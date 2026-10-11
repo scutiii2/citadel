@@ -10,7 +10,8 @@ it("sandboxes the game and accepts only its window, origin and protocol messages
   const w = mount(GameStage, { attachTo: document.body, props: { game, url: game.url + "/#ticket=x" } });
   const frame = w.find("iframe"); const source = (frame.element as HTMLIFrameElement).contentWindow;
   expect(source).not.toBeNull();
-  expect(frame.attributes("sandbox")).toBe("allow-scripts allow-same-origin"); expect(frame.attributes("referrerpolicy")).toBe("no-referrer");
+  // allow-forms: the game's Begin battle is a form submit, which a sandbox without it silently blocks.
+  expect(frame.attributes("sandbox")?.split(" ").sort()).toEqual(["allow-forms", "allow-same-origin", "allow-scripts"]); expect(frame.attributes("referrerpolicy")).toBe("no-referrer");
   async function message(origin: string, sender: Window | null, data: unknown) { window.dispatchEvent(new MessageEvent("message", { origin, source: sender, data })); await w.vm.$nextTick(); }
   const ready = { source: "game", type: "ready" };
   await message("https://evil.example", source, ready); await message(game.url, window, ready);

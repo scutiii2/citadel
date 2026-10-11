@@ -26,7 +26,7 @@ onMounted(listen); onActivated(listen); onDeactivated(stop); onUnmounted(stop);
   <p v-if="!allowed" role="alert">Game URL is not allowed</p>
   <div v-else class="game-stage">
     <p v-if="!ready" role="status">Opening {{ game.name }}…</p>
-    <iframe ref="frame" :src="url" :title="game.name" sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer" :style="{ height: `${height}px` }" />
+    <iframe ref="frame" :src="url" :title="game.name" sandbox="allow-scripts allow-same-origin allow-forms" referrerpolicy="no-referrer" :style="{ height: `${height}px` }" />
   </div>
 </template>
 <style scoped>

@@ -97,7 +97,8 @@ assets, e2e, theme and fonts. New class `HostBridge` handles ticket redeem, bear
 ## ember_web and ember_admin
 
 - `GamesView` at `/games`; `/ascension` redirects. `GameStage` renders the iframe with
-  `sandbox="allow-scripts allow-same-origin"`, listens only for `ready`, `resize`, `close` from the game's origin.
+  `sandbox="allow-scripts allow-same-origin allow-forms"` (`allow-forms`: a sandbox without it
+  silently blocks the game's form submits, such as Begin battle), listens only for `ready`, `resize`, `close` from the game's origin.
 - CSP `frame-src` lists only registered game origins, built from the registry, never a wildcard.
 - ember_admin page: list, register by URL, refresh, deregister (type-to-confirm, per the UI conventions).
 

@@ -233,7 +233,8 @@ URL, token or key.
   always go to the entry agent, there is no per-agent chat.
 - Games page (`/games`; `/ascension` redirects): lists games permitted by ember_api. Play
   requests a short-lived launch ticket and opens the registered origin in an iframe
-  with `allow-scripts allow-same-origin`. Messages require the game's origin and iframe
+  with `allow-scripts allow-same-origin allow-forms` (without `allow-forms` a sandbox silently
+  blocks the game's form submits, such as Begin battle). Messages require the game's origin and iframe
   window; resize is bounded, and close clears the in-memory launch URL. The games
   list stays cached; leaving the page closes the frame so a spent ticket is never reused. Ascension's UI, art and tests live in `apps/ascension/web`.
 - Config issues page (`config.issues.view`): problems in ember_api's config and
