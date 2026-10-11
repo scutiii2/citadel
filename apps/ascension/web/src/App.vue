@@ -178,7 +178,6 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
           <ShopPanel v-else class="tab-body" />
         </template>
       </template>
-      <EmButton v-if="session.status === 'ready'" class="close-game" @click="session.bridge?.requestClose()">Close game</EmButton>
     </EmShell>
   </section>
 </template>

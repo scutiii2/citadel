@@ -33,8 +33,7 @@ describe("real host session wiring", () => {
     expect(wrapper.text()).toContain("Continue");
     expect(fetchFn.mock.calls.map(([path]) => path)).toEqual(["/session/redeem", "/ascension/catalog", "/ascension/profile"]);
     expect(postMessage).toHaveBeenCalledWith({ source: "game", type: "ready" }, "http://127.0.0.1:5173");
-    await wrapper.find("button.close-game").trigger("click");
-    expect(postMessage).toHaveBeenCalledWith({ source: "game", type: "close" }, "http://127.0.0.1:5173");
+    expect(wrapper.find("button.close-game").exists()).toBe(false);
     wrapper.unmount();
   });
   it("shows the ended screen when the real transport receives 401", async () => {
