@@ -2,7 +2,7 @@
 
 Rules: `../ART_GUIDE.md` (read it first; it explains sizes, the black background and the crop steps).
 Files for this Ascended: `sprite_main_card.webp`, `sprite_preview_card.webp`, `sprite_battle.webp` (this folder).
-Current art: the six existing sprites are copies of the first portrait, so all three need to be redrawn to the new rules.
+Primary identity reference: `sprite_preview_card.webp`. Read `identity.md` and inspect this established reference before every generation. Keep the existing preview; recreate the main and battle sprites to the guide's framing and dimensions.
 
 ## Design (the visual canon, keep it the same in all three sprites)
 
@@ -17,9 +17,9 @@ Current art: the six existing sprites are copies of the first portrait, so all t
 
 ## How to run it
 
-1. Upload the current `sprite_main_card.webp` in the first message and add: "Redraw this exact character in the new format and keep the design."
+1. Read `identity.md`, upload `sprite_preview_card.webp` as the primary reference and add: "Redraw this exact character in the new format and keep the design."
 2. Paste the main card prompt. Iterate until the design is right.
-3. In the same chat paste the preview prompt, then the battle prompt, each starting with: "Use the character in the previous image as the exact reference: same design, colours, armour and proportions. "
+3. Generate the battle sprite from the established preview reference too, starting with: "Use the character in the reference preview as the exact reference: same design, colours, armour and proportions." Keep the current preview unless a replacement is requested.
 4. Crop and convert with the commands in `../ART_GUIDE.md` section 6, check the checklist in section 7.
 
 ## Main card prompt (`sprite_main_card.webp`)

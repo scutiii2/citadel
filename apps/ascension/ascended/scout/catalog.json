@@ -1,7 +1,7 @@
 {
   "id": "scout",
   "name": "Scout",
-  "art": { "focus": 10, "focus_preview": 50 },
+  "art": { "focus": 50, "focus_preview": 50 },
   "starter": true,
   "forbidden": false,
   "ascension_types": [
