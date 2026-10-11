@@ -88,9 +88,12 @@ describe("RoundLog", () => {
 
     const wrapper = mount(RoundLog, { props: { battle: view } });
 
-    const titles = wrapper.findAll(".title").map((t) => t.text());
-    expect(titles[0]).toContain("R02");
-    expect(titles[1]).toContain("Round 1: Guardian chose Strike, Bruiser chose Attack");
+    expect(wrapper.findAll(".title").map((t) => t.text())).toEqual(["Round 2", "Round 1"]);
+    expect(wrapper.findAll(".now").map((n) => n.text())).toEqual(["Latest"]);
+    const first = wrapper.findAll(".round")[1]!;
+    expect(first.findAll(".who").map((w) => w.text())).toEqual(["Guardian", "Bruiser"]);
+    expect(first.findAll(".move").map((m) => m.text())).toEqual(["Strike", "Attack"]);
+    expect(first.findAll(".move").map((m) => m.classes().find((c) => c.startsWith("tone-")))).toEqual(["tone-attack", "tone-attack"]);
     expect(wrapper.text()).toContain("Guardian hits for 18; Bruiser has 20 HP left");
     expect(wrapper.find(".rounds").attributes("aria-live")).toBe("polite");
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CATALOG } from "../api/AscensionClient.fixtures";
-import { abilityEffect, describeAction, describeEvent, formatCountdown, passiveText, tierStanding, titleCase } from "./ascension";
+import { abilityEffect, actionTone, describeAction, describeEvent, formatCountdown, passiveText, tierStanding, titleCase } from "./ascension";
 
 const NAMES = { player: "Guardian", wild: "Bruiser" };
 
@@ -54,5 +54,16 @@ describe("ascension helpers", () => {
     expect(describeEvent({ type: "something_new" }, NAMES)).toBe("Something new");
     expect(describeAction("ability:guardian_strike", [{ id: "guardian_strike", name: "Strike" }])).toBe("Strike");
     expect(describeAction("flee", [])).toBe("Flee");
+  });
+});
+
+describe("actionTone", () => {
+  it("colours abilities by category and flee and catch by themselves", () => {
+    expect(actionTone("attack", "ATTACK")).toBe("attack");
+    expect(actionTone("ability:guard", "Defense")).toBe("defense");
+    expect(actionTone("ability:boost", "SUPPORT")).toBe("support");
+    expect(actionTone("flee", "FLEE")).toBe("flee");
+    expect(actionTone("catch", "CATCH")).toBe("catch");
+    expect(actionTone("ability:odd", "MYSTERY")).toBe("other");
   });
 });

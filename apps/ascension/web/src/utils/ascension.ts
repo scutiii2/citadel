@@ -124,3 +124,14 @@ export function describeAction(key: string, abilities: readonly Pick<FighterAbil
   }
   return titleCase(key);
 }
+
+/** What colour family an action belongs to, as ActionBar paints it: abilities by their
+ * category, flee and catch by themselves, anything unexpected as "other". */
+export type ActionTone = "attack" | "defense" | "support" | "flee" | "catch" | "other";
+
+export function actionTone(key: string, category: string): ActionTone {
+  if (key === "flee" || key === "catch") return key;
+  const tone = category.toLowerCase();
+  return tone === "attack" || tone === "defense" || tone === "support" ? tone : "other";
+}
+
