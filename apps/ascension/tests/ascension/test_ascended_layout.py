@@ -24,3 +24,9 @@ def test_no_sprites_are_kept_outside_the_ascended_folders():
     assert not (PROJECT / "web" / "src" / "assets" / "ascended").exists()
     stray = [p for p in (PROJECT / "web" / "src").rglob("sprite_*")]
     assert stray == []
+
+
+def test_every_ascended_has_its_art_prompts_and_the_shared_guide_exists():
+    assert (ASCENDEDS_PATH / "ART_GUIDE.md").is_file()
+    for folder in sorted(p for p in ASCENDEDS_PATH.iterdir() if (p / "catalog.json").is_file()):
+        assert (folder / "art_prompts.md").is_file(), f"{folder.name} has no art_prompts.md"
