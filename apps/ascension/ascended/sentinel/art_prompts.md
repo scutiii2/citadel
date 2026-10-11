@@ -2,7 +2,16 @@
 
 Rules: `../ART_GUIDE.md` (read it first; it explains sizes, the black background and the crop steps).
 Files for this Ascended: `sprite_main_card.webp`, `sprite_preview_card.webp`, `sprite_battle.webp` (this folder).
-Current art: the six existing sprites are copies of the first portrait, so all three need to be redrawn to the new rules.
+Identity: `identity.md` records the persistent design. The established `sprite_preview_card.webp` is the primary reference for recreating other sprites.
+Status: main card and battle recreated from the preview with built-in image generation; preview preserved. Main is 1536 x 796 WebP; battle is 512 x 512 lossless WebP with flat black background. Sources: `main_source.png`, `battle_source.png`. In-game review remains pending.
+
+## Recreation prompt adjustments (2026-10-11)
+
+Use the established preview as the exact character reference with the prompts below. Preserve its owl facial discs, hooked beak, gold-edged feather tufts, cracked slate plates, purple feather mantle, chest diamond, belt/hilt gems and kite shield with gold star ornament.
+
+- Main generation: 1536 x 1024 landscape. Keep the entire figure within the central safe band; the selected source has horns near y=250 and feet near y=800. The first draft was too tall; the framing correction requested reducing the entire figure to 72% of its first-draft size while preserving the scene and design. Centre crop 1536 x 796 at y=114.
+- Battle generation: turn the beak, torso, gaze and feet clearly right in a three-quarter side guard, shield leading right and mantle trailing left. Use flat pure black background, no ground or shadow, about 6% margin above and 4% below. Keep all deep shadows visible slate, targeting #3a4352, and purple feathers readable; no black inside the character. Chunky square pixel clusters, hard stepped edges, no smoothing. The transparent drafts had stray edge pixels and were replaced by the flat-black source.
+- Conversion: main WebP quality 92; battle nearest-neighbour downscale to 512 x 512 and lossless WebP. Keep source PNGs beside the final files.
 
 ## Design (the visual canon, keep it the same in all three sprites)
 
@@ -17,9 +26,9 @@ Current art: the six existing sprites are copies of the first portrait, so all t
 
 ## How to run it
 
-1. Upload the current `sprite_main_card.webp` in the first message and add: "Redraw this exact character in the new format and keep the design."
+1. Read `identity.md`, inspect the primary reference `sprite_preview_card.webp`, and upload that preview with: "Redraw this exact character in the new format and keep the design."
 2. Paste the main card prompt. Iterate until the design is right.
-3. In the same chat paste the preview prompt, then the battle prompt, each starting with: "Use the character in the previous image as the exact reference: same design, colours, armour and proportions. "
+3. For each recreation, supply the established preview as the exact identity reference: same design, colours, armour and proportions. Keep the existing preview unless its recreation is requested. For the battle sprite, turn the beak, gaze, torso and feet clearly toward the right; shield leads right and mantle trails left.
 4. Crop and convert with the commands in `../ART_GUIDE.md` section 6, check the checklist in section 7.
 
 ## Main card prompt (`sprite_main_card.webp`)
