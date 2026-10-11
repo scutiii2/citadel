@@ -31,6 +31,7 @@ scoped by port, so the same ember_api session cookie is sent.
 | Capabilities (`/capabilities`) | `capabilities.manage` |
 | Extensions (`/extensions`) | `extensions.manage` |
 | Agents (`/agents`) | `agents.manage` |
+| Tickets (`/tickets`) | `tickets.manage` |
 | Analytics (`/analytics`) | any of `logs.view`, `logs.errors.view`, `logs.chat.view`, `traffic.view` |
 | Workspace overview (`/admin`) | any account, role, invitation, or workspace settings permission |
 | Accounts (`/admin/accounts`) | any of `accounts.view`, `accounts.manage`, `accounts.delete`, `roles.assign` |
@@ -132,6 +133,35 @@ Workspace settings remain drafts until saved through the unsaved-change bar.
 Old bookmarks such as `/admin?tab=roles` redirect to `/admin/roles`, preserving
 other query options and the fragment. `/admin/invites?create=1` opens the invite
 drawer and removes the transient creation flag from the URL.
+
+## Tickets
+
+Tickets (`/tickets`, `tickets.manage`) groups similar reports for triage.
+Expand a group to see its tickets and reporter display names, source and status.
+Open a ticket to read its description, context and thread, reply as staff,
+change status, priority, assignee or comma-separated tags, move it to another
+group or split it into a new one. Reporter/model context is marked unverified.
+Needs review lists possible duplicates and offers the suggested group.
+
+Status, priority, tag and view mode persist in the URL (`status`, `priority`,
+`tag`, `mode=review`). Setting group priority pins it; switch Pinned off to
+resume automatic elevation. Server controls retain confirmed values while
+saving. The workspace overview shows Open tickets and Urgent tickets counts,
+links to unfiltered triage (urgent counts include ticket and group priority), and a Tickets destination for accounts
+with `tickets.manage`, independently of account-management permissions.
+
+All calls require `tickets.manage`:
+
+| Method | Route | Action |
+|---|---|---|
+| GET | `/api/admin/tickets` | List tickets with filters, including group and possible duplicates. |
+| GET | `/api/admin/tickets/stats` | Read open, urgent and group counts. |
+| GET | `/api/admin/tickets/{id}` | Read a ticket and its comments. |
+| PATCH | `/api/admin/tickets/{id}` | Change status, priority, assignee or tags. |
+| POST | `/api/admin/tickets/{id}/comments` | Add a staff reply. |
+| POST | `/api/admin/tickets/{id}/move` | Move to a group; `group_id: null` splits out. |
+| GET | `/api/admin/ticket-groups` | List groups with counts and tags. |
+| PATCH | `/api/admin/ticket-groups/{id}` | Change priority or pin state, then reload counts. |
 
 ## Tests
 

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { adminClient, type AdminSummary } from "../api/AdminClient";
+import { ticketsAdminClient, type TicketStats } from "../api/TicketsAdminClient";
 import { ADMIN_PAGES } from "../router/pages";
 import { useAuthStore } from "../stores/auth";
 import { errorMessage } from "../utils/errors";
@@ -10,6 +11,7 @@ import "../components/admin/admin.css";
 
 const auth = useAuthStore();
 const summary = ref<AdminSummary | null>(null);
+const ticketStats = ref<TicketStats | null>(null);
 const error = ref("");
 const destinations = computed(() => ADMIN_PAGES.filter(s => s.to !== "/admin").filter((s) => Array.isArray(s.permission) ? s.permission.some(auth.hasPermission) : auth.hasPermission(s.permission)));
 const descriptions: Record<string, string> = {
@@ -19,11 +21,15 @@ const descriptions: Record<string, string> = {
   "/capabilities": "Browse capabilities, manage availability, and test their tools.",
   "/extensions": "Manage shared extensions and explore their tools.",
   "/agents": "Create agents, choose their provider and gateway, and write their configs.",
+  "/tickets": "Triage reports and suggestions, grouped by similar issue.",
   "/analytics": "Review logs, errors, chat activity, and traffic.",
   "/usage": "Review each user's token usage, activity, and account limits.",
   "/admin/settings": "Control approval requirements for every account.",
 };
 onMounted(async () => {
+  if (auth.hasPermission("tickets.manage")) {
+    ticketsAdminClient.stats().then((stats) => (ticketStats.value = stats), (err) => (error.value = errorMessage(err)));
+  }
   if (!auth.hasPermission("accounts.view") && !auth.hasPermission("invites.manage")) return;
   try { summary.value = await adminClient.summary(); }
   catch (err) { error.value = errorMessage(err); }
@@ -39,6 +45,10 @@ onMounted(async () => {
       <RouterLink v-if="auth.hasPermission('accounts.view')" to="/admin/accounts?status=unverified"><StatTile label="Unverified" :value="summary?.unverified ?? null" warn /><span class="stat-link">Review accounts →</span></RouterLink>
       <RouterLink v-if="auth.hasPermission('accounts.view')" to="/admin/accounts?status=disabled"><StatTile label="Disabled" :value="summary?.disabled ?? null" /><span class="stat-link">Review accounts →</span></RouterLink>
       <RouterLink v-if="auth.hasPermission('invites.manage')" to="/admin/invites"><StatTile label="Open invites" :value="summary?.open_invites ?? null" /><span class="stat-link">Manage invites →</span></RouterLink>
+    </div>
+    <div v-if="auth.hasPermission('tickets.manage')" class="stats">
+      <RouterLink to="/tickets"><StatTile label="Open tickets" :value="ticketStats?.open ?? null" /><span class="stat-link">Triage tickets →</span></RouterLink>
+      <RouterLink to="/tickets"><StatTile label="Urgent tickets" :value="ticketStats?.urgent ?? null" warn /><span class="stat-link">Triage tickets →</span></RouterLink>
     </div>
     <div v-if="auth.hasPermission('accounts.view') && summary?.unverified" class="admin-info">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 10 18H2zM12 9v5m0 3v1" /></svg>

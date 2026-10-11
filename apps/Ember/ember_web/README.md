@@ -301,6 +301,24 @@ URL, token or key.
   `light-dark()` tokens in `style.css`, so browsers older than Chrome 123,
   Firefox 120 or Safari 17.5 lose them.
 
+## Tickets
+
+Tickets (`/tickets`, `tickets.create`) lists the signed-in account's reports,
+with type, status and last update. Filter by status, file a bug, feature request
+or other question using type, title and description, then open its thread,
+reply or close it after confirmation. Failed submissions keep the draft.
+Tags, priority and assignee are not shown or sent by this reporter form.
+
+All calls use the same-origin session and require `tickets.create`:
+
+| Method | Route | Action |
+|---|---|---|
+| GET | `/api/tickets?status=…` | List this account's tickets; status is optional. |
+| POST | `/api/tickets` | File a ticket. |
+| GET | `/api/tickets/{id}` | Read a ticket and its comments. |
+| POST | `/api/tickets/{id}/comments` | Add a reply. |
+| POST | `/api/tickets/{id}/close` | Close the ticket. |
+
 ## Requirements
 
 - Node.js 24 (npm on `PATH`)
@@ -410,7 +428,7 @@ src/
   composables/  useChatShortcuts (window-level chat keys), useChatRoute (address bar <-> open chat),
                 useElapsed (running clock), useNotify (chime), useCompletionNotify (completion alerts), useSidebarCollapse (chat list),
                 useTheme (system / light / dark)
-  views/        pages: Overview, Chat, Capabilities, Agents, Ascension, Usage, Settings, ConfigIssues,
+  views/        pages: Overview, Chat, Capabilities, Agents, Ascension, Usage, Tickets, Settings, ConfigIssues,
                 Account, Login, Register, VerifyEmail, NoAccess, SharedChat (public)
   components/   reusable pieces: MessageList, ToolSteps, AgentActivity, ChatInput, CommandFormModal, MarkdownContent,
                 CopyButton, UsageChip, UsageGauges, UsageHeatmap, ElapsedTime, WelcomeCard, DownloadCards, TemplatePicker, TemplatesModal, ShareDialog, ConversationSidebar, EntryAgentTag, ToolRunForm, ToolResultPanel, ToolCard, CapabilitySection, ConfirmModal, NavRail, SidebarEditor, ChatSettingsMenu, SettingRow, AuthCard

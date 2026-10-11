@@ -1,19 +1,24 @@
 import { createPinia, setActivePinia } from "pinia";
 import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { adminClient } from "../api/AdminClient";
+import { ticketsAdminClient } from "../api/TicketsAdminClient";
 import { useAuthStore } from "../stores/auth";
 import AdminView from "./AdminView.vue";
 import AdminOverviewView from "./AdminOverviewView.vue";
 import AdminNav from "../components/AdminNav.vue";
 
 vi.mock("../api/AdminClient", () => ({ adminClient: { summary: vi.fn() } }));
+vi.mock("../api/TicketsAdminClient", () => ({ ticketsAdminClient: { stats: vi.fn() } }));
 const client = vi.mocked(adminClient);
+const mounted: ReturnType<typeof mount>[] = [];
+afterEach(() => mounted.splice(0).forEach((wrapper) => wrapper.unmount()));
 beforeEach(() => {
   setActivePinia(createPinia());
   useAuthStore().account = { id: 1, username: "admin", email: "a@example.com", email_verified: true, roles: [], permissions: ["accounts.view", "roles.view", "invites.manage", "settings.manage"] };
   client.summary.mockReset();
+  vi.mocked(ticketsAdminClient.stats).mockReset();
   client.summary.mockResolvedValue({ accounts: 24, unverified: 3, disabled: 1, open_invites: 5, roles: 2 });
 });
 async function view(path = '/admin') {
@@ -23,9 +28,10 @@ async function view(path = '/admin') {
     { path: 'accounts', component: { template: '<div>accounts page</div>' } },
     { path: 'invites', component: { template: '<div>invites page</div>' } },
     { path: 'settings', component: { template: '<div>settings page</div>' } },
-  ] }] });
+  ] }, { path: '/:pathMatch(.*)*', component: { template: '<div />' } }] });
   await router.push(path);
   const wrapper = mount({ components: { AdminNav }, template: '<div><AdminNav /><RouterView /></div>' }, { global: { plugins: [router] } });
+  mounted.push(wrapper);
   await flushPromises();
   return { wrapper, router };
 }
@@ -83,4 +89,30 @@ it('shows integration destinations without requesting unrelated account statisti
   const { wrapper } = await view();
   expect(wrapper.findAll('.destination').map(a => a.attributes('href'))).toEqual(['/capabilities']);
   expect(client.summary).not.toHaveBeenCalled();
+});
+
+it('shows ticket counts and destinations for ticket managers without account access', async () => {
+  vi.mocked(ticketsAdminClient.stats).mockResolvedValue({ open: 4, urgent: 1, groups: 3 });
+  useAuthStore().account!.permissions = ['tickets.manage'];
+  const { wrapper } = await view();
+  expect(wrapper.findAll('.stats .tile').map(tile => tile.text())).toEqual(['Open tickets4', 'Urgent tickets1']);
+  expect(wrapper.findAll('.stats a').map(link => link.attributes('href'))).toEqual(['/tickets', '/tickets']);
+  expect(wrapper.findAll('.destination').map(link => link.attributes('href'))).toEqual(['/tickets']);
+  expect(wrapper.find('.destination p').text()).toContain('grouped by similar issue');
+  expect(client.summary).not.toHaveBeenCalled();
+});
+
+it('does not ask for ticket counts without the permission', async () => {
+  const { wrapper } = await view();
+  expect(ticketsAdminClient.stats).not.toHaveBeenCalled();
+  expect(wrapper.text()).not.toContain('Open tickets');
+  expect(wrapper.findAll('.destination').map(link => link.attributes('href'))).not.toContain('/tickets');
+});
+
+it('keeps ticket destinations available when ticket statistics fail', async () => {
+  useAuthStore().account!.permissions = ['tickets.manage'];
+  vi.mocked(ticketsAdminClient.stats).mockRejectedValue(new Error('Ticket service unavailable'));
+  const { wrapper } = await view();
+  expect(wrapper.get('[role="alert"]').text()).toContain('Ticket service unavailable');
+  expect(wrapper.find('.destination').attributes('href')).toBe('/tickets');
 });

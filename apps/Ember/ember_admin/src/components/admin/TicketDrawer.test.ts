@@ -118,7 +118,7 @@ describe("TicketDrawer", () => {
 
     expect(wrapper.emitted("comment")![0]).toEqual(["Looking into it"]);
     expect((wrapper.find("textarea[aria-label='Reply']").element as HTMLTextAreaElement).value).toBe("Looking into it");
-    await wrapper.setProps({ ticket: { ...TICKET, comments: [...TICKET.comments!, { id: 2, ticket_id: 7, author: "root", author_role: "staff", body: "Looking into it", created_at: "2026-10-10T13:00:00+00:00" }] } });
+    await wrapper.setProps({ replyReceipt: 1, ticket: { ...TICKET, comments: [...TICKET.comments!, { id: 2, ticket_id: 7, author: "root", author_role: "staff", body: "Looking into it", created_at: "2026-10-10T13:00:00+00:00" }] } });
     expect((wrapper.find("textarea[aria-label='Reply']").element as HTMLTextAreaElement).value).toBe("");
   });
 
@@ -137,5 +137,17 @@ describe("TicketDrawer", () => {
     expect(wrapper.find("button.move").attributes("disabled")).toBeDefined();
     await wrapper.find("button.move").trigger("click");
     expect(wrapper.emitted("move")).toBeUndefined();
+  });
+  it("keeps unsent fields when initial details or another edit refresh the ticket", async () => {
+    const wrapper = drawer({ comments: undefined });
+    await wrapper.find("input[aria-label='Assignee']").setValue("new owner");
+    await wrapper.find("input[aria-label='Tags']").setValue("unsaved tag");
+    await wrapper.find("textarea[aria-label='Reply']").setValue("unsent reply");
+    await wrapper.setProps({ ticket: { ...TICKET } });
+    expect((wrapper.find("input[aria-label='Assignee']").element as HTMLInputElement).value).toBe("new owner");
+    expect((wrapper.find("input[aria-label='Tags']").element as HTMLInputElement).value).toBe("unsaved tag");
+    expect((wrapper.find("textarea[aria-label='Reply']").element as HTMLTextAreaElement).value).toBe("unsent reply");
+    await wrapper.setProps({ ticket: { ...TICKET, assignee: "new owner" } });
+    expect((wrapper.find("input[aria-label='Tags']").element as HTMLInputElement).value).toBe("unsaved tag");
   });
 });

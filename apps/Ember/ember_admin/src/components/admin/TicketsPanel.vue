@@ -53,6 +53,7 @@ const selected = ref<AdminTicket | null>(null);
 const loadError = ref("");
 const actionError = ref("");
 const notice = ref("");
+const replyReceipt = ref(0);
 const busy = ref(false);
 const loading = ref(true);
 
@@ -150,19 +151,19 @@ function dismiss(): void {
 }
 
 /** Everything a change can touch: the lists and the open ticket. */
-async function refreshAll(): Promise<void> {
+async function refreshAll(refreshDetail = true): Promise<void> {
   await Promise.all([load(), loadExpanded()]);
-  await refreshSelected();
+  if (refreshDetail) await refreshSelected();
 }
 
-async function act(call: () => Promise<unknown>, done = "Saved."): Promise<void> {
+async function act(call: () => Promise<unknown>, done = "Saved.", refreshDetail = true): Promise<void> {
   if (busy.value) return;
   actionError.value = "";
   notice.value = "";
   busy.value = true;
   try {
     await call();
-    await refreshAll();
+    await refreshAll(refreshDetail);
     notice.value = done;
   } catch (err) {
     actionError.value = errorMessage(err);
@@ -171,10 +172,22 @@ async function act(call: () => Promise<unknown>, done = "Saved."): Promise<void>
   }
 }
 
-const update = (changes: TicketChanges) => act(() => ticketsAdminClient.update(selected.value!.id, changes));
-const comment = (body: string) => act(() => ticketsAdminClient.comment(selected.value!.id, body), "Reply sent.");
+function ticketAction(call: (id: number) => Promise<AdminTicket>, done = "Saved.", sentReply = false): Promise<void> {
+  if (busy.value || !selected.value) return Promise.resolve();
+  const id = selected.value.id;
+  const seq = ++selectionSeq; // Supersede any earlier detail GET.
+  return act(async () => {
+    const confirmed = await call(id);
+    if (seq === selectionSeq && selected.value?.id === id) {
+      selected.value = confirmed;
+      if (sentReply) ++replyReceipt.value;
+    }
+  }, done, false);
+}
+const update = (changes: TicketChanges) => ticketAction(id => ticketsAdminClient.update(id, changes));
+const comment = (body: string) => ticketAction(id => ticketsAdminClient.comment(id, body), "Reply sent.", true);
 const move = (groupId: number | null) =>
-  act(() => ticketsAdminClient.move(selected.value!.id, groupId), groupId === null ? "Split out into a new group." : `Moved to group ${groupId}.`);
+  ticketAction(id => ticketsAdminClient.move(id, groupId), groupId === null ? "Split out into a new group." : `Moved to group ${groupId}.`);
 
 /** The shown value stays the server's until the reload brings the new one. */
 function setGroupPriority(group: TicketGroup, event: Event): void {
@@ -297,6 +310,7 @@ function setPinned(group: TicketGroup, event: Event): void {
         :busy="busy"
         :error="actionError"
         :notice="notice"
+        :reply-receipt="replyReceipt"
         @close="dismiss"
         @update="update"
         @comment="comment"

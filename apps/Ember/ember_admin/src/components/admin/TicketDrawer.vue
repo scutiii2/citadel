@@ -16,7 +16,7 @@ import "./admin.css";
  * priority, assignee, tags, group, and the thread. It only shows state and
  * reports what staff chose (the parent runs the call and passes the fresh
  * ticket back); `busy` disables the controls while a call is in flight. */
-const props = defineProps<{ ticket: AdminTicket; busy: boolean; error: string; notice: string }>();
+const props = defineProps<{ ticket: AdminTicket; busy: boolean; error: string; notice: string; replyReceipt?: number }>();
 const emit = defineEmits<{
   close: [];
   update: [changes: TicketChanges];
@@ -35,14 +35,19 @@ const reply = ref("");
 watch(
   () => props.ticket,
   (ticket, previous) => {
-    assignee.value = ticket.assignee ?? "";
-    tags.value = ticket.tags.join(", ");
-    if (previous?.id !== ticket.id) groupNumber.value = "";
-    // A new comment means the reply went through.
-    if (previous?.id !== ticket.id || (ticket.comments?.length ?? 0) !== (previous?.comments?.length ?? 0)) reply.value = "";
+    const changed = previous?.id !== ticket.id;
+    // Refresh clean fields; preserve unsaved edits to this same ticket.
+    if (changed || assignee.value === (previous?.assignee ?? "")) assignee.value = ticket.assignee ?? "";
+    if (changed || tags.value === previous?.tags.join(", ")) tags.value = ticket.tags.join(", ");
+    if (changed) {
+      groupNumber.value = "";
+      reply.value = "";
+    }
   },
   { immediate: true },
 );
+
+watch(() => props.replyReceipt, () => { reply.value = ""; });
 
 const reported = computed(() => Object.entries(props.ticket.context.reported ?? {}));
 const verified = computed(() => Object.entries(props.ticket.context.verified ?? {}));

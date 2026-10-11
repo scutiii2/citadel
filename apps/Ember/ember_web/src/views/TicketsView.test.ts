@@ -243,4 +243,45 @@ describe("TicketsView", () => {
     await flushPromises();
     expect(wrapper.find(".detail-title").exists()).toBe(false);
   });
+  it("keeps a confirmed close when the initial detail finishes later", async () => {
+    let finish!: (value: Ticket) => void;
+    client.get.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    client.close.mockResolvedValue(ticket(1, { status: "closed" }));
+    const wrapper = await mountView();
+    await rows(wrapper)[1]!.trigger("click");
+    await button(wrapper, "Close ticket").trigger("click");
+    await button(wrapper, "Close the ticket").trigger("click");
+    await flushPromises();
+    finish(ticket(1));
+    await flushPromises();
+    expect(wrapper.findAll("button").some(b => b.text() === "Close ticket")).toBe(false);
+  });
+
+  it("locks creation fields while submitting, including after reopening", async () => {
+    client.create.mockImplementationOnce(() => new Promise(() => {}));
+    const wrapper = await mountView();
+    await button(wrapper, "New ticket").trigger("click");
+    await wrapper.find("input[aria-label='Title']").setValue("Issue");
+    await wrapper.find("textarea[aria-label='Description']").setValue("Details");
+    await wrapper.find("button.submit-ticket").trigger("click");
+    expect(wrapper.find("input[aria-label='Title']").attributes("disabled")).toBeDefined();
+    expect(wrapper.find("textarea[aria-label='Description']").attributes("disabled")).toBeDefined();
+    await button(wrapper, "Cancel").trigger("click");
+    await button(wrapper, "New ticket").trigger("click");
+    expect(wrapper.find("input[aria-label='Title']").attributes("disabled")).toBeDefined();
+  });
+
+  it("locks reply editing and competing close while sending", async () => {
+    client.get.mockResolvedValue(ticket(1));
+    client.comment.mockImplementationOnce(() => new Promise(() => {}));
+    const wrapper = await mountView();
+    await rows(wrapper)[1]!.trigger("click");
+    await flushPromises();
+    await wrapper.find("textarea[aria-label='Reply']").setValue("Details");
+    await button(wrapper, "Send").trigger("click");
+    expect(wrapper.find("textarea[aria-label='Reply']").attributes("disabled")).toBeDefined();
+    await button(wrapper, "Close ticket").trigger("click");
+    await button(wrapper, "Close the ticket").trigger("click");
+    expect(client.close).not.toHaveBeenCalled();
+  });
 });

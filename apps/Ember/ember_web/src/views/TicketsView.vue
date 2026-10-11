@@ -110,8 +110,8 @@ function dismiss(): void {
 }
 
 async function sendReply(): Promise<void> {
-  if (!current.value || reply.value.trim() === "" || replying.value) return;
-  const seq = detailSeq;
+  if (!current.value || reply.value.trim() === "" || replying.value || closing.value) return;
+  const seq = ++detailSeq;
   replying.value = true;
   detailError.value = "";
   try {
@@ -128,8 +128,8 @@ async function sendReply(): Promise<void> {
 }
 
 async function closeTicket(): Promise<void> {
-  if (!current.value || closing.value) return;
-  const seq = detailSeq;
+  if (!current.value || closing.value || replying.value) return;
+  const seq = ++detailSeq;
   closing.value = true;
   detailError.value = "";
   try {
@@ -187,11 +187,11 @@ async function closeTicket(): Promise<void> {
 
     <BaseModal :open="newOpen" title="New ticket" @close="newOpen = false">
       <form class="form" @submit.prevent="submit">
-        <SegmentedControl v-model="draft.type" :options="TYPE_OPTIONS" label="Type" aria-label="Ticket type" />
-        <label>Title<input v-model="draft.title" type="text" maxlength="120" aria-label="Title" /></label>
+        <SegmentedControl v-model="draft.type" :options="TYPE_OPTIONS.map(option => ({ ...option, disabled: saving }))" label="Type" aria-label="Ticket type" />
+        <label>Title<input v-model="draft.title" type="text" maxlength="120" aria-label="Title" :disabled="saving" /></label>
         <label>
           Description
-          <textarea v-model="draft.description" rows="6" maxlength="4000" aria-label="Description" />
+          <textarea v-model="draft.description" rows="6" maxlength="4000" aria-label="Description" :disabled="saving" />
         </label>
         <p v-if="formError" class="form-error error" role="alert">{{ formError }}</p>
         <div class="actions">
@@ -225,10 +225,10 @@ async function closeTicket(): Promise<void> {
         </ul>
 
         <form class="form reply" @submit.prevent="sendReply">
-          <textarea v-model="reply" rows="3" maxlength="2000" aria-label="Reply" placeholder="Add details or answer a question" />
+          <textarea v-model="reply" rows="3" maxlength="2000" aria-label="Reply" placeholder="Add details or answer a question" :disabled="replying || closing" />
           <div class="actions">
             <button v-if="current.status !== 'closed'" type="button" class="chip" @click="confirmOpen = true">Close ticket</button>
-            <button type="submit" class="primary" :disabled="reply.trim() === '' || replying" :aria-busy="replying">Send</button>
+            <button type="submit" class="primary" :disabled="reply.trim() === '' || replying || closing" :aria-busy="replying">Send</button>
           </div>
         </form>
       </template>

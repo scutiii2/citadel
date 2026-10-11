@@ -278,7 +278,7 @@ describe("TicketsPanel", () => {
     await flushPromises();
     await wrapper.find("button.ticket-link").trigger("click");
     await flushPromises();
-    client.get.mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }));
+    client.update.mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }));
     await wrapper.find("select[aria-label='Status']").setValue("closed");
     await flushPromises();
     await wrapper.find("aside.drawer button.x").trigger("click");
@@ -304,5 +304,35 @@ describe("TicketsPanel", () => {
     await flushPromises();
     expect(client.listGroups).toHaveBeenLastCalledWith({ status: "closed", priority: "urgent", tag: "email" });
     expect((wrapper.find("select[aria-label='Priority filter']").element as HTMLSelectElement).value).toBe("urgent");
+  });
+  it("shows the confirmed reply even when the subsequent detail GET would fail", async () => {
+    const wrapper = await panel();
+    await wrapper.find("button.expand").trigger("click");
+    await flushPromises();
+    await wrapper.find("button.ticket-link").trigger("click");
+    await flushPromises();
+    client.get.mockRejectedValue(new ApiError(502, "Detail unavailable"));
+    client.comment.mockResolvedValue(ticket(11, { comments: [{
+      id: 99, ticket_id: 11, author: "root", author_role: "staff",
+      body: "Confirmed reply", created_at: "2026-10-11T12:00:00+00:00",
+    }] }));
+    await wrapper.find("textarea[aria-label='Reply']").setValue("Confirmed reply");
+    await wrapper.find("button.send-reply").trigger("click");
+    await flushPromises();
+    expect(wrapper.find("aside.drawer .thread").text()).toContain("Confirmed reply");
+    expect((wrapper.find("textarea[aria-label='Reply']").element as HTMLTextAreaElement).value).toBe("");
+  });
+  it("keeps the confirmed mutation when an older initial detail finishes", async () => {
+    let finish!: (value: AdminTicket) => void;
+    const wrapper = await panel();
+    await wrapper.find("button.expand").trigger("click");
+    await flushPromises();
+    client.get.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    await wrapper.find("button.ticket-link").trigger("click");
+    await wrapper.find("select[aria-label='Status']").setValue("closed");
+    await flushPromises();
+    finish(ticket(11));
+    await flushPromises();
+    expect((wrapper.find("select[aria-label='Status']").element as HTMLSelectElement).value).toBe("closed");
   });
 });
