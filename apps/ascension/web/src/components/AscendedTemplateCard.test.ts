@@ -68,6 +68,7 @@ describe("AscendedTemplateCard", () => {
     expect(guardian.find("img.portrait").exists()).toBe(true);
     expect(guardian.find(".letter").exists()).toBe(false);
     expect((guardian.find("img.portrait").element as HTMLElement).style.objectPosition).toBe("50% 21%");
+    expect(guardian.find("img.portrait").attributes("src")).toBe("/ascended/guardian/sprite_main_card.webp");
 
     const bruiser = mount(AscendedTemplateCard, { props: { ascended: ascendedInfo("bruiser") } });
     expect(bruiser.find("img.portrait").exists()).toBe(false);
@@ -81,6 +82,7 @@ describe("AscendedTemplateCard", () => {
     expect(wrapper.find(".ability").exists()).toBe(false);
     expect(wrapper.findAll(".behind")).toHaveLength(1);
     expect((wrapper.find("img.portrait").element as HTMLElement).style.objectPosition).toBe("50% 14%");
+    expect(wrapper.find("img.portrait").attributes("src")).toBe("/ascended/sentinel/sprite_preview_card.webp");
   });
 
   it("colours each ability's slot by its category", () => {

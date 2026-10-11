@@ -2,7 +2,8 @@
 import { computed } from "vue";
 import type { BattleView, Buff, Fighter } from "../api/AscensionClient";
 import { usePlaybackStore } from "../stores/playback";
-import { ascendedArt } from "./ascendedArt";
+import { useAscensionStore } from "../stores/ascension";
+import { spriteFor } from "../utils/sprites";
 import EmBar from "./ui/EmBar.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
 
@@ -10,6 +11,7 @@ import EmTierBadge from "./ui/EmTierBadge.vue";
  * portrait, and what is affecting them (buffs, defense). The numbers are always written. */
 const props = defineProps<{ battle: BattleView }>();
 const playback = usePlaybackStore();
+const ascension = useAscensionStore();
 
 const sides = computed<{ key: string; label: string; fighter: Fighter }[]>(() => [
   { key: "player", label: "You", fighter: props.battle.player },
@@ -37,7 +39,8 @@ function hpOf(key: string, fighter: Fighter): number {
 }
 
 function art(fighter: Fighter): string | null {
-  return ascendedArt(fighter.ascended_id)?.url ?? null;
+  const info = ascension.catalog?.ascendeds.find((a) => a.id === fighter.ascended_id);
+  return spriteFor(info?.art, "battle");
 }
 </script>
 

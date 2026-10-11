@@ -72,6 +72,7 @@ describe("ShopPanel", () => {
     const cards = wrapper.findAll("[data-offer]");
     expect(cards).toHaveLength(2);
     expect(cards[0]!.text()).toContain("Guardian");
+    expect(cards[0]!.find("img").attributes("src")).toBe("/ascended/guardian/sprite_preview_card.webp");
     expect(cards[0]!.text()).toContain("3 left");
     expect(cards[0]!.text()).toContain("40");
     expect(cards[1]!.text()).toContain("1 left");

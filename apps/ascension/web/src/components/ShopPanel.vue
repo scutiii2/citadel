@@ -4,7 +4,7 @@ import type { ShopOffer } from "../api/AscensionClient";
 import { useNowSeconds } from "../composables/useNowSeconds";
 import { useAscensionStore } from "../stores/ascension";
 import { formatCountdown, titleCase } from "../utils/ascension";
-import { ascendedArt } from "./ascendedArt";
+import { spriteFor } from "../utils/sprites";
 import EmButton from "./ui/EmButton.vue";
 import EmConfirm from "./ui/EmConfirm.vue";
 import EmIcon from "./ui/EmIcon.vue";
@@ -29,7 +29,7 @@ const now = useNowSeconds();
 const secondsLeft = computed(() => Math.max(0, store.shopEndsAt - now.value));
 const offers = computed(() => store.shop?.offers ?? []);
 const nameOf = (id: string) => store.catalog?.ascendeds.find((a) => a.id === id)?.name ?? titleCase(id);
-const artOf = (id: string) => ascendedArt(id)?.url ?? null;
+const artOf = (id: string) => spriteFor(store.catalog?.ascendeds.find((a) => a.id === id)?.art, "preview_card");
 
 onMounted(() => void store.loadShop());
 // At zero a new rotation has begun: ask for it.

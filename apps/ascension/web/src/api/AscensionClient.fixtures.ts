@@ -1,4 +1,4 @@
-import type { BattleView, Catalog, EncounterPreview, Fighter, OwnedAscended, Profile, AscendedInfo, ShopOffer, ShopWindow, TierInfo } from "./AscensionClient";
+import type { AscendedArtInfo, BattleView, Catalog, EncounterPreview, Fighter, OwnedAscended, Profile, AscendedInfo, ShopOffer, ShopWindow, TierInfo } from "./AscensionClient";
 
 /** Test data shaped like Ascension's answers, for the Ascension tests. */
 
@@ -6,6 +6,17 @@ const nameOf = (id: string) => id.charAt(0).toUpperCase() + id.slice(1);
 
 export function tier(id: string, emblemPrice: number, copyThreshold: number | null): TierInfo {
   return { id, stat_multiplier: 1, copy_threshold: copyThreshold, copy_reward: 1, emblem_strength: 1, emblem_price: emblemPrice };
+}
+
+const SHIPPED_FOCUS: Record<string, [number, number]> = {
+  guardian: [21, 50], scout: [10, 50], striker: [10, 50], sentinel: [12, 14], channeler: [30, 43], forbidden: [18, 29],
+};
+
+/** The art block the game sends: the six shipped Ascended have all three sprites, the others none. */
+export function artFor(id: string): AscendedArtInfo {
+  const focus = SHIPPED_FOCUS[id];
+  const url = (name: string) => (focus ? `/ascended/${id}/sprite_${name}.webp` : null);
+  return { main_card: url("main_card"), preview_card: url("preview_card"), battle: url("battle"), focus: focus?.[0] ?? 50, focus_preview: focus?.[1] ?? 50 };
 }
 
 export function ascendedInfo(id: string, extra: Partial<AscendedInfo> = {}): AscendedInfo {
@@ -23,6 +34,7 @@ export function ascendedInfo(id: string, extra: Partial<AscendedInfo> = {}): Asc
       { id: `${id}_strike`, name: "Strike", unlock_level: 1, category: "ATTACK", percentage: 120, cooldown: 1, stat: null, duration: null },
       { id: `${id}_rally`, name: "Rally", unlock_level: 5, category: "SUPPORT", percentage: 50, cooldown: 3, stat: "essence", duration: 2 },
     ],
+    art: artFor(id),
     ...extra,
   };
 }

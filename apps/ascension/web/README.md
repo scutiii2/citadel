@@ -79,3 +79,12 @@ loads the window again, so a rotation, a sold-out offer or a stale `rotation` (4
 leaves old cards on screen. Sold-out and unaffordable cards carry `is-off`. `.em-lift` in `theme.css` is the shared
 hover glow (rise, crisp tier-coloured ring and a wide soft bloom) used by the shop, collection and starter cards; it is off under
 `prefers-reduced-motion` and for `is-off` cards.
+
+## Sprites
+
+Sprites are not part of the web build. Each Ascended's folder in `../ascended/<id>/` holds
+`sprite_main_card.webp`, `sprite_preview_card.webp` and `sprite_battle.webp`; the game serves them at
+`/ascended/<id>/<file>` and lists the URLs in the catalog (`AscendedInfo.art`). `spriteFor(art, slot)` in
+`src/utils/sprites.ts` picks one: the full card uses the main sprite, the small card (collection, shop offers,
+starter list) the preview sprite, and the battle arena the battle sprite. A missing slot falls back to the first
+sprite that exists, then to the letter placeholder. The dev server proxies `/ascended` to the game.

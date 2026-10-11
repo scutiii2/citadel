@@ -3,7 +3,7 @@ import { computed } from "vue";
 import type { AscendedInfo } from "../api/AscensionClient";
 import frameUrl from "../assets/card_frame.webp";
 import { abilityEffect, passiveText, titleCase } from "../utils/ascension";
-import { ascendedArt } from "./ascendedArt";
+import { spriteFocus, spriteFor, type SpriteSlot } from "../utils/sprites";
 
 /** An Ascended's card, drawn on the card frame (assets/ascension/card_frame.webp,
  * the text-free front template, 1060 x 1484). The frame is the whole
@@ -12,7 +12,7 @@ import { ascendedArt } from "./ascendedArt";
  * width. The frame's see-through holes show the artwork box and, for each
  * ability, a colour for its category. The frame's metal is tinted for the
  * Ascended's tier; the Ascension plate keeps its own colours. The Ascended's portrait
- * (ascendedArt.ts) shows in the artwork window, or its first letter when it has none.
+ * (the sprite in its folder, served by the game) shows in the artwork window, or its first letter when it has none.
  * `compact` is the small version for lists: the frame cropped to its top part so the
  * artwork is larger, the name, and a plate with the tier's name at the bottom, no stats
  * or text; `showLevel` adds the level to its header. The width is `--card-width` (440 px,
@@ -99,8 +99,9 @@ const tintStyle = computed(() => ({
   maskImage: `url(${frameUrl})`,
   WebkitMaskImage: `url(${frameUrl})`,
 }));
-const art = computed(() => ascendedArt(props.ascended.id));
-const artPosition = computed(() => `50% ${(props.compact ? art.value?.focusCompact : art.value?.focus) ?? 50}%`);
+const slot = computed<SpriteSlot>(() => (props.compact ? "preview_card" : "main_card"));
+const artUrl = computed(() => spriteFor(props.ascended.art, slot.value));
+const artPosition = computed(() => `50% ${spriteFocus(props.ascended.art, slot.value)}%`);
 const tierVar = computed(() => `var(--em-tier-${props.tierId}, var(--em-tier-common))`);
 const passiveName = computed(() => titleCase(props.ascended.passive.kind));
 const passive = computed(() => passiveText(props.ascended.passive.kind, props.ascended.passive.params));
@@ -123,7 +124,7 @@ const abilities = computed(() =>
     :aria-label="`${ascended.name}, ${titleCase(tierId)}, level ${level}`"
   >
     <div class="behind art-fill" :style="compact ? ART_COMPACT : ART" aria-hidden="true">
-      <img v-if="art" class="portrait" :src="art.url" :style="{ objectPosition: artPosition }" alt="" draggable="false" />
+      <img v-if="artUrl" class="portrait" :src="artUrl" :style="{ objectPosition: artPosition }" alt="" draggable="false" />
       <template v-else>
         <span class="letter">{{ ascended.name.slice(0, 1) }}</span>
         <small v-if="!compact">Artwork</small>

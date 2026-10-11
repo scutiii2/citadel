@@ -65,6 +65,9 @@ describe("BattleArena", () => {
     expect(wrapper.findAll("p.hp").map((p) => p.text())).toEqual(["HP 80 / 100", "HP 20 / 100"]);
     expect(wrapper.text()).toContain("+4 essence, 2 rounds left");
     expect(wrapper.find(".versus").text()).toBe("VS");
+    expect(wrapper.find(".player img").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
+    expect(wrapper.find(".wild img").exists()).toBe(false);
+    expect(wrapper.find(".wild .letter").text()).toBe("B");
   });
 });
 
