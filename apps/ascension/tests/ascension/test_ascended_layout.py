@@ -14,10 +14,9 @@ def test_every_sprite_lives_in_its_ascended_folder_under_an_exact_name():
             assert (folder / "catalog.json").is_file(), f"{folder.name} has sprites but no catalog.json"
 
 
-def test_the_shipped_ascended_have_all_three_sprites_except_bruiser():
-    for name in ("channeler", "forbidden", "guardian", "scout", "sentinel", "striker"):
+def test_the_shipped_ascended_have_all_three_sprites():
+    for name in ("bruiser", "channeler", "forbidden", "guardian", "scout", "sentinel", "striker"):
         assert {f.name for f in (ASCENDEDS_PATH / name).glob("sprite_*")} == SPRITES, name
-    assert not list((ASCENDEDS_PATH / "bruiser").glob("sprite_*"))
 
 
 def test_no_sprites_are_kept_outside_the_ascended_folders():

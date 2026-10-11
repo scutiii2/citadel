@@ -2,11 +2,11 @@
 
 Rules: `../ART_GUIDE.md` (read it first; it explains sizes, the black background and the crop steps).
 Files for this Ascended: `sprite_main_card.webp`, `sprite_preview_card.webp`, `sprite_battle.webp` (this folder).
-Current art: none. The game shows a letter placeholder until the three sprites exist.
+Status: main, preview and battle generated using the built-in imagegen tool. Sources: `main.png`, `preview.png`, `battle.png`; final game assets are the three WebP files above. Character identity and reference priority: `identity.md`.
 
 ## Design (the visual canon, keep it the same in all three sprites)
 
-- **Role:** No art yet (it shows a letter placeholder). Heavy attacker: the passive adds attack damage against a defending target, so the design says brute force that breaks guards.
+- **Role:** Heavy attacker: the passive adds attack damage against a defending target, so the design says brute force that breaks guards.
 - **Concept:** a hulking, hunched basalt brute with a tusked boar-like head, small furious amber eyes, and cracked dark-brown hide with glowing molten seams.
 - **Key details:** oversized fists wrapped in rusted iron bands, one big spiked iron pauldron, heavy bone-white tusks, a glowing cracked belly plate, and embers rising from its shoulders.
 - **Palette:** dark basalt brown-grey, rust orange, iron, bone white, molten amber.
@@ -14,13 +14,22 @@ Current art: none. The game shows a letter placeholder until the three sprites e
 - **Main card pose:** rearing up with both fists raised overhead ready to smash down, tusks bared, looking at the viewer.
 - **Preview framing:** the head and the massive shoulders and one fist, tusks and glowing eyes in front.
 - **Battle pose:** a heavy wind-up facing right, one fist drawn back, the other held low.
+- **Established reference details:** jagged basalt forehead crest, pointed warm brown ears, reddish blunt snout with two nostrils, upward-curving warm ivory tusks, three chunky toe claws, round rock-plated amber belly core. The single pauldron is on the anatomical left shoulder (viewer right in the frontal reference), with slate spikes, rust-orange edging and rivets. Read `identity.md` before every generation.
 
 ## How to run it
 
-1. No reference image yet: generate the main card first, pick the best, and use it as the reference for the other two.
+1. Read `identity.md` and inspect `sprite_preview_card.webp`, the primary reference for future recreations. Use `main.png` as the supporting full-body reference. Preserve the single pauldron's anatomical shoulder across poses.
 2. Paste the main card prompt. Iterate until the design is right.
 3. In the same chat paste the preview prompt, then the battle prompt, each starting with: "Use the character in the previous image as the exact reference: same design, colours, armour and proportions. "
 4. Crop and convert with the commands in `../ART_GUIDE.md` section 6, check the checklist in section 7.
+
+## Generation refinements used
+
+- Main framing: the first option was too tall. The selected main keeps the exact design and raised-fists pose, shrinking the whole character into the central safe band with background above and below.
+- Preview: reference `main.png`; close portrait with one cuffed fist, matching crest, snout, tusks, single pauldron and core; simplified dark amber halo.
+- Battle: reference `main.png`; full-body right-facing wind-up, transparent alpha. Targeted edits lightened internal shading and contours to slate, using #3b4658 as the final requested darkest palette entry; removed detached sparks while keeping the design and pose.
+- Final conversion: centre-crop main to its own width / 1.93; resize preview and battle to 512 square using nearest-neighbour sampling for crisp pixel edges; WebP quality 92 for cards, lossless WebP with alpha for battle.
+- Validation: main is 1536 x 796, preview and battle are 512 x 512; battle alpha preserved. The preview was inspected at 150 x 150 (`preview_150.png`). Layout tests pass. In-game collection, details and battle inspection remains pending.
 
 ## Main card prompt (`sprite_main_card.webp`)
 
