@@ -32,7 +32,7 @@ export interface TicketFilterState {
   status: "all" | TicketStatus;
   priority: "all" | TicketPriority;
   tag: string;
-  mode: "groups" | "review";
+  mode: "board" | "groups" | "review";
 }
 
 /** mcp_server times carry an offset ("+00:00"), so they parse as they are. */

@@ -136,15 +136,25 @@ drawer and removes the transient creation flag from the URL.
 
 ## Tickets
 
-Tickets (`/tickets`, `tickets.manage`) groups similar reports for triage.
+Tickets (`/tickets`, `tickets.manage`) opens a full-width Kanban board with
+Open, In progress, Resolved and Closed columns. Cards show effective priority,
+source, tags, issue group, assignee and last update. Each column scrolls independently;
+below 768px a column selector shows one status at a time above the bottom rail.
+Drag a card to change its status; it moves only after the server confirms.
+The ticket drawer also provides a status selector for keyboard and touch use.
+Search matches ticket IDs, titles, reporters, assignees, tags and loaded group names.
+The board loads up to 500 matching tickets and shows a notice when it reaches that limit.
+
+Groups keeps the existing grouping and pinned priority controls.
 Expand a group to see its tickets and reporter display names, source and status.
-Open a ticket to read its description, context and thread, reply as staff,
+Open a ticket in the side dialog to read its description, context and thread, reply as staff,
 change status, priority, assignee or comma-separated tags, move it to another
 group or split it into a new one. Reporter/model context is marked unverified.
 Needs review lists possible duplicates and offers the suggested group.
 
 Status, priority, tag and view mode persist in the URL (`status`, `priority`,
-`tag`, `mode=review`). Setting group priority pins it; switch Pinned off to
+`tag`, `mode=groups` or `mode=review`; omitted mode means Board). Search is local to
+the current page. Setting group priority pins it; switch Pinned off to
 resume automatic elevation. Server controls retain confirmed values while
 saving. The workspace overview shows Open tickets and Urgent tickets counts,
 links to unfiltered triage (urgent counts include ticket and group priority), and a Tickets destination for accounts

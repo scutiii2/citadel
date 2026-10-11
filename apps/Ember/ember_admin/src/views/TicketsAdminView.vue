@@ -18,7 +18,7 @@ const filters = computed<TicketFilterState>(() => {
     status: (STATUSES as readonly unknown[]).includes(status) ? (status as TicketFilterState["status"]) : "all",
     priority: (PRIORITIES as readonly unknown[]).includes(priority) ? (priority as TicketFilterState["priority"]) : "all",
     tag: typeof tag === "string" ? tag : "",
-    mode: mode === "review" ? "review" : "groups",
+    mode: mode === "review" || mode === "groups" ? mode : "board",
   };
 });
 
@@ -29,7 +29,7 @@ function updateFilters(next: TicketFilterState): void {
       status: next.status === "all" ? undefined : next.status,
       priority: next.priority === "all" ? undefined : next.priority,
       tag: next.tag || undefined,
-      mode: next.mode === "review" ? "review" : undefined,
+      mode: next.mode === "board" ? undefined : next.mode,
     },
   });
 }
@@ -37,12 +37,34 @@ function updateFilters(next: TicketFilterState): void {
 
 <template>
   <section class="info-page tickets-admin">
-    <div class="column page-column">
+    <div class="ticket-page-column">
       <h2 class="page-title">Tickets</h2>
       <p class="intro page-description">
-        Reports from people and from the assistant, grouped by similar issue. Priority rises as a group grows; set one by hand to pin it.
+        A clear view of what needs attention and what’s moving forward.
       </p>
       <TicketsPanel :filters="filters" @filter="updateFilters" />
     </div>
   </section>
 </template>
+
+<style scoped>
+.tickets-admin {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ticket-page-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 28px 30px 16px;
+}
+.page-title { font-size: 1.5rem; }
+.page-description { margin-bottom: 24px; }
+@media (max-width: 767px) {
+  .ticket-page-column { padding: 20px 16px 12px; }
+  .page-title { font-size: 1.3rem; }
+  .page-description { margin-bottom: 18px; font-size: 0.8rem; }
+}
+</style>
