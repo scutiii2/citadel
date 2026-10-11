@@ -5,6 +5,7 @@ import GameStage from "../components/games/GameStage.vue";
 import "../components/infoPage.css";
 const store = useGamesStore();
 const active = computed(() => store.games.find(game => game.id === store.activeId));
+const playing = computed(() => Boolean(active.value && store.launchUrl));
 // Wallpapers that failed to load fall back to the initial-letter tile.
 const broken = reactive(new Set<string>());
 // The whole card launches the game; the Play button is its keyboard and screen-reader entry.
@@ -14,10 +15,10 @@ onMounted(() => store.load());
 onDeactivated(() => store.close());
 </script>
 <template>
-  <section class="games-view info-page"><div class="column">
-    <header class="heading"><div><h2>Games</h2><p>Choose a game to play in Ember.</p></div><button class="refresh" :disabled="store.loading || store.launching" @click="store.load()">Refresh</button></header>
+  <section class="games-view info-page" :class="{ playing }"><div class="column">
+    <header v-if="!playing" class="heading"><div><h2>Games</h2><p>Choose a game to play in Ember.</p></div><button class="refresh" :disabled="store.loading || store.launching" @click="store.load()">Refresh</button></header>
     <p v-if="store.error" role="alert" class="error">{{ store.error }}</p>
-    <div v-if="active && store.launchUrl" class="active-game">
+    <div v-if="playing && active && store.launchUrl" class="active-game">
       <header class="stage-head"><h3>{{ active.name }}</h3><button class="close-game" @click="store.close()">Close game</button></header>
       <GameStage :key="store.launchUrl" :game="active" :url="store.launchUrl" @close="store.close()" />
     </div>
@@ -57,4 +58,9 @@ button.play:focus-visible, .game-card:hover button.play, .game-card[data-launchi
 @media (prefers-reduced-motion: reduce) { .game-card, .shade p, button.play { transition: none; } .game-card:hover, .game-card:focus-within { transform: none; } }
 button:disabled { opacity: .6; cursor: default; } button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 p.error { color: var(--danger); }
+/* While a game runs it takes the whole page: no heading, no column, no page scroll. */
+.games-view.playing { display: flex; padding: 12px; overflow: hidden; }
+.playing .column { display: flex; flex-direction: column; flex: 1; min-height: 0; max-width: none; margin: 0; }
+.active-game { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.active-game .stage-head { margin-bottom: 8px; }
 </style>

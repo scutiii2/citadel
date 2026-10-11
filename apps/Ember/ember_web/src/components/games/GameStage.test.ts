@@ -19,9 +19,7 @@ it("sandboxes the game and accepts only its window, origin and protocol messages
   expect(w.find("[role=status]").exists()).toBe(true);
   expect(source).toBe((w.find("iframe").element as HTMLIFrameElement).contentWindow);
   await message(game.url, source, ready); expect(w.find("[role=status]").exists()).toBe(false);
-  await message(game.url, source, { source: "game", type: "resize", height: 100 }); expect(frame.attributes("style")).toContain("320px");
-  await message(game.url, source, { source: "game", type: "resize", height: 9000 }); expect(frame.attributes("style")).toContain("4000px");
-  await message(game.url, source, { source: "game", type: "resize", height: NaN }); expect(frame.attributes("style")).toContain("4000px");
+  await message(game.url, source, { source: "game", type: "resize", height: 900 }); expect(frame.attributes("style")).toBeUndefined(); expect(w.emitted("close")).toBeUndefined();
   await message(game.url, source, { source: "game", type: "close" }); expect(w.emitted("close")).toHaveLength(1);
   w.unmount(); expect(removed).toHaveBeenCalledWith("message", expect.any(Function)); removed.mockRestore();
 });

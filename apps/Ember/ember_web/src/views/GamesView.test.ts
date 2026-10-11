@@ -13,7 +13,9 @@ it("shows filtered games, launches a stage and closes it", async () => {
   vi.spyOn(GamesClient.prototype, "list").mockResolvedValue([game]); vi.spyOn(GamesClient.prototype, "launch").mockResolvedValue({ url: game.url + "/#ticket=x" });
   const w = mount(GamesView); await flushPromises(); expect(w.text()).toContain("Collect Ascended");
   await w.find("button.play").trigger("click"); await flushPromises(); expect(w.find("iframe").exists()).toBe(true);
-  await w.find("button.close-game").trigger("click"); expect(w.find("iframe").exists()).toBe(false); w.unmount();
+  expect(w.classes()).toContain("playing"); expect(w.find("header.heading").exists()).toBe(false);
+  await w.find("button.close-game").trigger("click"); expect(w.find("iframe").exists()).toBe(false);
+  expect(w.classes()).not.toContain("playing"); expect(w.find("header.heading").exists()).toBe(true); w.unmount();
 });
 it("shows the wallpaper, launches from a card click once, and falls back to a letter tile", async () => {
   vi.spyOn(GamesClient.prototype, "list").mockResolvedValue([game]);
