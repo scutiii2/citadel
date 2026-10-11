@@ -1,7 +1,7 @@
 {
   "id": "channeler",
   "name": "Channeler",
-  "art": { "focus": 30, "focus_preview": 43 },
+  "art": { "focus": 50, "focus_preview": 43 },
   "starter": false,
   "forbidden": false,
   "ascension_types": [
