@@ -68,3 +68,13 @@ EMBLEM throw with wobble, caught or broke free, flee. The arena shows the old he
 While it plays, the action buttons are locked and the result screen waits; the Skip button or a click on
 the arena jumps to the end. Nothing plays when a battle is opened or restored, while an EMBLEM prompt is
 open (its countdown is running), or with `prefers-reduced-motion`.
+
+## Shop
+
+The Shop tab loads `GET /ascension/shop`: this account's copy offers for the current rotation (each with `left` of
+`stock`) while EMBLEMs stay always on sale. `seconds_left` from the answer is counted down on this device's clock
+(`store.shopEndsAt`), never from the server's timestamp. At zero, after a purchase and after any refusal the page
+loads the window again, so a rotation, a sold-out offer or a stale `rotation` (409 "the shop has refreshed") never
+leaves old cards on screen. Sold-out and unaffordable cards carry `is-off`. `.em-lift` in `theme.css` is the shared
+hover lift (rise, soft shadow, tier-coloured edge) used by the shop cards and the collection cards; it is off under
+`prefers-reduced-motion` and for `is-off` cards.

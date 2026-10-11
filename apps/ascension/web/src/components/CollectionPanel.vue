@@ -109,7 +109,7 @@ function show(ascended: OwnedAscended): void {
         <small>{{ notOwned.length }} still to find</small>
       </div>
       <ul class="grid missing">
-        <li v-for="ascended in notOwned" :key="ascended.id" class="missing-ascended">
+        <li v-for="ascended in notOwned" :key="ascended.id" class="missing-ascended em-lift" :style="{ '--tier': 'var(--em-border)' }">
           <img class="back" :src="cardBackUrl" alt="" draggable="false" />
           <h4 class="missing-name">{{ ascended.name }}</h4>
           <p class="hint">{{ ascended.forbidden ? "Only by capture" : "Catch one, or buy copies in the shop" }}</p>

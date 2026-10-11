@@ -105,6 +105,19 @@ describe("CollectionPanel", () => {
 });
 
 describe("not collected", () => {
+  it("lets owned and not collected cards lift on hover, but not a fainted one", () => {
+    const wrapper = mountPanel({
+      ...PROFILE,
+      ascendeds: [ownedAscended("guardian"), ownedAscended("striker", { faint_until: Date.now() / 1000 + 600 })],
+    });
+
+    const [ready, fainted] = wrapper.findAll(".ascended-card");
+    expect(ready!.classes()).toContain("em-lift");
+    expect(ready!.classes()).not.toContain("is-off");
+    expect(fainted!.classes()).toContain("is-off");
+    expect(wrapper.find(".missing-ascended").classes()).toContain("em-lift");
+  });
+
   it("shows a face-down card with the Ascended's name and how to get it", () => {
     const wrapper = mountPanel();
 

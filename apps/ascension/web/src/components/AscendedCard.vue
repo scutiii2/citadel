@@ -22,8 +22,9 @@ const faintLeft = computed(() => (props.ascended.faint_until === null ? 0 : Math
 
 <template>
   <div
-    class="ascended-card"
-    :class="{ down: faintLeft > 0 }"
+    class="ascended-card em-lift"
+    :class="{ down: faintLeft > 0, 'is-off': faintLeft > 0 }"
+    :style="{ '--tier': `var(--em-tier-${ascended.tier_id}, var(--em-tier-common))` }"
     role="button"
     tabindex="0"
     :aria-label="`${ascended.name}, ${titleCase(ascended.tier_id)}, level ${ascended.level}`"
@@ -59,10 +60,6 @@ const faintLeft = computed(() => (props.ascended.faint_until === null ? 0 : Math
   border-radius: var(--em-radius);
   color: var(--em-text);
   cursor: pointer;
-  transition: filter 120ms ease;
-}
-.ascended-card:hover {
-  filter: brightness(1.1);
 }
 .ascended-card:focus-visible {
   outline: 2px solid var(--em-accent);
