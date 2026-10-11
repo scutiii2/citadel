@@ -196,7 +196,10 @@ function send(): void {
   justify-content: space-between;
   gap: 10px;
 }
-.name {
+.head .name {
+  font-family: var(--sans);
+  font-size: 1.15em;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 .meta {

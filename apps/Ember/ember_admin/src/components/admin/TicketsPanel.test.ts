@@ -289,14 +289,14 @@ describe("TicketsPanel", () => {
 
   it("loads filters from the URL, preserves other query options, and restores them on navigation", async () => {
     const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/tickets", component: TicketsAdminView }] });
-    await router.push("/tickets?status=open&priority=urgent&tag=email&source=bookmark");
+    await router.push("/tickets?mode=groups&status=open&priority=urgent&tag=email&source=bookmark");
     const wrapper = mount(TicketsAdminView, { global: { plugins: [router] }, attachTo: document.body });
     mounted.push(wrapper);
     await flushPromises();
     expect(client.listGroups).toHaveBeenLastCalledWith({ status: "open", priority: "urgent", tag: "email" });
     await wrapper.findAll("button.segment").find((b) => b.text() === "Closed")!.trigger("click");
     await flushPromises();
-    expect(router.currentRoute.value.query).toEqual({ status: "closed", priority: "urgent", tag: "email", source: "bookmark" });
+    expect(router.currentRoute.value.query).toEqual({ mode: "groups", status: "closed", priority: "urgent", tag: "email", source: "bookmark" });
     await router.push("/tickets?mode=review");
     await flushPromises();
     expect(client.listTickets).toHaveBeenLastCalledWith({ possible: true });
@@ -334,5 +334,89 @@ describe("TicketsPanel", () => {
     finish(ticket(11));
     await flushPromises();
     expect((wrapper.find("select[aria-label='Status']").element as HTMLSelectElement).value).toBe("closed");
+  });
+
+  it("places tickets in status columns and sorts by effective priority", async () => {
+    client.listTickets.mockResolvedValue([
+      ticket(11, { effective_priority: "normal" }),
+      ticket(12, { effective_priority: "urgent" }),
+      ticket(13, { status: "in_progress", assignee: "sam" }),
+      ticket(14, { status: "resolved" }),
+      ticket(15, { status: "closed" }),
+    ]);
+    const wrapper = await panel({ mode: "board" });
+    const open = wrapper.find('[data-status="open"]');
+    expect(wrapper.findAll(".kanban-column")).toHaveLength(4);
+    expect(open.findAll(".ticket-card").map(card => card.attributes("data-ticket-id"))).toEqual(["12", "11"]);
+    expect(open.text()).toContain("Urgent");
+    expect(open.text()).toContain("Group 1");
+    expect(wrapper.find('[data-status="in_progress"]').text()).toContain("sam");
+    expect(wrapper.find('[data-status="resolved"]').text()).toContain("Ticket 14");
+    expect(wrapper.find('[data-status="closed"]').text()).toContain("Ticket 15");
+  });
+
+  it("searches board tickets by title, reporter and group without another request", async () => {
+    const wrapper = await panel({ mode: "board" });
+    const calls = client.listTickets.mock.calls.length;
+    await wrapper.find('input[aria-label="Search tickets"]').setValue("bob");
+    expect(wrapper.findAll(".ticket-card")).toHaveLength(1);
+    expect(wrapper.find(".ticket-card").text()).toContain("Ticket 12");
+    await wrapper.find('input[aria-label="Search tickets"]').setValue("Group 1");
+    expect(wrapper.findAll(".ticket-card")).toHaveLength(2);
+    expect(client.listTickets.mock.calls).toHaveLength(calls);
+  });
+
+  it("opens the default board from the ticket URL without a breadcrumb bar", async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/tickets", component: TicketsAdminView }] });
+    await router.push("/tickets");
+    const wrapper = mount(TicketsAdminView, { global: { plugins: [router] }, attachTo: document.body });
+    mounted.push(wrapper);
+    await flushPromises();
+    expect(wrapper.findAll(".kanban-column")).toHaveLength(4);
+    expect(wrapper.find(".page-title").text()).toBe("Tickets");
+    expect(wrapper.find(".topbar").exists()).toBe(false);
+  });
+
+  it("keeps a dropped card in its column until the server confirms, then moves it", async () => {
+    let finish!: (value: AdminTicket) => void;
+    client.update.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const wrapper = await panel({ mode: "board" });
+    await wrapper.find('[data-ticket-id="11"]').trigger("dragstart", { dataTransfer: { setData: vi.fn(), effectAllowed: "" } });
+    await wrapper.find('[data-status="resolved"]').trigger("drop");
+    await flushPromises();
+    expect(wrapper.find('[data-status="open"] [data-ticket-id="11"]').exists()).toBe(true);
+    client.listTickets.mockResolvedValue([ticket(11, { status: "resolved" }), ticket(12, { status: "closed" })]);
+    finish(ticket(11, { status: "resolved" }));
+    await flushPromises();
+    expect(wrapper.find('[data-status="resolved"] [data-ticket-id="11"]').exists()).toBe(true);
+  });
+
+  it("leaves a card in place and shows the error when a status drop fails", async () => {
+    client.update.mockRejectedValueOnce(new ApiError(502, "Status could not be saved"));
+    const wrapper = await panel({ mode: "board" });
+    await wrapper.find('[data-ticket-id="11"]').trigger("dragstart", { dataTransfer: { setData: vi.fn(), effectAllowed: "" } });
+    await wrapper.find('[data-status="resolved"]').trigger("drop");
+    await flushPromises();
+    expect(wrapper.find('[data-status="open"] [data-ticket-id="11"]').exists()).toBe(true);
+    expect(wrapper.find('[role="alert"]').text()).toContain("Status could not be saved");
+  });
+
+  it("keeps the latest board when an older filtered request finishes", async () => {
+    let finish!: (rows: AdminTicket[]) => void;
+    client.listTickets.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const wrapper = await panel({ mode: "board" });
+    client.listTickets.mockResolvedValue([ticket(99, { effective_priority: "urgent" })]);
+    await wrapper.setProps({ filters: { ...FILTERS, mode: "board", priority: "urgent" } });
+    await flushPromises();
+    finish([ticket(11)]);
+    await flushPromises();
+    expect(wrapper.findAll(".ticket-card")).toHaveLength(1);
+    expect(wrapper.find(".ticket-card").text()).toContain("Ticket 99");
+  });
+
+  it("selects the bookmarked status column on mobile", async () => {
+    client.listTickets.mockResolvedValue([ticket(14, { status: "resolved" })]);
+    const wrapper = await panel({ mode: "board", status: "resolved" });
+    expect((wrapper.find('select[aria-label="Visible column"]').element as HTMLSelectElement).value).toBe("resolved");
   });
 });
