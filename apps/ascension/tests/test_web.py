@@ -99,3 +99,11 @@ def test_launcher_builds_ui_before_starting_backend():
     assert 'if not exist "web\\dist\\index.html"' in launcher
     assert 'npm --prefix web ci' in launcher and 'npm --prefix web run build' in launcher
     assert launcher.index('npm --prefix web run build') < launcher.index('python -m src.run')
+
+
+def test_the_ascended_path_is_never_turned_into_a_page(dist, config):
+    client = TestClient(ui_app(dist, config))
+    for path in ("/ascended/guardian", "/ascended/guardian/sprite_battle.webp"):
+        response = client.get(path)
+        assert response.status_code == 404
+        assert "game shell" not in response.text

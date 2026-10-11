@@ -22,6 +22,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CATALOG_PATH = PROJECT_ROOT / "configs" / "ascension_catalog.json"
 ASCENDEDS_PATH = PROJECT_ROOT / "ascended"
 ASCENDED_FILE = "catalog.json"
+# The sprite files an Ascended folder may hold, in the order main card, small card, battle.
+SPRITE_NAMES = ("sprite_main_card.webp", "sprite_preview_card.webp", "sprite_battle.webp")
 STATS = ("hp", "essence", "speed")
 
 
@@ -43,6 +45,17 @@ class TierSpec:
 
 
 @dataclass(frozen=True)
+class ArtSpec:
+    """Which sprites an Ascended's folder holds, and where to centre the crop (percent, like CSS object-position)."""
+
+    main_card: bool = False
+    preview_card: bool = False
+    battle: bool = False
+    focus: float = 50
+    focus_preview: float = 50
+
+
+@dataclass(frozen=True)
 class AscendedSpec:
     id: str
     name: str
@@ -54,6 +67,7 @@ class AscendedSpec:
     passive: PassiveSpec
     abilities: tuple[AbilitySpec, ...]
     ascension_types: tuple[AscensionType, ...] = ()
+    art: ArtSpec = ArtSpec()
 
 
 @dataclass(frozen=True)
@@ -125,6 +139,20 @@ def _ability(raw: Mapping[str, Any], ascended_id: str) -> AbilitySpec:
     return ability
 
 
+def _art(raw: Mapping[str, Any], where: str) -> ArtSpec:
+    art = raw.get("art", {})
+    if not isinstance(art, Mapping) or set(art) - {"focus", "focus_preview"}:
+        raise CatalogError(f"{where}: art may only set focus and focus_preview")
+    focus = {}
+    for key in ("focus", "focus_preview"):
+        value = art.get(key, 50)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 100:
+            raise CatalogError(f"{where}: art {key} must be a number from 0 to 100")
+        focus[key] = value
+    found = raw.get("sprites", [])
+    return ArtSpec(*(name in found for name in SPRITE_NAMES), **focus)
+
+
 def _ascended_spec(raw: Mapping[str, Any]) -> AscendedSpec:
     sid = _require(raw, "id", "ascended")
     where = f"ascended {sid!r}"
@@ -143,12 +171,13 @@ def _ascended_spec(raw: Mapping[str, Any]) -> AscendedSpec:
         id=sid, name=_require(raw, "name", where), starter=bool(raw.get("starter")), forbidden=bool(raw.get("forbidden")),
         base_price=_require(raw, "base_price", where), base=dict(base), growth=dict(growth),
         passive=PassiveSpec(_require(passive, "kind", f"{where} passive"), dict(passive.get("params", {}))), abilities=abilities,
-        ascension_types=ascension_types,
+        ascension_types=ascension_types, art=_art(raw, where),
     )
 
 
 class Catalog:
     def __init__(self, raw: Mapping[str, Any]) -> None:
+        self.ascendeds_path: Path | None = None
         try:
             self._build(raw)
         except CatalogError:
@@ -242,7 +271,9 @@ class Catalog:
         if not isinstance(raw, dict):
             raise CatalogError(f"cannot load catalog {catalog_path}: must be an object")
         raw["ascendeds"] = cls._load_ascendeds(ascendeds_path)
-        return cls(raw)
+        catalog = cls(raw)
+        catalog.ascendeds_path = ascendeds_path
+        return catalog
 
     @staticmethod
     def _load_ascendeds(ascendeds_path: Path) -> list[Any]:
@@ -261,8 +292,17 @@ class Catalog:
             if not isinstance(ascended, dict) or ascended.get("id") != folder.name:
                 found = ascended.get("id") if isinstance(ascended, dict) else ascended
                 raise CatalogError(f"ascended file {label}: id {found!r} must equal the folder name {folder.name!r}")
+            ascended["sprites"] = [name for name in SPRITE_NAMES if (folder / name).is_file()]
             ascendeds.append(ascended)
         return ascendeds
+
+    def sprite_path(self, ascended_id: str, file: str) -> Path | None:
+        """The sprite file for a catalog Ascended and one of the three exact names, else None.
+        The path is built from the catalog id and the fixed name, never from request text."""
+        if self.ascendeds_path is None or file not in SPRITE_NAMES or ascended_id not in self._ascendeds:
+            return None
+        path = self.ascendeds_path / ascended_id / file
+        return path if path.is_file() else None
 
     @property
     def regular_tiers(self) -> tuple[TierSpec, ...]:

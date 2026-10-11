@@ -113,3 +113,31 @@ def test_the_shop_section_covers_the_regular_tiers(catalog):
 def test_a_bad_shop_section_is_refused(raw, mutate):
     with pytest.raises(CatalogError):
         Catalog(_broken(raw, mutate))
+
+
+def test_sprites_are_found_in_the_folder_and_crops_come_from_catalog_json(catalog):
+    guardian = catalog.ascended("guardian").art
+    assert (guardian.main_card, guardian.preview_card, guardian.battle) == (True, True, True)
+    assert (guardian.focus, guardian.focus_preview) == (21, 50)
+    assert catalog.ascended("sentinel").art.focus_preview == 14
+    bruiser = catalog.ascended("bruiser").art
+    assert (bruiser.main_card, bruiser.preview_card, bruiser.battle) == (False, False, False)
+    assert (bruiser.focus, bruiser.focus_preview) == (50, 50)
+
+
+def test_sprite_path_only_answers_for_catalog_ids_and_exact_names(catalog):
+    assert catalog.sprite_path("guardian", "sprite_battle.webp").is_file()
+    assert catalog.sprite_path("bruiser", "sprite_battle.webp") is None  # no such file
+    assert catalog.sprite_path("nobody", "sprite_battle.webp") is None
+    for bad in ("catalog.json", "../guardian/sprite_battle.webp", "sprite_battle.png", "SPRITE_BATTLE.WEBP", ""):
+        assert catalog.sprite_path("guardian", bad) is None
+
+
+def test_a_catalog_built_from_a_dict_has_no_sprites(raw):
+    assert Catalog(copy.deepcopy(raw)).ascended("guardian").art.main_card is False
+
+
+@pytest.mark.parametrize("art", [{"focus": 101}, {"focus": -1}, {"focus_preview": "x"}, {"focus": True}, {"other": 1}, "no"])
+def test_a_bad_art_section_is_refused(raw, art):
+    with pytest.raises(CatalogError, match="art"):
+        Catalog(_broken(raw, lambda d: _ascended(d, "guardian").update(art=art)))

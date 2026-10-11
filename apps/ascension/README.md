@@ -78,6 +78,17 @@ failure stops the launcher. If UI sources are absent, the API still starts;
 `/` returns 503 with
 `UI not built: run npm --prefix web run build`.
 
+## Ascended files
+
+Everything that belongs to one Ascended lives in `ascended/<id>/` (rule in `AGENTS.md`, checked by
+`tests/ascension/test_ascended_layout.py`): its `catalog.json` and up to three sprites,
+`sprite_main_card.webp` (full card art), `sprite_preview_card.webp` (small card in the collection, shop and starter
+list) and `sprite_battle.webp` (the battle arena). The game finds the sprites by file name when it loads the catalog,
+lists them in each Ascended's `art` block of `/ascension/catalog` (a URL, or `null` when missing) and serves them at
+`/ascended/<id>/<file>` with `Cache-Control: no-cache`, so replaced art shows after a reload. `catalog.json` may hold
+`"art": {"focus": 21, "focus_preview": 50}`, the vertical crop centres (0 to 100, default 50) for the main and preview
+sprites. Adding an Ascended is dropping a folder; a missing sprite falls back to another one, then to a letter.
+
 ## Rotating shop
 
 Every `shop_rotation_seconds` (default 21600, so 00:00, 06:00, 12:00 and 18:00 UTC) each account gets
@@ -154,6 +165,7 @@ last saw; a stale pair is a 409.
 | Route | Purpose |
 |---|---|
 | `GET /ascension/catalog` | Ascended, abilities, tiers, personalities, shop data |
+| `GET /ascended/{id}/{file}` | Public sprite files (`sprite_main_card`, `sprite_preview_card`, `sprite_battle`, `.webp`); any other path is a 404 |
 | `POST /ascension/profile` | Create the profile with a starter |
 | `POST /ascension/profile/reset` | Delete all of the player's progress (needs `confirm: true`) |
 | `GET /ascension/profile` | Wallet, Ascended, timers, pending encounter, active battle |

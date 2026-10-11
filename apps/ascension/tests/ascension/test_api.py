@@ -244,3 +244,33 @@ def test_a_stale_rotation_and_a_missing_slot_are_refused_over_http(client):
 
 def test_the_shop_needs_a_profile(client):
     assert client.get("/ascension/shop", headers=headers(client, "newbie", key=False)).status_code == 404
+
+
+def test_the_catalog_lists_each_ascended_s_sprites(client):
+    data = client.get("/ascension/catalog", headers=headers(client, key=False)).json()
+    by_id = {s["id"]: s for s in data["ascendeds"]}
+    assert by_id["guardian"]["art"] == {
+        "main_card": "/ascended/guardian/sprite_main_card.webp",
+        "preview_card": "/ascended/guardian/sprite_preview_card.webp",
+        "battle": "/ascended/guardian/sprite_battle.webp",
+        "focus": 21, "focus_preview": 50,
+    }
+    assert by_id["bruiser"]["art"]["main_card"] is None and by_id["bruiser"]["art"]["battle"] is None
+
+
+def test_sprites_are_public_and_never_stale(client):
+    response = client.get("/ascended/guardian/sprite_battle.webp")
+    assert response.status_code == 200 and response.headers["content-type"] == "image/webp"
+    assert response.headers["cache-control"] == "no-cache" and response.headers["etag"]
+    assert response.content[:4] == b"RIFF"
+
+
+@pytest.mark.parametrize("path", [
+    "/ascended/nobody/sprite_battle.webp", "/ascended/bruiser/sprite_battle.webp", "/ascended/guardian/catalog.json",
+    "/ascended/guardian/sprite_battle.png", "/ascended/guardian/%2e%2e/guardian/sprite_battle.webp",
+    "/ascended/%2e%2e/configs/ascension_catalog.json", "/ascended/guardian/..%5ccatalog.json", "/ascended/guardian",
+])
+def test_any_other_sprite_request_is_a_404_not_a_page(client, path):
+    response = client.get(path)
+    assert response.status_code == 404
+    assert "text/html" not in response.headers.get("content-type", "")

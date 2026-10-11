@@ -1,6 +1,7 @@
 {
   "id": "striker",
   "name": "Striker",
+  "art": { "focus": 10, "focus_preview": 50 },
   "starter": true,
   "forbidden": false,
   "ascension_types": [

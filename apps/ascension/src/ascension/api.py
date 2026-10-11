@@ -11,11 +11,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt
 
 from src.auth import requester
-from src.ascension.catalog import Catalog, CatalogError
+from src.ascension.catalog import SPRITE_NAMES, Catalog, CatalogError
 from src.ascension.collection import CollectionService
 from src.ascension.coordinator import RoundCoordinator
 from src.ascension.encounters import EncounterService
@@ -94,6 +94,14 @@ def idempotency_key(idempotency_key: str = Header(default="", alias="Idempotency
     return idempotency_key.strip()
 
 
+def _art_summary(spec: Any) -> dict[str, Any]:
+    """The sprite URLs an Ascended has (null for a missing one) and its crop centres."""
+    art = spec.art
+    present = (art.main_card, art.preview_card, art.battle)
+    urls = [f"/ascended/{spec.id}/{name}" if here else None for name, here in zip(SPRITE_NAMES, present)]
+    return {"main_card": urls[0], "preview_card": urls[1], "battle": urls[2], "focus": art.focus, "focus_preview": art.focus_preview}
+
+
 def catalog_summary(catalog: Catalog) -> dict[str, Any]:
     """Public catalog data: Ascended, abilities, tiers, personalities and shop metadata."""
     return {
@@ -107,7 +115,7 @@ def catalog_summary(catalog: Catalog) -> dict[str, Any]:
         "ascendeds": [
             {"id": s.id, "name": s.name, "starter": s.starter, "forbidden": s.forbidden, "ascension_types": [t.value for t in s.ascension_types], "base": dict(s.base),
              "growth": dict(s.growth), "base_price": s.base_price, "passive": s.passive.to_dict(),
-             "abilities": [a.to_dict() for a in s.abilities]}
+             "abilities": [a.to_dict() for a in s.abilities], "art": _art_summary(s)}
             for s in catalog.all_ascendeds()
         ],
         "personalities": [{"id": p.id, "categories": list(p.categories)} for p in catalog.personalities.values()],
@@ -225,6 +233,22 @@ def install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(CatalogError, catalog_error)
 
 
+def build_art_router(catalog: Catalog) -> APIRouter:
+    """Public: an <img> cannot send the bearer, and the art is not secret. Only catalog ids and the three exact names answer."""
+    router = APIRouter()
+    headers = {"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"}
+
+    @router.get("/ascended/{ascended_id}/{file}")
+    async def sprite(ascended_id: str, file: str):
+        path = catalog.sprite_path(ascended_id, file)
+        if path is None:
+            raise HTTPException(404, "Not Found")
+        return FileResponse(path, media_type="image/webp", headers=headers)
+
+    return router
+
+
 def mount_ascendeds(app: FastAPI, services: AscendedServices) -> None:
     install_error_handlers(app)
     app.include_router(build_router(services))
+    app.include_router(build_art_router(services.catalog))

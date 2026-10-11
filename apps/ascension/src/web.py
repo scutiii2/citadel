@@ -37,7 +37,7 @@ class UiMount:
         return FileResponse(resolved, headers=self._headers)
 
     def page(self, path: str) -> FileResponse | PlainTextResponse:
-        if any(path == prefix or path.startswith(prefix + "/") for prefix in ("ascension", "session", "health")):
+        if any(path == prefix or path.startswith(prefix + "/") for prefix in ("ascension", "ascended", "session", "health")):
             raise self._not_found()
         # Missing file requests (including a normalised /assets/../config.py)
         # are never turned into SPA routes. Route names without suffixes fall back.
