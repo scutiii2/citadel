@@ -118,7 +118,7 @@ onUnmounted(() => store.detach());
         <template v-else>
           <EmPageHead :title="heading.title" :subtitle="heading.subtitle">
             <button type="button" class="menu-link" @click="screen = 'menu'"><EmIcon name="arrow" class="back-arrow" /> Main menu</button>
-            <EmTabs :model-value="tab" :options="tabs" aria-label="Ascension sections" @update:model-value="selectTab" />
+            <EmTabs :model-value="tab" :options="tabs" ariaLabel="Ascension sections" @update:model-value="selectTab" />
           </EmPageHead>
           <EmNotice v-if="store.error" tone="error" class="status">{{ store.error }}</EmNotice>
 

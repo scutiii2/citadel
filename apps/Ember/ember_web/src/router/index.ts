@@ -83,6 +83,12 @@ export const router = createRouter({
       meta: { permission: "chat.use" },
     },
     {
+      path: "/tickets",
+      name: "tickets",
+      component: () => import("../views/TicketsView.vue"),
+      meta: { permission: "tickets.create" },
+    },
+    {
       path: "/settings",
       name: "settings",
       component: () => import("../views/SettingsView.vue"),

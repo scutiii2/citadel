@@ -33,7 +33,7 @@ function forfeit(): void {
 
 <template>
   <div class="controls">
-    <EmTabs :model-value="battle.mode" :options="modeOptions" aria-label="Who plays" @update:model-value="setMode" />
+    <EmTabs :model-value="battle.mode" :options="modeOptions" ariaLabel="Who plays" @update:model-value="setMode" />
     <EmButton variant="danger" :disabled="!active || store.battleBusy" @click="forfeitOpen = true"><EmIcon name="battle" /> Forfeit</EmButton>
 
     <EmConfirm

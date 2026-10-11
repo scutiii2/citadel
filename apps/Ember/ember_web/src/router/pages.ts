@@ -48,6 +48,13 @@ export const NAV_PAGES: NavPage[] = [
   },
   { to: "/usage", label: "Usage", icon: ["M3 3v16a2 2 0 0 0 2 2h16", "M18 17V9", "M13 17V5", "M8 17v-3"], description: "Token usage and limits.", permission: "chat.use" },
   {
+    to: "/tickets",
+    label: "Tickets",
+    icon: ["M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z", "M13 5v2", "M13 17v2", "M13 11v2"],
+    description: "Report a bug, suggest a feature or ask for help, and follow the answers.",
+    permission: "tickets.create",
+  },
+  {
     to: "/settings",
     label: "Settings",
     icon: [

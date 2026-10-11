@@ -178,9 +178,9 @@ async function fight(): Promise<void> {
       <EmPanel>
         <h3 class="em-pixel heading">Battle plan</h3>
         <p class="label">Personality preset</p>
-        <EmTabs v-model="presetSlot" class="wide" :options="PRESET_OPTIONS" aria-label="Personality preset" />
+        <EmTabs v-model="presetSlot" class="wide" :options="PRESET_OPTIONS" ariaLabel="Personality preset" />
         <p class="label">Who plays?</p>
-        <EmTabs :model-value="mode" class="wide" :options="MODE_OPTIONS" aria-label="Who plays" @update:model-value="setMode" />
+        <EmTabs :model-value="mode" class="wide" :options="MODE_OPTIONS" ariaLabel="Who plays" @update:model-value="setMode" />
         <label class="field">
           <span>Highest EMBLEM tier for Autonomous play</span>
           <select v-model="emblemLimit" name="limit">

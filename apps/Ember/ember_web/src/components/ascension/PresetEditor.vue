@@ -69,7 +69,7 @@ async function save(): Promise<void> {
 <template>
   <section class="preset-editor">
     <h4 class="heading">Personality presets</h4>
-    <EmTabs v-model="slot" class="slots" :options="SLOT_OPTIONS" aria-label="Preset slot" />
+    <EmTabs v-model="slot" class="slots" :options="SLOT_OPTIONS" ariaLabel="Preset slot" />
     <p class="count em-num">Preset {{ slot }} · {{ chosen.length }} of {{ MAX_EQUIPPED }} personalities equipped</p>
 
     <EmNotice v-if="loadError" tone="error">{{ loadError }}</EmNotice>
