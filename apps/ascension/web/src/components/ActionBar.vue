@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import type { ActionChoice, BattleView, LegalAction } from "../api/AscensionClient";
 import { ROUND_PACE_MS, useAscensionStore } from "../stores/ascension";
+import { usePlaybackStore } from "../stores/playback";
 import { titleCase } from "../utils/ascension";
 import EmButton from "./ui/EmButton.vue";
 import EmDialog from "./ui/EmDialog.vue";
@@ -13,6 +14,7 @@ import EmPanel from "./ui/EmPanel.vue";
  * disabled with how long. A catch asks which EMBLEM to throw. */
 const props = defineProps<{ battle: BattleView }>();
 const store = useAscensionStore();
+const playback = usePlaybackStore();
 
 const BASIC_LABELS: Record<Exclude<LegalAction["kind"], "ability">, string> = {
   attack: "Attack",
@@ -22,7 +24,7 @@ const BASIC_LABELS: Record<Exclude<LegalAction["kind"], "ability">, string> = {
 const BASIC_NOTES: Record<string, string> = { flee: "Try to escape", catch: "Choose an EMBLEM" };
 const paceSeconds = ROUND_PACE_MS / 1000;
 
-const locked = computed(() => props.battle.status !== "active" || props.battle.phase !== "choosing" || store.battleBusy);
+const locked = computed(() => props.battle.status !== "active" || props.battle.phase !== "choosing" || store.battleBusy || playback.busy);
 const coolingDown = computed(() => props.battle.player.abilities.filter((a) => !a.ready));
 const ownedTiers = computed(() => (store.catalog?.tiers ?? []).filter((t) => (props.battle.emblems[t.id] ?? 0) > 0));
 const catchOpen = ref(false);

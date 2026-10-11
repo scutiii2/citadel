@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import type { BattleMode, BattleView } from "../api/AscensionClient";
 import { useAscensionStore } from "../stores/ascension";
+import { usePlaybackStore } from "../stores/playback";
 import EmButton from "./ui/EmButton.vue";
 import EmConfirm from "./ui/EmConfirm.vue";
 import EmIcon from "./ui/EmIcon.vue";
@@ -12,9 +13,10 @@ import EmTabs from "./ui/EmTabs.vue";
  * Ascension needs a limit for autonomous play. */
 const props = defineProps<{ battle: BattleView }>();
 const store = useAscensionStore();
+const playback = usePlaybackStore();
 
 const active = computed(() => props.battle.status === "active");
-const locked = computed(() => !active.value || props.battle.phase !== "choosing" || store.battleBusy);
+const locked = computed(() => !active.value || props.battle.phase !== "choosing" || store.battleBusy || playback.busy);
 const modeOptions = computed(() => [
   { value: "manual", label: "Manual", disabled: locked.value },
   { value: "autonomous", label: "Autonomous", disabled: locked.value || props.battle.emblem_limit === null },

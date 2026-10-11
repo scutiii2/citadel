@@ -59,3 +59,12 @@ unmounts. Closing a game preserves its server-side progress.
 
 The radius-scale test scans all Vue/CSS sources. Components use the copied
 radius tokens or the existing Ascension theme tokens, without literal radii.
+
+## Battle animation
+
+`src/stores/playback.ts` plays each new round of a battle as short steps (`src/utils/battleCues.ts` maps
+server events to them): attack lunge, hit shake with a floating damage number, defense glow, support glow,
+EMBLEM throw with wobble, caught or broke free, flee. The arena shows the old health until a hit lands.
+While it plays, the action buttons are locked and the result screen waits; the Skip button or a click on
+the arena jumps to the end. Nothing plays when a battle is opened or restored, while an EMBLEM prompt is
+open (its countdown is running), or with `prefers-reduced-motion`.

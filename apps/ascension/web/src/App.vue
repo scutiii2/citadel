@@ -4,6 +4,7 @@ import "./components/fonts";
 import "./components/theme.css";
 import ActionBar from "./components/ActionBar.vue";
 import BattleArena from "./components/BattleArena.vue";
+import { usePlaybackStore } from "./stores/playback";
 import BattleControls from "./components/BattleControls.vue";
 import BattleResult from "./components/BattleResult.vue";
 import CollectionPanel from "./components/CollectionPanel.vue";
@@ -32,6 +33,7 @@ type Screen = "menu" | "starter" | "game";
 
 const session = useSessionStore();
 const store = useAscensionStore();
+const playback = usePlaybackStore();
 const page = ref<HTMLElement | null>(null);
 let observer: ResizeObserver | null = null;
 let stopMessages: (() => void) | null = null;
@@ -161,7 +163,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 
           <div v-else-if="tab === 'battle'" class="tab-body">
             <template v-if="store.battle">
-              <BattleResult v-if="store.battle.result" :battle="store.battle" />
+              <BattleResult v-if="store.battle.result && !playback.busy" :battle="store.battle" />
               <template v-else>
                 <BattleControls :battle="store.battle" />
                 <BattleArena :battle="store.battle" />
