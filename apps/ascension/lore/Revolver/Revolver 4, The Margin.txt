@@ -1,0 +1,293 @@
+# Revolver 4, The Margin
+
+Swift had always hated waiting, though not because she was impatient. Impatience was sloppy. Waiting meant surrendering control to something slower than herself, and she could hear every click of the safehouse clock as proof of exactly how much control she was losing by the second.
+
+Dagger sat across from her, one boot tapping the floor.
+
+"Stop."
+
+His foot stopped. Three seconds later it started again.
+
+"You're doing it on purpose."
+
+"No."
+
+"That's worse."
+
+He leaned back against the wall. "You said I should keep moving."
+
+"I said move when movement matters."
+
+"How do I know when it matters?"
+
+"You don't." She picked up the stopwatch, pressed the button. Nothing. Pressed it again. The battery had died at some point without telling her. She tossed it onto the table.
+
+"Broken?"
+
+"Dead."
+
+"You should replace it."
+
+"No."
+
+"Why?"
+
+She stood. "Because I don't need it," and walked toward the training room, and he followed the way he always followed — not the following itself that bothered her, but the expectation underneath it, the quiet belief that staying close enough to people who knew more would eventually mean they told him what he needed. She'd believed the same thing once, before she learned that some of the people ahead of you were only running in the wrong direction with more confidence than you had.
+
+---
+
+Before the Revolver, speed had been a game. Then it became an identity. Then, without her noticing the exact moment of the shift, it became a debt she was still paying down.
+
+She'd been thirteen the first time an adult told her she was wasting her legs — a man timing her from the edge of a wet school field, mud filling her shoes with every stride. *Again.* She ran. *Again.* By sixteen nobody in her district could beat her over the distances that mattered — short enough to punish hesitation, long enough to punish stupidity. She learned to hear footsteps without turning her head, to judge a corner before her body had fully committed to it, to tell which opponents attacked too early out of fear of losing and which waited because they trusted themselves. The second kind was dangerous. She liked dangerous opponents. They made winning mean something.
+
+Her first real rival was a girl named Mara, slower by a margin too small to matter and too stubborn to ever look sideways or chase. She simply ran, every time, at exactly her own pace, and for months that pace lost to Swift's. Then one afternoon it didn't.
+
+Four hundred meters, the track still smelling of wet rubber after a storm that had passed through an hour earlier. Swift took the lead before the first turn and held it the whole way, heard Mara behind her, not close, then closer, and answered by accelerating into the final straight the way she'd answered every challenge before this one. She crossed the line certain she'd won.
+
+The official raised Mara's number instead. One hundredth of a second.
+
+Mara walked over. "Good race."
+
+"You were slow."
+
+"You were fast." A shrug, nothing behind it, no opening for the fight Swift wanted to have. It was the wrong answer — she'd wanted an excuse to hate, and Mara had refused to hand her one. She walked away, and Swift stayed on the empty track until the field lights came on overhead. That night she threw her medal into a drawer instead of a bin, and hated herself for choosing the drawer.
+
+---
+
+Ghost found her three months later, and didn't offer her a place in anything. He offered her another race — a courier moving through an industrial district with a stolen data chip.
+
+"Catch him."
+
+"That's it?"
+
+"That's it."
+
+"How far?"
+
+Six kilometers. Rain. Warehouse corridors, three fences, a river path.
+
+"Who is he?"
+
+"Doesn't matter."
+
+"It matters to me."
+
+"Why?"
+
+"Because I need to know what I'm racing."
+
+Ghost studied her for a moment longer than the question required. "You're racing yourself."
+
+She hated the answer and took the job anyway. The courier turned out to be clever rather than fast — crowds, alleys, a changed jacket, a market crossed twice with a deliberate double-back that would have shaken off anyone slower. She caught him beside a drainage canal with thirty seconds left before his extraction and took the chip out of his hand before he'd fully processed that she was there.
+
+"Who are you?"
+
+"Someone faster," she said, already walking away.
+
+Ghost was waiting at the end of the road. "You caught him."
+
+"Obviously."
+
+"You nearly missed the turn at the market."
+
+"I didn't."
+
+"You did." He was right — a mistake of less than a second, small enough that nobody else alive would have caught it. He had. That was the first time she understood that speed on its own had never been the whole answer to anything.
+
+She joined. Maze was already there, the first person she'd met who could irritate her without appearing to try — solving problems before she'd finished describing them, knowing shortcuts she didn't know existed, capable of standing perfectly still for ten minutes and somehow making her feel, the entire time, like the one wasting everyone's day.
+
+Their first argument was about a door with three locks. He studied it. She said, "Move."
+
+"No."
+
+"I can get through."
+
+"I know."
+
+"Then why are you still standing there?"
+
+"Because you haven't asked the door what it wants."
+
+"The door is a door."
+
+He smiled. "That's why it wins."
+
+She kicked it, and the first lock broke on the strike; he sighed as the second gave way on its own, and the third, it turned out, had already been quietly disabled before she'd even raised her foot.
+
+"You could have told me."
+
+"You could have asked."
+
+She hated him — or told herself she did, which turned out to be a different thing entirely once they started working well enough together that the distinction stopped mattering.
+
+---
+
+Years later, cleaning weapons after a training session, Dagger asked her about him without asking directly, which she noticed and let go unremarked, because he was learning to be better than direct.
+
+"Was Maze really as smart as everyone says?"
+
+"Smarter."
+
+"Than Ghost?"
+
+"No."
+
+"Then who?"
+
+"Depends what you mean."
+
+He stopped polishing. "You know what I mean."
+
+She slid the blade into its sheath. "That's why I don't answer."
+
+He waited. She stood, walked to the cabinet. "Maze was good at finding doors."
+
+"And Ghost?"
+
+"Ghost was good at deciding which ones shouldn't be opened."
+
+Dagger sat with that for a while. "Did you trust him?"
+
+"No." A pause. "Not always."
+
+"That's different."
+
+"Yes."
+
+"Why didn't you tell anyone?"
+
+"Tell them what?" she said, closing the cabinet, and neither of them had an answer for that, which was the whole trouble with Maze in retrospect — after the betrayal, every old conversation curdled. A joke could become a warning in hindsight. A favor could become preparation. A missing file could become deliberate. A disagreement could become a test that she'd failed without knowing she was taking it. She preferred enemies who announced themselves; they were easier to outrun.
+
+---
+
+The Ghost hunt brought her to a railway station two weeks after that conversation. Tech had found footage — a figure crossing a platform, a familiar posture, a familiar pace, the image quality bad enough that Deadeye had called it useless outright. Tech disagreed. She believed Tech, not because the footage was convincing, but because he'd stopped talking the moment he saw it, and Tech never stopped talking without a reason.
+
+"That's him?"
+
+"I didn't say that."
+
+"You stopped breathing."
+
+"I breathe."
+
+"Not when you're lying."
+
+He glanced at her. "I hate when Euphoria teaches people things," and replayed the footage — the figure crossing the frame, three seconds, gone.
+
+She leaned closer. "That's not Ghost."
+
+"You sure?"
+
+"Yes. His left foot." She pointed at the frozen frame. "Ghost lands heavier on the outside edge."
+
+Tech stared, rewound it, watched again. She was right. The figure wasn't Ghost — but whoever it was had clearly studied him closely enough to fake almost everything else, and that bothered her more than a confirmed sighting would have.
+
+"Who made this?"
+
+"Don't know." He checked the timestamp. Four minutes were missing. "Because someone deleted it."
+
+"Can you recover it?"
+
+"Almost anything. Somebody better than me did this one, though."
+
+She smiled without much humor in it. "Now we're getting somewhere."
+
+---
+
+That night an envelope waited under her door — no name, no seal. Inside, a photograph of Mara's old track, taken years after Swift had left it behind, the field empty except for a single figure standing at the starting line. On the back, handwritten:
+
+*You still look behind you.*
+
+She read it twice, then burned it in the sink and kept the photograph, told no one — not Dagger, not Tech, not Deadeye, and especially not Ghost. In the morning the ash had stuck to the porcelain; she scrubbed it clean and left one black fleck sitting stubbornly beneath the drain, because some things resisted being entirely removed no matter how carefully you worked at them.
+
+---
+
+The confrontation with Maze had happened three days before the operation that eventually exposed him — a warehouse office, one fluorescent tube flickering overhead, Maze sitting on the desk reading something on a tablet he didn't bother putting down when she came in.
+
+"You've been following me."
+
+"You're not difficult to follow."
+
+"Then stop."
+
+"I ask everyone questions."
+
+"You don't ask Ghost."
+
+"I don't need to."
+
+She stepped closer. "You're hiding something."
+
+He set the tablet down. "So are you."
+
+"I don't have anything worth hiding."
+
+"That's not true."
+
+Her hand drifted toward her knife. He didn't react to it at all.
+
+"What do you know?"
+
+"Enough."
+
+"Then say it."
+
+He looked at her for several seconds. "No."
+
+She hated him then, or believed she did, and walked out. At the door he said her name, and she stopped.
+
+"You're going to miss something."
+
+She turned. He was already back on the tablet. "Miss what?"
+
+He didn't answer, and she waited a long moment for a follow-up that never came before she finally left. For months afterward she wondered whether that had been a warning she'd walked away from, or whether he'd simply been amusing himself with an unanswered question because he knew she'd never let one go. There was no way to settle it. Maze was dead, Ghost was gone, and the only person who could have told her the truth had left her with nothing but the silence to interrogate.
+
+---
+
+Dagger was waiting when she got back to the training room. "You took too long."
+
+"I know."
+
+"You finally admit it."
+
+She threw him a pair of gloves. "Fight."
+
+The spar lasted under a minute — he moved fast, too fast, committed hard to a strike she let come and then simply wasn't there for, stepping aside so his own momentum carried him past her before she caught his wrist and put him on the floor.
+
+"You cheated."
+
+"No."
+
+"You moved before I attacked."
+
+"That's called anticipation."
+
+"I thought you said speed."
+
+"I said nothing about speed."
+
+He sat up, took her offered hand, and for a moment she looked at him a beat longer than the moment needed. He was getting fast. Too fast. Ghost had taught him well — possibly too well.
+
+"Again?"
+
+"Tomorrow."
+
+"Why?"
+
+She glanced at the window, at the rain starting against the glass. "Because tomorrow isn't promised," and walked away before he could ask her what she meant by that, which was fortunate, because she wasn't entirely sure herself.
+
+---
+
+She lay awake that night — not because of the photograph, not because of Maze, not because of Ghost, she told herself, and kept telling herself, listening to rain tick against the roof and a pipe somewhere in the walls knock twice and go still.
+
+She thought about Mara crossing the line by one hundredth of a second. About the courier slipping half a turn ahead of her at the market. About Maze's voice: *you're going to miss something.* About the morning the team first realized Ghost was gone, and how she'd already been moving before anyone finished the sentence — across the room, out the door, down the stairs two at a time, into a street that gave her nothing back. No footsteps. No vehicle. No trace at all. She'd run anyway, down the block, across the alley, over the wall, through rain that hadn't let up in hours, until her lungs burned and the city blurred into a single smear of light and she still hadn't caught him.
+
+She'd been fast enough to catch almost anyone in her life. Not him. Not then, and — she suspected, lying there in the dark — not now either.
+
+She opened her eyes. Her feet were on the floor before she'd consciously decided to stand, and she crossed to the window and looked down at an empty street. For a second she thought she saw someone at the far end of it — a man, standing still, watching. By the time she'd crossed to the door the figure was gone.
+
+She stood there with her hand on the handle. She could have followed. She could have run, the way she always ran, the way running had solved nearly everything for her since she was thirteen years old in wet grass. Instead she stayed exactly where she was, and it was the smallest hesitation of her entire life, and she couldn't tell, afterward, whether it had been exhaustion or something closer to the beginning of an answer she didn't want.
+
+Not losing a race. Not being slower, or beaten, or outrun. Something quieter than any of that — the possibility of being fast enough to reach the place where something happened, and still arriving after it had already stopped mattering.
+
+She let go of the door handle. Outside, the rain kept falling, indifferent to whether she moved or didn't. She stayed awake until morning, and never did decide which choice would have been the right one.

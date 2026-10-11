@@ -1,0 +1,229 @@
+# Revolver 6, Indirect
+
+Tech trusted machines for one reason: they never pretended to be innocent. A machine did what it was built to do. A knife cut. A camera recorded. A lock resisted. A server remembered. People were different — people built the machine, gave it a purpose, and then looked away the moment the purpose turned ugly, and Tech had always found that particular arrangement convenient, right up until Ghost disappeared and every screen in the safehouse started asking him the same question without using a single word to do it. Timestamps. Corrupted files. Gaps between frames where something should have been and wasn't.
+
+He sat alone in the operations room at three in the morning, six monitors glowing around him, the terminal's blue-white light the only thing in the room that hadn't changed in years. On the largest screen, Ghost crossed a hallway — or someone wanted them to believe he had. Tech advanced the footage one frame at a time. Nothing. Again. Nothing. Again, and this time a reflection surfaced in a glass door.
+
+He enlarged it. There — the same pale strip at the wrist Deadeye had found. He opened another file, then another. The mark appeared in all three, different years, different locations, different operations. Whoever wore it had been present for longer than anyone had realized.
+
+"You're kidding," he said, to no one, and the room didn't answer.
+
+He opened the oldest file — restricted, another authorization screen blocking the way. He entered a code. Denied. A second. Denied. A third, one he hadn't expected to work at all, and the system accepted it without complaint.
+
+It belonged to Maze.
+
+The archive opened. Tech stopped smiling.
+
+---
+
+He'd been bored before he became useful, which was the simplest way to describe it. His teachers called him distracted. His parents called him difficult. Other children called him strange, because he finished assignments before most of them had finished understanding what the assignment was. He'd taught himself programming from library books, since the school computers were locked down tighter than the library ever was, and taught himself to remove restrictions mostly because restrictions irritated him on a level he couldn't fully explain.
+
+At fourteen he broke into the municipal traffic system, not to steal anything — just to see whether he could. He changed the timing of three lights. Nothing happened. He changed six, and a bus nearly clipped a motorcycle at an intersection two streets over. He restored everything immediately and lay awake the rest of the night staring at the ceiling, understanding for the first time that a system didn't care whether the person touching it understood the consequences. It simply responded, the way water responds to a hand pushed into it, without judgment either way.
+
+He never told anyone. A week later a man in a gray jacket knocked on his door.
+
+"That was you."
+
+"Who are you?"
+
+"Someone who knows what you did."
+
+"Then you know I fixed it."
+
+"I do."
+
+"Are you here to arrest me?"
+
+"No." The man handed him a card with an address printed on it. "You need better problems."
+
+"What happens there?"
+
+"You find out."
+
+He went. The address belonged to a private research facility, and that was where Tech first sat down in front of a machine powerful enough to make him forget the time entirely. No lessons. No restrictions. No artificial exercises built to teach a lesson he'd already learned. Real systems, real problems, and nobody telling him to stop. He stayed until morning, then the next night, then the one after that, and for the first time in his life someone had put a machine in front of him that could actually keep pace with the way his mind moved. That was enough, and it stayed enough for a long time.
+
+---
+
+Ghost found him six months later. "You're wasting time."
+
+"That's a contradiction."
+
+"How?"
+
+"You said I'm wasting it. Then why are you here?"
+
+"Because you're good."
+
+"Good at what?"
+
+Ghost looked around the room. "Everything you shouldn't be doing."
+
+"That's vague."
+
+"You're coming with me."
+
+"No."
+
+Ghost waited.
+
+"Why not?"
+
+"You'll tell me later," Ghost said, and left, and Tech followed him twenty minutes after that without ever fully explaining to himself why he had.
+
+---
+
+The Revolver handed him access to systems no ordinary network should have contained — satellite feeds, financial networks, weapons databases, identity registries, encrypted channels that most people didn't know existed at all. He loved every part of it, not because the systems were dangerous, but because they were honest in a way people rarely bothered to be. A locked door had a reason. An encrypted file had a key somewhere. A blind camera had a blind spot. Every problem had architecture, and every architecture had a weakness, and every weakness could be found if you were patient and curious enough to keep looking.
+
+People were harder. They claimed one thing and wanted another. They lied badly or brilliantly, changed their minds mid-sentence, and Tech found the whole species exhausting in a way no machine had ever managed to be.
+
+"You see things other people miss," Ghost told him once.
+
+"That's because other people don't look."
+
+"You don't look either."
+
+"What?"
+
+"You search."
+
+"Same thing."
+
+"No," Ghost said, and walked away before Tech could argue the point, which he hated most of all — being right without sticking around to enjoy it.
+
+---
+
+After Maze's betrayal, Tech found the first discrepancy almost by accident — a timestamp, a camera feed that should have run four minutes and hadn't. Not corrupted. Deleted, and deletion was a different animal entirely: corruption was damage, something that just happened to a file, but deletion was a choice someone had made on purpose.
+
+He restored the missing segment and found Maze standing in a corridor, speaking to someone off-camera. The audio was gone; he recovered a fraction of it, three words he played back twice without being able to place the second voice. He saved the file and told no one, and it wasn't because he thought Maze deserved protecting. He wanted to know what came next, and curiosity had always been the cleanest excuse he owned for the things he chose not to say out loud. He'd used it for years. It was getting harder, lately, to draw the line between curiosity and something closer to complicity.
+
+---
+
+The present-day archive opened slowly — old mission logs, financial transfers, equipment orders, personnel movements, and then a folder with no operational label at all, just a date. Inside were photographs. Eight people. Then nine.
+
+Dagger.
+
+The last photograph stopped him cold — the boy at twelve, blood on his face, a blanket around his shoulders, and a man standing behind him.
+
+Disposer.
+
+He opened the metadata. The photograph had been pulled from a cleanup archive, accessed first by Maze, copied again, then hidden. He searched the access history and found one more name attached to it.
+
+Ghost.
+
+He sat back, and the room seemed to shrink around him. He opened another file, then another. Ghost had accessed the same archive repeatedly — not after the betrayal, but before it, long before, and Tech found himself whispering the question out loud to a screen that was never going to answer it.
+
+"What were you doing?"
+
+Nothing, of course. Ghost was gone. He looked at the photograph again — Dagger's face barely visible under the blood, furious and terrified and unmistakably alive — and realized none of them had ever asked where the boy had actually come from. Maybe because Ghost hadn't wanted them to. Maybe because everyone had been too busy becoming whatever the Revolver needed them to become to spare the attention for anyone else's history.
+
+He closed the file, then opened it again, and copied everything before he'd fully decided he was going to.
+
+---
+
+"You're still awake," Euphoria said from the doorway.
+
+"You're still talking."
+
+"Occupational hazard."
+
+"Your occupation is making people lie."
+
+"Sometimes." She came closer. "What did you find?"
+
+"Nothing."
+
+"You're a terrible liar."
+
+"Deadeye said that yesterday."
+
+"Deadeye doesn't lie."
+
+"Exactly."
+
+She leaned against the console. "Is it about Ghost?"
+
+"Everything's about Ghost now."
+
+"That's not an answer."
+
+"I know."
+
+"Did Maze leave something?"
+
+He hesitated a beat too long, and her expression shifted before he'd said a word. "What?"
+
+"Why do you care?"
+
+"Because I asked."
+
+"That's not why."
+
+She looked at him, waiting, and for once he had nothing clever ready to hand her. She reached for the keyboard; he caught her wrist before she got there.
+
+"No."
+
+"Why?"
+
+"I don't know yet."
+
+She studied him for a long moment. "You're afraid."
+
+He laughed. "That's absurd."
+
+"Maybe. Call me when you know what you're afraid of," she said, and left, and he watched the door close before looking down at his own hand. It was shaking, only slightly. He tucked it under the desk out of sight, as if that solved anything.
+
+---
+
+He found the second layer at dawn — an entire database hidden inside a maintenance log, names and locations and payments and operations spread out further than he'd expected. The Revolver, he realized scrolling through it, hadn't built the network they operated inside of. They'd inherited a piece of it. Ghost had spent years quietly dismantling other pieces. Maze had apparently spent that same time studying the whole structure from underneath.
+
+Companies. Politicians. Police officials. Private contractors. Mercenaries. Some names dead, some still active, some familiar in a way that made his stomach drop before his mind had finished parsing why.
+
+His own name was one of them. Not as an operative.
+
+**TECHNICAL ASSET — CONTINUITY VALUE: HIGH**
+
+Beneath it, a list of every system he'd built for the team, every surveillance architecture, every exploit, every tool, every back door he'd ever designed — catalogued, weaponized, repurposed, sold, by someone planning for a future in which Tech was no longer the one being asked to build anything. He scrolled to the final line.
+
+**Creator liability: indirect.**
+
+He stared at it, laughed once, then again, and the second laugh came out wrong in a way that scared him more than the words on the screen did. He'd spent years telling himself he only built the tools — other people decided how to use them, and the decision was never his to carry. It had always sounded reasonable when he said it to himself. Now it sounded like a sentence someone else had taught him to repeat.
+
+---
+
+Ghost had asked him to destroy a program once. He'd refused.
+
+"It took me six months."
+
+"Destroy it."
+
+"It could prevent a city-wide attack."
+
+"It could also cause one."
+
+"That's not my decision."
+
+"Whose is it, then?" Ghost had asked, and Tech had no answer ready, and after a silence long enough to become its own kind of answer, he'd deleted the program himself and hated Ghost for making him do it. Years later he'd understood that the program had never been the real test. The test had been whether he could admit that making a thing carried responsibility for everything the thing made possible afterward.
+
+He'd thought he passed. The archive suggested otherwise.
+
+---
+
+By noon he'd copied the files onto three drives. He destroyed the first, buried the second inside the safehouse walls, and kept the third for himself. He should have handed it to Deadeye. He should have told Euphoria, told Dagger, told someone. Instead he told himself he needed to understand the network first — reasonable, practical, necessary — and he'd always been very good at making those words sound like something other than fear.
+
+Before leaving the room he went back to the photograph of Dagger one more time, enlarged it further than before. Behind Dagger, Disposer. Behind Disposer, barely visible through smoke, a second figure with an obscured face and a familiar coat.
+
+Maze.
+
+And past that, a reflection in a broken window.
+
+Ghost.
+
+Watching, not from outside the building. From inside it.
+
+Tech froze, rewound, and watched the reflection vanish, reappear, vanish again, until he'd enlarged it so far the image dissolved into blocks of meaningless color. He couldn't prove it was Ghost. He couldn't prove it wasn't. That was the problem people never wanted to hear about machines — they didn't give you answers, only evidence, and it was always a person left standing there afterward, deciding what the evidence actually meant.
+
+He shut the monitor down. The room went dark, and for the first time in years he wished there were no systems left anywhere to search — no cameras, no archives, no hidden partitions, no perfect record of everything he'd ever built. He'd never once wanted ignorance before this. Wanting it now frightened him more than anything the files had shown him.
+
+He left with the third drive in his pocket, telling no one what he'd found, not yet. Behind him, one monitor stayed lit — an empty corridor, a door opening at the far end, then closing again with no one visible in the frame. The timestamp kept running underneath it, patient, indifferent.
+
+He hadn't built that camera. He knew exactly who had.
