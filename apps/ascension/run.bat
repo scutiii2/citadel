@@ -1,6 +1,7 @@
 @echo off
 REM Ascension launcher - builds and serves the game UI and backend on the
 REM port in configs\config_app.json (8060 by default).
+REM Rebuild after UI edits: npm --prefix web run build.
 REM LABEL: Ascension
 REM DESCRIPTION: Ascension game UI and API for Ember. Collect and battle Ascended, with Laya-assisted AI and saved progress. No LLM, no billing.
 

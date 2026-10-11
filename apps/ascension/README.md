@@ -11,8 +11,9 @@ is `docs/superpowers/specs/2026-10-09-emberlings-decisions.md`.
 
 Ascension serves its game API and its own built web UI. Ember registers the
 game, hosts it in an iframe and supplies a one-time identity ticket. The
-backend changes are Phase 2 of `docs/superpowers/plans/2026-10-11-game-host.md`;
-the Vue sources move into `web/` in Phase 3.
+backend and standalone Vue UI are Phases 2 and 3 of
+`docs/superpowers/plans/2026-10-11-game-host.md`. The generic Ember host follows
+in Phase 4.
 
 ## The game in short
 
@@ -47,7 +48,7 @@ falls back to basic ATTACK.
 ## Requirements
 
 - Python 3.11 or newer on Windows (`py` launcher).
-- Node.js and npm to build the Vue UI once `web/package.json` is present.
+- Node.js and npm to build the Vue UI.
 - Optional: the `laya` package (`pip install -e ".[laya]"`).
 
 ## Run
@@ -71,8 +72,8 @@ Delete the old file, or point `database_path` at a new one, to start fresh.
 `server_launcher` lists this project from its `run.bat`. Default port 8060.
 When `web/dist/index.html` is missing and `web/package.json` exists, the launcher
 runs `npm --prefix web ci` followed by `npm --prefix web run build`. A build
-failure stops the launcher. During Phase 2, when the UI sources are absent, it
-starts the API anyway; `/` returns 503 with
+failure stops the launcher. If UI sources are absent, the API still starts;
+`/` returns 503 with
 `UI not built: run npm --prefix web run build`.
 
 ## Ember host configuration
@@ -171,8 +172,8 @@ deadline. Timers run in real time while the service is stopped.
 ## Tests and the Laya evaluation
 
 ```
-.venv_mini_games\Scripts\python -m pytest
-.venv_mini_games\Scripts\python -m src.ascension.eval.situation_eval
+.venv_ascension\Scripts\python -m pytest
+.venv_ascension\Scripts\python -m src.ascension.eval.situation_eval
 ```
 
 The tests use a fake Laya engine. The evaluation needs the real model, is run by
@@ -199,7 +200,7 @@ the collection; it has no effect in battle. All current Ascended are `enchant`.
 - `src/` - config, bearer auth, sessions, Ember identity client, UI serving,
   the Laya client and the FastAPI app.
 - `manifest.json` - public game metadata.
-- `web/dist/` - built game UI (Vue sources arrive in Phase 3).
+- `web/` - standalone Vue game UI, tests, fonts and card art; `web/dist/` is the build.
 - `src/ascension/` - Ascension: catalog, battle engine, passives, action policy and
   decider, situation readers, repository, services, coordinator, API.
 - `src/ascension/eval/` - the manual Laya evaluation.
@@ -219,8 +220,31 @@ the collection; it has no effect in battle. All current Ascended are `enchant`.
 
 ## Known gaps
 
-Deferred to the Ember UI spec:
+Remaining gameplay gaps:
 
 - The mood draw is stored in `rounds`, but no route reveals it after a battle has
   finished.
-- The manifest supplies game discovery; the Vue UI sources arrive in Phase 3.
+- Manual gameplay verification remains a user check.
+
+## Standalone web UI
+
+See [web/README.md](web/README.md) for development and build commands. The UI now
+lives in this project and calls `/ascension` directly with an in-memory bearer
+session. Run `npm --prefix web ci`, then `npm --prefix web run build` after UI
+changes. `run.bat` installs and builds automatically when `web/dist/index.html`
+is missing, then FastAPI serves the build.
+
+The Vite dev port defaults to 5174 and proxies game requests to port 8060. Set
+`VITE_EMBER_ORIGIN` before development/build to match the backend's `ember_origin`
+(default `http://127.0.0.1:5173`); a mismatch can block iframe loading or messages.
+Without a launch ticket, the page says “Open this game from Ember”. An expired
+session asks the player to reopen the game; it does not retry the spent ticket.
+
+## Launch from Ember
+
+Set `ember_api_url` to `http://127.0.0.1:8030` and `ember_origin` to the Ember
+web origin (default `http://127.0.0.1:5173`). Configure the same internal token
+on both servers yourself; it is only used by the server-side redeem client.
+Register `http://127.0.0.1:8060` in Ember Admin's Games page and grant
+`games.ascension.play` to player roles. Administrator receives the grant on
+registration. Build with `VITE_EMBER_ORIGIN` matching `ember_origin`.
