@@ -70,8 +70,8 @@ describe("AccountView", () => {
   it("lists the pages the tab bar leaves out", async () => {
     const wrapper = await mountView([]);
 
-    // chat.use: Agents and Settings; Chat, Capabilities and Usage are in the bar.
-    expect(wrapper.findAll(".more-list a").map((a) => a.text())).toEqual(["Agents", "Settings"]);
+    // chat.use: Agents, Games and Settings; Chat, Capabilities and Usage are in the bar.
+    expect(wrapper.findAll(".more-list a").map((a) => a.text())).toEqual(["Agents", "Games", "Settings"]);
     expect(wrapper.find(".more-list a.issues").exists()).toBe(false);
   });
 

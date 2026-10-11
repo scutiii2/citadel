@@ -3,9 +3,11 @@ import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Account } from "../api/AuthClient";
 import { navPreferencesClient, type NavPrefs } from "../api/NavPreferencesClient";
+import { settingsClient } from "../api/SettingsClient";
 import { useAuthStore } from "../stores/auth";
 import SidebarEditor from "./SidebarEditor.vue";
 
+vi.mock("../api/SettingsClient", () => ({ settingsClient: { get: vi.fn(), pages: vi.fn() } }));
 vi.mock("../api/NavPreferencesClient", () => ({
   navPreferencesClient: { get: vi.fn(), save: vi.fn(), reset: vi.fn() },
 }));
@@ -32,6 +34,8 @@ const lastSaved = () => vi.mocked(navPreferencesClient.save).mock.lastCall![0];
 
 beforeEach(() => {
   vi.resetAllMocks();
+  // Games is open to every account; these tests are about the other pages, so the admin hides it.
+  vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/games"] });
   vi.mocked(navPreferencesClient.save).mockImplementation(async (p) => p);
   vi.mocked(navPreferencesClient.reset).mockResolvedValue(undefined);
 });
@@ -156,5 +160,13 @@ describe("SidebarEditor", () => {
     await flushPromises();
 
     expect(wrapper.find('[role="alert"]').text()).toBe("Server is down");
+  });
+});
+
+describe("pages hidden by the administrator", () => {
+  it("are not offered to the account, and Games is when not hidden", async () => {
+    vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/usage", "/agents"] });
+
+    expect(names(await setup())).toEqual(["Chat", "Capabilities", "Games", "Settings"]);
   });
 });

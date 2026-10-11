@@ -27,7 +27,6 @@ from src.routes import (
     chat_folders,
     chats,
     config_issues,
-    ascension as ascension_routes,
     games as games_routes,
     tickets as tickets_routes,
     logs,
@@ -48,7 +47,6 @@ from src.services.backup_service import BackupScheduler, DatabaseBackup
 from src.services.migrations import MigrationRunner
 from src.services.chat_service import MAX_CHAT_BYTES
 from src.services.email_service import EmailSender, McpEmailSender
-from src.services.ascension_gateway import AscensionApi, AscensionGateway
 from src.services.game_manifest import ManifestFetcher
 from src.services.extension_probe import ExtensionProbe
 from src.services.log_service import LogWriter
@@ -85,15 +83,13 @@ def create_app(
     agent_gateway: AgentGateway | None = None,
     server_tools: ServerTools | None = None,
     traffic: TrafficRecorder | None = None,
-    ascension: AscensionApi | None = None,
     *,
     game_fetcher: ManifestFetcher | None = None,
 ) -> FastAPI:
     """email_sender defaults to the MCP Email capability,
     upstream_transport to real HTTP, agent_gateway to a real MCP client for
     ai_agent and server_tools to one for mcp_server; tests pass fakes. traffic
-    defaults to a recorder saving to the database; tests pass their own.
-    ascension defaults to an HTTP client for the Ascension backend."""
+    defaults to a recorder saving to the database; tests pass their own."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -122,9 +118,6 @@ def create_app(
         # Raises SecretBoxError (a clear one-line message) when .env holds a key that is not valid.
         secret_box = SecretBox(ensure_secrets_key(settings.env_path))
         upstream = httpx.AsyncClient(transport=upstream_transport, timeout=_UPSTREAM_TIMEOUT)
-        # A client of its own for the Ascension backend: no default headers and no redirects,
-        # so the internal token can never follow a redirect to another host.
-        ascension_client = httpx.AsyncClient(transport=upstream_transport, follow_redirects=False)
 
         manifest_client = httpx.AsyncClient(follow_redirects=False)
         app.state.game_fetcher = game_fetcher or ManifestFetcher(
@@ -147,9 +140,6 @@ def create_app(
         app.state.agent_gateway = agent_gateway or McpAgentGateway(internal_token or None, recorder)
         app.state.extension_probe = ExtensionProbe(app.state.agent_gateway)
         app.state.server_tools = server_tools or McpServerTools(settings.mcp_server_url, internal_token or None, recorder)
-        app.state.ascension = ascension or AscensionGateway(
-            ascension_client, settings.ascension_url, internal_token or None, recorder
-        )
         app.state.logs = log_writer
         app.state.traffic = recorder
         recorder.start()
@@ -175,7 +165,6 @@ def create_app(
             # Saves the counters (turns just ended may have added some).
             await recorder.stop()
             await upstream.aclose()
-            await ascension_client.aclose()
             await manifest_client.aclose()
             await database.dispose()
 
@@ -213,7 +202,6 @@ def create_app(
     app.include_router(traffic_routes.router)
     app.include_router(attachments.router)
     app.include_router(config_issues.router)
-    app.include_router(ascension_routes.router)
     app.include_router(games_routes.router)
     app.include_router(games_routes.internal_router)
     app.include_router(tickets_routes.router)

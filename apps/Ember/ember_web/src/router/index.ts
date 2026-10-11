@@ -1,3 +1,4 @@
+import { useGamesStore } from "../stores/games";
 import { createRouter, createWebHistory, type RouteLocationRaw } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { useConfigIssuesStore } from "../stores/configIssues";
@@ -64,12 +65,8 @@ export const router = createRouter({
       component: () => import("../views/AgentsView.vue"),
       meta: { permission: "chat.use" },
     },
-    {
-      path: "/ascension",
-      name: "ascension",
-      component: () => import("../views/AscensionView.vue"),
-      meta: { permission: "ascension.play" },
-    },
+    { path: "/games", name: "games", component: () => import("../views/GamesView.vue") },
+    { path: "/ascension", redirect: "/games" },
     {
       path: "/config-issues",
       name: "config-issues",
@@ -136,7 +133,11 @@ router.beforeEach(async (to): Promise<true | RouteLocationRaw> => {
     return to.name === "verify-email" || to.meta.anyAccount ? true : { name: "verify-email" };
   }
 
-  const home = HOME_PAGES.find((p) => auth.hasPermission(p.permission));
+  let home = HOME_PAGES.find((p) => auth.hasPermission(p.permission));
+  if (!home) {
+    const games = useGamesStore(); await games.ensureLoaded();
+    if (games.games.length > 0) home = { name: "games", permission: "" };
+  }
   // The verify page stays open to an unverified account even when verification
   // is optional (the Account page links to it).
   if (to.meta.guestOnly || (to.name === "verify-email" && account.email_verified)) {

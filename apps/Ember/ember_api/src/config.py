@@ -15,8 +15,6 @@ ENV_PATH = PROJECT_DIR / ".env"
 # Pre-.env layout: one secret_*.env file per concern. Read once to build .env.
 LEGACY_SECRETS_DIR = PROJECT_DIR / "secrets"
 
-# The Ascension backend; a config without the key uses this.
-DEFAULT_ASCENSION_URL = "http://127.0.0.1:8060"
 
 
 @dataclass(frozen=True)
@@ -145,8 +143,6 @@ class Settings:
     # another machine. Wins over agents_registry_path when set.
     agents_registry_url: str | None = None
     mcp_server_url: str = "http://127.0.0.1:8010/mcp"
-    # The Ascension backend's root URL (its routes sit under /ascension).
-    ascension_url: str = DEFAULT_ASCENSION_URL
     games_allow_private_urls: bool = True
     security: SecuritySettings = field(default_factory=SecuritySettings)
     usage: UsageSettings = field(default_factory=UsageSettings)
@@ -188,7 +184,6 @@ def load_settings() -> Settings:
         agents_registry_path=_project_path(registry_path),
         agents_registry_url=raw.get("agents_registry_url") or None,
         mcp_server_url=raw.get("mcp_server_url") or "http://127.0.0.1:8010/mcp",
-        ascension_url=raw.get("ascension_url") or DEFAULT_ASCENSION_URL,
         games_allow_private_urls=bool(raw.get("games_allow_private_urls", True)),
         security=SecuritySettings.from_config(raw.get("security", {})),
         usage=UsageSettings.from_config(raw.get("usage", {})),

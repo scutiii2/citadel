@@ -30,7 +30,7 @@ describe("OverviewView", () => {
     const { wrapper, router } = setup(["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage", "watchers.view"]);
     expect(wrapper.find(".primary").attributes("href")).toBe("/");
     expect(wrapper.findAll(".card").map((link) => link.attributes("href"))).toEqual([
-      "/agents", "/capabilities", "/usage", "/settings", "/account",
+      "/agents", "/capabilities", "/games", "/usage", "/settings", "/account",
     ]);
     expect(wrapper.text()).toContain("Signed in as ada");
     await wrapper.find('.card[href="/capabilities"]').trigger("click");
@@ -41,14 +41,13 @@ describe("OverviewView", () => {
   it("hides chat and empty groups without permissions, while keeping Account", async () => {
     const { wrapper, auth } = setup([]);
     expect(wrapper.find(".hero").exists()).toBe(false);
-    expect(wrapper.find("#work-heading").exists()).toBe(false);
     expect(wrapper.find("#monitor-heading").exists()).toBe(false);
-    expect(wrapper.findAll(".card").map((link) => link.attributes("href"))).toEqual(["/account"]);
-    expect(wrapper.text()).toContain("Your role gives you no pages yet");
+    // Games is open to every verified account; the server filters what each may play.
+    expect(wrapper.findAll(".card").map((link) => link.attributes("href"))).toEqual(["/games", "/account"]);
     auth.account = { ...auth.account!, permissions: ["traffic.view", "roles.manage"] };
     await wrapper.vm.$nextTick();
     expect(wrapper.findAll(".card").map((link) => link.attributes("href"))).toEqual([
-      "/account", "http://localhost:5176/",
+      "/games", "/account", "http://localhost:5176/",
     ]);
     expect(wrapper.find(".hero").exists()).toBe(false);
     expect(wrapper.get(".admin-shortcut").attributes("target")).toBe("_blank");
@@ -59,5 +58,19 @@ describe("OverviewView", () => {
     const { wrapper } = setup(["chat.use", "tools.view", "traffic.view", "roles.manage", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"], false);
     expect(wrapper.find(".hero").exists()).toBe(false);
     expect(wrapper.findAll(".card").map((link) => link.attributes("href"))).toEqual(["/account"]);
+  });
+});
+
+describe("pages hidden by the administrator", () => {
+  it("leaves them out of the cards", async () => {
+    const { wrapper } = setup(["chat.use"]);
+    const { usePageVisibilityStore } = await import("../stores/pageVisibility");
+    usePageVisibilityStore().hidden = ["/usage", "/games"];
+    await wrapper.vm.$nextTick();
+
+    const hrefs = wrapper.findAll(".card").map((link) => link.attributes("href"));
+    expect(hrefs).not.toContain("/usage");
+    expect(hrefs).not.toContain("/games");
+    expect(hrefs).toContain("/agents");
   });
 });

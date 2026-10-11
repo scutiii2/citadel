@@ -6,11 +6,13 @@ import type { Account } from "../api/AuthClient";
 import { authClient } from "../api/AuthClient";
 import { configIssuesClient } from "../api/ConfigIssuesClient";
 import { navPreferencesClient, type NavPrefs } from "../api/NavPreferencesClient";
+import { settingsClient } from "../api/SettingsClient";
 import { NAV_PAGES } from "../router/pages";
 import { useAuthStore } from "../stores/auth";
 import NavRail from "./NavRail.vue";
 
 vi.mock("../api/AuthClient", () => ({ authClient: { logout: vi.fn(() => Promise.resolve()) } }));
+vi.mock("../api/SettingsClient", () => ({ settingsClient: { get: vi.fn(), pages: vi.fn() } }));
 vi.mock("../api/NavPreferencesClient", () => ({
   navPreferencesClient: { get: vi.fn(() => Promise.resolve({ order: [], pinned: [], hidden: [] })) },
 }));
@@ -51,6 +53,8 @@ const pageLinks = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) => wra
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Games is open to every account; these tests are about the other pages, so the admin hides it.
+  vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/games"] });
 });
 
 describe("NavRail", () => {
@@ -256,4 +260,33 @@ it("offers Ember Admin to delegated admins and hides it for members and unverifi
   auth.account = { ...auth.account, email_verified: false };
   await flushPromises();
   expect(wrapper.find(".admin-link").exists()).toBe(false);
+});
+
+describe("pages hidden by the administrator", () => {
+  it("leaves them out of the rail, and shows Games when it is not hidden", async () => {
+    vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/usage"] });
+    const { wrapper } = await setup(ACCOUNT);
+
+    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Capabilities", "Agents", "Games", "Settings"]);
+  });
+
+  it("never removes Chat or Settings, even if the list names them", async () => {
+    vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/", "/settings", "/games"] });
+    const { wrapper } = await setup(ACCOUNT);
+
+    const labels = pageLinks(wrapper).map((l) => l.attributes("aria-label"));
+    expect(labels).toContain("Chat");
+    expect(labels).toContain("Settings");
+  });
+
+  it("draws no pages until the hidden list has loaded", async () => {
+    let release: (value: { hidden: string[] }) => void = () => {};
+    vi.mocked(settingsClient.pages).mockReturnValue(new Promise((resolve) => (release = resolve)));
+    const { wrapper } = await setup(ACCOUNT);
+
+    expect(pageLinks(wrapper)).toHaveLength(0);
+    release({ hidden: ["/games"] });
+    await flushPromises();
+    expect(pageLinks(wrapper)).toHaveLength(5);
+  });
 });

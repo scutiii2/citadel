@@ -13,7 +13,6 @@ from src.db import Database
 from src.models import Account
 from src.services.agent_gateway import AgentGateway
 from src.services.email_service import EmailSender
-from src.services.ascension_gateway import AscensionApi
 from src.services.log_service import LogWriter
 from src.services.memory_purger import MemoryPurger
 from src.services.otp_service import OtpService
@@ -76,10 +75,6 @@ def get_extension_probe(request: Request) -> ExtensionProbe:
 
 def get_server_tools(request: Request) -> ServerTools:
     return request.app.state.server_tools
-
-
-def get_ascension(request: Request) -> AscensionApi:
-    return request.app.state.ascension
 
 
 def get_memory_purger(request: Request) -> MemoryPurger:

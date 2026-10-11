@@ -1,9 +1,10 @@
+import { GamesClient } from "../api/GamesClient";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authClient, type Account } from "../api/AuthClient";
 import { UnauthorizedError } from "../api/http";
 import { router } from "./index";
-import { NAV_PAGES } from "./pages";
+import { NAV_PAGES, visiblePages } from "./pages";
 
 vi.mock("../api/AuthClient", () => ({ authClient: { me: vi.fn() } }));
 
@@ -27,6 +28,7 @@ beforeEach(async () => {
   await router.replace("/login");
   setActivePinia(createPinia());
   vi.clearAllMocks();
+  vi.spyOn(GamesClient.prototype, "list").mockResolvedValue([]);
 });
 
 describe("shared chat route", () => {
@@ -228,27 +230,43 @@ it("does not expose personal Usage to a usage observer without chat permission",
   expect(router.currentRoute.value.name).toBe("no-access");
 });
 
-describe("Ascension page", () => {
-  it("opens for an account that may play", async () => {
-    me.mockResolvedValue({ ...ACCOUNT, permissions: [...ACCOUNT.permissions, "ascension.play"] });
-
-    await router.push("/ascension");
-
-    expect(router.currentRoute.value.name).toBe("ascension");
-  });
-
-  it("sends an account without ascension.play to its home page", async () => {
+describe("Games page", () => {
+  it("opens for a signed-in account and redirects old Ascension links", async () => {
     me.mockResolvedValue(ACCOUNT);
+    await router.push("/games"); expect(router.currentRoute.value.name).toBe("games");
+    await router.push("/ascension"); expect(router.currentRoute.value.name).toBe("games");
+  });
+  it("shows the nav button to every verified account, even one with no permissions", () => {
+    const page = NAV_PAGES.find(p => p.to === "/games"); expect(page?.label).toBe("Games");
+    expect(visiblePages((p) => p === "").some(p => p.to === "/games")).toBe(true);
+  });
+});
 
-    await router.push("/ascension");
+describe("pages hidden by the administrator", () => {
+  const has = () => true;
+  const ids = (hidden: string[]) => visiblePages(has, hidden).map((p) => p.to);
 
-    expect(router.currentRoute.value.name).toBe("chat");
+  it("drops the pages in the list and keeps the rest", () => {
+    expect(ids(["/usage", "/games"])).not.toContain("/usage");
+    expect(ids(["/usage", "/games"])).not.toContain("/games");
+    expect(ids(["/usage"])).toContain("/agents");
   });
 
-  it("is in the nav rail and on Overview only for that permission", () => {
-    const page = NAV_PAGES.find((p) => p.to === "/ascension");
-
-    expect(page?.label).toBe("Ascension");
-    expect(page?.permission).toBe("ascension.play");
+  it("shows every page when nothing is hidden", () => {
+    expect(visiblePages(has).map((p) => p.to)).toEqual(NAV_PAGES.map((p) => p.to));
   });
+
+  it("never hides Chat or Settings, whatever the list says", () => {
+    expect(ids(["/", "/settings"])).toEqual(expect.arrayContaining(["/", "/settings"]));
+  });
+
+  it("still applies the account's permissions to the pages left", () => {
+    expect(visiblePages((p) => p === "", ["/usage"]).map((p) => p.to)).toEqual(["/games"]);
+  });
+});
+
+it("lands game-only accounts on Games when the filtered catalog is nonempty", async () => {
+  me.mockResolvedValue({ ...ACCOUNT, permissions: ["games.ascension.play"] });
+  vi.spyOn(GamesClient.prototype, "list").mockResolvedValue([{ id: "ascension", name: "Ascension", url: "http://localhost:8060", description: "", icon: "", version: "1" }]);
+  await router.push("/"); expect(router.currentRoute.value.name).toBe("games");
 });

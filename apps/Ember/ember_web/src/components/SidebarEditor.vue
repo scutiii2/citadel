@@ -8,6 +8,7 @@ import { computed, ref } from "vue";
 import SettingRow from "./SettingRow.vue";
 import ToggleSwitch from "./ToggleSwitch.vue";
 import { visiblePages } from "../router/pages";
+import { usePageVisibilityStore } from "../stores/pageVisibility";
 import { useAuthStore } from "../stores/auth";
 import { useNavPrefsStore } from "../stores/navPrefs";
 import type { NavPrefs } from "../api/NavPreferencesClient";
@@ -18,6 +19,7 @@ const PIN_ICON = "M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3z";
 const GRIP_ICON = "M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01";
 
 const auth = useAuthStore();
+const pageVisibility = usePageVisibilityStore();
 const navPrefs = useNavPrefsStore();
 
 const props = defineProps<{ modelValue?: NavPrefs }>();
@@ -31,7 +33,7 @@ function reset(): void {
   if (props.modelValue) emit('update:modelValue', { order: [], pinned: [], hidden: [] });
   else void navPrefs.reset();
 }
-const pages = computed(() => visiblePages((p) => auth.hasPermission(p)));
+const pages = computed(() => visiblePages((p) => auth.hasPermission(p), pageVisibility.hidden));
 const groups = computed(() => arrange(pages.value, prefs.value));
 const rows = computed(() => [
   ...groups.value.pinned.map((page) => ({ page, pinned: true })),

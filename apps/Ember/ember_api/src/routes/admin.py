@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from pydantic import BaseModel, EmailStr, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, StrictBool
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.deps import (
@@ -32,7 +32,7 @@ from src.services.permissions import (
     ADMIN_ROLE, is_known_permission, ADMIN_PERMISSIONS, ACCOUNTS_VIEW, ACCOUNTS_MANAGE,
     ACCOUNTS_DELETE, ROLES_VIEW, ROLES_MANAGE, ROLES_ASSIGN, INVITES_MANAGE, SETTINGS_MANAGE,
 )
-from src.services.settings_service import BOOLEAN_SETTINGS, SettingsService
+from src.services.settings_service import BOOLEAN_SETTINGS, MAX_HIDDEN_PAGES, InvalidPages, SettingsService
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +195,29 @@ class CreateInviteRequest(BaseModel):
 
 class SettingIn(BaseModel):
     value: StrictBool
+
+
+class HiddenPagesIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    hidden: list[str] = Field(max_length=MAX_HIDDEN_PAGES)
+
+
+# Declared before /settings/{name}, so "pages" is not read as a setting name.
+@router.put("/settings/pages")
+async def change_hidden_pages(
+    body: HiddenPagesIn,
+    account: Account = Depends(require_settings_manage),
+    app_settings: SettingsService = Depends(get_settings_service),
+    logs: LogWriter = Depends(get_log_writer),
+) -> dict[str, list[str]]:
+    """Hides pages from every account's sidebar (nav only: they still open by URL)."""
+    try:
+        before = await app_settings.set_hidden_pages(body.hidden)
+    except InvalidPages as error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
+    now = await app_settings.hidden_pages()
+    await logs.action(account, "admin.setting", f"Hidden sidebar pages: {', '.join(before) or 'none'} -> {', '.join(now) or 'none'}")
+    return {"hidden": now}
 
 
 @router.put("/settings/{name}")

@@ -38,13 +38,13 @@ export const NAV_PAGES: NavPage[] = [
     permission: "chat.use",
   },
   {
-    to: "/ascension",
-    label: "Ascension",
+    to: "/games",
+    label: "Games",
     icon: [
       "M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z",
     ],
-    description: "Collect Ascended, battle wild ones and spend Insignia in the shop.",
-    permission: "ascension.play",
+    description: "Play the games available for your account.",
+    permission: "",
   },
   { to: "/usage", label: "Usage", icon: ["M3 3v16a2 2 0 0 0 2 2h16", "M18 17V9", "M13 17V5", "M8 17v-3"], description: "Token usage and limits.", permission: "chat.use" },
   {
@@ -66,9 +66,15 @@ export const NAV_PAGES: NavPage[] = [
   },
 ];
 
-/** The pages an account with these permissions may open. */
-export function visiblePages(hasPermission: (permission: string) => boolean): NavPage[] {
-  return NAV_PAGES.filter((p) =>
-    Array.isArray(p.permission) ? p.permission.some(hasPermission) : hasPermission(p.permission),
+/** Pages an administrator cannot hide from the sidebar: Chat is home and Settings holds the account's own preferences. */
+export const PROTECTED_PAGES: readonly string[] = ["/", "/settings"];
+
+/** The pages an account with these permissions may open, less the ones an administrator hid
+ * for everyone (`hidden`; nav only, the pages still open by URL). */
+export function visiblePages(hasPermission: (permission: string) => boolean, hidden: readonly string[] = []): NavPage[] {
+  return NAV_PAGES.filter(
+    (p) =>
+      (PROTECTED_PAGES.includes(p.to) || !hidden.includes(p.to)) &&
+      (Array.isArray(p.permission) ? p.permission.some(hasPermission) : hasPermission(p.permission)),
   );
 }

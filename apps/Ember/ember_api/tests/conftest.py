@@ -17,7 +17,6 @@ from src.config import BackupSettings, SecuritySettings, Settings, UsageSettings
 from src.services import otp_service
 from src.services.agent_gateway import AgentCallError, Caller
 from src.services.email_service import EmailDeliveryError
-from src.services.ascension_gateway import AscensionRefused, AscensionUnavailable
 from src.services.server_tools import ServerUnavailable
 from src.services.traffic import TrafficRecorder
 
@@ -286,32 +285,6 @@ class FakeServerTools:
         return set(self.templates)
 
 
-@dataclass
-class FakeAscension:
-    """Stands in for Ascension behind AscensionGateway. Records every call;
-    `responses` maps (method, path) to a reply (default {"ok": True});
-    `refuse` raises AscensionRefused(status, message) and `unavailable`
-    raises AscensionUnavailable."""
-
-    calls: list[dict[str, Any]] = field(default_factory=list)
-    responses: dict[tuple[str, str], Any] = field(default_factory=dict)
-    refuse: tuple[int, str] | None = None
-    unavailable: bool = False
-
-    async def request(self, method, path, account, *, json=None, params=None, idempotency_key=None):
-        self.calls.append(
-            {"method": method, "path": path, "owner": str(account.id), "json": json, "params": params, "key": idempotency_key}
-        )
-        if self.unavailable:
-            raise AscensionUnavailable("connection refused (fake)")
-        if self.refuse is not None:
-            raise AscensionRefused(*self.refuse)
-        return self.responses.get((method, path), {"ok": True})
-
-    async def reset_profile(self, account, idempotency_key):
-        return await self.request("POST", "/ascension/profile/reset", account, json={"confirm": True}, idempotency_key=idempotency_key)
-
-
 def make_settings(
     tmp_path: Path,
     *,
@@ -382,11 +355,6 @@ def server_tools() -> FakeServerTools:
 
 
 @pytest.fixture
-def ascension() -> FakeAscension:
-    return FakeAscension()
-
-
-@pytest.fixture
 def traffic() -> TrafficRecorder:
     """Counts in memory only (no database), so tests read it with pending()."""
     return TrafficRecorder()
@@ -400,7 +368,6 @@ def client_factory(
     agent: FakeAgent,
     server_tools: FakeServerTools,
     traffic: TrafficRecorder,
-    ascension: FakeAscension,
 ) -> Iterator[Callable[..., TestClient]]:
     """Builds a started app (lifespan run) per call; all are closed at the end."""
     opened: list[TestClient] = []
@@ -417,7 +384,6 @@ def client_factory(
                 agent_gateway=agent,
                 server_tools=server_tools,
                 traffic=traffic,
-                ascension=ascension,
                 game_fetcher=game_fetcher,
             ),
             client=(address, 50000),

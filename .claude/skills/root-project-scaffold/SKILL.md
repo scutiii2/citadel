@@ -35,6 +35,8 @@ pre-create empty ones "for consistency":
 | `data/` | Persists runtime data to disk (mcp_server, ember_api have it; ai_agent keeps its registry and usage JSONL under `.data/`; chat_cli keeps nothing, ember_api stores its chats) |
 | `docs/` | Documentation beyond the README is substantial enough to split out |
 | `migrations/`, `scripts/` | ember_api only: Alembic revisions and its CLIs (`migrate_db`, `backup_db`, `import_chat_app`). A new project with a database may follow it; otherwise use `src/` |
+| `web/` | Standalone game UI with its own package manifest and lockfile; build into ignored `web/dist/` and serve it from the game API (see Ascension) |
+| `manifest.json` | Public game metadata for Ember registration |
 | `logs/` | The project writes its own log files (needs a `logging_setup.py`-style module in `src/`, not an ad-hoc log call) |
 
 Do not invent additional top-level folders (`lib/`, `scripts/`, `bin/`,
@@ -71,7 +73,8 @@ changes the convention for every project after it.
    `/mcp`, reject calls without it once set. Never import another root
    project: self-contained means a separate venv and no shared packages
    (see `chat_cli`, which talks to ember_api over HTTP instead of reusing
-   its code).
+   its code). Game browser APIs use game-owned bearer sessions: the shared token
+   stays server-side for redemption against Ember. Never expose it in the UI.
 
 ## mcp_server's dotted variant
 

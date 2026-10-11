@@ -3,15 +3,17 @@ import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import { ADMIN_ACCESS_PERMISSIONS, emberAdminUrl } from "../utils/adminLink";
 import { visiblePages } from "../router/pages";
+import { usePageVisibilityStore } from "../stores/pageVisibility";
 import { useAuthStore } from "../stores/auth";
 
 // Account is always available and is not part of the permission-gated rail.
 const ACCOUNT_ICON = ["M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2", "M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"];
 
 const auth = useAuthStore();
+const pageVisibility = usePageVisibilityStore();
 const adminUrl = emberAdminUrl();
 const canAdmin = computed(() => ADMIN_ACCESS_PERMISSIONS.some(auth.hasPermission));
-const pages = computed(() => visiblePages((p) => auth.hasPermission(p)));
+const pages = computed(() => visiblePages((p) => auth.hasPermission(p), pageVisibility.hidden));
 const chat = computed(() => pages.value.find((p) => p.to === "/"));
 const initial = computed(() => auth.account?.username.charAt(0).toUpperCase() ?? "");
 const descriptions: Record<string, string> = {

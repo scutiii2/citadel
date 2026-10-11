@@ -184,7 +184,7 @@ URL, token or key.
 - "Terse replies" toggle in the chat header (ai_agent's `caveman`
   option), remembered per account.
 - Settings page (`/settings`, `chat.use`): your preferences in one place, grouped by task: Chat (terse
-  replies, ask before tools, chime, desktop notifications), Appearance (theme), Sidebar (see below). Workspace tool approval is configured in ember_admin.
+  replies, ask before tools, chime, desktop notifications), Appearance (theme), Sidebar (see below). Workspace tool approval and the pages hidden from every sidebar (Games, Usage and others; `GET /api/settings/pages`) are configured in ember_admin. Games shows for every verified account.
   A search box filters them as you type (label, description and extra keywords; Enter focuses the first
   match, Esc clears it). A setting that differs from its default shows an accent dot and a reset
   button ("Back to default"), and the header counts how many are changed. Chat and theme apply instantly and
@@ -231,23 +231,11 @@ URL, token or key.
   (a value the agent file does not set is left out), and a status (running,
   offline, disabled; an icon and a word). Read-only, refreshed every 15 s: new chats
   always go to the entry agent, there is no per-agent chat.
-- Ascension page (`/ascension`, `ascension.play`): the Ascension game (collect and battle Ascended) from `apps/ascension`, through ember_api's
-  `/api/ascension` pass-through (the browser never learns Ascension's address or token). The page has its own look, not
-  Ember's: its theme (`components/ascension/theme.css`, `--em-*` tokens: steel, copper, ivory), its bundled fonts
-  (Silkscreen and Inter, SIL OFL, via `@fontsource`) and its own small components in `components/ascension/ui/`
-  (design source: `docs/design/ascension/`, spec `docs/superpowers/specs/2026-10-11-emberlings-redesign-design.md`).
-  A masthead shows the Insignia wallet. The page opens on a main menu (New game, or Continue, Quick battle, Shop,
-  How to play and Reset progress with a save, beside a fanned hand of small cards). New game picks a starter from a column of
-  small cards, the large card and a side panel. In the game, a title, a Main menu link and tabs: Collection (small cards with
-  tier, copies, XP bar and a faint countdown, face-down cards for Ascended not collected yet; a card opens its full card,
-  personalities and five presets with a save toast), Battle (look for a wild Ascended; preview and decline or fight; set up
-  Ascended, preset, mode and EMBLEM limit; the arena with health bars, move buttons coloured by category and a round log,
-  latest first; autonomous rounds every 1.5 s; the five-second EMBLEM prompt counts down on this device; a result page per
-  outcome) and Shop (wallet, EMBLEMs, copies, selling a copy). Cards are drawn on `assets/ascension/card_frame.webp`
-  (tinted per tier) with portraits from `assets/ascension/ascended/` (`ascendedArt.ts`; Bruiser has none yet). The battle loop pauses while
-  the browser tab is hidden or another page is open and resumes where the battle is; a lost connection shows
-  "Reconnecting..." and retries every 3 s; a stale action is refreshed, never resent. Kept alive across page switches.
-  Every change sends a fresh `Idempotency-Key`.
+- Games page (`/games`; `/ascension` redirects): lists games permitted by ember_api. Play
+  requests a short-lived launch ticket and opens the registered origin in an iframe
+  with `allow-scripts allow-same-origin`. Messages require the game's origin and iframe
+  window; resize is bounded, and close clears the in-memory launch URL. The games
+  list stays cached; leaving the page closes the frame so a spent ticket is never reused. Ascension's UI, art and tests live in `apps/ascension/web`.
 - Config issues page (`config.issues.view`): problems in ember_api's config and
   secret files, as errors (broken) or warnings (risky or incomplete), grouped by
   file. Not a nav tab: a red (errors) or amber (warnings only) alert with a count
@@ -372,9 +360,8 @@ token (five 2 px chart marks are allow-listed).
 
 `turnStream` (the event stream: pieces of events, ping, reconnect with backoff, resume, give up, abort) is covered too.
 
-Ascension: the client (paths, Idempotency-Key per action), the store's battle loop with fake timers (1.5 s pace,
-stop when left or hidden, prompt countdown and settle at zero, stale 409, reconnect, 502), each tab's components and
-the page. `e2e/ascension.spec.ts` picks a starter on a first visit.
+Games tests cover the client, account-scoped store, stale launch replies, iframe
+origin/source checks, ready/resize/close messages, empty accounts and navigation.
 
 ### End-to-end test
 
@@ -420,23 +407,21 @@ routes - `/api/mcp/agents/{id}` (agent status only) and `/api/mcp/server`
 src/
   api/          http + AuthClient / ChatsClient / UsageClient / CommandsClient /
                 ExtensionsClient / AgentsClient / AttachmentsClient /
-                ConfigIssuesClient / TemplatesClient / NavPreferencesClient / SharesClient / SettingsClient / AscensionClient (ember_api REST),
+                ConfigIssuesClient / TemplatesClient / NavPreferencesClient / SharesClient / SettingsClient / GamesClient (ember_api REST),
                 McpClientBase / AiAgentClient / McpServerClient (MCP via ember_api), types
   services/     ConversationStorage (chat history; one-time import of old local chats),
                 turnStream (watching a running answer), slashCommands
-  stores/       Pinia: auth, entryAgent, chat, templates, navPrefs, accountCapabilities, configIssues, ascension
+  stores/       Pinia: auth, entryAgent, chat, templates, navPrefs, accountCapabilities, configIssues, games
   composables/  useChatShortcuts (window-level chat keys), useChatRoute (address bar <-> open chat),
                 useElapsed (running clock), useNotify (chime), useCompletionNotify (completion alerts), useSidebarCollapse (chat list),
                 useTheme (system / light / dark)
-  views/        pages: Overview, Chat, Capabilities, Agents, Ascension, Usage, Tickets, Settings, ConfigIssues,
+  views/        pages: Overview, Chat, Capabilities, Agents, Games, Usage, Tickets, Settings, ConfigIssues,
                 Account, Login, Register, VerifyEmail, NoAccess, SharedChat (public)
   components/   reusable pieces: MessageList, ToolSteps, AgentActivity, ChatInput, CommandFormModal, MarkdownContent,
                 CopyButton, UsageChip, UsageGauges, UsageHeatmap, ElapsedTime, WelcomeCard, DownloadCards, TemplatePicker, TemplatesModal, ShareDialog, ConversationSidebar, EntryAgentTag, ToolRunForm, ToolResultPanel, ToolCard, CapabilitySection, ConfirmModal, NavRail, SidebarEditor, ChatSettingsMenu, SettingRow, AuthCard
     analytics/  shared LineChart, hover/keyboard state in useBucketCursor and chart.css, used by Usage
     infoPage.css  shared look of the Agents / Config pages
-    ascension/   the Ascension page: MainMenu, StarterPick, AscendedTemplateCard, CollectionPanel, AscendedCard, PresetEditor,
-                  EncounterPanel, BattleControls, BattleArena, RoundLog, ActionBar, EmblemPrompt, BattleResult, ShopPanel,
-                  EmShell, ascendedArt, starterCopy; theme.css and fonts.ts; ui/ holds the Em* primitives
+    games/      GameStage and origin/source-checked game messages
   router/       routes + access guard, safe post-login redirect, pages (nav + Overview list)
   utils/        markdown rendering, download markers, tool-schema forms, error/time formatting, chat export,
                 tool titles, tool-result formatting, attachment blocks in questions, clipboard, usage formatting, log-analytics helpers, saved-prompt helpers
@@ -525,3 +510,13 @@ Production browser tests cover phone layouts, installation metadata, offline she
 loading, API cache exclusion and reconnection.
 
 Usage shows only the logged-in account, including for administrators. Workspace and per-user usage inspection lives in ember_admin.
+
+## Game hosts
+
+Set `EMBER_GAME_ORIGINS` before starting or building Vite to a space-separated list
+of permitted game origins. It supplies CSP `frame-src` in development and preview;
+production hosting must send the same policy. Local defaults allow localhost and
+127.0.0.1 on any port. `frame-ancestors 'none'` keeps Ember itself out of frames.
+Game permissions are granted through roles. The Games navigation entry shows for
+every verified account (an empty list says no games are available); an administrator
+can hide it for everyone in ember_admin, Workspace settings, Sidebar pages.

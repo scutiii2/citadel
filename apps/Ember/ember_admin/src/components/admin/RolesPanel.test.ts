@@ -348,3 +348,10 @@ it("loads only the affected accounts on demand", async () => {
   expect(wrapper.find(".affected-accounts").text()).toContain("m@example.com");
   expect(wrapper.find(".affected-accounts").text()).not.toContain("o@example.com");
 });
+
+it("shows registry-created game permissions in the role editor", async () => {
+  client.listPermissions.mockResolvedValue([...PERMISSIONS, { name: "games.ascension.play", description: "Play Ascension" }]);
+  const wrapper = await panel(); await listItem(wrapper, "Member").trigger("click");
+  expect(editor(wrapper).text()).toContain("games.ascension.play");
+  expect(editor(wrapper).text()).toContain("Play Ascension"); wrapper.unmount();
+});

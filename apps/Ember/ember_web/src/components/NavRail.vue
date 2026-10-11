@@ -8,6 +8,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import EmberLogo from "./EmberLogo.vue";
 import { useTheme } from "../composables/useTheme";
 import { CONFIG_ISSUES_ICON, OVERVIEW_ICON, PROFILE_ICON, visiblePages } from "../router/pages";
+import { usePageVisibilityStore } from "../stores/pageVisibility";
 import { useAuthStore } from "../stores/auth";
 import { useConfigIssuesStore } from "../stores/configIssues";
 import { useNavPrefsStore } from "../stores/navPrefs";
@@ -18,6 +19,7 @@ const { theme, next, cycle } = useTheme();
 const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" } as const;
 
 const auth = useAuthStore();
+const pageVisibility = usePageVisibilityStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -27,8 +29,8 @@ const canBrowse = computed(() => auth.account !== null && !auth.needsVerificatio
 const navPrefs = useNavPrefsStore();
 // Nothing is drawn until the arrangement has loaded, so the icons don't jump.
 const pages = computed(() =>
-  canBrowse.value && navPrefs.ready
-    ? railPages(visiblePages((p) => auth.hasPermission(p)), navPrefs.prefs)
+  canBrowse.value && navPrefs.ready && pageVisibility.ready
+    ? railPages(visiblePages((p) => auth.hasPermission(p), pageVisibility.hidden), navPrefs.prefs)
     : { pinned: [], rest: [] },
 );
 const hasPages = computed(() => pages.value.pinned.length + pages.value.rest.length > 0);
@@ -45,7 +47,7 @@ interface Tab {
   near?: "l" | "r";
 }
 const tabs = computed(() => {
-  const open = new Map(visiblePages((p) => auth.hasPermission(p)).map((p) => [p.to, p]));
+  const open = new Map(visiblePages((p) => auth.hasPermission(p), pageVisibility.hidden).map((p) => [p.to, p]));
   // A copy, so setting `near` below never touches the shared page list.
   const page = (to: string): Tab | undefined => {
     const p = open.get(to);

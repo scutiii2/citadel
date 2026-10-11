@@ -31,7 +31,6 @@ AGENTS_MANAGE = "agents.manage"
 TICKETS_CREATE = "tickets.create"
 TICKETS_MANAGE = "tickets.manage"
 GAMES_MANAGE = "games.manage"
-ASCENSION_PLAY = "games.ascension.play"  # Compatibility for the old proxy.
 
 ALL_PERMISSIONS = MappingProxyType({
     CHAT_USE: "Chat with ai_agent instances",
@@ -61,8 +60,6 @@ ALL_PERMISSIONS = MappingProxyType({
     TICKETS_CREATE: "Report bugs, suggest features and follow your own tickets",
     TICKETS_MANAGE: "See every ticket, triage them and set status, priority and assignee",
     GAMES_MANAGE: "Register, refresh and remove games",
-    # Seed access for the legacy proxy until Phase 4 removes it.
-    ASCENSION_PLAY: "Play ascension",
 })
 
 ADMIN_ROLE = "Administrator"

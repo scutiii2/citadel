@@ -379,3 +379,20 @@ def test_bulk_permission_save_keeps_protected_and_delegation_rules(client: TestC
     saved = role_by_name(client, "Ops")
     assert saved["description"] is None
     assert saved["permissions"] == ["roles.manage"]
+
+
+def test_game_permissions_and_role_grants_survive_deregistration(client_factory):
+    from tests.test_games_registry import FakeFetcher
+    fetcher = FakeFetcher()
+    fetcher.raw.update(id="puzzle", name="Puzzle")
+    client = client_factory(game_fetcher=fetcher)
+    as_admin(client)
+    assert client.post("/api/games", json={"url": "http://localhost:8060"}).status_code == 201
+    permission = {"name": "games.puzzle.play", "description": "Play puzzle"}
+    assert permission in client.get("/api/admin/permissions").json()
+    role = client.post("/api/admin/roles", json={"name": "Players"}).json()
+    assert client.put(f"/api/admin/roles/{role['id']}/permissions/games.puzzle.play").status_code == 200
+    assert "games.puzzle.play" in role_by_name(client, "Players")["permissions"]
+    assert client.delete("/api/games/puzzle").status_code == 204
+    assert permission in client.get("/api/admin/permissions").json()
+    assert "games.puzzle.play" in role_by_name(client, "Players")["permissions"]

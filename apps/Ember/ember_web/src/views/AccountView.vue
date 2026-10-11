@@ -6,11 +6,13 @@ import ActionButton from "../components/ActionButton.vue";
 import ConfirmModal from "../components/ConfirmModal.vue";
 import { useTheme } from "../composables/useTheme";
 import { CONFIG_ISSUES_ICON, visiblePages } from "../router/pages";
+import { usePageVisibilityStore } from "../stores/pageVisibility";
 import { useAuthStore } from "../stores/auth";
 import { useConfigIssuesStore } from "../stores/configIssues";
 import { errorMessage, formatUtc } from "../utils/errors";
 
 const auth = useAuthStore();
+const pageVisibility = usePageVisibilityStore();
 const router = useRouter();
 
 // Theme and log out live here too: the narrow-screen nav bar has no room for them.
@@ -20,7 +22,7 @@ const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" } as const
 // The narrow-screen bar holds only five pages; the rest are listed here, on
 // narrow screens only (the wide rail already shows them).
 const IN_TAB_BAR = new Set(["/", "/capabilities", "/usage"]);
-const morePages = computed(() => visiblePages((p) => auth.hasPermission(p)).filter((p) => !IN_TAB_BAR.has(p.to)));
+const morePages = computed(() => visiblePages((p) => auth.hasPermission(p), pageVisibility.hidden).filter((p) => !IN_TAB_BAR.has(p.to)));
 const configIssues = useConfigIssuesStore();
 const showConfigIssues = computed(() => auth.hasPermission("config.issues.view") && configIssues.issues.length > 0);
 

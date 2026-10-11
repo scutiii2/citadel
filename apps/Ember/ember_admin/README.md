@@ -37,7 +37,7 @@ scoped by port, so the same ember_api session cookie is sent.
 | Accounts (`/admin/accounts`) | any of `accounts.view`, `accounts.manage`, `accounts.delete`, `roles.assign` |
 | Roles & permissions (`/admin/roles`) | any of `roles.view`, `roles.manage`, `roles.assign` |
 | Invites (`/admin/invites`) | `invites.manage` |
-| Workspace settings (`/admin/settings`) | `settings.manage` |
+| Workspace settings (`/admin/settings`): tool approval and Sidebar pages (which ember_web pages every account's sidebar shows; nav only) | `settings.manage` |
 | Profile (`/profile`; `/account` redirects here) | any logged-in account |
 | Personal settings (`/settings`) | any logged-in account |
 | Email verification (`/verify-email`) | any logged-in account |
@@ -250,3 +250,14 @@ Production browser tests cover phone layouts, installation metadata, offline she
 loading, API cache exclusion and reconnection.
 
 Usage (/usage, usage.all.view) lists every account for a selected period, including zero-usage accounts. Select a user for rolling limits, totals, activity, annual heatmap, breakdown, recent calls and a Markdown export. It does not require chat.use or accounts.view.
+
+## Games registry
+
+The Games page (`/games`, `games.manage`) registers a game by its base URL,
+refreshes its manifest and deregisters it after an exact game-id confirmation.
+Failures appear inline. Registration creates `games.<id>.play`; assign it through
+the Roles page. Deregistration retains permissions and role grants.
+
+For local Ascension, register `http://127.0.0.1:8060` after building its UI and
+configuring server-side redemption against Ember API on port 8030. Configure
+Ember web's `EMBER_GAME_ORIGINS` for production game origins.
