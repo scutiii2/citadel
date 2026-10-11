@@ -40,7 +40,7 @@ onDeactivated(() => store.close());
 .column { max-width: 980px; margin: 0 auto; }
 .heading, .stage-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 h2 { margin: 0; font-size: 1.2em; } h3 { margin: 0; font-size: 1em; } p { color: var(--muted); }
-.games { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 300px)); gap: 16px; }
 .game-card { cursor: pointer; position: relative; aspect-ratio: 16 / 10; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); transition: transform .15s ease; }
 .game-card:hover, .game-card:focus-within { transform: translateY(-2px); }
 .wallpaper { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
