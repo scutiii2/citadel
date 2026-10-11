@@ -12,8 +12,8 @@ const idle = <T>(): Record<Side, T | null> => ({ player: null, wild: null });
 /** Plays each new round of the battle as a short animation, one step at a time, and says
  * what the arena should show meanwhile: each fighter's effect, a thrown EMBLEM, a floating
  * text, and the health to show (the old value until the hit lands). Nothing plays when a
- * battle is first opened or restored, when an EMBLEM prompt is open (its 5 seconds are
- * running), or when the account asks for reduced motion. `busy` stays true until the last
+ * battle is first opened or restored or when an EMBLEM prompt is open (its 5 seconds are
+ * running). It plays even when the system asks for reduced motion: the battle is the game. `busy` stays true until the last
  * step ends, so the page can hold the result and the action buttons back. */
 export const usePlaybackStore = defineStore("playback", () => {
   const ascension = useAscensionStore();
@@ -81,10 +81,6 @@ export const usePlaybackStore = defineStore("playback", () => {
     clear();
   }
 
-  function reducedMotion(): boolean {
-    return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }
-
   watch(
     () => ascension.battle,
     (now, before) => {
@@ -97,7 +93,7 @@ export const usePlaybackStore = defineStore("playback", () => {
         return;
       }
       const fresh = now.history.slice(before.history.length);
-      if (fresh.length === 0 || reducedMotion()) return;
+      if (fresh.length === 0) return;
       const steps = fresh.flatMap((round) => stepsFor(round.events));
       if (steps.length === 0) return;
       const starting = !busy.value;

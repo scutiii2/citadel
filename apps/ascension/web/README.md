@@ -66,8 +66,9 @@ radius tokens or the existing Ascension theme tokens, without literal radii.
 server events to them): attack lunge, hit shake with a floating damage number, defense glow, support glow,
 EMBLEM throw with wobble, caught or broke free, flee. The arena shows the old health until a hit lands.
 While it plays, the action buttons are locked and the result screen waits; the Skip button or a click on
-the arena jumps to the end. Nothing plays when a battle is opened or restored, while an EMBLEM prompt is
-open (its countdown is running), or with `prefers-reduced-motion`.
+the arena jumps to the end. Nothing plays when a battle is opened or restored, or while an EMBLEM prompt is
+open (its countdown is running). It always plays, even with `prefers-reduced-motion`: `.em-glow` on the arena
+exempts it from the global reduced-motion rule in `theme.css`.
 
 ## Shop
 

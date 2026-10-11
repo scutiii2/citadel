@@ -70,11 +70,13 @@ describe("StarterPick", () => {
     expect(wrapper.find(".info .blurb").text()).toBe("A steady shield for the journey ahead.");
     expect(wrapper.find(".info .facts").text()).toContain("100 HP · +5 / lvl");
     expect(wrapper.find(".info .facts").text()).toContain("Abilities unlock at levels 1 and 5.");
-    expect(wrapper.find(".selected-label").text()).toBe("Selected");
+    expect(wrapper.find(".selected-label").exists()).toBe(false);
+    expect(wrapper.find(".choice.selected").classes()).toContain("em-glow");
 
     await wrapper.findAll("[role=radio]")[1]!.trigger("click");
     expect(wrapper.find(".info .name").text()).toBe("Striker");
-    expect(wrapper.findAll(".selected-label")).toHaveLength(1);
+    expect(wrapper.findAll(".choice.selected")).toHaveLength(1);
+    expect(wrapper.findAll(".em-glow")).toHaveLength(1);
   });
 
   it("goes back to the menu", async () => {

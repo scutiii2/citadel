@@ -54,7 +54,7 @@ async function start(): Promise<void> {
         <div v-for="s in starters" :key="s.id" class="item">
           <div
             class="choice em-lift"
-            :class="{ selected: current.id === s.id }"
+            :class="{ selected: current.id === s.id, 'em-glow': current.id === s.id }"
             role="radio"
             tabindex="0"
             :aria-checked="current.id === s.id"
@@ -66,7 +66,6 @@ async function start(): Promise<void> {
             <AscendedTemplateCard :ascended="s" compact />
           </div>
           <p class="note">
-            <span v-if="current.id === s.id" class="selected-label"><EmIcon name="check" :size="14" /> Selected</span>
             {{ starterCopy(s.id).motto }}
           </p>
         </div>
@@ -171,15 +170,6 @@ async function start(): Promise<void> {
   font-size: 12px;
   color: var(--em-muted);
 }
-.selected-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--em-accent);
-}
 .name {
   margin: 16px 0 12px;
   font-size: 18px;
@@ -250,10 +240,7 @@ async function start(): Promise<void> {
 }
 @media (prefers-reduced-motion: reduce) {
   .choice.selected {
-    animation: none;
-    box-shadow:
-      0 0 0 6px #f3b47a22,
-      0 0 24px #f3b47a33;
+    animation-duration: 3.2s;
   }
 }
 </style>

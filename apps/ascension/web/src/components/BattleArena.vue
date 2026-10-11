@@ -42,7 +42,7 @@ function art(fighter: Fighter): string | null {
 </script>
 
 <template>
-  <section class="arena" :class="{ playing: playback.busy }" :aria-label="`Round ${battle.round}`" @click="playback.busy && playback.skip()">
+  <section class="arena em-glow" :class="{ playing: playback.busy }" :aria-label="`Round ${battle.round}`" @click="playback.busy && playback.skip()">
     <button v-if="playback.busy" type="button" class="skip" @click.stop="playback.skip()">Skip</button>
     <div class="fighters">
       <template v-for="(side, i) in sides" :key="side.key">
@@ -397,14 +397,6 @@ function art(fighter: Fighter): string | null {
   to {
     transform: translate(-50%, -56px);
     opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sprite,
-  .sprite img,
-  .ball,
-  .float {
-    animation: none !important;
   }
 }
 @media (max-width: 700px) {
