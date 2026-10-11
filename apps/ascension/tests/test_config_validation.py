@@ -43,15 +43,19 @@ def test_error_text_says_at_least_only_for_range_errors(raw):
         parse_config(raw)
 
 
-def test_empty_token_logs_a_warning(monkeypatch, caplog):
+def test_empty_token_logs_a_warning(monkeypatch, caplog, config, tmp_path):
+    from dataclasses import replace
+    monkeypatch.setattr(run, "load_config", lambda: replace(config, database_path=tmp_path / "run.sqlite3"))
     monkeypatch.setattr(run, "load_token", lambda: "")
     with caplog.at_level(logging.WARNING, logger="ascension"):
         run.build_app()
-    assert any("unauthenticated" in r.message for r in caplog.records)
+    assert any("launches cannot be redeemed" in r.message for r in caplog.records)
 
 
-def test_a_configured_token_logs_no_warning(monkeypatch, caplog):
+def test_a_configured_token_logs_no_warning(monkeypatch, caplog, config, tmp_path):
+    from dataclasses import replace
+    monkeypatch.setattr(run, "load_config", lambda: replace(config, database_path=tmp_path / "run.sqlite3"))
     monkeypatch.setattr(run, "load_token", lambda: "secret-token")
     with caplog.at_level(logging.WARNING, logger="ascension"):
         run.build_app()
-    assert not any("unauthenticated" in r.message for r in caplog.records)
+    assert not any("launches cannot be redeemed" in r.message for r in caplog.records)

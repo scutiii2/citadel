@@ -1,8 +1,8 @@
 @echo off
-REM ascension dev launcher - serves the game backend (Ascension) over HTTP on the
+REM Ascension launcher - builds and serves the game UI and backend on the
 REM port in configs\config_app.json (8060 by default).
 REM LABEL: Ascension
-REM DESCRIPTION: Game backend for Ember (Ascension: collect and battle Ascended). Battle engine, Laya-assisted AI and saved progress. No LLM, no billing.
+REM DESCRIPTION: Ascension game UI and API for Ember. Collect and battle Ascended, with Laya-assisted AI and saved progress. No LLM, no billing.
 
 cd /d "%~dp0"
 
@@ -17,7 +17,18 @@ if not exist ".venv_ascension\Scripts\python.exe" (
 )
 
 :run
-py -m src.run
+if not exist "web\dist\index.html" (
+    if exist "web\package.json" (
+        echo Building Ascension UI ...
+        call npm --prefix web ci
+        if errorlevel 1 goto :end
+        call npm --prefix web run build
+        if errorlevel 1 goto :end
+    ) else (
+        echo UI sources are not installed yet; starting the backend with the UI-not-built response.
+    )
+)
+python -m src.run
 
 echo.
 echo ----------------------------------------

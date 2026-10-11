@@ -45,3 +45,33 @@ def test_missing_field_is_rejected(raw):
 def test_unreadable_file_is_a_config_error(tmp_path):
     with pytest.raises(ConfigError, match="cannot read"):
         load_config(tmp_path / "missing.json")
+
+
+
+def host_values():
+    return {"ember_api_url": "http://127.0.0.1:8030", "ember_origin": "http://127.0.0.1:5173", "session_hours": 8, "game_id": "ascension", "dev_fake_owner": ""}
+
+
+def test_game_host_settings_are_typed_and_dev_owner_is_off(raw):
+    raw.update(host_values())
+    config = parse_config(raw)
+    assert config.ember_api_url == "http://127.0.0.1:8030"
+    assert config.ember_origin == "http://127.0.0.1:5173"
+    assert config.session_hours == 8
+    assert config.game_id == "ascension" and config.dev_fake_owner == ""
+
+
+@pytest.mark.parametrize("key", list(host_values()))
+def test_game_host_settings_are_required(raw, key):
+    raw.update(host_values())
+    del raw[key]
+    with pytest.raises(ConfigError, match=key):
+        parse_config(raw)
+
+
+@pytest.mark.parametrize("key,value", [("session_hours", 0), ("session_hours", True), ("session_hours", float("inf")), ("dev_fake_owner", 42), ("ember_origin", "http://host/path"), ("ember_origin", "http://user:password@host"), ("ember_origin", "http://host; frame-ancestors *"), ("ember_api_url", "ftp://host"), ("game_id", "Bad_ID")])
+def test_game_host_settings_reject_unsafe_values(raw, key, value):
+    raw.update(host_values())
+    raw[key] = value
+    with pytest.raises(ConfigError, match=key):
+        parse_config(raw)

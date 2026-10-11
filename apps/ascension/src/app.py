@@ -1,18 +1,40 @@
-"""The FastAPI shell every game mounts into: token check, health and error shape."""
+"""Ascension app shell: bearer sessions, ticket redemption, health and error shape."""
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
-from src.auth import InternalTokenMiddleware
+from src.config import AppConfig
+from src.ember_identity import EmberIdentity
+from src.sessions import GameSessions
+from src.session_routes import RedeemLimiter, SessionRoutes
 
 
-def create_app(token: str = "") -> FastAPI:
-    app = FastAPI(title="ascension", docs_url=None, redoc_url=None, openapi_url=None)
-    app.add_middleware(InternalTokenMiddleware, token=token)
+def create_app(*, sessions: GameSessions | None = None, identity: EmberIdentity | None = None,
+               config: AppConfig | None = None, internal_token: str = "") -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        if identity is None and config is not None:
+            async with httpx.AsyncClient(follow_redirects=False) as client:
+                app.state.identity = EmberIdentity(client, config.ember_api_url, internal_token, config.game_id)
+                try:
+                    yield
+                finally:
+                    app.state.identity = None
+        else:
+            yield
+
+    app = FastAPI(title="ascension", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app.state.sessions = sessions or GameSessions((config.session_hours if config else 8) * 3600)
+    app.state.identity = identity
+    app.state.redeem_limiter = RedeemLimiter()
+    app.state.dev_fake_owner = config.dev_fake_owner if config else ""
+    SessionRoutes().mount(app)
 
     @app.exception_handler(RequestValidationError)
     async def bad_body(request: Request, error: RequestValidationError) -> JSONResponse:

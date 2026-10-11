@@ -1,5 +1,5 @@
 import dataclasses
-import itertools
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,19 +9,15 @@ from src.laya_client import LayaClient
 from src.ascension.api import mount_ascendeds
 from src.ascension.composition import build_ascended_services
 from src.ascension.runtime import SeededRandom
+from tests.conftest import signed_in
 from tests.fake_laya import FakeEngine
 from tests.ascension.helpers import FixedClock
 
 TOKEN = "t0ken"
-_KEYS = itertools.count(1)
-
-
-def headers(owner="ann", key=True, token=TOKEN):
-    result = {"X-Internal-Token": token} if token else {}
-    if owner:
-        result["X-Requester-Username"] = owner
+def headers(client, owner="ann", key=True):
+    result = signed_in(client.app, owner) if owner else {}
     if key is True:
-        result["Idempotency-Key"] = f"k{next(_KEYS)}"
+        result["Idempotency-Key"] = f"k{uuid.uuid4().hex}"
     elif key:
         result["Idempotency-Key"] = key
     return result
@@ -35,7 +31,7 @@ def clock():
 @pytest.fixture
 def client(config, tmp_path, clock):
     config = dataclasses.replace(config, database_path=tmp_path / "api.sqlite3")
-    app = create_app(TOKEN)
+    app = create_app()
     services = build_ascended_services(config, LayaClient(FakeEngine(fail=True)), clock=clock, rng=SeededRandom(5))
     mount_ascendeds(app, services)
     with TestClient(app) as test_client:
@@ -43,7 +39,7 @@ def client(config, tmp_path, clock):
 
 
 def start_profile(client, owner="ann", starter="guardian"):
-    response = client.post("/ascension/profile", json={"starter_ascended_id": starter}, headers=headers(owner))
+    response = client.post("/ascension/profile", json={"starter_ascended_id": starter}, headers=headers(client, owner))
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -55,22 +51,22 @@ def test_health_needs_no_token(client):
 
 
 @pytest.mark.parametrize("h", [{}, {"X-Requester-Username": "ann"}, {"X-Internal-Token": "wrong", "X-Requester-Username": "ann"}])
-def test_the_internal_token_is_required(client, h):
+def test_bearer_auth_is_required(client, h):
     assert client.get("/ascension/profile", headers=h).status_code == 401
 
 
-def test_the_requester_header_is_required(client):
-    response = client.get("/ascension/profile", headers=headers(owner=None))
-    assert response.status_code == 400 and "X-Requester-Username" in response.json()["error"]
+def test_a_bearer_session_is_required(client):
+    response = client.get("/ascension/profile", headers=headers(client, owner=None))
+    assert response.status_code == 401 and response.json()["error"] == "Not signed in"
 
 
 def test_mutations_need_an_idempotency_key(client):
-    response = client.post("/ascension/profile", json={"starter_ascended_id": "guardian"}, headers=headers(key=False))
+    response = client.post("/ascension/profile", json={"starter_ascended_id": "guardian"}, headers=headers(client, key=False))
     assert response.status_code == 400 and "Idempotency-Key" in response.json()["error"]
 
 
 def test_the_catalog_is_readable_and_complete(client):
-    data = client.get("/ascension/catalog", headers=headers(owner="anyone")).json()
+    data = client.get("/ascension/catalog", headers=headers(client, owner="anyone")).json()
     assert len(data["ascendeds"]) == 7 and [t["id"] for t in data["tiers"]][-1] == "forbidden"
     assert {s["id"] for s in data["ascendeds"] if s["starter"]} == {"guardian", "striker", "scout"}
     assert len(data["personalities"]) == 8
@@ -80,67 +76,67 @@ def test_the_catalog_is_readable_and_complete(client):
 # -- profile, personalities, presets -------------------------------------------------
 
 def test_profile_creation_is_once_and_idempotent(client):
-    first = client.post("/ascension/profile", json={"starter_ascended_id": "scout"}, headers=headers(key="same"))
-    again = client.post("/ascension/profile", json={"starter_ascended_id": "scout"}, headers=headers(key="same"))
-    other = client.post("/ascension/profile", json={"starter_ascended_id": "scout"}, headers=headers())
-    clash = client.post("/ascension/profile", json={"starter_ascended_id": "striker"}, headers=headers(key="same"))
+    first = client.post("/ascension/profile", json={"starter_ascended_id": "scout"}, headers=headers(client, key="same"))
+    again = client.post("/ascension/profile", json={"starter_ascended_id": "scout"}, headers=headers(client, key="same"))
+    other = client.post("/ascension/profile", json={"starter_ascended_id": "scout"}, headers=headers(client, ))
+    clash = client.post("/ascension/profile", json={"starter_ascended_id": "striker"}, headers=headers(client, key="same"))
     assert first.status_code == again.status_code == 201 and first.json() == again.json()
     assert other.status_code == 409 and clash.status_code == 409
-    profile = client.get("/ascension/profile", headers=headers()).json()
+    profile = client.get("/ascension/profile", headers=headers(client, )).json()
     assert profile["emblems"] == {"common": 5} and profile["insignia"] == 0 and profile["ascendeds"][0]["ascended_id"] == "scout"
     assert profile["ascendeds"][0]["ascension_types"] == ["enchant"]
 
 
 def test_a_bad_starter_and_unknown_fields_are_400(client):
-    assert client.post("/ascension/profile", json={"starter_ascended_id": "forbidden"}, headers=headers()).status_code == 400
-    assert client.post("/ascension/profile", json={"starter_ascended_id": "guardian", "insignia": 9999}, headers=headers()).status_code == 400
-    assert client.post("/ascension/profile", json={}, headers=headers()).status_code == 400
+    assert client.post("/ascension/profile", json={"starter_ascended_id": "forbidden"}, headers=headers(client, )).status_code == 400
+    assert client.post("/ascension/profile", json={"starter_ascended_id": "guardian", "insignia": 9999}, headers=headers(client, )).status_code == 400
+    assert client.post("/ascension/profile", json={}, headers=headers(client, )).status_code == 400
 
 
 def test_profiles_are_private_to_their_owner(client):
     start_profile(client, "ann")
-    assert client.get("/ascension/profile", headers=headers("bob")).status_code == 404
-    assert client.get("/ascension/ascendeds/guardian/personalities", headers=headers("bob")).status_code == 404
+    assert client.get("/ascension/profile", headers=headers(client, "bob")).status_code == 404
+    assert client.get("/ascension/ascendeds/guardian/personalities", headers=headers(client, "bob")).status_code == 404
 
 
 def test_personalities_and_presets_over_http(client):
     start_profile(client)
-    pool = client.get("/ascension/ascendeds/guardian/personalities", headers=headers()).json()
+    pool = client.get("/ascension/ascendeds/guardian/personalities", headers=headers(client, )).json()
     ids = [p["id"] for p in pool["items"]]
     assert len(ids) == 1 and pool["next_cursor"] is None
-    put = client.put("/ascension/ascendeds/guardian/presets/2", json={"instance_ids": ids}, headers=headers())
-    assert put.status_code == 200 and client.get("/ascension/ascendeds/guardian/presets/2", headers=headers()).json()["instance_ids"] == ids
-    assert client.put("/ascension/ascendeds/guardian/presets/2", json={"instance_ids": ["nope"]}, headers=headers()).status_code == 400
-    assert client.put("/ascension/ascendeds/guardian/presets/9", json={"instance_ids": []}, headers=headers()).status_code == 400
-    assert client.get("/ascension/ascendeds/guardian/personalities?limit=500", headers=headers()).status_code == 400
+    put = client.put("/ascension/ascendeds/guardian/presets/2", json={"instance_ids": ids}, headers=headers(client, ))
+    assert put.status_code == 200 and client.get("/ascension/ascendeds/guardian/presets/2", headers=headers(client, )).json()["instance_ids"] == ids
+    assert client.put("/ascension/ascendeds/guardian/presets/2", json={"instance_ids": ["nope"]}, headers=headers(client, )).status_code == 400
+    assert client.put("/ascension/ascendeds/guardian/presets/9", json={"instance_ids": []}, headers=headers(client, )).status_code == 400
+    assert client.get("/ascension/ascendeds/guardian/personalities?limit=500", headers=headers(client, )).status_code == 400
 
 
 # -- encounters ----------------------------------------------------------------------
 
 def test_encounter_rolls_respect_the_cooldown(client, clock):
     start_profile(client)
-    first = client.post("/ascension/encounters", headers=headers())
-    early = client.post("/ascension/encounters", headers=headers())
+    first = client.post("/ascension/encounters", headers=headers(client, ))
+    early = client.post("/ascension/encounters", headers=headers(client, ))
     assert first.status_code == 201 and "personalities" not in first.text
     assert early.status_code == 409 and early.json()["retry_after"] == pytest.approx(30)
     clock.advance(31)
-    assert client.post("/ascension/encounters", headers=headers()).status_code == 201
+    assert client.post("/ascension/encounters", headers=headers(client, )).status_code == 201
 
 
 def test_decline_over_http(client):
     start_profile(client)
-    encounter = client.post("/ascension/encounters", headers=headers()).json()
-    assert client.post(f"/ascension/encounters/{encounter['id']}/decline", headers=headers()).json()["status"] == "declined"
-    assert client.get(f"/ascension/encounters/{encounter['id']}", headers=headers("bob")).status_code == 404
+    encounter = client.post("/ascension/encounters", headers=headers(client, )).json()
+    assert client.post(f"/ascension/encounters/{encounter['id']}/decline", headers=headers(client, )).json()["status"] == "declined"
+    assert client.get(f"/ascension/encounters/{encounter['id']}", headers=headers(client, "bob")).status_code == 404
 
 
 # -- battles -------------------------------------------------------------------------
 
 def open_battle(client, mode="manual", **extra):
     start_profile(client)
-    encounter = client.post("/ascension/encounters", headers=headers()).json()
+    encounter = client.post("/ascension/encounters", headers=headers(client, )).json()
     body = {"encounter_id": encounter["id"], "ascended_id": "guardian", "preset_slot": 1, "mode": mode, **extra}
-    response = client.post("/ascension/battles", json=body, headers=headers())
+    response = client.post("/ascension/battles", json=body, headers=headers(client, ))
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -149,20 +145,20 @@ def test_a_battle_can_be_started_played_and_forfeited(client):
     view = open_battle(client)
     assert view["phase"] == "choosing" and any(a["kind"] == "attack" for a in view["actions"])
     action = {"round": view["round"], "revision": view["revision"], "action": {"kind": "attack"}}
-    after = client.post(f"/ascension/battles/{view['id']}/actions", json=action, headers=headers())
+    after = client.post(f"/ascension/battles/{view['id']}/actions", json=action, headers=headers(client, ))
     assert after.status_code == 200 and after.json()["revision"] == 2 and len(after.json()["history"]) == 1
     if after.json()["status"] == "active":
-        done = client.post(f"/ascension/battles/{view['id']}/forfeit", headers=headers()).json()
+        done = client.post(f"/ascension/battles/{view['id']}/forfeit", headers=headers(client, )).json()
         assert done["status"] == "terminal" and done["result"]["kind"] == "forfeited"
-        assert client.post(f"/ascension/battles/{view['id']}/forfeit", headers=headers()).status_code == 409
+        assert client.post(f"/ascension/battles/{view['id']}/forfeit", headers=headers(client, )).status_code == 409
 
 
 def test_a_stale_action_is_a_409_and_a_retry_is_not_repeated(client):
     view = open_battle(client)
     body = {"round": 1, "revision": 1, "action": {"kind": "attack"}}
-    first = client.post(f"/ascension/battles/{view['id']}/actions", json=body, headers=headers(key="once"))
-    retry = client.post(f"/ascension/battles/{view['id']}/actions", json=body, headers=headers(key="once"))
-    stale = client.post(f"/ascension/battles/{view['id']}/actions", json=body, headers=headers())
+    first = client.post(f"/ascension/battles/{view['id']}/actions", json=body, headers=headers(client, key="once"))
+    retry = client.post(f"/ascension/battles/{view['id']}/actions", json=body, headers=headers(client, key="once"))
+    stale = client.post(f"/ascension/battles/{view['id']}/actions", json=body, headers=headers(client, ))
     assert first.status_code == retry.status_code == 200 and first.json() == retry.json()
     assert stale.status_code == 409
 
@@ -170,56 +166,56 @@ def test_a_stale_action_is_a_409_and_a_retry_is_not_repeated(client):
 def test_clients_cannot_send_rewards_or_chances(client):
     view = open_battle(client)
     cheat = {"round": 1, "revision": 1, "action": {"kind": "attack", "damage": 9999}}
-    assert client.post(f"/ascension/battles/{view['id']}/actions", json=cheat, headers=headers()).status_code == 400
+    assert client.post(f"/ascension/battles/{view['id']}/actions", json=cheat, headers=headers(client, )).status_code == 400
     cheat = {"round": 1, "revision": 1, "action": {"kind": "attack"}, "xp": 5000}
-    assert client.post(f"/ascension/battles/{view['id']}/actions", json=cheat, headers=headers()).status_code == 400
+    assert client.post(f"/ascension/battles/{view['id']}/actions", json=cheat, headers=headers(client, )).status_code == 400
 
 
 def test_illegal_actions_and_wrong_modes(client):
     view = open_battle(client)
     nope = {"round": 1, "revision": 1, "action": {"kind": "ability", "ability_id": "unknown"}}
-    assert client.post(f"/ascension/battles/{view['id']}/actions", json=nope, headers=headers()).status_code == 400
-    advance = client.post(f"/ascension/battles/{view['id']}/advance", json={"round": 1, "revision": 1}, headers=headers())
+    assert client.post(f"/ascension/battles/{view['id']}/actions", json=nope, headers=headers(client, )).status_code == 400
+    advance = client.post(f"/ascension/battles/{view['id']}/advance", json={"round": 1, "revision": 1}, headers=headers(client, ))
     assert advance.status_code == 409  # manual battles wait for the player
 
 
 def test_autonomous_advance_and_mode_switch(client):
     view = open_battle(client, mode="autonomous", emblem_limit="common")
-    played = client.post(f"/ascension/battles/{view['id']}/advance", json={"round": 1, "revision": 1}, headers=headers())
+    played = client.post(f"/ascension/battles/{view['id']}/advance", json={"round": 1, "revision": 1}, headers=headers(client, ))
     assert played.status_code == 200
     data = played.json()
     if data["phase"] == "awaiting_emblem":  # the Ascended chose CATCH: the player has five seconds to pick an EMBLEM
         assert data["history"] == [] and data["prompt"]["seconds_left"] == 5.0
         body = {"round": data["round"], "revision": data["revision"], "mode": "manual"}
-        assert client.post(f"/ascension/battles/{view['id']}/mode", json=body, headers=headers()).status_code == 409
+        assert client.post(f"/ascension/battles/{view['id']}/mode", json=body, headers=headers(client, )).status_code == 409
         return
     assert len(data["history"]) == 1
     if data["status"] == "active":
         body = {"round": data["round"], "revision": data["revision"], "mode": "manual"}
-        assert client.post(f"/ascension/battles/{view['id']}/mode", json=body, headers=headers()).json()["mode"] == "manual"
+        assert client.post(f"/ascension/battles/{view['id']}/mode", json=body, headers=headers(client, )).json()["mode"] == "manual"
 
 
 def test_battles_are_private_to_their_owner(client):
     view = open_battle(client)
     start_profile(client, "bob")
-    assert client.get(f"/ascension/battles/{view['id']}", headers=headers("bob")).status_code == 404
-    assert client.post(f"/ascension/battles/{view['id']}/forfeit", headers=headers("bob")).status_code == 404
-    assert client.get("/ascension/battles/missing", headers=headers()).status_code == 404
+    assert client.get(f"/ascension/battles/{view['id']}", headers=headers(client, "bob")).status_code == 404
+    assert client.post(f"/ascension/battles/{view['id']}/forfeit", headers=headers(client, "bob")).status_code == 404
+    assert client.get("/ascension/battles/missing", headers=headers(client, )).status_code == 404
 
 
 def test_a_second_battle_is_refused_while_one_is_active(client):
     open_battle(client)
-    assert client.post("/ascension/encounters", headers=headers()).status_code == 409
+    assert client.post("/ascension/encounters", headers=headers(client, )).status_code == 409
 
 
 # -- shop ----------------------------------------------------------------------------
 
 def test_shop_over_http(client):
     start_profile(client)
-    poor = client.post("/ascension/shop/purchases", json={"kind": "emblem", "tier": "rare", "quantity": 1}, headers=headers())
+    poor = client.post("/ascension/shop/purchases", json={"kind": "emblem", "tier": "rare", "quantity": 1}, headers=headers(client, ))
     assert poor.status_code == 409
-    assert client.post("/ascension/shop/purchases", json={"kind": "copies", "ascended_id": "sentinel", "tier": "common"}, headers=headers()).status_code == 409
-    assert client.post("/ascension/shop/purchases", json={"kind": "stock", "tier": "rare"}, headers=headers()).status_code == 400
-    assert client.post("/ascension/shop/purchases", json={"kind": "emblem", "tier": "gold", "quantity": 1}, headers=headers()).status_code == 400
-    assert client.post("/ascension/ascendeds/guardian/sales", headers=headers()).status_code == 409  # nothing to sell
-    assert client.post("/ascension/ascendeds/dragon/sales", headers=headers()).status_code == 400
+    assert client.post("/ascension/shop/purchases", json={"kind": "copies", "ascended_id": "sentinel", "tier": "common"}, headers=headers(client, )).status_code == 409
+    assert client.post("/ascension/shop/purchases", json={"kind": "stock", "tier": "rare"}, headers=headers(client, )).status_code == 400
+    assert client.post("/ascension/shop/purchases", json={"kind": "emblem", "tier": "gold", "quantity": 1}, headers=headers(client, )).status_code == 400
+    assert client.post("/ascension/ascendeds/guardian/sales", headers=headers(client, )).status_code == 409  # nothing to sell
+    assert client.post("/ascension/ascendeds/dragon/sales", headers=headers(client, )).status_code == 400

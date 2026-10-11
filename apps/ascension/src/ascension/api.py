@@ -1,6 +1,6 @@
 """HTTP routes for Ascension: thin adapters over the services.
 
-Ownership comes from the trusted requester header only. Request bodies reject
+Ownership comes from a verified bearer session only. Request bodies reject
 unknown fields, so a client can never supply rewards, stats, chances, random
 results or personalities. Every mutation needs an Idempotency-Key header.
 """
@@ -114,7 +114,7 @@ def catalog_summary(catalog: Catalog) -> dict[str, Any]:
 
 
 def build_router(services: AscendedServices) -> APIRouter:
-    router = APIRouter(prefix="/ascension")
+    router = APIRouter(prefix="/ascension", dependencies=[Depends(requester)])
     collection, encounters, shop, coordinator = services.collection, services.encounters, services.shop, services.coordinator
 
     @router.get("/catalog")

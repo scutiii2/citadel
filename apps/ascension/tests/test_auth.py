@@ -1,45 +1,46 @@
-import asyncio
-
 import pytest
-from fastapi import HTTPException
-
-from src.auth import InternalTokenMiddleware, load_token, requester
-
-
-async def _call(token: str, path: str, headers: dict[str, str]) -> int:
-    seen = {}
-
-    async def app(scope, receive, send):
-        await send({"type": "http.response.start", "status": 200, "headers": []})
-        await send({"type": "http.response.body", "body": b""})
-
-    async def send(message):
-        if message["type"] == "http.response.start":
-            seen["status"] = message["status"]
-
-    scope = {"type": "http", "path": path, "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()]}
-    await InternalTokenMiddleware(app, token)(scope, None, send)
-    return seen["status"]
+from fastapi import Depends
+from fastapi.testclient import TestClient
+from src.app import create_app
+from src.auth import load_token, requester
+from src.sessions import GameSessions
+from tests.conftest import signed_in
+from tests.test_sessions import Clock
 
 
-def test_wrong_token_is_rejected():
-    assert asyncio.run(_call("secret", "/ascension/profile", {"X-Internal-Token": "nope"})) == 401
+@pytest.fixture
+def app():
+    app = create_app()
+    @app.get("/protected")
+    def protected(owner: str = Depends(requester)):
+        return {"owner": owner}
+    return app
 
 
-def test_missing_token_is_rejected():
-    assert asyncio.run(_call("secret", "/ascension/profile", {})) == 401
+@pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer unknown"}, {"Authorization": "Basic unknown"}, {"Authorization": "Bearer"}, {"X-Requester-Username": "42", "X-Internal-Token": "old-internal"}])
+def test_missing_invalid_or_legacy_auth_is_401(app, headers):
+    with TestClient(app) as client:
+        response = client.get("/protected", headers=headers)
+        assert response.status_code == 401 and response.json() == {"error": "Not signed in"}
 
 
-def test_right_token_passes():
-    assert asyncio.run(_call("secret", "/ascension/profile", {"X-Internal-Token": "secret"})) == 200
+def test_bearer_session_controls_owner_and_instances_are_isolated(app):
+    headers = signed_in(app, "42")
+    headers["X-Requester-Username"] = "forged"
+    with TestClient(app) as client:
+        assert client.get("/protected", headers=headers).json() == {"owner": "42"}
+        assert client.get("/protected", headers=signed_in(app, "99")).json() == {"owner": "99"}
+        assert client.get("/health").json() == {"status": "ok"}
 
 
-def test_health_is_open():
-    assert asyncio.run(_call("secret", "/health", {})) == 200
-
-
-def test_no_token_configured_passes_everything():
-    assert asyncio.run(_call("", "/ascension/profile", {})) == 200
+def test_expired_token_is_401(app):
+    clock = Clock()
+    app.state.sessions = GameSessions(60, clock=clock)
+    headers = signed_in(app, "42")
+    clock.now = 60
+    with TestClient(app) as client:
+        assert client.get("/protected", headers=headers).json() == {"error": "Not signed in"}
+        assert client.get("/protected", headers=headers).status_code == 401
 
 
 def test_load_token_reads_the_file(tmp_path, monkeypatch):
@@ -56,8 +57,33 @@ def test_environment_wins_over_the_file(tmp_path, monkeypatch):
     assert load_token(env) == "from-env"
 
 
-def test_requester_strips_and_requires_a_name():
-    assert requester("  ann ") == "ann"
-    with pytest.raises(HTTPException) as error:
-        requester("  ")
-    assert error.value.status_code == 400
+
+def test_concurrent_expired_requests_return_401_without_thread_races(app):
+    import asyncio
+    import threading
+    import httpx
+
+    class ExpiryClock:
+        def __init__(self):
+            self.now = 0.0
+            self.barrier = threading.Barrier(2)
+        def __call__(self):
+            if self.now >= 60:
+                try:
+                    asyncio.get_running_loop()
+                except RuntimeError:
+                    # Coordinate legacy sync dependencies after both read the
+                    # session, exposing double deletion from worker threads.
+                    self.barrier.wait(timeout=2)
+            return self.now
+
+    async def go():
+        clock = ExpiryClock()
+        app.state.sessions = GameSessions(60, clock=clock)
+        headers = signed_in(app, "42")
+        clock.now = 60
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://game") as client:
+            responses = await asyncio.gather(client.get("/protected", headers=headers), client.get("/protected", headers=headers))
+        assert [response.status_code for response in responses] == [401, 401]
+        assert all(response.json() == {"error": "Not signed in"} for response in responses)
+    asyncio.run(go())

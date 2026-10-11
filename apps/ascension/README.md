@@ -9,8 +9,10 @@ Specs and plans: `docs/superpowers/specs/2026-10-10-emberlings-backend-design.md
 and `docs/superpowers/plans/2026-10-10-emberlings-backend.md`; the decision record
 is `docs/superpowers/specs/2026-10-09-emberlings-decisions.md`.
 
-Part of a series. This project is the backend only; the `ember_api` proxy, the
-`ember_web` pages and the chat tools come in later specs.
+Ascension serves its game API and its own built web UI. Ember registers the
+game, hosts it in an iframe and supplies a one-time identity ticket. The
+backend changes are Phase 2 of `docs/superpowers/plans/2026-10-11-game-host.md`;
+the Vue sources move into `web/` in Phase 3.
 
 ## The game in short
 
@@ -45,6 +47,7 @@ falls back to basic ATTACK.
 ## Requirements
 
 - Python 3.11 or newer on Windows (`py` launcher).
+- Node.js and npm to build the Vue UI once `web/package.json` is present.
 - Optional: the `laya` package (`pip install -e ".[laya]"`).
 
 ## Run
@@ -53,23 +56,82 @@ falls back to basic ATTACK.
 run.bat
 ```
 
-The first start creates `.venv_mini_games`, installs the project and creates
+The first start creates `.venv_ascension`, installs the project and creates
 `configs/config_app.json` and `.env` from their `.example` twins. Both
 real files are gitignored; `configs/ascension_catalog.json` (Ascended rules, abilities,
 tiers, economy and policy numbers) is tracked. Put the same `INTERNAL_API_TOKEN`
-in `.env` that `mcp_server`, `ai_agent` and `ember_api` use; once set,
-every route except `/health` needs the `X-Internal-Token` header. Game data lives
+in Ascension's local environment that `ember_api` uses. This token is used only
+for outgoing server-to-server ticket redemption. Game routes always require a
+bearer session, including when the internal token is missing. Game data lives
 in `.data/ascension.sqlite3` (gitignored).
 The database was renamed with the game (it was `data/sparks.sqlite3`, schema version 1; now `.data/ascension.sqlite3`, schema version 2).
 There is no migration: a start with an old file fails with `database schema version 1 is not supported`.
 Delete the old file, or point `database_path` at a new one, to start fresh.
 
 `server_launcher` lists this project from its `run.bat`. Default port 8060.
+When `web/dist/index.html` is missing and `web/package.json` exists, the launcher
+runs `npm --prefix web ci` followed by `npm --prefix web run build`. A build
+failure stops the launcher. During Phase 2, when the UI sources are absent, it
+starts the API anyway; `/` returns 503 with
+`UI not built: run npm --prefix web run build`.
+
+## Ember host configuration
+
+Add these required fields to an existing `configs/config_app.json`, using the
+values in `configs/config_app.json.example`:
+
+| Setting | Example/default | Purpose |
+|---|---|---|
+| `ember_api_url` | `http://127.0.0.1:8030` | Ember API base URL; 8030 is its actual default port |
+| `ember_origin` | `http://127.0.0.1:5173` | Single Ember web origin allowed to frame the game |
+| `session_hours` | `8` | Absolute session lifetime; reads do not extend it |
+| `game_id` | `ascension` | Game id sent to Ember when redeeming a ticket |
+| `dev_fake_owner` | empty string | Optional fixed local owner; empty disables it |
+
+`ember_origin` must be an http/https origin without credentials, a path, query
+or fragment. Keep it equal to the UI's `VITE_EMBER_ORIGIN` setting when Phase 3
+adds `HostBridge`; that value controls the browser's `postMessage` target.
+
+## Ticket redemption and UI serving
+
+`POST /session/redeem` accepts only `{ "ticket": "..." }`. Ascension sends the
+ticket and configured `game_id` to Ember's `/internal/games/tickets/redeem`
+with its internal header. Ember returns the account id as text; that remains
+the owner of saved data. A successful request returns a random 256-bit token
+and `expires_in` seconds. The browser keeps the token in memory and sends
+`Authorization: Bearer <token>` on game calls. No cookies are involved.
+Sessions expire without refresh, are capped at 1,000 (oldest evicted), and
+are lost on process restart.
+
+Redemption is limited to 10 attempts per 60 seconds per socket peer IP;
+invalid tickets and malformed bodies count too. Responses are 400 for a bad
+body, 401 `{"error": "Invalid ticket"}` for a rejected ticket, 502
+`{"error": "Ember is not available"}` for an unavailable or malformed Ember
+response, and 429 after the limit. Ember's internal token is never sent to the
+browser, and redirects are never followed by the identity client.
+
+For local development only, setting `dev_fake_owner` lets ticket `dev` open a
+session for that owner without calling Ember. Other tickets still go through
+Ember, and the same rate limit applies. Leave the setting empty for normal use.
+
+`GET /manifest.json` is public. `web/dist` supplies `index.html` and `/assets/*`.
+Non-file UI paths use the SPA fallback; missing assets, dotted file requests,
+traversal, and the `/ascension`, `/session`, and `/health` namespaces never use
+that fallback. Resolved asset and index paths must remain within the build.
+UI and manifest responses set `Content-Security-Policy` with
+`frame-ancestors <ember_origin>`, `X-Content-Type-Options: nosniff`, and
+`Referrer-Policy: no-referrer`; they do not set `X-Frame-Options`.
+
+Phase 2 changes the game's auth protocol. The legacy Ember proxy still sends
+the old headers and cannot play this backend until the later host/UI phases
+complete the ticket flow.
 
 ## API
 
-Every route except `/health` needs `X-Internal-Token` (once configured) and
-`X-Requester-Username`, the owner of all records. Mutations also need an
+Every `/ascension` route, including the catalog, needs a valid
+`Authorization: Bearer <token>` session. `/health`, `/manifest.json`, the UI and
+`/session/redeem` are public. Legacy requester and internal headers cannot
+identify a player. Mutations also need an
 `Idempotency-Key` header; a retry with the same key returns the first result.
 Bodies reject unknown fields. Round mutations carry the `round` and `revision` you
 last saw; a stale pair is a 409.
@@ -97,7 +159,8 @@ last saw; a stale pair is a 409.
 
 `POST /ascension/profile/reset` deletes the player's profile, Ascended, personalities, presets, EMBLEMs, encounters and battle history so a starter can be chosen again; it needs `{"confirm": true}` and is refused with a 409 while a battle is active.
 
-Errors: 400 bad input or unknown Ascended or tier, 401 bad token, 404 missing or
+Errors: 400 bad input or unknown Ascended or tier, 401 `Not signed in` for a
+missing, invalid or expired bearer session, 404 missing or
 someone else's record, 409 state conflict (stale revision, wrong phase, not enough
 Insignia, cooldown, one active battle).
 
@@ -133,7 +196,10 @@ the collection; it has no effect in battle. All current Ascended are `enchant`.
 
 ## Layout
 
-- `src/` - shared shell: config, auth, the Laya client, the FastAPI app.
+- `src/` - config, bearer auth, sessions, Ember identity client, UI serving,
+  the Laya client and the FastAPI app.
+- `manifest.json` - public game metadata.
+- `web/dist/` - built game UI (Vue sources arrive in Phase 3).
 - `src/ascension/` - Ascension: catalog, battle engine, passives, action policy and
   decider, situation readers, repository, services, coordinator, API.
 - `src/ascension/eval/` - the manual Laya evaluation.
@@ -157,4 +223,4 @@ Deferred to the Ember UI spec:
 
 - The mood draw is stored in `rounds`, but no route reveals it after a battle has
   finished.
-- There is no game-discovery route.
+- The manifest supplies game discovery; the Vue UI sources arrive in Phase 3.

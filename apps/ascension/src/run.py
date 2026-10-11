@@ -9,7 +9,8 @@ from fastapi import FastAPI
 
 from src.app import create_app
 from src.auth import load_token
-from src.config import AppConfig, load_config
+from src.config import AppConfig, PROJECT_ROOT, load_config
+from src.web import UiMount
 from src.laya_client import LayaClient
 from src.ascension.api import mount_ascendeds
 from src.ascension.composition import build_ascended_services
@@ -30,9 +31,10 @@ def build_app() -> tuple[FastAPI, AppConfig]:
         log.info("Laya is not installed; game decisions will use heuristics")
     token = load_token()
     if not token:
-        log.warning("INTERNAL_API_TOKEN is empty; the API is unauthenticated")
-    app = create_app(token)
+        log.warning("INTERNAL_API_TOKEN is empty; game launches cannot be redeemed")
+    app = create_app(config=config, internal_token=token)
     mount_ascendeds(app, build_ascended_services(config, laya))
+    UiMount(PROJECT_ROOT / "web" / "dist", config.ember_origin).mount(app)
     return app, config
 
 
