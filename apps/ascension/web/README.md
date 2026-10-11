@@ -76,5 +76,5 @@ The Shop tab loads `GET /ascension/shop`: this account's copy offers for the cur
 (`store.shopEndsAt`), never from the server's timestamp. At zero, after a purchase and after any refusal the page
 loads the window again, so a rotation, a sold-out offer or a stale `rotation` (409 "the shop has refreshed") never
 leaves old cards on screen. Sold-out and unaffordable cards carry `is-off`. `.em-lift` in `theme.css` is the shared
-hover lift (rise, soft shadow, tier-coloured edge) used by the shop cards and the collection cards; it is off under
+hover glow (rise, crisp tier-coloured ring and a wide soft bloom) used by the shop, collection and starter cards; it is off under
 `prefers-reduced-motion` and for `is-off` cards.

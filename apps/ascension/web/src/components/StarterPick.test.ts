@@ -27,6 +27,7 @@ describe("StarterPick", () => {
     expect(choices.map((c) => c.attributes("aria-label"))).toEqual(["Guardian", "Striker"]);
     expect(choices.map((c) => c.attributes("aria-checked"))).toEqual(["true", "false"]);
     expect(choices[0]!.classes()).toContain("selected");
+    expect(choices.every((c) => c.classes().includes("em-lift"))).toBe(true);
     expect(wrapper.find(".detail .ascended-name").text()).toBe("Guardian");
     expect(wrapper.find(".detail .passive").exists()).toBe(true);
     expect(wrapper.find(".choice .passive").exists()).toBe(false);

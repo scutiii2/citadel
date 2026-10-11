@@ -53,7 +53,7 @@ async function start(): Promise<void> {
       <div class="choices" role="radiogroup" aria-label="Starter Ascended">
         <div v-for="s in starters" :key="s.id" class="item">
           <div
-            class="choice"
+            class="choice em-lift"
             :class="{ selected: current.id === s.id }"
             role="radio"
             tabindex="0"
@@ -135,24 +135,33 @@ async function start(): Promise<void> {
   --card-width: 170px;
 }
 .choice {
+  --tier: var(--em-tier-common);
   width: var(--card-width);
   border-radius: var(--em-radius);
   cursor: pointer;
-  transition: box-shadow 160ms ease;
-}
-.choice:hover {
-  filter: brightness(1.1);
 }
 .choice:focus-visible {
   outline: 2px solid var(--em-accent);
   outline-offset: 3px;
 }
+/* The chosen card breathes in copper, so it never looks like a hover. */
 .choice.selected {
   outline: 2px solid var(--em-accent);
   outline-offset: 3px;
-  box-shadow:
-    0 0 0 6px #f3b47a22,
-    0 0 24px #f3b47a33;
+  animation: breathe 1.8s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 6px #f3b47a14,
+      0 0 8px 0 #f3b47a33;
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px #f3b47a33,
+      0 0 26px 6px #f3b47a80;
+  }
 }
 .note {
   display: flex;
@@ -240,8 +249,11 @@ async function start(): Promise<void> {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .choice {
-    transition: none;
+  .choice.selected {
+    animation: none;
+    box-shadow:
+      0 0 0 6px #f3b47a22,
+      0 0 24px #f3b47a33;
   }
 }
 </style>
