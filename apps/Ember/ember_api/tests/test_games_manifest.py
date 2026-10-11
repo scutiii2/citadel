@@ -30,6 +30,27 @@ def test_invalid_manifest(payload):
         fetch(lambda r: httpx.Response(200, json=payload))
 
 
+@pytest.mark.parametrize("value, expected", [
+    ("", ""),
+    ("assets/w.webp", "http://127.0.0.1:8060/base/assets/w.webp"),
+    ("/w.webp?v=2#x", "http://127.0.0.1:8060/w.webp?v=2"),
+    ("https://cdn.example.com/w.png", "https://cdn.example.com/w.png"),
+])
+def test_wallpaper_resolves_against_game_url(value, expected):
+    manifest = fetch(lambda r: httpx.Response(200, json=good(wallpaper=value)))
+    assert manifest.wallpaper == expected
+
+
+@pytest.mark.parametrize("value", ["x" * 301, 4, None, "ftp://x/w.png", "http://u:p@x/w.png", "a b.png"])
+def test_invalid_wallpaper(value):
+    with pytest.raises(ManifestError):
+        fetch(lambda r: httpx.Response(200, json=good(wallpaper=value)))
+
+
+def test_missing_wallpaper_is_empty():
+    assert fetch(lambda r: httpx.Response(200, json=good())).wallpaper == ""
+
+
 def test_non_json():
     with pytest.raises(ManifestError):
         fetch(lambda r: httpx.Response(200, content=b"not json"))

@@ -267,6 +267,6 @@ describe("pages hidden by the administrator", () => {
 
 it("lands game-only accounts on Games when the filtered catalog is nonempty", async () => {
   me.mockResolvedValue({ ...ACCOUNT, permissions: ["games.ascension.play"] });
-  vi.spyOn(GamesClient.prototype, "list").mockResolvedValue([{ id: "ascension", name: "Ascension", url: "http://localhost:8060", description: "", icon: "", version: "1" }]);
+  vi.spyOn(GamesClient.prototype, "list").mockResolvedValue([{ id: "ascension", name: "Ascension", url: "http://localhost:8060", description: "", icon: "", wallpaper: "", version: "1" }]);
   await router.push("/"); expect(router.currentRoute.value.name).toBe("games");
 });

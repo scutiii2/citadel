@@ -3,5 +3,6 @@
   "name": "Ascension",
   "description": "Collect Ascended, battle wild ones, spend Insignia.",
   "icon": "",
+  "wallpaper": "assets/wallpaper.svg",
   "version": "1.0"
 }

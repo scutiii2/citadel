@@ -575,7 +575,10 @@ registration. Audit actions are `games.register`, `games.refresh`,
 Manifests are JSON objects with `id`, `name`, `description`, `icon`, and
 `version`. IDs match `^[a-z0-9][a-z0-9-]{0,62}$`; name is nonempty and at most
 80 characters, description and icon at most 300, version at most 40. Optional
-text fields default to empty strings. Fetches have a five-second timeout,
+text fields default to empty strings. `wallpaper` (at most 300 characters) is the
+card image: a path relative to the game's URL or an absolute http(s) URL, stored
+resolved (migration 0015) and returned by `GET /api/games`; ember_web loads it
+directly, so its origin must be in `EMBER_GAME_ORIGINS` (CSP `img-src`). Fetches have a five-second timeout,
 a 64 KiB decoded body cap, and refuse redirects. URLs allow http/https,
 without credentials; subpath bases are preserved, queries and fragments removed.
 

@@ -37,6 +37,7 @@ class GameInfo(BaseModel):
     name: str
     description: str
     icon: str
+    wallpaper: str
     version: str
     url: str
 

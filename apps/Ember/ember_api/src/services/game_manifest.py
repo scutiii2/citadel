@@ -10,7 +10,7 @@ import ipaddress
 import json
 import re
 from dataclasses import dataclass
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urldefrag, urljoin, urlsplit, urlunsplit
 import httpx
 from src.services.permissions import GAME_ID_PATTERN
 
@@ -27,6 +27,7 @@ class Manifest:
     icon: str
     version: str
     raw: dict
+    wallpaper: str = ""
 
 
 class GameUrlPolicy:
@@ -94,10 +95,17 @@ class ManifestFetcher:
                     body.extend(chunk)
         except (httpx.HTTPError, httpx.InvalidURL) as error:
             raise ManifestError("Cannot reach the game") from error
-        return self._parse(bytes(body))
+        return self._parse(bytes(body), base)
 
-    @staticmethod
-    def _parse(body: bytes) -> Manifest:
+    def _wallpaper(self, value: str, base: str) -> str:
+        """Resolve a manifest wallpaper (relative to the game, or absolute) to a checked http(s) URL."""
+        if not value:
+            return ""
+        resolved = urldefrag(urljoin(f"{base}/", value)).url
+        self._policy.normalize(resolved)  # validation only; the query of an image URL is kept
+        return resolved
+
+    def _parse(self, body: bytes, base: str) -> Manifest:
         try:
             raw = json.loads(body)
         except (ValueError, UnicodeError, RecursionError) as error:
@@ -108,9 +116,10 @@ class ManifestFetcher:
         if not isinstance(game_id, str) or not re.fullmatch(GAME_ID_PATTERN, game_id):
             raise ManifestError("Invalid manifest id")
         values = {}
-        for field, limit in (("name", 80), ("description", 300), ("icon", 300), ("version", 40)):
+        for field, limit in (("name", 80), ("description", 300), ("icon", 300), ("wallpaper", 300), ("version", 40)):
             value = raw.get(field, "")
             if not isinstance(value, str) or len(value) > limit or (field == "name" and not value.strip()):
                 raise ManifestError(f"Invalid manifest {field}")
             values[field] = value
+        values["wallpaper"] = self._wallpaper(values["wallpaper"], base)
         return Manifest(id=game_id, raw=raw, **values)
