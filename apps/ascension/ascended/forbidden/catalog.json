@@ -1,7 +1,7 @@
 {
   "id": "forbidden",
   "name": "Forbidden",
-  "art": { "focus": 18, "focus_preview": 29 },
+  "art": { "focus": 50, "focus_preview": 29 },
   "starter": false,
   "forbidden": true,
   "ascension_types": [
