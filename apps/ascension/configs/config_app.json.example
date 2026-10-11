@@ -8,6 +8,8 @@
   "emblem_prompt_seconds": 5.0,
   "encounter_cooldown_seconds": 30.0,
   "faint_seconds": 300.0,
+  "shop_rotation_seconds": 21600.0,
+  "shop_offers": 5,
   "ember_api_url": "http://127.0.0.1:8030",
   "ember_origin": "http://127.0.0.1:5173",
   "session_hours": 8,

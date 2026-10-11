@@ -91,6 +91,10 @@
       0.1
     ]
   },
+  "shop": {
+    "stock": { "common": 3, "rare": 3, "unique": 2, "royal": 1, "legendary": 1 },
+    "tier_weights": { "common": 40, "rare": 30, "unique": 18, "royal": 8, "legendary": 4 }
+  },
   "personalities": [
     {
       "id": "AGGRESSIVE",

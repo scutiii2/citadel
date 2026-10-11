@@ -214,8 +214,33 @@ def test_shop_over_http(client):
     start_profile(client)
     poor = client.post("/ascension/shop/purchases", json={"kind": "emblem", "tier": "rare", "quantity": 1}, headers=headers(client, ))
     assert poor.status_code == 409
-    assert client.post("/ascension/shop/purchases", json={"kind": "copies", "ascended_id": "sentinel", "tier": "common"}, headers=headers(client, )).status_code == 409
+    assert client.post("/ascension/shop/purchases", json={"kind": "copies", "ascended_id": "sentinel", "tier": "common"}, headers=headers(client, )).status_code == 400
+    assert client.post("/ascension/shop/purchases", json={"kind": "copies"}, headers=headers(client, )).status_code == 400
     assert client.post("/ascension/shop/purchases", json={"kind": "stock", "tier": "rare"}, headers=headers(client, )).status_code == 400
     assert client.post("/ascension/shop/purchases", json={"kind": "emblem", "tier": "gold", "quantity": 1}, headers=headers(client, )).status_code == 400
     assert client.post("/ascension/ascendeds/guardian/sales", headers=headers(client, )).status_code == 409  # nothing to sell
     assert client.post("/ascension/ascendeds/dragon/sales", headers=headers(client, )).status_code == 400
+
+
+def test_the_shop_lists_offers_and_refuses_a_player_without_insignia(client):
+    start_profile(client)
+    shop = client.get("/ascension/shop", headers=headers(client, key=False))
+    assert shop.status_code == 200, shop.text
+    body = shop.json()
+    assert len(body["offers"]) == 5 and body["seconds_left"] > 0
+    offer = body["offers"][0]
+    poor = client.post("/ascension/shop/purchases", json={"kind": "copies", "rotation": body["rotation"], "slot": offer["slot"]}, headers=headers(client))
+    assert poor.status_code == 409  # a new player has no Insignia
+
+
+def test_a_stale_rotation_and_a_missing_slot_are_refused_over_http(client):
+    start_profile(client)
+    body = client.get("/ascension/shop", headers=headers(client, key=False)).json()
+    stale = client.post("/ascension/shop/purchases", json={"kind": "copies", "rotation": body["rotation"] - 1, "slot": 0}, headers=headers(client))
+    assert stale.status_code == 409 and "refreshed" in stale.json()["error"]
+    missing = client.post("/ascension/shop/purchases", json={"kind": "copies", "rotation": body["rotation"], "slot": 99}, headers=headers(client))
+    assert missing.status_code == 400
+
+
+def test_the_shop_needs_a_profile(client):
+    assert client.get("/ascension/shop", headers=headers(client, "newbie", key=False)).status_code == 404

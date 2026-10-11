@@ -1,4 +1,4 @@
-"""The shop: buy EMBLEMs and regular-Ascended copies, sell copies back."""
+"""The shop: buy EMBLEMs, buy this rotation's limited copy offers, sell copies back."""
 
 from __future__ import annotations
 
@@ -6,18 +6,22 @@ from dataclasses import replace
 from typing import Any
 
 from src.ascension.catalog import Catalog
-from src.ascension.errors import InsufficientFunds, InvalidRequest, NotFound, NothingToSell, WrongPhase
+from src.ascension.errors import Conflict, InsufficientFunds, InvalidRequest, NotFound, NothingToSell, SoldOut, WrongPhase
 from src.ascension.idempotency import IdempotentWriter
 from src.ascension.progression import ProgressionService
 from src.ascension.records import AscendedRecord
-from src.ascension.repository import AscendedTransaction
+from src.ascension.repository import AscendedRepository, AscendedTransaction
+from src.ascension.runtime import Clock
+from src.ascension.shop_offers import ShopOffers
 
 MAX_EMBLEM_PURCHASE = 99
 
 
 class ShopService:
-    def __init__(self, writer: IdempotentWriter, catalog: Catalog, progression: ProgressionService) -> None:
-        self._writer, self._catalog, self._progression = writer, catalog, progression
+    def __init__(self, repository: AscendedRepository, writer: IdempotentWriter, catalog: Catalog,
+                 progression: ProgressionService, offers: ShopOffers, clock: Clock) -> None:
+        self._repository, self._writer, self._catalog = repository, writer, catalog
+        self._progression, self._offers, self._clock = progression, offers, clock
 
     # -- prices --------------------------------------------------------------------
 
@@ -61,26 +65,57 @@ class ShopService:
 
         return await self._writer.commit(owner, key, "shop.emblems", {"tier": tier_id, "quantity": quantity}, work)
 
-    async def buy_copies(self, owner: str, key: str, ascended_id: str, tier_id: str) -> dict[str, Any]:
-        spec = self._catalog.ascended(ascended_id)
-        if spec.forbidden:
-            raise InvalidRequest("the Forbidden Ascended can only be captured")
-        if self._catalog.tier(tier_id).copy_threshold is None:
-            raise InvalidRequest("choose one of the five regular tiers")
+    async def list_offers(self, owner: str) -> dict[str, Any]:
+        """This account's current window: each offer with its remaining stock and today's price."""
+        now = self._clock.now()
+        window = self._offers.window(owner, now)
+        async with self._repository.transaction() as tx:
+            if await tx.get_player(owner) is None:
+                raise NotFound("no profile yet; choose a starter first")
+            bought = await tx.shop_bought(owner, window.rotation)
+            owned = {record.ascended_id: record for record in await tx.list_ascendeds(owner)}
+        offers = []
+        for offer in window.offers:
+            record = owned.get(offer.ascended_id)
+            price, granted, resulting = self.copy_price(offer.ascended_id, record, offer.tier_id)
+            offers.append({
+                "slot": offer.slot, "ascended_id": offer.ascended_id, "tier_id": offer.tier_id,
+                "copies_granted": granted, "stock": offer.stock, "left": max(0, offer.stock - bought.get(offer.slot, 0)),
+                "price": price, "resulting_tier_id": resulting, "owned_copies": record.copies if record else 0,
+            })
+        return {"rotation": window.rotation, "refreshes_at": window.refreshes_at,
+                "seconds_left": max(0.0, window.refreshes_at - now), "offers": offers}
+
+    async def buy_offer(self, owner: str, key: str, rotation: int, slot: int) -> dict[str, Any]:
+        for value in (rotation, slot):
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise InvalidRequest("rotation and slot must be whole numbers")
 
         async def work(tx: AscendedTransaction) -> dict[str, Any]:
-            await self._reject_if_fighting(tx, owner, ascended_id)
-            owned = await tx.get_ascended(owner, ascended_id)
-            price, granted, resulting = self.copy_price(ascended_id, owned, tier_id)
+            window = self._offers.window(owner, self._clock.now())
+            if rotation != window.rotation:
+                raise Conflict("the shop has refreshed; look at the new offers")
+            offer = next((o for o in window.offers if o.slot == slot), None)
+            if offer is None:
+                raise InvalidRequest("there is no such offer")
+            bought = (await tx.shop_bought(owner, rotation)).get(slot, 0)
+            if bought >= offer.stock:
+                raise SoldOut("that offer is sold out")
+            await self._reject_if_fighting(tx, owner, offer.ascended_id)
+            owned = await tx.get_ascended(owner, offer.ascended_id)
+            price, granted, resulting = self.copy_price(offer.ascended_id, owned, offer.tier_id)
             await self._spend(tx, owner, price)
             if owned is None:
-                await tx.put_ascended(AscendedRecord(owner, ascended_id, granted, 1, 0))
+                await tx.put_ascended(AscendedRecord(owner, offer.ascended_id, granted, 1, 0))
             else:
                 await tx.put_ascended(replace(owned, copies=owned.copies + granted))
-            return {"kind": "copies", "ascended_id": ascended_id, "tier_id": tier_id, "copies_granted": granted,
-                    "price": price, "resulting_tier_id": resulting}
+            await tx.add_shop_purchase(owner, rotation, slot)
+            await tx.prune_shop(owner, rotation)
+            return {"kind": "copies", "ascended_id": offer.ascended_id, "tier_id": offer.tier_id, "copies_granted": granted,
+                    "price": price, "resulting_tier_id": resulting, "slot": slot, "rotation": rotation,
+                    "left": offer.stock - bought - 1}
 
-        return await self._writer.commit(owner, key, "shop.copies", {"ascended": ascended_id, "tier": tier_id}, work)
+        return await self._writer.commit(owner, key, "shop.offer", {"rotation": rotation, "slot": slot}, work)
 
     async def sell_copy(self, owner: str, key: str, ascended_id: str) -> dict[str, Any]:
         self._catalog.ascended(ascended_id)

@@ -29,8 +29,8 @@ from src.ascension.records import (
     AscendedRecord,
 )
 
-SCHEMA_VERSION = 2
-SCHEMA = """
+SCHEMA_VERSION = 3
+BASE_SCHEMA = """
 CREATE TABLE players (
     owner TEXT PRIMARY KEY, insignia INTEGER NOT NULL CHECK (insignia >= 0),
     last_roll_at REAL, created_at REAL NOT NULL);
@@ -67,6 +67,13 @@ CREATE TABLE idempotency (
     created_at REAL NOT NULL, PRIMARY KEY (owner, key));
 """
 
+SHOP_SCHEMA = """
+CREATE TABLE shop_purchases (
+    owner TEXT NOT NULL, rotation INTEGER NOT NULL, slot INTEGER NOT NULL, bought INTEGER NOT NULL CHECK (bought >= 0),
+    PRIMARY KEY (owner, rotation, slot));
+"""
+SCHEMA = BASE_SCHEMA + SHOP_SCHEMA
+
 
 class AscendedTransaction(Protocol):
     """Everything a service may read or write inside one transaction."""
@@ -97,6 +104,9 @@ class AscendedTransaction(Protocol):
     async def add_round(self, battle_id: str, round_number: int, record: dict[str, Any]) -> None: ...
     async def get_idempotent(self, owner: str, key: str) -> IdempotencyRecord | None: ...
     async def put_idempotent(self, owner: str, key: str, request_hash: str, response: dict[str, Any], now: float) -> None: ...
+    async def shop_bought(self, owner: str, rotation: int) -> dict[int, int]: ...
+    async def add_shop_purchase(self, owner: str, rotation: int, slot: int) -> None: ...
+    async def prune_shop(self, owner: str, rotation: int) -> None: ...
     async def delete_player_data(self, owner: str) -> None: ...
 
 
@@ -341,6 +351,22 @@ class _SqliteTransaction:
 
     # -- reset ---------------------------------------------------------------------
 
+    # -- rotating shop ---------------------------------------------------------------
+
+    async def shop_bought(self, owner: str, rotation: int) -> dict[int, int]:
+        rows = await self._run("SELECT slot, bought FROM shop_purchases WHERE owner = ? AND rotation = ?", (owner, rotation), "all")
+        return {row["slot"]: row["bought"] for row in rows}
+
+    async def add_shop_purchase(self, owner: str, rotation: int, slot: int) -> None:
+        await self._run(
+            "INSERT INTO shop_purchases (owner, rotation, slot, bought) VALUES (?, ?, ?, 1) "
+            "ON CONFLICT (owner, rotation, slot) DO UPDATE SET bought = bought + 1",
+            (owner, rotation, slot),
+        )
+
+    async def prune_shop(self, owner: str, rotation: int) -> None:
+        await self._run("DELETE FROM shop_purchases WHERE owner = ? AND rotation < ?", (owner, rotation))
+
     async def delete_player_data(self, owner: str) -> None:
         # Rounds carry no owner, so they go first, through the owner's battle ids.
         await self._run("DELETE FROM rounds WHERE battle_id IN (SELECT id FROM battles WHERE owner = ?)", (owner,))
@@ -350,6 +376,7 @@ class _SqliteTransaction:
         await self._run("DELETE FROM personalities WHERE owner = ?", (owner,))
         await self._run("DELETE FROM ascendeds WHERE owner = ?", (owner,))
         await self._run("DELETE FROM emblems WHERE owner = ?", (owner,))
+        await self._run("DELETE FROM shop_purchases WHERE owner = ?", (owner,))
         await self._run("DELETE FROM players WHERE owner = ?", (owner,))
         await self._run("DELETE FROM idempotency WHERE owner = ?", (owner,))
 
@@ -377,6 +404,8 @@ class SqliteAscendedRepository:
             version = conn.execute("PRAGMA user_version").fetchone()[0]
             if version == 0:
                 conn.executescript(f"BEGIN; {SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
+            elif version == 2:
+                conn.executescript(f"BEGIN; {SHOP_SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
             elif version != SCHEMA_VERSION:
                 raise RuntimeError(f"database schema version {version} is not supported (expected {SCHEMA_VERSION})")
         except BaseException:

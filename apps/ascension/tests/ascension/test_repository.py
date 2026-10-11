@@ -267,3 +267,50 @@ def test_unsupported_schema_version_is_refused(db_path):
 
     with pytest.raises(RuntimeError, match="schema version 99"):
         run(scenario())
+
+
+def test_shop_purchases_are_counted_per_slot_and_pruned(db_path):
+    async def scenario():
+        repo = SqliteAscendedRepository(db_path)
+        async with repo.transaction() as tx:
+            await tx.create_player("ann", 1.0)
+            await tx.add_shop_purchase("ann", 5, 0)
+            await tx.add_shop_purchase("ann", 5, 0)
+            await tx.add_shop_purchase("ann", 5, 2)
+            await tx.add_shop_purchase("ann", 4, 1)
+            before = await tx.shop_bought("ann", 5)
+            await tx.prune_shop("ann", 5)
+            old = await tx.shop_bought("ann", 4)
+            await tx.delete_player_data("ann")
+            gone = await tx.shop_bought("ann", 5)
+        await repo.close()
+        return before, old, gone
+
+    before, old, gone = run(scenario())
+    assert before == {0: 2, 2: 1} and old == {} and gone == {}
+
+
+def test_a_version_2_database_is_upgraded_to_3(db_path):
+    from src.ascension.repository import BASE_SCHEMA
+
+    db_path.parent.mkdir(parents=True)
+    conn = sqlite3.connect(str(db_path))
+    conn.executescript(f"{BASE_SCHEMA} PRAGMA user_version = 2;")
+    conn.execute("INSERT INTO players (owner, insignia, created_at) VALUES ('ann', 7, 1.0)")
+    conn.commit()
+    conn.close()
+
+    async def scenario():
+        repo = SqliteAscendedRepository(db_path)
+        async with repo.transaction() as tx:
+            player = await tx.get_player("ann")
+            await tx.add_shop_purchase("ann", 1, 0)
+            bought = await tx.shop_bought("ann", 1)
+        await repo.close()
+        return player, bought
+
+    player, bought = run(scenario())
+    check = sqlite3.connect(str(db_path))
+    version = check.execute("PRAGMA user_version").fetchone()[0]
+    check.close()
+    assert player.insignia == 7 and bought == {0: 1} and version == 3

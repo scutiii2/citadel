@@ -1,10 +1,11 @@
 import pytest
 
 from src.ascension.catalog import CatalogError
-from src.ascension.errors import InsufficientFunds, InvalidRequest, NothingToSell, WrongPhase
+from src.ascension.errors import Conflict, InsufficientFunds, InvalidRequest, NothingToSell, SoldOut, WrongPhase
 from src.ascension.records import AscendedRecord
 from tests.ascension.env import CATALOG, Env, run
-from tests.ascension.helpers import battle_record
+from src.ascension.shop_offers import Offer
+from tests.ascension.helpers import FixedOffers, battle_record
 
 
 def make(tmp_path):
@@ -72,51 +73,10 @@ def test_unknown_tier_is_a_catalog_error(tmp_path):
     run(scenario())
 
 
-def test_buying_a_new_ascended_starts_it_at_level_one(tmp_path):
-    async def scenario():
-        env = make(tmp_path)
-        await env.start_player()
-        await env.give(insignia=1000)
-        bought = await env.shop.buy_copies("ann", "c1", "sentinel", "common")
-        profile = await env.collection.profile("ann")
-        await env.close()
-        return bought, profile
-
-    bought, profile = run(scenario())
-    assert bought["price"] == 2 * 1 * 140 and bought["copies_granted"] == 1
-    sentinel = next(s for s in profile["ascendeds"] if s["ascended_id"] == "sentinel")
-    assert (sentinel["level"], sentinel["copies"]) == (1, 1) and profile["insignia"] == 1000 - 280
 
 
-def test_buying_keeps_an_owned_ascended_level_and_prices_at_the_resulting_tier(tmp_path):
-    async def scenario():
-        env = make(tmp_path)
-        await env.start_player()
-        await env.give(insignia=5000, guardian=AscendedRecord("ann", "guardian", 9, 11, 40))
-        bought = await env.shop.buy_copies("ann", "c1", "guardian", "rare")  # 9 + 2 = 11 copies -> Rare
-        profile = await env.collection.profile("ann")
-        await env.close()
-        return bought, profile
-
-    bought, profile = run(scenario())
-    assert bought["resulting_tier_id"] == "rare" and bought["copies_granted"] == 2
-    assert bought["price"] == 2 * 2 * CATALOG.sale_value("guardian", "rare", 11)  # 2 x copies x resale at Rare, level 11
-    guardian = profile["ascendeds"][0]
-    assert (guardian["level"], guardian["xp"], guardian["copies"]) == (11, 40, 11)
 
 
-def test_the_forbidden_ascended_and_tier_cannot_be_bought(tmp_path):
-    async def scenario():
-        env = make(tmp_path)
-        await env.start_player()
-        await env.give(insignia=10**6)
-        with pytest.raises(InvalidRequest, match="captured"):
-            await env.shop.buy_copies("ann", "c1", "forbidden", "common")
-        with pytest.raises(InvalidRequest, match="regular tiers"):
-            await env.shop.buy_copies("ann", "c2", "sentinel", "forbidden")
-        await env.close()
-
-    run(scenario())
 
 
 def test_selling_pays_the_value_before_the_copy_goes_and_can_downgrade(tmp_path):
@@ -170,28 +130,168 @@ def test_buying_then_reselling_never_makes_a_profit(ascended_id, package, start_
 def _price(owned, package):
     from src.ascension.shop import ShopService
 
-    return ShopService(None, CATALOG, None).copy_price(owned.ascended_id, owned, package)
+    return ShopService(None, None, CATALOG, None, None, None).copy_price(owned.ascended_id, owned, package)
 
 
-def test_a_ascended_that_is_fighting_cannot_be_bought_or_sold_but_others_can(tmp_path):
+def fixed(*offers):
+    return lambda tmp: Env(tmp / "s.sqlite3", offers=FixedOffers(*offers))
+
+
+GUARDIAN_COMMON = Offer(0, "guardian", "common", 2)
+SCOUT_RARE = Offer(1, "scout", "rare", 1)
+
+
+def test_the_window_lists_offers_with_the_servers_price(tmp_path):
     async def scenario():
-        env = make(tmp_path)
+        env = fixed(GUARDIAN_COMMON, SCOUT_RARE)(tmp_path)
+        await env.start_player()
+        window = await env.shop.list_offers("ann")
+        await env.close()
+        return env, window
+
+    env, window = run(scenario())
+    assert window["rotation"] == int(env.clock.now() // 21600.0)
+    assert window["seconds_left"] == window["refreshes_at"] - env.clock.now()
+    first, second = window["offers"]
+    owned = AscendedRecord("ann", "guardian", 0, 1, 0)
+    price, granted, resulting = _price(owned, "common")
+    assert (first["slot"], first["ascended_id"], first["tier_id"]) == (0, "guardian", "common")
+    assert (first["price"], first["copies_granted"], first["resulting_tier_id"]) == (price, granted, resulting)
+    assert first["stock"] == 2 and first["left"] == 2 and second["left"] == 1
+    assert "owned_copies" in first
+
+
+def test_buying_an_offer_grants_copies_and_uses_stock(tmp_path):
+    async def scenario():
+        env = fixed(GUARDIAN_COMMON)(tmp_path)
+        await env.start_player()
+        await env.give(insignia=1000)
+        rotation = env.offers.rotation_at(env.clock.now())
+        first = await env.shop.buy_offer("ann", "b1", rotation, 0)
+        second = await env.shop.buy_offer("ann", "b2", rotation, 0)
+        with pytest.raises(SoldOut):
+            await env.shop.buy_offer("ann", "b3", rotation, 0)
+        window = await env.shop.list_offers("ann")
+        insignia, _ = await balance(env)
+        await env.close()
+        return first, second, window, insignia
+
+    first, second, window, insignia = run(scenario())
+    assert first["kind"] == "copies" and first["left"] == 1 and second["left"] == 0
+    assert window["offers"][0]["left"] == 0
+    assert insignia == 1000 - first["price"] - second["price"]
+
+
+def test_buying_a_new_ascended_starts_it_at_level_one(tmp_path):
+    async def scenario():
+        env = fixed(Offer(0, "sentinel", "common", 1))(tmp_path)
+        await env.start_player()
+        await env.give(insignia=1000)
+        rotation = env.offers.rotation_at(env.clock.now())
+        bought = await env.shop.buy_offer("ann", "c1", rotation, 0)
+        profile = await env.collection.profile("ann")
+        await env.close()
+        return bought, profile
+
+    bought, profile = run(scenario())
+    assert bought["price"] == 2 * 1 * 140 and bought["copies_granted"] == 1
+    sentinel = next(s for s in profile["ascendeds"] if s["ascended_id"] == "sentinel")
+    assert (sentinel["level"], sentinel["copies"]) == (1, 1) and profile["insignia"] == 1000 - 280
+
+
+def test_buying_keeps_an_owned_ascended_level_and_prices_at_the_resulting_tier(tmp_path):
+    async def scenario():
+        env = fixed(Offer(0, "guardian", "rare", 1))(tmp_path)
+        await env.start_player()
+        await env.give(insignia=5000, guardian=AscendedRecord("ann", "guardian", 9, 11, 40))
+        rotation = env.offers.rotation_at(env.clock.now())
+        bought = await env.shop.buy_offer("ann", "c1", rotation, 0)  # 9 + 2 = 11 copies -> Rare
+        profile = await env.collection.profile("ann")
+        await env.close()
+        return bought, profile
+
+    bought, profile = run(scenario())
+    assert bought["resulting_tier_id"] == "rare" and bought["copies_granted"] == 2
+    assert bought["price"] == 2 * 2 * CATALOG.sale_value("guardian", "rare", 11)  # 2 x copies x resale at Rare, level 11
+    guardian = profile["ascendeds"][0]
+    assert (guardian["level"], guardian["xp"], guardian["copies"]) == (11, 40, 11)
+
+
+def test_a_stale_rotation_and_an_unknown_slot_are_refused(tmp_path):
+    async def scenario():
+        env = fixed(GUARDIAN_COMMON)(tmp_path)
+        await env.start_player()
+        await env.give(insignia=1000)
+        rotation = env.offers.rotation_at(env.clock.now())
+        with pytest.raises(Conflict, match="refreshed"):
+            await env.shop.buy_offer("ann", "b1", rotation - 1, 0)
+        with pytest.raises(InvalidRequest):
+            await env.shop.buy_offer("ann", "b2", rotation, 9)
+        with pytest.raises(InvalidRequest):
+            await env.shop.buy_offer("ann", "b3", rotation, True)
+        env.clock.advance(21600)
+        with pytest.raises(Conflict, match="refreshed"):
+            await env.shop.buy_offer("ann", "b4", rotation, 0)
+        await env.close()
+
+    run(scenario())
+
+
+def test_a_new_rotation_restores_stock_and_drops_old_counts(tmp_path):
+    async def scenario():
+        env = fixed(Offer(0, "guardian", "common", 1))(tmp_path)
+        await env.start_player()
+        await env.give(insignia=1000)
+        first_rotation = env.offers.rotation_at(env.clock.now())
+        await env.shop.buy_offer("ann", "b1", first_rotation, 0)
+        env.clock.advance(21600)
+        second_rotation = env.offers.rotation_at(env.clock.now())
+        again = await env.shop.buy_offer("ann", "b2", second_rotation, 0)
+        async with env.repo.transaction() as tx:
+            old = await tx.shop_bought("ann", first_rotation)
+        await env.close()
+        return again, old
+
+    again, old = run(scenario())
+    assert again["left"] == 0 and old == {}
+
+
+def test_a_fighting_ascended_cannot_be_bought_or_sold_but_others_can(tmp_path):
+    async def scenario():
+        env = fixed(GUARDIAN_COMMON, SCOUT_RARE)(tmp_path)
         await env.start_player()
         await env.give(insignia=5000, guardian=AscendedRecord("ann", "guardian", 3, 1, 0))
         async with env.repo.transaction() as tx:
             await tx.add_battle(battle_record())  # its fighter is the guardian Ascended by default
+        rotation = env.offers.rotation_at(env.clock.now())
         with pytest.raises(WrongPhase):
-            await env.shop.buy_copies("ann", "c1", "guardian", "common")
+            await env.shop.buy_offer("ann", "b1", rotation, 0)
         with pytest.raises(WrongPhase):
             await env.shop.sell_copy("ann", "s1", "guardian")
-        await env.shop.buy_copies("ann", "c2", "scout", "common")
+        await env.shop.buy_offer("ann", "b2", rotation, 1)
         await env.shop.buy_emblems("ann", "e1", "common", 1)
         await env.close()
 
     run(scenario())
 
 
-def test_a_retried_purchase_is_charged_once(tmp_path):
+def test_a_retried_offer_purchase_is_charged_once(tmp_path):
+    async def scenario():
+        env = fixed(GUARDIAN_COMMON)(tmp_path)
+        await env.start_player()
+        await env.give(insignia=1000)
+        rotation = env.offers.rotation_at(env.clock.now())
+        first = await env.shop.buy_offer("ann", "same", rotation, 0)
+        second = await env.shop.buy_offer("ann", "same", rotation, 0)
+        insignia, _ = await balance(env)
+        await env.close()
+        return first, second, insignia
+
+    first, second, insignia = run(scenario())
+    assert first == second and insignia == 1000 - first["price"]
+
+
+def test_a_retried_emblem_purchase_is_charged_once(tmp_path):
     async def scenario():
         env = make(tmp_path)
         await env.start_player()
@@ -204,3 +304,17 @@ def test_a_retried_purchase_is_charged_once(tmp_path):
 
     first, second, (insignia, emblems) = run(scenario())
     assert first == second and insignia == 960 and emblems == {"common": 7}
+
+
+def test_not_enough_insignia_keeps_the_stock(tmp_path):
+    async def scenario():
+        env = fixed(SCOUT_RARE)(tmp_path)
+        await env.start_player()
+        rotation = env.offers.rotation_at(env.clock.now())
+        with pytest.raises(InsufficientFunds):
+            await env.shop.buy_offer("ann", "b1", rotation, 1)
+        window = await env.shop.list_offers("ann")
+        await env.close()
+        return window
+
+    assert run(scenario())["offers"][0]["left"] == 1

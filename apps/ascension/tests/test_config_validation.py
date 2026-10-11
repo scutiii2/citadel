@@ -15,7 +15,7 @@ def raw():
 
 
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
-@pytest.mark.parametrize("key", ["port", "laya_timeout_seconds", "faint_seconds", "laya_min_confidence"])
+@pytest.mark.parametrize("key", ["port", "laya_timeout_seconds", "faint_seconds", "laya_min_confidence", "shop_rotation_seconds"])
 def test_non_finite_numbers_are_rejected(raw, key, bad):
     raw[key] = bad
     with pytest.raises(ConfigError, match=key):

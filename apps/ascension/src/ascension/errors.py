@@ -77,3 +77,7 @@ class IdempotencyConflict(Conflict):
 
 class NothingToSell(Conflict):
     pass
+
+
+class SoldOut(Conflict):
+    """The offer's stock for this rotation is used up."""

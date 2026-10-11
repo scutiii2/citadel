@@ -16,6 +16,7 @@ from src.ascension.progression import ProgressionService
 from src.ascension.repository import SqliteAscendedRepository
 from src.ascension.runtime import RandomSource, SeededRandom
 from src.ascension.shop import ShopService
+from src.ascension.shop_offers import ShopOffers
 from tests.ascension.helpers import FixedClock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -36,7 +37,7 @@ _KEYS = itertools.count(1)  # unique across Env instances, so a restarted Env ne
 
 
 class Env:
-    def __init__(self, db_path: Path, rng: RandomSource | None = None) -> None:
+    def __init__(self, db_path: Path, rng: RandomSource | None = None, offers=None) -> None:
         self.catalog = CATALOG
         self.clock = FixedClock()
         self.rng = rng or SeededRandom(11)
@@ -46,7 +47,8 @@ class Env:
         self.progression = ProgressionService(CATALOG, self.clock, FAINT)
         self.collection = CollectionService(self.repo, self.writer, CATALOG, self.clock, self.rng, COOLDOWN)
         self.encounters = EncounterService(self.repo, self.writer, CATALOG, self.clock, self.rng, COOLDOWN)
-        self.shop = ShopService(self.writer, CATALOG, self.progression)
+        self.offers = offers or ShopOffers(CATALOG, 21600.0, 5)
+        self.shop = ShopService(self.repo, self.writer, CATALOG, self.progression, self.offers, self.clock)
 
     def coordinator(self, policy=None, reader=None, picker=None, laya=None):
         """A RoundCoordinator over this Env. Imports are local: the coordinator is built in a later task."""

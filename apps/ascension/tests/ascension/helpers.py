@@ -31,6 +31,23 @@ class FixedClock:
         self.t += seconds
 
 
+class FixedOffers:
+    """A shop window with the given offers, for tests that need a known Ascended or stock."""
+
+    def __init__(self, *offers, seconds: float = 21600.0) -> None:
+        self.offers = tuple(offers)
+        self.seconds = seconds
+
+    def rotation_at(self, now: float) -> int:
+        return int(now // self.seconds)
+
+    def window(self, owner: str, now: float):
+        from src.ascension.shop_offers import ShopWindow
+
+        rotation = self.rotation_at(now)
+        return ShopWindow(rotation, (rotation + 1) * self.seconds, self.offers)
+
+
 def fighter(
     side: str = PLAYER,
     hp: int = 100,

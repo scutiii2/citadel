@@ -19,6 +19,7 @@ from src.ascension.progression import ProgressionService
 from src.ascension.repository import AscendedRepository, SqliteAscendedRepository
 from src.ascension.runtime import Clock, RandomSource, SystemClock, SystemRandom
 from src.ascension.shop import ShopService
+from src.ascension.shop_offers import ShopOffers
 from src.ascension.situation import (
     FallbackSituationReader,
     HeuristicSituationReader,
@@ -53,6 +54,7 @@ def build_ascended_services(
         catalog=catalog,
         collection=CollectionService(repository, writer, catalog, clock, rng, config.encounter_cooldown_seconds),
         encounters=EncounterService(repository, writer, catalog, clock, rng, config.encounter_cooldown_seconds),
-        shop=ShopService(writer, catalog, progression),
+        shop=ShopService(repository, writer, catalog, progression,
+                         ShopOffers(catalog, config.shop_rotation_seconds, config.shop_offers), clock),
         coordinator=coordinator,
     )

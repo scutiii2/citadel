@@ -25,7 +25,8 @@ in Phase 4.
 - **CATCH** collects the wild Ascended with an EMBLEM. Winning or collecting pays XP
   and Insignia; collecting also adds copies and one random personality.
 - Ascended keep absorbed copies, which set their tier; Insignia buys EMBLEMs and
-  copies in the shop.
+  copies in the shop. EMBLEMs are always on sale. Copies come as a few limited
+  offers per account that rotate every 6 hours (see Rotating shop).
 - Play manually, or let your Ascended play on its own with a personality preset.
 
 ## How an Ascended chooses on its own
@@ -65,8 +66,9 @@ in Ascension's local environment that `ember_api` uses. This token is used only
 for outgoing server-to-server ticket redemption. Game routes always require a
 bearer session, including when the internal token is missing. Game data lives
 in `.data/ascension.sqlite3` (gitignored).
-The database was renamed with the game (it was `data/sparks.sqlite3`, schema version 1; now `.data/ascension.sqlite3`, schema version 2).
-There is no migration: a start with an old file fails with `database schema version 1 is not supported`.
+The database was renamed with the game (it was `data/sparks.sqlite3`, schema version 1; now `.data/ascension.sqlite3`, schema version 3).
+A version 2 file is upgraded to 3 on start (it gains the `shop_purchases` table). Any other old file fails with
+`database schema version 1 is not supported`.
 Delete the old file, or point `database_path` at a new one, to start fresh.
 
 `server_launcher` lists this project from its `run.bat`. Default port 8060.
@@ -75,6 +77,16 @@ runs `npm --prefix web ci` followed by `npm --prefix web run build`. A build
 failure stops the launcher. If UI sources are absent, the API still starts;
 `/` returns 503 with
 `UI not built: run npm --prefix web run build`.
+
+## Rotating shop
+
+Every `shop_rotation_seconds` (default 21600, so 00:00, 06:00, 12:00 and 18:00 UTC) each account gets
+`shop_offers` (default 5, 1 to 12) copy offers. An offer is one regular Ascended with one tier package and a limited
+stock (Common 3, Rare 3, Unique 2, Royal 1, Legendary 1; set under `shop` in `configs/ascension_catalog.json`).
+Offers are derived from the account and the rotation, so they are the same until the next rotation and no stock is
+shared between players. Only purchase counts are stored (`shop_purchases`). Prices are worked out when you list or
+buy, from the copies and level you have. A purchase with an old `rotation` is refused with a 409 ("the shop has
+refreshed"); a used-up offer is a 409 "sold out".
 
 ## Ember host configuration
 
@@ -88,6 +100,8 @@ values in `configs/config_app.json.example`:
 | `session_hours` | `8` | Absolute session lifetime; reads do not extend it |
 | `game_id` | `ascension` | Game id sent to Ember when redeeming a ticket |
 | `dev_fake_owner` | empty string | Optional fixed local owner; empty disables it |
+| `shop_rotation_seconds` | `21600` | How long one shop rotation lasts (at least 60) |
+| `shop_offers` | `5` | Copy offers per account and rotation (1 to 12) |
 
 `ember_origin` must be an http/https origin without credentials, a path, query
 or fragment. Keep it equal to the UI's `VITE_EMBER_ORIGIN` setting when Phase 3
@@ -155,7 +169,8 @@ last saw; a stale pair is a 409.
 | `POST /ascension/battles/{id}/advance` | Play one autonomous round, or settle an expired prompt |
 | `POST /ascension/battles/{id}/mode` | Switch manual or autonomous between rounds |
 | `POST /ascension/battles/{id}/forfeit` | End as a loss |
-| `POST /ascension/shop/purchases` | Buy EMBLEMs or regular-Ascended copies |
+| `GET /ascension/shop` | This account's current offers: `rotation`, `seconds_left`, and per offer `slot`, Ascended, tier, `stock`, `left`, `price` |
+| `POST /ascension/shop/purchases` | Buy EMBLEMs (`{kind: "emblem", tier, quantity}`) or an offer (`{kind: "copies", rotation, slot}`) |
 | `POST /ascension/ascendeds/{id}/sales` | Sell one absorbed copy |
 
 `POST /ascension/profile/reset` deletes the player's profile, Ascended, personalities, presets, EMBLEMs, encounters and battle history so a starter can be chosen again; it needs `{"confirm": true}` and is refused with a 409 while a battle is active.

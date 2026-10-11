@@ -95,3 +95,21 @@ def test_unreadable_file_is_a_catalog_error(tmp_path):
 
 def test_the_default_locations_load_the_shipped_catalog():
     assert [s.id for s in Catalog.load().all_ascendeds()] == [s.id for s in Catalog.load(CATALOG_PATH, ASCENDEDS_PATH).all_ascendeds()]
+
+
+def test_the_shop_section_covers_the_regular_tiers(catalog):
+    assert set(catalog.shop.stock) == {t.id for t in catalog.regular_tiers}
+    assert set(catalog.shop.tier_weights) == set(catalog.shop.stock)
+    assert catalog.shop.stock["common"] == 3 and catalog.shop.stock["legendary"] == 1
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda d: d.pop("shop"),
+    lambda d: d["shop"]["stock"].pop("rare"),
+    lambda d: d["shop"]["stock"].update(common=0),
+    lambda d: d["shop"]["tier_weights"].update(common=0),
+    lambda d: d["shop"]["stock"].update(forbidden=1),
+])
+def test_a_bad_shop_section_is_refused(raw, mutate):
+    with pytest.raises(CatalogError):
+        Catalog(_broken(raw, mutate))

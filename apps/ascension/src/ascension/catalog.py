@@ -88,6 +88,14 @@ class Economy:
 
 
 @dataclass(frozen=True)
+class ShopSpec:
+    """Per regular tier: how many times one offer can be bought, and how likely the tier is to be offered."""
+
+    stock: Mapping[str, int]
+    tier_weights: Mapping[str, float]
+
+
+@dataclass(frozen=True)
 class Levels:
     regular_cap: int
     forbidden_cap: int
@@ -154,6 +162,8 @@ class Catalog:
         self.version: int = _require(raw, "version", "catalog")
         self.tiers: tuple[TierSpec, ...] = tuple(TierSpec(**t) for t in _require(raw, "tiers", "catalog"))
         self.levels = Levels(**_require(raw, "levels", "catalog"))
+        shop = _require(raw, "shop", "catalog")
+        self.shop = ShopSpec(dict(_require(shop, "stock", "shop")), dict(_require(shop, "tier_weights", "shop")))
         economy = dict(_require(raw, "economy", "catalog"))
         economy["personality_tier_probabilities"] = tuple(economy["personality_tier_probabilities"])
         self.economy = Economy(**economy)
@@ -197,6 +207,13 @@ class Catalog:
         thresholds = [t.copy_threshold for t in self.regular_tiers]
         if thresholds[0] != 0 or thresholds != sorted(set(thresholds)):
             raise CatalogError("regular copy thresholds must start at 0 and strictly increase")
+        regular_ids = {t.id for t in self.regular_tiers}
+        if set(self.shop.stock) != regular_ids or set(self.shop.tier_weights) != regular_ids:
+            raise CatalogError("shop stock and tier_weights must list exactly the regular tiers")
+        if any(isinstance(n, bool) or not isinstance(n, int) or n < 1 for n in self.shop.stock.values()):
+            raise CatalogError("shop stock must be a whole number of at least 1 per tier")
+        if any(isinstance(w, bool) or not isinstance(w, (int, float)) or w <= 0 for w in self.shop.tier_weights.values()):
+            raise CatalogError("shop tier_weights must be positive numbers")
         if len([s for s in self._ascendeds.values() if s.starter]) != 3:
             raise CatalogError("exactly three Ascended must be starters")
         if len([s for s in self._ascendeds.values() if s.forbidden]) != 1:

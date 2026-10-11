@@ -32,6 +32,8 @@ class AppConfig:
     emblem_prompt_seconds: float
     encounter_cooldown_seconds: float
     faint_seconds: float
+    shop_rotation_seconds: float
+    shop_offers: int
     ember_api_url: str
     ember_origin: str
     session_hours: float
@@ -120,6 +122,8 @@ def parse_config(raw: Any, root: Path = PROJECT_ROOT) -> AppConfig:
         emblem_prompt_seconds=_number(raw, "emblem_prompt_seconds", float, 0.1),
         encounter_cooldown_seconds=_number(raw, "encounter_cooldown_seconds", float, 0.0),
         faint_seconds=_number(raw, "faint_seconds", float, 0.0),
+        shop_rotation_seconds=_number(raw, "shop_rotation_seconds", float, 60.0),
+        shop_offers=_number(raw, "shop_offers", int, 1, 12),
         ember_api_url=host_config.url("ember_api_url"),
         ember_origin=host_config.url("ember_origin", origin=True),
         session_hours=_number(raw, "session_hours", float, 0.01),

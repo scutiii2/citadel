@@ -75,3 +75,25 @@ def test_game_host_settings_reject_unsafe_values(raw, key, value):
     raw[key] = value
     with pytest.raises(ConfigError, match=key):
         parse_config(raw)
+
+
+def test_shop_settings_are_typed(raw):
+    raw.update(host_values())
+    config = parse_config(raw)
+    assert config.shop_rotation_seconds == 21600.0 and config.shop_offers == 5
+
+
+@pytest.mark.parametrize("key", ["shop_rotation_seconds", "shop_offers"])
+def test_shop_settings_are_required(raw, key):
+    raw.update(host_values())
+    del raw[key]
+    with pytest.raises(ConfigError, match=key):
+        parse_config(raw)
+
+
+@pytest.mark.parametrize("key,value", [("shop_offers", 0), ("shop_offers", 13), ("shop_offers", 2.5), ("shop_offers", True), ("shop_rotation_seconds", 10)])
+def test_shop_settings_reject_bad_values(raw, key, value):
+    raw.update(host_values())
+    raw[key] = value
+    with pytest.raises(ConfigError, match=key):
+        parse_config(raw)

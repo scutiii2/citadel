@@ -82,9 +82,10 @@ class ModeRequest(RoundBody):
 
 class PurchaseBody(_Body):
     kind: str
-    tier: str
+    tier: str | None = None
     quantity: StrictInt = 1
-    ascended_id: str | None = None
+    rotation: StrictInt | None = None
+    slot: StrictInt | None = None
 
 
 def idempotency_key(idempotency_key: str = Header(default="", alias="Idempotency-Key")) -> str:
@@ -191,13 +192,17 @@ def build_router(services: AscendedServices) -> APIRouter:
     async def forfeit(battle_id: str, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
         return await coordinator.forfeit(owner, key, battle_id)
 
+    @router.get("/shop")
+    async def shop_window(owner: str = Depends(requester)):
+        return await shop.list_offers(owner)
+
     @router.post("/shop/purchases", status_code=201)
     async def purchase(body: PurchaseBody, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
-        if body.kind == "emblem":
+        if body.kind == "emblem" and body.tier:
             return await shop.buy_emblems(owner, key, body.tier, body.quantity)
-        if body.kind == "copies" and body.ascended_id:
-            return await shop.buy_copies(owner, key, body.ascended_id, body.tier)
-        raise HTTPException(400, 'kind must be "emblem" (with tier, quantity) or "copies" (with ascended_id, tier)')
+        if body.kind == "copies" and body.rotation is not None and body.slot is not None:
+            return await shop.buy_offer(owner, key, body.rotation, body.slot)
+        raise HTTPException(400, 'kind must be "emblem" (with tier, quantity) or "copies" (with rotation, slot)')
 
     @router.post("/ascendeds/{ascended_id}/sales", status_code=201)
     async def sell(ascended_id: str, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
