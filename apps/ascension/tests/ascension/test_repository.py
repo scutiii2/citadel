@@ -17,7 +17,7 @@ def run(coro):
 
 @pytest.fixture
 def db_path(tmp_path):
-    return tmp_path / "data" / "ascension.sqlite3"
+    return tmp_path / ".data" / "ascension.sqlite3"
 
 
 def test_players_and_wallet(db_path):

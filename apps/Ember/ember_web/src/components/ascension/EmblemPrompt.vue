@@ -10,7 +10,7 @@ import EmRing from "./ui/EmRing.vue";
 
 /** The five-second EMBLEM prompt over the arena: the tiers this battle's limit permits,
  * with owned counts, and a countdown (the store's, counted on this device). "Let my
- * Ascended decide" only closes it; at zero the store calls advance and mini_games settles
+ * Ascended decide" only closes it; at zero the store calls advance and Ascension settles
  * the prompt (the Ascended's choice, or a basic ATTACK). A tier you own none of is disabled. */
 const store = useAscensionStore();
 const dismissed = ref(false);

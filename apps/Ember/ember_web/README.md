@@ -231,8 +231,8 @@ URL, token or key.
   (a value the agent file does not set is left out), and a status (running,
   offline, disabled; an icon and a word). Read-only, refreshed every 15 s: new chats
   always go to the entry agent, there is no per-agent chat.
-- Ascension page (`/ascension`, `ascension.play`): the Ascension game (collect and battle Ascended) from `apps/mini_games`, through ember_api's
-  `/api/ascension` pass-through (the browser never learns mini_games' address or token). The page has its own look, not
+- Ascension page (`/ascension`, `ascension.play`): the Ascension game (collect and battle Ascended) from `apps/ascension`, through ember_api's
+  `/api/ascension` pass-through (the browser never learns Ascension's address or token). The page has its own look, not
   Ember's: its theme (`components/ascension/theme.css`, `--em-*` tokens: steel, copper, ivory), its bundled fonts
   (Silkscreen and Inter, SIL OFL, via `@fontsource`) and its own small components in `components/ascension/ui/`
   (design source: `docs/design/ascension/`, spec `docs/superpowers/specs/2026-10-11-emberlings-redesign-design.md`).

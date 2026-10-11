@@ -1,7 +1,7 @@
 import type { Account } from "./AuthClient";
 import type { BattleView, Catalog, EncounterPreview, Fighter, OwnedAscended, Profile, AscendedInfo, TierInfo } from "./AscensionClient";
 
-/** Test data shaped like mini_games' answers, for the Ascension tests. */
+/** Test data shaped like Ascension's answers, for the Ascension tests. */
 
 const nameOf = (id: string) => id.charAt(0).toUpperCase() + id.slice(1);
 

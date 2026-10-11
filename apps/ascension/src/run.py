@@ -1,4 +1,4 @@
-"""Start the mini_games backend: `python -m src.run`."""
+"""Start the Ascension backend: `python -m src.run`."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from src.laya_client import LayaClient
 from src.ascension.api import mount_ascendeds
 from src.ascension.composition import build_ascended_services
 
-log = logging.getLogger("mini_games")
+log = logging.getLogger("ascension")
 
 
 def build_app() -> tuple[FastAPI, AppConfig]:

@@ -15,7 +15,7 @@ ENV_PATH = PROJECT_DIR / ".env"
 # Pre-.env layout: one secret_*.env file per concern. Read once to build .env.
 LEGACY_SECRETS_DIR = PROJECT_DIR / "secrets"
 
-# mini_games (the Ascension game); a config without the key uses this.
+# The Ascension backend; a config without the key uses this.
 DEFAULT_ASCENSION_URL = "http://127.0.0.1:8060"
 
 
@@ -145,7 +145,7 @@ class Settings:
     # another machine. Wins over agents_registry_path when set.
     agents_registry_url: str | None = None
     mcp_server_url: str = "http://127.0.0.1:8010/mcp"
-    # mini_games' root URL (the Ascension game; its routes sit under /ascension).
+    # The Ascension backend's root URL (its routes sit under /ascension).
     ascension_url: str = DEFAULT_ASCENSION_URL
     security: SecuritySettings = field(default_factory=SecuritySettings)
     usage: UsageSettings = field(default_factory=UsageSettings)

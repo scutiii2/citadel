@@ -23,7 +23,7 @@ Mandatory in every root project:
 | `pyproject.toml` | Its own dependencies — each root project is a separate Python environment, never a shared venv |
 | `run.bat` | The one launcher, env-var-configured: don't copy the bat per instance, set env vars before calling it (ai_agent goes further: its bat starts a supervisor that runs one child per `agents/<id>.json`). Creates its own `.venv_<project>` on first run |
 | `configs/` | JSON config, each real file gitignored with a committed `.example` twin (`config_x.json` + `config_x.json.example`) |
-| `.env`, `.env.example` | The project's one credentials file, in the project root beside `configs/` (no `secrets/` folder). The real `.env` is gitignored; `.env.example` is committed. `mini_games`, `mcp_server` and `ai_agent` follow this |
+| `.env`, `.env.example` | The project's one credentials file, in the project root beside `configs/` (no `secrets/` folder). The real `.env` is gitignored; `.env.example` is committed. `ascension`, `mcp_server` and `ai_agent` follow this |
 | `src/` | The actual code |
 | `tests/` | Its test suite |
 

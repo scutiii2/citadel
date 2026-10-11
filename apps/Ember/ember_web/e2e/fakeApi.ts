@@ -198,7 +198,7 @@ const ASCENSION_CATALOG = {
   personalities: [{ id: "AGGRESSIVE", categories: ["ATTACK"] }],
 };
 
-/** The profile mini_games makes for a new player with this starter. */
+/** The profile Ascension makes for a new player with this starter. */
 function ascensionProfile(starter: string): Record<string, unknown> {
   return {
     owner: "1",

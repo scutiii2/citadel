@@ -1,5 +1,5 @@
 """The real AscensionGateway behind /api/ascension, talking to a fake
-mini_games: what actually leaves ember_api, and what never reaches the browser."""
+Ascension: what actually leaves ember_api, and what never reaches the browser."""
 
 from __future__ import annotations
 
@@ -86,7 +86,7 @@ def test_a_token_mismatch_shows_neither_address_nor_token(real_client: TestClien
     assert "8060" not in response.text and TOKEN not in response.text
 
 
-def test_mini_games_down_is_502(real_client: TestClient, upstream: FakeUpstream) -> None:
+def test_ascension_down_is_502(real_client: TestClient, upstream: FakeUpstream) -> None:
     upstream.unreachable = True
     as_admin(real_client)
 
@@ -112,7 +112,7 @@ def test_a_refusal_reaches_the_browser_as_detail(real_client: TestClient, upstre
         ("PUT", "/api/ascension/ascendeds/guardian/presets/1", {"instance_ids": ["i1"]}),
     ],
 )
-def test_browser_identity_headers_never_reach_mini_games(
+def test_browser_identity_headers_never_reach_ascension(
     real_client: TestClient, upstream: FakeUpstream, method: str, path: str, body: dict | None
 ) -> None:
     upstream.handler = games

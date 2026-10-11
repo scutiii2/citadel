@@ -27,7 +27,7 @@ const PROMPT_TICK_MS = 200;
 
 /** The Ascension page's state: catalog, profile, the current encounter and
  * battle, and the battle loop. The loop runs only while the page is attached
- * (mounted or reactivated in KeepAlive) and visible; mini_games keeps the
+ * (mounted or reactivated in KeepAlive) and visible; Ascension keeps the
  * battle between rounds, so stopping is always safe. Changes resolve to null
  * on failure and say why in `error` (or `unavailable` on 502). */
 export const useAscensionStore = defineStore("ascension", () => {
@@ -92,7 +92,7 @@ export const useAscensionStore = defineStore("ascension", () => {
     promptTick = setInterval(() => {
       promptRemaining.value = Math.max(0, (promptEndsAt - performance.now()) / 1000);
     }, PROMPT_TICK_MS);
-    // At zero mini_games settles the prompt itself (the Ascended's own choice, or a basic ATTACK).
+    // At zero Ascension settles the prompt itself (the Ascended's own choice, or a basic ATTACK).
     promptTimer = setTimeout(() => {
       promptRemaining.value = 0;
       void advance();

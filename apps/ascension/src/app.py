@@ -11,7 +11,7 @@ from src.auth import InternalTokenMiddleware
 
 
 def create_app(token: str = "") -> FastAPI:
-    app = FastAPI(title="mini_games", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="ascension", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(InternalTokenMiddleware, token=token)
 
     @app.exception_handler(RequestValidationError)

@@ -28,7 +28,7 @@ function count(value: unknown, fallback: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? "" : "s"}`;
 }
 
-/** A passive in one sentence, from its catalog kind and params (mini_games'
+/** A passive in one sentence, from its catalog kind and params (Ascension'
  * passives.py). An unknown kind falls back to its name. */
 export function passiveText(kind: string, params: Record<string, unknown>): string {
   switch (kind) {
@@ -88,7 +88,7 @@ function percent(value: unknown): string {
   return `${Math.round(Number(value) * 100)}%`;
 }
 
-/** One line of the round log for an engine event (mini_games' engine.py). */
+/** One line of the round log for an engine event (Ascension's engine.py). */
 export function describeEvent(event: BattleEvent, names: SideNames): string {
   const who = sideName(event.side, names);
   switch (event.type) {

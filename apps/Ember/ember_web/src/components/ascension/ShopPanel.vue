@@ -11,7 +11,7 @@ import EmTierBadge from "./ui/EmTierBadge.vue";
 /** The Shop tab: the wallet, EMBLEMs per tier, copies of a regular Ascended at a tier, and
  * selling one absorbed copy. EMBLEM buttons are disabled when Insignia would not cover
  * the price, and a line says which tiers are out of reach. A copy's price depends on
- * numbers only mini_games knows, so it says itself (a 409 with the cost) when Insignia
+ * numbers only Ascension knows, so it says itself (a 409 with the cost) when Insignia
  * falls short; the page shows that message (the store's `error`). */
 const store = useAscensionStore();
 const MAX_QUANTITY = 99;

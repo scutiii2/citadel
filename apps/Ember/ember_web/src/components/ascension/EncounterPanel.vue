@@ -15,7 +15,7 @@ import EmTierBadge from "./ui/EmTierBadge.vue";
 /** The Battle tab without a battle, in three steps: look for a wild Ascended (once the
  * cooldown is over), see it and decline for free or fight, then set the battle up (which
  * Ascended, which preset, who plays and the highest EMBLEM tier the Ascended may throw on its
- * own). mini_games needs a preset and a limit for autonomous play. It reports the step
+ * own). Ascension needs a preset and a limit for autonomous play. It reports the step
  * (`stage`) so the page can title it. */
 export type EncounterStage = "look" | "preview" | "setup";
 const emit = defineEmits<{ stage: [stage: EncounterStage] }>();

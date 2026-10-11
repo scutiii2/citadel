@@ -1,6 +1,6 @@
-# mini_games
+# Ascension
 
-Game backend for Ember. It hosts **Ascension**, a game of collecting and
+Game backend for Ember: **Ascension**, a game of collecting and
 battling **Ascended**, with a local Laya model helping the AI read the battle. It
 never calls an LLM, so it costs nothing to play. Chess and Tetris will plug in
 later as further games (see `docs/superpowers/` at the repo root).
@@ -59,8 +59,8 @@ real files are gitignored; `configs/ascension_catalog.json` (Ascended rules, abi
 tiers, economy and policy numbers) is tracked. Put the same `INTERNAL_API_TOKEN`
 in `.env` that `mcp_server`, `ai_agent` and `ember_api` use; once set,
 every route except `/health` needs the `X-Internal-Token` header. Game data lives
-in `data/ascension.sqlite3` (gitignored).
-The database was renamed with the game (it was `data/sparks.sqlite3`, schema version 1; now schema version 2).
+in `.data/ascension.sqlite3` (gitignored).
+The database was renamed with the game (it was `data/sparks.sqlite3`, schema version 1; now `.data/ascension.sqlite3`, schema version 2).
 There is no migration: a start with an old file fails with `database schema version 1 is not supported`.
 Delete the old file, or point `database_path` at a new one, to start fresh.
 
@@ -140,7 +140,7 @@ the collection; it has no effect in battle. All current Ascended are `enchant`.
 - `configs/`, `.env` - gitignored real files with `.example` twins, plus the
   tracked `ascension_catalog.json`. `.env` and `.env.example` sit in the project root,
   beside `configs/`.
-- `data/` - SQLite database (created at runtime).
+- `.data/` - SQLite database (created at runtime, gitignored).
 
 ## Behaviour notes
 
@@ -148,7 +148,7 @@ the collection; it has no effect in battle. All current Ascended are `enchant`.
   picker chooses among the tiers the player may spend. With exactly one permitted
   tier it uses that tier. With two or more and no Laya, the autonomous CATCH
   becomes a basic ATTACK.
-- **Port.** The launcher's `MINI_GAMES_PORT` entry is only a launcher default.
+- **Port.** The launcher's `ASCENSION_PORT` entry is only a launcher default.
   The real port is `port` in `configs/config_app.json`; keep the two equal.
 
 ## Known gaps

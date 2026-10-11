@@ -288,7 +288,7 @@ class FakeServerTools:
 
 @dataclass
 class FakeAscension:
-    """Stands in for mini_games behind AscensionGateway. Records every call;
+    """Stands in for Ascension behind AscensionGateway. Records every call;
     `responses` maps (method, path) to a reply (default {"ok": True});
     `refuse` raises AscensionRefused(status, message) and `unavailable`
     raises AscensionUnavailable."""

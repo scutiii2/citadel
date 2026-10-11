@@ -17,7 +17,7 @@ KEY = {"Idempotency-Key": "key-1"}
 ROUND = {"round": 1, "revision": 2}
 START = {"encounter_id": "enc_1", "ascended_id": "guardian", "preset_slot": 1, "mode": "autonomous", "emblem_limit": "rare"}
 
-# (ember_api path, mini_games path, forwarded query)
+# (ember_api path, Ascension path, forwarded query)
 READS = [
     ("/api/ascension/catalog", "/ascension/catalog", None),
     ("/api/ascension/profile", "/ascension/profile", None),
@@ -33,7 +33,7 @@ READS = [
 ]
 
 ACTION = {**ROUND, "action": {"kind": "ability", "ability_id": "guardian_bulwark"}}
-# (method, ember_api path, body sent, mini_games path, body forwarded, status)
+# (method, ember_api path, body sent, Ascension path, body forwarded, status)
 MUTATIONS: list[tuple[str, str, dict[str, Any], str, Any, int]] = [
     ("POST", "/api/ascension/profile", {"starter_ascended_id": "guardian"}, "/ascension/profile", {"starter_ascended_id": "guardian"}, 201),
     (

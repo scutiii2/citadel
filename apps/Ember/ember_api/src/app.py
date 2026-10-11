@@ -89,7 +89,7 @@ def create_app(
     upstream_transport to real HTTP, agent_gateway to a real MCP client for
     ai_agent and server_tools to one for mcp_server; tests pass fakes. traffic
     defaults to a recorder saving to the database; tests pass their own.
-    ascension defaults to an HTTP client for mini_games (the Ascension game)."""
+    ascension defaults to an HTTP client for the Ascension backend."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -118,7 +118,7 @@ def create_app(
         # Raises SecretBoxError (a clear one-line message) when .env holds a key that is not valid.
         secret_box = SecretBox(ensure_secrets_key(settings.env_path))
         upstream = httpx.AsyncClient(transport=upstream_transport, timeout=_UPSTREAM_TIMEOUT)
-        # A client of its own for mini_games: no default headers and no redirects,
+        # A client of its own for the Ascension backend: no default headers and no redirects,
         # so the internal token can never follow a redirect to another host.
         ascension_client = httpx.AsyncClient(transport=upstream_transport, follow_redirects=False)
 

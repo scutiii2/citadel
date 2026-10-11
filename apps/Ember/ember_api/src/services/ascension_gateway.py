@@ -1,4 +1,4 @@
-"""ember_api's client for apps/mini_games (the Ascension game).
+"""ember_api's client for apps/ascension (the Ascension game).
 
 Only the fixed routes in _ROUTES are reachable; the browser never names a URL.
 Every call carries the owner (the account id as text, never the username: an
@@ -7,7 +7,7 @@ the old name), the internal token when one is configured, and the
 Idempotency-Key of a change. Headers are built here only, so nothing the
 browser sent is ever forwarded.
 
-mini_games' own refusals (400, 404, 409) keep their status and message, which
+Ascension's own refusals (400, 404, 409) keep their status and message, which
 is safe to show; any other 4xx becomes a 400. A token mismatch (401), a server
 error, a body that is not JSON or no answer at all make Ascension
 "unavailable" (the routes answer 502)."""
@@ -29,7 +29,7 @@ TIMEOUT_SECONDS = 10.0
 UNAVAILABLE_MESSAGE = "Ascension is not available right now"
 _PASSED_THROUGH = (400, 404, 409)
 MESSAGE_MAX = 300
-# mini_games' ids: server-made tokens and catalog ids.
+# Ascension's ids: server-made tokens and catalog ids.
 _ID = r"[A-Za-z0-9_-]{1,64}"
 _ROUTES: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
     (method, re.compile(pattern))
@@ -59,11 +59,11 @@ _WORDS = frozenset(
 
 
 class AscensionUnavailable(Exception):
-    """mini_games could not be used (maps to 502)."""
+    """Ascension could not be used (maps to 502)."""
 
 
 class AscensionRefused(Exception):
-    """mini_games refused the request; the message is its own and safe to show."""
+    """Ascension refused the request; the message is its own and safe to show."""
 
     def __init__(self, status: int, message: str) -> None:
         super().__init__(message)
@@ -139,7 +139,7 @@ class AscensionGateway:
         if not is_allowed(method, path):
             raise ValueError(f"not an Ascension route: {method} {path}")
         try:
-            with self._traffic.timed("mini_games", _traffic_name(method, path)) as timing:
+            with self._traffic.timed("ascension", _traffic_name(method, path)) as timing:
                 response = await self._client.request(
                     method,
                     f"{self._base}{path}",
@@ -153,7 +153,7 @@ class AscensionGateway:
                 timing.ok = 200 <= code < 300 or (400 <= code < 500 and code != 401)
         except (httpx.HTTPError, httpx.InvalidURL) as error:
             # Only the error's class: its text can embed the address.
-            logger.warning("mini_games %s %s unreachable: %s", method, path, type(error).__name__)
+            logger.warning("Ascension %s %s unreachable: %s", method, path, type(error).__name__)
             raise AscensionUnavailable(UNAVAILABLE_MESSAGE) from error
         status = response.status_code
         if status == 204:
@@ -164,7 +164,7 @@ class AscensionGateway:
             body = None
         if status == 401:
             logger.warning(
-                "mini_games refused ember_api's internal token: INTERNAL_API_TOKEN differs between the two .env files"
+                "Ascension refused ember_api's internal token: INTERNAL_API_TOKEN differs between the two .env files"
             )
             raise AscensionUnavailable(UNAVAILABLE_MESSAGE)
         if status in _PASSED_THROUGH:
@@ -173,6 +173,6 @@ class AscensionGateway:
             raise AscensionRefused(400, _message(body, status))
         if not 200 <= status < 300 or body is None:
             # 5xx, a redirect (never followed) or anything else unexpected.
-            logger.warning("mini_games %s %s answered %s", method, path, status)
+            logger.warning("Ascension %s %s answered %s", method, path, status)
             raise AscensionUnavailable(UNAVAILABLE_MESSAGE)
         return body

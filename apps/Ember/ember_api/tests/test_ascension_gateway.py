@@ -1,4 +1,4 @@
-"""AscensionGateway against a fake mini_games (httpx.MockTransport)."""
+"""AscensionGateway against a fake Ascension (httpx.MockTransport)."""
 
 from __future__ import annotations
 
@@ -252,7 +252,7 @@ def test_traffic_counts_a_token_refusal_and_server_errors_as_failed(status: int,
     assert traffic_status(status) == [expected]
 
 
-def test_a_long_message_from_mini_games_is_cut_to_300_characters() -> None:
+def test_a_long_message_from_ascension_is_cut_to_300_characters() -> None:
     with pytest.raises(AscensionRefused) as raised:
         call(lambda r: httpx.Response(409, json={"error": "x" * 5000}), "POST", "/ascension/profile", json={}, idempotency_key="k")
 

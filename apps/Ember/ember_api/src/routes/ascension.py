@@ -1,15 +1,15 @@
-"""/api/ascension: the Ascension game (apps/mini_games), passed through.
+"""/api/ascension: the Ascension game (apps/ascension), passed through.
 
 ember_api keeps no game data. It checks the session and ascension.play,
-validates every body against mini_games' own rules (unknown fields refused,
+validates every body against Ascension's own rules (unknown fields refused,
 so a client can never send rewards, stats or an owner), requires an
 Idempotency-Key on every change and forwards the call through the
 AscensionGateway, which adds the owner (the account id as text) and the
-internal token itself. Bad input is a 400 here and never reaches mini_games.
+internal token itself. Bad input is a 400 here and never reaches Ascension.
 
 Changes of value (a new profile, a reset, a battle started or forfeited, a purchase,
 a sale) are written to the activity log after they succeeded. Round actions
-and advance are not: one line per round would flood the log, and mini_games
+and advance are not: one line per round would flood the log, and Ascension
 records every finished battle itself."""
 
 from __future__ import annotations

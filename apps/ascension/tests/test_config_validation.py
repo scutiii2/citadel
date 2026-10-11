@@ -45,13 +45,13 @@ def test_error_text_says_at_least_only_for_range_errors(raw):
 
 def test_empty_token_logs_a_warning(monkeypatch, caplog):
     monkeypatch.setattr(run, "load_token", lambda: "")
-    with caplog.at_level(logging.WARNING, logger="mini_games"):
+    with caplog.at_level(logging.WARNING, logger="ascension"):
         run.build_app()
     assert any("unauthenticated" in r.message for r in caplog.records)
 
 
 def test_a_configured_token_logs_no_warning(monkeypatch, caplog):
     monkeypatch.setattr(run, "load_token", lambda: "secret-token")
-    with caplog.at_level(logging.WARNING, logger="mini_games"):
+    with caplog.at_level(logging.WARNING, logger="ascension"):
         run.build_app()
     assert not any("unauthenticated" in r.message for r in caplog.records)

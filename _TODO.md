@@ -126,7 +126,7 @@ Items 1 to 6 are complete; item 7 remains open.
 
 ## Ascension card images in the UI (added 2026-10-10)
 
-**Context**: Every Ascended will get card art. For now two shared placeholders stand in for each card: `apps/mini_games/ascended/ascended_common_front_template.png` and `apps/mini_games/ascended/ascended_common_back_template.png` (tracked, `e212f9a`). Each Ascended has its own folder `apps/mini_games/ascended/<id>/` (with `catalog.json`) where its own assets will be added later. Today the Ember page shows no images: Ascended cards are text, and the menu showcase uses a letter in a circle.
+**Context**: Every Ascended will get card art. For now two shared placeholders stand in for each card: `apps/ascension/ascended/ascended_common_front_template.png` and `apps/ascension/ascended/ascended_common_back_template.png` (tracked, `e212f9a`). Each Ascended has its own folder `apps/ascension/ascended/<id>/` (with `catalog.json`) where its own assets will be added later. Today the Ember page shows no images: Ascended cards are text, and the menu showcase uses a letter in a circle.
 
 **Plan**:
 - mini_games: a route that serves an Ascended's card image (front or back). It serves `ascended/<id>/` assets when they exist and falls back to the shared placeholder. The catalog or the route decides the file names, never the client; reject any path outside `ascendeds/`.
@@ -139,10 +139,10 @@ Items 1 to 6 are complete; item 7 remains open.
 
 ## Split Ascension out of mini_games and make the Ember page a game host (added 2026-10-11)
 
-**Context**: Today the Ascension game lives inside `apps/mini_games` (package `src/ascension`, port 8060) and its UI is a page inside `apps/Ember/ember_web` (`/ascension`, `ascension.play`), reached through ember_api's `/api/ascension` pass-through. The user wants the game and its UI separated from both.
+**Context**: The Ascension game was inside `apps/mini_games`; on 2026-10-11 the folder moved to `apps/ascension` (package `src/ascension`, port 8060, venv `.venv_ascension`), and `apps/mini_games` is now empty and its UI is a page inside `apps/Ember/ember_web` (`/ascension`, `ascension.play`), reached through ember_api's `/api/ascension` pass-through. The user wants the game and its UI separated from both.
 
 **Plan**:
-- Ascension gets its own project folder in `apps/` (its own backend code, README, tests, config), not code inside `mini_games`.
+- **Done 2026-10-11:** Ascension has its own project folder `apps/ascension/` (its own backend code, README, tests, config), not code inside `mini_games`.
 - Ascension gets its own web UI server. It no longer shares ember_web's app, theme, router or build.
 - The mini_games page in ember_web becomes a host (an "emulator"): it plays any registered mini game, such as Ascension, and does not hold game code. Games register and deregister by their URLs.
 

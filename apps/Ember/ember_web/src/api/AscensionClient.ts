@@ -1,7 +1,7 @@
 import { apiRequest } from "./http";
 
-/** The Ascension game (apps/mini_games) through ember_api's /api/ascension
- * pass-through. Field names are mini_games' own. Every change carries an
+/** The Ascension game (apps/ascension) through ember_api's /api/ascension
+ * pass-through. Field names are Ascension's own. Every change carries an
  * Idempotency-Key: a fresh one per user action, unless the caller passes the
  * key of the action it is retrying. Times (`next_roll_at`, `faint_until`,
  * `deadline`, `created_at`) are server epoch seconds. */

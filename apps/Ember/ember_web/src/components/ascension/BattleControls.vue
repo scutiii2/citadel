@@ -9,7 +9,7 @@ import EmTabs from "./ui/EmTabs.vue";
 
 /** Above the arena: who plays (manual or autonomous, switched between rounds) and
  * Forfeit, which asks first. A battle started without an EMBLEM limit stays manual:
- * mini_games needs a limit for autonomous play. */
+ * Ascension needs a limit for autonomous play. */
 const props = defineProps<{ battle: BattleView }>();
 const store = useAscensionStore();
 
