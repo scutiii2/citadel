@@ -1,18 +1,21 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import type { ShopOffer } from "../api/AscensionClient";
+import { useNowSeconds } from "../composables/useNowSeconds";
 import { useAscensionStore } from "../stores/ascension";
-import { titleCase } from "../utils/ascension";
+import { formatCountdown, titleCase } from "../utils/ascension";
+import { ascendedArt } from "./ascendedArt";
 import EmButton from "./ui/EmButton.vue";
 import EmConfirm from "./ui/EmConfirm.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmPanel from "./ui/EmPanel.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
 
-/** The Shop tab: the wallet, EMBLEMs per tier, copies of a regular Ascended at a tier, and
- * selling one absorbed copy. EMBLEM buttons are disabled when Insignia would not cover
- * the price, and a line says which tiers are out of reach. A copy's price depends on
- * numbers only Ascension knows, so it says itself (a 409 with the cost) when Insignia
- * falls short; the page shows that message (the store's `error`). */
+/** The Shop tab: the wallet, this account's rotating copy offers (each with limited stock, new
+ * ones every few hours), EMBLEMs per tier, and selling one absorbed copy. A card that cannot be
+ * bought (sold out, or Insignia would not cover it) is dimmed and does not lift. A copy's price
+ * comes from the server, which also refuses when Insignia falls short; the page shows that
+ * message (the store's `error`). */
 const store = useAscensionStore();
 const MAX_QUANTITY = 99;
 
@@ -21,6 +24,34 @@ const tiers = computed(() => store.catalog?.tiers ?? []);
 const quantities = reactive<Record<string, number>>({});
 const message = ref("");
 const outOfReach = computed(() => tiers.value.filter((t) => t.emblem_price > insignia.value).map((t) => titleCase(t.id)));
+
+const now = useNowSeconds();
+const secondsLeft = computed(() => Math.max(0, store.shopEndsAt - now.value));
+const offers = computed(() => store.shop?.offers ?? []);
+const nameOf = (id: string) => store.catalog?.ascendeds.find((a) => a.id === id)?.name ?? titleCase(id);
+const artOf = (id: string) => ascendedArt(id)?.url ?? null;
+
+onMounted(() => void store.loadShop());
+// At zero a new rotation has begun: ask for it.
+watch(
+  () => secondsLeft.value <= 0 && store.shop !== null,
+  (over) => {
+    if (over) void store.loadShop();
+  },
+);
+
+function offerOff(offer: ShopOffer): boolean {
+  return offer.left <= 0 || offer.price > insignia.value;
+}
+
+async function buyOffer(offer: ShopOffer): Promise<void> {
+  message.value = "";
+  const bought = await store.buyOffer(offer);
+  if (bought) {
+    const copies = `${bought.copies_granted} ${bought.copies_granted === 1 ? "copy" : "copies"}`;
+    message.value = `Bought ${copies} of ${nameOf(bought.ascended_id)} for ${bought.price} Insignia; it is now ${titleCase(bought.resulting_tier_id)}.`;
+  }
+}
 
 function quantityOf(tierId: string): number {
   return quantities[tierId] ?? 1;
@@ -45,20 +76,6 @@ async function buyEmblems(tierId: string): Promise<void> {
   const bought = await store.buyEmblems(tierId, quantityOf(tierId));
   if (bought) {
     message.value = `Bought ${bought.quantity} ${titleCase(bought.tier_id)} EMBLEM${bought.quantity === 1 ? "" : "s"} for ${bought.price} Insignia.`;
-  }
-}
-
-const regularAscendeds = computed(() => (store.catalog?.ascendeds ?? []).filter((s) => !s.forbidden));
-const regularTiers = computed(() => tiers.value.filter((t) => t.copy_threshold !== null));
-const copyAscended = ref("");
-const copyTier = ref("");
-
-async function buyCopies(): Promise<void> {
-  message.value = "";
-  const bought = await store.buyCopies(copyAscended.value, copyTier.value);
-  if (bought) {
-    const copies = `${bought.copies_granted} ${bought.copies_granted === 1 ? "copy" : "copies"}`;
-    message.value = `Bought ${copies} for ${bought.price} Insignia; it is now ${titleCase(bought.resulting_tier_id)}.`;
   }
 }
 
@@ -95,17 +112,60 @@ async function sell(): Promise<void> {
 
     <EmPanel>
       <div class="section-head">
+        <h3 class="em-pixel">Today's offers</h3>
+        <small class="refresh em-num">Refreshes in {{ formatCountdown(secondsLeft) }}</small>
+      </div>
+      <p v-if="store.shop && offers.length === 0" class="empty">Nothing is on offer right now.</p>
+      <ul v-else class="cards">
+        <li
+          v-for="offer in offers"
+          :key="offer.slot"
+          class="card em-lift"
+          :class="{ 'is-off': offerOff(offer) }"
+          :data-offer="offer.slot"
+          :style="{ '--tier': `var(--em-tier-${offer.tier_id}, var(--em-tier-common))` }"
+        >
+          <span v-if="offer.left <= 0" class="ribbon">Sold out</span>
+          <div class="portrait">
+            <img v-if="artOf(offer.ascended_id)" :src="artOf(offer.ascended_id)!" alt="" draggable="false" />
+            <span v-else class="letter" aria-hidden="true">{{ nameOf(offer.ascended_id).slice(0, 1) }}</span>
+          </div>
+          <h4>{{ nameOf(offer.ascended_id) }}</h4>
+          <div class="meta">
+            <EmTierBadge :tier-id="offer.tier_id" />
+            <span class="em-num">+{{ offer.copies_granted }} {{ offer.copies_granted === 1 ? "copy" : "copies" }}</span>
+          </div>
+          <p class="em-num owned">You have {{ offer.owned_copies }} · becomes {{ titleCase(offer.resulting_tier_id) }}</p>
+          <p class="em-num stock">{{ offer.left }} left</p>
+          <EmButton variant="primary" class="block" :disabled="store.busy || offerOff(offer)" @click="buyOffer(offer)">
+            <EmIcon name="shop" /> {{ offer.price }} Insignia
+          </EmButton>
+        </li>
+      </ul>
+      <p class="hint">Offers are yours alone and change every few hours. Absorbed copies raise an Ascended's tier.</p>
+    </EmPanel>
+
+    <EmPanel>
+      <div class="section-head">
         <h3 class="em-pixel">Buy EMBLEMs</h3>
         <small>Choose how many, then buy</small>
       </div>
-      <ul class="rows">
-        <li v-for="t in tiers" :key="t.id" class="row" :data-tier="t.id">
-          <div class="what">
+      <ul class="cards emblems">
+        <li
+          v-for="t in tiers"
+          :key="t.id"
+          class="card em-lift"
+          :class="{ 'is-off': t.emblem_price > insignia }"
+          :data-tier="t.id"
+          :style="{ '--tier': `var(--em-tier-${t.id}, var(--em-tier-common))` }"
+        >
+          <div class="band" aria-hidden="true" />
+          <div class="meta">
             <EmTierBadge :tier-id="t.id" />
             <span>{{ titleCase(t.id) }} EMBLEM</span>
           </div>
-          <span class="price em-num"><strong>{{ t.emblem_price }}</strong> Insignia</span>
-          <span class="owned em-num">{{ store.profile?.emblems[t.id] ?? 0 }} owned</span>
+          <p class="em-num price"><strong>{{ t.emblem_price }}</strong> Insignia</p>
+          <p class="em-num owned">{{ store.profile?.emblems[t.id] ?? 0 }} owned</p>
           <input
             type="number"
             min="1"
@@ -114,7 +174,7 @@ async function sell(): Promise<void> {
             :aria-label="`${titleCase(t.id)} EMBLEMs to buy`"
             @input="setQuantity(t.id, $event)"
           />
-          <EmButton variant="primary" :disabled="!canBuyEmblems(t.id, t.emblem_price)" @click="buyEmblems(t.id)">
+          <EmButton variant="primary" class="block" :disabled="!canBuyEmblems(t.id, t.emblem_price)" @click="buyEmblems(t.id)">
             Buy for {{ emblemCost(t.id, t.emblem_price) }}
           </EmButton>
         </li>
@@ -122,49 +182,20 @@ async function sell(): Promise<void> {
       <p v-if="outOfReach.length" class="hint">Not enough Insignia for: {{ outOfReach.join(", ") }}.</p>
     </EmPanel>
 
-    <div class="lower">
-      <EmPanel>
-        <h3 class="em-pixel">Buy Ascended copies</h3>
-        <label class="field">
-          <span>Ascended</span>
-          <select v-model="copyAscended" name="copy-ascended" aria-label="Ascended">
-            <option value="" disabled>Choose an Ascended</option>
-            <option v-for="s in regularAscendeds" :key="s.id" :value="s.id">{{ s.name }}</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Tier</span>
-          <select v-model="copyTier" name="copy-tier" aria-label="Tier">
-            <option value="" disabled>Choose a tier</option>
-            <option v-for="t in regularTiers" :key="t.id" :value="t.id">{{ titleCase(t.id) }}</option>
-          </select>
-        </label>
-        <p class="hint">
-          Absorbed copies raise an Ascended's tier. The price depends on the copies you already have and the Ascended's level; the shop
-          tells you when your Insignia falls short.
-        </p>
-        <EmButton variant="primary" class="block" :disabled="store.busy || !copyAscended || !copyTier" @click="buyCopies">
-          <EmIcon name="shop" /> Buy copies
-        </EmButton>
-      </EmPanel>
-
-      <EmPanel>
-        <h3 class="em-pixel">Sell an absorbed copy</h3>
-        <p v-if="sellable.length === 0" class="empty">No absorbed copies to sell.</p>
-        <template v-else>
-          <p class="hint">Sell one absorbed copy. Your collected Ascended stays with you.</p>
-          <ul class="rows sell">
-            <li v-for="s in sellable" :key="s.ascended_id" class="row" :data-sell="s.ascended_id">
-              <div class="what">
-                <strong>{{ s.name }}</strong>
-                <span class="em-num">{{ s.copies }} {{ s.copies === 1 ? "copy" : "copies" }} · {{ titleCase(s.tier_id) }}</span>
-              </div>
-              <EmButton :disabled="store.busy" @click="selling = s.ascended_id"><EmIcon name="coin" /> Sell one copy</EmButton>
-            </li>
-          </ul>
-        </template>
-      </EmPanel>
-    </div>
+    <EmPanel>
+      <h3 class="em-pixel">Sell an absorbed copy</h3>
+      <p v-if="sellable.length === 0" class="empty">No absorbed copies to sell.</p>
+      <template v-else>
+        <p class="hint">Sell one absorbed copy. Your collected Ascended stays with you.</p>
+        <ul class="cards sell">
+          <li v-for="s in sellable" :key="s.ascended_id" class="card em-lift" :data-sell="s.ascended_id" :style="{ '--tier': `var(--em-tier-${s.tier_id}, var(--em-tier-common))` }">
+            <h4>{{ s.name }}</h4>
+            <p class="em-num owned">{{ s.copies }} {{ s.copies === 1 ? "copy" : "copies" }} · {{ titleCase(s.tier_id) }}</p>
+            <EmButton class="block" :disabled="store.busy" @click="selling = s.ascended_id"><EmIcon name="coin" /> Sell one copy</EmButton>
+          </li>
+        </ul>
+      </template>
+    </EmPanel>
 
     <EmConfirm
       :open="selling !== null"
@@ -234,47 +265,94 @@ h3 {
 .section-head small {
   color: var(--em-muted);
 }
-.rows {
+.refresh {
+  color: var(--em-accent);
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--em-space-4);
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.row {
-  display: grid;
-  grid-template-columns: 1fr 120px 90px 70px 120px;
-  align-items: center;
-  gap: var(--em-space-4);
-  padding: 14px 0;
-  border-bottom: 1px solid var(--em-divider);
-}
-.row:last-child {
-  border-bottom: 0;
-}
-.sell .row {
-  grid-template-columns: 1fr auto;
-}
-.what {
+.card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  gap: var(--em-space-2);
+  padding: var(--em-space-4);
+  border: 1px solid var(--em-border);
+  border-top: 3px solid var(--tier, var(--em-border));
+  border-radius: var(--em-radius);
+  background: var(--em-raised);
 }
-.what > span:last-child {
+.card.is-off {
+  opacity: 0.6;
+}
+.card h4 {
+  margin: 0;
+  font-size: 15px;
+}
+.portrait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+}
+.portrait img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  mix-blend-mode: lighten;
+}
+.letter {
+  font-size: 52px;
+  font-weight: 600;
+  color: var(--em-accent);
+}
+.band {
+  height: 36px;
+  margin: calc(var(--em-space-4) * -1) calc(var(--em-space-4) * -1) 0;
+  background: linear-gradient(color-mix(in srgb, var(--tier) 35%, transparent), transparent);
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  font-size: 13px;
+}
+.owned {
+  margin: 0;
   font-size: 12px;
   color: var(--em-muted);
 }
+.stock {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tier);
+}
 .price {
-  text-align: right;
+  margin: 0;
 }
 .price strong {
-  font-size: 16px;
+  font-size: 18px;
 }
-.owned {
-  text-align: right;
-  font-size: 13px;
-  color: var(--em-muted);
+.ribbon {
+  position: absolute;
+  top: 10px;
+  right: -1px;
+  padding: 2px 10px;
+  background: var(--em-danger-surface);
+  border: 1px solid var(--em-danger);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--em-danger);
 }
-.row input {
+.card input {
   min-height: var(--em-target);
   padding: 8px;
   border: 1px solid var(--em-border);
@@ -285,37 +363,13 @@ h3 {
   text-align: center;
 }
 .hint {
-  margin: var(--em-space-3) 0;
+  margin: var(--em-space-3) 0 0;
   font-size: 12px;
   color: var(--em-muted);
-}
-.lower {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--em-space-5);
-  align-items: start;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--em-space-2);
-  margin-bottom: var(--em-space-3);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--em-muted);
-}
-.field select {
-  min-height: var(--em-target);
-  padding: 10px 12px;
-  border: 1px solid var(--em-border);
-  border-radius: var(--em-radius);
-  color: var(--em-text);
-  background: var(--em-bg);
-  font: inherit;
-  font-size: 14px;
 }
 .block {
   width: 100%;
+  margin-top: auto;
 }
 .empty {
   padding: 14px;
@@ -334,19 +388,13 @@ h3 {
     border-bottom: 1px solid var(--em-divider);
     text-align: center;
   }
-  .row {
-    grid-template-columns: 1fr 70px 76px;
-    gap: var(--em-space-2);
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .row .price,
-  .row .owned {
-    display: none;
-  }
-  .lower {
+}
+@media (max-width: 420px) {
+  .cards {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .sell .row {
-    grid-template-columns: 1fr auto;
   }
 }
 </style>

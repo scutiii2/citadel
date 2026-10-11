@@ -2,7 +2,7 @@ import { flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAscensionClient, type BattleView, type EmblemPromptState } from "../api/AscensionClient";
-import { CATALOG, ENCOUNTER, PROFILE, battleView } from "../api/AscensionClient.fixtures";
+import { CATALOG, ENCOUNTER, PROFILE, battleView, shopWindow } from "../api/AscensionClient.fixtures";
 import { ApiError } from "../api/http";
 import { useSessionStore } from "./session";
 import { RECONNECT_MS, ROUND_PACE_MS, useAscensionStore } from "./ascension";
@@ -26,7 +26,8 @@ vi.mock("../api/AscensionClient", () => {
     setMode: vi.fn(),
     forfeit: vi.fn(),
     buyEmblems: vi.fn(),
-    buyCopies: vi.fn(),
+    shop: vi.fn(),
+    buyOffer: vi.fn(),
     sellCopy: vi.fn(),
     resetProfile: vi.fn(),
   };
@@ -337,5 +338,44 @@ describe("resetting progress", () => {
 
     finish({ reset: true });
     await expect(first).resolves.toBe(true);
+  });
+});
+
+describe("rotating shop", () => {
+  it("loads the window and counts down from the answer on this device's clock", async () => {
+    const s = await attached();
+    client.shop.mockResolvedValue(shopWindow({ seconds_left: 120 }));
+    const before = Date.now() / 1000;
+
+    await s.loadShop();
+
+    expect(s.shop?.offers).toHaveLength(2);
+    expect(s.shopEndsAt).toBeGreaterThanOrEqual(before + 120);
+    expect(s.shopEndsAt).toBeLessThan(before + 125);
+  });
+
+  it("buys an offer, then reloads the window and the profile", async () => {
+    const s = await attached();
+    client.shop.mockResolvedValue(shopWindow());
+    client.buyOffer.mockResolvedValue({ kind: "copies", ascended_id: "guardian", tier_id: "common", copies_granted: 1, price: 40, resulting_tier_id: "common", slot: 0, rotation: 46, left: 2 });
+    await s.loadShop();
+
+    const bought = await s.buyOffer(s.shop!.offers[0]!);
+
+    expect(client.buyOffer).toHaveBeenCalledWith(46, 0);
+    expect(bought?.left).toBe(2);
+    expect(client.shop).toHaveBeenCalledTimes(2);
+  });
+
+  it("reloads the window when the shop says it has refreshed", async () => {
+    const s = await attached();
+    client.shop.mockResolvedValue(shopWindow());
+    client.buyOffer.mockRejectedValue(new ApiError(409, "the shop has refreshed; look at the new offers"));
+    await s.loadShop();
+
+    await s.buyOffer(s.shop!.offers[0]!);
+
+    expect(s.error).toBe("the shop has refreshed; look at the new offers");
+    expect(client.shop).toHaveBeenCalledTimes(2);
   });
 });

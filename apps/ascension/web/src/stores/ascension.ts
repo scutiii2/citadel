@@ -11,6 +11,8 @@ import {
   type EncounterPreview,
   type Preset,
   type Profile,
+  type ShopOffer,
+  type ShopWindow,
   type Sale,
   type StartBattleInput,
 } from "../api/AscensionClient";
@@ -49,6 +51,9 @@ export const useAscensionStore = defineStore("ascension", () => {
   const error = ref("");
   /** Seconds left on the EMBLEM prompt, counted on this device's monotonic clock. */
   const promptRemaining = ref(0);
+  /** The account's current shop window and, on this device's clock (epoch seconds), when it ends. */
+  const shop = ref<ShopWindow | null>(null);
+  const shopEndsAt = ref(0);
   const promptTotal = ref(0);
 
   const promptOpen = computed(() => {
@@ -396,8 +401,28 @@ export const useAscensionStore = defineStore("ascension", () => {
     return mutate(() => ascensionClient.buyEmblems(tier, quantity), () => refreshProfile());
   }
 
-  function buyCopies(ascendedId: string, tier: string): Promise<CopyPurchase | null> {
-    return mutate(() => ascensionClient.buyCopies(ascendedId, tier), () => refreshProfile());
+  async function loadShop(): Promise<void> {
+    const started = generation;
+    try {
+      const window = await ascensionClient.shop();
+      if (started !== generation) return;
+      shop.value = window;
+      shopEndsAt.value = Date.now() / 1000 + window.seconds_left;
+    } catch (err) {
+      if (started === generation) report(err);
+    }
+  }
+
+  async function buyOffer(offer: ShopOffer): Promise<CopyPurchase | null> {
+    const current = shop.value;
+    if (current === null) return null;
+    const result = await mutate(
+      () => ascensionClient.buyOffer(current.rotation, offer.slot),
+      () => refreshProfile(),
+    );
+    // A refresh, a sold-out offer or a purchase all change what the shop shows.
+    await loadShop();
+    return result;
   }
 
   function sellCopy(ascendedId: string): Promise<Sale | null> {
@@ -434,6 +459,7 @@ export const useAscensionStore = defineStore("ascension", () => {
       clearTimers();
       catalog.value = null;
       profile.value = null;
+      shop.value = null;
       needsStarter.value = false;
       encounter.value = null;
       battle.value = null;
@@ -475,7 +501,10 @@ export const useAscensionStore = defineStore("ascension", () => {
     startBattle,
     savePreset,
     buyEmblems,
-    buyCopies,
+    shop,
+    shopEndsAt,
+    loadShop,
+    buyOffer,
     sellCopy,
     resetProgress,
     act,

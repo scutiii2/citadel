@@ -2,13 +2,13 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAscensionClient } from "../api/AscensionClient";
-import { CATALOG, PROFILE, ownedAscended } from "../api/AscensionClient.fixtures";
+import { CATALOG, PROFILE, ownedAscended, shopOffer, shopWindow } from "../api/AscensionClient.fixtures";
 import { ApiError } from "../api/http";
 import { useAscensionStore } from "../stores/ascension";
 import ShopPanel from "./ShopPanel.vue";
 
 vi.mock("../api/AscensionClient", () => {
-  const client = { buyEmblems: vi.fn(), buyCopies: vi.fn(), sellCopy: vi.fn(), profile: vi.fn() };
+  const client = { buyEmblems: vi.fn(), shop: vi.fn(), buyOffer: vi.fn(), sellCopy: vi.fn(), profile: vi.fn() };
   return { useAscensionClient: () => client };
 });
 
@@ -27,12 +27,15 @@ beforeEach(() => {
   vi.resetAllMocks();
   setActivePinia(createPinia());
   client.profile.mockResolvedValue(PROFILE);
+  client.shop.mockResolvedValue(shopWindow());
 });
 
 function mountShop(insignia = 25) {
   const store = useAscensionStore();
   store.catalog = CATALOG;
   store.profile = { ...PROFILE, insignia, ascendeds: [ownedAscended("guardian", { copies: 2 })] };
+  store.shop = shopWindow();
+  store.shopEndsAt = Date.now() / 1000 + 3 * 3600 + 12 * 60;
   return { store, wrapper: mount(ShopPanel) };
 }
 
@@ -63,20 +66,56 @@ describe("ShopPanel", () => {
     expect(wrapper.find(".notice").text()).toBe("Bought 2 Common EMBLEMs for 20 Insignia.");
   });
 
-  it("leaves the copy price to the server and keeps its refusal", async () => {
-    client.buyCopies.mockRejectedValue(new ApiError(409, "that costs 400 Insignia and you have 25"));
-    const { store, wrapper } = mountShop(25);
-    const buy = () => wrapper.findAll("button").find((b) => b.text() === "Buy copies")!;
-    expect(buy().attributes("disabled")).toBeDefined();
+  it("shows the offers with stock, price and the time to the next rotation", () => {
+    const { wrapper } = mountShop(500);
 
-    await wrapper.find("select[name='copy-ascended']").setValue("bruiser");
-    await wrapper.find("select[name='copy-tier']").setValue("rare");
-    expect(buy().attributes("disabled")).toBeUndefined();
-    await buy().trigger("click");
+    const cards = wrapper.findAll("[data-offer]");
+    expect(cards).toHaveLength(2);
+    expect(cards[0]!.text()).toContain("Guardian");
+    expect(cards[0]!.text()).toContain("3 left");
+    expect(cards[0]!.text()).toContain("40");
+    expect(cards[1]!.text()).toContain("1 left");
+    expect(wrapper.find(".refresh").text()).toContain("Refreshes in 3:12:");
+  });
+
+  it("buys an offer and says what it bought", async () => {
+    client.buyOffer.mockResolvedValue({ kind: "copies", ascended_id: "guardian", tier_id: "common", copies_granted: 1, price: 40, resulting_tier_id: "common", slot: 0, rotation: 46, left: 2 });
+    const { wrapper } = mountShop(500);
+
+    await wrapper.find('[data-offer="0"] button').trigger("click");
     await flushPromises();
 
-    expect(client.buyCopies).toHaveBeenCalledExactlyOnceWith("bruiser", "rare");
+    expect(client.buyOffer).toHaveBeenCalledExactlyOnceWith(46, 0);
+    expect(wrapper.find(".notice").text()).toBe("Bought 1 copy of Guardian for 40 Insignia; it is now Common.");
+  });
+
+  it("keeps the server's refusal when an offer costs more than the Insignia", async () => {
+    client.buyOffer.mockRejectedValue(new ApiError(409, "that costs 400 Insignia and you have 25"));
+    const { store, wrapper } = mountShop(500);
+
+    await wrapper.find('[data-offer="0"] button').trigger("click");
+    await flushPromises();
+
     expect(store.error).toBe("that costs 400 Insignia and you have 25");
+  });
+
+  it("marks a sold-out offer and an unaffordable one", async () => {
+    const { store, wrapper } = mountShop(50);
+    store.shop = shopWindow({ offers: [shopOffer({ left: 0 }), shopOffer({ slot: 1, ascended_id: "scout", price: 90 })] });
+    await wrapper.vm.$nextTick();
+
+    const [soldOut, dear] = wrapper.findAll("[data-offer]");
+    expect(soldOut!.classes()).toContain("is-off");
+    expect(soldOut!.text()).toContain("Sold out");
+    expect(soldOut!.find("button").attributes("disabled")).toBeDefined();
+    expect(dear!.classes()).toContain("is-off");
+    expect(dear!.find("button").attributes("disabled")).toBeDefined();
+  });
+
+  it("loads the window when the tab opens", () => {
+    mountShop(500);
+
+    expect(client.shop).toHaveBeenCalled();
   });
 
   it("sells one copy after confirming", async () => {

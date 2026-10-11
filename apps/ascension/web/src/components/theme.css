@@ -114,3 +114,21 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* A card that answers the pointer: it rises a little and its edge brightens. A card with a
+ * tier colour (--tier) glows in it. Disabled and sold-out cards (.is-off) do not lift. */
+.em-lift {
+  transition: transform 160ms ease-out, box-shadow 160ms ease-out, border-color 160ms ease-out;
+}
+.em-lift:not(.is-off):hover,
+.em-lift:not(.is-off):focus-within {
+  transform: translateY(-4px) scale(1.02);
+  border-color: var(--tier, var(--em-accent));
+  box-shadow: 0 10px 22px #0008, 0 0 14px color-mix(in srgb, var(--tier, var(--em-accent)) 35%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .em-lift:not(.is-off):hover,
+  .em-lift:not(.is-off):focus-within {
+    transform: none;
+  }
+}

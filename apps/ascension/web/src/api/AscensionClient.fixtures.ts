@@ -1,4 +1,4 @@
-import type { BattleView, Catalog, EncounterPreview, Fighter, OwnedAscended, Profile, AscendedInfo, TierInfo } from "./AscensionClient";
+import type { BattleView, Catalog, EncounterPreview, Fighter, OwnedAscended, Profile, AscendedInfo, ShopOffer, ShopWindow, TierInfo } from "./AscensionClient";
 
 /** Test data shaped like Ascension's answers, for the Ascension tests. */
 
@@ -129,3 +129,17 @@ export function battleView(extra: Partial<BattleView> = {}): BattleView {
   };
 }
 
+export function shopOffer(extra: Partial<ShopOffer> = {}): ShopOffer {
+  return {
+    slot: 0, ascended_id: "guardian", tier_id: "common", copies_granted: 1, stock: 3, left: 3,
+    price: 40, resulting_tier_id: "common", owned_copies: 0, ...extra,
+  };
+}
+
+export function shopWindow(extra: Partial<ShopWindow> = {}): ShopWindow {
+  return {
+    rotation: 46, refreshes_at: 1_015_200, seconds_left: 3600,
+    offers: [shopOffer(), shopOffer({ slot: 1, ascended_id: "scout", tier_id: "rare", stock: 1, left: 1, price: 90 })],
+    ...extra,
+  };
+}

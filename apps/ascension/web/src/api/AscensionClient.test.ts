@@ -48,7 +48,7 @@ describe("ascensionClient", () => {
     await ascensionClient.setMode("b1", AT, "autonomous", "rare", "k");
     await ascensionClient.forfeit("b1", "k");
     await ascensionClient.buyEmblems("common", 3, "k");
-    await ascensionClient.buyCopies("bruiser", "rare", "k");
+    await ascensionClient.buyOffer(46, 2, "k");
     await ascensionClient.sellCopy("guardian", "k");
     await ascensionClient.resetProfile("k");
 
@@ -65,7 +65,7 @@ describe("ascensionClient", () => {
       ["POST", "/ascension/battles/b1/mode", { round: 3, revision: 7, mode: "autonomous", emblem_limit: "rare" }, KEY],
       ["POST", "/ascension/battles/b1/forfeit", undefined, KEY],
       ["POST", "/ascension/shop/purchases", { kind: "emblem", tier: "common", quantity: 3 }, KEY],
-      ["POST", "/ascension/shop/purchases", { kind: "copies", ascended_id: "bruiser", tier: "rare" }, KEY],
+      ["POST", "/ascension/shop/purchases", { kind: "copies", rotation: 46, slot: 2 }, KEY],
       ["POST", "/ascension/ascendeds/guardian/sales", undefined, KEY],
       ["POST", "/ascension/profile/reset", { confirm: true }, KEY],
     ]);

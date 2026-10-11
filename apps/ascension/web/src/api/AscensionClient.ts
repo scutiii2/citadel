@@ -246,6 +246,29 @@ export interface CopyPurchase {
   copies_granted: number;
   price: number;
   resulting_tier_id: string;
+  slot: number;
+  rotation: number;
+  left: number;
+}
+
+export interface ShopOffer {
+  slot: number;
+  ascended_id: string;
+  tier_id: string;
+  copies_granted: number;
+  stock: number;
+  left: number;
+  price: number;
+  resulting_tier_id: string;
+  owned_copies: number;
+}
+
+export interface ShopWindow {
+  rotation: number;
+  refreshes_at: number;
+  /** Seconds to the next rotation when the answer was made; count down on this device's clock. */
+  seconds_left: number;
+  offers: ShopOffer[];
 }
 
 export interface Sale {
@@ -317,8 +340,9 @@ export class AscensionClient {
     this.http.request<BattleView>("POST", `${BASE}/battles/${part(id)}/forfeit`, undefined, withKey(key));
   buyEmblems = (tier: string, quantity: number, key: string = newIdempotencyKey()) =>
     this.http.request<EmblemPurchase>("POST", `${BASE}/shop/purchases`, { kind: "emblem", tier, quantity }, withKey(key));
-  buyCopies = (ascendedId: string, tier: string, key: string = newIdempotencyKey()) =>
-    this.http.request<CopyPurchase>("POST", `${BASE}/shop/purchases`, { kind: "copies", ascended_id: ascendedId, tier }, withKey(key));
+  shop = () => this.http.request<ShopWindow>("GET", `${BASE}/shop`);
+  buyOffer = (rotation: number, slot: number, key: string = newIdempotencyKey()) =>
+    this.http.request<CopyPurchase>("POST", `${BASE}/shop/purchases`, { kind: "copies", rotation, slot }, withKey(key));
   sellCopy = (ascendedId: string, key: string = newIdempotencyKey()) =>
     this.http.request<Sale>("POST", `${BASE}/ascendeds/${part(ascendedId)}/sales`, undefined, withKey(key));
 }
