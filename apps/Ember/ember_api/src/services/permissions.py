@@ -1,6 +1,9 @@
 """Every permission ember_api knows about. The Administrator role always
 holds all of them (see AuthService.ensure_bootstrap_admin)."""
 
+import re
+from types import MappingProxyType
+
 CHAT_USE = "chat.use"
 TOOLS_VIEW = "tools.view"
 TOOLS_EXECUTE = "tools.execute"
@@ -27,9 +30,10 @@ TRAFFIC_VIEW = "traffic.view"
 AGENTS_MANAGE = "agents.manage"
 TICKETS_CREATE = "tickets.create"
 TICKETS_MANAGE = "tickets.manage"
-ASCENSION_PLAY = "ascension.play"
+GAMES_MANAGE = "games.manage"
+ASCENSION_PLAY = "games.ascension.play"  # Compatibility for the old proxy.
 
-ALL_PERMISSIONS: dict[str, str] = {
+ALL_PERMISSIONS = MappingProxyType({
     CHAT_USE: "Chat with ai_agent instances",
     TOOLS_VIEW: "Browse tools, capabilities, help and resources",
     TOOLS_EXECUTE: "Run tools directly and through chat agents",
@@ -56,8 +60,10 @@ ALL_PERMISSIONS: dict[str, str] = {
     AGENTS_MANAGE: "Create, edit and remove ai_agent agents (provider, gateway, persona, tools)",
     TICKETS_CREATE: "Report bugs, suggest features and follow your own tickets",
     TICKETS_MANAGE: "See every ticket, triage them and set status, priority and assignee",
-    ASCENSION_PLAY: "Play Ascension",
-}
+    GAMES_MANAGE: "Register, refresh and remove games",
+    # Seed access for the legacy proxy until Phase 4 removes it.
+    ASCENSION_PLAY: "Play ascension",
+})
 
 ADMIN_ROLE = "Administrator"
 
@@ -72,3 +78,33 @@ ADMIN_PERMISSIONS = (
     ACCOUNTS_VIEW, ACCOUNTS_MANAGE, ACCOUNTS_DELETE, ROLES_VIEW,
     ROLES_MANAGE, ROLES_ASSIGN, INVITES_MANAGE, SETTINGS_MANAGE,
 )
+
+
+GAME_ID_PATTERN = r"^[a-z0-9][a-z0-9-]{0,62}$"
+
+
+class PermissionCatalog:
+    """Recognises static permissions and the play permission of a valid game id."""
+
+    @staticmethod
+    def game_play(game_id: str) -> str:
+        return f"games.{game_id}.play"
+
+    @staticmethod
+    def description(name: str) -> str | None:
+        if name in ALL_PERMISSIONS:
+            return ALL_PERMISSIONS[name]
+        match = re.fullmatch(r"games\.([a-z0-9][a-z0-9-]{0,62})\.play", name)
+        return f"Play {match.group(1)}" if match else None
+
+
+def game_play_permission(game_id: str) -> str:
+    return PermissionCatalog.game_play(game_id)
+
+
+def is_known_permission(name: str) -> bool:
+    return PermissionCatalog.description(name) is not None
+
+
+def permission_description(name: str) -> str | None:
+    return PermissionCatalog.description(name)

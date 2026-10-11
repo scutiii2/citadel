@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import utcnow
 from src.models import Account, AuthSession, InviteCode, Permission, Role
-from src.services.permissions import ROLES_MANAGE, ROLES_ASSIGN, ADMIN_ROLE, ALL_PERMISSIONS
+from src.services.permissions import ROLES_MANAGE, ROLES_ASSIGN, ADMIN_ROLE, is_known_permission, permission_description
 
 
 class AdminError(Exception):
@@ -93,7 +93,7 @@ class AdminService:
     async def permissions(self) -> list[Permission]:
         """Only permissions the code still knows about."""
         rows = await self._session.scalars(select(Permission).order_by(Permission.name))
-        return [p for p in rows if p.name in ALL_PERMISSIONS]
+        return [p for p in rows if is_known_permission(p.name)]
 
     async def account(self, account_id: int) -> Account:
         return await self._get(Account, account_id, "Account")
@@ -182,12 +182,12 @@ class AdminService:
         desired_permissions: list[Permission] | None = None
         if permissions is not None:
             desired = set(permissions)
-            unknown = desired - ALL_PERMISSIONS.keys()
+            unknown = {n for n in desired if not is_known_permission(n)}
             if unknown:
                 raise NotFoundError(f"Unknown permission: {sorted(unknown)[0]}")
             if not desired <= actor.permission_names:
                 raise DelegationError("You cannot grant a permission you do not hold")
-            current = {p.name for p in role.permissions if p.name in ALL_PERMISSIONS}
+            current = {p.name for p in role.permissions if is_known_permission(p.name)}
             if role.name == ADMIN_ROLE and desired != current:
                 raise AdminError(f"Role '{ADMIN_ROLE}' always holds every permission")
             if any(r.id == role.id for r in actor.roles):
@@ -200,11 +200,11 @@ class AdminService:
             for permission_name in sorted(desired):
                 permission = existing.get(permission_name)
                 if permission is None:
-                    permission = Permission(name=permission_name, description=ALL_PERMISSIONS[permission_name])
+                    permission = Permission(name=permission_name, description=permission_description(permission_name))
                     self._session.add(permission)
                 desired_permissions.append(permission)
             # Retired associations remain available for migration rollback.
-            desired_permissions.extend(p for p in role.permissions if p.name not in ALL_PERMISSIONS)
+            desired_permissions.extend(p for p in role.permissions if not is_known_permission(p.name))
         if name is not None and name != role.name:
             if role.name == ADMIN_ROLE:
                 raise AdminError(f"Role '{ADMIN_ROLE}' cannot be renamed")
@@ -227,13 +227,13 @@ class AdminService:
 
     async def grant_permission(self, role: Role, permission_name: str, *, actor: Account) -> Role:
         self.ensure_can_delegate(actor, role)
-        if permission_name in ALL_PERMISSIONS and permission_name not in actor.permission_names:
+        if is_known_permission(permission_name) and permission_name not in actor.permission_names:
             raise DelegationError("You cannot grant a permission you do not hold")
-        if permission_name not in ALL_PERMISSIONS:
+        if not is_known_permission(permission_name):
             raise NotFoundError(f"Unknown permission: {permission_name}")
         permission = await self._session.scalar(select(Permission).where(Permission.name == permission_name))
         if permission is None:  # known to the code but not seeded yet
-            permission = Permission(name=permission_name, description=ALL_PERMISSIONS[permission_name])
+            permission = Permission(name=permission_name, description=permission_description(permission_name))
             self._session.add(permission)
         if permission not in role.permissions:
             role.permissions.append(permission)
@@ -264,7 +264,7 @@ class AdminService:
     @staticmethod
     def ensure_can_delegate(actor: Account, role: Role) -> None:
         """Delegated administrators may only affect roles within their own authority."""
-        if not {p.name for p in role.permissions if p.name in ALL_PERMISSIONS} <= actor.permission_names:
+        if not {p.name for p in role.permissions if is_known_permission(p.name)} <= actor.permission_names:
             raise DelegationError("You cannot manage or assign a role with permissions you do not hold")
 
     # --- helpers -------------------------------------------------------------

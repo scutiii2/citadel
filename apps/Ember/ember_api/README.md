@@ -554,3 +554,48 @@ downgrade to 0009 retains original broad grants and removes the new permission
 rows, but does not undo role edits made after upgrading.
 
 Admin usage includes every existing account, including disabled accounts and accounts with no usage in the selected period. Tokens include summaries; answers count distinct chat turns (delegated agents count once, summaries count zero). Personal usage remains scoped to the session account. Admin detail routes require usage.all.view, independently of chat.use and accounts.view.
+
+
+## Game registry and launch tickets
+
+Authenticated accounts use `GET /api/games` to list enabled games for which
+an account has `games.<id>.play`. `POST /api/games/{id}/launch` returns the
+registered base URL with a single-use ticket in `/#ticket=...`. Tickets expire
+in 60 seconds. Only their SHA-256 hashes are stored; launch prunes tickets
+that expired more than one minute ago. Tickets are never written to audit logs.
+
+`games.manage` authorizes `GET /api/games/registry`, registration through
+`POST /api/games` with `{ "url": "http://127.0.0.1:8060" }`, refresh through
+`POST /api/games/{id}/refresh` and `DELETE /api/games/{id}`. The registry list
+includes disabled games. Registration fetches `<base>/manifest.json`, creates
+`games.<id>.play`, and grants it to Administrator. Deregistration removes the
+game and its tickets, but retains the permission and role grants for later
+registration. Audit actions are `games.register`, `games.refresh`,
+`games.deregister`, and `games.launch`.
+
+Manifests are JSON objects with `id`, `name`, `description`, `icon`, and
+`version`. IDs match `^[a-z0-9][a-z0-9-]{0,62}$`; name is nonempty and at most
+80 characters, description and icon at most 300, version at most 40. Optional
+text fields default to empty strings. Fetches have a five-second timeout,
+a 64 KiB decoded body cap, and refuse redirects. URLs allow http/https,
+without credentials; subpath bases are preserved, queries and fragments removed.
+
+`games_allow_private_urls` defaults to true for local development. Set it to
+false for production to refuse localhost names and literal non-public IP
+addresses. As specified by the implementation plan, DNS hostnames are allowed
+without resolution: this validation does not prevent private DNS targets or
+DNS rebinding. Restrict production egress to trusted game hosts as well.
+
+Game servers call `POST /internal/games/tickets/redeem` with `{ "ticket": "...",
+"game_id": "ascension" }` and `X-Internal-Token`. This endpoint checks the
+configured internal token with a constant-time comparison, never authenticates
+from cookies, and returns `{ "account_id": "...", "display_name": "..." }`.
+Invalid authentication, unknown, expired, replayed or wrong-game tickets return
+one generic 401. A missing server token configuration returns 503. Redemption
+atomically consumes a ticket; a wrong-game attempt does not consume it.
+
+Migration 0014 creates the registry and ticket tables and renames
+`ascension.play` to `games.ascension.play`, preserving role grants and merging
+both permission rows if necessary. Downgrade reverses the rename and removes
+the new tables. The old `/api/ascension` proxy remains available in this phase;
+its permission alias and bootstrap seed are retained until proxy removal.

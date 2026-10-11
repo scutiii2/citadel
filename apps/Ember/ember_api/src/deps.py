@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable
 
-from fastapi import Depends, HTTPException, Request, status
+import hmac
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import Settings
@@ -24,6 +25,8 @@ from src.services.traffic import TrafficRecorder
 from src.services.turns import TurnRegistry
 from src.services.extension_probe import ExtensionProbe
 from src.services.secret_box import SecretBox
+from src.services.game_registry import GameRegistry
+from src.services.game_tickets import TicketService
 
 
 def get_settings(request: Request) -> Settings:
@@ -130,3 +133,20 @@ def require_any_permission(*names: str) -> Callable[..., Awaitable[Account]]:
         return account
 
     return dependency
+
+
+
+def get_game_registry(request: Request, session: AsyncSession = Depends(get_db_session)) -> GameRegistry:
+    return GameRegistry(session, request.app.state.game_fetcher, request.app.state.settings.games_allow_private_urls)
+
+
+def get_ticket_service(session: AsyncSession = Depends(get_db_session)) -> TicketService:
+    return TicketService(session)
+
+
+def require_internal_token(request: Request, x_internal_token: str | None = Header(default=None)) -> None:
+    expected = request.app.state.internal_token
+    if not expected:
+        raise HTTPException(503, "internal token not configured")
+    if x_internal_token is None or not hmac.compare_digest(x_internal_token.encode(), expected.encode()):
+        raise HTTPException(401, "Invalid ticket")

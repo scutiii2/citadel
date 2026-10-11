@@ -147,6 +147,7 @@ class Settings:
     mcp_server_url: str = "http://127.0.0.1:8010/mcp"
     # The Ascension backend's root URL (its routes sit under /ascension).
     ascension_url: str = DEFAULT_ASCENSION_URL
+    games_allow_private_urls: bool = True
     security: SecuritySettings = field(default_factory=SecuritySettings)
     usage: UsageSettings = field(default_factory=UsageSettings)
     backup: BackupSettings = field(default_factory=BackupSettings)
@@ -188,6 +189,7 @@ def load_settings() -> Settings:
         agents_registry_url=raw.get("agents_registry_url") or None,
         mcp_server_url=raw.get("mcp_server_url") or "http://127.0.0.1:8010/mcp",
         ascension_url=raw.get("ascension_url") or DEFAULT_ASCENSION_URL,
+        games_allow_private_urls=bool(raw.get("games_allow_private_urls", True)),
         security=SecuritySettings.from_config(raw.get("security", {})),
         usage=UsageSettings.from_config(raw.get("usage", {})),
         backup=BackupSettings.from_config(raw.get("backup", {})),

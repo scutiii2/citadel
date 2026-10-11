@@ -29,7 +29,7 @@ from src.services.log_service import LogWriter
 from src.services.memory_purger import MemoryPurger
 from src.services.otp_service import OtpService
 from src.services.permissions import (
-    ADMIN_ROLE, ALL_PERMISSIONS, ADMIN_PERMISSIONS, ACCOUNTS_VIEW, ACCOUNTS_MANAGE,
+    ADMIN_ROLE, is_known_permission, ADMIN_PERMISSIONS, ACCOUNTS_VIEW, ACCOUNTS_MANAGE,
     ACCOUNTS_DELETE, ROLES_VIEW, ROLES_MANAGE, ROLES_ASSIGN, INVITES_MANAGE, SETTINGS_MANAGE,
 )
 from src.services.settings_service import BOOLEAN_SETTINGS, SettingsService
@@ -109,7 +109,7 @@ class RoleOut(BaseModel):
             name=role.name,
             description=role.description,
             is_protected=role.name == ADMIN_ROLE,
-            permissions=sorted(p.name for p in role.permissions if p.name in ALL_PERMISSIONS),
+            permissions=sorted(p.name for p in role.permissions if is_known_permission(p.name)),
             account_count=len(role.accounts),
         )
 

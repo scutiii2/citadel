@@ -321,6 +321,7 @@ def make_settings(
     security: SecuritySettings | None = None,
     usage: UsageSettings | None = None,
     backup: BackupSettings | None = None,
+    games_allow_private_urls: bool = True,
     require_email_verification: bool = True,
 ) -> Settings:
     registry = tmp_path / "config_agents.json"
@@ -348,6 +349,7 @@ def make_settings(
         usage=usage or UsageSettings(),
         # Off unless a test asks: a background copy of every test's database is noise.
         backup=backup or BackupSettings(enabled=False),
+        games_allow_private_urls=games_allow_private_urls,
         config_path=tmp_path / "config_app.json",
     )
 
@@ -406,6 +408,7 @@ def client_factory(
     def factory(address: str = "testclient", **kwargs) -> TestClient:
         """address: the socket peer the app sees (default: Starlette's
         "testclient"), for tests that depend on the client IP."""
+        game_fetcher = kwargs.pop("game_fetcher", None)
         client = TestClient(
             create_app(
                 make_settings(tmp_path, **kwargs),
@@ -415,6 +418,7 @@ def client_factory(
                 server_tools=server_tools,
                 traffic=traffic,
                 ascension=ascension,
+                game_fetcher=game_fetcher,
             ),
             client=(address, 50000),
         )

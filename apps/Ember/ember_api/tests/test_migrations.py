@@ -18,8 +18,8 @@ from src.db import Base, Database
 from src.services.migrations import BASELINE, MIGRATIONS_DIR, MigrationRunner
 
 # The newest real migration; the tests' throwaway one comes after it.
-HEAD = "0013"
-NEXT = "0014"
+HEAD = "0014"
+NEXT = "0015"
 
 
 def drop_account_uid(conn: sqlite3.Connection) -> None:
@@ -32,6 +32,8 @@ def test_permission_split_preserves_access_once_and_keeps_revocations(tmp_path: 
     run_with(make_database(tmp_path))
     path = tmp_path / "ember.db"
     with closing(sqlite3.connect(path)) as conn:
+        conn.execute("DROP TABLE game_tickets")
+        conn.execute("DROP TABLE games")
         conn.execute("UPDATE alembic_version SET version_num = '0009'")
         drop_account_uid(conn)
         for name in ("admin.manage", "tools.use", "chat.use"):
@@ -70,6 +72,8 @@ def test_ticket_permission_is_granted_to_chat_roles_once(tmp_path: Path) -> None
     run_with(make_database(tmp_path))
     path = tmp_path / "ember.db"
     with closing(sqlite3.connect(path)) as conn:
+        conn.execute("DROP TABLE game_tickets")
+        conn.execute("DROP TABLE games")
         conn.execute("UPDATE alembic_version SET version_num = '0011'")
         for name in ("chatters", "readers"):
             conn.execute("INSERT INTO roles (name) VALUES (?)", (name,))
@@ -105,6 +109,8 @@ def test_the_game_permission_is_renamed_with_its_grants_kept(tmp_path: Path) -> 
     run_with(make_database(tmp_path))
     path = tmp_path / "ember.db"
     with closing(sqlite3.connect(path)) as conn:
+        conn.execute("DROP TABLE game_tickets")
+        conn.execute("DROP TABLE games")
         conn.execute("UPDATE alembic_version SET version_num = '0012'")
         conn.execute("DELETE FROM permissions WHERE name = 'ascension.play'")
         conn.execute("INSERT INTO roles (name) VALUES ('players')")
@@ -124,7 +130,7 @@ def test_the_game_permission_is_renamed_with_its_grants_kept(tmp_path: Path) -> 
             "JOIN permissions p ON p.id = rp.permission_id WHERE r.name = 'players'"
         )}
     assert "emberlings.play" not in names
-    assert granted == {"ascension.play"}
+    assert granted == {"games.ascension.play"}
 
 
 def make_database(tmp_path: Path) -> Database:
@@ -190,6 +196,8 @@ def test_account_uid_is_backfilled_unique_and_removed_by_the_downgrade(tmp_path:
     path = tmp_path / "ember.db"
     with closing(sqlite3.connect(path)) as conn:
         drop_account_uid(conn)
+        conn.execute("DROP TABLE game_tickets")
+        conn.execute("DROP TABLE games")
         conn.execute("UPDATE alembic_version SET version_num = '0010'")
         for name in ("lex", "sam"):
             conn.execute(
@@ -323,6 +331,8 @@ class TestDatabaseFromBeforeMigrations:
             conn.execute("DROP TABLE traffic_buckets")  # likewise
             conn.execute("DROP TABLE nav_preferences")  # likewise
             conn.execute("DROP TABLE account_capabilities")  # likewise
+            conn.execute("DROP TABLE game_tickets")
+            conn.execute("DROP TABLE games")
             conn.execute("DROP TABLE user_extensions")  # likewise
             drop_chat_folders(conn)
             conn.execute("ALTER TABLE accounts DROP COLUMN prompt_suggestions")  # added after the baseline too
@@ -361,7 +371,7 @@ class TestDatabaseFromBeforeMigrations:
     def test_it_is_only_stamped_when_the_baseline_is_the_newest_revision(self, tmp_path: Path) -> None:
         path = self.build_legacy(tmp_path)
         scripts = tmp_path / "baseline_only"
-        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*"))
+        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*"))
         calls: list[int] = []
 
         async def backup() -> None:
@@ -457,6 +467,8 @@ class TestLaterMigration:
             conn.execute("DROP TABLE traffic_buckets")
             conn.execute("DROP TABLE nav_preferences")  # likewise
             conn.execute("DROP TABLE account_capabilities")  # likewise
+            conn.execute("DROP TABLE game_tickets")
+            conn.execute("DROP TABLE games")
             conn.execute("DROP TABLE user_extensions")  # likewise
             for column in ("agent_id", "provider_id", "gateway", "started_at", "finished_at", "delegated_by"):
                 conn.execute(f"ALTER TABLE usage_records DROP COLUMN {column}")
@@ -537,3 +549,39 @@ def test_stamping_and_upgrading_are_not_confused_by_a_foreign_table(tmp_path: Pa
             await database.dispose()
 
     assert asyncio.run(go()) == "created"
+
+
+@pytest.mark.parametrize("collision", [False, True])
+def test_games_migration_preserves_grants_and_reverses(tmp_path: Path, collision: bool):
+    from alembic import command
+    run_with(make_database(tmp_path))
+
+    def migrate(target):
+        async def go():
+            database = make_database(tmp_path)
+            runner = MigrationRunner(database.engine)
+            try:
+                async with database.engine.connect() as conn:
+                    await conn.run_sync(lambda sync: command.downgrade(runner._config(sync), target))
+            finally:
+                await database.dispose()
+        asyncio.run(go())
+
+    migrate("0013")
+    path = tmp_path / "ember.db"
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("INSERT INTO roles (name) VALUES ('game players')")
+        conn.execute("INSERT INTO permissions (name) VALUES ('ascension.play')")
+        conn.execute("INSERT INTO role_permission SELECT r.id, p.id FROM roles r, permissions p WHERE r.name='game players' AND p.name='ascension.play'")
+        if collision:
+            conn.execute("INSERT INTO permissions (name) VALUES ('games.ascension.play')")
+            conn.execute("INSERT INTO role_permission SELECT r.id, p.id FROM roles r, permissions p WHERE r.name='game players' AND p.name='games.ascension.play'")
+        conn.commit()
+    run_with(make_database(tmp_path))
+    assert {"games", "game_tickets"} <= tables_of(path)
+    with closing(sqlite3.connect(path)) as conn:
+        assert conn.execute("SELECT p.name FROM role_permission rp JOIN permissions p ON p.id=rp.permission_id").fetchall() == [("games.ascension.play",)]
+    migrate("0013")
+    assert not {"games", "game_tickets"} & tables_of(path)
+    with closing(sqlite3.connect(path)) as conn:
+        assert conn.execute("SELECT p.name FROM role_permission rp JOIN permissions p ON p.id=rp.permission_id").fetchall() == [("ascension.play",)]

@@ -18,7 +18,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from src.db import utcnow
 from src.models import Account, LoginAttempt, Permission, Role
-from src.services.permissions import ADMIN_ROLE, ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS
+from src.services.permissions import ADMIN_ROLE, ALL_PERMISSIONS, is_known_permission, DEFAULT_ROLE_PERMISSIONS
 from src.utils.config_loader import load_env_secrets
 
 LOGIN_ATTEMPT_RETENTION = timedelta(days=30)
@@ -156,7 +156,7 @@ class AuthService:
         if role is None:
             role = Role(name=ADMIN_ROLE, description="Full-access bootstrap role")
             self._session.add(role)
-        role.permissions = [existing[name] for name in ALL_PERMISSIONS]
+        role.permissions = [p for name, p in existing.items() if is_known_permission(name)]
         await self._session.commit()
         return role
 

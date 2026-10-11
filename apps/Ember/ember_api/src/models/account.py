@@ -37,6 +37,6 @@ class Account(Base):
 
     @property
     def permission_names(self) -> set[str]:
-        from src.services.permissions import ALL_PERMISSIONS
+        from src.services.permissions import is_known_permission
 
-        return {p.name for role in self.roles for p in role.permissions if p.name in ALL_PERMISSIONS}
+        return {p.name for role in self.roles for p in role.permissions if is_known_permission(p.name)}

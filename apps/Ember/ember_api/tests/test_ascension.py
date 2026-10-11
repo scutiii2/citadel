@@ -155,8 +155,8 @@ def test_needs_ascension_play(client: TestClient, email: FakeEmailSender, ascens
 def test_the_administrator_role_has_the_permission_and_member_does_not(client: TestClient) -> None:
     as_admin(client)
 
-    assert "ascension.play" in role_by_name(client, "Administrator")["permissions"]
-    assert "ascension.play" not in role_by_name(client, "Member")["permissions"]
+    assert "games.ascension.play" in role_by_name(client, "Administrator")["permissions"]
+    assert "games.ascension.play" not in role_by_name(client, "Member")["permissions"]
 
 
 # --- validation -----------------------------------------------------------------

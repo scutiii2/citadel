@@ -28,6 +28,7 @@ from src.routes import (
     chats,
     config_issues,
     ascension as ascension_routes,
+    games as games_routes,
     tickets as tickets_routes,
     logs,
     mcp,
@@ -48,6 +49,7 @@ from src.services.migrations import MigrationRunner
 from src.services.chat_service import MAX_CHAT_BYTES
 from src.services.email_service import EmailSender, McpEmailSender
 from src.services.ascension_gateway import AscensionApi, AscensionGateway
+from src.services.game_manifest import ManifestFetcher
 from src.services.extension_probe import ExtensionProbe
 from src.services.log_service import LogWriter
 from src.services.mcp_proxy import McpProxy
@@ -84,6 +86,8 @@ def create_app(
     server_tools: ServerTools | None = None,
     traffic: TrafficRecorder | None = None,
     ascension: AscensionApi | None = None,
+    *,
+    game_fetcher: ManifestFetcher | None = None,
 ) -> FastAPI:
     """email_sender defaults to the MCP Email capability,
     upstream_transport to real HTTP, agent_gateway to a real MCP client for
@@ -121,6 +125,11 @@ def create_app(
         # A client of its own for the Ascension backend: no default headers and no redirects,
         # so the internal token can never follow a redirect to another host.
         ascension_client = httpx.AsyncClient(transport=upstream_transport, follow_redirects=False)
+
+        manifest_client = httpx.AsyncClient(follow_redirects=False)
+        app.state.game_fetcher = game_fetcher or ManifestFetcher(
+            manifest_client, allow_private=settings.games_allow_private_urls
+        )
 
         app.state.settings = settings
         app.state.database = database
@@ -167,6 +176,7 @@ def create_app(
             await recorder.stop()
             await upstream.aclose()
             await ascension_client.aclose()
+            await manifest_client.aclose()
             await database.dispose()
 
     app = FastAPI(title="ember_api", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -204,6 +214,8 @@ def create_app(
     app.include_router(attachments.router)
     app.include_router(config_issues.router)
     app.include_router(ascension_routes.router)
+    app.include_router(games_routes.router)
+    app.include_router(games_routes.internal_router)
     app.include_router(tickets_routes.router)
     app.include_router(tickets_routes.admin_router)
 
