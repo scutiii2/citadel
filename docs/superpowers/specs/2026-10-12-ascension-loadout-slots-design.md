@@ -5,7 +5,7 @@ Builds on the ability trees (`2026-10-12-ascension-ability-trees-design.md`) and
 
 ## Goal
 
-Twoychi fights with up to 4 active abilities and 2 passives. Every other Ascended stays a basic character: 3 active
+Twoychi fights with up to 4 active abilities and 2 passives. The seven existing Ascended (bruiser, channeler, forbidden, guardian, scout, sentinel, striker) stay basic characters: 3 active
 abilities, 1 passive and a single tree, exactly as today. Twoychi is the one Ascended whose
 slots are tied to the branches of her tree: each slot takes only nodes of its own branch. Troy's three forms and Aya are
 those branches, so a form is just "the slot an ability sits in"; it changes no stats and no abilities.
@@ -17,7 +17,7 @@ multipliers, and any change to the other Ascended (their kit, slots and trees st
 
 | Question | Decision |
 |---|---|
-| Slots | An Ascended without `slots` in its tree has `a1` to `a3` and `p1`; any learned node of the right kind goes in any slot. Only a tree that declares `slots` can have `a4` or `p2`. Twoychi is the only one that does. |
+| Slots | An Ascended without `slots` in its tree has `a1` to `a3` and `p1`; any learned node of the right kind goes in any slot. Only a tree that declares `slots` can have `a4` or `p2`. Today only Twoychi does; a future special Ascended may declare its own. |
 | Twoychi's slots | Declared in her `tree.json`: `a1` Wolf, `a2` Bear, `a3` Dog, `a4` Aya; `p1` Troy (Wolf, Bear and Dog passives), `p2` Aya. A slot takes only learned nodes of its own branches. |
 | Form bonus | None. An ability is authored with its own numbers, and it can only sit in its own form's slot, so "the stats follow the form" holds by construction. |
 | Cross-tree nodes | A node needing two branches still has one home `branch` (written in the node). It sits in that branch's slot. |
