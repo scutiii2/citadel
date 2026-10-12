@@ -105,18 +105,6 @@
   outline-offset: 3px;
 }
 
-/* .em-glow marks motion that stays on with reduced motion, and everything inside it: the chosen
- * starter's slow glow, and the battle arena (the battle is the game and its animations show what happened). */
-@media (prefers-reduced-motion: reduce) {
-  .em-root *:not(.em-glow, .em-glow *),
-  .em-root *::before,
-  .em-root *::after {
-    animation: none !important;
-    transition: none !important;
-    scroll-behavior: auto !important;
-  }
-}
-
 /* A card that answers the pointer: it rises, gets a crisp ring in its tier colour (--tier) and a
  * wide soft bloom around it. Disabled and sold-out cards (.is-off) do not react. */
 .em-lift {
@@ -130,10 +118,4 @@
     0 0 0 2px var(--tier, var(--em-accent)),
     0 0 28px 4px color-mix(in srgb, var(--tier, var(--em-accent)) 40%, transparent),
     0 12px 24px #0009;
-}
-@media (prefers-reduced-motion: reduce) {
-  .em-lift:not(.is-off):hover,
-  .em-lift:not(.is-off):focus-within {
-    transform: none;
-  }
 }

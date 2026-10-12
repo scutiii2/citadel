@@ -13,7 +13,7 @@ const idle = <T>(): Record<Side, T | null> => ({ player: null, wild: null });
  * what the arena should show meanwhile: each fighter's effect, a thrown EMBLEM, a floating
  * text, and the health to show (the old value until the hit lands). Nothing plays when a
  * battle is first opened or restored or when an EMBLEM prompt is open (its 5 seconds are
- * running). It plays even when the system asks for reduced motion: the battle is the game. `busy` stays true until the last
+ * running). `busy` stays true until the last
  * step ends, so the page can hold the result and the action buttons back. */
 export const usePlaybackStore = defineStore("playback", () => {
   const ascension = useAscensionStore();

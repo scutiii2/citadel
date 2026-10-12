@@ -51,9 +51,4 @@ function select(): void {
       0 0 26px 6px color-mix(in srgb, var(--em-accent) 50%, transparent);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .choice.selected {
-    animation-duration: 3.2s;
-  }
-}
 </style>

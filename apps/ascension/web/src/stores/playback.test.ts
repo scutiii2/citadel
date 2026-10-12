@@ -84,16 +84,6 @@ describe("battle playback", () => {
     expect(playback.busy).toBe(false);
   });
 
-  it("plays even when the system asks for reduced motion", async () => {
-    vi.stubGlobal("matchMedia", () => ({ matches: true }));
-    const { ascension, playback, before } = await setup();
-
-    ascension.battle = after(before);
-    await settle();
-
-    expect(playback.busy).toBe(true);
-  });
-
   it("queues a round that arrives while another plays", async () => {
     const { ascension, playback, before } = await setup();
     ascension.battle = after(before);

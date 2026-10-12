@@ -188,9 +188,4 @@ const types = computed(() => props.ascended.ascension_types);
 .card.flipped .flipper {
   transform: rotateY(180deg);
 }
-@media (prefers-reduced-motion: reduce) {
-  .flipper {
-    transition: none;
-  }
-}
 </style>

@@ -31,7 +31,7 @@ describe("stepsFor", () => {
     expect(caught.map((s) => s.ball?.wild?.phase)).toEqual(["throw", "throw", "wobble", "wobble", "wobble", "still", "caught"]);
     expect(caught[0]!.ball!.wild!.emblem).toBe("rare");
     expect(caught.slice(2, 5).map((s) => s.ball?.wild?.strain)).toEqual([1, 2, 3]);
-    expect(caught.slice(2, 6).every((s) => s.fx?.wild === "struggle")).toBe(true);
+    expect(caught.slice(2, 6).every((s) => s.fx?.wild === "absorb")).toBe(true);
     expect(caught[6]!.float!.text).toBe("Caught!");
 
     const free = stepsFor([{ type: "capture_attempt", side: "player", emblem: "common", chance: 0.58, success: false }]);

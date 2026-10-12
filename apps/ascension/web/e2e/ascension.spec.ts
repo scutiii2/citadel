@@ -4,7 +4,7 @@ import { installFakeApi } from "./fakeApi.ts";
 import { CATALOG, PROFILE, ascendedInfo, ownedAscended } from "../src/api/AscensionClient.fixtures.ts";
 
 for (const viewport of [{ width: 1280, height: 720 }, { width: 768, height: 720 }, { width: 390, height: 844 }]) {
-  test(`squad preparation fits at ${viewport.width}px and respects reduced motion`, async ({ page }, testInfo) => {
+  test(`squad preparation fits at ${viewport.width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     const api = await installFakeApi(page);
     api.ascension.profile = {
@@ -38,8 +38,6 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 768, height: 720 
     expect(player!.y).toBe(wild!.y);
     expect(player!.x + player!.width).toBeLessThanOrEqual(wild!.x + 1);
     expect(await selected.evaluate(el => getComputedStyle(el).animationName)).toMatch(/^breathe(?:-|$)/);
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    expect(await selected.evaluate(el => getComputedStyle(el).animationDuration)).toBe("3.2s");
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
     if (viewport.width > 700) await page.setViewportSize({ width: viewport.width, height: 1320 });
     await page.getByRole("main").evaluate(el => { el.scrollTop = 0; });

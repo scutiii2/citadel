@@ -86,7 +86,7 @@ function pose(key: string) {
           <EmBar kind="hp" :value="hpOf(side.key, side.fighter)" :max="side.fighter.max_hp" :label="`${side.fighter.name} health`" />
           <p class="hp em-num">HP {{ hpOf(side.key, side.fighter) }} / {{ side.fighter.max_hp }}</p>
           <div class="art">
-            <div class="sprite" :class="[playback.fx[side.key as 'player' | 'wild'] ? `fx-${playback.fx[side.key as 'player' | 'wild']}` : '', playback.fx[side.key as 'player' | 'wild'] === 'struggle' ? `struggle-${playback.ball[side.key as 'player' | 'wild']?.strain ?? 0}` : '']">
+            <div class="sprite" :class="[playback.fx[side.key as 'player' | 'wild'] ? `fx-${playback.fx[side.key as 'player' | 'wild']}` : '']">
               <span v-if="sheet(side.fighter)" class="pic"><AnimatedSprite :sheet="sheet(side.fighter)!" :state="pose(side.key)" /></span>
               <img v-else-if="art(side.fighter)" :src="art(side.fighter)!" alt="" draggable="false" />
               <span v-else class="letter" aria-hidden="true">{{ side.fighter.name.slice(0, 1) }}</span>
@@ -269,19 +269,6 @@ function pose(key: string) {
 .fx-absorb {
   animation: absorb 400ms ease-in forwards;
 }
-/* The Ascended is half pulled into the EMBLEM and thrashes against it, harder each tug. */
-.struggle-1 {
-  animation: struggle-1 800ms ease-in-out both;
-}
-.struggle-2 {
-  animation: struggle-2 900ms ease-in-out both;
-}
-.struggle-3 {
-  animation: struggle-3 1000ms ease-in-out both;
-}
-.struggle-0 {
-  animation: shiver 600ms ease-in-out both;
-}
 .fx-release {
   animation: release 400ms ease-out;
 }
@@ -319,13 +306,16 @@ function pose(key: string) {
   animation: strain-ring 450ms ease-out infinite;
 }
 .strain-1 {
-  animation: wobble-1 800ms ease-in-out both;
+  --amp: 1;
+  animation: ball-struggle 520ms ease-in-out infinite;
 }
 .strain-2 {
-  animation: wobble-2 900ms ease-in-out both;
+  --amp: 1.6;
+  animation: ball-struggle 420ms ease-in-out infinite;
 }
 .strain-3 {
-  animation: wobble-3 1000ms ease-in-out both;
+  --amp: 2.2;
+  animation: ball-struggle 320ms ease-in-out infinite;
 }
 .ball-still {
   animation: hush 600ms ease-in-out both;
@@ -447,29 +437,12 @@ function pose(key: string) {
     transform: translate(0, 0) scale(1);
   }
 }
-@keyframes wobble-1 {
-  0%, 100% { transform: scale(1.1) rotate(0); }
-  20% { transform: scale(1.1) rotate(-18deg); }
-  45% { transform: scale(1.1) rotate(16deg); }
-  70% { transform: scale(1.1) rotate(-10deg); }
-}
-@keyframes wobble-2 {
-  0%, 100% { transform: scale(1.2) rotate(0); }
-  12% { transform: scale(1.25) rotate(-28deg) translateX(-4px); }
-  30% { transform: scale(1.25) rotate(26deg) translateX(4px); }
-  48% { transform: scale(1.2) rotate(-24deg); }
-  66% { transform: scale(1.2) rotate(20deg); }
-  82% { transform: scale(1.2) rotate(-8deg); }
-}
-@keyframes wobble-3 {
-  0%, 100% { transform: scale(1.3) rotate(0); }
-  8% { transform: scale(1.4) rotate(-36deg) translateX(-6px); }
-  22% { transform: scale(1.4) rotate(34deg) translateX(6px); }
-  36% { transform: scale(1.35) rotate(-34deg) translateX(-5px); }
-  50% { transform: scale(1.35) rotate(30deg) translateX(5px); }
-  64% { transform: scale(1.3) rotate(-24deg); }
-  78% { transform: scale(1.3) rotate(18deg); }
-  90% { transform: scale(1.3) rotate(-6deg); }
+/* The EMBLEM pulses in size, bounces and rotates as the Ascended fights it; --amp grows each tug. */
+@keyframes ball-struggle {
+  0%, 100% { transform: translateY(0) scale(1) rotate(0); }
+  20% { transform: translateY(calc(var(--amp) * -8px)) scale(calc(1 + var(--amp) * 0.12)) rotate(calc(var(--amp) * -14deg)); }
+  50% { transform: translateY(0) scale(calc(1 - var(--amp) * 0.04)) rotate(0); }
+  70% { transform: translateY(calc(var(--amp) * -6px)) scale(calc(1 + var(--amp) * 0.1)) rotate(calc(var(--amp) * 14deg)); }
 }
 @keyframes hush {
   0% { transform: scale(1.3); filter: drop-shadow(0 0 8px var(--tier)); }
@@ -479,43 +452,6 @@ function pose(key: string) {
 @keyframes strain-ring {
   from { transform: scale(1); opacity: 0.9; }
   to { transform: scale(2.2); opacity: 0; }
-}
-@keyframes struggle-1 {
-  0% { transform: scale(0.5); opacity: 0.7; filter: brightness(1.4) drop-shadow(0 0 10px var(--em-danger)); }
-  20% { transform: scale(0.62) translate(-12px, 4px) rotate(-8deg); opacity: 1; }
-  45% { transform: scale(0.58) translate(12px, -6px) rotate(8deg); }
-  70% { transform: scale(0.6) translate(-8px, 0) rotate(-5deg); }
-  100% { transform: scale(0.5); opacity: 0.75; filter: brightness(1.4) drop-shadow(0 0 10px var(--em-danger)); }
-}
-@keyframes struggle-2 {
-  0% { transform: scale(0.5); opacity: 0.7; filter: brightness(1.5) drop-shadow(0 0 14px var(--em-danger)); }
-  12% { transform: scale(0.76) translate(-22px, 6px) rotate(-12deg); opacity: 1; }
-  30% { transform: scale(0.7) translate(22px, -10px) rotate(12deg); }
-  48% { transform: scale(0.78) translate(-20px, 4px) rotate(-10deg); }
-  66% { transform: scale(0.7) translate(18px, 0) rotate(9deg); }
-  100% { transform: scale(0.5); opacity: 0.75; filter: brightness(1.5) drop-shadow(0 0 14px var(--em-danger)); }
-}
-@keyframes struggle-3 {
-  0% { transform: scale(0.5); opacity: 0.7; filter: brightness(1.7) drop-shadow(0 0 18px var(--em-danger)); }
-  8% { transform: scale(0.95) translate(-32px, 8px) rotate(-16deg); opacity: 1; }
-  22% { transform: scale(0.88) translate(32px, -14px) rotate(16deg); }
-  36% { transform: scale(0.96) translate(-30px, 6px) rotate(-14deg); }
-  50% { transform: scale(0.88) translate(28px, -8px) rotate(13deg); }
-  64% { transform: scale(0.92) translate(-22px, 4px) rotate(-9deg); }
-  80% { transform: scale(0.8) translate(14px, 0) rotate(6deg); }
-  100% { transform: scale(0.4); opacity: 0.6; filter: brightness(1.7) drop-shadow(0 0 18px var(--em-danger)); }
-}
-/* The held breath: pulled almost all the way in, trembling. */
-@keyframes shiver {
-  0%, 100% { transform: scale(0.4) translate(0, 0); opacity: 0.6; }
-  25% { transform: scale(0.42) translate(-3px, 1px); }
-  50% { transform: scale(0.38) translate(3px, -1px); opacity: 0.45; }
-  75% { transform: scale(0.42) translate(-2px, -1px); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .strain-1, .strain-2, .strain-3, .ball-still, .ball-wobble::after, .struggle-0, .struggle-1, .struggle-2, .struggle-3 {
-    animation: none;
-  }
 }
 @keyframes caught {
   40% {
