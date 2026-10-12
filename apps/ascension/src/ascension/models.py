@@ -57,6 +57,14 @@ class PassiveSpec:
 
 
 @dataclass(frozen=True)
+class Loadout:
+    """The abilities and passive an Ascended fights with: its equipped tree nodes."""
+
+    abilities: tuple[AbilitySpec, ...]
+    passive: PassiveSpec
+
+
+@dataclass(frozen=True)
 class Action:
     """A choice for one round. `kind` is attack (basic), ability, flee or catch."""
 

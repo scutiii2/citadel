@@ -14,7 +14,9 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from src.ascension.ascension_types import AscensionType
-from src.ascension.models import ABILITY_CATEGORIES, CATEGORIES, AbilitySpec, PassiveSpec
+from src.ascension.models import ABILITY_CATEGORIES, CATEGORIES, AbilitySpec, PassiveSpec, Loadout
+from src.ascension.passives import PassiveFactory
+from src.ascension.tree import AbilityTree, NodeCost, TreeError, TreeNode, passive_root_id
 
 ABILITY_UNLOCK_LEVELS = (1, 10, 20)
 # The catalog always sits in the same place in the project tree, so it has no config entry.
@@ -22,6 +24,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CATALOG_PATH = PROJECT_ROOT / "configs" / "ascension_catalog.json"
 ASCENDEDS_PATH = PROJECT_ROOT / "ascended"
 ASCENDED_FILE = "catalog.json"
+TREE_FILE = "tree.json"
 # The sprite files an Ascended folder may hold, in the order main card, small card, battle.
 SPRITE_NAMES = ("sprite_main_card.webp", "sprite_preview_card.webp", "sprite_battle.webp")
 STATS = ("hp", "power", "speed")
@@ -70,6 +73,7 @@ class AscendedSpec:
     abilities: tuple[AbilitySpec, ...]
     ascension_types: tuple[AscensionType, ...] = ()
     art: ArtSpec = ArtSpec()
+    tree: AbilityTree | None = None  # Set by _ascended_spec, with roots when no tree.json exists.
 
 
 @dataclass(frozen=True)
@@ -155,6 +159,75 @@ def _art(raw: Mapping[str, Any], where: str) -> ArtSpec:
     return ArtSpec(*(name in found for name in SPRITE_NAMES), **focus)
 
 
+def _number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _tree(raw: Any, spec_id: str, abilities: tuple[AbilitySpec, ...], passive: PassiveSpec) -> AbilityTree:
+    """The Ascended's tree: its roots (the catalog kit) plus any nodes in tree.json."""
+    where = f"ascended {spec_id!r} tree"
+    root_abilities = {a.id: a for a in abilities}
+    passive_id = passive_root_id(spec_id)
+    if raw is None:
+        raw = {"nodes": [{"id": i, "root": True, "x": 40, "y": 60 + 110 * n}
+                         for n, i in enumerate([*root_abilities, passive_id])]}
+    if not isinstance(raw, Mapping) or set(raw) - {"nodes"} or not isinstance(raw.get("nodes", []), list):
+        raise CatalogError(f"{where}: only nodes is allowed, as a list")
+    nodes: list[TreeNode] = []
+    listed_roots: list[str] = []
+    for item in raw.get("nodes", []):
+        node_id = item.get("id") if isinstance(item, Mapping) else None
+        if not isinstance(node_id, str):
+            raise CatalogError(f"{where}: every node needs an id")
+        at = f"{where} node {node_id!r}"
+        if not _number(item.get("x")) or not _number(item.get("y")):
+            raise CatalogError(f"{at}: x and y must be numbers")
+        x, y = item["x"], item["y"]
+        if item.get("root"):
+            listed_roots.append(node_id)
+            if node_id == passive_id:
+                nodes.append(TreeNode(node_id, "passive", passive.kind.replace("_", " ").title(), x, y, root=True, passive=passive))
+            elif node_id in root_abilities:
+                a = root_abilities[node_id]
+                nodes.append(TreeNode(node_id, "ability", a.name, x, y, unlock_level=a.unlock_level, root=True, ability=a))
+            else:
+                raise CatalogError(f"{at}: a root must be one of the catalog abilities or {passive_id!r}")
+            continue
+        requires = item.get("requires", [])
+        if not isinstance(requires, list) or any(not isinstance(r, str) for r in requires):
+            raise CatalogError(f"{at}: requires must be a list of node ids")
+        cost_raw = item.get("cost")
+        if not isinstance(cost_raw, Mapping):
+            raise CatalogError(f"{at}: needs a cost with a tier and an amount")
+        amount = cost_raw.get("amount")
+        if isinstance(amount, bool) or not isinstance(amount, int) or amount < 1 or not isinstance(cost_raw.get("tier"), str):
+            raise CatalogError(f"{at}: cost needs a tier and a whole amount of at least 1")
+        cost = NodeCost(cost_raw["tier"], amount)
+        kind = item.get("kind")
+        if kind == "ability":
+            a = _ability(item, spec_id)
+            nodes.append(TreeNode(node_id, "ability", a.name, x, y, tuple(requires), a.unlock_level, cost, ability=a))
+        elif kind == "passive":
+            body = item.get("passive")
+            level = item.get("unlock_level")
+            if not isinstance(body, Mapping) or "kind" not in body or isinstance(level, bool) or not isinstance(level, int) or level < 1:
+                raise CatalogError(f"{at}: a passive node needs a passive (kind, params) and a whole unlock_level of at least 1")
+            spec = PassiveSpec(body["kind"], dict(body.get("params", {})))
+            try:
+                PassiveFactory().create(spec)
+            except (ValueError, TypeError) as error:
+                raise CatalogError(f"{at}: unknown passive or bad params ({error})") from error
+            nodes.append(TreeNode(node_id, "passive", str(item.get("name", node_id)), x, y, tuple(requires), level, cost, passive=spec))
+        else:
+            raise CatalogError(f"{at}: kind must be ability or passive")
+    if raw.get("nodes") and sorted(listed_roots) != sorted([*root_abilities, passive_id]):
+        raise CatalogError(f"{where}: must list every root: {', '.join([*root_abilities, passive_id])}")
+    try:
+        return AbilityTree(nodes)
+    except TreeError as error:
+        raise CatalogError(f"{where}: {error}") from error
+
+
 def _ascended_spec(raw: Mapping[str, Any]) -> AscendedSpec:
     sid = _require(raw, "id", "ascended")
     where = f"ascended {sid!r}"
@@ -169,11 +242,13 @@ def _ascended_spec(raw: Mapping[str, Any]) -> AscendedSpec:
         ascension_types = AscensionType.parse_all(raw.get("ascension_types", []), where)
     except ValueError as error:
         raise CatalogError(str(error)) from error
+    passive_spec = PassiveSpec(_require(passive, "kind", f"{where} passive"), dict(passive.get("params", {})))
     return AscendedSpec(
         id=sid, name=_require(raw, "name", where), starter=bool(raw.get("starter")), forbidden=bool(raw.get("forbidden")),
         base_price=_require(raw, "base_price", where), start_tier=raw.get("start_tier"), base=dict(base), growth=dict(growth),
-        passive=PassiveSpec(_require(passive, "kind", f"{where} passive"), dict(passive.get("params", {}))), abilities=abilities,
+        passive=passive_spec, abilities=abilities,
         ascension_types=ascension_types, art=_art(raw, where),
+        tree=_tree(raw.get("tree"), sid, abilities, passive_spec),
     )
 
 
@@ -208,10 +283,13 @@ class Catalog:
         self._ascendeds = {s.id: s for s in specs}
         if len(self._ascendeds) != len(specs):
             raise CatalogError("ascended ids must be unique")
-        # Action keys and cooldowns key on the ability id, so it is unique across Ascended.
-        ability_ids = [a.id for s in specs for a in s.abilities]
+        # Action keys and cooldowns key on the ability id, so it is unique across Ascended, and tree nodes share the id space.
+        node_ids = [n.id for s in specs for n in s.tree.nodes]
+        ability_ids = [n.id for s in specs for n in s.tree.nodes if n.kind == "ability"]
         if len(set(ability_ids)) != len(ability_ids):
             raise CatalogError("ability ids must be unique across all Ascended")
+        if len(set(node_ids)) != len(node_ids):
+            raise CatalogError("tree node ids must be unique across all Ascended")
         self._tiers = {t.id: t for t in self.tiers}
         self._validate()
 
@@ -231,6 +309,9 @@ class Catalog:
                 raise CatalogError(f"ascended {spec.id!r}: base_price must be positive")
             if spec.start_tier is not None and (spec.forbidden or spec.start_tier not in regular_tier_ids):
                 raise CatalogError(f"ascended {spec.id!r}: start_tier must be a regular tier (Forbidden has none)")
+            for node in spec.tree.nodes:
+                if node.cost is not None and node.cost.tier not in regular_tier_ids:
+                    raise CatalogError(f"ascended {spec.id!r} tree node {node.id!r}: cost tier must be a regular tier")
         if not math.isclose(sum(t.encounter_probability for t in self.tiers), 1.0, abs_tol=1e-9):
             raise CatalogError("tier encounter probabilities must sum to 1")
         if not math.isclose(sum(self.economy.personality_tier_probabilities), 1.0, abs_tol=1e-9):
@@ -299,8 +380,19 @@ class Catalog:
                 found = ascended.get("id") if isinstance(ascended, dict) else ascended
                 raise CatalogError(f"ascended file {label}: id {found!r} must equal the folder name {folder.name!r}")
             ascended["sprites"] = [name for name in SPRITE_NAMES if (folder / name).is_file()]
+            tree_file = folder / TREE_FILE
+            if tree_file.is_file():
+                try:
+                    ascended["tree"] = json.loads(tree_file.read_text(encoding="utf-8"))
+                except (OSError, ValueError) as error:
+                    raise CatalogError(f"cannot load tree file {folder.name}/{TREE_FILE}: {error}") from error
             ascendeds.append(ascended)
         return ascendeds
+
+    def default_loadout(self, ascended_id: str) -> Loadout:
+        """The starting kit: the catalog abilities in order and the catalog passive."""
+        spec = self.ascended(ascended_id)
+        return Loadout(spec.abilities, spec.passive)
 
     def sprite_path(self, ascended_id: str, file: str) -> Path | None:
         """The sprite file for a catalog Ascended and one of the three exact names, else None.

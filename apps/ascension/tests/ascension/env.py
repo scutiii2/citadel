@@ -27,9 +27,15 @@ CATALOG = Catalog.load(CATALOG_PATH, ASCENDEDS_PATH)
 
 
 def load_raw() -> dict:
-    """The shipped catalog as the raw dict Catalog() takes: the rules plus the Ascended, by folder name."""
+    """The shipped catalog as the raw dict Catalog() takes: the rules plus the Ascended (and their trees), by folder name."""
     raw = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
-    raw["ascendeds"] = [json.loads(f.read_text(encoding="utf-8")) for f in sorted(ASCENDEDS_PATH.glob("*/catalog.json"), key=lambda f: f.parent.name)]
+    raw["ascendeds"] = []
+    for f in sorted(ASCENDEDS_PATH.glob("*/catalog.json"), key=lambda f: f.parent.name):
+        ascended = json.loads(f.read_text(encoding="utf-8"))
+        tree_file = f.parent / "tree.json"
+        if tree_file.is_file():
+            ascended["tree"] = json.loads(tree_file.read_text(encoding="utf-8"))
+        raw["ascendeds"].append(ascended)
     return raw
 COOLDOWN = 30.0
 FAINT = 300.0
