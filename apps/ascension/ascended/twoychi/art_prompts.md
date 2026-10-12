@@ -2,7 +2,7 @@
 
 Rules: `../ART_GUIDE.md` (read it first; it explains sizes, the black background and the crop steps).
 Files for this Ascended: `sprite_main_card.webp`, `sprite_preview_card.webp`, `sprite_battle.webp` (this folder).
-Status: no sprites yet. Design brief: `identity.md`. Once the first portrait is approved, save it as `sprite_preview_card.webp` and name it the primary reference in `identity.md`.
+Status: revised main-card candidate in main-v2.png and main_card-v2.webp. Preview candidate: preview.png and preview_card.webp (512 x 512), prompt in preview_generation_prompt.md. Battle candidate: battle.png and battle.webp (512 x 512 lossless transparent WebP), prompt in battle_generation_prompt.md. Generation prompt: main_generation_prompt-v2.md. Design brief: `identity.md`. Once the first portrait is approved, save it as `sprite_preview_card.webp` and name it the primary reference in `identity.md`.
 
 ## How to run it
 

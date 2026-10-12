@@ -1,6 +1,6 @@
 # Twoychi: visual identity
 
-Status: design brief, no sprites yet. There is no reference image. Once the first portrait is generated and approved, make it `sprite_preview_card.webp` and name it here as the primary reference, as the other Ascended do. Until then, this file and `../ART_GUIDE.md` control the design. Lore: `../../lore/README.md` (Twoychi in Unchosen and Undeserving).
+Status: main-card, preview and battle candidates generated. Battle candidate: battle.png and battle.webp (512 x 512, lossless, transparent, facing right). preview.png and preview_card.webp are the portrait candidates; preview-150.png checks small-size readability. preview.png is the primary design reference used for battle, per the user instruction to match the previous portrait; main-v2.png is the supporting full-body reference. main-v2.png is the updated source reference; main_card-v2.webp is its centred 1536 x 796 crop. Earlier candidates remain in main.png and main_card.webp. Once the first portrait is generated and approved, make it `sprite_preview_card.webp` and name it here as the primary reference, as the other Ascended do. Until then, this file and `../ART_GUIDE.md` control the design. Lore: `../../lore/README.md` (Twoychi in Unchosen and Undeserving).
 
 ## Concept
 
