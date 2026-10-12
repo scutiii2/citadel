@@ -361,3 +361,57 @@ def test_trees_and_loadouts_over_http(tree_client):
     assert again["loadout"] == {"a1": "guardian_heavy_blow", "a2": "guardian_bulwark", "a3": None, "p1": None}
     assert client.put("/ascension/ascendeds/guardian/loadout", json={"slots": {}}, headers=h()).status_code == 400
     assert client.put("/ascension/ascendeds/guardian/loadout", json={"slots": {"a1": "x"}, "extra": 1}, headers=h()).status_code == 400
+
+
+def test_squad_routes_and_profile_membership(client):
+    profile=start_profile(client)
+    assert profile["squad"] == ["guardian"]
+    assert client.get("/ascension/squad",headers=headers(client)).json() == {"ascended_ids":["guardian"],"size":5}
+    key=headers(client)
+    response=client.put("/ascension/squad",json={"ascended_ids":["guardian"]},headers=key)
+    assert response.status_code == 200
+    assert client.put("/ascension/squad",json={"ascended_ids":["guardian"]},headers=key).json() == response.json()
+    assert client.get("/ascension/profile",headers=headers(client)).json()["ascendeds"][0]["in_squad"]
+
+
+def test_finished_battle_exposes_squad_xp(config, tmp_path):
+    from dataclasses import replace
+    from src.ascension.records import AscendedRecord
+    from tests.ascension.env import Env, run
+    from tests.ascension.test_coordinator import encounter
+    from tests.ascension.helpers import ScriptedPolicy
+
+    env = Env(tmp_path / "squad-api.sqlite3")
+
+    async def prepare():
+        await env.start_player()
+        await env.give(guardian=AscendedRecord("ann", "guardian", 0, 30, 0),
+                       scout=AscendedRecord("ann", "scout", 0, 1, 0))
+        async with env.repo.transaction() as tx:
+            await tx.set_squad("ann", ["guardian", "scout"])
+        return await encounter(env)
+
+    try:
+        eid = run(prepare())
+        app = create_app()
+        services = build_ascended_services(config, LayaClient(FakeEngine(fail=True)),
+                                           repository=env.repo, clock=env.clock)
+        services = replace(services, coordinator=env.coordinator(policy=ScriptedPolicy()))
+        mount_ascendeds(app, services)
+        with TestClient(app) as api:
+            response = api.post("/ascension/battles", headers=headers(api), json={
+                "encounter_id": eid, "ascended_id": "guardian", "mode": "manual"})
+            assert response.status_code == 201, response.text
+            view = response.json()
+            for _ in range(10):
+                response = api.post(f"/ascension/battles/{view['id']}/actions", headers=headers(api), json={
+                    "round": view["round"], "revision": view["revision"], "action": {"kind": "attack"}})
+                assert response.status_code == 200, response.text
+                view = response.json()
+                if view["status"] != "active":
+                    break
+            assert view["result"]["kind"] == "won"
+            assert view["result"]["squad_xp"] == [{"ascended_id": "scout", "name": env.catalog.ascended("scout").name,
+                                                   "xp": 10, "level_before": 1, "level_after": 1}]
+    finally:
+        run(env.close())

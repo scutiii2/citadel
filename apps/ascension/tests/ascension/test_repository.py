@@ -425,4 +425,4 @@ def test_a_version_4_database_gets_the_tree_tables(db_path):
     check = sqlite3.connect(str(db_path))
     version = check.execute("PRAGMA user_version").fetchone()[0]
     check.close()
-    assert (kept.tier_id, kept.copies) == ("rare", 2) and learned == {"g_wall"} and version == SCHEMA_VERSION == 5
+    assert (kept.tier_id, kept.copies) == ("rare", 2) and learned == {"g_wall"} and version == SCHEMA_VERSION == 6

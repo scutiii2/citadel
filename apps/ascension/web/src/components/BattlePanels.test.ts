@@ -286,6 +286,20 @@ describe("EmblemPrompt", () => {
 });
 
 describe("BattleResult", () => {
+  it("shows bench XP beneath the fighter reward, including level-ups", () => {
+    const view = battleView({ status: "terminal", phase: "terminal", result: {
+      kind: "won", xp: 40, level_before: 1, level_after: 1,
+      squad_xp: [
+        { ascended_id: "striker", name: "Striker", xp: 10, level_before: 1, level_after: 2 },
+        { ascended_id: "scout", name: "Scout", xp: 10, level_before: 3, level_after: 3 },
+      ],
+    } });
+    withBattle(view);
+    const wrapper = mount(BattleResult, { props: { battle: view } });
+    expect(wrapper.find(".squad-xp").text()).toContain("Squad XP");
+    expect(wrapper.findAll(".squad-xp li").map(r => r.text())).toEqual(["+10 XP · Striker, now level 2", "+10 XP · Scout"]);
+    expect(wrapper.find(".reward strong").text()).toBe("+40 XP");
+  });
   it("shows a capture with the personalities it revealed, and Back leaves it", async () => {
     const view = battleView({
       status: "terminal",

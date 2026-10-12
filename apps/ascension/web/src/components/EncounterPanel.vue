@@ -9,6 +9,7 @@ import EmButton from "./ui/EmButton.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmPanel from "./ui/EmPanel.vue";
+import EmPickCard from "./ui/EmPickCard.vue";
 import EmTabs from "./ui/EmTabs.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
 
@@ -33,7 +34,12 @@ const rollWait = computed(() => {
   const at = store.profile?.next_roll_at ?? null;
   return at === null ? 0 : Math.max(0, at - now.value);
 });
-const ascendeds = computed(() => store.profile?.ascendeds ?? []);
+const ascendeds = computed(() => store.squadMembers);
+const squadSlots = computed(() => Array.from({ length: store.profile?.squad_size ?? 0 }, (_, i) => {
+  const member = ascendeds.value[i];
+  const info = store.catalog?.ascendeds.find(s => s.id === member?.ascended_id);
+  return member && info ? { member, info } : null;
+}));
 const ready = computed(() => ascendeds.value.filter((s) => s.faint_until === null || s.faint_until <= now.value));
 const resting = computed(() => ascendeds.value.filter((s) => s.faint_until !== null && s.faint_until > now.value));
 const tiers = computed(() => store.catalog?.tiers ?? []);
@@ -55,7 +61,7 @@ const chosenInfo = computed(() => store.catalog?.ascendeds.find((s) => s.id === 
 const autonomousIncomplete = computed(
   () => mode.value === "autonomous" && (presetSlot.value === "none" || emblemLimit.value === "none"),
 );
-const canFight = computed(() => ascendedId.value !== "" && !autonomousIncomplete.value && !store.busy);
+const canFight = computed(() => chosen.value !== null && !autonomousIncomplete.value && !store.busy);
 const limitHint = computed(() => {
   const index = tiers.value.findIndex((t) => t.id === emblemLimit.value);
   if (index === -1) return "Choose a limit to let your Ascended throw EMBLEMs on its own. Autonomous play needs one.";
@@ -79,6 +85,10 @@ function openForm(): void {
   mode.value = "manual";
   emblemLimit.value = "none";
   formOpen.value = true;
+}
+
+function pick(id: string): void {
+  if (!store.busy && ready.value.some(s => s.ascended_id === id)) ascendedId.value = id;
 }
 
 function setMode(value: string): void {
@@ -155,28 +165,35 @@ async function fight(): Promise<void> {
       </div>
     </EmPanel>
 
-    <form v-else class="start-form split" @submit.prevent="fight">
-      <EmPanel>
-        <h3 class="em-pixel heading">Choose your Ascended</h3>
-        <div class="chosen">
-          <AscendedTemplateCard v-if="chosenInfo && chosen" class="own-card" :ascended="chosenInfo" :level="chosen.level" :tier-id="chosen.tier_id" compact show-level />
-          <div class="pick">
-            <label class="field">
-              <span>Your Ascended</span>
-              <select v-model="ascendedId" name="ascended">
-                <option v-for="s in ready" :key="s.ascended_id" :value="s.ascended_id">{{ s.name }} · {{ titleCase(s.tier_id) }} · Lv. {{ s.level }}</option>
-              </select>
-            </label>
-            <p class="caption">Fainted Ascended are unavailable.</p>
-          </div>
+    <form v-else class="start-form picker" @submit.prevent="fight">
+      <div class="squad-choices" role="radiogroup" aria-label="Your squad">
+        <div v-for="(slot, index) in squadSlots" :key="slot?.member.ascended_id ?? index" class="squad-item">
+          <template v-if="slot">
+            <EmPickCard
+              :selected="chosen?.ascended_id === slot.member.ascended_id"
+              :disabled="store.busy || (slot.member.faint_until !== null && slot.member.faint_until > now)"
+              :aria-label="slot.member.name"
+              @select="pick(slot.member.ascended_id)"
+            >
+              <AscendedTemplateCard :ascended="slot.info" :level="slot.member.level" :tier-id="slot.member.tier_id" compact show-level />
+            </EmPickCard>
+            <p class="caption squad-note">
+              {{ titleCase(slot.member.tier_id) }} · Lv. {{ slot.member.level }}
+              <span v-if="slot.member.faint_until !== null && slot.member.faint_until > now">
+                Fainted, ready in {{ formatCountdown(slot.member.faint_until - now) }}
+              </span>
+            </p>
+          </template>
+          <div v-else class="empty-slot">Empty slot</div>
         </div>
-        <ul v-if="resting.length" class="resting">
-          <li v-for="s in resting" :key="s.ascended_id" class="em-num">{{ s.name }} · Fainted, ready in {{ formatCountdown((s.faint_until ?? 0) - now) }}</li>
-        </ul>
-      </EmPanel>
+      </div>
 
-      <EmPanel>
+      <AscendedTemplateCard v-if="chosenInfo && chosen" class="detail" :ascended="chosenInfo" :level="chosen.level" :tier-id="chosen.tier_id" show-level />
+      <EmNotice v-else tone="error">{{ ready.length ? "Select a ready squad member to continue." : "No squad member is ready. Wait until one is ready again." }}</EmNotice>
+
+      <EmPanel class="plan">
         <h3 class="em-pixel heading">Battle plan</h3>
+        <p v-if="chosen" class="caption">Fighting: {{ chosen.name }}. The rest of your squad shares XP if you win.</p>
         <p class="label">Personality preset</p>
         <EmTabs v-model="presetSlot" class="wide" :options="PRESET_OPTIONS" ariaLabel="Personality preset" />
         <p class="label">Who plays?</p>
@@ -280,20 +297,6 @@ async function fight(): Promise<void> {
   gap: var(--em-space-3);
   margin-top: var(--em-space-2);
 }
-.chosen {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--em-space-5);
-  align-items: center;
-}
-.own-card {
-  --card-width: 190px;
-  flex: none;
-}
-.pick {
-  flex: 1;
-  min-width: 200px;
-}
 .field {
   display: flex;
   flex-direction: column;
@@ -313,17 +316,6 @@ async function fight(): Promise<void> {
   font: inherit;
   font-size: 14px;
 }
-.resting {
-  margin: var(--em-space-4) 0 0;
-  padding: 0;
-  list-style: none;
-}
-.resting li {
-  padding: 14px 16px;
-  border: 1px dashed var(--em-border);
-  font-size: 14px;
-  color: var(--em-muted);
-}
 .label {
   margin: var(--em-space-4) 0 var(--em-space-2);
   font-size: 12px;
@@ -339,11 +331,59 @@ async function fight(): Promise<void> {
 .start-form .caption {
   margin: var(--em-space-2) 0 var(--em-space-3);
 }
+.picker {
+  display: grid;
+  grid-template-columns: 190px 440px minmax(0, 1fr);
+  gap: var(--em-space-6);
+  align-items: start;
+}
+.squad-choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--em-space-5);
+}
+.squad-item {
+  --card-width: 170px;
+}
+.squad-note {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--em-space-2);
+}
+.empty-slot {
+  display: grid;
+  place-items: center;
+  width: var(--card-width);
+  min-height: 110px;
+  border: 1px dashed var(--em-border);
+  border-radius: var(--em-radius);
+  color: var(--em-muted);
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .picker { grid-template-columns: 190px minmax(0, 1fr); }
+  .plan { grid-column: 1 / -1; }
+  .detail { --card-width: min(440px, 100%); }
+}
 @media (max-width: 700px) {
   .split {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--em-space-4);
   }
+  .picker {
+    display: flex;
+    flex-direction: column;
+    gap: var(--em-space-5);
+  }
+  .squad-choices {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--em-space-4);
+  }
+  .squad-item { --card-width: 150px; }
+  .detail { --card-width: min(440px, 100%); align-self: center; }
+  .plan { width: 100%; }
   .look {
     padding: 32px 16px;
   }

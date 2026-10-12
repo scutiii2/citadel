@@ -15,7 +15,7 @@ import sqlite3
 from concurrent.futures import Executor, ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncContextManager, AsyncIterator, Protocol
+from typing import Any, AsyncContextManager, AsyncIterator, Protocol, Sequence
 
 from src.ascension.errors import ActiveBattleExists, BattleAlreadyExists, StaleBattle
 from src.ascension.models import BattleSetup, BattleState, PersonalityInstance
@@ -29,7 +29,7 @@ from src.ascension.records import (
     AscendedRecord,
 )
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 BASE_SCHEMA = """
 CREATE TABLE players (
     owner TEXT PRIMARY KEY, insignia INTEGER NOT NULL CHECK (insignia >= 0),
@@ -93,7 +93,12 @@ CREATE TABLE loadouts (
     owner TEXT NOT NULL, ascended_id TEXT NOT NULL, slot TEXT NOT NULL, node_id TEXT NOT NULL,
     PRIMARY KEY (owner, ascended_id, slot));
 """
-SCHEMA = BASE_SCHEMA + SHOP_SCHEMA + STAR_MIGRATION + TREE_SCHEMA
+SQUAD_SCHEMA = """
+CREATE TABLE squad (
+    owner TEXT NOT NULL, ascended_id TEXT NOT NULL, position INTEGER NOT NULL CHECK (position >= 1),
+    PRIMARY KEY (owner, ascended_id), UNIQUE (owner, position));
+"""
+SCHEMA = BASE_SCHEMA + SHOP_SCHEMA + STAR_MIGRATION + TREE_SCHEMA + SQUAD_SCHEMA
 
 
 class AscendedTransaction(Protocol):
@@ -110,6 +115,8 @@ class AscendedTransaction(Protocol):
     async def get_ascended(self, owner: str, ascended_id: str) -> AscendedRecord | None: ...
     async def list_ascendeds(self, owner: str) -> list[AscendedRecord]: ...
     async def put_ascended(self, record: AscendedRecord) -> None: ...
+    async def get_squad(self, owner: str) -> tuple[str, ...]: ...
+    async def set_squad(self, owner: str, ascended_ids: Sequence[str]) -> None: ...
     async def learned_nodes(self, owner: str, ascended_id: str) -> set[str]: ...
     async def add_learned_node(self, owner: str, ascended_id: str, node_id: str) -> None: ...
     async def get_loadout(self, owner: str, ascended_id: str) -> dict[str, str]: ...
@@ -239,6 +246,16 @@ class _SqliteTransaction:
             (record.owner, record.ascended_id, record.copies, record.level, record.xp, record.faint_until,
              record.tier_id, record.stars),
         )
+
+    async def get_squad(self, owner: str) -> tuple[str, ...]:
+        rows = await self._run("SELECT ascended_id FROM squad WHERE owner = ? ORDER BY position", (owner,), "all")
+        return tuple(row["ascended_id"] for row in rows)
+
+    async def set_squad(self, owner: str, ascended_ids: Sequence[str]) -> None:
+        await self._run("DELETE FROM squad WHERE owner = ?", (owner,))
+        for position, ascended_id in enumerate(ascended_ids, 1):
+            await self._run("INSERT INTO squad (owner, ascended_id, position) VALUES (?, ?, ?)",
+                            (owner, ascended_id, position))
 
     async def learned_nodes(self, owner: str, ascended_id: str) -> set[str]:
         rows = await self._run("SELECT node_id FROM learned_nodes WHERE owner = ? AND ascended_id = ?", (owner, ascended_id), "all")
@@ -433,6 +450,7 @@ class _SqliteTransaction:
         await self._run("DELETE FROM personalities WHERE owner = ?", (owner,))
         await self._run("DELETE FROM learned_nodes WHERE owner = ?", (owner,))
         await self._run("DELETE FROM loadouts WHERE owner = ?", (owner,))
+        await self._run("DELETE FROM squad WHERE owner = ?", (owner,))
         await self._run("DELETE FROM ascendeds WHERE owner = ?", (owner,))
         await self._run("DELETE FROM emblems WHERE owner = ?", (owner,))
         await self._run("DELETE FROM essences WHERE owner = ?", (owner,))
@@ -442,8 +460,9 @@ class _SqliteTransaction:
 
 
 class SqliteAscendedRepository:
-    def __init__(self, path: Path | str) -> None:
+    def __init__(self, path: Path | str, squad_size: int = 5) -> None:
         self._path = str(path)
+        self._squad_size = squad_size
         self._conn: sqlite3.Connection | None = None
         self._lock = asyncio.Lock()
         self._executor: ThreadPoolExecutor | None = None
@@ -464,10 +483,18 @@ class SqliteAscendedRepository:
             version = conn.execute("PRAGMA user_version").fetchone()[0]
             if version == 0:
                 conn.executescript(f"BEGIN; {SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
-            elif version in (2, 3, 4):
+            elif version in (2, 3, 4, 5):
                 shop = SHOP_SCHEMA if version == 2 else ""
                 stars = STAR_MIGRATION if version in (2, 3) else ""
-                conn.executescript(f"BEGIN; {shop} {stars} {TREE_SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
+                trees = TREE_SCHEMA if version < 5 else ""
+                conn.executescript(f"BEGIN; {shop} {stars} {trees} {SQUAD_SCHEMA}")
+                conn.execute("INSERT INTO squad (owner, ascended_id, position) "
+                             "SELECT owner, ascended_id, position FROM ("
+                             "SELECT owner, ascended_id, ROW_NUMBER() OVER "
+                             "(PARTITION BY owner ORDER BY level DESC, ascended_id ASC) AS position FROM ascendeds) "
+                             "WHERE position <= ?", (self._squad_size,))
+                conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+                conn.execute("COMMIT")
             elif version != SCHEMA_VERSION:
                 raise RuntimeError(f"database schema version {version} is not supported (expected {SCHEMA_VERSION})")
         except BaseException:

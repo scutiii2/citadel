@@ -4,6 +4,24 @@ import { installFakeApi } from "./fakeApi.ts";
 import { PROFILE } from "../src/api/AscensionClient.fixtures.ts";
 
 for (const viewport of [{ width: 1280, height: 720 }, { width: 768, height: 720 }, { width: 390, height: 844 }]) {
+  test(`squad preparation fits at ${viewport.width}px and respects reduced motion`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport);
+    const api = await installFakeApi(page);
+    api.ascension.profile = { ...PROFILE };
+    await page.goto("/#ticket=e2e-launch");
+    await page.getByRole("tab", { name: "Battle", exact: true }).click();
+    await page.getByRole("button", { name: "Look for a wild Ascended", exact: true }).click();
+    await page.getByRole("button", { name: "Fight", exact: true }).click();
+    const selected = page.getByRole("radiogroup", { name: "Your squad" }).getByRole("radio", { name: "Guardian" });
+    await expect(selected).toHaveAttribute("aria-checked", "true");
+    expect(await selected.evaluate(el => getComputedStyle(el).animationName)).toMatch(/^breathe(?:-|$)/);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    expect(await selected.evaluate(el => getComputedStyle(el).animationDuration)).toBe("3.2s");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+    await page.screenshot({ path: testInfo.outputPath("squad-setup.png"), fullPage: true });
+    expect(api.unexpected).toEqual([]);
+  });
+
   test(`only the main content scrolls at ${viewport.width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     const api = await installFakeApi(page);
@@ -70,5 +88,13 @@ test("a first visit picks a starter, then the collection and the Battle tab open
   await expect(page.getByRole("tab", { name: "Battle", exact: true })).toBeEnabled();
   expect(api.ascension.keys).toHaveLength(1);
   expect(api.ascension.keys[0]).toMatch(/^[0-9a-f-]{32,36}$/);
+  await page.getByRole("tab", { name: "Battle", exact: true }).click();
+  await page.getByRole("button", { name: "Look for a wild Ascended", exact: true }).click();
+  await page.getByRole("button", { name: "Fight", exact: true }).click();
+  const squad = page.getByRole("radiogroup", { name: "Your squad" });
+  await expect(squad.getByRole("radio", { name: "Guardian", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(squad.locator(".empty-slot")).toHaveCount(4);
+  await expect(page.locator(".start-form .detail .ascended-name")).toHaveText("Guardian");
+  await expect(page.getByRole("button", { name: "Begin battle", exact: true })).toBeEnabled();
   expect(api.unexpected).toEqual([]);
 });

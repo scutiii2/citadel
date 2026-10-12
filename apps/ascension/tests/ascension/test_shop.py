@@ -256,7 +256,9 @@ def test_a_fighting_ascended_cannot_be_bought_or_sold_but_others_can(tmp_path):
     async def scenario():
         env = fixed(GUARDIAN_COMMON, SCOUT_RARE)(tmp_path)
         await env.start_player()
-        await env.give(insignia=5000, guardian=AscendedRecord("ann", "guardian", 3, 1, 0))
+        # Buying a duplicate of another owned Ascended does not edit the locked squad.
+        await env.give(insignia=5000, guardian=AscendedRecord("ann", "guardian", 3, 1, 0),
+                       scout=AscendedRecord("ann", "scout", 0, 1, 0))
         async with env.repo.transaction() as tx:
             await tx.add_battle(battle_record())  # its fighter is the guardian Ascended by default
         rotation = env.offers.rotation_at(env.clock.now())

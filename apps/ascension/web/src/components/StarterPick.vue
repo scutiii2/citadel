@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useAscensionStore } from "../stores/ascension";
 import { abilityEffect } from "../utils/ascension";
 import AscendedTemplateCard from "./AscendedTemplateCard.vue";
+import EmPickCard from "./ui/EmPickCard.vue";
 import { starterCopy } from "./starterCopy";
 import EmButton from "./ui/EmButton.vue";
 import EmIcon from "./ui/EmIcon.vue";
@@ -53,19 +54,14 @@ async function start(): Promise<void> {
     <div v-if="current" class="picker">
       <div class="choices" role="radiogroup" aria-label="Starter Ascended">
         <div v-for="s in starters" :key="s.id" class="item">
-          <div
-            class="choice em-lift"
-            :class="{ selected: current.id === s.id, 'em-glow': current.id === s.id }"
-            role="radio"
-            tabindex="0"
-            :aria-checked="current.id === s.id"
+          <EmPickCard
+            :selected="current.id === s.id"
+            :disabled="store.busy"
             :aria-label="s.name"
-            @click="pick(s.id)"
-            @keydown.enter.prevent="pick(s.id)"
-            @keydown.space.prevent="pick(s.id)"
+            @select="pick(s.id)"
           >
             <AscendedTemplateCard :ascended="s" compact />
-          </div>
+          </EmPickCard>
           <p class="note">
             {{ starterCopy(s.id).motto }}
           </p>
@@ -133,35 +129,6 @@ async function start(): Promise<void> {
 }
 .item {
   --card-width: 170px;
-}
-.choice {
-  --tier: var(--em-tier-common);
-  width: var(--card-width);
-  border-radius: var(--em-radius);
-  cursor: pointer;
-}
-.choice:focus-visible {
-  outline: 2px solid var(--em-accent);
-  outline-offset: 3px;
-}
-/* The chosen card breathes in copper, so it never looks like a hover. */
-.choice.selected {
-  outline: 2px solid var(--em-accent);
-  outline-offset: 3px;
-  animation: breathe 1.8s ease-in-out infinite;
-}
-@keyframes breathe {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 6px #f3b47a14,
-      0 0 8px 0 #f3b47a33;
-  }
-  50% {
-    box-shadow:
-      0 0 0 6px #f3b47a33,
-      0 0 26px 6px #f3b47a80;
-  }
 }
 .note {
   display: flex;
@@ -237,11 +204,6 @@ async function start(): Promise<void> {
   .detail {
     --card-width: min(440px, 100%);
     align-self: center;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .choice.selected {
-    animation-duration: 3.2s;
   }
 }
 </style>

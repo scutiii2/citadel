@@ -43,6 +43,11 @@ export const useAscensionStore = defineStore("ascension", () => {
 
   const catalog = ref<Catalog | null>(null);
   const profile = ref<Profile | null>(null);
+  const squadIds = computed(() => profile.value?.squad ?? []);
+  const squadMembers = computed(() => squadIds.value.flatMap(id => {
+    const member = profile.value?.ascendeds.find(a => a.ascended_id === id);
+    return member ? [member] : [];
+  }));
   /** GET /profile answered 404: the account has not chosen a starter yet. */
   const needsStarter = ref(false);
   const encounter = ref<EncounterPreview | null>(null);
@@ -434,6 +439,19 @@ export const useAscensionStore = defineStore("ascension", () => {
     return mutate(() => ascensionClient.sellCopy(ascendedId), () => refreshProfile());
   }
 
+  function setSquad(ids: string[]): Promise<{ ascended_ids: string[]; size: number } | null> {
+    if (busy.value) return Promise.resolve(null);
+    return mutate(() => ascensionClient.putSquad(ids), () => refreshProfile());
+  }
+
+  function addToSquad(id: string) {
+    return setSquad([...squadIds.value, id]);
+  }
+
+  function removeFromSquad(id: string) {
+    return setSquad(squadIds.value.filter(member => member !== id));
+  }
+
   function addStar(ascendedId: string): Promise<StarUp | null> {
     return mutate(() => ascensionClient.addStar(ascendedId), () => refreshProfile());
   }
@@ -500,6 +518,11 @@ export const useAscensionStore = defineStore("ascension", () => {
   return {
     catalog,
     profile,
+    squadIds,
+    squadMembers,
+    setSquad,
+    addToSquad,
+    removeFromSquad,
     needsStarter,
     encounter,
     battle,

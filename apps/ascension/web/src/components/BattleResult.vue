@@ -72,6 +72,14 @@ const story = computed(() => {
       <div v-if="result.xp !== undefined" class="reward">
         <strong class="em-pixel em-num">+{{ result.xp }} XP</strong>
         <span>for {{ battle.player.name }}<template v-if="levelledUp">, now level {{ result.level_after }}</template></span>
+        <div v-if="result.squad_xp?.length" class="squad-xp">
+          <h3>Squad XP</h3>
+          <ul>
+            <li v-for="member in result.squad_xp" :key="member.ascended_id">
+              +{{ member.xp }} XP · {{ member.name }}<template v-if="member.level_after > member.level_before">, now level {{ member.level_after }}</template>
+            </li>
+          </ul>
+        </div>
       </div>
       <div v-if="result.insignia !== undefined" class="reward">
         <strong class="em-pixel em-num">+{{ result.insignia }} Insignia</strong>
@@ -166,6 +174,24 @@ const story = computed(() => {
 .reward span {
   font-size: 13px;
   color: var(--em-muted);
+}
+.squad-xp {
+  margin-top: var(--em-space-3);
+  padding-top: var(--em-space-3);
+  border-top: 1px solid var(--em-border);
+  text-align: left;
+  font-size: 13px;
+  color: var(--em-muted);
+}
+.squad-xp h3 {
+  margin: 0 0 var(--em-space-2);
+  font-size: 14px;
+  color: var(--em-text);
+}
+.squad-xp ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
 .none {
   margin: var(--em-space-5) 0;

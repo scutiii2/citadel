@@ -11,6 +11,7 @@ import math
 from dataclasses import replace
 from typing import Any
 
+from src.ascension.squad import SquadService
 from src.ascension.catalog import Catalog
 from src.ascension.models import PersonalityInstance
 from src.ascension.records import BattleRecord, PersonalityRecord, AscendedRecord
@@ -42,6 +43,11 @@ class ProgressionService:
             level += 1
         return level, (0 if level >= cap else xp)
 
+    def squad_share(self, fighter_xp: int, bench_count: int) -> int:
+        if bench_count == 0:
+            return 0
+        return math.floor(fighter_xp * self._catalog.economy.bench_xp_pool_factor / bench_count + _EPS)
+
     def add_copies(self, ascended_id: str, copies: int, granted: int) -> int:
         if self._catalog.ascended(ascended_id).forbidden:
             return min(copies + granted, self._catalog.economy.forbidden_copy_cap)
@@ -71,6 +77,17 @@ class ProgressionService:
             xp, insignia = self.rewards_for(enemy.level, enemy.tier_id)
             level, new_xp = self.add_xp(fighter.ascended_id, ascended.level, ascended.xp, xp)
             await tx.put_ascended(replace(ascended, level=level, xp=new_xp))
+            bench = [a for a in await tx.get_squad(owner) if a != fighter.ascended_id]
+            share = self.squad_share(xp, len(bench))
+            result["squad_xp"] = []
+            for ascended_id in bench:
+                member = await tx.get_ascended(owner, ascended_id)
+                if member is None:
+                    continue
+                bench_level, bench_xp = self.add_xp(ascended_id, member.level, member.xp, share)
+                await tx.put_ascended(replace(member, level=bench_level, xp=bench_xp))
+                result["squad_xp"].append({"ascended_id": ascended_id, "name": self._catalog.ascended(ascended_id).name,
+                                           "xp": share, "level_before": member.level, "level_after": bench_level})
             await tx.add_insignia(owner, insignia)
             essence = self._catalog.tier(enemy.tier_id).essence_cost
             await tx.add_essence(owner, enemy.tier_id, essence)
@@ -93,6 +110,7 @@ class ProgressionService:
             copies = max(0, granted - 1)  # the first copy is the Ascended itself; the rest are spare
             start = self._catalog.start_tier(enemy.ascended_id)
             await tx.put_ascended(AscendedRecord(owner, enemy.ascended_id, copies, 1, 0, tier_id=start))
+            await SquadService.auto_equip(tx, owner, enemy.ascended_id, self._catalog.economy.squad_size)
         else:
             copies = self.add_copies(enemy.ascended_id, owned.copies, reward)
             await tx.put_ascended(replace(owned, copies=copies))

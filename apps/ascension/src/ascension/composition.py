@@ -18,6 +18,7 @@ from src.ascension.policy import ActionPolicy, Mood
 from src.ascension.progression import ProgressionService
 from src.ascension.repository import AscendedRepository, SqliteAscendedRepository
 from src.ascension.runtime import Clock, RandomSource, SystemClock, SystemRandom
+from src.ascension.squad import SquadService
 from src.ascension.shop import ShopService
 from src.ascension.shop_offers import ShopOffers
 from src.ascension.trees import TreeService
@@ -38,7 +39,7 @@ def build_ascended_services(
     """Everything is injected, so tests and other front ends can swap any part."""
     catalog = catalog or Catalog.load()
     clock, rng = clock or SystemClock(), rng or SystemRandom()
-    repository = repository or SqliteAscendedRepository(config.database_path)
+    repository = repository or SqliteAscendedRepository(config.database_path, squad_size=catalog.economy.squad_size)
     writer = IdempotentWriter(repository, clock)
     engine = BattleEngine(catalog)
     progression = ProgressionService(catalog, clock, config.faint_seconds)
@@ -60,5 +61,5 @@ def build_ascended_services(
         shop=ShopService(repository, writer, catalog, progression,
                          ShopOffers(catalog, config.shop_rotation_seconds, config.shop_offers), clock),
         upgrades=UpgradeService(repository, writer, catalog),
-        coordinator=coordinator, trees=trees,
+        coordinator=coordinator, trees=trees, squad=SquadService(repository, writer, catalog),
     )

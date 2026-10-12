@@ -29,6 +29,27 @@ in Phase 4.
   on sale. Copies come as a few limited offers per account that rotate every 6 hours (see Rotating shop).
 - Play manually, or let your Ascended play on its own with a personality preset.
 
+## Squad
+
+Equip between one and `economy.squad_size` Ascended (default five) in the Collection tab.
+Only squad members can start battles. Squad edits are locked during an active battle.
+The starter joins immediately; a newly captured or first-purchased Ascended joins when
+there is a free slot. Full squads leave new arrivals in the collection.
+
+Winning or capturing pays the fighter its full XP reward. The other squad members
+split a smaller pool equally: `floor(reward * bench_xp_pool_factor)`, default 0.5,
+divided by the bench count and rounded down. Remainders are discarded. Fainted bench
+members still receive XP; level caps discard excess XP. Ascended outside the squad
+receive nothing. Knock-outs and forfeits pay no XP.
+
+`GET /ascension/squad` returns ordered `ascended_ids` and `size`.
+`PUT /ascension/squad` replaces membership with the same ordered list and requires
+an `Idempotency-Key`. Profiles include `squad`, `squad_size` and each member's
+`in_squad` flag. Rewarded battle results include a `squad_xp` breakdown.
+
+SQLite schema 6 upgrades existing players by equipping their highest-level Ascended
+first, breaking ties by Ascended id, up to the configured squad size.
+
 ## How an Ascended chooses on its own
 
 The engine owns the choice. Laya or the heuristic still reads three public-state values: danger, enemy

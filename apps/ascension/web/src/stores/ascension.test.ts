@@ -11,6 +11,7 @@ vi.mock("../api/AscensionClient", () => {
   const client = {
     catalog: vi.fn(),
     profile: vi.fn(),
+    putSquad: vi.fn(),
     createProfile: vi.fn(),
     personalities: vi.fn(),
     preset: vi.fn(),
@@ -377,5 +378,45 @@ describe("rotating shop", () => {
 
     expect(s.error).toBe("the shop has refreshed; look at the new offers");
     expect(client.shop).toHaveBeenCalledTimes(2);
+  });
+});
+
+
+describe("squad", () => {
+  it("keeps profile squad order, appends and removes with a profile refresh", async () => {
+    const s = await attached();
+    s.profile = { ...PROFILE, squad: ["striker", "guardian"], ascendeds: [PROFILE.ascendeds[0]!, { ...PROFILE.ascendeds[0]!, ascended_id: "striker" }] };
+    expect(s.squadMembers.map(a => a.ascended_id)).toEqual(["striker", "guardian"]);
+    client.putSquad.mockResolvedValue({ ascended_ids: ["striker", "guardian", "bruiser"], size: 5 });
+    client.profile.mockResolvedValue({ ...s.profile, squad: ["striker", "guardian", "bruiser"] });
+    await s.addToSquad("bruiser");
+    expect(client.putSquad).toHaveBeenLastCalledWith(["striker", "guardian", "bruiser"]);
+    expect(s.squadIds).toEqual(["striker", "guardian", "bruiser"]);
+    client.profile.mockResolvedValue({ ...s.profile, squad: ["guardian", "bruiser"] });
+    await s.removeFromSquad("striker");
+    expect(client.putSquad).toHaveBeenLastCalledWith(["guardian", "bruiser"]);
+    expect(s.squadIds).toEqual(["guardian", "bruiser"]);
+  });
+
+  it("reports a refused change, clears busy, and preserves the squad", async () => {
+    const s = await attached();
+    client.putSquad.mockRejectedValue(new ApiError(409, "Finish your battle first."));
+    expect(await s.setSquad(["striker"])).toBeNull();
+    expect(s.error).toContain("Finish your battle first.");
+    expect(s.busy).toBe(false);
+    expect(s.squadIds).toEqual(["guardian"]);
+  });
+
+  it("stays busy through profile refresh and ignores another squad change", async () => {
+    const s = await attached();
+    let resolve!: (value: { ascended_ids: string[]; size: number }) => void;
+    client.putSquad.mockReturnValue(new Promise(done => { resolve = done; }));
+    const change = s.setSquad(["guardian"]);
+    expect(s.busy).toBe(true);
+    expect(await s.setSquad(["striker"])).toBeNull();
+    expect(client.putSquad).toHaveBeenCalledTimes(1);
+    resolve({ ascended_ids: ["guardian"], size: 5 });
+    await change;
+    expect(s.busy).toBe(false);
   });
 });

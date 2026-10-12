@@ -44,6 +44,20 @@ const groups = computed(() => groupByType(owned.value));
 
 const openId = ref<string | null>(null);
 const open = computed(() => store.profile?.ascendeds.find(s => s.ascended_id === openId.value) ?? null);
+const squadSlots = computed(() => Array.from({ length: store.profile?.squad_size ?? 0 }, (_, index) => store.squadMembers[index] ?? null));
+const battleActive = computed(() => !!store.profile?.active_battle || store.battle?.status === "active");
+const squadReason = computed(() => {
+  if (battleActive.value) return "Finish your battle first.";
+  if (open.value && store.squadIds.includes(open.value.ascended_id)) {
+    return store.squadIds.length <= 1 ? "Keep at least one Ascended." : "";
+  }
+  return store.squadIds.length >= (store.profile?.squad_size ?? 0) ? "Squad full. Remove a member first." : "";
+});
+function toggleSquad(): void {
+  if (!open.value || store.busy || squadReason.value) return;
+  const id = open.value.ascended_id;
+  void (store.squadIds.includes(id) ? store.removeFromSquad(id) : store.addToSquad(id));
+}
 const detailTab = ref("overview");
 const treeVisited = ref(false);
 const detailTabs = [{ value: "overview", label: "Overview" }, { value: "personalities", label: "Personalities" }, { value: "tree", label: "Ability tree" }];
@@ -131,6 +145,19 @@ function show(ascended: OwnedAscended): void {
     </div>
 
     </Teleport>
+    <section class="squad-section" aria-label="Squad">
+      <h3 class="em-pixel">Squad</h3>
+      <ul class="squad-strip">
+        <li v-for="(member, index) in squadSlots" :key="index" class="squad-slot" :class="{ 'squad-empty': !member }">
+          <template v-if="member">
+            <AscendedTemplateCard v-if="store.catalog?.ascendeds.find(a => a.id === member.ascended_id)" :ascended="store.catalog!.ascendeds.find(a => a.id === member.ascended_id)!" :level="member.level" :tier-id="member.tier_id" compact show-level />
+            <EmButton :disabled="store.squadIds.length <= 1 || battleActive || store.busy" :aria-label="`Remove ${member.name} from squad`" :aria-busy="store.busy" @click="store.removeFromSquad(member.ascended_id)">Remove</EmButton>
+          </template>
+          <span v-else>Empty slot</span>
+        </li>
+      </ul>
+      <p v-if="battleActive" class="muted">Finish your battle first.</p>
+    </section>
     <ul v-if="essences.length" class="essences" aria-label="Essence">
       <li v-for="[tierId, count] in essences" :key="tierId" :style="{ '--tier': `var(--em-tier-${tierId}, var(--em-tier-common))` }">
         <EmTierBadge :tier-id="tierId" :label="`${titleCase(tierId)} essence`" /> <strong class="em-num">{{ count }}</strong>
@@ -145,12 +172,18 @@ function show(ascended: OwnedAscended): void {
       <section v-for="group in groups" :key="group.typeId ?? 'none'" class="group" :data-type="group.typeId ?? 'none'">
         <h4 class="group-name"><TypeSymbol v-if="group.typeId" :type-id="group.typeId" :size="40" decorative />{{ group.label }} <small class="em-num">{{ group.items.length }}</small></h4>
         <div class="grid">
-          <AscendedCard v-for="ascended in group.items" :key="ascended.ascended_id" :ascended="ascended" @open="show(ascended)" />
+          <div v-for="ascended in group.items" :key="ascended.ascended_id" class="owned-entry">
+            <AscendedCard :ascended="ascended" @open="show(ascended)" />
+            <span v-if="ascended.in_squad" class="squad-marker">Squad</span>
+          </div>
         </div>
       </section>
     </template>
     <div v-else class="grid">
-      <AscendedCard v-for="ascended in owned" :key="ascended.ascended_id" :ascended="ascended" @open="show(ascended)" />
+      <div v-for="ascended in owned" :key="ascended.ascended_id" class="owned-entry">
+        <AscendedCard :ascended="ascended" @open="show(ascended)" />
+        <span v-if="ascended.in_squad" class="squad-marker">Squad</span>
+      </div>
     </div>
     <p v-if="owned.length === 0" class="empty">{{ typeFilter === null ? "None collected yet." : `No ${typeLabel(typeFilter)} Ascended collected yet.` }}</p>
 
@@ -214,6 +247,10 @@ function show(ascended: OwnedAscended): void {
         <div class="side">
           <EmTabs v-model="detailTab" :options="detailTabs" ariaLabel="Ascended detail sections" @update:model-value="value => { if (value === 'tree') treeVisited = true; }" />
           <section v-if="detailTab === 'overview'" class="overview" role="tabpanel" aria-label="Overview">
+            <div class="squad-control">
+              <EmButton :disabled="!!squadReason || store.busy" :aria-busy="store.busy" @click="toggleSquad">{{ store.busy ? 'Saving squad…' : store.squadIds.includes(open.ascended_id) ? 'Remove from squad' : 'Add to squad' }}</EmButton>
+              <p v-if="squadReason" class="muted">{{ squadReason }}</p>
+            </div>
             <AscendedTemplateCard v-if="openInfo" class="big-card" :ascended="openInfo" :level="open.level" :tier-id="open.tier_id" />
             <div v-if="openInfo" class="overview-effects"><h4>Innate passive</h4><strong>{{ titleCase(openInfo.passive.kind) }}</strong><p>{{ passiveText(openInfo.passive.kind, openInfo.passive.params) }}</p><h4>Foundation abilities</h4><article v-for="ability in openInfo.abilities" :key="ability.id"><strong>{{ ability.name }}</strong><p>{{ abilityEffect(ability) }} · Level {{ ability.unlock_level }}</p></article><p class="muted">Manage learned abilities and your battle loadout in the Ability tree tab. The card shows base stats and growth; current stats are in the summary.</p></div>
           </section>
@@ -237,6 +274,13 @@ function show(ascended: OwnedAscended): void {
 </template>
 
 <style scoped>
+.squad-section h3 { margin: 0 0 var(--em-space-3); }
+.squad-strip { display: flex; flex-wrap: wrap; gap: var(--em-space-3); padding: 0; margin: 0; list-style: none; }
+.squad-slot { display: flex; flex-direction: column; gap: var(--em-space-2); width: 150px; }
+.squad-slot :deep(.card) { --card-width: 100%; }
+.squad-empty { min-height: 180px; justify-content: center; align-items: center; border: 1px dashed var(--em-border); border-radius: var(--em-radius); color: var(--em-muted); }
+.squad-control { flex-basis: 100%; }
+.squad-marker { display: inline-block; margin-top: var(--em-space-2); padding: var(--em-space-1) var(--em-space-2); border: 1px solid var(--em-accent); border-radius: var(--em-radius); color: var(--em-accent); font-size: 12px; }
 .section-head {
   display: flex;
   flex-wrap: wrap;

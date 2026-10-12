@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt
+from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt, StrictStr
 
 from src.auth import requester
 from src.ascension.catalog import ANIMATION_SHEET, SPRITE_NAMES, Catalog, CatalogError
@@ -20,6 +20,7 @@ from src.ascension.collection import CollectionService
 from src.ascension.coordinator import RoundCoordinator
 from src.ascension.encounters import EncounterService
 from src.ascension.errors import EncounterCooldown, InvalidRequest, AscendedError
+from src.ascension.squad import SquadService
 from src.ascension.shop import ShopService
 from src.ascension.trees import TreeService
 from src.ascension.upgrades import UpgradeService
@@ -34,6 +35,7 @@ class AscendedServices:
     upgrades: UpgradeService
     trees: TreeService
     coordinator: RoundCoordinator
+    squad: SquadService
 
 
 class _Body(BaseModel):
@@ -54,6 +56,10 @@ class PresetBody(_Body):
 
 class LoadoutBody(_Body):
     slots: dict[str, str | None]
+
+
+class SquadBody(_Body):
+    ascended_ids: list[StrictStr]
 
 
 class StartBody(_Body):
@@ -157,6 +163,14 @@ def build_router(services: AscendedServices) -> APIRouter:
     @router.get("/profile")
     async def get_profile(owner: str = Depends(requester)):
         return await collection.profile(owner)
+
+    @router.get("/squad")
+    async def get_squad(owner: str = Depends(requester)):
+        return await services.squad.get(owner)
+
+    @router.put("/squad")
+    async def put_squad(body: SquadBody, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
+        return await services.squad.put(owner, key, body.ascended_ids)
 
     @router.get("/ascendeds/{ascended_id}/personalities")
     async def list_personalities(ascended_id: str, limit: int | None = Query(default=None), cursor: int = Query(default=0, ge=0, le=2**63 - 1),

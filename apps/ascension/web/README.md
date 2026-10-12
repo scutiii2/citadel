@@ -39,9 +39,25 @@ runs `npm ci` and builds when `dist/index.html` is missing. After source changes
 rebuild with `npm run build`. FastAPI serves the UI and security headers on the
 game's port; Vite preview is only a local build preview.
 
-The migrated Playwright smoke test is self-contained and uses a fake game API.
-`npm run test:e2e` launches a browser; agents do not run it. Manual verification
-belongs to the user.
+The Playwright smoke tests are self-contained and use a fake game API.
+`npm run test:e2e` launches a browser and checks the collection, starter and battle
+preparation screens at desktop and mobile sizes.
+
+## Squad and battle preparation
+
+The Collection tab shows one slot per configured squad position. Use the detail
+dialog to add or remove a member, or remove one directly from the strip. The last
+member cannot be removed, and active battles lock equipment changes.
+
+Battle preparation lists the squad in position order, with empty slots and fainting
+countdowns. The first ready member is selected; click a card or press Enter or Space
+to choose another. Fainted members cannot be selected. The selected member appears
+as a full card beside the battle plan. The shared `EmPickCard` component owns the
+starter and squad pickers' copper outline and breathing glow, including its reduced
+motion rule. On small screens the squad wraps above the full card.
+
+Battle results keep the fighter's XP reward prominent and list the other squad
+members' shares and level-ups underneath it.
 
 ## HostBridge
 

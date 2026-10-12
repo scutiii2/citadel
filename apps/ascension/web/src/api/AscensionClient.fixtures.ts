@@ -67,6 +67,7 @@ export const CATALOG: Catalog = {
 
 export function ownedAscended(id: string, extra: Partial<OwnedAscended> = {}): OwnedAscended {
   return {
+    in_squad: false,
     ascended_id: id,
     name: nameOf(id),
     ascension_types: ["enchant"],
@@ -89,11 +90,13 @@ export function ownedAscended(id: string, extra: Partial<OwnedAscended> = {}): O
 }
 
 export const PROFILE: Profile = {
+  squad: ["guardian"],
+  squad_size: 5,
   owner: "1",
   insignia: 100,
   emblems: { common: 2 },
   essences: {},
-  ascendeds: [ownedAscended("guardian")],
+  ascendeds: [ownedAscended("guardian", { in_squad: true })],
   pending_encounter: null,
   active_battle: null,
   next_roll_at: null,
