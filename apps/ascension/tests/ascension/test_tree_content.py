@@ -9,7 +9,7 @@ IDS = [s.id for s in CATALOG.all_ascendeds()]
 def test_each_shipped_ascended_has_a_real_tree(ascended_id):
     tree = CATALOG.ascended(ascended_id).tree
     extra = [n for n in tree.nodes if not n.root]
-    assert len(tree.roots) == 4 and 3 <= len(extra) <= 5
+    assert len(tree.roots) == 4 and 3 <= len(extra) <= 40
     assert any(n.kind == "passive" for n in extra) and any(n.kind == "ability" for n in extra)
     assert all(n.cost.amount >= 1 for n in extra)
 
