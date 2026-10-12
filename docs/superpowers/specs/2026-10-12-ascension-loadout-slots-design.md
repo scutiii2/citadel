@@ -1,6 +1,6 @@
 # Ascension: four active slots, two passive slots, and Twoychi's branch slots
 
-Date: 2026-10-12. Status: draft, waiting for review.
+Date: 2026-10-12. Status: approved, plan written.
 Builds on the ability trees (`2026-10-12-ascension-ability-trees-design.md`) and the effects design.
 
 ## Goal
@@ -33,8 +33,8 @@ multipliers, and any change to the other Ascended (their kit, slots and trees st
  "nodes": [{"id": "twoychi_rending_bite", "branch": "wolf", ...}]}
 ```
 
-- `slots` maps a slot id (`a1` to `a4`, `p1`, `p2`) to the branch names it takes. A slot not listed takes any branch.
-  If `slots` is present it must list every slot it restricts; a branch used in `nodes` must appear in at least one slot
+- `slots` maps a slot id (`a1` to `a4`, `p1`, `p2`) to the branch names it takes. The declared slots are the Ascended's slots: they must include `a1` and `p1`,
+  the active ones run consecutively from `a1`, and each lists at least one branch; a branch used in `nodes` must appear in at least one slot
   of the matching kind (an ability branch in an `a` slot, a passive node's branch in a `p` slot), or it is unequippable
   and the loader rejects the tree.
 - Every node of a tree that declares `slots` needs a `branch` (a lowercase name). Roots too. Without `slots`, `branch`
