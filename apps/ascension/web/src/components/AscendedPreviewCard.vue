@@ -12,7 +12,8 @@ import TypeSymbol from "./ui/TypeSymbol.vue";
  * symbols in its medallion. The tier is the frame's colour, never written. The faces are
  * drawn at 265 x 371 and the boxes below are in those pixels, turned into percentages, so the
  * card scales with its width (`--card-width`, 150 px). On a device with hover the card turns
- * to its back under the pointer; `flipped` shows the back regardless. */
+ * to its back under the pointer; `flipped` keeps the back showing, without turning to the front on hover
+ * (for an Ascended not yet collected, whose art stays hidden). */
 const props = withDefaults(defineProps<{ ascended: AscendedInfo; level?: number; tierId?: string; showLevel?: boolean; flipped?: boolean }>(), {
   level: 1,
   tierId: "common",
@@ -180,7 +181,7 @@ const types = computed(() => props.ascended.ascension_types);
   .flipper {
     transition: transform 0.45s ease;
   }
-  .card:hover .flipper {
+  .card:not(.flipped):hover .flipper {
     transform: rotateY(180deg);
   }
 }

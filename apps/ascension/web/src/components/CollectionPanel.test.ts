@@ -208,7 +208,7 @@ describe("not collected", () => {
     const wrapper = mountPanel();
 
     const rows = wrapper.findAll(".missing-ascended");
-    expect(rows[0]!.find("img.back").exists()).toBe(true);
+    expect(rows[0]!.find(".card.flipped").exists()).toBe(true);
     expect(rows[0]!.text()).toContain("Catch one, or buy copies in the shop");
     expect(rows[rows.length - 1]!.text()).toContain("Only by capture");
   });

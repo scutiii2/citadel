@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useAscensionClient, type OwnedAscended, type PersonalityItem } from "../api/AscensionClient";
-import cardBackUrl from "../assets/card_back.png";
 import { useAscensionStore } from "../stores/ascension";
 import { errorMessage } from "../utils/errors";
 import { filterByType, groupByType, typeLabel, typesPresent } from "../utils/ascensionTypes";
@@ -195,7 +194,7 @@ function show(ascended: OwnedAscended): void {
       </div>
       <ul class="grid missing">
         <li v-for="ascended in notOwned" :key="ascended.id" class="missing-ascended em-lift" :style="{ '--tier': 'var(--em-border)' }">
-          <img class="back" :src="cardBackUrl" alt="" draggable="false" />
+          <AscendedPreviewCard class="back" :ascended="ascended" :tier-id="ascended.start_tier" flipped />
           <h4 class="missing-name">{{ ascended.name }}</h4>
           <p class="hint">{{ ascended.forbidden ? "Only by capture" : "Catch one, or buy copies in the shop" }}</p>
         </li>
@@ -318,12 +317,10 @@ function show(ascended: OwnedAscended): void {
   gap: 4px;
 }
 .back {
-  width: 100%;
+  --card-width: 100%;
   margin-bottom: 6px;
-  border-radius: var(--em-radius);
   filter: grayscale(0.4);
   opacity: 0.7;
-  user-select: none;
 }
 .missing-name {
   margin: 0;
