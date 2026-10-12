@@ -166,7 +166,7 @@ function show(ascended: OwnedAscended): void {
     </template>
 
     <EmDialog class="ascended-details" :open="open !== null" :title="open?.name ?? 'Ascended details'" wide @close="openId = null">
-      <div v-if="open" class="details">
+      <div v-if="open" class="details" :class="{ 'tree-expanded': detailTab === 'tree' }">
         <aside class="summary">
           <img v-if="openInfo && spriteFor(openInfo.art, 'main_card')" class="detail-portrait" :src="spriteFor(openInfo.art, 'main_card')!" :style="{ objectPosition: `50% ${spriteFocus(openInfo.art, 'main_card')}%` }" :alt="open.name" />
           <h3 class="em-pixel name">{{ open.name }}</h3>
@@ -290,6 +290,14 @@ function show(ascended: OwnedAscended): void {
   grid-template-columns: 230px minmax(0, 1fr);
   gap: var(--em-space-6);
 }
+.details.tree-expanded { grid-template-columns: minmax(0, 1fr); gap: var(--em-space-4); }
+.tree-expanded .summary { display: grid; grid-template-columns: 1fr 1fr 1fr 220px; align-items: center; }
+.tree-expanded .summary .detail-portrait,
+.tree-expanded .summary .current-stats,
+.tree-expanded .summary .battle-status,
+.tree-expanded .summary .xp,
+.tree-expanded .summary .upgrade { display: none; }
+.tree-expanded .copy-summary { grid-column: 4; grid-row: 1; }
 .collection :deep(.em-dialog.ascended-details) { width: min(1472px, calc(100vw - 32px)); }
 .summary { display: flex; flex-direction: column; gap: var(--em-space-3); min-width: 0; }
 .detail-portrait { width: 100%; height: 198px; object-fit: cover; border: 1px solid var(--em-divider); }
@@ -467,6 +475,8 @@ function show(ascended: OwnedAscended): void {
   cursor: pointer;
 }
 @media (max-width: 700px) {
+  .tree-expanded .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tree-expanded .copy-summary { grid-column: 2; grid-row: 1 / span 2; }
   .details { grid-template-columns: minmax(0, 1fr); gap: var(--em-space-5); }
   .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   .summary .detail-portrait { height: 160px; grid-row: span 3; }

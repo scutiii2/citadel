@@ -49,6 +49,30 @@ const mountTab = async () => {
 };
 
 describe("TreeTab", () => {
+  it("centers the first successful load even after a failed initial request", async () => {
+    client.tree.mockRejectedValueOnce(new Error("Try again"));
+    const wrapper = await mountTab();
+    const scrollTo = vi.fn();
+    HTMLElement.prototype.scrollTo = scrollTo;
+    try {
+      await wrapper.findAll("button").find(b => b.text() === "Retry")!.trigger("click");
+      await flushPromises();
+      expect(scrollTo).toHaveBeenCalled();
+    } finally {
+      delete (HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
+    }
+  });
+  it("uses octagons for active abilities and circles for passives around a portrait hub", async () => {
+    const wrapper = await mountTab();
+    expect(wrapper.find(".origin-hub").text()).toContain("Guardian");
+    expect(wrapper.find('[data-node="g_a"] polygon').exists()).toBe(true);
+    expect(wrapper.find('[data-node="g_pass"] circle.node-outline').exists()).toBe(true);
+    await wrapper.find('[data-node="g_far"]').trigger("click");
+    expect(wrapper.findAll(".tree-line.highlighted")).toHaveLength(2);
+    await wrapper.findAll("button").find(b => b.text() === "Hide names")!.trigger("click");
+    expect(wrapper.find('[data-node="g_a"]').attributes('aria-label')).toContain('A');
+    expect(wrapper.find('[data-node="g_a"] .node-name').isVisible()).toBe(false);
+  });
   it("refreshes requirements after an upgrade consumes essence", async () => {
     const wrapper = await mountTab();
     const next = structuredClone(TREE);
