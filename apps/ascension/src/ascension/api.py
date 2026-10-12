@@ -52,6 +52,11 @@ class PresetBody(_Body):
     instance_ids: list[str]
 
 
+class LoadoutBody(_Body):
+    abilities: list[str]
+    passive: str | None = None
+
+
 class StartBody(_Body):
     encounter_id: str
     ascended_id: str
@@ -120,7 +125,7 @@ def catalog_summary(catalog: Catalog) -> dict[str, Any]:
         "ascendeds": [
             {"id": s.id, "name": s.name, "starter": s.starter, "forbidden": s.forbidden, "start_tier": catalog.start_tier(s.id), "ascension_types": [t.value for t in s.ascension_types], "base": dict(s.base),
              "growth": dict(s.growth), "base_price": s.base_price, "passive": s.passive.to_dict(),
-             "abilities": [a.to_dict() for a in s.abilities], "art": _art_summary(s)}
+             "abilities": [a.to_dict() for a in s.abilities], "tree": [n.to_public() for n in s.tree.nodes], "art": _art_summary(s)}
             for s in catalog.all_ascendeds()
         ],
         "personalities": [{"id": p.id, "categories": list(p.categories)} for p in catalog.personalities.values()],
@@ -224,6 +229,18 @@ def build_router(services: AscendedServices) -> APIRouter:
     @router.post("/ascendeds/{ascended_id}/tier", status_code=201)
     async def raise_tier(ascended_id: str, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
         return await services.upgrades.raise_tier(owner, key, ascended_id)
+
+    @router.get("/ascendeds/{ascended_id}/tree")
+    async def get_tree(ascended_id: str, owner: str = Depends(requester)):
+        return await services.trees.view(owner, ascended_id)
+
+    @router.post("/ascendeds/{ascended_id}/tree/{node_id}/learn", status_code=201)
+    async def learn_node(ascended_id: str, node_id: str, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
+        return await services.trees.learn(owner, key, ascended_id, node_id)
+
+    @router.put("/ascendeds/{ascended_id}/loadout")
+    async def put_loadout(ascended_id: str, body: LoadoutBody, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
+        return await services.trees.set_loadout(owner, key, ascended_id, body.abilities, body.passive)
 
     @router.post("/ascendeds/{ascended_id}/sales", status_code=201)
     async def sell(ascended_id: str, owner: str = Depends(requester), key: str = Depends(idempotency_key)):

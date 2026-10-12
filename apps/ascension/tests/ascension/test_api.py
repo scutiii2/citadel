@@ -296,3 +296,50 @@ def test_stars_and_tier_over_http(client):
     assert client.post(f"/ascension/ascendeds/{owned['ascended_id']}/tier", headers=headers(client)).status_code == 409  # no stars
     assert client.post("/ascension/ascendeds/sentinel/stars", headers=headers(client)).status_code == 404  # not owned
     assert client.post("/ascension/ascendeds/dragon/tier", headers=headers(client)).status_code == 404
+
+
+# -- ability trees -------------------------------------------------------------------
+
+def test_the_catalog_lists_every_tree(client):
+    data = client.get("/ascension/catalog", headers=headers(client, owner="anyone")).json()
+    guardian = next(s for s in data["ascendeds"] if s["id"] == "guardian")
+    ids = {n["id"] for n in guardian["tree"]}
+    assert {"guardian_bulwark", "guardian_passive"} <= ids
+    assert all({"id", "kind", "x", "y", "requires", "unlock_level", "cost", "root"} <= set(n) for n in guardian["tree"])
+
+
+@pytest.fixture
+def tree_client(config, tmp_path, clock):
+    from src.ascension.catalog import Catalog
+    from tests.ascension.env import load_raw
+    from tests.ascension.test_trees import TREE
+
+    raw = load_raw()
+    next(s for s in raw["ascendeds"] if s["id"] == "guardian")["tree"] = TREE
+    config = dataclasses.replace(config, database_path=tmp_path / "tree_api.sqlite3")
+    app = create_app()
+    services = build_ascended_services(config, LayaClient(FakeEngine(fail=True)), catalog=Catalog(raw),
+                                      clock=clock, rng=SeededRandom(5))
+    mount_ascendeds(app, services)
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+def test_trees_and_loadouts_over_http(tree_client):
+    client = tree_client
+    start_profile(client)
+    h = lambda: headers(client)  # noqa: E731
+    tree = client.get("/ascension/ascendeds/guardian/tree", headers=headers(client, key=False)).json()
+    assert tree["loadout"]["a1"] == "guardian_bulwark" and tree["loadout"]["p1"] == "guardian_passive"
+    assert all(n["state"] in ("learned", "learnable", "locked") for n in tree["nodes"])
+    assert client.get("/ascension/ascendeds/sentinel/tree", headers=headers(client, key=False)).status_code == 404
+    assert client.post("/ascension/ascendeds/guardian/tree/nope/learn", headers=h()).status_code == 400
+    assert client.post("/ascension/ascendeds/guardian/tree/guardian_bulwark/learn", headers=h()).status_code == 409  # a root
+    locked = next(n["id"] for n in tree["nodes"] if n["state"] == "locked")
+    assert client.post(f"/ascension/ascendeds/guardian/tree/{locked}/learn", headers=h()).status_code == 409
+    saved = client.put("/ascension/ascendeds/guardian/loadout", json={"abilities": ["guardian_heavy_blow", "guardian_bulwark"], "passive": None}, headers=h())
+    assert saved.status_code == 200 and saved.json()["abilities"] == ["guardian_heavy_blow", "guardian_bulwark"]
+    again = client.get("/ascension/ascendeds/guardian/tree", headers=headers(client, key=False)).json()
+    assert again["loadout"] == {"a1": "guardian_heavy_blow", "a2": "guardian_bulwark", "a3": None, "p1": None}
+    assert client.put("/ascension/ascendeds/guardian/loadout", json={"abilities": []}, headers=h()).status_code == 400
+    assert client.put("/ascension/ascendeds/guardian/loadout", json={"abilities": ["x"], "extra": 1}, headers=h()).status_code == 400
