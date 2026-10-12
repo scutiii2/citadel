@@ -11,6 +11,7 @@ import { CONFIG_ISSUES_ICON, OVERVIEW_ICON, PROFILE_ICON, visiblePages } from ".
 import { usePageVisibilityStore } from "../stores/pageVisibility";
 import { useAuthStore } from "../stores/auth";
 import { useConfigIssuesStore } from "../stores/configIssues";
+import { useGamesStore } from "../stores/games";
 import { useNavPrefsStore } from "../stores/navPrefs";
 import { ADMIN_ACCESS_PERMISSIONS, emberAdminUrl } from "../utils/adminLink";
 import { railPages } from "../utils/navArrangement";
@@ -63,6 +64,10 @@ const tabs = computed(() => {
   right[0]!.near = "r";
   return { left, right, chat: page("/") };
 });
+
+// While a game runs, the rail carries its Close button (narrow screens use a button over the game).
+const games = useGamesStore();
+const gamePlaying = computed(() => Boolean(games.activeId && games.launchUrl));
 
 const configIssues = useConfigIssuesStore();
 const showConfigAlert = computed(() => canBrowse.value && configIssues.issues.length > 0);
@@ -158,6 +163,9 @@ async function logout(): Promise<void> {
     </RouterLink>
 
     <div class="bottom">
+      <button v-if="gamePlaying" type="button" class="close-game" data-label="Close game" aria-label="Close game" @click="games.close()">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+      </button>
       <a v-if="canAdmin" :href="adminUrl" target="_blank" rel="noopener noreferrer" class="admin-link" data-label="Ember Admin" aria-label="Open Ember Admin">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3 3 7v5c0 5 5 8 9 10 4-2 9-5 9-10V7zM8 12l3 3 5-6" /></svg>
       </a>
@@ -252,6 +260,7 @@ nav a,
 .alert,
 .theme,
 .admin-link,
+.close-game,
 .account,
 .logout {
   position: relative;
@@ -299,6 +308,7 @@ nav a,
 nav a:hover,
 .admin-link:hover,
 .theme:hover,
+.close-game:hover,
 .account:hover,
 .logout:hover {
   color: var(--text);
