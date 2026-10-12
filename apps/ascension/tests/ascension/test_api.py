@@ -355,9 +355,9 @@ def test_trees_and_loadouts_over_http(tree_client):
     assert client.post("/ascension/ascendeds/guardian/tree/guardian_bulwark/learn", headers=h()).status_code == 409  # a root
     locked = next(n["id"] for n in tree["nodes"] if n["state"] == "locked")
     assert client.post(f"/ascension/ascendeds/guardian/tree/{locked}/learn", headers=h()).status_code == 409
-    saved = client.put("/ascension/ascendeds/guardian/loadout", json={"abilities": ["guardian_heavy_blow", "guardian_bulwark"], "passive": None}, headers=h())
-    assert saved.status_code == 200 and saved.json()["abilities"] == ["guardian_heavy_blow", "guardian_bulwark"]
+    saved = client.put("/ascension/ascendeds/guardian/loadout", json={"slots": {"a1": "guardian_heavy_blow", "a2": "guardian_bulwark"}}, headers=h())
+    assert saved.status_code == 200 and saved.json()["slots"] == {"a1": "guardian_heavy_blow", "a2": "guardian_bulwark"}
     again = client.get("/ascension/ascendeds/guardian/tree", headers=headers(client, key=False)).json()
     assert again["loadout"] == {"a1": "guardian_heavy_blow", "a2": "guardian_bulwark", "a3": None, "p1": None}
-    assert client.put("/ascension/ascendeds/guardian/loadout", json={"abilities": []}, headers=h()).status_code == 400
-    assert client.put("/ascension/ascendeds/guardian/loadout", json={"abilities": ["x"], "extra": 1}, headers=h()).status_code == 400
+    assert client.put("/ascension/ascendeds/guardian/loadout", json={"slots": {}}, headers=h()).status_code == 400
+    assert client.put("/ascension/ascendeds/guardian/loadout", json={"slots": {"a1": "x"}, "extra": 1}, headers=h()).status_code == 400

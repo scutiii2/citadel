@@ -137,7 +137,7 @@ def test_a_loadout_swaps_in_learned_nodes_and_is_what_a_battle_resolves(tmp_path
         for key, node in (("a", "guardian_iron_wall"), ("b", "guardian_stoneskin"), ("c", "guardian_shield_slam")):
             await env.trees.learn("ann", key, "guardian", node)
         saved = await env.trees.set_loadout("ann", "l1", "guardian",
-                                            ["guardian_shield_slam", "guardian_iron_wall", "guardian_heavy_blow"], "guardian_stoneskin")
+                                            {"a1": "guardian_shield_slam", "a2": "guardian_iron_wall", "a3": "guardian_heavy_blow", "p1": "guardian_stoneskin"})
         view = await env.trees.view("ann", "guardian")
         async with env.repo.transaction() as tx:
             kit = await env.trees.loadout_in(tx, "ann", "guardian")
@@ -145,7 +145,7 @@ def test_a_loadout_swaps_in_learned_nodes_and_is_what_a_battle_resolves(tmp_path
         return saved, view, kit
 
     saved, view, kit = run(scenario())
-    assert saved["abilities"] == ["guardian_shield_slam", "guardian_iron_wall", "guardian_heavy_blow"] and saved["passive"] == "guardian_stoneskin"
+    assert saved["slots"] == {"a1": "guardian_shield_slam", "a2": "guardian_iron_wall", "a3": "guardian_heavy_blow", "p1": "guardian_stoneskin"}
     assert view["loadout"] == {"a1": "guardian_shield_slam", "a2": "guardian_iron_wall", "a3": "guardian_heavy_blow", "p1": "guardian_stoneskin"}
     assert [a.id for a in kit.abilities] == ["guardian_shield_slam", "guardian_iron_wall", "guardian_heavy_blow"]
     assert kit.passive.kind == "defense_rating_bonus"
@@ -157,7 +157,7 @@ def test_a_loadout_may_be_all_attack_and_have_no_passive(tmp_path):
         await owned(env)
         await env.give_essence("common", 5)
         await env.trees.learn("ann", "a", "guardian", "guardian_shield_slam")
-        await env.trees.set_loadout("ann", "l1", "guardian", ["guardian_shield_slam", "guardian_heavy_blow"], None)
+        await env.trees.set_loadout("ann", "l1", "guardian", {"a1": "guardian_shield_slam", "a2": "guardian_heavy_blow"})
         async with env.repo.transaction() as tx:
             kit = await env.trees.loadout_in(tx, "ann", "guardian")
         await env.close()
@@ -182,7 +182,7 @@ def test_a_bad_loadout_is_refused_and_changes_nothing(tmp_path, abilities, passi
         env = make(tmp_path)
         await owned(env)
         with pytest.raises(InvalidRequest):
-            await env.trees.set_loadout("ann", "l1", "guardian", abilities, passive)
+            await env.trees.set_loadout("ann", "l1", "guardian", {**{f"a{i}": a for i, a in enumerate(abilities, 1)}, **({"p1": passive} if passive is not None else {})})
         async with env.repo.transaction() as tx:
             return await tx.get_loadout("ann", "guardian")
 
@@ -196,7 +196,7 @@ def test_the_loadout_cannot_change_while_that_ascended_fights(tmp_path):
         async with env.repo.transaction() as tx:
             await tx.add_battle(battle_record())  # an active battle for ann whose fighter is the guardian
         with pytest.raises(WrongPhase):
-            await env.trees.set_loadout("ann", "l1", "guardian", ["guardian_bulwark"], None)
+            await env.trees.set_loadout("ann", "l1", "guardian", {"a1": "guardian_bulwark"})
         await env.close()
 
     run(scenario())
