@@ -17,3 +17,7 @@ Primary reference: `sprite_preview_card.webp`, the established preview portrait.
 Keep the reference's face, markings, layered feather anatomy, ear and crest silhouette, one tail, pendant, four bracers and proportions. Pose, crop and background may change; do not add wings, weapons, extra limbs or redesign details to accommodate generation drift.
 
 Main card: low running hero stance, head turned toward the viewer, tail flowing behind; full silhouette within the central safe band. Battle: crouched ready-to-sprint stance facing right, tail sweeping upward behind; complete isolated body, slate shadows at least approximately #2a3342, no ground or cast shadow.
+
+## Preview export reference
+
+`sprite_preview_card.webp` is the 512 x 512 game export. `preview_source.webp` preserves the original unmodified reference, including details outside the square crop; inspect it when creating full-body sprites. The export correction changes framing and dimensions only, not the character identity.

@@ -18,3 +18,7 @@ Primary reference: `sprite_preview_card.webp`, the current established portrait.
 Keep the face, flame mane, single flaming tail, armour pieces, scarf and the glowing curved blade. Pose, crop and background may change; do not add wings, a second weapon, a shield, extra limbs or a different head shape.
 
 Main card: a low aggressive lunge with the blade ready on the right, tail flame curling behind, glancing at the viewer. Battle: a forward lunge facing right, blade held out ahead, tail flame behind; complete isolated figure, darkest tones at least approximately #2a3342, no ground or cast shadow.
+
+## Preview export reference
+
+`sprite_preview_card.webp` is the 512 x 512 game export. `preview_source.webp` preserves the original unmodified reference, including details outside the square crop; inspect it when creating full-body sprites. The export correction changes framing and dimensions only, not the character identity.

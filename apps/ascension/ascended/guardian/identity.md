@@ -13,3 +13,7 @@ Primary reference: `sprite_preview_card.webp`. Preserve this established design 
 - Signature glow: ember orange with amber/gold highlights in eyes, crown flame, furnace and shield boss. Glow illuminates adjacent metal.
 
 Across sprites preserve face, armour construction, shield shape, palette, glow locations and proportions. Only pose, framing and background change. Battle faces right with shield leading; use dark slate at least about #2a3342 for its darkest body pixels, including recesses and outlines, to survive the arena's lighten blend.
+
+## Preview export reference
+
+`sprite_preview_card.webp` is the 512 x 512 game export. `preview_source.webp` preserves the original unmodified reference, including details outside the square crop; inspect it when creating full-body sprites. The export correction changes framing and dimensions only, not the character identity.

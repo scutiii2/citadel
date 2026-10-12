@@ -21,3 +21,7 @@ Primary reference: `sprite_preview_card.webp`, the established portrait. Preserv
 - Preview: keep the established image as the primary design reference; its current portrait framing is not a template for the new output dimensions.
 
 Pose, crop and background changes must not alter the face, feather tufts, gems, armour ornament, shield silhouette or proportions. Correct accidental generation drift rather than updating this identity to match it.
+
+## Preview export reference
+
+`sprite_preview_card.webp` is the 512 x 512 game export. `preview_source.webp` preserves the original unmodified reference, including details outside the square crop; inspect it when creating full-body sprites. The export correction changes framing and dimensions only, not the character identity.

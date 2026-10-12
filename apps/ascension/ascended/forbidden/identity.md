@@ -13,3 +13,7 @@ Primary reference: `sprite_preview_card.webp`. Use this established portrait as 
 - Palette: charcoal/slate, bronze/gold, crimson and lava orange; yellow eyes. Its own molten glow lights nearby armour.
 
 Preserve face, crystal crown and wings, chest gem, claw construction, hovering anatomy, colours and proportions across sprites. Only pose, framing and background change. Battle faces right; raise the darkest character tones to dark slate (about #2a3342 or lighter), including outlines and recesses, for the arena's lighten blend.
+
+## Preview export reference
+
+`sprite_preview_card.webp` is the 512 x 512 game export. `preview_source.webp` preserves the original unmodified reference, including details outside the square crop; inspect it when creating full-body sprites. The export correction changes framing and dimensions only, not the character identity.

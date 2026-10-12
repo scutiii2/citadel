@@ -18,4 +18,8 @@
 ## Framing
 - Main card: complete hovering figure centred in the landscape crop, palms open at its sides; dim ruined forge behind it.
 - Battle: complete floating figure in a three-quarter view facing right, hands casting toward the right; flat pure-black background, no floor or shadow.
-- Preserve the established preview card as the reference, even though its current portrait dimensions predate the square-format guide.
+- Preserve the established character design. The preview export is now square; `preview_source.webp` retains the original portrait reference.
+
+## Preview export reference
+
+`sprite_preview_card.webp` is the 512 x 512 game export. `preview_source.webp` preserves the original unmodified reference, including details outside the square crop; inspect it when creating full-body sprites. The export correction changes framing and dimensions only, not the character identity.

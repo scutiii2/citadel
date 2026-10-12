@@ -2,7 +2,7 @@
 
 Rules: `../ART_GUIDE.md` (read it first; it explains sizes, the black background and the crop steps).
 Files for this Ascended: `sprite_main_card.webp`, `sprite_preview_card.webp`, `sprite_battle.webp` (this folder).
-Status: main card and battle sprite recreated from the established preview using the built-in image generator. Preview retained as the primary reference; its legacy portrait dimensions are unchanged. See `identity.md` for persistent design. In-game visual check remains pending.
+Status: main card and battle sprite recreated from the established preview using the built-in image generator. Preview design retained as the primary reference; its export is now 512 x 512. See `identity.md` for persistent design. In-game visual check remains pending.
 
 ## Design (the visual canon, keep it the same in all three sprites)
 
@@ -46,3 +46,7 @@ Create the battle sprite of an original game creature. Channeler is a floating b
 - Main framing correction: shrink the complete character to fit y=230..800 on a 1536 x 1024 canvas; preserve all design details and fill surrounding space with matching dim forge. Centre crop to 1536 x 796.
 - Battle final: right-facing three-quarter casting pose, pure-black background, slate outlines, no floor or shadow. Resize with nearest-neighbour filtering and add black margins for a 512 x 512 lossless WebP. Transparency draft discarded because it contained coloured artifacts.
 - Source PNGs: `main.png` and `battle.png`. Preview remains untouched.
+
+## Export size correction (2026-10-12)
+
+Preview exported at 512 x 512 without stretching. The original reference is retained as `preview_source.webp`. Portrait sources use a square crop at the catalog's existing `art.focus_preview`; square sources are downscaled with nearest-neighbour sampling. Main card must be 1536 x 796 and battle 512 x 512. Read `identity.md` and inspect the original reference before further generation.
