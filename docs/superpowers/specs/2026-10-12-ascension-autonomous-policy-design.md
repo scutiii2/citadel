@@ -1,6 +1,6 @@
 # Ascension: autonomous policy redesign
 
-Date: 2026-10-12. Status: proposed, built after `2026-10-12-ascension-ability-trees-design.md`.
+Date: 2026-10-12. Status: built, follows `2026-10-12-ascension-ability-trees-design.md`.
 
 ## Why
 
@@ -22,13 +22,10 @@ The policy also ignores what an ability does (an active buff or defense, a likel
      INTERCEPT (catch) stay categories as today.
   2. **Action inside the category.** A softmax over a utility. The player chose personality-driven variety, so potency
      matters little and personality style and repeat avoidance matter most.
-- Utility of an action `a` inside its category: `style_affinity(personality, a)` weighted highest, a small potency term
-  (`log` of the percentage ratio to the category best), and a repeat penalty `repeat_factor ^ repeats` that is stronger
-  than today's. A softmax temperature in the catalog keeps the pick random.
-- **Style.** Each ability node has an optional `style` tag from a small set (for example `burst`, `steady`). Each
-  personality lists the styles it likes in `ascension_catalog.json`. No tag means neutral. The tag set and the mapping
-  are my proposal (?); they need a design pass with the tree content.
-- The audit records both stages: category probabilities, then per-category action utilities and probabilities.
+- Utility of an action inside its category combines a small potency term (`log` of its percentage relative to
+  the category mean), any `pick_by_percentage` override, and a repeat penalty. Softmax temperature keeps the pick random.
+- Decided: no style tags; `pick_by_percentage`, `repeat` and the potency term give the variety.
+- The audit records category probabilities, final action probabilities and fired rules.
 
 ## Match reading and mood (added 2026-10-12)
 
@@ -63,6 +60,7 @@ A rule has a condition (`lead_over`/`lead_under`, `own_hp_under`, `enemy_low`, `
 - `counter`: moves mass to the category that beats `enemy_last` (see Cunning).
 - `copy_enemy`: moves mass to `enemy_last` (Mimic).
 - `break_streak`: after a hidden streak length, forces the least likely category once, then resets (Weird).
+- `stay`: boosts the category chosen last (Stubborn).
 - `repeat`: replaces the repeat factor (Stubborn removes the penalty).
 - `pick_by_percentage`: `high` or `low` in stage 2 (Gambler).
 
@@ -98,8 +96,7 @@ conditions are rejected by catalog validation; Weird's streak resets; Anxious ha
 
 ## Config
 
-`policy` in `configs/ascension_catalog.json` gains the mood constants (decay, thresholds), the `rules` of every personality, and `style_weight`, `potency_weight`, `temperature` and a
-`personality_styles` map. The old coefficients stay as the category situation values.
+`policy` in `configs/ascension_catalog.json` gains the mood constants (decay, thresholds), the `rules` of every personality, and `potency_weight`, `pick_weight`, `temperature` and `counter_boost`. The old coefficients stay as the category situation values.
 
 ## Tests
 
@@ -107,15 +104,13 @@ conditions are rejected by catalog validation; Weird's streak resets; Anxious ha
   actions between categories without changing categories present leaves the category probabilities unchanged);
 - a category with one action behaves as today;
 - repeats lower an action inside its category and still leave other categories alone;
-- style affinity shifts the pick toward the liked style, and temperature 0 picks the best, high temperature approaches uniform;
+- `pick_by_percentage` shifts the pick toward high or low percentages; temperature is positive and high temperature approaches uniform;
 - the audit shape;
 - the Laya-fed evaluation (`situation_eval`) still runs.
 
 ## Open questions
 
-- The style tags and the personality mapping (above).
 - Whether the wild side shares the same utility or keeps a plain pick. Drafted: the same policy for both sides.
 - Fit rules (skip a stacked buff, go for the kill) were dropped for now because variety was chosen; they can return as a
   later utility term.
-- With rules now carrying personality behaviour, the `style` tags (stage 2) may be unnecessary. Decide when the rules are tuned; `pick_by_percentage` covers Gambler.
 - Mood meter formulas (rates, decay) are first guesses (?).

@@ -31,15 +31,58 @@ in Phase 4.
 
 ## How an Ascended chooses on its own
 
-A fixed personality fed to a classifier would pick the same action every time, so
-the engine owns the choice. Laya only reads the situation:
+The engine owns the choice. Laya or the heuristic still reads three public-state values: danger, enemy
+aggression and advantage. An uncertain, invalid, late or missing Laya value falls back to the heuristic.
 
-1. Laya answers three short typed questions (danger, enemy aggression, advantage)
-   about a public-state text. If a read is uncertain, invalid, late or missing, an
-   engine heuristic supplies that value instead.
-2. The engine turns those values, the round's personality weights (one equipped
-   personality leads each round), a potency term and a repeat penalty into action
-   probabilities, then draws with the battle's seeded random stream.
+The policy chooses in two stages:
+
+1. A category from situation values, personality weights and the rules that fire. Only categories with a legal action
+   share probability, so equipping three ATTACK abilities does not give ATTACK more category shares.
+2. An action inside that category, using a softmax over a small potency term, repeat avoidance and any
+   `pick_by_percentage` rule. The final seeded draw still picks from the combined action probabilities.
+
+The same mood-lead draw chooses which personality instance leads each round. Match reading adds HP fractions,
+HP lead and trend, round number, own category streak, the enemy's last category, damage taken last round and whether
+the enemy has low HP. Three hidden mood meters are replayed from public battle history: **rage** rises with damage
+and decays, **confidence** follows changes in the HP lead, and **nerves** follow losing and low HP.
+They are recomputed on every decision; no new state is saved and restarting reproduces the same choice.
+With personalities the decider uses one draw for the mood lead and one for the final action; without them, only the final draw.
+
+Rules are data on each personality in `configs/ascension_catalog.json`: `when` holds conditions and the other keys
+hold effects. Conditions include `lead_over`, `lead_under`, `own_hp_under`, `enemy_low`, `rage_over`,
+`confidence_over`, `nerves_over`, `hit_taken_over`, `streak_over`, `round_under`, `round_over` and `enemy_last_is`.
+An empty condition always holds. The eight effects are `multiply` (category factors), `chaos` (mass toward unlikely
+categories), `counter`, `copy_enemy`, `break_streak`, `stay` (boost the last category), `repeat` and
+`pick_by_percentage` (`high` or `low`). Rule strength is tier / 3, reduced by `off_mood_factor` for non-leading instances.
+There are no ability style tags. The private audit records match, meters, category and action probabilities, and fired rules.
+All rule values and mood constants are first guesses (?).
+
+The first eight personalities retain their original category preferences; fourteen more act through rules:
+
+| Personality | Behaviour |
+|---|---|
+| AGGRESSIVE | Prefers ATTACK. |
+| DEFENSIVE | Prefers DEFENSE. |
+| SUPPORTIVE | Prefers SUPPORT. |
+| COWARD | Prefers FEAR (fleeing). |
+| TENACIOUS | Prefers INTERCEPT (catching). |
+| BOLD | Prefers ATTACK and SUPPORT. |
+| CAUTIOUS | Prefers DEFENSE and FEAR. |
+| DISCIPLINED | Prefers DEFENSE and SUPPORT. |
+| WEIRD | Breaks a hidden category streak by jumping toward the least likely other category. |
+| ANXIOUS | Adds chaos when nerves are high; stays plain while calm. |
+| RECKLESS | Low HP raises ATTACK and lowers DEFENSE and FEAR. |
+| VENGEFUL | Rage raises ATTACK. |
+| BERSERKER | Rage raises ATTACK and suppresses FEAR; very low HP raises ATTACK again. |
+| COCKY | High confidence raises ATTACK and lowers DEFENSE; losing adds chaos. |
+| COMEBACK | Losing raises ATTACK and SUPPORT. |
+| CUNNING | Counters enemy ATTACK with DEFENSE, and enemy SUPPORT or DEFENSE with ATTACK. |
+| MIMIC | Boosts the enemy's last category. |
+| PATIENT | Favours SUPPORT and DEFENSE early, ATTACK later or against low enemy HP. |
+| OPPORTUNIST | Low enemy HP raises ATTACK and INTERCEPT; a healthy enemy raises DEFENSE. |
+| STUBBORN | Removes repeat avoidance and boosts its previous category. |
+| GAMBLER | Prefers high percentages while losing and low percentages with a strong lead. |
+| STOIC | Has no rules or category preferences; the control group. |
 
 `situation_source` in `configs/config_app.json` is `heuristic` (the default) or
 `laya`. Choose `laya` only if `docs/ascension-laya-eval.md`, produced by the manual
