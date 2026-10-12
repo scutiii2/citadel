@@ -6,7 +6,7 @@
   "laya_timeout_seconds": 2.0,
   "laya_min_confidence": 0.7,
   "emblem_prompt_seconds": 5.0,
-  "encounter_cooldown_seconds": 30.0,
+  "encounter_cooldown_seconds": 0.0,
   "faint_seconds": 300.0,
   "shop_rotation_seconds": 21600.0,
   "shop_offers": 5,
