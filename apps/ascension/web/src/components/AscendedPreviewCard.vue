@@ -101,7 +101,8 @@ const types = computed(() => props.ascended.ascension_types);
   inset: 0;
   transform-style: preserve-3d;
 }
-.face {
+/* Callers also use "face" on the card root; only the two internal faces are positioned here. */
+.flipper > .face {
   position: absolute;
   inset: 0;
   backface-visibility: hidden;

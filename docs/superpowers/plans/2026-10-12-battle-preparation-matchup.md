@@ -19,3 +19,8 @@
 - Desktop, tablet and phone screenshots inspected; separate capture of phone controls confirms the start action remains reachable in the content scroll area.
 - Independent final review: no actionable material findings. Backend routes and battle payloads are unchanged.
 - App source changes are limited to the approved layout and its controls, documentation and regression tests. No merge or deployment performed.
+## Rebase integration
+
+- Rebased onto e6ef3db, retaining AscendedPreviewCard in the encounter preview and the approved compact squad/matchup in preparation.
+- Browser checks exposed a flip-card CSS collision: callers' root class `face` matched the internal face positioning rule and covered navigation. Scoped the rule to `.flipper > .face`; the existing navigation/preparation checks went from failing to passing.
+- Combined verification: 243 Vitest tests, all 10 Chrome Playwright checks, and the production build pass.
