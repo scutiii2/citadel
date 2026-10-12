@@ -70,7 +70,8 @@ def test_the_catalog_is_readable_and_complete(client):
     assert len(data["ascendeds"]) == 8 and [t["id"] for t in data["tiers"]][-1] == "forbidden"
     assert {s["id"] for s in data["ascendeds"] if s["starter"]} == {"guardian", "striker", "scout"}
     assert len(data["personalities"]) == 22
-    assert all(s["ascension_types"] == ["enchant"] for s in data["ascendeds"])
+    assert all("enchant" in s["ascension_types"] for s in data["ascendeds"])
+    assert next(s for s in data["ascendeds"] if s["id"] == "twoychi")["ascension_types"] == ["enchant", "divine"]
 
 
 # -- profile, personalities, presets -------------------------------------------------

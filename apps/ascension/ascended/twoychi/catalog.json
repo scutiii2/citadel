@@ -6,7 +6,8 @@
   "forbidden": false,
   "start_tier": "common",
   "ascension_types": [
-    "enchant"
+    "enchant",
+    "divine"
   ],
   "base_price": 140,
   "base": {

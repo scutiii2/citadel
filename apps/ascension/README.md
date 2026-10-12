@@ -314,7 +314,7 @@ skipped. Both locations are fixed in the project tree and have no config entry.
 Each Ascended file may list `"ascension_types"`, zero or more of `pure`, `abyss`,
 `divine`, `crimson`, `enchant` and `synthetic` (the Ascension game's types). An
 unknown or repeated type stops startup. For now a type only filters and groups
-the collection; it has no effect in battle. All current Ascended are `enchant`.
+the collection; it has no effect in battle. Every Ascended has `enchant`; Twoychi is also `divine`.
 
 ## Layout
 

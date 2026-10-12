@@ -24,9 +24,11 @@ def test_the_six_ascension_types_are_known():
     assert AscensionType.ABYSS.label == "Abyss"
 
 
-def test_every_shipped_ascended_is_enchant():
+def test_every_shipped_ascended_has_enchant_and_only_twoychi_adds_divine():
     catalog = Catalog.load()
-    assert all(s.ascension_types == (AscensionType.ENCHANT,) for s in catalog.all_ascendeds())
+    assert all(AscensionType.ENCHANT in s.ascension_types for s in catalog.all_ascendeds())
+    assert {s.id: s.ascension_types for s in catalog.all_ascendeds() if len(s.ascension_types) > 1} == {
+        "twoychi": (AscensionType.ENCHANT, AscensionType.DIVINE)}
 
 
 def test_a_catalog_accepts_several_types_or_none(raw):

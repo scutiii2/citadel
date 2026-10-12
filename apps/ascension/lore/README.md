@@ -33,7 +33,7 @@ Spelling quirks to keep in mind when linking: the folders are `Out-of-TIme` (cap
 
 ## Ascension types
 
-The lore names **six** types of Ascendant. In the game every Ascended currently has `"ascension_types": ["enchant"]` in its `catalog.json`, so the other five are unused so far.
+The lore names **six** types of Ascendant. In the game every Ascended has `enchant` in `"ascension_types"` in its `catalog.json`, and one Ascended may carry several types (Twoychi is `enchant` and `divine`). Pure, abyss, crimson and synthetic are unused so far.
 
 | Type | What it is (from the text) | Source |
 | --- | --- | --- |
@@ -131,7 +131,7 @@ Theme: the Collector, the immortal man cursed by a witch, and what the mirrors m
 | **The Witch** | Cursed the boy in a wet field | Curse (maybe only belief) | Not remembered | Low |
 | **Maze** | Sold the list of everyone the Collector protected | Not stated here | Not described | Low |
 | **Aya** (half of Twoychi) | Water spirit; heart belongs to someone absent; never loved the Collector that way | Controls water; heals wounds with it; can bring the dead back when it is not yet their fate; her soul stays where she fell until she returns | Sits by water, hands go still when worried. Wears a mended sleeve | High |
-| **Troy** (half of Twoychi) | Aya's protector dog; cannot be killed; stops the dead from running away | Two forms besides the dog: wolf and bear (your decision; the text also mentions six wolves and a giant). Personality changes with the form | A solemn, sleepy dog; prefers shade | High |
+| **Troy** (half of Twoychi) | Aya's protector dog; cannot be killed | Two forms besides the dog: wolf and bear (your decision; the text also mentions six wolves and a giant). Personality changes with the form | A solemn, sleepy dog; prefers shade | High |
 | **The Telepathy-faced illusion** | The Collector's fake of a dead powerful sentient | Illusion | A dead man's face | Low |
 | **The mirror reflections** | Sentients of the mirror dimension, fed by the Collector for years | Patient, exact | Reflections of whoever they take | Medium |
 | **The Reflection** | Grin's other dead child, Chrono's sibling (your decision; the text never says so): every timeline-version of it died at the same instant, their energy merged and fell into a loose pocket dimension, the Mirror Dimension, which locked around it. What the mirror beings became: one body, thousands of minds, wearing the Collector's face | Is a crossing: skin holds glass; strikes pass through; multiplies by stepping out of a mirror; empties mirrors; folds the overworld into the mirror | His face. Eyes show "a place folding and unfolding" | High |
@@ -144,7 +144,7 @@ Theme: the backstory of Twoychi (Aya and Troy): the island that heals only the "
 
 | Character | Who | Power / type | Look in text | Fit |
 | --- | --- | --- | --- | --- |
-| **Twoychi** (Aya + Troy; the text's "woman of endings") | Medium of death: guides each dying being through its journey to death. Aya is merciful and calm; Troy's personality shifts with his form (modelled on Kindred from League of Legends). Called Aya (the calm after) and Troy (the pain before) in Undeserving 1. Cannot finish the immortal man's death | Eases, takes, or gives life back. Aya can revive someone whose fate is not yet done; Troy keeps them from fleeing | Ageless; hair moves as if in water; eyes "the color eyes go right before they close" | High |
+| **Twoychi** (Aya + Troy; the text's "woman of endings") | Medium of death: guides each dying being through its journey to death. Aya is merciful and calm; Troy's personality shifts with his form (modelled on Kindred from League of Legends). Called Aya (the calm after) and Troy (the pain before) in Undeserving 1. Cannot finish the immortal man's death | Eases, takes, or gives life back. Aya can revive someone whose fate is not yet done | Ageless; hair moves as if in water; eyes "the color eyes go right before they close" | High |
 | **The immortal man** | Ghost, the Collector, the Illusionist (confirmed) | Cannot die | "Died" on fields, kept returning | High |
 | **The Babaylans (seven women)** | Island keepers, unbleached cloth; the eldest speaks truth plainly | Heal the deserving; read the sea | Seven women in unbleached cloth | High |
 | **The Anito** | Carved figures, faces worn to "the idea of eyes" | Judges, channel the island | Weathered wooden figures | High |
@@ -167,7 +167,7 @@ Notes: this novel explains where Twoychi (Aya and Troy of Unchosen) comes from. 
 
 - **Ghost = the Collector = the Illusionist.** Revolver 8 ends with Ghost surviving the fall as "The Collector." Unchosen 1 gives the same name set. The mask, codenames and "trained a single recruit" match Dagger.
 - **Maze** sold out Ghost in Revolver and the Collector's list in Unchosen: the same betrayal told twice. Treat as one person.
-- **Twoychi = Aya + Troy.** Born in Undeserving 7; the woman the Collector loves in Unchosen; the medium of death in Undeserving 1. Aya is the merciful, calm one and can revive the dead whose fate is not done; Troy stops the dead from fleeing and changes personality with his form.
+- **Twoychi = Aya + Troy.** Born in Undeserving 7; the woman the Collector loves in Unchosen; the medium of death in Undeserving 1. Aya is the merciful, calm one and can revive the dead whose fate is not done; Troy changes personality with his form.
 - **Telepathy**: Out-of-Time's APSC founder and Unchosen's "Telepathy" illusion (a fake of a dead powerful sentient) share a name. The text never says they are the same person. Out-of-Time hints his borrowed face is not what it seems.
 - **Twilight** is not a child of Grin. Undeserving hands the story from Twoychi to her.
 - **The two dead children of Grin are Chrono and the Reflection.** Chrono survived the energy sync and became Time; the Reflection did not and was sealed in the Mirror Dimension. Unchosen may never say so outright.
