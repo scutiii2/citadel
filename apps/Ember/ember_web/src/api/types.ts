@@ -189,6 +189,7 @@ export interface JsonSchema {
   minimum?: number;
   maximum?: number;
   maxLength?: number;
+  maxItems?: number;
   pattern?: string;
   // Form hints a tool adds with Field(json_schema_extra=...), as chat_app's
   // command form reads them.

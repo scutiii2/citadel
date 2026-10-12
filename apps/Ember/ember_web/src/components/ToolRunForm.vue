@@ -110,6 +110,45 @@ function shownLines(field: ToolField): { label: string; value: string }[] {
     .filter((line) => line.value !== "");
 }
 
+// Tag choices use the same server-provided options as ordinary selects.
+const tagDrafts = reactive<Record<string, string>>({});
+function selectedTags(field: ToolField): string[] {
+  const value = values.value[field.name];
+  return Array.isArray(value) ? value : [];
+}
+
+function addTag(field: ToolField, event: Event): void {
+  const select = event.target as HTMLSelectElement;
+  const tag = select.value;
+  const selected = selectedTags(field);
+  select.value = "";
+  if (props.running || selected.includes(tag) || (field.maxItems !== undefined && selected.length >= field.maxItems)) return;
+  if (!choicesOf(field)?.some((option) => option.value === tag)) return;
+  values.value[field.name] = [...selected, tag];
+}
+
+function createTag(field: ToolField): void {
+  const tag = (tagDrafts[field.name] ?? "").trim().toLowerCase().replace(/\s+/g, "-");
+  const selected = selectedTags(field);
+  if (props.running || !tag || (field.maxItems !== undefined && selected.length >= field.maxItems)) return;
+  if (tag.length > 64 || !/^[\p{L}\p{N}_-]+$/u.test(tag)) {
+    errors.value[field.name] = "Use letters, numbers, hyphens or underscores, up to 64 characters.";
+    return;
+  }
+  delete errors.value[field.name];
+  tagDrafts[field.name] = "";
+  if (!selected.includes(tag)) {
+    values.value[field.name] = [...selected, tag];
+    onFormChange();
+  }
+}
+
+function removeTag(field: ToolField, tag: string): void {
+  if (props.running) return;
+  values.value[field.name] = selectedTags(field).filter((value) => value !== tag);
+  onFormChange();
+}
+
 // --- file fields --------------------------------------------------------------
 
 interface Upload {
@@ -217,6 +256,25 @@ function inputType(field: ToolField): string {
           <span v-else class="error">{{ uploads[f.name]!.filename }}: {{ uploads[f.name]!.error }}</span>
         </div>
 
+        <div v-else-if="f.widget === 'tags'" class="tag-picker">
+          <ul v-if="selectedTags(f).length" class="tag-chips" aria-label="Selected tags">
+            <li v-for="tag in selectedTags(f)" :key="tag" class="tag-chip">
+              <span>{{ tag }}</span>
+              <button type="button" :aria-label="`Remove ${tag} tag`" :disabled="running" @click="removeTag(f, tag)">×</button>
+            </li>
+          </ul>
+          <select :id="`field-${f.name}`" value="" :disabled="running || !choicesOf(f)?.length || (f.maxItems !== undefined && selectedTags(f).length >= f.maxItems)" @change="addTag(f, $event)">
+            <option value="">{{ remote[f.name]?.state === 'loading' ? 'Loading tags…' : 'Add a tag…' }}</option>
+            <option v-for="option in (choicesOf(f) ?? []).filter((option) => !selectedTags(f).includes(option.value))" :key="option.value" :value="option.value">{{ option.label }}</option>
+          </select>
+          <div class="new-tag">
+            <input v-model="tagDrafts[f.name]" type="text" aria-label="New tag" placeholder="New tag name" maxlength="64" :disabled="running || (f.maxItems !== undefined && selectedTags(f).length >= f.maxItems)" @keydown.enter.prevent.stop="createTag(f)" @change.stop />
+            <button type="button" class="create-tag" :disabled="running || !tagDrafts[f.name]?.trim() || (f.maxItems !== undefined && selectedTags(f).length >= f.maxItems)" @click="createTag(f)">Create tag</button>
+          </div>
+          <small class="hint">Type a new tag and press Enter to add it.</small>
+          <small v-if="f.maxItems !== undefined" class="hint">{{ selectedTags(f).length }} / {{ f.maxItems }} tags selected</small>
+        </div>
+
         <template v-else-if="choicesOf(f) !== null">
           <select :id="`field-${f.name}`" v-model="values[f.name]" :disabled="remote[f.name]?.state === 'loading' || remote[f.name]?.state === 'waiting'" @change="onSelect(f)">
             <option value="">
@@ -278,7 +336,8 @@ function inputType(field: ToolField): string {
       </template>
       <small v-if="errors[f.name]" class="error">{{ errors[f.name] }}</small>
       <small v-else-if="remote[f.name]?.state === 'failed'" class="hint">
-        Couldn't load the choices ({{ remote[f.name]!.error }}) - type the value instead.
+        Couldn't load the choices ({{ remote[f.name]!.error }}).
+        {{ f.widget === 'tags' ? 'Create a tag below, or leave tags empty to let the server choose.' : 'Type the value instead.' }}
       </small>
       <small v-else-if="f.description" class="hint">{{ f.description }}</small>
     </div>
@@ -290,6 +349,19 @@ function inputType(field: ToolField): string {
 </template>
 
 <style scoped>
+.new-tag { display: flex; gap: 8px; }
+.new-tag input { flex: 1; min-width: 0; }
+button.create-tag { flex-shrink: 0; padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-full); color: var(--text); background: var(--surface); cursor: pointer; }
+button.create-tag:disabled { opacity: 0.5; cursor: default; }
+button.create-tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tag-picker { display: flex; flex-direction: column; gap: 8px; }
+.tag-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.tag-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 8px; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--code-bg); font-size: 0.9em; }
+.tag-chip span { overflow-wrap: anywhere; }
+.tag-chip button { flex-shrink: 0; border: none; padding: 0 3px; color: var(--muted); background: transparent; cursor: pointer; font: inherit; }
+.tag-chip button:hover { color: var(--text); }
+.tag-chip button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .tool-form {
   display: flex;
   flex-direction: column;

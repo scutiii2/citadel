@@ -296,6 +296,9 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
     }
 
     // The Capabilities page: the list, the on/off switch, and (through MCP below) the tools each one offers.
+    if (method === "GET" && path === "/api/commands/options" && url.searchParams.get("template") === "/tickets/tags") {
+      return json(route, ["config", "tool-failure", "auth", "ui", "chat", "performance", "email", "feature-request"].map((value) => ({ value, label: value, extra: {} })));
+    }
     if (method === "GET" && path === "/api/capabilities") return json(route, [...api.capabilities.values()]);
     const capabilityPath = /^\/api\/capabilities\/([a-z_]+)$/.exec(path);
     if (method === "PATCH" && capabilityPath) {
@@ -321,10 +324,10 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
       else set.delete(accountItem[2]!);
       return json(route, accountView());
     }
+    if (method === "GET" && path === "/api/games") return json(route, { games: [] });
     if (method === "GET" && path === "/api/extensions") return json(route, []);
 
     // The account's private extensions: a saved one is reported connected with one tool.
-    if (method === "GET" && path === "/api/games") return json(route, { games: [] });
     if (method === "GET" && path === "/api/user-extensions") return json(route, [...api.userExtensions.values()]);
     if (method === "POST" && path === "/api/user-extensions") {
       const body = request.postDataJSON() as { label: string; url: string; description?: string; headers?: Record<string, string> };

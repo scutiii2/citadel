@@ -521,6 +521,7 @@ onBeforeUnmount(() => {
 /* One wrapper per message (the scroll-to target); a column so children keep
    their own alignment (align-self on the command bubble, .user-row). */
 .msg {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-lg);
@@ -651,6 +652,8 @@ onBeforeUnmount(() => {
   background: var(--accent);
 }
 .user-bubble {
+  min-width: 0;
+  overflow-x: auto;
   max-width: 80%;
   padding: 10px 14px;
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-sm) var(--radius-xl);
@@ -692,6 +695,8 @@ onBeforeUnmount(() => {
   background: var(--surface);
 }
 .assistant > * {
+  min-width: 0;
+  max-width: 100%;
   grid-column: 2;
 }
 .attachment {

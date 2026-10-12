@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import type { CommandInfo } from "../api/CommandsClient";
 import type { JsonSchema } from "../api/types";
 import { commandText } from "../utils/toolSchema";
@@ -10,8 +10,20 @@ import ToolRunForm from "./ToolRunForm.vue";
  * builds the same "/<capability> <command> key=value ..." text a user could
  * type, which the chat then runs. */
 
-const props = defineProps<{ command: CommandInfo | null; schema: JsonSchema | null }>();
+const props = defineProps<{ command: CommandInfo | null; schema: JsonSchema | null; chatId?: string | null }>();
 const emit = defineEmits<{ submit: [text: string]; close: [] }>();
+
+// Manual ticket provenance comes from the chat, rather than user input.
+const manualTicket = computed(() => props.command?.tool_name === "tool_ticket_createTicket");
+const formSchema = computed(() => {
+  if (!manualTicket.value || !props.schema) return props.schema;
+  const automatic = new Set(["source", "chat_id"]);
+  return {
+    ...props.schema,
+    properties: Object.fromEntries(Object.entries(props.schema.properties ?? {}).filter(([name]) => !automatic.has(name))),
+    required: props.schema.required?.filter((name) => !automatic.has(name)),
+  };
+});
 
 const dialog = ref<HTMLDialogElement | null>(null);
 
@@ -26,7 +38,12 @@ watch(
 
 function run(args: Record<string, unknown>): void {
   if (!props.command) return;
-  emit("submit", commandText(props.command.capability, props.command.name, args));
+  const context: Record<string, unknown> = {};
+  if (manualTicket.value) {
+    if (props.schema?.properties?.source) context.source = "user";
+    if (props.schema?.properties?.chat_id && props.chatId) context.chat_id = props.chatId;
+  }
+  emit("submit", commandText(props.command.capability, props.command.name, { ...args, ...context }));
 }
 </script>
 
@@ -38,7 +55,8 @@ function run(args: Record<string, unknown>): void {
         <button type="button" class="close" aria-label="Close" @click="emit('close')">×</button>
       </header>
       <p v-if="command.description" class="description">{{ command.description }}</p>
-      <ToolRunForm :key="command.tool_name" :schema="schema" :running="false" submit-label="Run command" @run="run" />
+      <p v-if="manualTicket && chatId" class="description">This ticket is linked to the current chat automatically.</p>
+      <ToolRunForm v-if="formSchema" :key="command.tool_name" :schema="formSchema" :running="false" submit-label="Run command" @run="run" />
     </template>
   </dialog>
 </template>

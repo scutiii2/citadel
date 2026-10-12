@@ -1,8 +1,9 @@
 import { useAuthStore } from "../stores/auth";
 import { createPinia, setActivePinia } from "pinia";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { JsonSchema } from "../api/types";
+import { commandsClient } from "../api/CommandsClient";
 import ToolRunForm from "./ToolRunForm.vue";
 
 vi.mock("../api/CommandsClient", () => ({ commandsClient: { options: vi.fn(), upload: vi.fn() } }));
@@ -96,4 +97,81 @@ beforeEach(() => {
 it("does not run a live form without tools.execute", () => {
   useAuthStore().account!.permissions = [];
   expect(mountForm({ live: true }).emitted("run")).toBeUndefined();
+});
+
+const TAG_SCHEMA: JsonSchema = {
+  type: "object",
+  properties: { tags: { anyOf: [{ type: "array", items: { type: "string" } }, { type: "null" }], input: "tags", options_url: "/tickets/tags", maxItems: 2 } },
+};
+
+describe("tag picker", () => {
+  beforeEach(() => {
+    vi.mocked(commandsClient.options).mockResolvedValue([
+      { value: "ui", label: "ui", extra: {} },
+      { value: "chat", label: "chat", extra: {} },
+      { value: "config", label: "config", extra: {} },
+    ]);
+  });
+
+  it("adds and removes chips and submits a tag array without JSON input", async () => {
+    const w = mountForm({ schema: TAG_SCHEMA });
+    await flushPromises();
+    expect(w.find("textarea").exists()).toBe(false);
+    await w.get("#field-tags").setValue("ui");
+    await w.get("#field-tags").setValue("chat");
+    expect(w.findAll(".tag-chip")).toHaveLength(2);
+    await w.get('button[aria-label="Remove ui tag"]').trigger("click");
+    await w.get("form").trigger("submit");
+    expect(w.emitted("run")).toEqual([[{ tags: ["chat"] }]]);
+  });
+
+  it("limits selections and permits server-selected tags when all chips are removed", async () => {
+    const w = mountForm({ schema: TAG_SCHEMA });
+    await flushPromises();
+    await w.get("#field-tags").setValue("ui");
+    await w.get("#field-tags").setValue("chat");
+    expect(w.get("#field-tags").attributes("disabled")).toBeDefined();
+    await w.get('button[aria-label="Remove ui tag"]').trigger("click");
+    await w.get('button[aria-label="Remove chat tag"]').trigger("click");
+    expect(w.get("#field-tags").attributes("disabled")).toBeUndefined();
+    await w.get("form").trigger("submit");
+    expect(w.emitted("run")).toEqual([[{}]]);
+  });
+
+  it("creates normalized custom tags with Enter and prevents duplicate chips", async () => {
+    const w = mountForm({ schema: TAG_SCHEMA });
+    await flushPromises();
+    await w.get('input[aria-label="New tag"]').setValue(" Mobile Bug ");
+    await w.get('input[aria-label="New tag"]').trigger("keydown", { key: "Enter" });
+    expect(w.emitted("run")).toBeUndefined();
+    expect(w.get(".tag-chip").text()).toContain("mobile-bug");
+    await w.get('input[aria-label="New tag"]').setValue("mobile-bug");
+    await w.get('button.create-tag').trigger("click");
+    expect(w.findAll(".tag-chip")).toHaveLength(1);
+    await w.get("form").trigger("submit");
+    expect(w.emitted("run")).toEqual([[{ tags: ["mobile-bug"] }]]);
+  });
+
+  it("creates tags when choices are offline and enforces the selection limit", async () => {
+    vi.mocked(commandsClient.options).mockRejectedValue(new Error("offline"));
+    const w = mountForm({ schema: TAG_SCHEMA });
+    await flushPromises();
+    for (const tag of ["custom-one", "custom-two"]) {
+      await w.get('input[aria-label="New tag"]').setValue(tag);
+      await w.get('button.create-tag').trigger("click");
+    }
+    expect(w.get('input[aria-label="New tag"]').attributes("disabled")).toBeDefined();
+    await w.get('button[aria-label="Remove custom-one tag"]').trigger("click");
+    expect(w.get('input[aria-label="New tag"]').attributes("disabled")).toBeUndefined();
+  });
+
+  it("keeps an unavailable tag list optional without falling back to JSON", async () => {
+    vi.mocked(commandsClient.options).mockRejectedValue(new Error("offline"));
+    const w = mountForm({ schema: TAG_SCHEMA });
+    await flushPromises();
+    expect(w.find("textarea").exists()).toBe(false);
+    expect(w.text()).toContain("leave tags empty");
+    await w.get("form").trigger("submit");
+    expect(w.emitted("run")).toEqual([[{}]]);
+  });
 });

@@ -30,6 +30,13 @@ async function onClick(event: MouseEvent): Promise<void> {
 </template>
 
 <style scoped>
+/* Keep wide rendered content inside this message, including images and graphs. */
+.markdown {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .markdown > :deep(:first-child) {
   margin-top: 0;
 }
@@ -89,11 +96,15 @@ async function onClick(event: MouseEvent): Promise<void> {
   max-width: 100%;
   overflow-x: auto;
   border-collapse: collapse;
+  overflow-wrap: normal;
   margin: 0.5em 0;
 }
 .markdown :deep(th),
 .markdown :deep(td) {
   padding: 6px 10px;
+  max-width: 32rem;
+  white-space: normal;
+  overflow-wrap: break-word;
   border: 1px solid var(--border);
 }
 .markdown :deep(th) {

@@ -83,7 +83,13 @@ URL, token or key.
   that takes parameters opens its form (chat_app's command form): selects
   filled from mcp_server, dependent selects, and file fields that upload
   the file and fill in its path on mcp_server. Close the form to type
-  `key=value` instead. A command's reply carries a chip "No AI used · direct tool call · 0.8 s"
+  `key=value` instead. The manual `/ticket create` form adds `source=user`
+  and the current chat ID automatically (no chat ID before a chat exists).
+  Failure details stay editable. Tags use a dropdown of the server's configured
+  choices and removable chips, with up to five selections. Create a custom tag
+  by entering a name and pressing Enter or Create tag; it becomes available
+  on your later tickets after submitting. Empty tags let the server choose them.
+  A command's reply carries a chip "No AI used · direct tool call · 0.8 s"
   (the time is saved with the reply, older replies show no time). When a tool's
   result lists `download_markers`, or an answer holds a
   `[[DOWNLOAD filename="..." bytes="..." url="/server/download?path=..." label="..."]]`

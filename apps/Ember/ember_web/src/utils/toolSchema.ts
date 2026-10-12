@@ -1,7 +1,7 @@
 import type { JsonSchema } from "../api/types";
 
 /** How a value is parsed into a tool argument. */
-export type FieldKind = "string" | "number" | "integer" | "boolean" | "enum" | "json";
+export type FieldKind = "string" | "number" | "integer" | "boolean" | "enum" | "json" | "tags";
 
 /** How a field is drawn. A tool can ask for one with a schema hint
  * (`input`, chat_app's command-form convention); otherwise it follows the
@@ -17,9 +17,10 @@ export type FieldWidget =
   | "select"
   | "checkbox"
   | "json"
-  | "file";
+  | "file"
+  | "tags";
 
-const WIDGETS = new Set<FieldWidget>(["text", "textarea", "password", "number", "range", "date", "select", "checkbox", "json", "file"]);
+const WIDGETS = new Set<FieldWidget>(["text", "textarea", "password", "number", "range", "date", "select", "checkbox", "json", "file", "tags"]);
 
 /** One form field derived from one tool parameter. */
 export interface ToolField {
@@ -33,7 +34,7 @@ export interface ToolField {
   /** Suggested values (the schema's `examples`), offered while typing. */
   examples: string[];
   /** Initial value in the form's own representation (text for most kinds). */
-  initial: string | boolean;
+  initial: string | boolean | string[];
   /** A path on mcp_server listing this select's options; may contain
    * {param} placeholders filled from `dependsOn`. */
   optionsUrl?: string;
@@ -46,11 +47,12 @@ export interface ToolField {
   max?: number;
   step?: number;
   maxLength?: number;
+  maxItems?: number;
   pattern?: string;
 }
 
-/** What the form holds per field: text inputs keep text, checkboxes a boolean. */
-export type FieldValues = Record<string, string | boolean>;
+/** Form values: text inputs keep text, checkboxes a boolean, tags a string list. */
+export type FieldValues = Record<string, string | boolean | string[]>;
 
 /** pydantic writes Optional[X] as anyOf: [X, {type: "null"}]; the form only
  * needs X. Anything with several real alternatives stays as-is (→ json).
@@ -65,6 +67,7 @@ function unwrapOptional(schema: JsonSchema): JsonSchema {
 }
 
 function kindOf(schema: JsonSchema): FieldKind {
+  if (schema.input === "tags") return "tags";
   if (schema.enum && schema.enum.length > 0) return "enum";
   const type = Array.isArray(schema.type) ? schema.type.find((t) => t !== "null") : schema.type;
   switch (type) {
@@ -101,7 +104,8 @@ function expandInitial(template: string): string {
   return template.replaceAll("{timestamp}", stamp);
 }
 
-function initialFor(kind: FieldKind, schema: JsonSchema): string | boolean {
+function initialFor(kind: FieldKind, schema: JsonSchema): string | boolean | string[] {
+  if (kind === "tags") return Array.isArray(schema.default) ? schema.default.filter((tag): tag is string => typeof tag === "string") : [];
   if (kind === "boolean") return schema.default === true;
   if (typeof schema.initial === "string" && schema.default === undefined) return expandInitial(schema.initial);
   const value = schema.default;
@@ -129,7 +133,7 @@ export function fieldsFromSchema(schema: JsonSchema): ToolField[] {
       widget,
       required: required.has(name),
       description: prop.description ?? "",
-      options: kind === "enum" ? (prop.enum ?? []).map(String) : [],
+      options: kind === "enum" ? (prop.enum ?? []).map(String) : kind === "tags" ? (prop.items?.enum ?? []).map(String) : [],
       examples: (prop.examples ?? []).filter((e) => e !== null && typeof e !== "object").map(String),
       initial: initialFor(kind, prop),
       optionsUrl: typeof prop.options_url === "string" ? prop.options_url : undefined,
@@ -140,6 +144,7 @@ export function fieldsFromSchema(schema: JsonSchema): ToolField[] {
       max: prop.maximum,
       step: typeof prop.step === "number" ? prop.step : undefined,
       maxLength: prop.maxLength,
+      maxItems: prop.maxItems,
       pattern: prop.pattern,
     };
   });
@@ -161,6 +166,14 @@ export function buildArgs(fields: ToolField[], values: FieldValues): BuildResult
 
   for (const field of fields) {
     const value = values[field.name];
+
+    if (field.kind === "tags") {
+      const tags = Array.isArray(value) ? [...new Set(value.map((tag) => tag.trim()).filter(Boolean))] : [];
+      if (field.maxItems !== undefined && tags.length > field.maxItems) errors[field.name] = `Choose at most ${field.maxItems} tags.`;
+      else if (tags.length) args[field.name] = tags;
+      else if (field.required) errors[field.name] = "Choose at least one tag.";
+      continue;
+    }
 
     if (field.kind === "boolean") {
       args[field.name] = value === true;

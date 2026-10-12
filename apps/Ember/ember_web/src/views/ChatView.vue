@@ -458,7 +458,7 @@ useChatShortcuts({
             </span>
           </template>
         </ChatInput>
-        <CommandFormModal :command="formCommand" :schema="formSchema" @submit="runCommandForm" @close="closeCommandForm" />
+        <CommandFormModal :command="formCommand" :schema="formSchema" :chat-id="activeId" @submit="runCommandForm" @close="closeCommandForm" />
         <TemplatesModal :open="templatesOpen" :draft="templatesDraft" @close="templatesOpen = false" />
         <ShareDialog :open="shareOpen" :chat-id="activeId" @close="shareOpen = false" />
         <ConfirmModal
