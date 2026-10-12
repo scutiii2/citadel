@@ -54,10 +54,10 @@ const emit = defineEmits<{ shop: [] }>();
   gap: var(--em-space-5);
   min-width: 0;
 }
-.mast.has-account { grid-template-columns: auto minmax(0, 1fr); }
-.has-account .navigation { grid-column: 2; grid-row: 1; justify-self: end; }
+.mast.has-account { grid-template-columns: minmax(0, 1fr) auto; }
+.has-account .navigation { grid-column: 1; grid-row: 1; justify-self: start; }
 .account-actions { display: flex; align-items: center; gap: var(--em-space-2); }
-.has-account .account-actions { grid-column: 1; grid-row: 1; }
+.has-account .account-actions { grid-column: 2; grid-row: 1; }
 .screen-heading {
   flex: none;
   width: 100%;
