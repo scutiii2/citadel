@@ -99,3 +99,6 @@ dev_rfc.log
 !/apps/ascension/configs/ascension_catalog.json
 /apps/ascension/.env
 /apps/ascension/.data/
+
+# Dependencies, never tracked.
+node_modules/
