@@ -88,14 +88,14 @@ class BattleEngine:
         return Fighter(
             side=side, ascended_id=ascended_id, tier_id=tier_id, level=level,
             max_hp=stat("hp"), power=stat("power"), speed=stat("speed"),
-            abilities=tuple(a for a in kit.abilities if a.unlock_level <= level), passive=kit.passive,
+            abilities=tuple(a for a in kit.abilities if a.unlock_level <= level), passive=kit.passive, extra_passives=kit.extra_passives,
         )
 
     def start_state(self, setup: BattleSetup) -> BattleState:
         def fresh(fighter: Fighter) -> FighterState:
-            kind = fighter.passive.kind
-            buffs = tuple(Buff(f"passive:{kind}", stat, amount, None)
-                          for stat, amount in self._passives.create(fighter.passive).start_buffs(fighter.power))
+            specs = (fighter.passive, *fighter.extra_passives)
+            buffs = tuple(Buff(f"passive:{spec.kind}", stat, amount, None)
+                          for spec in specs for stat, amount in self._passives.create(spec).start_buffs(fighter.power))
             return FighterState(hp=fighter.max_hp, buffs=buffs)
 
         return BattleState(round=1, player=fresh(setup.player), wild=fresh(setup.wild))
@@ -154,7 +154,7 @@ class BattleEngine:
         self, setup: BattleSetup, state: BattleState, player_action: Action, wild_action: Action, rng: RandomSource
     ) -> RoundOutcome:
         rec = RecordingRandom(rng)
-        sides = {s: _Side(s, setup.of(s), state.of(s), self._passives.create(setup.of(s).passive)) for s in SIDES}
+        sides = {s: _Side(s, setup.of(s), state.of(s), self._passives.create_all((setup.of(s).passive, *setup.of(s).extra_passives))) for s in SIDES}
         actions = {PLAYER: player_action, WILD: wild_action}
         events: list[dict[str, Any]] = []
         rnd = state.round

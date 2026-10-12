@@ -87,6 +87,7 @@ class Loadout:
 
     abilities: tuple[AbilitySpec, ...]
     passive: PassiveSpec
+    extra_passives: tuple[PassiveSpec, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -171,12 +172,14 @@ class Fighter:
     speed: int  # unbuffed
     abilities: tuple[AbilitySpec, ...]
     passive: PassiveSpec
+    extra_passives: tuple[PassiveSpec, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "side": self.side, "ascended_id": self.ascended_id, "tier_id": self.tier_id, "level": self.level,
             "max_hp": self.max_hp, "power": self.power, "speed": self.speed,
             "abilities": [a.to_dict() for a in self.abilities], "passive": self.passive.to_dict(),
+            "extra_passives": [p.to_dict() for p in self.extra_passives],
         }
 
     @classmethod
@@ -184,6 +187,7 @@ class Fighter:
         return cls(
             raw["side"], raw["ascended_id"], raw["tier_id"], raw["level"], raw["max_hp"], raw["power"] if "power" in raw else raw["essence"], raw["speed"],
             tuple(AbilitySpec.from_dict(a) for a in raw["abilities"]), PassiveSpec.from_dict(raw["passive"]),
+            tuple(PassiveSpec.from_dict(p) for p in raw.get("extra_passives", [])),
         )
 
 
