@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.ascension.squad import SquadService
 from src.ascension.catalog import Catalog
 from src.ascension.errors import AlreadyInitialized, BattleInProgress, InvalidRequest, NotFound
 from src.ascension.idempotency import IdempotentWriter
@@ -36,6 +37,7 @@ class CollectionService:
             raise NotFound("no profile yet; choose a starter first")
         now = self._clock.now()
         essences = await tx.essence_counts(owner)
+        squad = await tx.get_squad(owner)
         ascendeds = []
         for ascended in await tx.list_ascendeds(owner):
             spec = self._catalog.ascended(ascended.ascended_id)
@@ -44,7 +46,7 @@ class CollectionService:
             tier = self._catalog.tier(tier_id)
             needed = self._catalog.stars_to_advance(ascended.ascended_id, tier_id)
             ascendeds.append({
-                "ascended_id": ascended.ascended_id, "name": spec.name,
+                "ascended_id": ascended.ascended_id, "name": spec.name, "in_squad": ascended.ascended_id in squad,
                 "ascension_types": [t.value for t in spec.ascension_types], "level": ascended.level, "xp": ascended.xp,
                 "xp_needed": None if ascended.level >= level_cap else self._catalog.levels.xp_per_level * ascended.level,
                 "level_cap": level_cap, "copies": ascended.copies, "tier_id": tier_id,
@@ -60,7 +62,7 @@ class CollectionService:
         active = await tx.active_battle(owner)
         return {
             "owner": owner, "insignia": player.insignia, "emblems": await tx.emblem_counts(owner), "essences": essences,
-            "ascendeds": ascendeds,
+            "ascendeds": ascendeds, "squad": list(squad), "squad_size": self._catalog.economy.squad_size,
             "pending_encounter": pending.id if pending else None, "active_battle": active.id if active else None,
             "next_roll_at": None if player.last_roll_at is None else player.last_roll_at + self._cooldown,
         }
@@ -84,6 +86,7 @@ class CollectionService:
                 await tx.add_emblems(owner, tier_id, count)
             await tx.put_ascended(AscendedRecord(owner, starter_ascended_id, 0, 1, 0,
                                                  tier_id=self._catalog.start_tier(starter_ascended_id)))
+            await SquadService.auto_equip(tx, owner, starter_ascended_id, self._catalog.economy.squad_size)
             types = list(self._catalog.personalities)
             type_id = types[min(int(self._rng.next() * len(types)), len(types) - 1)]
             personality = PersonalityRecord(new_id(), owner, starter_ascended_id, type_id,

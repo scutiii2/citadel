@@ -80,6 +80,8 @@
     "xp_per_level": 100
   },
   "economy": {
+    "squad_size": 5,
+    "bench_xp_pool_factor": 0.5,
     "xp_reward_factor": 20,
     "insignia_reward_factor": 10,
     "sale_level_bonus": 0.05,

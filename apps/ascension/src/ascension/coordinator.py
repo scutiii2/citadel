@@ -151,6 +151,8 @@ class RoundCoordinator:
             ascended = await tx.get_ascended(owner, ascended_id)
             if ascended is None:
                 raise NotFound("you do not own that Ascended")
+            if ascended_id not in await tx.get_squad(owner):
+                raise InvalidRequest("that Ascended is not in your squad")
             now = self._clock.now()
             if ascended.faint_until is not None and ascended.faint_until > now:
                 raise AscendedFainted(f"that Ascended is fainted for another {ascended.faint_until - now:.0f} seconds")

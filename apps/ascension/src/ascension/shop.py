@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+from src.ascension.squad import SquadService
 from src.ascension.catalog import Catalog
-from src.ascension.errors import Conflict, InsufficientFunds, InvalidRequest, NotFound, NothingToSell, SoldOut, WrongPhase
+from src.ascension.errors import BattleInProgress, Conflict, InsufficientFunds, InvalidRequest, NotFound, NothingToSell, SoldOut, WrongPhase
 from src.ascension.idempotency import IdempotentWriter
 from src.ascension.progression import ProgressionService
 from src.ascension.records import AscendedRecord
@@ -101,11 +102,15 @@ class ShopService:
                 raise SoldOut("that offer is sold out")
             await self._reject_if_fighting(tx, owner, offer.ascended_id)
             owned = await tx.get_ascended(owner, offer.ascended_id)
+            if (owned is None and len(await tx.get_squad(owner)) < self._catalog.economy.squad_size
+                    and await tx.active_battle(owner) is not None):
+                raise BattleInProgress("finish your active battle before adding an Ascended to your squad")
             price, granted = self.copy_price(offer.ascended_id, owned, offer.tier_id)
             await self._spend(tx, owner, price)
             if owned is None:  # the first copy is the Ascended itself; the rest are spare
                 start = self._catalog.start_tier(offer.ascended_id)
                 await tx.put_ascended(AscendedRecord(owner, offer.ascended_id, max(0, granted - 1), 1, 0, tier_id=start))
+                await SquadService.auto_equip(tx, owner, offer.ascended_id, self._catalog.economy.squad_size)
             else:
                 await tx.put_ascended(replace(owned, copies=owned.copies + granted))
             await tx.add_shop_purchase(owner, rotation, slot)

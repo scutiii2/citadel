@@ -121,6 +121,8 @@ class Economy:
     starter_personality_tier: int
     encounter_level_window: int
     personality_tier_probabilities: tuple[float, ...]
+    squad_size: int = 5
+    bench_xp_pool_factor: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -359,6 +361,11 @@ class Catalog:
         economy = dict(_require(raw, "economy", "catalog"))
         economy["personality_tier_probabilities"] = tuple(economy["personality_tier_probabilities"])
         self.economy = Economy(**economy)
+        size, factor = self.economy.squad_size, self.economy.bench_xp_pool_factor
+        if isinstance(size, bool) or not isinstance(size, int) or size < 1:
+            raise CatalogError("economy: squad_size must be an integer of at least 1")
+        if not _number(factor) or not 0 <= factor < 1:
+            raise CatalogError("economy: bench_xp_pool_factor must be >= 0 and < 1")
         personalities = [PersonalitySpec(p["id"], tuple(p["categories"]), self._rules(p)) for p in _require(raw, "personalities", "catalog")]
         self.personalities: dict[str, PersonalitySpec] = {p.id: p for p in personalities}
         if len(self.personalities) != len(personalities):
