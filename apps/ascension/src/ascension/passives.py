@@ -100,12 +100,32 @@ class CooldownReduction(Passive):
         return max(base - self._rounds, self._minimum)
 
 
+class AttackBonusVersusMarked(Passive):
+    def __init__(self, mark: str, power_fraction: float) -> None:
+        self._mark, self._fraction = mark, power_fraction
+
+    def marked_bonus(self, power: int, marks: frozenset[str]) -> float:
+        return power * self._fraction if self._mark in marks else 0.0
+
+
+class HealBonus(Passive):
+    """Heals and regeneration grow by `fraction`; with `hp_below` only while own HP is below that share of max HP."""
+
+    def __init__(self, fraction: float, hp_below: float | None = None) -> None:
+        self._fraction, self._below = fraction, hp_below
+
+    def heal_multiplier(self, hp: int, max_hp: int) -> float:
+        return 1 + self._fraction if self._below is None or hp < max_hp * self._below else 1.0
+
+
 class PassiveFactory:
     """Builds a Passive from the saved spec. Register new kinds with `register`."""
 
     def __init__(self) -> None:
         self._kinds: dict[str, Callable[..., Passive]] = {
             "none": Passive,
+            "attack_bonus_vs_marked": AttackBonusVersusMarked,
+            "heal_bonus": HealBonus,
             "defense_extension": DefenseExtension,
             "low_hp_attack_bonus": LowHpAttackBonus,
             "battle_start_speed": BattleStartSpeed,
