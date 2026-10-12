@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from src.ascension.models import PLAYER, WILD
+from src.ascension.models import PLAYER, WILD, AbilitySpec, Loadout, PassiveSpec
 from src.ascension.simulation import BattleSimulator, Combatant, personality_set
 from src.ascension.situation import HeuristicSituationReader
 from tests.ascension.env import CATALOG
@@ -91,3 +91,22 @@ def test_the_round_limit_stops_a_long_battle(max_rounds):
     tank_a, tank_b = ascended("sentinel", level=30, personalities=[("DEFENSIVE", 3)]), ascended("sentinel", level=30, personalities=[("DEFENSIVE", 3)])
     report = run(sim.run(tank_a, tank_b, seed=1, max_rounds=max_rounds))
     assert report.rounds <= max_rounds
+
+
+ATTACKS = Loadout(
+    tuple(AbilitySpec(f"fury_{n}", f"Fury {n}", 1, "ATTACK", 100.0 + 25 * n, 1) for n in range(3)),
+    PassiveSpec("none", {}),
+)
+
+
+def with_attacks(personality):
+    return Combatant("sentinel", "common", 20, personality_set(CATALOG, personality), reader, ATTACKS)
+
+
+def test_a_loadout_of_three_attacks_still_follows_the_personality():
+    other = with_attacks(("DISCIPLINED", 2))
+    coward = [run(sim.run(with_attacks(("COWARD", 3)), other, seed=s, max_rounds=30)) for s in range(40)]
+    aggressive = [run(sim.run(with_attacks(("AGGRESSIVE", 3)), other, seed=s, max_rounds=30)) for s in range(40)]
+    flee = lambda reports: sum(r.share(PLAYER, "FEAR") for r in reports) / len(reports)  # noqa: E731
+    assert flee(coward) > flee(aggressive)
+    assert all("DEFENSE" not in r.actions[PLAYER] for r in coward)  # the loadout has none, so none is ever chosen

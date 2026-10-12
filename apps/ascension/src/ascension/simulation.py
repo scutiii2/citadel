@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from src.ascension.catalog import Catalog
 from src.ascension.decider import ActionDecider
 from src.ascension.engine import BattleEngine
-from src.ascension.models import PLAYER, SIDES, WILD, BattleSetup, PersonalityInstance
+from src.ascension.models import PLAYER, SIDES, WILD, BattleSetup, PersonalityInstance, Loadout
 from src.ascension.policy import ActionPolicy, Mood
 from src.ascension.runtime import SeededRandom
 from src.ascension.situation import SituationReader, SituationView, SituationViewBuilder
@@ -24,6 +24,7 @@ class Combatant:
     level: int
     personalities: tuple[PersonalityInstance, ...]
     reader: SituationReader
+    loadout: Loadout | None = None
 
 
 @dataclass(frozen=True)
@@ -49,8 +50,8 @@ class BattleSimulator:
 
     async def run(self, player: Combatant, wild: Combatant, seed: int, max_rounds: int = 60) -> SimulationReport:
         setup = BattleSetup(
-            self._engine.build_fighter(PLAYER, player.ascended_id, player.tier_id, player.level),
-            self._engine.build_fighter(WILD, wild.ascended_id, wild.tier_id, wild.level),
+            self._engine.build_fighter(PLAYER, player.ascended_id, player.tier_id, player.level, player.loadout),
+            self._engine.build_fighter(WILD, wild.ascended_id, wild.tier_id, wild.level, wild.loadout),
         )
         deciders = {
             side: ActionDecider(self._catalog, self._engine, self._policy, self._mood, who.reader, self._views)
