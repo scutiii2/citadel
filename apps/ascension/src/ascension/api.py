@@ -21,6 +21,7 @@ from src.ascension.coordinator import RoundCoordinator
 from src.ascension.encounters import EncounterService
 from src.ascension.errors import EncounterCooldown, InvalidRequest, AscendedError
 from src.ascension.shop import ShopService
+from src.ascension.trees import TreeService
 from src.ascension.upgrades import UpgradeService
 
 
@@ -31,6 +32,7 @@ class AscendedServices:
     encounters: EncounterService
     shop: ShopService
     upgrades: UpgradeService
+    trees: TreeService
     coordinator: RoundCoordinator
 
 

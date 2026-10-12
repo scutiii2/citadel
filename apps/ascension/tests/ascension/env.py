@@ -80,7 +80,7 @@ class Env:
         )
         return RoundCoordinator(
             self.repo, self.writer, CATALOG, self.engine, decider, situation_views,
-            picker or LayaEmblemPicker(client), self.progression, views, self.clock, CoordinatorSettings(PROMPT),
+            picker or LayaEmblemPicker(client), self.progression, views, self.clock, CoordinatorSettings(PROMPT), trees=self.trees,
         )
 
     def key(self) -> str:

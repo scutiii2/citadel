@@ -20,6 +20,7 @@ from src.ascension.repository import AscendedRepository, SqliteAscendedRepositor
 from src.ascension.runtime import Clock, RandomSource, SystemClock, SystemRandom
 from src.ascension.shop import ShopService
 from src.ascension.shop_offers import ShopOffers
+from src.ascension.trees import TreeService
 from src.ascension.upgrades import UpgradeService
 from src.ascension.situation import (
     FallbackSituationReader,
@@ -47,9 +48,10 @@ def build_ascended_services(
     )
     situation_views = SituationViewBuilder(engine)
     decider = ActionDecider(catalog, engine, ActionPolicy(catalog.policy), Mood(catalog), reader, situation_views)
+    trees = TreeService(repository, writer, catalog)
     coordinator = RoundCoordinator(
         repository, writer, catalog, engine, decider, situation_views, LayaEmblemPicker(laya), progression,
-        BattleViewBuilder(engine, catalog), clock, CoordinatorSettings(config.emblem_prompt_seconds),
+        BattleViewBuilder(engine, catalog), clock, CoordinatorSettings(config.emblem_prompt_seconds), trees=trees,
     )
     return AscendedServices(
         catalog=catalog,
@@ -58,5 +60,5 @@ def build_ascended_services(
         shop=ShopService(repository, writer, catalog, progression,
                          ShopOffers(catalog, config.shop_rotation_seconds, config.shop_offers), clock),
         upgrades=UpgradeService(repository, writer, catalog),
-        coordinator=coordinator,
+        coordinator=coordinator, trees=trees,
     )

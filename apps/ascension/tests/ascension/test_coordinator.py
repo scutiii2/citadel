@@ -710,3 +710,22 @@ def test_a_restart_between_rounds_gives_the_same_battle_as_not_restarting(tmp_pa
     two = tmp_path / "two"
     one.mkdir(), two.mkdir()
     assert run(play(one, restart=False)) == run(play(two, restart=True))
+
+
+def test_a_battle_starts_with_the_equipped_loadout_and_keeps_it(tmp_path):
+    async def scenario():
+        env = make(tmp_path)
+        await env.start_player()
+        await strong_guardian(env)
+        async with env.repo.transaction() as tx:
+            await tx.put_loadout("ann", "guardian", {"a1": "guardian_bulwark", "a2": "guardian_heavy_blow"})
+        coord = env.coordinator()
+        await begin(env, coord)
+        async with env.repo.transaction() as tx:
+            battle = await tx.active_battle("ann")
+        await env.close()
+        return battle
+
+    battle = run(scenario())
+    assert [a.id for a in battle.setup.player.abilities] == ["guardian_bulwark", "guardian_heavy_blow"]
+    assert battle.setup.player.passive.kind == "none"  # no p1 row: the player equipped no passive

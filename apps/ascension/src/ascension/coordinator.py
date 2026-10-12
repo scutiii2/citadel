@@ -41,6 +41,7 @@ from src.ascension.idempotency import IdempotentWriter
 from src.ascension.models import PLAYER, WILD, Action, BattleSetup
 from src.ascension.progression import ProgressionService
 from src.ascension.records import BattleRecord
+from src.ascension.trees import TreeService
 from src.ascension.repository import AscendedRepository, AscendedTransaction
 from src.ascension.runtime import Clock, SeededRandom, new_id, new_seed
 from src.ascension.situation import SituationViewBuilder
@@ -58,11 +59,13 @@ class RoundCoordinator:
         self, repository: AscendedRepository, writer: IdempotentWriter, catalog: Catalog, engine: BattleEngine,
         decider: ActionDecider, situation_views: SituationViewBuilder, emblem_picker: EmblemPicker,
         progression: ProgressionService, battle_views: BattleViewBuilder, clock: Clock, settings: CoordinatorSettings,
+        trees: TreeService | None = None,
     ) -> None:
         self._repo, self._writer, self._catalog, self._engine = repository, writer, catalog, engine
         self._decider, self._situation_views = decider, situation_views
         self._emblem_picker, self._progression, self._battle_views = emblem_picker, progression, battle_views
         self._clock, self._settings = clock, settings
+        self._trees = trees
         self._locks: dict[str, asyncio.Lock] = {}
         self._users: dict[str, int] = {}  # requests holding or awaiting each lock
 
@@ -159,8 +162,9 @@ class RoundCoordinator:
                 instances = tuple(by_id[i] for i in ids if i in by_id)  # frozen for the whole battle
             if mode == "autonomous" and not instances:
                 raise InvalidRequest("that preset has no personalities; equip at least one")
+            loadout = await self._trees.loadout_in(tx, owner, ascended_id) if self._trees else None
             setup = BattleSetup(
-                self._engine.build_fighter(PLAYER, ascended_id, self._catalog.tier_of(ascended_id, ascended.tier_id), ascended.level),
+                self._engine.build_fighter(PLAYER, ascended_id, self._catalog.tier_of(ascended_id, ascended.tier_id), ascended.level, loadout),
                 self._engine.build_fighter(WILD, encounter.ascended_id, encounter.tier_id, encounter.level),
             )
             record = BattleRecord(
