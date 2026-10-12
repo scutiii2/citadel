@@ -44,6 +44,65 @@ function button(buttons: DOMWrapper<HTMLButtonElement>[], text: string | RegExp)
 }
 
 describe("EncounterPanel", () => {
+  it("lists the squad in order with empty slots and selects a ready fighter by keyboard", async () => {
+    client.startBattle.mockResolvedValue(battleView({ mode: "manual" }));
+    const profile = {
+      ...PROFILE, squad: ["striker", "guardian"], squad_size: 5,
+      ascendeds: [ownedAscended("guardian"), ownedAscended("striker")],
+    };
+    const { wrapper } = mountPanel(profile, ENCOUNTER);
+    await button(wrapper.findAll("button"), "Fight").trigger("click");
+    const squad = wrapper.find('[role="radiogroup"][aria-label="Your squad"]');
+    const choices = squad.findAll('[role="radio"]');
+    expect(choices.map(c => c.attributes("aria-label"))).toEqual(["Striker", "Guardian"]);
+    expect(squad.findAll(".empty-slot")).toHaveLength(3);
+    expect(wrapper.find(".detail .ascended-name").text()).toBe("Striker");
+    await choices[1]!.trigger("keydown.space");
+    expect(wrapper.find(".detail .ascended-name").text()).toBe("Guardian");
+    await wrapper.find("form.start-form").trigger("submit");
+    await flushPromises();
+    expect(client.startBattle).toHaveBeenCalledWith(expect.objectContaining({ ascended_id: "guardian" }));
+  });
+
+  it("preselects the first ready squad member and blocks fainted members", async () => {
+    const profile = {
+      ...PROFILE, squad: ["guardian", "striker"], squad_size: 3,
+      ascendeds: [ownedAscended("guardian", { faint_until: Date.now() / 1000 + 600 }), ownedAscended("striker")],
+    };
+    const { store, wrapper } = mountPanel(profile, ENCOUNTER);
+    await button(wrapper.findAll("button"), "Fight").trigger("click");
+    const choices = wrapper.findAll('[role="radio"]');
+    expect(choices[0]!.attributes("aria-disabled")).toBe("true");
+    expect(choices[1]!.attributes("aria-checked")).toBe("true");
+    await choices[0]!.trigger("click");
+    await choices[0]!.trigger("keydown.enter");
+    expect(wrapper.find(".detail .ascended-name").text()).toBe("Striker");
+    store.profile = { ...profile, ascendeds: profile.ascendeds.map(a => ({ ...a, faint_until: Date.now() / 1000 + 600 })) };
+    await wrapper.vm.$nextTick();
+    expect(button(wrapper.findAll("button"), "Begin battle").attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).toContain("No squad member is ready");
+  });
+
+  it("does not offer an owned ready Ascended outside the squad", () => {
+    const profile = {
+      ...PROFILE, squad: ["guardian"], squad_size: 5,
+      ascendeds: [ownedAscended("guardian", { faint_until: Date.now() / 1000 + 600 }), ownedAscended("striker")],
+    };
+    const { wrapper } = mountPanel(profile, ENCOUNTER);
+    expect(button(wrapper.findAll("button"), "Fight").attributes("disabled")).toBeDefined();
+  });
+
+  it("asks for another ready fighter if the selected member becomes fainted", async () => {
+    const profile = { ...PROFILE, squad: ["guardian", "striker"], squad_size: 5,
+      ascendeds: [ownedAscended("guardian"), ownedAscended("striker")] };
+    const { store, wrapper } = mountPanel(profile, ENCOUNTER);
+    await button(wrapper.findAll("button"), "Fight").trigger("click");
+    store.profile = { ...profile, ascendeds: [ownedAscended("guardian", { faint_until: Date.now() / 1000 + 600 }), ownedAscended("striker")] };
+    await wrapper.vm.$nextTick();
+    expect(wrapper.text()).toContain("Select a ready squad member");
+    expect(wrapper.text()).not.toContain("No squad member is ready");
+    expect(button(wrapper.findAll("button"), "Begin battle").attributes("disabled")).toBeDefined();
+  });
   it("looks for a wild Ascended once the cooldown is over", async () => {
     client.rollEncounter.mockResolvedValue(ENCOUNTER);
     const { store, wrapper } = mountPanel();
