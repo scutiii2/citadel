@@ -14,13 +14,16 @@ const client = useAscensionClient();
 
 const NODE_W = 124;
 const NODE_H = 52;
-const ABILITY_SLOTS: LoadoutSlot[] = ["a1", "a2", "a3"];
 
 const tree = ref<TreeView | null>(null);
 const selectedId = ref<string | null>(null);
 const error = ref("");
 /** A failed load, else the failure of the last learn or equip (the store keeps it). */
 const shownError = computed(() => error.value || store.error);
+
+const slotList = computed(() => tree.value?.slots ?? []);
+const equipSlots = computed(() => slotList.value.filter((slot) => slot.kind === selected.value?.kind
+  && (slot.branches === null || (selected.value?.branch != null && slot.branches.includes(selected.value.branch)))));
 
 const selected = computed(() => tree.value?.nodes.find((n) => n.id === selectedId.value) ?? null);
 const byId = computed(() => new Map((tree.value?.nodes ?? []).map((n) => [n.id, n])));
@@ -73,21 +76,20 @@ async function learn(node: TreeNodeState): Promise<void> {
 
 /** The replaced slot loses its node; the node leaves any other slot first. */
 async function equip(node: TreeNodeState, slot: LoadoutSlot): Promise<void> {
-  const next: Record<LoadoutSlot, string | null> = { ...(tree.value as TreeView).loadout };
+  const next: Partial<Record<LoadoutSlot, string | null>> = { ...(tree.value as TreeView).loadout };
   for (const key of Object.keys(next) as LoadoutSlot[]) if (next[key] === node.id) next[key] = null;
   next[slot] = node.id;
   await save(next);
 }
 
 async function unequip(node: TreeNodeState): Promise<void> {
-  const next: Record<LoadoutSlot, string | null> = { ...(tree.value as TreeView).loadout };
+  const next: Partial<Record<LoadoutSlot, string | null>> = { ...(tree.value as TreeView).loadout };
   for (const key of Object.keys(next) as LoadoutSlot[]) if (next[key] === node.id) next[key] = null;
   await save(next);
 }
 
-async function save(next: Record<LoadoutSlot, string | null>): Promise<void> {
-  const abilities = ABILITY_SLOTS.map((s) => next[s]).filter((id): id is string => id !== null);
-  const result = await store.saveLoadout(props.ascended.ascended_id, abilities, next.p1);
+async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<void> {
+  const result = await store.saveLoadout(props.ascended.ascended_id, next);
   if (result) await load();
 }
 </script>
@@ -97,8 +99,7 @@ async function save(next: Record<LoadoutSlot, string | null>): Promise<void> {
     <EmNotice v-if="shownError" tone="error">{{ shownError }}</EmNotice>
     <template v-if="tree">
       <div class="slots" aria-label="Equipped">
-        <span v-for="slot in ABILITY_SLOTS" :key="slot" class="slot"><small>{{ slot.toUpperCase() }}</small> {{ slotLabel(slot) }}</span>
-        <span class="slot"><small>PASSIVE</small> {{ slotLabel("p1") }}</span>
+        <span v-for="slot in slotList" :key="slot.id" class="slot"><small>{{ slot.id.toUpperCase() }}</small> {{ slotLabel(slot.id) }}<small v-if="slot.branches" class="branch-hint">{{ slot.branches.join(" / ") }}</small></span>
       </div>
       <div class="scroll">
         <div class="canvas" :style="{ width: `${width}px`, height: `${height + shiftY}px` }">
@@ -129,10 +130,7 @@ async function save(next: Record<LoadoutSlot, string | null>): Promise<void> {
         <p v-if="selected.state === 'locked'" class="reason">{{ selected.reason }}</p>
         <EmButton v-if="selected.state === 'learnable'" class="learn" variant="primary" :disabled="store.busy" @click="learn(selected)">Learn</EmButton>
         <div v-if="selected.state === 'learned'" class="equip">
-          <template v-if="selected.kind === 'ability'">
-            <EmButton v-for="slot in ABILITY_SLOTS" :key="slot" :data-slot="slot" :disabled="store.busy" @click="equip(selected, slot)">Equip {{ slot.toUpperCase() }}</EmButton>
-          </template>
-          <EmButton v-else data-slot="p1" :disabled="store.busy" @click="equip(selected, 'p1')">Equip passive</EmButton>
+          <EmButton v-for="slot in equipSlots" :key="slot.id" :data-slot="slot.id" :disabled="store.busy" @click="equip(selected, slot.id)">Equip {{ slot.id.toUpperCase() }}</EmButton>
           <EmButton v-if="equippedSlot(selected)" class="unequip" :disabled="store.busy" @click="unequip(selected)">Unequip</EmButton>
         </div>
       </div>
@@ -144,6 +142,7 @@ async function save(next: Record<LoadoutSlot, string | null>): Promise<void> {
 .slots { display: flex; flex-wrap: wrap; gap: var(--em-space-2); margin-bottom: var(--em-space-3); }
 .slot { padding: 4px 10px; border: 1px solid var(--em-border); border-radius: var(--em-radius); font-size: 12px; }
 .slot small { margin-right: 4px; color: var(--em-muted); font-weight: 700; }
+.branch-hint { display: block; margin-top: 2px; font-weight: 400; }
 .scroll { max-width: 100%; overflow: auto; border: 1px solid var(--em-border); border-radius: var(--em-radius); }
 .canvas { position: relative; }
 .lines { position: absolute; inset: 0; }
