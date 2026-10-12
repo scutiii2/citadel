@@ -45,7 +45,7 @@ class EncounterRoller:
         if tier_id == self._catalog.forbidden_tier.id:
             spec = self._catalog.forbidden_ascended()
         else:
-            regular = self._catalog.regular_ascendeds()
+            regular = self._catalog.ascendeds_at_tier(tier_id)
             spec = regular[self._pick(len(regular), rng.next())]
         cap = self._catalog.level_cap(spec.id)
         window = self._catalog.economy.encounter_level_window

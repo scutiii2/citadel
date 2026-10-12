@@ -42,14 +42,14 @@ class CollectionService:
             level_cap = self._catalog.level_cap(ascended.ascended_id)
             tier_id = self._catalog.tier_of(ascended.ascended_id, ascended.tier_id)
             tier = self._catalog.tier(tier_id)
-            needed = tier.stars_to_advance
+            needed = self._catalog.stars_to_advance(ascended.ascended_id, tier_id)
             ascendeds.append({
                 "ascended_id": ascended.ascended_id, "name": spec.name,
                 "ascension_types": [t.value for t in spec.ascension_types], "level": ascended.level, "xp": ascended.xp,
                 "xp_needed": None if ascended.level >= level_cap else self._catalog.levels.xp_per_level * ascended.level,
                 "level_cap": level_cap, "copies": ascended.copies, "tier_id": tier_id,
                 "stars": ascended.stars, "stars_needed": needed, "star_essence_cost": tier.essence_cost,
-                "next_tier_id": self._catalog.next_tier(tier_id),
+                "next_tier_id": self._catalog.next_tier(ascended.ascended_id, tier_id),
                 "can_star_up": needed is not None and ascended.stars < needed and ascended.copies >= 1
                                and essences.get(tier_id, 0) >= tier.essence_cost,
                 "can_tier_up": needed is not None and ascended.stars >= needed,

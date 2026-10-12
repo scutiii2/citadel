@@ -87,6 +87,8 @@ export interface AscendedInfo {
   forbidden: boolean;
   /** The tier it is first owned at. */
   start_tier: string;
+  /** The highest tier it can reach. */
+  end_tier: string;
   /** Ascension Type ids; zero or more. */
   ascension_types: string[];
   base: Record<string, number>;

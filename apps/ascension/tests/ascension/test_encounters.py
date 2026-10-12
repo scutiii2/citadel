@@ -20,13 +20,16 @@ def test_tier_follows_the_encounter_probabilities(u, tier):
     assert roll(10, u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0).tier_id == tier
 
 
-def test_regular_tiers_pick_uniformly_among_the_seven_regular_ascendeds():
-    picked = [roll(10, 0.3, u, 0.0, 0.0, 0.0, 0.0).ascended_id for u in (0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.99)]
-    assert picked == ["bruiser", "channeler", "guardian", "scout", "sentinel", "striker", "twoychi"]  # file-name order
+def test_a_tier_picks_uniformly_among_the_ascended_whose_ladder_includes_it():
+    common = [roll(10, 0.3, u, 0.0, 0.0, 0.0, 0.0).ascended_id for u in (0.0, 0.5, 0.99)]
+    assert common == ["guardian", "scout", "striker"]  # file-name order
+    rare = [roll(10, 0.7, u, 0.0, 0.0, 0.0, 0.0).ascended_id for u in (0.0, 0.2, 0.4, 0.6, 0.8, 0.99)]
+    assert rare == ["bruiser", "channeler", "guardian", "scout", "sentinel", "striker"]
+    assert roll(10, 0.995, 0.5, 0.0, 0.0, 0.0, 0.0).ascended_id == "twoychi"  # the only legendary
 
 
 def test_forbidden_tier_is_always_the_forbidden_ascended_and_uses_one_fewer_draw():
-    assert roll(10, 0.9995, 0.0, 0.0, 0.0, 0.0).ascended_id == "forbidden"
+    assert roll(10, 0.9995, 0.0, 0.0, 0.0, 0.0).ascended_id == "cindrax"
 
 
 @pytest.mark.parametrize("highest,ascended_draw,low,high", [

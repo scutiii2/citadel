@@ -5,6 +5,7 @@
   "starter": true,
   "forbidden": false,
   "start_tier": "common",
+  "end_tier": "unique",
   "ascension_types": [
     "enchant"
   ],

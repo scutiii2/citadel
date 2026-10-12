@@ -314,7 +314,7 @@ def test_a_knockout_faints_the_fighter_for_five_minutes_without_copy_loss(tmp_pa
         await env.start_player()
         await env.give(guardian=AscendedRecord("ann", "guardian", 3, 1, 0))
         coord = env.coordinator(ScriptedPolicy())
-        view = await begin(env, coord, ascended_id="forbidden", tier="forbidden", level=50)
+        view = await begin(env, coord, ascended_id="cindrax", tier="forbidden", level=50)
         done = await act(coord, env, view)
         while done["status"] == "active":
             done = await act(coord, env, done)
@@ -382,7 +382,7 @@ def test_a_failed_collection_attempt_still_costs_the_emblem(tmp_path):
         await env.start_player()
         await strong_guardian(env)  # 1462 HP survives one hit from the level-50 Forbidden Ascended
         coord = env.coordinator(ScriptedPolicy())
-        view = await begin(env, coord, ascended_id="forbidden", tier="forbidden", level=50)
+        view = await begin(env, coord, ascended_id="cindrax", tier="forbidden", level=50)
         after = await act(coord, env, view, "catch", emblem_tier="common")  # 100 / (100 + 12800): about 0.8%
         counts = (await stats(env))[1]
         await env.close()

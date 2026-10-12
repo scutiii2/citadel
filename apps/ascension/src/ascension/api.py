@@ -124,7 +124,7 @@ def catalog_summary(catalog: Catalog) -> dict[str, Any]:
         ],
         "levels": {"regular_cap": catalog.levels.regular_cap, "forbidden_cap": catalog.levels.forbidden_cap},
         "ascendeds": [
-            {"id": s.id, "name": s.name, "starter": s.starter, "forbidden": s.forbidden, "start_tier": catalog.start_tier(s.id), "ascension_types": [t.value for t in s.ascension_types], "base": dict(s.base),
+            {"id": s.id, "name": s.name, "starter": s.starter, "forbidden": s.forbidden, "start_tier": catalog.start_tier(s.id), "end_tier": catalog.end_tier(s.id), "ascension_types": [t.value for t in s.ascension_types], "base": dict(s.base),
              "growth": dict(s.growth), "base_price": s.base_price, "passive": s.passive.to_dict(),
              "abilities": [a.to_dict() for a in s.abilities], "tree": [n.to_public() for n in s.tree.nodes], "art": _art_summary(s)}
             for s in catalog.all_ascendeds()

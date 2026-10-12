@@ -34,8 +34,8 @@ def test_xp_carries_through_level_ups_and_stops_at_the_cap(level, xp, gained, ex
 
 
 def test_forbidden_levels_to_fifty():
-    assert progression.add_xp("forbidden", 49, 0, 4900) == (50, 0)
-    assert progression.add_xp("forbidden", 30, 0, 100) == (30, 100)
+    assert progression.add_xp("cindrax", 49, 0, 4900) == (50, 0)
+    assert progression.add_xp("cindrax", 30, 0, 100) == (30, 100)
 
 
 @pytest.mark.parametrize("level,tier,xp,insignia", [(10, "common", 200, 100), (10, "unique", 300, 150), (1, "rare", 25, 12), (30, "forbidden", 2400, 1200)])
@@ -44,7 +44,7 @@ def test_reward_formulas(level, tier, xp, insignia):
 
 
 def test_forbidden_copies_cap_at_one_hundred():
-    assert progression.add_copies("forbidden", 99, 1) == 100 and progression.add_copies("forbidden", 100, 1) == 100
+    assert progression.add_copies("cindrax", 99, 1) == 100 and progression.add_copies("cindrax", 100, 1) == 100
     assert progression.add_copies("guardian", 500, 5) == 505
 
 
@@ -97,8 +97,8 @@ def test_capturing_an_unowned_ascended_starts_it_at_level_one_and_its_start_tier
     battle = build_battle(wild_ascended="channeler", wild_tier="rare")
     result, ascendeds, player, personalities = run(apply("captured", battle, FIGHTER, 0.5))
     new = ascendeds["channeler"]
-    assert (new.level, new.xp, new.copies, new.tier_id, new.stars) == (1, 0, 1, "common", 0)  # Rare grants 2: the first is the Ascended
-    assert result["copies_granted"] == 2 and result["tier_id"] == "common"
+    assert (new.level, new.xp, new.copies, new.tier_id, new.stars) == (1, 0, 1, "rare", 0)  # Rare grants 2: the first is the Ascended
+    assert result["copies_granted"] == 2 and result["tier_id"] == "rare"
     assert player.insignia == 125  # Rare level 10: 10 * 10 * 1.25
     assert [p.type_id for p in personalities["channeler"]] == ["BOLD"]  # draw 0.5 of 3 -> index 1
     assert result["awarded_personality"]["type"] == "BOLD"
@@ -142,17 +142,17 @@ def test_identical_personalities_stay_distinct_instances():
 
 
 def test_a_capped_forbidden_capture_still_pays_xp_insignia_and_a_personality():
-    capped = AscendedRecord("ann", "forbidden", 100, 40, 0)
-    battle = build_battle(wild_ascended="forbidden", wild_tier="forbidden", wild_level=20)
+    capped = AscendedRecord("ann", "cindrax", 100, 40, 0)
+    battle = build_battle(wild_ascended="cindrax", wild_tier="forbidden", wild_level=20)
     result, ascendeds, player, personalities = run(apply("captured", battle, FIGHTER, 0.0, others=(capped,)))
-    assert ascendeds["forbidden"].copies == 100 and result["copies_granted"] == 0
-    assert player.insignia == 800 and len(personalities["forbidden"]) == 1
+    assert ascendeds["cindrax"].copies == 100 and result["copies_granted"] == 0
+    assert player.insignia == 800 and len(personalities["cindrax"]) == 1
 
 
 def test_a_first_forbidden_capture_grants_the_ascended_and_no_spare_copy():
-    battle = build_battle(wild_ascended="forbidden", wild_tier="forbidden", wild_level=3)
+    battle = build_battle(wild_ascended="cindrax", wild_tier="forbidden", wild_level=3)
     result, ascendeds, _, _ = run(apply("captured", battle, FIGHTER, 0.0))
-    assert (ascendeds["forbidden"].copies, ascendeds["forbidden"].level, result["tier_id"]) == (0, 1, "forbidden")
+    assert (ascendeds["cindrax"].copies, ascendeds["cindrax"].level, result["tier_id"]) == (0, 1, "forbidden")
     assert result["copies_granted"] == 1
 
 
@@ -191,7 +191,7 @@ def test_the_whole_result_is_atomic():
 def test_a_win_pays_the_enemy_tiers_essence_and_a_forbidden_capture_pays_red_essence():
     won, _, _, _ = run(apply("won", build_battle(wild_tier="royal"), FIGHTER))
     assert (won["essence"], won["essence_tier_id"]) == (4, "royal")
-    captured, _, _, _ = run(apply("captured", build_battle(wild_ascended="forbidden", wild_tier="forbidden"), FIGHTER, 0.0))
+    captured, _, _, _ = run(apply("captured", build_battle(wild_ascended="cindrax", wild_tier="forbidden"), FIGHTER, 0.0))
     assert (captured["essence"], captured["essence_tier_id"]) == (10, "forbidden")
     lost, _, _, _ = run(apply("knocked_out", build_battle(), FIGHTER))
     assert "essence" not in lost

@@ -203,7 +203,7 @@ Each Ascended in `ascended/` should have `identity.md`: the persistent look to r
 | Ascended | `identity.md` | Notes |
 | --- | --- | --- |
 | Guardian | [guardian/identity.md](../ascended/guardian/identity.md) | Ember golem with a kite shield |
-| Forbidden | [forbidden/identity.md](../ascended/forbidden/identity.md) | Floating magma crystal fiend |
+| Cindrax | [cindrax/identity.md](../ascended/cindrax/identity.md) | Floating magma crystal fiend |
 | Scout | [scout/identity.md](../ascended/scout/identity.md) | One-tailed feathered fox, flame-edged |
 | Bruiser | [bruiser/identity.md](../ascended/bruiser/identity.md) | Hulking basalt boar-creature with amber cracks and ivory tusks |
 | Channeler | [channeler/identity.md](../ascended/channeler/identity.md) | Hovering brass lantern with a cyan flame spirit |

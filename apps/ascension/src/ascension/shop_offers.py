@@ -44,13 +44,16 @@ class ShopOffers:
         offers: list[Offer] = []
         for slot in range(min(self._count, len(pool))):
             ascended_id = pool.pop(int(rng.next() * len(pool)))
-            tier_id = self._pick_tier(rng.next())
+            tier_id = self._pick_tier(rng.next(), ascended_id)
             offers.append(Offer(slot, ascended_id, tier_id, self._catalog.shop.stock[tier_id]))
         return ShopWindow(rotation, (rotation + 1) * self._seconds, tuple(offers))
 
-    def _pick_tier(self, draw: float) -> str:
+    def _pick_tier(self, draw: float, ascended_id: str) -> str:
+        """A weighted tier from the ones this Ascended can be at."""
         weights = self._catalog.shop.tier_weights
-        tiers = [t.id for t in self._catalog.regular_tiers]
+        low, high = self._catalog.start_tier(ascended_id), self._catalog.end_tier(ascended_id)
+        ids = [t.id for t in self._catalog.regular_tiers]
+        tiers = ids[ids.index(low):ids.index(high) + 1]
         target = draw * sum(weights[t] for t in tiers)
         for tier_id in tiers:
             target -= weights[tier_id]

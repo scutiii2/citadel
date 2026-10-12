@@ -1,4 +1,4 @@
-# Forbidden visual identity
+# Cindrax visual identity
 
 Primary reference: `sprite_preview_card.webp`. Use this established portrait as the exact design reference for main card and battle recreations. `../ART_GUIDE.md` controls style and framing; `art_prompts.md` controls poses.
 

@@ -16,7 +16,7 @@ def test_every_sprite_lives_in_its_ascended_folder_under_an_exact_name():
 
 
 def test_the_shipped_ascended_have_all_three_sprites():
-    for name in ("bruiser", "channeler", "forbidden", "guardian", "scout", "sentinel", "striker"):
+    for name in ("bruiser", "channeler", "cindrax", "guardian", "scout", "sentinel", "striker"):
         assert {f.name for f in (ASCENDEDS_PATH / name).glob("sprite_*")} == SPRITES, name
 
 

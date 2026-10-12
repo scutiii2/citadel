@@ -80,6 +80,7 @@ class AscendedSpec:
     passive: PassiveSpec
     abilities: tuple[AbilitySpec, ...]
     ascension_types: tuple[AscensionType, ...] = ()
+    end_tier: str | None = None  # the highest tier it can reach; None = the last regular tier
     art: ArtSpec = ArtSpec()
     tree: AbilityTree | None = None  # Set by _ascended_spec, with roots when no tree.json exists.
     passive_2: PassiveSpec | None = None
@@ -323,7 +324,7 @@ def _ascended_spec(raw: Mapping[str, Any]) -> AscendedSpec:
         raise CatalogError(f"{where}: passive_2 and the p2 slot go together")
     return AscendedSpec(
         id=sid, name=_require(raw, "name", where), starter=bool(raw.get("starter")), forbidden=bool(raw.get("forbidden")),
-        base_price=_require(raw, "base_price", where), start_tier=raw.get("start_tier"), base=dict(base), growth=dict(growth),
+        base_price=_require(raw, "base_price", where), start_tier=raw.get("start_tier"), end_tier=raw.get("end_tier"), base=dict(base), growth=dict(growth),
         passive=passive_spec, abilities=abilities,
         ascension_types=ascension_types, art=_art(raw, where),
         tree=tree, passive_2=passive_2,
@@ -402,6 +403,10 @@ class Catalog:
                 raise CatalogError(f"ascended {spec.id!r}: base_price must be positive")
             if spec.start_tier is not None and (spec.forbidden or spec.start_tier not in regular_tier_ids):
                 raise CatalogError(f"ascended {spec.id!r}: start_tier must be a regular tier (Forbidden has none)")
+            if spec.end_tier is not None and (spec.forbidden or spec.end_tier not in regular_tier_ids):
+                raise CatalogError(f"ascended {spec.id!r}: end_tier must be a regular tier (Forbidden has none)")
+            if not spec.forbidden and self._rank(self.end_tier(spec.id)) < self._rank(self.start_tier(spec.id)):
+                raise CatalogError(f"ascended {spec.id!r}: end_tier must not be below start_tier")
             for node in spec.tree.nodes:
                 if node.cost is not None and node.cost.tier not in regular_tier_ids:
                     raise CatalogError(f"ascended {spec.id!r} tree node {node.id!r}: cost tier must be a regular tier")
@@ -576,17 +581,39 @@ class Catalog:
             return self.forbidden_tier.id
         return spec.start_tier or self.regular_tiers[0].id
 
+    def end_tier(self, ascended_id: str) -> str:
+        """The highest tier an Ascended can reach."""
+        spec = self.ascended(ascended_id)
+        if spec.forbidden:
+            return self.forbidden_tier.id
+        return spec.end_tier or self.regular_tiers[-1].id
+
+    def _rank(self, tier_id: str) -> int:
+        return [t.id for t in self.tiers].index(tier_id)
+
     def tier_of(self, ascended_id: str, tier_id: str | None) -> str:
         """The tier an owned Ascended is at now: its saved tier, else its start tier. Forbidden never moves."""
         if self.ascended(ascended_id).forbidden or tier_id is None:
             return self.start_tier(ascended_id)
         return self.tier(tier_id).id
 
-    def next_tier(self, tier_id: str) -> str | None:
-        """The regular tier above `tier_id`, or None at the top of the ladder."""
+    def next_tier(self, ascended_id: str, tier_id: str) -> str | None:
+        """The regular tier above `tier_id`, or None at the end of this Ascended's ladder."""
+        if tier_id == self.end_tier(ascended_id):
+            return None
         ids = [t.id for t in self.regular_tiers]
         position = ids.index(tier_id) if tier_id in ids else len(ids) - 1
         return ids[position + 1] if position + 1 < len(ids) else None
+
+    def stars_to_advance(self, ascended_id: str, tier_id: str) -> int | None:
+        """Stars that unlock the next tier; None at the end of this Ascended's ladder."""
+        return None if self.next_tier(ascended_id, tier_id) is None else self.tier(tier_id).stars_to_advance
+
+    def ascendeds_at_tier(self, tier_id: str) -> tuple[AscendedSpec, ...]:
+        """Regular Ascended whose ladder includes `tier_id`, by id."""
+        rank = self._rank(tier_id)
+        return tuple(s for s in self.regular_ascendeds()
+                     if self._rank(self.start_tier(s.id)) <= rank <= self._rank(self.end_tier(s.id)))
 
     def sale_value(self, ascended_id: str, tier_id: str, level: int) -> int:
         """Insignia for selling one copy of an Ascended at this tier and level."""

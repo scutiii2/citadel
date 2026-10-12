@@ -1,31 +1,31 @@
 {
   "nodes": [
     {
-      "id": "forbidden_ruin",
+      "id": "cindrax_ruin",
       "root": true,
       "x": 40,
       "y": 132
     },
     {
-      "id": "forbidden_dread_ward",
+      "id": "cindrax_dread_ward",
       "root": true,
       "x": 40,
       "y": 252
     },
     {
-      "id": "forbidden_ascendance",
+      "id": "cindrax_ascendance",
       "root": true,
       "x": 40,
       "y": 372
     },
     {
-      "id": "forbidden_passive",
+      "id": "cindrax_passive",
       "root": true,
       "x": 40,
       "y": 492
     },
     {
-      "id": "forbidden_oblivion",
+      "id": "cindrax_oblivion",
       "kind": "ability",
       "name": "Oblivion",
       "category": "ATTACK",
@@ -33,7 +33,7 @@
       "cooldown": 3,
       "unlock_level": 30,
       "requires": [
-        "forbidden_ruin"
+        "cindrax_ruin"
       ],
       "cost": {
         "tier": "unique",
@@ -43,7 +43,7 @@
       "y": 132
     },
     {
-      "id": "forbidden_void_shroud",
+      "id": "cindrax_void_shroud",
       "kind": "ability",
       "name": "Void Shroud",
       "category": "DEFENSE",
@@ -51,7 +51,7 @@
       "cooldown": 3,
       "unlock_level": 25,
       "requires": [
-        "forbidden_dread_ward"
+        "cindrax_dread_ward"
       ],
       "cost": {
         "tier": "unique",
@@ -61,7 +61,7 @@
       "y": 252
     },
     {
-      "id": "forbidden_hollow_crown",
+      "id": "cindrax_hollow_crown",
       "kind": "ability",
       "name": "Hollow Crown",
       "category": "SUPPORT",
@@ -71,7 +71,7 @@
       "cooldown": 4,
       "unlock_level": 35,
       "requires": [
-        "forbidden_ascendance"
+        "cindrax_ascendance"
       ],
       "cost": {
         "tier": "unique",
@@ -81,7 +81,7 @@
       "y": 372
     },
     {
-      "id": "forbidden_rime",
+      "id": "cindrax_rime",
       "kind": "passive",
       "name": "Rime",
       "unlock_level": 40,
@@ -92,7 +92,7 @@
         }
       },
       "requires": [
-        "forbidden_hollow_crown"
+        "cindrax_hollow_crown"
       ],
       "cost": {
         "tier": "unique",
@@ -102,12 +102,12 @@
       "y": 492
     },
     {
-      "id": "forbidden_crystal_rend",
+      "id": "cindrax_crystal_rend",
       "kind": "ability",
       "name": "Crystal Rend",
       "unlock_level": 8,
       "requires": [
-        "forbidden_ruin"
+        "cindrax_ruin"
       ],
       "cost": {
         "tier": "common",
@@ -127,12 +127,12 @@
       ]
     },
     {
-      "id": "forbidden_obsidian_heart",
+      "id": "cindrax_obsidian_heart",
       "kind": "passive",
       "name": "Obsidian Heart",
       "unlock_level": 12,
       "requires": [
-        "forbidden_passive"
+        "cindrax_passive"
       ],
       "cost": {
         "tier": "common",
@@ -149,12 +149,12 @@
       }
     },
     {
-      "id": "forbidden_fracture_hex",
+      "id": "cindrax_fracture_hex",
       "kind": "ability",
       "name": "Fracture Hex",
       "unlock_level": 18,
       "requires": [
-        "forbidden_crystal_rend"
+        "cindrax_crystal_rend"
       ],
       "cost": {
         "tier": "rare",
@@ -174,12 +174,12 @@
       ]
     },
     {
-      "id": "forbidden_crown_of_ash",
+      "id": "cindrax_crown_of_ash",
       "kind": "ability",
       "name": "Crown of Ash",
       "unlock_level": 24,
       "requires": [
-        "forbidden_ascendance"
+        "cindrax_ascendance"
       ],
       "cost": {
         "tier": "rare",
@@ -199,12 +199,12 @@
       ]
     },
     {
-      "id": "forbidden_magma_rebirth",
+      "id": "cindrax_magma_rebirth",
       "kind": "ability",
       "name": "Magma Rebirth",
       "unlock_level": 32,
       "requires": [
-        "forbidden_void_shroud"
+        "cindrax_void_shroud"
       ],
       "cost": {
         "tier": "unique",
@@ -223,12 +223,12 @@
       ]
     },
     {
-      "id": "forbidden_dread_dominion",
+      "id": "cindrax_dread_dominion",
       "kind": "ability",
       "name": "Dread Dominion",
       "unlock_level": 38,
       "requires": [
-        "forbidden_fracture_hex"
+        "cindrax_fracture_hex"
       ],
       "cost": {
         "tier": "unique",
@@ -253,12 +253,12 @@
       ]
     },
     {
-      "id": "forbidden_refuse_the_end",
+      "id": "cindrax_refuse_the_end",
       "kind": "ability",
       "name": "Refuse the End",
       "unlock_level": 44,
       "requires": [
-        "forbidden_magma_rebirth"
+        "cindrax_magma_rebirth"
       ],
       "cost": {
         "tier": "unique",
@@ -277,17 +277,17 @@
       ]
     },
     {
-      "id": "forbidden_worldsplitter",
+      "id": "cindrax_worldsplitter",
       "kind": "ability",
       "name": "Worldsplitter",
       "unlock_level": 50,
       "requires": [
-        "forbidden_oblivion",
-        "forbidden_rime",
-        "forbidden_obsidian_heart",
-        "forbidden_crown_of_ash",
-        "forbidden_dread_dominion",
-        "forbidden_refuse_the_end"
+        "cindrax_oblivion",
+        "cindrax_rime",
+        "cindrax_obsidian_heart",
+        "cindrax_crown_of_ash",
+        "cindrax_dread_dominion",
+        "cindrax_refuse_the_end"
       ],
       "cost": {
         "tier": "unique",

@@ -78,10 +78,10 @@ def test_the_top_of_the_ladder_takes_no_stars_and_cannot_rise(tmp_path):
         env = make(tmp_path)
         await env.start_player()
         await env.give(guardian=AscendedRecord("ann", "guardian", 5, 1, 0, tier_id="legendary"),
-                       forbidden=AscendedRecord("ann", "forbidden", 5, 1, 0))
+                       cindrax=AscendedRecord("ann", "cindrax", 5, 1, 0))
         await env.give_essence("legendary", 9)
-        await env.give_essence("forbidden", 99)
-        for ascended_id in ("guardian", "forbidden"):
+        await env.give_essence("cindrax", 99)
+        for ascended_id in ("guardian", "cindrax"):
             with pytest.raises(UpgradeNotReady):
                 await env.upgrades.add_star("ann", f"s-{ascended_id}", ascended_id)
             with pytest.raises(InvalidRequest):

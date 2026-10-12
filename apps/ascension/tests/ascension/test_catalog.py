@@ -25,17 +25,17 @@ def test_shipped_catalog_is_valid(catalog):
     assert [t.id for t in catalog.tiers] == ["common", "rare", "unique", "royal", "legendary", "forbidden"]
     assert len(catalog.all_ascendeds()) == 8
     assert [s.id for s in catalog.starter_ascendeds()] == ["guardian", "scout", "striker"]  # file-name order
-    assert catalog.forbidden_ascended().id == "forbidden"
+    assert catalog.forbidden_ascended().id == "cindrax"
     assert len(catalog.regular_ascendeds()) == 7
-    assert [s.id for s in catalog.all_ascendeds()] == ["bruiser", "channeler", "forbidden", "guardian", "scout", "sentinel", "striker", "twoychi"]
+    assert [s.id for s in catalog.all_ascendeds()] == ["bruiser", "channeler", "cindrax", "guardian", "scout", "sentinel", "striker", "twoychi"]
 
 
 def test_stats_use_growth_then_tier_multiplier_and_floor(catalog):
     assert catalog.stat_value("guardian", 1, "common", "hp") == 150
     assert catalog.stat_value("guardian", 11, "common", "hp") == 300  # 150 + 15 * 10
     assert catalog.stat_value("scout", 3, "rare", "power") == 33  # (22 + 2.2 * 2) * 1.25 = 33.0
-    assert catalog.stat_value("forbidden", 1, "forbidden", "hp") == 800
-    assert catalog.stat_value("forbidden", 1, "forbidden", "speed") == 120
+    assert catalog.stat_value("cindrax", 1, "forbidden", "hp") == 800
+    assert catalog.stat_value("cindrax", 1, "forbidden", "speed") == 120
     assert catalog.stat_value("scout", 2, "common", "speed") == 38  # 35 + 3.5 = 38.5 floored
 
 
@@ -53,28 +53,39 @@ def test_the_star_ladder_follows_the_unity_tiers(catalog, tier, stars, essence):
 
 
 def test_the_tier_above_follows_the_ladder_and_stops_at_legendary(catalog):
-    assert [catalog.next_tier(t) for t in ("common", "rare", "unique", "royal", "legendary")] == [
-        "rare", "unique", "royal", "legendary", None]
+    assert [catalog.next_tier("twoychi", t) for t in ("unique", "royal", "legendary")] == ["royal", "legendary", None]
+
+
+def test_each_ascended_ladder_ends_at_its_end_tier(catalog):
+    ladders = {s.id: (catalog.start_tier(s.id), catalog.end_tier(s.id)) for s in catalog.all_ascendeds()}
+    assert ladders == {
+        "guardian": ("common", "unique"), "scout": ("common", "unique"), "striker": ("common", "unique"),
+        "bruiser": ("rare", "royal"), "channeler": ("rare", "royal"), "sentinel": ("rare", "royal"),
+        "twoychi": ("unique", "legendary"), "cindrax": ("forbidden", "forbidden")}
+    assert catalog.next_tier("guardian", "unique") is None and catalog.stars_to_advance("guardian", "unique") is None
+    assert catalog.next_tier("guardian", "common") == "rare" and catalog.stars_to_advance("guardian", "common") == 1
+    assert [s.id for s in catalog.ascendeds_at_tier("common")] == ["guardian", "scout", "striker"]
+    assert [s.id for s in catalog.ascendeds_at_tier("legendary")] == ["twoychi"]
 
 
 def test_an_owned_ascended_is_at_its_saved_tier_else_its_start_tier(catalog):
-    assert catalog.start_tier("sentinel") == "common"
-    assert catalog.tier_of("sentinel", None) == "common" and catalog.tier_of("sentinel", "royal") == "royal"
+    assert catalog.start_tier("sentinel") == "rare"
+    assert catalog.tier_of("sentinel", None) == "rare" and catalog.tier_of("sentinel", "royal") == "royal"
 
 
 def test_forbidden_is_always_forbidden(catalog):
-    assert catalog.start_tier("forbidden") == "forbidden"
-    assert catalog.tier_of("forbidden", None) == "forbidden" and catalog.tier_of("forbidden", "common") == "forbidden"
+    assert catalog.start_tier("cindrax") == "forbidden"
+    assert catalog.tier_of("cindrax", None) == "forbidden" and catalog.tier_of("cindrax", "common") == "forbidden"
 
 
 def test_level_caps(catalog):
-    assert catalog.level_cap("guardian") == 30 and catalog.level_cap("forbidden") == 50
+    assert catalog.level_cap("guardian") == 30 and catalog.level_cap("cindrax") == 50
 
 
 def test_sale_value_formula(catalog):
     assert catalog.sale_value("guardian", "common", 1) == 100
     assert catalog.sale_value("guardian", "rare", 11) == 187  # 100 * 1.25 * 1.5 = 187.5
-    assert catalog.sale_value("forbidden", "forbidden", 1) == 4000
+    assert catalog.sale_value("cindrax", "forbidden", 1) == 4000
 
 
 def _broken(raw, mutate):
