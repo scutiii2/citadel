@@ -1,8 +1,9 @@
 """Game catalog, administration, launch and server-to-server ticket redemption."""
 from __future__ import annotations
+import json
 from typing import Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Response
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import Settings
@@ -38,8 +39,15 @@ class GameInfo(BaseModel):
     description: str
     icon: str
     wallpaper: str
+    symbols: list[str] = []
     version: str
     url: str
+
+    @field_validator("symbols", mode="before")
+    @classmethod
+    def _decode_symbols(cls, value: object) -> object:
+        """The column stores the list as JSON text."""
+        return json.loads(value) if isinstance(value, str) else value
 
 
 class RegistryGameInfo(GameInfo):

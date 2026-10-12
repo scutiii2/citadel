@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { GamesClient } from "../api/GamesClient";
 import { useAuthStore } from "../stores/auth";
 import GamesView from "./GamesView.vue";
-const game = { id: "ascension", name: "Ascension", description: "Collect Ascended", icon: "", wallpaper: "http://localhost:8060/assets/wallpaper.svg", version: "1", url: "http://localhost:8060" };
+const game = { id: "ascension", name: "Ascension", description: "Collect Ascended", icon: "", wallpaper: "http://localhost:8060/assets/wallpaper.svg", symbols: ["http://localhost:8060/assets/types/pure_flat.webp"], version: "1", url: "http://localhost:8060" };
 beforeEach(() => { setActivePinia(createPinia()); useAuthStore().account = { id: 1, username: "player", email: "p@example.com", email_verified: true, roles: [], permissions: [] }; });
 afterEach(() => vi.restoreAllMocks());
 it("shows filtered games, launches a stage and closes it", async () => {
@@ -29,9 +29,15 @@ it("shows the wallpaper, launches from a card click once, and falls back to a le
   await w.find("img.wallpaper").trigger("error");
   expect(w.find("img.wallpaper").exists()).toBe(false); expect(w.find(".wallpaper.fallback").text()).toBe("A"); w.unmount();
 });
+it("shows the game's symbols as a row of badges and none when it has none", async () => {
+  vi.spyOn(GamesClient.prototype, "list").mockResolvedValueOnce([game]).mockResolvedValueOnce([{ ...game, symbols: [] }]);
+  const w = mount(GamesView); await flushPromises();
+  expect(w.findAll(".symbols img").map(i => i.attributes("src"))).toEqual(game.symbols);
+  await w.find("button.refresh").trigger("click"); await flushPromises(); expect(w.find(".symbols").exists()).toBe(false); w.unmount();
+});
 it("uses the letter tile when a game has no wallpaper", async () => {
   vi.spyOn(GamesClient.prototype, "list").mockResolvedValue([{ ...game, wallpaper: "" }]);
-  const w = mount(GamesView); await flushPromises(); expect(w.find("img").exists()).toBe(false); expect(w.find(".wallpaper.fallback").exists()).toBe(true); w.unmount();
+  const w = mount(GamesView); await flushPromises(); expect(w.find("img.wallpaper").exists()).toBe(false); expect(w.find(".wallpaper.fallback").exists()).toBe(true); w.unmount();
 });
 it("shows the empty account state and inline request failures", async () => {
   vi.spyOn(GamesClient.prototype, "list").mockResolvedValueOnce([]).mockRejectedValueOnce(new Error("Offline"));

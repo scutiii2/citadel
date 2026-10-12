@@ -1,7 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { expect, it, vi } from "vitest";
 import GameStage from "./GameStage.vue";
-const game = { id: "ascension", name: "Ascension", description: "", icon: "", wallpaper: "", version: "1", url: "http://localhost:8060" };
+const game = { id: "ascension", name: "Ascension", description: "", icon: "", wallpaper: "", symbols: [], version: "1", url: "http://localhost:8060" };
 it.each(["https://foreign.example/#ticket=x", "javascript:alert(1)", "http://user@localhost:8060/#ticket=x"])("refuses a launch URL outside the registered origin: %s", url => {
   const w = mount(GameStage, { props: { game, url } }); expect(w.find("iframe").exists()).toBe(false); expect(w.text()).toContain("Game URL is not allowed"); w.unmount();
 });

@@ -13,6 +13,7 @@ class Game(Base):
     name: Mapped[str] = mapped_column(String(80))
     description: Mapped[str] = mapped_column(String(300), default="")
     icon: Mapped[str] = mapped_column(String(300), default="")
+    symbols: Mapped[str] = mapped_column(Text, default="[]", server_default="[]")
     wallpaper: Mapped[str] = mapped_column(String(1000), default="", server_default="")
     version: Mapped[str] = mapped_column(String(40), default="")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)

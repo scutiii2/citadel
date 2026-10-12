@@ -80,6 +80,7 @@ class GameRegistry:
         game.description = manifest.description
         game.icon = manifest.icon
         game.wallpaper = manifest.wallpaper
+        game.symbols = json.dumps(list(manifest.symbols))
         game.version = manifest.version
         game.manifest = json.dumps(manifest.raw)
         game.updated_at = utcnow()

@@ -47,6 +47,21 @@ def test_invalid_wallpaper(value):
         fetch(lambda r: httpx.Response(200, json=good(wallpaper=value)))
 
 
+def test_symbols_resolve_against_game_url():
+    manifest = fetch(lambda r: httpx.Response(200, json=good(symbols=["assets/a.webp", "https://cdn.example.com/b.png"])))
+    assert manifest.symbols == ("http://127.0.0.1:8060/base/assets/a.webp", "https://cdn.example.com/b.png")
+
+
+@pytest.mark.parametrize("value", ["a.png", [4], [""], ["x" * 301], ["a.png"] * 9, [None], ["ftp://x/a.png"], {"a": 1}])
+def test_invalid_symbols(value):
+    with pytest.raises(ManifestError):
+        fetch(lambda r: httpx.Response(200, json=good(symbols=value)))
+
+
+def test_missing_symbols_is_empty():
+    assert fetch(lambda r: httpx.Response(200, json=good())).symbols == ()
+
+
 def test_missing_wallpaper_is_empty():
     assert fetch(lambda r: httpx.Response(200, json=good())).wallpaper == ""
 

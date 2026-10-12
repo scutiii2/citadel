@@ -6,6 +6,7 @@ import { useAscensionStore } from "../stores/ascension";
 import { spriteFor } from "../utils/sprites";
 import EmBar from "./ui/EmBar.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
+import TypeSymbol from "./ui/TypeSymbol.vue";
 
 /** Both Ascended facing each other across a VS marker: name, level, tier, health, their
  * portrait, and what is affecting them (buffs, defense). The numbers are always written. */
@@ -38,6 +39,11 @@ function hpOf(key: string, fighter: Fighter): number {
   return playback.hp?.[key as "player" | "wild"] ?? fighter.hp;
 }
 
+/** The fighter's Ascension Types, from the catalog (a battle view does not carry them). */
+function typesOf(fighter: Fighter): string[] {
+  return ascension.catalog?.ascendeds.find((a) => a.id === fighter.ascended_id)?.ascension_types ?? [];
+}
+
 function art(fighter: Fighter): string | null {
   const info = ascension.catalog?.ascendeds.find((a) => a.id === fighter.ascended_id);
   return spriteFor(info?.art, "battle");
@@ -53,7 +59,10 @@ function art(fighter: Fighter): string | null {
         <article class="fighter" :class="side.key" :aria-label="`${side.label}: ${side.fighter.name}`">
           <div class="head">
             <h3>{{ side.fighter.name }} <small class="em-num">Lv. {{ side.fighter.level }}</small></h3>
-            <EmTierBadge :tier-id="side.fighter.tier_id" />
+            <span class="badges">
+              <TypeSymbol v-for="id in typesOf(side.fighter)" :key="id" :type-id="id" :size="28" />
+              <EmTierBadge :tier-id="side.fighter.tier_id" />
+            </span>
           </div>
           <EmBar kind="hp" :value="hpOf(side.key, side.fighter)" :max="side.fighter.max_hp" :label="`${side.fighter.name} health`" />
           <p class="hp em-num">HP {{ hpOf(side.key, side.fighter) }} / {{ side.fighter.max_hp }}</p>
@@ -109,6 +118,11 @@ function art(fighter: Fighter): string | null {
   justify-content: space-between;
   gap: var(--em-space-2);
   margin-bottom: var(--em-space-2);
+}
+.badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .head h3 {
   margin: 0;

@@ -15,6 +15,9 @@ import httpx
 from src.services.permissions import GAME_ID_PATTERN
 
 
+MAX_SYMBOLS = 8
+
+
 class ManifestError(Exception):
     """Safe manifest validation or connection error for the registering account."""
 
@@ -28,6 +31,7 @@ class Manifest:
     version: str
     raw: dict
     wallpaper: str = ""
+    symbols: tuple[str, ...] = ()
 
 
 class GameUrlPolicy:
@@ -97,8 +101,8 @@ class ManifestFetcher:
             raise ManifestError("Cannot reach the game") from error
         return self._parse(bytes(body), base)
 
-    def _wallpaper(self, value: str, base: str) -> str:
-        """Resolve a manifest wallpaper (relative to the game, or absolute) to a checked http(s) URL."""
+    def _image_url(self, value: str, base: str) -> str:
+        """Resolve a manifest image (relative to the game, or absolute) to a checked http(s) URL."""
         if not value:
             return ""
         resolved = urldefrag(urljoin(f"{base}/", value)).url
@@ -121,5 +125,13 @@ class ManifestFetcher:
             if not isinstance(value, str) or len(value) > limit or (field == "name" and not value.strip()):
                 raise ManifestError(f"Invalid manifest {field}")
             values[field] = value
-        values["wallpaper"] = self._wallpaper(values["wallpaper"], base)
-        return Manifest(id=game_id, raw=raw, **values)
+        values["wallpaper"] = self._image_url(values["wallpaper"], base)
+        return Manifest(id=game_id, raw=raw, symbols=self._symbols(raw.get("symbols", []), base), **values)
+
+    def _symbols(self, value: object, base: str) -> tuple[str, ...]:
+        """Small badge images the game shows on its card (for example its types), at most eight."""
+        if not isinstance(value, list) or len(value) > MAX_SYMBOLS:
+            raise ManifestError("Invalid manifest symbols")
+        if any(not isinstance(item, str) or not item or len(item) > 300 for item in value):
+            raise ManifestError("Invalid manifest symbols")
+        return tuple(self._image_url(item, base) for item in value)

@@ -16,6 +16,7 @@ import EmDialog from "./ui/EmDialog.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmSwitch from "./ui/EmSwitch.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
+import TypeSymbol from "./ui/TypeSymbol.vue";
 
 /** The Collection tab: owned Ascended as small cards with a caption, the rest of the
  * catalog as face-down cards, and a card's details (the full card, personalities,
@@ -113,7 +114,7 @@ function show(ascended: OwnedAscended): void {
           :aria-pressed="typeFilter === id"
           @click="typeFilter = typeFilter === id ? null : id"
         >
-          {{ typeLabel(id) }}
+          <TypeSymbol :type-id="id" :size="20" decorative />{{ typeLabel(id) }}
         </button>
       </div>
       <EmSwitch v-model="grouped" label="Group by type" />
@@ -131,7 +132,7 @@ function show(ascended: OwnedAscended): void {
     </div>
     <template v-if="grouped">
       <section v-for="group in groups" :key="group.typeId ?? 'none'" class="group" :data-type="group.typeId ?? 'none'">
-        <h4 class="group-name">{{ group.label }} <small class="em-num">{{ group.items.length }}</small></h4>
+        <h4 class="group-name"><TypeSymbol v-if="group.typeId" :type-id="group.typeId" :size="40" decorative />{{ group.label }} <small class="em-num">{{ group.items.length }}</small></h4>
         <div class="grid">
           <AscendedCard v-for="ascended in group.items" :key="ascended.ascended_id" :ascended="ascended" @open="show(ascended)" />
         </div>
@@ -164,7 +165,7 @@ function show(ascended: OwnedAscended): void {
           <p class="level em-num">Level {{ open.level }} of {{ open.level_cap }}</p>
           <div class="badges">
             <EmTierBadge :tier-id="open.tier_id" />
-            <span v-for="id in open.ascension_types" :key="id" class="type-chip">{{ typeLabel(id) }}</span>
+            <span v-for="id in open.ascension_types" :key="id" class="type-chip"><TypeSymbol :type-id="id" :size="18" decorative />{{ typeLabel(id) }}</span>
           </div>
           <div class="xp">
             <template v-if="open.xp_needed !== null">
@@ -300,6 +301,9 @@ function show(ascended: OwnedAscended): void {
   align-items: center;
 }
 .type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 2px 8px;
   border: 1px solid var(--em-border);
   border-radius: var(--em-radius);
@@ -321,6 +325,9 @@ function show(ascended: OwnedAscended): void {
   gap: var(--em-space-2);
 }
 .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   min-height: var(--em-target);
   padding: 0 14px;
   border: 1px solid var(--em-border);
@@ -341,6 +348,9 @@ function show(ascended: OwnedAscended): void {
   margin-bottom: var(--em-space-5);
 }
 .group-name {
+  display: flex;
+  align-items: center;
+  gap: var(--em-space-2);
   margin: 0 0 var(--em-space-3);
   font-size: 16px;
 }

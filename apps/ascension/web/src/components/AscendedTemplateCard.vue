@@ -4,6 +4,7 @@ import type { AscendedInfo } from "../api/AscensionClient";
 import frameUrl from "../assets/card_frame.webp";
 import { abilityEffect, passiveText, titleCase } from "../utils/ascension";
 import { spriteFocus, spriteFor, type SpriteSlot } from "../utils/sprites";
+import TypeSymbol from "./ui/TypeSymbol.vue";
 
 /** An Ascended's card, drawn on the card frame (assets/ascension/card_frame.webp,
  * the text-free front template, 1060 x 1484). The frame is the whole
@@ -40,6 +41,9 @@ const HEADER = box(235, 62, 850, 135);
 const HEADER_COMPACT = box(235, 62, 850, 135, COMPACT_ZOOM);
 const ART = box(81, 167, 978, 631);
 const ART_COMPACT = box(81, 167, 978, 631, COMPACT_ZOOM);
+/** The Ascension Type symbols, in the artwork window's top-right corner. */
+const TYPES = box(618, 179, 966, 259);
+const TYPES_COMPACT = box(618, 179, 966, 259, COMPACT_ZOOM);
 const STAT_COLUMNS = [box(70, 668, 375, 800), box(375, 668, 686, 800), box(686, 668, 990, 800)];
 const PASSIVE = box(100, 820, 960, 938);
 /** The three ability holes in the frame (see-through). */
@@ -137,6 +141,10 @@ const abilities = computed(() =>
     <img class="frame" :src="frameUrl" alt="" draggable="false" />
     <div v-if="tint" class="tint" :style="tintStyle" aria-hidden="true" />
     <img v-if="tint && !compact" class="frame plate" :src="frameUrl" alt="" draggable="false" :style="{ clipPath: PLATE_CLIP }" />
+
+    <div v-if="ascended.ascension_types.length" class="types" :style="compact ? TYPES_COMPACT : TYPES">
+      <TypeSymbol v-for="id in ascended.ascension_types" :key="id" :type-id="id" :size="compact ? '11cqw' : '8cqw'" :flat="compact" />
+    </div>
 
     <footer v-if="compact" class="tier-plate em-pixel">{{ titleCase(tierId) }}</footer>
 
@@ -265,6 +273,14 @@ const abilities = computed(() =>
   font-size: 2.4cqw;
   letter-spacing: 0.4cqw;
   text-transform: uppercase;
+}
+.types {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 1cqw;
+  filter: drop-shadow(0 0 0.6cqw #000);
 }
 .header {
   position: absolute;

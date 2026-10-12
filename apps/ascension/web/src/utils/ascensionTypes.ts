@@ -9,6 +9,16 @@ export const ASCENSION_TYPES = [
   { id: "synthetic", label: "Synthetic" },
 ] as const;
 
+/** Below this size (px) the flat symbol is used: the detailed one turns to mush when small. */
+export const FLAT_BELOW = 32;
+
+/** The symbol file of a type, or null for a type with no symbol. Files are served by the
+ * game under /assets/types/ (web/public/assets/types/): `<id>.webp` and `<id>_flat.webp`. */
+export function typeSymbolUrl(typeId: string, flat: boolean): string | null {
+  if (!ASCENSION_TYPES.some((t) => t.id === typeId)) return null;
+  return `/assets/types/${typeId}${flat ? "_flat" : ""}.webp`;
+}
+
 export interface TypeGroup<T> {
   /** null for the Ascendeds with no type. */
   typeId: string | null;

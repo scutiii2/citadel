@@ -4,7 +4,7 @@ import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { GamesClient, type GameInfo } from "../api/GamesClient";
 import { useAuthStore } from "./auth";
 import { useGamesStore } from "./games";
-const game: GameInfo = { id: "ascension", name: "Ascension", description: "Collect", icon: "", wallpaper: "", version: "1", url: "http://localhost:8060" };
+const game: GameInfo = { id: "ascension", name: "Ascension", description: "Collect", icon: "", wallpaper: "", symbols: [], version: "1", url: "http://localhost:8060" };
 beforeEach(() => { setActivePinia(createPinia()); useAuthStore().account = { id: 1, username: "player", email: "p@example.com", email_verified: true, roles: [], permissions: [] }; });
 afterEach(() => vi.restoreAllMocks());
 it("loads playable games and holds the launch URL only until close", async () => {

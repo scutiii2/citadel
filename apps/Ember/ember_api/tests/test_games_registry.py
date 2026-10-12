@@ -79,3 +79,23 @@ def test_conflicts_and_changed_identity_leave_game_intact(tmp_path):
                 with pytest.raises(GameNotFound):
                     await operation("unknown")
     asyncio.run(go())
+
+
+def test_wallpaper_and_symbols_are_stored_and_listed(tmp_path):
+    from src.routes.games import GameInfo
+    async def go():
+        async with game_database(tmp_path) as (_, session):
+            fetcher = FakeFetcher()
+            fetcher.raw.update(wallpaper="http://localhost:8060/assets/w.webp")
+            registry = GameRegistry(session, fetcher, True)
+            await registry.register("http://localhost:8060")
+            assert GameInfo.model_validate(await registry.get("ascension")).symbols == []
+            original = fetcher.fetch
+            async def with_symbols(url):
+                manifest = await original(url)
+                return Manifest(**{**fetcher.raw, "symbols": ("http://localhost:8060/assets/a.webp",)}, raw=manifest.raw)
+            fetcher.fetch = with_symbols
+            info = GameInfo.model_validate(await registry.refresh("ascension"))
+            assert info.wallpaper == "http://localhost:8060/assets/w.webp"
+            assert info.symbols == ["http://localhost:8060/assets/a.webp"]
+    asyncio.run(go())

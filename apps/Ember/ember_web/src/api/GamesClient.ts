@@ -1,5 +1,5 @@
 import { apiRequest } from "./http";
-export interface GameInfo { id: string; name: string; description: string; icon: string; wallpaper: string; version: string; url: string; }
+export interface GameInfo { id: string; name: string; description: string; icon: string; wallpaper: string; symbols: string[]; version: string; url: string; }
 export class GamesClient {
   private readonly request: typeof apiRequest;
   constructor(request: typeof apiRequest = apiRequest) { this.request = request; }
