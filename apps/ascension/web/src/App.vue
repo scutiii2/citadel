@@ -26,7 +26,6 @@ import EmPanel from "./components/ui/EmPanel.vue";
 import EmTabs, { type EmTabOption } from "./components/ui/EmTabs.vue";
 import { useSessionStore } from "./stores/session";
 import { useAscensionStore } from "./stores/ascension";
-import { titleCase } from "./utils/ascension";
 
 /** Ascension: a main menu, then collect Ascended, battle wild ones, spend Insignia.
  * The game has its own theme (components/theme.css). Its store's loop runs
@@ -74,7 +73,7 @@ const heading = computed<{ title: string; subtitle: string }>(() => {
   }
   const wild = store.encounter;
   if (encounterStage.value === "setup" && wild !== null) {
-    return { title: "Prepare for battle", subtitle: `Wild ${wild.name} · ${titleCase(wild.tier_id)} · Level ${wild.level}` };
+    return { title: "Prepare for battle", subtitle: "Choose who steps into the arena, then set your battle plan." };
   }
   if (encounterStage.value === "preview") return { title: "A wild Ascended appeared", subtitle: "Take a look. Choose your moment." };
   return { title: "Into the wild", subtitle: "Your next Ascended is waiting." };

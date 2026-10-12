@@ -44,6 +44,28 @@ function button(buttons: DOMWrapper<HTMLButtonElement>[], text: string | RegExp)
 }
 
 describe("EncounterPanel", () => {
+  it("puts the selected fighter beside the opponent and summarizes squad availability", async () => {
+    const { wrapper } = mountPanel(PROFILE, ENCOUNTER);
+    await button(wrapper.findAll("button"), "Fight").trigger("click");
+    expect(wrapper.find(".matchup .player .ascended-name").text()).toBe("Guardian");
+    expect(wrapper.find(".matchup .wild .ascended-name").text()).toBe("Bruiser");
+    expect(wrapper.find(".squad-summary").text()).toBe("1 ready · 0 fainted · 4 open slots");
+    expect(wrapper.find("select[name='limit']").attributes("disabled")).toBeDefined();
+    expect(wrapper.find(".battle-footer").text()).toContain("Guardian gets full XP if you win or capture");
+  });
+
+  it("locks battle plan changes while a start request is in flight", async () => {
+    let resolve!: (value: ReturnType<typeof battleView>) => void;
+    client.startBattle.mockReturnValue(new Promise(done => { resolve = done; }));
+    const { wrapper } = mountPanel(PROFILE, ENCOUNTER);
+    await button(wrapper.findAll("button"), "Fight").trigger("click");
+    await wrapper.find("form.start-form").trigger("submit");
+    expect(wrapper.find("select[name='preset']").attributes("disabled")).toBeDefined();
+    expect(wrapper.findAll('[role="tab"]').every(t => t.attributes("disabled") !== undefined)).toBe(true);
+    expect(button(wrapper.findAll("button"), "Back to encounter").attributes("disabled")).toBeDefined();
+    resolve(battleView({ mode: "manual" }));
+    await flushPromises();
+  });
   it("lists the squad in order with empty slots and selects a ready fighter by keyboard", async () => {
     client.startBattle.mockResolvedValue(battleView({ mode: "manual" }));
     const profile = {
@@ -56,9 +78,9 @@ describe("EncounterPanel", () => {
     const choices = squad.findAll('[role="radio"]');
     expect(choices.map(c => c.attributes("aria-label"))).toEqual(["Striker", "Guardian"]);
     expect(squad.findAll(".empty-slot")).toHaveLength(3);
-    expect(wrapper.find(".detail .ascended-name").text()).toBe("Striker");
+    expect(wrapper.find(".matchup .player .ascended-name").text()).toBe("Striker");
     await choices[1]!.trigger("keydown.space");
-    expect(wrapper.find(".detail .ascended-name").text()).toBe("Guardian");
+    expect(wrapper.find(".matchup .player .ascended-name").text()).toBe("Guardian");
     await wrapper.find("form.start-form").trigger("submit");
     await flushPromises();
     expect(client.startBattle).toHaveBeenCalledWith(expect.objectContaining({ ascended_id: "guardian" }));
@@ -76,7 +98,7 @@ describe("EncounterPanel", () => {
     expect(choices[1]!.attributes("aria-checked")).toBe("true");
     await choices[0]!.trigger("click");
     await choices[0]!.trigger("keydown.enter");
-    expect(wrapper.find(".detail .ascended-name").text()).toBe("Striker");
+    expect(wrapper.find(".matchup .player .ascended-name").text()).toBe("Striker");
     store.profile = { ...profile, ascendeds: profile.ascendeds.map(a => ({ ...a, faint_until: Date.now() / 1000 + 600 })) };
     await wrapper.vm.$nextTick();
     expect(button(wrapper.findAll("button"), "Begin battle").attributes("disabled")).toBeDefined();
@@ -160,7 +182,7 @@ describe("EncounterPanel", () => {
     expect(submit.attributes("disabled")).toBeDefined();
     expect(form.text()).toContain("Autonomous play needs a preset and an EMBLEM limit.");
 
-    await form.findAll("[role=tab]").find((t) => t.text() === "2")!.trigger("click");
+    await form.find("select[name='preset']").setValue("2");
     await form.find("select[name='limit']").setValue("rare");
     expect(submit.attributes("disabled")).toBeUndefined();
     await form.trigger("submit");
