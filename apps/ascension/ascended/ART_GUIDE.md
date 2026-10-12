@@ -154,3 +154,19 @@ default 50.
    details, poses). Keep the three prompts' structure: they are built from sections 2 to 4 of this guide.
 4. Make the three sprites using `identity.md`, update it and the prompts when necessary, check section 7, and add
    the entry to the prompts file's "Status" line.
+
+## 9. Animation sheet (optional, `spreadsheet_animation.webp` + `animations.json`)
+
+`animations.json` is the source of truth: the grid, each state's row, frame count, frame time and loop. The game reads it.
+These rules cover what the JSON cannot say.
+
+- Lossless WebP atlas with alpha. Every cell has the same size (Twoychi: 320 x 320, 4 columns x 6 rows) with transparent padding.
+- Rows, top to bottom, are the states in `animations.json` (Twoychi: idle, attack, defend, support, flee, catch). Frames play left to right.
+  Idle and flee loop; the other rows play once, then return to idle.
+- Draw every frame on the same anchor, measured from the cell's top-left (Twoychi: 160, 296). Mirror the whole cell
+  horizontally for left-facing opponents, and mirror the anchor too.
+- Scale with nearest-neighbour only, to keep the pixel edges. Repack generated rows into equal cells without rescaling the art.
+- The sheet is generated frame art with small pose variation, not a rigged animation. Review it at battle scale.
+- `sprite_battle.webp` stays as the fallback and the reference art. The arena plays the sheet
+  (`web/src/components/ui/AnimatedSprite.vue`).
+- Twoychi's catch row is a catching action: Aya receives a water orb and draws it into her hands. It does not show Twoychi being captured.

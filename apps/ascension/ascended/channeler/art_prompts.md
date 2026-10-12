@@ -45,8 +45,8 @@ Create the battle sprite of an original game creature. Channeler is a floating b
 - Generated with the built-in image tool using the established preview as the character reference.
 - Main framing correction: shrink the complete character to fit y=230..800 on a 1536 x 1024 canvas; preserve all design details and fill surrounding space with matching dim forge. Centre crop to 1536 x 796.
 - Battle final: right-facing three-quarter casting pose, pure-black background, slate outlines, no floor or shadow. Resize with nearest-neighbour filtering and add black margins for a 512 x 512 lossless WebP. Transparency draft discarded because it contained coloured artifacts.
-- Source PNGs: `main.png` and `battle.png`. Preview remains untouched.
+- The preview remains untouched.
 
 ## Export size correction (2026-10-12)
 
-Preview exported at 512 x 512 without stretching. The original reference is retained as `preview_source.webp`. Portrait sources use a square crop at the catalog's existing `art.focus_preview`; square sources are downscaled with nearest-neighbour sampling. Main card must be 1536 x 796 and battle 512 x 512. Read `identity.md` and inspect the original reference before further generation.
+Preview exported at 512 x 512 without stretching. Portrait sources use a square crop at the catalog's existing `art.focus_preview`; square sources are downscaled with nearest-neighbour sampling. Main card must be 1536 x 796 and battle 512 x 512. Read `identity.md` and inspect `sprite_preview_card.webp` before further generation.

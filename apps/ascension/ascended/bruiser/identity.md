@@ -12,7 +12,7 @@ Palette: basalt brown-grey, slate iron, rust orange, warm ivory, amber and yello
 
 Primary reference for future recreation: `sprite_preview_card.webp`, the established portrait. Preserve its face, crest, tusks, colours, armour and core when recreating the main or battle sprite.
 
-Supporting full-body reference: `main.png`, established and inspected first, and its cropped `sprite_main_card.webp`. Use these to resolve leg proportions, feet, wrist bands and the single pauldron's anatomical shoulder. Supporting pose reference: `battle.png` and `sprite_battle.webp`. Preview source: `preview.png`; tiny-size readability reference: `preview_150.png`. All images are in this folder and have been generated and inspected.
+Supporting full-body reference: `sprite_main_card.webp`. Use it to resolve leg proportions, feet, wrist bands and the single pauldron's anatomical shoulder. Supporting pose reference: `sprite_battle.webp`. All images are in this folder.
 
 Established details: a jagged basalt crest above the forehead, reddish brown blunt snout with two dark nostrils, pointed warm brown ears, two upward-curving ivory tusks, angry amber eyes under heavy stone brows, three chunky toe claws per foot, and a rounded rock-plated belly core with bright branching amber fissures. The single pauldron is on the creature's left shoulder (viewer right in the frontal reference), with rust-orange edging, rivets and pale slate spikes. Wrist bands are broad slate iron cuffs with rust-orange rims. Maintain that anatomical shoulder across poses.
 

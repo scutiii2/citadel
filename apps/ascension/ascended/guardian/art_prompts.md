@@ -3,7 +3,7 @@
 Rules: `../ART_GUIDE.md` (read it first; it explains sizes, the black background and the crop steps).
 Files for this Ascended: `sprite_main_card.webp`, `sprite_preview_card.webp`, `sprite_battle.webp` (this folder).
 Primary reference: `sprite_preview_card.webp`; read `identity.md` before generation. Recreate main card and battle from this established preview.
-Status: preview preserved; main card and battle recreated from the preview, converted and visually inspected. Main 1536 x 796 WebP; battle 512 x 512 lossless WebP with transparency. In-game reload check pending. Source PNGs: `main_source.png`, `battle_source.png`.
+Status: preview preserved; main card and battle recreated from the preview, converted and visually inspected. Main 1536 x 796 WebP; battle 512 x 512 lossless WebP with transparency. In-game reload check pending.
 
 ## Design (the visual canon, keep it the same in all three sprites)
 
@@ -43,4 +43,4 @@ Use sprite_preview_card.webp as the exact character reference, preserving the de
 
 ## Export size correction (2026-10-12)
 
-Preview exported at 512 x 512 without stretching. The original reference is retained as `preview_source.webp`. Portrait sources use a square crop at the catalog's existing `art.focus_preview`; square sources are downscaled with nearest-neighbour sampling. Main card must be 1536 x 796 and battle 512 x 512. Read `identity.md` and inspect the original reference before further generation.
+Preview exported at 512 x 512 without stretching. Portrait sources use a square crop at the catalog's existing `art.focus_preview`; square sources are downscaled with nearest-neighbour sampling. Main card must be 1536 x 796 and battle 512 x 512. Read `identity.md` and inspect `sprite_preview_card.webp` before further generation.

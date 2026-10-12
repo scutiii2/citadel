@@ -20,4 +20,4 @@ Main card: low running hero stance, head turned toward the viewer, tail flowing 
 
 ## Preview export reference
 
-`sprite_preview_card.webp` is the 512 x 512 game export. `preview_source.webp` preserves the original unmodified reference, including details outside the square crop; inspect it when creating full-body sprites. The export correction changes framing and dimensions only, not the character identity.
+`sprite_preview_card.webp` is the 512 x 512 game export and the primary reference. The export correction changes framing and dimensions only, not the character identity.

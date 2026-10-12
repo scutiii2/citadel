@@ -17,7 +17,7 @@ Current art: main card and battle use the recreated Striker sprites and source P
 
 ## How to run it
 
-1. Read `identity.md` and upload `preview_source.webp` in the first message and add: "Redraw this exact character in the new format and keep the design."
+1. Read `identity.md` and upload `sprite_preview_card.webp` in the first message and add: "Redraw this exact character in the new format and keep the design."
 2. Paste the main card prompt. Iterate until the design is right.
 3. In the same chat paste the preview prompt, then the battle prompt, each starting with: "Use the character in the previous image as the exact reference: same design, colours, armour and proportions. "
 4. Crop and convert with the commands in `../ART_GUIDE.md` section 6, check the checklist in section 7.
@@ -42,4 +42,4 @@ Create the battle sprite of an original game creature. Striker is a small armour
 
 ## Export size correction (2026-10-12)
 
-Preview exported at 512 x 512 without stretching. The original reference is retained as `preview_source.webp`. Portrait sources use a square crop at the catalog's existing `art.focus_preview`; square sources are downscaled with nearest-neighbour sampling. Main card must be 1536 x 796 and battle 512 x 512. Read `identity.md` and inspect the original reference before further generation.
+Preview exported at 512 x 512 without stretching. Portrait sources use a square crop at the catalog's existing `art.focus_preview`; square sources are downscaled with nearest-neighbour sampling. Main card must be 1536 x 796 and battle 512 x 512. Read `identity.md` and inspect `sprite_preview_card.webp` before further generation.

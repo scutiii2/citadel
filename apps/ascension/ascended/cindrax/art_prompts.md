@@ -4,7 +4,7 @@ Rules: `../ART_GUIDE.md` (read it first; it explains sizes, the black background
 Files for this Ascended: `sprite_main_card.webp`, `sprite_preview_card.webp`, `sprite_battle.webp` (this folder).
 Primary reference: sprite_preview_card.webp; see identity.md for the established visual identity. Preserve the preview while recreating main card and battle art.
 
-Status (2026-10-12): main card and battle recreated with built-in image generation from the established preview. Main: 1536 x 796 WebP, centred crop from `main_source.png`. Battle: 512 x 512 transparent lossless WebP, right-facing floating pose, slate shadows and copper lava recesses, resized with nearest-neighbour and padded to clear margins from `battle_source.png`. Preview preserved. Layout tests passed; live game review remains pending.
+Status (2026-10-12): main card and battle recreated with built-in image generation from the established preview. Main: 1536 x 796 WebP, centred crop of the generated image. Battle: 512 x 512 transparent lossless WebP, right-facing floating pose, slate shadows and copper lava recesses, resized with nearest-neighbour and padded to clear margins. Preview preserved. Layout tests passed; live game review remains pending.
 
 Generation corrections: keep the main figure and shards within the central safe band; shrink the first composition rather than crop crown or tail. For battle, preserve the hovering anatomy and replace near-black armour and lava holes with visible slate/copper. Do not add legs, boots, ground or shadows. Use the exact visual features in `identity.md` throughout.
 
@@ -46,4 +46,4 @@ Create the battle sprite of an original game creature. Cindrax is a hovering mag
 
 ## Export size correction (2026-10-12)
 
-Preview exported at 512 x 512 without stretching. The original reference is retained as `preview_source.webp`. Portrait sources use a square crop at the catalog's existing `art.focus_preview`; square sources are downscaled with nearest-neighbour sampling. Main card must be 1536 x 796 and battle 512 x 512. Read `identity.md` and inspect the original reference before further generation.
+Preview exported at 512 x 512 without stretching. Portrait sources use a square crop at the catalog's existing `art.focus_preview`; square sources are downscaled with nearest-neighbour sampling. Main card must be 1536 x 796 and battle 512 x 512. Read `identity.md` and inspect `sprite_preview_card.webp` before further generation.

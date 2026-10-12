@@ -2,7 +2,7 @@
 
 Date: 2026-10-12. Status: built.
 Builds on the ability trees (`2026-10-12-ascension-ability-trees-design.md`). It gives the battle the mechanics that
-Twoychi's design list needs and the engine lacks (`ascended/twoychi/ability_design.md`, every item marked "later" that
+Twoychi's design list needs and the engine lacks (`docs/design/ascension/twoychi-ability-design.md`, every item marked "later" that
 this spec covers).
 
 ## Goal
