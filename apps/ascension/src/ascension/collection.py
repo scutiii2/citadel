@@ -35,23 +35,32 @@ class CollectionService:
         if player is None:
             raise NotFound("no profile yet; choose a starter first")
         now = self._clock.now()
+        essences = await tx.essence_counts(owner)
         ascendeds = []
         for ascended in await tx.list_ascendeds(owner):
             spec = self._catalog.ascended(ascended.ascended_id)
             level_cap = self._catalog.level_cap(ascended.ascended_id)
+            tier_id = self._catalog.tier_of(ascended.ascended_id, ascended.tier_id)
+            tier = self._catalog.tier(tier_id)
+            needed = tier.stars_to_advance
             ascendeds.append({
                 "ascended_id": ascended.ascended_id, "name": spec.name,
                 "ascension_types": [t.value for t in spec.ascension_types], "level": ascended.level, "xp": ascended.xp,
                 "xp_needed": None if ascended.level >= level_cap else self._catalog.levels.xp_per_level * ascended.level,
-                "level_cap": level_cap, "copies": ascended.copies,
-                "tier_id": self._catalog.tier_for_copies(ascended.ascended_id, ascended.copies),
+                "level_cap": level_cap, "copies": ascended.copies, "tier_id": tier_id,
+                "stars": ascended.stars, "stars_needed": needed, "star_essence_cost": tier.essence_cost,
+                "next_tier_id": self._catalog.next_tier(tier_id),
+                "can_star_up": needed is not None and ascended.stars < needed and ascended.copies >= 1
+                               and essences.get(tier_id, 0) >= tier.essence_cost,
+                "can_tier_up": needed is not None and ascended.stars >= needed,
                 "faint_until": ascended.faint_until,
                 "fainted": ascended.faint_until is not None and ascended.faint_until > now,
             })
         pending = await tx.pending_encounter(owner)
         active = await tx.active_battle(owner)
         return {
-            "owner": owner, "insignia": player.insignia, "emblems": await tx.emblem_counts(owner), "ascendeds": ascendeds,
+            "owner": owner, "insignia": player.insignia, "emblems": await tx.emblem_counts(owner), "essences": essences,
+            "ascendeds": ascendeds,
             "pending_encounter": pending.id if pending else None, "active_battle": active.id if active else None,
             "next_roll_at": None if player.last_roll_at is None else player.last_roll_at + self._cooldown,
         }
@@ -73,7 +82,8 @@ class CollectionService:
             await tx.create_player(owner, now)
             for tier_id, count in self._catalog.economy.starter_emblems.items():
                 await tx.add_emblems(owner, tier_id, count)
-            await tx.put_ascended(AscendedRecord(owner, starter_ascended_id, 0, 1, 0))
+            await tx.put_ascended(AscendedRecord(owner, starter_ascended_id, 0, 1, 0,
+                                                 tier_id=self._catalog.start_tier(starter_ascended_id)))
             types = list(self._catalog.personalities)
             type_id = types[min(int(self._rng.next() * len(types)), len(types) - 1)]
             personality = PersonalityRecord(new_id(), owner, starter_ascended_id, type_id,

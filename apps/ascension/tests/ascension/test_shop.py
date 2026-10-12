@@ -79,11 +79,11 @@ def test_unknown_tier_is_a_catalog_error(tmp_path):
 
 
 
-def test_selling_pays_the_value_before_the_copy_goes_and_can_downgrade(tmp_path):
+def test_selling_pays_the_value_at_the_current_tier_and_never_changes_it(tmp_path):
     async def scenario():
         env = make(tmp_path)
         await env.start_player()
-        await env.give(guardian=AscendedRecord("ann", "guardian", 10, 11, 0))  # Rare at 10 copies
+        await env.give(guardian=AscendedRecord("ann", "guardian", 10, 11, 0, tier_id="rare"))
         sale = await env.shop.sell_copy("ann", "s1", "guardian")
         insignia, _ = await balance(env)
         await env.close()
@@ -91,7 +91,7 @@ def test_selling_pays_the_value_before_the_copy_goes_and_can_downgrade(tmp_path)
 
     sale, insignia = run(scenario())
     value = CATALOG.sale_value("guardian", "rare", 11)
-    assert sale["value"] == value == insignia and sale["downgraded"] is True and sale["tier_id"] == "common" and sale["copies"] == 9
+    assert sale["value"] == value == insignia and sale["tier_id"] == "rare" and sale["copies"] == 9 and "downgraded" not in sale
 
 
 def test_selling_never_removes_the_owned_ascended_or_causes_fainting(tmp_path):
@@ -114,16 +114,11 @@ def test_selling_never_removes_the_owned_ascended_or_causes_fainting(tmp_path):
 
 @pytest.mark.parametrize("ascended_id", [s.id for s in CATALOG.regular_ascendeds()])
 @pytest.mark.parametrize("package", ["common", "rare", "unique", "royal", "legendary"])
-@pytest.mark.parametrize("start_copies,level", [(0, 1), (8, 7), (39, 30), (99, 12), (249, 30)])
-def test_buying_then_reselling_never_makes_a_profit(ascended_id, package, start_copies, level):
-    owned = AscendedRecord("ann", ascended_id, start_copies, level, 0)
-    price, granted, resulting = _price(owned, package)
-    resale = 0
-    copies = owned.copies + granted
-    for _ in range(granted):
-        tier = CATALOG.tier_for_copies(ascended_id, copies)
-        resale += CATALOG.sale_value(ascended_id, tier, level)
-        copies -= 1
+@pytest.mark.parametrize("tier,level", [("common", 1), ("rare", 7), ("unique", 30), ("royal", 12), ("legendary", 30)])
+def test_buying_then_reselling_never_makes_a_profit(ascended_id, package, tier, level):
+    owned = AscendedRecord("ann", ascended_id, 3, level, 0, tier_id=tier)
+    price, granted = _price(owned, package)
+    resale = granted * CATALOG.sale_value(ascended_id, tier, level)
     assert resale < price
 
 
@@ -154,9 +149,9 @@ def test_the_window_lists_offers_with_the_servers_price(tmp_path):
     assert window["seconds_left"] == window["refreshes_at"] - env.clock.now()
     first, second = window["offers"]
     owned = AscendedRecord("ann", "guardian", 0, 1, 0)
-    price, granted, resulting = _price(owned, "common")
+    price, granted = _price(owned, "common")
     assert (first["slot"], first["ascended_id"], first["tier_id"]) == (0, "guardian", "common")
-    assert (first["price"], first["copies_granted"], first["resulting_tier_id"]) == (price, granted, resulting)
+    assert (first["price"], first["copies_granted"]) == (price, granted)
     assert first["stock"] == 2 and first["left"] == 2 and second["left"] == 1
     assert "owned_copies" in first
 
@@ -196,25 +191,26 @@ def test_buying_a_new_ascended_starts_it_at_level_one(tmp_path):
     bought, profile = run(scenario())
     assert bought["price"] == 2 * 1 * 140 and bought["copies_granted"] == 1
     sentinel = next(s for s in profile["ascendeds"] if s["ascended_id"] == "sentinel")
-    assert (sentinel["level"], sentinel["copies"]) == (1, 1) and profile["insignia"] == 1000 - 280
+    assert (sentinel["level"], sentinel["copies"], sentinel["tier_id"]) == (1, 0, "common")  # the first copy is the Ascended
+    assert profile["insignia"] == 1000 - 280
 
 
-def test_buying_keeps_an_owned_ascended_level_and_prices_at_the_resulting_tier(tmp_path):
+def test_buying_keeps_an_owned_ascended_level_and_tier_and_prices_at_its_tier(tmp_path):
     async def scenario():
         env = fixed(Offer(0, "guardian", "rare", 1))(tmp_path)
         await env.start_player()
-        await env.give(insignia=5000, guardian=AscendedRecord("ann", "guardian", 9, 11, 40))
+        await env.give(insignia=5000, guardian=AscendedRecord("ann", "guardian", 9, 11, 40, tier_id="rare"))
         rotation = env.offers.rotation_at(env.clock.now())
-        bought = await env.shop.buy_offer("ann", "c1", rotation, 0)  # 9 + 2 = 11 copies -> Rare
+        bought = await env.shop.buy_offer("ann", "c1", rotation, 0)  # 9 + 2 = 11 spare copies
         profile = await env.collection.profile("ann")
         await env.close()
         return bought, profile
 
     bought, profile = run(scenario())
-    assert bought["resulting_tier_id"] == "rare" and bought["copies_granted"] == 2
+    assert bought["copies_granted"] == 2 and "resulting_tier_id" not in bought
     assert bought["price"] == 2 * 2 * CATALOG.sale_value("guardian", "rare", 11)  # 2 x copies x resale at Rare, level 11
     guardian = profile["ascendeds"][0]
-    assert (guardian["level"], guardian["xp"], guardian["copies"]) == (11, 40, 11)
+    assert (guardian["level"], guardian["xp"], guardian["copies"], guardian["tier_id"]) == (11, 40, 11, "rare")
 
 
 def test_a_stale_rotation_and_an_unknown_slot_are_refused(tmp_path):

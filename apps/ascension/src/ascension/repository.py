@@ -29,7 +29,7 @@ from src.ascension.records import (
     AscendedRecord,
 )
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 BASE_SCHEMA = """
 CREATE TABLE players (
     owner TEXT PRIMARY KEY, insignia INTEGER NOT NULL CHECK (insignia >= 0),
@@ -72,7 +72,20 @@ CREATE TABLE shop_purchases (
     owner TEXT NOT NULL, rotation INTEGER NOT NULL, slot INTEGER NOT NULL, bought INTEGER NOT NULL CHECK (bought >= 0),
     PRIMARY KEY (owner, rotation, slot));
 """
-SCHEMA = BASE_SCHEMA + SHOP_SCHEMA
+ESSENCE_SCHEMA = """
+CREATE TABLE essences (
+    owner TEXT NOT NULL, tier_id TEXT NOT NULL, count INTEGER NOT NULL CHECK (count >= 0),
+    PRIMARY KEY (owner, tier_id));
+"""
+# Version 3 kept a copy count that set the tier. Each owned Ascended keeps the tier its copies had reached
+# (the old thresholds), and those absorbed copies are spent: copies now only counts spare duplicates.
+STAR_MIGRATION = """
+ALTER TABLE ascendeds ADD COLUMN tier_id TEXT;
+ALTER TABLE ascendeds ADD COLUMN stars INTEGER NOT NULL DEFAULT 0 CHECK (stars >= 0);
+UPDATE ascendeds SET tier_id = CASE WHEN copies >= 250 THEN 'legendary' WHEN copies >= 100 THEN 'royal'
+    WHEN copies >= 40 THEN 'unique' WHEN copies >= 10 THEN 'rare' ELSE 'common' END, copies = 0;
+""" + ESSENCE_SCHEMA
+SCHEMA = BASE_SCHEMA + SHOP_SCHEMA + STAR_MIGRATION
 
 
 class AscendedTransaction(Protocol):
@@ -84,6 +97,8 @@ class AscendedTransaction(Protocol):
     async def set_last_roll(self, owner: str, when: float) -> None: ...
     async def emblem_counts(self, owner: str) -> dict[str, int]: ...
     async def add_emblems(self, owner: str, tier_id: str, delta: int) -> None: ...
+    async def essence_counts(self, owner: str) -> dict[str, int]: ...
+    async def add_essence(self, owner: str, tier_id: str, delta: int) -> None: ...
     async def get_ascended(self, owner: str, ascended_id: str) -> AscendedRecord | None: ...
     async def list_ascendeds(self, owner: str) -> list[AscendedRecord]: ...
     async def put_ascended(self, record: AscendedRecord) -> None: ...
@@ -179,11 +194,21 @@ class _SqliteTransaction:
         if changed == 0:
             await self._run("INSERT INTO emblems (owner, tier_id, count) VALUES (?, ?, ?)", (owner, tier_id, delta))
 
+    async def essence_counts(self, owner: str) -> dict[str, int]:
+        rows = await self._run("SELECT tier_id, count FROM essences WHERE owner = ? AND count > 0", (owner,), "all")
+        return {row["tier_id"]: row["count"] for row in rows}
+
+    async def add_essence(self, owner: str, tier_id: str, delta: int) -> None:
+        changed = await self._run("UPDATE essences SET count = count + ? WHERE owner = ? AND tier_id = ?", (delta, owner, tier_id))
+        if changed == 0:
+            await self._run("INSERT INTO essences (owner, tier_id, count) VALUES (?, ?, ?)", (owner, tier_id, delta))
+
     # -- Ascended, personalities, presets --------------------------------------------
 
     @staticmethod
     def _ascended(row: sqlite3.Row) -> AscendedRecord:
-        return AscendedRecord(row["owner"], row["ascended_id"], row["copies"], row["level"], row["xp"], row["faint_until"])
+        return AscendedRecord(row["owner"], row["ascended_id"], row["copies"], row["level"], row["xp"], row["faint_until"],
+                              row["tier_id"], row["stars"])
 
     async def get_ascended(self, owner: str, ascended_id: str) -> AscendedRecord | None:
         row = await self._run("SELECT * FROM ascendeds WHERE owner = ? AND ascended_id = ?", (owner, ascended_id), "one")
@@ -195,10 +220,12 @@ class _SqliteTransaction:
 
     async def put_ascended(self, record: AscendedRecord) -> None:
         await self._run(
-            "INSERT INTO ascendeds (owner, ascended_id, copies, level, xp, faint_until) VALUES (?, ?, ?, ?, ?, ?) "
+            "INSERT INTO ascendeds (owner, ascended_id, copies, level, xp, faint_until, tier_id, stars) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT (owner, ascended_id) DO UPDATE SET copies = excluded.copies, level = excluded.level, "
-            "xp = excluded.xp, faint_until = excluded.faint_until",
-            (record.owner, record.ascended_id, record.copies, record.level, record.xp, record.faint_until),
+            "xp = excluded.xp, faint_until = excluded.faint_until, tier_id = excluded.tier_id, stars = excluded.stars",
+            (record.owner, record.ascended_id, record.copies, record.level, record.xp, record.faint_until,
+             record.tier_id, record.stars),
         )
 
     @staticmethod
@@ -376,6 +403,7 @@ class _SqliteTransaction:
         await self._run("DELETE FROM personalities WHERE owner = ?", (owner,))
         await self._run("DELETE FROM ascendeds WHERE owner = ?", (owner,))
         await self._run("DELETE FROM emblems WHERE owner = ?", (owner,))
+        await self._run("DELETE FROM essences WHERE owner = ?", (owner,))
         await self._run("DELETE FROM shop_purchases WHERE owner = ?", (owner,))
         await self._run("DELETE FROM players WHERE owner = ?", (owner,))
         await self._run("DELETE FROM idempotency WHERE owner = ?", (owner,))
@@ -404,8 +432,9 @@ class SqliteAscendedRepository:
             version = conn.execute("PRAGMA user_version").fetchone()[0]
             if version == 0:
                 conn.executescript(f"BEGIN; {SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
-            elif version == 2:
-                conn.executescript(f"BEGIN; {SHOP_SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
+            elif version in (2, 3):
+                shop = SHOP_SCHEMA if version == 2 else ""
+                conn.executescript(f"BEGIN; {shop} {STAR_MIGRATION} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
             elif version != SCHEMA_VERSION:
                 raise RuntimeError(f"database schema version {version} is not supported (expected {SCHEMA_VERSION})")
         except BaseException:

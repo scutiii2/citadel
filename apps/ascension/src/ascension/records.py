@@ -20,10 +20,12 @@ class PlayerRecord:
 class AscendedRecord:
     owner: str
     ascended_id: str
-    copies: int
+    copies: int  # spare duplicates, spent one per star or sold
     level: int
     xp: int
     faint_until: float | None = None
+    tier_id: str | None = None  # None = the Ascended's start tier; Forbidden ignores it
+    stars: int = 0  # earned at this tier; reset when it moves up
 
 
 @dataclass(frozen=True)

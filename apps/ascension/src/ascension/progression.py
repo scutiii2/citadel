@@ -1,8 +1,8 @@
 """Progression: what a finished battle is worth.
 
-`apply_terminal` runs inside the caller's transaction, so XP, Insignia, copies,
-the awarded personality, fainting and the battle result are saved together or
-not at all.
+`apply_terminal` runs inside the caller's transaction, so XP, Insignia, essence,
+copies, the awarded personality, fainting and the battle result are saved together
+or not at all.
 """
 
 from __future__ import annotations
@@ -72,7 +72,10 @@ class ProgressionService:
             level, new_xp = self.add_xp(fighter.ascended_id, ascended.level, ascended.xp, xp)
             await tx.put_ascended(replace(ascended, level=level, xp=new_xp))
             await tx.add_insignia(owner, insignia)
-            result.update(xp=xp, insignia=insignia, level_before=ascended.level, level_after=level)
+            essence = self._catalog.tier(enemy.tier_id).essence_cost
+            await tx.add_essence(owner, enemy.tier_id, essence)
+            result.update(xp=xp, insignia=insignia, essence=essence, essence_tier_id=enemy.tier_id,
+                          level_before=ascended.level, level_after=level)
             if terminal == "captured":
                 result.update(await self._collect(tx, battle, rng))
         elif terminal in FAINTING:
@@ -86,9 +89,10 @@ class ProgressionService:
         reward = self._catalog.tier(enemy.tier_id).copy_reward
         owned = await tx.get_ascended(owner, enemy.ascended_id)
         if owned is None:
-            copies = self.add_copies(enemy.ascended_id, 0, reward)
-            await tx.put_ascended(AscendedRecord(owner, enemy.ascended_id, copies, 1, 0))
-            granted = copies
+            granted = self.add_copies(enemy.ascended_id, 0, reward)
+            copies = max(0, granted - 1)  # the first copy is the Ascended itself; the rest are spare
+            start = self._catalog.start_tier(enemy.ascended_id)
+            await tx.put_ascended(AscendedRecord(owner, enemy.ascended_id, copies, 1, 0, tier_id=start))
         else:
             copies = self.add_copies(enemy.ascended_id, owned.copies, reward)
             await tx.put_ascended(replace(owned, copies=copies))
@@ -101,7 +105,7 @@ class ProgressionService:
             "ascended_id": enemy.ascended_id,
             "copies_granted": granted,
             "copies": copies,
-            "tier_id": self._catalog.tier_for_copies(enemy.ascended_id, copies),
+            "tier_id": self._catalog.tier_of(enemy.ascended_id, owned.tier_id if owned else None),
             "awarded_personality": _describe(award.instance()),
             "revealed_personalities": [_describe(i) for i in instances],  # every source instance, awarded or not
         }

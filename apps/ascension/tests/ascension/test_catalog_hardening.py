@@ -68,9 +68,10 @@ def test_non_object_catalog_is_a_catalog_error():
         Catalog([])
 
 
-def test_negative_copies_clamp_to_the_lowest_tier():
+def test_an_unknown_saved_tier_is_a_catalog_error():
     catalog = Catalog.load(CATALOG_PATH, ASCENDEDS_PATH)
-    assert catalog.tier_for_copies("sentinel", -5) == "common"
+    with pytest.raises(CatalogError):
+        catalog.tier_of("sentinel", "mythic")
 
 
 @pytest.fixture

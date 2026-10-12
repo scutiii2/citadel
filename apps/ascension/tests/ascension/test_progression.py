@@ -93,11 +93,11 @@ def test_a_win_levels_up_with_carry():
     assert result["level_before"] == 1 and result["level_after"] == 2
 
 
-def test_capturing_an_unowned_ascended_starts_it_at_level_one_with_the_tiers_copies():
+def test_capturing_an_unowned_ascended_starts_it_at_level_one_and_its_start_tier_with_the_spare_copies():
     battle = build_battle(wild_ascended="channeler", wild_tier="rare")
     result, ascendeds, player, personalities = run(apply("captured", battle, FIGHTER, 0.5))
     new = ascendeds["channeler"]
-    assert (new.level, new.xp, new.copies) == (1, 0, 2)  # Rare grants 2 copies
+    assert (new.level, new.xp, new.copies, new.tier_id, new.stars) == (1, 0, 1, "common", 0)  # Rare grants 2: the first is the Ascended
     assert result["copies_granted"] == 2 and result["tier_id"] == "common"
     assert player.insignia == 125  # Rare level 10: 10 * 10 * 1.25
     assert [p.type_id for p in personalities["channeler"]] == ["BOLD"]  # draw 0.5 of 3 -> index 1
@@ -106,8 +106,8 @@ def test_capturing_an_unowned_ascended_starts_it_at_level_one_with_the_tiers_cop
     assert (ascendeds["guardian"].level, ascendeds["guardian"].xp) == (5, 280)  # 20 * 10 * 1.25 = 250 XP
 
 
-def test_capture_adds_copies_to_an_owned_ascended_and_tier_follows_the_count():
-    owned = AscendedRecord("ann", "scout", 8, 12, 40)
+def test_capture_adds_copies_to_an_owned_ascended_without_changing_its_tier():
+    owned = AscendedRecord("ann", "scout", 8, 12, 40, tier_id="rare")
     battle = build_battle(wild_ascended="scout", wild_tier="rare")
     result, ascendeds, _, _ = run(apply("captured", battle, FIGHTER, 0.0, others=(owned,)))
     assert (ascendeds["scout"].copies, ascendeds["scout"].level) == (10, 12) and result["tier_id"] == "rare"
@@ -149,10 +149,11 @@ def test_a_capped_forbidden_capture_still_pays_xp_insignia_and_a_personality():
     assert player.insignia == 800 and len(personalities["forbidden"]) == 1
 
 
-def test_a_first_forbidden_capture_grants_one_copy():
+def test_a_first_forbidden_capture_grants_the_ascended_and_no_spare_copy():
     battle = build_battle(wild_ascended="forbidden", wild_tier="forbidden", wild_level=3)
     result, ascendeds, _, _ = run(apply("captured", battle, FIGHTER, 0.0))
-    assert (ascendeds["forbidden"].copies, ascendeds["forbidden"].level, result["tier_id"]) == (1, 1, "forbidden")
+    assert (ascendeds["forbidden"].copies, ascendeds["forbidden"].level, result["tier_id"]) == (0, 1, "forbidden")
+    assert result["copies_granted"] == 1
 
 
 @pytest.mark.parametrize("terminal", ["knocked_out", "forfeited"])
@@ -185,3 +186,27 @@ def test_the_whole_result_is_atomic():
 
     ascended, player = run(scenario())
     assert ascended == FIGHTER and player.insignia == 0
+
+
+def test_a_win_pays_the_enemy_tiers_essence_and_a_forbidden_capture_pays_red_essence():
+    won, _, _, _ = run(apply("won", build_battle(wild_tier="royal"), FIGHTER))
+    assert (won["essence"], won["essence_tier_id"]) == (4, "royal")
+    captured, _, _, _ = run(apply("captured", build_battle(wild_ascended="forbidden", wild_tier="forbidden"), FIGHTER, 0.0))
+    assert (captured["essence"], captured["essence_tier_id"]) == (10, "forbidden")
+    lost, _, _, _ = run(apply("knocked_out", build_battle(), FIGHTER))
+    assert "essence" not in lost
+
+
+def test_the_essence_is_banked_with_the_profile():
+    async def scenario():
+        repo = SqliteAscendedRepository(":memory:")
+        async with repo.transaction() as tx:
+            await tx.create_player("ann", 1.0)
+            await tx.put_ascended(FIGHTER)
+            await progression.apply_terminal(tx, build_battle(wild_tier="rare"), "won", ScriptedRandom())
+            await progression.apply_terminal(tx, build_battle(wild_tier="rare"), "won", ScriptedRandom())
+            counts = await tx.essence_counts("ann")
+        await repo.close()
+        return counts
+
+    assert run(scenario()) == {"rare": 4}

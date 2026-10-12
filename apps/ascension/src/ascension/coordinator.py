@@ -160,7 +160,7 @@ class RoundCoordinator:
             if mode == "autonomous" and not instances:
                 raise InvalidRequest("that preset has no personalities; equip at least one")
             setup = BattleSetup(
-                self._engine.build_fighter(PLAYER, ascended_id, self._catalog.tier_for_copies(ascended_id, ascended.copies), ascended.level),
+                self._engine.build_fighter(PLAYER, ascended_id, self._catalog.tier_of(ascended_id, ascended.tier_id), ascended.level),
                 self._engine.build_fighter(WILD, encounter.ascended_id, encounter.tier_id, encounter.level),
             )
             record = BattleRecord(

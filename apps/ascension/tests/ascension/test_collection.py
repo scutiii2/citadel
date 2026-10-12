@@ -83,7 +83,7 @@ def test_profile_reports_xp_needed_faint_and_timers(tmp_path):
         await env.start_player()
         from src.ascension.records import AscendedRecord
 
-        await env.give(guardian=AscendedRecord("ann", "guardian", 12, 30, 0, faint_until=env.clock.now() + 60))
+        await env.give(guardian=AscendedRecord("ann", "guardian", 12, 30, 0, faint_until=env.clock.now() + 60, tier_id="rare"))
         profile = await env.collection.profile("ann")
         await env.close()
         return profile["ascendeds"][0]

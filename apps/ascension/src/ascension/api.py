@@ -21,6 +21,7 @@ from src.ascension.coordinator import RoundCoordinator
 from src.ascension.encounters import EncounterService
 from src.ascension.errors import EncounterCooldown, InvalidRequest, AscendedError
 from src.ascension.shop import ShopService
+from src.ascension.upgrades import UpgradeService
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class AscendedServices:
     collection: CollectionService
     encounters: EncounterService
     shop: ShopService
+    upgrades: UpgradeService
     coordinator: RoundCoordinator
 
 
@@ -107,13 +109,14 @@ def catalog_summary(catalog: Catalog) -> dict[str, Any]:
     return {
         "version": catalog.version,
         "tiers": [
-            {"id": t.id, "stat_multiplier": t.stat_multiplier, "copy_threshold": t.copy_threshold, "copy_reward": t.copy_reward,
+            {"id": t.id, "stat_multiplier": t.stat_multiplier, "stars_to_advance": t.stars_to_advance, "essence_cost": t.essence_cost,
+             "copy_reward": t.copy_reward,
              "emblem_strength": t.emblem_strength, "emblem_price": t.emblem_price}
             for t in catalog.tiers
         ],
         "levels": {"regular_cap": catalog.levels.regular_cap, "forbidden_cap": catalog.levels.forbidden_cap},
         "ascendeds": [
-            {"id": s.id, "name": s.name, "starter": s.starter, "forbidden": s.forbidden, "ascension_types": [t.value for t in s.ascension_types], "base": dict(s.base),
+            {"id": s.id, "name": s.name, "starter": s.starter, "forbidden": s.forbidden, "start_tier": catalog.start_tier(s.id), "ascension_types": [t.value for t in s.ascension_types], "base": dict(s.base),
              "growth": dict(s.growth), "base_price": s.base_price, "passive": s.passive.to_dict(),
              "abilities": [a.to_dict() for a in s.abilities], "art": _art_summary(s)}
             for s in catalog.all_ascendeds()
@@ -211,6 +214,14 @@ def build_router(services: AscendedServices) -> APIRouter:
         if body.kind == "copies" and body.rotation is not None and body.slot is not None:
             return await shop.buy_offer(owner, key, body.rotation, body.slot)
         raise HTTPException(400, 'kind must be "emblem" (with tier, quantity) or "copies" (with rotation, slot)')
+
+    @router.post("/ascendeds/{ascended_id}/stars", status_code=201)
+    async def add_star(ascended_id: str, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
+        return await services.upgrades.add_star(owner, key, ascended_id)
+
+    @router.post("/ascendeds/{ascended_id}/tier", status_code=201)
+    async def raise_tier(ascended_id: str, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
+        return await services.upgrades.raise_tier(owner, key, ascended_id)
 
     @router.post("/ascendeds/{ascended_id}/sales", status_code=201)
     async def sell(ascended_id: str, owner: str = Depends(requester), key: str = Depends(idempotency_key)):

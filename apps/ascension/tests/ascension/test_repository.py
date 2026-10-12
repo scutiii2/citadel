@@ -290,8 +290,8 @@ def test_shop_purchases_are_counted_per_slot_and_pruned(db_path):
     assert before == {0: 2, 2: 1} and old == {} and gone == {}
 
 
-def test_a_version_2_database_is_upgraded_to_3(db_path):
-    from src.ascension.repository import BASE_SCHEMA
+def test_a_version_2_database_is_upgraded_to_the_current_version(db_path):
+    from src.ascension.repository import BASE_SCHEMA, SCHEMA_VERSION
 
     db_path.parent.mkdir(parents=True)
     conn = sqlite3.connect(str(db_path))
@@ -313,4 +313,66 @@ def test_a_version_2_database_is_upgraded_to_3(db_path):
     check = sqlite3.connect(str(db_path))
     version = check.execute("PRAGMA user_version").fetchone()[0]
     check.close()
-    assert player.insignia == 7 and bought == {0: 1} and version == 3
+    assert player.insignia == 7 and bought == {0: 1} and version == SCHEMA_VERSION
+
+
+def test_a_version_3_database_keeps_each_ascended_tier_and_spends_the_absorbed_copies(db_path):
+    from src.ascension.repository import BASE_SCHEMA, SHOP_SCHEMA, SCHEMA_VERSION
+
+    db_path.parent.mkdir(parents=True)
+    conn = sqlite3.connect(str(db_path))
+    conn.executescript(f"{BASE_SCHEMA} {SHOP_SCHEMA} PRAGMA user_version = 3;")
+    conn.execute("INSERT INTO ascendeds (owner, ascended_id, copies, level, xp) VALUES ('ann', 'guardian', 12, 5, 0)")
+    conn.execute("INSERT INTO ascendeds (owner, ascended_id, copies, level, xp) VALUES ('ann', 'scout', 3, 1, 0)")
+    conn.commit()
+    conn.close()
+
+    async def scenario():
+        repo = SqliteAscendedRepository(db_path)
+        async with repo.transaction() as tx:
+            guardian, scout = await tx.get_ascended("ann", "guardian"), await tx.get_ascended("ann", "scout")
+            essences = await tx.essence_counts("ann")
+        await repo.close()
+        return guardian, scout, essences
+
+    guardian, scout, essences = run(scenario())
+    check = sqlite3.connect(str(db_path))
+    version = check.execute("PRAGMA user_version").fetchone()[0]
+    check.close()
+    assert (guardian.tier_id, guardian.copies, guardian.stars) == ("rare", 0, 0)
+    assert (scout.tier_id, scout.copies) == ("common", 0) and essences == {} and version == SCHEMA_VERSION
+
+
+def test_essence_accumulates_per_tier_cannot_go_negative_and_is_wiped_with_the_player(db_path):
+    async def scenario():
+        repo = SqliteAscendedRepository(db_path)
+        async with repo.transaction() as tx:
+            await tx.create_player("ann", 1.0)
+            await tx.add_essence("ann", "common", 5)
+            await tx.add_essence("ann", "common", -2)
+            await tx.add_essence("ann", "rare", 1)
+            counts = await tx.essence_counts("ann")
+        assert counts == {"common": 3, "rare": 1}
+        with pytest.raises(sqlite3.IntegrityError):
+            async with repo.transaction() as tx:
+                await tx.add_essence("ann", "common", -4)
+        async with repo.transaction() as tx:
+            await tx.delete_player_data("ann")
+            gone = await tx.essence_counts("ann")
+        await repo.close()
+        return gone
+
+    assert run(scenario()) == {}
+
+
+def test_tier_and_stars_round_trip(db_path):
+    async def scenario():
+        repo = SqliteAscendedRepository(db_path)
+        async with repo.transaction() as tx:
+            await tx.put_ascended(AscendedRecord("ann", "guardian", 2, 4, 50, tier_id="unique", stars=2))
+            saved = await tx.get_ascended("ann", "guardian")
+        await repo.close()
+        return saved
+
+    saved = run(scenario())
+    assert (saved.tier_id, saved.stars, saved.copies) == ("unique", 2, 2)

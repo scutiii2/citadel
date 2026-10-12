@@ -41,8 +41,8 @@ async def encounter(env, ascended_id="scout", tier="common", level=1, instances=
     return eid
 
 
-async def strong_guardian(env, copies=250, level=30):
-    await env.give(guardian=AscendedRecord("ann", "guardian", copies, level, 0))
+async def strong_guardian(env, copies=0, level=30):
+    await env.give(guardian=AscendedRecord("ann", "guardian", copies, level, 0, tier_id="legendary"))
 
 
 async def begin(env, coord, mode="manual", eid=None, slot=1, limit=None, **enc):
@@ -372,7 +372,7 @@ def test_a_capture_reveals_every_source_personality_and_spends_the_emblem(tmp_pa
     result = outcome["result"]
     assert result["kind"] == "captured" and {p["type"] for p in result["revealed_personalities"]} == {"COWARD", "BOLD"}
     assert len(pool) == 1 and result["awarded_personality"]["type"] in {"COWARD", "BOLD"}
-    assert ascendeds["channeler"].level == 1 and ascendeds["channeler"].copies == 1 and insignia == 10
+    assert ascendeds["channeler"].level == 1 and ascendeds["channeler"].copies == 0 and insignia == 10
     assert emblems["legendary"] == 40 - len(outcome["history"])  # one EMBLEM per attempt, win or lose
 
 

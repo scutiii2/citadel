@@ -81,3 +81,15 @@ class NothingToSell(Conflict):
 
 class SoldOut(Conflict):
     """The offer's stock for this rotation is used up."""
+
+
+class InsufficientCopies(Conflict):
+    """An upgrade needs a spare copy the player does not have."""
+
+
+class InsufficientEssence(Conflict):
+    """An upgrade needs more of the tier's essence than the player holds."""
+
+
+class UpgradeNotReady(Conflict):
+    """The Ascended cannot take that upgrade yet (stars full, stars short, or top of the ladder)."""

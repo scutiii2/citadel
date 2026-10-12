@@ -1,4 +1,4 @@
-"""The shop: buy EMBLEMs, buy this rotation's limited copy offers, sell copies back."""
+"""The shop: buy EMBLEMs, buy this rotation's limited copy offers, sell spare copies back."""
 
 from __future__ import annotations
 
@@ -25,15 +25,13 @@ class ShopService:
 
     # -- prices --------------------------------------------------------------------
 
-    def copy_price(self, ascended_id: str, owned: AscendedRecord | None, tier_id: str) -> tuple[int, int, str]:
-        """(price, copies granted, resulting tier) for buying the regular `tier_id` package.
-        The price is twice the resale value of the granted copies at the resulting tier and level."""
+    def copy_price(self, ascended_id: str, owned: AscendedRecord | None, tier_id: str) -> tuple[int, int]:
+        """(price, copies granted) for buying the regular `tier_id` package.
+        The price is twice the resale value of the granted copies at the Ascended's tier and level."""
         granted = self._catalog.tier(tier_id).copy_reward
-        copies = (owned.copies if owned else 0) + granted
-        resulting = self._catalog.tier_for_copies(ascended_id, copies)
-        level = owned.level if owned else 1
-        per_copy = self._catalog.sale_value(ascended_id, resulting, level)
-        return self._catalog.economy.purchase_factor * granted * per_copy, granted, resulting
+        current = self._catalog.tier_of(ascended_id, owned.tier_id if owned else None)
+        per_copy = self._catalog.sale_value(ascended_id, current, owned.level if owned else 1)
+        return self._catalog.economy.purchase_factor * granted * per_copy, granted
 
     # -- operations ----------------------------------------------------------------
 
@@ -77,11 +75,11 @@ class ShopService:
         offers = []
         for offer in window.offers:
             record = owned.get(offer.ascended_id)
-            price, granted, resulting = self.copy_price(offer.ascended_id, record, offer.tier_id)
+            price, granted = self.copy_price(offer.ascended_id, record, offer.tier_id)
             offers.append({
                 "slot": offer.slot, "ascended_id": offer.ascended_id, "tier_id": offer.tier_id,
                 "copies_granted": granted, "stock": offer.stock, "left": max(0, offer.stock - bought.get(offer.slot, 0)),
-                "price": price, "resulting_tier_id": resulting, "owned_copies": record.copies if record else 0,
+                "price": price, "owned": record is not None, "owned_copies": record.copies if record else 0,
             })
         return {"rotation": window.rotation, "refreshes_at": window.refreshes_at,
                 "seconds_left": max(0.0, window.refreshes_at - now), "offers": offers}
@@ -103,16 +101,17 @@ class ShopService:
                 raise SoldOut("that offer is sold out")
             await self._reject_if_fighting(tx, owner, offer.ascended_id)
             owned = await tx.get_ascended(owner, offer.ascended_id)
-            price, granted, resulting = self.copy_price(offer.ascended_id, owned, offer.tier_id)
+            price, granted = self.copy_price(offer.ascended_id, owned, offer.tier_id)
             await self._spend(tx, owner, price)
-            if owned is None:
-                await tx.put_ascended(AscendedRecord(owner, offer.ascended_id, granted, 1, 0))
+            if owned is None:  # the first copy is the Ascended itself; the rest are spare
+                start = self._catalog.start_tier(offer.ascended_id)
+                await tx.put_ascended(AscendedRecord(owner, offer.ascended_id, max(0, granted - 1), 1, 0, tier_id=start))
             else:
                 await tx.put_ascended(replace(owned, copies=owned.copies + granted))
             await tx.add_shop_purchase(owner, rotation, slot)
             await tx.prune_shop(owner, rotation)
             return {"kind": "copies", "ascended_id": offer.ascended_id, "tier_id": offer.tier_id, "copies_granted": granted,
-                    "price": price, "resulting_tier_id": resulting, "slot": slot, "rotation": rotation,
+                    "price": price, "slot": slot, "rotation": rotation,
                     "left": offer.stock - bought - 1}
 
         return await self._writer.commit(owner, key, "shop.offer", {"rotation": rotation, "slot": slot}, work)
@@ -124,13 +123,11 @@ class ShopService:
             await self._reject_if_fighting(tx, owner, ascended_id)
             owned = await tx.get_ascended(owner, ascended_id)
             if owned is None or owned.copies == 0:
-                raise NothingToSell("there is no absorbed copy to sell")
-            before = self._catalog.tier_for_copies(ascended_id, owned.copies)
-            value = self._catalog.sale_value(ascended_id, before, owned.level)  # tier and level before the copy goes
+                raise NothingToSell("there is no spare copy to sell")
+            tier_id = self._catalog.tier_of(ascended_id, owned.tier_id)
+            value = self._catalog.sale_value(ascended_id, tier_id, owned.level)
             await tx.put_ascended(replace(owned, copies=owned.copies - 1))
             await tx.add_insignia(owner, value)
-            after = self._catalog.tier_for_copies(ascended_id, owned.copies - 1)
-            return {"kind": "sale", "ascended_id": ascended_id, "value": value, "copies": owned.copies - 1,
-                    "tier_id": after, "downgraded": after != before}
+            return {"kind": "sale", "ascended_id": ascended_id, "value": value, "copies": owned.copies - 1, "tier_id": tier_id}
 
         return await self._writer.commit(owner, key, "shop.sell", {"ascended": ascended_id}, work)

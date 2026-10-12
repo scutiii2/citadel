@@ -274,3 +274,25 @@ def test_any_other_sprite_request_is_a_404_not_a_page(client, path):
     response = client.get(path)
     assert response.status_code == 404
     assert "text/html" not in response.headers.get("content-type", "")
+
+
+# -- stars and tiers -----------------------------------------------------------------
+
+def test_the_catalog_publishes_the_star_ladder_and_each_start_tier(client):
+    data = client.get("/ascension/catalog", headers=headers(client, owner="anyone")).json()
+    assert [(t["id"], t["stars_to_advance"], t["essence_cost"]) for t in data["tiers"]] == [
+        ("common", 1, 1), ("rare", 2, 2), ("unique", 3, 3), ("royal", 5, 4), ("legendary", None, 5), ("forbidden", None, 10)]
+    assert all("copy_threshold" not in t for t in data["tiers"])
+    assert {s["id"]: s["start_tier"] for s in data["ascendeds"]}["forbidden"] == "forbidden"
+
+
+def test_stars_and_tier_over_http(client):
+    start_profile(client)
+    profile = client.get("/ascension/profile", headers=headers(client, key=False)).json()
+    owned = profile["ascendeds"][0]
+    assert profile["essences"] == {} and (owned["tier_id"], owned["stars"], owned["stars_needed"]) == ("common", 0, 1)
+    assert owned["can_star_up"] is False and owned["can_tier_up"] is False
+    assert client.post(f"/ascension/ascendeds/{owned['ascended_id']}/stars", headers=headers(client)).status_code == 409  # no copy or essence
+    assert client.post(f"/ascension/ascendeds/{owned['ascended_id']}/tier", headers=headers(client)).status_code == 409  # no stars
+    assert client.post("/ascension/ascendeds/sentinel/stars", headers=headers(client)).status_code == 404  # not owned
+    assert client.post("/ascension/ascendeds/dragon/tier", headers=headers(client)).status_code == 404

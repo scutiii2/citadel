@@ -40,7 +40,8 @@ class TierSpec:
     emblem_strength: int
     emblem_price: int
     encounter_probability: float
-    copy_threshold: int | None  # None = outside the copy-based progression (Forbidden)
+    stars_to_advance: int | None  # stars that unlock the next tier; None = top of the ladder (Legendary, Forbidden)
+    essence_cost: int  # essence of this tier spent per star, and earned from beating an enemy of this tier
     copy_reward: int
 
 
@@ -62,6 +63,7 @@ class AscendedSpec:
     starter: bool
     forbidden: bool
     base_price: int
+    start_tier: str | None  # None = the first regular tier (Forbidden is always the Forbidden tier)
     base: Mapping[str, float]
     growth: Mapping[str, float]
     passive: PassiveSpec
@@ -169,7 +171,7 @@ def _ascended_spec(raw: Mapping[str, Any]) -> AscendedSpec:
         raise CatalogError(str(error)) from error
     return AscendedSpec(
         id=sid, name=_require(raw, "name", where), starter=bool(raw.get("starter")), forbidden=bool(raw.get("forbidden")),
-        base_price=_require(raw, "base_price", where), base=dict(base), growth=dict(growth),
+        base_price=_require(raw, "base_price", where), start_tier=raw.get("start_tier"), base=dict(base), growth=dict(growth),
         passive=PassiveSpec(_require(passive, "kind", f"{where} passive"), dict(passive.get("params", {}))), abilities=abilities,
         ascension_types=ascension_types, art=_art(raw, where),
     )
@@ -223,19 +225,23 @@ class Catalog:
         for tier in self.tiers:
             if tier.stat_multiplier <= 0 or tier.capture_multiplier <= 0 or tier.encounter_probability < 0:
                 raise CatalogError(f"tier {tier.id!r}: multipliers must be positive and probability non-negative")
+        regular_tier_ids = {t.id for t in self.regular_tiers}
         for spec in self._ascendeds.values():
             if spec.base_price <= 0:
                 raise CatalogError(f"ascended {spec.id!r}: base_price must be positive")
+            if spec.start_tier is not None and (spec.forbidden or spec.start_tier not in regular_tier_ids):
+                raise CatalogError(f"ascended {spec.id!r}: start_tier must be a regular tier (Forbidden has none)")
         if not math.isclose(sum(t.encounter_probability for t in self.tiers), 1.0, abs_tol=1e-9):
             raise CatalogError("tier encounter probabilities must sum to 1")
         if not math.isclose(sum(self.economy.personality_tier_probabilities), 1.0, abs_tol=1e-9):
             raise CatalogError("personality tier probabilities must sum to 1")
-        forbidden_tiers = [t for t in self.tiers if t.copy_threshold is None]
-        if len(forbidden_tiers) != 1 or self.tiers[-1] is not forbidden_tiers[0]:
-            raise CatalogError("exactly one tier, the last, may have copy_threshold null (Forbidden)")
-        thresholds = [t.copy_threshold for t in self.regular_tiers]
-        if thresholds[0] != 0 or thresholds != sorted(set(thresholds)):
-            raise CatalogError("regular copy thresholds must start at 0 and strictly increase")
+        if self.tiers[-1].stars_to_advance is not None:
+            raise CatalogError("the last tier (Forbidden) is outside the star ladder: stars_to_advance must be null")
+        ladder = [t.stars_to_advance for t in self.regular_tiers]
+        if ladder[-1] is not None or any(isinstance(n, bool) or not isinstance(n, int) or n < 1 for n in ladder[:-1]):
+            raise CatalogError("each regular tier but the last needs stars_to_advance of at least 1; the last needs null")
+        if any(isinstance(t.essence_cost, bool) or not isinstance(t.essence_cost, int) or t.essence_cost < 1 for t in self.tiers):
+            raise CatalogError("every tier needs an essence_cost of at least 1")
         regular_ids = {t.id for t in self.regular_tiers}
         if set(self.shop.stock) != regular_ids or set(self.shop.tier_weights) != regular_ids:
             raise CatalogError("shop stock and tier_weights must list exactly the regular tiers")
@@ -348,13 +354,24 @@ class Catalog:
         raw = (spec.base[stat] + spec.growth[stat] * (level - 1)) * self.tier(tier_id).stat_multiplier
         return max(1, math.floor(raw + 1e-9))
 
-    def tier_for_copies(self, ascended_id: str, copies: int) -> str:
-        """Highest regular tier whose threshold the copy count meets; Forbidden is fixed.
-        A negative count clamps to the lowest tier."""
-        if self.ascended(ascended_id).forbidden:
+    def start_tier(self, ascended_id: str) -> str:
+        """The tier an Ascended is first owned at."""
+        spec = self.ascended(ascended_id)
+        if spec.forbidden:
             return self.forbidden_tier.id
-        reached = [t for t in self.regular_tiers if copies >= t.copy_threshold]
-        return (reached or self.regular_tiers[:1])[-1].id
+        return spec.start_tier or self.regular_tiers[0].id
+
+    def tier_of(self, ascended_id: str, tier_id: str | None) -> str:
+        """The tier an owned Ascended is at now: its saved tier, else its start tier. Forbidden never moves."""
+        if self.ascended(ascended_id).forbidden or tier_id is None:
+            return self.start_tier(ascended_id)
+        return self.tier(tier_id).id
+
+    def next_tier(self, tier_id: str) -> str | None:
+        """The regular tier above `tier_id`, or None at the top of the ladder."""
+        ids = [t.id for t in self.regular_tiers]
+        position = ids.index(tier_id) if tier_id in ids else len(ids) - 1
+        return ids[position + 1] if position + 1 < len(ids) else None
 
     def sale_value(self, ascended_id: str, tier_id: str, level: int) -> int:
         """Insignia for selling one copy of an Ascended at this tier and level."""

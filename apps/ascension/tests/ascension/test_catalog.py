@@ -45,14 +45,26 @@ def test_every_ascended_grows_ten_percent_of_base(catalog):
             assert spec.growth[stat] == pytest.approx(spec.base[stat] * 0.1)
 
 
-@pytest.mark.parametrize("copies,tier", [(0, "common"), (9, "common"), (10, "rare"), (39, "rare"), (40, "unique"), (100, "royal"), (250, "legendary"), (9999, "legendary")])
-def test_regular_tier_follows_copies(catalog, copies, tier):
-    assert catalog.tier_for_copies("sentinel", copies) == tier
+@pytest.mark.parametrize("tier,stars,essence", [
+    ("common", 1, 1), ("rare", 2, 2), ("unique", 3, 3), ("royal", 5, 4), ("legendary", None, 5), ("forbidden", None, 10),
+])
+def test_the_star_ladder_follows_the_unity_tiers(catalog, tier, stars, essence):
+    assert (catalog.tier(tier).stars_to_advance, catalog.tier(tier).essence_cost) == (stars, essence)
+
+
+def test_the_tier_above_follows_the_ladder_and_stops_at_legendary(catalog):
+    assert [catalog.next_tier(t) for t in ("common", "rare", "unique", "royal", "legendary")] == [
+        "rare", "unique", "royal", "legendary", None]
+
+
+def test_an_owned_ascended_is_at_its_saved_tier_else_its_start_tier(catalog):
+    assert catalog.start_tier("sentinel") == "common"
+    assert catalog.tier_of("sentinel", None) == "common" and catalog.tier_of("sentinel", "royal") == "royal"
 
 
 def test_forbidden_is_always_forbidden(catalog):
-    assert catalog.tier_for_copies("forbidden", 0) == "forbidden"
-    assert catalog.tier_for_copies("forbidden", 100) == "forbidden"
+    assert catalog.start_tier("forbidden") == "forbidden"
+    assert catalog.tier_of("forbidden", None) == "forbidden" and catalog.tier_of("forbidden", "common") == "forbidden"
 
 
 def test_level_caps(catalog):
@@ -74,7 +86,10 @@ def _broken(raw, mutate):
 @pytest.mark.parametrize("mutate,message", [
     (lambda d: d["tiers"][0].update(encounter_probability=0.5), "sum to 1"),
     (lambda d: d["tiers"][1].update(id="common"), "unique"),
-    (lambda d: d["tiers"][2].update(copy_threshold=5), "strictly increase"),
+    (lambda d: d["tiers"][2].update(stars_to_advance=0), "stars_to_advance of at least 1"),
+    (lambda d: d["tiers"][4].update(stars_to_advance=3), "the last needs null"),
+    (lambda d: d["tiers"][1].update(essence_cost=0), "essence_cost of at least 1"),
+    (lambda d: _ascended(d, "guardian").update(start_tier="forbidden"), "start_tier must be a regular tier"),
     (lambda d: _ascended(d, "guardian").update(starter=False), "three Ascended must be starters"),
     (lambda d: _ascended(d, "sentinel")["abilities"].pop(), "unlock at levels"),
     (lambda d: _ascended(d, "guardian")["abilities"][1].pop("duration"), "SUPPORT needs"),
