@@ -51,7 +51,8 @@ class TreeNode:
         }
         if self.ability is not None:
             a = self.ability
-            shown.update(category=a.category, percentage=a.percentage, cooldown=a.cooldown, stat=a.stat, duration=a.duration)
+            shown.update(category=a.category, percentage=a.percentage, cooldown=a.cooldown, stat=a.stat, duration=a.duration,
+                         effects=[e.to_dict() for e in a.effects])
         if self.passive is not None:
             shown["passive"] = self.passive.to_dict()
         return shown

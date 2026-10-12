@@ -14,6 +14,8 @@ SIDES = (PLAYER, WILD)
 CATEGORIES = ("ATTACK", "DEFENSE", "SUPPORT", "FEAR", "INTERCEPT")
 ABILITY_CATEGORIES = ("ATTACK", "DEFENSE", "SUPPORT")
 
+STAT_STATUS = {"slow": "speed", "weaken": "power"}  # statuses that move a stat, with a negative amount
+HARMFUL = ("bleed", "slow", "weaken", "exposed")  # what cleanse removes
 
 def _legacy_stat(stat: str | None) -> str | None:
     """Battles saved before the ESSENCE to POWER rename still say "essence"."""
@@ -22,6 +24,24 @@ def _legacy_stat(stat: str | None) -> str | None:
 
 def other(side: str) -> str:
     return WILD if side == PLAYER else PLAYER
+
+
+@dataclass(frozen=True)
+class EffectSpec:
+    """One extra thing an ability does. See effects.py for the rules per kind."""
+
+    kind: str
+    percentage: float | None = None
+    rounds: int | None = None
+    name: str | None = None  # marks only
+    target: str | None = None  # marks only: "foe" or "self"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {k: v for k, v in self.__dict__.items() if v is not None}
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> "EffectSpec":
+        return cls(**raw)
 
 
 @dataclass(frozen=True)
@@ -35,12 +55,17 @@ class AbilitySpec:
     stat: str | None = None  # SUPPORT only: "power" or "speed"
     duration: int | None = None  # SUPPORT only: rounds, counting the activation round
 
+    effects: tuple["EffectSpec", ...] = ()
+
     def to_dict(self) -> dict[str, Any]:
-        return dict(self.__dict__)
+        raw = dict(self.__dict__)
+        raw["effects"] = [e.to_dict() for e in self.effects]
+        return raw
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "AbilitySpec":
-        return cls(**{**raw, "stat": _legacy_stat(raw.get("stat"))})
+        data = {**raw, "stat": _legacy_stat(raw.get("stat")), "effects": tuple(EffectSpec.from_dict(e) for e in raw.get("effects", []))}
+        return cls(**data)
 
 
 @dataclass(frozen=True)
@@ -103,6 +128,22 @@ class Buff:
 
 
 @dataclass(frozen=True)
+class Status:
+    """A lasting effect on a fighter: bleed, slow, weaken, exposed, regen, ward or a mark (`mark:<name>`)."""
+
+    id: str
+    amount: int
+    rounds_left: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return dict(self.__dict__)
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> "Status":
+        return cls(**raw)
+
+
+@dataclass(frozen=True)
 class DefenseEffect:
     rating: float
     attacks_left: int
@@ -152,17 +193,20 @@ class FighterState:
     buffs: tuple[Buff, ...] = ()
     defense: DefenseEffect | None = None
     cooldowns: tuple[tuple[str, int], ...] = ()  # (ability id, first round it is available again)
+    statuses: tuple[Status, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {"hp": self.hp, "buffs": [b.to_dict() for b in self.buffs],
                 "defense": self.defense.to_dict() if self.defense else None,
-                "cooldowns": [[a, r] for a, r in self.cooldowns]}
+                "cooldowns": [[a, r] for a, r in self.cooldowns],
+                "statuses": [s.to_dict() for s in self.statuses]}
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "FighterState":
         return cls(raw["hp"], tuple(Buff.from_dict(b) for b in raw["buffs"]),
                    DefenseEffect.from_dict(raw["defense"]) if raw["defense"] else None,
-                   tuple((a, r) for a, r in raw["cooldowns"]))
+                   tuple((a, r) for a, r in raw["cooldowns"]),
+                   tuple(Status.from_dict(s) for s in raw.get("statuses", [])))
 
 
 @dataclass(frozen=True)

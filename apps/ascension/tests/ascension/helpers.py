@@ -68,9 +68,9 @@ def setup(player: Fighter | None = None, wild: Fighter | None = None) -> BattleS
 
 def ability(
     id: str = "a1", category: str = "ATTACK", percentage: float = 150, cooldown: int = 1,
-    stat: str | None = None, duration: int | None = None, unlock_level: int = 1,
+    stat: str | None = None, duration: int | None = None, unlock_level: int = 1, effects: tuple = (),
 ) -> AbilitySpec:
-    return AbilitySpec(id, id, unlock_level, category, percentage, cooldown, stat, duration)
+    return AbilitySpec(id, id, unlock_level, category, percentage, cooldown, stat, duration, effects)
 
 
 def battle_record(owner: str = "ann", battle_id: str = "b1", encounter_id: str = "e1", status: str = "active", revision: int = 1):

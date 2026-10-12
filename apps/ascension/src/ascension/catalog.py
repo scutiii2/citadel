@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from src.ascension.ascension_types import AscensionType
+from src.ascension.effects import parse_effects
 from src.ascension.match_state import MoodConstants
 from src.ascension.personality_rules import Rule, parse_rules
 from src.ascension.models import ABILITY_CATEGORIES, CATEGORIES, AbilitySpec, PassiveSpec, Loadout
@@ -138,11 +139,15 @@ def _require(raw: Mapping[str, Any], key: str, where: str) -> Any:
 
 def _ability(raw: Mapping[str, Any], ascended_id: str) -> AbilitySpec:
     where = f"ascended {ascended_id!r} ability {raw.get('id')!r}"
+    try:
+        effects = parse_effects(raw.get("effects", []), where)
+    except ValueError as error:
+        raise CatalogError(str(error)) from error
     ability = AbilitySpec(
         id=_require(raw, "id", where), name=_require(raw, "name", where),
         unlock_level=_require(raw, "unlock_level", where), category=_require(raw, "category", where),
         percentage=float(_require(raw, "percentage", where)), cooldown=_require(raw, "cooldown", where),
-        stat=raw.get("stat"), duration=raw.get("duration"),
+        stat=raw.get("stat"), duration=raw.get("duration"), effects=effects,
     )
     if ability.category not in ABILITY_CATEGORIES:
         raise CatalogError(f"{where}: category must be one of {ABILITY_CATEGORIES}")
