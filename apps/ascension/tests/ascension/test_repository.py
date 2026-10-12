@@ -376,3 +376,53 @@ def test_tier_and_stars_round_trip(db_path):
 
     saved = run(scenario())
     assert (saved.tier_id, saved.stars, saved.copies) == ("unique", 2, 2)
+
+
+def test_learned_nodes_and_loadouts_round_trip_and_reset(db_path):
+    async def scenario():
+        repo = SqliteAscendedRepository(db_path)
+        async with repo.transaction() as tx:
+            await tx.create_player("ann", 1.0)
+            await tx.add_learned_node("ann", "guardian", "g_wall")
+            await tx.add_learned_node("ann", "guardian", "g_wall")  # a repeat changes nothing
+            await tx.add_learned_node("bob", "guardian", "g_other")
+            await tx.put_loadout("ann", "guardian", {"a1": "g_wall", "p1": "g_skin"})
+            await tx.put_loadout("ann", "guardian", {"a1": "g_a", "a2": "g_b"})  # replaces the old rows
+            learned, loadout, none = (await tx.learned_nodes("ann", "guardian"), await tx.get_loadout("ann", "guardian"),
+                                      await tx.get_loadout("ann", "scout"))
+        async with repo.transaction() as tx:
+            await tx.delete_player_data("ann")
+            gone = (await tx.learned_nodes("ann", "guardian"), await tx.get_loadout("ann", "guardian"))
+            bob = await tx.learned_nodes("bob", "guardian")
+        await repo.close()
+        return learned, loadout, none, gone, bob
+
+    learned, loadout, none, gone, bob = run(scenario())
+    assert learned == {"g_wall"} and loadout == {"a1": "g_a", "a2": "g_b"} and none == {}
+    assert gone == (set(), {}) and bob == {"g_other"}
+
+
+def test_a_version_4_database_gets_the_tree_tables(db_path):
+    from src.ascension.repository import BASE_SCHEMA, SHOP_SCHEMA, STAR_MIGRATION, SCHEMA_VERSION
+
+    db_path.parent.mkdir(parents=True)
+    conn = sqlite3.connect(str(db_path))
+    conn.executescript(f"{BASE_SCHEMA} {SHOP_SCHEMA} {STAR_MIGRATION} PRAGMA user_version = 4;")
+    conn.execute("INSERT INTO ascendeds (owner, ascended_id, copies, level, xp, tier_id) VALUES ('ann', 'guardian', 2, 5, 0, 'rare')")
+    conn.commit()
+    conn.close()
+
+    async def scenario():
+        repo = SqliteAscendedRepository(db_path)
+        async with repo.transaction() as tx:
+            kept = await tx.get_ascended("ann", "guardian")
+            await tx.add_learned_node("ann", "guardian", "g_wall")
+            learned = await tx.learned_nodes("ann", "guardian")
+        await repo.close()
+        return kept, learned
+
+    kept, learned = run(scenario())
+    check = sqlite3.connect(str(db_path))
+    version = check.execute("PRAGMA user_version").fetchone()[0]
+    check.close()
+    assert (kept.tier_id, kept.copies) == ("rare", 2) and learned == {"g_wall"} and version == SCHEMA_VERSION == 5

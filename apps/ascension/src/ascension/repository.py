@@ -29,7 +29,7 @@ from src.ascension.records import (
     AscendedRecord,
 )
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 BASE_SCHEMA = """
 CREATE TABLE players (
     owner TEXT PRIMARY KEY, insignia INTEGER NOT NULL CHECK (insignia >= 0),
@@ -85,7 +85,15 @@ ALTER TABLE ascendeds ADD COLUMN stars INTEGER NOT NULL DEFAULT 0 CHECK (stars >
 UPDATE ascendeds SET tier_id = CASE WHEN copies >= 250 THEN 'legendary' WHEN copies >= 100 THEN 'royal'
     WHEN copies >= 40 THEN 'unique' WHEN copies >= 10 THEN 'rare' ELSE 'common' END, copies = 0;
 """ + ESSENCE_SCHEMA
-SCHEMA = BASE_SCHEMA + SHOP_SCHEMA + STAR_MIGRATION
+TREE_SCHEMA = """
+CREATE TABLE learned_nodes (
+    owner TEXT NOT NULL, ascended_id TEXT NOT NULL, node_id TEXT NOT NULL,
+    PRIMARY KEY (owner, ascended_id, node_id));
+CREATE TABLE loadouts (
+    owner TEXT NOT NULL, ascended_id TEXT NOT NULL, slot TEXT NOT NULL, node_id TEXT NOT NULL,
+    PRIMARY KEY (owner, ascended_id, slot));
+"""
+SCHEMA = BASE_SCHEMA + SHOP_SCHEMA + STAR_MIGRATION + TREE_SCHEMA
 
 
 class AscendedTransaction(Protocol):
@@ -102,6 +110,10 @@ class AscendedTransaction(Protocol):
     async def get_ascended(self, owner: str, ascended_id: str) -> AscendedRecord | None: ...
     async def list_ascendeds(self, owner: str) -> list[AscendedRecord]: ...
     async def put_ascended(self, record: AscendedRecord) -> None: ...
+    async def learned_nodes(self, owner: str, ascended_id: str) -> set[str]: ...
+    async def add_learned_node(self, owner: str, ascended_id: str, node_id: str) -> None: ...
+    async def get_loadout(self, owner: str, ascended_id: str) -> dict[str, str]: ...
+    async def put_loadout(self, owner: str, ascended_id: str, slots: dict[str, str]) -> None: ...
     async def add_personality(self, record: PersonalityRecord) -> None: ...
     async def list_personalities(self, owner: str, ascended_id: str, limit: int, after_seq: int) -> list[PersonalityRecord]: ...
     async def get_personalities(self, owner: str, ascended_id: str, ids: list[str]) -> list[PersonalityRecord]: ...
@@ -227,6 +239,24 @@ class _SqliteTransaction:
             (record.owner, record.ascended_id, record.copies, record.level, record.xp, record.faint_until,
              record.tier_id, record.stars),
         )
+
+    async def learned_nodes(self, owner: str, ascended_id: str) -> set[str]:
+        rows = await self._run("SELECT node_id FROM learned_nodes WHERE owner = ? AND ascended_id = ?", (owner, ascended_id), "all")
+        return {row["node_id"] for row in rows}
+
+    async def add_learned_node(self, owner: str, ascended_id: str, node_id: str) -> None:
+        await self._run("INSERT OR IGNORE INTO learned_nodes (owner, ascended_id, node_id) VALUES (?, ?, ?)",
+                        (owner, ascended_id, node_id))
+
+    async def get_loadout(self, owner: str, ascended_id: str) -> dict[str, str]:
+        rows = await self._run("SELECT slot, node_id FROM loadouts WHERE owner = ? AND ascended_id = ?", (owner, ascended_id), "all")
+        return {row["slot"]: row["node_id"] for row in rows}
+
+    async def put_loadout(self, owner: str, ascended_id: str, slots: dict[str, str]) -> None:
+        await self._run("DELETE FROM loadouts WHERE owner = ? AND ascended_id = ?", (owner, ascended_id))
+        for slot, node_id in slots.items():
+            await self._run("INSERT INTO loadouts (owner, ascended_id, slot, node_id) VALUES (?, ?, ?, ?)",
+                            (owner, ascended_id, slot, node_id))
 
     @staticmethod
     def _personality(row: sqlite3.Row) -> PersonalityRecord:
@@ -401,6 +431,8 @@ class _SqliteTransaction:
         await self._run("DELETE FROM encounters WHERE owner = ?", (owner,))
         await self._run("DELETE FROM presets WHERE owner = ?", (owner,))
         await self._run("DELETE FROM personalities WHERE owner = ?", (owner,))
+        await self._run("DELETE FROM learned_nodes WHERE owner = ?", (owner,))
+        await self._run("DELETE FROM loadouts WHERE owner = ?", (owner,))
         await self._run("DELETE FROM ascendeds WHERE owner = ?", (owner,))
         await self._run("DELETE FROM emblems WHERE owner = ?", (owner,))
         await self._run("DELETE FROM essences WHERE owner = ?", (owner,))
@@ -432,9 +464,10 @@ class SqliteAscendedRepository:
             version = conn.execute("PRAGMA user_version").fetchone()[0]
             if version == 0:
                 conn.executescript(f"BEGIN; {SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
-            elif version in (2, 3):
+            elif version in (2, 3, 4):
                 shop = SHOP_SCHEMA if version == 2 else ""
-                conn.executescript(f"BEGIN; {shop} {STAR_MIGRATION} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
+                stars = STAR_MIGRATION if version in (2, 3) else ""
+                conn.executescript(f"BEGIN; {shop} {stars} {TREE_SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
             elif version != SCHEMA_VERSION:
                 raise RuntimeError(f"database schema version {version} is not supported (expected {SCHEMA_VERSION})")
         except BaseException:
