@@ -74,6 +74,8 @@ def test_the_default_loadout_is_the_catalog_kit(raw):
     (lambda s: s.update(tree=tree_of(nodes=[ABILITY, {**ABILITY, "x": 250}])), "unique"),
     (lambda s: s.update(tree=tree_of(nodes=[{**ABILITY, "requires": []}])), "unreachable"),
     (lambda s: s.update(tree={"nodes": tree_of()["nodes"], "extra": 1}), "only nodes"),
+    (lambda s: s.update(tree={"nodes": [{**n, "requires": ["guardian_rally"]} if n["id"] == "guardian_bulwark" else n
+                                        for n in tree_of()["nodes"]]}), "root cannot have requirements"),
 ])
 def test_a_broken_tree_is_a_catalog_error(raw, mutate, message):
     with pytest.raises(CatalogError, match=message):

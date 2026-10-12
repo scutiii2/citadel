@@ -3,7 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useAscensionClient, type LoadoutSlot, type OwnedAscended, type TreeNodeState, type TreeView } from "../api/AscensionClient";
 import { useAscensionStore } from "../stores/ascension";
 import { errorMessage } from "../utils/errors";
-import { titleCase } from "../utils/ascension";
+import { passiveText, titleCase } from "../utils/ascension";
 import EmButton from "./ui/EmButton.vue";
 import EmNotice from "./ui/EmNotice.vue";
 
@@ -19,6 +19,8 @@ const ABILITY_SLOTS: LoadoutSlot[] = ["a1", "a2", "a3"];
 const tree = ref<TreeView | null>(null);
 const selectedId = ref<string | null>(null);
 const error = ref("");
+/** A failed load, else the failure of the last learn or equip (the store keeps it). */
+const shownError = computed(() => error.value || store.error);
 
 const selected = computed(() => tree.value?.nodes.find((n) => n.id === selectedId.value) ?? null);
 const byId = computed(() => new Map((tree.value?.nodes ?? []).map((n) => [n.id, n])));
@@ -57,7 +59,7 @@ const equippedSlot = (node: TreeNodeState): LoadoutSlot | null =>
 
 const costText = (node: TreeNodeState): string => (node.cost ? `${node.cost.amount} ${node.cost.tier} essence` : "free");
 const detail = (node: TreeNodeState): string => {
-  if (node.kind === "passive") return `Passive: ${titleCase(node.passive?.kind ?? "none")}`;
+  if (node.kind === "passive") return node.passive ? passiveText(node.passive.kind, node.passive.params) : "No passive effect.";
   const bits = [`${node.category ?? ""} ${node.percentage ?? 0}%`, `cooldown ${node.cooldown ?? 1}`];
   if (node.stat) bits.push(`+${node.stat} for ${node.duration} rounds`);
   return bits.join(", ");
@@ -91,7 +93,7 @@ async function save(next: Record<LoadoutSlot, string | null>): Promise<void> {
 
 <template>
   <section class="tree-tab">
-    <EmNotice v-if="error" tone="error">{{ error }}</EmNotice>
+    <EmNotice v-if="shownError" tone="error">{{ shownError }}</EmNotice>
     <template v-if="tree">
       <div class="slots" aria-label="Equipped">
         <span v-for="slot in ABILITY_SLOTS" :key="slot" class="slot"><small>{{ slot.toUpperCase() }}</small> {{ slotLabel(slot) }}</span>

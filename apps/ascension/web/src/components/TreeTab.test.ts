@@ -102,4 +102,26 @@ describe("TreeTab", () => {
 
     expect(client.saveLoadout).toHaveBeenCalledWith("guardian", ["g_a", "g_b"], null);
   });
+
+  it("shows why a learn failed inside the tab", async () => {
+    client.learnNode.mockRejectedValue(new Error("Iron Wall needs 3 common essence"));
+    const wrapper = await mountTab();
+
+    await wrapper.find('[data-node="g_wall"]').trigger("click");
+    await wrapper.find(".node-detail button.learn").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find(".tree-tab .em-notice").text()).toContain("Iron Wall needs 3 common essence");
+  });
+
+  it("describes a passive with its numbers", async () => {
+    const tree = structuredClone(TREE);
+    tree.nodes[2] = { ...tree.nodes[2]!, passive: { kind: "defense_rating_bonus", params: { power_fraction: 0.4 } } };
+    client.tree.mockResolvedValue(tree);
+    const wrapper = await mountTab();
+
+    await wrapper.find('[data-node="g_pass"]').trigger("click");
+
+    expect(wrapper.find(".node-detail").text()).toContain("Defense rating rises by 40% of its Power.");
+  });
 });

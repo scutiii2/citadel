@@ -184,6 +184,8 @@ def _tree(raw: Any, spec_id: str, abilities: tuple[AbilitySpec, ...], passive: P
             raise CatalogError(f"{at}: x and y must be numbers")
         x, y = item["x"], item["y"]
         if item.get("root"):
+            if item.get("requires"):
+                raise CatalogError(f"{at}: a root cannot have requirements")
             listed_roots.append(node_id)
             if node_id == passive_id:
                 nodes.append(TreeNode(node_id, "passive", passive.kind.replace("_", " ").title(), x, y, root=True, passive=passive))
