@@ -160,7 +160,7 @@ The file is an object with a `nodes` list. Every node has a unique `id` and nume
 - Roots list `id`, `root: true`, `x` and `y`; for example, `{"id": "guardian_bulwark", "root": true, "x": 60, "y": 300}`.
   List all three catalog abilities and the passive root `<id>_passive`. Their names and numbers come from `catalog.json`.
   Roots are free and always learned. Without a tree file, the catalog supplies these four roots.
-- Ability nodes have `kind: "ability"`, `name`, `category`, `percentage`, `cooldown` and `unlock_level`.
+- Ability nodes have `kind: "ability"`, `name`, `category`, `percentage`, `cooldown`, `unlock_level` and optional `effects`.
   SUPPORT also has `stat` (`power` or `speed`) and `duration`.
 - Passive nodes have `kind: "passive"`, `name`, `unlock_level` and `passive: {"kind": ..., "params": {...}}`,
   using an existing passive kind.
@@ -177,6 +177,51 @@ Ability level gates still apply in battle.
 A battle freezes the equipped loadout when it starts. That Ascended's loadout cannot change during its active battle;
 other Ascended can still change theirs. Database version 5 adds `learned_nodes` and `loadouts` without changing
 version 4 data. Roots are implied rather than stored, and resetting progress removes both tables' rows for the player.
+
+## Effects
+
+Catalog abilities and ability nodes may carry an optional `effects` list, with at most three objects.
+Each object has a `kind` and the fields below. Missing effects preserve the existing ability behavior;
+saved battles without effects or statuses still load.
+
+| Kind | Fields | Target and behavior |
+|---|---|---|
+| `heal` | `percentage` | Self: restores that percentage of power as HP, capped at max HP. |
+| `regen` | `percentage`, `rounds` | Self: restores that amount each round. |
+| `bleed` | `percentage`, `rounds` | Foe: deals that amount each round (at least 1), ignoring defense. |
+| `slow` | `percentage`, `rounds` | Foe: lowers current speed by that percentage, with a stat floor of 1. |
+| `weaken` | `percentage`, `rounds` | Foe: lowers current power by that percentage, with a stat floor of 1. |
+| `exposed` | `percentage`, `rounds` | Foe: subtracts that amount of power from its shield rating, never below 0. |
+| `mark` | `name`, `rounds`, optional `target` | A named mark; target is `foe` (default) or `self`. |
+| `cleanse` | none | Self: removes bleed, slow, weaken and exposed; marks, regen and ward stay. |
+| `ward` | `rounds` | Self: one lethal attack or bleed tick leaves 1 HP and consumes the ward. |
+
+Percentages must be positive, durations at least one round, and mark names lowercase letters and underscores.
+Unknown fields are rejected. Numbers are placeholders (?). Except slow and weaken, amounts use the caster's power:
+unbuffed power for SUPPORT, current power for DEFENSE and ATTACK.
+
+SUPPORT applies its buff then effects; DEFENSE applies its shield then effects. ATTACK applies effects after its hit
+only while the target survives. At the end of a surviving round, the wild side ticks first, then the player;
+each regenerates before bleeding. If both die from ticks, the player wins. A lethal bleed ends the battle without
+advancing the round. Status rounds count down afterward, including the activation round, and zero-round statuses expire.
+
+Fighters save statuses as `id`, `amount`, `rounds_left`. Applying the same id replaces its amount and duration;
+statuses never stack. Marks use `mark:<name>` and have no effect until a passive reads them. A ward also expires
+after its rounds. Public battle views show statuses and ability effects; revealed events describe heals, statuses,
+cleanses, ticks and ward rescues. Bleed ticks do not count as attack damage in the hidden mood meters.
+
+Two passive kinds read these mechanics: `attack_bonus_vs_marked` (`mark`, `power_fraction`) adds that fraction
+of power as raw attack damage against the matching mark; `heal_bonus` (`fraction`, optional `hp_below`) multiplies
+heals and regeneration by `1 + fraction`, optionally only below that share of max HP.
+The autonomous policy does not yet account for wasting a heal at full HP.
+
+For example, an attack node deals its normal damage, applies bleed and a prey mark if the foe survives, then
+bleed ticks at the end of that round. All values below are placeholders (?).
+
+```json
+{"id": "twoychi_rending_bite", "name": "Rending Bite", "unlock_level": 10, "category": "ATTACK", "percentage": 180, "cooldown": 2,
+ "effects": [{"kind": "bleed", "percentage": 20, "rounds": 3}, {"kind": "mark", "name": "prey", "rounds": 3}]}
+```
 
 ## Rotating shop
 

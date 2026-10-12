@@ -1,5 +1,8 @@
 # Twoychi: ability design
 
+Healing, bleed, slow, weaken, exposed, marks, cleanse and ward now exist in the engine (see the README, Effects).
+The tree has not been converted yet; the rows marked later that need only these mechanics can now become real.
+
 Source: a draft ability list for Twoychi (four trees: Troy Wolf, Troy Bear, Troy Dog, Aya), written for a real-time game.
 The game here is a turn-based 1v1 with three ability categories, so the tree in `tree.json` uses only what the engine
 can do today. Everything else stays in this file, marked **later**, until the engine can express it.
