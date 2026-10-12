@@ -35,6 +35,7 @@ export function ascendedInfo(id: string, extra: Partial<AscendedInfo> = {}): Asc
       { id: `${id}_strike`, name: "Strike", unlock_level: 1, category: "ATTACK", percentage: 120, cooldown: 1, stat: null, duration: null },
       { id: `${id}_rally`, name: "Rally", unlock_level: 5, category: "SUPPORT", percentage: 50, cooldown: 3, stat: "power", duration: 2 },
     ],
+    tree: [],
     art: artFor(id),
     ...extra,
   };

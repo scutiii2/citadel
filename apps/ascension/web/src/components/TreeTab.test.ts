@@ -1,0 +1,105 @@
+import { flushPromises, mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useAscensionClient, type TreeView } from "../api/AscensionClient";
+import { CATALOG, PROFILE, ownedAscended } from "../api/AscensionClient.fixtures";
+import { useAscensionStore } from "../stores/ascension";
+import TreeTab from "./TreeTab.vue";
+
+vi.mock("../api/AscensionClient", () => {
+  const client = { tree: vi.fn(), learnNode: vi.fn(), saveLoadout: vi.fn(), profile: vi.fn() };
+  return { useAscensionClient: () => client };
+});
+
+const client = vi.mocked(useAscensionClient());
+
+const node = (id: string, extra = {}) => ({
+  id, kind: "ability" as const, name: id.replace("g_", "").toUpperCase(), x: 40, y: 40, requires: [], unlock_level: 1, root: false,
+  cost: null, category: "ATTACK", percentage: 100, cooldown: 1, stat: null, duration: null, state: "learned" as const, reason: null, ...extra,
+});
+
+const TREE: TreeView = {
+  ascended_id: "guardian", level: 12, essences: { common: 3 },
+  nodes: [
+    node("g_a", { root: true, x: 40, y: 40 }),
+    node("g_b", { root: true, x: 40, y: 160, category: "DEFENSE" }),
+    node("g_pass", { kind: "passive", root: true, x: 160, y: 100, passive: { kind: "none", params: {} } }),
+    node("g_wall", { x: 200, y: 40, requires: ["g_a"], unlock_level: 12, cost: { tier: "common", amount: 3 }, state: "learnable" }),
+    node("g_far", { x: 320, y: 40, requires: ["g_wall"], unlock_level: 20, cost: { tier: "rare", amount: 3 }, state: "locked", reason: "needs level 20" }),
+  ],
+  loadout: { a1: "g_a", a2: "g_b", a3: null, p1: "g_pass" },
+};
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  setActivePinia(createPinia());
+  const store = useAscensionStore();
+  store.catalog = CATALOG;
+  store.profile = PROFILE;
+  client.tree.mockResolvedValue(structuredClone(TREE));
+  client.profile.mockResolvedValue(PROFILE);
+});
+
+const mountTab = async () => {
+  const wrapper = mount(TreeTab, { props: { ascended: ownedAscended("guardian", { level: 12 }) } });
+  await flushPromises();
+  return wrapper;
+};
+
+describe("TreeTab", () => {
+  it("draws every node at its place with its state and a line per prerequisite", async () => {
+    const wrapper = await mountTab();
+
+    expect(client.tree).toHaveBeenCalledWith("guardian");
+    const nodes = wrapper.findAll(".tree-node");
+    expect(nodes).toHaveLength(5);
+    expect(wrapper.find('[data-node="g_wall"]').attributes("data-state")).toBe("learnable");
+    expect(wrapper.find('[data-node="g_far"]').attributes("data-state")).toBe("locked");
+    expect(wrapper.find('[data-node="g_wall"]').attributes("style")).toContain("left: 200px");
+    expect(wrapper.findAll(".tree-line")).toHaveLength(2);
+    expect(wrapper.find(".slots").text()).toContain("empty");
+  });
+
+  it("learns a node and reloads the tree", async () => {
+    client.learnNode.mockResolvedValue({ kind: "learn", ascended_id: "guardian", node_id: "g_wall", essence_tier: "common", essence_spent: 3 });
+    const wrapper = await mountTab();
+
+    await wrapper.find('[data-node="g_wall"]').trigger("click");
+    expect(wrapper.find(".node-detail").text()).toContain("3 common essence");
+    await wrapper.find(".node-detail button.learn").trigger("click");
+    await flushPromises();
+
+    expect(client.learnNode).toHaveBeenCalledWith("guardian", "g_wall");
+    expect(client.tree).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows why a locked node cannot be learned and disables Learn", async () => {
+    const wrapper = await mountTab();
+
+    await wrapper.find('[data-node="g_far"]').trigger("click");
+    expect(wrapper.find(".node-detail").text()).toContain("needs level 20");
+    expect(wrapper.find(".node-detail button.learn").exists()).toBe(false);
+  });
+
+  it("equips a learned ability in a slot and saves the whole loadout", async () => {
+    client.saveLoadout.mockResolvedValue({ ascended_id: "guardian", abilities: ["g_b"], passive: "g_pass" });
+    const wrapper = await mountTab();
+
+    await wrapper.find('[data-node="g_b"]').trigger("click");
+    await wrapper.find('.node-detail button[data-slot="a1"]').trigger("click");
+    await flushPromises();
+
+    expect(client.saveLoadout).toHaveBeenCalledWith("guardian", ["g_b"], "g_pass");
+  });
+
+  it("can unequip the passive", async () => {
+    client.saveLoadout.mockResolvedValue({ ascended_id: "guardian", abilities: ["g_a", "g_b"], passive: null });
+    const wrapper = await mountTab();
+
+    await wrapper.find('[data-node="g_pass"]').trigger("click");
+    await wrapper.find(".node-detail button.unequip").trigger("click");
+    await flushPromises();
+
+    expect(client.saveLoadout).toHaveBeenCalledWith("guardian", ["g_a", "g_b"], null);
+  });
+});

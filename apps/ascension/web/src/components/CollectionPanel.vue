@@ -6,6 +6,7 @@ import { useAscensionStore } from "../stores/ascension";
 import { errorMessage } from "../utils/errors";
 import { filterByType, groupByType, typeLabel, typesPresent } from "../utils/ascensionTypes";
 import { titleCase } from "../utils/ascension";
+import TreeTab from "./TreeTab.vue";
 import PresetEditor from "./PresetEditor.vue";
 import AscendedCard from "./AscendedCard.vue";
 import AscendedTemplateCard from "./AscendedTemplateCard.vue";
@@ -37,6 +38,7 @@ const notOwned = computed(() => filterByType(allNotOwned.value, typeFilter.value
 const groups = computed(() => groupByType(owned.value));
 
 const open = ref<OwnedAscended | null>(null);
+const treeOpen = ref(false);
 const openInfo = computed(() => store.catalog?.ascendeds.find((s) => s.id === open.value?.ascended_id) ?? null);
 const personalities = ref<PersonalityItem[]>([]);
 const nextCursor = ref<number | null>(null);
@@ -89,6 +91,7 @@ async function raiseTier(ascended: OwnedAscended): Promise<void> {
 }
 
 function show(ascended: OwnedAscended): void {
+  treeOpen.value = false;
   upgradeMessage.value = "";
   open.value = ascended;
   personalities.value = [];
@@ -190,6 +193,8 @@ function show(ascended: OwnedAscended): void {
             <p v-if="upgradeMessage" class="upgrade-note" role="status">{{ upgradeMessage }}</p>
           </div>
 
+          <EmButton :aria-expanded="treeOpen" @click="treeOpen = !treeOpen">{{ treeOpen ? "Hide ability tree" : "Ability tree" }}</EmButton>
+          <TreeTab v-if="treeOpen" :ascended="open" />
           <div class="people-head">
             <h4>Collected personalities</h4>
             <small class="em-num">{{ personalities.length }}{{ nextCursor !== null ? "+" : "" }} collected</small>

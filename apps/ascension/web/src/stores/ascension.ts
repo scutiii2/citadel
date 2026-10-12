@@ -16,6 +16,8 @@ import {
   type Sale,
   type StarUp,
   type TierUp,
+  type LearnResult,
+  type LoadoutResult,
   type StartBattleInput,
 } from "../api/AscensionClient";
 import { ApiError, UnauthorizedError } from "../api/http";
@@ -435,6 +437,14 @@ export const useAscensionStore = defineStore("ascension", () => {
     return mutate(() => ascensionClient.addStar(ascendedId), () => refreshProfile());
   }
 
+  function learnNode(ascendedId: string, nodeId: string): Promise<LearnResult | null> {
+    return mutate(() => ascensionClient.learnNode(ascendedId, nodeId), () => refreshProfile());
+  }
+
+  function saveLoadout(ascendedId: string, abilities: string[], passive: string | null): Promise<LoadoutResult | null> {
+    return mutate(() => ascensionClient.saveLoadout(ascendedId, abilities, passive), () => undefined);
+  }
+
   function raiseTier(ascendedId: string): Promise<TierUp | null> {
     return mutate(() => ascensionClient.raiseTier(ascendedId), () => refreshProfile());
   }
@@ -518,6 +528,8 @@ export const useAscensionStore = defineStore("ascension", () => {
     sellCopy,
     addStar,
     raiseTier,
+    learnNode,
+    saveLoadout,
     resetProgress,
     act,
     answerEmblem,

@@ -45,6 +45,22 @@ export interface AscendedArtInfo {
   focus_preview: number;
 }
 
+export interface TreeCost { tier: string; amount: number }
+export interface TreeNodeView {
+  id: string; kind: "ability" | "passive"; name: string; x: number; y: number; requires: string[];
+  unlock_level: number; root: boolean; cost: TreeCost | null;
+  category?: string; percentage?: number; cooldown?: number; stat?: string | null; duration?: number | null;
+  passive?: { kind: string; params: Record<string, unknown> };
+}
+export interface TreeNodeState extends TreeNodeView { state: "learned" | "learnable" | "locked"; reason: string | null }
+export type LoadoutSlot = "a1" | "a2" | "a3" | "p1";
+export interface TreeView {
+  ascended_id: string; level: number; essences: Record<string, number>;
+  nodes: TreeNodeState[]; loadout: Record<LoadoutSlot, string | null>;
+}
+export interface LearnResult { kind: "learn"; ascended_id: string; node_id: string; essence_tier: string; essence_spent: number }
+export interface LoadoutResult { ascended_id: string; abilities: string[]; passive: string | null }
+
 export interface AscendedInfo {
   id: string;
   name: string;
@@ -59,6 +75,7 @@ export interface AscendedInfo {
   base_price: number;
   passive: { kind: string; params: Record<string, unknown> };
   abilities: AbilityInfo[];
+  tree: TreeNodeView[];
   art: AscendedArtInfo;
 }
 
@@ -391,6 +408,12 @@ export class AscensionClient {
   sellCopy = (ascendedId: string, key: string = newIdempotencyKey()) =>
     this.http.request<Sale>("POST", `${BASE}/ascendeds/${part(ascendedId)}/sales`, undefined, withKey(key));
   /** One star: a spare copy plus the tier's essence. */
+  tree = (ascendedId: string) => this.http.request<TreeView>("GET", `${BASE}/ascendeds/${part(ascendedId)}/tree`);
+  learnNode = (ascendedId: string, nodeId: string, key: string = newIdempotencyKey()) =>
+    this.http.request<LearnResult>("POST", `${BASE}/ascendeds/${part(ascendedId)}/tree/${part(nodeId)}/learn`, undefined, withKey(key));
+  saveLoadout = (ascendedId: string, abilities: string[], passive: string | null, key: string = newIdempotencyKey()) =>
+    this.http.request<LoadoutResult>("PUT", `${BASE}/ascendeds/${part(ascendedId)}/loadout`, { abilities, passive }, withKey(key));
+
   addStar = (ascendedId: string, key: string = newIdempotencyKey()) =>
     this.http.request<StarUp>("POST", `${BASE}/ascendeds/${part(ascendedId)}/stars`, undefined, withKey(key));
   /** With enough stars, the next tier; the stars start again. */
