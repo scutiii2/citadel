@@ -1,4 +1,5 @@
 """What an Ascended can read about the match, and the hidden mood it builds.
+Bleed ticks count as damage, heals and regen as recovery.
 
 Both are derived from public battle state and its history, so nothing is saved and a
 restarted battle decides identically. Pure: no database, clock or model.
@@ -71,9 +72,12 @@ class MatchReader:
         leads = [0.0]
         for revealed in state.history:
             attacks = [e for e in revealed.events if e.get("type") == "attack"]
-            taken = sum(e["damage"] for e in attacks if e["side"] == foe)
-            dealt = sum(e["damage"] for e in attacks if e["side"] == side)
-            own_hp, enemy_hp = max(0.0, own_hp - taken), max(0.0, enemy_hp - dealt)
+            bleeds = [e for e in revealed.events if e.get("type") == "tick" and e.get("kind") == "bleed"]
+            heals = [e for e in revealed.events if e.get("type") == "heal" or (e.get("type") == "tick" and e.get("kind") == "regen")]
+            taken = sum(e["damage"] for e in attacks if e["side"] == foe) + sum(e["amount"] for e in bleeds if e["side"] == side)
+            dealt = sum(e["damage"] for e in attacks if e["side"] == side) + sum(e["amount"] for e in bleeds if e["side"] == foe)
+            own_hp = min(float(own.max_hp), max(0.0, own_hp - taken + sum(e["amount"] for e in heals if e["side"] == side)))
+            enemy_hp = min(float(enemy.max_hp), max(0.0, enemy_hp - dealt + sum(e["amount"] for e in heals if e["side"] == foe)))
             own_fraction, enemy_fraction = own_hp / own.max_hp, enemy_hp / enemy.max_hp
             lead = own_fraction - enemy_fraction
             hit = taken / own.max_hp

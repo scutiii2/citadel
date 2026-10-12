@@ -65,7 +65,7 @@ Example, in an ability node or `catalog.json` ability:
   and the round does not advance.
 - New events in the revealed round: `heal`, `status` (id, target, amount, rounds), `cleanse`, `tick` (bleed or regen,
   amount, hp), `ward_triggered`. They are public like the existing ones, and `MatchReader` still reads only `attack`
-  events (a bleed tick is not counted as damage dealt in the mood meters; recorded as a follow-up).
+  events (the mood replay counts bleed ticks as damage and heals and regen as recovery).
 
 ## Passives
 
@@ -106,6 +106,8 @@ apply to ability nodes in `tree.json`.
 ## Open questions
 
 - The numbers are placeholders (?). Bleed ignoring defense and slow as a percentage of speed are first guesses.
-- A heal at full HP wastes the turn. The autonomous policy should learn this (a follow-up term).
+- Done: the autonomous policy applies a fit multiplier (`status_fit.py`) after its two stages: heals at full HP, cleanses with
+  nothing to clean, a ward already up and a status the foe already has are weighted down; a cleanse with a harmful status
+  on you and a heal when wounded are weighted up.
 - Marks are only readable by the two new passives for now; abilities that react to a mark are a later addition.
 - Twoychi's conversion (which "later" abilities become real effects) is its own plan after this lands.

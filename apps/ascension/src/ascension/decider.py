@@ -12,6 +12,7 @@ from src.ascension.match_state import MatchReader
 from src.ascension.models import PLAYER, Action, BattleSetup, BattleState, PersonalityInstance
 from src.ascension.policy import ActionPolicy, Mood, PolicyContext
 from src.ascension.runtime import RandomSource
+from src.ascension.status_fit import action_fit
 from src.ascension.situation import SituationReader, SituationViewBuilder
 
 
@@ -46,7 +47,7 @@ class ActionDecider:
         context = PolicyContext(
             situation=situation, enemy_hp_fraction=view.enemy_hp_fraction, enemy_flee_share=flee_share,
             collector=side == PLAYER, recent_keys=tuple(r.actions[side][0] for r in state.history), weights=weights,
-            match=match, meters=meters, rules=rules,
+            match=match, meters=meters, rules=rules, fit=action_fit(setup, state, side, legal),
         )
         decision = self._policy.choose(legal, context, rng.next())
         details = decision.details or {}

@@ -11,7 +11,7 @@ personality biases behaviour without making it predictable.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 from src.ascension.catalog import Catalog, PolicySpec
@@ -43,6 +43,7 @@ class PolicyContext:
     match: MatchState | None = None  # None: no personality rule can fire
     meters: MoodMeters | None = None
     rules: tuple[ActiveRule, ...] = ()
+    fit: Mapping[str, float] = field(default_factory=dict)  # action key -> how well it suits the state (a heal at full HP is poor)
 
 
 @dataclass(frozen=True)
@@ -210,6 +211,10 @@ class ActionPolicy:
             shares = self._within([actions[i] for i in indexes], ctx, fired)
             for index, share in zip(indexes, shares):
                 probabilities[index] = categories[category] * share
+        if ctx.fit:
+            weighted = [p * ctx.fit.get(a.key, 1.0) for a, p in zip(actions, probabilities)]
+            total = sum(weighted)
+            probabilities = [w / total for w in weighted]
         return Explanation(probabilities, categories, [a.name for a in fired])
 
     def probabilities(self, actions: Sequence[Action], ctx: PolicyContext) -> list[float]:

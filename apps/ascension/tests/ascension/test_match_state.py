@@ -76,3 +76,18 @@ def test_the_wild_side_reads_the_same_battle_from_its_own_seat():
 def test_reading_twice_gives_the_same_answer():
     history = [rnd(1, hits=[(WILD, 12)]), rnd(2, hits=[(PLAYER, 5)])]
     assert read(history, player_hp=88, wild_hp=95) == read(history, player_hp=88, wild_hp=95)
+
+
+def test_bleed_ticks_count_as_damage_and_heals_as_recovery():
+    from src.ascension.models import RevealedRound
+
+    events = (
+        {"type": "tick", "side": PLAYER, "kind": "bleed", "amount": 10, "hp": 90},
+        {"type": "heal", "side": WILD, "amount": 15},
+        {"type": "tick", "side": WILD, "kind": "regen", "amount": 5, "hp": 100},
+    )
+    first = RevealedRound(1, {PLAYER: ("attack", "ATTACK"), WILD: ("attack", "ATTACK")}, events)
+    match, meters = read([first], player_hp=90, wild_hp=100)
+    assert match.hit_taken == pytest.approx(0.1)
+    assert meters.rage == pytest.approx(0.4)
+    assert meters.confidence == pytest.approx(0.3)  # the lead shrank: own lost 10, the foe healed back to full
