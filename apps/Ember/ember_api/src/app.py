@@ -48,6 +48,7 @@ from src.services.migrations import MigrationRunner
 from src.services.chat_service import MAX_CHAT_BYTES
 from src.services.email_service import EmailSender, McpEmailSender
 from src.services.game_manifest import ManifestFetcher
+from src.services.game_sync import GameSyncScheduler
 from src.services.extension_probe import ExtensionProbe
 from src.services.log_service import LogWriter
 from src.services.mcp_proxy import McpProxy
@@ -70,6 +71,8 @@ DEFAULT_REQUEST_BYTES = 1024 * 1024
 # The routes that take big bodies: chats (history imports, questions with
 # attached text), attachment files and command-form uploads.
 LARGE_BODY_PREFIXES = ("/api/chats", "/api/attachments", "/api/uploads")
+# How often registered games are re-read for manifest changes (a game may start after ember_api).
+GAME_SYNC_EVERY = timedelta(minutes=10)
 
 # No read timeout: an MCP event stream stays open for as long as a chat turn
 # (or the session) lasts. Connect/write/pool still fail fast.
@@ -155,9 +158,14 @@ def create_app(
             )
             backups.start()
             app.state.backups = backups
+        game_sync = GameSyncScheduler(
+            database, app.state.game_fetcher, settings.games_allow_private_urls, GAME_SYNC_EVERY
+        )
+        game_sync.start()
         try:
             yield
         finally:
+            await game_sync.stop()
             if backups is not None:
                 await backups.stop()
             # Before the database closes: running turns save what they have.
