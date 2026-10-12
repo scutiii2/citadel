@@ -47,6 +47,16 @@ const mountTab = async () => {
 };
 
 describe("TreeTab", () => {
+  it("shows an ability's effects in the node detail", async () => {
+    const tree = structuredClone(TREE);
+    tree.nodes[3] = { ...tree.nodes[3]!, effects: [{ kind: "bleed", percentage: 20, rounds: 3 }] };
+    client.tree.mockResolvedValue(tree);
+    const wrapper = await mountTab();
+
+    await wrapper.find('[data-node="g_wall"]').trigger("click");
+
+    expect(wrapper.find(".node-detail").text()).toContain("Bleeds 20% for 3 rounds");
+  });
   it("draws every node at its place with its state and a line per prerequisite", async () => {
     const wrapper = await mountTab();
 

@@ -53,6 +53,15 @@ const manual = () =>
   });
 
 describe("BattleArena", () => {
+  it("lists statuses beside buffs", () => {
+    const view = battleView({
+      player: fighter("guardian", { statuses: [{ id: "mark:prey", amount: 0, rounds_left: 2 }] }),
+      wild: fighter("bruiser", { statuses: [{ id: "bleed", amount: 5, rounds_left: 3 }] }),
+    });
+    const wrapper = mount(BattleArena, { props: { battle: view } });
+    expect(wrapper.text()).toContain("marked prey, 2 rounds left");
+    expect(wrapper.text()).toContain("bleeding 5 a round, 3 rounds left");
+  });
   it("shows both Ascended with their health written out, and what affects them", () => {
     const view = battleView({
       wild: fighter("bruiser", { hp: 20, buffs: [{ source: "bruiser_rally", stat: "power", amount: 4, rounds_left: 2 }] }),

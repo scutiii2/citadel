@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CATALOG } from "../api/AscensionClient.fixtures";
-import { abilityEffect, actionTone, describeAction, describeEvent, formatCountdown, passiveText, tierStanding, titleCase } from "./ascension";
+import { effectText, statusText, abilityEffect, actionTone, describeAction, describeEvent, formatCountdown, passiveText, tierStanding, titleCase } from "./ascension";
 
 const NAMES = { player: "Guardian", wild: "Bruiser" };
 
@@ -65,5 +65,55 @@ describe("actionTone", () => {
     expect(actionTone("flee", "FLEE")).toBe("flee");
     expect(actionTone("catch", "CATCH")).toBe("catch");
     expect(actionTone("ability:odd", "MYSTERY")).toBe("other");
+  });
+});
+
+describe("effects in words", () => {
+  it("writes each effect kind", () => {
+    expect(effectText(undefined)).toBe("");
+    expect(effectText([])).toBe("");
+    expect(effectText([{ kind: "heal", percentage: 50 }])).toBe("Heals 50% of power");
+    expect(effectText([{ kind: "regen", percentage: 25, rounds: 3 }])).toBe("Regenerates 25% for 3 rounds");
+    expect(effectText([{ kind: "bleed", percentage: 20, rounds: 1 }])).toBe("Bleeds 20% for 1 round");
+    expect(effectText([{ kind: "slow", percentage: 30, rounds: 2 }, { kind: "weaken", percentage: 10, rounds: 2 }])).toBe(
+      "Slows 30% for 2 rounds, Weakens 10% for 2 rounds",
+    );
+    expect(effectText([{ kind: "exposed", percentage: 40, rounds: 2 }])).toBe("Exposes 40% for 2 rounds");
+    expect(effectText([{ kind: "mark", name: "prey", rounds: 3 }])).toBe("Marks prey for 3 rounds");
+    expect(effectText([{ kind: "mark", name: "soaked", rounds: 2, target: "self" }])).toBe("Gains the soaked mark for 2 rounds");
+    expect(effectText([{ kind: "cleanse" }, { kind: "ward", rounds: 2 }])).toBe("Cleanses, Wards one lethal hit for 2 rounds");
+  });
+
+  it("appends effects to the ability line only when there are some", () => {
+    expect(abilityEffect({ category: "ATTACK", percentage: 150, cooldown: 1 })).toBe("Attack 150% · cd 1");
+    expect(abilityEffect({ category: "ATTACK", percentage: 150, cooldown: 1, effects: [{ kind: "bleed", percentage: 20, rounds: 3 }] })).toBe(
+      "Attack 150% · cd 1 · Bleeds 20% for 3 rounds",
+    );
+  });
+
+  it("writes statuses and the new passives and events", () => {
+    expect(statusText({ id: "bleed", amount: 5, rounds_left: 2 })).toBe("bleeding 5 a round, 2 rounds left");
+    expect(statusText({ id: "slow", amount: -10, rounds_left: 1 })).toBe("slowed by 10, 1 round left");
+    expect(statusText({ id: "weaken", amount: -4, rounds_left: 2 })).toBe("weakened by 4, 2 rounds left");
+    expect(statusText({ id: "exposed", amount: 20, rounds_left: 2 })).toBe("exposed, defense down 20, 2 rounds left");
+    expect(statusText({ id: "regen", amount: 7, rounds_left: 3 })).toBe("regenerating 7 a round, 3 rounds left");
+    expect(statusText({ id: "ward", amount: 0, rounds_left: 2 })).toBe("warded, 2 rounds left");
+    expect(statusText({ id: "mark:prey", amount: 0, rounds_left: 1 })).toBe("marked prey, 1 round left");
+    expect(passiveText("attack_bonus_vs_marked", { mark: "prey", power_fraction: 0.2 })).toBe(
+      "Attacks deal extra damage equal to 20% of its Power against a target marked prey.",
+    );
+    expect(passiveText("heal_bonus", { fraction: 0.5 })).toBe("Heals are 50% stronger.");
+    expect(passiveText("heal_bonus", { fraction: 0.5, hp_below: 0.5 })).toBe("Below 50% HP, heals are 50% stronger.");
+    expect(describeEvent({ type: "heal", side: "player", amount: 12 }, NAMES)).toBe("Guardian heals 12");
+    expect(describeEvent({ type: "status", side: "player", target: "wild", status: "bleed", amount: 5, rounds: 2 }, NAMES)).toBe(
+      "Guardian puts bleed on Bruiser for 2 rounds",
+    );
+    expect(describeEvent({ type: "status", side: "player", target: "wild", status: "mark:prey", amount: 0, rounds: 1 }, NAMES)).toBe(
+      "Guardian puts a prey mark on Bruiser for 1 round",
+    );
+    expect(describeEvent({ type: "cleanse", side: "wild", removed: ["bleed", "slow"] }, NAMES)).toBe("Bruiser cleanses bleed, slow");
+    expect(describeEvent({ type: "tick", side: "wild", kind: "bleed", amount: 5, hp: 30 }, NAMES)).toBe("Bruiser bleeds for 5; 30 HP left");
+    expect(describeEvent({ type: "tick", side: "player", kind: "regen", amount: 7, hp: 60 }, NAMES)).toBe("Guardian recovers 7; 60 HP");
+    expect(describeEvent({ type: "ward_triggered", side: "player" }, NAMES)).toBe("Guardian is saved by a ward at 1 HP");
   });
 });

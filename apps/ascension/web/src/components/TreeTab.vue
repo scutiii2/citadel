@@ -3,7 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useAscensionClient, type LoadoutSlot, type OwnedAscended, type TreeNodeState, type TreeView } from "../api/AscensionClient";
 import { useAscensionStore } from "../stores/ascension";
 import { errorMessage } from "../utils/errors";
-import { passiveText, titleCase } from "../utils/ascension";
+import { effectText, passiveText, titleCase } from "../utils/ascension";
 import EmButton from "./ui/EmButton.vue";
 import EmNotice from "./ui/EmNotice.vue";
 
@@ -62,7 +62,8 @@ const detail = (node: TreeNodeState): string => {
   if (node.kind === "passive") return node.passive ? passiveText(node.passive.kind, node.passive.params) : "No passive effect.";
   const bits = [`${node.category ?? ""} ${node.percentage ?? 0}%`, `cooldown ${node.cooldown ?? 1}`];
   if (node.stat) bits.push(`+${node.stat} for ${node.duration} rounds`);
-  return bits.join(", ");
+  const effect = effectText(node.effects);
+  return effect ? `${bits.join(", ")}. ${effect}.` : bits.join(", ");
 };
 
 async function learn(node: TreeNodeState): Promise<void> {

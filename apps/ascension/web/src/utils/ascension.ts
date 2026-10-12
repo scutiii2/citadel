@@ -1,4 +1,4 @@
-import type { AbilityInfo, BattleEvent, FighterAbility, ResultKind, TierInfo } from "../api/AscensionClient";
+import type { EffectInfo, Status, AbilityInfo, BattleEvent, FighterAbility, ResultKind, TierInfo } from "../api/AscensionClient";
 
 /** How a tier badge is drawn: the three strongest tiers with the accent, the
  * one below them in full text colour, the rest muted. The tier name is always
@@ -32,6 +32,10 @@ function count(value: unknown, fallback: number, noun: string): string {
  * passives.py). An unknown kind falls back to its name. */
 export function passiveText(kind: string, params: Record<string, unknown>): string {
   switch (kind) {
+    case "attack_bonus_vs_marked":
+      return `Attacks deal extra damage equal to ${percent(params.power_fraction)} of its Power against a target marked ${String(params.mark)}.`;
+    case "heal_bonus":
+      return `${params.hp_below === undefined ? "" : `Below ${percent(params.hp_below)} HP, `}${params.hp_below === undefined ? "Heals" : "heals"} are ${percent(params.fraction)} stronger.`;
     case "defense_extension":
       return `Defense shields ${count(params.protected_attacks, 1, "attack")} for ${count(params.rounds, 1, "round")}.`;
     case "low_hp_attack_bonus":
@@ -51,9 +55,50 @@ export function passiveText(kind: string, params: Record<string, unknown>): stri
   }
 }
 
+function rounds(effect: EffectInfo): string {
+  return count(effect.rounds, 1, "round");
+}
+
+/** An ability's effects in words, joined by commas; empty when it has none. */
+export function effectText(effects: readonly EffectInfo[] | undefined): string {
+  return (effects ?? [])
+    .map((e) => {
+      switch (e.kind) {
+        case "heal": return `Heals ${e.percentage}% of power`;
+        case "regen": return `Regenerates ${e.percentage}% for ${rounds(e)}`;
+        case "bleed": return `Bleeds ${e.percentage}% for ${rounds(e)}`;
+        case "slow": return `Slows ${e.percentage}% for ${rounds(e)}`;
+        case "weaken": return `Weakens ${e.percentage}% for ${rounds(e)}`;
+        case "exposed": return `Exposes ${e.percentage}% for ${rounds(e)}`;
+        case "mark": return e.target === "self" ? `Gains the ${e.name} mark for ${rounds(e)}` : `Marks ${e.name} for ${rounds(e)}`;
+        case "cleanse": return "Cleanses";
+        case "ward": return `Wards one lethal hit for ${rounds(e)}`;
+        default: return titleCase(e.kind);
+      }
+    })
+    .join(", ");
+}
+
+/** One status on a fighter, in words. */
+export function statusText(status: Status): string {
+  const left = `${count(status.rounds_left, 1, "round")} left`;
+  if (status.id.startsWith("mark:")) return `marked ${status.id.slice("mark:".length)}, ${left}`;
+  switch (status.id) {
+    case "bleed": return `bleeding ${status.amount} a round, ${left}`;
+    case "slow": return `slowed by ${Math.abs(status.amount)}, ${left}`;
+    case "weaken": return `weakened by ${Math.abs(status.amount)}, ${left}`;
+    case "exposed": return `exposed, defense down ${status.amount}, ${left}`;
+    case "regen": return `regenerating ${status.amount} a round, ${left}`;
+    case "ward": return `warded, ${left}`;
+    default: return `${titleCase(status.id)}, ${left}`;
+  }
+}
+
 /** An ability's effect line: "Attack 150% · cd 1". */
-export function abilityEffect(ability: Pick<AbilityInfo, "category" | "percentage" | "cooldown">): string {
-  return `${titleCase(ability.category)} ${ability.percentage}% · cd ${ability.cooldown}`;
+export function abilityEffect(ability: Pick<AbilityInfo, "category" | "percentage" | "cooldown" | "effects">): string {
+  const base = `${titleCase(ability.category)} ${ability.percentage}% · cd ${ability.cooldown}`;
+  const extra = effectText(ability.effects);
+  return extra ? `${base} · ${extra}` : base;
 }
 
 /** Seconds as m:ss (h:mm:ss from an hour), rounded up so 0:00 means done. */
@@ -111,6 +156,22 @@ export function describeEvent(event: BattleEvent, names: SideNames): string {
       return `${who} tries to catch, to no effect`;
     case "capture_attempt":
       return `${who} throws a ${titleCase(String(event.emblem))} EMBLEM (${percent(event.chance)}): ${event.success ? "caught" : "it broke free"}`;
+    case "heal":
+      return `${who} heals ${String(event.amount)}`;
+    case "status": {
+      const target = sideName(event.target, names);
+      const id = String(event.status);
+      const what = id.startsWith("mark:") ? `a ${id.slice("mark:".length)} mark` : id;
+      return `${who} puts ${what} on ${target} for ${count(event.rounds, 1, "round")}`;
+    }
+    case "cleanse":
+      return `${who} cleanses ${(event.removed as string[]).join(", ") || "nothing"}`;
+    case "tick":
+      return event.kind === "bleed"
+        ? `${who} bleeds for ${String(event.amount)}; ${String(event.hp)} HP left`
+        : `${who} recovers ${String(event.amount)}; ${String(event.hp)} HP`;
+    case "ward_triggered":
+      return `${who} is saved by a ward at 1 HP`;
     default:
       return titleCase(event.type);
   }

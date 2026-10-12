@@ -3,6 +3,7 @@ import { computed } from "vue";
 import type { BattleView, Buff, Fighter } from "../api/AscensionClient";
 import { usePlaybackStore } from "../stores/playback";
 import { useAscensionStore } from "../stores/ascension";
+import { statusText } from "../utils/ascension";
 import { spriteFor } from "../utils/sprites";
 import EmBar from "./ui/EmBar.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
@@ -31,6 +32,7 @@ function effects(fighter: Fighter): string[] {
     const d = fighter.defense;
     list.push(`Defense ${d.rating}: ${d.attacks_left} attacks or ${d.rounds_left} rounds left`);
   }
+  for (const status of fighter.statuses ?? []) list.push(statusText(status));
   return list;
 }
 

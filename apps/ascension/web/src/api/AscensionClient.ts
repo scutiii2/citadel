@@ -25,7 +25,11 @@ export interface TierInfo {
   emblem_price: number;
 }
 
+export interface EffectInfo { kind: string; percentage?: number; rounds?: number; name?: string; target?: string }
+export interface Status { id: string; amount: number; rounds_left: number }
+
 export interface AbilityInfo {
+  effects?: EffectInfo[];
   id: string;
   name: string;
   unlock_level: number;
@@ -47,6 +51,7 @@ export interface AscendedArtInfo {
 
 export interface TreeCost { tier: string; amount: number }
 export interface TreeNodeView {
+  effects?: EffectInfo[];
   id: string; kind: "ability" | "passive"; name: string; x: number; y: number; requires: string[];
   unlock_level: number; root: boolean; cost: TreeCost | null;
   category?: string; percentage?: number; cooldown?: number; stat?: string | null; duration?: number | null;
@@ -166,6 +171,7 @@ export interface DefenseEffect {
 }
 
 export interface FighterAbility {
+  effects?: EffectInfo[];
   id: string;
   name: string;
   category: string;
@@ -175,6 +181,7 @@ export interface FighterAbility {
 }
 
 export interface Fighter {
+  statuses?: Status[];
   ascended_id: string;
   name: string;
   tier_id: string;
