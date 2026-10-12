@@ -278,6 +278,7 @@ function show(ascended: OwnedAscended): void {
 }
 .big-card {
   flex: none;
+  align-self: flex-start; /* a stretched flex item ignores the card's aspect ratio */
 }
 .side {
   display: flex;
