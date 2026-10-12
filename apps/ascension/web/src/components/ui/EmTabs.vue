@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import EmIcon from "./EmIcon.vue";
 import type { IconName } from "./icons";
 
@@ -15,6 +15,8 @@ export interface EmTabOption {
 const props = defineProps<{ modelValue: string; options: EmTabOption[]; ariaLabel: string }>();
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
 const tabs = ref<HTMLButtonElement[]>([]);
+const tabStop = computed(() => props.options.find(option => option.value === props.modelValue && !option.disabled)?.value
+  ?? props.options.find(option => !option.disabled)?.value);
 
 function select(option: EmTabOption): void {
   if (!option.disabled) emit("update:modelValue", option.value);
@@ -44,7 +46,7 @@ function move(from: number, step: number | "first" | "last"): void {
       class="tab"
       :class="{ active: option.value === modelValue }"
       :aria-selected="option.value === modelValue"
-      :tabindex="option.value === modelValue ? 0 : -1"
+      :tabindex="option.value === tabStop ? 0 : -1"
       :disabled="option.disabled"
       @click="select(option)"
       @keydown.right.prevent="move(i, 1)"

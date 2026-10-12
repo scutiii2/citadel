@@ -2,10 +2,8 @@
 import { computed, ref } from "vue";
 import { useAscensionStore } from "../stores/ascension";
 import AscendedTemplateCard from "./AscendedTemplateCard.vue";
-import EmButton from "./ui/EmButton.vue";
+import HowToPlayDialog from "./HowToPlayDialog.vue";
 import EmConfirm from "./ui/EmConfirm.vue";
-import EmDialog from "./ui/EmDialog.vue";
-import EmIcon from "./ui/EmIcon.vue";
 import EmMenuRow from "./ui/EmMenuRow.vue";
 import EmNotice from "./ui/EmNotice.vue";
 
@@ -103,16 +101,7 @@ async function reset(): Promise<void> {
       <EmNotice tone="error" class="reset-notice">This permanently removes your Ascended, Insignia, EMBLEMs and presets.</EmNotice>
     </EmConfirm>
 
-    <EmDialog :open="showingHelp" title="Keep the fire going" @close="showingHelp = false">
-      <ol class="rules">
-        <li><strong>Choose a starter.</strong> Guardian, Scout or Striker begins your collection.</li>
-        <li><strong>Find a wild Ascended.</strong> Preview it, then fight or decline for free.</li>
-        <li><strong>Make your move.</strong> Play manually or let your Ascended act autonomously.</li>
-        <li><strong>Throw an EMBLEM.</strong> Choose a permitted tier before the five-second timer ends.</li>
-        <li><strong>Forge your collection.</strong> Earn XP, Insignia and essence; spare copies and essence add stars, and stars raise tiers. Levels cap at 30, or 50 for Forbidden.</li>
-      </ol>
-      <EmButton variant="primary" class="ready" @click="showingHelp = false"><EmIcon name="play" /> Ready to play</EmButton>
-    </EmDialog>
+    <HowToPlayDialog :open="showingHelp" @close="showingHelp = false" />
   </section>
 </template>
 
@@ -185,20 +174,6 @@ async function reset(): Promise<void> {
 }
 .reset-notice {
   margin-bottom: 18px;
-}
-.rules {
-  margin: 0 0 20px;
-  padding-left: 22px;
-  color: var(--em-muted);
-}
-.rules li {
-  padding: 8px 0;
-}
-.rules strong {
-  color: var(--em-text);
-}
-.ready {
-  width: 100%;
 }
 @media (max-width: 700px) {
   .hero {
