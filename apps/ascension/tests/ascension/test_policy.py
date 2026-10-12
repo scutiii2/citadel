@@ -236,7 +236,7 @@ def test_break_streak_leaves_the_streak_for_the_least_likely_category_only_after
     early = cats([rule(break_streak=True)], match=MatchState(round=1, own_last="ATTACK", own_streak=limit - 1))
     assert early == pytest.approx(CALM)
     broken = cats([rule(break_streak=True)], match=MatchState(round=1, own_last="ATTACK", own_streak=limit))
-    least = min((c for c in CALM if c != "ATTACK"), key=CALM.get)
+    least = min((c for c in CALM if c not in ("ATTACK", "FEAR", "INTERCEPT")), key=CALM.get)  # a turn, not a retreat
     assert broken[least] == pytest.approx(1.0) and broken["ATTACK"] == pytest.approx(0.0)
     half = cats([rule(strength=0.5, break_streak=True)], match=MatchState(round=1, own_last="ATTACK", own_streak=limit))
     assert half[least] == pytest.approx(0.5 + 0.5 * CALM[least])

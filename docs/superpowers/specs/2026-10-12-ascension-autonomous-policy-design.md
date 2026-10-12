@@ -59,7 +59,7 @@ A rule has a condition (`lead_over`/`lead_under`, `own_hp_under`, `enemy_low`, `
   least likely ones. The seeded draw keeps it reproducible.
 - `counter`: moves mass to the category that beats `enemy_last` (see Cunning).
 - `copy_enemy`: moves mass to `enemy_last` (Mimic).
-- `break_streak`: after a hidden streak length, forces the least likely category once, then resets (Weird).
+- `break_streak`: after a hidden streak length, forces the least likely category once, then resets (Weird). After tuning it skips FEAR and INTERCEPT unless nothing else is left, so a turn is never a retreat.
 - `stay`: boosts the category chosen last (Stubborn).
 - `repeat`: replaces the repeat factor (Stubborn removes the penalty).
 - `pick_by_percentage`: `high` or `low` in stage 2 (Gambler).

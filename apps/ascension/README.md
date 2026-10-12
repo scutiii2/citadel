@@ -69,7 +69,7 @@ The first eight personalities retain their original category preferences; fourte
 | BOLD | Prefers ATTACK and SUPPORT. |
 | CAUTIOUS | Prefers DEFENSE and FEAR. |
 | DISCIPLINED | Prefers DEFENSE and SUPPORT. |
-| WEIRD | Breaks a hidden category streak by jumping toward the least likely other category. |
+| WEIRD | Breaks a hidden category streak by jumping to its least likely other category (a turn to DEFENSE, SUPPORT or ATTACK, never a flee unless nothing else is left). |
 | ANXIOUS | Adds chaos when nerves are high; stays plain while calm. |
 | RECKLESS | Low HP raises ATTACK and lowers DEFENSE and FEAR. |
 | VENGEFUL | Rage raises ATTACK. |

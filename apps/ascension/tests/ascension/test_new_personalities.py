@@ -69,7 +69,7 @@ def test_patient_turns_to_attack_later_in_the_battle():
 def test_opportunist_defends_a_little_more_while_the_enemy_is_healthy():
     healthy = cats("OPPORTUNIST", match=MatchState(round=6, enemy_low=False))
     assert healthy["DEFENSE"] > CALM["DEFENSE"]
-    assert healthy["DEFENSE"] / healthy["SUPPORT"] == pytest.approx(CALM["DEFENSE"] / CALM["SUPPORT"] * 1.2)
+    assert healthy["DEFENSE"] / healthy["SUPPORT"] == pytest.approx(CALM["DEFENSE"] / CALM["SUPPORT"] * 1.3)
 
 
 def test_tier_scales_the_strength_of_a_personality():

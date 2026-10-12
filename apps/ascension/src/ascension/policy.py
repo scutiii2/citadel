@@ -146,14 +146,16 @@ class ActionPolicy:
         return self._chaos(self._break_streak(shares, ctx, fired), fired)
 
     def _break_streak(self, shares: dict[str, float], ctx: PolicyContext, fired: list[ActiveRule]) -> dict[str, float]:
-        """After a hidden streak limit the Ascended jumps to its least likely other category."""
+        """After a hidden streak limit the Ascended jumps to its least likely other category.
+        A turn, not a retreat: FEAR and INTERCEPT are only chosen when nothing else is left."""
         strength = max((a.strength for a in fired if a.rule.effects.get("break_streak")), default=0.0)
         match, mood = ctx.match, self._spec.mood
         if not strength or match.own_last not in shares or len(shares) < 2:
             return shares
         if match.own_streak < mood.streak_base + (match.round * 7) % mood.streak_span:
             return shares
-        target = min((c for c in shares if c != match.own_last), key=lambda c: shares[c])
+        others = [c for c in shares if c != match.own_last]
+        target = min([c for c in others if c not in ("FEAR", "INTERCEPT")] or others, key=lambda c: shares[c])
         blend = min(1.0, strength)
         return {c: (1 - blend) * v + (blend if c == target else 0.0) for c, v in shares.items()}
 
