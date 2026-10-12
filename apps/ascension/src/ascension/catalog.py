@@ -494,9 +494,13 @@ class Catalog:
         return ascendeds
 
     def default_loadout(self, ascended_id: str) -> Loadout:
-        """The starting kit: the catalog abilities in order and the catalog passive."""
+        """The starting kit, in the same slot order shown by the tree view."""
         spec = self.ascended(ascended_id)
-        return Loadout(spec.abilities, spec.passive, (spec.passive_2,) if spec.passive_2 else ())
+        slots = self.default_slots(ascended_id)
+        nodes = [spec.tree.node(slots[slot]) for slot in spec.tree.slot_ids if slot in slots]
+        abilities = tuple(node.ability for node in nodes if node.kind == "ability")
+        passives = [node.passive for node in nodes if node.kind == "passive"]
+        return Loadout(abilities, passives[0] if passives else PassiveSpec("none"), tuple(passives[1:]))
 
     def default_slots(self, ascended_id: str) -> dict[str, str]:
         """Fill each slot with the first catalog root it accepts, in slot order."""
