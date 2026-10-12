@@ -1,7 +1,12 @@
 # Twoychi: ability design
 
 Healing, bleed, slow, weaken, exposed, marks, cleanse and ward now exist in the engine (see the README, Effects).
-The tree has not been converted yet; the rows marked later that need only these mechanics can now become real.
+The tree now uses them (47 nodes). Converted: Mending Current (regen), Tidal Mend (heal), Healing Rain (regen, Soaked mark),
+Borrowed Breath (ward), Mercy's Current (heal, cleanse), new Purifying Water and Shake It Off (cleanse), Rending Bite and
+Blood in the Water (bleed, Prey mark), Scent of Danger (Prey mark), Hamstring and Earthbreaker (slow), Circle the Prey
+(exposed), Comforting Presence and Home Is Wherever You Are (regen, cleanse), Give Until Empty (`heal_bonus`) and the new
+No Escape (`attack_bonus_vs_marked` on Prey). The per-ability tables below keep their older notes; the tree is the truth.
+Still later: Water, forms, taunt, root, revive, positions, several targets.
 
 Source: a draft ability list for Twoychi (four trees: Troy Wolf, Troy Bear, Troy Dog, Aya), written for a real-time game.
 The game here is a turn-based 1v1 with three ability categories, so the tree in `tree.json` uses only what the engine
