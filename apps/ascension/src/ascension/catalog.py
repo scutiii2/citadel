@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from src.ascension.ascension_types import AscensionType
+from src.ascension.match_state import MoodConstants
+from src.ascension.personality_rules import Rule, parse_rules
 from src.ascension.models import ABILITY_CATEGORIES, CATEGORIES, AbilitySpec, PassiveSpec, Loadout
 from src.ascension.passives import PassiveFactory
 from src.ascension.tree import AbilityTree, NodeCost, TreeError, TreeNode, passive_root_id
@@ -80,6 +82,7 @@ class AscendedSpec:
 class PersonalitySpec:
     id: str
     categories: tuple[str, ...]
+    rules: tuple[Rule, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -91,6 +94,11 @@ class PolicySpec:
     default_aggression: float
     default_flee_share: float
     coefficients: Mapping[str, Mapping[str, float]]
+    potency_weight: float = 0.3  # stage 2: weight of how strong an ability is inside its category
+    pick_weight: float = 1.5  # stage 2: weight of pick_by_percentage rules
+    temperature: float = 0.7  # stage 2: softmax temperature
+    counter_boost: float = 3.0  # stage 1: boost of the counter or copied category at full strength
+    mood: MoodConstants = MoodConstants()
 
 
 @dataclass(frozen=True)
@@ -264,6 +272,13 @@ class Catalog:
         except (TypeError, KeyError, AttributeError, ValueError, IndexError) as error:
             raise CatalogError(f"malformed catalog: {type(error).__name__}: {error}") from error
 
+    @staticmethod
+    def _rules(raw_personality: Mapping[str, Any]) -> tuple[Rule, ...]:
+        try:
+            return parse_rules(raw_personality.get("rules", []), f"personality {raw_personality['id']!r}")
+        except ValueError as error:
+            raise CatalogError(str(error)) from error
+
     def _build(self, raw: Mapping[str, Any]) -> None:
         if not isinstance(raw, Mapping):
             raise CatalogError("catalog must be an object")
@@ -275,11 +290,12 @@ class Catalog:
         economy = dict(_require(raw, "economy", "catalog"))
         economy["personality_tier_probabilities"] = tuple(economy["personality_tier_probabilities"])
         self.economy = Economy(**economy)
-        personalities = [PersonalitySpec(p["id"], tuple(p["categories"])) for p in _require(raw, "personalities", "catalog")]
+        personalities = [PersonalitySpec(p["id"], tuple(p["categories"]), self._rules(p)) for p in _require(raw, "personalities", "catalog")]
         self.personalities: dict[str, PersonalitySpec] = {p.id: p for p in personalities}
         if len(self.personalities) != len(personalities):
             raise CatalogError("personality ids must be unique")
         policy = dict(_require(raw, "policy", "catalog"))
+        policy["mood"] = MoodConstants(**policy.get("mood", {}))
         self.policy = PolicySpec(**policy)
         ascendeds = _require(raw, "ascendeds", "catalog")
         ascended_ids = [_require(s, "id", "ascended") for s in ascendeds]
@@ -346,8 +362,14 @@ class Catalog:
         if any(s.starter and s.forbidden for s in self._ascendeds.values()):
             raise CatalogError("a starter cannot be Forbidden")
         for personality in self.personalities.values():
-            if not personality.categories or any(c not in CATEGORIES for c in personality.categories):
+            if any(c not in CATEGORIES for c in personality.categories):
                 raise CatalogError(f"personality {personality.id!r} has invalid categories")
+        p, m = self.policy, self.policy.mood
+        if p.temperature <= 0 or p.potency_weight < 0 or p.pick_weight < 0 or p.counter_boost < 1 or not 0 < p.repeat_factor <= 1:
+            raise CatalogError("policy needs temperature > 0, potency_weight and pick_weight >= 0, counter_boost >= 1 and 0 < repeat_factor <= 1")
+        if not (0 <= m.rage_decay <= 1 and m.rage_gain >= 0 and m.confidence_step >= 0 and 0 <= m.nerves_follow <= 1
+                and 0 <= m.enemy_low <= 1 and m.streak_base >= 1 and m.streak_span >= 1):
+            raise CatalogError("policy mood numbers are out of range")
         for category in CATEGORIES:
             if category not in self.policy.coefficients:
                 raise CatalogError(f"policy coefficients missing for {category}")
