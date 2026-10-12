@@ -1,0 +1,10 @@
+{"nodes": [
+  {"id": "bruiser_crushing_blow", "root": true, "x": 40, "y": 40},
+  {"id": "bruiser_guard_up", "root": true, "x": 40, "y": 160},
+  {"id": "bruiser_rage", "root": true, "x": 40, "y": 280},
+  {"id": "bruiser_passive", "root": true, "x": 160, "y": 160},
+  {"id": "bruiser_haymaker", "kind": "ability", "name": "Haymaker", "category": "ATTACK", "percentage": 240, "cooldown": 3, "unlock_level": 14, "requires": ["bruiser_crushing_blow"], "cost": {"tier": "common", "amount": 4}, "x": 200, "y": 40},
+  {"id": "bruiser_iron_hide", "kind": "ability", "name": "Iron Hide", "category": "DEFENSE", "percentage": 180, "cooldown": 2, "unlock_level": 10, "requires": ["bruiser_guard_up"], "cost": {"tier": "common", "amount": 2}, "x": 200, "y": 260},
+  {"id": "bruiser_warcry", "kind": "ability", "name": "Warcry", "category": "SUPPORT", "stat": "power", "duration": 3, "percentage": 80, "cooldown": 3, "unlock_level": 18, "requires": ["bruiser_rage"], "cost": {"tier": "rare", "amount": 3}, "x": 200, "y": 340},
+  {"id": "bruiser_grudge", "kind": "passive", "name": "Grudge", "unlock_level": 16, "passive": {"kind": "low_hp_attack_bonus", "params": {"hp_below": 0.6, "power_fraction": 0.3}}, "requires": ["bruiser_passive"], "cost": {"tier": "rare", "amount": 3}, "x": 320, "y": 160}
+]}

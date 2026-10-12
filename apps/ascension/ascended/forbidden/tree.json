@@ -1,0 +1,10 @@
+{"nodes": [
+  {"id": "forbidden_ruin", "root": true, "x": 200, "y": 40},
+  {"id": "forbidden_dread_ward", "root": true, "x": 60, "y": 180},
+  {"id": "forbidden_ascendance", "root": true, "x": 340, "y": 180},
+  {"id": "forbidden_passive", "root": true, "x": 200, "y": 180},
+  {"id": "forbidden_oblivion", "kind": "ability", "name": "Oblivion", "category": "ATTACK", "percentage": 320, "cooldown": 3, "unlock_level": 30, "requires": ["forbidden_ruin"], "cost": {"tier": "unique", "amount": 4}, "x": 200, "y": -80},
+  {"id": "forbidden_void_shroud", "kind": "ability", "name": "Void Shroud", "category": "DEFENSE", "percentage": 400, "cooldown": 3, "unlock_level": 25, "requires": ["forbidden_dread_ward"], "cost": {"tier": "unique", "amount": 3}, "x": 60, "y": 300},
+  {"id": "forbidden_hollow_crown", "kind": "ability", "name": "Hollow Crown", "category": "SUPPORT", "stat": "power", "duration": 3, "percentage": 150, "cooldown": 4, "unlock_level": 35, "requires": ["forbidden_ascendance"], "cost": {"tier": "unique", "amount": 5}, "x": 340, "y": 300},
+  {"id": "forbidden_rime", "kind": "passive", "name": "Rime", "unlock_level": 40, "passive": {"kind": "support_duration_bonus", "params": {"rounds": 1}}, "requires": ["forbidden_hollow_crown"], "cost": {"tier": "unique", "amount": 5}, "x": 200, "y": 300}
+]}

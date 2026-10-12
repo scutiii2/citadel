@@ -279,7 +279,14 @@ class Catalog:
             raise CatalogError("personality ids must be unique")
         policy = dict(_require(raw, "policy", "catalog"))
         self.policy = PolicySpec(**policy)
-        specs = [_ascended_spec(s) for s in _require(raw, "ascendeds", "catalog")]
+        ascendeds = _require(raw, "ascendeds", "catalog")
+        ascended_ids = [_require(s, "id", "ascended") for s in ascendeds]
+        if len(set(ascended_ids)) != len(ascended_ids):
+            raise CatalogError("ascended ids must be unique")
+        catalog_ability_ids = [a["id"] for s in ascendeds for a in s["abilities"]]
+        if len(set(catalog_ability_ids)) != len(catalog_ability_ids):
+            raise CatalogError("ability ids must be unique across all Ascended")
+        specs = [_ascended_spec(s) for s in ascendeds]
         self._ascendeds = {s.id: s for s in specs}
         if len(self._ascendeds) != len(specs):
             raise CatalogError("ascended ids must be unique")

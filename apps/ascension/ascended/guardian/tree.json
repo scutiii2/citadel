@@ -1,0 +1,10 @@
+{"nodes": [
+  {"id": "guardian_heavy_blow", "root": true, "x": 60, "y": 60},
+  {"id": "guardian_rally", "root": true, "x": 60, "y": 180},
+  {"id": "guardian_bulwark", "root": true, "x": 60, "y": 300},
+  {"id": "guardian_passive", "root": true, "x": 220, "y": 180},
+  {"id": "guardian_shield_slam", "kind": "ability", "name": "Shield Slam", "category": "ATTACK", "percentage": 190, "cooldown": 2, "unlock_level": 18, "requires": ["guardian_heavy_blow"], "cost": {"tier": "common", "amount": 4}, "x": 220, "y": 60},
+  {"id": "guardian_iron_wall", "kind": "ability", "name": "Iron Wall", "category": "DEFENSE", "percentage": 260, "cooldown": 3, "unlock_level": 12, "requires": ["guardian_bulwark"], "cost": {"tier": "common", "amount": 3}, "x": 220, "y": 300},
+  {"id": "guardian_unyielding", "kind": "ability", "name": "Unyielding", "category": "SUPPORT", "stat": "power", "duration": 3, "percentage": 75, "cooldown": 3, "unlock_level": 22, "requires": ["guardian_rally"], "cost": {"tier": "rare", "amount": 3}, "x": 380, "y": 120},
+  {"id": "guardian_stoneskin", "kind": "passive", "name": "Stoneskin", "unlock_level": 15, "passive": {"kind": "defense_rating_bonus", "params": {"power_fraction": 0.4}}, "requires": ["guardian_iron_wall"], "cost": {"tier": "rare", "amount": 3}, "x": 380, "y": 300}
+]}

@@ -1,0 +1,10 @@
+{"nodes": [
+  {"id": "sentinel_stone_guard", "root": true, "x": 200, "y": 300},
+  {"id": "sentinel_hold_fast", "root": true, "x": 60, "y": 200},
+  {"id": "sentinel_shield_bash", "root": true, "x": 340, "y": 200},
+  {"id": "sentinel_passive", "root": true, "x": 200, "y": 180},
+  {"id": "sentinel_bastion", "kind": "ability", "name": "Bastion", "category": "DEFENSE", "percentage": 400, "cooldown": 3, "unlock_level": 14, "requires": ["sentinel_stone_guard"], "cost": {"tier": "rare", "amount": 3}, "x": 200, "y": 420},
+  {"id": "sentinel_vigil", "kind": "ability", "name": "Vigil", "category": "SUPPORT", "stat": "power", "duration": 3, "percentage": 80, "cooldown": 3, "unlock_level": 12, "requires": ["sentinel_hold_fast"], "cost": {"tier": "common", "amount": 3}, "x": 60, "y": 80},
+  {"id": "sentinel_pillar_strike", "kind": "ability", "name": "Pillar Strike", "category": "ATTACK", "percentage": 170, "cooldown": 3, "unlock_level": 20, "requires": ["sentinel_shield_bash"], "cost": {"tier": "rare", "amount": 3}, "x": 340, "y": 80},
+  {"id": "sentinel_watchtower", "kind": "passive", "name": "Watchtower", "unlock_level": 16, "passive": {"kind": "defense_extension", "params": {"protected_attacks": 2, "rounds": 1}}, "requires": ["sentinel_bastion"], "cost": {"tier": "rare", "amount": 4}, "x": 340, "y": 420}
+]}

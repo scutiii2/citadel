@@ -1,0 +1,11 @@
+{"nodes": [
+  {"id": "scout_quickstep", "root": true, "x": 40, "y": 160},
+  {"id": "scout_swift_slash", "root": true, "x": 140, "y": 60},
+  {"id": "scout_evade", "root": true, "x": 140, "y": 260},
+  {"id": "scout_passive", "root": true, "x": 260, "y": 160},
+  {"id": "scout_gale_step", "kind": "ability", "name": "Gale Step", "category": "SUPPORT", "stat": "speed", "duration": 3, "percentage": 140, "cooldown": 3, "unlock_level": 12, "requires": ["scout_quickstep"], "cost": {"tier": "common", "amount": 3}, "x": 40, "y": 20},
+  {"id": "scout_twin_cuts", "kind": "ability", "name": "Twin Cuts", "category": "ATTACK", "percentage": 90, "cooldown": 1, "unlock_level": 9, "requires": ["scout_swift_slash"], "cost": {"tier": "common", "amount": 2}, "x": 260, "y": 40},
+  {"id": "scout_mirage", "kind": "ability", "name": "Mirage", "category": "DEFENSE", "percentage": 200, "cooldown": 2, "unlock_level": 16, "requires": ["scout_evade"], "cost": {"tier": "rare", "amount": 3}, "x": 260, "y": 280},
+  {"id": "scout_fleet_footed", "kind": "passive", "name": "Fleet Footed", "unlock_level": 14, "passive": {"kind": "support_duration_bonus", "params": {"rounds": 1}}, "requires": ["scout_gale_step"], "cost": {"tier": "rare", "amount": 3}, "x": 380, "y": 100},
+  {"id": "scout_headstart", "kind": "passive", "name": "Headstart", "unlock_level": 20, "passive": {"kind": "battle_start_speed", "params": {"power_fraction": 0.8}}, "requires": ["scout_passive"], "cost": {"tier": "rare", "amount": 4}, "x": 380, "y": 220}
+]}

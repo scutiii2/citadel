@@ -1,0 +1,10 @@
+{"nodes": [
+  {"id": "channeler_focus", "root": true, "x": 40, "y": 100},
+  {"id": "channeler_bolt", "root": true, "x": 180, "y": 40},
+  {"id": "channeler_ward", "root": true, "x": 180, "y": 220},
+  {"id": "channeler_passive", "root": true, "x": 180, "y": 130},
+  {"id": "channeler_attunement", "kind": "ability", "name": "Attunement", "category": "SUPPORT", "stat": "power", "duration": 3, "percentage": 110, "cooldown": 3, "unlock_level": 12, "requires": ["channeler_focus"], "cost": {"tier": "common", "amount": 3}, "x": 40, "y": 240},
+  {"id": "channeler_overload", "kind": "ability", "name": "Overload", "category": "ATTACK", "percentage": 220, "cooldown": 3, "unlock_level": 16, "requires": ["channeler_bolt"], "cost": {"tier": "rare", "amount": 3}, "x": 320, "y": 40},
+  {"id": "channeler_lantern_ward", "kind": "ability", "name": "Lantern Ward", "category": "DEFENSE", "percentage": 160, "cooldown": 2, "unlock_level": 10, "requires": ["channeler_ward"], "cost": {"tier": "common", "amount": 2}, "x": 320, "y": 220},
+  {"id": "channeler_afterglow", "kind": "passive", "name": "Afterglow", "unlock_level": 18, "passive": {"kind": "cooldown_reduction", "params": {"rounds": 1, "minimum": 1}}, "requires": ["channeler_passive"], "cost": {"tier": "rare", "amount": 4}, "x": 320, "y": 130}
+]}

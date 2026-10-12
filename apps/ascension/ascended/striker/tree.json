@@ -1,0 +1,10 @@
+{"nodes": [
+  {"id": "striker_rending_strike", "root": true, "x": 40, "y": 40},
+  {"id": "striker_battle_focus", "root": true, "x": 40, "y": 160},
+  {"id": "striker_brace", "root": true, "x": 40, "y": 280},
+  {"id": "striker_passive", "root": true, "x": 180, "y": 100},
+  {"id": "striker_flurry", "kind": "ability", "name": "Flurry", "category": "ATTACK", "percentage": 110, "cooldown": 1, "unlock_level": 8, "requires": ["striker_rending_strike"], "cost": {"tier": "common", "amount": 2}, "x": 180, "y": 20},
+  {"id": "striker_execution", "kind": "ability", "name": "Execution", "category": "ATTACK", "percentage": 260, "cooldown": 3, "unlock_level": 20, "requires": ["striker_flurry"], "cost": {"tier": "rare", "amount": 4}, "x": 320, "y": 20},
+  {"id": "striker_bloodlust", "kind": "ability", "name": "Bloodlust", "category": "SUPPORT", "stat": "power", "duration": 2, "percentage": 90, "cooldown": 3, "unlock_level": 14, "requires": ["striker_battle_focus"], "cost": {"tier": "common", "amount": 3}, "x": 180, "y": 220},
+  {"id": "striker_desperation", "kind": "passive", "name": "Desperation", "unlock_level": 18, "passive": {"kind": "low_hp_attack_bonus", "params": {"hp_below": 0.7, "power_fraction": 0.25}}, "requires": ["striker_passive"], "cost": {"tier": "rare", "amount": 3}, "x": 320, "y": 140}
+]}
