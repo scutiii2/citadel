@@ -21,10 +21,10 @@ Aya has two appearances. Ordinary people see only the first, as the Collector sa
 ## Troy
 
 - A shih tzu. Small, sturdy and long-coated, with a short flat face, round dark eyes, a dark nose and a feathered plume tail curled over his back. White and black coat in patches.
-- Troy has a base shape and **two forms**: **wolf** and **bear**. Show all of them. Each form is the same dog made larger and fiercer, and keeps the white and black coat and the shih tzu face shape:
+- Troy has a base shape and **two forms**: **wolf** and **bear**. Show all of them. Each form has the true face and body of its animal, not a shih tzu face, but keeps Troy's white and black colour pattern (the same patch layout, the dark mask and white markings around the eyes and muzzle, and the white plume on the tail or rump) so it reads as Troy:
   1. **Dog (base).** The small shih tzu, solemn and calm, usually resting by Aya.
-  2. **Wolf.** A lean white and black wolf with the same face markings.
-  3. **Bear.** A white and black bear, calm and massive.
+  2. **Wolf.** A lean white and black wolf: long muzzle, pointed ears, wolf build, Troy's colour pattern.
+  3. **Bear.** A white and black bear: broad head, round ears, massive build, calm, Troy's colour pattern.
 - Personality changes with the form, in the style of Kindred: the dog is sleepy and watchful, the wolf focused and fast, the bear overwhelming and indifferent. Show this in posture and expression, never in text.
 - Palette: white, black, a little cool grey. Cyan appears only as rim light and eye glints from Aya's water, never as his coat.
 
@@ -37,7 +37,7 @@ Aya has two appearances. Ordinary people see only the first, as the Collector sa
 
 ## Consistency across sprites
 
-Keep these in every sprite: human Aya in front with her mended sleeve, her true spirit form behind her with translucent hands controlling water, her pale cyan eyes, Troy's white and black shih tzu markings, his curled tail and flat face, and the cyan-white water linking both. Pose, crop and background change; do not make Troy a different breed or colour, make the true form's hands opaque, hide the true form, make the front Aya look supernatural, or add weapons.
+Keep these in every sprite: human Aya in front with her mended sleeve, her true spirit form behind her with translucent hands controlling water, her pale cyan eyes, Troy's white and black shih tzu markings, his curled tail and flat face, and the cyan-white water linking both. Pose, crop and background change; do not change Troy's colours or patch layout, give the wolf or bear a shih tzu face, or drop the shared markings, make the true form's hands opaque, hide the true form, make the front Aya look supernatural, or add weapons.
 
 Battle shading follows `../ART_GUIDE.md`: darkest tones at least about #2a3342, including Troy's black, which must be a dark slate, not pure black.
 
