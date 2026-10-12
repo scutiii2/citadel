@@ -124,6 +124,7 @@ export interface Catalog {
 }
 
 export interface OwnedAscended {
+  in_squad: boolean;
   ascended_id: string;
   name: string;
   ascension_types: string[];
@@ -148,6 +149,8 @@ export interface OwnedAscended {
 }
 
 export interface Profile {
+  squad: string[];
+  squad_size: number;
   owner: string;
   insignia: number;
   emblems: Record<string, number>;
@@ -262,6 +265,7 @@ export interface RevealedPersonality {
 }
 
 export interface BattleResult {
+  squad_xp?: { ascended_id: string; name: string; xp: number; level_before: number; level_after: number }[];
   kind: ResultKind;
   xp?: number;
   insignia?: number;
@@ -399,6 +403,9 @@ export class AscensionClient {
   catalog = () => this.http.request<Catalog>("GET", `${BASE}/catalog`);
   /** 404 (ApiError) until the account has chosen a starter. */
   profile = () => this.http.request<Profile>("GET", `${BASE}/profile`);
+  getSquad = () => this.http.request<{ ascended_ids: string[]; size: number }>("GET", `${BASE}/squad`);
+  putSquad = (ids: string[], key: string = newIdempotencyKey()) =>
+    this.http.request<{ ascended_ids: string[]; size: number }>("PUT", `${BASE}/squad`, { ascended_ids: ids }, withKey(key));
   createProfile = (starterAscendedId: string, key: string = newIdempotencyKey()) =>
     this.http.request<Profile>("POST", `${BASE}/profile`, { starter_ascended_id: starterAscendedId }, withKey(key));
   /** Deletes every Ascended, personality, preset, EMBLEM and Insignia. 404: no profile; 409: a battle is active. */

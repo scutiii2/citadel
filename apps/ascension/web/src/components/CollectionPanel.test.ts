@@ -8,7 +8,7 @@ import CollectionPanel from "./CollectionPanel.vue";
 import PresetEditor from "./PresetEditor.vue";
 
 vi.mock("../api/AscensionClient", () => {
-  const client = { personalities: vi.fn(), preset: vi.fn(), savePreset: vi.fn(), profile: vi.fn(), addStar: vi.fn(), raiseTier: vi.fn() };
+  const client = { putSquad: vi.fn(), personalities: vi.fn(), preset: vi.fn(), savePreset: vi.fn(), profile: vi.fn(), addStar: vi.fn(), raiseTier: vi.fn() };
   return { useAscensionClient: () => client };
 });
 
@@ -317,5 +317,52 @@ describe("PresetEditor", () => {
         ["No type 1", ["Bruiser"]],
       ]);
     });
+  });
+});
+
+
+describe("collection squad controls", () => {
+  it("renders the configured slots, marks members and prevents removing the last", async () => {
+    const wrapper = mountPanel({ ...PROFILE, squad_size: 3 });
+    expect(wrapper.findAll(".squad-slot")).toHaveLength(3);
+    expect(wrapper.findAll(".squad-empty")).toHaveLength(2);
+    expect(wrapper.find(".squad-strip button").attributes("disabled")).toBeDefined();
+    expect(wrapper.find(".owned-entry .squad-marker").text()).toBe("Squad");
+    await wrapper.find(".ascended-card").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".squad-control button").text()).toBe("Remove from squad");
+    expect(wrapper.find(".squad-control button").attributes("disabled")).toBeDefined();
+    expect(wrapper.find(".squad-control").text()).toContain("Keep at least one Ascended.");
+  });
+
+  it("adds an outsider and removes a member through the store", async () => {
+    const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian", { in_squad: true }), ownedAscended("striker")] });
+    client.putSquad.mockResolvedValue({ ascended_ids: ["guardian", "striker"], size: 5 });
+    client.profile.mockResolvedValue({ ...PROFILE, squad: ["guardian", "striker"], ascendeds: [ownedAscended("guardian", { in_squad: true }), ownedAscended("striker", { in_squad: true })] });
+    await wrapper.findAll(".ascended-card")[1]!.trigger("click");
+    await flushPromises();
+    await wrapper.find(".squad-control button").trigger("click");
+    await flushPromises();
+    expect(client.putSquad).toHaveBeenCalledWith(["guardian", "striker"]);
+    expect(wrapper.find(".squad-control button").text()).toBe("Remove from squad");
+    await wrapper.find(".squad-control button").trigger("click");
+    await flushPromises();
+    expect(client.putSquad).toHaveBeenLastCalledWith(["guardian"]);
+  });
+
+  it("explains full squads and active battles, and disables busy changes", async () => {
+    const wrapper = mountPanel({ ...PROFILE, squad_size: 1, ascendeds: [ownedAscended("guardian"), ownedAscended("striker")] });
+    await wrapper.findAll(".ascended-card")[1]!.trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".squad-control").text()).toContain("Squad full. Remove a member first.");
+    expect(wrapper.find(".squad-control button").attributes("disabled")).toBeDefined();
+    useAscensionStore().profile!.active_battle = "b1";
+    await flushPromises();
+    expect(wrapper.find(".squad-control").text()).toContain("Finish your battle first.");
+    useAscensionStore().profile!.active_battle = null;
+    useAscensionStore().profile!.squad_size = 5;
+    useAscensionStore().busy = true;
+    await flushPromises();
+    expect(wrapper.find(".squad-control button").attributes("disabled")).toBeDefined();
   });
 });

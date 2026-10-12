@@ -111,3 +111,13 @@ describe("ascensionClient", () => {
     }
   });
 });
+
+
+it("reads and replaces the ordered squad with an idempotency key", async () => {
+  await ascensionClient.getSquad();
+  await ascensionClient.putSquad(["striker", "guardian"], "k");
+  expect(request.mock.calls).toEqual([
+    ["GET", "/ascension/squad"],
+    ["PUT", "/ascension/squad", { ascended_ids: ["striker", "guardian"] }, KEY],
+  ]);
+});
