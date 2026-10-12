@@ -5,18 +5,19 @@ Builds on the ability trees (`2026-10-12-ascension-ability-trees-design.md`) and
 
 ## Goal
 
-Every Ascended fights with up to 4 active abilities and 2 passives (today 3 and 1). Twoychi is the first Ascended whose
+Twoychi fights with up to 4 active abilities and 2 passives. Every other Ascended stays a basic character: 3 active
+abilities, 1 passive and a single tree, exactly as today. Twoychi is the one Ascended whose
 slots are tied to the branches of her tree: each slot takes only nodes of its own branch. Troy's three forms and Aya are
 those branches, so a form is just "the slot an ability sits in"; it changes no stats and no abilities.
 
 Out of scope: a Water resource (Water is Aya's animation and identity only, never a mechanic), form stances, form
-multipliers, loadouts for the other Ascended beyond the two new empty slots, new content for the other Ascended's trees.
+multipliers, and any change to the other Ascended (their kit, slots and trees stay as they are).
 
 ## Decisions
 
 | Question | Decision |
 |---|---|
-| Slots for everyone | Active `a1` to `a4`, passive `p1` and `p2`. Any learned node of the right kind may go in any slot, unless the tree declares slots. |
+| Slots | An Ascended without `slots` in its tree has `a1` to `a3` and `p1`; any learned node of the right kind goes in any slot. Only a tree that declares `slots` can have `a4` or `p2`. Twoychi is the only one that does. |
 | Twoychi's slots | Declared in her `tree.json`: `a1` Wolf, `a2` Bear, `a3` Dog, `a4` Aya; `p1` Troy (Wolf, Bear and Dog passives), `p2` Aya. A slot takes only learned nodes of its own branches. |
 | Form bonus | None. An ability is authored with its own numbers, and it can only sit in its own form's slot, so "the stats follow the form" holds by construction. |
 | Cross-tree nodes | A node needing two branches still has one home `branch` (written in the node). It sits in that branch's slot. |
@@ -25,7 +26,7 @@ multipliers, loadouts for the other Ascended beyond the two new empty slots, new
 
 ## Tree format
 
-`tree.json` gains optional fields. An Ascended without them behaves as today, with the free slots.
+`tree.json` gains optional fields. An Ascended without them behaves exactly as today: 3 active slots, 1 passive slot, free choice, one tree.
 
 ```json
 {"slots": {"a1": ["wolf"], "a2": ["bear"], "a3": ["dog"], "a4": ["aya"], "p1": ["wolf", "bear", "dog"], "p2": ["aya"]},
@@ -38,16 +39,16 @@ multipliers, loadouts for the other Ascended beyond the two new empty slots, new
   and the loader rejects the tree.
 - Every node of a tree that declares `slots` needs a `branch` (a lowercase name). Roots too. Without `slots`, `branch`
   is optional and ignored.
-- **Roots.** The catalog kit holds up to 4 abilities (today 3) and up to 2 passives. A root is a catalog ability, the
-  first passive (`<id>_passive`) or the optional second passive (`<id>_passive_2`). For an Ascended with the usual kit
-  (3 abilities and 1 passive) nothing changes; the test "4 roots" becomes "the catalog kit as roots".
+- **Roots.** A root is a catalog ability, the first passive (`<id>_passive`) or the second passive (`<id>_passive_2`).
+  The catalog kit holds 3 abilities and 1 passive; only an Ascended whose tree declares `a4` and `p2` may list a 4th
+  ability and a `passive_2` (the loader rejects them otherwise). For everyone else there are 4 roots as today.
 - Validation: every node's `branch` is known; a node must have a slot that can take it; the existing checks (no cycles, no
   unreachable nodes, no shared points, a root cannot have `requires`) stay.
 
 ## Catalog
 
-`ascended/<id>/catalog.json` may list up to 4 `abilities` and may add `passive_2` (same shape as `passive`). The default
-loadout fills `a1` to `a4` from the abilities in order, `p1` from `passive` and `p2` from `passive_2` if present.
+`ascended/<id>/catalog.json` lists 3 `abilities` and one `passive`. Twoychi lists 4 `abilities` and adds `passive_2` (same
+shape as `passive`). The default loadout fills the slots the Ascended has, in order: `a1` to `a3` or `a4`, `p1`, and `p2` if present.
 The AI-controlled wild Ascended use the same default loadout as today.
 
 ## Twoychi
@@ -66,7 +67,7 @@ The AI-controlled wild Ascended use the same default loadout as today.
 
 `PUT /ascension/ascendeds/{id}/loadout` takes `{"slots": {"a1": "<node id>", "a3": "<node id>", "p1": "<node id>"}}`.
 Each value is a learned node of the right kind; a slot may be left out or null. The old body (`abilities`, `passive`)
-is no longer accepted. Rules, in order: known slot ids only; no node in two slots; each node learned, of the right kind
+is no longer accepted. A slot the Ascended does not have (`a4` on a basic one) is an error. Rules, in order: known slot ids only; no node in two slots; each node learned, of the right kind
 and allowed by the tree's `slots`; at least one `a` slot filled; and the Ascended is not in the active battle. Errors
 name the slot and the node.
 
@@ -81,9 +82,9 @@ autonomous policy and the personalities work per category, so a fourth ability c
 
 ## Tests
 
-- catalog: up to 4 abilities and a second passive load; `slots` validated (unknown branch, branch without a matching slot,
-  node without a branch, wrong slot kind); a tree without `slots` still loads with the free slots; default loadout fills
-  `a1` to `a4`, `p1` and `p2`.
+- catalog: Twoychi's 4 abilities and second passive load; a 4th ability or `passive_2` without `a4`/`p2` slots is rejected; `slots` validated (unknown branch, branch without a matching slot,
+  node without a branch, wrong slot kind); a tree without `slots` still loads with 3 active slots and 1 passive slot; default loadout fills
+  the Ascended's own slots.
 - trees service: a node outside the slot's branches is rejected, naming slot and node; the free slots accept any learned
   node; at least one active ability; no repeats; fighting Ascended refused; a stored loadout with a stale slot is ignored
   when the battle starts and the default kit fills in when nothing is left.
@@ -96,4 +97,4 @@ autonomous policy and the personalities work per category, so a fourth ability c
 ## Open questions
 
 - All numbers, the Aya passives and the Waterbound bonus are placeholders (?).
-- Whether the other Ascended should get tree nodes for the 4th active and 2nd passive slots later, or leave them empty.
+- None for the other Ascended: they stay 3 + 1 with one tree each.
