@@ -25,6 +25,7 @@ import TypeSymbol from "./ui/TypeSymbol.vue";
  * catalog as face-down cards, and a card's details (the full card, personalities,
  * presets) in a dialog. */
 const store = useAscensionStore();
+defineProps<{ controlsTarget?: HTMLElement | null }>();
 const ascensionClient = useAscensionClient();
 const PAGE_SIZE = 50;
 
@@ -111,6 +112,7 @@ function show(ascended: OwnedAscended): void {
 
 <template>
   <section class="collection">
+    <Teleport :to="controlsTarget ?? 'body'" :disabled="!controlsTarget">
     <div v-if="types.length" class="filters">
       <div class="chips" role="group" aria-label="Filter by Ascension Type">
         <button type="button" class="chip" :aria-pressed="typeFilter === null" @click="typeFilter = null">All</button>
@@ -128,6 +130,7 @@ function show(ascended: OwnedAscended): void {
       <EmSwitch v-model="grouped" label="Group by type" />
     </div>
 
+    </Teleport>
     <ul v-if="essences.length" class="essences" aria-label="Essence">
       <li v-for="[tierId, count] in essences" :key="tierId" :style="{ '--tier': `var(--em-tier-${tierId}, var(--em-tier-common))` }">
         <EmTierBadge :tier-id="tierId" :label="`${titleCase(tierId)} essence`" /> <strong class="em-num">{{ count }}</strong>

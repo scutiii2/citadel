@@ -9,8 +9,10 @@ defineProps<{ insignia: number | null }>();
 <template>
   <div class="shell">
     <header class="mast">
-      <h1 class="brand em-pixel"><EmIcon name="flame" :size="22" /> ASCENSION</h1>
-      <p class="tagline">Collect. Forge. Battle.</p>
+      <div class="navigation"><slot name="navigation">
+        <h1 class="brand em-pixel"><EmIcon name="flame" :size="22" /> ASCENSION</h1>
+        <p class="tagline">Collect. Forge. Battle.</p>
+      </slot></div>
       <div v-if="insignia !== null" class="wallet" aria-label="Your Insignia">
         <EmIcon name="coin" />
         <span class="em-num amount">{{ insignia }}</span>
@@ -18,24 +20,43 @@ defineProps<{ insignia: number | null }>();
       </div>
       <span v-else class="wallet-gap" aria-hidden="true" />
     </header>
-    <main class="main"><slot /></main>
+    <div v-if="$slots.heading" class="screen-heading"><slot name="heading" /></div>
+    <main class="main" tabindex="0" aria-label="Screen content"><slot /></main>
   </div>
 </template>
 
 <style scoped>
 .shell {
-  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 .mast {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--em-space-4);
-  height: 88px;
+  flex: none;
+  min-height: 80px;
   padding: 0 var(--em-space-7);
   border-bottom: 1px solid var(--em-divider);
   background: var(--em-header);
 }
+.navigation {
+  display: flex;
+  align-items: center;
+  gap: var(--em-space-5);
+  min-width: 0;
+}
+.screen-heading {
+  flex: none;
+  width: 100%;
+  padding: var(--em-space-5) var(--em-space-7);
+  border-bottom: 1px solid var(--em-divider);
+}
+.screen-heading :deep(.head) { margin-bottom: 0; }
 .brand {
   display: flex;
   align-items: center;
@@ -69,14 +90,19 @@ defineProps<{ insignia: number | null }>();
   font-size: 16px;
 }
 .main {
-  max-width: calc(1184px + 2 * var(--em-space-7));
-  margin: 0 auto;
-  padding: var(--em-space-6) var(--em-space-7) var(--em-space-7);
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  padding: var(--em-space-5) var(--em-space-7) var(--em-space-7);
 }
 @media (max-width: 700px) {
   .mast {
-    grid-template-columns: 1fr auto;
-    height: 72px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 64px;
+    gap: var(--em-space-2);
     padding: 0 var(--em-space-4);
   }
   .brand {
@@ -93,5 +119,7 @@ defineProps<{ insignia: number | null }>();
   .main {
     padding: var(--em-space-5) var(--em-space-4) var(--em-space-6);
   }
+  .navigation { gap: var(--em-space-2); }
+  .screen-heading { padding: var(--em-space-4); }
 }
 </style>
