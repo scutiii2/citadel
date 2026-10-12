@@ -16,7 +16,7 @@ Signature colours: **cyan and white** for Twoychi as a whole (Aya's colours, and
 - Eyes: very pale, the colour eyes go just before they close (from the lore); a cool pale cyan-white.
 - Calm, merciful bearing. Never aggressive; the water is shown at rest or flowing, not as a weapon.
 - Palette: white, pale cyan, deeper aqua in the water, with soft cyan light on nearby surfaces.
-- **Open decision: her face.** `../ART_GUIDE.md` bans human faces. Aya is a spirit, so options are a veiled or hooded face, a face of smooth light with only the pale eyes, or a face turned away. Choose one before the first generation and record it here.
+- Her face is allowed (`../ART_GUIDE.md` no longer bans faces). Keep it calm, pale and spirit-like; record the approved face here after the first generation.
 
 ## Troy
 

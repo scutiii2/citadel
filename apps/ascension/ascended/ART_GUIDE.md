@@ -2,11 +2,28 @@
 
 How to make the three sprites of an Ascended with ChatGPT image generation so every Ascended looks like it
 belongs to the same game. Each Ascended has its own `art_prompts.md` (in its folder) with three ready-to-paste
-prompts; this file holds the rules they come from. When a prompt and this guide disagree, this guide wins and the
-prompt gets fixed.
+prompts, and an `identity.md` recording its persistent visual identity and reference images. This guide controls
+style, sizes and framing; `identity.md` controls the character design. Keep `art_prompts.md` consistent with both.
+When a prompt and this guide disagree, this guide wins and the prompt gets fixed.
 
 Where files go: everything for one Ascended lives in `ascended/<id>/` (see `../AGENTS.md`). The finished files are
 `sprite_main_card.webp`, `sprite_preview_card.webp` and `sprite_battle.webp` in that folder.
+
+### Identity record (`identity.md`)
+
+- Before creating, recreating or editing any sprite, read this guide, the Ascended's `identity.md` and its
+  `art_prompts.md`, then inspect the reference images named in `identity.md`.
+- If `identity.md` does not exist, create it in `ascended/<id>/` before generating sprites. For an existing
+  Ascended, derive it from the established art and design notes; use the existing preview card as the primary
+  reference when recreating other sprites for consistency. For a new Ascended, record the intended design and
+  identify its reference image once the design is established.
+- Record the defining anatomy, face, proportions, silhouette, colours, signature glow, armour, clothing, weapons
+  and distinctive features. Name the primary and supporting reference images and state what must stay consistent
+  across poses and framing.
+- Update `identity.md` when an intentional redesign or newly established detail makes it incomplete or outdated,
+  and update the design notes and prompts in `art_prompts.md` to match. Pose, crop and background changes alone do
+  not change the character's identity. Do not rewrite the identity to legitimise accidental generation drift;
+  correct the sprite instead.
 
 ## 1. The three sprites
 
@@ -27,8 +44,8 @@ is drawn by the game on top of the art. Never draw a card frame, border or any t
   runes, lava glow. The shared accent is ember-orange light. Every Ascended also has one signature glow colour
   (listed in its `art_prompts.md`) that is used for its eyes, gems, flames or core.
 - **Character:** armoured or elemental creature, a clear silhouette you can read at 150 px, big expressive glowing
-  eyes (a little cute, a little fierce), a glowing gem, core or flame as the focal point. Creatures and constructs
-  only: no humans, no human faces.
+  eyes (a little cute, a little fierce), a glowing gem, core or flame as the focal point. Creatures, constructs and
+  spirits; faces are allowed.
 - **Light:** one strong light that comes from the character's own glow, lighting nearby metal and stone. The rest is
   dark and moody.
 - **Colour discipline:** one dominant colour family per Ascended plus ember orange. Avoid pure white and pure black.
@@ -38,7 +55,7 @@ is drawn by the game on top of the art. Never draw a card frame, border or any t
 ## 3. Never
 
 No text, letters, numbers, logos, watermarks, signatures, speech bubbles, UI, card frames or borders. No second
-character. No humans. No blood or gore. No cropping of the character by the image edge (except where a rule below
+character. No ordinary humans. No blood or gore. No cropping of the character by the image edge (except where a rule below
 says otherwise). No realistic or 3D rendering.
 
 ## 4. Rules per sprite
@@ -73,12 +90,16 @@ says otherwise). No realistic or 3D rendering.
 
 ## 5. Working with ChatGPT
 
+Before step 1, read or create the Ascended's `identity.md` as described above. Use its character details and
+reference priority for every generation prompt, including additional sprites beyond the three standard files.
+
 1. Start a new chat per Ascended. Paste the main prompt from its `art_prompts.md` first. Iterate until the character
    is right. This is the reference for the other two.
 2. In the same chat, ask for the preview and the battle sprite with the other two prompts. Start each with: "Use the
    character in the previous image as the exact reference: same design, colours, armour and proportions."
-3. For an Ascended that already has art, upload its current `sprite_main_card.webp` in the first message and say
-   "redraw this exact character in the new format, keep the design".
+3. For an Ascended that already has art, upload the primary reference specified in `identity.md` in the first
+   message and say "redraw this exact character in the new format, keep the design". When recreating the main card
+   or battle sprite from an established preview, use `sprite_preview_card.webp` as that reference.
 4. ChatGPT cannot make every size. It makes 1536 x 1024, 1024 x 1024 or 1024 x 1536. Ask for the nearest and crop
    afterwards (section 6).
 5. Fix-up lines that work, one at a time:
@@ -113,6 +134,8 @@ default 50.
 ## 7. Delivery checklist
 
 - [ ] Same character in all three sprites.
+- [ ] `identity.md` exists in the Ascended's folder, was read before generation, and matches the established
+      character and reference images; update it and `art_prompts.md` if necessary.
 - [ ] No text, frame, border, watermark.
 - [ ] Main card: whole character inside the middle band, readable after the 1.93 : 1 crop.
 - [ ] Preview: recognisable at 150 px.
@@ -125,6 +148,9 @@ default 50.
 ## 8. A new Ascended
 
 1. Make `ascended/<id>/` with its `catalog.json` (see the other Ascended).
-2. Copy another Ascended's `art_prompts.md`, then rewrite its "Design" section (concept, colours, signature glow,
+2. Create `identity.md` with the intended visual identity, defining features and consistency rules. After the
+   character design is established, record the primary reference image and refine the identity details.
+3. Copy another Ascended's `art_prompts.md`, then rewrite its "Design" section (concept, colours, signature glow,
    details, poses). Keep the three prompts' structure: they are built from sections 2 to 4 of this guide.
-3. Make the three sprites, check section 7, and add the entry to the prompts file's "Status" line.
+4. Make the three sprites using `identity.md`, update it and the prompts when necessary, check section 7, and add
+   the entry to the prompts file's "Status" line.
