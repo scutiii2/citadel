@@ -20,6 +20,8 @@ const node = (id: string, extra = {}) => ({
 
 const TREE: TreeView = {
   ascended_id: "guardian", level: 12, essences: { common: 3 },
+  slots: [{ id: "a1", kind: "ability", branches: null }, { id: "a2", kind: "ability", branches: null },
+          { id: "a3", kind: "ability", branches: null }, { id: "p1", kind: "passive", branches: null }],
   nodes: [
     node("g_a", { root: true, x: 40, y: 40 }),
     node("g_b", { root: true, x: 40, y: 160, category: "DEFENSE" }),
@@ -115,25 +117,25 @@ describe("TreeTab", () => {
   });
 
   it("equips a learned ability in a slot and saves the whole loadout", async () => {
-    client.saveLoadout.mockResolvedValue({ ascended_id: "guardian", abilities: ["g_b"], passive: "g_pass" });
+    client.saveLoadout.mockResolvedValue({ ascended_id: "guardian", slots: { a1: "g_b", p1: "g_pass" } });
     const wrapper = await mountTab();
 
     await wrapper.find('[data-node="g_b"]').trigger("click");
     await wrapper.find('.node-detail button[data-slot="a1"]').trigger("click");
     await flushPromises();
 
-    expect(client.saveLoadout).toHaveBeenCalledWith("guardian", ["g_b"], "g_pass");
+    expect(client.saveLoadout).toHaveBeenCalledWith("guardian", { a1: "g_b", a2: null, a3: null, p1: "g_pass" });
   });
 
   it("can unequip the passive", async () => {
-    client.saveLoadout.mockResolvedValue({ ascended_id: "guardian", abilities: ["g_a", "g_b"], passive: null });
+    client.saveLoadout.mockResolvedValue({ ascended_id: "guardian", slots: { a1: "g_a", a2: "g_b" } });
     const wrapper = await mountTab();
 
     await wrapper.find('[data-node="g_pass"]').trigger("click");
     await wrapper.find(".node-detail button.unequip").trigger("click");
     await flushPromises();
 
-    expect(client.saveLoadout).toHaveBeenCalledWith("guardian", ["g_a", "g_b"], null);
+    expect(client.saveLoadout).toHaveBeenCalledWith("guardian", { a1: "g_a", a2: "g_b", a3: null, p1: null });
   });
 
   it("shows why a learn failed inside the tab", async () => {
@@ -156,5 +158,46 @@ describe("TreeTab", () => {
     await wrapper.find('[data-node="g_pass"]').trigger("click");
 
     expect(wrapper.find(".node-detail").text()).toContain("Defense rating rises by 40% of its Power.");
+  });
+
+  it("shows six branch slots and only the matching equip buttons", async () => {
+    const tree: TreeView = {
+      ...structuredClone(TREE),
+      slots: [
+        { id: "a1", kind: "ability", branches: ["wolf"] },
+        { id: "a2", kind: "ability", branches: ["bear"] },
+        { id: "a3", kind: "ability", branches: ["dog"] },
+        { id: "a4", kind: "ability", branches: ["aya"] },
+        { id: "p1", kind: "passive", branches: ["wolf", "bear", "dog"] },
+        { id: "p2", kind: "passive", branches: ["aya"] },
+      ],
+      nodes: [node("g_wolf", { branch: "wolf" }), node("g_aya", { kind: "passive", branch: "aya" })],
+      loadout: { a1: "g_wolf", a2: null, a3: null, a4: null, p1: null, p2: null },
+    };
+    client.tree.mockResolvedValue(tree);
+    client.saveLoadout.mockResolvedValue({ ascended_id: "guardian", slots: { a1: "g_wolf", p2: "g_aya" } });
+    const wrapper = await mountTab();
+    const chips = wrapper.findAll(".slots .slot");
+    expect(chips).toHaveLength(6);
+    expect(chips.map((chip) => chip.text())).toEqual([
+      expect.stringContaining("wolf"), expect.stringContaining("bear"), expect.stringContaining("dog"),
+      expect.stringContaining("aya"), expect.stringContaining("wolf"), expect.stringContaining("aya"),
+    ]);
+    await wrapper.find('[data-node="g_wolf"]').trigger("click");
+    expect(wrapper.findAll(".equip button[data-slot]").map((button) => button.text())).toEqual([expect.stringMatching(/^Equip A1/)]);
+    await wrapper.find('[data-node="g_aya"]').trigger("click");
+    expect(wrapper.findAll(".equip button[data-slot]").map((button) => button.text())).toEqual([expect.stringMatching(/^Equip P2/)]);
+    await wrapper.find('.equip button[data-slot="p2"]').trigger("click");
+    await flushPromises();
+    expect(client.saveLoadout).toHaveBeenCalledWith("guardian", { a1: "g_wolf", a2: null, a3: null, a4: null, p1: null, p2: "g_aya" });
+  });
+
+  it("displays the server's loadout error", async () => {
+    client.saveLoadout.mockRejectedValue(new Error("'g_b' cannot go in slot 'a1'"));
+    const wrapper = await mountTab();
+    await wrapper.find('[data-node="g_b"]').trigger("click");
+    await wrapper.find('.equip button[data-slot="a1"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".tree-tab .em-notice").text()).toContain("'g_b' cannot go in slot 'a1'");
   });
 });

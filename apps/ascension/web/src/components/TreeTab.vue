@@ -15,7 +15,6 @@ const client = useAscensionClient();
 
 const NODE_W = 156;
 const NODE_H = 88;
-const ABILITY_SLOTS: LoadoutSlot[] = ["a1", "a2", "a3"];
 
 const tree = ref<TreeView | null>(null);
 const selectedId = ref<string | null>(null);
@@ -27,6 +26,10 @@ let request = 0;
 let drag: { x: number; y: number; left: number; top: number } | null = null;
 /** A failed load, else the failure of the last learn or equip (the store keeps it). */
 const shownError = computed(() => error.value || store.error);
+
+const slotList = computed(() => tree.value?.slots ?? []);
+const equipSlots = computed(() => slotList.value.filter((slot) => slot.kind === selected.value?.kind
+  && (slot.branches === null || (selected.value?.branch != null && slot.branches.includes(selected.value.branch)))));
 
 const selected = computed(() => tree.value?.nodes.find((n) => n.id === selectedId.value) ?? null);
 const byId = computed(() => new Map((tree.value?.nodes ?? []).map((n) => [n.id, n])));
@@ -119,21 +122,20 @@ async function learn(node: TreeNodeState): Promise<void> {
 
 /** The replaced slot loses its node; the node leaves any other slot first. */
 async function equip(node: TreeNodeState, slot: LoadoutSlot): Promise<void> {
-  const next: Record<LoadoutSlot, string | null> = { ...(tree.value as TreeView).loadout };
+  const next: Partial<Record<LoadoutSlot, string | null>> = { ...(tree.value as TreeView).loadout };
   for (const key of Object.keys(next) as LoadoutSlot[]) if (next[key] === node.id) next[key] = null;
   next[slot] = node.id;
   await save(next);
 }
 
 async function unequip(node: TreeNodeState): Promise<void> {
-  const next: Record<LoadoutSlot, string | null> = { ...(tree.value as TreeView).loadout };
+  const next: Partial<Record<LoadoutSlot, string | null>> = { ...(tree.value as TreeView).loadout };
   for (const key of Object.keys(next) as LoadoutSlot[]) if (next[key] === node.id) next[key] = null;
   await save(next);
 }
 
-async function save(next: Record<LoadoutSlot, string | null>): Promise<void> {
-  const abilities = ABILITY_SLOTS.map((s) => next[s]).filter((id): id is string => id !== null);
-  const result = await store.saveLoadout(props.ascended.ascended_id, abilities, next.p1);
+async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<void> {
+  const result = await store.saveLoadout(props.ascended.ascended_id, next);
   if (result) await load();
 }
 </script>
@@ -146,8 +148,7 @@ async function save(next: Record<LoadoutSlot, string | null>): Promise<void> {
     <template v-if="tree">
       <div class="tree-heading"><div><h3>Ability tree</h3><p class="muted em-num">{{ learned }} / {{ tree.nodes.length }} learned · Select a node to inspect it</p></div><div class="tree-controls"><EmButton aria-label="Zoom out" @click="changeZoom(-0.1)">−</EmButton><span class="em-num">{{ Math.round(zoom * 100) }}%</span><EmButton aria-label="Zoom in" @click="changeZoom(0.1)">+</EmButton><EmButton @click="fit">Fit tree</EmButton></div></div>
       <div class="slots" aria-label="Equipped">
-        <button v-for="slot in ABILITY_SLOTS" :key="slot" type="button" class="slot" :disabled="!tree.loadout[slot]" @click="selectedId = tree.loadout[slot]"><small>{{ slot.toUpperCase() }}</small> {{ slotLabel(slot) }}</button>
-        <button type="button" class="slot" :disabled="!tree.loadout.p1" @click="selectedId = tree.loadout.p1"><small>PASSIVE</small> {{ slotLabel("p1") }}</button>
+        <button v-for="slot in slotList" :key="slot.id" type="button" class="slot" :disabled="!tree.loadout[slot.id]" @click="selectedId = tree.loadout[slot.id] ?? null"><small>{{ slot.id.toUpperCase() }}</small> {{ slotLabel(slot.id) }}<small v-if="slot.branches" class="branch-hint">{{ slot.branches.join(" / ") }}</small></button>
       </div>
       <div class="tree-layout">
       <div class="graph-area">
@@ -192,10 +193,7 @@ async function save(next: Record<LoadoutSlot, string | null>): Promise<void> {
         <p v-if="selected.state === 'locked'" class="reason">{{ selected.reason }}</p>
         <EmButton v-if="selected.state === 'learnable'" class="learn" variant="primary" :disabled="store.busy || loading" @click="learn(selected)">Learn · {{ costText(selected) }}</EmButton>
         <div v-if="selected.state === 'learned'" class="equip">
-          <template v-if="selected.kind === 'ability'">
-            <EmButton v-for="slot in ABILITY_SLOTS" :key="slot" :data-slot="slot" :disabled="store.busy || loading" @click="equip(selected, slot)">Equip {{ slot.toUpperCase() }}<small>{{ slotLabel(slot) }}</small></EmButton>
-          </template>
-          <EmButton v-else data-slot="p1" :disabled="store.busy || loading" @click="equip(selected, 'p1')">Equip passive</EmButton>
+          <EmButton v-for="slot in equipSlots" :key="slot.id" :data-slot="slot.id" :disabled="store.busy || loading" @click="equip(selected, slot.id)">Equip {{ slot.id.toUpperCase() }}<small>{{ slotLabel(slot.id) }}</small></EmButton>
           <EmButton v-if="equippedSlot(selected)" class="unequip" :disabled="store.busy || loading" @click="unequip(selected)">Unequip</EmButton>
         </div>
         <p v-if="selected.state !== 'learned'" class="muted">Learning unlocks this {{ selected.kind }}. Equip it in a battle slot to use it.</p>
@@ -210,7 +208,7 @@ async function save(next: Record<LoadoutSlot, string | null>): Promise<void> {
 .tree-heading h3 { margin: 0; font-size: 20px; }
 .tree-heading p { margin: 4px 0 0; font-size: 12px; }
 .tree-controls { display: flex; align-items: center; gap: var(--em-space-2); }
-.slots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--em-space-2); margin-bottom: var(--em-space-4); }
+.slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--em-space-2); margin-bottom: var(--em-space-4); }
 button.slot { padding: 10px 12px; min-height: var(--em-target); border: 1px solid var(--em-divider); border-radius: var(--em-radius); font: inherit; font-size: 12px; color: var(--em-text); background: var(--em-bg); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
 .slot:disabled { cursor: default; color: var(--em-muted); }
 .slot small { display: block; color: var(--em-muted); font-weight: 700; }
@@ -218,6 +216,7 @@ button.slot { padding: 10px 12px; min-height: var(--em-target); border: 1px soli
 .graph-area { min-width: 0; }
 .scroll { max-width: 100%; max-height: 560px; min-height: 260px; overflow: auto; border: 1px solid var(--em-divider); border-radius: var(--em-radius); background: var(--em-bg); cursor: grab; }
 .canvas { position: relative; transform-origin: top left; }
+.branch-hint { margin-top: 2px; font-weight: 400; }
 .lines { position: absolute; inset: 0; }
 .tree-line { stroke: var(--em-border); stroke-width: 2; fill: none; }
 .tree-node { position: absolute; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 12px; border: 1px solid var(--em-border); border-radius: var(--em-radius); background: var(--em-panel); color: var(--em-text); font: inherit; text-align: left; cursor: pointer; }

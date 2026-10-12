@@ -18,6 +18,7 @@ import {
   type TierUp,
   type LearnResult,
   type LoadoutResult,
+  type LoadoutSlot,
   type StartBattleInput,
 } from "../api/AscensionClient";
 import { ApiError, UnauthorizedError } from "../api/http";
@@ -441,8 +442,8 @@ export const useAscensionStore = defineStore("ascension", () => {
     return mutate(() => ascensionClient.learnNode(ascendedId, nodeId), () => refreshProfile());
   }
 
-  function saveLoadout(ascendedId: string, abilities: string[], passive: string | null): Promise<LoadoutResult | null> {
-    return mutate(() => ascensionClient.saveLoadout(ascendedId, abilities, passive), () => undefined);
+  function saveLoadout(ascendedId: string, slots: Partial<Record<LoadoutSlot, string | null>>): Promise<LoadoutResult | null> {
+    return mutate(() => ascensionClient.saveLoadout(ascendedId, slots), () => undefined);
   }
 
   function raiseTier(ascendedId: string): Promise<TierUp | null> {

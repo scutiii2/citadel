@@ -63,6 +63,7 @@ export interface AscendedArtInfo {
 
 export interface TreeCost { tier: string; amount: number }
 export interface TreeNodeView {
+  branch?: string | null;
   effects?: EffectInfo[];
   id: string; kind: "ability" | "passive"; name: string; x: number; y: number; requires: string[];
   unlock_level: number; root: boolean; cost: TreeCost | null;
@@ -70,13 +71,14 @@ export interface TreeNodeView {
   passive?: { kind: string; params: Record<string, unknown> };
 }
 export interface TreeNodeState extends TreeNodeView { state: "learned" | "learnable" | "locked"; reason: string | null }
-export type LoadoutSlot = "a1" | "a2" | "a3" | "p1";
+export type LoadoutSlot = "a1" | "a2" | "a3" | "a4" | "p1" | "p2";
+export interface SlotInfo { id: LoadoutSlot; kind: "ability" | "passive"; branches: string[] | null }
 export interface TreeView {
   ascended_id: string; level: number; essences: Record<string, number>;
-  nodes: TreeNodeState[]; loadout: Record<LoadoutSlot, string | null>;
+  nodes: TreeNodeState[]; slots: SlotInfo[]; loadout: Partial<Record<LoadoutSlot, string | null>>;
 }
 export interface LearnResult { kind: "learn"; ascended_id: string; node_id: string; essence_tier: string; essence_spent: number }
-export interface LoadoutResult { ascended_id: string; abilities: string[]; passive: string | null }
+export interface LoadoutResult { ascended_id: string; slots: Record<string, string | null> }
 
 export interface AscendedInfo {
   id: string;
@@ -445,8 +447,8 @@ export class AscensionClient {
   tree = (ascendedId: string) => this.http.request<TreeView>("GET", `${BASE}/ascendeds/${part(ascendedId)}/tree`);
   learnNode = (ascendedId: string, nodeId: string, key: string = newIdempotencyKey()) =>
     this.http.request<LearnResult>("POST", `${BASE}/ascendeds/${part(ascendedId)}/tree/${part(nodeId)}/learn`, undefined, withKey(key));
-  saveLoadout = (ascendedId: string, abilities: string[], passive: string | null, key: string = newIdempotencyKey()) =>
-    this.http.request<LoadoutResult>("PUT", `${BASE}/ascendeds/${part(ascendedId)}/loadout`, { abilities, passive }, withKey(key));
+  saveLoadout = (ascendedId: string, slots: Partial<Record<LoadoutSlot, string | null>>, key: string = newIdempotencyKey()) =>
+    this.http.request<LoadoutResult>("PUT", `${BASE}/ascendeds/${part(ascendedId)}/loadout`, { slots }, withKey(key));
 
   addStar = (ascendedId: string, key: string = newIdempotencyKey()) =>
     this.http.request<StarUp>("POST", `${BASE}/ascendeds/${part(ascendedId)}/stars`, undefined, withKey(key));
