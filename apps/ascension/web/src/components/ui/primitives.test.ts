@@ -76,6 +76,15 @@ describe("EmTabs", () => {
     await wrapper.findAll("[role=tab]")[0]!.trigger("keydown.end");
     expect(wrapper.emitted("update:modelValue")![1]).toEqual(["c"]);
   });
+
+  it("keeps an enabled tab keyboard reachable when another screen is open", async () => {
+    const wrapper = mount(EmTabs, { props: { modelValue: "other", options: [{ ...options[0]!, disabled: true }, options[2]!], ariaLabel: "Sections" } });
+    const tabs = wrapper.findAll("[role=tab]");
+    expect(tabs.map(t => t.attributes("aria-selected"))).toEqual(["false", "false"]);
+    expect(tabs.map(t => t.attributes("tabindex"))).toEqual(["-1", "0"]);
+    await tabs[1]!.trigger("click");
+    expect(wrapper.emitted("update:modelValue")).toEqual([["c"]]);
+  });
 });
 
 describe("EmTierBadge", () => {

@@ -36,7 +36,6 @@ for (const width of [1440, 768, 375]) {
     };
     await page.route("**/ascension/ascendeds/striker/tree", route => route.fulfill({ json: tree }));
     await page.goto("/#ticket=e2e-launch");
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.locator(".ascended-card").click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.locator(".copy-summary")).toContainText("4 spare copies");

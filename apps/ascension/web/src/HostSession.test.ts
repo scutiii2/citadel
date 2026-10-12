@@ -30,7 +30,7 @@ describe("real host session wiring", () => {
     const wrapper = mount(App);
     await flushPromises();
     expect(window.location.hash).toBe("");
-    expect(wrapper.text()).toContain("Continue");
+    expect(wrapper.find(".collection").exists()).toBe(true);
     expect(fetchFn.mock.calls.map(([path]) => path)).toEqual(["/session/redeem", "/ascension/catalog", "/ascension/profile"]);
     expect(postMessage).toHaveBeenCalledWith({ source: "game", type: "ready" }, "http://127.0.0.1:5173");
     expect(wrapper.find("button.close-game").exists()).toBe(false);

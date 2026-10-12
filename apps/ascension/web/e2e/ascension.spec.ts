@@ -3,13 +3,13 @@ import { expect, test } from "@playwright/test";
 import { installFakeApi } from "./fakeApi.ts";
 import { PROFILE } from "../src/api/AscensionClient.fixtures.ts";
 
-for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) {
+for (const viewport of [{ width: 1280, height: 720 }, { width: 768, height: 720 }, { width: 390, height: 844 }]) {
   test(`only the main content scrolls at ${viewport.width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     const api = await installFakeApi(page);
     api.ascension.profile = { ...PROFILE };
     await page.goto("/#ticket=e2e-launch");
-    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("heading", { name: "Your collection" })).toBeVisible();
     const main = page.getByRole("main");
     const heading = page.getByRole("heading", { name: "Your collection" });
     const before = await heading.boundingBox();
@@ -25,6 +25,33 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
       pageOverflow: document.documentElement.scrollHeight > innerHeight,
       horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
     }))).toEqual({ pageScroll: 0, pageOverflow: false, horizontalOverflow: false });
+    await expect(page.getByRole("button", { name: "Continue", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Shop", exact: true })).toHaveCount(0);
+    const wallet = page.getByRole("button", { name: "Open shop, 100 Insignia" });
+    const walletBox = await wallet.boundingBox();
+    const helpBox = await page.getByRole("button", { name: "How to play", exact: true }).boundingBox();
+    const settingsBox = await page.getByRole("button", { name: "Settings", exact: true }).boundingBox();
+    expect(walletBox!.x).toBeLessThan(helpBox!.x);
+    expect(helpBox!.x).toBeLessThan(settingsBox!.x);
+    expect(walletBox!.y).toBe(helpBox!.y);
+    expect(walletBox!.y).toBe(settingsBox!.y);
+    await wallet.click();
+    await expect(page.getByRole("heading", { name: "The forge shop" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Battle", exact: true })).toHaveAttribute("tabindex", "0");
+    await page.getByRole("button", { name: "How to play", exact: true }).click();
+    const help = page.getByRole("dialog", { name: "Keep the fire going" });
+    await expect(help).toBeVisible();
+    await help.getByRole("button", { name: "Ready to play" }).click();
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    const settings = page.getByRole("dialog", { name: "Settings", exact: true });
+    await settings.getByRole("button", { name: "Reset progress", exact: true }).click();
+    const reset = page.getByRole("dialog", { name: "Reset all Ascension progress?" });
+    await expect(reset.getByRole("button", { name: "Reset progress", exact: true })).toBeDisabled();
+    await reset.getByRole("textbox", { name: "Type RESET to confirm" }).fill("RESET");
+    await reset.getByRole("button", { name: "Reset progress", exact: true }).click();
+    await expect(page.getByRole("button", { name: "New game", exact: true })).toBeVisible();
+    await expect(settings).not.toBeVisible();
+    expect(api.unexpected).toEqual([]);
   });
 }
 

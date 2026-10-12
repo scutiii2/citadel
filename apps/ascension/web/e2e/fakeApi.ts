@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { CATALOG, PROFILE, ownedAscended } from "../src/api/AscensionClient.fixtures.ts";
+import { CATALOG, PROFILE, ownedAscended, shopWindow } from "../src/api/AscensionClient.fixtures.ts";
 
 export class FakeGameApi {
   readonly ascension = { profile: null as Record<string, unknown> | null, keys: [] as string[] };
@@ -12,6 +12,11 @@ export class FakeGameApi {
       const req = route.request(); const path = new URL(req.url()).pathname; const method = req.method();
       if (req.headers().authorization !== "Bearer e2e-session") return route.fulfill({ status: 401, json: { error: "Not signed in" } });
       if (method === "GET" && path === "/ascension/catalog") return route.fulfill({ json: CATALOG });
+      if (method === "GET" && path === "/ascension/shop") return route.fulfill({ json: shopWindow() });
+      if (method === "POST" && path === "/ascension/profile/reset") {
+        this.ascension.profile = null;
+        return route.fulfill({ json: { reset: true } });
+      }
       if (method === "GET" && path === "/ascension/profile") return route.fulfill({ status: this.ascension.profile ? 200 : 404, json: this.ascension.profile ?? { error: "Choose a starter first" } });
       if (method === "POST" && path === "/ascension/profile") {
         this.ascension.keys.push(req.headers()["idempotency-key"] ?? "");

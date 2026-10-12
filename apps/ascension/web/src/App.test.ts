@@ -17,6 +17,8 @@ vi.mock("./api/AscensionClient", () => {
     personalities: vi.fn(),
     preset: vi.fn(),
     advance: vi.fn(),
+    shop: vi.fn(),
+    resetProfile: vi.fn(),
   };
   return { useAscensionClient: () => client };
 });
@@ -77,22 +79,60 @@ describe("AscensionView", () => {
     expect(tab(wrapper, "Collection").classes()).toContain("active");
   });
 
-  it("a returning player sees the menu first; Continue and Menu move between the screens", async () => {
+  it("opens the collection directly for returning players and uses Insignia to open the shop", async () => {
     const wrapper = await mountView();
-
-    expect(wrapper.find("[role=tab]").exists()).toBe(false);
-    await wrapper.findAll("nav button")[0]!.trigger("click");
     expect(tab(wrapper, "Collection").classes()).toContain("active");
+    expect(wrapper.find(".hero").exists()).toBe(false);
+    expect(wrapper.find("button.menu-link").exists()).toBe(false);
+    expect(wrapper.findAll(".navigation [role=tab]").map(t => t.text())).toEqual(["Battle", "Collection"]);
+    await wrapper.find("button.wallet").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".shop").exists()).toBe(true);
+    expect(wrapper.find("button.wallet").attributes("aria-pressed")).toBe("true");
+    await tab(wrapper, "Collection").trigger("click");
+    expect(wrapper.find(".collection").exists()).toBe(true);
+    wrapper.unmount();
+  });
 
-    await wrapper.find("button.menu-link").trigger("click");
-    expect(wrapper.find("[role=tab]").exists()).toBe(false);
-    await wrapper.findAll("nav button")[2]!.trigger("click");
-    expect(tab(wrapper, "Shop").classes()).toContain("active");
+  it("opens help and settings from the header and resets only after confirmation", async () => {
+    client.resetProfile.mockResolvedValue({ reset: true });
+    const wrapper = await mountView();
+    await wrapper.find('[aria-label="How to play"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('dialog[aria-label="Keep the fire going"]').attributes("open")).toBeDefined();
+    await wrapper.find('dialog[aria-label="Keep the fire going"] button.close').trigger("click");
+    await wrapper.find('[aria-label="Settings"]').trigger("click");
+    await flushPromises();
+    const settings = wrapper.find('dialog[aria-label="Settings"]');
+    expect(settings.attributes("open")).toBeDefined();
+    await settings.find("button.danger").trigger("click");
+    await flushPromises();
+    const confirmation = wrapper.find('dialog[aria-label="Reset all Ascension progress?"]');
+    expect((confirmation.find("button.confirm").element as HTMLButtonElement).disabled).toBe(true);
+    expect(client.resetProfile).not.toHaveBeenCalled();
+    await confirmation.find("input").setValue("RESET");
+    await confirmation.find("button.confirm").trigger("click");
+    await flushPromises();
+    expect(client.resetProfile).toHaveBeenCalledTimes(1);
+    expect(wrapper.find(".hero").exists()).toBe(true);
+    expect(wrapper.find('button[aria-label="Settings"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("prevents reset from settings while a battle is active", async () => {
+    client.profile.mockResolvedValue({ ...PROFILE, active_battle: "b1" });
+    client.battle.mockResolvedValue(battleView({ mode: "manual" }));
+    const wrapper = await mountView();
+    await wrapper.find('[aria-label="Settings"]').trigger("click");
+    await flushPromises();
+    const settings = wrapper.find('dialog[aria-label="Settings"]');
+    expect((settings.find("button.danger").element as HTMLButtonElement).disabled).toBe(true);
+    expect(settings.text()).toContain("Finish or forfeit your battle to reset");
+    wrapper.unmount();
   });
 
   it("shows Insignia in the masthead and a title for each tab", async () => {
     const wrapper = await mountView();
-    await wrapper.findAll("nav button")[0]!.trigger("click");
 
     expect(wrapper.find(".wallet").text()).toBe("100 Insignia");
     expect(wrapper.find(".subtitle").text()).toBe("1 Ascended. Every one has a story.");
@@ -123,7 +163,7 @@ describe("AscensionView", () => {
     await flushPromises();
 
     expect(wrapper.find(".unavailable").exists()).toBe(false);
-    expect(wrapper.find("nav").exists()).toBe(true);
+    expect(wrapper.find(".collection").exists()).toBe(true);
   });
 
   it("stops the battle loop when the page goes away", async () => {
