@@ -10,7 +10,6 @@ import { useNowSeconds } from "../composables/useNowSeconds";
 import TreeTab from "./TreeTab.vue";
 import PresetEditor from "./PresetEditor.vue";
 import AscendedCard from "./AscendedCard.vue";
-import AscendedTemplateCard from "./AscendedTemplateCard.vue";
 import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 import EmBar from "./ui/EmBar.vue";
 import EmButton from "./ui/EmButton.vue";
@@ -251,8 +250,7 @@ function show(ascended: OwnedAscended): void {
               <EmButton :disabled="!!squadReason || store.busy" :aria-busy="store.busy" @click="toggleSquad">{{ store.busy ? 'Saving squad…' : store.squadIds.includes(open.ascended_id) ? 'Remove from squad' : 'Add to squad' }}</EmButton>
               <p v-if="squadReason" class="muted">{{ squadReason }}</p>
             </div>
-            <AscendedTemplateCard v-if="openInfo" class="big-card" :ascended="openInfo" :level="open.level" :tier-id="open.tier_id" />
-            <div v-if="openInfo" class="overview-effects"><h4>Innate passive</h4><strong>{{ titleCase(openInfo.passive.kind) }}</strong><p>{{ passiveText(openInfo.passive.kind, openInfo.passive.params) }}</p><h4>Foundation abilities</h4><article v-for="ability in openInfo.abilities" :key="ability.id"><strong>{{ ability.name }}</strong><p>{{ abilityEffect(ability) }} · Level {{ ability.unlock_level }}</p></article><p class="muted">Manage learned abilities and your battle loadout in the Ability tree tab. The card shows base stats and growth; current stats are in the summary.</p></div>
+            <div v-if="openInfo" class="overview-effects"><h4>Innate passive</h4><strong>{{ titleCase(openInfo.passive.kind) }}</strong><p>{{ passiveText(openInfo.passive.kind, openInfo.passive.params) }}</p><h4>Foundation abilities</h4><article v-for="ability in openInfo.abilities" :key="ability.id"><strong>{{ ability.name }}</strong><p>{{ abilityEffect(ability) }} · Level {{ ability.unlock_level }}</p></article><p class="muted">Manage learned abilities and your battle loadout in the Ability tree tab. Current stats are in the summary.</p></div>
           </section>
           <section v-show="detailTab === 'personalities'" role="tabpanel" aria-label="Personalities">
           <div class="people-head">
@@ -315,6 +313,7 @@ function show(ascended: OwnedAscended): void {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 10px;
 }
 .back {
   --card-width: 100%;
@@ -359,11 +358,6 @@ function show(ascended: OwnedAscended): void {
 .overview-effects h4 { margin-top: var(--em-space-4); color: var(--em-accent); }
 .overview-effects p { color: var(--em-muted); font-size: 13px; }
 .overview-effects article { padding: var(--em-space-3); background: var(--em-bg); border: 1px solid var(--em-divider); }
-.big-card {
-  flex: none;
-  --card-width: 340px;
-  align-self: flex-start; /* a stretched flex item ignores the card's aspect ratio */
-}
 .side {
   display: flex;
   flex: 1;
@@ -530,11 +524,6 @@ function show(ascended: OwnedAscended): void {
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 24px 18px;
-  }
-  .big-card {
-    --card-width: 100%;
-    max-width: 440px;
-    margin: 0 auto;
   }
 }
 </style>

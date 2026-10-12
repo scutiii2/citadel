@@ -88,8 +88,8 @@ describe("CollectionPanel", () => {
     expect(client.personalities).toHaveBeenCalledWith("guardian", null, 50);
     expect(client.preset).toHaveBeenCalledWith("guardian", 1);
     const details = wrapper.find(".details");
-    expect(details.find(".big-card .ascended-name").text()).toBe("Guardian");
-    expect(details.findAll(".big-card .ability").map((a) => a.find("strong").text())).toEqual(["Strike", "Rally"]);
+    expect(details.find(".big-card").exists()).toBe(false);
+    expect(details.findAll(".overview-effects article strong").map((a) => a.text())).toEqual(["Strike", "Rally"]);
     await details.findAll('[role="tab"]').find((b) => b.text() === "Personalities")!.trigger("click");
     expect(details.find(".personalities").text()).toContain("Aggressive");
     expect(details.find(".personalities").text()).toContain("Tier 2");
