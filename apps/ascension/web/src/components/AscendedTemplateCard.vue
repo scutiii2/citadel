@@ -68,7 +68,7 @@ const DEFAULT_FILL = "#3a3e46";
 // 24x24 stroke icons, as path data.
 const STAT_ICONS = {
   hp: ["M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"],
-  essence: ["M12 3c1 3 5 5 5 9a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-8z"],
+  power: ["M12 3c1 3 5 5 5 9a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-8z"],
   speed: ["M4 20C4 11 10 5 20 4c0 9-6 15-14 15", "M4 20L14 10"],
 } as const;
 const CATEGORY_ICONS: Record<string, readonly string[]> = {
@@ -81,7 +81,7 @@ const CATEGORY_ICONS: Record<string, readonly string[]> = {
 
 const STATS = [
   { key: "hp", label: "HP" },
-  { key: "essence", label: "Essence" },
+  { key: "power", label: "Power" },
   { key: "speed", label: "Speed" },
 ] as const;
 const stats = computed(() =>

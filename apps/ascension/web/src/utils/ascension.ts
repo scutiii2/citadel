@@ -35,13 +35,13 @@ export function passiveText(kind: string, params: Record<string, unknown>): stri
     case "defense_extension":
       return `Defense shields ${count(params.protected_attacks, 1, "attack")} for ${count(params.rounds, 1, "round")}.`;
     case "low_hp_attack_bonus":
-      return `Below ${percent(params.hp_below)} HP, attacks deal extra damage equal to ${percent(params.essence_fraction)} of its Essence.`;
+      return `Below ${percent(params.hp_below)} HP, attacks deal extra damage equal to ${percent(params.power_fraction)} of its Power.`;
     case "battle_start_speed":
-      return `At battle start, gains Speed equal to ${percent(params.essence_fraction)} of its Essence.`;
+      return `At battle start, gains Speed equal to ${percent(params.power_fraction)} of its Power.`;
     case "defense_rating_bonus":
-      return `Defense rating rises by ${percent(params.essence_fraction)} of its Essence.`;
+      return `Defense rating rises by ${percent(params.power_fraction)} of its Power.`;
     case "attack_bonus_vs_defense":
-      return `Attacks deal extra damage equal to ${percent(params.essence_fraction)} of its Essence against a defending target.`;
+      return `Attacks deal extra damage equal to ${percent(params.power_fraction)} of its Power against a defending target.`;
     case "support_duration_bonus":
       return `Support effects last ${count(params.rounds, 1, "round")} longer.`;
     case "cooldown_reduction":

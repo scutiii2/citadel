@@ -36,13 +36,13 @@ def test_build_fighter_unlocks_abilities_by_level():
 
 def test_build_fighter_applies_tier_to_stats():
     f = engine.build_fighter(WILD, "forbidden", "forbidden", 1)
-    assert (f.max_hp, f.essence, f.speed) == (800, 160, 120)
+    assert (f.max_hp, f.power, f.speed) == (800, 160, 120)
 
 
-def test_scout_starts_with_a_speed_buff_from_unbuffed_essence():
+def test_scout_starts_with_a_speed_buff_from_unbuffed_power():
     s = BattleSetup(engine.build_fighter(PLAYER, "scout", "common", 1), engine.build_fighter(WILD, "guardian", "common", 1))
     state = engine.start_state(s)
-    assert engine.stat(s.player, state.player, "speed") == 35 + 11  # 50% of 22 ESSENCE
+    assert engine.stat(s.player, state.player, "speed") == 35 + 11  # 50% of 22 POWER
     assert engine.stat(s.wild, state.wild, "speed") == 15 and state.round == 1
 
 
@@ -92,13 +92,13 @@ def test_resolve_action_matches_payloads():
 
 # -- attack and defense --------------------------------------------------------------
 
-def test_basic_attack_is_one_hundred_percent_of_essence():
+def test_basic_attack_is_one_hundred_percent_of_power():
     out = play(setup(), ATTACK, FLEE, 0.1, 0.99)  # player first; wild flee fails
     assert out.state.wild.hp == 60 and out.state.round == 2
 
 
 def test_minimum_damage_is_one():
-    s = setup(fighter(essence=0))
+    s = setup(fighter(power=0))
     assert play(s, ATTACK, FLEE, 0.1, 0.99).state.wild.hp == 99
 
 
@@ -113,7 +113,7 @@ def test_defense_uses_diminishing_returns_and_protects_one_attack():
 def test_defense_protects_only_its_allowed_attacks():
     guard = ability("guard", "DEFENSE", 250)
     passive = PassiveSpec("defense_extension", {"protected_attacks": 2, "rounds": 2})
-    s = setup(player=fighter(PLAYER, speed=1000), wild=fighter(WILD, essence=40, abilities=(guard,), passive=passive))
+    s = setup(player=fighter(PLAYER, speed=1000), wild=fighter(WILD, power=40, abilities=(guard,), passive=passive))
     r1 = play(s, ATTACK, use(guard), 0.1)
     assert r1.state.wild.hp == 80 and r1.state.wild.defense.attacks_left == 1 and r1.state.wild.defense.rounds_left == 1
     r2 = engine.resolve_round(s, r1.state, ATTACK, ATTACK, ScriptedRandom(0.1))
@@ -141,27 +141,27 @@ def test_defense_refresh_restores_allowance_without_banking():
     assert (refreshed.state.wild.defense.attacks_left, refreshed.state.wild.defense.rounds_left) == (2, 1)
 
 
-def test_sentinel_adds_unbuffed_essence_share_to_defense_rating():
+def test_sentinel_adds_unbuffed_power_share_to_defense_rating():
     guard = ability("guard", "DEFENSE", 100)
-    passive = PassiveSpec("defense_rating_bonus", {"essence_fraction": 0.5})
-    s = setup(wild=fighter(WILD, essence=40, abilities=(guard,), passive=passive))
+    passive = PassiveSpec("defense_rating_bonus", {"power_fraction": 0.5})
+    s = setup(wild=fighter(WILD, power=40, abilities=(guard,), passive=passive))
     event = next(e for e in play(s, FLEE, use(guard), 0.5, 0.99).events if e["type"] == "defense")
     assert event["rating"] == 60  # 40 + 20
 
 
 def test_striker_bonus_below_half_hp_and_bruiser_bonus_against_defense():
-    low = PassiveSpec("low_hp_attack_bonus", {"hp_below": 0.5, "essence_fraction": 0.5})
-    s = setup(player=fighter(PLAYER, essence=40, passive=low))
+    low = PassiveSpec("low_hp_attack_bonus", {"hp_below": 0.5, "power_fraction": 0.5})
+    s = setup(player=fighter(PLAYER, power=40, passive=low))
     hurt = BattleState(1, FighterState(hp=40), FighterState(hp=100))
     assert play(s, ATTACK, FLEE, 0.1, 0.99, state=hurt).state.wild.hp == 40  # 40 + 20 raw
     guard = ability("guard", "DEFENSE", 0)
-    bruise = PassiveSpec("attack_bonus_vs_defense", {"essence_fraction": 0.5})
-    s2 = setup(player=fighter(PLAYER, essence=40, passive=bruise), wild=fighter(WILD, abilities=(guard,)))
+    bruise = PassiveSpec("attack_bonus_vs_defense", {"power_fraction": 0.5})
+    s2 = setup(player=fighter(PLAYER, power=40, passive=bruise), wild=fighter(WILD, abilities=(guard,)))
     assert play(s2, ATTACK, use(guard), 0.1).state.wild.hp == 40  # 60 raw, defense rating ~0
 
 
 def test_knockout_ends_the_round_and_skips_later_actions():
-    s = setup(player=fighter(PLAYER, essence=200, speed=1000), wild=fighter(WILD, hp=50))
+    s = setup(player=fighter(PLAYER, power=200, speed=1000), wild=fighter(WILD, hp=50))
     out = play(s, ATTACK, ATTACK, 0.1)
     assert out.terminal == "won" and out.state.round == 1
     assert out.state.player.hp == 100  # the wild's attack never ran
@@ -169,27 +169,27 @@ def test_knockout_ends_the_round_and_skips_later_actions():
 
 
 def test_player_knocked_out():
-    s = setup(player=fighter(PLAYER, hp=10, speed=1), wild=fighter(WILD, essence=200, speed=1000))
+    s = setup(player=fighter(PLAYER, hp=10, speed=1), wild=fighter(WILD, power=200, speed=1000))
     assert play(s, ATTACK, ATTACK, 0.99).terminal == "knocked_out"
 
 
 # -- support and buffs ---------------------------------------------------------------
 
 def test_support_buff_applies_to_this_rounds_attack_and_lasts_its_duration():
-    focus = ability("focus", "SUPPORT", 50, stat="essence", duration=2)
-    s = setup(player=fighter(PLAYER, essence=40, abilities=(focus,)))
+    focus = ability("focus", "SUPPORT", 50, stat="power", duration=2)
+    s = setup(player=fighter(PLAYER, power=40, abilities=(focus,)))
     r1 = play(s, use(focus), FLEE, 0.1, 0.99)
     assert r1.state.player.buffs[0].amount == 20 and r1.state.player.buffs[0].rounds_left == 1
     r2 = engine.resolve_round(s, r1.state, ATTACK, FLEE, ScriptedRandom(0.1, 0.99))
-    assert r2.state.wild.hp == 40  # attack uses 60 ESSENCE
+    assert r2.state.wild.hp == 40  # attack uses 60 POWER
     assert r2.state.player.buffs == ()  # expired after its second round
 
 
 def test_reusing_a_support_refreshes_without_stacking_and_different_buffs_add():
-    a = ability("a", "SUPPORT", 50, stat="essence", duration=2)
-    b = ability("b", "SUPPORT", 25, stat="essence", duration=3)
-    s = setup(player=fighter(PLAYER, essence=40, abilities=(a, b)))
-    running = replace(engine.start_state(s), player=FighterState(hp=100, buffs=(Buff("a", "essence", 20, 2),)))
+    a = ability("a", "SUPPORT", 50, stat="power", duration=2)
+    b = ability("b", "SUPPORT", 25, stat="power", duration=3)
+    s = setup(player=fighter(PLAYER, power=40, abilities=(a, b)))
+    running = replace(engine.start_state(s), player=FighterState(hp=100, buffs=(Buff("a", "power", 20, 2),)))
     refreshed = engine.resolve_round(s, running, use(a), FLEE, ScriptedRandom(0.1, 0.99)).state
     assert [(x.source, x.amount, x.rounds_left) for x in refreshed.player.buffs] == [("a", 20, 1)]  # one copy, restarted
     added = engine.resolve_round(s, running, use(b), FLEE, ScriptedRandom(0.1, 0.99)).state
@@ -197,14 +197,14 @@ def test_reusing_a_support_refreshes_without_stacking_and_different_buffs_add():
 
 
 def test_channeler_passive_extends_support_duration():
-    focus = ability("focus", "SUPPORT", 50, stat="essence", duration=2)
+    focus = ability("focus", "SUPPORT", 50, stat="power", duration=2)
     s = setup(player=fighter(PLAYER, abilities=(focus,), passive=PassiveSpec("support_duration_bonus", {"rounds": 1})))
     assert play(s, use(focus), FLEE, 0.1, 0.99).state.player.buffs[0].rounds_left == 2  # 3 total, 1 spent
 
 
 def test_speed_buff_changes_this_rounds_order_roll():
     quick = ability("quick", "SUPPORT", 100, stat="speed", duration=2)
-    s = setup(player=fighter(PLAYER, essence=30, speed=10, abilities=(quick,)), wild=fighter(WILD, speed=40))
+    s = setup(player=fighter(PLAYER, power=30, speed=10, abilities=(quick,)), wild=fighter(WILD, speed=40))
     out = play(s, use(quick), FLEE, 0.5, 0.99)
     order = next(e for e in out.events if e["type"] == "order")
     assert order["chance_player_first"] == pytest.approx(40 / 80, abs=1e-4)  # speed 10 + 30 against 40
@@ -229,7 +229,7 @@ def test_exactly_one_order_roll_even_when_nothing_needs_ordering():
 # -- flee and catch ------------------------------------------------------------------
 
 def test_flee_chance_formula_and_success():
-    s = setup(player=fighter(PLAYER, essence=100, speed=1000))
+    s = setup(player=fighter(PLAYER, power=100, speed=1000))
     out = play(s, FLEE, ATTACK, 0.1, 0.49)  # 100 / 200 * full HP = 0.5
     assert out.terminal == "escaped"
     flee = next(e for e in out.events if e["type"] == "flee")
@@ -237,7 +237,7 @@ def test_flee_chance_formula_and_success():
 
 
 def test_flee_chance_scales_with_remaining_hp():
-    s = setup(player=fighter(PLAYER, essence=100, speed=1000))
+    s = setup(player=fighter(PLAYER, power=100, speed=1000))
     hurt = BattleState(1, FighterState(hp=50), FighterState(hp=100))
     flee = next(e for e in play(s, FLEE, ATTACK, 0.1, 0.99, state=hurt).events if e["type"] == "flee")
     assert flee["chance"] == pytest.approx(0.25)
@@ -245,7 +245,7 @@ def test_flee_chance_scales_with_remaining_hp():
 
 def test_flee_uses_the_hp_left_when_the_attempt_resolves():
     # The wild Ascended acts first and halves the player's HP, so the escape chance is 0.5 * 0.5.
-    s = setup(player=fighter(PLAYER, hp=100, essence=100, speed=1), wild=fighter(WILD, essence=50, speed=1000))
+    s = setup(player=fighter(PLAYER, hp=100, power=100, speed=1), wild=fighter(WILD, power=50, speed=1000))
     out = play(s, FLEE, ATTACK, 0.99, 0.99)
     flee = next(e for e in out.events if e["type"] == "flee")
     assert flee["chance"] == pytest.approx(0.25) and out.state.player.hp == 50
@@ -264,7 +264,7 @@ def test_the_order_roll_follows_the_speed_ratio_over_many_rounds():
 
 @pytest.mark.parametrize("draw", [0.01, 0.99])  # the order roll must not matter
 def test_catch_counters_flee_whatever_the_order(draw):
-    s = setup(player=fighter(PLAYER, essence=100), wild=fighter(WILD, essence=100))
+    s = setup(player=fighter(PLAYER, power=100), wild=fighter(WILD, power=100))
     out = play(s, FLEE, CATCH_WILD, draw, 0.2)
     flee = next(e for e in out.events if e["type"] == "flee")
     assert flee["chance"] == pytest.approx(0.25)  # 0.5 * 100 / 200
@@ -272,7 +272,7 @@ def test_catch_counters_flee_whatever_the_order(draw):
 
 
 def test_player_catch_against_flee_makes_no_collection_attempt():
-    s = setup(player=fighter(PLAYER, essence=100), wild=fighter(WILD, essence=100))
+    s = setup(player=fighter(PLAYER, power=100), wild=fighter(WILD, power=100))
     out = play(s, catch(), FLEE, 0.01, 0.99)
     assert out.emblem_consumed is None and out.terminal is None
     assert next(e for e in out.events if e["type"] == "flee")["chance"] == pytest.approx(0.25)
@@ -308,7 +308,7 @@ def test_wild_catch_against_a_non_flee_action_does_nothing():
 
 
 def test_terminal_result_preempts_a_later_collection_attempt():
-    s = setup(player=fighter(PLAYER, speed=1), wild=fighter(WILD, essence=500, speed=1000))
+    s = setup(player=fighter(PLAYER, speed=1), wild=fighter(WILD, power=500, speed=1000))
     out = play(s, catch(), ATTACK, 0.99)  # wild acts first and knocks the player out
     assert out.terminal == "knocked_out" and out.emblem_consumed is None
 

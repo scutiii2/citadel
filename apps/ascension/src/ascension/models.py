@@ -15,6 +15,11 @@ CATEGORIES = ("ATTACK", "DEFENSE", "SUPPORT", "FEAR", "INTERCEPT")
 ABILITY_CATEGORIES = ("ATTACK", "DEFENSE", "SUPPORT")
 
 
+def _legacy_stat(stat: str | None) -> str | None:
+    """Battles saved before the ESSENCE to POWER rename still say "essence"."""
+    return "power" if stat == "essence" else stat
+
+
 def other(side: str) -> str:
     return WILD if side == PLAYER else PLAYER
 
@@ -25,9 +30,9 @@ class AbilitySpec:
     name: str
     unlock_level: int
     category: str  # ATTACK, DEFENSE or SUPPORT
-    percentage: float  # of ESSENCE
+    percentage: float  # of POWER
     cooldown: int
-    stat: str | None = None  # SUPPORT only: "essence" or "speed"
+    stat: str | None = None  # SUPPORT only: "power" or "speed"
     duration: int | None = None  # SUPPORT only: rounds, counting the activation round
 
     def to_dict(self) -> dict[str, Any]:
@@ -35,7 +40,7 @@ class AbilitySpec:
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "AbilitySpec":
-        return cls(**raw)
+        return cls(**{**raw, "stat": _legacy_stat(raw.get("stat"))})
 
 
 @dataclass(frozen=True)
@@ -77,7 +82,7 @@ class Action:
 @dataclass(frozen=True)
 class Buff:
     source: str  # ability id, or "passive:<kind>"
-    stat: str  # "essence" or "speed"
+    stat: str  # "power" or "speed"
     amount: int
     rounds_left: int | None  # None = lasts the whole battle
 
@@ -86,7 +91,7 @@ class Buff:
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "Buff":
-        return cls(**raw)
+        return cls(**{**raw, "stat": _legacy_stat(raw["stat"])})
 
 
 @dataclass(frozen=True)
@@ -113,7 +118,7 @@ class Fighter:
     tier_id: str
     level: int
     max_hp: int
-    essence: int  # unbuffed
+    power: int  # unbuffed
     speed: int  # unbuffed
     abilities: tuple[AbilitySpec, ...]
     passive: PassiveSpec
@@ -121,14 +126,14 @@ class Fighter:
     def to_dict(self) -> dict[str, Any]:
         return {
             "side": self.side, "ascended_id": self.ascended_id, "tier_id": self.tier_id, "level": self.level,
-            "max_hp": self.max_hp, "essence": self.essence, "speed": self.speed,
+            "max_hp": self.max_hp, "power": self.power, "speed": self.speed,
             "abilities": [a.to_dict() for a in self.abilities], "passive": self.passive.to_dict(),
         }
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "Fighter":
         return cls(
-            raw["side"], raw["ascended_id"], raw["tier_id"], raw["level"], raw["max_hp"], raw["essence"], raw["speed"],
+            raw["side"], raw["ascended_id"], raw["tier_id"], raw["level"], raw["max_hp"], raw["power"] if "power" in raw else raw["essence"], raw["speed"],
             tuple(AbilitySpec.from_dict(a) for a in raw["abilities"]), PassiveSpec.from_dict(raw["passive"]),
         )
 

@@ -24,7 +24,7 @@ ASCENDEDS_PATH = PROJECT_ROOT / "ascended"
 ASCENDED_FILE = "catalog.json"
 # The sprite files an Ascended folder may hold, in the order main card, small card, battle.
 SPRITE_NAMES = ("sprite_main_card.webp", "sprite_preview_card.webp", "sprite_battle.webp")
-STATS = ("hp", "essence", "speed")
+STATS = ("hp", "power", "speed")
 
 
 class CatalogError(ValueError):
@@ -134,8 +134,8 @@ def _ability(raw: Mapping[str, Any], ascended_id: str) -> AbilitySpec:
         raise CatalogError(f"{where}: category must be one of {ABILITY_CATEGORIES}")
     if ability.cooldown < 1 or ability.percentage <= 0:
         raise CatalogError(f"{where}: cooldown must be at least 1 and percentage positive")
-    if ability.category == "SUPPORT" and (ability.stat not in ("essence", "speed") or not ability.duration or ability.duration < 1):
-        raise CatalogError(f"{where}: SUPPORT needs a stat (essence or speed) and a duration of at least 1")
+    if ability.category == "SUPPORT" and (ability.stat not in ("power", "speed") or not ability.duration or ability.duration < 1):
+        raise CatalogError(f"{where}: SUPPORT needs a stat (power or speed) and a duration of at least 1")
     return ability
 
 
@@ -158,7 +158,7 @@ def _ascended_spec(raw: Mapping[str, Any]) -> AscendedSpec:
     where = f"ascended {sid!r}"
     base, growth = _require(raw, "base", where), _require(raw, "growth", where)
     if set(base) != set(STATS) or set(growth) != set(STATS):
-        raise CatalogError(f"{where}: base and growth need exactly hp, essence and speed")
+        raise CatalogError(f"{where}: base and growth need exactly hp, power and speed")
     abilities = tuple(_ability(a, sid) for a in _require(raw, "abilities", where))
     if tuple(a.unlock_level for a in abilities) != ABILITY_UNLOCK_LEVELS:
         raise CatalogError(f"{where}: abilities must unlock at levels {ABILITY_UNLOCK_LEVELS}")

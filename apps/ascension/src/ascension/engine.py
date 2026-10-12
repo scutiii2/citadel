@@ -68,7 +68,7 @@ class BattleEngine:
         stat = lambda name: self._catalog.stat_value(ascended_id, level, tier_id, name)  # noqa: E731
         return Fighter(
             side=side, ascended_id=ascended_id, tier_id=tier_id, level=level,
-            max_hp=stat("hp"), essence=stat("essence"), speed=stat("speed"),
+            max_hp=stat("hp"), power=stat("power"), speed=stat("speed"),
             abilities=tuple(a for a in spec.abilities if a.unlock_level <= level), passive=spec.passive,
         )
 
@@ -76,13 +76,13 @@ class BattleEngine:
         def fresh(fighter: Fighter) -> FighterState:
             kind = fighter.passive.kind
             buffs = tuple(Buff(f"passive:{kind}", stat, amount, None)
-                          for stat, amount in self._passives.create(fighter.passive).start_buffs(fighter.essence))
+                          for stat, amount in self._passives.create(fighter.passive).start_buffs(fighter.power))
             return FighterState(hp=fighter.max_hp, buffs=buffs)
 
         return BattleState(round=1, player=fresh(setup.player), wild=fresh(setup.wild))
 
     def stat(self, fighter: Fighter, fstate: FighterState, name: str) -> int:
-        """Current ESSENCE or SPEED including temporary buffs."""
+        """Current POWER or SPEED including temporary buffs."""
         return getattr(fighter, name) + sum(b.amount for b in fstate.buffs if b.stat == name)
 
     # -- legal actions -------------------------------------------------------------
@@ -142,7 +142,7 @@ class BattleEngine:
             if action.kind == "ability":
                 ability = self._ability(sides[side].fighter, action.ability_id)
                 sides[side].cooldowns[ability.id] = rnd + sides[side].passive.cooldown(ability.cooldown) + 1
-        for side in SIDES:  # SUPPORT first, so DEFENSE sees this round's ESSENCE buffs
+        for side in SIDES:  # SUPPORT first, so DEFENSE sees this round's POWER buffs
             if actions[side].category == "SUPPORT":
                 self._support(sides[side], self._ability(sides[side].fighter, actions[side].ability_id), events)
         for side in SIDES:
@@ -153,7 +153,7 @@ class BattleEngine:
         for side in SIDES:  # CATCH reduces FLEE whatever the action order; settled before any escape roll
             if actions[side].kind == "flee":
                 foe = sides[other(side)]
-                catchers[side] = foe.stat("essence") if actions[other(side)].kind == "catch" else None
+                catchers[side] = foe.stat("power") if actions[other(side)].kind == "catch" else None
                 if catchers[side] is not None:
                     events.append({"type": "catch_counters_flee", "side": other(side), "target": side})
 
@@ -201,7 +201,7 @@ class BattleEngine:
 
     @staticmethod
     def _support(me: _Side, ability: AbilitySpec, events: list) -> None:
-        amount = math.floor(me.fighter.essence * ability.percentage / 100 + _EPS)  # unbuffed ESSENCE
+        amount = math.floor(me.fighter.power * ability.percentage / 100 + _EPS)  # unbuffed POWER
         duration = ability.duration + me.passive.support_extra_rounds()
         me.buffs = [b for b in me.buffs if b.source != ability.id]  # reuse refreshes, never stacks
         me.buffs.append(Buff(ability.id, ability.stat, amount, duration))
@@ -209,7 +209,7 @@ class BattleEngine:
 
     @staticmethod
     def _defense(me: _Side, ability: AbilitySpec, events: list) -> None:
-        rating = me.stat("essence") * ability.percentage / 100 + me.passive.defense_rating_bonus(me.fighter.essence)
+        rating = me.stat("power") * ability.percentage / 100 + me.passive.defense_rating_bonus(me.fighter.power)
         attacks, rounds = me.passive.defense_limits()
         if me.defense:
             rating = max(rating, me.defense.rating)  # overlapping defenses keep the strongest rating
@@ -217,17 +217,17 @@ class BattleEngine:
         events.append({"type": "defense", "side": me.side, "ability": ability.id, "rating": round(rating, 2)})
 
     @staticmethod
-    def _flee(me: _Side, catcher_essence: int | None) -> float:
-        essence = me.stat("essence")
-        chance = essence / (100 + essence) * me.hp / me.fighter.max_hp
-        return chance * 100 / (100 + catcher_essence) if catcher_essence is not None else chance
+    def _flee(me: _Side, catcher_power: int | None) -> float:
+        power = me.stat("power")
+        chance = power / (100 + power) * me.hp / me.fighter.max_hp
+        return chance * 100 / (100 + catcher_power) if catcher_power is not None else chance
 
     @staticmethod
     def _attack(sides: dict[str, _Side], actions: dict[str, Action], attacker: str, events: list) -> str | None:
         me, foe = sides[attacker], sides[other(attacker)]
-        essence = me.stat("essence")
-        raw = essence * actions[attacker].percentage / 100 + me.passive.attack_bonus(
-            essence, me.hp, me.fighter.max_hp, actions[foe.side].category == "DEFENSE"
+        power = me.stat("power")
+        raw = power * actions[attacker].percentage / 100 + me.passive.attack_bonus(
+            power, me.hp, me.fighter.max_hp, actions[foe.side].category == "DEFENSE"
         )
         protected = bool(foe.defense and foe.defense.attacks_left > 0)
         if protected:

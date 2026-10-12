@@ -148,7 +148,7 @@ export interface Fighter {
   level: number;
   hp: number;
   max_hp: number;
-  essence: number;
+  power: number;
   speed: number;
   buffs: Buff[];
   defense: DefenseEffect | null;

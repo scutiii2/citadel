@@ -10,12 +10,12 @@
   "base_price": 100,
   "base": {
     "hp": 150,
-    "essence": 20,
+    "power": 20,
     "speed": 15
   },
   "growth": {
     "hp": 15,
-    "essence": 2,
+    "power": 2,
     "speed": 1.5
   },
   "passive": {
@@ -41,7 +41,7 @@
       "category": "SUPPORT",
       "percentage": 50,
       "cooldown": 2,
-      "stat": "essence",
+      "stat": "power",
       "duration": 2
     },
     {

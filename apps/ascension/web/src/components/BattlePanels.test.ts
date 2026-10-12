@@ -55,7 +55,7 @@ const manual = () =>
 describe("BattleArena", () => {
   it("shows both Ascended with their health written out, and what affects them", () => {
     const view = battleView({
-      wild: fighter("bruiser", { hp: 20, buffs: [{ source: "bruiser_rally", stat: "essence", amount: 4, rounds_left: 2 }] }),
+      wild: fighter("bruiser", { hp: 20, buffs: [{ source: "bruiser_rally", stat: "power", amount: 4, rounds_left: 2 }] }),
     });
     withBattle(view);
 
@@ -63,7 +63,7 @@ describe("BattleArena", () => {
 
     expect(wrapper.findAll("[role='progressbar']").map((m) => m.attributes("aria-valuenow"))).toEqual(["80", "20"]);
     expect(wrapper.findAll("p.hp").map((p) => p.text())).toEqual(["HP 80 / 100", "HP 20 / 100"]);
-    expect(wrapper.text()).toContain("+4 essence, 2 rounds left");
+    expect(wrapper.text()).toContain("+4 power, 2 rounds left");
     expect(wrapper.find(".versus").text()).toBe("VS");
     expect(wrapper.find(".player img").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
     expect(wrapper.find(".wild img").exists()).toBe(false);

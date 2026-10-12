@@ -9,18 +9,18 @@
   "base_price": 130,
   "base": {
     "hp": 140,
-    "essence": 28,
+    "power": 28,
     "speed": 12
   },
   "growth": {
     "hp": 14,
-    "essence": 2.8,
+    "power": 2.8,
     "speed": 1.2
   },
   "passive": {
     "kind": "attack_bonus_vs_defense",
     "params": {
-      "essence_fraction": 0.25
+      "power_fraction": 0.25
     }
   },
   "abilities": [
@@ -47,7 +47,7 @@
       "category": "SUPPORT",
       "percentage": 50,
       "cooldown": 2,
-      "stat": "essence",
+      "stat": "power",
       "duration": 2
     }
   ]

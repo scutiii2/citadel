@@ -77,7 +77,7 @@ function art(fighter: Fighter): string | null {
               aria-hidden="true"
             >{{ playback.floating.text }}</span>
           </div>
-          <p class="stats em-num">Essence {{ side.fighter.essence }} · Speed {{ side.fighter.speed }}</p>
+          <p class="stats em-num">Power {{ side.fighter.power }} · Speed {{ side.fighter.speed }}</p>
           <ul v-if="effects(side.fighter).length" class="effects">
             <li v-for="text in effects(side.fighter)" :key="text">{{ side.label }} · {{ text }}</li>
           </ul>

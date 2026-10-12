@@ -21,22 +21,22 @@ def test_defense_extension_sets_limits():
 
 
 def test_low_hp_bonus_applies_strictly_below_half():
-    p = make("low_hp_attack_bonus", hp_below=0.5, essence_fraction=0.2)
+    p = make("low_hp_attack_bonus", hp_below=0.5, power_fraction=0.2)
     assert p.attack_bonus(50, 49, 100, False) == pytest.approx(10)
     assert p.attack_bonus(50, 50, 100, False) == 0
     assert p.attack_bonus(50, 100, 100, False) == 0
 
 
-def test_scout_start_speed_uses_unbuffed_essence_floor():
-    assert make("battle_start_speed", essence_fraction=0.5).start_buffs(25) == [("speed", 12)]
+def test_scout_start_speed_uses_unbuffed_power_floor():
+    assert make("battle_start_speed", power_fraction=0.5).start_buffs(25) == [("speed", 12)]
 
 
 def test_sentinel_adds_defense_rating():
-    assert make("defense_rating_bonus", essence_fraction=0.5).defense_rating_bonus(30) == 15
+    assert make("defense_rating_bonus", power_fraction=0.5).defense_rating_bonus(30) == 15
 
 
 def test_bruiser_bonus_only_against_defense():
-    p = make("attack_bonus_vs_defense", essence_fraction=0.25)
+    p = make("attack_bonus_vs_defense", power_fraction=0.25)
     assert p.attack_bonus(40, 100, 100, True) == 10 and p.attack_bonus(40, 100, 100, False) == 0
 
 

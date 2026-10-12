@@ -10,18 +10,18 @@
   "base_price": 110,
   "base": {
     "hp": 120,
-    "essence": 22,
+    "power": 22,
     "speed": 35
   },
   "growth": {
     "hp": 12,
-    "essence": 2.2,
+    "power": 2.2,
     "speed": 3.5
   },
   "passive": {
     "kind": "battle_start_speed",
     "params": {
-      "essence_fraction": 0.5
+      "power_fraction": 0.5
     }
   },
   "abilities": [

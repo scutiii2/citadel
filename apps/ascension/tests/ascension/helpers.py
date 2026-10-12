@@ -51,7 +51,7 @@ class FixedOffers:
 def fighter(
     side: str = PLAYER,
     hp: int = 100,
-    essence: int = 40,
+    power: int = 40,
     speed: int = 20,
     abilities: tuple[AbilitySpec, ...] = (),
     passive: PassiveSpec | None = None,
@@ -59,7 +59,7 @@ def fighter(
     tier_id: str = "common",
     level: int = 1,
 ) -> Fighter:
-    return Fighter(side, ascended_id, tier_id, level, hp, essence, speed, abilities, passive or PassiveSpec("none"))
+    return Fighter(side, ascended_id, tier_id, level, hp, power, speed, abilities, passive or PassiveSpec("none"))
 
 
 def setup(player: Fighter | None = None, wild: Fighter | None = None) -> BattleSetup:

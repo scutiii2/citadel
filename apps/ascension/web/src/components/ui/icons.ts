@@ -1,6 +1,6 @@
 /** Icon path data on a 24 x 24 grid (docs/design/ascension/screens.js). Straight
  * strokes, miter joins, square caps; drawn with the text colour. Heart = HP, flame =
- * Essence and EMBLEM, feather = Speed, shield = Defense, sword = Attack. */
+ * Power and EMBLEM, feather = Speed, shield = Defense, sword = Attack. */
 export const ICONS = {
   play: "M7 4L19 12L7 20Z",
   battle: "M4 3L16 15M8 3L19 14L15 18L4 7ZM12 16L7 21M3 17L7 21L11 17",

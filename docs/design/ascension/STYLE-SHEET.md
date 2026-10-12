@@ -106,7 +106,7 @@ Switches use a squared **40 × 24 px** track and **16 px** thumb. Copper indicat
 
 Original geometric SVGs on a **24 × 24** grid. Straight strokes, miter joins, square caps, no gradients, no colored emoji. Standard size **18 px**, stroke **1.8 px**; empty-state and reward icons **40 px**. Use monochrome icons that inherit their text color. Icon-only close buttons have accessible labels and 44 px targets.
 
-Required icons: **play, battle, shop, book, reset, heart, flame, feather, shield, sword, arrow, close**. Supporting icons: **check, coin/Insignia, clock, lock, warning, spark**. `screens.js` contains the exact SVG path definitions used in the mockups. Heart = HP; flame = Essence / EMBLEM; feather = Speed; shield = Defense; sword = Attack. Retain written stat and action names.
+Required icons: **play, battle, shop, book, reset, heart, flame, feather, shield, sword, arrow, close**. Supporting icons: **check, coin/Insignia, clock, lock, warning, spark**. `screens.js` contains the exact SVG path definitions used in the mockups. Heart = HP; flame = Power / EMBLEM; feather = Speed; shield = Defense; sword = Attack. Retain written stat and action names.
 
 ## 6. Components and states
 

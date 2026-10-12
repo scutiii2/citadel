@@ -38,7 +38,7 @@ class BattleViewBuilder:
         return {
             "ascended_id": fighter.ascended_id, "name": self._catalog.ascended(fighter.ascended_id).name,
             "tier_id": fighter.tier_id, "level": fighter.level, "hp": state.hp, "max_hp": fighter.max_hp,
-            "essence": self._engine.stat(fighter, state, "essence"), "speed": self._engine.stat(fighter, state, "speed"),
+            "power": self._engine.stat(fighter, state, "power"), "speed": self._engine.stat(fighter, state, "speed"),
             "buffs": [b.to_dict() for b in state.buffs],
             "defense": state.defense.to_dict() if state.defense else None,
             "abilities": [

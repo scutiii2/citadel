@@ -29,8 +29,8 @@ class SituationView:
     round: int
     own_hp_fraction: float
     enemy_hp_fraction: float
-    own_essence: int
-    enemy_essence: int
+    own_power: int
+    enemy_power: int
     own_speed: int
     enemy_speed: int
     own_history: tuple[str, ...]  # categories of its own revealed actions, oldest first
@@ -40,7 +40,7 @@ class SituationView:
         recent = lambda h: ", ".join(h[-HISTORY_ROUNDS:]) or "none"  # noqa: E731
         return (
             f"Round {self.round}. Own HP {self.own_hp_fraction:.0%}, enemy HP {self.enemy_hp_fraction:.0%}. "
-            f"ESSENCE own {self.own_essence}, enemy {self.enemy_essence}. "
+            f"POWER own {self.own_power}, enemy {self.enemy_power}. "
             f"SPEED own {self.own_speed}, enemy {self.enemy_speed}. "
             f"Enemy recent actions: {recent(self.enemy_history)}. Own recent actions: {recent(self.own_history)}."
         )
@@ -67,8 +67,8 @@ class SituationViewBuilder:
             round=state.round,
             own_hp_fraction=own_state.hp / own.max_hp,
             enemy_hp_fraction=enemy_state.hp / enemy.max_hp,
-            own_essence=self._engine.stat(own, own_state, "essence"),
-            enemy_essence=self._engine.stat(enemy, enemy_state, "essence"),
+            own_power=self._engine.stat(own, own_state, "power"),
+            enemy_power=self._engine.stat(enemy, enemy_state, "power"),
             own_speed=self._engine.stat(own, own_state, "speed"),
             enemy_speed=self._engine.stat(enemy, enemy_state, "speed"),
             own_history=tuple(r.actions[side][1] for r in state.history),

@@ -21,7 +21,7 @@ heuristic = HeuristicSituationReader()
 
 
 def view(**changes) -> SituationView:
-    base = dict(round=3, own_hp_fraction=0.5, enemy_hp_fraction=0.8, own_essence=52, enemy_essence=40,
+    base = dict(round=3, own_hp_fraction=0.5, enemy_hp_fraction=0.8, own_power=52, enemy_power=40,
                 own_speed=30, enemy_speed=25, own_history=("ATTACK", "FEAR"), enemy_history=("ATTACK", "ATTACK", "DEFENSE"))
     base.update(changes)
     return SituationView(**base)
@@ -35,7 +35,7 @@ def run(coro):
 
 def test_text_is_compact_and_public():
     text = view().to_text()
-    assert text == ("Round 3. Own HP 50%, enemy HP 80%. ESSENCE own 52, enemy 40. SPEED own 30, enemy 25. "
+    assert text == ("Round 3. Own HP 50%, enemy HP 80%. POWER own 52, enemy 40. SPEED own 30, enemy 25. "
                     "Enemy recent actions: ATTACK, ATTACK, DEFENSE. Own recent actions: ATTACK, FEAR.")
 
 
@@ -45,14 +45,14 @@ def test_text_keeps_only_recent_history_and_handles_none():
 
 
 def test_builder_reads_public_state_from_each_side():
-    s = setup(fighter(PLAYER, hp=100, essence=40, speed=20), fighter(WILD, hp=200, essence=30, speed=10))
+    s = setup(fighter(PLAYER, hp=100, power=40, speed=20), fighter(WILD, hp=200, power=30, speed=10))
     state = engine.start_state(s)
     out = engine.resolve_round(s, state, Action("attack", "ATTACK"), Action("flee", "FEAR"), ScriptedRandom(0.1, 0.99))
     mine = SituationViewBuilder(engine).build(s, out.state, PLAYER)
     theirs = SituationViewBuilder(engine).build(s, out.state, WILD)
     assert (mine.own_hp_fraction, mine.enemy_hp_fraction) == (1.0, 0.8)
     assert mine.own_history == ("ATTACK",) and mine.enemy_history == ("FEAR",)
-    assert theirs.own_history == ("FEAR",) and theirs.enemy_essence == 40
+    assert theirs.own_history == ("FEAR",) and theirs.enemy_power == 40
 
 
 # -- heuristic -----------------------------------------------------------------------

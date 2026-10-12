@@ -15,7 +15,7 @@ from src.ascension.models import PassiveSpec
 class Passive:
     """Neutral behavior: an Ascended without a passive effect."""
 
-    def start_buffs(self, essence: int) -> list[tuple[str, int]]:
+    def start_buffs(self, power: int) -> list[tuple[str, int]]:
         """(stat, amount) bonuses applied once when the battle starts."""
         return []
 
@@ -23,13 +23,13 @@ class Passive:
         """(protected attacks, rounds) of a fresh DEFENSE effect."""
         return 1, 1
 
-    def defense_rating_bonus(self, essence: int) -> float:
+    def defense_rating_bonus(self, power: int) -> float:
         return 0.0
 
     def support_extra_rounds(self) -> int:
         return 0
 
-    def attack_bonus(self, essence: int, hp: int, max_hp: int, target_chose_defense: bool) -> float:
+    def attack_bonus(self, power: int, hp: int, max_hp: int, target_chose_defense: bool) -> float:
         """Raw damage added to an attack, before mitigation."""
         return 0.0
 
@@ -46,35 +46,35 @@ class DefenseExtension(Passive):
 
 
 class LowHpAttackBonus(Passive):
-    def __init__(self, hp_below: float, essence_fraction: float) -> None:
-        self._below, self._fraction = hp_below, essence_fraction
+    def __init__(self, hp_below: float, power_fraction: float) -> None:
+        self._below, self._fraction = hp_below, power_fraction
 
-    def attack_bonus(self, essence: int, hp: int, max_hp: int, target_chose_defense: bool) -> float:
-        return essence * self._fraction if hp < max_hp * self._below else 0.0
+    def attack_bonus(self, power: int, hp: int, max_hp: int, target_chose_defense: bool) -> float:
+        return power * self._fraction if hp < max_hp * self._below else 0.0
 
 
 class BattleStartSpeed(Passive):
-    def __init__(self, essence_fraction: float) -> None:
-        self._fraction = essence_fraction
+    def __init__(self, power_fraction: float) -> None:
+        self._fraction = power_fraction
 
-    def start_buffs(self, essence: int) -> list[tuple[str, int]]:
-        return [("speed", math.floor(essence * self._fraction))]
+    def start_buffs(self, power: int) -> list[tuple[str, int]]:
+        return [("speed", math.floor(power * self._fraction))]
 
 
 class DefenseRatingBonus(Passive):
-    def __init__(self, essence_fraction: float) -> None:
-        self._fraction = essence_fraction
+    def __init__(self, power_fraction: float) -> None:
+        self._fraction = power_fraction
 
-    def defense_rating_bonus(self, essence: int) -> float:
-        return essence * self._fraction
+    def defense_rating_bonus(self, power: int) -> float:
+        return power * self._fraction
 
 
 class AttackBonusVersusDefense(Passive):
-    def __init__(self, essence_fraction: float) -> None:
-        self._fraction = essence_fraction
+    def __init__(self, power_fraction: float) -> None:
+        self._fraction = power_fraction
 
-    def attack_bonus(self, essence: int, hp: int, max_hp: int, target_chose_defense: bool) -> float:
-        return essence * self._fraction if target_chose_defense else 0.0
+    def attack_bonus(self, power: int, hp: int, max_hp: int, target_chose_defense: bool) -> float:
+        return power * self._fraction if target_chose_defense else 0.0
 
 
 class SupportDurationBonus(Passive):

@@ -33,7 +33,7 @@ def test_shipped_catalog_is_valid(catalog):
 def test_stats_use_growth_then_tier_multiplier_and_floor(catalog):
     assert catalog.stat_value("guardian", 1, "common", "hp") == 150
     assert catalog.stat_value("guardian", 11, "common", "hp") == 300  # 150 + 15 * 10
-    assert catalog.stat_value("scout", 3, "rare", "essence") == 33  # (22 + 2.2 * 2) * 1.25 = 33.0
+    assert catalog.stat_value("scout", 3, "rare", "power") == 33  # (22 + 2.2 * 2) * 1.25 = 33.0
     assert catalog.stat_value("forbidden", 1, "forbidden", "hp") == 800
     assert catalog.stat_value("forbidden", 1, "forbidden", "speed") == 120
     assert catalog.stat_value("scout", 2, "common", "speed") == 38  # 35 + 3.5 = 38.5 floored
@@ -41,7 +41,7 @@ def test_stats_use_growth_then_tier_multiplier_and_floor(catalog):
 
 def test_every_ascended_grows_ten_percent_of_base(catalog):
     for spec in catalog.all_ascendeds():
-        for stat in ("hp", "essence", "speed"):
+        for stat in ("hp", "power", "speed"):
             assert spec.growth[stat] == pytest.approx(spec.base[stat] * 0.1)
 
 
@@ -81,7 +81,7 @@ def _broken(raw, mutate):
     (lambda d: _ascended(d, "guardian")["abilities"][0].update(category="HEAL"), "category must be"),
     (lambda d: d["personalities"][0].update(categories=["NOPE"]), "invalid categories"),
     (lambda d: d["policy"]["coefficients"].pop("FEAR"), "coefficients missing"),
-    (lambda d: _ascended(d, "guardian")["base"].pop("hp"), "exactly hp, essence and speed"),
+    (lambda d: _ascended(d, "guardian")["base"].pop("hp"), "exactly hp, power and speed"),
 ])
 def test_inconsistent_catalogs_are_rejected(raw, mutate, message):
     with pytest.raises(CatalogError, match=message):
