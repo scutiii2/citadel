@@ -3,7 +3,7 @@ from dataclasses import replace
 import pytest
 
 from src.ascension.engine import ActionError, BattleEngine
-from src.ascension.models import PLAYER, WILD, Action, BattleSetup, BattleState, Buff, FighterState, PassiveSpec
+from src.ascension.models import PLAYER, WILD, Action, BattleSetup, BattleState, Buff, FighterState, PassiveSpec, AbilitySpec, Loadout
 from tests.ascension.helpers import ScriptedRandom, ability, fighter, setup
 from tests.ascension.env import CATALOG
 
@@ -328,3 +328,17 @@ def test_battle_state_and_setup_round_trip_through_json():
     out = play(s, ATTACK, FLEE, 0.1, 0.99)
     assert BattleSetup.from_dict(json.loads(json.dumps(s.to_dict()))) == s
     assert BattleState.from_dict(json.loads(json.dumps(out.state.to_dict()))) == out.state
+
+
+def test_a_loadout_replaces_the_default_kit_and_still_obeys_levels():
+    attack = lambda n, level: AbilitySpec(f"x_{n}", f"X{n}", level, "ATTACK", 100.0 + n, 1)  # noqa: E731
+    loadout = Loadout((attack(1, 1), attack(2, 10), attack(3, 40)), PassiveSpec("battle_start_speed", {"power_fraction": 0.5}))
+    fighter = engine.build_fighter(PLAYER, "guardian", "common", 20, loadout)
+    assert [a.id for a in fighter.abilities] == ["x_1", "x_2"]  # level 40 stays locked
+    assert all(a.category == "ATTACK" for a in fighter.abilities)
+    assert fighter.passive.kind == "battle_start_speed"
+
+
+def test_without_a_loadout_the_default_kit_is_used():
+    fighter = engine.build_fighter(PLAYER, "guardian", "common", 30)
+    assert [a.id for a in fighter.abilities] == ["guardian_bulwark", "guardian_rally", "guardian_heavy_blow"]

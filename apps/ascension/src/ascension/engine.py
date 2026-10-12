@@ -24,6 +24,7 @@ from src.ascension.models import (
     Buff,
     DefenseEffect,
     Fighter,
+    Loadout,
     FighterState,
     RevealedRound,
     RoundOutcome,
@@ -63,13 +64,13 @@ class BattleEngine:
 
     # -- setup ---------------------------------------------------------------------
 
-    def build_fighter(self, side: str, ascended_id: str, tier_id: str, level: int) -> Fighter:
-        spec = self._catalog.ascended(ascended_id)
+    def build_fighter(self, side: str, ascended_id: str, tier_id: str, level: int, loadout: Loadout | None = None) -> Fighter:
+        kit = loadout or self._catalog.default_loadout(ascended_id)
         stat = lambda name: self._catalog.stat_value(ascended_id, level, tier_id, name)  # noqa: E731
         return Fighter(
             side=side, ascended_id=ascended_id, tier_id=tier_id, level=level,
             max_hp=stat("hp"), power=stat("power"), speed=stat("speed"),
-            abilities=tuple(a for a in spec.abilities if a.unlock_level <= level), passive=spec.passive,
+            abilities=tuple(a for a in kit.abilities if a.unlock_level <= level), passive=kit.passive,
         )
 
     def start_state(self, setup: BattleSetup) -> BattleState:
