@@ -21,20 +21,18 @@ Signature colours: **cyan and white** for Twoychi as a whole (Aya's colours, and
 ## Troy
 
 - A shih tzu. Small, sturdy and long-coated, with a short flat face, round dark eyes, a dark nose and a feathered plume tail curled over his back. White and black coat in patches.
-- He shows **all his forms**; each is the same dog scaled up and made fiercer, and each keeps the white and black coat and the shih tzu face shape:
-  1. **Dog.** The small shih tzu, solemn and calm, usually resting by Aya.
-  2. **Wolf.** One enemy: a lean white and black wolf with the same face markings.
-  3. **Pack of six wolves.** More than one enemy: six wolves, white and black, around Aya.
-  4. **Giant.** No other choice: a huge white and black beast with a shih tzu-like face, "too large for its name". The ground should look like it remembers it.
-  5. **Bear** (Unchosen mentions a bear that flattens men "like a landslide"): a white and black bear, calm and massive.
-- Personality changes with the form, in the style of Kindred: the dog is sleepy and watchful, the wolf focused, the pack coordinated, the giant and the bear overwhelming and indifferent. Show this in posture and expression, never in text.
+- Troy has a base shape and **two forms**: **wolf** and **bear**. Show all of them. Each form is the same dog made larger and fiercer, and keeps the white and black coat and the shih tzu face shape:
+  1. **Dog (base).** The small shih tzu, solemn and calm, usually resting by Aya.
+  2. **Wolf.** A lean white and black wolf with the same face markings.
+  3. **Bear.** A white and black bear, calm and massive.
+- Personality changes with the form, in the style of Kindred: the dog is sleepy and watchful, the wolf focused and fast, the bear overwhelming and indifferent. Show this in posture and expression, never in text.
 - Palette: white, black, a little cool grey. Cyan appears only as rim light and eye glints from Aya's water, never as his coat.
 
 ## Together
 
 - Aya is the focal figure. Troy stands beside or in front of her, within the same silhouette. Water curls around both of them, tying cyan to white and black.
-- In the main card, Troy appears in several forms at once (small dog nearest, larger forms behind, rendered ghostly and white-black), so all forms read in one image.
-- Preview: head and shoulders of Aya with her translucent hands and Troy's dog head or a wolf head. Battle: Aya and the dog as one complete figure facing right, with water arcing toward the right.
+- In the main card, Troy appears in all three shapes at once (small dog nearest, wolf and bear behind, rendered ghostly and white-black), so every form reads in one image.
+- Preview: head and shoulders of Aya with her translucent hands and Troy's dog head. Battle: Aya and the dog as one complete figure facing right, with water arcing toward the right.
 - Palette overall: cyan and white lead; black appears only on Troy. Keep the cyan-white colour family dominant.
 
 ## Consistency across sprites
