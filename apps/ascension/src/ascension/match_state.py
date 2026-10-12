@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from src.ascension.models import BattleSetup, BattleState, other
+
 
 @dataclass(frozen=True)
 class MoodConstants:
@@ -48,3 +50,53 @@ class MoodMeters:
 
     def to_dict(self) -> dict[str, float]:
         return {k: round(v, 3) for k, v in self.__dict__.items()}
+
+
+def _clamp(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+class MatchReader:
+    """Reads one side's view of the match, and replays the history to get its mood meters."""
+
+    def __init__(self, constants: MoodConstants) -> None:
+        self._c = constants
+
+    def read(self, setup: BattleSetup, state: BattleState, side: str) -> tuple[MatchState, MoodMeters]:
+        foe = other(side)
+        own, enemy = setup.of(side), setup.of(foe)
+        c = self._c
+        own_hp, enemy_hp = float(own.max_hp), float(enemy.max_hp)
+        rage, confidence, nerves, hit = 0.0, 0.5, 0.0, 0.0
+        leads = [0.0]
+        for revealed in state.history:
+            attacks = [e for e in revealed.events if e.get("type") == "attack"]
+            taken = sum(e["damage"] for e in attacks if e["side"] == foe)
+            dealt = sum(e["damage"] for e in attacks if e["side"] == side)
+            own_hp, enemy_hp = max(0.0, own_hp - taken), max(0.0, enemy_hp - dealt)
+            own_fraction, enemy_fraction = own_hp / own.max_hp, enemy_hp / enemy.max_hp
+            lead = own_fraction - enemy_fraction
+            hit = taken / own.max_hp
+            rage = _clamp(rage * c.rage_decay + hit * c.rage_gain)
+            if lead > leads[-1] + 1e-9:
+                confidence = _clamp(confidence + c.confidence_step)
+            elif lead < leads[-1] - 1e-9:
+                confidence = _clamp(confidence - c.confidence_step)
+            target = _clamp(max(0.0, -lead) + max(0.0, 0.5 - own_fraction))
+            nerves = _clamp(nerves + c.nerves_follow * (target - nerves))
+            leads.append(lead)
+        own_now, enemy_now = state.of(side).hp / own.max_hp, state.of(foe).hp / enemy.max_hp
+        mine = [r.actions[side][1] for r in state.history]
+        theirs = [r.actions[foe][1] for r in state.history]
+        streak = 0
+        for category in reversed(mine):
+            if category != mine[-1]:
+                break
+            streak += 1
+        match = MatchState(
+            own_hp=own_now, enemy_hp=enemy_now, lead=own_now - enemy_now,
+            trend=leads[-1] - leads[max(0, len(leads) - 3)], round=state.round, own_streak=streak,
+            own_last=mine[-1] if mine else None, enemy_last=theirs[-1] if theirs else None,
+            hit_taken=hit, enemy_low=enemy_now < c.enemy_low,
+        )
+        return match, MoodMeters(rage, confidence, nerves)

@@ -108,3 +108,11 @@ class ScriptedPolicy:
         key = script.pop(0) if script else "attack"
         action = next(a for a in actions if a.key == key)
         return PolicyDecision(action, tuple(self.probabilities(actions, ctx)))
+
+
+def revealed_round(number, player=("attack", "ATTACK"), wild=("attack", "ATTACK"), hits=()):
+    """A finished round for history. `hits` is (attacker side, damage) pairs; they become public attack events."""
+    from src.ascension.models import RevealedRound
+
+    events = tuple({"type": "attack", "side": side, "damage": damage, "protected": False, "target_hp": 0} for side, damage in hits)
+    return RevealedRound(number, {PLAYER: player, WILD: wild}, events)
