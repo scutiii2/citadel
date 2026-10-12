@@ -35,6 +35,7 @@ const session = useSessionStore();
 const store = useAscensionStore();
 const playback = usePlaybackStore();
 const page = ref<HTMLElement | null>(null);
+const collectionControls = ref<HTMLElement | null>(null);
 let observer: ResizeObserver | null = null;
 let stopMessages: (() => void) | null = null;
 function notifyContentSize(): void {
@@ -47,9 +48,9 @@ function notifyContentSize(): void {
 const screen = ref<Screen>("menu");
 const tab = ref<Tab>("collection");
 const tabs: EmTabOption[] = [
-  { value: "collection", label: "Collection", icon: "book" },
-  { value: "battle", label: "Battle", icon: "battle" },
+  { value: "battle", label: "Battle", icon: "play" },
   { value: "shop", label: "Shop", icon: "shop" },
+  { value: "collection", label: "Collection", icon: "book" },
 ];
 const encounterStage = ref<EncounterStage>("look");
 /** The page title and the line under it, from the tab and, in Battle, the step. */
@@ -123,6 +124,17 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 <template>
   <section ref="page" class="em-root ascension-page">
     <EmShell :insignia="session.status === 'ready' ? store.profile?.insignia ?? 0 : null">
+      <template v-if="session.status === 'ready' && store.loaded && !store.unavailable && screen !== 'menu'" #navigation>
+        <button type="button" class="menu-link" aria-label="Main menu" @click="screen = 'menu'"><EmIcon name="arrow" class="back-arrow" /></button>
+        <EmTabs v-if="screen === 'game'" :model-value="tab" :options="tabs" ariaLabel="Ascension sections" @update:model-value="selectTab" />
+      </template>
+      <template v-if="session.status === 'ready' && store.loaded && !store.unavailable && screen !== 'menu'" #heading>
+        <EmPageHead v-if="screen === 'starter'" title="Choose your first Ascended" subtitle="One companion. A whole world of possibilities." />
+        <EmPageHead v-else :title="heading.title" :subtitle="heading.subtitle">
+          <div v-if="tab === 'collection'" ref="collectionControls" class="screen-options" />
+          <BattleControls v-else-if="tab === 'battle' && store.battle && !(store.battle.result && !playback.busy)" :battle="store.battle" />
+        </EmPageHead>
+      </template>
       <EmPanel v-if="session.status !== 'ready'" class="state" :role="session.status === 'connecting' ? 'status' : 'alert'">
         <EmIcon name="flame" :size="40" />
         <h2 class="em-pixel">{{ session.status === 'connecting' ? 'Connecting to Ember…' : session.status === 'ended' ? 'Session ended, reopen the game from Ember' : 'Open this game from Ember' }}</h2>
@@ -148,24 +160,19 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
       <template v-else>
         <EmNotice v-if="store.reconnecting" class="status">Reconnecting… Your battle will resume when connected.</EmNotice>
         <MainMenu v-if="screen === 'menu'" @new-game="screen = 'starter'" @play="play" />
-        <StarterPick v-else-if="screen === 'starter'" @back="screen = 'menu'" @started="play('collection')" />
+        <StarterPick v-else-if="screen === 'starter'" hide-heading @back="screen = 'menu'" @started="play('collection')" />
 
         <template v-else>
-          <EmPageHead :title="heading.title" :subtitle="heading.subtitle">
-            <button type="button" class="menu-link" @click="screen = 'menu'"><EmIcon name="arrow" class="back-arrow" /> Main menu</button>
-            <EmTabs :model-value="tab" :options="tabs" ariaLabel="Ascension sections" @update:model-value="selectTab" />
-          </EmPageHead>
           <EmNotice v-if="store.error" tone="error" class="status">{{ store.error }}</EmNotice>
 
           <div v-if="tab === 'collection'" class="tab-body">
-            <CollectionPanel />
+            <CollectionPanel :controls-target="collectionControls" />
           </div>
 
           <div v-else-if="tab === 'battle'" class="tab-body">
             <template v-if="store.battle">
               <BattleResult v-if="store.battle.result && !playback.busy" :battle="store.battle" />
               <template v-else>
-                <BattleControls :battle="store.battle" />
                 <BattleArena :battle="store.battle" />
                 <div class="battle-bottom">
                   <ActionBar :battle="store.battle" />
@@ -188,7 +195,8 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 .ascension-page {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  height: 100%;
+  overflow: hidden;
 }
 .menu-link {
   display: inline-flex;
@@ -243,7 +251,15 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
   margin: var(--em-space-3) 0;
 }
 .tab-body {
-  margin-top: var(--em-space-5);
+  min-width: 0;
+}
+.screen-options { max-width: 680px; }
+.screen-options :deep(.filters), :deep(.screen-heading .controls) { margin-bottom: 0; }
+@media (max-width: 700px) {
+  :deep(.navigation .tab) { min-width: var(--em-target); padding: 8px; gap: 0; font-size: 0; }
+  :deep(.navigation .tab:first-child) { gap: 4px; font-size: 12px; }
+  :deep(.navigation .em-tabs) { width: auto; }
+  .menu-link { padding: 0; }
 }
 .battle-bottom {
   display: grid;

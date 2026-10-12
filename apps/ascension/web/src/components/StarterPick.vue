@@ -14,6 +14,7 @@ import type { IconName } from "./ui/icons";
  * copper outline and says "Selected"); the large card and a side panel show the chosen
  * Ascended in full. The first starter is chosen on open. "Main menu" goes back. */
 const emit = defineEmits<{ back: []; started: [] }>();
+defineProps<{ hideHeading?: boolean }>();
 
 const CATEGORY_ICONS: Record<string, IconName> = { ATTACK: "sword", DEFENSE: "shield", SUPPORT: "arrow", FLEE: "arrow", INTERCEPT: "ascended" };
 
@@ -45,7 +46,7 @@ async function start(): Promise<void> {
 
 <template>
   <section class="starters">
-    <EmPageHead title="Choose your first Ascended" subtitle="One companion. A whole world of possibilities.">
+    <EmPageHead v-if="!hideHeading" title="Choose your first Ascended" subtitle="One companion. A whole world of possibilities.">
       <button type="button" class="back" @click="emit('back')"><EmIcon name="arrow" class="back-arrow" /> Main menu</button>
     </EmPageHead>
 
