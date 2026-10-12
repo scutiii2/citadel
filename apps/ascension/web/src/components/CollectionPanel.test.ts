@@ -8,7 +8,7 @@ import CollectionPanel from "./CollectionPanel.vue";
 import PresetEditor from "./PresetEditor.vue";
 
 vi.mock("../api/AscensionClient", () => {
-  const client = { personalities: vi.fn(), preset: vi.fn(), savePreset: vi.fn() };
+  const client = { personalities: vi.fn(), preset: vi.fn(), savePreset: vi.fn(), profile: vi.fn(), addStar: vi.fn(), raiseTier: vi.fn() };
   return { useAscensionClient: () => client };
 });
 
@@ -101,6 +101,64 @@ describe("CollectionPanel", () => {
     expect(client.personalities).toHaveBeenLastCalledWith("guardian", 7, 50);
     expect(wrapper.find(".personalities").text()).toContain("Cautious");
     expect(wrapper.find(".details").findAll("button").some((b) => b.text() === "Show more")).toBe(false);
+  });
+});
+
+describe("stars and tiers", () => {
+  const ready = (extra = {}) => ownedAscended("guardian", { copies: 2, stars: 0, stars_needed: 2, star_essence_cost: 2, next_tier_id: "unique", tier_id: "rare", can_star_up: true, ...extra });
+
+  it("lists the essence held above the cards", () => {
+    const wrapper = mountPanel({ ...PROFILE, essences: { common: 3, rare: 0, royal: 1 } });
+
+    expect(wrapper.findAll(".essences li").map((li) => li.text())).toEqual(["Common essence 3", "Royal essence 1"]);
+  });
+
+  it("adds a star with a spare copy and essence, then shows the refreshed stars", async () => {
+    client.addStar.mockResolvedValue({ kind: "star", ascended_id: "guardian", tier_id: "rare", stars: 1, stars_needed: 2, essence_spent: 2, copies: 1, can_tier_up: false });
+    client.profile.mockResolvedValue({ ...PROFILE, essences: { rare: 1 }, ascendeds: [ready({ copies: 1, stars: 1, can_star_up: false })] });
+    const wrapper = mountPanel({ ...PROFILE, essences: { rare: 3 }, ascendeds: [ready()] });
+
+    await wrapper.find(".ascended-card").trigger("click");
+    await flushPromises();
+    const upgrade = wrapper.find(".upgrade");
+    expect(upgrade.text()).toContain("Stars 0 / 2 to reach Unique");
+    expect(upgrade.text()).toContain("A star costs 1 spare copy and 2 Rare essence");
+    await upgrade.findAll("button").find((b) => b.text() === "Add a star")!.trigger("click");
+    await flushPromises();
+
+    expect(client.addStar).toHaveBeenCalledWith("guardian");
+    expect(wrapper.find(".upgrade").text()).toContain("Stars 1 / 2 to reach Unique");
+    expect(wrapper.find(".upgrade-note").text()).toBe("Guardian gained a star: 1 of 2.");
+    expect(wrapper.find(".upgrade").findAll("button").find((b) => b.text() === "Add a star")!.attributes("disabled")).toBeDefined();
+  });
+
+  it("offers the tier instead of a star once the stars are full", async () => {
+    client.raiseTier.mockResolvedValue({ kind: "tier", ascended_id: "guardian", from_tier_id: "rare", tier_id: "unique", stars: 0 });
+    client.profile.mockResolvedValue({ ...PROFILE, ascendeds: [ready({ tier_id: "unique", stars: 0, stars_needed: 3, next_tier_id: "royal", can_star_up: false })] });
+    const wrapper = mountPanel({ ...PROFILE, ascendeds: [ready({ stars: 2, can_star_up: false, can_tier_up: true })] });
+
+    await wrapper.find(".ascended-card").trigger("click");
+    await flushPromises();
+    const buttons = wrapper.find(".upgrade").findAll("button").map((b) => b.text());
+    expect(buttons).toEqual(["Raise to Unique"]);
+    await wrapper.find(".upgrade button").trigger("click");
+    await flushPromises();
+
+    expect(client.raiseTier).toHaveBeenCalledWith("guardian");
+    expect(wrapper.find(".upgrade-note").text()).toBe("Guardian rose to Unique.");
+    expect(wrapper.find(".details .em-tier").text()).toBe("Unique");
+  });
+
+  it("disables the star when a copy or essence is missing, and says the top of the ladder has none", async () => {
+    const wrapper = mountPanel({ ...PROFILE, ascendeds: [ready({ can_star_up: false }), ownedAscended("forbidden", { tier_id: "forbidden", stars_needed: null, next_tier_id: null })] });
+
+    await wrapper.find(".ascended-card").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".upgrade button").attributes("disabled")).toBeDefined();
+    await wrapper.findAll(".ascended-card")[1]!.trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".upgrade").text()).toContain("Top of its ladder");
+    expect(wrapper.find(".upgrade button").exists()).toBe(false);
   });
 });
 

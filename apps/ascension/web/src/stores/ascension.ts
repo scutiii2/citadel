@@ -14,6 +14,8 @@ import {
   type ShopOffer,
   type ShopWindow,
   type Sale,
+  type StarUp,
+  type TierUp,
   type StartBattleInput,
 } from "../api/AscensionClient";
 import { ApiError, UnauthorizedError } from "../api/http";
@@ -429,6 +431,14 @@ export const useAscensionStore = defineStore("ascension", () => {
     return mutate(() => ascensionClient.sellCopy(ascendedId), () => refreshProfile());
   }
 
+  function addStar(ascendedId: string): Promise<StarUp | null> {
+    return mutate(() => ascensionClient.addStar(ascendedId), () => refreshProfile());
+  }
+
+  function raiseTier(ascendedId: string): Promise<TierUp | null> {
+    return mutate(() => ascensionClient.raiseTier(ascendedId), () => refreshProfile());
+  }
+
   /** Deletes all progress. Resolves false (state kept) when another change is
    * running or the server refuses, e.g. 409 while a battle is active. */
   async function resetProgress(): Promise<boolean> {
@@ -506,6 +516,8 @@ export const useAscensionStore = defineStore("ascension", () => {
     loadShop,
     buyOffer,
     sellCopy,
+    addStar,
+    raiseTier,
     resetProgress,
     act,
     answerEmblem,

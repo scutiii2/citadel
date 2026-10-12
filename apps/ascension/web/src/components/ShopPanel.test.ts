@@ -80,14 +80,14 @@ describe("ShopPanel", () => {
   });
 
   it("buys an offer and says what it bought", async () => {
-    client.buyOffer.mockResolvedValue({ kind: "copies", ascended_id: "guardian", tier_id: "common", copies_granted: 1, price: 40, resulting_tier_id: "common", slot: 0, rotation: 46, left: 2 });
+    client.buyOffer.mockResolvedValue({ kind: "copies", ascended_id: "guardian", tier_id: "common", copies_granted: 1, price: 40, slot: 0, rotation: 46, left: 2 });
     const { wrapper } = mountShop(500);
 
     await wrapper.find('[data-offer="0"] button').trigger("click");
     await flushPromises();
 
     expect(client.buyOffer).toHaveBeenCalledExactlyOnceWith(46, 0);
-    expect(wrapper.find(".notice").text()).toBe("Bought 1 copy of Guardian for 40 Insignia; it is now Common.");
+    expect(wrapper.find(".notice").text()).toBe("Bought 1 copy of Guardian for 40 Insignia.");
   });
 
   it("keeps the server's refusal when an offer costs more than the Insignia", async () => {

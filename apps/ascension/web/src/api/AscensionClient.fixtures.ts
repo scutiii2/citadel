@@ -4,8 +4,8 @@ import type { AscendedArtInfo, BattleView, Catalog, EncounterPreview, Fighter, O
 
 const nameOf = (id: string) => id.charAt(0).toUpperCase() + id.slice(1);
 
-export function tier(id: string, emblemPrice: number, copyThreshold: number | null): TierInfo {
-  return { id, stat_multiplier: 1, copy_threshold: copyThreshold, copy_reward: 1, emblem_strength: 1, emblem_price: emblemPrice };
+export function tier(id: string, emblemPrice: number, starsToAdvance: number | null): TierInfo {
+  return { id, stat_multiplier: 1, stars_to_advance: starsToAdvance, essence_cost: 1, copy_reward: 1, emblem_strength: 1, emblem_price: emblemPrice };
 }
 
 const SHIPPED_FOCUS: Record<string, [number, number]> = {
@@ -25,6 +25,7 @@ export function ascendedInfo(id: string, extra: Partial<AscendedInfo> = {}): Asc
     name: nameOf(id),
     starter: false,
     forbidden: false,
+    start_tier: "common",
     ascension_types: ["enchant"],
     base: { hp: 100, power: 10, speed: 10 },
     growth: { hp: 5, power: 1, speed: 1 },
@@ -42,11 +43,11 @@ export function ascendedInfo(id: string, extra: Partial<AscendedInfo> = {}): Asc
 export const CATALOG: Catalog = {
   version: 1,
   tiers: [
-    tier("common", 10, 0),
-    tier("rare", 40, 3),
-    tier("unique", 90, 6),
-    tier("royal", 150, 10),
-    tier("legendary", 250, 15),
+    tier("common", 10, 1),
+    tier("rare", 40, 2),
+    tier("unique", 90, 3),
+    tier("royal", 150, 5),
+    tier("legendary", 250, null),
     tier("forbidden", 500, null),
   ],
   levels: { regular_cap: 30, forbidden_cap: 50 },
@@ -54,7 +55,7 @@ export const CATALOG: Catalog = {
     ascendedInfo("guardian", { starter: true }),
     ascendedInfo("striker", { starter: true }),
     ascendedInfo("bruiser"),
-    ascendedInfo("forbidden", { forbidden: true }),
+    ascendedInfo("forbidden", { forbidden: true, start_tier: "forbidden" }),
   ],
   personalities: [
     { id: "AGGRESSIVE", categories: ["ATTACK"] },
@@ -73,6 +74,12 @@ export function ownedAscended(id: string, extra: Partial<OwnedAscended> = {}): O
     level_cap: 30,
     copies: 1,
     tier_id: "common",
+    stars: 0,
+    stars_needed: 1,
+    star_essence_cost: 1,
+    next_tier_id: "rare",
+    can_star_up: false,
+    can_tier_up: false,
     faint_until: null,
     fainted: false,
     ...extra,
@@ -83,6 +90,7 @@ export const PROFILE: Profile = {
   owner: "1",
   insignia: 100,
   emblems: { common: 2 },
+  essences: {},
   ascendeds: [ownedAscended("guardian")],
   pending_encounter: null,
   active_battle: null,
@@ -144,7 +152,7 @@ export function battleView(extra: Partial<BattleView> = {}): BattleView {
 export function shopOffer(extra: Partial<ShopOffer> = {}): ShopOffer {
   return {
     slot: 0, ascended_id: "guardian", tier_id: "common", copies_granted: 1, stock: 3, left: 3,
-    price: 40, resulting_tier_id: "common", owned_copies: 0, ...extra,
+    price: 40, owned: false, owned_copies: 0, ...extra,
   };
 }
 

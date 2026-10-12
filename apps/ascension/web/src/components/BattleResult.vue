@@ -37,7 +37,7 @@ const levelledUp = computed(() => {
 });
 const awarded = computed(() => {
   const r = result.value;
-  return r !== null && (r.xp !== undefined || r.insignia !== undefined || r.copies_granted !== undefined);
+  return r !== null && (r.xp !== undefined || r.insignia !== undefined || r.essence !== undefined || r.copies_granted !== undefined);
 });
 const story = computed(() => {
   const r = result.value;
@@ -77,9 +77,13 @@ const story = computed(() => {
         <strong class="em-pixel em-num">+{{ result.insignia }} Insignia</strong>
         <span>added to your wallet</span>
       </div>
+      <div v-if="result.essence !== undefined && result.essence_tier_id" class="reward">
+        <strong class="em-pixel em-num">+{{ result.essence }} {{ titleCase(result.essence_tier_id) }} essence</strong>
+        <span>for upgrading stars</span>
+      </div>
       <div v-if="result.copies_granted !== undefined" class="reward">
         <strong class="em-pixel em-num">+{{ result.copies_granted }} {{ result.copies_granted === 1 ? "copy" : "copies" }}</strong>
-        <span>of {{ battle.wild.name }}<template v-if="result.tier_id">, now {{ titleCase(result.tier_id) }}</template></span>
+        <span>of {{ battle.wild.name }}<template v-if="result.tier_id">, at {{ titleCase(result.tier_id) }}</template></span>
       </div>
     </div>
     <p v-else class="none">No rewards from this battle.</p>

@@ -23,10 +23,10 @@ in Phase 4.
   then the actions are revealed and resolved together: SUPPORT, then DEFENSE,
   then a speed-weighted order for ATTACK, CATCH and FLEE.
 - **CATCH** collects the wild Ascended with an EMBLEM. Winning or collecting pays XP
-  and Insignia; collecting also adds copies and one random personality.
-- Ascended keep absorbed copies, which set their tier; Insignia buys EMBLEMs and
-  copies in the shop. EMBLEMs are always on sale. Copies come as a few limited
-  offers per account that rotate every 6 hours (see Rotating shop).
+  and Insignia plus essence of the enemy's tier; collecting also adds copies and one random personality.
+- Each Ascended starts at its own tier (`start_tier`). Spare copies and essence turn into stars, and enough
+  stars raise the tier (see Stars and tiers). Insignia buys EMBLEMs and copies in the shop. EMBLEMs are always
+  on sale. Copies come as a few limited offers per account that rotate every 6 hours (see Rotating shop).
 - Play manually, or let your Ascended play on its own with a personality preset.
 
 ## How an Ascended chooses on its own
@@ -88,6 +88,23 @@ lists them in each Ascended's `art` block of `/ascension/catalog` (a URL, or `nu
 `/ascended/<id>/<file>` with `Cache-Control: no-cache`, so replaced art shows after a reload. `catalog.json` may hold
 `"art": {"focus": 21, "focus_preview": 50}`, the vertical crop centres (0 to 100, default 50) for the main and preview
 sprites. Adding an Ascended is dropping a folder; a missing sprite falls back to another one, then to a letter.
+
+## Stars and tiers
+
+Power is the stat that drives damage, defence and fleeing. Essence is upgrade material, one kind per tier (grey,
+green, blue, purple, gold, red), as in the Unity project.
+
+- An Ascended is first owned at its `start_tier` (`ascended/<id>/catalog.json`, default `common`; Forbidden is always
+  `forbidden`). Tier only changes by a tier-up. It sets the stat multiplier.
+- The first copy is the Ascended itself. Any further copy, from a capture or the shop, is a **spare copy** (`copies`).
+- **A star** costs one spare copy and the tier's `essence_cost` in that tier's essence. Each tier has
+  `stars_to_advance` (the Unity star ladder): Common 1, Rare 2, Unique 3, Royal 5. Legendary and Forbidden have none:
+  they take no stars and cannot rise.
+- With enough stars an Ascended can **raise its tier** (free). The stars then start again from zero.
+- Beating or collecting an enemy pays that enemy's tier `essence_cost` in its tier essence (Common 1, Rare 2, Unique 3,
+  Royal 4, Legendary 5, Forbidden 10). Essence is never lost when a battle is lost.
+- Selling a spare copy pays the Ascended's current tier and level and never changes the tier.
+- Saved databases at version 3 keep each Ascended's tier (the one its absorbed copies had reached); those copies are spent.
 
 ## Rotating shop
 
@@ -183,14 +200,16 @@ last saw; a stale pair is a 409.
 | `POST /ascension/battles/{id}/forfeit` | End as a loss |
 | `GET /ascension/shop` | This account's current offers: `rotation`, `seconds_left`, and per offer `slot`, Ascended, tier, `stock`, `left`, `price` |
 | `POST /ascension/shop/purchases` | Buy EMBLEMs (`{kind: "emblem", tier, quantity}`) or an offer (`{kind: "copies", rotation, slot}`) |
-| `POST /ascension/ascendeds/{id}/sales` | Sell one absorbed copy |
+| `POST /ascension/ascendeds/{id}/sales` | Sell one spare copy |
+| `POST /ascension/ascendeds/{id}/stars` | Add a star (one spare copy and the tier's essence) |
+| `POST /ascension/ascendeds/{id}/tier` | Raise the tier once the stars are full |
 
 `POST /ascension/profile/reset` deletes the player's profile, Ascended, personalities, presets, EMBLEMs, encounters and battle history so a starter can be chosen again; it needs `{"confirm": true}` and is refused with a 409 while a battle is active.
 
 Errors: 400 bad input or unknown Ascended or tier, 401 `Not signed in` for a
 missing, invalid or expired bearer session, 404 missing or
 someone else's record, 409 state conflict (stale revision, wrong phase, not enough
-Insignia, cooldown, one active battle).
+Insignia, essence or copies, stars not ready, cooldown, one active battle).
 
 Closing the game view simply stops calls to `advance`: the battle stays saved
 between rounds and resumes where it was, including an open EMBLEM prompt and its

@@ -109,7 +109,7 @@ async function reset(): Promise<void> {
         <li><strong>Find a wild Ascended.</strong> Preview it, then fight or decline for free.</li>
         <li><strong>Make your move.</strong> Play manually or let your Ascended act autonomously.</li>
         <li><strong>Throw an EMBLEM.</strong> Choose a permitted tier before the five-second timer ends.</li>
-        <li><strong>Forge your collection.</strong> Earn XP and Insignia; copies raise tiers. Levels cap at 30, or 50 for Forbidden.</li>
+        <li><strong>Forge your collection.</strong> Earn XP, Insignia and essence; spare copies and essence add stars, and stars raise tiers. Levels cap at 30, or 50 for Forbidden.</li>
       </ol>
       <EmButton variant="primary" class="ready" @click="showingHelp = false"><EmIcon name="play" /> Ready to play</EmButton>
     </EmDialog>

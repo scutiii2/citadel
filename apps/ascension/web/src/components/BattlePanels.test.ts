@@ -237,6 +237,8 @@ describe("BattleResult", () => {
         kind: "captured",
         xp: 30,
         insignia: 12,
+        essence: 2,
+        essence_tier_id: "rare",
         level_before: 3,
         level_after: 4,
         ascended_id: "bruiser",
@@ -257,7 +259,8 @@ describe("BattleResult", () => {
     expect(text).toContain("Captured");
     expect(wrapper.findAll(".reward")[0]!.text()).toBe("+30 XPfor Guardian, now level 4");
     expect(text).toContain("+12 Insignia");
-    expect(wrapper.findAll(".reward")[2]!.text()).toBe("+2 copiesof Bruiser, now Rare");
+    expect(wrapper.findAll(".reward")[2]!.text()).toBe("+2 Rare essencefor upgrading stars");
+    expect(wrapper.findAll(".reward")[3]!.text()).toBe("+2 copiesof Bruiser, at Rare");
     expect(text).toContain("Cautious · tier 1");
     expect(text).toContain("Bold · tier 2 (now yours)");
 

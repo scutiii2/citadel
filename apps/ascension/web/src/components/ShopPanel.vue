@@ -49,7 +49,7 @@ async function buyOffer(offer: ShopOffer): Promise<void> {
   const bought = await store.buyOffer(offer);
   if (bought) {
     const copies = `${bought.copies_granted} ${bought.copies_granted === 1 ? "copy" : "copies"}`;
-    message.value = `Bought ${copies} of ${nameOf(bought.ascended_id)} for ${bought.price} Insignia; it is now ${titleCase(bought.resulting_tier_id)}.`;
+    message.value = `Bought ${copies} of ${nameOf(bought.ascended_id)} for ${bought.price} Insignia.`;
   }
 }
 
@@ -90,7 +90,7 @@ async function sell(): Promise<void> {
   message.value = "";
   const sale = await store.sellCopy(ascendedId);
   if (sale) {
-    message.value = `Sold one copy for ${sale.value} Insignia${sale.downgraded ? `; it is now ${titleCase(sale.tier_id)}` : ""}.`;
+    message.value = `Sold one copy for ${sale.value} Insignia.`;
   }
 }
 </script>
@@ -135,14 +135,14 @@ async function sell(): Promise<void> {
             <EmTierBadge :tier-id="offer.tier_id" />
             <span class="em-num">+{{ offer.copies_granted }} {{ offer.copies_granted === 1 ? "copy" : "copies" }}</span>
           </div>
-          <p class="em-num owned">You have {{ offer.owned_copies }} · becomes {{ titleCase(offer.resulting_tier_id) }}</p>
+          <p class="em-num owned">{{ offer.owned ? `You have ${offer.owned_copies} spare` : "A new Ascended for you" }}</p>
           <p class="em-num stock">{{ offer.left }} left</p>
           <EmButton variant="primary" class="block" :disabled="store.busy || offerOff(offer)" @click="buyOffer(offer)">
             <EmIcon name="shop" /> {{ offer.price }} Insignia
           </EmButton>
         </li>
       </ul>
-      <p class="hint">Offers are yours alone and change every few hours. Absorbed copies raise an Ascended's tier.</p>
+      <p class="hint">Offers are yours alone and change every few hours. Spare copies turn into stars, with essence from battles.</p>
     </EmPanel>
 
     <EmPanel>
@@ -184,7 +184,7 @@ async function sell(): Promise<void> {
 
     <EmPanel>
       <h3 class="em-pixel">Sell an absorbed copy</h3>
-      <p v-if="sellable.length === 0" class="empty">No absorbed copies to sell.</p>
+      <p v-if="sellable.length === 0" class="empty">No spare copies to sell.</p>
       <template v-else>
         <p class="hint">Sell one absorbed copy. Your collected Ascended stays with you.</p>
         <ul class="cards sell">

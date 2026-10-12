@@ -4,6 +4,7 @@
   "art": { "focus": 12, "focus_preview": 14 },
   "starter": false,
   "forbidden": false,
+  "start_tier": "common",
   "ascension_types": [
     "enchant"
   ],

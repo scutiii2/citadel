@@ -10,6 +10,7 @@ import PresetEditor from "./PresetEditor.vue";
 import AscendedCard from "./AscendedCard.vue";
 import AscendedTemplateCard from "./AscendedTemplateCard.vue";
 import EmBar from "./ui/EmBar.vue";
+import EmButton from "./ui/EmButton.vue";
 import EmDialog from "./ui/EmDialog.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmSwitch from "./ui/EmSwitch.vue";
@@ -59,7 +60,36 @@ async function loadPersonalities(cursor: number | null): Promise<void> {
   }
 }
 
+const upgradeMessage = ref("");
+const essences = computed(() => Object.entries(store.profile?.essences ?? {}).filter(([, count]) => count > 0));
+const essenceOf = (tierId: string) => store.profile?.essences[tierId] ?? 0;
+
+/** The details dialog keeps its own copy of the card; after an upgrade it takes the refreshed one. */
+function refreshOpen(): void {
+  const id = open.value?.ascended_id;
+  open.value = store.profile?.ascendeds.find((s) => s.ascended_id === id) ?? open.value;
+}
+
+async function addStar(ascended: OwnedAscended): Promise<void> {
+  upgradeMessage.value = "";
+  const result = await store.addStar(ascended.ascended_id);
+  refreshOpen();
+  if (result) {
+    upgradeMessage.value = `${ascended.name} gained a star: ${result.stars} of ${result.stars_needed}.`;
+  }
+}
+
+async function raiseTier(ascended: OwnedAscended): Promise<void> {
+  upgradeMessage.value = "";
+  const result = await store.raiseTier(ascended.ascended_id);
+  refreshOpen();
+  if (result) {
+    upgradeMessage.value = `${ascended.name} rose to ${titleCase(result.tier_id)}.`;
+  }
+}
+
 function show(ascended: OwnedAscended): void {
+  upgradeMessage.value = "";
   open.value = ascended;
   personalities.value = [];
   nextCursor.value = null;
@@ -85,6 +115,12 @@ function show(ascended: OwnedAscended): void {
       </div>
       <EmSwitch v-model="grouped" label="Group by type" />
     </div>
+
+    <ul v-if="essences.length" class="essences" aria-label="Essence">
+      <li v-for="[tierId, count] in essences" :key="tierId" :style="{ '--tier': `var(--em-tier-${tierId}, var(--em-tier-common))` }">
+        <EmTierBadge :tier-id="tierId" :label="`${titleCase(tierId)} essence`" /> <strong class="em-num">{{ count }}</strong>
+      </li>
+    </ul>
 
     <div class="section-head">
       <h3 class="em-pixel">Collected Ascended</h3>
@@ -133,6 +169,25 @@ function show(ascended: OwnedAscended): void {
               <span class="em-num">{{ open.xp }} / {{ open.xp_needed }} XP</span>
             </template>
             <span v-else>Highest level reached</span>
+          </div>
+
+          <div class="upgrade">
+            <template v-if="open.stars_needed !== null">
+              <EmBar :value="open.stars" :max="open.stars_needed" :label="`${open.name} stars`" />
+              <span class="em-num">Stars {{ open.stars }} / {{ open.stars_needed }} to reach {{ titleCase(open.next_tier_id ?? "") }}</span>
+              <span class="em-num">
+                A star costs 1 spare copy and {{ open.star_essence_cost }} {{ titleCase(open.tier_id) }} essence.
+                You have {{ open.copies }} {{ open.copies === 1 ? "copy" : "copies" }} and {{ essenceOf(open.tier_id) }} essence.
+              </span>
+              <div class="upgrade-actions">
+                <EmButton v-if="open.can_tier_up" variant="primary" :disabled="store.busy" @click="raiseTier(open)">
+                  Raise to {{ titleCase(open.next_tier_id ?? "") }}
+                </EmButton>
+                <EmButton v-else :disabled="!open.can_star_up || store.busy" @click="addStar(open)">Add a star</EmButton>
+              </div>
+            </template>
+            <span v-else>Top of its ladder: no more stars.</span>
+            <p v-if="upgradeMessage" class="upgrade-note" role="status">{{ upgradeMessage }}</p>
           </div>
 
           <div class="people-head">
@@ -287,6 +342,35 @@ function show(ascended: OwnedAscended): void {
 .group-name small {
   margin-left: var(--em-space-2);
   color: var(--em-muted);
+}
+.essences {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--em-space-3);
+  margin: 0 0 var(--em-space-4);
+  padding: 0;
+  list-style: none;
+}
+.essences li {
+  display: flex;
+  align-items: center;
+  gap: var(--em-space-2);
+}
+.upgrade {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 var(--em-space-3);
+  font-size: 12px;
+  color: var(--em-muted);
+}
+.upgrade-note {
+  margin: 0;
+  color: var(--em-text);
+}
+.upgrade-actions {
+  display: flex;
+  gap: var(--em-space-2);
 }
 .xp {
   display: flex;

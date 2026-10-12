@@ -16,7 +16,10 @@ export interface TierInfo {
   id: string;
   stat_multiplier: number;
   /** Copies a regular Ascended needs for this tier; null for the Forbidden tier. */
-  copy_threshold: number | null;
+  /** Stars that unlock the next tier; null at the top of the ladder. */
+  stars_to_advance: number | null;
+  /** Essence of this tier spent per star, and earned from beating an enemy of this tier. */
+  essence_cost: number;
   copy_reward: number;
   emblem_strength: number;
   emblem_price: number;
@@ -47,6 +50,8 @@ export interface AscendedInfo {
   name: string;
   starter: boolean;
   forbidden: boolean;
+  /** The tier it is first owned at. */
+  start_tier: string;
   /** Ascension Type ids; zero or more. */
   ascension_types: string[];
   base: Record<string, number>;
@@ -75,8 +80,17 @@ export interface OwnedAscended {
   /** null at the level cap. */
   xp_needed: number | null;
   level_cap: number;
+  /** Spare duplicates: one is spent per star, or sold. */
   copies: number;
   tier_id: string;
+  stars: number;
+  /** Stars that unlock the next tier; null at the top of the ladder. */
+  stars_needed: number | null;
+  /** Essence of its own tier that one star costs. */
+  star_essence_cost: number;
+  next_tier_id: string | null;
+  can_star_up: boolean;
+  can_tier_up: boolean;
   faint_until: number | null;
   fainted: boolean;
 }
@@ -85,6 +99,8 @@ export interface Profile {
   owner: string;
   insignia: number;
   emblems: Record<string, number>;
+  /** Upgrade material, by tier. */
+  essences: Record<string, number>;
   ascendeds: OwnedAscended[];
   pending_encounter: string | null;
   active_battle: string | null;
@@ -194,6 +210,8 @@ export interface BattleResult {
   kind: ResultKind;
   xp?: number;
   insignia?: number;
+  essence?: number;
+  essence_tier_id?: string;
   level_before?: number;
   level_after?: number;
   ascended_id?: string;
@@ -255,7 +273,6 @@ export interface CopyPurchase {
   tier_id: string;
   copies_granted: number;
   price: number;
-  resulting_tier_id: string;
   slot: number;
   rotation: number;
   left: number;
@@ -269,7 +286,7 @@ export interface ShopOffer {
   stock: number;
   left: number;
   price: number;
-  resulting_tier_id: string;
+  owned: boolean;
   owned_copies: number;
 }
 
@@ -287,7 +304,25 @@ export interface Sale {
   value: number;
   copies: number;
   tier_id: string;
-  downgraded: boolean;
+}
+
+export interface StarUp {
+  kind: "star";
+  ascended_id: string;
+  tier_id: string;
+  stars: number;
+  stars_needed: number;
+  essence_spent: number;
+  copies: number;
+  can_tier_up: boolean;
+}
+
+export interface TierUp {
+  kind: "tier";
+  ascended_id: string;
+  from_tier_id: string;
+  tier_id: string;
+  stars: number;
 }
 
 const BASE = "/ascension";
@@ -355,6 +390,12 @@ export class AscensionClient {
     this.http.request<CopyPurchase>("POST", `${BASE}/shop/purchases`, { kind: "copies", rotation, slot }, withKey(key));
   sellCopy = (ascendedId: string, key: string = newIdempotencyKey()) =>
     this.http.request<Sale>("POST", `${BASE}/ascendeds/${part(ascendedId)}/sales`, undefined, withKey(key));
+  /** One star: a spare copy plus the tier's essence. */
+  addStar = (ascendedId: string, key: string = newIdempotencyKey()) =>
+    this.http.request<StarUp>("POST", `${BASE}/ascendeds/${part(ascendedId)}/stars`, undefined, withKey(key));
+  /** With enough stars, the next tier; the stars start again. */
+  raiseTier = (ascendedId: string, key: string = newIdempotencyKey()) =>
+    this.http.request<TierUp>("POST", `${BASE}/ascendeds/${part(ascendedId)}/tier`, undefined, withKey(key));
 }
 
 /** The client belongs to this app's session store, never a module singleton. */
