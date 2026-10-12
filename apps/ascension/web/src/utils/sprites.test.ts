@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { AscendedArtInfo } from "../api/AscensionClient";
-import { spriteFocus, spriteFor } from "./sprites";
+import { poseFor, spriteFocus, spriteFor } from "./sprites";
 
-const ART: AscendedArtInfo = { main_card: "/a/main.webp", preview_card: "/a/preview.webp", battle: "/a/battle.webp", focus: 21, focus_preview: 50 };
+const ART: AscendedArtInfo = { main_card: "/a/main.webp", preview_card: "/a/preview.webp", battle: "/a/battle.webp", focus: 21, focus_preview: 50, animation: null };
 
 describe("spriteFor", () => {
   it("gives the slot's own sprite", () => {
@@ -28,5 +28,20 @@ describe("spriteFocus", () => {
     expect(spriteFocus({ ...ART, focus: 21, focus_preview: 14 }, "main_card")).toBe(21);
     expect(spriteFocus({ ...ART, focus: 21, focus_preview: 14 }, "preview_card")).toBe(14);
     expect(spriteFocus(undefined, "main_card")).toBe(50);
+  });
+});
+
+describe("poseFor", () => {
+  it("maps what a fighter does to its animation state, idle otherwise", () => {
+    expect(poseFor("lunge", false)).toBe("attack");
+    expect(poseFor("guard", false)).toBe("defend");
+    expect(poseFor("boost", false)).toBe("support");
+    expect(poseFor("flee-away", false)).toBe("flee");
+    expect(poseFor("flee-fail", false)).toBe("flee");
+    for (const fx of ["hit", "guarded", "absorb", "release", null, undefined] as const) expect(poseFor(fx, false)).toBe("idle");
+  });
+
+  it("catches while an EMBLEM is thrown at the other side", () => {
+    expect(poseFor(null, true)).toBe("catch");
   });
 });

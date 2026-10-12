@@ -16,7 +16,7 @@ const SHIPPED_FOCUS: Record<string, [number, number]> = {
 export function artFor(id: string): AscendedArtInfo {
   const focus = SHIPPED_FOCUS[id];
   const url = (name: string) => (focus ? `/ascended/${id}/sprite_${name}.webp` : null);
-  return { main_card: url("main_card"), preview_card: url("preview_card"), battle: url("battle"), focus: focus?.[0] ?? 50, focus_preview: focus?.[1] ?? 50 };
+  return { main_card: url("main_card"), preview_card: url("preview_card"), battle: url("battle"), focus: focus?.[0] ?? 50, focus_preview: focus?.[1] ?? 50, animation: null };
 }
 
 export function ascendedInfo(id: string, extra: Partial<AscendedInfo> = {}): AscendedInfo {

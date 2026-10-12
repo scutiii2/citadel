@@ -11,6 +11,10 @@ Sprites, per Ascended (exact names, WebP):
 - `sprite_preview_card.webp`: the small card (collection, shop offers, starter list).
 - `sprite_battle.webp`: the fighter in the battle arena.
 
+An Ascended may also hold `spreadsheet_animation.webp` (a grid of frames, one row per state, facing right) and
+`animations.json` (the grid and each state's row, frame count, frame time and loop). The battle arena plays it in place
+of `sprite_battle.webp`; Ascended without one keep the still sprite.
+
 Also in each folder: `art_prompts.md`, the visual canon of that Ascended and three ready-to-paste ChatGPT prompts
 (main card, preview card, battle). The shared ruleset for all of them is `ascended/ART_GUIDE.md`: sizes, the pixel-art
 style bible, the black battle background, the crop and convert commands and the checklist. Make or change sprites

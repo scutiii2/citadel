@@ -140,6 +140,29 @@ def test_sprites_are_found_in_the_folder_and_crops_come_from_catalog_json(catalo
     assert (bruiser.focus, bruiser.focus_preview) == (50, 50)
 
 
+def test_a_sheet_in_the_folder_gives_a_checked_animation(catalog):
+    animation = catalog.ascended("twoychi").art.animation
+    assert set(animation["states"]) == {"idle", "attack", "defend", "support", "flee", "catch"}
+    assert animation["states"]["idle"] == {"row": 0, "frames": 4, "frame_ms": 180, "loop": True}
+    assert catalog.ascended("guardian").art.animation is None
+    assert catalog.sprite_path("twoychi", "spreadsheet_animation.webp").is_file()
+    assert catalog.sprite_path("guardian", "spreadsheet_animation.webp") is None
+
+
+@pytest.mark.parametrize("animation", [
+    "no", {}, {"columns": 4, "rows": 6, "states": {}},
+    {"columns": 4, "rows": 1, "states": {"idle": {"row": 1, "frames": 4, "frame_ms": 100, "loop": True}}},
+    {"columns": 4, "rows": 1, "states": {"idle": {"row": 0, "frames": 5, "frame_ms": 100, "loop": True}}},
+    {"columns": 4, "rows": 1, "states": {"idle": {"row": 0, "frames": 4, "frame_ms": 0, "loop": True}}},
+    {"columns": 4, "rows": 1, "states": {"idle": {"row": 0, "frames": 4, "frame_ms": 100, "loop": 1}}},
+    {"columns": 4, "rows": 2, "states": {"idle": {"row": 0, "frames": 4, "frame_ms": 100, "loop": True},
+                                         "dance": {"row": 1, "frames": 4, "frame_ms": 100, "loop": True}}},
+])
+def test_a_bad_animation_is_refused(raw, animation):
+    with pytest.raises(CatalogError):
+        Catalog(_broken(raw, lambda d: d["ascendeds"][0].update(animation=animation)))
+
+
 def test_sprite_path_only_answers_for_catalog_ids_and_exact_names(catalog):
     assert catalog.sprite_path("guardian", "sprite_battle.webp").is_file()
     assert catalog.sprite_path("bruiser", "sprite_battle.webp") is None  # no such file

@@ -30,6 +30,10 @@ ASCENDED_FILE = "catalog.json"
 TREE_FILE = "tree.json"
 # The sprite files an Ascended folder may hold, in the order main card, small card, battle.
 SPRITE_NAMES = ("sprite_main_card.webp", "sprite_preview_card.webp", "sprite_battle.webp")
+# The optional animation sheet (a grid of frames, one row per state) and the file that describes its grid.
+ANIMATION_SHEET = "spreadsheet_animation.webp"
+ANIMATION_FILE = "animations.json"
+ANIMATION_STATES = ("idle", "attack", "defend", "support", "flee", "catch")
 STATS = ("hp", "power", "speed")
 
 
@@ -60,6 +64,7 @@ class ArtSpec:
     battle: bool = False
     focus: float = 50
     focus_preview: float = 50
+    animation: Mapping[str, Any] | None = None  # the sheet's grid and states; None = no sheet, the battle sprite stays still
 
 
 @dataclass(frozen=True)
@@ -169,7 +174,33 @@ def _art(raw: Mapping[str, Any], where: str) -> ArtSpec:
             raise CatalogError(f"{where}: art {key} must be a number from 0 to 100")
         focus[key] = value
     found = raw.get("sprites", [])
-    return ArtSpec(*(name in found for name in SPRITE_NAMES), **focus)
+    animation = _animation(raw["animation"], where) if raw.get("animation") is not None else None
+    return ArtSpec(*(name in found for name in SPRITE_NAMES), **focus, animation=animation)
+
+
+def _animation(raw: Any, where: str) -> dict[str, Any]:
+    """The checked animation grid: `columns`, `rows` and, per state, its sheet row, frame count, frame time and loop."""
+    at = f"{where} {ANIMATION_FILE}"
+
+    def whole(value: Any, name: str, low: int = 1) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or value < low:
+            raise CatalogError(f"{at}: {name} must be a whole number of at least {low}")
+        return value
+
+    if not isinstance(raw, Mapping) or set(raw) != {"columns", "rows", "states"} or not isinstance(raw["states"], Mapping):
+        raise CatalogError(f"{at}: needs exactly columns, rows and states")
+    columns, rows = whole(raw["columns"], "columns"), whole(raw["rows"], "rows")
+    states: dict[str, Any] = {}
+    for name, state in raw["states"].items():
+        if name not in ANIMATION_STATES or not isinstance(state, Mapping) or set(state) != {"row", "frames", "frame_ms", "loop"}:
+            raise CatalogError(f"{at}: state {name!r} must be one of {ANIMATION_STATES} with row, frames, frame_ms and loop")
+        row, frames = whole(state["row"], f"{name} row", 0), whole(state["frames"], f"{name} frames")
+        if row >= rows or frames > columns or not isinstance(state["loop"], bool):
+            raise CatalogError(f"{at}: state {name!r} does not fit the grid or loop is not true or false")
+        states[name] = {"row": row, "frames": frames, "frame_ms": whole(state["frame_ms"], f"{name} frame_ms"), "loop": state["loop"]}
+    if "idle" not in states:
+        raise CatalogError(f"{at}: needs an idle state")
+    return {"columns": columns, "rows": rows, "states": states}
 
 
 def _number(value: Any) -> bool:
@@ -416,6 +447,11 @@ class Catalog:
                 found = ascended.get("id") if isinstance(ascended, dict) else ascended
                 raise CatalogError(f"ascended file {label}: id {found!r} must equal the folder name {folder.name!r}")
             ascended["sprites"] = [name for name in SPRITE_NAMES if (folder / name).is_file()]
+            if (folder / ANIMATION_SHEET).is_file():
+                try:
+                    ascended["animation"] = json.loads((folder / ANIMATION_FILE).read_text(encoding="utf-8"))
+                except (OSError, ValueError) as error:
+                    raise CatalogError(f"cannot load animation file {folder.name}/{ANIMATION_FILE}: {error}") from error
             tree_file = folder / TREE_FILE
             if tree_file.is_file():
                 try:
@@ -431,9 +467,9 @@ class Catalog:
         return Loadout(spec.abilities, spec.passive)
 
     def sprite_path(self, ascended_id: str, file: str) -> Path | None:
-        """The sprite file for a catalog Ascended and one of the three exact names, else None.
-        The path is built from the catalog id and the fixed name, never from request text."""
-        if self.ascendeds_path is None or file not in SPRITE_NAMES or ascended_id not in self._ascendeds:
+        """The sprite file for a catalog Ascended and one of the exact names (the three sprites or the animation
+        sheet), else None. The path is built from the catalog id and the fixed name, never from request text."""
+        if self.ascendeds_path is None or file not in (*SPRITE_NAMES, ANIMATION_SHEET) or ascended_id not in self._ascendeds:
             return None
         path = self.ascendeds_path / ascended_id / file
         return path if path.is_file() else None

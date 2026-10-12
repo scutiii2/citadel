@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt
 
 from src.auth import requester
-from src.ascension.catalog import SPRITE_NAMES, Catalog, CatalogError
+from src.ascension.catalog import ANIMATION_SHEET, SPRITE_NAMES, Catalog, CatalogError
 from src.ascension.collection import CollectionService
 from src.ascension.coordinator import RoundCoordinator
 from src.ascension.encounters import EncounterService
@@ -104,11 +104,13 @@ def idempotency_key(idempotency_key: str = Header(default="", alias="Idempotency
 
 
 def _art_summary(spec: Any) -> dict[str, Any]:
-    """The sprite URLs an Ascended has (null for a missing one) and its crop centres."""
+    """The sprite URLs an Ascended has (null for a missing one), its crop centres and its animation sheet (null without one)."""
     art = spec.art
     present = (art.main_card, art.preview_card, art.battle)
     urls = [f"/ascended/{spec.id}/{name}" if here else None for name, here in zip(SPRITE_NAMES, present)]
-    return {"main_card": urls[0], "preview_card": urls[1], "battle": urls[2], "focus": art.focus, "focus_preview": art.focus_preview}
+    animation = {"url": f"/ascended/{spec.id}/{ANIMATION_SHEET}", **art.animation} if art.animation else None
+    return {"main_card": urls[0], "preview_card": urls[1], "battle": urls[2], "focus": art.focus, "focus_preview": art.focus_preview,
+            "animation": animation}
 
 
 def catalog_summary(catalog: Catalog) -> dict[str, Any]:
@@ -264,7 +266,7 @@ def install_error_handlers(app: FastAPI) -> None:
 
 
 def build_art_router(catalog: Catalog) -> APIRouter:
-    """Public: an <img> cannot send the bearer, and the art is not secret. Only catalog ids and the three exact names answer."""
+    """Public: an <img> cannot send the bearer, and the art is not secret. Only catalog ids and the exact sprite and sheet names answer."""
     router = APIRouter()
     headers = {"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"}
 

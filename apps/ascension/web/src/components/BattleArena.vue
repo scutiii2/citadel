@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { BattleView, Buff, Fighter } from "../api/AscensionClient";
+import type { BattleView, Buff, Fighter, Side } from "../api/AscensionClient";
 import { usePlaybackStore } from "../stores/playback";
 import { useAscensionStore } from "../stores/ascension";
 import { statusText } from "../utils/ascension";
-import { spriteFor } from "../utils/sprites";
+import { poseFor, spriteFor } from "../utils/sprites";
+import { other } from "../utils/battleCues";
+import AnimatedSprite from "./ui/AnimatedSprite.vue";
 import EmBar from "./ui/EmBar.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
 import TypeSymbol from "./ui/TypeSymbol.vue";
@@ -46,9 +48,23 @@ function typesOf(fighter: Fighter): string[] {
   return ascension.catalog?.ascendeds.find((a) => a.id === fighter.ascended_id)?.ascension_types ?? [];
 }
 
+function artInfo(fighter: Fighter) {
+  return ascension.catalog?.ascendeds.find((a) => a.id === fighter.ascended_id)?.art;
+}
+
 function art(fighter: Fighter): string | null {
-  const info = ascension.catalog?.ascendeds.find((a) => a.id === fighter.ascended_id);
-  return spriteFor(info?.art, "battle");
+  return spriteFor(artInfo(fighter), "battle");
+}
+
+/** The fighter's sheet, if it has one; the rest keep their still battle sprite. */
+function sheet(fighter: Fighter) {
+  return artInfo(fighter)?.animation ?? null;
+}
+
+/** What the fighter does now: its effect, or catching while an EMBLEM is thrown at the other side. */
+function pose(key: string) {
+  const side = key as Side;
+  return poseFor(playback.fx[side], playback.ball[other(side)]?.phase === "throw");
 }
 </script>
 
@@ -70,7 +86,8 @@ function art(fighter: Fighter): string | null {
           <p class="hp em-num">HP {{ hpOf(side.key, side.fighter) }} / {{ side.fighter.max_hp }}</p>
           <div class="art">
             <div class="sprite" :class="playback.fx[side.key as 'player' | 'wild'] ? `fx-${playback.fx[side.key as 'player' | 'wild']}` : ''">
-              <img v-if="art(side.fighter)" :src="art(side.fighter)!" alt="" draggable="false" />
+              <span v-if="sheet(side.fighter)" class="pic"><AnimatedSprite :sheet="sheet(side.fighter)!" :state="pose(side.key)" /></span>
+              <img v-else-if="art(side.fighter)" :src="art(side.fighter)!" alt="" draggable="false" />
               <span v-else class="letter" aria-hidden="true">{{ side.fighter.name.slice(0, 1) }}</span>
             </div>
             <span
@@ -160,7 +177,13 @@ function art(fighter: Fighter): string | null {
   object-fit: contain;
   mix-blend-mode: lighten;
 }
-.wild .art img {
+.pic {
+  display: flex;
+  height: 100%;
+  max-width: 100%;
+}
+.wild .art img,
+.wild .pic {
   transform: scaleX(-1);
 }
 .letter {
@@ -214,22 +237,26 @@ function art(fighter: Fighter): string | null {
 .fx-hit {
   animation: shake 460ms linear;
 }
-.fx-hit img {
+.fx-hit img,
+.fx-hit .pic {
   animation: flash-damage 460ms ease-out;
 }
 .fx-guarded {
   animation: shake-small 460ms linear;
 }
-.fx-guarded img {
+.fx-guarded img,
+.fx-guarded .pic {
   animation: glow-defense 460ms ease-out;
 }
-.fx-guard img {
+.fx-guard img,
+.fx-guard .pic {
   animation: glow-defense 700ms ease-in-out;
 }
 .fx-boost {
   animation: rise 700ms ease-out;
 }
-.fx-boost img {
+.fx-boost img,
+.fx-boost .pic {
   animation: glow-support 700ms ease-in-out;
 }
 .fx-flee-away {

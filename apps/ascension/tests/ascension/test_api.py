@@ -254,9 +254,19 @@ def test_the_catalog_lists_each_ascended_s_sprites(client):
         "main_card": "/ascended/guardian/sprite_main_card.webp",
         "preview_card": "/ascended/guardian/sprite_preview_card.webp",
         "battle": "/ascended/guardian/sprite_battle.webp",
-        "focus": 21, "focus_preview": 50,
+        "focus": 21, "focus_preview": 50, "animation": None,
     }
     assert by_id["bruiser"]["art"]["main_card"] is None and by_id["bruiser"]["art"]["battle"] is None
+
+
+def test_an_ascended_with_a_sheet_lists_its_animation(client):
+    data = client.get("/ascension/catalog", headers=headers(client, key=False)).json()
+    animation = {s["id"]: s for s in data["ascendeds"]}["twoychi"]["art"]["animation"]
+    assert animation["url"] == "/ascended/twoychi/spreadsheet_animation.webp"
+    assert (animation["columns"], animation["rows"]) == (4, 6)
+    assert animation["states"]["attack"] == {"row": 1, "frames": 4, "frame_ms": 100, "loop": False}
+    sheet = client.get(animation["url"])
+    assert sheet.status_code == 200 and sheet.headers["content-type"] == "image/webp"
 
 
 def test_sprites_are_public_and_never_stale(client):

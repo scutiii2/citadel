@@ -87,4 +87,9 @@ Sprites are not part of the web build. Each Ascended's folder in `../ascended/<i
 `/ascended/<id>/<file>` and lists the URLs in the catalog (`AscendedInfo.art`). `spriteFor(art, slot)` in
 `src/utils/sprites.ts` picks one: the full card uses the main sprite, the small card (collection, shop offers,
 starter list) the preview sprite, and the battle arena the battle sprite. A missing slot falls back to the first
-sprite that exists, then to the letter placeholder. The dev server proxies `/ascended` to the game.
+sprite that exists, then to the letter placeholder.
+
+An Ascended with an animation sheet (`AscendedInfo.art.animation`) is drawn in battle by `ui/AnimatedSprite.vue`
+instead of the still sprite: the sheet is one background image and CSS `steps()` moves it across the frames, one row per
+state. `poseFor(fx, catching)` in `src/utils/sprites.ts` picks the state from the playback effect (lunge is attack,
+guard is defend, boost is support, flee is flee, an EMBLEM thrown at the other side is catch, anything else idle). The dev server proxies `/ascended` to the game.

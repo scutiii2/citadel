@@ -132,6 +132,13 @@ lists them in each Ascended's `art` block of `/ascension/catalog` (a URL, or `nu
 `"art": {"focus": 21, "focus_preview": 50}`, the vertical crop centres (0 to 100, default 50) for the main and preview
 sprites. Adding an Ascended is dropping a folder; a missing sprite falls back to another one, then to a letter.
 
+An Ascended may also hold an animation sheet, `spreadsheet_animation.webp`, and `animations.json` beside it: the grid
+(`columns`, `rows`) and, per state (`idle`, `attack`, `defend`, `support`, `flee`, `catch`), its `row`, `frames`,
+`frame_ms` and `loop`. The catalog checks the file and lists it as `art.animation` (the sheet URL plus the grid), and the
+sheet is served like a sprite. In battle the arena plays it instead of `sprite_battle.webp`: idle at rest, attack when
+the fighter strikes, defend, support, flee, and catch while an EMBLEM is thrown at the other side. Ascended without a
+sheet keep their still battle sprite.
+
 ## Stars and tiers
 
 Power is the stat that drives damage, defence and fleeing. Essence is upgrade material, one kind per tier (grey,
@@ -299,7 +306,7 @@ last saw; a stale pair is a 409.
 | Route | Purpose |
 |---|---|
 | `GET /ascension/catalog` | Ascended, abilities, tiers, personalities, shop data |
-| `GET /ascended/{id}/{file}` | Public sprite files (`sprite_main_card`, `sprite_preview_card`, `sprite_battle`, `.webp`); any other path is a 404 |
+| `GET /ascended/{id}/{file}` | Public sprite files (`sprite_main_card`, `sprite_preview_card`, `sprite_battle`, `spreadsheet_animation`, `.webp`); any other path is a 404 |
 | `POST /ascension/profile` | Create the profile with a starter |
 | `POST /ascension/profile/reset` | Delete all of the player's progress (needs `confirm: true`) |
 | `GET /ascension/profile` | Wallet, Ascended, timers, pending encounter, active battle |

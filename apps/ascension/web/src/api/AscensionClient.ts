@@ -40,6 +40,16 @@ export interface AbilityInfo {
   duration: number | null;
 }
 
+export type AnimationState = "idle" | "attack" | "defend" | "support" | "flee" | "catch";
+
+/** The animation sheet of an Ascended: a grid of frames, one row per state, all facing right. */
+export interface AnimationInfo {
+  url: string;
+  columns: number;
+  rows: number;
+  states: Partial<Record<AnimationState, { row: number; frames: number; frame_ms: number; loop: boolean }>>;
+}
+
 export interface AscendedArtInfo {
   main_card: string | null;
   preview_card: string | null;
@@ -47,6 +57,8 @@ export interface AscendedArtInfo {
   /** Vertical crop centre, 0 to 100 (CSS object-position), for the main card and the preview card. */
   focus: number;
   focus_preview: number;
+  /** Null when the Ascended has no sheet: the battle sprite then stays still. */
+  animation: AnimationInfo | null;
 }
 
 export interface TreeCost { tier: string; amount: number }
