@@ -35,11 +35,11 @@ at the moment of use (the unbuffed power for SUPPORT, as the existing buff does;
 | `kind` | Target | Fields | Meaning |
 |---|---|---|---|
 | `heal` | self | `percentage` | Restore `floor(power * pct / 100)` HP now, up to max HP. |
-| `regen` | self | `percentage`, `rounds` | Restore that amount at the end of each of `rounds` rounds. |
+| `regen` | self | `percentage`, `rounds` | Restore that amount (at least 1) at the end of each of `rounds` rounds. |
 | `bleed` | foe | `percentage`, `rounds` | Deal that amount (at least 1) at the end of each of `rounds` rounds. Ignores defense. |
-| `slow` | foe | `percentage`, `rounds` | Lower the target's speed by `pct` percent of its current speed. |
-| `weaken` | foe | `percentage`, `rounds` | Lower the target's power by `pct` percent of its current power. |
-| `exposed` | foe | `percentage`, `rounds` | Lower the defense rating of the target's shield by `floor(power * pct / 100)`. |
+| `slow` | foe | `percentage`, `rounds` | Lower the target's speed by `pct` percent of its current speed (at least 1). |
+| `weaken` | foe | `percentage`, `rounds` | Lower the target's power by `pct` percent of its current power (at least 1). |
+| `exposed` | foe | `percentage`, `rounds` | Lower the defense rating of the target's shield by `floor(power * pct / 100)` (at least 1). |
 | `mark` | `foe` or `self` (default `foe`) | `name`, `rounds` | A named mark with no effect itself, for passives to read (`prey`, `soaked`). |
 | `cleanse` | self | none | Remove bleed, slow, weaken and exposed. |
 | `ward` | self | `rounds` | Survive one lethal hit at 1 HP. |

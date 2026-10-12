@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import type { ActionChoice, BattleView, LegalAction } from "../api/AscensionClient";
 import { ROUND_PACE_MS, useAscensionStore } from "../stores/ascension";
 import { usePlaybackStore } from "../stores/playback";
-import { titleCase } from "../utils/ascension";
+import { effectText, titleCase } from "../utils/ascension";
 import EmButton from "./ui/EmButton.vue";
 import EmDialog from "./ui/EmDialog.vue";
 import EmIcon from "./ui/EmIcon.vue";
@@ -36,7 +36,8 @@ function label(action: LegalAction): string {
 
 function detail(action: LegalAction): string {
   if (action.kind === "flee" || action.kind === "catch") return BASIC_NOTES[action.kind]!;
-  return `${titleCase(action.category)} · ${action.percentage}%`;
+  const effects = effectText(action.effects);
+  return `${titleCase(action.category)} · ${action.percentage}%${effects ? ` · ${effects}` : ""}`;
 }
 
 function categoryOf(action: LegalAction): string {

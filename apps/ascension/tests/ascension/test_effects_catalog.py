@@ -49,6 +49,9 @@ def test_an_ability_without_effects_has_none():
     ([{"kind": "mark", "rounds": 2, "name": "Prey"}], "lowercase name"),
     ([{"kind": "mark", "rounds": 2, "name": "prey", "target": "both"}], "foe or self"),
     ([{"kind": "heal", "percentage": 5, "name": "prey"}], "only a mark"),
+    ([{"kind": "mark", "rounds": 2, "name": "prey", "target": ""}], "foe or self"),
+    ([{"kind": "heal", "percentage": float("inf")}], "positive percentage"),
+    ([{"kind": "bleed", "percentage": float("nan"), "rounds": 2}], "positive percentage"),
 ])
 def test_a_bad_effect_is_a_catalog_error(effects, message):
     with pytest.raises(CatalogError, match=message):

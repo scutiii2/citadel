@@ -54,9 +54,11 @@ class BattleViewBuilder:
         actions: list[dict[str, Any]] = []
         if not finished:
             names = {a.id: a.name for a in record.setup.player.abilities}
+            effects = {a.id: [e.to_dict() for e in a.effects] for a in record.setup.player.abilities}
             for action in self._engine.legal_actions(record.setup, record.state, PLAYER, can_collect=bool(emblems)):
                 actions.append({"kind": action.kind, "category": action.category, "ability_id": action.ability_id,
-                                "name": names.get(action.ability_id), "percentage": action.percentage})
+                                "name": names.get(action.ability_id), "percentage": action.percentage,
+                                "effects": effects.get(action.ability_id, [])})
         prompt = None
         if record.phase == "awaiting_emblem" and record.pending:
             deadline = record.pending["deadline"]

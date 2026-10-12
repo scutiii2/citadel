@@ -201,6 +201,7 @@ export interface LegalAction {
   ability_id: string | null;
   name: string | null;
   percentage: number;
+  effects?: EffectInfo[];
 }
 
 export interface EmblemPromptState {

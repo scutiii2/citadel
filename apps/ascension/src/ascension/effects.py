@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, Mapping
 
@@ -15,7 +16,7 @@ MAX_EFFECTS = 3
 
 
 def _number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def parse_effects(raw: Any, where: str) -> tuple[EffectSpec, ...]:
@@ -44,7 +45,7 @@ def parse_effects(raw: Any, where: str) -> tuple[EffectSpec, ...]:
         if kind == "mark":
             if not isinstance(name, str) or not re.fullmatch(r"[a-z_]+", name):
                 raise ValueError(f"{at}: a mark needs a lowercase name (letters and underscores)")
-            target = target or "foe"
+            target = "foe" if target is None else target
             if target not in ("foe", "self"):
                 raise ValueError(f"{at}: a mark target must be foe or self")
         elif name is not None or target is not None:

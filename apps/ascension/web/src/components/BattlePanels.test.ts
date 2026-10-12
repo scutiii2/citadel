@@ -132,6 +132,16 @@ describe("ActionBar", () => {
     expect(buttons[4]!.text()).toContain("Cooling down (3 rounds)");
   });
 
+  it("describes an ability's effects on its button", () => {
+    const view = manual();
+    view.actions = view.actions.map((a) => (a.ability_id ? { ...a, effects: [{ kind: "bleed", percentage: 20, rounds: 3 }] } : a));
+    withBattle(view);
+
+    const wrapper = mount(ActionBar, { props: { battle: view } });
+
+    expect(wrapper.findAll("button.action")[1]!.find(".action-detail").text()).toContain("Bleeds 20% for 3 rounds");
+  });
+
   it("sends the chosen action with the round and revision it saw", async () => {
     const view = manual();
     withBattle(view);

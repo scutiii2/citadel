@@ -19,3 +19,5 @@ def test_the_public_view_shows_statuses_and_ability_effects():
     assert view["wild"]["statuses"] == [{"id": "bleed", "amount": 5, "rounds_left": 3}]
     assert view["player"]["abilities"][0]["effects"] == [{"kind": "bleed", "percentage": 20.0, "rounds": 3}]
     assert view["wild"]["abilities"] == []
+    assert view["actions"][1]["effects"] == [{"kind": "bleed", "percentage": 20.0, "rounds": 3}]
+    assert view["actions"][0]["effects"] == []  # the basic attack has none
