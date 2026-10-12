@@ -21,7 +21,7 @@ from src.ascension.models import ABILITY_CATEGORIES, CATEGORIES, AbilitySpec, Pa
 from src.ascension.passives import PassiveFactory
 from src.ascension.tree import AbilityTree, NodeCost, TreeError, TreeNode, passive_root_id
 
-ABILITY_UNLOCK_LEVELS = (1, 10, 20)
+ABILITY_UNLOCK_LEVELS = (1, 10, 20, 30)
 # The catalog always sits in the same place in the project tree, so it has no config entry.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CATALOG_PATH = PROJECT_ROOT / "configs" / "ascension_catalog.json"
@@ -82,6 +82,7 @@ class AscendedSpec:
     ascension_types: tuple[AscensionType, ...] = ()
     art: ArtSpec = ArtSpec()
     tree: AbilityTree | None = None  # Set by _ascended_spec, with roots when no tree.json exists.
+    passive_2: PassiveSpec | None = None
 
 
 @dataclass(frozen=True)
@@ -207,16 +208,24 @@ def _number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _tree(raw: Any, spec_id: str, abilities: tuple[AbilitySpec, ...], passive: PassiveSpec) -> AbilityTree:
+def _tree(raw: Any, spec_id: str, abilities: tuple[AbilitySpec, ...], passive: PassiveSpec, passive_2: PassiveSpec | None = None) -> AbilityTree:
     """The Ascended's tree: its roots (the catalog kit) plus any nodes in tree.json."""
     where = f"ascended {spec_id!r} tree"
     root_abilities = {a.id: a for a in abilities}
     passive_id = passive_root_id(spec_id)
+    root_passives = {passive_id: passive}
+    if passive_2 is not None:
+        root_passives[passive_root_id(spec_id, 2)] = passive_2
     if raw is None:
         raw = {"nodes": [{"id": i, "root": True, "x": 40, "y": 60 + 110 * n}
-                         for n, i in enumerate([*root_abilities, passive_id])]}
-    if not isinstance(raw, Mapping) or set(raw) - {"nodes"} or not isinstance(raw.get("nodes", []), list):
-        raise CatalogError(f"{where}: only nodes is allowed, as a list")
+                         for n, i in enumerate([*root_abilities, *root_passives])]}
+    if not isinstance(raw, Mapping) or set(raw) - {"nodes", "slots"} or not isinstance(raw.get("nodes", []), list):
+        raise CatalogError(f"{where}: only nodes (a list) and slots (a mapping) are allowed")
+    slots = raw.get("slots")
+    if "slots" in raw:
+        if not isinstance(slots, Mapping) or any(not isinstance(k, str) or not isinstance(v, list) or any(not isinstance(x, str) for x in v) for k, v in slots.items()):
+            raise CatalogError(f"{where}: slots must map slot ids to lists of branches")
+        slots = {k: tuple(v) for k, v in slots.items()}
     nodes: list[TreeNode] = []
     listed_roots: list[str] = []
     for item in raw.get("nodes", []):
@@ -226,16 +235,20 @@ def _tree(raw: Any, spec_id: str, abilities: tuple[AbilitySpec, ...], passive: P
         at = f"{where} node {node_id!r}"
         if not _number(item.get("x")) or not _number(item.get("y")):
             raise CatalogError(f"{at}: x and y must be numbers")
+        branch = item.get("branch")
+        if branch is not None and not isinstance(branch, str):
+            raise CatalogError(f"{at}: branch must be a string")
         x, y = item["x"], item["y"]
         if item.get("root"):
             if item.get("requires"):
                 raise CatalogError(f"{at}: a root cannot have requirements")
             listed_roots.append(node_id)
-            if node_id == passive_id:
-                nodes.append(TreeNode(node_id, "passive", passive.kind.replace("_", " ").title(), x, y, root=True, passive=passive))
+            if node_id in root_passives:
+                root_passive = root_passives[node_id]
+                nodes.append(TreeNode(node_id, "passive", root_passive.kind.replace("_", " ").title(), x, y, root=True, passive=root_passive, branch=branch))
             elif node_id in root_abilities:
                 a = root_abilities[node_id]
-                nodes.append(TreeNode(node_id, "ability", a.name, x, y, unlock_level=a.unlock_level, root=True, ability=a))
+                nodes.append(TreeNode(node_id, "ability", a.name, x, y, unlock_level=a.unlock_level, root=True, ability=a, branch=branch))
             else:
                 raise CatalogError(f"{at}: a root must be one of the catalog abilities or {passive_id!r}")
             continue
@@ -252,7 +265,7 @@ def _tree(raw: Any, spec_id: str, abilities: tuple[AbilitySpec, ...], passive: P
         kind = item.get("kind")
         if kind == "ability":
             a = _ability(item, spec_id)
-            nodes.append(TreeNode(node_id, "ability", a.name, x, y, tuple(requires), a.unlock_level, cost, ability=a))
+            nodes.append(TreeNode(node_id, "ability", a.name, x, y, tuple(requires), a.unlock_level, cost, ability=a, branch=branch))
         elif kind == "passive":
             body = item.get("passive")
             level = item.get("unlock_level")
@@ -263,13 +276,13 @@ def _tree(raw: Any, spec_id: str, abilities: tuple[AbilitySpec, ...], passive: P
                 PassiveFactory().create(spec)
             except (ValueError, TypeError) as error:
                 raise CatalogError(f"{at}: unknown passive or bad params ({error})") from error
-            nodes.append(TreeNode(node_id, "passive", str(item.get("name", node_id)), x, y, tuple(requires), level, cost, passive=spec))
+            nodes.append(TreeNode(node_id, "passive", str(item.get("name", node_id)), x, y, tuple(requires), level, cost, passive=spec, branch=branch))
         else:
             raise CatalogError(f"{at}: kind must be ability or passive")
-    if raw.get("nodes") and sorted(listed_roots) != sorted([*root_abilities, passive_id]):
-        raise CatalogError(f"{where}: must list every root: {', '.join([*root_abilities, passive_id])}")
+    if raw.get("nodes") and sorted(listed_roots) != sorted([*root_abilities, *root_passives]):
+        raise CatalogError(f"{where}: must list every root: {', '.join([*root_abilities, *root_passives])}")
     try:
-        return AbilityTree(nodes)
+        return AbilityTree(nodes, slots)
     except TreeError as error:
         raise CatalogError(f"{where}: {error}") from error
 
@@ -281,20 +294,39 @@ def _ascended_spec(raw: Mapping[str, Any]) -> AscendedSpec:
     if set(base) != set(STATS) or set(growth) != set(STATS):
         raise CatalogError(f"{where}: base and growth need exactly hp, power and speed")
     abilities = tuple(_ability(a, sid) for a in _require(raw, "abilities", where))
-    if tuple(a.unlock_level for a in abilities) != ABILITY_UNLOCK_LEVELS:
-        raise CatalogError(f"{where}: abilities must unlock at levels {ABILITY_UNLOCK_LEVELS}")
     passive = _require(raw, "passive", where)
     try:
         ascension_types = AscensionType.parse_all(raw.get("ascension_types", []), where)
     except ValueError as error:
         raise CatalogError(str(error)) from error
     passive_spec = PassiveSpec(_require(passive, "kind", f"{where} passive"), dict(passive.get("params", {})))
+    second = raw.get("passive_2")
+    passive_2 = PassiveSpec(_require(second, "kind", f"{where} passive_2"), dict(second.get("params", {}))) if second is not None else None
+    if passive_2 is not None:
+        try:
+            PassiveFactory().create(passive_2)
+        except (ValueError, TypeError) as error:
+            raise CatalogError(f"{where}: passive_2 has unknown kind or bad params ({error})") from error
+    declared_slots = (raw.get("tree") or {}).get("slots")
+    if declared_slots is None:
+        if len(abilities) != 3:
+            raise CatalogError(f"{where}: needs 3 abilities that unlock at levels (1, 10, 20) (one per active slot)")
+        if passive_2 is not None:
+            raise CatalogError(f"{where}: passive_2 and the p2 slot go together")
+    tree = _tree(raw.get("tree"), sid, abilities, passive_spec, passive_2)
+    count = sum(slot.startswith("a") for slot in tree.slot_ids)
+    if len(abilities) != count:
+        raise CatalogError(f"{where}: needs {count} abilities (one per active slot)")
+    if tuple(a.unlock_level for a in abilities) != ABILITY_UNLOCK_LEVELS[:count]:
+        raise CatalogError(f"{where}: abilities must unlock at levels {ABILITY_UNLOCK_LEVELS[:count]}")
+    if (passive_2 is not None) != ("p2" in tree.slot_ids):
+        raise CatalogError(f"{where}: passive_2 and the p2 slot go together")
     return AscendedSpec(
         id=sid, name=_require(raw, "name", where), starter=bool(raw.get("starter")), forbidden=bool(raw.get("forbidden")),
         base_price=_require(raw, "base_price", where), start_tier=raw.get("start_tier"), base=dict(base), growth=dict(growth),
         passive=passive_spec, abilities=abilities,
         ascension_types=ascension_types, art=_art(raw, where),
-        tree=_tree(raw.get("tree"), sid, abilities, passive_spec),
+        tree=tree, passive_2=passive_2,
     )
 
 
@@ -464,7 +496,22 @@ class Catalog:
     def default_loadout(self, ascended_id: str) -> Loadout:
         """The starting kit: the catalog abilities in order and the catalog passive."""
         spec = self.ascended(ascended_id)
-        return Loadout(spec.abilities, spec.passive)
+        return Loadout(spec.abilities, spec.passive, (spec.passive_2,) if spec.passive_2 else ())
+
+    def default_slots(self, ascended_id: str) -> dict[str, str]:
+        """Fill each slot with the first catalog root it accepts, in slot order."""
+        spec = self.ascended(ascended_id)
+        tree = spec.tree
+        roots = [tree.node(a.id) for a in spec.abilities] + [tree.node(passive_root_id(ascended_id))]
+        if spec.passive_2 is not None:
+            roots.append(tree.node(passive_root_id(ascended_id, 2)))
+        filled: dict[str, str] = {}
+        for root in roots:
+            for slot in tree.slot_ids:
+                if slot not in filled and tree.accepts(slot, root):
+                    filled[slot] = root.id
+                    break
+        return {slot: filled[slot] for slot in tree.slot_ids if slot in filled}
 
     def sprite_path(self, ascended_id: str, file: str) -> Path | None:
         """The sprite file for a catalog Ascended and one of the exact names (the three sprites or the animation
