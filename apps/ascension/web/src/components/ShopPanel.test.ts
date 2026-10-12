@@ -120,7 +120,7 @@ describe("ShopPanel", () => {
   });
 
   it("sells one copy after confirming", async () => {
-    client.sellCopy.mockResolvedValue({ kind: "sale", ascended_id: "guardian", value: 12, copies: 1, tier_id: "common", downgraded: false });
+    client.sellCopy.mockResolvedValue({ kind: "sale", ascended_id: "guardian", value: 12, copies: 1, tier_id: "common" });
     const { wrapper } = mountShop();
 
     await wrapper.find('[data-sell="guardian"] button').trigger("click");

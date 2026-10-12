@@ -357,7 +357,7 @@ describe("rotating shop", () => {
   it("buys an offer, then reloads the window and the profile", async () => {
     const s = await attached();
     client.shop.mockResolvedValue(shopWindow());
-    client.buyOffer.mockResolvedValue({ kind: "copies", ascended_id: "guardian", tier_id: "common", copies_granted: 1, price: 40, resulting_tier_id: "common", slot: 0, rotation: 46, left: 2 });
+    client.buyOffer.mockResolvedValue({ kind: "copies", ascended_id: "guardian", tier_id: "common", copies_granted: 1, price: 40, slot: 0, rotation: 46, left: 2 });
     await s.loadShop();
 
     const bought = await s.buyOffer(s.shop!.offers[0]!);
