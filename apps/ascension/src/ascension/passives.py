@@ -33,6 +33,13 @@ class Passive:
         """Raw damage added to an attack, before mitigation."""
         return 0.0
 
+    def marked_bonus(self, power: int, marks: frozenset[str]) -> float:
+        """Raw damage added to an attack against a target carrying one of these marks."""
+        return 0.0
+
+    def heal_multiplier(self, hp: int, max_hp: int) -> float:
+        return 1.0
+
     def cooldown(self, base: int) -> int:
         return base
 

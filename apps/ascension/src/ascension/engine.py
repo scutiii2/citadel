@@ -14,6 +14,9 @@ from typing import Any
 
 from src.ascension.catalog import Catalog
 from src.ascension.models import (
+    HARMFUL,
+    STAT_STATUS,
+    Status,
     PLAYER,
     SIDES,
     WILD,
@@ -49,12 +52,27 @@ class _Side:
         self.buffs = list(fstate.buffs)
         self.defense = fstate.defense
         self.cooldowns = dict(fstate.cooldowns)
+        self.statuses = list(fstate.statuses)
 
     def stat(self, name: str) -> int:
-        return getattr(self.fighter, name) + sum(b.amount for b in self.buffs if b.stat == name)
+        value = getattr(self.fighter, name) + sum(b.amount for b in self.buffs if b.stat == name)
+        value += sum(s.amount for s in self.statuses if STAT_STATUS.get(s.id) == name)
+        return max(1, value)
+
+    def status_amount(self, status_id: str) -> int:
+        return sum(s.amount for s in self.statuses if s.id == status_id)
+
+    def has_status(self, status_id: str) -> bool:
+        return any(s.id == status_id for s in self.statuses)
+
+    def marks(self) -> frozenset[str]:
+        return frozenset(s.id[len("mark:"):] for s in self.statuses if s.id.startswith("mark:"))
+
+    def set_status(self, status: Status) -> None:
+        self.statuses = [s for s in self.statuses if s.id != status.id] + [status]
 
     def freeze(self) -> FighterState:
-        return FighterState(self.hp, tuple(self.buffs), self.defense, tuple(sorted(self.cooldowns.items())))
+        return FighterState(self.hp, tuple(self.buffs), self.defense, tuple(sorted(self.cooldowns.items())), tuple(self.statuses))
 
 
 class BattleEngine:
@@ -83,8 +101,10 @@ class BattleEngine:
         return BattleState(round=1, player=fresh(setup.player), wild=fresh(setup.wild))
 
     def stat(self, fighter: Fighter, fstate: FighterState, name: str) -> int:
-        """Current POWER or SPEED including temporary buffs."""
-        return getattr(fighter, name) + sum(b.amount for b in fstate.buffs if b.stat == name)
+        """Current POWER or SPEED including temporary buffs and slow or weaken."""
+        value = getattr(fighter, name) + sum(b.amount for b in fstate.buffs if b.stat == name)
+        value += sum(s.amount for s in fstate.statuses if STAT_STATUS.get(s.id) == name)
+        return max(1, value)
 
     # -- legal actions -------------------------------------------------------------
 
@@ -145,10 +165,14 @@ class BattleEngine:
                 sides[side].cooldowns[ability.id] = rnd + sides[side].passive.cooldown(ability.cooldown) + 1
         for side in SIDES:  # SUPPORT first, so DEFENSE sees this round's POWER buffs
             if actions[side].category == "SUPPORT":
-                self._support(sides[side], self._ability(sides[side].fighter, actions[side].ability_id), events)
+                spec = self._ability(sides[side].fighter, actions[side].ability_id)
+                self._support(sides[side], spec, events)
+                self._apply_effects(sides[side], sides[other(side)], spec, sides[side].fighter.power, events)  # unbuffed POWER
         for side in SIDES:
             if actions[side].category == "DEFENSE":
-                self._defense(sides[side], self._ability(sides[side].fighter, actions[side].ability_id), events)
+                spec = self._ability(sides[side].fighter, actions[side].ability_id)
+                self._defense(sides[side], spec, events)
+                self._apply_effects(sides[side], sides[other(side)], spec, sides[side].stat("power"), events)
 
         catchers: dict[str, int | None] = {}
         for side in SIDES:  # CATCH reduces FLEE whatever the action order; settled before any escape roll
@@ -171,6 +195,9 @@ class BattleEngine:
             action = actions[side]
             if action.category == "ATTACK":
                 terminal = self._attack(sides, actions, side, events)
+                if not terminal and action.kind == "ability":  # an ability's effects land after its hit
+                    spec = self._ability(sides[side].fighter, action.ability_id)
+                    self._apply_effects(sides[side], sides[other(side)], spec, sides[side].stat("power"), events)
             elif action.kind == "catch":
                 terminal, spent = self._catch(setup, sides, actions, side, rec, events)
                 emblem = spent or emblem
@@ -180,6 +207,9 @@ class BattleEngine:
                 events.append({"type": "flee", "side": side, "chance": round(chance, 4), "success": succeeded})
                 if succeeded:
                     terminal = "escaped" if side == PLAYER else "wild_escaped"
+
+        if not terminal:
+            terminal = self._tick(sides, events)
 
         revealed = RevealedRound(rnd, {s: (actions[s].key, actions[s].category) for s in SIDES}, tuple(events))
         if not terminal:
@@ -218,6 +248,78 @@ class BattleEngine:
         events.append({"type": "defense", "side": me.side, "ability": ability.id, "rating": round(rating, 2)})
 
     @staticmethod
+    def _ward(me: _Side, events: list) -> bool:
+        """A ward turns a lethal hit into 1 HP, once. True when it saved the fighter."""
+        if me.hp > 0 or not me.has_status("ward"):
+            return False
+        me.hp = 1
+        me.statuses = [s for s in me.statuses if s.id != "ward"]
+        events.append({"type": "ward_triggered", "side": me.side})
+        return True
+
+    @staticmethod
+    def _give(caster: _Side, target: _Side, status: Status, events: list) -> None:
+        target.set_status(status)
+        events.append({"type": "status", "side": caster.side, "target": target.side, "status": status.id,
+                       "amount": status.amount, "rounds": status.rounds_left})
+
+    @staticmethod
+    def _apply_effects(me: _Side, foe: _Side, spec: AbilitySpec, power: int, events: list) -> None:
+        for effect in spec.effects:
+            amount = math.floor(power * (effect.percentage or 0) / 100 + _EPS)
+            rounds = effect.rounds or 0
+            if effect.kind == "heal":
+                bonus = me.passive.heal_multiplier(me.hp, me.fighter.max_hp)
+                healed = min(math.floor(amount * bonus + _EPS), me.fighter.max_hp - me.hp)
+                me.hp += healed
+                events.append({"type": "heal", "side": me.side, "amount": healed})
+            elif effect.kind == "regen":
+                BattleEngine._give(me, me, Status("regen", max(1, amount), rounds), events)
+            elif effect.kind == "bleed":
+                BattleEngine._give(me, foe, Status("bleed", max(1, amount), rounds), events)
+            elif effect.kind == "slow":
+                cut = math.floor(foe.stat("speed") * (effect.percentage or 0) / 100 + _EPS)
+                BattleEngine._give(me, foe, Status("slow", -max(1, cut), rounds), events)
+            elif effect.kind == "weaken":
+                cut = math.floor(foe.stat("power") * (effect.percentage or 0) / 100 + _EPS)
+                BattleEngine._give(me, foe, Status("weaken", -max(1, cut), rounds), events)
+            elif effect.kind == "exposed":
+                BattleEngine._give(me, foe, Status("exposed", max(1, amount), rounds), events)
+            elif effect.kind == "mark":
+                target = me if effect.target == "self" else foe
+                BattleEngine._give(me, target, Status(f"mark:{effect.name}", 0, rounds), events)
+            elif effect.kind == "cleanse":
+                removed = [s.id for s in me.statuses if s.id in HARMFUL]
+                me.statuses = [s for s in me.statuses if s.id not in HARMFUL]
+                events.append({"type": "cleanse", "side": me.side, "removed": removed})
+            elif effect.kind == "ward":
+                BattleEngine._give(me, me, Status("ward", 0, rounds), events)
+
+    @staticmethod
+    def _tick(sides: dict[str, _Side], events: list) -> str | None:
+        """End of a surviving round: regen heals, bleed hurts (wild side first). A bleed can end the battle."""
+        dead: list[str] = []
+        for side in (WILD, PLAYER):
+            me = sides[side]
+            regen = me.status_amount("regen")
+            if regen:
+                bonus = me.passive.heal_multiplier(me.hp, me.fighter.max_hp)
+                healed = min(math.floor(regen * bonus + _EPS), me.fighter.max_hp - me.hp)
+                me.hp += healed
+                events.append({"type": "tick", "side": side, "kind": "regen", "amount": healed, "hp": me.hp})
+            bleed = me.status_amount("bleed")
+            if bleed:
+                me.hp = max(0, me.hp - bleed)
+                if me.hp == 0:
+                    BattleEngine._ward(me, events)
+                events.append({"type": "tick", "side": side, "kind": "bleed", "amount": bleed, "hp": me.hp})
+                if me.hp == 0:
+                    dead.append(side)
+        if WILD in dead:
+            return "won"
+        return "knocked_out" if PLAYER in dead else None
+
+    @staticmethod
     def _flee(me: _Side, catcher_power: int | None) -> float:
         power = me.stat("power")
         chance = power / (100 + power) * me.hp / me.fighter.max_hp
@@ -229,15 +331,18 @@ class BattleEngine:
         power = me.stat("power")
         raw = power * actions[attacker].percentage / 100 + me.passive.attack_bonus(
             power, me.hp, me.fighter.max_hp, actions[foe.side].category == "DEFENSE"
-        )
+        ) + me.passive.marked_bonus(power, foe.marks())
         protected = bool(foe.defense and foe.defense.attacks_left > 0)
         if protected:
-            damage = math.floor(raw * 100 / (100 + foe.defense.rating) + _EPS)
+            rating = max(0.0, foe.defense.rating - foe.status_amount("exposed"))
+            damage = math.floor(raw * 100 / (100 + rating) + _EPS)
             foe.defense = replace(foe.defense, attacks_left=foe.defense.attacks_left - 1)
         else:
             damage = math.floor(raw + _EPS)
         damage = max(1, damage)
         foe.hp = max(0, foe.hp - damage)
+        if foe.hp == 0:
+            BattleEngine._ward(foe, events)
         events.append({"type": "attack", "side": attacker, "damage": damage, "protected": protected, "target_hp": foe.hp})
         if foe.hp == 0:
             return "won" if foe.side == WILD else "knocked_out"
@@ -264,3 +369,5 @@ class BattleEngine:
         if me.defense:
             left = replace(me.defense, rounds_left=me.defense.rounds_left - 1)
             me.defense = left if left.rounds_left > 0 and left.attacks_left > 0 else None
+        me.statuses = [replace(s, rounds_left=s.rounds_left - 1) for s in me.statuses]
+        me.statuses = [s for s in me.statuses if s.rounds_left > 0]
