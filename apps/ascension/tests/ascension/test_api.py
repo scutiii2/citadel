@@ -69,7 +69,7 @@ def test_the_catalog_is_readable_and_complete(client):
     data = client.get("/ascension/catalog", headers=headers(client, owner="anyone")).json()
     assert len(data["ascendeds"]) == 7 and [t["id"] for t in data["tiers"]][-1] == "forbidden"
     assert {s["id"] for s in data["ascendeds"] if s["starter"]} == {"guardian", "striker", "scout"}
-    assert len(data["personalities"]) == 8
+    assert len(data["personalities"]) == 22
     assert all(s["ascension_types"] == ["enchant"] for s in data["ascendeds"])
 
 

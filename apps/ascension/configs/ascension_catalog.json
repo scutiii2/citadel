@@ -152,7 +152,35 @@
         "DEFENSE",
         "SUPPORT"
       ]
-    }
+    },
+    { "id": "WEIRD", "categories": [], "rules": [ { "break_streak": true } ] },
+    { "id": "ANXIOUS", "categories": [], "rules": [ { "when": { "nerves_over": 0.5 }, "chaos": 0.6 } ] },
+    { "id": "RECKLESS", "categories": [], "rules": [
+        { "when": { "own_hp_under": 0.5 }, "multiply": { "ATTACK": 1.6, "DEFENSE": 0.7, "FEAR": 0.5 } } ] },
+    { "id": "VENGEFUL", "categories": [], "rules": [ { "when": { "rage_over": 0.3 }, "multiply": { "ATTACK": 1.8 } } ] },
+    { "id": "BERSERKER", "categories": [], "rules": [
+        { "when": { "rage_over": 0.2 }, "multiply": { "ATTACK": 1.5 } },
+        { "when": { "rage_over": 0.6 }, "multiply": { "FEAR": 0.1 } },
+        { "when": { "own_hp_under": 0.25 }, "multiply": { "ATTACK": 1.6 } } ] },
+    { "id": "COCKY", "categories": [], "rules": [
+        { "when": { "confidence_over": 0.6 }, "multiply": { "ATTACK": 1.4, "DEFENSE": 0.6 } },
+        { "when": { "lead_under": 0.0 }, "chaos": 0.3 } ] },
+    { "id": "COMEBACK", "categories": [], "rules": [
+        { "when": { "lead_under": 0.0 }, "multiply": { "ATTACK": 1.4, "SUPPORT": 1.4 } } ] },
+    { "id": "CUNNING", "categories": [], "rules": [ { "counter": true } ] },
+    { "id": "MIMIC", "categories": [], "rules": [ { "copy_enemy": true } ] },
+    { "id": "PATIENT", "categories": [], "rules": [
+        { "when": { "round_under": 4 }, "multiply": { "SUPPORT": 1.5, "DEFENSE": 1.5 } },
+        { "when": { "round_over": 3 }, "multiply": { "ATTACK": 1.5 } },
+        { "when": { "enemy_low": true }, "multiply": { "ATTACK": 1.5 } } ] },
+    { "id": "OPPORTUNIST", "categories": [], "rules": [
+        { "when": { "enemy_low": true }, "multiply": { "ATTACK": 1.8, "INTERCEPT": 1.8 } },
+        { "when": { "enemy_low": false }, "multiply": { "DEFENSE": 1.2 } } ] },
+    { "id": "STUBBORN", "categories": [], "rules": [ { "repeat": 1.0, "stay": 2.0 } ] },
+    { "id": "GAMBLER", "categories": [], "rules": [
+        { "when": { "lead_under": 0.0 }, "pick_by_percentage": "high" },
+        { "when": { "lead_over": 0.3 }, "pick_by_percentage": "low" } ] },
+    { "id": "STOIC", "categories": [] }
   ],
   "policy": {
     "gain": 0.25,
@@ -161,6 +189,19 @@
     "floor": 0.05,
     "default_aggression": 0.5,
     "default_flee_share": 0.1,
+    "potency_weight": 0.3,
+    "pick_weight": 1.5,
+    "temperature": 0.7,
+    "counter_boost": 3.0,
+    "mood": {
+      "rage_decay": 0.5,
+      "rage_gain": 4.0,
+      "confidence_step": 0.2,
+      "nerves_follow": 0.5,
+      "enemy_low": 0.3,
+      "streak_base": 2,
+      "streak_span": 3
+    },
     "coefficients": {
       "ATTACK": {
         "base": 0.5,

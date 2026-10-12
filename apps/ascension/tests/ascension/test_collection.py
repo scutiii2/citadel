@@ -1,7 +1,7 @@
 import pytest
 
 from src.ascension.errors import AlreadyInitialized, IdempotencyConflict, InvalidRequest, NotFound
-from tests.ascension.env import Env, run
+from tests.ascension.env import CATALOG, Env, run
 from tests.ascension.helpers import ScriptedRandom
 
 
@@ -26,7 +26,7 @@ def test_initialize_creates_the_starter_setup(tmp_path):
     assert preset["instance_ids"] == [pool["items"][0]["id"]]
 
 
-@pytest.mark.parametrize("draw,expected", [(0.0, "AGGRESSIVE"), (0.99, "DISCIPLINED")])
+@pytest.mark.parametrize("draw,expected", [(0.0, "AGGRESSIVE"), (0.99, list(CATALOG.personalities)[-1])])
 def test_the_starter_personality_is_uniform_over_the_eight_types(tmp_path, draw, expected):
     async def scenario():
         env = make(tmp_path, draw)

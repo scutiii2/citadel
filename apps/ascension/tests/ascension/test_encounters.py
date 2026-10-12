@@ -54,7 +54,7 @@ def test_one_to_three_personalities_with_equal_odds(count_draw, count):
 def test_personality_type_and_tier_come_from_the_draws():
     rolled = roll(10, 0.3, 0.0, 0.0, 0.0, 0.99, 0.95)  # one instance: last type, tier 3
     [only] = rolled.personalities
-    assert (only.type_id, only.tier) == ("DISCIPLINED", 3)
+    assert (only.type_id, only.tier) == (list(CATALOG.personalities)[-1], 3)
     assert roll(10, 0.3, 0.0, 0.0, 0.0, 0.0, 0.59).personalities[0].tier == 1
     assert roll(10, 0.3, 0.0, 0.0, 0.0, 0.0, 0.7).personalities[0].tier == 2
 
