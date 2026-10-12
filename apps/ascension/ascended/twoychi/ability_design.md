@@ -88,7 +88,7 @@ slow, exposed, marks, cleanse and ward effects. The status tables below retain t
 
 | Ability | Status |
 |---|---|
-| Waterbound (passive) | Later: needs the Water resource. |
+| Waterbound (passive) | In tree: Aya passive root `heal_bonus` 0.15 (placeholder). Water is identity only, with no mechanic. |
 | Mending Current | In tree: SUPPORT power 70 for 3 rounds. The heal over time: later (needs healing). |
 | Tidal Mend | In tree: DEFENSE 180 (stands in for the water shield from excess healing). The heal: later. |
 | Purifying Water | Later: needs cleanse. |

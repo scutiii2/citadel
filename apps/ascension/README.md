@@ -167,7 +167,8 @@ Tree balance numbers are placeholders (?).
 The file is an object with a `nodes` list. Every node has a unique `id` and numeric `x`/`y` coordinates:
 
 - Roots list `id`, `root: true`, `x` and `y`; for example, `{"id": "guardian_bulwark", "root": true, "x": 60, "y": 300}`.
-  List all three catalog abilities and the passive root `<id>_passive`. Their names and numbers come from `catalog.json`.
+  List every catalog ability and the passive root `<id>_passive`, plus `<id>_passive_2` when present.
+  Their names and numbers come from `catalog.json`. The ability roots unlock at 1, 10, 20 (and 30 for the fourth).
   Roots are free and always learned. Without a tree file, the catalog supplies these four roots.
 - Ability nodes have `kind: "ability"`, `name`, `category`, `percentage`, `cooldown`, `unlock_level` and optional `effects`.
   SUPPORT also has `stat` (`power` or `speed`) and `duration`.
@@ -178,10 +179,37 @@ The file is an object with a `nodes` list. Every node has a unique `id` and nume
 
 Learning is permanent per account and needs the node's level, every prerequisite learned, and enough essence of
 its cost tier. A successful learn spends that essence once; mutations accept an idempotency key for retries.
-Equip one to three distinct learned ability nodes and zero or one learned passive node: three ability slots
-(`a1`, `a2`, `a3`) and one passive slot (`p1`). Any ability category combination is allowed.
-When no loadout is saved, the three catalog abilities and catalog passive are equipped in their default order.
-Ability level gates still apply in battle.
+The seven basic Ascended (bruiser, channeler, cindrax, guardian, scout, sentinel, striker) keep three active
+slots (`a1` to `a3`) and one passive slot (`p1`); any learned node of the matching kind fits.
+Twoychi declares four active slots and two passive slots:
+
+| Slot | Branches |
+|---|---|
+| A1 | Wolf abilities |
+| A2 | Bear abilities |
+| A3 | Dog abilities |
+| A4 | Aya abilities |
+| P1 | Wolf, Bear and Dog passives |
+| P2 | Aya passives |
+
+`tree.json` may declare `slots`, a mapping from slot ids to non-empty lists of lowercase branch names.
+The declared slots are the Ascended's slots, including `a1` and `p1`, with active ids consecutive from `a1`.
+Every node, including roots and cross-tree nodes, then needs one home `branch` and a slot of its kind that accepts it.
+Without `slots`, branches impose no restriction and the basic 3+1 slots apply.
+Only a tree declaring `a4` may have a fourth catalog ability; `p2` and catalog `passive_2` go together.
+Twoychi's Waterbound (`heal_bonus`) is her second passive; Water is identity only, with no mechanic or form bonus.
+
+`PUT /ascension/ascendeds/{id}/loadout` replaces the loadout with a slot map, for example
+`{"slots": {"a1": "twoychi_troys_hunt", "a4": "twoychi_tidecall", "p2": "twoychi_passive_2"}}`.
+Omitted or null slots are empty. At least one active slot must be filled; nodes must be learned, distinct,
+and of the kind and branch that their slot accepts. The old `abilities`/`passive` request body is rejected.
+The tree response lists the Ascended's slots with kind and branches, nodes with `branch`, and every slot in `loadout`.
+The tree tab displays those slots and offers only the matching equip buttons.
+
+When no loadout is saved, the catalog kit is equipped. Saved abilities resolve in slot order;
+stale, unlearned or off-branch entries are ignored at battle start, with the default kit used if no active node survives.
+Ability level gates still apply in battle. Two equipped passives act together: bonuses add, multipliers multiply,
+defense limits take the best of each limit, start buffs concatenate, and cooldown reductions chain.
 
 A battle freezes the equipped loadout when it starts. That Ascended's loadout cannot change during its active battle;
 other Ascended can still change theirs. Database version 5 adds `learned_nodes` and `loadouts` without changing
@@ -328,7 +356,7 @@ last saw; a stale pair is a 409.
 | `POST /ascension/shop/purchases` | Buy EMBLEMs (`{kind: "emblem", tier, quantity}`) or an offer (`{kind: "copies", rotation, slot}`) |
 | `GET /ascension/ascendeds/{id}/tree` | Nodes with learned, learnable or locked state, essence and equipped slots |
 | `POST /ascension/ascendeds/{id}/tree/{node}/learn` | Learn a node with level, prerequisites and essence |
-| `PUT /ascension/ascendeds/{id}/loadout` | Replace equipped abilities and passive (`{abilities: [node ids], passive: node id or null}`) |
+| `PUT /ascension/ascendeds/{id}/loadout` | Replace equipped slots (`{slots: {a1: node id, p1: node id or null, ...}}`) |
 | `POST /ascension/ascendeds/{id}/sales` | Sell one spare copy |
 | `POST /ascension/ascendeds/{id}/stars` | Add a star (one spare copy and the tier's essence) |
 | `POST /ascension/ascendeds/{id}/tier` | Raise the tier once the stars are full |

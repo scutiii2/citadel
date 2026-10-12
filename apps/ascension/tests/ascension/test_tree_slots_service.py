@@ -107,4 +107,4 @@ def test_a_stale_slot_is_ignored_at_battle_start(tmp_path):
 
     kept, fallback = run(scenario())
     assert [a.id for a in kept.abilities] == ["guardian_rally"]  # a1 holds a node of the wrong branch and is dropped
-    assert [a.id for a in fallback.abilities] == ["guardian_bulwark", "guardian_rally", "guardian_heavy_blow"]
+    assert [a.id for a in fallback.abilities] == ["guardian_heavy_blow", "guardian_bulwark", "guardian_rally"]

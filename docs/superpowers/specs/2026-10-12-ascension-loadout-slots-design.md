@@ -1,6 +1,6 @@
 # Ascension: four active slots, two passive slots, and Twoychi's branch slots
 
-Date: 2026-10-12. Status: approved, plan written.
+Date: 2026-10-12. Status: built.
 Builds on the ability trees (`2026-10-12-ascension-ability-trees-design.md`) and the effects design.
 
 ## Goal
@@ -41,7 +41,7 @@ multipliers, and any change to the other Ascended (their kit, slots and trees st
   is optional and ignored.
 - **Roots.** A root is a catalog ability, the first passive (`<id>_passive`) or the second passive (`<id>_passive_2`).
   The catalog kit holds 3 abilities and 1 passive; only an Ascended whose tree declares `a4` and `p2` may list a 4th
-  ability and a `passive_2` (the loader rejects them otherwise). For everyone else there are 4 roots as today.
+  ability and a `passive_2` (the loader rejects them otherwise). The catalog ability roots unlock at levels 1, 10, 20 and (for the fourth) 30. For everyone else there are 4 roots as today.
 - Validation: every node's `branch` is known; a node must have a slot that can take it; the existing checks (no cycles, no
   unreachable nodes, no shared points, a root cannot have `requires`) stay.
 
@@ -71,13 +71,14 @@ is no longer accepted. A slot the Ascended does not have (`a4` on a basic one) i
 and allowed by the tree's `slots`; at least one `a` slot filled; and the Ascended is not in the active battle. Errors
 name the slot and the node.
 
-`GET .../tree` returns `slots` (each with its kind and branches), each node's `branch` and the `loadout` as a map of all
-six slot ids. The web `TreeTab` shows the six slots, filtered to the branch a slot takes, and the arena and action bar
+`GET .../tree` returns `slots` (each with its kind and branches), each node's `branch` and the `loadout` as a map of every
+slot the Ascended has (four for a basic tree, six for Twoychi). The web `TreeTab` shows those slots, filtered to the branch a slot takes, and the arena and action bar
 simply show however many abilities the loadout has.
 
 ## Engine and policy
 
-No change: the engine already takes any number of abilities. The battle freezes its loadout at start as today. The
+The engine takes any number of abilities. Equipped passives combine through `CombinedPassive`: bonuses add,
+multipliers multiply and defense limits take the best of each limit. The battle freezes its loadout at start as today. The
 autonomous policy and the personalities work per category, so a fourth ability changes nothing in them.
 
 ## Tests
