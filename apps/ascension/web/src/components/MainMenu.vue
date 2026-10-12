@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useAscensionStore } from "../stores/ascension";
-import AscendedTemplateCard from "./AscendedTemplateCard.vue";
+import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 import HowToPlayDialog from "./HowToPlayDialog.vue";
 import EmConfirm from "./ui/EmConfirm.vue";
 import EmMenuRow from "./ui/EmMenuRow.vue";
@@ -80,7 +80,7 @@ async function reset(): Promise<void> {
     <div class="hand-wrap">
       <ul class="hand" :aria-label="hasSave ? 'Your first Ascended' : 'Starter Ascended'">
         <li v-for="ascended in hand" :key="ascended.id" class="ascended" :style="{ '--rot': ascended.rot, '--lift': ascended.lift, zIndex: ascended.z }">
-          <AscendedTemplateCard :ascended="ascended.info" :level="ascended.level" :tier-id="ascended.tierId" compact :show-level="hasSave" />
+          <AscendedPreviewCard :ascended="ascended.info" :level="ascended.level" :tier-id="ascended.tierId" :show-level="hasSave" />
         </li>
       </ul>
       <p class="hand-caption">{{ handCaption }}</p>

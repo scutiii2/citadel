@@ -3,7 +3,7 @@ import { computed } from "vue";
 import type { AscendedInfo } from "../api/AscensionClient";
 import frameUrl from "../assets/card_frame.webp";
 import { abilityEffect, passiveText, titleCase } from "../utils/ascension";
-import { spriteFocus, spriteFor, type SpriteSlot } from "../utils/sprites";
+import { spriteFocus, spriteFor } from "../utils/sprites";
 import TypeSymbol from "./ui/TypeSymbol.vue";
 
 /** An Ascended's card, drawn on the card frame (assets/ascension/card_frame.webp,
@@ -14,36 +14,25 @@ import TypeSymbol from "./ui/TypeSymbol.vue";
  * ability, a colour for its category. The frame's metal is tinted for the
  * Ascended's tier; the Ascension plate keeps its own colours. The Ascended's portrait
  * (the sprite in its folder, served by the game) shows in the artwork window, or its first letter when it has none.
- * `compact` is the small version for lists: the frame cropped to its top part so the
- * artwork is larger, the name, and a plate with the tier's name at the bottom, no stats
- * or text; `showLevel` adds the level to its header. The width is `--card-width` (440 px,
- * or 150 px compact). */
-const props = withDefaults(defineProps<{ ascended: AscendedInfo; level?: number; tierId?: string; compact?: boolean; showLevel?: boolean }>(), {
+ * The width is `--card-width` (440 px). The small card for lists is AscendedPreviewCard. */
+const props = withDefaults(defineProps<{ ascended: AscendedInfo; level?: number; tierId?: string }>(), {
   level: 1,
   tierId: "common",
-  compact: false,
-  showLevel: false,
 });
 
 const FRAME_W = 1060;
 const FRAME_H = 1484;
 
-/** The compact card draws the frame this much taller than the card and shows its top. */
-const COMPACT_ZOOM = 1.9;
-
-/** A box in frame pixels as CSS percentages of the card; `zoom` for the cropped compact frame. */
-function box(x0: number, y0: number, x1: number, y1: number, zoom = 1): Record<string, string> {
+/** A box in frame pixels as CSS percentages of the card. */
+function box(x0: number, y0: number, x1: number, y1: number): Record<string, string> {
   const pct = (v: number, of: number) => `${(v / of) * 100}%`;
-  return { left: pct(x0, FRAME_W), top: pct(y0 * zoom, FRAME_H), width: pct(x1 - x0, FRAME_W), height: pct((y1 - y0) * zoom, FRAME_H) };
+  return { left: pct(x0, FRAME_W), top: pct(y0, FRAME_H), width: pct(x1 - x0, FRAME_W), height: pct(y1 - y0, FRAME_H) };
 }
 
 const HEADER = box(235, 62, 850, 135);
-const HEADER_COMPACT = box(235, 62, 850, 135, COMPACT_ZOOM);
 const ART = box(81, 167, 978, 631);
-const ART_COMPACT = box(81, 167, 978, 631, COMPACT_ZOOM);
 /** The Ascension Type symbols, in the artwork window's top-right corner. */
 const TYPES = box(618, 179, 966, 259);
-const TYPES_COMPACT = box(618, 179, 966, 259, COMPACT_ZOOM);
 const STAT_COLUMNS = [box(70, 668, 375, 800), box(375, 668, 686, 800), box(686, 668, 990, 800)];
 const PASSIVE = box(100, 820, 960, 938);
 /** The three ability holes in the frame (see-through). */
@@ -103,9 +92,8 @@ const tintStyle = computed(() => ({
   maskImage: `url(${frameUrl})`,
   WebkitMaskImage: `url(${frameUrl})`,
 }));
-const slot = computed<SpriteSlot>(() => (props.compact ? "preview_card" : "main_card"));
-const artUrl = computed(() => spriteFor(props.ascended.art, slot.value));
-const artPosition = computed(() => `50% ${spriteFocus(props.ascended.art, slot.value)}%`);
+const artUrl = computed(() => spriteFor(props.ascended.art, "main_card"));
+const artPosition = computed(() => `50% ${spriteFocus(props.ascended.art, "main_card")}%`);
 const tierVar = computed(() => `var(--em-tier-${props.tierId}, var(--em-tier-common))`);
 const passiveName = computed(() => titleCase(props.ascended.passive.kind));
 const passive = computed(() => passiveText(props.ascended.passive.kind, props.ascended.passive.params));
@@ -123,37 +111,33 @@ const abilities = computed(() =>
 <template>
   <article
     class="card"
-    :class="[`tier-${tierId}`, { compact }]"
+    :class="`tier-${tierId}`"
     :style="{ '--tier': tierVar }"
     :aria-label="`${ascended.name}, ${titleCase(tierId)}, level ${level}`"
   >
-    <div class="behind art-fill" :style="compact ? ART_COMPACT : ART" aria-hidden="true">
+    <div class="behind art-fill" :style="ART" aria-hidden="true">
       <img v-if="artUrl" class="portrait" :src="artUrl" :style="{ objectPosition: artPosition }" alt="" draggable="false" />
       <template v-else>
         <span class="letter">{{ ascended.name.slice(0, 1) }}</span>
-        <small v-if="!compact">Artwork</small>
+        <small>Artwork</small>
       </template>
     </div>
-    <template v-if="!compact">
-      <div v-for="a in abilities" :key="a.ability.id" class="behind" :style="a.fill" aria-hidden="true" />
-    </template>
+    <div v-for="a in abilities" :key="a.ability.id" class="behind" :style="a.fill" aria-hidden="true" />
 
     <img class="frame" :src="frameUrl" alt="" draggable="false" />
     <div v-if="tint" class="tint" :style="tintStyle" aria-hidden="true" />
-    <img v-if="tint && !compact" class="frame plate" :src="frameUrl" alt="" draggable="false" :style="{ clipPath: PLATE_CLIP }" />
+    <img v-if="tint" class="frame plate" :src="frameUrl" alt="" draggable="false" :style="{ clipPath: PLATE_CLIP }" />
 
-    <div v-if="ascended.ascension_types.length" class="types" :style="compact ? TYPES_COMPACT : TYPES">
-      <TypeSymbol v-for="id in ascended.ascension_types" :key="id" :type-id="id" :size="compact ? '11cqw' : '8cqw'" :flat="compact" />
+    <div v-if="ascended.ascension_types.length" class="types" :style="TYPES">
+      <TypeSymbol v-for="id in ascended.ascension_types" :key="id" :type-id="id" size="8cqw" />
     </div>
 
-    <footer v-if="compact" class="tier-plate em-pixel">{{ titleCase(tierId) }}</footer>
-
-    <header class="header" :style="compact ? HEADER_COMPACT : HEADER">
+    <header class="header" :style="HEADER">
       <h4 class="ascended-name">{{ ascended.name }}</h4>
-      <span v-if="!compact || showLevel" class="level">Lv {{ level }}</span>
+      <span class="level">Lv {{ level }}</span>
     </header>
 
-    <dl v-if="!compact" class="stat-list">
+    <dl class="stat-list">
       <div v-for="s in stats" :key="s.key" class="stat" :style="s.style">
         <dt>
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path v-for="d in s.icon" :key="d" :d="d" /></svg>
@@ -164,23 +148,21 @@ const abilities = computed(() =>
       </div>
     </dl>
 
-    <p v-if="!compact" class="passive" :style="PASSIVE" :title="`${passiveName}: ${passive}`">
+    <p class="passive" :style="PASSIVE" :title="`${passiveName}: ${passive}`">
       <strong :class="{ alone: passive === passiveName }">{{ passiveName }}</strong>
       <template v-if="passive !== passiveName">{{ ` ${passive}` }}</template>
     </p>
 
-    <template v-if="!compact">
-      <div v-for="a in abilities" :key="a.ability.id" class="ability" :style="a.slot">
-        <span class="slot" aria-hidden="true">
-          <svg class="icon" viewBox="0 0 24 24"><path v-for="d in a.icon" :key="d" :d="d" /></svg>
-        </span>
-        <div class="ability-text">
-          <strong>{{ a.ability.name }}</strong>
-          <span>{{ a.effect }}</span>
-        </div>
-        <span class="unlock">Lv {{ a.ability.unlock_level }}</span>
+    <div v-for="a in abilities" :key="a.ability.id" class="ability" :style="a.slot">
+      <span class="slot" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24"><path v-for="d in a.icon" :key="d" :d="d" /></svg>
+      </span>
+      <div class="ability-text">
+        <strong>{{ a.ability.name }}</strong>
+        <span>{{ a.effect }}</span>
       </div>
-    </template>
+      <span class="unlock">Lv {{ a.ability.unlock_level }}</span>
+    </div>
   </article>
 </template>
 
@@ -195,14 +177,6 @@ const abilities = computed(() =>
   color: #e8e8ea;
   text-align: left;
 }
-.card.compact {
-  width: var(--card-width, 150px);
-  overflow: hidden;
-}
-.compact .frame,
-.compact .tint {
-  height: 190%;
-}
 .portrait {
   position: absolute;
   inset: 0;
@@ -210,32 +184,6 @@ const abilities = computed(() =>
   height: 100%;
   object-fit: cover;
   user-select: none;
-}
-.tier-plate {
-  position: absolute;
-  right: 9%;
-  bottom: 5%;
-  left: 9%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 14%;
-  border: 1px solid var(--tier);
-  background: #17222e;
-  box-shadow: inset 0 0 0 2px #101720;
-  font-size: 5.8cqw;
-  letter-spacing: 0.3cqw;
-  text-transform: uppercase;
-  color: var(--tier);
-}
-.compact .level {
-  font-size: 5.5cqw;
-}
-.compact .ascended-name {
-  font-size: 7.5cqw;
-}
-.compact .letter {
-  font-size: 34cqw;
 }
 .frame,
 .tint {

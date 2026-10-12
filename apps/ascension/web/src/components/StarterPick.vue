@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useAscensionStore } from "../stores/ascension";
 import { abilityEffect } from "../utils/ascension";
 import AscendedTemplateCard from "./AscendedTemplateCard.vue";
+import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 import EmPickCard from "./ui/EmPickCard.vue";
 import { starterCopy } from "./starterCopy";
 import EmButton from "./ui/EmButton.vue";
@@ -60,7 +61,7 @@ async function start(): Promise<void> {
             :aria-label="s.name"
             @select="pick(s.id)"
           >
-            <AscendedTemplateCard :ascended="s" compact />
+            <AscendedPreviewCard :ascended="s" />
           </EmPickCard>
           <p class="note">
             {{ starterCopy(s.id).motto }}

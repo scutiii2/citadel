@@ -4,7 +4,7 @@ import type { OwnedAscended } from "../api/AscensionClient";
 import { useNowSeconds } from "../composables/useNowSeconds";
 import { useAscensionStore } from "../stores/ascension";
 import { formatCountdown, titleCase } from "../utils/ascension";
-import AscendedTemplateCard from "./AscendedTemplateCard.vue";
+import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 import EmBar from "./ui/EmBar.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
@@ -32,7 +32,7 @@ const faintLeft = computed(() => (props.ascended.faint_until === null ? 0 : Math
     @keydown.enter.prevent="emit('open')"
     @keydown.space.prevent="emit('open')"
   >
-    <AscendedTemplateCard v-if="info" class="face" :ascended="info" :level="ascended.level" :tier-id="ascended.tier_id" compact show-level />
+    <AscendedPreviewCard v-if="info" class="face" :ascended="info" :level="ascended.level" :tier-id="ascended.tier_id" show-level />
     <span v-else class="ascended-name">{{ ascended.name }}</span>
     <span class="caption">
       <span class="tier-line">

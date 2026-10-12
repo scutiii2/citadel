@@ -75,16 +75,6 @@ describe("AscendedTemplateCard", () => {
     expect(bruiser.find(".letter").text()).toBe("B");
   });
 
-  it("the small card has a tier plate, no ability slots, and its own portrait focus", () => {
-    const wrapper = mount(AscendedTemplateCard, { props: { ascended: ascendedInfo("sentinel"), tierId: "royal", compact: true } });
-
-    expect(wrapper.find(".tier-plate").text()).toBe("Royal");
-    expect(wrapper.find(".ability").exists()).toBe(false);
-    expect(wrapper.findAll(".behind")).toHaveLength(1);
-    expect((wrapper.find("img.portrait").element as HTMLElement).style.objectPosition).toBe("50% 14%");
-    expect(wrapper.find("img.portrait").attributes("src")).toBe("/ascended/sentinel/sprite_preview_card.webp");
-  });
-
   it("colours each ability's slot by its category", () => {
     const ascended = ascendedInfo("mixed", {
       abilities: ["ATTACK", "DEFENSE", "SUPPORT"].map((category, i) => ({

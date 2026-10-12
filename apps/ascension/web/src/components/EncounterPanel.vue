@@ -5,6 +5,7 @@ import { useNowSeconds } from "../composables/useNowSeconds";
 import { useAscensionStore } from "../stores/ascension";
 import { formatCountdown, titleCase } from "../utils/ascension";
 import AscendedTemplateCard from "./AscendedTemplateCard.vue";
+import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 import EmButton from "./ui/EmButton.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmNotice from "./ui/EmNotice.vue";
@@ -142,13 +143,12 @@ async function fight(): Promise<void> {
     </div>
 
     <EmPanel v-else-if="stage === 'preview' && store.encounter" class="preview">
-      <AscendedTemplateCard
+      <AscendedPreviewCard
         v-if="wildInfo"
         class="wild-card"
         :ascended="wildInfo"
         :level="store.encounter.level"
         :tier-id="store.encounter.tier_id"
-        compact
         show-level
       />
       <div class="about">
@@ -175,7 +175,7 @@ async function fight(): Promise<void> {
               :aria-label="slot.member.name"
               @select="pick(slot.member.ascended_id)"
             >
-              <AscendedTemplateCard :ascended="slot.info" :level="slot.member.level" :tier-id="slot.member.tier_id" compact show-level />
+              <AscendedPreviewCard :ascended="slot.info" :level="slot.member.level" :tier-id="slot.member.tier_id" show-level />
             </EmPickCard>
             <p class="caption squad-note">
               {{ titleCase(slot.member.tier_id) }} · Lv. {{ slot.member.level }}
@@ -188,7 +188,7 @@ async function fight(): Promise<void> {
         </div>
       </div>
 
-      <AscendedTemplateCard v-if="chosenInfo && chosen" class="detail" :ascended="chosenInfo" :level="chosen.level" :tier-id="chosen.tier_id" show-level />
+      <AscendedTemplateCard v-if="chosenInfo && chosen" class="detail" :ascended="chosenInfo" :level="chosen.level" :tier-id="chosen.tier_id" />
       <EmNotice v-else tone="error">{{ ready.length ? "Select a ready squad member to continue." : "No squad member is ready. Wait until one is ready again." }}</EmNotice>
 
       <EmPanel class="plan">

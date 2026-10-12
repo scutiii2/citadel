@@ -50,7 +50,7 @@ describe("CollectionPanel", () => {
     expect(text).toContain("40 / 300 XP");
     expect(cards[0]!.find(".ascended-name").text()).toBe("Guardian");
     expect(cards[0]!.find(".level").text()).toBe("Lv 3");
-    expect(cards[0]!.find(".tint").exists()).toBe(true);
+    expect(cards[0]!.find("img.frame").attributes("src")).toContain("front_rare");
     expect(cards[0]!.find(".passive").exists()).toBe(false);
     expect(wrapper.findAll(".missing-ascended").map((row) => row.find(".missing-name").text())).toEqual([
       "Striker",

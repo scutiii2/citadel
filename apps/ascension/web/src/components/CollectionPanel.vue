@@ -12,6 +12,7 @@ import TreeTab from "./TreeTab.vue";
 import PresetEditor from "./PresetEditor.vue";
 import AscendedCard from "./AscendedCard.vue";
 import AscendedTemplateCard from "./AscendedTemplateCard.vue";
+import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 import EmBar from "./ui/EmBar.vue";
 import EmButton from "./ui/EmButton.vue";
 import EmDialog from "./ui/EmDialog.vue";
@@ -150,7 +151,7 @@ function show(ascended: OwnedAscended): void {
       <ul class="squad-strip">
         <li v-for="(member, index) in squadSlots" :key="index" class="squad-slot" :class="{ 'squad-empty': !member }">
           <template v-if="member">
-            <AscendedTemplateCard v-if="store.catalog?.ascendeds.find(a => a.id === member.ascended_id)" :ascended="store.catalog!.ascendeds.find(a => a.id === member.ascended_id)!" :level="member.level" :tier-id="member.tier_id" compact show-level />
+            <AscendedPreviewCard v-if="store.catalog?.ascendeds.find(a => a.id === member.ascended_id)" :ascended="store.catalog!.ascendeds.find(a => a.id === member.ascended_id)!" :level="member.level" :tier-id="member.tier_id" show-level />
             <EmButton :disabled="store.squadIds.length <= 1 || battleActive || store.busy" :aria-label="`Remove ${member.name} from squad`" :aria-busy="store.busy" @click="store.removeFromSquad(member.ascended_id)">Remove</EmButton>
           </template>
           <span v-else>Empty slot</span>
