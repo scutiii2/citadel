@@ -53,8 +53,7 @@ class PresetBody(_Body):
 
 
 class LoadoutBody(_Body):
-    abilities: list[str]
-    passive: str | None = None
+    slots: dict[str, str | None]
 
 
 class StartBody(_Body):
@@ -242,7 +241,7 @@ def build_router(services: AscendedServices) -> APIRouter:
 
     @router.put("/ascendeds/{ascended_id}/loadout")
     async def put_loadout(ascended_id: str, body: LoadoutBody, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
-        return await services.trees.set_loadout(owner, key, ascended_id, body.abilities, body.passive)
+        return await services.trees.set_loadout(owner, key, ascended_id, body.slots)
 
     @router.post("/ascendeds/{ascended_id}/sales", status_code=201)
     async def sell(ascended_id: str, owner: str = Depends(requester), key: str = Depends(idempotency_key)):

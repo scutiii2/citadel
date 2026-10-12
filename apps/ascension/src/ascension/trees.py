@@ -10,10 +10,8 @@ from src.ascension.idempotency import IdempotentWriter
 from src.ascension.models import Loadout, PassiveSpec
 from src.ascension.records import AscendedRecord
 from src.ascension.repository import AscendedRepository, AscendedTransaction
-from src.ascension.tree import TreeNode, passive_root_id
+from src.ascension.tree import TreeNode
 
-ABILITY_SLOTS = ("a1", "a2", "a3")
-PASSIVE_SLOT = "p1"
 NO_PASSIVE = PassiveSpec("none", {})
 
 
@@ -33,10 +31,7 @@ class TreeService:
         return {n.id for n in self._catalog.ascended(ascended_id).tree.roots} | stored
 
     def _default_slots(self, ascended_id: str) -> dict[str, str]:
-        spec = self._catalog.ascended(ascended_id)
-        slots = {slot: a.id for slot, a in zip(ABILITY_SLOTS, spec.abilities)}
-        slots[PASSIVE_SLOT] = passive_root_id(ascended_id)
-        return slots
+        return self._catalog.default_slots(ascended_id)
 
     def _slots(self, ascended_id: str, stored: dict[str, str]) -> dict[str, str]:
         return stored if stored else self._default_slots(ascended_id)
@@ -74,8 +69,10 @@ class TreeService:
             state, reason = self._state(node, record, learned, essences, tree)
             nodes.append({**node.to_public(), "state": state, "reason": reason})
         slots = self._slots(ascended_id, stored)
-        loadout = {slot: slots.get(slot) for slot in (*ABILITY_SLOTS, PASSIVE_SLOT)}
-        return {"ascended_id": ascended_id, "level": record.level, "essences": essences, "nodes": nodes, "loadout": loadout}
+        loadout = {slot: slots.get(slot) for slot in tree.slot_ids}
+        return {"ascended_id": ascended_id, "level": record.level, "essences": essences, "nodes": nodes, "loadout": loadout,
+                "slots": [{"id": slot, "kind": "ability" if slot.startswith("a") else "passive",
+                           "branches": list(tree.branches(slot)) if tree.declared else None} for slot in tree.slot_ids]}
 
     async def loadout_in(self, tx: AscendedTransaction, owner: str, ascended_id: str) -> Loadout:
         """The kit a battle starts with, read inside the caller's transaction."""
@@ -84,16 +81,17 @@ class TreeService:
             return self._catalog.default_loadout(ascended_id)
         tree = self._catalog.ascended(ascended_id).tree
         learned = self._learned(ascended_id, await tx.learned_nodes(owner, ascended_id))
-        abilities = []
-        for slot in ABILITY_SLOTS:
+        abilities, passives = [], []
+        for slot in tree.slot_ids:
             node = tree.node(stored.get(slot, ""))
-            if node is not None and node.kind == "ability" and node.id in learned:
-                abilities.append(node.ability)
+            if node is not None and node.id in learned and tree.accepts(slot, node):
+                if node.kind == "ability":
+                    abilities.append(node.ability)
+                else:
+                    passives.append(node.passive)
         if not abilities:
             return self._catalog.default_loadout(ascended_id)
-        passive_node = tree.node(stored.get(PASSIVE_SLOT, ""))
-        passive = passive_node.passive if passive_node is not None and passive_node.kind == "passive" and passive_node.id in learned else NO_PASSIVE
-        return Loadout(tuple(abilities), passive)
+        return Loadout(tuple(abilities), passives[0] if passives else NO_PASSIVE, tuple(passives[1:]))
 
     # -- writes --------------------------------------------------------------------
 
@@ -120,31 +118,35 @@ class TreeService:
 
         return await self._writer.commit(owner, key, "tree.learn", {"ascended": ascended_id, "node": node_id}, work)
 
-    async def set_loadout(self, owner: str, key: str, ascended_id: str, abilities: list[str], passive: str | None) -> dict[str, Any]:
-        if not isinstance(abilities, list) or any(not isinstance(a, str) for a in abilities) or not (passive is None or isinstance(passive, str)):
-            raise InvalidRequest("abilities must be a list of node ids and passive a node id or null")
-        if not 1 <= len(abilities) <= len(ABILITY_SLOTS) or len(set(abilities)) != len(abilities):
-            raise InvalidRequest(f"equip 1 to {len(ABILITY_SLOTS)} different abilities")
+    async def set_loadout(self, owner: str, key: str, ascended_id: str, slots: dict[str, str | None]) -> dict[str, Any]:
+        if not isinstance(slots, dict) or any(not isinstance(s, str) or not (n is None or isinstance(n, str)) for s, n in slots.items()):
+            raise InvalidRequest("slots must map slot ids to node ids or null")
 
         async def work(tx: AscendedTransaction) -> dict[str, Any]:
             await self._owned(tx, owner, ascended_id)
-            await self._reject_if_fighting(tx, owner, ascended_id)
             tree = self._catalog.ascended(ascended_id).tree
+            for slot, node_id in slots.items():
+                if slot not in tree.slot_ids:
+                    raise InvalidRequest(f"that Ascended has no slot {slot!r} for node {node_id!r}")
+            seen: dict[str, str] = {}
+            for slot, node_id in slots.items():
+                if node_id is None:
+                    continue
+                if node_id in seen:
+                    raise InvalidRequest(f"{node_id!r} is in two slots: {seen[node_id]!r} and {slot!r}")
+                seen[node_id] = slot
             learned = self._learned(ascended_id, await tx.learned_nodes(owner, ascended_id))
-
-            def need(node_id: str, kind: str) -> None:
+            for slot, node_id in slots.items():
+                if node_id is None:
+                    continue
                 node = tree.node(node_id)
-                if node is None or node.kind != kind or node_id not in learned:
-                    raise InvalidRequest(f"{node_id!r} is not a learned {kind} node of this Ascended")
+                if node is None or node_id not in learned or not tree.accepts(slot, node):
+                    raise InvalidRequest(f"{node_id!r} cannot go in slot {slot!r}: needs a learned node of the allowed kind and branch")
+            if not any(s.startswith("a") and n is not None for s, n in slots.items()):
+                raise InvalidRequest("equip at least one active ability")
+            await self._reject_if_fighting(tx, owner, ascended_id)
+            filled = {slot: node_id for slot, node_id in slots.items() if node_id is not None}
+            await tx.put_loadout(owner, ascended_id, filled)
+            return {"ascended_id": ascended_id, "slots": filled}
 
-            for node_id in abilities:
-                need(node_id, "ability")
-            if passive is not None:
-                need(passive, "passive")
-            slots = dict(zip(ABILITY_SLOTS, abilities))
-            if passive is not None:
-                slots[PASSIVE_SLOT] = passive
-            await tx.put_loadout(owner, ascended_id, slots)
-            return {"ascended_id": ascended_id, "abilities": list(abilities), "passive": passive}
-
-        return await self._writer.commit(owner, key, "tree.loadout", {"ascended": ascended_id, "abilities": abilities, "passive": passive}, work)
+        return await self._writer.commit(owner, key, "tree.loadout", {"ascended": ascended_id, "slots": slots}, work)

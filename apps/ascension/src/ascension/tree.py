@@ -118,6 +118,10 @@ class AbilityTree:
     def slot_ids(self) -> tuple[str, ...]:
         return tuple(s for s in (*ACTIVE_SLOTS, *PASSIVE_SLOTS) if s in self._slots) if self._slots is not None else DEFAULT_SLOTS
 
+    def branches(self, slot: str) -> tuple[str, ...] | None:
+        """The branches a declared slot takes; free slots have no branch restriction."""
+        return self._slots[slot] if self._slots is not None else None
+
     def accepts(self, slot: str, node: TreeNode) -> bool:
         """Can this node sit in this slot? The kind must match; a declared slot also needs the node's branch."""
         if slot not in self.slot_ids or node.kind != ("ability" if slot in ACTIVE_SLOTS else "passive"):
