@@ -23,11 +23,11 @@ def catalog():
 def test_shipped_catalog_is_valid(catalog):
     assert catalog.version == 1
     assert [t.id for t in catalog.tiers] == ["common", "rare", "unique", "royal", "legendary", "forbidden"]
-    assert len(catalog.all_ascendeds()) == 7
+    assert len(catalog.all_ascendeds()) == 8
     assert [s.id for s in catalog.starter_ascendeds()] == ["guardian", "scout", "striker"]  # file-name order
     assert catalog.forbidden_ascended().id == "forbidden"
-    assert len(catalog.regular_ascendeds()) == 6
-    assert [s.id for s in catalog.all_ascendeds()] == ["bruiser", "channeler", "forbidden", "guardian", "scout", "sentinel", "striker"]
+    assert len(catalog.regular_ascendeds()) == 7
+    assert [s.id for s in catalog.all_ascendeds()] == ["bruiser", "channeler", "forbidden", "guardian", "scout", "sentinel", "striker", "twoychi"]
 
 
 def test_stats_use_growth_then_tier_multiplier_and_floor(catalog):

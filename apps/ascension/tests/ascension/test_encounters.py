@@ -20,9 +20,9 @@ def test_tier_follows_the_encounter_probabilities(u, tier):
     assert roll(10, u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0).tier_id == tier
 
 
-def test_regular_tiers_pick_uniformly_among_the_six_regular_ascendeds():
-    picked = [roll(10, 0.3, u, 0.0, 0.0, 0.0, 0.0).ascended_id for u in (0.0, 0.17, 0.34, 0.5, 0.67, 0.99)]
-    assert picked == ["bruiser", "channeler", "guardian", "scout", "sentinel", "striker"]  # file-name order
+def test_regular_tiers_pick_uniformly_among_the_seven_regular_ascendeds():
+    picked = [roll(10, 0.3, u, 0.0, 0.0, 0.0, 0.0).ascended_id for u in (0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.99)]
+    assert picked == ["bruiser", "channeler", "guardian", "scout", "sentinel", "striker", "twoychi"]  # file-name order
 
 
 def test_forbidden_tier_is_always_the_forbidden_ascended_and_uses_one_fewer_draw():

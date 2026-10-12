@@ -1,0 +1,11 @@
+{"nodes": [
+  {"id": "twoychi_tidecall", "root": true, "x": 40, "y": 200},
+  {"id": "twoychi_mournful_veil", "root": true, "x": 40, "y": 320},
+  {"id": "twoychi_troys_hunt", "root": true, "x": 360, "y": 200},
+  {"id": "twoychi_passive", "root": true, "x": 200, "y": 260},
+  {"id": "twoychi_merciful_tide", "kind": "ability", "name": "Merciful Tide", "category": "SUPPORT", "stat": "speed", "duration": 3, "percentage": 50, "cooldown": 3, "unlock_level": 12, "requires": ["twoychi_tidecall"], "cost": {"tier": "common", "amount": 3}, "x": 40, "y": 80},
+  {"id": "twoychi_ebb_ward", "kind": "ability", "name": "Ebb Ward", "category": "DEFENSE", "percentage": 240, "cooldown": 3, "unlock_level": 16, "requires": ["twoychi_mournful_veil"], "cost": {"tier": "rare", "amount": 3}, "x": 200, "y": 400},
+  {"id": "twoychi_wolf_rush", "kind": "ability", "name": "Wolf Rush", "category": "ATTACK", "percentage": 110, "cooldown": 1, "unlock_level": 9, "requires": ["twoychi_troys_hunt"], "cost": {"tier": "common", "amount": 2}, "x": 360, "y": 80},
+  {"id": "twoychi_bear_crush", "kind": "ability", "name": "Bear Crush", "category": "ATTACK", "percentage": 250, "cooldown": 3, "unlock_level": 22, "requires": ["twoychi_wolf_rush"], "cost": {"tier": "rare", "amount": 4}, "x": 520, "y": 80},
+  {"id": "twoychi_guiding_light", "kind": "passive", "name": "Guiding Light", "unlock_level": 18, "passive": {"kind": "cooldown_reduction", "params": {"rounds": 1, "minimum": 1}}, "requires": ["twoychi_passive"], "cost": {"tier": "rare", "amount": 4}, "x": 360, "y": 340}
+]}

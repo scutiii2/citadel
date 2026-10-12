@@ -5,7 +5,7 @@ from tests.ascension.env import CATALOG
 IDS = [s.id for s in CATALOG.all_ascendeds()]
 
 
-@pytest.mark.parametrize("ascended_id", [i for i in IDS if i != "twoychi"])
+@pytest.mark.parametrize("ascended_id", IDS)
 def test_each_shipped_ascended_has_a_real_tree(ascended_id):
     tree = CATALOG.ascended(ascended_id).tree
     extra = [n for n in tree.nodes if not n.root]

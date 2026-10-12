@@ -82,7 +82,7 @@ def ascendeds_dir(tmp_path):
 
 
 def test_a_copied_ascendeds_directory_loads(ascendeds_dir):
-    assert len(Catalog.load(CATALOG_PATH, ascendeds_dir).all_ascendeds()) == 7
+    assert len(Catalog.load(CATALOG_PATH, ascendeds_dir).all_ascendeds()) == 8
 
 
 def test_a_missing_ascendeds_directory_is_a_catalog_error(tmp_path):
@@ -127,7 +127,7 @@ def test_a_duplicate_ascended_id_is_rejected(ascendeds_dir):
 def test_folders_without_a_catalog_file_and_loose_files_are_skipped(ascendeds_dir):
     (ascendeds_dir / "empty_draft").mkdir()
     (ascendeds_dir / "ascended_common_front_template.png").write_bytes(b"png")
-    assert len(Catalog.load(CATALOG_PATH, ascendeds_dir).all_ascendeds()) == 7
+    assert len(Catalog.load(CATALOG_PATH, ascendeds_dir).all_ascendeds()) == 8
 
 
 def test_the_load_order_is_alphabetical(ascendeds_dir):
