@@ -27,7 +27,7 @@ def test_a_battle_finishes_and_the_same_seed_replays_exactly():
 
 
 def test_a_much_stronger_ascended_wins():
-    strong = ascended("forbidden", level=40, tier="forbidden", personalities=[("AGGRESSIVE", 3)])
+    strong = ascended("cindrax", level=40, tier="forbidden", personalities=[("AGGRESSIVE", 3)])
     weak = ascended("guardian", level=1, personalities=[("AGGRESSIVE", 3)])
     results = [run(sim.run(strong, weak, seed=s)).winner for s in range(10)]
     assert WILD not in results and results.count(PLAYER) >= 8  # the weak side may escape, but never wins

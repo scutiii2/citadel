@@ -55,7 +55,7 @@ describe("CollectionPanel", () => {
     expect(wrapper.findAll(".missing-ascended").map((row) => row.find(".missing-name").text())).toEqual([
       "Striker",
       "Bruiser",
-      "Forbidden",
+      "Cindrax",
     ]);
   });
 
@@ -150,7 +150,7 @@ describe("stars and tiers", () => {
   });
 
   it("disables the star when a copy or essence is missing, and says the top of the ladder has none", async () => {
-    const wrapper = mountPanel({ ...PROFILE, ascendeds: [ready({ can_star_up: false }), ownedAscended("forbidden", { tier_id: "forbidden", stars_needed: null, next_tier_id: null })] });
+    const wrapper = mountPanel({ ...PROFILE, ascendeds: [ready({ can_star_up: false }), ownedAscended("cindrax", { tier_id: "forbidden", stars_needed: null, next_tier_id: null })] });
 
     await wrapper.find(".ascended-card").trigger("click");
     await flushPromises();
@@ -239,7 +239,7 @@ describe("PresetEditor", () => {
         ascendedInfo("guardian", { starter: true, ascension_types: ["enchant"] }),
         ascendedInfo("striker", { starter: true, ascension_types: ["divine", "enchant"] }),
         ascendedInfo("bruiser", { ascension_types: [] }),
-        ascendedInfo("forbidden", { forbidden: true, ascension_types: ["abyss"] }),
+        ascendedInfo("cindrax", { forbidden: true, ascension_types: ["abyss"] }),
       ],
     };
     const PROFILE_TYPED: Profile = {
@@ -274,7 +274,7 @@ describe("PresetEditor", () => {
       expect(wrapper.findAll(".missing-ascended")).toHaveLength(0);
       await chip(wrapper, "Abyss").trigger("click");
       expect(wrapper.find(".empty").text()).toBe("No Abyss Ascended collected yet.");
-      expect(wrapper.findAll(".missing-name").map((n) => n.text())).toEqual(["Forbidden"]);
+      expect(wrapper.findAll(".missing-name").map((n) => n.text())).toEqual(["Cindrax"]);
       await chip(wrapper, "Abyss").trigger("click");
       expect(chip(wrapper, "All").attributes("aria-pressed")).toBe("true");
     });

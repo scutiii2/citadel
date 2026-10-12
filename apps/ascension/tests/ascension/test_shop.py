@@ -179,7 +179,7 @@ def test_buying_an_offer_grants_copies_and_uses_stock(tmp_path):
 
 def test_buying_a_new_ascended_starts_it_at_level_one(tmp_path):
     async def scenario():
-        env = fixed(Offer(0, "sentinel", "common", 1))(tmp_path)
+        env = fixed(Offer(0, "sentinel", "rare", 1))(tmp_path)
         await env.start_player()
         await env.give(insignia=1000)
         rotation = env.offers.rotation_at(env.clock.now())
@@ -189,10 +189,10 @@ def test_buying_a_new_ascended_starts_it_at_level_one(tmp_path):
         return bought, profile
 
     bought, profile = run(scenario())
-    assert bought["price"] == 2 * 1 * 140 and bought["copies_granted"] == 1
+    assert bought["price"] == 2 * 2 * 175 and bought["copies_granted"] == 2  # Rare: 2 copies at 140 * 1.25 each
     sentinel = next(s for s in profile["ascendeds"] if s["ascended_id"] == "sentinel")
-    assert (sentinel["level"], sentinel["copies"], sentinel["tier_id"]) == (1, 0, "common")  # the first copy is the Ascended
-    assert profile["insignia"] == 1000 - 280
+    assert (sentinel["level"], sentinel["copies"], sentinel["tier_id"]) == (1, 1, "rare")  # the first copy is the Ascended
+    assert profile["insignia"] == 1000 - 700
 
 
 def test_buying_keeps_an_owned_ascended_level_and_tier_and_prices_at_its_tier(tmp_path):

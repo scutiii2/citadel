@@ -9,7 +9,7 @@ export function tier(id: string, emblemPrice: number, starsToAdvance: number | n
 }
 
 const SHIPPED_FOCUS: Record<string, [number, number]> = {
-  guardian: [21, 50], scout: [10, 50], striker: [10, 50], sentinel: [12, 14], channeler: [30, 43], forbidden: [18, 29],
+  guardian: [21, 50], scout: [10, 50], striker: [10, 50], sentinel: [12, 14], channeler: [30, 43], cindrax: [18, 29],
 };
 
 /** The art block the game sends: the six shipped Ascended have all three sprites, the others none. */
@@ -26,6 +26,7 @@ export function ascendedInfo(id: string, extra: Partial<AscendedInfo> = {}): Asc
     starter: false,
     forbidden: false,
     start_tier: "common",
+    end_tier: "legendary",
     ascension_types: ["enchant"],
     base: { hp: 100, power: 10, speed: 10 },
     growth: { hp: 5, power: 1, speed: 1 },
@@ -56,7 +57,7 @@ export const CATALOG: Catalog = {
     ascendedInfo("guardian", { starter: true }),
     ascendedInfo("striker", { starter: true }),
     ascendedInfo("bruiser"),
-    ascendedInfo("forbidden", { forbidden: true, start_tier: "forbidden" }),
+    ascendedInfo("cindrax", { forbidden: true, start_tier: "forbidden", end_tier: "forbidden" }),
   ],
   personalities: [
     { id: "AGGRESSIVE", categories: ["ATTACK"] },

@@ -48,4 +48,4 @@ def test_lower_tiers_are_offered_more_often():
     for n in range(300):
         for offer in offers().window(f"player{n}", NOW).offers:
             seen[offer.tier_id] += 1
-    assert seen["common"] > seen["rare"] > seen["unique"] > seen["legendary"]
+    assert seen["rare"] > seen["unique"] > seen["legendary"] > 0  # only the Ascended whose ladder reaches a tier are offered at it

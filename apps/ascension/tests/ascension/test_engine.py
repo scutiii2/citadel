@@ -35,7 +35,7 @@ def test_build_fighter_unlocks_abilities_by_level():
 
 
 def test_build_fighter_applies_tier_to_stats():
-    f = engine.build_fighter(WILD, "forbidden", "forbidden", 1)
+    f = engine.build_fighter(WILD, "cindrax", "forbidden", 1)
     assert (f.max_hp, f.power, f.speed) == (800, 160, 120)
 
 
@@ -324,7 +324,7 @@ def test_history_records_revealed_actions_and_round_advances():
 def test_battle_state_and_setup_round_trip_through_json():
     import json
 
-    s = BattleSetup(engine.build_fighter(PLAYER, "scout", "rare", 12), engine.build_fighter(WILD, "forbidden", "forbidden", 5))
+    s = BattleSetup(engine.build_fighter(PLAYER, "scout", "rare", 12), engine.build_fighter(WILD, "cindrax", "forbidden", 5))
     out = play(s, ATTACK, FLEE, 0.1, 0.99)
     assert BattleSetup.from_dict(json.loads(json.dumps(s.to_dict()))) == s
     assert BattleState.from_dict(json.loads(json.dumps(out.state.to_dict()))) == out.state

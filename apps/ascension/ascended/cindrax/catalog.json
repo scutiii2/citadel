@@ -1,6 +1,6 @@
 {
-  "id": "forbidden",
-  "name": "Forbidden",
+  "id": "cindrax",
+  "name": "Cindrax",
   "art": { "focus": 50, "focus_preview": 29 },
   "starter": false,
   "forbidden": true,
@@ -27,7 +27,7 @@
   },
   "abilities": [
     {
-      "id": "forbidden_ruin",
+      "id": "cindrax_ruin",
       "name": "Ruin",
       "unlock_level": 1,
       "category": "ATTACK",
@@ -35,7 +35,7 @@
       "cooldown": 2
     },
     {
-      "id": "forbidden_dread_ward",
+      "id": "cindrax_dread_ward",
       "name": "Dread Ward",
       "unlock_level": 10,
       "category": "DEFENSE",
@@ -43,7 +43,7 @@
       "cooldown": 2
     },
     {
-      "id": "forbidden_ascendance",
+      "id": "cindrax_ascendance",
       "name": "Ascendance",
       "unlock_level": 20,
       "category": "SUPPORT",

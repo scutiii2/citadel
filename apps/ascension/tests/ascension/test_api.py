@@ -294,7 +294,7 @@ def test_the_catalog_publishes_the_star_ladder_and_each_start_tier(client):
     assert [(t["id"], t["stars_to_advance"], t["essence_cost"]) for t in data["tiers"]] == [
         ("common", 1, 1), ("rare", 2, 2), ("unique", 3, 3), ("royal", 5, 4), ("legendary", None, 5), ("forbidden", None, 10)]
     assert all("copy_threshold" not in t for t in data["tiers"])
-    assert {s["id"]: s["start_tier"] for s in data["ascendeds"]}["forbidden"] == "forbidden"
+    assert {s["id"]: s["start_tier"] for s in data["ascendeds"]}["cindrax"] == "forbidden"
 
 
 def test_stars_and_tier_over_http(client):

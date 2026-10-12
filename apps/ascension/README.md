@@ -145,11 +145,13 @@ Power is the stat that drives damage, defence and fleeing. Essence is upgrade ma
 green, blue, purple, gold, red), as in the Unity project.
 
 - An Ascended is first owned at its `start_tier` (`ascended/<id>/catalog.json`, default `common`; Forbidden is always
-  `forbidden`). Tier only changes by a tier-up. It sets the stat multiplier.
+  `forbidden`) and can rise no higher than its `end_tier` (default `legendary`). Shipped ladders: starters Common to
+  Unique, Bruiser, Channeler and Sentinel Rare to Royal, Twoychi Unique to Legendary. A wild Ascended or shop offer only
+  appears at a tier on its ladder. Tier only changes by a tier-up. It sets the stat multiplier.
 - The first copy is the Ascended itself. Any further copy, from a capture or the shop, is a **spare copy** (`copies`).
 - **A star** costs one spare copy and the tier's `essence_cost` in that tier's essence. Each tier has
-  `stars_to_advance` (the Unity star ladder): Common 1, Rare 2, Unique 3, Royal 5. Legendary and Forbidden have none:
-  they take no stars and cannot rise.
+  `stars_to_advance` (the Unity star ladder): Common 1, Rare 2, Unique 3, Royal 5. Legendary and Forbidden have none,
+  and neither has the last tier of an Ascended's own ladder: it takes no stars and cannot rise.
 - With enough stars an Ascended can **raise its tier** (free). The stars then start again from zero.
 - Beating or collecting an enemy pays that enemy's tier `essence_cost` in its tier essence (Common 1, Rare 2, Unique 3,
   Royal 4, Legendary 5, Forbidden 10). Essence is never lost when a battle is lost.

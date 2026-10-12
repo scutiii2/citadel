@@ -4,7 +4,8 @@
   "art": { "focus": 50, "focus_preview": 50 },
   "starter": false,
   "forbidden": false,
-  "start_tier": "common",
+  "start_tier": "unique",
+  "end_tier": "legendary",
   "ascension_types": [
     "enchant",
     "divine"

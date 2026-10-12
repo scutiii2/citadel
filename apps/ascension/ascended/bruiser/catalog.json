@@ -3,7 +3,8 @@
   "name": "Bruiser",
   "starter": false,
   "forbidden": false,
-  "start_tier": "common",
+  "start_tier": "rare",
+  "end_tier": "royal",
   "ascension_types": [
     "enchant"
   ],
