@@ -3,8 +3,8 @@ import { computed, ref, watch } from "vue";
 import { useAscensionStore } from "../stores/ascension";
 import { titleCase } from "../utils/ascension";
 import EmButton from "./ui/EmButton.vue";
+import EmEmblem from "./ui/EmEmblem.vue";
 import EmDialog from "./ui/EmDialog.vue";
-import EmIcon from "./ui/EmIcon.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmRing from "./ui/EmRing.vue";
 
@@ -42,7 +42,7 @@ watch(
           :disabled="expired || store.battleBusy || (prompt.owned[tier] ?? 0) === 0"
           @click="store.answerEmblem(tier)"
         >
-          <span class="name"><EmIcon name="flame" /> {{ titleCase(tier) }}</span>
+          <span class="name"><EmEmblem :tier-id="tier" :size="28" /> {{ titleCase(tier) }}</span>
           <span class="count em-num">{{ prompt.owned[tier] ?? 0 }} owned</span>
         </EmButton>
       </div>

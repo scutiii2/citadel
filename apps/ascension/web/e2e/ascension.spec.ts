@@ -116,7 +116,7 @@ test("a first visit picks a starter, then the collection and the Battle tab open
   await page.getByRole("radio", { name: "Guardian" }).click();
   await page.getByRole("button", { name: "Start with Guardian" }).click();
 
-  await expect(page.locator(".ascended-card")).toHaveCount(1);
+  await expect(page.locator(".squad-card")).toHaveCount(1);
   await expect(page.getByRole("tab", { name: "Battle", exact: true })).toBeEnabled();
   expect(api.ascension.keys).toHaveLength(1);
   expect(api.ascension.keys[0]).toMatch(/^[0-9a-f-]{32,36}$/);

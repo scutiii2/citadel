@@ -75,7 +75,7 @@ describe("AscensionView", () => {
     await flushPromises();
 
     expect(client.createProfile).toHaveBeenCalledExactlyOnceWith("guardian");
-    expect(wrapper.findAll(".ascended-card")).toHaveLength(1);
+    expect(wrapper.findAll(".squad-card")).toHaveLength(1);
     expect(tab(wrapper, "Collection").classes()).toContain("active");
   });
 

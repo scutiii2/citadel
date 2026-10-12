@@ -6,6 +6,7 @@ import { useAscensionStore } from "../stores/ascension";
 import { formatCountdown, titleCase } from "../utils/ascension";
 import { spriteFor } from "../utils/sprites";
 import EmButton from "./ui/EmButton.vue";
+import EmEmblem from "./ui/EmEmblem.vue";
 import EmConfirm from "./ui/EmConfirm.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmPanel from "./ui/EmPanel.vue";
@@ -105,6 +106,7 @@ async function sell(): Promise<void> {
         <h3 class="em-pixel em-num amount">{{ insignia }} Insignia</h3>
       </div>
       <div v-for="t in tiers" :key="t.id" class="count" :style="{ '--tier': `var(--em-tier-${t.id}, var(--em-tier-common))` }">
+        <EmEmblem :tier-id="t.id" :size="36" />
         <strong class="em-pixel em-num">{{ store.profile?.emblems[t.id] ?? 0 }}</strong>
         <span>{{ titleCase(t.id) }} EMBLEMs</span>
       </div>
@@ -161,6 +163,7 @@ async function sell(): Promise<void> {
         >
           <div class="band" aria-hidden="true" />
           <div class="meta">
+            <EmEmblem :tier-id="t.id" :size="56" />
             <EmTierBadge :tier-id="t.id" />
             <span>{{ titleCase(t.id) }} EMBLEM</span>
           </div>
@@ -239,6 +242,10 @@ async function sell(): Promise<void> {
   text-align: center;
   font-size: 12px;
   color: var(--tier);
+}
+.count .em-emblem {
+  display: block;
+  margin: 0 auto 4px;
 }
 .count strong {
   display: block;

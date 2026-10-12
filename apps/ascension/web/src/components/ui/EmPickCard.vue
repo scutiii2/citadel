@@ -23,7 +23,9 @@ function select(): void {
 <style scoped>
 .choice {
   --tier: var(--em-tier-common);
+  box-sizing: border-box;
   width: var(--card-width);
+  padding: 10px;
   border-radius: var(--em-radius);
   cursor: pointer;
 }

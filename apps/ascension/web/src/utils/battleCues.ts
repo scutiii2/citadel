@@ -2,14 +2,16 @@ import type { BattleEvent, Side } from "../api/AscensionClient";
 import { titleCase } from "./ascension";
 
 /** What one fighter's picture does during a step. */
-export type Fx = "lunge" | "hit" | "guarded" | "guard" | "boost" | "flee-away" | "flee-fail" | "absorb" | "release";
-/** Where a thrown EMBLEM is on its way to the wild Ascended. */
-export type BallPhase = "throw" | "wobble" | "caught" | "open";
+export type Fx = "lunge" | "hit" | "guarded" | "guard" | "boost" | "flee-away" | "flee-fail" | "absorb" | "release" | "struggle";
+/** Where a thrown EMBLEM is on its way to the wild Ascended: thrown, shaken by the Ascended
+ * fighting it (`strain` 1 to 3, harder each time), a held breath, then closed or broken open. */
+export type BallPhase = "throw" | "wobble" | "still" | "caught" | "open";
 export type FloatTone = "damage" | "guarded" | "good" | "bad" | "info";
 
 export interface Ball {
   phase: BallPhase;
   emblem: string;
+  strain?: 1 | 2 | 3;
 }
 
 export interface Floating {
@@ -70,7 +72,11 @@ function stepsForEvent(event: BattleEvent): Step[] {
       const caught = event.success === true;
       return [
         { ms: 650, ball: { [target]: { phase: "throw", emblem } } },
-        { ms: 1000, fx: { [target]: "absorb" }, ball: { [target]: { phase: "wobble", emblem } } },
+        { ms: 450, fx: { [target]: "absorb" }, ball: { [target]: { phase: "throw", emblem } } },
+        { ms: 800, fx: { [target]: "struggle" }, ball: { [target]: { phase: "wobble", emblem, strain: 1 } } },
+        { ms: 900, fx: { [target]: "struggle" }, ball: { [target]: { phase: "wobble", emblem, strain: 2 } } },
+        { ms: 1000, fx: { [target]: "struggle" }, ball: { [target]: { phase: "wobble", emblem, strain: 3 } } },
+        { ms: 600, fx: { [target]: "struggle" }, ball: { [target]: { phase: "still", emblem } } },
         caught
           ? { ms: 800, fx: { [target]: "absorb" }, ball: { [target]: { phase: "caught", emblem } }, float: { side: target, text: "Caught!", tone: "good" } }
           : { ms: 700, fx: { [target]: "release" }, ball: { [target]: { phase: "open", emblem } }, float: { side: target, text: "Broke free!", tone: "bad" } },

@@ -37,7 +37,8 @@ const allNotOwned = computed(() => {
 });
 /** The types to offer as filters: those any Ascended in the catalog has. */
 const types = computed(() => typesPresent(store.catalog?.ascendeds ?? []));
-const owned = computed(() => filterByType(allOwned.value, typeFilter.value));
+/** Squad members show in the squad strip, so the collected list leaves them out. */
+const owned = computed(() => filterByType(allOwned.value.filter((s) => !s.in_squad), typeFilter.value));
 const notOwned = computed(() => filterByType(allNotOwned.value, typeFilter.value));
 const groups = computed(() => groupByType(owned.value));
 
@@ -112,6 +113,61 @@ async function raiseTier(ascended: OwnedAscended): Promise<void> {
   }
 }
 
+/** Drag and drop (mouse): a collected card dropped on a squad slot joins the squad (replacing
+ * that slot's member when the squad is full), a squad card dropped on another slot reorders,
+ * and a squad card dropped on the collected list leaves the squad. Click and the buttons stay
+ * the way to do it on touch screens. */
+const dragId = ref<string | null>(null);
+const dragFromSquad = ref(false);
+const overSlot = ref<number | null>(null);
+const overCollected = ref(false);
+function dragStart(event: DragEvent, id: string, fromSquad: boolean): void {
+  if (store.busy || battleActive.value) { event.preventDefault(); return; }
+  dragId.value = id;
+  dragFromSquad.value = fromSquad;
+  if (event.dataTransfer) { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", id); }
+}
+function dragEnd(): void {
+  dragId.value = null;
+  overSlot.value = null;
+  overCollected.value = false;
+}
+function dragOverSlot(event: DragEvent, index: number): void {
+  if (dragId.value === null) return;
+  event.preventDefault();
+  overSlot.value = index;
+}
+function dragOverCollected(event: DragEvent): void {
+  if (dragId.value === null || !dragFromSquad.value) return;
+  event.preventDefault();
+  overCollected.value = true;
+}
+async function dropOnSlot(index: number): Promise<void> {
+  const id = dragId.value;
+  dragEnd();
+  if (id === null || store.busy || battleActive.value) return;
+  const ids = [...store.squadIds];
+  const current = ids.indexOf(id);
+  if (current >= 0) {
+    ids.splice(current, 1);
+    ids.splice(Math.min(index, ids.length), 0, id);
+    if (ids.every((value, i) => value === store.squadIds[i])) return;
+  } else if (ids.length >= (store.profile?.squad_size ?? 0)) {
+    if (index >= ids.length) return;
+    ids[index] = id;
+  } else {
+    ids.splice(Math.min(index, ids.length), 0, id);
+  }
+  await store.setSquad(ids);
+}
+async function dropOnCollected(): Promise<void> {
+  const id = dragId.value;
+  const fromSquad = dragFromSquad.value;
+  dragEnd();
+  if (id === null || !fromSquad || store.busy || battleActive.value || store.squadIds.length <= 1) return;
+  await store.removeFromSquad(id);
+}
+
 function show(ascended: OwnedAscended): void {
   detailTab.value = "overview";
   treeVisited.value = false;
@@ -144,12 +200,32 @@ function show(ascended: OwnedAscended): void {
     </div>
 
     </Teleport>
+    <ul v-if="essences.length" class="essences" aria-label="Essence">
+      <li v-for="[tierId, count] in essences" :key="tierId" :style="{ '--tier': `var(--em-tier-${tierId}, var(--em-tier-common))` }">
+        <EmTierBadge :tier-id="tierId" :label="`${titleCase(tierId)} essence`" /> <strong class="em-num">{{ count }}</strong>
+      </li>
+    </ul>
     <section class="squad-section" aria-label="Squad">
       <h3 class="em-pixel">Squad</h3>
       <ul class="squad-strip">
-        <li v-for="(member, index) in squadSlots" :key="index" class="squad-slot" :class="{ 'squad-empty': !member }">
+        <li v-for="(member, index) in squadSlots" :key="index" class="squad-slot" :class="{ 'squad-empty': !member, 'drop-over': dragId !== null && overSlot === index }" @dragover="dragOverSlot($event, index)" @dragleave="overSlot = null" @drop.prevent="dropOnSlot(index)">
           <template v-if="member">
-            <AscendedPreviewCard v-if="store.catalog?.ascendeds.find(a => a.id === member.ascended_id)" :ascended="store.catalog!.ascendeds.find(a => a.id === member.ascended_id)!" :level="member.level" :tier-id="member.tier_id" show-level />
+            <div
+              v-if="store.catalog?.ascendeds.find(a => a.id === member.ascended_id)"
+              class="squad-card em-lift"
+              :style="{ '--tier': `var(--em-tier-${member.tier_id}, var(--em-tier-common))` }"
+              role="button"
+              tabindex="0"
+              draggable="true"
+              :aria-label="`${member.name}, details`"
+              @dragstart="dragStart($event, member.ascended_id, true)"
+              @dragend="dragEnd"
+              @click="show(member)"
+              @keydown.enter.prevent="show(member)"
+              @keydown.space.prevent="show(member)"
+            >
+              <AscendedPreviewCard :ascended="store.catalog!.ascendeds.find(a => a.id === member.ascended_id)!" :level="member.level" :tier-id="member.tier_id" show-level />
+            </div>
             <EmButton :disabled="store.squadIds.length <= 1 || battleActive || store.busy" :aria-label="`Remove ${member.name} from squad`" :aria-busy="store.busy" @click="store.removeFromSquad(member.ascended_id)">Remove</EmButton>
           </template>
           <span v-else>Empty slot</span>
@@ -157,34 +233,30 @@ function show(ascended: OwnedAscended): void {
       </ul>
       <p v-if="battleActive" class="muted">Finish your battle first.</p>
     </section>
-    <ul v-if="essences.length" class="essences" aria-label="Essence">
-      <li v-for="[tierId, count] in essences" :key="tierId" :style="{ '--tier': `var(--em-tier-${tierId}, var(--em-tier-common))` }">
-        <EmTierBadge :tier-id="tierId" :label="`${titleCase(tierId)} essence`" /> <strong class="em-num">{{ count }}</strong>
-      </li>
-    </ul>
 
-    <div class="section-head">
-      <h3 class="em-pixel">Collected Ascended</h3>
-      <small>Choose a card to manage presets</small>
-    </div>
-    <template v-if="grouped">
-      <section v-for="group in groups" :key="group.typeId ?? 'none'" class="group" :data-type="group.typeId ?? 'none'">
-        <h4 class="group-name"><TypeSymbol v-if="group.typeId" :type-id="group.typeId" :size="40" decorative />{{ group.label }} <small class="em-num">{{ group.items.length }}</small></h4>
-        <div class="grid">
-          <div v-for="ascended in group.items" :key="ascended.ascended_id" class="owned-entry">
-            <AscendedCard :ascended="ascended" @open="show(ascended)" />
-            <span v-if="ascended.in_squad" class="squad-marker">Squad</span>
-          </div>
-        </div>
-      </section>
-    </template>
-    <div v-else class="grid">
-      <div v-for="ascended in owned" :key="ascended.ascended_id" class="owned-entry">
-        <AscendedCard :ascended="ascended" @open="show(ascended)" />
-        <span v-if="ascended.in_squad" class="squad-marker">Squad</span>
+    <div class="collected-zone" :class="{ 'drop-over': overCollected }" @dragover="dragOverCollected" @dragleave="overCollected = false" @drop.prevent="dropOnCollected">
+      <div class="section-head">
+        <h3 class="em-pixel">Collected Ascended</h3>
+        <small>Choose a card to manage presets</small>
       </div>
+      <template v-if="grouped">
+        <section v-for="group in groups" :key="group.typeId ?? 'none'" class="group" :data-type="group.typeId ?? 'none'">
+          <h4 class="group-name"><TypeSymbol v-if="group.typeId" :type-id="group.typeId" :size="40" decorative />{{ group.label }} <small class="em-num">{{ group.items.length }}</small></h4>
+          <div class="grid">
+            <div v-for="ascended in group.items" :key="ascended.ascended_id" class="owned-entry" draggable="true" @dragstart="dragStart($event, ascended.ascended_id, false)" @dragend="dragEnd">
+              <AscendedCard :ascended="ascended" @open="show(ascended)" />
+            </div>
+          </div>
+        </section>
+      </template>
+      <div v-else class="grid">
+        <div v-for="ascended in owned" :key="ascended.ascended_id" class="owned-entry" draggable="true" @dragstart="dragStart($event, ascended.ascended_id, false)" @dragend="dragEnd">
+          <AscendedCard :ascended="ascended" @open="show(ascended)" />
+        </div>
+      </div>
+      <p v-if="owned.length === 0" class="empty">{{ allOwned.length > owned.length && typeFilter === null ? "Everyone you collected is in your squad." : typeFilter === null ? "None collected yet." : `No ${typeLabel(typeFilter)} Ascended collected yet.` }}</p>
+
     </div>
-    <p v-if="owned.length === 0" class="empty">{{ typeFilter === null ? "None collected yet." : `No ${typeLabel(typeFilter)} Ascended collected yet.` }}</p>
 
     <template v-if="notOwned.length">
       <div class="section-head">
@@ -276,8 +348,12 @@ function show(ascended: OwnedAscended): void {
 .squad-strip { display: flex; flex-wrap: wrap; gap: var(--em-space-3); padding: 0; margin: 0; list-style: none; }
 .squad-slot { display: flex; flex-direction: column; gap: var(--em-space-2); width: 150px; }
 .squad-slot :deep(.card) { --card-width: 100%; }
+.squad-card { padding: 10px; border-radius: var(--em-radius); cursor: pointer; }
+.squad-card:focus-visible { outline: 2px solid var(--em-accent); outline-offset: 3px; }
 .squad-empty { min-height: 180px; justify-content: center; align-items: center; border: 1px dashed var(--em-border); border-radius: var(--em-radius); color: var(--em-muted); }
 .squad-control { flex-basis: 100%; }
+.squad-slot.drop-over { outline: 2px dashed var(--em-accent); outline-offset: 4px; border-radius: var(--em-radius); }
+.collected-zone.drop-over { outline: 2px dashed var(--em-accent); outline-offset: 6px; border-radius: var(--em-radius); }
 .squad-marker { display: inline-block; margin-top: var(--em-space-2); padding: var(--em-space-1) var(--em-space-2); border: 1px solid var(--em-accent); border-radius: var(--em-radius); color: var(--em-accent); font-size: 12px; }
 .section-head {
   display: flex;

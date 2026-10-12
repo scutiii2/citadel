@@ -173,8 +173,8 @@ Then set `agents_registry_url` in `apps/Ember/ember_api/configs/config_app.json`
 
 `agents/triage-assistant.json` defines a local specialist backed by Laya, a
 small model that answers typed questions about a short text. It is part of the
-tracked roster. Install the optional dependency with `pip install -e ".[laya]"`,
-or set `enabled: false` if this installation should not run it. Restart the
+tracked roster. Laya is a regular dependency, installed with `pip install -e .`;
+set `enabled: false` if this installation should not run it. Restart the
 supervisor after changing the roster. Its provider is `laya`, gateway `local`,
 model `convaiinnovations/laya`; no cloud model or API key is used.
 

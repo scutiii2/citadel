@@ -56,7 +56,9 @@ const faintLeft = computed(() => (props.ascended.faint_until === null ? 0 : Math
   display: flex;
   flex-direction: column;
   gap: var(--em-space-2);
+  box-sizing: border-box;
   width: var(--card-width, 100%);
+  padding: 10px;
   border-radius: var(--em-radius);
   color: var(--em-text);
   cursor: pointer;

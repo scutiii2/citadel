@@ -163,7 +163,7 @@ class LayaQuestions:
             try:
                 import laya
             except ImportError as error:
-                raise RuntimeError('Laya requires the optional dependency: pip install -e ".[laya]"') from error
+                raise RuntimeError('Laya is not installed: pip install -e .') from error
             self._engine = laya.load(DEFAULT_MODEL)
         return self._engine
 

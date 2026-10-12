@@ -5,8 +5,8 @@ import { ROUND_PACE_MS, useAscensionStore } from "../stores/ascension";
 import { usePlaybackStore } from "../stores/playback";
 import { effectText, titleCase } from "../utils/ascension";
 import EmButton from "./ui/EmButton.vue";
+import EmEmblem from "./ui/EmEmblem.vue";
 import EmDialog from "./ui/EmDialog.vue";
-import EmIcon from "./ui/EmIcon.vue";
 import EmPanel from "./ui/EmPanel.vue";
 
 /** "Your move": in manual mode one button per legal action, in the colour of its
@@ -91,7 +91,7 @@ function throwEmblem(tier: string): void {
       <p v-if="ownedTiers.length === 0" class="muted none">You have no EMBLEMs. Buy some in the shop.</p>
       <div class="tiers">
         <EmButton v-for="t in ownedTiers" :key="t.id" variant="primary" @click="throwEmblem(t.id)">
-          <EmIcon name="flame" /> {{ titleCase(t.id) }} ({{ battle.emblems[t.id] }})
+          <EmEmblem :tier-id="t.id" :size="28" /> {{ titleCase(t.id) }} ({{ battle.emblems[t.id] }})
         </EmButton>
       </div>
     </EmDialog>

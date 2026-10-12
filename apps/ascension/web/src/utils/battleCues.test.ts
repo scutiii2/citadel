@@ -28,13 +28,15 @@ describe("stepsFor", () => {
 
   it("throws an EMBLEM at the other side, wobbles, then closes or breaks free", () => {
     const caught = stepsFor([{ type: "capture_attempt", side: "player", emblem: "rare", chance: 0.4, success: true }]);
-    expect(caught.map((s) => s.ball?.wild?.phase)).toEqual(["throw", "wobble", "caught"]);
+    expect(caught.map((s) => s.ball?.wild?.phase)).toEqual(["throw", "throw", "wobble", "wobble", "wobble", "still", "caught"]);
     expect(caught[0]!.ball!.wild!.emblem).toBe("rare");
-    expect(caught[2]!.float!.text).toBe("Caught!");
+    expect(caught.slice(2, 5).map((s) => s.ball?.wild?.strain)).toEqual([1, 2, 3]);
+    expect(caught.slice(2, 6).every((s) => s.fx?.wild === "struggle")).toBe(true);
+    expect(caught[6]!.float!.text).toBe("Caught!");
 
     const free = stepsFor([{ type: "capture_attempt", side: "player", emblem: "common", chance: 0.58, success: false }]);
-    expect(free.map((s) => s.ball?.wild?.phase)).toEqual(["throw", "wobble", "open"]);
-    expect(free[2]!.fx).toEqual({ wild: "release" });
+    expect(free.map((s) => s.ball?.wild?.phase)).toEqual(["throw", "throw", "wobble", "wobble", "wobble", "still", "open"]);
+    expect(free[6]!.fx).toEqual({ wild: "release" });
   });
 
   it("shows no effect for a catch that does nothing and ignores events without a picture", () => {
