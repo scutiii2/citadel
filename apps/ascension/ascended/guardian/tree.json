@@ -1,10 +1,302 @@
-{"nodes": [
-  {"id": "guardian_heavy_blow", "root": true, "x": 60, "y": 60},
-  {"id": "guardian_rally", "root": true, "x": 60, "y": 180},
-  {"id": "guardian_bulwark", "root": true, "x": 60, "y": 300},
-  {"id": "guardian_passive", "root": true, "x": 220, "y": 180},
-  {"id": "guardian_shield_slam", "kind": "ability", "name": "Shield Slam", "category": "ATTACK", "percentage": 190, "cooldown": 2, "unlock_level": 18, "requires": ["guardian_heavy_blow"], "cost": {"tier": "common", "amount": 4}, "x": 220, "y": 60},
-  {"id": "guardian_iron_wall", "kind": "ability", "name": "Iron Wall", "category": "DEFENSE", "percentage": 260, "cooldown": 3, "unlock_level": 12, "requires": ["guardian_bulwark"], "cost": {"tier": "common", "amount": 3}, "x": 220, "y": 300},
-  {"id": "guardian_unyielding", "kind": "ability", "name": "Unyielding", "category": "SUPPORT", "stat": "power", "duration": 3, "percentage": 75, "cooldown": 3, "unlock_level": 22, "requires": ["guardian_rally"], "cost": {"tier": "rare", "amount": 3}, "x": 380, "y": 120},
-  {"id": "guardian_stoneskin", "kind": "passive", "name": "Stoneskin", "unlock_level": 15, "passive": {"kind": "defense_rating_bonus", "params": {"power_fraction": 0.4}}, "requires": ["guardian_iron_wall"], "cost": {"tier": "rare", "amount": 3}, "x": 380, "y": 300}
-]}
+{
+  "nodes": [
+    {
+      "id": "guardian_heavy_blow",
+      "root": true,
+      "x": 40,
+      "y": 60
+    },
+    {
+      "id": "guardian_rally",
+      "root": true,
+      "x": 40,
+      "y": 180
+    },
+    {
+      "id": "guardian_bulwark",
+      "root": true,
+      "x": 40,
+      "y": 300
+    },
+    {
+      "id": "guardian_passive",
+      "root": true,
+      "x": 40,
+      "y": 420
+    },
+    {
+      "id": "guardian_shield_slam",
+      "kind": "ability",
+      "name": "Shield Slam",
+      "category": "ATTACK",
+      "percentage": 190,
+      "cooldown": 2,
+      "unlock_level": 20,
+      "requires": [
+        "guardian_heavy_blow"
+      ],
+      "cost": {
+        "tier": "common",
+        "amount": 4
+      },
+      "x": 260,
+      "y": 60
+    },
+    {
+      "id": "guardian_iron_wall",
+      "kind": "ability",
+      "name": "Iron Wall",
+      "category": "DEFENSE",
+      "percentage": 260,
+      "cooldown": 3,
+      "unlock_level": 12,
+      "requires": [
+        "guardian_bulwark"
+      ],
+      "cost": {
+        "tier": "common",
+        "amount": 3
+      },
+      "x": 260,
+      "y": 180
+    },
+    {
+      "id": "guardian_unyielding",
+      "kind": "ability",
+      "name": "Unyielding",
+      "category": "SUPPORT",
+      "stat": "power",
+      "duration": 3,
+      "percentage": 75,
+      "cooldown": 3,
+      "unlock_level": 22,
+      "requires": [
+        "guardian_rally"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 3
+      },
+      "x": 260,
+      "y": 300
+    },
+    {
+      "id": "guardian_stoneskin",
+      "kind": "passive",
+      "name": "Stoneskin",
+      "unlock_level": 15,
+      "passive": {
+        "kind": "defense_rating_bonus",
+        "params": {
+          "power_fraction": 0.4
+        }
+      },
+      "requires": [
+        "guardian_iron_wall"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 3
+      },
+      "x": 260,
+      "y": 420
+    },
+    {
+      "id": "guardian_ember_mend",
+      "kind": "ability",
+      "name": "Ember Mend",
+      "unlock_level": 8,
+      "requires": [
+        "guardian_bulwark"
+      ],
+      "cost": {
+        "tier": "common",
+        "amount": 2
+      },
+      "x": 500,
+      "y": 60,
+      "category": "DEFENSE",
+      "percentage": 160,
+      "cooldown": 2,
+      "effects": [
+        {
+          "kind": "heal",
+          "percentage": 60
+        }
+      ]
+    },
+    {
+      "id": "guardian_tempered_core",
+      "kind": "passive",
+      "name": "Tempered Core",
+      "unlock_level": 10,
+      "requires": [
+        "guardian_passive"
+      ],
+      "cost": {
+        "tier": "common",
+        "amount": 2
+      },
+      "x": 500,
+      "y": 180,
+      "passive": {
+        "kind": "heal_bonus",
+        "params": {
+          "fraction": 0.25
+        }
+      }
+    },
+    {
+      "id": "guardian_shield_pressure",
+      "kind": "ability",
+      "name": "Shield Pressure",
+      "unlock_level": 22,
+      "requires": [
+        "guardian_shield_slam"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 500,
+      "y": 300,
+      "category": "ATTACK",
+      "percentage": 130,
+      "cooldown": 2,
+      "effects": [
+        {
+          "kind": "weaken",
+          "percentage": 15,
+          "rounds": 2
+        }
+      ]
+    },
+    {
+      "id": "guardian_forge_breath",
+      "kind": "ability",
+      "name": "Forge Breath",
+      "unlock_level": 24,
+      "requires": [
+        "guardian_unyielding"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 500,
+      "y": 420,
+      "category": "SUPPORT",
+      "percentage": 55,
+      "cooldown": 3,
+      "stat": "power",
+      "duration": 3,
+      "effects": [
+        {
+          "kind": "regen",
+          "percentage": 25,
+          "rounds": 3
+        }
+      ]
+    },
+    {
+      "id": "guardian_sealed_armour",
+      "kind": "ability",
+      "name": "Sealed Armour",
+      "unlock_level": 20,
+      "requires": [
+        "guardian_stoneskin"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 740,
+      "y": 60,
+      "category": "DEFENSE",
+      "percentage": 220,
+      "cooldown": 3,
+      "effects": [
+        {
+          "kind": "cleanse"
+        }
+      ]
+    },
+    {
+      "id": "guardian_last_ember",
+      "kind": "ability",
+      "name": "Last Ember",
+      "unlock_level": 26,
+      "requires": [
+        "guardian_sealed_armour"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 740,
+      "y": 180,
+      "category": "DEFENSE",
+      "percentage": 180,
+      "cooldown": 4,
+      "effects": [
+        {
+          "kind": "ward",
+          "rounds": 2
+        }
+      ]
+    },
+    {
+      "id": "guardian_steadfast",
+      "kind": "passive",
+      "name": "Steadfast",
+      "unlock_level": 28,
+      "requires": [
+        "guardian_tempered_core"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 740,
+      "y": 300,
+      "passive": {
+        "kind": "defense_extension",
+        "params": {
+          "protected_attacks": 3,
+          "rounds": 2
+        }
+      }
+    },
+    {
+      "id": "guardian_heart_of_the_forge",
+      "kind": "ability",
+      "name": "Heart of the Forge",
+      "unlock_level": 30,
+      "requires": [
+        "guardian_ember_mend",
+        "guardian_shield_pressure",
+        "guardian_forge_breath",
+        "guardian_last_ember",
+        "guardian_steadfast"
+      ],
+      "cost": {
+        "tier": "unique",
+        "amount": 5
+      },
+      "x": 1000,
+      "y": 240,
+      "category": "DEFENSE",
+      "percentage": 300,
+      "cooldown": 4,
+      "effects": [
+        {
+          "kind": "heal",
+          "percentage": 80
+        },
+        {
+          "kind": "cleanse"
+        }
+      ]
+    }
+  ]
+}

@@ -1,11 +1,301 @@
-{"nodes": [
-  {"id": "scout_quickstep", "root": true, "x": 40, "y": 160},
-  {"id": "scout_swift_slash", "root": true, "x": 140, "y": 60},
-  {"id": "scout_evade", "root": true, "x": 140, "y": 260},
-  {"id": "scout_passive", "root": true, "x": 260, "y": 160},
-  {"id": "scout_gale_step", "kind": "ability", "name": "Gale Step", "category": "SUPPORT", "stat": "speed", "duration": 3, "percentage": 140, "cooldown": 3, "unlock_level": 12, "requires": ["scout_quickstep"], "cost": {"tier": "common", "amount": 3}, "x": 40, "y": 20},
-  {"id": "scout_twin_cuts", "kind": "ability", "name": "Twin Cuts", "category": "ATTACK", "percentage": 90, "cooldown": 1, "unlock_level": 9, "requires": ["scout_swift_slash"], "cost": {"tier": "common", "amount": 2}, "x": 260, "y": 40},
-  {"id": "scout_mirage", "kind": "ability", "name": "Mirage", "category": "DEFENSE", "percentage": 200, "cooldown": 2, "unlock_level": 16, "requires": ["scout_evade"], "cost": {"tier": "rare", "amount": 3}, "x": 260, "y": 280},
-  {"id": "scout_fleet_footed", "kind": "passive", "name": "Fleet Footed", "unlock_level": 14, "passive": {"kind": "support_duration_bonus", "params": {"rounds": 1}}, "requires": ["scout_gale_step"], "cost": {"tier": "rare", "amount": 3}, "x": 380, "y": 100},
-  {"id": "scout_headstart", "kind": "passive", "name": "Headstart", "unlock_level": 20, "passive": {"kind": "battle_start_speed", "params": {"power_fraction": 0.8}}, "requires": ["scout_passive"], "cost": {"tier": "rare", "amount": 4}, "x": 380, "y": 220}
-]}
+{
+  "nodes": [
+    {
+      "id": "scout_quickstep",
+      "root": true,
+      "x": 40,
+      "y": 72
+    },
+    {
+      "id": "scout_swift_slash",
+      "root": true,
+      "x": 40,
+      "y": 192
+    },
+    {
+      "id": "scout_evade",
+      "root": true,
+      "x": 40,
+      "y": 312
+    },
+    {
+      "id": "scout_passive",
+      "root": true,
+      "x": 40,
+      "y": 432
+    },
+    {
+      "id": "scout_gale_step",
+      "kind": "ability",
+      "name": "Gale Step",
+      "category": "SUPPORT",
+      "stat": "speed",
+      "duration": 3,
+      "percentage": 140,
+      "cooldown": 3,
+      "unlock_level": 12,
+      "requires": [
+        "scout_quickstep"
+      ],
+      "cost": {
+        "tier": "common",
+        "amount": 3
+      },
+      "x": 260,
+      "y": 72
+    },
+    {
+      "id": "scout_twin_cuts",
+      "kind": "ability",
+      "name": "Twin Cuts",
+      "category": "ATTACK",
+      "percentage": 90,
+      "cooldown": 1,
+      "unlock_level": 10,
+      "requires": [
+        "scout_swift_slash"
+      ],
+      "cost": {
+        "tier": "common",
+        "amount": 2
+      },
+      "x": 260,
+      "y": 192
+    },
+    {
+      "id": "scout_mirage",
+      "kind": "ability",
+      "name": "Mirage",
+      "category": "DEFENSE",
+      "percentage": 200,
+      "cooldown": 2,
+      "unlock_level": 20,
+      "requires": [
+        "scout_evade"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 3
+      },
+      "x": 260,
+      "y": 312
+    },
+    {
+      "id": "scout_fleet_footed",
+      "kind": "passive",
+      "name": "Fleet Footed",
+      "unlock_level": 14,
+      "passive": {
+        "kind": "support_duration_bonus",
+        "params": {
+          "rounds": 1
+        }
+      },
+      "requires": [
+        "scout_gale_step"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 3
+      },
+      "x": 260,
+      "y": 432
+    },
+    {
+      "id": "scout_headstart",
+      "kind": "passive",
+      "name": "Headstart",
+      "unlock_level": 20,
+      "passive": {
+        "kind": "battle_start_speed",
+        "params": {
+          "power_fraction": 0.8
+        }
+      },
+      "requires": [
+        "scout_passive"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 500,
+      "y": 72
+    },
+    {
+      "id": "scout_feather_feint",
+      "kind": "ability",
+      "name": "Feather Feint",
+      "unlock_level": 12,
+      "requires": [
+        "scout_twin_cuts"
+      ],
+      "cost": {
+        "tier": "common",
+        "amount": 3
+      },
+      "x": 500,
+      "y": 192,
+      "category": "ATTACK",
+      "percentage": 100,
+      "cooldown": 2,
+      "effects": [
+        {
+          "kind": "slow",
+          "percentage": 20,
+          "rounds": 2
+        }
+      ]
+    },
+    {
+      "id": "scout_trailblaze",
+      "kind": "ability",
+      "name": "Trailblaze",
+      "unlock_level": 16,
+      "requires": [
+        "scout_fleet_footed"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 3
+      },
+      "x": 500,
+      "y": 312,
+      "category": "SUPPORT",
+      "percentage": 90,
+      "cooldown": 3,
+      "stat": "speed",
+      "duration": 3,
+      "effects": [
+        {
+          "kind": "cleanse"
+        }
+      ]
+    },
+    {
+      "id": "scout_ember_trail",
+      "kind": "ability",
+      "name": "Ember Trail",
+      "unlock_level": 20,
+      "requires": [
+        "scout_feather_feint"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 500,
+      "y": 432,
+      "category": "ATTACK",
+      "percentage": 145,
+      "cooldown": 2,
+      "effects": [
+        {
+          "kind": "mark",
+          "name": "trail",
+          "rounds": 3
+        }
+      ]
+    },
+    {
+      "id": "scout_keen_scent",
+      "kind": "passive",
+      "name": "Keen Scent",
+      "unlock_level": 24,
+      "requires": [
+        "scout_headstart"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 740,
+      "y": 72,
+      "passive": {
+        "kind": "attack_bonus_vs_marked",
+        "params": {
+          "mark": "trail",
+          "power_fraction": 0.3
+        }
+      }
+    },
+    {
+      "id": "scout_slipstream",
+      "kind": "ability",
+      "name": "Slipstream",
+      "unlock_level": 24,
+      "requires": [
+        "scout_mirage"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 740,
+      "y": 192,
+      "category": "DEFENSE",
+      "percentage": 170,
+      "cooldown": 3,
+      "effects": [
+        {
+          "kind": "regen",
+          "percentage": 20,
+          "rounds": 3
+        }
+      ]
+    },
+    {
+      "id": "scout_tailwind",
+      "kind": "ability",
+      "name": "Tailwind",
+      "unlock_level": 28,
+      "requires": [
+        "scout_trailblaze"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 740,
+      "y": 312,
+      "category": "SUPPORT",
+      "percentage": 160,
+      "cooldown": 3,
+      "stat": "speed",
+      "duration": 3
+    },
+    {
+      "id": "scout_horizon_dash",
+      "kind": "ability",
+      "name": "Horizon Dash",
+      "unlock_level": 30,
+      "requires": [
+        "scout_ember_trail",
+        "scout_keen_scent",
+        "scout_slipstream",
+        "scout_tailwind"
+      ],
+      "cost": {
+        "tier": "unique",
+        "amount": 5
+      },
+      "x": 1000,
+      "y": 252,
+      "category": "ATTACK",
+      "percentage": 220,
+      "cooldown": 4,
+      "effects": [
+        {
+          "kind": "slow",
+          "percentage": 25,
+          "rounds": 2
+        },
+        {
+          "kind": "exposed",
+          "percentage": 30,
+          "rounds": 2
+        }
+      ]
+    }
+  ]
+}
