@@ -10,13 +10,13 @@ Signature colours: **cyan and white** for Twoychi as a whole (Aya's colours, and
 
 ## Aya
 
-- A water-bender spirit. Her body is a spirit: pale, softly luminous, partly translucent. Water shows through the translucent parts.
-- **Her hands are translucent like a spirit's.** They are the clearest feature. Water gathers in and around the open hands and flows from them as ribbons, arcs, orbs or a stream. Show the water and the spirit hands as one design: the hands are glass-clear white with cyan glow at the palms, and the water is the same cyan and white.
-- Her hair moves as if underwater even on dry ground (from the lore), in cyan-to-white strands.
-- Eyes: very pale, the colour eyes go just before they close (from the lore); a cool pale cyan-white.
-- Calm, merciful bearing. Never aggressive; the water is shown at rest or flowing, not as a weapon.
+Aya has two appearances. Ordinary people see only the first, as the Collector saw her. The second shows only when she uses her power (healing, guiding the dead).
+
+- **Human form (the one in front).** A young woman, calm and kind, who looks entirely human. Plain travelling clothes with a mended sleeve (from the lore), white and cyan accents, simple boots; hair dark brown, loose. Face calm and human, with pale cyan-grey eyes. She is never aggressive; water is at rest or flowing around her hands. No visible sign that she is anything more.
+- **True form (the one behind).** When she uses her power, her real form shows behind her: a large, pale, softly luminous water-bender spirit, partly translucent, in cyan and white. Water shows through it. Its hands are translucent like a spirit's, glass-clear white with a cyan glow at the palms, and it controls water with them: ribbons, arcs and orbs rise from them. Its hair drifts as if underwater in cyan-to-white strands, and its eyes are very pale cyan-white (the colour eyes go just before they close, from the lore). It mirrors her pose, a little larger, and fades to mist toward the edges so it never hides her.
+- Both read as one being: same pose, same flow of water. The human Aya stays in front and remains the focal figure; the true form is the glow and shape behind her.
 - Palette: white, pale cyan, deeper aqua in the water, with soft cyan light on nearby surfaces.
-- Her face is allowed (`../ART_GUIDE.md` no longer bans faces). Keep it calm, pale and spirit-like; record the approved face here after the first generation.
+- Her face (human form) is allowed (`../ART_GUIDE.md` no longer bans faces). Record the approved face here after the first generation.
 
 ## Troy
 
@@ -30,14 +30,14 @@ Signature colours: **cyan and white** for Twoychi as a whole (Aya's colours, and
 
 ## Together
 
-- Aya is the focal figure. Troy stands beside or in front of her, within the same silhouette. Water curls around both of them, tying cyan to white and black.
+- Human Aya is the focal figure, with her true form behind her. Troy stands beside or in front of her, within the same silhouette. Water curls around all of them, tying cyan to white and black.
 - In the main card, Troy appears in all three shapes at once (small dog nearest, wolf and bear behind, rendered ghostly and white-black), so every form reads in one image.
-- Preview: head and shoulders of Aya with her translucent hands and Troy's dog head. Battle: Aya and the dog as one complete figure facing right, with water arcing toward the right.
+- Preview: head and shoulders of human Aya with her true form's glowing outline behind her, and Troy's dog head. Battle: Aya and the dog as one complete figure facing right, with water arcing toward the right.
 - Palette overall: cyan and white lead; black appears only on Troy. Keep the cyan-white colour family dominant.
 
 ## Consistency across sprites
 
-Keep these in every sprite: Aya's translucent hands holding water, her pale cyan eyes, her flowing hair, Troy's white and black shih tzu markings, his curled tail and flat face, and the cyan-white water linking both. Pose, crop and background change; do not make Troy a different breed or colour, make Aya's hands opaque, or add weapons.
+Keep these in every sprite: human Aya in front with her mended sleeve, her true spirit form behind her with translucent hands controlling water, her pale cyan eyes, Troy's white and black shih tzu markings, his curled tail and flat face, and the cyan-white water linking both. Pose, crop and background change; do not make Troy a different breed or colour, make the true form's hands opaque, hide the true form, make the front Aya look supernatural, or add weapons.
 
 Battle shading follows `../ART_GUIDE.md`: darkest tones at least about #2a3342, including Troy's black, which must be a dark slate, not pure black.
 
