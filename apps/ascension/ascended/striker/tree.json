@@ -1,10 +1,296 @@
-{"nodes": [
-  {"id": "striker_rending_strike", "root": true, "x": 40, "y": 40},
-  {"id": "striker_battle_focus", "root": true, "x": 40, "y": 160},
-  {"id": "striker_brace", "root": true, "x": 40, "y": 280},
-  {"id": "striker_passive", "root": true, "x": 180, "y": 100},
-  {"id": "striker_flurry", "kind": "ability", "name": "Flurry", "category": "ATTACK", "percentage": 110, "cooldown": 1, "unlock_level": 8, "requires": ["striker_rending_strike"], "cost": {"tier": "common", "amount": 2}, "x": 180, "y": 20},
-  {"id": "striker_execution", "kind": "ability", "name": "Execution", "category": "ATTACK", "percentage": 260, "cooldown": 3, "unlock_level": 20, "requires": ["striker_flurry"], "cost": {"tier": "rare", "amount": 4}, "x": 320, "y": 20},
-  {"id": "striker_bloodlust", "kind": "ability", "name": "Bloodlust", "category": "SUPPORT", "stat": "power", "duration": 2, "percentage": 90, "cooldown": 3, "unlock_level": 14, "requires": ["striker_battle_focus"], "cost": {"tier": "common", "amount": 3}, "x": 180, "y": 220},
-  {"id": "striker_desperation", "kind": "passive", "name": "Desperation", "unlock_level": 18, "passive": {"kind": "low_hp_attack_bonus", "params": {"hp_below": 0.7, "power_fraction": 0.25}}, "requires": ["striker_passive"], "cost": {"tier": "rare", "amount": 3}, "x": 320, "y": 140}
-]}
+{
+  "nodes": [
+    {
+      "id": "striker_rending_strike",
+      "root": true,
+      "x": 40,
+      "y": 84
+    },
+    {
+      "id": "striker_battle_focus",
+      "root": true,
+      "x": 40,
+      "y": 204
+    },
+    {
+      "id": "striker_brace",
+      "root": true,
+      "x": 40,
+      "y": 324
+    },
+    {
+      "id": "striker_passive",
+      "root": true,
+      "x": 40,
+      "y": 444
+    },
+    {
+      "id": "striker_flurry",
+      "kind": "ability",
+      "name": "Flurry",
+      "category": "ATTACK",
+      "percentage": 110,
+      "cooldown": 1,
+      "unlock_level": 8,
+      "requires": [
+        "striker_rending_strike"
+      ],
+      "cost": {
+        "tier": "common",
+        "amount": 2
+      },
+      "x": 260,
+      "y": 84
+    },
+    {
+      "id": "striker_execution",
+      "kind": "ability",
+      "name": "Execution",
+      "category": "ATTACK",
+      "percentage": 260,
+      "cooldown": 3,
+      "unlock_level": 20,
+      "requires": [
+        "striker_flurry"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 260,
+      "y": 204
+    },
+    {
+      "id": "striker_bloodlust",
+      "kind": "ability",
+      "name": "Bloodlust",
+      "category": "SUPPORT",
+      "stat": "power",
+      "duration": 2,
+      "percentage": 90,
+      "cooldown": 3,
+      "unlock_level": 14,
+      "requires": [
+        "striker_battle_focus"
+      ],
+      "cost": {
+        "tier": "common",
+        "amount": 3
+      },
+      "x": 260,
+      "y": 324
+    },
+    {
+      "id": "striker_desperation",
+      "kind": "passive",
+      "name": "Desperation",
+      "unlock_level": 18,
+      "passive": {
+        "kind": "low_hp_attack_bonus",
+        "params": {
+          "hp_below": 0.7,
+          "power_fraction": 0.25
+        }
+      },
+      "requires": [
+        "striker_passive"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 3
+      },
+      "x": 260,
+      "y": 444
+    },
+    {
+      "id": "striker_scorching_edge",
+      "kind": "ability",
+      "name": "Scorching Edge",
+      "unlock_level": 12,
+      "requires": [
+        "striker_flurry"
+      ],
+      "cost": {
+        "tier": "common",
+        "amount": 3
+      },
+      "x": 500,
+      "y": 84,
+      "category": "ATTACK",
+      "percentage": 130,
+      "cooldown": 2,
+      "effects": [
+        {
+          "kind": "bleed",
+          "percentage": 20,
+          "rounds": 3
+        }
+      ]
+    },
+    {
+      "id": "striker_blade_temper",
+      "kind": "passive",
+      "name": "Blade Temper",
+      "unlock_level": 12,
+      "requires": [
+        "striker_passive"
+      ],
+      "cost": {
+        "tier": "common",
+        "amount": 3
+      },
+      "x": 500,
+      "y": 204,
+      "passive": {
+        "kind": "attack_bonus_vs_defense",
+        "params": {
+          "power_fraction": 0.3
+        }
+      }
+    },
+    {
+      "id": "striker_cinder_focus",
+      "kind": "ability",
+      "name": "Cinder Focus",
+      "unlock_level": 18,
+      "requires": [
+        "striker_bloodlust"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 3
+      },
+      "x": 500,
+      "y": 324,
+      "category": "SUPPORT",
+      "percentage": 65,
+      "cooldown": 3,
+      "stat": "power",
+      "duration": 3,
+      "effects": [
+        {
+          "kind": "cleanse"
+        }
+      ]
+    },
+    {
+      "id": "striker_crossguard",
+      "kind": "ability",
+      "name": "Crossguard",
+      "unlock_level": 22,
+      "requires": [
+        "striker_brace"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 500,
+      "y": 444,
+      "category": "DEFENSE",
+      "percentage": 150,
+      "cooldown": 2
+    },
+    {
+      "id": "striker_open_the_guard",
+      "kind": "ability",
+      "name": "Open the Guard",
+      "unlock_level": 24,
+      "requires": [
+        "striker_scorching_edge"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 740,
+      "y": 84,
+      "category": "ATTACK",
+      "percentage": 160,
+      "cooldown": 2,
+      "effects": [
+        {
+          "kind": "exposed",
+          "percentage": 40,
+          "rounds": 3
+        }
+      ]
+    },
+    {
+      "id": "striker_ember_recovery",
+      "kind": "ability",
+      "name": "Ember Recovery",
+      "unlock_level": 26,
+      "requires": [
+        "striker_crossguard"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 740,
+      "y": 204,
+      "category": "DEFENSE",
+      "percentage": 130,
+      "cooldown": 3,
+      "effects": [
+        {
+          "kind": "heal",
+          "percentage": 50
+        }
+      ]
+    },
+    {
+      "id": "striker_white_heat",
+      "kind": "passive",
+      "name": "White Heat",
+      "unlock_level": 28,
+      "requires": [
+        "striker_desperation"
+      ],
+      "cost": {
+        "tier": "rare",
+        "amount": 4
+      },
+      "x": 740,
+      "y": 324,
+      "passive": {
+        "kind": "low_hp_attack_bonus",
+        "params": {
+          "hp_below": 0.4,
+          "power_fraction": 0.45
+        }
+      }
+    },
+    {
+      "id": "striker_sunsteel_cleave",
+      "kind": "ability",
+      "name": "Sunsteel Cleave",
+      "unlock_level": 30,
+      "requires": [
+        "striker_execution",
+        "striker_blade_temper",
+        "striker_cinder_focus",
+        "striker_open_the_guard",
+        "striker_ember_recovery",
+        "striker_white_heat"
+      ],
+      "cost": {
+        "tier": "unique",
+        "amount": 5
+      },
+      "x": 1000,
+      "y": 264,
+      "category": "ATTACK",
+      "percentage": 300,
+      "cooldown": 4,
+      "effects": [
+        {
+          "kind": "bleed",
+          "percentage": 25,
+          "rounds": 3
+        }
+      ]
+    }
+  ]
+}
