@@ -26,6 +26,10 @@
       "rounds": 1
     }
   },
+  "passive_2": {
+    "kind": "heal_bonus",
+    "params": { "fraction": 0.15 }
+  },
   "abilities": [
     {
       "id": "twoychi_tidecall",
@@ -52,6 +56,23 @@
       "category": "ATTACK",
       "percentage": 160,
       "cooldown": 2
+    },
+    {
+      "id": "twoychi_comforting_presence",
+      "name": "Comforting Presence",
+      "unlock_level": 30,
+      "category": "SUPPORT",
+      "percentage": 50,
+      "cooldown": 3,
+      "stat": "power",
+      "duration": 4,
+      "effects": [
+        {
+          "kind": "regen",
+          "percentage": 10,
+          "rounds": 4
+        }
+      ]
     }
   ]
 }

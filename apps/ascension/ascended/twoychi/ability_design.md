@@ -1,30 +1,21 @@
 # Twoychi: ability design
 
-Healing, bleed, slow, weaken, exposed, marks, cleanse and ward now exist in the engine (see the README, Effects).
-The tree now uses them (47 nodes). Converted: Mending Current (regen), Tidal Mend (heal), Healing Rain (regen, Soaked mark),
-Borrowed Breath (ward), Mercy's Current (heal, cleanse), new Purifying Water and Shake It Off (cleanse), Rending Bite and
-Blood in the Water (bleed, Prey mark), Scent of Danger (Prey mark), Hamstring and Earthbreaker (slow), Circle the Prey
-(exposed), Comforting Presence and Home Is Wherever You Are (regen, cleanse), Give Until Empty (`heal_bonus`) and the new
-No Escape (`attack_bonus_vs_marked` on Prey). The per-ability tables below keep their older notes; the tree is the truth.
-Still later: Water, forms, taunt, root, revive, positions, several targets.
+The tree has four active slots and two passive slots. Each node has one home branch, including cross-tree nodes.
+Troy's forms are loadout slots with no form bonus. Water is Aya's identity and animation only; Water has no mechanic.
+All numbers, including Waterbound and the new Aya passives, are placeholders (?).
 
-Source: a draft ability list for Twoychi (four trees: Troy Wolf, Troy Bear, Troy Dog, Aya), written for a real-time game.
-The game here is a turn-based 1v1 with three ability categories, so the tree in `tree.json` uses only what the engine
-can do today. Everything else stays in this file, marked **later**, until the engine can express it.
+| Slot | Takes |
+|---|---|
+| A1 | Wolf abilities |
+| A2 | Bear abilities |
+| A3 | Dog abilities (Comforting Presence root) |
+| A4 | Aya abilities |
+| P1 | Wolf, Bear and Dog passives (Troy) |
+| P2 | Aya passives (Waterbound root) |
 
-What the engine can express today:
-- An ability: `category` (ATTACK, DEFENSE, SUPPORT), `percentage` of power, `cooldown`, and for SUPPORT a `stat`
-  (`power` or `speed`) and a `duration`.
-- A passive: one of the existing kinds (`attack_bonus_vs_defense`, `low_hp_attack_bonus`, `battle_start_speed`,
-  `defense_rating_bonus`, `defense_extension`, `support_duration_bonus`, `cooldown_reduction`).
-- A node: `requires` (all listed nodes, so a node can need nodes from two branches), `unlock_level`, an essence `cost`.
-
-What it cannot yet: healing over time, marks (Prey, Bleeding, Soaked), a Water resource, cleanse, revive, taunt, slows and
-roots on the enemy, several targets, positions, pickups, hidden enemies, and Troy changing form as a stance.
-
-The tree in `tree.json` has 44 nodes: the four roots (Tidecall, Mournful Veil, Troy's Hunt, the passive) plus four
-branches that grow from them. Wolf grows from Troy's Hunt, Aya from Tidecall, Bear from Mournful Veil, Dog from the
-passive. The cross-tree nodes need two branches. All numbers are placeholders (?).
+The catalog roots unlock at levels 1, 10, 20 and 30. The tree uses the engine's healing, regeneration, bleed,
+slow, exposed, marks, cleanse and ward effects. The status tables below retain their original draft notes;
+`tree.json` is the current implementation. Later possibilities include taunt, roots, revive, positions and several targets.
 
 ## Identity of each tree
 
@@ -32,7 +23,7 @@ passive. The cross-tree nodes need two branches. All numbers are placeholders (?
 |---|---|---|
 | Troy Wolf | Hunt, damage, speed, execution | Troy's Hunt (ATTACK) |
 | Troy Bear | Tank, protection, bruiser | Mournful Veil (DEFENSE) |
-| Troy Dog | Utility, recovery, companionship (not a weaker wolf) | the passive |
+| Troy Dog | Utility, recovery, companionship (not a weaker wolf) | Comforting Presence (SUPPORT) |
 | Aya | Healing, water, cleansing, mercy | Tidecall (SUPPORT) |
 
 ## Status of every ability
