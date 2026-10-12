@@ -47,6 +47,19 @@ const mountTab = async () => {
 };
 
 describe("TreeTab", () => {
+  it("refreshes requirements after an upgrade consumes essence", async () => {
+    const wrapper = await mountTab();
+    const next = structuredClone(TREE);
+    next.essences.common = 0;
+    next.nodes[3] = { ...next.nodes[3]!, state: "locked", reason: "needs essence" };
+    client.tree.mockResolvedValue(next);
+    await wrapper.setProps({ ascended: ownedAscended("guardian", { level: 12, copies: 0, stars: 1 }) });
+    await flushPromises();
+    expect(client.tree).toHaveBeenCalledTimes(2);
+    await wrapper.find('[data-node="g_wall"]').trigger("click");
+    expect(wrapper.find(".node-detail").text()).toContain("You have 0");
+    expect(wrapper.find(".node-detail button.learn").exists()).toBe(false);
+  });
   it("shows an ability's effects in the node detail", async () => {
     const tree = structuredClone(TREE);
     tree.nodes[3] = { ...tree.nodes[3]!, effects: [{ kind: "bleed", percentage: 20, rounds: 3 }] };
@@ -65,9 +78,19 @@ describe("TreeTab", () => {
     expect(nodes).toHaveLength(5);
     expect(wrapper.find('[data-node="g_wall"]').attributes("data-state")).toBe("learnable");
     expect(wrapper.find('[data-node="g_far"]').attributes("data-state")).toBe("locked");
-    expect(wrapper.find('[data-node="g_wall"]').attributes("style")).toContain("left: 200px");
+    expect(wrapper.find('[data-node="g_wall"]').text()).toContain("Available");
     expect(wrapper.findAll(".tree-line")).toHaveLength(2);
     expect(wrapper.find(".slots").text()).toContain("empty");
+  });
+
+  it("shows individual unmet requirements and available essence in the inspector", async () => {
+    const wrapper = await mountTab();
+    await wrapper.find('[data-node="g_far"]').trigger("click");
+    const detail = wrapper.find(".node-detail");
+    expect(detail.text()).toContain("Level 20");
+    expect(detail.text()).toContain("WALL");
+    expect(detail.text()).toContain("You have 0");
+    expect(wrapper.find('[data-node="g_far"]').text()).toContain("Locked");
   });
 
   it("learns a node and reloads the tree", async () => {

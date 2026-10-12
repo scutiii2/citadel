@@ -5,7 +5,9 @@ import cardBackUrl from "../assets/card_back.png";
 import { useAscensionStore } from "../stores/ascension";
 import { errorMessage } from "../utils/errors";
 import { filterByType, groupByType, typeLabel, typesPresent } from "../utils/ascensionTypes";
-import { titleCase } from "../utils/ascension";
+import { formatCountdown, titleCase, passiveText, abilityEffect } from "../utils/ascension";
+import { spriteFor, spriteFocus } from "../utils/sprites";
+import { useNowSeconds } from "../composables/useNowSeconds";
 import TreeTab from "./TreeTab.vue";
 import PresetEditor from "./PresetEditor.vue";
 import AscendedCard from "./AscendedCard.vue";
@@ -16,6 +18,7 @@ import EmDialog from "./ui/EmDialog.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmSwitch from "./ui/EmSwitch.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
+import EmTabs from "./ui/EmTabs.vue";
 import TypeSymbol from "./ui/TypeSymbol.vue";
 
 /** The Collection tab: owned Ascended as small cards with a caption, the rest of the
@@ -38,9 +41,21 @@ const owned = computed(() => filterByType(allOwned.value, typeFilter.value));
 const notOwned = computed(() => filterByType(allNotOwned.value, typeFilter.value));
 const groups = computed(() => groupByType(owned.value));
 
-const open = ref<OwnedAscended | null>(null);
-const treeOpen = ref(false);
+const openId = ref<string | null>(null);
+const open = computed(() => store.profile?.ascendeds.find(s => s.ascended_id === openId.value) ?? null);
+const detailTab = ref("overview");
+const treeVisited = ref(false);
+const detailTabs = [{ value: "overview", label: "Overview" }, { value: "personalities", label: "Personalities" }, { value: "tree", label: "Ability tree" }];
+const now = useNowSeconds();
 const openInfo = computed(() => store.catalog?.ascendeds.find((s) => s.id === open.value?.ascended_id) ?? null);
+const faintLeft = computed(() => Math.max(0, (open.value?.faint_until ?? 0) - now.value));
+const stats = computed(() => {
+  const info = openInfo.value;
+  const owned = open.value;
+  if (!info || !owned) return [];
+  const multiplier = store.catalog?.tiers.find(t => t.id === owned.tier_id)?.stat_multiplier ?? 1;
+  return ["hp", "power", "speed"].map(key => ({ key, value: Math.max(1, Math.floor(((info.base[key] ?? 0) + (info.growth[key] ?? 0) * (owned.level - 1)) * multiplier + 1e-9)) }));
+});
 const personalities = ref<PersonalityItem[]>([]);
 const nextCursor = ref<number | null>(null);
 const loadingMore = ref(false);
@@ -67,16 +82,9 @@ const upgradeMessage = ref("");
 const essences = computed(() => Object.entries(store.profile?.essences ?? {}).filter(([, count]) => count > 0));
 const essenceOf = (tierId: string) => store.profile?.essences[tierId] ?? 0;
 
-/** The details dialog keeps its own copy of the card; after an upgrade it takes the refreshed one. */
-function refreshOpen(): void {
-  const id = open.value?.ascended_id;
-  open.value = store.profile?.ascendeds.find((s) => s.ascended_id === id) ?? open.value;
-}
-
 async function addStar(ascended: OwnedAscended): Promise<void> {
   upgradeMessage.value = "";
   const result = await store.addStar(ascended.ascended_id);
-  refreshOpen();
   if (result) {
     upgradeMessage.value = `${ascended.name} gained a star: ${result.stars} of ${result.stars_needed}.`;
   }
@@ -85,16 +93,16 @@ async function addStar(ascended: OwnedAscended): Promise<void> {
 async function raiseTier(ascended: OwnedAscended): Promise<void> {
   upgradeMessage.value = "";
   const result = await store.raiseTier(ascended.ascended_id);
-  refreshOpen();
   if (result) {
     upgradeMessage.value = `${ascended.name} rose to ${titleCase(result.tier_id)}.`;
   }
 }
 
 function show(ascended: OwnedAscended): void {
-  treeOpen.value = false;
+  detailTab.value = "overview";
+  treeVisited.value = false;
   upgradeMessage.value = "";
-  open.value = ascended;
+  openId.value = ascended.ascended_id;
   personalities.value = [];
   nextCursor.value = null;
   void loadPersonalities(null);
@@ -157,16 +165,20 @@ function show(ascended: OwnedAscended): void {
       </ul>
     </template>
 
-    <EmDialog :open="open !== null" title="Ascended details" wide @close="open = null">
+    <EmDialog class="ascended-details" :open="open !== null" :title="open?.name ?? 'Ascended details'" wide @close="openId = null">
       <div v-if="open" class="details">
-        <AscendedTemplateCard v-if="openInfo" class="big-card" :ascended="openInfo" :level="open.level" :tier-id="open.tier_id" />
-        <div class="side">
+        <aside class="summary">
+          <img v-if="openInfo && spriteFor(openInfo.art, 'main_card')" class="detail-portrait" :src="spriteFor(openInfo.art, 'main_card')!" :style="{ objectPosition: `50% ${spriteFocus(openInfo.art, 'main_card')}%` }" :alt="open.name" />
           <h3 class="em-pixel name">{{ open.name }}</h3>
+          <div class="copy-summary"><strong class="em-num">{{ open.copies }}</strong> {{ open.copies === 1 ? 'spare copy' : 'spare copies' }}<small>Available to spend on stars</small></div>
           <p class="level em-num">Level {{ open.level }} of {{ open.level_cap }}</p>
           <div class="badges">
             <EmTierBadge :tier-id="open.tier_id" />
             <span v-for="id in open.ascension_types" :key="id" class="type-chip"><TypeSymbol :type-id="id" :size="18" decorative />{{ typeLabel(id) }}</span>
           </div>
+
+          <dl class="current-stats" aria-label="Current stats"><div v-for="stat in stats" :key="stat.key"><dt>{{ stat.key === 'hp' ? 'HP' : titleCase(stat.key) }}</dt><dd class="em-num">{{ stat.value }}</dd></div></dl>
+          <p class="battle-status" :class="{ fainted: faintLeft > 0 }">{{ faintLeft > 0 ? `Fainted, ready in ${formatCountdown(faintLeft)}` : 'Ready for battle' }}</p>
           <div class="xp">
             <template v-if="open.xp_needed !== null">
               <EmBar :value="open.xp" :max="open.xp_needed" :label="`${open.name} XP`" />
@@ -187,32 +199,34 @@ function show(ascended: OwnedAscended): void {
                 <EmButton v-if="open.can_tier_up" variant="primary" :disabled="store.busy" @click="raiseTier(open)">
                   Raise to {{ titleCase(open.next_tier_id ?? "") }}
                 </EmButton>
-                <EmButton v-else :disabled="!open.can_star_up || store.busy" @click="addStar(open)">Add a star</EmButton>
+                <EmButton v-else variant="primary" :disabled="!open.can_star_up || store.busy" @click="addStar(open)">Add a star</EmButton>
               </div>
             </template>
             <span v-else>Top of its ladder: no more stars.</span>
             <p v-if="upgradeMessage" class="upgrade-note" role="status">{{ upgradeMessage }}</p>
           </div>
 
-          <EmButton :aria-expanded="treeOpen" @click="treeOpen = !treeOpen">{{ treeOpen ? "Hide ability tree" : "Ability tree" }}</EmButton>
-          <TreeTab v-if="treeOpen" :ascended="open" />
+          <EmNotice v-if="store.error" tone="error">{{ store.error }}</EmNotice>
+        </aside>
+        <div class="side">
+          <EmTabs v-model="detailTab" :options="detailTabs" ariaLabel="Ascended detail sections" @update:model-value="value => { if (value === 'tree') treeVisited = true; }" />
+          <section v-if="detailTab === 'overview'" class="overview" role="tabpanel" aria-label="Overview">
+            <AscendedTemplateCard v-if="openInfo" class="big-card" :ascended="openInfo" :level="open.level" :tier-id="open.tier_id" />
+            <div v-if="openInfo" class="overview-effects"><h4>Innate passive</h4><strong>{{ titleCase(openInfo.passive.kind) }}</strong><p>{{ passiveText(openInfo.passive.kind, openInfo.passive.params) }}</p><h4>Foundation abilities</h4><article v-for="ability in openInfo.abilities" :key="ability.id"><strong>{{ ability.name }}</strong><p>{{ abilityEffect(ability) }} · Level {{ ability.unlock_level }}</p></article><p class="muted">Manage learned abilities and your battle loadout in the Ability tree tab. The card shows base stats and growth; current stats are in the summary.</p></div>
+          </section>
+          <section v-show="detailTab === 'personalities'" role="tabpanel" aria-label="Personalities">
           <div class="people-head">
             <h4>Collected personalities</h4>
             <small class="em-num">{{ personalities.length }}{{ nextCursor !== null ? "+" : "" }} collected</small>
           </div>
           <EmNotice v-if="detailError" tone="error">{{ detailError }}</EmNotice>
-          <ul v-if="personalities.length" class="personalities">
-            <li v-for="p in personalities" :key="p.id">
-              <strong>{{ titleCase(p.type) }}</strong>
-              <EmTierBadge tier-id="common" :label="`Tier ${p.tier}`" />
-            </li>
-          </ul>
-          <p v-else-if="!loadingMore" class="muted">None collected yet.</p>
+          <p v-if="loadingMore" class="muted" role="status">Loading personalities…</p>
+          <PresetEditor :key="open.ascended_id" :ascended-id="open.ascended_id" :ascended-name="open.name" :personalities="personalities" />
           <button v-if="nextCursor !== null" type="button" class="more" :disabled="loadingMore" @click="loadPersonalities(nextCursor)">
             Show more
           </button>
-
-          <PresetEditor :ascended-id="open.ascended_id" :ascended-name="open.name" :personalities="personalities" />
+          </section>
+          <section v-if="treeVisited" v-show="detailTab === 'tree'" role="tabpanel" aria-label="Ability tree"><TreeTab :key="open.ascended_id" :ascended="open" /></section>
         </div>
       </div>
     </EmDialog>
@@ -272,19 +286,36 @@ function show(ascended: OwnedAscended): void {
   color: var(--em-muted);
 }
 .details {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
   gap: var(--em-space-6);
 }
+.collection :deep(.em-dialog.ascended-details) { width: min(1472px, calc(100vw - 32px)); }
+.summary { display: flex; flex-direction: column; gap: var(--em-space-3); min-width: 0; }
+.detail-portrait { width: 100%; height: 198px; object-fit: cover; border: 1px solid var(--em-divider); }
+.copy-summary { padding: var(--em-space-3); background: var(--em-bg); border: 1px solid var(--em-accent); }
+.copy-summary strong { font-size: 28px; margin-right: var(--em-space-2); }
+.copy-summary small { display: block; color: var(--em-muted); font-size: 12px; }
+.current-stats { display: flex; justify-content: space-between; margin: 0; padding: var(--em-space-3) 0; border-block: 1px solid var(--em-divider); }
+.current-stats dt { color: var(--em-muted); font-size: 12px; }
+.current-stats dd { margin: 0; font-size: 22px; font-weight: 600; }
+.battle-status { color: var(--em-success); font-size: 13px; }
+.battle-status.fainted { color: var(--em-danger); }
+.overview { display: flex; flex-wrap: wrap; gap: var(--em-space-5); }
+.overview-effects { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: var(--em-space-3); }
+.overview-effects h4 { margin-top: var(--em-space-4); color: var(--em-accent); }
+.overview-effects p { color: var(--em-muted); font-size: 13px; }
+.overview-effects article { padding: var(--em-space-3); background: var(--em-bg); border: 1px solid var(--em-divider); }
 .big-card {
   flex: none;
+  --card-width: 340px;
 }
 .side {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: var(--em-space-2);
-  min-width: 280px;
+  min-width: 0;
+  gap: var(--em-space-5);
 }
 .name {
   margin: 0;
@@ -435,6 +466,11 @@ function show(ascended: OwnedAscended): void {
   cursor: pointer;
 }
 @media (max-width: 700px) {
+  .details { grid-template-columns: minmax(0, 1fr); gap: var(--em-space-5); }
+  .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .summary .detail-portrait { height: 160px; grid-row: span 3; }
+  .summary .current-stats, .summary .xp, .summary .upgrade, .summary .battle-status { grid-column: 1 / -1; }
+  .summary .name { display: none; }
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 24px 18px;

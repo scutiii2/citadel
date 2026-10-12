@@ -130,7 +130,10 @@ def catalog_summary(catalog: Catalog) -> dict[str, Any]:
              "abilities": [a.to_dict() for a in s.abilities], "tree": [n.to_public() for n in s.tree.nodes], "art": _art_summary(s)}
             for s in catalog.all_ascendeds()
         ],
-        "personalities": [{"id": p.id, "categories": list(p.categories)} for p in catalog.personalities.values()],
+        "personalities": [{"id": p.id, "categories": list(p.categories),
+                           "rules": [{"when": dict(r.when), **dict(r.effects)} for r in p.rules]}
+                          for p in catalog.personalities.values()],
+        "personality_off_mood_factor": catalog.policy.off_mood_factor,
     }
 
 

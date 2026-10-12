@@ -74,6 +74,13 @@ def test_the_catalog_is_readable_and_complete(client):
     assert next(s for s in data["ascendeds"] if s["id"] == "twoychi")["ascension_types"] == ["enchant", "divine"]
 
 
+def test_catalog_explains_conditional_personalities(client):
+    data = client.get("/ascension/catalog", headers=headers(client)).json()
+    reckless = next(p for p in data["personalities"] if p["id"] == "RECKLESS")
+    assert reckless["rules"] == [{"when": {"own_hp_under": 0.5}, "multiply": {"ATTACK": 1.6, "DEFENSE": 0.7, "FEAR": 0.5}}]
+    assert data["personality_off_mood_factor"] == 0.5
+
+
 # -- profile, personalities, presets -------------------------------------------------
 
 def test_profile_creation_is_once_and_idempotent(client):

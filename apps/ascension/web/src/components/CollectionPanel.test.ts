@@ -90,6 +90,7 @@ describe("CollectionPanel", () => {
     const details = wrapper.find(".details");
     expect(details.find(".big-card .ascended-name").text()).toBe("Guardian");
     expect(details.findAll(".big-card .ability").map((a) => a.find("strong").text())).toEqual(["Strike", "Rally"]);
+    await details.findAll('[role="tab"]').find((b) => b.text() === "Personalities")!.trigger("click");
     expect(details.find(".personalities").text()).toContain("Aggressive");
     expect(details.find(".personalities").text()).toContain("Tier 2");
     expect(details.text()).toContain("1+ collected");
@@ -102,6 +103,33 @@ describe("CollectionPanel", () => {
     expect(wrapper.find(".personalities").text()).toContain("Cautious");
     expect(wrapper.find(".details").findAll("button").some((b) => b.text() === "Show more")).toBe(false);
   });
+});
+
+it("keeps the spare-copy count visible at the top tier and across detail tabs", async () => {
+  const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian", { copies: 0, stars_needed: null })] });
+  await wrapper.find(".ascended-card").trigger("click");
+  await flushPromises();
+  expect(wrapper.find(".copy-summary").text()).toContain("0 spare copies");
+  await wrapper.findAll('[role="tab"]').find((b) => b.text() === "Personalities")!.trigger("click");
+  expect(wrapper.find(".copy-summary").isVisible()).toBe(true);
+});
+
+it("explains a personality beside its preset control", async () => {
+  client.personalities.mockResolvedValue({ items: [{ id: "p1", type: "AGGRESSIVE", tier: 2 }], next_cursor: null });
+  const wrapper = mountPanel();
+  await wrapper.find(".ascended-card").trigger("click");
+  await flushPromises();
+  await wrapper.findAll('[role="tab"]').find((b) => b.text() === "Personalities")!.trigger("click");
+  expect(wrapper.find(".personality-description").text()).toContain("2 preference weight");
+});
+
+it("updates the summary when learning an ability refreshes the profile", async () => {
+  const wrapper = mountPanel();
+  await wrapper.find(".ascended-card").trigger("click");
+  await flushPromises();
+  useAscensionStore().profile = { ...PROFILE, ascendeds: [ownedAscended("guardian", { copies: 4, can_star_up: false })] };
+  await flushPromises();
+  expect(wrapper.find(".copy-summary").text()).toContain("4 spare copies");
 });
 
 describe("stars and tiers", () => {

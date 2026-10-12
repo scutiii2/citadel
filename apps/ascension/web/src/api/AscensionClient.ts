@@ -96,13 +96,27 @@ export interface AscendedInfo {
   art: AscendedArtInfo;
 }
 
+export interface PersonalityRule {
+  when: Record<string, number | string | boolean>;
+  multiply?: Record<string, number>;
+  chaos?: number;
+  counter?: boolean;
+  copy_enemy?: boolean;
+  break_streak?: boolean;
+  stay?: number;
+  repeat?: number;
+  pick_by_percentage?: "high" | "low";
+}
+export interface PersonalityInfo { id: string; categories: string[]; rules?: PersonalityRule[] }
+
 export interface Catalog {
   version: number;
   /** Weakest first. */
   tiers: TierInfo[];
   levels: { regular_cap: number; forbidden_cap: number };
   ascendeds: AscendedInfo[];
-  personalities: { id: string; categories: string[] }[];
+  personalities: PersonalityInfo[];
+  personality_off_mood_factor?: number;
 }
 
 export interface OwnedAscended {
