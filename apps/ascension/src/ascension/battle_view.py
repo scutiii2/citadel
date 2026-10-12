@@ -41,9 +41,10 @@ class BattleViewBuilder:
             "power": self._engine.stat(fighter, state, "power"), "speed": self._engine.stat(fighter, state, "speed"),
             "buffs": [b.to_dict() for b in state.buffs],
             "defense": state.defense.to_dict() if state.defense else None,
+            "statuses": [s.to_dict() for s in state.statuses],
             "abilities": [
                 {"id": a.id, "name": a.name, "category": a.category, "percentage": a.percentage,
-                 "cooldown": a.cooldown, "ready": record.state.round >= ready.get(a.id, 0)}
+                 "cooldown": a.cooldown, "effects": [e.to_dict() for e in a.effects], "ready": record.state.round >= ready.get(a.id, 0)}
                 for a in fighter.abilities
             ],
         }
