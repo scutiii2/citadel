@@ -18,6 +18,7 @@ from src.ascension.runtime import RandomSource, SeededRandom
 from src.ascension.shop import ShopService
 from src.ascension.shop_offers import ShopOffers
 from src.ascension.upgrades import UpgradeService
+from src.ascension.trees import TreeService
 from tests.ascension.helpers import FixedClock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -57,6 +58,7 @@ class Env:
         self.offers = offers or ShopOffers(CATALOG, 21600.0, 5)
         self.shop = ShopService(self.repo, self.writer, CATALOG, self.progression, self.offers, self.clock)
         self.upgrades = UpgradeService(self.repo, self.writer, CATALOG)
+        self.trees = TreeService(self.repo, self.writer, CATALOG)
 
     def coordinator(self, policy=None, reader=None, picker=None, laya=None):
         """A RoundCoordinator over this Env. Imports are local: the coordinator is built in a later task."""
