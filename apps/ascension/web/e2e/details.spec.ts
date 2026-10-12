@@ -24,6 +24,8 @@ for (const width of [1440, 768, 375]) {
     const learned = new Set(["striker_rending_strike", "striker_battle_focus", "striker_brace", "striker_passive", "striker_flurry"]);
     const tree: TreeView = {
       ascended_id: "striker", level: 14, essences: { common: 12, rare: 8 },
+      slots: [{ id: "a1", kind: "ability", branches: null }, { id: "a2", kind: "ability", branches: null },
+        { id: "a3", kind: "ability", branches: null }, { id: "p1", kind: "passive", branches: null }],
       loadout: { a1: "striker_rending_strike", a2: "striker_battle_focus", a3: "striker_brace", p1: "striker_passive" },
       nodes: definitions.map((n: Partial<TreeNodeState> & { id: string }) => {
         const ability = spec.abilities.find((a: { id: string }) => a.id === n.id);
