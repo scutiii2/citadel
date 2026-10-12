@@ -66,8 +66,8 @@ in Ascension's local environment that `ember_api` uses. This token is used only
 for outgoing server-to-server ticket redemption. Game routes always require a
 bearer session, including when the internal token is missing. Game data lives
 in `.data/ascension.sqlite3` (gitignored).
-The database was renamed with the game (it was `data/sparks.sqlite3`, schema version 1; now `.data/ascension.sqlite3`, schema version 3).
-A version 2 file is upgraded to 3 on start (it gains the `shop_purchases` table). Any other old file fails with
+The database was renamed with the game (it was `data/sparks.sqlite3`, schema version 1; now `.data/ascension.sqlite3`, schema version 5).
+Version 2, 3 and 4 files are upgraded to 5 on start (shop purchases, stars/essence and ability trees as needed). Version 1 fails with
 `database schema version 1 is not supported`.
 Delete the old file, or point `database_path` at a new one, to start fresh.
 
@@ -105,6 +105,35 @@ green, blue, purple, gold, red), as in the Unity project.
   Royal 4, Legendary 5, Forbidden 10). Essence is never lost when a battle is lost.
 - Selling a spare copy pays the Ascended's current tier and level and never changes the tier.
 - Saved databases at version 3 keep each Ascended's tier (the one its absorbed copies had reached); those copies are spent.
+
+## Ability trees
+
+Each Ascended has an ability tree in `ascended/<id>/tree.json`, beside `catalog.json`. The Collection details
+open an Ability tree view: select a node to learn it or equip it in a slot. The graph scrolls at phone width.
+Tree balance numbers are placeholders (?).
+
+The file is an object with a `nodes` list. Every node has a unique `id` and numeric `x`/`y` coordinates:
+
+- Roots list `id`, `root: true`, `x` and `y`; for example, `{"id": "guardian_bulwark", "root": true, "x": 60, "y": 300}`.
+  List all three catalog abilities and the passive root `<id>_passive`. Their names and numbers come from `catalog.json`.
+  Roots are free and always learned. Without a tree file, the catalog supplies these four roots.
+- Ability nodes have `kind: "ability"`, `name`, `category`, `percentage`, `cooldown` and `unlock_level`.
+  SUPPORT also has `stat` (`power` or `speed`) and `duration`.
+- Passive nodes have `kind: "passive"`, `name`, `unlock_level` and `passive: {"kind": ..., "params": {...}}`,
+  using an existing passive kind.
+- Every non-root node has `requires` (prerequisite node ids) and `cost: {"tier": ..., "amount": ...}`.
+  Costs spend a regular tier's essence. All prerequisites must lead back to roots; cycles and shared node positions are rejected.
+
+Learning is permanent per account and needs the node's level, every prerequisite learned, and enough essence of
+its cost tier. A successful learn spends that essence once; mutations accept an idempotency key for retries.
+Equip one to three distinct learned ability nodes and zero or one learned passive node: three ability slots
+(`a1`, `a2`, `a3`) and one passive slot (`p1`). Any ability category combination is allowed.
+When no loadout is saved, the three catalog abilities and catalog passive are equipped in their default order.
+Ability level gates still apply in battle.
+
+A battle freezes the equipped loadout when it starts. That Ascended's loadout cannot change during its active battle;
+other Ascended can still change theirs. Database version 5 adds `learned_nodes` and `loadouts` without changing
+version 4 data. Roots are implied rather than stored, and resetting progress removes both tables' rows for the player.
 
 ## Rotating shop
 
@@ -200,6 +229,9 @@ last saw; a stale pair is a 409.
 | `POST /ascension/battles/{id}/forfeit` | End as a loss |
 | `GET /ascension/shop` | This account's current offers: `rotation`, `seconds_left`, and per offer `slot`, Ascended, tier, `stock`, `left`, `price` |
 | `POST /ascension/shop/purchases` | Buy EMBLEMs (`{kind: "emblem", tier, quantity}`) or an offer (`{kind: "copies", rotation, slot}`) |
+| `GET /ascension/ascendeds/{id}/tree` | Nodes with learned, learnable or locked state, essence and equipped slots |
+| `POST /ascension/ascendeds/{id}/tree/{node}/learn` | Learn a node with level, prerequisites and essence |
+| `PUT /ascension/ascendeds/{id}/loadout` | Replace equipped abilities and passive (`{abilities: [node ids], passive: node id or null}`) |
 | `POST /ascension/ascendeds/{id}/sales` | Sell one spare copy |
 | `POST /ascension/ascendeds/{id}/stars` | Add a star (one spare copy and the tier's essence) |
 | `POST /ascension/ascendeds/{id}/tier` | Raise the tier once the stars are full |
