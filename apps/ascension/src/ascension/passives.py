@@ -7,7 +7,7 @@ neutral defaults, so the engine asks every passive the same questions.
 from __future__ import annotations
 
 import math
-from typing import Callable
+from typing import Callable, Sequence
 
 from src.ascension.models import PassiveSpec
 
@@ -118,6 +118,43 @@ class HealBonus(Passive):
         return 1 + self._fraction if self._below is None or hp < max_hp * self._below else 1.0
 
 
+class CombinedPassive(Passive):
+    """Several equipped passives acting as one: bonuses add, multipliers multiply, limits take the best."""
+
+    def __init__(self, passives: Sequence[Passive]) -> None:
+        self._passives = tuple(passives)
+
+    def start_buffs(self, power: int) -> list[tuple[str, int]]:
+        return [buff for p in self._passives for buff in p.start_buffs(power)]
+
+    def defense_limits(self) -> tuple[int, int]:
+        limits = [p.defense_limits() for p in self._passives]
+        return max(a for a, _ in limits), max(r for _, r in limits)
+
+    def defense_rating_bonus(self, power: int) -> float:
+        return sum(p.defense_rating_bonus(power) for p in self._passives)
+
+    def support_extra_rounds(self) -> int:
+        return sum(p.support_extra_rounds() for p in self._passives)
+
+    def attack_bonus(self, power: int, hp: int, max_hp: int, target_chose_defense: bool) -> float:
+        return sum(p.attack_bonus(power, hp, max_hp, target_chose_defense) for p in self._passives)
+
+    def marked_bonus(self, power: int, marks: frozenset[str]) -> float:
+        return sum(p.marked_bonus(power, marks) for p in self._passives)
+
+    def heal_multiplier(self, hp: int, max_hp: int) -> float:
+        result = 1.0
+        for p in self._passives:
+            result *= p.heal_multiplier(hp, max_hp)
+        return result
+
+    def cooldown(self, base: int) -> int:
+        for p in self._passives:
+            base = p.cooldown(base)
+        return base
+
+
 class PassiveFactory:
     """Builds a Passive from the saved spec. Register new kinds with `register`."""
 
@@ -143,3 +180,10 @@ class PassiveFactory:
             return self._kinds[spec.kind](**spec.params)
         except KeyError:
             raise ValueError(f"unknown passive kind {spec.kind!r}") from None
+
+    def create_all(self, specs: Sequence[PassiveSpec]) -> Passive:
+        """One passive for a whole equipped set: neutral for none, that passive for one, a combination for several."""
+        built = [self.create(s) for s in specs]
+        if not built:
+            return Passive()
+        return built[0] if len(built) == 1 else CombinedPassive(built)

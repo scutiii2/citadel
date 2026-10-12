@@ -23,3 +23,12 @@ def test_a_legacy_essence_stat_still_becomes_power():
     legacy = {"id": "a", "name": "A", "unlock_level": 1, "category": "SUPPORT", "percentage": 50.0, "cooldown": 2,
               "stat": "essence", "duration": 2}
     assert AbilitySpec.from_dict(legacy).stat == "power"
+
+def test_fighter_extra_passives_round_trip_and_old_saves_load():
+    from src.ascension.models import Fighter, PassiveSpec
+
+    fighter = Fighter("player", "x", "common", 1, 10, 5, 5, (), PassiveSpec("none"), (PassiveSpec("heal_bonus", {"fraction": 0.1}),))
+    assert Fighter.from_dict(fighter.to_dict()) == fighter
+    old = fighter.to_dict()
+    del old["extra_passives"]
+    assert Fighter.from_dict(old).extra_passives == ()
