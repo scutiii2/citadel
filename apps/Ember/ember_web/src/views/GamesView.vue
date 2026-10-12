@@ -19,7 +19,8 @@ onDeactivated(() => store.close());
     <header v-if="!playing" class="heading"><div><h2>Games</h2><p>Choose a game to play in Ember.</p></div><button class="refresh" :disabled="store.loading || store.launching" @click="store.load()">Refresh</button></header>
     <p v-if="store.error" role="alert" class="error">{{ store.error }}</p>
     <div v-if="playing && active && store.launchUrl" class="active-game">
-      <header class="stage-head"><h3>{{ active.name }}</h3><button class="close-game" @click="store.close()">Close game</button></header>
+      <!-- On wide screens the nav rail closes the game; this button is for narrow screens, where the rail is a tab bar. -->
+      <button class="close-game" aria-label="Close game" @click="store.close()">✕</button>
       <GameStage :key="store.launchUrl" :game="active" :url="store.launchUrl" @close="store.close()" />
     </div>
     <p v-else-if="store.loading" role="status">Loading games…</p>
@@ -41,7 +42,7 @@ onDeactivated(() => store.close());
 <style scoped>
 .games-view { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 16px; }
 .column { max-width: 980px; margin: 0 auto; }
-.heading, .stage-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 h2 { margin: 0; font-size: 1.2em; } h3 { margin: 0; font-size: 1em; } p { color: var(--muted); }
 .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 300px)); gap: 16px; }
 .game-card { cursor: pointer; position: relative; aspect-ratio: 16 / 10; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); transition: transform .15s ease; }
@@ -69,5 +70,9 @@ p.error { color: var(--danger); }
 .games-view.playing { display: flex; padding: 12px; overflow: hidden; }
 .playing .column { display: flex; flex-direction: column; flex: 1; min-height: 0; max-width: none; margin: 0; }
 .active-game { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.active-game .stage-head { margin-bottom: 8px; }
+.active-game { position: relative; }
+.close-game { display: none; }
+@media (max-width: 767px) {
+  .close-game { display: grid; place-items: center; position: absolute; top: 8px; right: 8px; z-index: 5; width: 32px; height: 32px; padding: 0; background: rgb(0 0 0 / 55%); border-color: rgb(255 255 255 / 25%); color: white; }
+}
 </style>
