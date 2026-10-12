@@ -64,7 +64,7 @@ def test_a_basic_ascended_cannot_have_a_fourth_ability_or_a_second_passive():
 
 def test_the_seven_basic_ascended_keep_three_and_one():
     catalog = Catalog(load_raw())
-    for sid in ("bruiser", "channeler", "cindrax", "guardian", "scout", "sentinel", "striker"):
+    for sid in ("bruiser", "channeler", "forbidden", "guardian", "scout", "sentinel", "striker"):
         tree = catalog.ascended(sid).tree
         assert tree.slot_ids == ("a1", "a2", "a3", "p1") and len(tree.roots) == 4
         assert catalog.default_loadout(sid).extra_passives == ()
