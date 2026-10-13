@@ -345,7 +345,8 @@ describe("BattleResult", () => {
         copies_granted: 2,
         copies: 2,
         tier_id: "rare",
-        awarded_personality: { id: "w2", type: "BOLD", tier: 2 },
+        awarded_personality: { id: "new-record", type: "BOLD", tier: 2 },
+        awarded_index: 1,
         revealed_personalities: [
           { id: "w1", type: "CAUTIOUS", tier: 1 },
           { id: "w2", type: "BOLD", tier: 2 },

@@ -116,7 +116,8 @@ class ProgressionService:
             await tx.put_ascended(replace(owned, copies=copies))
             granted = copies - owned.copies
         instances = battle.wild_personalities
-        chosen = instances[min(int(rng.next() * len(instances)), len(instances) - 1)]
+        picked = min(int(rng.next() * len(instances)), len(instances) - 1)
+        chosen = instances[picked]
         award = PersonalityRecord(new_id(), owner, enemy.ascended_id, chosen.type_id, chosen.tier, self._clock.now())
         await tx.add_personality(award)
         return {
@@ -125,6 +126,7 @@ class ProgressionService:
             "copies": copies,
             "tier_id": self._catalog.tier_of(enemy.ascended_id, owned.tier_id if owned else None),
             "awarded_personality": _describe(award.instance()),
+            "awarded_index": picked,  # position in revealed_personalities (the award itself gets a new id)
             "revealed_personalities": [_describe(i) for i in instances],  # every source instance, awarded or not
         }
 

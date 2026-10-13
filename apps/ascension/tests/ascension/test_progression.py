@@ -118,6 +118,7 @@ def test_every_source_personality_is_equally_likely_to_be_awarded(draw, index):
     battle = build_battle(wild_ascended="channeler")
     result, _, _, _ = run(apply("captured", battle, FIGHTER, draw))
     assert result["awarded_personality"]["type"] == ["COWARD", "BOLD", "AGGRESSIVE"][index]
+    assert result["awarded_index"] == index
 
 
 def test_identical_personalities_stay_distinct_instances():

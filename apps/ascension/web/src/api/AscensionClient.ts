@@ -280,6 +280,8 @@ export interface BattleResult {
   copies?: number;
   tier_id?: string;
   awarded_personality?: RevealedPersonality;
+  /** Position of the awarded personality in `revealed_personalities`. */
+  awarded_index?: number;
   revealed_personalities?: RevealedPersonality[];
   faint_until?: number;
 }

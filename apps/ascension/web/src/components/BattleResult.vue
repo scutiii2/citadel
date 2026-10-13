@@ -29,7 +29,7 @@ const memberArt = (id: string) => spriteFor(store.catalog?.ascendeds.find(a => a
 
 
 const revealed = computed(() => result.value?.revealed_personalities ?? []);
-const awardedIndex = computed(() => revealed.value.findIndex(p => p.id === result.value?.awarded_personality?.id));
+const awardedIndex = computed(() => result.value?.awarded_index ?? -1);
 const LAPS = 3;
 const lit = ref<number | null>(null);
 const settled = ref(!(revealed.value.length > 1 && awardedIndex.value >= 0));
@@ -137,8 +137,8 @@ const story = computed(() => {
     <template v-if="result.revealed_personalities?.length">
       <h3 class="revealed-title">Personalities revealed</h3>
       <ul class="revealed" :title="settled ? undefined : 'Click to skip'" @click="settled || settle()">
-        <li v-for="(p, i) in revealed" :key="p.id" :class="{ lit: lit === i, won: settled && p.id === result.awarded_personality?.id, dim: settled && result.awarded_personality && p.id !== result.awarded_personality.id && revealed.length > 1 }">
-          {{ titleCase(p.type) }} · tier {{ p.tier }}<strong v-if="settled && p.id === result.awarded_personality?.id"> (now yours)</strong>
+        <li v-for="(p, i) in revealed" :key="p.id" :class="{ lit: lit === i, won: settled && i === awardedIndex, dim: settled && awardedIndex >= 0 && i !== awardedIndex && revealed.length > 1 }">
+          {{ titleCase(p.type) }} · tier {{ p.tier }}<strong v-if="settled && i === awardedIndex"> (now yours)</strong>
         </li>
       </ul>
     </template>
