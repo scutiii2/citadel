@@ -1,5 +1,7 @@
 # Cindrax: art prompts
 
+Latest battle export (2026-10-13): `sprite_battle.webp` regenerated from the established preview, preserving the magma-crystal identity. `battle_source.png` records the selected corrected source. Complete right-facing hovering silhouette, transparent background, safe crown and lower-tip margins, slate armour shadows, 512 x 512 lossless WebP. Main and preview cards are unchanged. Export and layout verification are performed with the rest of the new battle sprite set; live game reload review remains separate.
+
 Rules: `../ART_GUIDE.md` (read it first; it explains sizes, the black background and the crop steps).
 Files for this Ascended: `sprite_main_card.webp`, `sprite_preview_card.webp`, `sprite_battle.webp` (this folder).
 Primary reference: sprite_preview_card.webp; see identity.md for the established visual identity. Preserve the preview while recreating main card and battle art.

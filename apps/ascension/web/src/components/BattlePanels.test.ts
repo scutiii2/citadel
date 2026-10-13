@@ -87,35 +87,21 @@ describe("BattleArena animation", () => {
     states: { idle: { row: 0, frames: 4, frame_ms: 180, loop: true }, attack: { row: 1, frames: 4, frame_ms: 100, loop: false } },
   };
 
-  it("plays the sheet instead of the still sprite, and only for an Ascended that has one", () => {
-    const store = withBattle(battleView({ wild: fighter("bruiser") }));
-    store.catalog = { ...CATALOG, ascendeds: CATALOG.ascendeds.map((a) => (a.id === "guardian" ? { ...a, art: { ...a.art, animation: sheet } } : a)) };
-
-    const wrapper = mount(BattleArena, { props: { battle: store.battle! } });
-
-    const animated = wrapper.find(".player .animated-sprite");
-    expect(animated.exists()).toBe(true);
-    expect(animated.attributes("style")).toContain("spreadsheet_animation.webp");
-    expect(animated.attributes("style")).toContain("background-size: 400% 600%");
-    expect(wrapper.find(".player .sprite img").exists()).toBe(false);
-    expect(wrapper.find(".wild .animated-sprite").exists()).toBe(false);
-  });
-
-  it("shows the attack row while the fighter lunges and falls back to idle for a state the sheet lacks", async () => {
+  it("keeps the static battle sprite even when animation metadata exists", async () => {
     const store = withBattle(battleView());
     store.catalog = { ...CATALOG, ascendeds: CATALOG.ascendeds.map((a) => (a.id === "guardian" ? { ...a, art: { ...a.art, animation: sheet } } : a)) };
     const playback = usePlaybackStore();
     const wrapper = mount(BattleArena, { props: { battle: store.battle! } });
-    const rowY = () => wrapper.find(".player .animated-sprite").attributes("style");
-
-    expect(rowY()).toContain("background-position-y: 0%");
+    expect(wrapper.find(".player .sprite img").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
+    expect(wrapper.find(".animated-sprite").exists()).toBe(false);
     playback.fx = { player: "lunge", wild: null };
     await wrapper.vm.$nextTick();
-    expect(rowY()).toContain("background-position-y: 20%");
-    playback.fx = { player: "guard", wild: null };
-    await wrapper.vm.$nextTick();
-    expect(rowY()).toContain("background-position-y: 0%");
+    expect(wrapper.find(".player .sprite").classes()).toContain("fx-lunge");
+    await wrapper.find(".player .sprite img").trigger("error");
+    expect(wrapper.find(".player .sprite img").exists()).toBe(false);
+    expect(wrapper.find(".player .letter").text()).toBe("G");
   });
+
 });
 
 describe("RoundLog", () => {

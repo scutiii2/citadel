@@ -179,4 +179,19 @@ function pick(side: Side, entry: BattleView["history"][number]) {
   border-top: 1px solid var(--em-divider);
   font-size: 13px;
 }
+
+.round-log { min-width: 0; height: 100%; padding: 10px; }
+.head { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--em-divider); }
+.head h3 { font-family: var(--em-font-display); font-size: 13px; text-transform: uppercase; }
+.head small { font-size: 10px; }
+.rounds { max-height: 380px; gap: 8px; padding-right: 4px; }
+.round { background: linear-gradient(130deg, var(--em-raised), var(--em-header)); }
+.picks { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.pick { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.move { font-size: 12px; }
+.event { font-size: 11px; line-height: 1.5; }
+.title { font-size: 10px; }
+.title .num { font-size: 13px; }
+@media (max-width: 900px) { .rounds { max-height: 240px; } }
+
 </style>

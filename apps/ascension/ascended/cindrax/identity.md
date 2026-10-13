@@ -1,5 +1,9 @@
 # Cindrax visual identity
 
+## Battle source refresh (2026-10-13)
+
+`battle_source.png` is the new full-resolution source of `sprite_battle.webp`, regenerated from the established preview. This preserves Cindrax's existing identity while matching the new battle set's crisp rendering. The source was corrected to restore safe margins above the crown and lift deep armour shadows for the arena blend. The 512 x 512 lossless export uses nearest-neighbour scaling and transparent padding. Card artwork remains unchanged.
+
 Primary reference: `sprite_preview_card.webp`. Use this established portrait as the exact design reference for main card and battle recreations. `../ART_GUIDE.md` controls style and framing; `art_prompts.md` controls poses.
 
 - A floating magma crystal fiend, with a broad armoured upper body narrowing into a pointed, segmented lava-and-obsidian lower body. No walking legs or boots: preserve the hovering tapered silhouette.

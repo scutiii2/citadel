@@ -26,6 +26,17 @@ def test_initialize_creates_the_starter_setup(tmp_path):
     assert preset["instance_ids"] == [pool["items"][0]["id"]]
 
 
+def test_profile_quotes_the_actual_spare_copy_sale_value(tmp_path):
+    async def scenario():
+        env = make(tmp_path)
+        profile = await env.start_player("ann", "guardian")
+        await env.close()
+        return profile
+
+    [owned] = run(scenario())["ascendeds"]
+    assert owned["sale_value"] == CATALOG.sale_value("guardian", "common", 1)
+
+
 @pytest.mark.parametrize("draw,expected", [(0.0, "AGGRESSIVE"), (0.99, list(CATALOG.personalities)[-1])])
 def test_the_starter_personality_is_uniform_over_the_eight_types(tmp_path, draw, expected):
     async def scenario():

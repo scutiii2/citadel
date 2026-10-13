@@ -23,12 +23,12 @@ describe("BattleMatchup", () => {
     expect(wrapper.text()).toContain("Opponent personalities stay hidden until capture");
   });
 
-  it("uses the catalog crop and falls back to a letter when artwork is missing or fails", async () => {
+  it("uses only battle art and falls back to a letter when artwork is missing or fails", async () => {
     const setup = props();
     setup.playerInfo.art!.focus = 21;
     const wrapper = mount(BattleMatchup, { props: setup });
-    expect(wrapper.find(".player img").attributes("src")).toBe("/ascended/guardian/sprite_main_card.webp");
-    expect(wrapper.find(".player img").attributes("style")).toContain("50% 21%");
+    expect(wrapper.find(".player img").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
+    expect(wrapper.find(".player img").attributes("style")).toContain("50% 50%");
     expect(wrapper.find(".wild .letter").text()).toBe("B");
     await wrapper.find(".player img").trigger("error");
     expect(wrapper.find(".player img").exists()).toBe(false);

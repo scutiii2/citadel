@@ -3,7 +3,7 @@ import EmIcon from "./ui/EmIcon.vue";
 
 /** The page's frame: the masthead (logo, tagline, Insignia wallet) over the content.
  * The wallet shows only once there is a profile. */
-defineProps<{ insignia: number | null; shopEnabled?: boolean; shopOpen?: boolean }>();
+defineProps<{ insignia: number | null; shopEnabled?: boolean; shopOpen?: boolean; destination?: string }>();
 const emit = defineEmits<{ shop: [] }>();
 </script>
 
@@ -13,7 +13,7 @@ const emit = defineEmits<{ shop: [] }>();
       <div class="navigation"><slot name="navigation">
         <h1 class="brand em-pixel"><EmIcon name="flame" :size="22" /> ASCENSION</h1>
         <p class="tagline">Collect. Forge. Battle.</p>
-      </slot></div>
+      </slot><span class="destination">{{ destination ?? "Main menu" }}</span></div>
       <div v-if="insignia !== null" class="account-actions">
       <component :is="shopEnabled ? 'button' : 'div'" class="wallet" :type="shopEnabled ? 'button' : undefined" :aria-label="shopEnabled ? 'Open shop, ' + insignia + ' Insignia' : 'Your Insignia'" :aria-pressed="shopEnabled ? shopOpen : undefined" @click="shopEnabled && emit('shop')">
         <EmIcon name="coin" />
@@ -141,4 +141,15 @@ button.wallet:hover, button.wallet[aria-pressed="true"] { border-color: var(--em
   .navigation { gap: var(--em-space-2); }
   .screen-heading { padding: var(--em-space-4); }
 }
+</style>
+
+<style scoped>
+.mast { min-height:74px; border-bottom:1px solid #65869c; box-shadow:inset 0 -3px 0 #06111b; padding-inline:24px; background:linear-gradient(180deg,#11283a,#0a1a27); }
+.destination { border-left:1px solid var(--em-accent); padding-left:20px; color:var(--em-text); font-weight:600; white-space:nowrap; }
+.brand { font-size:24px; text-shadow:0 2px 0 #83532e; } .tagline { display:none; }
+.wallet { background:#0a1a28; border-color:#617d90; box-shadow:inset 0 0 0 2px #07111c; }
+.main { padding:24px; } .screen-heading { padding:20px 24px; background:linear-gradient(90deg,#142b3c,#091a27); }
+@media(max-width:1100px) { .navigation { flex-wrap:wrap; gap:10px; } .destination { font-size:11px; padding-left:10px; } }
+@media(max-width:900px) { .mast.has-account { grid-template-columns:minmax(0,1fr) auto; } .has-account .navigation { grid-row:1; } .has-account .account-actions { grid-column:2; grid-row:1; } .account-actions { gap:4px; } }
+@media(max-width:700px) { .mast { padding:10px 12px; } .mast.has-account { grid-template-columns:minmax(0,1fr); gap:8px; } .has-account .account-actions { grid-column:1; grid-row:2; } .destination { margin-left:auto; } .main { padding:16px 12px; } .screen-heading { padding:16px 12px; } .brand { font-size:18px; } }
 </style>

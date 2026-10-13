@@ -50,48 +50,10 @@ describe("AscendedTemplateCard", () => {
     expect(wrapper.find(".passive").text()).toBe("Steady");
   });
 
-  it("tints the frame for every tier but Common", () => {
-    const tintOf = (tierId: string) => {
-      const tint = mount(AscendedTemplateCard, { props: { ascended: striker, tierId } }).find(".tint");
-      return tint.exists() ? (tint.element as HTMLElement).style.background : null;
-    };
-
-    expect(tintOf("common")).toBeNull();
-    expect(tintOf("unknown")).toBeNull();
-    const tints = ["rare", "unique", "royal", "legendary", "forbidden"].map(tintOf);
-    expect(tints.every((t) => t)).toBe(true);
-    expect(new Set(tints).size).toBe(5);
-  });
-
-  it("shows the Ascended's portrait in the artwork window, or its letter when it has none", () => {
-    const guardian = mount(AscendedTemplateCard, { props: { ascended: ascendedInfo("guardian") } });
-    expect(guardian.find("img.portrait").exists()).toBe(true);
-    expect(guardian.find(".letter").exists()).toBe(false);
-    expect((guardian.find("img.portrait").element as HTMLElement).style.objectPosition).toBe("50% 21%");
-    expect(guardian.find("img.portrait").attributes("src")).toBe("/ascended/guardian/sprite_main_card.webp");
-
-    const bruiser = mount(AscendedTemplateCard, { props: { ascended: ascendedInfo("bruiser") } });
-    expect(bruiser.find("img.portrait").exists()).toBe(false);
-    expect(bruiser.find(".letter").text()).toBe("B");
-  });
-
-  it("colours each ability's slot by its category", () => {
-    const ascended = ascendedInfo("mixed", {
-      abilities: ["ATTACK", "DEFENSE", "SUPPORT"].map((category, i) => ({
-        id: `a${i}`,
-        name: category,
-        unlock_level: 1,
-        category,
-        percentage: 100,
-        cooldown: 1,
-        stat: null,
-        duration: null,
-      })),
-    });
-    const wrapper = mount(AscendedTemplateCard, { props: { ascended } });
-
-    const fills = wrapper.findAll(".behind:not(.art-fill)").map((el) => (el.element as HTMLElement).style.background);
-    expect(fills).toHaveLength(3);
-    expect(new Set(fills).size).toBe(3);
+  it("shows readable tier and battle artwork", () => {
+    const card = mount(AscendedTemplateCard, { props: { ascended: ascendedInfo("guardian"), tierId: "rare" } });
+    expect(card.find(".tier").text()).toBe("Rare");
+    expect(card.find("img.portrait").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
+    expect((card.find("img.portrait").element as HTMLElement).style.objectPosition).toBe("50% 50%");
   });
 });

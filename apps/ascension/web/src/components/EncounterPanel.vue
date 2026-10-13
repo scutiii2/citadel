@@ -4,7 +4,7 @@ import type { BattleMode } from "../api/AscensionClient";
 import { useNowSeconds } from "../composables/useNowSeconds";
 import { useAscensionStore } from "../stores/ascension";
 import { formatCountdown, titleCase } from "../utils/ascension";
-import { spriteFocus, spriteFor } from "../utils/sprites";
+import { spriteFor } from "../utils/sprites";
 import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 import BattleMatchup from "./BattleMatchup.vue";
 import EmButton from "./ui/EmButton.vue";
@@ -177,7 +177,7 @@ async function fight(): Promise<void> {
         <p class="em-eyebrow">One fighter. Your whole squad behind you.</p>
         <EmButton class="back-to-encounter" :disabled="store.busy" @click="formOpen = false"><EmIcon name="arrow" /> Back to encounter</EmButton>
       </div>
-      <BattleMatchup :player="chosen" :player-info="chosenInfo" :wild="store.encounter" :wild-info="wildInfo" :player-multiplier="chosenMultiplier" />
+      <BattleMatchup class="setup-matchup" :player="chosen" :player-info="chosenInfo" :wild="store.encounter" :wild-info="wildInfo" :player-multiplier="chosenMultiplier" />
       <EmNotice v-if="!chosen" tone="error">{{ ready.length ? "Select a ready squad member to continue." : "No squad member is ready. Wait until one is ready again." }}</EmNotice>
 
       <section class="squad-section" aria-label="Choose from your squad">
@@ -192,12 +192,13 @@ async function fight(): Promise<void> {
               :aria-label="slot.member.name"
               @select="pick(slot.member.ascended_id)"
             >
-              <img v-if="spriteFor(slot.info.art, 'preview_card') && !failedPreviews.includes(slot.member.ascended_id)" class="squad-art" :src="spriteFor(slot.info.art, 'preview_card')!" :style="{ objectPosition: `50% ${spriteFocus(slot.info.art, 'preview_card')}%` }" alt="" draggable="false" @error="failedPreviews.push(slot.member.ascended_id)" />
+              <img v-if="spriteFor(slot.info.art, 'battle') && !failedPreviews.includes(slot.member.ascended_id)" class="squad-art" :src="spriteFor(slot.info.art, 'battle')!"  alt="" draggable="false" @error="failedPreviews.push(slot.member.ascended_id)" />
               <span v-else class="squad-art letter em-pixel" aria-hidden="true">{{ slot.member.name.slice(0, 1) }}</span>
               <span class="squad-note">
                 <strong>{{ slot.member.name }}</strong>
                 <small v-if="slot.member.faint_until !== null && slot.member.faint_until > now" class="resting">Fainted · {{ formatCountdown(slot.member.faint_until - now) }}</small>
                 <small v-else>Lv. {{ slot.member.level }} · {{ titleCase(slot.member.tier_id) }}</small>
+                <span class="fighter-stats em-num"><span v-for="stat in ['hp', 'power', 'speed']" :key="stat">{{ stat === 'hp' ? 'HP' : titleCase(stat) }} <b>{{ Math.max(1, Math.floor(((slot.info.base[stat] ?? 0) + (slot.info.growth[stat] ?? 0) * (slot.member.level - 1)) * (tiers.find(t => t.id === slot.member.tier_id)?.stat_multiplier ?? 1) + 1e-9)) }}</b></span></span>
               </span>
               <span v-if="chosen?.ascended_id === slot.member.ascended_id" class="selected-mark" aria-hidden="true">✓</span>
             </EmPickCard>
@@ -231,11 +232,13 @@ async function fight(): Promise<void> {
           </div>
         </div>
         <EmNotice v-if="autonomousIncomplete" class="plan-error" tone="error">Autonomous play needs a preset and an EMBLEM limit.</EmNotice>
+        <EmButton type="submit" class="begin-battle" variant="primary" :disabled="!canFight" :aria-busy="store.busy">Begin battle <EmIcon name="arrow" /></EmButton>
+        <EmButton class="decline" :disabled="store.busy" @click="store.declineEncounter()">Decline encounter</EmButton>
       </EmPanel>
 
       <div class="battle-footer">
         <p v-if="chosen" class="xp-note"><EmIcon name="ascended" /><span>{{ chosen.name }} gets full XP if you win or capture.<small>The other squad members share a smaller XP pool.</small></span></p>
-        <EmButton type="submit" class="begin-battle" variant="primary" :disabled="!canFight" :aria-busy="store.busy">Begin battle <EmIcon name="arrow" /></EmButton>
+
       </div>
     </form>
   </section>
@@ -441,4 +444,32 @@ async function fight(): Promise<void> {
   .battle-footer { flex-direction: column; align-items: stretch; }
   .begin-battle { width: 100%; }
 }
+
+.start-form { grid-template-columns: 230px minmax(0, 1fr) 285px; gap: 10px; align-items: start; }
+.setup-heading { grid-column: 1 / -1; padding-bottom: 8px; border-bottom: 1px solid var(--em-divider); }
+.setup-matchup { grid-column: 1; grid-row: 2 / 4; }
+.squad-section { grid-column: 2; grid-row: 2; border: 1px solid var(--em-divider); background: var(--em-header); padding: 10px; }
+.squad-heading { margin-bottom: 10px; }
+.squad-heading h3 { font-family: var(--em-font-display); text-transform: uppercase; font-size: 13px; }
+.squad-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0; margin: 0; }
+.squad-choice { min-height: 132px; flex-direction: row; align-items: center; gap: 8px; background: linear-gradient(135deg, var(--em-raised), var(--em-header)); }
+.squad-art { width: 68px; height: 112px; object-fit: contain; background: #071019; image-rendering: pixelated; }
+.squad-note { flex: 1; }
+.fighter-stats { display: grid; gap: 4px; margin-top: 6px; font-size: 10px; color: var(--em-muted); }
+.fighter-stats > span { display: flex; justify-content: space-between; gap: 6px; }
+.fighter-stats b { color: var(--em-text); }
+.empty-slot { min-height: 132px; }
+.plan { grid-column: 3; grid-row: 2 / 4; padding: 12px; }
+.plan-heading { margin-bottom: 12px; }
+.plan-heading .caption { display: none; }
+.plan-fields { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.plan-fields > div:last-child { grid-column: auto; }
+.plan-fields .caption { font-size: 10px; line-height: 1.5; }
+.plan .begin-battle, .plan .decline { width: 100%; min-width: 0; margin-top: 12px; }
+.battle-footer { grid-column: 2; padding: 8px; }
+.start-form > :deep(.em-notice) { grid-column: 1 / -1; }
+.about { min-width: 0; }
+@media (max-width: 1100px) { .start-form { grid-template-columns: 210px minmax(0, 1fr); } .plan { grid-column: 1 / -1; grid-row: auto; } .plan-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); } .plan .begin-battle, .plan .decline { width: auto; margin-right: 8px; } }
+@media (max-width: 700px) { .start-form { grid-template-columns: minmax(0, 1fr); } .setup-matchup, .squad-section, .plan, .battle-footer { grid-column: 1; grid-row: auto; } .squad-choices { display: grid; overflow: visible; grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-item { min-width: 0; } .squad-choice { flex-direction: column; align-items: stretch; } .squad-art { width: 100%; height: 108px; } .empty-slot { min-height: 180px; } .plan-fields { grid-template-columns: minmax(0, 1fr); } .plan .begin-battle, .plan .decline { width: 100%; margin-right: 0; } }
+
 </style>

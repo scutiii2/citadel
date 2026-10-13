@@ -407,8 +407,8 @@ export const useAscensionStore = defineStore("ascension", () => {
     );
   }
 
-  function buyEmblems(tier: string, quantity: number): Promise<EmblemPurchase | null> {
-    return mutate(() => ascensionClient.buyEmblems(tier, quantity), () => refreshProfile());
+  function buyEmblems(tier: string, quantity: number, key?: string): Promise<EmblemPurchase | null> {
+    return mutate(() => key ? ascensionClient.buyEmblems(tier, quantity, key) : ascensionClient.buyEmblems(tier, quantity), () => refreshProfile());
   }
 
   async function loadShop(): Promise<void> {
@@ -423,11 +423,11 @@ export const useAscensionStore = defineStore("ascension", () => {
     }
   }
 
-  async function buyOffer(offer: ShopOffer): Promise<CopyPurchase | null> {
-    const current = shop.value;
-    if (current === null) return null;
+  async function buyOffer(offer: Pick<ShopOffer, "slot">, key?: string, originalRotation?: number): Promise<CopyPurchase | null> {
+    const rotation = originalRotation ?? shop.value?.rotation;
+    if (rotation === undefined) return null;
     const result = await mutate(
-      () => ascensionClient.buyOffer(current.rotation, offer.slot),
+      () => key ? ascensionClient.buyOffer(rotation, offer.slot, key) : ascensionClient.buyOffer(rotation, offer.slot),
       () => refreshProfile(),
     );
     // A refresh, a sold-out offer or a purchase all change what the shop shows.
@@ -435,8 +435,8 @@ export const useAscensionStore = defineStore("ascension", () => {
     return result;
   }
 
-  function sellCopy(ascendedId: string): Promise<Sale | null> {
-    return mutate(() => ascensionClient.sellCopy(ascendedId), () => refreshProfile());
+  function sellCopy(ascendedId: string, key?: string): Promise<Sale | null> {
+    return mutate(() => key ? ascensionClient.sellCopy(ascendedId, key) : ascensionClient.sellCopy(ascendedId), () => refreshProfile());
   }
 
   function setSquad(ids: string[]): Promise<{ ascended_ids: string[]; size: number } | null> {

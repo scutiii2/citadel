@@ -1,25 +1,19 @@
-# Channeler identity
+# Channeler visual identity
 
-## References
-- Primary: `sprite_preview_card.webp`, the established portrait. Use this exact character when recreating the main card and battle sprites.
-- Supporting: `art_prompts.md` for poses and `../ART_GUIDE.md` for style and framing.
+## Approved redesign (2026-10-13)
 
-## Persistent design
-- A hovering brass-and-iron lantern construct; no legs or human anatomy.
-- Rounded glass belly framed by curved brass ribs and riveted gold bands. A cyan flame spirit inside has two large dark blue vertical eyes and a tiny smiling mouth.
-- Tiered charcoal/slate iron roof with brass trim and a pointed cap. A gold diamond ornament with a cyan centre sits above the cap.
-- Gold rings orbit above the cap, around the belly and below the base.
-- Two articulated bronze gauntlets float at the sides, joined by short dark metal wrist links. Broad segmented fingers and open palms carry cyan flames.
-- A cyan gem in a gold diamond setting decorates the lower front. A faceted cyan/ice-blue crystal with gold edging hangs below the base.
-- Brass/gold dominant metal, slate iron, cyan and ice-blue signature glow. Ember-orange belongs to the forge background. Cyan light illuminates nearby metal.
-- Keep the smiling spirit, lantern proportions, roof silhouette, ring arrangement, two gauntlets, lower gem and pendant consistent across sprites. Only pose, framing and scenery change.
-- Battle shading uses slate no darker than approximately #2a3342, including outlines. Spirit eyes remain blue/slate rather than black.
+The user approved the character artwork in the collection and battle concepts and explicitly requested this design for the battle sprite. This intentional redesign supersedes the former creature design for newly generated art.
 
-## Framing
-- Main card: complete hovering figure centred in the landscape crop, palms open at its sides; dim ruined forge behind it.
-- Battle: complete floating figure in a three-quarter view facing right, hands casting toward the right; flat pure-black background, no floor or shadow.
-- Preserve the established character design. The preview export is square (`sprite_preview_card.webp`).
+A blue-haired fantasy sorceress with a pale youthful face and luminous icy-blue eyes, sapphire hood or head covering, long layered cobalt robes, silver/blue ornamentation, blue gloves and boots, and a small bright cyan-blue spell orb held above one hand. Match the approved blue mage silhouette and modest fully covered robes. No lantern body, brass orbiting rings or detached hands.
 
-## Preview export reference
+## References and consistency
 
-`sprite_preview_card.webp` is the 512 x 512 game export and the primary reference. The export correction changes framing and dimensions only, not the character identity.
+- Primary new-design reference: `battle_source.png`, the generated full-resolution source for `sprite_battle.webp` in this folder.
+- `sprite_battle.webp` is the 512 x 512 game export of that source.
+- The approved UI concept sheets supplied the original design direction; the character-only source is the reference for future poses and card artwork.
+- Existing `sprite_main_card.webp` and `sprite_preview_card.webp` retain the previous design because this request covers battle sprites only. Do not use those legacy cards to override the approved redesign. Updating the cards is a separate art pass.
+- Preserve face/helmet, silhouette, clothing, armour, weapons, palette and proportions across future sprites. Correct accidental drift rather than changing this identity.
+
+## Battle framing
+
+Right-facing three-quarter casting stance, leading hand extended to the right with a small blue spell orb, robe folds behind. A single full-body figure on transparent background, with no ground, cast shadow, text or frame. Nothing touches an edge. Use crisp square pixel clusters and dark slate shadows approximately #2a3342 or lighter so the arena's lighten blend does not erase details. Export at 512 x 512, lossless WebP, with nearest-neighbour scaling.

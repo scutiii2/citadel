@@ -1,23 +1,19 @@
 # Scout visual identity
 
-Primary reference: `sprite_preview_card.webp`, the established preview portrait. Use it as the exact character reference when recreating the main card and battle sprites. Written prompts are subordinate to this reference for character details and to `../ART_GUIDE.md` for framing and style.
+## Approved redesign (2026-10-13)
 
-## Defining features
+The user approved the character artwork in the main menu and collection concepts and explicitly requested this design for the battle sprite. This intentional redesign supersedes the former creature design for newly generated art.
 
-- One agile, four-legged fox-like creature, with a large expressive head, slim torso, compact paws and long triangular feathered ears.
-- Layered teal, cyan and slate-blue feathered fur; pale cream muzzle, cheek tufts, throat, chest and underside. Dark blue ear interiors and feather shadows.
-- Very large amber-orange glowing eyes, cream brow markings, a small dark slate nose and a confident, alert expression. No human anatomy or face.
-- Tall swept-up blue feather crest and exceptionally tall pointed ears, edged with ember-orange flame. Preserve the reference's head silhouette.
-- One huge tail made of overlapping blue-teal feather fans, with orange flaming feather tips. It belongs to a single tail, not multiple tails or wings.
-- A glowing faceted orange pendant in a copper setting and chain on the chest. Copper segmented bracers with dark slate inserts encircle all four lower legs.
-- Orange flames, eyes and pendant supply the signature light. Preserve teal-blue as the dominant colour family, with cream and copper accents.
+A lithe green-hooded fantasy ranger with a youthful elfin face, chestnut hair visible under the hood, deep forest-green hood and short cloak, leather chest straps and belt, green tunic, brown bracers and boots, curved wooden bow and quiver. Match the approved green archer silhouette. No fox anatomy, feathers or flame tail.
 
-## Consistency across sprites
+## References and consistency
 
-Keep the reference's face, markings, layered feather anatomy, ear and crest silhouette, one tail, pendant, four bracers and proportions. Pose, crop and background may change; do not add wings, weapons, extra limbs or redesign details to accommodate generation drift.
+- Primary new-design reference: `battle_source.png`, the generated full-resolution source for `sprite_battle.webp` in this folder.
+- `sprite_battle.webp` is the 512 x 512 game export of that source.
+- The approved UI concept sheets supplied the original design direction; the character-only source is the reference for future poses and card artwork.
+- Existing `sprite_main_card.webp` and `sprite_preview_card.webp` retain the previous design because this request covers battle sprites only. Do not use those legacy cards to override the approved redesign. Updating the cards is a separate art pass.
+- Preserve face/helmet, silhouette, clothing, armour, weapons, palette and proportions across future sprites. Correct accidental drift rather than changing this identity.
 
-Main card: low running hero stance, head turned toward the viewer, tail flowing behind; full silhouette within the central safe band. Battle: crouched ready-to-sprint stance facing right, tail sweeping upward behind; complete isolated body, slate shadows at least approximately #2a3342, no ground or cast shadow.
+## Battle framing
 
-## Preview export reference
-
-`sprite_preview_card.webp` is the 512 x 512 game export and the primary reference. The export correction changes framing and dimensions only, not the character identity.
+Right-facing three-quarter alert archer stance, bow held toward the right with an arrow nocked, cloak trailing left. A single full-body figure on transparent background, with no ground, cast shadow, text or frame. Nothing touches an edge. Use crisp square pixel clusters and dark slate shadows approximately #2a3342 or lighter so the arena's lighten blend does not erase details. Export at 512 x 512, lossless WebP, with nearest-neighbour scaling.

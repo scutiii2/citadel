@@ -49,6 +49,10 @@ const mountTab = async () => {
 };
 
 describe("TreeTab", () => {
+  it("uses the battle sprite for the graph origin", async () => {
+    const wrapper = await mountTab();
+    expect(wrapper.find(".hub-portrait img").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
+  });
   it("centers the first successful load even after a failed initial request", async () => {
     client.tree.mockRejectedValueOnce(new Error("Try again"));
     const wrapper = await mountTab();

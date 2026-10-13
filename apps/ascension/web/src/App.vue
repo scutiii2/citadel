@@ -98,19 +98,10 @@ async function reset(): Promise<void> {
   }
 }
 
-watch(() => store.profile !== null, (exists) => {
-  if (exists && screen.value === "menu") play(store.battle || store.encounter ? "battle" : "collection");
-}, { immediate: true });
-
-// A restored (or just started) battle, or an encounter, skips the menu: an
-// open battle must not run unseen behind it.
-watch(
-  () => store.battle?.id ?? store.encounter?.id ?? null,
-  (id) => {
-    if (id !== null) play("battle");
-  },
-  { immediate: true },
-);
+// Newly found encounters enter planning; restored saves and battles start at the menu.
+watch(() => store.encounter?.id ?? null, (id, previous) => {
+  if (id !== null && previous !== undefined) play("battle");
+});
 // Losing the save (reset) sends the page back to the menu.
 watch(
   () => store.needsStarter,
@@ -148,13 +139,14 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 
 <template>
   <section ref="page" class="em-root ascension-page" :class="{ fighting }">
-    <EmShell :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
+    <EmShell :destination="screen === 'menu' ? 'Main menu' : screen === 'starter' ? 'Starter selection' : tab === 'battle' ? 'Quick battle' : tab === 'collection' ? 'Collection' : 'Shop'" :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
       <template v-if="hasAccount" #actions>
         <EmButton class="account-action" aria-label="How to play" title="How to play" @click="showingHelp = true"><EmIcon name="book" /><span class="action-label">How to play</span></EmButton>
         <EmButton class="account-action" aria-label="Settings" title="Settings" @click="showingSettings = true"><EmIcon name="settings" /><span class="action-label">Settings</span></EmButton>
       </template>
       <template v-if="session.status === 'ready' && store.loaded && !store.unavailable && screen !== 'menu'" #navigation>
-        <button v-if="!hasAccount" type="button" class="menu-link" aria-label="Main menu" @click="screen = 'menu'"><EmIcon name="arrow" class="back-arrow" /></button>
+        <button type="button" class="menu-link" aria-label="Main menu" @click="screen = 'menu'"><EmIcon name="arrow" class="back-arrow" /></button>
+        <h1 class="screen-brand em-pixel">ASCENSION</h1>
         <EmTabs v-if="screen === 'game'" :model-value="tab" :options="tabs" ariaLabel="Ascension sections" @update:model-value="selectTab" />
       </template>
       <template v-if="session.status === 'ready' && store.loaded && !store.unavailable && screen !== 'menu'" #heading>
@@ -202,11 +194,11 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
             <template v-if="store.battle">
               <BattleResult v-if="store.battle.result && !playback.busy" :battle="store.battle" />
               <template v-else>
-                <BattleArena :battle="store.battle" />
-                <div class="battle-bottom">
-                  <ActionBar :battle="store.battle" />
+                <div class="battle-stage">
+                  <BattleArena :battle="store.battle" />
                   <RoundLog :battle="store.battle" />
                 </div>
+                <div class="battle-bottom"><ActionBar :battle="store.battle" /></div>
                 <EmblemPrompt />
               </template>
             </template>
@@ -310,7 +302,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 }
 .battle-bottom {
   display: grid;
-  grid-template-columns: 1.15fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--em-space-5);
   margin-top: var(--em-space-5);
 }
@@ -320,7 +312,6 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
     gap: var(--em-space-3);
     margin-top: var(--em-space-3);
   }
-  .fighting :deep(.mast) { display: none; }
   .fighting :deep(.screen-heading) { padding: var(--em-space-2) var(--em-space-3); }
   .fighting :deep(.screen-heading .head) { gap: var(--em-space-2); }
   .fighting :deep(.screen-heading .em-eyebrow),
@@ -328,4 +319,12 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
   .fighting :deep(.screen-heading .title) { margin: 0; font-size: 14px; }
   .fighting :deep(.main) { padding: var(--em-space-3) var(--em-space-3) var(--em-space-4); }
 }
+</style>
+
+<style scoped>
+.screen-brand { margin:0; flex:none; font-size:20px; color:var(--em-accent); text-shadow:0 2px 0 #84522d; }
+.battle-stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:stretch; }
+@media(max-width:1100px) { .screen-brand { font-size:15px; } }
+@media(max-width:900px) { .battle-stage { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:700px) { .screen-brand { font-size:12px; } }
 </style>

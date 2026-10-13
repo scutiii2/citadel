@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import type { BattleView, Buff, Fighter, Side } from "../api/AscensionClient";
+import { computed, ref } from "vue";
+import type { BattleView, Buff, Fighter } from "../api/AscensionClient";
 import { usePlaybackStore } from "../stores/playback";
 import { useAscensionStore } from "../stores/ascension";
 import { statusText } from "../utils/ascension";
-import { poseFor, spriteFor } from "../utils/sprites";
-import { other } from "../utils/battleCues";
-import AnimatedSprite from "./ui/AnimatedSprite.vue";
+import { spriteFor } from "../utils/sprites";
 import EmBar from "./ui/EmBar.vue";
 import EmEmblem from "./ui/EmEmblem.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
@@ -17,6 +15,7 @@ import TypeSymbol from "./ui/TypeSymbol.vue";
 const props = defineProps<{ battle: BattleView }>();
 const playback = usePlaybackStore();
 const ascension = useAscensionStore();
+const failedImages = ref<string[]>([]);
 
 const sides = computed<{ key: string; label: string; fighter: Fighter }[]>(() => [
   { key: "player", label: "You", fighter: props.battle.player },
@@ -54,24 +53,16 @@ function artInfo(fighter: Fighter) {
 }
 
 function art(fighter: Fighter): string | null {
-  return spriteFor(artInfo(fighter), "battle");
+  const url = spriteFor(artInfo(fighter), "battle");
+  return url && !failedImages.value.includes(url) ? url : null;
 }
 
-/** The fighter's sheet, if it has one; the rest keep their still battle sprite. */
-function sheet(fighter: Fighter) {
-  return artInfo(fighter)?.animation ?? null;
-}
-
-/** What the fighter does now: its effect, or catching while an EMBLEM is thrown at the other side. */
-function pose(key: string) {
-  const side = key as Side;
-  return poseFor(playback.fx[side], playback.ball[other(side)]?.phase === "throw");
-}
 </script>
 
 <template>
   <section class="arena em-glow" :class="{ playing: playback.busy }" :aria-label="`Round ${battle.round}`" @click="playback.busy && playback.skip()">
     <button v-if="playback.busy" type="button" class="skip" @click.stop="playback.skip()">Skip</button>
+    <p class="round-number em-pixel">Round {{ battle.round }}</p>
     <div class="fighters">
       <template v-for="(side, i) in sides" :key="side.key">
         <div v-if="i === 1" class="versus em-pixel" aria-hidden="true">VS</div>
@@ -87,8 +78,7 @@ function pose(key: string) {
           <p class="hp em-num">HP {{ hpOf(side.key, side.fighter) }} / {{ side.fighter.max_hp }}</p>
           <div class="art">
             <div class="sprite" :class="[playback.fx[side.key as 'player' | 'wild'] ? `fx-${playback.fx[side.key as 'player' | 'wild']}` : '']">
-              <span v-if="sheet(side.fighter)" class="pic"><AnimatedSprite :sheet="sheet(side.fighter)!" :state="pose(side.key)" /></span>
-              <img v-else-if="art(side.fighter)" :src="art(side.fighter)!" alt="" draggable="false" />
+              <img v-if="art(side.fighter)" :src="art(side.fighter)!" alt="" draggable="false" @error="failedImages.push(art(side.fighter)!)" />
               <span v-else class="letter" aria-hidden="true">{{ side.fighter.name.slice(0, 1) }}</span>
             </div>
             <span
@@ -528,4 +518,22 @@ function pose(key: string) {
     font-size: 11px;
   }
 }
+
+.arena { padding: 14px; overflow: hidden; background: linear-gradient(180deg, #09121cd9, #111c2866), var(--em-forge-scene, radial-gradient(ellipse at 50% 90%, #36424b, #101720)); background-position: center; background-size: cover; box-shadow: inset 0 0 0 3px #0a111b; }
+.round-number { position: static; margin: 0 0 12px; text-align: center; font-size: 13px; color: var(--em-text); }
+.fighters { grid-template-columns: minmax(0, 1fr) 35px minmax(0, 1fr); gap: 14px; }
+.fighter { min-width: 0; }
+.head { align-items: start; min-height: 44px; }
+.head h3 { font-size: 14px; }
+.head small { display: block; margin-top: 4px; }
+.badges { flex-wrap: wrap; justify-content: flex-end; }
+.badges :deep(.em-tier) { font-size: 10px; }
+.hp { color: var(--em-text); text-shadow: 0 1px #000; }
+.art { height: 240px; align-items: end; margin-top: 12px; }
+.art img { image-rendering: pixelated; }
+.stats, .effects { font-size: 11px; line-height: 1.5; }
+.effects li { background: #0a172acc; padding: 2px 6px; margin-top: 4px; border-left: 2px solid var(--em-accent); }
+.versus { font-size: 14px; opacity: .5; }
+@media (max-width: 700px) { .arena { padding: 10px; } .round-number { position: static; transform: none; text-align: center; margin-bottom: 12px; } .fighters { grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr); gap: 6px; } .versus { order: 0; margin: 0; font-size: 10px; } .wild { order: 0; } .head { flex-direction: column; gap: 4px; min-height: 66px; } .badges { justify-content: flex-start; } .head h3 { font-size: 12px; } .art { height: 160px; } .hp, .stats, .effects { font-size: 10px; } }
+
 </style>

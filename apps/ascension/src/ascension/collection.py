@@ -50,6 +50,7 @@ class CollectionService:
                 "ascension_types": [t.value for t in spec.ascension_types], "level": ascended.level, "xp": ascended.xp,
                 "xp_needed": None if ascended.level >= level_cap else self._catalog.levels.xp_per_level * ascended.level,
                 "level_cap": level_cap, "copies": ascended.copies, "tier_id": tier_id,
+                "sale_value": self._catalog.sale_value(ascended.ascended_id, tier_id, ascended.level),
                 "stars": ascended.stars, "stars_needed": needed, "star_essence_cost": tier.essence_cost,
                 "next_tier_id": self._catalog.next_tier(ascended.ascended_id, tier_id),
                 "can_star_up": needed is not None and ascended.stars < needed and ascended.copies >= 1

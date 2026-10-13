@@ -1,24 +1,19 @@
 # Striker visual identity
 
-Primary reference: `sprite_preview_card.webp`, the current established portrait. Use it as the exact character reference when recreating the main card and battle sprites. Written prompts are subordinate to this reference for character details and to `../ART_GUIDE.md` for framing and style.
+## Approved redesign (2026-10-13)
 
-## Defining features
+The user approved the character artwork in the main menu and collection concepts and explicitly requested this design for the battle sprite. This intentional redesign supersedes the former creature design for newly generated art.
 
-- A small, agile salamander-dragon warrior on two legs, with a long rounded head, no human anatomy or face.
-- Red scaly skin with darker crimson spots, an orange-gold belly and throat, and clawed three-toed feet with pale claws.
-- Large round amber-orange eyes, a calm, cheeky half-smile and a small snout.
-- A mane of flame runs from the back of the head along the neck in pointed orange and yellow tongues. Two small horn-like spikes rise on the head.
-- One long, thick tail, red on top with an orange underside, ending in a swirling flame. Keep it a single tail.
-- Steel pauldrons, gauntlets and knee plates, riveted and trimmed with bronze, worn over brown leather and cloth; a dark brown scarf at the neck.
-- A broad, curved, single-edged blade with a bronze crossguard, gripped in both hands. The steel glows along the edge with fire orange and flickers with flame.
-- Palette: crimson, orange, steel grey, bronze and dark brown. Fire orange (mane, tail, blade edge, eyes) is the signature glow.
+A fierce humanoid fantasy sword warrior with spiky flame-red hair, intense amber eyes, crimson/dark-red fitted plate armour, gold accents, red scarf or short cape, sturdy greaves and a broad red-glowing steel sword. Match the approved red-haired warrior silhouette and angular armour. No salamander head or tail.
 
-## Consistency across sprites
+## References and consistency
 
-Keep the face, flame mane, single flaming tail, armour pieces, scarf and the glowing curved blade. Pose, crop and background may change; do not add wings, a second weapon, a shield, extra limbs or a different head shape.
+- Primary new-design reference: `battle_source.png`, the generated full-resolution source for `sprite_battle.webp` in this folder.
+- `sprite_battle.webp` is the 512 x 512 game export of that source.
+- The approved UI concept sheets supplied the original design direction; the character-only source is the reference for future poses and card artwork.
+- Existing `sprite_main_card.webp` and `sprite_preview_card.webp` retain the previous design because this request covers battle sprites only. Do not use those legacy cards to override the approved redesign. Updating the cards is a separate art pass.
+- Preserve face/helmet, silhouette, clothing, armour, weapons, palette and proportions across future sprites. Correct accidental drift rather than changing this identity.
 
-Main card: a low aggressive lunge with the blade ready on the right, tail flame curling behind, glancing at the viewer. Battle: a forward lunge facing right, blade held out ahead, tail flame behind; complete isolated figure, darkest tones at least approximately #2a3342, no ground or cast shadow.
+## Battle framing
 
-## Preview export reference
-
-`sprite_preview_card.webp` is the 512 x 512 game export and the primary reference. The export correction changes framing and dimensions only, not the character identity.
+Right-facing three-quarter attack-ready stance, knees bent, broad glowing sword angled forward toward the right. A single full-body figure on transparent background, with no ground, cast shadow, text or frame. Nothing touches an edge. Use crisp square pixel clusters and dark slate shadows approximately #2a3342 or lighter so the arena's lighten blend does not erase details. Export at 512 x 512, lossless WebP, with nearest-neighbour scaling.

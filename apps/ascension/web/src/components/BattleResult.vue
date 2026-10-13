@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { BattleView, ResultKind } from "../api/AscensionClient";
 import { useNowSeconds } from "../composables/useNowSeconds";
 import { useAscensionStore } from "../stores/ascension";
 import { RESULT_LABELS, formatCountdown, titleCase } from "../utils/ascension";
+import { spriteFor } from "../utils/sprites";
 import EmButton from "./ui/EmButton.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmPanel from "./ui/EmPanel.vue";
@@ -16,6 +17,9 @@ const props = defineProps<{ battle: BattleView }>();
 const store = useAscensionStore();
 const now = useNowSeconds();
 const result = computed(() => props.battle.result);
+const imageFailed = ref(false);
+const featured = computed(() => result.value?.kind === "captured" ? props.battle.wild : props.battle.player);
+const featuredArt = computed(() => spriteFor(store.catalog?.ascendeds.find(a => a.id === featured.value.ascended_id)?.art, "battle"));
 
 const TONES: Record<ResultKind, { tone: "success" | "danger" | "accent" | "warning"; icon: IconName }> = {
   won: { tone: "success", icon: "shield" },
@@ -64,22 +68,20 @@ const story = computed(() => {
 
 <template>
   <EmPanel v-if="result" class="battle-result" role="status">
+    <div class="result-scene">
     <div class="mark" :class="style.tone" aria-hidden="true"><EmIcon :name="style.icon" :size="40" /></div>
     <h2 class="em-pixel title">{{ RESULT_LABELS[result.kind] }}</h2>
     <p class="story">{{ story }}</p>
+    <img v-if="featuredArt && !imageFailed" class="result-art" :src="featuredArt" alt="" draggable="false" @error="imageFailed = true" />
+    <span v-else class="result-letter em-pixel" aria-hidden="true">{{ featured.name.slice(0, 1) }}</span>
+    </div>
 
     <div v-if="awarded" class="rewards">
+      <h3 class="rewards-heading em-pixel">Rewards</h3>
       <div v-if="result.xp !== undefined" class="reward">
         <strong class="em-pixel em-num">+{{ result.xp }} XP</strong>
         <span>for {{ battle.player.name }}<template v-if="levelledUp">, now level {{ result.level_after }}</template></span>
-        <div v-if="result.squad_xp?.length" class="squad-xp">
-          <h3>Squad XP</h3>
-          <ul>
-            <li v-for="member in result.squad_xp" :key="member.ascended_id">
-              +{{ member.xp }} XP · {{ member.name }}<template v-if="member.level_after > member.level_before">, now level {{ member.level_after }}</template>
-            </li>
-          </ul>
-        </div>
+
       </div>
       <div v-if="result.insignia !== undefined" class="reward">
         <strong class="em-pixel em-num">+{{ result.insignia }} Insignia</strong>
@@ -96,6 +98,15 @@ const story = computed(() => {
     </div>
     <p v-else class="none">No rewards from this battle.</p>
 
+    <div class="result-details">
+        <div v-if="result.squad_xp?.length" class="squad-xp">
+          <h3>Squad XP</h3>
+          <ul>
+            <li v-for="member in result.squad_xp" :key="member.ascended_id">
+              +{{ member.xp }} XP · {{ member.name }}<template v-if="member.level_after > member.level_before">, now level {{ member.level_after }}</template>
+            </li>
+          </ul>
+        </div>
     <template v-if="result.revealed_personalities?.length">
       <h3 class="revealed-title">Personalities revealed</h3>
       <ul class="revealed">
@@ -106,6 +117,7 @@ const story = computed(() => {
     </template>
 
     <EmButton variant="primary" @click="store.closeBattle()">Back</EmButton>
+    </div>
   </EmPanel>
 </template>
 
@@ -218,4 +230,27 @@ const story = computed(() => {
     font-size: 20px;
   }
 }
+
+.battle-result { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .75fr) minmax(0, 1fr); gap: 10px; max-width: none; width: 100%; padding: 10px; align-items: stretch; text-align: left; background: var(--em-header); }
+.result-scene { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 20px 12px 10px; text-align: center; border: 1px solid var(--em-divider); background: linear-gradient(180deg, #07121ecc, #10172055), var(--em-forge-scene, radial-gradient(ellipse at bottom, #54402a, #101720)); background-position: center; background-size: cover; }
+.mark { width: 44px; height: 44px; margin-bottom: 8px; }
+.mark :deep(svg) { width: 28px; height: 28px; }
+.title { font-size: 24px; color: var(--em-accent); }
+.story { font-size: 13px; line-height: 1.5; }
+.result-art { display: block; width: 100%; height: 230px; object-fit: contain; margin-top: 10px; image-rendering: pixelated; mix-blend-mode: lighten; }
+.result-letter { display: grid; place-items: center; height: 230px; font-size: 80px; color: var(--em-muted); }
+.rewards { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 10px; border: 1px solid var(--em-divider); }
+.rewards-heading { margin: 0 0 4px; font-size: 14px; text-transform: uppercase; }
+.reward { padding: 12px; background: linear-gradient(140deg, var(--em-raised), var(--em-header)); border-color: var(--em-divider); }
+.reward strong { font-family: var(--em-font-body); font-size: 16px; font-weight: 700; }
+.reward span { font-size: 11px; }
+.result-details { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 12px; border: 1px solid var(--em-divider); background: linear-gradient(145deg, var(--em-panel), var(--em-header)); }
+.squad-xp { margin: 0; padding: 0; border: 0; }
+.squad-xp h3, .revealed-title { font-family: var(--em-font-display); text-transform: uppercase; font-size: 13px; }
+.squad-xp li, .revealed li { padding: 8px; margin-top: 6px; border: 1px solid var(--em-divider); background: var(--em-header); font-size: 12px; }
+.revealed { margin: 0; }
+.result-details :deep(.em-button) { width: 100%; margin-top: auto; }
+.none { margin: 0; align-self: start; }
+@media (max-width: 950px) { .battle-result { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .result-details { grid-column: 1 / -1; } }
+@media (max-width: 600px) { .battle-result { grid-template-columns: minmax(0, 1fr); } .result-details { grid-column: 1; } .title { font-size: 22px; } .result-art { height: 190px; } }
 </style>

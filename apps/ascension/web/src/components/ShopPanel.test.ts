@@ -9,7 +9,7 @@ import ShopPanel from "./ShopPanel.vue";
 
 vi.mock("../api/AscensionClient", () => {
   const client = { buyEmblems: vi.fn(), shop: vi.fn(), buyOffer: vi.fn(), sellCopy: vi.fn(), profile: vi.fn() };
-  return { useAscensionClient: () => client };
+  return { useAscensionClient: () => client, newIdempotencyKey: () => crypto.randomUUID() };
 });
 
 const client = vi.mocked(useAscensionClient());
@@ -33,7 +33,7 @@ beforeEach(() => {
 function mountShop(insignia = 25) {
   const store = useAscensionStore();
   store.catalog = CATALOG;
-  store.profile = { ...PROFILE, insignia, ascendeds: [ownedAscended("guardian", { copies: 2 })] };
+  store.profile = { ...PROFILE, insignia, ascendeds: [{ ...ownedAscended("guardian", { copies: 2 }), sale_value: 12 }] };
   store.shop = shopWindow();
   store.shopEndsAt = Date.now() / 1000 + 3 * 3600 + 12 * 60;
   return { store, wrapper: mount(ShopPanel) };
@@ -48,22 +48,24 @@ describe("ShopPanel", () => {
     expect(buyIn(wrapper, "common").attributes("disabled")).toBeUndefined();
     expect(buyIn(wrapper, "rare").attributes("disabled")).toBeDefined();
 
-    await wrapper.find('[data-tier="common"] input').setValue("3");
+    await buyIn(wrapper, "common").trigger("click");
+    await wrapper.find('[data-basket="emblem:common"] input').setValue("3");
 
-    expect(buyIn(wrapper, "common").text()).toBe("Buy for 30");
-    expect(buyIn(wrapper, "common").attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-total]').text()).toContain("30");
+    expect(wrapper.find('[data-checkout]').attributes("disabled")).toBeDefined();
   });
 
   it("buys EMBLEMs and says what it bought", async () => {
     client.buyEmblems.mockResolvedValue({ kind: "emblems", tier_id: "common", quantity: 2, price: 20 });
     const { wrapper } = mountShop(25);
 
-    await wrapper.find('[data-tier="common"] input').setValue("2");
     await buyIn(wrapper, "common").trigger("click");
+    await wrapper.find('[data-basket="emblem:common"] input').setValue("2");
+    await wrapper.find('[data-checkout]').trigger("click");
     await flushPromises();
 
-    expect(client.buyEmblems).toHaveBeenCalledExactlyOnceWith("common", 2);
-    expect(wrapper.find(".notice").text()).toBe("Bought 2 Common EMBLEMs for 20 Insignia.");
+    expect(client.buyEmblems).toHaveBeenCalledExactlyOnceWith("common", 2, expect.any(String));
+    expect(wrapper.find(".notice").text()).toContain("Purchased 2 units for 20 Insignia.");
   });
 
   it("shows the offers with stock, price and the time to the next rotation", () => {
@@ -72,7 +74,7 @@ describe("ShopPanel", () => {
     const cards = wrapper.findAll("[data-offer]");
     expect(cards).toHaveLength(2);
     expect(cards[0]!.text()).toContain("Guardian");
-    expect(cards[0]!.find("img").attributes("src")).toBe("/ascended/guardian/sprite_preview_card.webp");
+    expect(cards[0]!.find("img").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
     expect(cards[0]!.text()).toContain("3 left");
     expect(cards[0]!.text()).toContain("40");
     expect(cards[1]!.text()).toContain("1 left");
@@ -84,10 +86,11 @@ describe("ShopPanel", () => {
     const { wrapper } = mountShop(500);
 
     await wrapper.find('[data-offer="0"] button').trigger("click");
+    await wrapper.find('[data-checkout]').trigger("click");
     await flushPromises();
 
-    expect(client.buyOffer).toHaveBeenCalledExactlyOnceWith(46, 0);
-    expect(wrapper.find(".notice").text()).toBe("Bought 1 copy of Guardian for 40 Insignia.");
+    expect(client.buyOffer).toHaveBeenCalledExactlyOnceWith(46, 0, expect.any(String));
+    expect(wrapper.find(".notice").text()).toContain("Purchased 1 units for 40 Insignia.");
   });
 
   it("keeps the server's refusal when an offer costs more than the Insignia", async () => {
@@ -95,6 +98,7 @@ describe("ShopPanel", () => {
     const { store, wrapper } = mountShop(500);
 
     await wrapper.find('[data-offer="0"] button').trigger("click");
+    await wrapper.find('[data-checkout]').trigger("click");
     await flushPromises();
 
     expect(store.error).toBe("that costs 400 Insignia and you have 25");
@@ -123,12 +127,14 @@ describe("ShopPanel", () => {
     client.sellCopy.mockResolvedValue({ kind: "sale", ascended_id: "guardian", value: 12, copies: 1, tier_id: "common" });
     const { wrapper } = mountShop();
 
+    await wrapper.find('[data-mode="sell"]').trigger("click");
     await wrapper.find('[data-sell="guardian"] button').trigger("click");
+    await wrapper.find('[data-checkout]').trigger("click");
     expect(client.sellCopy).not.toHaveBeenCalled();
     await wrapper.find("button.confirm").trigger("click");
     await flushPromises();
 
-    expect(client.sellCopy).toHaveBeenCalledExactlyOnceWith("guardian");
-    expect(wrapper.find(".notice").text()).toBe("Sold one copy for 12 Insignia.");
+    expect(client.sellCopy).toHaveBeenCalledExactlyOnceWith("guardian", expect.any(String));
+    expect(wrapper.find(".notice").text()).toContain("Sold 1 spare copies for 12 Insignia.");
   });
 });

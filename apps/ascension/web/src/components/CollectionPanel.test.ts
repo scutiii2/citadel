@@ -14,6 +14,27 @@ vi.mock("../api/AscensionClient", () => {
 
 const client = vi.mocked(useAscensionClient());
 
+it("selects a collected character in the inspector before opening full details", async () => {
+  const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian")] });
+  await wrapper.find(".ascended-card").trigger("click");
+  expect(wrapper.find('[aria-label="Selected Ascended"]').text()).toContain("Guardian");
+  expect(wrapper.find(".ascended-details").attributes("open")).toBeUndefined();
+  await wrapper.find(".open-details").trigger("click");
+  await flushPromises();
+  expect(wrapper.find(".details .detail-portrait").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
+  expect(wrapper.find(".progression-panel").text()).toContain("A star costs");
+});
+
+it("filters collected cards by search and rarity and can hide concealed cards", async () => {
+  const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian"), ownedAscended("striker", { tier_id: "rare" })] });
+  await wrapper.find('input[type="search"]').setValue("str");
+  expect(wrapper.findAll(".ascended-card")).toHaveLength(1);
+  await wrapper.find('select[aria-label="Filter by rarity"]').setValue("common");
+  expect(wrapper.findAll(".ascended-card")).toHaveLength(0);
+  await wrapper.find('input[aria-label="Show uncollected"]').setValue(false);
+  expect(wrapper.findAll(".missing-ascended")).toHaveLength(0);
+});
+
 // jsdom has no <dialog> methods.
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
@@ -50,7 +71,7 @@ describe("CollectionPanel", () => {
     expect(text).toContain("40 / 300 XP");
     expect(cards[0]!.find(".ascended-name").text()).toBe("Guardian");
     expect(cards[0]!.find(".level").text()).toBe("Lv 3");
-    expect(cards[0]!.find("img.frame").attributes("src")).toContain("front_rare");
+    expect(cards[0]!.find("img.portrait").attributes("src")).toContain("sprite_battle.webp");
     expect(cards[0]!.find(".passive").exists()).toBe(false);
     expect(wrapper.findAll(".missing-ascended").map((row) => row.find(".missing-name").text())).toEqual([
       "Striker",
@@ -83,6 +104,7 @@ describe("CollectionPanel", () => {
     const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian")] });
 
     await wrapper.find(".ascended-card").trigger("click");
+    await wrapper.find(".open-details").trigger("click");
     await flushPromises();
 
     expect(client.personalities).toHaveBeenCalledWith("guardian", null, 50);
@@ -108,6 +130,7 @@ describe("CollectionPanel", () => {
 it("keeps the spare-copy count visible at the top tier and across detail tabs", async () => {
   const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian", { copies: 0, stars_needed: null })] });
   await wrapper.find(".ascended-card").trigger("click");
+    await wrapper.find(".open-details").trigger("click");
   await flushPromises();
   expect(wrapper.find(".copy-summary").text()).toContain("0 spare copies");
   await wrapper.findAll('[role="tab"]').find((b) => b.text() === "Personalities")!.trigger("click");
@@ -118,6 +141,7 @@ it("explains a personality beside its preset control", async () => {
   client.personalities.mockResolvedValue({ items: [{ id: "p1", type: "AGGRESSIVE", tier: 2 }], next_cursor: null });
   const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian")] });
   await wrapper.find(".ascended-card").trigger("click");
+    await wrapper.find(".open-details").trigger("click");
   await flushPromises();
   await wrapper.findAll('[role="tab"]').find((b) => b.text() === "Personalities")!.trigger("click");
   expect(wrapper.find(".personality-description").text()).toContain("2 preference weight");
@@ -126,6 +150,7 @@ it("explains a personality beside its preset control", async () => {
 it("updates the summary when learning an ability refreshes the profile", async () => {
   const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian")] });
   await wrapper.find(".ascended-card").trigger("click");
+    await wrapper.find(".open-details").trigger("click");
   await flushPromises();
   useAscensionStore().profile = { ...PROFILE, ascendeds: [ownedAscended("guardian", { copies: 4, can_star_up: false })] };
   await flushPromises();
@@ -147,6 +172,7 @@ describe("stars and tiers", () => {
     const wrapper = mountPanel({ ...PROFILE, essences: { rare: 3 }, ascendeds: [ready()] });
 
     await wrapper.find(".ascended-card").trigger("click");
+    await wrapper.find(".open-details").trigger("click");
     await flushPromises();
     const upgrade = wrapper.find(".upgrade");
     expect(upgrade.text()).toContain("Stars 0 / 2 to reach Unique");
@@ -166,6 +192,7 @@ describe("stars and tiers", () => {
     const wrapper = mountPanel({ ...PROFILE, ascendeds: [ready({ stars: 2, can_star_up: false, can_tier_up: true })] });
 
     await wrapper.find(".ascended-card").trigger("click");
+    await wrapper.find(".open-details").trigger("click");
     await flushPromises();
     const buttons = wrapper.find(".upgrade").findAll("button").map((b) => b.text());
     expect(buttons).toEqual(["Raise to Unique"]);
@@ -181,9 +208,11 @@ describe("stars and tiers", () => {
     const wrapper = mountPanel({ ...PROFILE, ascendeds: [ready({ can_star_up: false }), ownedAscended("cindrax", { tier_id: "forbidden", stars_needed: null, next_tier_id: null })] });
 
     await wrapper.find(".ascended-card").trigger("click");
+    await wrapper.find(".open-details").trigger("click");
     await flushPromises();
     expect(wrapper.find(".upgrade button").attributes("disabled")).toBeDefined();
     await wrapper.findAll(".ascended-card")[1]!.trigger("click");
+    await wrapper.find(".open-details").trigger("click");
     await flushPromises();
     expect(wrapper.find(".upgrade").text()).toContain("Top of its ladder");
     expect(wrapper.find(".upgrade button").exists()).toBe(false);
@@ -216,6 +245,14 @@ describe("not collected", () => {
 
 describe("PresetEditor", () => {
   const items = ["p1", "p2", "p3", "p4"].map((id) => ({ id, type: "BOLD", tier: 1 }));
+
+  it("shows the selected personalities and unsaved state in its preset inspector", async () => {
+    const wrapper = mount(PresetEditor, { props: { ascendedId: "guardian", ascendedName: "Guardian", personalities: items } });
+    await flushPromises();
+    await wrapper.findAll("input[role='switch']")[0]!.setValue(true);
+    expect(wrapper.find('[aria-label="Personality preset"]').text()).toContain("Bold");
+    expect(wrapper.find('[role="status"]').text()).toContain("Unsaved changes");
+  });
 
   it("equips at most three personalities and saves the preset", async () => {
     client.preset.mockResolvedValue({ ascended_id: "guardian", slot: 1, instance_ids: ["p1"] });
@@ -322,6 +359,36 @@ describe("PresetEditor", () => {
 
 
 describe("collection squad controls", () => {
+  it("replaces a full squad slot by dragging a collected card", async () => {
+    const wrapper = mountPanel({ ...PROFILE, squad_size: 1, ascendeds: [ownedAscended("guardian", { in_squad: true }), ownedAscended("striker")] });
+    client.putSquad.mockResolvedValue({ ascended_ids: ["striker"], size: 1 });
+    client.profile.mockResolvedValue({ ...PROFILE, squad: ["striker"], ascendeds: [ownedAscended("guardian"), ownedAscended("striker", { in_squad: true })] });
+    await wrapper.find(".owned-entry").trigger("dragstart");
+    await wrapper.find(".squad-slot").trigger("drop");
+    await flushPromises();
+    expect(client.putSquad).toHaveBeenCalledWith(["striker"]);
+  });
+
+  it("retains the selection when closing details and supports keyboard selection", async () => {
+    const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian")] });
+    await wrapper.find(".ascended-card").trigger("keydown", { key: "Enter" });
+    await wrapper.find(".open-details").trigger("click");
+    await flushPromises();
+    await wrapper.find('.ascended-details button[aria-label="Close"]').trigger("click");
+    expect(wrapper.find(".ascended-card").attributes("aria-pressed")).toBe("true");
+    expect(wrapper.find(".collection-inspector").text()).toContain("Guardian");
+  });
+
+  it("conceals the portrait when battle art is absent even when legacy art exists", async () => {
+    const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian")] });
+    useAscensionStore().catalog = { ...CATALOG, ascendeds: [ascendedInfo("guardian", { art: { main_card: "/legacy-main.webp", preview_card: "/legacy-preview.webp", battle: null, focus: 50, focus_preview: 50, animation: null } })] };
+    await wrapper.find(".ascended-card").trigger("click");
+    await wrapper.find(".open-details").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".detail-portrait").exists()).toBe(false);
+    expect(wrapper.find(".inspector-portrait").exists()).toBe(false);
+    expect(wrapper.findAll("img").some(img => img.attributes("src")?.includes("legacy"))).toBe(false);
+  });
   it("renders the configured slots, marks members and prevents removing the last", async () => {
     const wrapper = mountPanel({ ...PROFILE, squad_size: 3 });
     expect(wrapper.findAll(".squad-slot")).toHaveLength(3);
@@ -330,6 +397,7 @@ describe("collection squad controls", () => {
     expect(wrapper.find(".owned-entry").exists()).toBe(false);
     expect(wrapper.find(".empty").text()).toBe("Everyone you collected is in your squad.");
     await wrapper.find(".squad-card").trigger("click");
+    await wrapper.find(".open-details").trigger("click");
     await flushPromises();
     expect(wrapper.find(".squad-control button").text()).toBe("Remove from squad");
     expect(wrapper.find(".squad-control button").attributes("disabled")).toBeDefined();
@@ -342,6 +410,7 @@ describe("collection squad controls", () => {
     client.profile.mockResolvedValue({ ...PROFILE, squad: ["guardian", "striker"], ascendeds: [ownedAscended("guardian", { in_squad: true }), ownedAscended("striker", { in_squad: true })] });
     expect(wrapper.findAll(".ascended-card")).toHaveLength(1);
     await wrapper.find(".ascended-card").trigger("click");
+    await wrapper.find(".open-details").trigger("click");
     await flushPromises();
     await wrapper.find(".squad-control button").trigger("click");
     await flushPromises();
@@ -355,6 +424,7 @@ describe("collection squad controls", () => {
   it("explains full squads and active battles, and disables busy changes", async () => {
     const wrapper = mountPanel({ ...PROFILE, squad_size: 1, ascendeds: [ownedAscended("guardian", { in_squad: true }), ownedAscended("striker")] });
     await wrapper.find(".ascended-card").trigger("click");
+    await wrapper.find(".open-details").trigger("click");
     await flushPromises();
     expect(wrapper.find(".squad-control").text()).toContain("Squad full. Remove a member first.");
     expect(wrapper.find(".squad-control button").attributes("disabled")).toBeDefined();

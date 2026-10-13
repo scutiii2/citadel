@@ -12,7 +12,7 @@ import EmTierBadge from "./ui/EmTierBadge.vue";
 /** One owned Ascended on the Collection tab: its small card (tier colour, level) with a
  * caption of tier, copies and XP; a click or Enter opens its details. A fainted Ascended
  * is greyed out and says when it is ready again. */
-const props = defineProps<{ ascended: OwnedAscended }>();
+const props = defineProps<{ ascended: OwnedAscended; selected?: boolean }>();
 const emit = defineEmits<{ open: [] }>();
 const store = useAscensionStore();
 const now = useNowSeconds();
@@ -23,10 +23,11 @@ const faintLeft = computed(() => (props.ascended.faint_until === null ? 0 : Math
 <template>
   <div
     class="ascended-card em-lift"
-    :class="{ down: faintLeft > 0, 'is-off': faintLeft > 0 }"
+    :class="{ down: faintLeft > 0, 'is-off': faintLeft > 0, selected }"
     :style="{ '--tier': `var(--em-tier-${ascended.tier_id}, var(--em-tier-common))` }"
     role="button"
     tabindex="0"
+    :aria-pressed="selected ?? false"
     :aria-label="`${ascended.name}, ${titleCase(ascended.tier_id)}, level ${ascended.level}`"
     @click="emit('open')"
     @keydown.enter.prevent="emit('open')"
@@ -35,6 +36,8 @@ const faintLeft = computed(() => (props.ascended.faint_until === null ? 0 : Math
     <AscendedPreviewCard v-if="info" class="face" :ascended="info" :level="ascended.level" :tier-id="ascended.tier_id" show-level />
     <span v-else class="ascended-name">{{ ascended.name }}</span>
     <span class="caption">
+      <strong class="caption-name">{{ ascended.name }}</strong>
+      <span class="star-count em-num" :aria-label="`${ascended.stars} stars`">★ {{ ascended.stars }}</span>
       <span class="tier-line">
         <EmTierBadge :tier-id="ascended.tier_id" />
         <span class="copies em-num">{{ ascended.copies }} {{ ascended.copies === 1 ? "copy" : "copies" }}</span>
@@ -58,11 +61,14 @@ const faintLeft = computed(() => (props.ascended.faint_until === null ? 0 : Math
   gap: var(--em-space-2);
   box-sizing: border-box;
   width: var(--card-width, 100%);
-  padding: 10px;
+  padding: 6px;
+  border: 1px solid var(--em-border);
+  background: linear-gradient(135deg, var(--em-panel), var(--em-bg));
   border-radius: var(--em-radius);
   color: var(--em-text);
   cursor: pointer;
 }
+.ascended-card.selected { border-color: var(--em-accent); box-shadow: 0 0 0 2px var(--em-accent); }
 .ascended-card:focus-visible {
   outline: 2px solid var(--em-accent);
   outline-offset: 3px;
@@ -74,11 +80,13 @@ const faintLeft = computed(() => (props.ascended.faint_until === null ? 0 : Math
   filter: grayscale(1);
   opacity: 0.72;
 }
+.star-count { color: var(--em-accent); font-size: 12px; }
 .caption {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
+.caption-name { font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
 .tier-line {
   display: flex;
   flex-wrap: wrap;

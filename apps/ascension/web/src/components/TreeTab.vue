@@ -44,7 +44,7 @@ const point = (id: string) => layout.value.positions.get(id) ?? layout.value.cen
 const width = computed(() => layout.value.width);
 const height = computed(() => layout.value.height);
 const info = computed(() => store.catalog?.ascendeds.find(n => n.id === props.ascended.ascended_id));
-const portrait = computed(() => spriteFor(info.value?.art, "main_card"));
+const portrait = computed(() => spriteFor(info.value?.art, "battle"));
 const highlighted = computed(() => {
   const ids = new Set<string>();
   function visit(id: string): void {
@@ -199,7 +199,7 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
             <path v-for="l in lines" :key="l.key" class="tree-line" :class="{ learned: l.learned, highlighted: l.highlighted, 'shared-link': l.shared, concealed: l.shared && !l.highlighted }" :d="l.path" />
           </svg>
           <div class="origin-hub" :style="{ left: `${layout.center.x}px`, top: `${layout.center.y}px` }">
-            <div class="hub-portrait"><img v-if="portrait" :src="portrait" :alt="ascended.name" :style="{ objectPosition: `50% ${spriteFocus(info?.art, 'main_card')}%` }" /><EmIcon v-else name="ascended" :size="44" /></div>
+            <div class="hub-portrait"><img v-if="portrait" :src="portrait" :alt="ascended.name" :style="{ objectPosition: `50% ${spriteFocus(info?.art, 'battle')}%` }" /><EmIcon v-else name="ascended" :size="44" /></div>
             <strong>{{ ascended.name }}</strong><small class="em-num">Level {{ ascended.level }} · Origin</small>
           </div>
           <button
@@ -254,7 +254,7 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
 .tree-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--em-space-3); margin-bottom: var(--em-space-4); }
 .tree-heading h3 { margin: 0; font-size: 20px; }
 .tree-heading p { margin: 4px 0 0; font-size: 12px; }
-.tree-controls { display: flex; align-items: center; gap: var(--em-space-2); }
+.tree-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-2); }
 .path-labels { font-size: 12px; margin-bottom: var(--em-space-3); }
 .slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--em-space-2); margin-bottom: var(--em-space-4); }
 button.slot { padding: 10px 12px; min-height: var(--em-target); border: 1px solid var(--em-divider); border-radius: var(--em-radius); font: inherit; font-size: 12px; color: var(--em-text); background: var(--em-bg); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
@@ -262,7 +262,7 @@ button.slot { padding: 10px 12px; min-height: var(--em-target); border: 1px soli
 .slot small { display: block; color: var(--em-muted); font-weight: 700; }
 .tree-layout { display: grid; grid-template-columns: minmax(0, 1fr) 264px; gap: var(--em-space-4); align-items: start; }
 .graph-area { min-width: 0; }
-.scroll { max-width: 100%; max-height: 700px; min-height: 340px; overflow: auto; border: 1px solid var(--em-divider); border-radius: var(--em-radius); background: var(--em-bg); cursor: grab; }
+.scroll { max-width: 100%; max-height: 560px; min-height: 340px; overflow: auto; border: 1px solid var(--em-divider); border-radius: var(--em-radius); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--em-accent) 4%, var(--em-bg)), var(--em-bg)); cursor: grab; }
 .canvas { position: relative; transform-origin: top left; }
 .canvas-wrap { margin-inline: auto; }
 .branch-hint { margin-top: 2px; font-weight: 400; }
@@ -274,7 +274,9 @@ button.slot { padding: 10px 12px; min-height: var(--em-target); border: 1px soli
 .tree-line.shared-link { stroke-dasharray: 5 6; }
 .tree-line.concealed { visibility: hidden; }
 .orbit { stroke: var(--em-divider); stroke-width: 1; stroke-dasharray: 2 10; fill: none; opacity: 0.35; }
-button.tree-node { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; padding: 0; border: 0; border-radius: var(--em-radius); background: transparent; color: var(--em-text); font: inherit; text-align: center; cursor: pointer; }
+button.tree-node { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; padding: 0; border: 1px solid var(--em-border); border-radius: var(--em-radius); background: linear-gradient(135deg, var(--em-panel), var(--em-bg)); color: var(--em-text); font: inherit; text-align: center; cursor: pointer; }
+.tree-node.selected { border-color: var(--em-accent); box-shadow: 0 0 0 1px var(--em-accent); }
+.tree-node[data-state="locked"] { opacity: .65; }
 .tree-node strong { font-size: 12px; line-height: 1.25; }
 .tree-node small { color: var(--em-muted); font-size: 10px; line-height: 1.2; }
 .node-symbol { position: relative; display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; flex: none; color: var(--em-muted); }
@@ -291,15 +293,15 @@ button.tree-node { position: absolute; display: flex; flex-direction: column; al
 .tree-node.selected .node-symbol { color: var(--em-accent); filter: drop-shadow(0 0 5px color-mix(in srgb, var(--em-accent) 35%, transparent)); }
 .equipped-mark { position: absolute; right: 0; top: 0; width: 16px; height: 16px; border-radius: var(--radius-full); background: var(--em-success); color: var(--em-bg); display: flex; align-items: center; justify-content: center; }
 .origin-hub { position: absolute; width: 148px; transform: translate(-50%, -66px); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; text-align: center; }
-.hub-portrait { display: flex; align-items: center; justify-content: center; width: 132px; height: 132px; border: 2px solid var(--em-accent); padding: 6px; border-radius: var(--radius-full); color: var(--em-accent); background: var(--em-bg); }
-.hub-portrait img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-full); }
+.hub-portrait { display: flex; align-items: center; justify-content: center; width: 132px; height: 132px; border: 2px solid var(--em-accent); padding: 6px; border-radius: var(--em-radius); color: var(--em-accent); background: #060d15; }
+.hub-portrait img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; border-radius: var(--em-radius); }
 .origin-hub strong { font-size: 14px; }
 .origin-hub small { color: var(--em-accent); font-size: 11px; }
 .legend { display: flex; flex-wrap: wrap; gap: var(--em-space-3); color: var(--em-muted); font-size: 11px; margin-top: var(--em-space-2); }
 .legend span { display: flex; align-items: center; gap: 5px; }
 .legend svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; }
 .graph-help { font-size: 11px; margin-top: var(--em-space-2); }
-.node-detail { display: flex; flex-direction: column; gap: var(--em-space-3); padding: var(--em-space-4); border: 1px solid var(--em-accent); background: var(--em-bg); border-radius: var(--em-radius); font-size: 13px; }
+.node-detail { box-shadow: inset 0 0 0 3px rgb(255 255 255 / 2%); display: flex; flex-direction: column; gap: var(--em-space-3); padding: var(--em-space-4); border: 1px solid var(--em-accent); background: linear-gradient(135deg, var(--em-panel), var(--em-bg)); border-radius: var(--em-radius); font-size: 13px; }
 .node-detail h4, .node-detail p { margin: 0; }
 .node-detail h4 { font-size: 20px; }
 .node-detail h5 { font-size: 13px; margin: 0; }

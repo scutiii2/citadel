@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import type { AscendedInfo, EncounterPreview, OwnedAscended } from "../api/AscensionClient";
 import { typeLabel } from "../utils/ascensionTypes";
-import { spriteFocus, spriteFor } from "../utils/sprites";
+import { spriteFor } from "../utils/sprites";
 import EmIcon from "./ui/EmIcon.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
 
@@ -18,12 +18,12 @@ const fighters = computed(() => [
   { side: "player", label: "Your fighter", record: props.player, info: props.playerInfo },
   { side: "wild", label: "Wild opponent", record: props.wild, info: props.wildInfo },
 ].map(fighter => {
-  const url = spriteFor(fighter.info?.art, "main_card");
+  const url = spriteFor(fighter.info?.art, "battle");
   return {
     ...fighter,
     name: fighter.record?.name ?? "Choose a fighter",
     image: url && !failedImages.value.includes(url) ? url : null,
-    focus: spriteFocus(fighter.info?.art, "main_card"),
+    focus: 50,
     types: (fighter.info?.ascension_types ?? []).map(typeLabel).join(" · "),
   };
 }));
@@ -176,4 +176,21 @@ const stats = computed(() => {
   .stats dd { font-size: 12px; }
   .hidden-personalities { margin-left: auto; font-size: 9px; }
 }
+
+.matchup { grid-template-columns: minmax(0, 1fr); background: linear-gradient(150deg, var(--em-header), var(--em-bg)); }
+.fighter { height: 220px; }
+.wild { order: 0; }
+.player { order: 1; height: 150px; border-right: 0; border-top: 1px solid var(--em-divider); }
+.fighter img { object-fit: contain; padding: 30px 12px 58px; image-rendering: pixelated; mix-blend-mode: lighten; }
+.fighter::after { background: linear-gradient(0deg, var(--em-bg), transparent 36%); }
+.fighter-tag, .wild .fighter-tag { top: 10px; left: 10px; right: auto; font-size: 9px; }
+.fighter-info, .wild .fighter-info { bottom: 10px; left: 10px; right: 10px; text-align: left; }
+.ascended-name { font-size: 15px; margin-bottom: 4px; }
+.fighter-meta, .wild .fighter-meta { justify-content: flex-start; font-size: 10px; }
+.versus { display: none; }
+.matchup-foot { order: 2; padding: 10px; gap: 8px; }
+.stats { width: 100%; justify-content: space-between; gap: 6px; }
+.hidden-personalities { font-size: 10px; line-height: 1.5; }
+@media (max-width: 700px) { .matchup { grid-template-columns: repeat(2, minmax(0, 1fr)); } .wild, .player { height: 210px; order: 0; border-top: 0; } .player { border-right: 1px solid var(--em-divider); } .wild { order: 1; } .matchup-foot { grid-column: 1 / -1; } }
+
 </style>

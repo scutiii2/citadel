@@ -41,24 +41,29 @@ describe("MainMenu", () => {
   it("offers only New game and How to play without a save", async () => {
     const wrapper = mountMenu(null);
 
-    expect(labels(wrapper)).toEqual(["New game", "How to play"]);
+    expect(labels(wrapper)).toEqual(["New game", "How to play", "Tavern Coming soon / Locked"]);
     expect(wrapper.find(".save").text()).toBe("Three Ascended. Your first choice.");
     expect(wrapper.find(".hand-caption").text()).toBe("Guardian · Striker");
     await wrapper.find("button.primary").trigger("click");
     expect(wrapper.emitted("newGame")).toHaveLength(1);
   });
 
-  it("offers Continue, Quick battle and Shop with a save, and shows the stats", async () => {
+  it("offers primary Quick battle, explicit Collection and Shop with a save, and shows the stats", async () => {
     const wrapper = mountMenu();
 
-    expect(labels(wrapper)).toEqual(["Continue", "Quick battle", "Shop", "How to play", "Reset progress"]);
+    expect(labels(wrapper)).toEqual(["Quick battle", "Collection", "Shop", "How to play", "Tavern Coming soon / Locked", "Reset progress"]);
     expect(wrapper.find(".save").text()).toBe("1 Ascended, 100 Insignia");
     expect(wrapper.find(".hand-caption").text()).toBe("Your first Ascended");
+    expect(wrapper.find("button.primary").text()).toContain("Quick battle");
+    const tavern = wrapper.findAll("nav button").find(b => b.text().includes("Tavern"))!;
+    expect((tavern.element as HTMLButtonElement).disabled).toBe(true);
+    await tavern.trigger("click");
+    expect(wrapper.emitted("play")).toBeUndefined();
     const buttons = wrapper.findAll("nav button");
     await buttons[0]!.trigger("click");
     await buttons[1]!.trigger("click");
     await buttons[2]!.trigger("click");
-    expect(wrapper.emitted("play")).toEqual([["collection"], ["battle"], ["shop"]]);
+    expect(wrapper.emitted("play")).toEqual([["battle"], ["collection"], ["shop"]]);
   });
 
   it("previews the starters without a save and shows your team with one", () => {
@@ -110,6 +115,6 @@ describe("reset progress", () => {
 
     expect(client.resetProfile).toHaveBeenCalledTimes(1);
     expect(wrapper.findComponent({ name: "EmConfirm" }).props("open")).toBe(false);
-    expect(labels(wrapper)).toEqual(["New game", "How to play"]);
+    expect(labels(wrapper)).toEqual(["New game", "How to play", "Tavern Coming soon / Locked"]);
   });
 });

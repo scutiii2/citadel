@@ -29,7 +29,8 @@ withDefaults(defineProps<{ icon: IconName; variant?: "primary" | "secondary" | "
   border: 1px solid var(--em-border);
   border-radius: var(--em-radius);
   color: var(--em-text);
-  background: var(--em-raised);
+  background: linear-gradient(180deg,#163044,#0c1e2d);
+  box-shadow: inset 0 0 0 2px #071623, inset 0 3px 0 #66839744, 0 3px 0 #040d16;
   font: inherit;
   font-weight: 600;
   text-align: left;
@@ -48,7 +49,9 @@ withDefaults(defineProps<{ icon: IconName; variant?: "primary" | "secondary" | "
 .primary {
   border-color: var(--em-accent);
   color: var(--em-on-accent);
-  background: var(--em-accent);
+  background: linear-gradient(180deg,#facd8c,#e79751);
+  outline: 1px solid #9c6338;
+  outline-offset: 2px;
   box-shadow: 0 3px 0 var(--em-accent-edge);
 }
 .primary:hover:not(:disabled) {

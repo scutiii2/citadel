@@ -1,407 +1,355 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
-import type { ShopOffer } from "../api/AscensionClient";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { storeToRefs } from "pinia";
+import { newIdempotencyKey, type ShopOffer } from "../api/AscensionClient";
 import { useNowSeconds } from "../composables/useNowSeconds";
 import { useAscensionStore } from "../stores/ascension";
+import { useShopBasketStore, type BasketItem, type ShopMode } from "../stores/shopBasket";
 import { formatCountdown, titleCase } from "../utils/ascension";
 import { spriteFor } from "../utils/sprites";
 import EmButton from "./ui/EmButton.vue";
 import EmEmblem from "./ui/EmEmblem.vue";
 import EmConfirm from "./ui/EmConfirm.vue";
 import EmIcon from "./ui/EmIcon.vue";
-import EmPanel from "./ui/EmPanel.vue";
+import EmNotice from "./ui/EmNotice.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
 
-/** The Shop tab: the wallet, this account's rotating copy offers (each with limited stock, new
- * ones every few hours), EMBLEMs per tier, and selling one absorbed copy. A card that cannot be
- * bought (sold out, or Insignia would not cover it) is dimmed and does not lift. A copy's price
- * comes from the server, which also refuses when Insignia falls short; the page shows that
- * message (the store's `error`). */
 const store = useAscensionStore();
-const MAX_QUANTITY = 99;
-
-const insignia = computed(() => store.profile?.insignia ?? 0);
-const tiers = computed(() => store.catalog?.tiers ?? []);
-const quantities = reactive<Record<string, number>>({});
-const message = ref("");
-const outOfReach = computed(() => tiers.value.filter((t) => t.emblem_price > insignia.value).map((t) => titleCase(t.id)));
-
+const basket = useShopBasketStore();
+const { mode, processing, message, interrupted } = storeToRefs(basket);
+const baskets = basket.baskets;
+const category = ref("all");
+const rarity = ref("");
+const search = ref("");
+const hideUnavailable = ref(false);
+const reviewOpen = ref(false);
+let alive = true;
 const now = useNowSeconds();
 const secondsLeft = computed(() => Math.max(0, store.shopEndsAt - now.value));
+const insignia = computed(() => store.profile?.insignia ?? 0);
+const tiers = computed(() => store.catalog?.tiers ?? []);
 const offers = computed(() => store.shop?.offers ?? []);
-const nameOf = (id: string) => store.catalog?.ascendeds.find((a) => a.id === id)?.name ?? titleCase(id);
-const artOf = (id: string) => spriteFor(store.catalog?.ascendeds.find((a) => a.id === id)?.art, "preview_card");
+const items = computed(() => baskets[mode.value]);
+const total = computed(() => items.value.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0));
+const requiredFunds = computed(() => items.value.filter(item => !item.requestKey).reduce((sum, item) => sum + item.quantity * item.unitPrice, 0));
+const awaitingAcknowledgement = computed(() => items.value.some(item => item.requestKey));
+const units = computed(() => items.value.reduce((sum, item) => sum + item.quantity, 0));
+const balanceAfter = computed(() => insignia.value + (mode.value === "buy" ? -total.value : total.value));
+const locked = computed(() => processing.value || store.busy || reviewOpen.value);
+const canCheckout = computed(() => !locked.value && items.value.length > 0 && items.value.every(item => !problem(item)) && (mode.value === "sell" || requiredFunds.value <= insignia.value));
+const nameOf = (id: string) => store.catalog?.ascendeds.find(a => a.id === id)?.name ?? titleCase(id);
+const artOf = (id: string) => spriteFor(store.catalog?.ascendeds.find(a => a.id === id)?.art, "battle");
+const money = (value: number) => value.toLocaleString();
+const matches = (name: string, tierId: string) => (!rarity.value || rarity.value === tierId) && name.toLowerCase().includes(search.value.trim().toLowerCase());
+
+function fighting(id: string): boolean {
+  if (!store.profile?.active_battle && store.battle?.status !== "active") return false;
+  return !store.battle || store.battle.player.ascended_id === id;
+}
+const visibleOffers = computed(() => category.value === "emblems" ? [] : offers.value.filter(o => matches(nameOf(o.ascended_id), o.tier_id)));
+const visibleTiers = computed(() => category.value === "offers" ? [] : tiers.value.filter(t => matches(titleCase(t.id) + " EMBLEM", t.id)));
+const sellable = computed(() => (store.profile?.ascendeds ?? []).filter(a => matches(a.name, a.tier_id) && (!hideUnavailable.value || (a.copies > 0 && !fighting(a.ascended_id)))));
+const saleReview = computed(() => baskets.sell.map(item => item.name + " × " + item.quantity + " — " + money(item.quantity * item.unitPrice) + " Insignia").join("; ") + ". Only spare copies are sold. Your Ascended stays in your collection.");
+const offerKey = (offer: ShopOffer) => "offer:" + store.shop?.rotation + ":" + offer.slot;
+const selected = (key: string) => items.value.find(item => item.key === key);
+const offerOff = (offer: ShopOffer) => offer.left <= 0 || offer.price > insignia.value || fighting(offer.ascended_id) || !store.shop || secondsLeft.value <= 0;
+const selection = (item: BasketItem) => items.value.some(i => i.key === item.key);
+
+function available(item: BasketItem): number {
+  if (item.kind === "emblem") return 99;
+  if (item.kind === "sale") return store.profile?.ascendeds.find(a => a.ascended_id === item.id)?.copies ?? 0;
+  if (item.rotation !== store.shop?.rotation) return 0;
+  return offers.value.find(o => o.slot === item.slot)?.left ?? 0;
+}
+function problem(item: BasketItem): string {
+  // Resolve a prior attempt using its frozen payload/key. It may already have consumed stock or funds.
+  if (item.requestKey) return "";
+  if (item.kind === "offer") {
+    if (item.rotation !== store.shop?.rotation || secondsLeft.value <= 0) return "Expired offer · remove and choose again";
+    const offer = offers.value.find(o => o.slot === item.slot);
+    if (!offer || offer.ascended_id !== item.id) return "Offer unavailable";
+    if (offer.price !== item.unitPrice || offer.copies_granted !== item.copiesPerPack) return "Price changed · remove and add again";
+  }
+  if (item.kind === "emblem") {
+    if (tiers.value.find(t => t.id === item.id)?.emblem_price !== item.unitPrice) return "Price changed · remove and add again";
+  }
+  if (item.kind === "sale") {
+    const owned = store.profile?.ascendeds.find(a => a.ascended_id === item.id);
+    if (!owned || owned.sale_value !== item.unitPrice) return "Price changed · remove and add again";
+  }
+  if (item.kind !== "emblem" && fighting(item.id)) return "In active battle";
+  if (item.quantity > available(item)) return "Not enough stock · reduce quantity";
+  return "";
+}
+function add(item: BasketItem): void {
+  if (locked.value || selection(item)) return;
+  items.value.push(item);
+  message.value = "";
+}
+function addOffer(offer: ShopOffer): void {
+  if (offerOff(offer)) return;
+  add({ key: offerKey(offer), kind: "offer", id: offer.ascended_id, name: nameOf(offer.ascended_id), tierId: offer.tier_id, unitPrice: offer.price, quantity: 1, rotation: store.shop!.rotation, slot: offer.slot, copiesPerPack: offer.copies_granted });
+}
+function setQuantity(item: BasketItem, value: number): void {
+  if (locked.value || item.requestKey) return;
+  item.quantity = Math.min(Math.max(1, Math.floor(Number.isFinite(value) ? value : 1)), Math.max(1, available(item)));
+}
+function quantityInput(item: BasketItem, event: Event): void {
+  setQuantity(item, Number((event.target as HTMLInputElement).value));
+  (event.target as HTMLInputElement).value = String(item.quantity);
+}
+function remove(item: BasketItem): void {
+  if (!locked.value) baskets[mode.value] = items.value.filter(i => i.key !== item.key);
+}
+function switchMode(next: ShopMode): void {
+  if (locked.value) return;
+  mode.value = next;
+  category.value = "all";
+  search.value = "";
+  rarity.value = "";
+}
+function checkout(): void {
+  if (!canCheckout.value) return;
+  if (mode.value === "sell") reviewOpen.value = true;
+  else void trade();
+}
+
+/** Existing endpoints settle independently. Remove each successful unit immediately, retain the rest on failure. */
+async function trade(): Promise<void> {
+  if (processing.value || store.busy) return;
+  const side = mode.value;
+  const owner = store.profile?.owner;
+  const batch = [...baskets[side]];
+  if (batch.length === 0 || batch.some(item => problem(item)) || (side === "buy" && requiredFunds.value > insignia.value)) {
+    reviewOpen.value = false;
+    return;
+  }
+  reviewOpen.value = false;
+  processing.value = true;
+  interrupted.value = false;
+  message.value = "";
+  let completed = 0;
+  let amount = 0;
+  let stopped = "";
+  try {
+    // Revalidate offers before the first mutation, as a rotation can change while the basket is open.
+    if (batch.some(item => item.kind === "offer")) await store.loadShop();
+    for (const item of batch) {
+      while (item.quantity > 0) {
+        if (!alive || store.profile?.owner !== owner) { stopped = "Account or screen changed"; break; }
+        const issue = problem(item);
+        if (issue) { stopped = issue; break; }
+        if (!item.requestKey && item.kind !== "sale" && item.unitPrice * (item.kind === "emblem" ? item.quantity : 1) > insignia.value) {
+          stopped = "Not enough Insignia";
+          break;
+        }
+        const quantity = item.kind === "emblem" ? item.quantity : 1;
+        item.requestKey ??= newIdempotencyKey();
+        let result;
+        if (item.kind === "offer") {
+          result = await store.buyOffer({ slot: item.slot! }, item.requestKey, item.rotation);
+        } else if (item.kind === "emblem") result = await store.buyEmblems(item.id, quantity, item.requestKey);
+        else result = await store.sellCopy(item.id, item.requestKey);
+        if (!result) { stopped = store.error || "Trade could not complete"; break; }
+        if (store.profile?.owner !== owner) break;
+        completed += quantity;
+        item.requestKey = undefined;
+        amount += "price" in result ? result.price : result.value;
+        item.quantity -= quantity;
+        if (item.quantity === 0) baskets[side] = baskets[side].filter(i => i.key !== item.key);
+      }
+      if (!alive && baskets[side].length) stopped ||= "Screen changed";
+      if (stopped || !alive || store.profile?.owner !== owner) break;
+    }
+  } finally {
+    processing.value = false;
+    if (store.profile?.owner === owner) {
+      interrupted.value = Boolean(stopped);
+      const summary = side === "buy" ? "Purchased " + completed + " units for " + money(amount) + " Insignia." : "Sold " + completed + " spare copies for " + money(amount) + " Insignia.";
+      message.value = summary + (stopped ? " Stopped: " + stopped + ". Remaining items are still in your basket." : "");
+    }
+  }
+}
 
 onMounted(() => void store.loadShop());
-// At zero a new rotation has begun: ask for it.
-watch(
-  () => secondsLeft.value <= 0 && store.shop !== null,
-  (over) => {
-    if (over) void store.loadShop();
-  },
-);
-
-function offerOff(offer: ShopOffer): boolean {
-  return offer.left <= 0 || offer.price > insignia.value;
-}
-
-async function buyOffer(offer: ShopOffer): Promise<void> {
-  message.value = "";
-  const bought = await store.buyOffer(offer);
-  if (bought) {
-    const copies = `${bought.copies_granted} ${bought.copies_granted === 1 ? "copy" : "copies"}`;
-    message.value = `Bought ${copies} of ${nameOf(bought.ascended_id)} for ${bought.price} Insignia.`;
-  }
-}
-
-function quantityOf(tierId: string): number {
-  return quantities[tierId] ?? 1;
-}
-
-function emblemCost(tierId: string, price: number): number {
-  return price * quantityOf(tierId);
-}
-
-function canBuyEmblems(tierId: string, price: number): boolean {
-  const quantity = quantityOf(tierId);
-  const valid = Number.isInteger(quantity) && quantity >= 1 && quantity <= MAX_QUANTITY;
-  return !store.busy && valid && emblemCost(tierId, price) <= insignia.value;
-}
-
-function setQuantity(tierId: string, event: Event): void {
-  quantities[tierId] = Number((event.target as HTMLInputElement).value);
-}
-
-async function buyEmblems(tierId: string): Promise<void> {
-  message.value = "";
-  const bought = await store.buyEmblems(tierId, quantityOf(tierId));
-  if (bought) {
-    message.value = `Bought ${bought.quantity} ${titleCase(bought.tier_id)} EMBLEM${bought.quantity === 1 ? "" : "s"} for ${bought.price} Insignia.`;
-  }
-}
-
-const sellable = computed(() => (store.profile?.ascendeds ?? []).filter((s) => s.copies > 0));
-const selling = ref<string | null>(null);
-const sellingName = computed(() => sellable.value.find((s) => s.ascended_id === selling.value)?.name ?? "");
-
-async function sell(): Promise<void> {
-  const ascendedId = selling.value;
-  selling.value = null;
-  if (ascendedId === null) return;
-  message.value = "";
-  const sale = await store.sellCopy(ascendedId);
-  if (sale) {
-    message.value = `Sold one copy for ${sale.value} Insignia.`;
-  }
-}
+onUnmounted(() => { alive = false; });
+watch(() => secondsLeft.value <= 0 && store.shop !== null, over => { if (over) void store.loadShop(); });
+watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
 </script>
 
 <template>
-  <section class="shop">
-    <p v-if="message" class="notice" role="status"><EmIcon name="check" /> {{ message }}</p>
-
-    <EmPanel class="wallet">
-      <div class="balance">
-        <p class="em-eyebrow">Your wallet</p>
-        <h3 class="em-pixel em-num amount">{{ insignia }} Insignia</h3>
+  <section class="shop" :aria-busy="processing">
+    <div class="shop-toolbar">
+      <div class="mode-tabs" role="group" aria-label="Shop mode">
+        <button type="button" data-mode="buy" :aria-pressed="mode === 'buy'" :disabled="locked" @click="switchMode('buy')">Buy</button>
+        <button type="button" data-mode="sell" :aria-pressed="mode === 'sell'" :disabled="locked" @click="switchMode('sell')">Sell</button>
       </div>
-      <div v-for="t in tiers" :key="t.id" class="count" :style="{ '--tier': `var(--em-tier-${t.id}, var(--em-tier-common))` }">
-        <EmEmblem :tier-id="t.id" :size="36" />
-        <strong class="em-pixel em-num">{{ store.profile?.emblems[t.id] ?? 0 }}</strong>
-        <span>{{ titleCase(t.id) }} EMBLEMs</span>
+      <p class="shop-caption">{{ mode === 'buy' ? 'Prepare for your next encounter.' : 'Trade spare copies for Insignia.' }}</p>
+    </div>
+    <p v-if="message" class="notice" :class="{ interrupted }" role="status"><EmIcon :name="interrupted ? 'warning' : 'check'" />{{ message }}</p>
+    <EmNotice v-if="store.error" tone="error">{{ store.error }}</EmNotice>
+    <div class="trading-floor">
+      <aside class="category-rail" aria-label="Shop filters">
+        <p class="em-eyebrow">Browse</p>
+        <template v-if="mode === 'buy'">
+          <button v-for="c in [{ id: 'all', name: 'All items', icon: 'shop' as const }, { id: 'offers', name: 'Ascended offers', icon: 'ascended' as const }, { id: 'emblems', name: 'EMBLEMs', icon: 'shield' as const }]" :key="c.id" type="button" :aria-pressed="category === c.id" :disabled="locked" @click="category = c.id"><EmIcon :name="c.icon" />{{ c.name }}</button>
+        </template>
+        <div v-else class="rail-selected"><EmIcon name="ascended" />Spare copies</div>
+        <label class="rail-field"><span class="em-eyebrow">Rarity</span><select v-model="rarity" :disabled="locked" aria-label="Filter shop by rarity"><option value="">All rarities</option><option v-for="t in tiers" :key="t.id" :value="t.id">{{ titleCase(t.id) }}</option></select></label>
+        <label v-if="mode === 'sell'" class="hide-unavailable"><input v-model="hideUnavailable" type="checkbox" :disabled="locked" />Hide unavailable</label>
+        <div class="rail-note"><EmIcon :name="mode === 'buy' ? 'clock' : 'shield'" /><p>{{ mode === 'buy' ? 'Offers are yours alone. New stock every rotation.' : 'Sell only spare copies. Your collected Ascended stays with you.' }}</p></div>
+      </aside>
+
+      <div class="shop-catalog">
+        <header class="catalog-toolbar">
+          <input v-model="search" type="search" placeholder="Search items…" aria-label="Search shop" :disabled="locked" />
+          <small v-if="mode === 'buy'" class="refresh em-num"><EmIcon name="clock" />Refreshes in {{ formatCountdown(secondsLeft) }}</small>
+          <small v-else class="em-eyebrow">Your spare copies</small>
+        </header>
+        <div class="item-grid">
+          <template v-if="mode === 'buy'">
+            <article v-for="offer in visibleOffers" :key="offerKey(offer)" class="item-card" :class="{ 'is-off': offerOff(offer), selected: selected(offerKey(offer)) }" :data-offer="offer.slot" :style="{ '--tier': 'var(--em-tier-' + offer.tier_id + ')' }">
+              <div class="item-art"><img v-if="artOf(offer.ascended_id)" :src="artOf(offer.ascended_id)!" alt="" draggable="false" /><span v-else class="letter">{{ nameOf(offer.ascended_id).slice(0, 1) }}</span></div>
+              <div class="item-info"><h4>{{ nameOf(offer.ascended_id) }}</h4><EmTierBadge :tier-id="offer.tier_id" /><p>{{ offer.copies_granted }} {{ offer.copies_granted === 1 ? 'copy' : 'copies' }} / pack</p><p class="stock">{{ offer.left <= 0 ? 'Sold out' : offer.left + ' left' }}</p><p class="item-price em-num"><EmIcon name="coin" />{{ money(offer.price) }} <small>/ pack</small></p></div>
+              <EmIcon v-if="selected(offerKey(offer))" class="selection-check" name="check" />
+              <EmButton data-add :variant="selected(offerKey(offer)) ? 'primary' : 'secondary'" :disabled="locked || offerOff(offer) || !!selected(offerKey(offer))" @click="addOffer(offer)">{{ selected(offerKey(offer)) ? 'In basket' : fighting(offer.ascended_id) ? 'In active battle' : 'Add' }}</EmButton>
+            </article>
+            <article v-for="t in visibleTiers" :key="t.id" class="item-card" :class="{ 'is-off': t.emblem_price > insignia, selected: selected('emblem:' + t.id) }" :data-tier="t.id" :style="{ '--tier': 'var(--em-tier-' + t.id + ')' }">
+              <div class="item-art"><EmEmblem :tier-id="t.id" :size="84" /></div>
+              <div class="item-info"><h4>{{ titleCase(t.id) }} EMBLEM</h4><EmTierBadge :tier-id="t.id" /><p>Owned {{ store.profile?.emblems[t.id] ?? 0 }}</p><p class="item-price em-num"><EmIcon name="coin" />{{ money(t.emblem_price) }} <small>each</small></p></div>
+              <EmIcon v-if="selected('emblem:' + t.id)" class="selection-check" name="check" />
+              <EmButton data-add :variant="selected('emblem:' + t.id) ? 'primary' : 'secondary'" :disabled="locked || t.emblem_price > insignia || !!selected('emblem:' + t.id)" @click="add({ key: 'emblem:' + t.id, kind: 'emblem', id: t.id, name: titleCase(t.id) + ' EMBLEM', tierId: t.id, unitPrice: t.emblem_price, quantity: 1 })">{{ selected('emblem:' + t.id) ? 'In basket' : 'Add' }}</EmButton>
+            </article>
+          </template>
+          <template v-else>
+            <article v-for="a in sellable" :key="a.ascended_id" class="item-card" :class="{ 'is-off': a.copies <= 0 || fighting(a.ascended_id) || a.sale_value === undefined, selected: selected('sale:' + a.ascended_id) }" :data-sell="a.ascended_id" :style="{ '--tier': 'var(--em-tier-' + a.tier_id + ')' }">
+              <div class="item-art"><img v-if="artOf(a.ascended_id)" :src="artOf(a.ascended_id)!" alt="" draggable="false" /><span v-else class="letter">{{ a.name.slice(0, 1) }}</span></div>
+              <div class="item-info"><h4>{{ a.name }}</h4><EmTierBadge :tier-id="a.tier_id" /><p>{{ a.copies }} spare {{ a.copies === 1 ? 'copy' : 'copies' }}</p><p v-if="a.sale_value !== undefined" class="item-price em-num"><EmIcon name="coin" />{{ money(a.sale_value) }} <small>each</small></p><p v-else class="stock">Sale quote unavailable</p></div>
+              <EmIcon v-if="selected('sale:' + a.ascended_id)" class="selection-check" name="check" />
+              <EmButton data-add :variant="selected('sale:' + a.ascended_id) ? 'primary' : 'secondary'" :disabled="locked || a.copies <= 0 || fighting(a.ascended_id) || a.sale_value === undefined || !!selected('sale:' + a.ascended_id)" @click="add({ key: 'sale:' + a.ascended_id, kind: 'sale', id: a.ascended_id, name: a.name, tierId: a.tier_id, unitPrice: a.sale_value!, quantity: 1 })">{{ selected('sale:' + a.ascended_id) ? 'In basket' : fighting(a.ascended_id) ? 'In active battle' : a.copies <= 0 ? 'No spare copies' : 'Add' }}</EmButton>
+            </article>
+          </template>
+        </div>
+        <p v-if="mode === 'buy' ? !visibleOffers.length && !visibleTiers.length : !sellable.length" class="empty">No items match your filters.</p>
+        <p v-if="mode === 'buy' && category !== 'emblems' && !visibleOffers.length && !search && !rarity" class="hint">Nothing is on offer right now. EMBLEMs are still available.</p>
+        <p class="hint"><EmIcon name="check" />{{ mode === 'buy' ? 'Add several items, then adjust quantities in your basket.' : 'Choose spare copies, then review the batch before selling.' }}</p>
       </div>
-    </EmPanel>
 
-    <EmPanel>
-      <div class="section-head">
-        <h3 class="em-pixel">Today's offers</h3>
-        <small class="refresh em-num">Refreshes in {{ formatCountdown(secondsLeft) }}</small>
-      </div>
-      <p v-if="store.shop && offers.length === 0" class="empty">Nothing is on offer right now.</p>
-      <ul v-else class="cards">
-        <li
-          v-for="offer in offers"
-          :key="offer.slot"
-          class="card em-lift"
-          :class="{ 'is-off': offerOff(offer) }"
-          :data-offer="offer.slot"
-          :style="{ '--tier': `var(--em-tier-${offer.tier_id}, var(--em-tier-common))` }"
-        >
-          <span v-if="offer.left <= 0" class="ribbon">Sold out</span>
-          <div class="portrait">
-            <img v-if="artOf(offer.ascended_id)" :src="artOf(offer.ascended_id)!" alt="" draggable="false" />
-            <span v-else class="letter" aria-hidden="true">{{ nameOf(offer.ascended_id).slice(0, 1) }}</span>
-          </div>
-          <h4>{{ nameOf(offer.ascended_id) }}</h4>
-          <div class="meta">
-            <EmTierBadge :tier-id="offer.tier_id" />
-            <span class="em-num">+{{ offer.copies_granted }} {{ offer.copies_granted === 1 ? "copy" : "copies" }}</span>
-          </div>
-          <p class="em-num owned">{{ offer.owned ? `You have ${offer.owned_copies} spare` : "A new Ascended for you" }}</p>
-          <p class="em-num stock">{{ offer.left }} left</p>
-          <EmButton variant="primary" class="block" :disabled="store.busy || offerOff(offer)" @click="buyOffer(offer)">
-            <EmIcon name="shop" /> {{ offer.price }} Insignia
-          </EmButton>
-        </li>
-      </ul>
-      <p class="hint">Offers are yours alone and change every few hours. Spare copies turn into stars, with essence from battles.</p>
-    </EmPanel>
-
-    <EmPanel>
-      <div class="section-head">
-        <h3 class="em-pixel">Buy EMBLEMs</h3>
-        <small>Choose how many, then buy</small>
-      </div>
-      <ul class="cards emblems">
-        <li
-          v-for="t in tiers"
-          :key="t.id"
-          class="card em-lift"
-          :class="{ 'is-off': t.emblem_price > insignia }"
-          :data-tier="t.id"
-          :style="{ '--tier': `var(--em-tier-${t.id}, var(--em-tier-common))` }"
-        >
-          <div class="band" aria-hidden="true" />
-          <div class="meta">
-            <EmEmblem :tier-id="t.id" :size="56" />
-            <EmTierBadge :tier-id="t.id" />
-            <span>{{ titleCase(t.id) }} EMBLEM</span>
-          </div>
-          <p class="em-num price"><strong>{{ t.emblem_price }}</strong> Insignia</p>
-          <p class="em-num owned">{{ store.profile?.emblems[t.id] ?? 0 }} owned</p>
-          <input
-            type="number"
-            min="1"
-            :max="MAX_QUANTITY"
-            :value="quantityOf(t.id)"
-            :aria-label="`${titleCase(t.id)} EMBLEMs to buy`"
-            @input="setQuantity(t.id, $event)"
-          />
-          <EmButton variant="primary" class="block" :disabled="!canBuyEmblems(t.id, t.emblem_price)" @click="buyEmblems(t.id)">
-            Buy for {{ emblemCost(t.id, t.emblem_price) }}
-          </EmButton>
-        </li>
-      </ul>
-      <p v-if="outOfReach.length" class="hint">Not enough Insignia for: {{ outOfReach.join(", ") }}.</p>
-    </EmPanel>
-
-    <EmPanel>
-      <h3 class="em-pixel">Sell an absorbed copy</h3>
-      <p v-if="sellable.length === 0" class="empty">No spare copies to sell.</p>
-      <template v-else>
-        <p class="hint">Sell one absorbed copy. Your collected Ascended stays with you.</p>
-        <ul class="cards sell">
-          <li v-for="s in sellable" :key="s.ascended_id" class="card em-lift" :data-sell="s.ascended_id" :style="{ '--tier': `var(--em-tier-${s.tier_id}, var(--em-tier-common))` }">
-            <h4>{{ s.name }}</h4>
-            <p class="em-num owned">{{ s.copies }} {{ s.copies === 1 ? "copy" : "copies" }} · {{ titleCase(s.tier_id) }}</p>
-            <EmButton class="block" :disabled="store.busy" @click="selling = s.ascended_id"><EmIcon name="coin" /> Sell one copy</EmButton>
-          </li>
-        </ul>
-      </template>
-    </EmPanel>
-
-    <EmConfirm
-      :open="selling !== null"
-      title="Sell one copy?"
-      :message="`One absorbed copy of ${sellingName} goes back to the shop for Insignia. Its tier can drop.`"
-      confirm-label="Sell"
-      :busy="store.busy"
-      @confirm="sell"
-      @close="selling = null"
-    />
+      <aside class="basket-panel" aria-label="Shop basket">
+        <header class="basket-head"><EmIcon :name="mode === 'buy' ? 'shop' : 'coin'" :size="25" /><div><h3 class="em-pixel">{{ mode === 'buy' ? 'Purchase basket' : 'Sale basket' }}</h3><p>{{ items.length }} item {{ items.length === 1 ? 'type' : 'types' }} · {{ units }} {{ mode === 'buy' ? 'units' : 'copies' }}</p></div></header>
+        <div class="basket-items">
+          <p v-if="!items.length" class="basket-empty"><EmIcon name="shop" :size="32" />Your basket is empty.<small>Choose items from the grid to begin.</small></p>
+          <article v-for="item in items" :key="item.key" class="basket-item" :data-basket="item.key">
+            <EmEmblem v-if="item.kind === 'emblem'" :tier-id="item.id" :size="44" />
+            <img v-else-if="artOf(item.id)" :src="artOf(item.id)!" class="basket-art" alt="" />
+            <span v-else class="basket-art letter">{{ item.name.slice(0, 1) }}</span>
+            <div class="basket-line"><strong>{{ item.name }}</strong><small>{{ money(item.unitPrice) }} {{ item.kind === 'offer' ? '/ pack' : 'each' }}</small></div>
+            <button type="button" class="remove" :aria-label="'Remove ' + item.name + ' from basket'" :disabled="locked" @click="remove(item)"><EmIcon name="close" :size="15" /></button>
+            <div class="quantity-control"><button type="button" :aria-label="'Decrease ' + item.name + ' quantity'" :disabled="locked || !!item.requestKey || item.quantity <= 1" @click="setQuantity(item, item.quantity - 1)">−</button><input type="number" min="1" :max="Math.max(1, available(item))" :value="item.quantity" :aria-label="item.name + ' quantity'" :disabled="locked || !!item.requestKey" @input="quantityInput(item, $event)" /><button type="button" :aria-label="'Increase ' + item.name + ' quantity'" :disabled="locked || !!item.requestKey || item.quantity >= available(item)" @click="setQuantity(item, item.quantity + 1)">+</button></div>
+            <strong class="line-total em-num">{{ money(item.quantity * item.unitPrice) }}</strong>
+            <p v-if="problem(item)" class="item-problem">{{ problem(item) }}</p>
+            <p v-else-if="item.requestKey && !processing" class="item-problem">Retry this trade before changing its quantity.</p>
+          </article>
+        </div>
+        <footer class="basket-footer">
+          <div class="total" data-total><span>{{ mode === 'buy' ? 'Total' : 'You receive' }}</span><strong class="em-num">{{ money(total) }} <small>Insignia</small></strong></div>
+          <div class="balance-after" data-balance-after><span>Balance after</span><strong class="em-num">{{ awaitingAcknowledgement ? 'Awaiting confirmation' : money(balanceAfter) }}</strong></div>
+          <p v-if="mode === 'buy' && requiredFunds > insignia" class="item-problem">Not enough Insignia. Reduce your quantities.</p>
+          <p v-if="mode === 'sell'" class="hint">Only spare copies are sold. Your Ascended stays in your collection.</p>
+          <EmButton data-checkout variant="primary" :disabled="!canCheckout" @click="checkout">{{ processing ? 'Processing…' : mode === 'buy' ? 'Buy selected · ' + money(total) : 'Review sale · ' + money(total) }}</EmButton>
+        </footer>
+      </aside>
+    </div>
+    <EmConfirm :open="reviewOpen" title="Review selected copies" :message="saleReview" :confirm-label="'Sell for ' + money(total) + ' Insignia'" :busy="processing || store.busy" @confirm="trade" @close="reviewOpen = false" />
   </section>
 </template>
 
 <style scoped>
-.shop {
-  display: flex;
-  flex-direction: column;
-  gap: var(--em-space-5);
-}
-.notice {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border: 1px solid var(--em-success);
-  border-radius: var(--em-radius);
-  color: var(--em-success);
-  background: var(--em-success-surface);
-}
-.wallet {
-  display: grid;
-  grid-template-columns: 1.5fr repeat(6, 1fr);
-  gap: var(--em-space-3);
-  align-items: center;
-}
-.amount {
-  margin: 6px 0 0;
-  font-size: 18px;
-}
-.count {
-  text-align: center;
-  font-size: 12px;
-  color: var(--tier);
-}
-.count .em-emblem {
-  display: block;
-  margin: 0 auto 4px;
-}
-.count strong {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 22px;
-  font-weight: 400;
-}
-.section-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--em-space-3);
-  margin-bottom: var(--em-space-3);
-}
-h3 {
-  margin: 0 0 var(--em-space-3);
-  font-size: 18px;
-  line-height: 1.4;
-}
-.section-head h3 {
-  margin: 0;
-}
-.section-head small {
-  color: var(--em-muted);
-}
-.refresh {
-  color: var(--em-accent);
-}
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: var(--em-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--em-space-2);
-  padding: var(--em-space-4);
-  border: 1px solid var(--em-border);
-  border-top: 3px solid var(--tier, var(--em-border));
-  border-radius: var(--em-radius);
-  background: var(--em-raised);
-}
-.card.is-off {
-  opacity: 0.6;
-}
-.card h4 {
-  margin: 0;
-  font-size: 15px;
-}
-.portrait {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 120px;
-}
-.portrait img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  mix-blend-mode: lighten;
-}
-.letter {
-  font-size: 52px;
-  font-weight: 600;
-  color: var(--em-accent);
-}
-.band {
-  height: 36px;
-  margin: calc(var(--em-space-4) * -1) calc(var(--em-space-4) * -1) 0;
-  background: linear-gradient(color-mix(in srgb, var(--tier) 35%, transparent), transparent);
-}
-.meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-  font-size: 13px;
-}
-.owned {
-  margin: 0;
-  font-size: 12px;
-  color: var(--em-muted);
-}
-.stock {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--tier);
-}
-.price {
-  margin: 0;
-}
-.price strong {
-  font-size: 18px;
-}
-.ribbon {
-  position: absolute;
-  top: 10px;
-  right: -1px;
-  padding: 2px 10px;
-  background: var(--em-danger-surface);
-  border: 1px solid var(--em-danger);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--em-danger);
-}
-.card input {
-  min-height: var(--em-target);
-  padding: 8px;
-  border: 1px solid var(--em-border);
-  border-radius: var(--em-radius);
-  color: var(--em-text);
-  background: var(--em-bg);
-  font: inherit;
-  text-align: center;
-}
-.hint {
-  margin: var(--em-space-3) 0 0;
-  font-size: 12px;
-  color: var(--em-muted);
-}
-.block {
-  width: 100%;
-  margin-top: auto;
-}
-.empty {
-  padding: 14px;
-  border: 1px dashed var(--em-border);
-  font-size: 13px;
-  color: var(--em-muted);
-}
-@media (max-width: 700px) {
-  .wallet {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px 10px;
-  }
-  .balance {
-    grid-column: 1 / -1;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--em-divider);
-    text-align: center;
-  }
-  .cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 420px) {
-  .cards {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.shop { min-width: 0; }
+.shop-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.mode-tabs { display: flex; min-width: 220px; border: 1px solid var(--em-divider); border-radius: var(--em-radius); overflow: hidden; }
+.mode-tabs button { flex: 1; min-height: 44px; border: 0; padding: 10px 24px; color: var(--em-muted); background: var(--em-panel); text-transform: uppercase; font: inherit; font-weight: 700; cursor: pointer; }
+.mode-tabs button[aria-pressed="true"] { color: var(--em-on-accent); background: var(--em-accent); }
+.shop-caption { color: var(--em-muted); font-size: 13px; }
+.notice { display: flex; align-items: center; gap: 10px; padding: 12px 16px; margin-bottom: 12px; border: 1px solid var(--em-success); background: var(--em-success-surface); color: var(--em-success); font-size: 13px; }
+.notice.interrupted { color: var(--em-warning); background: var(--em-warning-surface); border-color: var(--em-warning); }
+.trading-floor { display: grid; grid-template-columns: 172px minmax(0, 1fr) 290px; min-width: 0; border: 1px solid var(--em-divider); border-radius: var(--em-radius); background: var(--em-panel); box-shadow: var(--em-panel-shadow); }
+.category-rail { display: flex; flex-direction: column; gap: 8px; padding: 16px 12px; border-right: 1px solid var(--em-divider); }
+.category-rail > .em-eyebrow { padding: 0 8px 8px; }
+.category-rail > button, .rail-selected { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 44px; padding: 10px 8px; color: var(--em-text); background: transparent; border: 1px solid transparent; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.category-rail > button[aria-pressed="true"], .rail-selected { border-left: 3px solid var(--em-accent); background: var(--em-warning-surface); }
+.rail-field { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--em-divider); padding-top: 22px; margin-top: 12px; }
+select, .catalog-toolbar input { width: 100%; min-height: 44px; border: 1px solid var(--em-divider); border-radius: var(--em-radius); background: var(--em-bg); color: var(--em-text); padding: 10px 12px; font: inherit; font-size: 12px; }
+.hide-unavailable { display: flex; align-items: center; gap: 8px; font-size: 12px; min-height: 44px; }
+input[type="checkbox"] { accent-color: var(--em-accent); width: 18px; height: 18px; }
+.rail-note { margin-top: auto; padding-top: 28px; color: var(--em-muted); font-size: 11px; line-height: 1.7; }
+.rail-note > .em-icon { color: var(--em-accent); margin-bottom: 6px; }
+.shop-catalog { min-width: 0; padding: 14px; }
+.catalog-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+.catalog-toolbar input { flex: 1; min-width: 80px; max-width: 360px; }
+.catalog-toolbar small { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--em-muted); }
+.item-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.item-card { position: relative; display: grid; grid-template-columns: 80px minmax(0, 1fr); align-content: start; gap: 8px; padding: 12px; border: 1px solid var(--em-divider); border-bottom: 3px solid var(--tier, var(--em-divider)); border-radius: var(--em-radius); background: linear-gradient(135deg, var(--em-raised), var(--em-panel)); min-width: 0; }
+.item-card.selected { outline: 2px solid var(--em-accent); outline-offset: -2px; }
+.item-card.is-off { background: var(--em-disabled-surface); }
+.item-card.is-off .item-art, .item-card.is-off .item-info { opacity: .55; }
+.item-art { display: flex; justify-content: center; align-items: center; min-height: 135px; background: radial-gradient(ellipse at 50% 90%, #f3b47a12, transparent 70%); }
+.item-art img { display: block; width: 100%; max-height: 140px; object-fit: contain; image-rendering: pixelated; }
+.item-art .em-emblem { width: min(100%, 84px); height: auto; }
+.item-info { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.item-info h4 { padding-right: 14px; font-size: 13px; overflow-wrap: anywhere; }
+.item-info p { font-size: 11px; color: var(--em-muted); }
+.item-info .stock { color: var(--tier); }
+.item-info .item-price { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; color: var(--em-text); font-size: 15px; font-weight: 700; margin-top: auto; }
+.item-price small { color: var(--em-muted); font-size: 10px; font-weight: 400; }
+.item-card > .em-button { grid-column: 1 / -1; width: 100%; min-height: 38px; padding: 7px; font-size: 12px; box-shadow: none; }
+.item-card > .em-button.primary:disabled { color: var(--em-on-accent); background: var(--em-accent); border-color: var(--em-accent); }
+.selection-check { position: absolute; top: 7px; right: 7px; padding: 2px; color: var(--em-on-accent); background: var(--em-accent); }
+.letter { font-family: var(--em-font-display); color: var(--em-accent); font-size: 32px; }
+.hint { display: flex; align-items: start; gap: 8px; color: var(--em-muted); font-size: 11px; line-height: 1.6; margin-top: 14px; }
+.empty { padding: 32px 12px; text-align: center; color: var(--em-muted); }
+.basket-panel { position: sticky; top: 0; align-self: start; display: flex; flex-direction: column; min-width: 0; height: min(680px, calc(100dvh - 300px)); min-height: 360px; padding: 16px; border-left: 1px solid var(--em-divider); background: #10172066; }
+.basket-head { display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--em-divider); }
+.basket-head > .em-icon { color: var(--em-accent); }
+.basket-head h3 { font-size: 13px; line-height: 1.6; }
+.basket-head p { color: var(--em-muted); font-size: 11px; }
+.basket-items { flex: 1; min-height: 0; overflow-y: auto; }
+.basket-empty { display: flex; flex-direction: column; gap: 12px; align-items: center; padding: 50px 0; color: var(--em-muted); font-size: 13px; text-align: center; }
+.basket-empty > .em-icon { color: var(--em-accent); opacity: .6; }
+.basket-empty small { font-size: 11px; }
+.basket-item { display: grid; grid-template-columns: 44px minmax(0, 1fr) 28px; gap: 10px 8px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--em-divider); }
+.basket-art { width: 44px; height: 52px; object-fit: contain; image-rendering: pixelated; }
+.basket-line { min-width: 0; }
+.basket-line strong { display: block; font-size: 12px; overflow-wrap: anywhere; }
+.basket-line small { display: block; color: var(--em-muted); font-size: 11px; margin-top: 4px; }
+.remove { display: flex; align-items: center; justify-content: center; align-self: start; width: 28px; height: 32px; border: 1px solid var(--em-divider); color: var(--em-muted); background: var(--em-panel); cursor: pointer; }
+.quantity-control { display: flex; grid-column: 1 / 3; max-width: 144px; }
+.quantity-control button, .quantity-control input { min-height: 38px; min-width: 0; border: 1px solid var(--em-divider); color: var(--em-text); background: var(--em-raised); font: inherit; }
+.quantity-control button { width: 38px; cursor: pointer; }
+.quantity-control input { width: 62px; padding: 3px; text-align: center; appearance: textfield; -moz-appearance: textfield; }
+.quantity-control input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.quantity-control button:disabled { opacity: .45; cursor: default; }
+.line-total { grid-column: 3; justify-self: end; font-size: 13px; }
+.item-problem { grid-column: 1 / -1; font-size: 11px; color: var(--em-danger); }
+.basket-footer { padding-top: 24px; }
+.total, .balance-after { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.total { font-size: 15px; font-weight: 700; }
+.total strong { font-size: 19px; }
+.total small { font-size: 11px; }
+.balance-after { margin-top: 12px; color: var(--em-muted); font-size: 12px; }
+.basket-footer > .item-problem { margin-top: 12px; }
+.basket-footer > .em-button { width: 100%; margin-top: 20px; min-height: 48px; padding: 12px 8px; }
+@media (max-width: 1400px) { .item-card { grid-template-columns: minmax(0, 1fr); } .item-art { min-height: 90px; } .item-art img { height: 110px; } .item-info .item-price { margin-top: 8px; } }
+@media (max-width: 1050px) { .trading-floor { grid-template-columns: 142px minmax(0, 1fr) 255px; } .item-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .catalog-toolbar { flex-direction: column; align-items: start; } .catalog-toolbar input { max-width: none; } }
+@media (max-width: 760px) {
+  .shop-caption { display: none; } .trading-floor { grid-template-columns: minmax(0, 1fr); } .category-rail { flex-direction: row; flex-wrap: wrap; gap: 6px; padding: 10px; border-right: 0; border-bottom: 1px solid var(--em-divider); }
+  .category-rail > .em-eyebrow, .rail-note { display: none; } .category-rail > button, .rail-selected { width: auto; flex: 1; justify-content: center; padding: 8px; }
+  .rail-field { flex: 1; min-width: 120px; padding: 0; border: 0; margin: 0; } .rail-field > span { display: none; } .hide-unavailable { flex: 1; white-space: nowrap; }
+  .item-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .item-card { padding: 10px; } .basket-panel { border-left: 0; border-top: 1px solid var(--em-divider); }
+  .catalog-toolbar { flex-direction: row; align-items: center; gap: 8px; } .catalog-toolbar input { flex: 1; width: 50%; } .catalog-toolbar small { max-width: 120px; font-size: 10px; }
+  .basket-footer { position: sticky; bottom: 0; background: var(--em-panel); padding: 16px 0 4px; border-top: 1px solid var(--em-divider); z-index: 2; }
+  .basket-panel { position: static; height: auto; min-height: 0; } .basket-items { overflow: visible; }
+  .basket-empty { padding: 24px; } .basket-item { grid-template-columns: 44px minmax(0, 1fr) 32px; } .remove { min-height: 44px; width: 32px; } .item-card > .em-button { min-height: 44px; }
+  .quantity-control button, .quantity-control input { min-height: 44px; }
 }
 </style>

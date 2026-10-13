@@ -9,7 +9,7 @@ import EmNotice from "./ui/EmNotice.vue";
 
 /** The Ascension main menu, the first screen: the title, the menu rows and a fanned
  * hand of small cards. Without a save it offers New game and previews the starters;
- * with one it offers Continue, Quick battle and Shop and shows your first Ascended.
+ * with one it offers Quick battle, Collection and Shop and shows your first Ascended.
  * Reset progress lives here, behind a type-to-confirm. */
 export type PlayTarget = "collection" | "battle" | "shop";
 const emit = defineEmits<{ newGame: []; play: [target: PlayTarget] }>();
@@ -55,9 +55,9 @@ async function reset(): Promise<void> {
 <template>
   <section class="hero">
     <div class="intro">
-      <p class="em-eyebrow">A little fire. A big adventure.</p>
-      <h2 class="em-pixel title">ASCENSION</h2>
-      <p class="tagline">Find your Ascended.<br />Forge a legend, one battle at a time.</p>
+      <p class="em-eyebrow">The forge awaits</p>
+      <h2 class="em-pixel title">FORGE YOUR<br />LEGEND</h2>
+      <p class="tagline">Collect. Forge. Battle.</p>
       <p v-if="hasSave" class="save em-num">{{ ascendedCount }} Ascended, {{ store.profile?.insignia }} Insignia</p>
       <p v-else class="save">Three Ascended. Your first choice.</p>
 
@@ -65,12 +65,13 @@ async function reset(): Promise<void> {
 
       <nav class="menu" aria-label="Main menu">
         <template v-if="hasSave">
-          <EmMenuRow icon="play" variant="primary" @click="emit('play', 'collection')">Continue</EmMenuRow>
-          <EmMenuRow icon="battle" @click="emit('play', 'battle')">Quick battle</EmMenuRow>
+          <EmMenuRow icon="battle" variant="primary" @click="emit('play', 'battle')">Quick battle</EmMenuRow>
+          <EmMenuRow icon="ascended" @click="emit('play', 'collection')">Collection</EmMenuRow>
           <EmMenuRow icon="shop" @click="emit('play', 'shop')">Shop</EmMenuRow>
         </template>
         <EmMenuRow v-else icon="play" variant="primary" @click="emit('newGame')">New game</EmMenuRow>
         <EmMenuRow icon="book" @click="showingHelp = true">How to play</EmMenuRow>
+        <EmMenuRow class="tavern" icon="lock" disabled><span>Tavern</span> <small>Coming soon / Locked</small></EmMenuRow>
         <EmMenuRow v-if="hasSave" icon="reset" variant="danger" :disabled="inBattle" @click="confirmingReset = true">Reset progress</EmMenuRow>
       </nav>
       <p v-if="hasSave && inBattle" class="caption">Finish or forfeit your battle to reset.</p>
@@ -106,103 +107,21 @@ async function reset(): Promise<void> {
 </template>
 
 <style scoped>
-.hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  align-items: center;
-  gap: 40px;
-  min-height: 590px;
-  background: radial-gradient(ellipse at 73% 50%, #2a3033, transparent 60%);
-}
-.title {
-  margin: 14px 0;
-  font-size: 46px;
-  line-height: 1.2;
-  color: var(--em-accent);
-}
-.tagline {
-  max-width: 370px;
-  margin-bottom: 28px;
-  font-size: 16px;
-  color: var(--em-muted);
-}
-.save {
-  margin: 0 0 16px;
-  font-size: 13px;
-}
-.menu {
-  display: grid;
-  gap: 10px;
-  max-width: 380px;
-  margin-top: 22px;
-}
-.caption {
-  margin-top: 18px;
-  font-size: 12px;
-  color: var(--em-muted);
-}
-.hand-wrap {
-  min-width: 0;
-}
-.hand {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 390px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.ascended {
-  --card-width: 170px;
-  flex: none;
-  margin: 0 -12px;
-  transform: rotate(var(--rot)) translateY(var(--lift));
-  box-shadow: 0 20px 35px #0008;
-  transition: transform 160ms ease;
-}
-.ascended:hover {
-  z-index: 20 !important;
-  transform: rotate(0deg) translateY(-30px);
-}
-.hand-caption {
-  text-align: center;
-  font-size: 11px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--em-muted);
-}
-.reset-notice {
-  margin-bottom: 18px;
-}
-@media (max-width: 700px) {
-  .hero {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 26px;
-    min-height: 0;
-  }
-  .title {
-    margin: 12px 0;
-    font-size: 31px;
-  }
-  .tagline {
-    margin-bottom: 16px;
-    font-size: 14px;
-  }
-  .menu {
-    max-width: none;
-  }
-  .hand-wrap {
-    order: 2;
-  }
-  .hand {
-    height: 270px;
-  }
-  .ascended {
-    --card-width: 128px;
-    margin: 0 -16px;
-  }
-}
+.hero { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr); align-items:center; gap:36px; min-height:640px; padding:32px; position:relative; isolation:isolate; border:1px solid #3a5c71; background:linear-gradient(90deg,#061622f2 0%,#071725d9 42%,#07172544),var(--em-forge-scene) center / cover; box-shadow:inset 0 0 0 4px #10212e,0 16px 48px #0006; }
+.intro { position:relative; z-index:2; min-width:0; }
+.title { margin:12px 0; font-size:clamp(32px,4.5vw,64px); line-height:1.12; color:#f6c480; text-shadow:0 3px 0 #835433,0 6px 0 #10151e; }
+.tagline { margin-bottom:20px; font-size:23px; font-weight:700; }
+.save { border-top:1px solid #4b6c82; padding-top:16px; margin-bottom:24px; color:var(--em-muted); }
+.menu { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.menu :deep(.primary) { grid-column:1/-1; min-height:76px; font-size:24px; } .menu :deep(.primary svg) { width:30px; height:30px; }
+.menu :deep(.em-row) { padding:16px 12px; } .menu :deep(.em-row.secondary:not(.tavern)) { flex-wrap:wrap; justify-content:center; gap:8px; } .menu :deep(.secondary .label) { flex:initial; font-size:13px; } .menu :deep(.secondary .arrow) { width:14px; }
+.menu :deep(.tavern) { grid-column:1/-1; min-height:82px; opacity:.7; } .tavern :deep(.label) { display:flex; flex-direction:column; align-items:flex-start; gap:3px; font-size:20px; } .tavern small { font-size:12px; font-weight:400; }
+.menu :deep(.danger) { grid-column:1/-1; margin-top:20px; border:0; border-top:1px solid #496276; background:transparent; box-shadow:none; padding-top:20px; }
+.caption { margin-top:14px; font-size:11px; color:var(--em-muted); } .hand-wrap { min-width:0; }
+.hand { display:flex; justify-content:center; align-items:center; height:420px; margin:0; padding:0; list-style:none; }
+.ascended { --card-width:clamp(145px,16vw,225px); flex:none; margin:0 -18px; transform:rotate(var(--rot)) translateY(var(--lift)); transition:transform 160ms ease; }
+.ascended:nth-child(2) :deep(.card) { border-color:var(--em-accent); box-shadow:inset 0 0 0 2px #151719,0 0 0 2px #b97843,0 20px 30px #0008; }
+.ascended:hover { z-index:20!important; transform:rotate(0deg) translateY(-30px); } .hand-caption { text-align:center; font:15px var(--em-font-display); color:var(--em-text); margin-top:16px; } .reset-notice { margin-bottom:18px; }
+@media(max-width:1000px) { .hero { padding:24px; gap:16px; } .menu :deep(.em-row.secondary:not(.tavern)) { flex-direction:column; } .menu :deep(.secondary .arrow) { display:none; } .ascended { --card-width:150px; margin:0 -28px; } }
+@media(max-width:700px) { .hero { grid-template-columns:minmax(0,1fr); padding:24px 16px; min-height:0; } .title { font-size:36px; } .tagline { font-size:18px; } .hand { height:260px; } .ascended { --card-width:clamp(90px,25vw,130px); margin:0 -12px; } .hand-wrap { margin-top:24px; } .menu :deep(.primary) { font-size:20px; min-height:64px; } }
 </style>

@@ -68,4 +68,9 @@ function forfeit(): void {
     margin-bottom: 0;
   }
 }
+
+.controls { padding: 8px 10px; margin-bottom: 10px; border: 1px solid var(--em-divider); background: linear-gradient(180deg, var(--em-raised), var(--em-header)); }
+.controls :deep(.em-button) { min-height: 34px; font-size: 12px; padding: 6px 12px; }
+.controls :deep(.tab) { min-height: 34px; font-size: 12px; }
+
 </style>

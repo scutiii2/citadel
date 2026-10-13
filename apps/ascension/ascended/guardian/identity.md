@@ -1,19 +1,19 @@
 # Guardian visual identity
 
-Primary reference: `sprite_preview_card.webp`. Preserve this established design when recreating the main card and battle sprite. `art_prompts.md` describes poses; `../ART_GUIDE.md` controls style and framing.
+## Approved redesign (2026-10-13)
 
-- Squat, broad, friendly but fierce ember golem; oversized round helmet-head, short sturdy legs and heavy rounded fists. No human anatomy or face.
-- Weathered slate-grey stone and iron plates, warm copper/bronze edging, visible rivets, cracks and segmented joints.
-- Helmet has a central brow ridge, two enormous recessed round amber-orange eyes and a broad curved lower rim. Dark facial recesses are mechanical openings, not a human mouth.
-- A bright orange and gold flame rises from the helmet crown; keep its scale relative to the head.
-- Rounded shoulder pauldrons with copper rims; thick forearm armour and clenched stone/metal fists.
-- Broad chest armour surrounds a large circular orange furnace opening at the belly, with visible fiery vertical divisions.
-- Large broad kite shield held on the viewer's right in the reference: clipped upper corners, pointed lower end, thick copper border, copper cross braces, rivets and a circular radiant ember boss with a toothed bronze surround. Keep its substantial size.
-- Short segmented armoured legs and broad boots. Match the preview's compact proportions; do not elongate the torso or limbs.
-- Signature glow: ember orange with amber/gold highlights in eyes, crown flame, furnace and shield boss. Glow illuminates adjacent metal.
+The user approved the character artwork in the main menu and collection concepts and explicitly requested this design for the battle sprite. This intentional redesign supersedes the former creature design for newly generated art.
 
-Across sprites preserve face, armour construction, shield shape, palette, glow locations and proportions. Only pose, framing and background change. Battle faces right with shield leading; use dark slate at least about #2a3342 for its darkest body pixels, including recesses and outlines, to survive the arena's lighten blend.
+A sturdy fully armoured fantasy knight, with a closed silver/slate helmet, narrow glowing amber visor, layered silver plate and copper-gold trim, broad angular blue kite shield bearing a simple gold cross, blue cloth tabard and a straight steel sword. Compact heroic proportions, broad shoulders, strong boots. No exposed human face, no furnace belly or golem flame crown.
 
-## Preview export reference
+## References and consistency
 
-`sprite_preview_card.webp` is the 512 x 512 game export and the primary reference. The export correction changes framing and dimensions only, not the character identity.
+- Primary new-design reference: `battle_source.png`, the generated full-resolution source for `sprite_battle.webp` in this folder.
+- `sprite_battle.webp` is the 512 x 512 game export of that source.
+- The approved UI concept sheets supplied the original design direction; the character-only source is the reference for future poses and card artwork.
+- Existing `sprite_main_card.webp` and `sprite_preview_card.webp` retain the previous design because this request covers battle sprites only. Do not use those legacy cards to override the approved redesign. Updating the cards is a separate art pass.
+- Preserve face/helmet, silhouette, clothing, armour, weapons, palette and proportions across future sprites. Correct accidental drift rather than changing this identity.
+
+## Battle framing
+
+Right-facing three-quarter defensive stance, shield leading toward the right, sword held ready behind it. A single full-body figure on transparent background, with no ground, cast shadow, text or frame. Nothing touches an edge. Use crisp square pixel clusters and dark slate shadows approximately #2a3342 or lighter so the arena's lighten blend does not erase details. Export at 512 x 512, lossless WebP, with nearest-neighbour scaling.

@@ -69,6 +69,7 @@ async function start(): Promise<void> {
         </div>
       </div>
 
+      <div class="starter-inspector">
       <AscendedTemplateCard :ascended="current" class="detail" />
 
       <EmPanel class="info">
@@ -94,6 +95,7 @@ async function start(): Promise<void> {
         </EmButton>
         <button type="button" class="back-link" @click="emit('back')"><EmIcon name="arrow" class="back-arrow" /> Back to main menu</button>
       </EmPanel>
+      </div>
     </div>
     <p v-else class="empty">No starters available.</p>
   </section>
@@ -207,4 +209,21 @@ async function start(): Promise<void> {
     align-self: center;
   }
 }
+
+/* The starter cards and inspector share the same steel frame. */
+.picker { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 12px; }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.item { min-width: 0; --card-width: 100%; }
+.note { padding: 9px 6px; margin: 0; text-align: center; border-bottom: 1px solid var(--em-accent-edge); }
+.starter-inspector { display: grid; grid-template-columns: minmax(125px, .65fr) minmax(0, 1fr); gap: 12px; padding: 12px; border: 1px solid var(--em-divider); background: linear-gradient(140deg, var(--em-header), var(--em-bg)); }
+.detail { --card-width: 100%; align-self: start; }
+.info { padding: 4px; border: 0; box-shadow: none; background: transparent; min-width: 0; }
+.name { margin: 10px 0; font-size: 18px; }
+.facts { gap: 12px; margin: 14px 0; }
+.facts strong { font-size: 13px; }
+.facts p, .blurb { font-size: 12px; }
+.back-link { font-size: 12px; }
+@media (max-width: 1050px) { .picker { grid-template-columns: minmax(0, 1fr); } .starter-inspector { grid-template-columns: 180px minmax(0, 1fr); } }
+@media (max-width: 600px) { .picker { display: grid; gap: 12px; } .choices { grid-template-columns: repeat(2, minmax(0, 1fr)); } .item { display: block; } .starter-inspector { grid-template-columns: minmax(0, 1fr); } .detail { --card-width: min(220px, 100%); justify-self: center; } .info { grid-column: auto; } }
+
 </style>

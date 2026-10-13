@@ -1,130 +1,125 @@
 /// <reference lib="dom" />
-import { expect, test } from "@playwright/test";
-import { installFakeApi } from "./fakeApi.ts";
-import { CATALOG, PROFILE, ascendedInfo, ownedAscended } from "../src/api/AscensionClient.fixtures.ts";
+import { expect, test, type Page } from "@playwright/test";
+import { installFakeApi } from "./fakeApi";
+import { PROFILE, ascendedInfo, ownedAscended } from "../src/api/AscensionClient.fixtures";
 
-for (const viewport of [{ width: 1280, height: 720 }, { width: 768, height: 720 }, { width: 390, height: 844 }]) {
-  test(`squad preparation fits at ${viewport.width}px`, async ({ page }, testInfo) => {
+async function fits(page: Page) {
+  const overflow = await page.evaluate(() => Array.from(document.querySelectorAll('*')).filter(el => el.getBoundingClientRect().right > innerWidth + 1 && getComputedStyle(el).position !== 'fixed').slice(0, 8).map(el => ({ tag: el.tagName, class: el.className, right: el.getBoundingClientRect().right })));
+  expect.soft(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), JSON.stringify(overflow)).toBe(true);
+  const sources = await page.locator('img[src^="/ascended/"]').evaluateAll(images => images.map(img => img.getAttribute("src")));
+  expect(sources.every(src => src?.endsWith("/sprite_battle.webp"))).toBe(true);
+}
+
+for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+  test(`menu, collection, basket and active battle remain usable at ${viewport.width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     const api = await installFakeApi(page);
-    api.ascension.profile = {
-      ...PROFILE,
-      squad: ["guardian", "striker", "scout"],
-      ascendeds: [ownedAscended("guardian", { level: 12, in_squad: true }), ownedAscended("striker", { level: 10, in_squad: true }),
-        ownedAscended("scout", { level: 9, in_squad: true, fainted: true, faint_until: Date.now() / 1000 + 134 })],
-    };
-    await page.route("**/ascension/catalog", route => route.fulfill({ json: {
-      ...CATALOG,
-      ascendeds: [...CATALOG.ascendeds.map(info => info.id === "bruiser" ? { ...info, art: { ...info.art,
-        main_card: "/ascended/bruiser/sprite_main_card.webp", preview_card: "/ascended/bruiser/sprite_preview_card.webp" } } : info),
-        ascendedInfo("scout", { name: "Scout", art: { main_card: "/ascended/scout/sprite_main_card.webp", preview_card: "/ascended/scout/sprite_preview_card.webp", battle: null, focus: 50, focus_preview: 50, animation: null } })],
-    } }));
+    api.ascension.profile = { ...structuredClone(PROFILE), insignia: 300,
+      squad: ["guardian", "striker", "scout"], ascendeds: [
+        ownedAscended("guardian", { in_squad: true, copies: 3, sale_value: 25 }),
+        ownedAscended("striker", { in_squad: true, level: 8 }),
+        ownedAscended("scout", { in_squad: true, fainted: true, faint_until: Date.now() / 1000 + 134 }),
+        ownedAscended("channeler", { level: 6, tier_id: "unique", copies: 2 }),
+      ] };
+    api.catalog.ascendeds.push(ascendedInfo("scout"), ascendedInfo("channeler"));
+    api.encounter = { ...api.encounter, ascended_id: "channeler", name: "Channeler", tier_id: "unique" };
     await page.goto("/#ticket=e2e-launch");
-    await page.getByRole("tab", { name: "Battle", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Quick battle", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Tavern/ })).toBeDisabled();
+    await page.screenshot({ animations: "disabled", path: testInfo.outputPath("menu.png"), fullPage: true });
+    await fits(page);
+    await page.getByRole("button", { name: "Collection", exact: true }).click();
+    const guardian = page.getByRole("button", { name: "Guardian, details", exact: true });
+    await guardian.focus();
+    await guardian.press("Enter");
+    await expect(page.getByRole("complementary", { name: "Selected Ascended" })).toContainText("Guardian");
+    await expect(page.getByRole("button", { name: "Open details", exact: true })).toBeVisible();
+    await page.screenshot({ animations: "disabled", path: testInfo.outputPath("collection.png"), fullPage: true });
+    if (viewport.width < 700) {
+      await page.locator(".collection-inspector").scrollIntoViewIfNeeded();
+      await page.screenshot({ animations: "disabled", path: testInfo.outputPath("collection-inspector.png") });
+    }
+    await fits(page);
+    await page.getByRole("button", { name: "Main menu", exact: true }).click();
+    await page.getByRole("button", { name: "Shop", exact: true }).click();
+    await page.locator('[data-offer="0"] button[data-add]').click();
+    await page.locator('[data-basket] input').fill("2");
+    await page.locator('[data-tier="common"] button[data-add]').click();
+    await page.screenshot({ animations: "disabled", path: testInfo.outputPath("shop.png"), fullPage: true });
+    if (viewport.width < 700) {
+      await page.locator('[data-checkout]').scrollIntoViewIfNeeded();
+      await page.screenshot({ animations: "disabled", path: testInfo.outputPath("shop-basket.png") });
+    }
+    await fits(page);
+    await page.locator('[data-checkout]').click();
+    await expect.poll(() => api.trades.length).toBe(3);
+    expect(api.trades.map(t => t.kind)).toEqual(["copies", "copies", "emblems"]);
+    await expect(page.locator('[data-basket] input')).toHaveCount(0);
+    await page.locator('[data-mode="sell"]').click();
+    await page.locator('[data-sell="guardian"] button[data-add]').click();
+    await page.locator('[data-checkout]').click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    expect(api.trades.filter(t => t.kind === "sale")).toHaveLength(0);
+    await page.getByRole("dialog").getByRole("button", { name: /Confirm|Sell/, exact: false }).last().click();
+    await expect.poll(() => api.trades.filter(t => t.kind === "sale").length).toBe(1);
+    await page.getByRole("button", { name: "Main menu", exact: true }).click();
+    await page.getByRole("button", { name: "Quick battle", exact: true }).click();
     await page.getByRole("button", { name: "Look for a wild Ascended", exact: true }).click();
     await page.getByRole("button", { name: "Fight", exact: true }).click();
-    const selected = page.getByRole("radiogroup", { name: "Your squad" }).getByRole("radio", { name: "Guardian" });
-    await expect(selected).toHaveAttribute("aria-checked", "true");
-    await expect(page.locator(".matchup .player .ascended-name")).toHaveText("Guardian");
-    await expect(page.locator(".matchup .wild .ascended-name")).toHaveText("Bruiser");
-    await expect(page.locator(".matchup .wild img")).toHaveAttribute("src", "/ascended/bruiser/sprite_main_card.webp");
+    await expect(page.getByRole("radio", { name: "Scout", exact: true })).toHaveAttribute("aria-disabled", "true");
     await page.getByRole("radio", { name: "Striker", exact: true }).click();
     await expect(page.locator(".matchup .player .ascended-name")).toHaveText("Striker");
-    await selected.click();
-    await expect(page.getByRole("radio", { name: "Scout", exact: true })).toHaveAttribute("aria-disabled", "true");
-    await expect(page.locator("select[name='limit']")).toBeDisabled();
-    const player = await page.locator(".matchup .player").boundingBox();
-    const wild = await page.locator(".matchup .wild").boundingBox();
-    expect(player!.y).toBe(wild!.y);
-    expect(player!.x + player!.width).toBeLessThanOrEqual(wild!.x + 1);
-    expect(await selected.evaluate(el => getComputedStyle(el).animationName)).toMatch(/^breathe(?:-|$)/);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
-    if (viewport.width > 700) await page.setViewportSize({ width: viewport.width, height: 1320 });
-    await page.getByRole("main").evaluate(el => { el.scrollTop = 0; });
-    await page.screenshot({ path: testInfo.outputPath("squad-setup.png"), fullPage: true });
-    await page.getByRole("button", { name: "Begin battle", exact: true }).scrollIntoViewIfNeeded();
-    await page.screenshot({ path: testInfo.outputPath("battle-plan.png"), fullPage: true });
+    await page.getByRole("radio", { name: "Guardian", exact: true }).click();
     await page.getByRole("tab", { name: "Autonomous", exact: true }).click();
     await expect(page.getByRole("button", { name: "Begin battle", exact: true })).toBeDisabled();
     await page.locator("select[name='preset']").selectOption("2");
     await page.locator("select[name='limit']").selectOption("rare");
     await expect(page.getByRole("button", { name: "Begin battle", exact: true })).toBeEnabled();
+    await page.getByRole("tab", { name: "Manual", exact: true }).click();
+    await page.screenshot({ animations: "disabled", path: testInfo.outputPath("battle-plan.png"), fullPage: true });
+    if (viewport.width < 700) {
+      await page.locator(".begin-battle").scrollIntoViewIfNeeded();
+      await page.screenshot({ animations: "disabled", path: testInfo.outputPath("battle-plan-controls.png") });
+    }
+    await fits(page);
+    await page.getByRole("button", { name: "Begin battle", exact: true }).click();
+    await expect(page.locator(".arena")).toBeVisible();
+    await expect(page.locator("button.action")).toHaveCount(4);
+    await page.getByRole("main", { name: "Screen content", exact: true }).evaluate(el => { el.scrollTop = 0; });
+    await page.screenshot({ animations: "disabled", path: testInfo.outputPath("battle.png"), fullPage: true });
+    if (viewport.width < 700) {
+      await page.locator(".action-bar").scrollIntoViewIfNeeded();
+      await page.screenshot({ animations: "disabled", path: testInfo.outputPath("battle-actions.png") });
+    }
+    await fits(page);
+    await page.getByRole("button", { name: "Main menu", exact: true }).click();
+    expect(api.battle?.status).toBe("active");
+    await page.getByRole("button", { name: "Quick battle", exact: true }).click();
+    await expect(page.locator(".arena")).toBeVisible();
+    expect(api.battle?.status).toBe("active");
+    expect(api.artRequests.every(path => path.endsWith("/sprite_battle.webp"))).toBe(true);
     expect(api.unexpected).toEqual([]);
   });
 
-  test(`only the main content scrolls at ${viewport.width}px`, async ({ page }, testInfo) => {
+  test(`first visit selects a starter at ${viewport.width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     const api = await installFakeApi(page);
-    api.ascension.profile = { ...PROFILE };
     await page.goto("/#ticket=e2e-launch");
-    await expect(page.getByRole("heading", { name: "Your collection" })).toBeVisible();
-    const main = page.getByRole("main");
-    const heading = page.getByRole("heading", { name: "Your collection" });
-    const before = await heading.boundingBox();
-    await page.screenshot({ path: testInfo.outputPath("collection.png") });
-    await expect.poll(() => main.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
-    await main.evaluate(el => { el.scrollTop = el.scrollHeight; });
-    await expect.poll(() => main.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
-    expect(await heading.boundingBox()).toEqual(before);
-    await expect(page.getByRole("tab", { name: "Battle", exact: true })).toBeVisible();
-    await expect(page.getByRole("group", { name: "Filter by Ascension Type" })).toBeVisible();
-    expect(await page.evaluate(() => ({
-      pageScroll: document.scrollingElement!.scrollTop,
-      pageOverflow: document.documentElement.scrollHeight > innerHeight,
-      horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
-    }))).toEqual({ pageScroll: 0, pageOverflow: false, horizontalOverflow: false });
-    await expect(page.getByRole("button", { name: "Continue", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("tab", { name: "Shop", exact: true })).toHaveCount(0);
-    const wallet = page.getByRole("button", { name: "Open shop, 100 Insignia" });
-    const walletBox = await wallet.boundingBox();
-    const helpBox = await page.getByRole("button", { name: "How to play", exact: true }).boundingBox();
-    const settingsBox = await page.getByRole("button", { name: "Settings", exact: true }).boundingBox();
-    expect(walletBox!.x).toBeLessThan(helpBox!.x);
-    expect(helpBox!.x).toBeLessThan(settingsBox!.x);
-    expect(walletBox!.y).toBe(helpBox!.y);
-    expect(walletBox!.y).toBe(settingsBox!.y);
-    await wallet.click();
-    await expect(page.getByRole("heading", { name: "The forge shop" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Battle", exact: true })).toHaveAttribute("tabindex", "0");
-    await page.getByRole("button", { name: "How to play", exact: true }).click();
-    const help = page.getByRole("dialog", { name: "Keep the fire going" });
-    await expect(help).toBeVisible();
-    await help.getByRole("button", { name: "Ready to play" }).click();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
-    const settings = page.getByRole("dialog", { name: "Settings", exact: true });
-    await settings.getByRole("button", { name: "Reset progress", exact: true }).click();
-    const reset = page.getByRole("dialog", { name: "Reset all Ascension progress?" });
-    await expect(reset.getByRole("button", { name: "Reset progress", exact: true })).toBeDisabled();
-    await reset.getByRole("textbox", { name: "Type RESET to confirm" }).fill("RESET");
-    await reset.getByRole("button", { name: "Reset progress", exact: true }).click();
-    await expect(page.getByRole("button", { name: "New game", exact: true })).toBeVisible();
-    await expect(settings).not.toBeVisible();
+    await page.getByRole("button", { name: "New game", exact: true }).click();
+    await page.getByRole("radio", { name: "Striker", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Start with Striker", exact: true })).toBeEnabled();
+    await page.screenshot({ animations: "disabled", path: testInfo.outputPath("starter.png"), fullPage: true });
+    if (viewport.width < 700) {
+      await page.locator(".start").scrollIntoViewIfNeeded();
+      await page.screenshot({ animations: "disabled", path: testInfo.outputPath("starter-inspector.png") });
+    }
+    await fits(page);
+    await page.getByRole("button", { name: "Start with Striker", exact: true }).click();
+    await expect(page.locator(".squad-card")).toHaveCount(1);
+    expect(api.ascension.keys).toHaveLength(1);
+    expect(api.ascension.keys[0]).toMatch(/^[0-9a-f-]{32,36}$/);
+    expect(api.artRequests.every(path => path.endsWith("/sprite_battle.webp"))).toBe(true);
     expect(api.unexpected).toEqual([]);
   });
 }
-
-test("a first visit picks a starter, then the collection and the Battle tab open", async ({ page }) => {
-  const api = await installFakeApi(page);
-  await page.goto("/#ticket=e2e-launch");
-
-  await expect(page.getByRole("button", { name: "New game" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continue" })).toHaveCount(0);
-  await page.getByRole("button", { name: "New game" }).click();
-  await expect(page.getByRole("heading", { name: "Choose your first Ascended" })).toBeVisible();
-  await page.getByRole("radio", { name: "Guardian" }).click();
-  await page.getByRole("button", { name: "Start with Guardian" }).click();
-
-  await expect(page.locator(".squad-card")).toHaveCount(1);
-  await expect(page.getByRole("tab", { name: "Battle", exact: true })).toBeEnabled();
-  expect(api.ascension.keys).toHaveLength(1);
-  expect(api.ascension.keys[0]).toMatch(/^[0-9a-f-]{32,36}$/);
-  await page.getByRole("tab", { name: "Battle", exact: true }).click();
-  await page.getByRole("button", { name: "Look for a wild Ascended", exact: true }).click();
-  await page.getByRole("button", { name: "Fight", exact: true }).click();
-  const squad = page.getByRole("radiogroup", { name: "Your squad" });
-  await expect(squad.getByRole("radio", { name: "Guardian", exact: true })).toHaveAttribute("aria-checked", "true");
-  await expect(squad.locator(".empty-slot")).toHaveCount(4);
-  await expect(page.locator(".start-form .matchup .player .ascended-name")).toHaveText("Guardian");
-  await expect(page.getByRole("button", { name: "Begin battle", exact: true })).toBeEnabled();
-  expect(api.unexpected).toEqual([]);
-});

@@ -4,6 +4,7 @@ import type { ActionChoice, BattleView, LegalAction } from "../api/AscensionClie
 import { ROUND_PACE_MS, useAscensionStore } from "../stores/ascension";
 import { usePlaybackStore } from "../stores/playback";
 import { effectText, titleCase } from "../utils/ascension";
+import EmIcon from "./ui/EmIcon.vue";
 import EmButton from "./ui/EmButton.vue";
 import EmEmblem from "./ui/EmEmblem.vue";
 import EmDialog from "./ui/EmDialog.vue";
@@ -78,6 +79,7 @@ function throwEmblem(tier: string): void {
         :disabled="locked"
         @click="choose(action)"
       >
+        <EmIcon class="action-icon" :name="action.kind === 'catch' ? 'ascended' : action.kind === 'flee' ? 'arrow' : action.category === 'DEFENSE' ? 'shield' : action.category === 'SUPPORT' ? 'flame' : 'sword'" :size="26" />
         <span class="action-name">{{ label(action) }}</span>
         <span class="action-detail">{{ detail(action) }}</span>
       </button>
@@ -202,4 +204,19 @@ function throwEmblem(tier: string): void {
     font-size: 11px;
   }
 }
+
+.action-icon { float: left; }
+.action-bar { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px; }
+.head { display: block; margin: 0; padding: 6px; }
+.head h3 { font-family: var(--em-font-display); text-transform: uppercase; color: var(--em-accent); font-size: 15px; margin-bottom: 6px; }
+.actions { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
+.action { min-height: 72px; padding: 10px; align-items: flex-start; text-align: left; background: linear-gradient(160deg, var(--em-raised), var(--em-header)); border-color: var(--em-divider); }
+.action-detail { font-size: 10px; line-height: 1.45; color: var(--em-muted); }
+.action.attack:not(:disabled) { color: var(--em-on-accent); background: linear-gradient(#f7c087, #d88c4d); border-color: var(--em-accent); }
+.action.attack:not(:disabled) .action-detail, .action.catch .action-detail { color: var(--em-on-accent); }
+.action.catch { background: linear-gradient(160deg, var(--em-raised), var(--em-header)); color: var(--em-text); box-shadow: none; }
+.action.catch .action-detail { color: var(--em-muted); }
+.action:focus-visible { outline: 2px solid var(--em-accent); outline-offset: 2px; }
+@media (max-width: 700px) { .action-bar { grid-template-columns: minmax(0, 1fr); gap: 8px; } .head { display: flex; margin: 0; } .head h3 { margin: 0; } .actions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 </style>

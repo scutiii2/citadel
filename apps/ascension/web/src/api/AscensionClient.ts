@@ -135,6 +135,8 @@ export interface OwnedAscended {
   level_cap: number;
   /** Spare duplicates: one is spent per star, or sold. */
   copies: number;
+  /** Server quote for selling one spare copy. Older servers may omit it. */
+  sale_value?: number;
   tier_id: string;
   stars: number;
   /** Stars that unlock the next tier; null at the top of the ladder. */

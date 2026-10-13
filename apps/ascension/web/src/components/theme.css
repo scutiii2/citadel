@@ -4,10 +4,11 @@
 
 .em-root {
   /* Palette (STYLE-SHEET section 1) */
-  --em-bg: #101720;
-  --em-header: #141e28;
-  --em-panel: #1b2733;
-  --em-raised: #253443;
+  --em-forge-scene: url("../assets/scenes/forge-hall.png");
+  --em-bg: #071421;
+  --em-header: #0b1b29;
+  --em-panel: #102332;
+  --em-raised: #1b3346;
   --em-text: #f5f0e6;
   --em-muted: #b8c6d2;
   --em-border: #6b7f90;
