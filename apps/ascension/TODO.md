@@ -15,4 +15,3 @@ Stays as it is: Battle arena and matchup (live fighter sprites, health bars and 
 ## Cleanup
 
 - [ ] `web/src/components/AscendedTemplateCard.vue` is no longer used by the starter screen. Delete it (and its test) if nothing else needs it.
-- [ ] Record the recent UI changes in `design_references/CHANGES.md` and re-run `python design_references/verify.py --update`.
