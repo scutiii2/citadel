@@ -432,10 +432,3 @@ it("keeps the personality list visible while another preset is loading", async (
   expect(wrapper.text()).not.toContain("Loading");
   expect(wrapper.find("input[role=switch]").attributes("disabled")).toBeDefined();
 });
-
-it("emits the category navigation target", async () => {
-  const wrapper = mountPanel();
-  await wrapper.findAll(".category-nav button").find(button => button.text() === "Battle")!.trigger("click");
-  await wrapper.findAll(".category-nav button").find(button => button.text() === "Shop")!.trigger("click");
-  expect(wrapper.emitted("navigate")).toEqual([["battle"], ["shop"]]);
-});

@@ -25,7 +25,6 @@ import TypeSymbol from "./ui/TypeSymbol.vue";
  * dialog with full progression, personalities and ability-tree operations. */
 const store = useAscensionStore();
 defineProps<{ controlsTarget?: HTMLElement | null }>();
-const emit = defineEmits<{ navigate: [target: "battle" | "shop"] }>();
 const ascensionClient = useAscensionClient();
 const PAGE_SIZE = 50;
 
@@ -185,7 +184,7 @@ function show(ascended: OwnedAscended): void {
 <template>
   <section class="collection">
     <aside class="filter-rail" aria-label="Collection filters">
-      <nav class="category-nav" aria-label="Game categories"><button type="button" class="active"><EmIcon name="book" />Collection</button><button type="button" @click="emit('navigate', 'battle')"><EmIcon name="battle" />Battle</button><button type="button" @click="emit('navigate', 'shop')"><EmIcon name="shop" />Shop</button></nav><h3 class="em-pixel">Filters</h3><button class="all-filter" type="button" @click="typeFilter = null; rarity = ''; search = ''">All Ascended</button>
+      <h3 class="em-pixel">Filters</h3><button class="all-filter" type="button" @click="typeFilter = null; rarity = ''; search = ''">All Ascended</button>
       <label class="filter-label">Search<input v-model="search" type="search" placeholder="Find an Ascended" aria-label="Search collection" /></label>
     <div v-if="types.length" class="filters">
       <div class="chips" role="group" aria-label="Filter by Ascension Type">
@@ -471,9 +470,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, .squad-card:foc
 .collection {grid-template-columns:200px minmax(0,1fr);gap:12px;}
 .filter-rail,.summary,.progression-panel,.stats-panel,.overview-effects {border-radius:var(--em-radius);background:linear-gradient(125deg,#102735,#091c29);}
 .filter-rail {padding:8px 12px 14px;gap:14px;}.filter-rail h3{font-size:11px;color:var(--em-muted);}
-.category-nav {display:flex;flex-direction:column;border-bottom:1px solid var(--em-border);padding-bottom:15px;gap:3px;}
-.category-nav button {display:flex;gap:15px;align-items:center;min-height:40px;padding:8px 12px;background:transparent;border:1px solid transparent;color:var(--em-text);font:inherit;font-size:13px;cursor:pointer;text-align:left;}
-.category-nav .active {background:linear-gradient(100deg,#edab603d,#e6a36922);border-left:4px solid var(--em-accent);}
 .all-filter{padding:10px 12px;color:var(--em-text);background:linear-gradient(#193243,#102737);border:1px solid var(--em-border);border-left:4px solid var(--em-accent);border-radius:var(--em-radius);font:inherit;font-size:13px;text-align:left;cursor:pointer;}
 .filter-label input,.filter-label select {border-radius:var(--em-radius);background:linear-gradient(#193243,#0e2231);}
 .squad-strip,.grid {grid-template-columns:repeat(auto-fill,136px);justify-content:start;}
@@ -483,6 +479,5 @@ button:focus-visible, input:focus-visible, select:focus-visible, .squad-card:foc
 .side :deep(.tab){border:1px solid var(--em-border);border-radius:var(--em-radius);background:linear-gradient(#112b3b,#0a1c28);}
 .side :deep(.tab.active),:deep(.em-button.primary:not(:disabled)){background:linear-gradient(#fac88a,#de9655);border-color:#f5b56f;color:#15222e;box-shadow:inset 0 1px #ffdeb0;}
 @media(max-width:1180px){.collection{grid-template-columns:170px minmax(0,1fr);}}
-@media(max-width:600px){.collection{grid-template-columns:minmax(0,1fr);}.category-nav{flex-direction:row;}.category-nav button{flex:1;padding:6px;gap:5px;font-size:12px;}}
-
+@media(max-width:600px){.collection{grid-template-columns:minmax(0,1fr);}}
 </style>

@@ -134,7 +134,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
           <EmNotice v-if="store.error" tone="error" class="status">{{ store.error }}</EmNotice>
 
           <div v-if="tab === 'collection'" class="tab-body">
-            <CollectionPanel @navigate="play" />
+            <CollectionPanel />
           </div>
 
           <div v-else-if="tab === 'battle'" class="tab-body">

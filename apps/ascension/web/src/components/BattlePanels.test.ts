@@ -1,4 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAscensionClient, type BattleView } from "../api/AscensionClient";
@@ -328,6 +329,7 @@ describe("BattleResult", () => {
     expect(wrapper.find(".reward strong").text()).toBe("+40 XP");
   });
   it("shows a capture with the personalities it revealed, and Back leaves it", async () => {
+    vi.useFakeTimers();
     const view = battleView({
       status: "terminal",
       phase: "terminal",
@@ -360,7 +362,15 @@ describe("BattleResult", () => {
     expect(wrapper.findAll(".reward")[2]!.text()).toBe("+2 Rare essencefor upgrading stars");
     expect(wrapper.findAll(".reward")[3]!.text()).toBe("+2 copiesof Bruiser, at Rare");
     expect(text).toContain("Cautious · tier 1");
-    expect(text).toContain("Bold · tier 2 (now yours)");
+    expect(text).not.toContain("(now yours)");
+    await nextTick();
+    expect(wrapper.find(".revealed li.lit").exists()).toBe(true);
+
+    vi.advanceTimersByTime(6000);
+    await nextTick();
+    expect(wrapper.find(".revealed li.won").text()).toBe("Bold · tier 2 (now yours)");
+    expect(wrapper.findAll(".revealed li.dim")).toHaveLength(1);
+    vi.useRealTimers();
 
     await wrapper.findAll("button").find((b) => b.text() === "Back to encounters")!.trigger("click");
     await flushPromises();
