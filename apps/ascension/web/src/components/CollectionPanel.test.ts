@@ -420,3 +420,22 @@ describe("collection squad controls", () => {
     expect(wrapper.find(".squad-control button").attributes("disabled")).toBeDefined();
   });
 });
+
+
+it("keeps the personality list visible while another preset is loading", async () => {
+  const personalities = [{ id: "p1", type: "AGGRESSIVE", tier: 2 }];
+  const wrapper = mount(PresetEditor, { props: { ascendedId: "guardian", ascendedName: "Guardian", personalities } });
+  await flushPromises();
+  client.preset.mockImplementationOnce(() => new Promise(() => {}));
+  await wrapper.findAll('[role="tab"]').find(tab => tab.text() === "2")!.trigger("click");
+  expect(wrapper.find(".personalities").text()).toContain("Aggressive");
+  expect(wrapper.text()).not.toContain("Loading");
+  expect(wrapper.find("input[role=switch]").attributes("disabled")).toBeDefined();
+});
+
+it("emits the category navigation target", async () => {
+  const wrapper = mountPanel();
+  await wrapper.findAll(".category-nav button").find(button => button.text() === "Battle")!.trigger("click");
+  await wrapper.findAll(".category-nav button").find(button => button.text() === "Shop")!.trigger("click");
+  expect(wrapper.emitted("navigate")).toEqual([["battle"], ["shop"]]);
+});

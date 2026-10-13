@@ -24,6 +24,8 @@ import TypeSymbol from "./ui/TypeSymbol.vue";
 /** Collection filters, squad strip and collected cards; pressing a card opens its details
  * dialog with full progression, personalities and ability-tree operations. */
 const store = useAscensionStore();
+defineProps<{ controlsTarget?: HTMLElement | null }>();
+const emit = defineEmits<{ navigate: [target: "battle" | "shop"] }>();
 const ascensionClient = useAscensionClient();
 const PAGE_SIZE = 50;
 
@@ -183,7 +185,7 @@ function show(ascended: OwnedAscended): void {
 <template>
   <section class="collection">
     <aside class="filter-rail" aria-label="Collection filters">
-      <h3 class="em-pixel">Filters</h3>
+      <nav class="category-nav" aria-label="Game categories"><button type="button" class="active"><EmIcon name="book" />Collection</button><button type="button" @click="emit('navigate', 'battle')"><EmIcon name="battle" />Battle</button><button type="button" @click="emit('navigate', 'shop')"><EmIcon name="shop" />Shop</button></nav><h3 class="em-pixel">Filters</h3><button class="all-filter" type="button" @click="typeFilter = null; rarity = ''; search = ''">All Ascended</button>
       <label class="filter-label">Search<input v-model="search" type="search" placeholder="Find an Ascended" aria-label="Search collection" /></label>
     <div v-if="types.length" class="filters">
       <div class="chips" role="group" aria-label="Filter by Ascension Type">
@@ -256,7 +258,7 @@ function show(ascended: OwnedAscended): void {
     <div class="collected-zone" :class="{ 'drop-over': overCollected }" @dragover="dragOverCollected" @dragleave="overCollected = false" @drop.prevent="dropOnCollected">
       <div class="section-head">
         <h3 class="em-pixel">Collected <small class="em-num">{{ owned.length }}</small></h3>
-        <small>Select an Ascended to inspect</small>
+        <small>Press a card for details</small>
       </div>
       <template v-if="grouped">
         <section v-for="group in groups" :key="group.typeId ?? 'none'" class="group" :data-type="group.typeId ?? 'none'">
@@ -465,4 +467,22 @@ button:focus-visible, input:focus-visible, select:focus-visible, .squad-card:foc
 @media (max-width: 1180px) { .collection { grid-template-columns: 160px minmax(0, 1fr); gap: 12px; } .details { grid-template-columns: 180px minmax(0, 1fr); } .progression-panel { grid-column: 2; } }
 @media (max-width: 900px) { .details { height: auto; } .details.tree-expanded .side { grid-column: 1; } .details > * { overflow-y: visible; } .collection { grid-template-columns: 150px minmax(0, 1fr); } .details.tree-expanded { grid-template-columns: minmax(0, 1fr); } .tree-expanded .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); align-items: start; } .tree-expanded .summary .detail-portrait { grid-row: 1 / span 4; height: 150px; } .tree-expanded .summary .battle-status, .tree-expanded .summary .squad-control { grid-column: 1 / -1; } }
 @media (max-width: 600px) { .collection { grid-template-columns: minmax(0, 1fr); } .filter-rail { position: static; gap: 12px; } .chips { flex-direction: row; flex-wrap: wrap; } .filters { gap: 12px; } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-empty { min-height: 90px; } .details { grid-template-columns: minmax(0, 1fr); } .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); } .summary .detail-portrait { grid-row: span 4; height: 150px; } .summary .battle-status { grid-column: 1 / -1; } .progression-panel { grid-column: 1; } .collection :deep(.em-dialog.ascended-details) { padding: 14px; } }
+
+.collection {grid-template-columns:200px minmax(0,1fr);gap:12px;}
+.filter-rail,.summary,.progression-panel,.stats-panel,.overview-effects {border-radius:var(--em-radius);background:linear-gradient(125deg,#102735,#091c29);}
+.filter-rail {padding:8px 12px 14px;gap:14px;}.filter-rail h3{font-size:11px;color:var(--em-muted);}
+.category-nav {display:flex;flex-direction:column;border-bottom:1px solid var(--em-border);padding-bottom:15px;gap:3px;}
+.category-nav button {display:flex;gap:15px;align-items:center;min-height:40px;padding:8px 12px;background:transparent;border:1px solid transparent;color:var(--em-text);font:inherit;font-size:13px;cursor:pointer;text-align:left;}
+.category-nav .active {background:linear-gradient(100deg,#edab603d,#e6a36922);border-left:4px solid var(--em-accent);}
+.all-filter{padding:10px 12px;color:var(--em-text);background:linear-gradient(#193243,#102737);border:1px solid var(--em-border);border-left:4px solid var(--em-accent);border-radius:var(--em-radius);font:inherit;font-size:13px;text-align:left;cursor:pointer;}
+.filter-label input,.filter-label select {border-radius:var(--em-radius);background:linear-gradient(#193243,#0e2231);}
+.squad-strip,.grid {grid-template-columns:repeat(auto-fill,136px);justify-content:start;}
+.squad-card,.squad-slot,.owned-entry,.missing-ascended{width:136px;}
+.squad-empty{box-sizing:border-box;}
+.current-stats dd {font-size:21px;}.progression-resources>div,.star-cost li,.overview-effects article {background:#102735;border-radius:var(--em-radius);}
+.side :deep(.tab){border:1px solid var(--em-border);border-radius:var(--em-radius);background:linear-gradient(#112b3b,#0a1c28);}
+.side :deep(.tab.active),:deep(.em-button.primary:not(:disabled)){background:linear-gradient(#fac88a,#de9655);border-color:#f5b56f;color:#15222e;box-shadow:inset 0 1px #ffdeb0;}
+@media(max-width:1180px){.collection{grid-template-columns:170px minmax(0,1fr);}}
+@media(max-width:600px){.collection{grid-template-columns:minmax(0,1fr);}.category-nav{flex-direction:row;}.category-nav button{flex:1;padding:6px;gap:5px;font-size:12px;}}
+
 </style>

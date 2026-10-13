@@ -3,8 +3,8 @@ import { computed, ref } from "vue";
 import EmIcon from "./EmIcon.vue";
 import type { IconName } from "./icons";
 
-/** A row of tabs in a dark well: the selected one is raised with a copper rule
- * underneath. Arrow keys, Home and End move between tabs. */
+/** A row of tabs in a dark well with a copper selected tab.
+ * Arrow keys, Home and End move between tabs. */
 export interface EmTabOption {
   value: string;
   label: string;
@@ -84,15 +84,15 @@ function move(from: number, step: number | "first" | "last"): void {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 120ms ease;
+  transition: filter 120ms ease;
 }
 .tab:hover:not(:disabled) {
-  background: #1c2a37;
+  filter: brightness(1.12);
 }
 .tab.active {
-  color: var(--em-text);
-  background: var(--em-raised);
-  box-shadow: inset 0 -2px var(--em-accent);
+  color: var(--em-on-accent);
+  background: linear-gradient(#f7c087, #df9b59);
+  box-shadow: inset 0 0 0 1px #fac58d;
 }
 .tab:disabled {
   color: var(--em-disabled-text);

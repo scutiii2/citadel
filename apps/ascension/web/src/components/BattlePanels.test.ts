@@ -74,7 +74,7 @@ describe("BattleArena", () => {
     expect(wrapper.findAll("[role='progressbar']").map((m) => m.attributes("aria-valuenow"))).toEqual(["80", "20"]);
     expect(wrapper.findAll("p.hp").map((p) => p.text())).toEqual(["HP 80 / 100", "HP 20 / 100"]);
     expect(wrapper.text()).toContain("+4 power, 2 rounds left");
-    expect(wrapper.find(".versus").text()).toBe("VS");
+    expect(wrapper.find(".round-number").text()).toBe("Round 1");
     expect(wrapper.find(".player .sprite img").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
     expect(wrapper.find(".wild .sprite img").exists()).toBe(false);
     expect(wrapper.find(".wild .letter").text()).toBe("B");
@@ -82,6 +82,33 @@ describe("BattleArena", () => {
 });
 
 describe("BattleArena animation", () => {
+  it("offers no skip control and clicking the arena leaves playback running", async () => {
+    const store = withBattle(battleView());
+    const playback = usePlaybackStore();
+    playback.busy = true;
+    playback.fx = { player: "lunge", wild: null };
+    const wrapper = mount(BattleArena, { props: { battle: store.battle! } });
+    expect(wrapper.find("button").exists()).toBe(false);
+    await wrapper.find(".arena").trigger("click");
+    expect(playback.busy).toBe(true);
+    expect(playback.fx.player).toBe("lunge");
+  });
+
+  it("shows only the EMBLEM through capture struggle and restores the fighter on release", async () => {
+    const store = withBattle(battleView());
+    const playback = usePlaybackStore();
+    const wrapper = mount(BattleArena, { props: { battle: store.battle! } });
+    for (const phase of ["wobble", "still", "caught"] as const) {
+      playback.ball = { player: null, wild: { phase, emblem: "common", strain: 2 } };
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".wild .sprite").classes()).toContain("concealed");
+      expect(wrapper.find(`.wild .ball-${phase}`).exists()).toBe(true);
+    }
+    playback.ball = { player: null, wild: { phase: "open", emblem: "common" } };
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".wild .sprite").classes()).not.toContain("concealed");
+  });
+
   const sheet = {
     url: "/ascended/guardian/spreadsheet_animation.webp", columns: 4, rows: 6,
     states: { idle: { row: 0, frames: 4, frame_ms: 180, loop: true }, attack: { row: 1, frames: 4, frame_ms: 100, loop: false } },
@@ -194,6 +221,20 @@ describe("ActionBar", () => {
 });
 
 describe("BattleControls", () => {
+  it("shows icon-only controls with accessible names and tooltips", () => {
+    const view = manual();
+    withBattle(view);
+    const wrapper = mount(BattleControls, { props: { battle: view } });
+    const tabs = wrapper.findAll("[role=tab]");
+    expect(tabs.map((tab) => tab.attributes("aria-label"))).toEqual(["Manual", "Autonomous"]);
+    expect(tabs.map((tab) => tab.attributes("title"))).toEqual(["Manual", "Autonomous"]);
+    expect(tabs.map((tab) => tab.text())).toEqual(["", ""]);
+    const forfeit = wrapper.find("button.forfeit");
+    expect(forfeit.attributes("aria-label")).toBe("Forfeit");
+    expect(forfeit.attributes("title")).toBe("Forfeit");
+    expect(forfeit.text()).toBe("");
+  });
+
   it("keeps a battle without an EMBLEM limit manual", async () => {
     const view = battleView({ mode: "manual", emblem_limit: null });
     withBattle(view);
@@ -283,7 +324,7 @@ describe("BattleResult", () => {
     withBattle(view);
     const wrapper = mount(BattleResult, { props: { battle: view } });
     expect(wrapper.find(".squad-xp").text()).toContain("Squad XP");
-    expect(wrapper.findAll(".squad-xp li").map(r => r.text())).toEqual(["+10 XP · Striker, now level 2", "+10 XP · Scout"]);
+    expect(wrapper.findAll(".squad-xp li").map(r => r.text())).toEqual(["+40 XP · Guardian", "+10 XP · Striker, now level 2", "+10 XP · Scout"]);
     expect(wrapper.find(".reward strong").text()).toBe("+40 XP");
   });
   it("shows a capture with the personalities it revealed, and Back leaves it", async () => {
@@ -321,7 +362,7 @@ describe("BattleResult", () => {
     expect(text).toContain("Cautious · tier 1");
     expect(text).toContain("Bold · tier 2 (now yours)");
 
-    await wrapper.findAll("button").find((b) => b.text() === "Back")!.trigger("click");
+    await wrapper.findAll("button").find((b) => b.text() === "Back to encounters")!.trigger("click");
     await flushPromises();
 
     expect(store.battle).toBeNull();

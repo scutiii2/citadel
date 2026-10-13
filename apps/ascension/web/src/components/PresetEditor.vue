@@ -77,11 +77,10 @@ async function save(): Promise<void> {
     <p v-else-if="personalities.length === 0" class="muted">This Ascended has no personalities yet.</p>
     <ul v-else class="choices personalities" :class="{ busy: loading }" :aria-busy="loading">
       <li v-for="p in personalities" :key="p.id" :class="{ selected: chosen.includes(p.id) }">
-        <EmSwitch :model-value="chosen.includes(p.id)" :label="titleCase(p.type)" :disabled="loading || (!chosen.includes(p.id) && full)" @update:model-value="toggle(p.id, $event)">
-          <EmTierBadge tier-id="common" :label="`Tier ${p.tier}`" class="badge" />
-        </EmSwitch>
-        <div class="category-tags"><span v-for="category in personalityInfo(p.type)?.categories" :key="category">{{ personalityCategory(category) }}</span><span v-if="personalityInfo(p.type)?.rules?.length">Conditional</span><strong v-if="chosen.includes(p.id)">Selected</strong></div>
+        <span class="personality-art"><EmIcon :name="p.type.includes('AGGRESS') ? 'battle' : p.type.includes('DEFEN') ? 'shield' : p.type.includes('CALM') ? 'feather' : 'ascended'" :size="38" /></span>
+        <div class="personality-name"><strong>{{ titleCase(p.type) }}</strong><EmTierBadge tier-id="common" :label="`Tier ${p.tier}`" class="badge" /><div class="category-tags"><span v-for="category in personalityInfo(p.type)?.categories" :key="category">{{ personalityCategory(category) }}</span><span v-if="personalityInfo(p.type)?.rules?.length">Conditional</span></div></div>
         <p class="personality-description">{{ personalityDescription(personalityInfo(p.type), p.tier) }}</p>
+        <EmSwitch :model-value="chosen.includes(p.id)" :label="chosen.includes(p.id) ? 'Selected' : 'Not selected'" :disabled="loading || (!chosen.includes(p.id) && full)" :aria-label="titleCase(p.type)" @update:model-value="toggle(p.id, $event)" />
       </li>
     </ul>
 
@@ -111,7 +110,7 @@ async function save(): Promise<void> {
 .preset-inspector { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--em-border); background: linear-gradient(135deg, var(--em-panel), var(--em-bg)); }
 .preset-inspector .heading { margin-bottom: 0; }
 .preset-inspector h5 { font-size: 11px; text-transform: uppercase; color: var(--em-muted); margin: 0; }
-.slots { display: flex; }
+.slots { display: flex; }.slots :deep(.tab.active){background:linear-gradient(#fac88a,#de9655);border:1px solid #f5b56f;color:#15222e;box-shadow:inset 0 1px #ffdeb0;}.preset-inspector :deep(.em-button.primary:not(:disabled)){background:linear-gradient(#fac88a,#de9655);border-color:#f5b56f;box-shadow:inset 0 1px #ffdeb0;}
 .slots :deep(.tab) { flex: 1; min-width: 0; padding-inline: 8px; }
 .count { font-size: 12px; color: var(--em-muted); margin: 0; }
 .choices { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
@@ -133,5 +132,10 @@ async function save(): Promise<void> {
 .unsaved { padding: 10px; border: 1px solid var(--em-accent); background: color-mix(in srgb, var(--em-accent) 12%, var(--em-bg)); font-size: 12px; color: var(--em-accent); margin: 0; }
 .unsaved small { display: block; margin-top: 4px; color: var(--em-muted); font-size: 11px; }
 .save { width: 100%; }
-@media (max-width: 1100px) { .preset-editor { grid-template-columns: minmax(0, 1fr); } }
+
+.preset-editor{grid-template-columns:minmax(0,1fr) 310px;gap:12px;}.personality-library{border:1px solid var(--em-border);padding:12px;background:linear-gradient(120deg,#102735,#091c29);}.heading{font-size:12px;}.choices li{display:grid;grid-template-columns:54px 115px minmax(0,1fr) 108px;gap:12px;align-items:center;padding:8px;background:linear-gradient(120deg,#173243,#0c2330);}.personality-art{width:52px;height:58px;display:grid;place-items:center;border:1px solid var(--em-border);background:#0b1c28;color:var(--em-accent);box-shadow:inset 0 0 0 3px #0004;}.personality-name{display:flex;flex-direction:column;gap:6px;font-size:12px;}.personality-description{margin:0;border-inline:1px solid var(--em-border);padding:5px 12px;line-height:1.6;font-size:11px;}.category-tags{font-size:9px;margin:0;gap:4px;}.badge{margin:0;}.choices :deep(.em-switch){font-size:10px;gap:6px;}.choices :deep(.track){width:24px;height:24px;padding:0;border-radius:var(--em-radius);}.choices :deep(.thumb){display:none;}.choices :deep(.input:checked + .track){background:linear-gradient(#fac488,#de9759);}.choices :deep(.input:checked + .track::after){content:'✓';color:#182633;font-size:19px;font-weight:900;margin:auto;}.choices :deep(.input:checked ~ .label){color:var(--em-accent);}.preset-inspector{background:linear-gradient(120deg,#102735,#091c29);border-radius:var(--em-radius);}.preset-inspector .hint{font-size:10px;}.selected-personalities li{background:#102735;}.unsaved{background:#6d293233;border-color:#a65c61;color:#f7846e;}.save{min-height:42px;}
+@media(max-width:1200px){.choices li{grid-template-columns:42px 95px minmax(0,1fr);gap:8px;}.personality-art{width:40px;}.choices :deep(.em-switch){grid-column:2 / -1;min-height:30px;}.personality-description{font-size:10px;padding-inline:8px;}}
+@media(max-width:950px){.preset-editor{grid-template-columns:minmax(0,1fr);}}
+@media(max-width:650px){.choices li{grid-template-columns:42px minmax(0,1fr);}.personality-description{grid-column:1 / -1;border:0;padding:0;font-size:12px;}.choices :deep(.em-switch){grid-column:1 / -1;}.personality-library{padding:10px;}}
+
 </style>

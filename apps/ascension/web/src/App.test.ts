@@ -50,7 +50,7 @@ afterEach(() => {
 async function mountView() {
   setActivePinia(createPinia());
   useSessionStore().status = "ready";
-  const wrapper = mount(AscensionView);
+  const wrapper = mount(AscensionView, { attachTo: document.body });
   await flushPromises();
   return wrapper;
 }
@@ -64,7 +64,7 @@ describe("AscensionView", () => {
     const wrapper = await mountView();
 
     expect(wrapper.find("[role=tab]").exists()).toBe(false);
-    expect(wrapper.findAll("nav .label").map((t) => t.text())).toEqual(["New game", "How to play", "Tavern Coming soon / Locked"]);
+    expect(wrapper.findAll("nav .label").map((t) => t.text())).toEqual(["New game", "How to play", "Tavern Hire Ascended · Coming soon"]);
 
     await wrapper.find("button.primary").trigger("click");
     expect(wrapper.find("button.start").text()).toBe("Start with Guardian");

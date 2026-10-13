@@ -60,23 +60,23 @@ function art(fighter: Fighter): string | null {
 </script>
 
 <template>
-  <section class="arena em-glow" :aria-label="`Round ${battle.round}`">
+  <section class="arena em-glow" :class="{ playing: playback.busy }" :aria-label="`Round ${battle.round}`">
     <p class="round-number em-pixel">Round {{ battle.round }}</p>
     <div class="fighters">
-      <template v-for="(side, i) in sides" :key="side.key">
-        <div v-if="i === 1" class="versus em-pixel" aria-hidden="true">VS</div>
+      <template v-for="side in sides" :key="side.key">
+
         <article class="fighter" :class="side.key" :aria-label="`${side.label}: ${side.fighter.name}`">
-          <div class="head">
+          <div class="head"><EmEmblem class="fighter-emblem" :tier-id="side.fighter.tier_id" :size="42" />
             <h3>{{ side.fighter.name }} <small class="em-num">Lv. {{ side.fighter.level }}</small></h3>
             <span class="badges">
               <TypeSymbol v-for="id in typesOf(side.fighter)" :key="id" :type-id="id" :size="28" />
               <EmTierBadge :tier-id="side.fighter.tier_id" />
             </span>
           </div>
-          <EmBar kind="hp" :value="hpOf(side.key, side.fighter)" :max="side.fighter.max_hp" :label="`${side.fighter.name} health`" />
-          <p class="hp em-num">HP {{ hpOf(side.key, side.fighter) }} / {{ side.fighter.max_hp }}</p>
+          <div class="health"><EmBar kind="hp" :value="hpOf(side.key, side.fighter)" :max="side.fighter.max_hp" :label="`${side.fighter.name} health`" />
+          <p class="hp em-num">HP {{ hpOf(side.key, side.fighter) }} / {{ side.fighter.max_hp }}</p></div>
           <div class="art">
-            <div class="sprite" :class="[playback.fx[side.key as 'player' | 'wild'] ? `fx-${playback.fx[side.key as 'player' | 'wild']}` : '']">
+            <div class="sprite" :class="[{ concealed: ['wobble', 'still', 'caught'].includes(playback.ball[side.key as 'player' | 'wild']?.phase ?? '') },playback.fx[side.key as 'player' | 'wild'] ? `fx-${playback.fx[side.key as 'player' | 'wild']}` : '']">
               <img v-if="art(side.fighter)" :src="art(side.fighter)!" alt="" draggable="false" @error="failedImages.push(art(side.fighter)!)" />
               <span v-else class="letter" aria-hidden="true">{{ side.fighter.name.slice(0, 1) }}</span>
             </div>
@@ -106,99 +106,7 @@ function art(fighter: Fighter): string | null {
 </template>
 
 <style scoped>
-.arena {
-  position: relative;
-  padding: var(--em-space-5);
-  border: 1px solid var(--em-border);
-  border-radius: var(--em-radius);
-  background:
-    radial-gradient(ellipse at 50% 90%, #36424b, transparent 70%),
-    linear-gradient(#152332, #101720);
-}
-.fighters {
-  display: grid;
-  grid-template-columns: 1fr 60px 1fr;
-  align-items: start;
-  gap: var(--em-space-5);
-}
-.head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--em-space-2);
-  margin-bottom: var(--em-space-2);
-}
-.badges {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.head h3 {
-  margin: 0;
-  font-size: 18px;
-}
-.head small {
-  font-size: 12px;
-  color: var(--em-muted);
-}
-.hp {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: var(--em-muted);
-}
-.art {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 230px;
-  margin-top: var(--em-space-3);
-}
-.sprite {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-}
-.art img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  mix-blend-mode: lighten;
-}
-.pic {
-  display: flex;
-  height: 100%;
-  max-width: 100%;
-}
-.wild .art img,
-.wild .pic {
-  transform: scaleX(-1);
-}
-.letter {
-  font-size: 80px;
-  font-weight: 600;
-  color: var(--em-accent);
-}
-.versus {
-  align-self: center;
-  text-align: center;
-  font-size: 24px;
-  color: var(--em-accent);
-}
-.stats {
-  margin: var(--em-space-2) 0 0;
-  font-size: 12px;
-  color: var(--em-muted);
-}
-.effects {
-  margin: 6px 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: 12px;
-  color: var(--em-muted);
-}
+.arena{position:relative;overflow:hidden;padding:20px 34px 10px;border:1px solid var(--em-divider);background:linear-gradient(#06121c22,#06121c11),var(--em-battle-scene,var(--em-forge-scene));background-position:center;background-size:cover;box-shadow:inset 0 0 0 3px #0a111b;min-height:390px}.round-number{position:absolute;top:18px;left:50%;transform:translateX(-50%);font-size:18px;text-shadow:0 2px #000}.fighters{display:grid;grid-template-columns:1fr 1fr;gap:22%;align-items:start}.fighter{min-width:0;position:relative}.head{display:flex;align-items:center;gap:10px;min-height:48px}.fighter-emblem{flex:none}.head h3{margin:0;font-size:16px}.head small{display:block;font-size:12px;color:var(--em-muted);margin-top:4px}.badges{display:flex;gap:5px;align-items:center}.badges :deep(.em-tier){font-size:10px}.wild .head{justify-content:flex-end;text-align:left}.health{position:relative;margin-top:6px}.health :deep(.em-bar.hp){height:21px;border:1px solid #a6bacb;border-radius:var(--em-radius);box-shadow:inset 0 0 0 2px #071019}.hp{position:absolute;inset:0;text-align:center;font-size:12px;line-height:21px;color:#fff;font-weight:700;text-shadow:0 1px 2px #000}.art{position:relative;display:flex;align-items:end;justify-content:center;height:250px;margin-top:12px}.sprite{display:flex;align-items:end;justify-content:center;width:100%;height:100%}.sprite.concealed{visibility:hidden}.art img{max-width:100%;max-height:100%;object-fit:contain;image-rendering:pixelated;mix-blend-mode:lighten}.wild .art img{transform:scaleX(-1)}.letter{font:80px var(--em-font-display);color:var(--em-accent)}.stats{font-size:11px;color:var(--em-muted);margin-top:8px;text-shadow:0 1px #000}.effects{position:absolute;top:80px;left:0;z-index:1;margin:0;padding:0;list-style:none;font-size:10px}.effects li{background:#081522dd;padding:3px 6px;margin-top:4px;border:1px solid var(--em-divider)}
 /* Battle playback: one class per effect, on the picture only. Player faces right, wild left. */
 .player .sprite {
   --dir: 1;
@@ -453,71 +361,7 @@ function art(fighter: Fighter): string | null {
     opacity: 0;
   }
 }
-@media (max-width: 700px) {
-  .arena {
-    padding: var(--em-space-3);
-  }
-  .fighters {
-    position: relative;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--em-space-2);
-  }
-  .versus {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    z-index: 1;
-    transform: translate(-50%, -50%);
-    font-size: 14px;
-    text-shadow: 0 2px 0 #000a;
-  }
-  .head {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    margin-bottom: 4px;
-  }
-  .head h3 {
-    max-width: 100%;
-    overflow: hidden;
-    font-size: 14px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .badges :deep(svg),
-  .badges :deep(img) {
-    max-width: 20px;
-    max-height: 20px;
-  }
-  .hp {
-    margin-top: 2px;
-    font-size: 11px;
-  }
-  .art {
-    height: 110px;
-    margin-top: var(--em-space-2);
-  }
-  .stats,
-  .effects {
-    font-size: 11px;
-  }
-}
 
-.arena { padding: 14px; overflow: hidden; background: linear-gradient(180deg, #09121cd9, #111c2866), var(--em-forge-scene, radial-gradient(ellipse at 50% 90%, #36424b, #101720)); background-position: center; background-size: cover; box-shadow: inset 0 0 0 3px #0a111b; }
-.round-number { position: static; margin: 0 0 12px; text-align: center; font-size: 13px; color: var(--em-text); }
-.fighters { grid-template-columns: minmax(0, 1fr) 35px minmax(0, 1fr); gap: 14px; }
-.fighter { min-width: 0; }
-.head { align-items: start; min-height: 44px; }
-.head h3 { font-size: 14px; }
-.head small { display: block; margin-top: 4px; }
-.badges { flex-wrap: wrap; justify-content: flex-end; }
-.badges :deep(.em-tier) { font-size: 10px; }
-.hp { color: var(--em-text); text-shadow: 0 1px #000; }
-.art { height: 240px; align-items: end; margin-top: 12px; }
-.art img { image-rendering: pixelated; }
-.stats, .effects { font-size: 11px; line-height: 1.5; }
-.effects li { background: #0a172acc; padding: 2px 6px; margin-top: 4px; border-left: 2px solid var(--em-accent); }
-.versus { font-size: 14px; opacity: .5; }
-@media (max-width: 700px) { .arena { padding: 10px; } .round-number { position: static; transform: none; text-align: center; margin-bottom: 12px; } .fighters { grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr); gap: 6px; } .versus { order: 0; margin: 0; font-size: 10px; } .wild { order: 0; } .head { flex-direction: column; gap: 4px; min-height: 66px; } .badges { justify-content: flex-start; } .head h3 { font-size: 12px; } .art { height: 160px; } .hp, .stats, .effects { font-size: 10px; } }
-
+@media(max-width:700px){.arena{padding:45px 10px 10px;min-height:315px}.round-number{top:12px;font-size:15px}.fighters{gap:8%}.head,.wild .head{flex-direction:column;align-items:flex-start;gap:4px;text-align:left;min-height:72px}.head h3{font-size:13px}.badges :deep(img){max-width:22px;max-height:22px}.health :deep(.em-bar.hp){height:19px}.hp{font-size:10px;line-height:19px}.art{height:160px}.stats{font-size:10px}.effects{top:110px;max-width:100%;font-size:9px}.ball{transform:scale(.8)}}
+.health :deep(.fill){background:linear-gradient(#7ab788,#3d8d55)}.wild .health :deep(.fill){background:linear-gradient(#db6576,#a12d40)}
 </style>

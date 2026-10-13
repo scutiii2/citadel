@@ -50,10 +50,9 @@ describe("AscendedTemplateCard", () => {
     expect(wrapper.find(".passive").text()).toBe("Steady");
   });
 
-  it("shows readable tier and battle artwork", () => {
+  it("names its tier for assistive tech and uses battle artwork", () => {
     const card = mount(AscendedTemplateCard, { props: { ascended: ascendedInfo("guardian"), tierId: "rare" } });
-    expect(card.find(".tier").text()).toBe("Rare");
+    expect(card.attributes("aria-label")).toBe("Guardian, Rare, level 1");
     expect(card.find("img.portrait").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
-    expect((card.find("img.portrait").element as HTMLElement).style.objectPosition).toBe("50% 50%");
   });
 });

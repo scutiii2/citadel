@@ -46,6 +46,7 @@ function categoryOf(action: LegalAction): string {
 }
 
 function choose(action: LegalAction): void {
+  if (locked.value || props.battle.mode !== "manual") return;
   if (action.kind === "catch") {
     catchOpen.value = true;
     return;
@@ -63,9 +64,9 @@ function throwEmblem(tier: string): void {
 
 <template>
   <EmPanel class="action-bar">
-    <div class="head">
+    <div class="head"><EmIcon name="battle" :size="32" />
       <h3>Your move</h3>
-      <small class="em-num">Round {{ battle.round }}</small>
+      <p class="move-hint">Choose an action for {{ battle.player.name }}.</p>
     </div>
 
     <p v-if="battle.mode === 'autonomous'" class="muted">Your Ascended chooses on its own, one round every {{ paceSeconds }} seconds.</p>
@@ -75,7 +76,7 @@ function throwEmblem(tier: string): void {
         :key="`${action.kind}:${action.ability_id ?? ''}`"
         type="button"
         class="action"
-        :class="categoryOf(action)"
+        :class="[categoryOf(action), { 'basic-attack': action.kind === 'attack' }]"
         :disabled="locked"
         @click="choose(action)"
       >
@@ -84,7 +85,7 @@ function throwEmblem(tier: string): void {
         <span class="action-detail">{{ detail(action) }}</span>
       </button>
       <button v-for="ability in coolingDown" :key="`cooldown:${ability.id}`" type="button" class="action" disabled>
-        <span class="action-name">{{ ability.name }}</span>
+        <EmIcon class="action-icon" name="clock" :size="30" /><span class="action-name">{{ ability.name }}</span>
         <span class="action-detail">Cooling down ({{ ability.cooldown }} {{ ability.cooldown === 1 ? "round" : "rounds" }})</span>
       </button>
     </div>
@@ -101,122 +102,6 @@ function throwEmblem(tier: string): void {
 </template>
 
 <style scoped>
-.head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--em-space-3);
-  margin-bottom: var(--em-space-4);
-}
-.head h3 {
-  margin: 0;
-  font-size: 18px;
-}
-.head small {
-  color: var(--em-muted);
-}
-.actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-.action {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-height: var(--em-target);
-  padding: 10px 6px;
-  border: 1px solid var(--em-border);
-  border-radius: var(--em-radius);
-  color: var(--em-text);
-  background: var(--em-raised);
-  font: inherit;
-  text-align: center;
-  cursor: pointer;
-  transition: background-color 120ms ease;
-}
-.action:hover:not(:disabled) {
-  background: #2f4153;
-}
-.action-name {
-  font-weight: 600;
-}
-.action-detail {
-  font-size: 12px;
-}
-.action.attack {
-  color: var(--em-cat-attack);
-  border-color: var(--em-cat-attack);
-}
-.action.defense {
-  color: var(--em-cat-defense);
-  border-color: var(--em-cat-defense);
-}
-.action.support {
-  color: var(--em-cat-support);
-  border-color: var(--em-cat-support);
-}
-.action.flee {
-  color: var(--em-cat-flee);
-  border-color: var(--em-cat-flee);
-}
-.action.intercept {
-  color: var(--em-cat-intercept);
-  border-color: var(--em-cat-intercept);
-}
-.action.catch {
-  color: var(--em-on-accent);
-  border-color: var(--em-accent);
-  background: var(--em-accent);
-  box-shadow: 0 3px 0 var(--em-accent-edge);
-}
-.action:disabled {
-  border-color: var(--em-disabled-border);
-  color: var(--em-disabled-text);
-  background: var(--em-disabled-surface);
-  box-shadow: none;
-  cursor: default;
-}
-.tiers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--em-space-3);
-}
-.none {
-  margin-bottom: var(--em-space-3);
-}
-@media (max-width: 700px) {
-  .actions {
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-  }
-  .head {
-    margin-bottom: var(--em-space-2);
-  }
-  .head h3 {
-    font-size: 14px;
-  }
-  .action {
-    padding: 6px 4px;
-  }
-  .action-detail {
-    font-size: 11px;
-  }
-}
-
-.action-icon { float: left; }
-.action-bar { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px; }
-.head { display: block; margin: 0; padding: 6px; }
-.head h3 { font-family: var(--em-font-display); text-transform: uppercase; color: var(--em-accent); font-size: 15px; margin-bottom: 6px; }
-.actions { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
-.action { min-height: 72px; padding: 10px; align-items: flex-start; text-align: left; background: linear-gradient(160deg, var(--em-raised), var(--em-header)); border-color: var(--em-divider); }
-.action-detail { font-size: 10px; line-height: 1.45; color: var(--em-muted); }
-.action.attack:not(:disabled) { color: var(--em-on-accent); background: linear-gradient(#f7c087, #d88c4d); border-color: var(--em-accent); }
-.action.attack:not(:disabled) .action-detail, .action.catch .action-detail { color: var(--em-on-accent); }
-.action.catch { background: linear-gradient(160deg, var(--em-raised), var(--em-header)); color: var(--em-text); box-shadow: none; }
-.action.catch .action-detail { color: var(--em-muted); }
-.action:focus-visible { outline: 2px solid var(--em-accent); outline-offset: 2px; }
-@media (max-width: 700px) { .action-bar { grid-template-columns: minmax(0, 1fr); gap: 8px; } .head { display: flex; margin: 0; } .head h3 { margin: 0; } .actions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-
+.action-bar{display:grid;grid-template-columns:210px minmax(0,1fr);gap:10px;align-items:stretch;padding:8px;border:1px solid var(--em-divider)}.head{display:grid;grid-template-columns:40px 1fr;align-content:center;gap:3px 8px}.head>svg{grid-row:1/3;color:var(--em-accent);align-self:center}.head h3{margin:0;font:17px var(--em-font-display);text-transform:uppercase;color:var(--em-accent)}.move-hint{font-size:11px;color:var(--em-muted)}.actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:6px}.action{display:grid;grid-template-columns:36px minmax(0,1fr);grid-template-rows:auto auto;gap:2px 8px;align-content:center;min-height:78px;padding:9px;border:1px solid var(--em-divider);border-radius:var(--em-radius);color:var(--em-text);background:linear-gradient(140deg,#192f40,#0c1c29);font:inherit;text-align:left;cursor:pointer}.action-icon{grid-row:1/3;align-self:center}.action-name{font-weight:700;font-size:13px}.action-detail{font-size:10px;line-height:1.45;color:var(--em-muted)}.action.basic-attack:not(:disabled){color:var(--em-on-accent);background:linear-gradient(#f7c087,#d98d4e);border-color:var(--em-accent)}.action.basic-attack:not(:disabled) .action-detail{color:var(--em-on-accent)}.action:disabled{opacity:.5;cursor:default}.action:hover:not(:disabled){filter:brightness(1.15)}.action:focus-visible{outline:2px solid var(--em-accent);outline-offset:2px}.tiers{display:flex;flex-wrap:wrap;gap:12px}.none{margin-bottom:12px}.muted{color:var(--em-muted)}
+@media(max-width:700px){.action-bar{grid-template-columns:1fr}.head{grid-template-columns:32px 1fr}.head h3{font-size:15px}.actions{grid-template-columns:repeat(2,minmax(0,1fr))}.action{grid-template-columns:26px minmax(0,1fr);gap:2px 5px;padding:7px}.action-name{font-size:12px}.action-icon{max-width:26px}}
 </style>

@@ -168,6 +168,13 @@ describe("EncounterPanel", () => {
     expect(store.encounter).toBeNull();
   });
 
+  it("cannot fight with an empty squad and explains how to add a fighter", () => {
+    const { wrapper } = mountPanel({ ...PROFILE, squad: [] }, ENCOUNTER);
+    expect(button(wrapper.findAll("button"), "Fight").attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).toContain("Your squad is empty. Add an Ascended in Collection to battle.");
+    expect(wrapper.find("form.start-form").exists()).toBe(false);
+  });
+
   it("cannot fight while every Ascended is fainted", () => {
     const { wrapper } = mountPanel(
       { ...PROFILE, ascendeds: [ownedAscended("guardian", { faint_until: Date.now() / 1000 + 600, fainted: true })] },

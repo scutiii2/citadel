@@ -13,8 +13,10 @@ import EmConfirm from "./ui/EmConfirm.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
+import EmQuantity from "./ui/EmQuantity.vue";
 
 const store = useAscensionStore();
+defineProps<{ controlsTarget?: HTMLElement | null }>();
 const basket = useShopBasketStore();
 const { mode, processing, message, interrupted } = storeToRefs(basket);
 const baskets = basket.baskets;
@@ -179,13 +181,14 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
 
 <template>
   <section class="shop" :aria-busy="processing">
+    <Teleport :to="controlsTarget ?? 'body'" :disabled="!controlsTarget">
     <div class="shop-toolbar">
       <div class="mode-tabs" role="group" aria-label="Shop mode">
         <button type="button" data-mode="buy" :aria-pressed="mode === 'buy'" :disabled="locked" @click="switchMode('buy')">Buy</button>
         <button type="button" data-mode="sell" :aria-pressed="mode === 'sell'" :disabled="locked" @click="switchMode('sell')">Sell</button>
       </div>
-      <p class="shop-caption">{{ mode === 'buy' ? 'Prepare for your next encounter.' : 'Trade spare copies for Insignia.' }}</p>
     </div>
+    </Teleport>
     <p v-if="message" class="notice" :class="{ interrupted }" role="status"><EmIcon :name="interrupted ? 'warning' : 'check'" />{{ message }}</p>
     <EmNotice v-if="store.error" tone="error">{{ store.error }}</EmNotice>
     <div class="trading-floor">
@@ -212,13 +215,15 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
               <div class="item-art"><img v-if="artOf(offer.ascended_id)" :src="artOf(offer.ascended_id)!" alt="" draggable="false" /><span v-else class="letter">{{ nameOf(offer.ascended_id).slice(0, 1) }}</span></div>
               <div class="item-info"><h4>{{ nameOf(offer.ascended_id) }}</h4><EmTierBadge :tier-id="offer.tier_id" /><p>{{ offer.copies_granted }} {{ offer.copies_granted === 1 ? 'copy' : 'copies' }} / pack</p><p class="stock">{{ offer.left <= 0 ? 'Sold out' : offer.left + ' left' }}</p><p class="item-price em-num"><EmIcon name="coin" />{{ money(offer.price) }} <small>/ pack</small></p></div>
               <EmIcon v-if="selected(offerKey(offer))" class="selection-check" name="check" />
-              <EmButton data-add :variant="selected(offerKey(offer)) ? 'primary' : 'secondary'" :disabled="locked || offerOff(offer) || !!selected(offerKey(offer))" @click="addOffer(offer)">{{ selected(offerKey(offer)) ? 'In basket' : fighting(offer.ascended_id) ? 'In active battle' : 'Add' }}</EmButton>
+              <EmQuantity v-if="selected(offerKey(offer))" :quantity="selected(offerKey(offer))!.quantity" :max="available(selected(offerKey(offer))!)" :name="selected(offerKey(offer))!.name" :disabled="locked || !!selected(offerKey(offer))!.requestKey" suffix="packs" @change="setQuantity(selected(offerKey(offer))!, $event)" />
+              <EmButton v-else data-add :variant="selected(offerKey(offer)) ? 'primary' : 'secondary'" :disabled="locked || offerOff(offer) || !!selected(offerKey(offer))" @click="addOffer(offer)">{{ selected(offerKey(offer)) ? 'In basket' : fighting(offer.ascended_id) ? 'In active battle' : 'Add' }}</EmButton>
             </article>
             <article v-for="t in visibleTiers" :key="t.id" class="item-card" :class="{ 'is-off': t.emblem_price > insignia, selected: selected('emblem:' + t.id) }" :data-tier="t.id" :style="{ '--tier': 'var(--em-tier-' + t.id + ')' }">
               <div class="item-art"><EmEmblem :tier-id="t.id" :size="84" /></div>
               <div class="item-info"><h4>{{ titleCase(t.id) }} EMBLEM</h4><EmTierBadge :tier-id="t.id" /><p>Owned {{ store.profile?.emblems[t.id] ?? 0 }}</p><p class="item-price em-num"><EmIcon name="coin" />{{ money(t.emblem_price) }} <small>each</small></p></div>
               <EmIcon v-if="selected('emblem:' + t.id)" class="selection-check" name="check" />
-              <EmButton data-add :variant="selected('emblem:' + t.id) ? 'primary' : 'secondary'" :disabled="locked || t.emblem_price > insignia || !!selected('emblem:' + t.id)" @click="add({ key: 'emblem:' + t.id, kind: 'emblem', id: t.id, name: titleCase(t.id) + ' EMBLEM', tierId: t.id, unitPrice: t.emblem_price, quantity: 1 })">{{ selected('emblem:' + t.id) ? 'In basket' : 'Add' }}</EmButton>
+              <EmQuantity v-if="selected('emblem:' + t.id)" :quantity="selected('emblem:' + t.id)!.quantity" :max="available(selected('emblem:' + t.id)!)" :name="selected('emblem:' + t.id)!.name" :disabled="locked || !!selected('emblem:' + t.id)!.requestKey"  @change="setQuantity(selected('emblem:' + t.id)!, $event)" />
+              <EmButton v-else data-add :variant="selected('emblem:' + t.id) ? 'primary' : 'secondary'" :disabled="locked || t.emblem_price > insignia || !!selected('emblem:' + t.id)" @click="add({ key: 'emblem:' + t.id, kind: 'emblem', id: t.id, name: titleCase(t.id) + ' EMBLEM', tierId: t.id, unitPrice: t.emblem_price, quantity: 1 })">{{ selected('emblem:' + t.id) ? 'In basket' : 'Add' }}</EmButton>
             </article>
           </template>
           <template v-else>
@@ -226,7 +231,8 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
               <div class="item-art"><img v-if="artOf(a.ascended_id)" :src="artOf(a.ascended_id)!" alt="" draggable="false" /><span v-else class="letter">{{ a.name.slice(0, 1) }}</span></div>
               <div class="item-info"><h4>{{ a.name }}</h4><EmTierBadge :tier-id="a.tier_id" /><p>{{ a.copies }} spare {{ a.copies === 1 ? 'copy' : 'copies' }}</p><p v-if="a.sale_value !== undefined" class="item-price em-num"><EmIcon name="coin" />{{ money(a.sale_value) }} <small>each</small></p><p v-else class="stock">Sale quote unavailable</p></div>
               <EmIcon v-if="selected('sale:' + a.ascended_id)" class="selection-check" name="check" />
-              <EmButton data-add :variant="selected('sale:' + a.ascended_id) ? 'primary' : 'secondary'" :disabled="locked || a.copies <= 0 || fighting(a.ascended_id) || a.sale_value === undefined || !!selected('sale:' + a.ascended_id)" @click="add({ key: 'sale:' + a.ascended_id, kind: 'sale', id: a.ascended_id, name: a.name, tierId: a.tier_id, unitPrice: a.sale_value!, quantity: 1 })">{{ selected('sale:' + a.ascended_id) ? 'In basket' : fighting(a.ascended_id) ? 'In active battle' : a.copies <= 0 ? 'No spare copies' : 'Add' }}</EmButton>
+              <EmQuantity v-if="selected('sale:' + a.ascended_id)" :quantity="selected('sale:' + a.ascended_id)!.quantity" :max="available(selected('sale:' + a.ascended_id)!)" :name="selected('sale:' + a.ascended_id)!.name" :disabled="locked || !!selected('sale:' + a.ascended_id)!.requestKey"  @change="setQuantity(selected('sale:' + a.ascended_id)!, $event)" />
+              <EmButton v-else data-add :variant="selected('sale:' + a.ascended_id) ? 'primary' : 'secondary'" :disabled="locked || a.copies <= 0 || fighting(a.ascended_id) || a.sale_value === undefined || !!selected('sale:' + a.ascended_id)" @click="add({ key: 'sale:' + a.ascended_id, kind: 'sale', id: a.ascended_id, name: a.name, tierId: a.tier_id, unitPrice: a.sale_value!, quantity: 1 })">{{ selected('sale:' + a.ascended_id) ? 'In basket' : fighting(a.ascended_id) ? 'In active battle' : a.copies <= 0 ? 'No spare copies' : 'Add' }}</EmButton>
             </article>
           </template>
         </div>
@@ -265,91 +271,71 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
 </template>
 
 <style scoped>
-.shop { min-width: 0; }
-.shop-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
-.mode-tabs { display: flex; min-width: 220px; border: 1px solid var(--em-divider); border-radius: var(--em-radius); overflow: hidden; }
-.mode-tabs button { flex: 1; min-height: 44px; border: 0; padding: 10px 24px; color: var(--em-muted); background: var(--em-panel); text-transform: uppercase; font: inherit; font-weight: 700; cursor: pointer; }
-.mode-tabs button[aria-pressed="true"] { color: var(--em-on-accent); background: var(--em-accent); }
-.shop-caption { color: var(--em-muted); font-size: 13px; }
-.notice { display: flex; align-items: center; gap: 10px; padding: 12px 16px; margin-bottom: 12px; border: 1px solid var(--em-success); background: var(--em-success-surface); color: var(--em-success); font-size: 13px; }
-.notice.interrupted { color: var(--em-warning); background: var(--em-warning-surface); border-color: var(--em-warning); }
-.trading-floor { display: grid; grid-template-columns: 172px minmax(0, 1fr) 290px; min-width: 0; border: 1px solid var(--em-divider); border-radius: var(--em-radius); background: var(--em-panel); box-shadow: var(--em-panel-shadow); }
-.category-rail { display: flex; flex-direction: column; gap: 8px; padding: 16px 12px; border-right: 1px solid var(--em-divider); }
-.category-rail > .em-eyebrow { padding: 0 8px 8px; }
-.category-rail > button, .rail-selected { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 44px; padding: 10px 8px; color: var(--em-text); background: transparent; border: 1px solid transparent; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
-.category-rail > button[aria-pressed="true"], .rail-selected { border-left: 3px solid var(--em-accent); background: var(--em-warning-surface); }
-.rail-field { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--em-divider); padding-top: 22px; margin-top: 12px; }
-select, .catalog-toolbar input { width: 100%; min-height: 44px; border: 1px solid var(--em-divider); border-radius: var(--em-radius); background: var(--em-bg); color: var(--em-text); padding: 10px 12px; font: inherit; font-size: 12px; }
-.hide-unavailable { display: flex; align-items: center; gap: 8px; font-size: 12px; min-height: 44px; }
-input[type="checkbox"] { accent-color: var(--em-accent); width: 18px; height: 18px; }
-.rail-note { margin-top: auto; padding-top: 28px; color: var(--em-muted); font-size: 11px; line-height: 1.7; }
-.rail-note > .em-icon { color: var(--em-accent); margin-bottom: 6px; }
-.shop-catalog { min-width: 0; padding: 14px; }
-.catalog-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
-.catalog-toolbar input { flex: 1; min-width: 80px; max-width: 360px; }
-.catalog-toolbar small { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--em-muted); }
-.item-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.item-card { position: relative; display: grid; grid-template-columns: 80px minmax(0, 1fr); align-content: start; gap: 8px; padding: 12px; border: 1px solid var(--em-divider); border-bottom: 3px solid var(--tier, var(--em-divider)); border-radius: var(--em-radius); background: linear-gradient(135deg, var(--em-raised), var(--em-panel)); min-width: 0; }
-.item-card.selected { outline: 2px solid var(--em-accent); outline-offset: -2px; }
-.item-card.is-off { background: var(--em-disabled-surface); }
-.item-card.is-off .item-art, .item-card.is-off .item-info { opacity: .55; }
-.item-art { display: flex; justify-content: center; align-items: center; min-height: 135px; background: radial-gradient(ellipse at 50% 90%, #f3b47a12, transparent 70%); }
-.item-art img { display: block; width: 100%; max-height: 140px; object-fit: contain; image-rendering: pixelated; }
-.item-art .em-emblem { width: min(100%, 84px); height: auto; }
-.item-info { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
-.item-info h4 { padding-right: 14px; font-size: 13px; overflow-wrap: anywhere; }
-.item-info p { font-size: 11px; color: var(--em-muted); }
-.item-info .stock { color: var(--tier); }
-.item-info .item-price { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; color: var(--em-text); font-size: 15px; font-weight: 700; margin-top: auto; }
-.item-price small { color: var(--em-muted); font-size: 10px; font-weight: 400; }
-.item-card > .em-button { grid-column: 1 / -1; width: 100%; min-height: 38px; padding: 7px; font-size: 12px; box-shadow: none; }
-.item-card > .em-button.primary:disabled { color: var(--em-on-accent); background: var(--em-accent); border-color: var(--em-accent); }
-.selection-check { position: absolute; top: 7px; right: 7px; padding: 2px; color: var(--em-on-accent); background: var(--em-accent); }
-.letter { font-family: var(--em-font-display); color: var(--em-accent); font-size: 32px; }
-.hint { display: flex; align-items: start; gap: 8px; color: var(--em-muted); font-size: 11px; line-height: 1.6; margin-top: 14px; }
-.empty { padding: 32px 12px; text-align: center; color: var(--em-muted); }
-.basket-panel { position: sticky; top: 0; align-self: start; display: flex; flex-direction: column; min-width: 0; height: min(680px, calc(100dvh - 300px)); min-height: 360px; padding: 16px; border-left: 1px solid var(--em-divider); background: #10172066; }
-.basket-head { display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--em-divider); }
-.basket-head > .em-icon { color: var(--em-accent); }
-.basket-head h3 { font-size: 13px; line-height: 1.6; }
-.basket-head p { color: var(--em-muted); font-size: 11px; }
-.basket-items { flex: 1; min-height: 0; overflow-y: auto; }
-.basket-empty { display: flex; flex-direction: column; gap: 12px; align-items: center; padding: 50px 0; color: var(--em-muted); font-size: 13px; text-align: center; }
-.basket-empty > .em-icon { color: var(--em-accent); opacity: .6; }
-.basket-empty small { font-size: 11px; }
-.basket-item { display: grid; grid-template-columns: 44px minmax(0, 1fr) 28px; gap: 10px 8px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--em-divider); }
-.basket-art { width: 44px; height: 52px; object-fit: contain; image-rendering: pixelated; }
-.basket-line { min-width: 0; }
-.basket-line strong { display: block; font-size: 12px; overflow-wrap: anywhere; }
-.basket-line small { display: block; color: var(--em-muted); font-size: 11px; margin-top: 4px; }
-.remove { display: flex; align-items: center; justify-content: center; align-self: start; width: 28px; height: 32px; border: 1px solid var(--em-divider); color: var(--em-muted); background: var(--em-panel); cursor: pointer; }
-.quantity-control { display: flex; grid-column: 1 / 3; max-width: 144px; }
-.quantity-control button, .quantity-control input { min-height: 38px; min-width: 0; border: 1px solid var(--em-divider); color: var(--em-text); background: var(--em-raised); font: inherit; }
-.quantity-control button { width: 38px; cursor: pointer; }
-.quantity-control input { width: 62px; padding: 3px; text-align: center; appearance: textfield; -moz-appearance: textfield; }
-.quantity-control input::-webkit-inner-spin-button { -webkit-appearance: none; }
-.quantity-control button:disabled { opacity: .45; cursor: default; }
-.line-total { grid-column: 3; justify-self: end; font-size: 13px; }
-.item-problem { grid-column: 1 / -1; font-size: 11px; color: var(--em-danger); }
-.basket-footer { padding-top: 24px; }
-.total, .balance-after { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.total { font-size: 15px; font-weight: 700; }
-.total strong { font-size: 19px; }
-.total small { font-size: 11px; }
-.balance-after { margin-top: 12px; color: var(--em-muted); font-size: 12px; }
-.basket-footer > .item-problem { margin-top: 12px; }
-.basket-footer > .em-button { width: 100%; margin-top: 20px; min-height: 48px; padding: 12px 8px; }
-@media (max-width: 1400px) { .item-card { grid-template-columns: minmax(0, 1fr); } .item-art { min-height: 90px; } .item-art img { height: 110px; } .item-info .item-price { margin-top: 8px; } }
-@media (max-width: 1050px) { .trading-floor { grid-template-columns: 142px minmax(0, 1fr) 255px; } .item-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .catalog-toolbar { flex-direction: column; align-items: start; } .catalog-toolbar input { max-width: none; } }
-@media (max-width: 760px) {
-  .shop-caption { display: none; } .trading-floor { grid-template-columns: minmax(0, 1fr); } .category-rail { flex-direction: row; flex-wrap: wrap; gap: 6px; padding: 10px; border-right: 0; border-bottom: 1px solid var(--em-divider); }
-  .category-rail > .em-eyebrow, .rail-note { display: none; } .category-rail > button, .rail-selected { width: auto; flex: 1; justify-content: center; padding: 8px; }
-  .rail-field { flex: 1; min-width: 120px; padding: 0; border: 0; margin: 0; } .rail-field > span { display: none; } .hide-unavailable { flex: 1; white-space: nowrap; }
-  .item-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .item-card { padding: 10px; } .basket-panel { border-left: 0; border-top: 1px solid var(--em-divider); }
-  .catalog-toolbar { flex-direction: row; align-items: center; gap: 8px; } .catalog-toolbar input { flex: 1; width: 50%; } .catalog-toolbar small { max-width: 120px; font-size: 10px; }
-  .basket-footer { position: sticky; bottom: 0; background: var(--em-panel); padding: 16px 0 4px; border-top: 1px solid var(--em-divider); z-index: 2; }
-  .basket-panel { position: static; height: auto; min-height: 0; } .basket-items { overflow: visible; }
-  .basket-empty { padding: 24px; } .basket-item { grid-template-columns: 44px minmax(0, 1fr) 32px; } .remove { min-height: 44px; width: 32px; } .item-card > .em-button { min-height: 44px; }
-  .quantity-control button, .quantity-control input { min-height: 44px; }
-}
+.shop { min-width:0; }
+.shop-toolbar { margin:0; display:flex; justify-content:center; }
+.mode-tabs { display:flex; width:220px; border:1px solid #435c70; border-radius:var(--em-radius); overflow:hidden; }
+.mode-tabs button { flex:1; min-height:38px; padding:6px 18px; font:inherit; font-size:12px; font-weight:700; text-transform:uppercase; color:var(--em-muted); background:linear-gradient(#223545,#152632); border:0; cursor:pointer; }
+.mode-tabs button[aria-pressed="true"] { color:var(--em-on-accent); background:linear-gradient(#fac892,#e9a363); }
+.notice { display:flex; align-items:center; gap:10px; padding:10px 14px; margin-bottom:8px; border:1px solid var(--em-success); color:var(--em-success); background:var(--em-success-surface); font-size:12px; }
+.notice.interrupted { color:var(--em-warning); border-color:var(--em-warning); background:var(--em-warning-surface); }
+.trading-floor { display:grid; grid-template-columns:210px minmax(0,1fr) 340px; min-height:440px; border:1px solid #405d72; border-radius:var(--em-radius); background:linear-gradient(110deg,#14232f,#142733 60%,#14212b); box-shadow:inset 0 0 0 2px #0b1b26; }
+.category-rail { display:flex; flex-direction:column; gap:8px; padding:10px; border-right:1px solid #3b5264; }
+.category-rail>.em-eyebrow { display:none; }
+.category-rail>button,.rail-selected { display:flex; align-items:center; gap:12px; width:100%; min-height:42px; padding:10px 12px; color:var(--em-text); background:transparent; border:0; font:inherit; font-size:13px; text-align:left; cursor:pointer; }
+.category-rail>button[aria-pressed="true"],.rail-selected { background:linear-gradient(90deg,#73594099,#3d3c3a99); border-left:4px solid var(--em-accent); border-radius:var(--em-radius); }
+.rail-field { display:flex; flex-direction:column; gap:12px; border-top:1px solid #3b5264; padding-top:28px; margin-top:24px; }
+select,.catalog-toolbar input { width:100%; min-height:36px; padding:8px 10px; border:1px solid #476278; border-radius:var(--em-radius); background:linear-gradient(#203342,#142634); color:var(--em-text); font:inherit; font-size:12px; }
+.hide-unavailable { display:flex; align-items:center; gap:10px; min-height:44px; font-size:12px; }
+input[type=checkbox] { width:18px; height:18px; accent-color:var(--em-accent); }
+.rail-note { display:none; }
+.shop-catalog { min-width:0; padding:8px; }
+.catalog-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+.catalog-toolbar input { flex:1; min-width:0; max-width:440px; }
+.catalog-toolbar small { display:flex; align-items:center; gap:8px; font-size:11px; white-space:nowrap; color:var(--em-muted); }
+.item-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.item-card { position:relative; display:grid; grid-template-columns:86px minmax(0,1fr); grid-template-rows:minmax(112px,auto) 32px; gap:4px 8px; min-width:0; padding:10px 8px 8px; border:1px solid #476075; border-bottom:3px solid var(--tier); border-radius:var(--em-radius); background:linear-gradient(140deg,#233747,#1c2f3e); }
+.item-card.selected { outline:2px solid var(--em-accent); outline-offset:-2px; }
+.item-card.is-off .item-art,.item-card.is-off .item-info { opacity:.5; }
+.item-card>.em-quantity,.item-card>.em-button { grid-column:1/-1; min-height:32px; width:100%; padding:4px; font-size:12px; box-shadow:none; }
+.item-art { display:flex; align-items:center; justify-content:center; min-width:0; }
+.item-art img { display:block; width:100%; max-height:112px; object-fit:contain; image-rendering:pixelated; }
+.item-art .em-emblem { width:80px; height:auto; }
+.item-info { display:flex; flex-direction:column; gap:5px; min-width:0; }
+.item-info h4 { padding-right:12px; font-size:12px; overflow-wrap:anywhere; }
+.item-info p { font-size:10px; color:var(--em-muted); }
+.item-info :deep(.em-tier) { padding:0; border:0; background:transparent; font-size:10px; }
+.item-info .stock { color:var(--tier); }
+.item-info .item-price { display:flex; align-items:center; flex-wrap:wrap; gap:4px; font-size:14px; font-weight:700; color:var(--em-text); margin-top:auto; }
+.item-price small { font-weight:400; font-size:10px; color:var(--em-muted); }
+.selection-check { position:absolute; top:6px; right:6px; padding:2px; color:var(--em-on-accent); background:var(--em-accent); border-radius:var(--em-radius); }
+.letter { font:32px var(--em-font-display); color:var(--em-accent); }
+.hint { display:flex; align-items:start; gap:6px; color:var(--em-muted); font-size:11px; line-height:1.5; margin-top:10px; }
+.empty { color:var(--em-muted); padding:28px; text-align:center; }
+.basket-panel { display:flex; flex-direction:column; min-width:0; padding:16px; border-left:1px solid #3b5264; background:#0c1b2666; }
+.basket-head { display:flex; align-items:center; gap:12px; padding-bottom:16px; border-bottom:1px solid #3b5264; }
+.basket-head>.em-icon { color:var(--em-accent); }
+.basket-head h3 { font-size:16px; font-weight:700; }
+.basket-head p { font-size:11px; color:var(--em-muted); margin-top:4px; }
+.basket-items { flex:1; min-height:0; }
+.basket-empty { display:flex; flex-direction:column; align-items:center; gap:12px; padding:44px 8px; color:var(--em-muted); text-align:center; font-size:12px; }
+.basket-empty>.em-icon { color:var(--em-accent); } .basket-empty small { font-size:11px; }
+.basket-item { display:grid; grid-template-columns:52px minmax(0,1fr) 28px; align-items:center; gap:8px; padding:16px 0; border-bottom:1px solid #3b5264; }
+.basket-art { width:52px; height:60px; object-fit:contain; image-rendering:pixelated; }
+.basket-line { min-width:0; } .basket-line strong { font-size:12px; display:block; } .basket-line small { display:block; font-size:11px; color:var(--em-muted); margin-top:6px; }
+.remove { display:flex; align-items:center; justify-content:center; width:28px; height:32px; padding:0; align-self:start; color:var(--em-muted); background:#1a2c3b; border:1px solid #3b5264; cursor:pointer; }
+.quantity-control { display:flex; grid-column:1/3; max-width:140px; }
+.quantity-control button,.quantity-control input { min-width:0; min-height:32px; padding:4px; border:1px solid #3b5264; background:#203545; color:var(--em-text); font:inherit; text-align:center; }
+.quantity-control button { width:32px; cursor:pointer; } .quantity-control input { width:60px; appearance:textfield; } .quantity-control input::-webkit-inner-spin-button { -webkit-appearance:none; }
+.quantity-control button:disabled { opacity:.4; cursor:default; }
+.line-total { grid-column:3; justify-self:end; font-size:13px; }
+.item-problem { grid-column:1/-1; color:var(--em-danger); font-size:11px; }
+.basket-footer { padding-top:24px; border-top:1px solid #3b5264; margin-top:18px; }
+.total,.balance-after { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.total { font-size:17px; font-weight:700; } .total strong { font-size:21px; } .total small { font-size:11px; }
+.balance-after { font-size:12px; color:var(--em-muted); margin-top:14px; } .balance-after strong { max-width:150px; text-align:right; }
+.basket-footer>.em-button { margin-top:20px; width:100%; min-height:48px; font-size:14px; }
+@media(max-width:1250px) { .trading-floor { grid-template-columns:170px minmax(0,1fr) 285px; } .item-card { grid-template-columns:64px minmax(0,1fr); } .item-art .em-emblem { width:64px; } .catalog-toolbar small { font-size:10px; } .basket-head h3 { font-size:13px; } }
+@media(max-width:1050px) { .trading-floor { grid-template-columns:150px minmax(0,1fr) 255px; } .item-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .catalog-toolbar { flex-wrap:wrap; gap:8px; } .catalog-toolbar input { flex-basis:100%; max-width:none; } .basket-head h3 { font-size:12px; } }
+@media(max-width:760px) { .trading-floor { grid-template-columns:minmax(0,1fr); } .category-rail { flex-direction:row; flex-wrap:wrap; padding:8px; border-right:0; border-bottom:1px solid #3b5264; } .category-rail>button,.rail-selected { flex:1; width:auto; justify-content:center; padding:8px; font-size:11px; } .rail-field { flex:1; min-width:120px; padding:0; margin:0; border:0; } .rail-field>span { display:none; } .hide-unavailable { flex:1; white-space:nowrap; } .item-card { grid-template-columns:64px minmax(0,1fr); padding:8px; } .item-grid { gap:6px; } .item-card>.em-quantity,.item-card>.em-button { min-height:44px; } .basket-panel { border-left:0; border-top:1px solid #3b5264; padding:14px; } .basket-footer { position:sticky; bottom:0; z-index:2; padding:16px 0 4px; background:var(--em-panel); } .quantity-control button,.quantity-control input,.remove { min-height:44px; } }
+@media(max-width:460px) { .item-card { grid-template-columns:minmax(0,1fr); grid-template-rows:96px auto 44px; } .item-art img { height:96px; } .item-art .em-emblem { width:72px; } .item-info h4 { font-size:12px; } .item-info .item-price { margin-top:4px; } }
 </style>

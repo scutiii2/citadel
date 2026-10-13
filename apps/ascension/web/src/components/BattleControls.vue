@@ -8,7 +8,7 @@ import EmConfirm from "./ui/EmConfirm.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmTabs, { type EmTabOption } from "./ui/EmTabs.vue";
 
-/** Above the arena: who plays (manual or autonomous, switched between rounds) and
+/** Above the round log: who plays (manual or autonomous, switched between rounds) and
  * Forfeit, which asks first. A battle started without an EMBLEM limit stays manual:
  * Ascension needs a limit for autonomous play. */
 const props = defineProps<{ battle: BattleView }>();

@@ -52,6 +52,7 @@ for (const width of [1440, 768, 375]) {
     await expect(dialog.locator(".origin-hub")).toContainText("Striker");
     await expect(dialog.locator('[data-node="striker_scorching_edge"] polygon')).toHaveCount(1);
     await expect(dialog.locator('[data-node="striker_passive"] circle.node-outline')).toHaveCount(1);
+    await dialog.getByRole("button", { name: "Fit tree", exact: true }).click();
     await dialog.locator('[data-node="striker_scorching_edge"]').click();
     await expect(dialog.locator(".node-detail")).toContainText("Flurry learned");
     await expect(dialog.locator(".node-detail")).toContainText("You have 12");
@@ -65,6 +66,7 @@ for (const width of [1440, 768, 375]) {
     expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
     if (width === 1440) await dialog.getByRole("button", { name: "Fit tree", exact: true }).click();
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath(`tree-${width}.png`) });
+    await dialog.getByRole("button", { name: "Fit tree", exact: true }).click();
     await dialog.locator('[data-node="striker_sunsteel_cleave"]').click();
     await expect(dialog.locator(".tree-line.shared-link.highlighted")).toHaveCount(6);
     await page.keyboard.press("Escape");

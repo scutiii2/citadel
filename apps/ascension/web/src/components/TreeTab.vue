@@ -16,8 +16,8 @@ const props = defineProps<{ ascended: OwnedAscended }>();
 const store = useAscensionStore();
 const client = useAscensionClient();
 
-const NODE_W = 156;
-const NODE_H = 116;
+const NODE_W = 216;
+const NODE_H = 108;
 const ICON_RADIUS = 30;
 const showNames = ref(true);
 
@@ -44,7 +44,28 @@ const equipSlots = computed(() => slotList.value.filter((slot) => slot.kind === 
 
 const selected = computed(() => tree.value?.nodes.find((n) => n.id === selectedId.value) ?? null);
 const byId = computed(() => new Map((tree.value?.nodes ?? []).map((n) => [n.id, n])));
-const layout = computed(() => layoutTree(tree.value?.nodes ?? []));
+const layout = computed(() => {
+  const nodes = tree.value?.nodes ?? [];
+  const radial = layoutTree(nodes);
+  if (!nodes.length) return radial;
+  if (nodes.length > 20) return { ...radial, positions: new Map([...radial.positions].map(([id, p]) => [id, { x: p.x * 1.5, y: p.y * 1.5 }])), center: { x: radial.center.x * 1.5, y: radial.center.y * 1.5 }, width: radial.width * 1.5, height: radial.height * 1.5 };
+  const depths = new Map<string, number>();
+  const visit = (id: string, seen = new Set<string>()): number => {
+    if (depths.has(id)) return depths.get(id)!;
+    if (seen.has(id)) return 0;
+    const node = nodes.find(n => n.id === id);
+    const next = new Set(seen).add(id);
+    const depth = node?.requires.length ? 1 + Math.max(...node.requires.map(parent => visit(parent, next))) : 0;
+    depths.set(id, depth); return depth;
+  };
+  nodes.forEach(n => visit(n.id));
+  const maxDepth = Math.max(...depths.values());
+  const rows = Array.from({ length: maxDepth + 1 }, (_, depth) => nodes.filter(n => depths.get(n.id) === depth));
+  const width = Math.max(720, Math.max(...rows.map(row => row.length)) * 236 + 40);
+  const positions = new Map<string, { x: number; y: number }>();
+  rows.forEach((row, depth) => row.forEach((node, index) => positions.set(node.id, { x: width / 2 + (index - (row.length - 1) / 2) * 236, y: 70 + (maxDepth - depth) * 146 })));
+  return { ...radial, positions, width, height: (maxDepth + 1) * 146 + 180, center: { x: width / 2, y: (maxDepth + 1) * 146 + 65 } };
+});
 const point = (id: string) => layout.value.positions.get(id) ?? layout.value.center;
 const width = computed(() => layout.value.width);
 const height = computed(() => layout.value.height);
@@ -90,7 +111,7 @@ function centre(value: number): void {
 function fit(): void {
   const el = scroll.value;
   if (!el?.clientWidth) return;
-  const value = Math.max(MIN_ZOOM, Math.min(1, el.clientWidth / width.value, el.clientHeight / height.value));
+  const value = Math.min(1, el.clientWidth / width.value, el.clientHeight / height.value);
   zoom.value = value;
   pan.value = { x: (el.clientWidth - width.value * value) / 2, y: (el.clientHeight - height.value * value) / 2 };
 }
@@ -125,7 +146,9 @@ const lines = computed(() => {
         const a = point(from.id), b = point(node.id);
         const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy) || 1;
         const cut = ICON_RADIUS + 4;
-        out.push({ key: `${required}>${node.id}`, path: `M ${a.x + dx / length * cut} ${a.y + dy / length * cut} L ${b.x - dx / length * cut} ${b.y - dy / length * cut}`, highlighted: highlighted.value.has(node.id) && highlighted.value.has(required), shared: layout.value.sharedIds.has(node.id), learned: from.state === 'learned' && node.state === 'learned' });
+        const elbow = (a.y - 32 + b.y + 76) / 2;
+        const path = (tree.value?.nodes.length ?? 0) <= 20 ? `M ${a.x} ${a.y - 32} L ${a.x} ${elbow} L ${b.x} ${elbow} L ${b.x} ${b.y + 76}` : `M ${a.x + dx / length * cut} ${a.y + dy / length * cut} L ${b.x - dx / length * cut} ${b.y - dy / length * cut}`;
+        out.push({ key: `${required}>${node.id}`, path, highlighted: highlighted.value.has(node.id) && highlighted.value.has(required), shared: layout.value.sharedIds.has(node.id), learned: from.state === 'learned' && node.state === 'learned' });
       }
     }
   }
@@ -134,7 +157,9 @@ const lines = computed(() => {
 const rootLines = computed(() => rootNodes.value.map(node => {
   const a = layout.value.center, b = point(node.id);
   const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy) || 1;
-  return { id: node.id, highlighted: highlighted.value.has(node.id), path: `M ${a.x + dx / length * 70} ${a.y + dy / length * 70} L ${b.x - dx / length * 34} ${b.y - dy / length * 34}` };
+  const elbow = (a.y - 60 + b.y + 76) / 2;
+  const path = (tree.value?.nodes.length ?? 0) <= 20 ? `M ${b.x} ${b.y + 76} L ${b.x} ${elbow} L ${a.x} ${elbow} L ${a.x} ${a.y - 60}` : `M ${a.x + dx / length * 70} ${a.y + dy / length * 70} L ${b.x - dx / length * 34} ${b.y - dy / length * 34}`;
+  return { id: node.id, highlighted: highlighted.value.has(node.id), path };
 }));
 
 async function load(): Promise<void> {
@@ -214,8 +239,8 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
     <template v-if="tree">
       <div class="tree-heading"><div><h3>Ability tree</h3><p class="muted em-num">{{ learned }} / {{ tree.nodes.length }} learned · {{ layout.branches.length }} paths from the Ascended</p></div></div>
       <p class="path-labels muted">Paths: {{ layout.branches.map(b => b.label).join(' · ') }}</p>
-      <div class="slots" aria-label="Equipped">
-        <button v-for="slot in slotList" :key="slot.id" type="button" class="slot" :disabled="!tree.loadout[slot.id]" @click="selectedId = tree.loadout[slot.id] ?? null"><small>{{ slot.id.toUpperCase() }}</small> {{ slotLabel(slot.id) }}<small v-if="slot.branches" class="branch-hint">{{ slot.branches.join(" / ") }}</small></button>
+      <h4 class="loadout-heading em-pixel">Equipped abilities</h4><div class="slots" aria-label="Equipped">
+        <button v-for="slot in slotList" :key="slot.id" type="button" class="slot" :disabled="!tree.loadout[slot.id]" @click="selectedId = tree.loadout[slot.id] ?? null"><small class="slot-number">{{ slot.id.toUpperCase() }}</small><EmIcon :name="byId.get(tree.loadout[slot.id] ?? '') ? nodeIcon(byId.get(tree.loadout[slot.id] ?? '')!) : 'ascended'" :size="28" /><span>{{ slotLabel(slot.id) }}</span><small v-if="slot.branches" class="branch-hint">{{ slot.branches.join(" / ") }}</small></button>
       </div>
       <div class="tree-layout">
       <div class="graph-area">
@@ -357,4 +382,15 @@ button.tree-node { position: absolute; display: flex; flex-direction: column; al
 .equip { display: flex; flex-direction: column; gap: var(--em-space-2); }
 .equip small { display: block; color: var(--em-muted); font-weight: 400; font-size: 11px; margin-left: var(--em-space-2); }
 @media (max-width: 1100px) { .tree-layout { grid-template-columns: minmax(0, 1fr); } .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.loadout-heading {font-size:12px;margin:0 0 8px;}
+.tree-heading h3 {font-size:14px;}.tree-heading{margin-bottom:8px;}.path-labels{margin:0 0 10px;}
+.tree-layout{grid-template-columns:minmax(0,1fr) 300px;gap:12px;}.scroll{height:385px;min-height:385px;max-height:480px;background:radial-gradient(ellipse at bottom,#143041,#081b28);}.tree-controls :deep(.em-button){min-height:30px;padding:4px 8px;font-size:11px;}
+.slots{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:12px;}
+button.slot{display:grid;grid-template-columns:30px 32px minmax(0,1fr);gap:8px;align-items:center;padding:6px;min-height:48px;background:linear-gradient(120deg,#173345,#0c2231);border:1px solid var(--em-border);}.slot .slot-number{display:grid;place-items:center;border:1px solid var(--em-border);height:30px;font-size:11px;}.slot .branch-hint{grid-column:3;}.slot>span{font-weight:700;}
+button.tree-node{display:grid;grid-template-columns:76px minmax(0,1fr);grid-template-rows:40px 28px 22px;align-items:center;text-align:left;padding:7px 10px;gap:0 10px;box-sizing:border-box;background:linear-gradient(120deg,#173446,#0c2231);box-shadow:inset 0 0 0 3px #0004;}
+.node-symbol{grid-row:1 / span 3;width:72px;height:78px;border:1px solid var(--em-border);background:linear-gradient(135deg,#25435c,#0c1f2b);box-shadow:inset 0 0 0 3px #0005;}.node-shape{inset:5px;width:62px;height:68px;}.tree-node strong{font-size:13px;}.tree-node small{font-size:11px;}.tree-node[data-state=locked]{opacity:.8;}.tree-node.selected{box-shadow:0 0 0 2px var(--em-accent),inset 0 0 0 3px #0004;}
+.orbit{display:none;}.node-detail{border-color:var(--em-border);padding:14px;}.node-detail h4{font-size:20px;}.hub-portrait{width:105px;height:92px;}.origin-hub{transform:translate(-50%,-55px);}.origin-hub small{font-size:12px;}.tree-line,.origin-line{stroke-width:3;}.legend{font-size:11px;}
+@media(max-width:1050px){.tree-layout{grid-template-columns:minmax(0,1fr);}.node-detail{display:flex;}.slots{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:650px){.scroll{height:350px;min-height:350px;}.tree-heading{gap:8px;}.tree-heading p{font-size:11px;}.path-labels{font-size:10px;}.tree-controls{gap:5px;}}
+
 </style>

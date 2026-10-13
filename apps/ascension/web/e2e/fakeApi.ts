@@ -93,6 +93,8 @@ export class FakeGameApi {
         return route.fulfill({ json: this.battle });
       }
       if (method === "GET" && /^\/ascension\/ascendeds\/[a-z0-9_-]+\/personalities$/.test(path)) return route.fulfill({ json: { items: [], next_cursor: null } });
+      const preset = /^\/ascension\/ascendeds\/([a-z0-9_-]+)\/presets\/(\d+)$/.exec(path);
+      if (method === "GET" && preset) return route.fulfill({ json: { ascended_id: preset[1], slot: Number(preset[2]), instance_ids: [] } });
       const sale = /^\/ascension\/ascendeds\/([a-z0-9_-]+)\/sales$/.exec(path);
       if (method === "POST" && sale && profile) {
         const member = profile.ascendeds.find(item => item.ascended_id === sale[1]);

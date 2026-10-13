@@ -238,3 +238,33 @@ describe("TreeTab", () => {
     expect(wrapper.find(".tree-tab .em-notice").text()).toContain("'g_b' cannot go in slot 'a1'");
   });
 });
+
+
+it.each([{ width: 330, height: 350 }, { width: 1000, height: 150 }])("fits both viewport dimensions ($width by $height)", async ({ width, height }) => {
+  const wrapper = await mountTab();
+  Object.defineProperties(wrapper.find(".scroll").element, {
+    clientWidth: { value: width }, clientHeight: { value: height },
+  });
+  await wrapper.find('button[aria-label="Fit tree"]').trigger("click");
+  const canvas = wrapper.find(".canvas").element as HTMLElement;
+  const scale = Number(canvas.style.transform.match(/scale\(([^)]+)\)/)![1]);
+  expect(parseFloat(canvas.style.width) * scale).toBeLessThanOrEqual(width);
+  expect(parseFloat(canvas.style.height) * scale).toBeLessThanOrEqual(height);
+});
+
+it("keeps the graph point beneath the cursor stable during wheel zoom", async () => {
+  const wrapper = await mountTab();
+  const viewport = wrapper.find(".scroll");
+  vi.spyOn(viewport.element, "getBoundingClientRect").mockReturnValue({ left: 30, top: 40 } as DOMRect);
+  const read = () => {
+    const transform = (wrapper.find(".canvas").element as HTMLElement).style.transform;
+    const values = transform.match(/translate\(([^p]+)px, ([^p]+)px\) scale\(([^)]+)\)/)!;
+    return { x: Number(values[1]), y: Number(values[2]), zoom: Number(values[3]) };
+  };
+  const before = read();
+  viewport.element.dispatchEvent(new WheelEvent("wheel", { deltaY: -100, clientX: 180, clientY: 130, bubbles: true }));
+  await flushPromises();
+  const after = read();
+  expect((150 - after.x) / after.zoom).toBeCloseTo((150 - before.x) / before.zoom);
+  expect((90 - after.y) / after.zoom).toBeCloseTo((90 - before.y) / before.zoom);
+});

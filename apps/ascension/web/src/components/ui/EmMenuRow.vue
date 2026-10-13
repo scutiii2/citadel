@@ -4,17 +4,18 @@ import type { IconName } from "./icons";
 
 /** A full-width menu row: icon, label and an arrow. `primary` is the copper one (one
  * per menu), `danger` the red one for a destructive action. */
-withDefaults(defineProps<{ icon: IconName; variant?: "primary" | "secondary" | "danger"; disabled?: boolean }>(), {
+withDefaults(defineProps<{ icon: IconName; variant?: "primary" | "secondary" | "danger"; disabled?: boolean; showArrow?: boolean }>(), {
   variant: "secondary",
   disabled: false,
+  showArrow: true,
 });
 </script>
 
 <template>
   <button type="button" class="em-row" :class="variant" :disabled="disabled">
-    <EmIcon :name="icon" :size="20" />
+    <slot name="icon"><EmIcon :name="icon" :size="20" /></slot>
     <span class="label"><slot /></span>
-    <EmIcon name="arrow" class="arrow" />
+    <slot name="trailing"><EmIcon v-if="showArrow" name="arrow" class="arrow" /></slot>
   </button>
 </template>
 
@@ -38,7 +39,7 @@ withDefaults(defineProps<{ icon: IconName; variant?: "primary" | "secondary" | "
   transition: filter 120ms ease;
 }
 .em-row:hover:not(:disabled) {
-  filter: brightness(1.25);
+  filter: brightness(1.12);
 }
 .label {
   flex: 1;
@@ -55,7 +56,7 @@ withDefaults(defineProps<{ icon: IconName; variant?: "primary" | "secondary" | "
   box-shadow: 0 3px 0 var(--em-accent-edge);
 }
 .primary:hover:not(:disabled) {
-  filter: brightness(1.08);
+  filter: brightness(1.12);
 }
 .danger {
   border-color: var(--em-danger);

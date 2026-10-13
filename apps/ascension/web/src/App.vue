@@ -19,7 +19,7 @@ import EmButton from "./components/ui/EmButton.vue";
 import EmIcon from "./components/ui/EmIcon.vue";
 import EmNotice from "./components/ui/EmNotice.vue";
 import EmPanel from "./components/ui/EmPanel.vue";
-import EmTabs, { type EmTabOption } from "./components/ui/EmTabs.vue";
+import EmTabs from "./components/ui/EmTabs.vue";
 import { useSessionStore } from "./stores/session";
 import { useAscensionStore } from "./stores/ascension";
 
@@ -33,6 +33,7 @@ const session = useSessionStore();
 const store = useAscensionStore();
 const playback = usePlaybackStore();
 const page = ref<HTMLElement | null>(null);
+const shopControls = ref<HTMLElement | null>(null);
 let observer: ResizeObserver | null = null;
 let stopMessages: (() => void) | null = null;
 function notifyContentSize(): void {
@@ -42,24 +43,17 @@ function notifyContentSize(): void {
     session.bridge?.notifyResize(mast.getBoundingClientRect().height + main.scrollHeight);
   }
 }
-/** Ascension is a PC game: a touch-first device (no hover, coarse pointer) gets a notice instead. */
-const touchOnly = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 const screen = ref<Screen>("menu");
+const touchOnly = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 const hasAccount = computed(() => session.status === "ready" && store.loaded && !store.unavailable && store.profile !== null);
-/** A battle being fought (or replayed): on a narrow screen only the battle shows, the masthead steps aside. */
+/** A battle being fought or replayed; its responsive layout keeps the Back header visible. */
 const fighting = computed(() => screen.value === "game" && tab.value === "battle" && !!store.battle && !(store.battle.result && !playback.busy));
 const tab = ref<Tab>("collection");
-const tabs: EmTabOption[] = [
-  { value: "battle", label: "Battle", icon: "play" },
-  { value: "collection", label: "Collection", icon: "book" },
-];
+const tabs = [{ value: "battle", label: "Battle", icon: "play" as const }, { value: "collection", label: "Collection", icon: "book" as const }];
+
 function play(target: PlayTarget): void {
   tab.value = target;
   screen.value = "game";
-}
-
-function selectTab(value: string): void {
-  tab.value = value as Tab;
 }
 
 // Newly found encounters enter planning; restored saves and battles start at the menu.
@@ -100,15 +94,14 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 
 <template>
   <section ref="page" class="em-root ascension-page" :class="{ fighting }">
-    <EmPanel v-if="touchOnly" class="state" role="alert">
-      <EmIcon name="warning" :size="40" />
-      <h2 class="em-pixel">Ascension is PC only</h2>
-      <p>Open this game on a computer with a mouse and keyboard.</p>
-    </EmPanel>
-    <EmShell v-else :destination="screen === 'menu' ? 'Main menu' : screen === 'starter' ? 'Starter selection' : tab === 'battle' ? 'Quick battle' : tab === 'collection' ? 'Collection' : 'Shop'" :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
+    <EmPanel v-if="touchOnly" class="state" role="alert"><EmIcon name="warning" :size="40" /><h2 class="em-pixel">Ascension is PC only</h2><p>Open this game on a computer with a mouse and keyboard.</p></EmPanel>
+    <EmShell v-else :destination="screen === 'menu' ? 'Main menu' : screen === 'starter' ? 'Choose your starter' : tab === 'collection' ? 'Your collection' : tab === 'shop' ? 'Forge Shop' : store.battle?.result ? 'Battle result' : store.battle ? 'Forge Arena' : 'Quick battle'" :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
       <template v-if="session.status === 'ready' && store.loaded && !store.unavailable && screen !== 'menu'" #navigation>
         <h1 class="screen-brand em-pixel"><button type="button" class="menu-link" aria-label="Main menu" title="Main menu" @click="screen = 'menu'">ASCENSION</button></h1>
-        <EmTabs v-if="screen === 'game'" :model-value="tab" :options="tabs" ariaLabel="Ascension sections" @update:model-value="selectTab" />
+        <EmTabs v-if="screen === 'game'" :model-value="tab" :options="tabs" ariaLabel="Ascension sections" @update:model-value="value => play(value as PlayTarget)" />
+      </template>
+      <template #tools>
+        <div v-if="screen === 'game' && tab === 'shop'" id="shop-mode-controls" ref="shopControls" class="header-controls" />
       </template>
       <EmPanel v-if="session.status !== 'ready'" class="state" :role="session.status === 'connecting' ? 'status' : 'alert'">
         <EmIcon name="flame" :size="40" />
@@ -141,7 +134,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
           <EmNotice v-if="store.error" tone="error" class="status">{{ store.error }}</EmNotice>
 
           <div v-if="tab === 'collection'" class="tab-body">
-            <CollectionPanel />
+            <CollectionPanel @navigate="play" />
           </div>
 
           <div v-else-if="tab === 'battle'" class="tab-body">
@@ -151,10 +144,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
                 <div class="battle-view">
                   <div class="battle-stage">
                     <BattleArena :battle="store.battle" />
-                    <div class="battle-side">
-                      <BattleControls :battle="store.battle" />
-                      <RoundLog :battle="store.battle" />
-                    </div>
+                    <div class="battle-side"><BattleControls :battle="store.battle" /><RoundLog :battle="store.battle" /></div>
                   </div>
                   <div class="battle-bottom"><ActionBar :battle="store.battle" /></div>
                 </div>
@@ -164,109 +154,25 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
             <EncounterPanel v-else />
           </div>
 
-          <ShopPanel v-else class="tab-body" />
+          <ShopPanel v-else class="tab-body" :controls-target="shopControls" />
         </template>
       </template>
     </EmShell>
   </section>
 </template>
 
-<style scoped>
-.ascension-page {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-}
-.menu-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: var(--em-target);
-  padding: 0 4px;
-  border: 0;
-  color: var(--em-accent);
-  background: none;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-.state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--em-space-3);
-  padding: 48px 24px;
-  text-align: center;
-}
-.state svg {
-  color: var(--em-accent);
-}
-.state h2 {
-  margin: 0;
-  font-size: 18px;
-  line-height: 1.4;
-}
-.state p {
-  max-width: 360px;
-  color: var(--em-muted);
-}
-.skeletons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 20px;
-  margin-top: var(--em-space-3);
-}
-.skeleton {
-  width: 140px;
-  aspect-ratio: 1060 / 1484;
-  border: 1px solid var(--em-border);
-  background: linear-gradient(var(--em-raised) 25%, #334756 25% 74%, var(--em-raised) 74%);
-}
-.status {
-  margin: var(--em-space-3) 0;
-}
-.tab-body {
-  min-width: 0;
-}
-@media (max-width: 700px) {
-  :deep(.navigation .tab) { min-width: var(--em-target); padding: 8px; gap: 0; font-size: 0; }
-  :deep(.navigation .tab:first-child) { gap: 4px; font-size: 12px; }
-  :deep(.navigation .em-tabs) { width: auto; }
-  .menu-link { padding: 0; }
-}
-.battle-bottom {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--em-space-5);
-  margin-top: var(--em-space-5);
-}
-@media (max-width: 700px) {
-  .battle-bottom {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--em-space-3);
-    margin-top: var(--em-space-3);
-  }
-  .fighting :deep(.main) { padding: var(--em-space-3) var(--em-space-3) var(--em-space-4); }
-}
-</style>
+
+
+
 
 <style scoped>
-.menu-link { font:inherit; color:inherit; text-shadow:inherit; letter-spacing:inherit; } .menu-link:hover { filter:brightness(1.2); } .menu-link:focus-visible { outline:2px solid var(--em-accent); outline-offset:4px; }
-.screen-brand { margin:0; flex:none; font-size:20px; color:var(--em-accent); text-shadow:0 2px 0 #84522d; }
-.battle-side { display:flex; flex-direction:column; min-width:0; }
-.battle-side > :last-child { flex:1; }
-.battle-stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:stretch; }
-@media(max-width:1100px) { .screen-brand { font-size:15px; } }
-/* Portrait: one column, the move buttons above the round log. */
-@media(max-width:900px) {
-  .battle-view { display:flex; flex-direction:column; gap:20px; }
-  .battle-stage, .battle-side { display:contents; }
-  .battle-side > :first-child { order:1; }
-  .battle-bottom { order:2; margin-top:0; }
-  .battle-side > :last-child { order:3; }
-}
-@media(max-width:700px) { .battle-view { gap:var(--em-space-3); } }
-@media(max-width:700px) { .screen-brand { font-size:12px; } }
+.ascension-page { flex:1; height:100%; min-height:0; box-sizing:border-box; padding:12px 16px; overflow:hidden; }
+.menu-link { display:flex; align-items:center; padding:0; border:0; color:inherit; background:transparent; font:inherit; cursor:pointer; }
+.back-arrow { transform:rotate(180deg); } .screen-brand { margin:0; flex:none; font-size:28px; font-weight:700; color:var(--em-accent); letter-spacing:.25px; }
+.subtle-settings { display:flex; align-items:center; justify-content:center; width:28px; height:32px; padding:0; border:0; color:var(--em-muted); background:transparent; cursor:pointer; }
+.battle-stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:6px; align-items:stretch; } .battle-bottom { margin-top:6px; } .status { margin-bottom:8px; } .state { max-width:680px; margin:48px auto; display:flex; flex-direction:column; align-items:center; gap:16px; padding:32px; text-align:center; } .state p { color:var(--em-muted); } .skeletons { display:flex; gap:12px; } .skeleton { width:100px; height:120px; background:var(--em-raised); } .settings-content { display:flex; flex-direction:column; gap:16px; }
+@media(max-width:1100px) { .screen-brand { font-size:22px; } }
+@media(max-width:900px) { .battle-view{display:flex;flex-direction:column;gap:6px}.battle-stage{display:contents}.battle-stage>.arena{order:1}.battle-bottom{order:2;margin-top:0}.battle-side{order:3} }
+@media(max-width:700px) { .ascension-page { padding:6px; } .screen-brand { font-size:16px; } }
+.battle-side{display:flex;flex-direction:column;gap:6px;min-width:0}.screen-brand{white-space:nowrap}.screen-brand + :deep(.em-tabs){padding:0;gap:0}.screen-brand + :deep(.tab){min-height:34px;font-size:12px;padding:7px 10px}@media(max-width:1100px){.screen-brand + :deep(.tab){padding:6px;font-size:11px}}
 </style>

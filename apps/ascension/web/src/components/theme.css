@@ -5,10 +5,16 @@
 .em-root {
   /* Palette (STYLE-SHEET section 1) */
   --em-forge-scene: url("../assets/scenes/forge-hall.png");
-  --em-bg: #071421;
-  --em-header: #0b1b29;
-  --em-panel: #102332;
-  --em-raised: #1b3346;
+  --em-menu-scene: url("../assets/scenes/menu-forge.png");
+  --em-card-scene: url("../assets/scenes/battle-stage.png");
+  --em-battle-scene: url("../assets/scenes/battle-stage.png");
+  --em-result-scene: url("../assets/scenes/result-stage.png");
+  --em-card-frame-steel: url("../assets/frames/portrait-steel.png");
+  --em-card-frame-copper: url("../assets/frames/portrait-copper.png");
+  --em-bg: #101720;
+  --em-header: #141e28;
+  --em-panel: #1b2733;
+  --em-raised: #253443;
   --em-text: #f5f0e6;
   --em-muted: #b8c6d2;
   --em-border: #6b7f90;
@@ -72,17 +78,6 @@
   box-sizing: border-box;
 }
 
-/* Nothing in the game is meant to be selected; text fields still are. */
-.em-root {
-  -webkit-user-select: none;
-  user-select: none;
-}
-.em-root input,
-.em-root textarea {
-  -webkit-user-select: text;
-  user-select: text;
-}
-
 .em-root h1,
 .em-root h2,
 .em-root h3,
@@ -132,8 +127,8 @@
     0 12px 24px #0009;
 }
 
-/* A preview card that answers the pointer: it rises and grows a little and gets a wide soft bloom
- * in its tier colour (--tier), with no ring. Put it on the AscendedPreviewCard itself. */
+/* Main UI interaction changes: inputs retain native text selection. */
+.em-root{-webkit-user-select:none;user-select:none}.em-root input,.em-root textarea{-webkit-user-select:text;user-select:text}
 .preview-lift {
   transition: transform 180ms ease-out, box-shadow 180ms ease-out;
 }
