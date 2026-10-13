@@ -9,7 +9,6 @@ import BattleControls from "./components/BattleControls.vue";
 import BattleResult from "./components/BattleResult.vue";
 import CollectionPanel from "./components/CollectionPanel.vue";
 import EmShell from "./components/EmShell.vue";
-import HowToPlayDialog from "./components/HowToPlayDialog.vue";
 import EmblemPrompt from "./components/EmblemPrompt.vue";
 import EncounterPanel from "./components/EncounterPanel.vue";
 import RoundLog from "./components/RoundLog.vue";
@@ -17,8 +16,6 @@ import MainMenu, { type PlayTarget } from "./components/MainMenu.vue";
 import ShopPanel from "./components/ShopPanel.vue";
 import StarterPick from "./components/StarterPick.vue";
 import EmButton from "./components/ui/EmButton.vue";
-import EmDialog from "./components/ui/EmDialog.vue";
-import EmConfirm from "./components/ui/EmConfirm.vue";
 import EmIcon from "./components/ui/EmIcon.vue";
 import EmNotice from "./components/ui/EmNotice.vue";
 import EmPanel from "./components/ui/EmPanel.vue";
@@ -46,11 +43,7 @@ function notifyContentSize(): void {
   }
 }
 const screen = ref<Screen>("menu");
-const showingHelp = ref(false);
-const showingSettings = ref(false);
-const confirmingReset = ref(false);
 const hasAccount = computed(() => session.status === "ready" && store.loaded && !store.unavailable && store.profile !== null);
-const inBattle = computed(() => store.profile?.active_battle != null || store.battle?.status === "active");
 /** A battle being fought (or replayed): on a narrow screen only the battle shows, the masthead steps aside. */
 const fighting = computed(() => screen.value === "game" && tab.value === "battle" && !!store.battle && !(store.battle.result && !playback.busy));
 const tab = ref<Tab>("collection");
@@ -67,14 +60,6 @@ function selectTab(value: string): void {
   tab.value = value as Tab;
 }
 
-async function reset(): Promise<void> {
-  if (inBattle.value || store.busy) return;
-  if (await store.resetProgress()) {
-    confirmingReset.value = false;
-    showingSettings.value = false;
-  }
-}
-
 // Newly found encounters enter planning; restored saves and battles start at the menu.
 watch(() => store.encounter?.id ?? null, (id, previous) => {
   if (id !== null && previous !== undefined) play("battle");
@@ -85,9 +70,6 @@ watch(
   (needs) => {
     if (needs) {
       screen.value = "menu";
-      showingHelp.value = false;
-      showingSettings.value = false;
-      confirmingReset.value = false;
     }
   },
 );
@@ -117,13 +99,8 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 <template>
   <section ref="page" class="em-root ascension-page" :class="{ fighting }">
     <EmShell :destination="screen === 'menu' ? 'Main menu' : screen === 'starter' ? 'Starter selection' : tab === 'battle' ? 'Quick battle' : tab === 'collection' ? 'Collection' : 'Shop'" :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
-      <template v-if="hasAccount" #actions>
-        <EmButton class="account-action" aria-label="How to play" title="How to play" @click="showingHelp = true"><EmIcon name="book" /><span class="action-label">How to play</span></EmButton>
-        <EmButton class="account-action" aria-label="Settings" title="Settings" @click="showingSettings = true"><EmIcon name="settings" /><span class="action-label">Settings</span></EmButton>
-      </template>
       <template v-if="session.status === 'ready' && store.loaded && !store.unavailable && screen !== 'menu'" #navigation>
-        <button type="button" class="menu-link" aria-label="Main menu" @click="screen = 'menu'"><EmIcon name="arrow" class="back-arrow" /></button>
-        <h1 class="screen-brand em-pixel">ASCENSION</h1>
+        <h1 class="screen-brand em-pixel"><button type="button" class="menu-link" aria-label="Main menu" title="Main menu" @click="screen = 'menu'">ASCENSION</button></h1>
         <EmTabs v-if="screen === 'game'" :model-value="tab" :options="tabs" ariaLabel="Ascension sections" @update:model-value="selectTab" />
       </template>
       <EmPanel v-if="session.status !== 'ready'" class="state" :role="session.status === 'connecting' ? 'status' : 'alert'">
@@ -182,19 +159,6 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
         </template>
       </template>
     </EmShell>
-    <HowToPlayDialog :open="hasAccount && showingHelp" @close="showingHelp = false" />
-    <EmDialog :open="hasAccount && showingSettings" title="Settings" @close="showingSettings = false">
-      <div class="settings-content">
-        <h3>Account progression</h3>
-        <p>Start again with a new starter Ascended.</p>
-        <EmButton variant="danger" :disabled="inBattle || store.busy" @click="confirmingReset = true"><EmIcon name="reset" /> Reset progress</EmButton>
-        <p v-if="inBattle">Finish or forfeit your battle to reset.</p>
-      </div>
-    </EmDialog>
-    <EmConfirm :open="hasAccount && confirmingReset" title="Reset all Ascension progress?" message="You will start again with a new starter Ascended." confirm-label="Reset progress" cancel-label="Keep my progress" danger require-text="RESET" :busy="store.busy || inBattle" @confirm="reset" @close="confirmingReset = false">
-      <EmNotice tone="error" class="reset-notice">This permanently removes your Ascended, Insignia, EMBLEMs and presets.</EmNotice>
-      <EmNotice v-if="store.error" tone="error" class="reset-notice">{{ store.error }}</EmNotice>
-    </EmConfirm>
   </section>
 </template>
 
@@ -217,9 +181,6 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-}
-.back-arrow {
-  transform: scaleX(-1);
 }
 .state {
   display: flex;
@@ -260,12 +221,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 .tab-body {
   min-width: 0;
 }
-.settings-content { display: flex; flex-direction: column; align-items: flex-start; gap: var(--em-space-4); }
-.settings-content p { color: var(--em-muted); }
-.reset-notice { margin-bottom: var(--em-space-4); }
 @media (max-width: 700px) {
-  .action-label { display: none; }
-  .account-action { min-width: var(--em-target); padding-inline: 12px; }
   :deep(.navigation .tab) { min-width: var(--em-target); padding: 8px; gap: 0; font-size: 0; }
   :deep(.navigation .tab:first-child) { gap: 4px; font-size: 12px; }
   :deep(.navigation .em-tabs) { width: auto; }
@@ -288,6 +244,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 </style>
 
 <style scoped>
+.menu-link { font:inherit; color:inherit; text-shadow:inherit; letter-spacing:inherit; } .menu-link:hover { filter:brightness(1.2); } .menu-link:focus-visible { outline:2px solid var(--em-accent); outline-offset:4px; }
 .screen-brand { margin:0; flex:none; font-size:20px; color:var(--em-accent); text-shadow:0 2px 0 #84522d; }
 .battle-side { display:flex; flex-direction:column; min-width:0; }
 .battle-side > :last-child { flex:1; }

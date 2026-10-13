@@ -96,18 +96,17 @@ describe("AscensionView", () => {
     wrapper.unmount();
   });
 
-  it("opens help and settings from the header and resets only after confirmation", async () => {
+  it("has no help or settings buttons in the header", async () => {
+    const wrapper = await mountView();
+    expect(wrapper.find(".account-actions [aria-label=\"How to play\"]").exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Settings"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("resets only after confirmation from the main menu", async () => {
     client.resetProfile.mockResolvedValue({ reset: true });
     const wrapper = await mountView();
-    await wrapper.find('.account-actions [aria-label="How to play"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.findAll('dialog[aria-label="Keep the fire going"]').find(d => d.attributes('open') !== undefined)!.attributes("open")).toBeDefined();
-    await wrapper.findAll('dialog[aria-label="Keep the fire going"]').find(d => d.attributes('open') !== undefined)!.find('button.close').trigger("click");
-    await wrapper.find('[aria-label="Settings"]').trigger("click");
-    await flushPromises();
-    const settings = wrapper.find('dialog[aria-label="Settings"]');
-    expect(settings.attributes("open")).toBeDefined();
-    await settings.find("button.danger").trigger("click");
+    await wrapper.find("nav button.danger").trigger("click");
     await flushPromises();
     const confirmation = wrapper.find('dialog[aria-label="Reset all Ascension progress?"]');
     expect((confirmation.find("button.confirm").element as HTMLButtonElement).disabled).toBe(true);
@@ -117,19 +116,6 @@ describe("AscensionView", () => {
     await flushPromises();
     expect(client.resetProfile).toHaveBeenCalledTimes(1);
     expect(wrapper.find(".hero").exists()).toBe(true);
-    expect(wrapper.find('button[aria-label="Settings"]').exists()).toBe(false);
-    wrapper.unmount();
-  });
-
-  it("prevents reset from settings while a battle is active", async () => {
-    client.profile.mockResolvedValue({ ...PROFILE, active_battle: "b1" });
-    client.battle.mockResolvedValue(battleView({ mode: "manual" }));
-    const wrapper = await mountView();
-    await wrapper.find('[aria-label="Settings"]').trigger("click");
-    await flushPromises();
-    const settings = wrapper.find('dialog[aria-label="Settings"]');
-    expect((settings.find("button.danger").element as HTMLButtonElement).disabled).toBe(true);
-    expect(settings.text()).toContain("Finish or forfeit your battle to reset");
     wrapper.unmount();
   });
 
