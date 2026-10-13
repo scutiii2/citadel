@@ -72,6 +72,17 @@
   box-sizing: border-box;
 }
 
+/* Nothing in the game is meant to be selected; text fields still are. */
+.em-root {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.em-root input,
+.em-root textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .em-root h1,
 .em-root h2,
 .em-root h3,
