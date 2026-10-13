@@ -20,7 +20,7 @@ beforeEach(() => {
 });
 
 describe("StarterPick", () => {
-  it("lists the starters as small cards and shows the first one in full", () => {
+  it("lists the starters as preview cards with stats and selects the first", () => {
     const wrapper = mount(StarterPick);
 
     const choices = wrapper.findAll("[role=radio]");
@@ -28,19 +28,20 @@ describe("StarterPick", () => {
     expect(choices.map((c) => c.attributes("aria-checked"))).toEqual(["true", "false"]);
     expect(choices[0]!.classes()).toContain("selected");
     expect(choices.every((c) => c.classes().includes("em-lift"))).toBe(true);
-    expect(wrapper.find(".detail .ascended-name").text()).toBe("Guardian");
-    expect(wrapper.find(".detail .passive").exists()).toBe(true);
-    expect(wrapper.find(".choice .passive").exists()).toBe(false);
+    expect(wrapper.findAll(".card .ascended-name").map((n) => n.text())).toEqual(["Guardian", "Striker"]);
+    expect(wrapper.find(".card .stats").exists()).toBe(true);
+    expect(wrapper.find(".card .stars").text()).toBe("★ 0");
+    expect(wrapper.find(".card .level").text()).toBe("Lv 1");
+    expect(wrapper.find(".starter-inspector").exists()).toBe(false);
     expect(wrapper.find("button.start").text()).toBe("Start with Guardian");
   });
 
-  it("picking a small card glows it, shows it in full, and starts with it", async () => {
+  it("picking a card selects it and starts with it", async () => {
     client.createProfile.mockResolvedValue(PROFILE);
     const wrapper = mount(StarterPick);
 
     await wrapper.findAll("[role=radio]")[1]!.trigger("click");
     expect(wrapper.findAll("[role=radio]").map((c) => c.classes().includes("selected"))).toEqual([false, true]);
-    expect(wrapper.find(".detail .ascended-name").text()).toBe("Striker");
     expect(client.createProfile).not.toHaveBeenCalled();
 
     await wrapper.find("button.start").trigger("click");
@@ -63,20 +64,15 @@ describe("StarterPick", () => {
     expect(client.createProfile).toHaveBeenCalledExactlyOnceWith("guardian");
   });
 
-  it("describes the chosen starter in the side panel and follows the pick", async () => {
+  it("has no side panel, only the start button for the chosen starter", async () => {
     const wrapper = mount(StarterPick);
 
-    expect(wrapper.find(".info .name").text()).toBe("Guardian");
-    expect(wrapper.find(".info .blurb").text()).toBe("A steady shield for the journey ahead.");
-    expect(wrapper.find(".info .facts").text()).toContain("100 HP · +5 / lvl");
-    expect(wrapper.find(".info .facts").text()).toContain("Abilities unlock at levels 1 and 5.");
-    expect(wrapper.find(".selected-label").exists()).toBe(false);
-    expect(wrapper.find(".choice.selected").classes()).toContain("em-glow");
-
+    expect(wrapper.find(".info").exists()).toBe(false);
+    expect(wrapper.find(".back-link").exists()).toBe(false);
+    expect(wrapper.find("button.start").text()).toBe("Start with Guardian");
     await wrapper.findAll("[role=radio]")[1]!.trigger("click");
-    expect(wrapper.find(".info .name").text()).toBe("Striker");
-    expect(wrapper.findAll(".choice.selected")).toHaveLength(1);
-    expect(wrapper.findAll(".em-glow")).toHaveLength(1);
+    expect(wrapper.find("button.start").text()).toBe("Start with Striker");
+    expect(wrapper.findAll("[role=radio].selected")).toHaveLength(1);
   });
 
   it("goes back to the menu", async () => {

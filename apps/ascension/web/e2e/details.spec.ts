@@ -38,7 +38,6 @@ for (const width of [1440, 768, 375]) {
     await page.goto("/#ticket=e2e-launch");
     await page.getByRole("button", { name: "Collection", exact: true }).click();
     await page.locator(".ascended-card").click();
-    await page.getByRole("button", { name: "Open details", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.locator(".copy-summary")).toContainText("4 spare copies");
     await expect(dialog.locator(".copy-summary")).toBeVisible();

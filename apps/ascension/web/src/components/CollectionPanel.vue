@@ -4,7 +4,7 @@ import { useAscensionClient, type OwnedAscended, type PersonalityItem } from "..
 import { useAscensionStore } from "../stores/ascension";
 import { errorMessage } from "../utils/errors";
 import { filterByType, groupByType, typeLabel, typesPresent } from "../utils/ascensionTypes";
-import { formatCountdown, titleCase, passiveText, abilityEffect } from "../utils/ascension";
+import { ascendedStats, formatCountdown, titleCase, passiveText, abilityEffect } from "../utils/ascension";
 import { spriteFor, spriteFocus } from "../utils/sprites";
 import { useNowSeconds } from "../composables/useNowSeconds";
 import TreeTab from "./TreeTab.vue";
@@ -21,8 +21,8 @@ import EmTierBadge from "./ui/EmTierBadge.vue";
 import EmTabs from "./ui/EmTabs.vue";
 import TypeSymbol from "./ui/TypeSymbol.vue";
 
-/** Collection filters, squad strip and selected Ascended inspector, with full
- * progression, personalities and ability-tree operations in the details dialog. */
+/** Collection filters, squad strip and collected cards; pressing a card opens its details
+ * dialog with full progression, personalities and ability-tree operations. */
 const store = useAscensionStore();
 const ascensionClient = useAscensionClient();
 const PAGE_SIZE = 50;
@@ -69,13 +69,8 @@ const openInfo = computed(() => store.catalog?.ascendeds.find((s) => s.id === op
 /** Seconds until a squad member is ready again; 0 when it is ready. */
 const faintOf = (m: OwnedAscended): number => (m.faint_until === null ? 0 : Math.max(0, m.faint_until - now.value));
 const faintLeft = computed(() => Math.max(0, (open.value?.faint_until ?? 0) - now.value));
-const stats = computed(() => {
-  const info = openInfo.value;
-  const owned = open.value;
-  if (!info || !owned) return [];
-  const multiplier = store.catalog?.tiers.find(t => t.id === owned.tier_id)?.stat_multiplier ?? 1;
-  return ["hp", "power", "speed"].map(key => ({ key, value: Math.max(1, Math.floor(((info.base[key] ?? 0) + (info.growth[key] ?? 0) * (owned.level - 1)) * multiplier + 1e-9)) }));
-});
+const statsOf = (m: OwnedAscended) => { const info = catalogById.value.get(m.ascended_id); return info ? ascendedStats(info, m.level, store.catalog?.tiers.find(t => t.id === m.tier_id)?.stat_multiplier ?? 1) : undefined; };
+const stats = computed(() => open.value ? statsOf(open.value) ?? [] : []);
 const personalities = ref<PersonalityItem[]>([]);
 const nextCursor = ref<number | null>(null);
 const loadingMore = ref(false);
@@ -178,6 +173,7 @@ function show(ascended: OwnedAscended): void {
   treeVisited.value = false;
   upgradeMessage.value = "";
   openId.value = ascended.ascended_id;
+  detailsOpen.value = true;
   personalities.value = [];
   nextCursor.value = null;
   void loadPersonalities(null);
@@ -230,11 +226,11 @@ function show(ascended: OwnedAscended): void {
           </span>
         </span></h3>
       <ul class="squad-strip">
-        <li v-for="(member, index) in squadSlots" :key="index" class="squad-slot" :class="{ 'squad-empty': !member, selected: member?.ascended_id === openId, 'drop-over': dragId !== null && overSlot === index }" @dragover="dragOverSlot($event, index)" @dragleave="overSlot = null" @drop.prevent="dropOnSlot(index)">
+        <li v-for="(member, index) in squadSlots" :key="index" class="squad-slot" :class="{ 'squad-empty': !member, 'drop-over': dragId !== null && overSlot === index }" @dragover="dragOverSlot($event, index)" @dragleave="overSlot = null" @drop.prevent="dropOnSlot(index)">
           <template v-if="member">
             <div
               v-if="store.catalog?.ascendeds.find(a => a.id === member.ascended_id)"
-              class="squad-card em-lift"
+              class="squad-card"
               :class="{ down: faintOf(member) > 0 }"
               :style="{ '--tier': `var(--em-tier-${member.tier_id}, var(--em-tier-common))` }"
               role="button"
@@ -247,7 +243,7 @@ function show(ascended: OwnedAscended): void {
               @keydown.enter.prevent="show(member)"
               @keydown.space.prevent="show(member)"
             >
-              <AscendedPreviewCard class="squad-face" :ascended="catalogById.get(member.ascended_id)!" :level="member.level" :tier-id="member.tier_id" :stars="member.stars" show-level />
+              <AscendedPreviewCard class="squad-face preview-lift" :ascended="catalogById.get(member.ascended_id)!" :level="member.level" :tier-id="member.tier_id" :stars="member.stars" :stats="statsOf(member)" show-level />
               <span v-if="faintOf(member) > 0" class="squad-fainted"><EmIcon name="clock" :size="14" /> Fainted · <strong class="em-num">{{ formatCountdown(faintOf(member)) }}</strong></span>
             </div>
           </template>
@@ -287,29 +283,13 @@ function show(ascended: OwnedAscended): void {
         <small>{{ notOwned.length }} still to find</small>
       </div>
       <ul class="grid missing">
-        <li v-for="ascended in notOwned" :key="ascended.id" class="missing-ascended em-lift" :style="{ '--tier': 'var(--em-border)' }">
-          <AscendedPreviewCard class="back" :ascended="ascended" :tier-id="ascended.start_tier" flipped />
-          <h4 class="missing-name">{{ ascended.name }}</h4>
-          <p class="hint">{{ ascended.forbidden ? "Only by capture" : "Catch one, or buy copies in the shop" }}</p>
+        <li v-for="ascended in notOwned" :key="ascended.id" class="missing-ascended">
+          <AscendedPreviewCard class="back preview-lift" :ascended="ascended" :tier-id="ascended.start_tier" flipped />
         </li>
       </ul>
     </template>
 
     </main>
-    <aside class="collection-inspector" aria-label="Selected Ascended">
-      <template v-if="open">
-        <small class="em-eyebrow">Selected Ascended</small>
-        <img v-if="openInfo && spriteFor(openInfo.art, 'battle')" class="inspector-portrait" :src="spriteFor(openInfo.art, 'battle')!" :alt="open.name" />
-        <div class="inspector-title"><h3>{{ open.name }}</h3><EmTierBadge :tier-id="open.tier_id" /><span class="em-num">Lv. {{ open.level }}</span></div>
-        <dl class="current-stats"><div v-for="stat in stats" :key="stat.key"><dt>{{ stat.key === 'hp' ? 'HP' : titleCase(stat.key) }}</dt><dd class="em-num">{{ stat.value }}</dd></div></dl>
-        <p class="inspector-copies em-num">{{ open.copies }} spare {{ open.copies === 1 ? 'copy' : 'copies' }}</p>
-        <p class="battle-status" :class="{ fainted: faintLeft > 0 }">{{ faintLeft > 0 ? 'Resting · ' + formatCountdown(faintLeft) : 'Ready for battle' }}</p>
-        <EmButton class="open-details" variant="primary" @click="detailsOpen = true">Open details</EmButton>
-        <EmButton :disabled="!!squadReason || store.busy" @click="toggleSquad">{{ store.squadIds.includes(open.ascended_id) ? 'Remove from squad' : 'Add to squad' }}</EmButton>
-        <p v-if="squadReason" class="muted inspector-reason">{{ squadReason }}</p>
-      </template>
-      <template v-else><div class="inspector-empty">◇</div><h3>Your Ascended</h3><p class="muted">Select a squad member or a collected card to see its stats and progression.</p></template>
-    </aside>
     <EmDialog class="ascended-details" :open="detailsOpen && open !== null" :title="open?.name ?? 'Ascended details'" wide @close="detailsOpen = false">
       <div v-if="open && detailsOpen" class="details" :class="{ 'tree-expanded': detailTab !== 'overview' }">
         <aside class="summary">
@@ -333,7 +313,7 @@ function show(ascended: OwnedAscended): void {
           <EmTabs v-model="detailTab" :options="detailTabs" ariaLabel="Ascended detail sections" @update:model-value="value => { if (value === 'tree') treeVisited = true; }" />
           <section v-if="detailTab === 'overview'" class="overview" role="tabpanel" aria-label="Overview">
             <div class="stats-panel"><h4 class="em-pixel">Stats & experience</h4>
-              <dl class="current-stats" aria-label="Current stats"><div v-for="stat in stats" :key="stat.key"><dt>{{ stat.key === 'hp' ? 'HP' : titleCase(stat.key) }}</dt><dd class="em-num">{{ stat.value }}</dd></div></dl>
+              <dl class="current-stats" aria-label="Current stats"><div v-for="stat in stats" :key="stat.key"><dt>{{ stat.label }}</dt><dd class="em-num">{{ stat.value }}</dd></div></dl>
           <div class="xp">
             <template v-if="open.xp_needed !== null">
               <EmBar :value="open.xp" :max="open.xp_needed" :label="`${open.name} XP`" />
@@ -387,8 +367,8 @@ function show(ascended: OwnedAscended): void {
 </template>
 
 <style scoped>
-.collection { display: grid; grid-template-columns: 184px minmax(0, 1fr) 276px; gap: 18px; align-items: start; }
-.filter-rail, .collection-inspector, .summary, .progression-panel, .stats-panel, .overview-effects { border: 1px solid var(--em-border); background: linear-gradient(135deg, var(--em-panel), var(--em-bg)); box-shadow: inset 0 0 0 3px rgb(255 255 255 / 2%); }
+.collection { display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 18px; align-items: start; }
+.filter-rail, .summary, .progression-panel, .stats-panel, .overview-effects { border: 1px solid var(--em-border); background: linear-gradient(135deg, var(--em-panel), var(--em-bg)); box-shadow: inset 0 0 0 3px rgb(255 255 255 / 2%); }
 .filter-rail { padding: 16px 12px; display: flex; flex-direction: column; gap: 18px; position: sticky; top: 18px; }
 .filter-rail h3 { font-size: 14px; margin: 0; }
 .filter-label { display: flex; flex-direction: column; gap: 8px; color: var(--em-muted); font-size: 12px; }
@@ -405,7 +385,6 @@ function show(ascended: OwnedAscended): void {
 h3 small { color: var(--em-muted); font-size: 12px; margin-left: 12px; }
 .squad-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; padding: 0; margin: 0; list-style: none; }
 .squad-slot { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.squad-slot.selected { outline: 2px solid var(--em-accent); outline-offset: 2px; }
 .squad-card { cursor: pointer; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .squad-face { --card-width: 100%; }
 .squad-card.down .squad-face { filter: grayscale(1); opacity: 0.72; }
@@ -427,18 +406,8 @@ h3 small { color: var(--em-muted); font-size: 12px; margin-left: 12px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
 .owned-entry { min-width: 0; }
 .empty { color: var(--em-muted); font-size: 13px; padding-block: 12px; }
-.missing-ascended { min-width: 0; display: flex; flex-direction: column; gap: 5px; padding: 6px; border: 1px dashed var(--em-border); background: var(--em-bg); }
+.missing-ascended { min-width: 0; }
 .back { --card-width: 100%; opacity: .6; }
-.missing-name { margin: 0; font-size: 13px; }
-.hint { color: var(--em-muted); font-size: 11px; margin: 0; }
-.collection-inspector { min-width: 0; padding: 16px; position: sticky; top: 18px; display: flex; flex-direction: column; gap: 12px; }
-.inspector-portrait { width: 100%; height: 230px; object-fit: contain; image-rendering: pixelated; background: #060d15; border: 1px solid var(--em-border); }
-.inspector-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.inspector-title h3 { flex-basis: 100%; margin: 0; font-size: 20px; }
-.inspector-title > span { color: var(--em-muted); font-size: 13px; }
-.inspector-copies { border-bottom: 1px solid var(--em-divider); padding-bottom: 12px; font-size: 13px; margin: 0; }
-.inspector-empty { height: 180px; display: grid; place-items: center; color: var(--em-border); font-size: 96px; }
-.inspector-reason { font-size: 12px; text-align: center; }
 .essences { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; padding: 0; list-style: none; }
 .essences li { display: flex; gap: 6px; align-items: center; font-size: 12px; }
 .group { margin-bottom: 18px; }
@@ -493,7 +462,7 @@ h3 small { color: var(--em-muted); font-size: 12px; margin-left: 12px; }
 .people-head small { color: var(--em-muted); font-size: 12px; }
 .more { min-height: 44px; color: var(--em-accent); background: transparent; border: 0; font: inherit; cursor: pointer; }
 button:focus-visible, input:focus-visible, select:focus-visible, .squad-card:focus-visible { outline: 2px solid var(--em-accent); outline-offset: 3px; }
-@media (max-width: 1180px) { .collection { grid-template-columns: 160px minmax(0, 1fr) 230px; gap: 12px; } .details { grid-template-columns: 180px minmax(0, 1fr); } .progression-panel { grid-column: 2; } .inspector-portrait { height: 190px; } }
-@media (max-width: 900px) { .details { height: auto; } .details.tree-expanded .side { grid-column: 1; } .details > * { overflow-y: visible; } .collection { grid-template-columns: 150px minmax(0, 1fr); } .collection-inspector { position: static; grid-column: 2; display: grid; grid-template-columns: 120px minmax(0, 1fr); } .inspector-portrait { grid-column: 1; grid-row: 2 / span 3; height: 140px; } .collection-inspector .current-stats { grid-column: 2; } .collection-inspector .open-details, .collection-inspector > .em-btn { grid-column: 1 / -1; } .details.tree-expanded { grid-template-columns: minmax(0, 1fr); } .tree-expanded .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); align-items: start; } .tree-expanded .summary .detail-portrait { grid-row: 1 / span 4; height: 150px; } .tree-expanded .summary .battle-status, .tree-expanded .summary .squad-control { grid-column: 1 / -1; } }
-@media (max-width: 600px) { .collection { grid-template-columns: minmax(0, 1fr); } .filter-rail { position: static; gap: 12px; } .chips { flex-direction: row; flex-wrap: wrap; } .filters { gap: 12px; } .collection-inspector { grid-column: 1; } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-empty { min-height: 90px; } .details { grid-template-columns: minmax(0, 1fr); } .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); } .summary .detail-portrait { grid-row: span 4; height: 150px; } .summary .battle-status { grid-column: 1 / -1; } .progression-panel { grid-column: 1; } .collection :deep(.em-dialog.ascended-details) { padding: 14px; } }
+@media (max-width: 1180px) { .collection { grid-template-columns: 160px minmax(0, 1fr); gap: 12px; } .details { grid-template-columns: 180px minmax(0, 1fr); } .progression-panel { grid-column: 2; } }
+@media (max-width: 900px) { .details { height: auto; } .details.tree-expanded .side { grid-column: 1; } .details > * { overflow-y: visible; } .collection { grid-template-columns: 150px minmax(0, 1fr); } .details.tree-expanded { grid-template-columns: minmax(0, 1fr); } .tree-expanded .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); align-items: start; } .tree-expanded .summary .detail-portrait { grid-row: 1 / span 4; height: 150px; } .tree-expanded .summary .battle-status, .tree-expanded .summary .squad-control { grid-column: 1 / -1; } }
+@media (max-width: 600px) { .collection { grid-template-columns: minmax(0, 1fr); } .filter-rail { position: static; gap: 12px; } .chips { flex-direction: row; flex-wrap: wrap; } .filters { gap: 12px; } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-empty { min-height: 90px; } .details { grid-template-columns: minmax(0, 1fr); } .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); } .summary .detail-portrait { grid-row: span 4; height: 150px; } .summary .battle-status { grid-column: 1 / -1; } .progression-panel { grid-column: 1; } .collection :deep(.em-dialog.ascended-details) { padding: 14px; } }
 </style>

@@ -131,3 +131,18 @@
     0 0 28px 4px color-mix(in srgb, var(--tier, var(--em-accent)) 40%, transparent),
     0 12px 24px #0009;
 }
+
+/* A preview card that answers the pointer: it rises and grows a little and gets a wide soft bloom
+ * in its tier colour (--tier), with no ring. Put it on the AscendedPreviewCard itself. */
+.preview-lift {
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out;
+}
+.preview-lift:hover {
+  transform: translateY(-4px) scale(1.03);
+  box-shadow:
+    inset 0 0 0 2px #091421,
+    inset 0 0 0 3px color-mix(in srgb, var(--tier, var(--em-accent)) 55%, transparent),
+    0 5px 0 #040c13,
+    0 0 28px 4px color-mix(in srgb, var(--tier, var(--em-accent)) 40%, transparent),
+    0 12px 24px #0009;
+}

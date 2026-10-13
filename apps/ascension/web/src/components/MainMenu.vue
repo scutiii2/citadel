@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useAscensionStore } from "../stores/ascension";
+import { ascendedStats } from "../utils/ascension";
 import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 import HowToPlayDialog from "./HowToPlayDialog.vue";
 import EmConfirm from "./ui/EmConfirm.vue";
@@ -33,15 +34,16 @@ const hand = computed(() => {
           info: catalog.find((c) => c.id === s.ascended_id),
           level: s.level,
           tierId: s.tier_id,
+          stars: s.stars,
         }))
       : catalog
           .filter((c) => c.starter)
           .slice(0, HAND_SIZE)
-          .map((c) => ({ id: c.id, info: c, level: 1, tierId: "common" }));
+          .map((c) => ({ id: c.id, info: c, level: 1, tierId: c.start_tier, stars: 0 }));
   return entries.flatMap((e, i) => {
     if (e.info === undefined) return [];
     const offset = i - (entries.length - 1) / 2;
-    return [{ ...e, info: e.info, rot: `${offset * 11}deg`, lift: `${-25 + Math.abs(offset) * 25}px`, z: 10 - Math.round(Math.abs(offset) * 4) }];
+    return [{ ...e, info: e.info, stats: ascendedStats(e.info, e.level, store.catalog?.tiers.find((t) => t.id === e.tierId)?.stat_multiplier ?? 1), rot: `${offset * 11}deg`, lift: `${-25 + Math.abs(offset) * 25}px`, z: 10 - Math.round(Math.abs(offset) * 4) }];
   });
 });
 const handCaption = computed(() => (hasSave.value ? "Your first Ascended" : hand.value.map((h) => h.info.name).join(" · ")));
@@ -81,7 +83,7 @@ async function reset(): Promise<void> {
     <div class="hand-wrap">
       <ul class="hand" :aria-label="hasSave ? 'Your first Ascended' : 'Starter Ascended'">
         <li v-for="ascended in hand" :key="ascended.id" class="ascended" :style="{ '--rot': ascended.rot, '--lift': ascended.lift, zIndex: ascended.z }">
-          <AscendedPreviewCard :ascended="ascended.info" :level="ascended.level" :tier-id="ascended.tierId" :show-level="hasSave" />
+          <AscendedPreviewCard :ascended="ascended.info" :level="ascended.level" :tier-id="ascended.tierId" :stars="ascended.stars" :stats="ascended.stats" show-level />
         </li>
       </ul>
       <p class="hand-caption">{{ handCaption }}</p>

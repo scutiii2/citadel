@@ -44,13 +44,12 @@ function button(buttons: DOMWrapper<HTMLButtonElement>[], text: string | RegExp)
 }
 
 describe("EncounterPanel", () => {
-  it("uses battle art in the fighter selection without portrait fallbacks", async () => {
+  it("shows the squad as preview cards with stats, using battle art", async () => {
     const { wrapper } = mountPanel(PROFILE, ENCOUNTER);
     await button(wrapper.findAll("button"), "Fight").trigger("click");
-    expect(wrapper.find("img.squad-art").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
-    await wrapper.find("img.squad-art").trigger("error");
-    expect(wrapper.find("img.squad-art").exists()).toBe(false);
-    expect(wrapper.find(".squad-art.letter").text()).toBe("G");
+    expect(wrapper.find(".squad-choice img.portrait").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
+    expect(wrapper.find(".squad-choice .stats").exists()).toBe(true);
+    expect(wrapper.find(".squad-choice .stars").exists()).toBe(true);
   });
 
   it("puts the selected fighter beside the opponent and summarizes squad availability", async () => {

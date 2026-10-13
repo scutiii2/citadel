@@ -33,13 +33,9 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     const guardian = page.getByRole("button", { name: "Guardian, details", exact: true });
     await guardian.focus();
     await guardian.press("Enter");
-    await expect(page.getByRole("complementary", { name: "Selected Ascended" })).toContainText("Guardian");
-    await expect(page.getByRole("button", { name: "Open details", exact: true })).toBeVisible();
+    await expect(page.getByRole("dialog")).toContainText("Guardian");
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath("collection.png"), fullPage: true });
-    if (viewport.width < 700) {
-      await page.locator(".collection-inspector").scrollIntoViewIfNeeded();
-      await page.screenshot({ animations: "disabled", path: testInfo.outputPath("collection-inspector.png") });
-    }
+    await page.getByRole("button", { name: "Close", exact: true }).click();
     await fits(page);
     await page.getByRole("button", { name: "Main menu", exact: true }).click();
     await page.getByRole("button", { name: "Shop", exact: true }).click();

@@ -1,4 +1,4 @@
-import type { EffectInfo, Status, AbilityInfo, BattleEvent, FighterAbility, ResultKind, TierInfo } from "../api/AscensionClient";
+import type { AscendedInfo, EffectInfo, Status, AbilityInfo, BattleEvent, FighterAbility, ResultKind, TierInfo } from "../api/AscensionClient";
 
 /** How a tier badge is drawn: the three strongest tiers with the accent, the
  * one below them in full text colour, the rest muted. The tier name is always
@@ -196,3 +196,13 @@ export function actionTone(key: string, category: string): ActionTone {
   return tone === "attack" || tone === "defense" || tone === "support" ? tone : "other";
 }
 
+export interface StatLine { key: string; label: string; value: number }
+
+/** HP, Power and Speed of an Ascended at a level and tier: base plus growth per level, times the tier multiplier. */
+export function ascendedStats(info: Pick<AscendedInfo, "base" | "growth">, level: number, multiplier: number): StatLine[] {
+  return ["hp", "power", "speed"].map((key) => ({
+    key,
+    label: key === "hp" ? "HP" : titleCase(key),
+    value: Math.max(1, Math.floor(((info.base[key] ?? 0) + (info.growth[key] ?? 0) * (level - 1)) * multiplier + 1e-9)),
+  }));
+}

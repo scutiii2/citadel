@@ -73,7 +73,8 @@ describe("MainMenu", () => {
     const team = mountMenu();
     expect(names(team)).toEqual(["Guardian"]);
     expect(team.find(".ascended .level").text()).toBe("Lv 3");
-    expect(mountMenu(null).find(".ascended .level").exists()).toBe(false);
+    expect(mountMenu(null).find(".ascended .level").text()).toBe("Lv 1");
+    expect(mountMenu(null).find(".ascended .stats").exists()).toBe(true);
   });
 
   it("opens How to play in a dialog", async () => {

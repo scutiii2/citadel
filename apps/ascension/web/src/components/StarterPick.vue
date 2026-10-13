@@ -1,40 +1,26 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import type { AscendedInfo } from "../api/AscensionClient";
 import { useAscensionStore } from "../stores/ascension";
-import { abilityEffect } from "../utils/ascension";
-import AscendedTemplateCard from "./AscendedTemplateCard.vue";
+import { ascendedStats } from "../utils/ascension";
 import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 import EmPickCard from "./ui/EmPickCard.vue";
 import { starterCopy } from "./starterCopy";
 import EmButton from "./ui/EmButton.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmPageHead from "./ui/EmPageHead.vue";
-import EmPanel from "./ui/EmPanel.vue";
-import type { IconName } from "./ui/icons";
 
-/** New game: pick the first Ascended from a column of small cards (the chosen one has the
- * copper outline and says "Selected"); the large card and a side panel show the chosen
- * Ascended in full. The first starter is chosen on open. "Main menu" goes back. */
+/** New game: pick the first Ascended from a row of preview cards (the chosen one has the
+ * copper outline), then start with it. The first starter is chosen on open. "Main menu" goes back. */
 const emit = defineEmits<{ back: []; started: [] }>();
 defineProps<{ hideHeading?: boolean }>();
-
-const CATEGORY_ICONS: Record<string, IconName> = { ATTACK: "sword", DEFENSE: "shield", SUPPORT: "arrow", FLEE: "arrow", INTERCEPT: "ascended" };
 
 const store = useAscensionStore();
 const picked = ref<string | null>(null);
 const starters = computed(() => (store.catalog?.ascendeds ?? []).filter((s) => s.starter));
 /** The first starter shows until another is chosen, so the big card is never empty. */
 const current = computed(() => starters.value.find((s) => s.id === picked.value) ?? starters.value[0] ?? null);
-const copy = computed(() => starterCopy(current.value?.id ?? ""));
-const hp = computed(() => ({ base: current.value?.base.hp ?? 0, growth: current.value?.growth.hp ?? 0 }));
-const firstAbility = computed(() => current.value?.abilities[0] ?? null);
-const unlockLevels = computed(() => (current.value?.abilities ?? []).map((a) => a.unlock_level));
-
-function unlockText(levels: number[]): string {
-  if (levels.length === 0) return "";
-  const head = levels.slice(0, -1).join(", ");
-  return levels.length === 1 ? `${levels[0]}` : `${head} and ${levels[levels.length - 1]}`;
-}
+const statsOf = (s: AscendedInfo) => ascendedStats(s, 1, store.catalog?.tiers.find((t) => t.id === s.start_tier)?.stat_multiplier ?? 1);
 
 function pick(id: string): void {
   if (!store.busy) picked.value = id;
@@ -61,7 +47,7 @@ async function start(): Promise<void> {
             :aria-label="s.name"
             @select="pick(s.id)"
           >
-            <AscendedPreviewCard :ascended="s" />
+            <AscendedPreviewCard :ascended="s" :tier-id="s.start_tier" :stars="0" :stats="statsOf(s)" show-level />
           </EmPickCard>
           <p class="note">
             {{ starterCopy(s.id).motto }}
@@ -69,41 +55,16 @@ async function start(): Promise<void> {
         </div>
       </div>
 
-      <div class="starter-inspector">
-      <AscendedTemplateCard :ascended="current" class="detail" />
-
-      <EmPanel class="info">
-        <p class="em-eyebrow">Your chosen starter</p>
-        <h3 class="em-pixel name">{{ current.name }}</h3>
-        <p class="blurb">{{ copy.blurb }}</p>
-        <div class="facts">
-          <div>
-            <strong><EmIcon name="heart" /> Health</strong>
-            <p class="em-num">{{ hp.base }} HP · +{{ hp.growth }} / lvl</p>
-          </div>
-          <div v-if="firstAbility">
-            <strong><EmIcon :name="CATEGORY_ICONS[firstAbility.category] ?? 'ascended'" /> {{ firstAbility.name }}</strong>
-            <p>{{ abilityEffect(firstAbility) }}</p>
-          </div>
-          <div>
-            <strong><EmIcon name="flame" /> Grow together</strong>
-            <p>Abilities unlock at levels {{ unlockText(unlockLevels) }}.</p>
-          </div>
-        </div>
-        <EmButton variant="primary" class="start" :disabled="store.busy" @click="start">
-          <EmIcon name="play" /> Start with {{ current.name }}
-        </EmButton>
-        <button type="button" class="back-link" @click="emit('back')"><EmIcon name="arrow" class="back-arrow" /> Back to main menu</button>
-      </EmPanel>
-      </div>
+      <EmButton variant="primary" class="start" :disabled="store.busy" @click="start">
+        <EmIcon name="play" /> Start with {{ current.name }}
+      </EmButton>
     </div>
     <p v-else class="empty">No starters available.</p>
   </section>
 </template>
 
 <style scoped>
-.back,
-.back-link {
+.back {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -116,114 +77,12 @@ async function start(): Promise<void> {
   font-weight: 600;
   cursor: pointer;
 }
-.back-arrow {
-  transform: scaleX(-1);
-}
-.picker {
-  display: grid;
-  grid-template-columns: 190px 440px minmax(0, 1fr);
-  gap: var(--em-space-6);
-  align-items: start;
-}
-.choices {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-.item {
-  --card-width: 170px;
-}
-.note {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--em-muted);
-}
-.name {
-  margin: 16px 0 12px;
-  font-size: 18px;
-  line-height: 1.4;
-}
-.blurb {
-  color: var(--em-muted);
-}
-.facts {
-  display: grid;
-  gap: 18px;
-  margin: 24px 0;
-}
-.facts > div {
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--em-divider);
-}
-.facts strong {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 3px;
-  font-size: 16px;
-}
-.facts p {
-  color: var(--em-muted);
-}
-.start {
-  width: 100%;
-}
-.back-link {
-  margin-top: 12px;
-}
-.empty {
-  color: var(--em-muted);
-}
-@media (max-width: 1100px) {
-  .picker {
-    grid-template-columns: 190px minmax(0, 1fr);
-  }
-  .info {
-    grid-column: 1 / -1;
-  }
-}
-@media (max-width: 700px) {
-  .picker {
-    display: flex;
-    flex-direction: column;
-    gap: 28px;
-  }
-  .choices {
-    width: 100%;
-    gap: 18px;
-  }
-  .item {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    --card-width: 150px;
-  }
-  .note {
-    margin-top: 0;
-  }
-  .detail {
-    --card-width: min(440px, 100%);
-    align-self: center;
-  }
-}
-
-/* The starter cards and inspector share the same steel frame. */
-.picker { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 12px; }
-.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.back-arrow { transform: scaleX(-1); }
+.picker { display: flex; flex-direction: column; gap: var(--em-space-6); }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 220px)); gap: 18px; justify-content: center; }
 .item { min-width: 0; --card-width: 100%; }
-.note { padding: 9px 6px; margin: 0; text-align: center; border-bottom: 1px solid var(--em-accent-edge); }
-.starter-inspector { display: grid; grid-template-columns: minmax(125px, .65fr) minmax(0, 1fr); gap: 12px; padding: 12px; border: 1px solid var(--em-divider); background: linear-gradient(140deg, var(--em-header), var(--em-bg)); }
-.detail { --card-width: 100%; align-self: start; }
-.info { padding: 4px; border: 0; box-shadow: none; background: transparent; min-width: 0; }
-.name { margin: 10px 0; font-size: 18px; }
-.facts { gap: 12px; margin: 14px 0; }
-.facts strong { font-size: 13px; }
-.facts p, .blurb { font-size: 12px; }
-.back-link { font-size: 12px; }
-@media (max-width: 1050px) { .picker { grid-template-columns: minmax(0, 1fr); } .starter-inspector { grid-template-columns: 180px minmax(0, 1fr); } }
-@media (max-width: 600px) { .picker { display: grid; gap: 12px; } .choices { grid-template-columns: repeat(2, minmax(0, 1fr)); } .item { display: block; } .starter-inspector { grid-template-columns: minmax(0, 1fr); } .detail { --card-width: min(220px, 100%); justify-self: center; } .info { grid-column: auto; } }
-
+.note { padding: 9px 6px; margin: 0; text-align: center; font-size: 12px; color: var(--em-muted); border-bottom: 1px solid var(--em-accent-edge); }
+.start { align-self: center; width: min(320px, 100%); }
+.empty { color: var(--em-muted); }
+@media (max-width: 600px) { .choices { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>

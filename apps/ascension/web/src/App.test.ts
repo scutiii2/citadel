@@ -67,7 +67,7 @@ describe("AscensionView", () => {
     expect(wrapper.findAll("nav .label").map((t) => t.text())).toEqual(["New game", "How to play", "Tavern Coming soon / Locked"]);
 
     await wrapper.find("button.primary").trigger("click");
-    expect(wrapper.text()).toContain("Your chosen starter");
+    expect(wrapper.find("button.start").text()).toBe("Start with Guardian");
     expect(wrapper.findAll("[role=radio]").map((c) => c.attributes("aria-label"))).toEqual(["Guardian", "Striker"]);
 
     client.createProfile.mockResolvedValue(PROFILE);

@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import type { BattleMode } from "../api/AscensionClient";
+import type { AscendedInfo, BattleMode } from "../api/AscensionClient";
 import { useNowSeconds } from "../composables/useNowSeconds";
 import { useAscensionStore } from "../stores/ascension";
-import { formatCountdown, titleCase } from "../utils/ascension";
-import { spriteFor } from "../utils/sprites";
+import { ascendedStats, formatCountdown, titleCase } from "../utils/ascension";
 import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 import BattleMatchup from "./BattleMatchup.vue";
 import EmButton from "./ui/EmButton.vue";
@@ -32,7 +31,6 @@ const modes = [
 ];
 const MODE_OPTIONS = computed(() => modes.map(option => ({ ...option, disabled: store.busy })));
 const PRESET_OPTIONS = [{ value: "none", label: "None equipped" }, ...[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `Preset ${n}` }))];
-const failedPreviews = ref<string[]>([]);
 
 const rollWait = computed(() => {
   const at = store.profile?.next_roll_at ?? null;
@@ -55,6 +53,8 @@ const ownedEmblems = computed(() =>
     .map((t) => `${store.profile?.emblems[t.id]} ${titleCase(t.id)}`)
     .join(" · "),
 );
+/** HP, Power and Speed of an Ascended at a level and tier, for the card strip. */
+const statsAt = (info: AscendedInfo, level: number, tierId: string) => ascendedStats(info, level, tiers.value.find((t) => t.id === tierId)?.stat_multiplier ?? 1);
 const wildInfo = computed(() => store.catalog?.ascendeds.find((s) => s.id === store.encounter?.ascended_id) ?? null);
 
 const formOpen = ref(false);
@@ -156,6 +156,7 @@ async function fight(): Promise<void> {
         :ascended="wildInfo"
         :level="store.encounter.level"
         :tier-id="store.encounter.tier_id"
+        :stats="statsAt(wildInfo, store.encounter.level, store.encounter.tier_id)"
         show-level
       />
       <div class="about">
@@ -193,15 +194,8 @@ async function fight(): Promise<void> {
               :aria-label="slot.member.name"
               @select="pick(slot.member.ascended_id)"
             >
-              <img v-if="spriteFor(slot.info.art, 'battle') && !failedPreviews.includes(slot.member.ascended_id)" class="squad-art" :src="spriteFor(slot.info.art, 'battle')!"  alt="" draggable="false" @error="failedPreviews.push(slot.member.ascended_id)" />
-              <span v-else class="squad-art letter em-pixel" aria-hidden="true">{{ slot.member.name.slice(0, 1) }}</span>
-              <span class="squad-note">
-                <strong>{{ slot.member.name }}</strong>
-                <small v-if="slot.member.faint_until !== null && slot.member.faint_until > now" class="resting">Fainted · {{ formatCountdown(slot.member.faint_until - now) }}</small>
-                <small v-else>Lv. {{ slot.member.level }} · {{ titleCase(slot.member.tier_id) }}</small>
-                <span class="fighter-stats em-num"><span v-for="stat in ['hp', 'power', 'speed']" :key="stat">{{ stat === 'hp' ? 'HP' : titleCase(stat) }} <b>{{ Math.max(1, Math.floor(((slot.info.base[stat] ?? 0) + (slot.info.growth[stat] ?? 0) * (slot.member.level - 1)) * (tiers.find(t => t.id === slot.member.tier_id)?.stat_multiplier ?? 1) + 1e-9)) }}</b></span></span>
-              </span>
-              <span v-if="chosen?.ascended_id === slot.member.ascended_id" class="selected-mark" aria-hidden="true">✓</span>
+              <AscendedPreviewCard class="squad-face" :class="{ down: slot.member.faint_until !== null && slot.member.faint_until > now }" :ascended="slot.info" :level="slot.member.level" :tier-id="slot.member.tier_id" :stars="slot.member.stars" :stats="statsAt(slot.info, slot.member.level, slot.member.tier_id)" show-level />
+              <small v-if="slot.member.faint_until !== null && slot.member.faint_until > now" class="resting">Fainted · {{ formatCountdown(slot.member.faint_until - now) }}</small>
             </EmPickCard>
           </template>
           <div v-else class="empty-slot"><span aria-hidden="true">+</span>Empty slot</div>
@@ -372,25 +366,10 @@ async function fight(): Promise<void> {
   margin: -6px;
 }
 .squad-item { min-width: 0; --card-width: 100%; }
-.squad-choice {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--em-space-3);
-  height: 100%;
-  min-height: 86px;
-  padding: var(--em-space-2);
-  border: 1px solid var(--em-divider);
-  background: var(--em-header);
-}
-.squad-choice.selected { border-color: var(--em-accent); background: color-mix(in srgb, var(--em-accent) 7%, var(--em-header)); }
-.squad-art { width: 56px; height: 64px; flex: none; object-fit: cover; border: 1px solid var(--em-divider); }
-.letter { display: grid; place-items: center; font-size: 25px; color: var(--em-muted); background: var(--em-raised); }
-.squad-note { display: flex; flex-direction: column; gap: var(--em-space-1); min-width: 0; }
-.squad-note strong { font-size: 12px; overflow-wrap: anywhere; }
-.squad-note small { color: var(--em-muted); font-size: 10px; }
-.squad-note .resting { color: var(--em-warning); }
-.selected-mark { position: absolute; top: var(--em-space-1); right: var(--em-space-2); color: var(--em-accent); font-size: 12px; }
+.squad-choice { display: flex; flex-direction: column; gap: var(--em-space-2); height: 100%; }
+.squad-face { --card-width: 100%; }
+.squad-face.down { filter: grayscale(1); opacity: 0.72; }
+.resting { color: var(--em-warning); font-size: 11px; text-align: center; }
 .empty-slot {
   display: grid;
   place-content: center;

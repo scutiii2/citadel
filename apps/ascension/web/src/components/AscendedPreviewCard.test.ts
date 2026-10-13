@@ -14,6 +14,12 @@ describe("AscendedPreviewCard", () => {
     const leveled = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("striker"), level: 7, showLevel: true } });
     expect(leveled.find(".level").text()).toBe("Lv 7");
   });
+  it("shows HP, Power and Speed over the art when stats are given", () => {
+    const none = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("striker") } });
+    expect(none.find(".stats").exists()).toBe(false);
+    const card = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("striker"), stats: [{ key: "hp", label: "HP", value: 648 }, { key: "power", label: "Power", value: 64 }, { key: "speed", label: "Speed", value: 36 }] } });
+    expect(card.find(".art .stats").text()).toBe("HP648Power64Speed36");
+  });
   it("uses battle art or a letter placeholder", () => {
     const card = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("sentinel") } });
     expect(card.find("img.portrait").attributes("src")).toBe("/ascended/sentinel/sprite_battle.webp");
