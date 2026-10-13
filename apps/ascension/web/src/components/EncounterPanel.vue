@@ -65,6 +65,7 @@ const emblemLimit = ref("none");
 const chosen = computed(() => ready.value.find((s) => s.ascended_id === ascendedId.value) ?? null);
 const chosenInfo = computed(() => store.catalog?.ascendeds.find((s) => s.id === chosen.value?.ascended_id) ?? null);
 const chosenMultiplier = computed(() => tiers.value.find(t => t.id === chosen.value?.tier_id)?.stat_multiplier ?? 1);
+const wildMultiplier = computed(() => tiers.value.find(t => t.id === store.encounter?.tier_id)?.stat_multiplier ?? 1);
 const autonomousIncomplete = computed(
   () => mode.value === "autonomous" && (presetSlot.value === "none" || emblemLimit.value === "none"),
 );
@@ -179,12 +180,12 @@ async function fight(): Promise<void> {
         <p class="em-eyebrow">One fighter. Your whole squad behind you.</p>
         <EmButton class="back-to-encounter" :disabled="store.busy" @click="formOpen = false"><EmIcon name="arrow" /> Back to encounter</EmButton>
       </div>
-      <BattleMatchup class="setup-matchup" :player="chosen" :player-info="chosenInfo" :wild="store.encounter" :wild-info="wildInfo" :player-multiplier="chosenMultiplier" />
+      <BattleMatchup class="setup-matchup" :player="chosen" :player-info="chosenInfo" :wild="store.encounter" :wild-info="wildInfo" :player-multiplier="chosenMultiplier" :wild-multiplier="wildMultiplier" />
       <EmNotice v-if="!chosen" tone="error">{{ ready.length ? "Select a ready squad member to continue." : "No squad member is ready. Wait until one is ready again." }}</EmNotice>
 
       <section class="squad-section" aria-label="Choose from your squad">
         <div class="squad-heading"><h3>Choose from your squad</h3><p class="squad-summary">{{ squadSummary }}</p></div>
-        <div class="squad-choices" role="radiogroup" aria-label="Your squad" :style="{ '--squad-size': Math.max(1, squadSlots.length) }">
+        <div class="squad-choices" role="radiogroup" aria-label="Your squad">
         <div v-for="(slot, index) in squadSlots" :key="slot?.member.ascended_id ?? index" class="squad-item">
           <template v-if="slot">
             <EmPickCard
@@ -360,7 +361,7 @@ async function fight(): Promise<void> {
 .squad-summary { font-size: 11px; color: var(--em-muted); }
 .squad-choices {
   display: grid;
-  grid-template-columns: repeat(var(--squad-size), minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(136px, 150px));
   gap: var(--em-space-3);
   padding: 6px;
   margin: -6px;
@@ -374,8 +375,8 @@ async function fight(): Promise<void> {
   display: grid;
   place-content: center;
   gap: var(--em-space-2);
-  height: 100%;
-  min-height: 86px;
+  aspect-ratio: 265 / 371;
+  align-content: center;
   border: 1px dashed var(--em-divider);
   border-radius: var(--em-radius);
   text-align: center;
@@ -398,10 +399,6 @@ async function fight(): Promise<void> {
 .xp-note > :deep(svg) { color: var(--em-accent); flex: none; }
 .xp-note small { display: block; margin-top: var(--em-space-1); color: var(--em-muted); font-size: 11px; }
 .begin-battle { min-width: 218px; justify-content: space-between; }
-@media (max-width: 1100px) {
-  .squad-choice { flex-direction: column; align-items: flex-start; }
-  .squad-art { width: 100%; height: 80px; }
-}
 @media (max-width: 700px) {
   .split { grid-template-columns: minmax(0, 1fr); gap: var(--em-space-4); }
   .look { padding: 32px 16px; }
@@ -409,11 +406,6 @@ async function fight(): Promise<void> {
   .buttons > * { flex: 1; }
   .setup-heading .em-eyebrow { font-size: 9px; letter-spacing: 1px; }
   .squad-summary { font-size: 10px; }
-  .squad-choices { display: flex; overflow-x: auto; padding-bottom: var(--em-space-3); scroll-snap-type: x proximity; }
-  .squad-item { flex: 0 0 110px; scroll-snap-align: start; }
-  .squad-art { height: 64px; }
-  .empty-slot { min-height: 118px; }
-  .squad-note small { font-size: 9px; }
   .plan { padding: var(--em-space-4); }
   .plan-heading > p { display: none; }
   .plan-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--em-space-4); }
@@ -425,31 +417,23 @@ async function fight(): Promise<void> {
   .begin-battle { width: 100%; }
 }
 
-.start-form { grid-template-columns: 230px minmax(0, 1fr) 285px; gap: 10px; align-items: start; }
+.start-form { grid-template-columns: minmax(0, 1fr) 285px; gap: 10px; align-items: start; }
 .setup-heading { grid-column: 1 / -1; padding-bottom: 8px; border-bottom: 1px solid var(--em-divider); }
-.setup-matchup { grid-column: 1; grid-row: 2 / 4; }
-.squad-section { grid-column: 2; grid-row: 2; border: 1px solid var(--em-divider); background: var(--em-header); padding: 10px; }
+.setup-matchup { grid-column: 1; grid-row: 2; }
+.start-form > :deep(.em-notice) { grid-column: 1; grid-row: 3; }
+.squad-section { grid-column: 1; grid-row: 4; border: 1px solid var(--em-divider); background: var(--em-header); padding: 10px; }
 .squad-heading { margin-bottom: 10px; }
 .squad-heading h3 { font-family: var(--em-font-display); text-transform: uppercase; font-size: 13px; }
-.squad-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0; margin: 0; }
-.squad-choice { min-height: 132px; flex-direction: row; align-items: center; gap: 8px; background: linear-gradient(135deg, var(--em-raised), var(--em-header)); }
-.squad-art { width: 68px; height: 112px; object-fit: contain; background: #071019; image-rendering: pixelated; }
-.squad-note { flex: 1; }
-.fighter-stats { display: grid; gap: 4px; margin-top: 6px; font-size: 10px; color: var(--em-muted); }
-.fighter-stats > span { display: flex; justify-content: space-between; gap: 6px; }
-.fighter-stats b { color: var(--em-text); }
-.empty-slot { min-height: 132px; }
-.plan { grid-column: 3; grid-row: 2 / 4; padding: 12px; }
+.squad-choices { gap: 10px; padding: 0; margin: 0; }
+.plan { grid-column: 2; grid-row: 2 / 6; padding: 12px; }
 .plan-heading { margin-bottom: 12px; }
 .plan-heading .caption { display: none; }
 .plan-fields { grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .plan-fields > div:last-child { grid-column: auto; }
 .plan-fields .caption { font-size: 10px; line-height: 1.5; }
 .plan .begin-battle, .plan .decline { width: 100%; min-width: 0; margin-top: 12px; }
-.battle-footer { grid-column: 2; padding: 8px; }
-.start-form > :deep(.em-notice) { grid-column: 1 / -1; }
+.battle-footer { grid-column: 1; grid-row: 5; padding: 8px; }
 .about { min-width: 0; }
-@media (max-width: 1100px) { .start-form { grid-template-columns: 210px minmax(0, 1fr); } .plan { grid-column: 1 / -1; grid-row: auto; } .plan-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); } .plan .begin-battle, .plan .decline { width: auto; margin-right: 8px; } }
-@media (max-width: 700px) { .start-form { grid-template-columns: minmax(0, 1fr); } .setup-matchup, .squad-section, .plan, .battle-footer { grid-column: 1; grid-row: auto; } .squad-choices { display: grid; overflow: visible; grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-item { min-width: 0; } .squad-choice { flex-direction: column; align-items: stretch; } .squad-art { width: 100%; height: 108px; } .empty-slot { min-height: 180px; } .plan-fields { grid-template-columns: minmax(0, 1fr); } .plan .begin-battle, .plan .decline { width: 100%; margin-right: 0; } }
-
+@media (max-width: 1100px) { .start-form { grid-template-columns: minmax(0, 1fr); } .setup-matchup, .start-form > :deep(.em-notice), .squad-section, .plan, .battle-footer { grid-column: 1; grid-row: auto; } .plan-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); } .plan .begin-battle, .plan .decline { width: auto; margin-right: 8px; } }
+@media (max-width: 700px) { .plan-fields { grid-template-columns: minmax(0, 1fr); } .plan .begin-battle, .plan .decline { width: 100%; margin-right: 0; } }
 </style>

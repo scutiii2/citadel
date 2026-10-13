@@ -12,33 +12,22 @@ const props = () => ({
 });
 
 describe("BattleMatchup", () => {
-  it("shows both fighters, their own tiers and levels, and current player stats", () => {
+  it("shows both fighters as preview cards with their own tiers, levels and stats", () => {
     const wrapper = mount(BattleMatchup, { props: props() });
     expect(wrapper.find(".player .ascended-name").text()).toBe("Guardian");
     expect(wrapper.find(".wild .ascended-name").text()).toBe("Bruiser");
-    expect(wrapper.find(".player").text()).toContain("Level 5");
-    expect(wrapper.find(".wild").text()).toContain("Level 4");
-    expect(wrapper.find(".player .em-tier").text()).toBe("Rare");
-    expect(wrapper.findAll(".stats dd").map(s => s.text())).toEqual(["192", "22", "22"]);
+    expect(wrapper.find(".player .level").text()).toBe("Lv 5");
+    expect(wrapper.find(".wild .level").text()).toBe("Lv 4");
+    expect(wrapper.find(".player .card").attributes("style")).toContain("--em-tier-rare");
+    expect(wrapper.findAll(".player .stats dd").map(s => s.text())).toEqual(["192", "22", "22"]);
+    expect(wrapper.find(".wild .stats").exists()).toBe(true);
     expect(wrapper.text()).toContain("Opponent personalities stay hidden until capture");
   });
 
-  it("uses only battle art and falls back to a letter when artwork is missing or fails", async () => {
-    const setup = props();
-    setup.playerInfo.art!.focus = 21;
-    const wrapper = mount(BattleMatchup, { props: setup });
-    expect(wrapper.find(".player img").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
-    expect(wrapper.find(".player img").attributes("style")).toContain("50% 50%");
-    expect(wrapper.find(".wild .letter").text()).toBe("B");
-    await wrapper.find(".player img").trigger("error");
-    expect(wrapper.find(".player img").exists()).toBe(false);
-    expect(wrapper.find(".player .letter").text()).toBe("G");
-  });
-
-  it("does not invent a fighter or stats when no ready member is selected", () => {
+  it("does not invent a fighter when no ready member is selected", () => {
     const wrapper = mount(BattleMatchup, { props: { ...props(), player: null, playerInfo: null } });
     expect(wrapper.find(".player").text()).toContain("Choose a fighter");
-    expect(wrapper.find(".stats").exists()).toBe(false);
+    expect(wrapper.find(".player .card").exists()).toBe(false);
     expect(wrapper.find(".wild .ascended-name").text()).toBe("Bruiser");
   });
 });

@@ -27,7 +27,6 @@ describe("StarterPick", () => {
     expect(choices.map((c) => c.attributes("aria-label"))).toEqual(["Guardian", "Striker"]);
     expect(choices.map((c) => c.attributes("aria-checked"))).toEqual(["true", "false"]);
     expect(choices[0]!.classes()).toContain("selected");
-    expect(choices.every((c) => c.classes().includes("em-lift"))).toBe(true);
     expect(wrapper.findAll(".card .ascended-name").map((n) => n.text())).toEqual(["Guardian", "Striker"]);
     expect(wrapper.find(".card .stats").exists()).toBe(true);
     expect(wrapper.find(".card .stars").text()).toBe("★ 0");

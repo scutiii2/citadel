@@ -148,14 +148,16 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
             <template v-if="store.battle">
               <BattleResult v-if="store.battle.result && !playback.busy" :battle="store.battle" />
               <template v-else>
-                <div class="battle-stage">
-                  <BattleArena :battle="store.battle" />
-                  <div class="battle-side">
-                    <BattleControls :battle="store.battle" />
-                    <RoundLog :battle="store.battle" />
+                <div class="battle-view">
+                  <div class="battle-stage">
+                    <BattleArena :battle="store.battle" />
+                    <div class="battle-side">
+                      <BattleControls :battle="store.battle" />
+                      <RoundLog :battle="store.battle" />
+                    </div>
                   </div>
+                  <div class="battle-bottom"><ActionBar :battle="store.battle" /></div>
                 </div>
-                <div class="battle-bottom"><ActionBar :battle="store.battle" /></div>
                 <EmblemPrompt />
               </template>
             </template>
@@ -257,6 +259,14 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 .battle-side > :last-child { flex:1; }
 .battle-stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:stretch; }
 @media(max-width:1100px) { .screen-brand { font-size:15px; } }
-@media(max-width:900px) { .battle-stage { grid-template-columns:minmax(0,1fr); } }
+/* Portrait: one column, the move buttons above the round log. */
+@media(max-width:900px) {
+  .battle-view { display:flex; flex-direction:column; gap:20px; }
+  .battle-stage, .battle-side { display:contents; }
+  .battle-side > :first-child { order:1; }
+  .battle-bottom { order:2; margin-top:0; }
+  .battle-side > :last-child { order:3; }
+}
+@media(max-width:700px) { .battle-view { gap:var(--em-space-3); } }
 @media(max-width:700px) { .screen-brand { font-size:12px; } }
 </style>

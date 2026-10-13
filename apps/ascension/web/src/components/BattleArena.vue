@@ -60,8 +60,7 @@ function art(fighter: Fighter): string | null {
 </script>
 
 <template>
-  <section class="arena em-glow" :class="{ playing: playback.busy }" :aria-label="`Round ${battle.round}`" @click="playback.busy && playback.skip()">
-    <button v-if="playback.busy" type="button" class="skip" @click.stop="playback.skip()">Skip</button>
+  <section class="arena em-glow" :aria-label="`Round ${battle.round}`">
     <p class="round-number em-pixel">Round {{ battle.round }}</p>
     <div class="fighters">
       <template v-for="(side, i) in sides" :key="side.key">
@@ -201,21 +200,6 @@ function art(fighter: Fighter): string | null {
   color: var(--em-muted);
 }
 /* Battle playback: one class per effect, on the picture only. Player faces right, wild left. */
-.skip {
-  position: absolute;
-  top: var(--em-space-2);
-  right: var(--em-space-2);
-  z-index: 2;
-  padding: 4px 12px;
-  border: 1px solid var(--em-border);
-  background: var(--em-header);
-  color: var(--em-text);
-  font-size: 12px;
-  cursor: pointer;
-}
-.arena.playing {
-  cursor: pointer;
-}
 .player .sprite {
   --dir: 1;
 }

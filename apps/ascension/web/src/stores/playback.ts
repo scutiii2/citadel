@@ -68,12 +68,6 @@ export const usePlaybackStore = defineStore("playback", () => {
     if (id === runId) clear();
   }
 
-  /** Jumps to the end: the real health shows and the result may open. */
-  function skip(): void {
-    queue = [];
-    wake?.();
-  }
-
   function reset(): void {
     runId += 1;
     queue = [];
@@ -103,5 +97,5 @@ export const usePlaybackStore = defineStore("playback", () => {
     },
   );
 
-  return { busy, fx, ball, floating, hp, skip };
+  return { busy, fx, ball, floating, hp };
 });

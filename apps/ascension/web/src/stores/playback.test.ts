@@ -63,18 +63,6 @@ describe("battle playback", () => {
     expect(playback.busy).toBe(false);
   });
 
-  it("jumps to the end when skipped", async () => {
-    const { ascension, playback, before } = await setup();
-    ascension.battle = after(before);
-    await settle();
-
-    playback.skip();
-    await settle();
-
-    expect(playback.busy).toBe(false);
-    expect(playback.hp).toBeNull();
-  });
-
   it("does not play while an EMBLEM prompt is open", async () => {
     const { ascension, playback, before } = await setup();
 
