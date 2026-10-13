@@ -42,6 +42,8 @@ function notifyContentSize(): void {
     session.bridge?.notifyResize(mast.getBoundingClientRect().height + main.scrollHeight);
   }
 }
+/** Ascension is a PC game: a touch-first device (no hover, coarse pointer) gets a notice instead. */
+const touchOnly = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 const screen = ref<Screen>("menu");
 const hasAccount = computed(() => session.status === "ready" && store.loaded && !store.unavailable && store.profile !== null);
 /** A battle being fought (or replayed): on a narrow screen only the battle shows, the masthead steps aside. */
@@ -98,7 +100,12 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 
 <template>
   <section ref="page" class="em-root ascension-page" :class="{ fighting }">
-    <EmShell :destination="screen === 'menu' ? 'Main menu' : screen === 'starter' ? 'Starter selection' : tab === 'battle' ? 'Quick battle' : tab === 'collection' ? 'Collection' : 'Shop'" :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
+    <EmPanel v-if="touchOnly" class="state" role="alert">
+      <EmIcon name="warning" :size="40" />
+      <h2 class="em-pixel">Ascension is PC only</h2>
+      <p>Open this game on a computer with a mouse and keyboard.</p>
+    </EmPanel>
+    <EmShell v-else :destination="screen === 'menu' ? 'Main menu' : screen === 'starter' ? 'Starter selection' : tab === 'battle' ? 'Quick battle' : tab === 'collection' ? 'Collection' : 'Shop'" :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
       <template v-if="session.status === 'ready' && store.loaded && !store.unavailable && screen !== 'menu'" #navigation>
         <h1 class="screen-brand em-pixel"><button type="button" class="menu-link" aria-label="Main menu" title="Main menu" @click="screen = 'menu'">ASCENSION</button></h1>
         <EmTabs v-if="screen === 'game'" :model-value="tab" :options="tabs" ariaLabel="Ascension sections" @update:model-value="selectTab" />

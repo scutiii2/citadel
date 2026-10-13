@@ -96,6 +96,19 @@ describe("AscensionView", () => {
     wrapper.unmount();
   });
 
+  it("shows a PC-only notice on a touch-first device", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as unknown as typeof window.matchMedia;
+    try {
+      const wrapper = await mountView();
+      expect(wrapper.text()).toContain("Ascension is PC only");
+      expect(wrapper.find(".wallet").exists()).toBe(false);
+      wrapper.unmount();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it("has no help or settings buttons in the header", async () => {
     const wrapper = await mountView();
     expect(wrapper.find(".account-actions [aria-label=\"How to play\"]").exists()).toBe(false);
