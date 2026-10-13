@@ -1,7 +1,7 @@
 # Ascension UI changes, 2026-10-13
 
 Record of the UI edits made on `main` after `7a149df` (`feat(ascension): checkpoint UI redesign progress`),
-up to `b60619f`. `manifest.json` holds the SHA-256 of every file below as committed at `b60619f`.
+up to `759a78a`. `manifest.json` holds the SHA-256 of every file below as committed at `759a78a`.
 After merging another branch, run `python design_references/verify.py` from `apps/ascension/`.
 A file reported `CHANGED` was edited by the merge: check that these changes survived.
 
@@ -18,6 +18,11 @@ Paths are relative to `apps/ascension/`.
 | Main menu row hover flicker fixed (brightness filter instead of background swap) | `web/src/components/ui/EmMenuRow.vue` |
 | Header "How to play" and "Settings" buttons removed; the ASCENSION logo is the button back to the main menu | `web/src/App.vue`, `web/src/App.test.ts` |
 | Text selection disabled across the game UI (inputs exempt) | `web/src/components/theme.css` |
+| Star cost shown as a list ("1 spare copy", "N essence", each with "You have X" and a green border when met) instead of a sentence | `web/src/components/CollectionPanel.vue`, `web/src/components/CollectionPanel.test.ts` |
+| Fainted Ascended marked in the squad strip (greyed portrait, countdown) and on collected cards (red "Fainted" badge) | `web/src/components/CollectionPanel.vue`, `web/src/components/AscendedCard.vue` |
+| Touch-first devices get an "Ascension is PC only" notice instead of the game | `web/src/App.vue`, `web/src/App.test.ts` |
+| Squad can be emptied (server accepts 0 to N); an empty squad cannot battle (Fight disabled, caption says so) | `src/ascension/squad.py`, `tests/ascension/test_squad.py`, `web/src/components/CollectionPanel.vue`, `web/src/components/EncounterPanel.vue` |
+| Squad slots lose their Remove button; help icon beside "Your squad" explains the squad and how to add or remove (new `info` icon) | `web/src/components/CollectionPanel.vue`, `web/src/components/ui/icons.ts` |
 
 ## Commits
 
@@ -27,3 +32,5 @@ Paths are relative to `apps/ascension/`.
 - `6a5c990` stop menu row hover flicker
 - `9564c6d` drop header help/settings, logo links to main menu
 - `b60619f` disable text selection across the game UI
+- `f817e14` PC-only notice on touch-first devices
+- `759a78a` empty squad allowed, fainted indicators, star cost list, squad help tooltip

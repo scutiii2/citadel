@@ -1,17 +1,21 @@
 {
-  "recorded_at_commit": "b60619f",
+  "recorded_at_commit": "759a78a",
   "files": {
-    "web/src/App.vue": "8da147d367665f87b0be2f70f8813d8decd569644b6a2324afd4b340ecf383d2",
-    "web/src/App.test.ts": "b1e923833bc91cd3b7de1d2c7e46ddec329a59967f460871481b786d4b1b8e77",
+    "web/src/App.vue": "74229e7c2ceee759a857e0880935def72b99d4640a0dc6c7e8dead90ccee708e",
+    "web/src/App.test.ts": "e5b3069f34ce6cf39c1f3a09094cad96dc673b1fd09c968e752afbb44b878005",
     "web/src/components/BattleControls.vue": "f7b3f7100d8f2a6844c8619dc720023d5d2584b14341fa2380bad206ea2c47cf",
     "web/src/components/BattlePanels.test.ts": "8d53549b60688483a9dada22421c67acf446d6f368fe5165ad81b8ecec6fcce9",
-    "web/src/components/CollectionPanel.vue": "ebc113bd0e1de1259a83bd0581eb5dbfe131af62d752684ec356df1ef1ac9137",
+    "web/src/components/CollectionPanel.vue": "c03b09c13122e84f2bfd3e666c3bd95ad165b6d248c784fa3f33719f17d8164e",
     "web/src/components/PresetEditor.vue": "b8676381aace222cdbf33fa8fde708867a5ffa0450f22658f23556a46012bd4f",
     "web/src/components/TreeTab.vue": "f593c4db458d2ea435b1eca3dfa8ceb963a5c46121a3f20d39998ccd34e5b3c5",
     "web/src/components/TreeTab.test.ts": "7c42ad1cdcde40763572eae14f81bcf12c993b48005942c5c3bb586e61d87af4",
     "web/src/components/theme.css": "465c1c41688fa345028ce5508804c4e6f0046f6f0affb776f6f3b67df770e38f",
     "web/src/components/ui/EmMenuRow.vue": "46e567541e925acf7e68ee2b5398766c76f6753092279573fe304aaabae0474f",
     "web/src/components/ui/EmTabs.vue": "70647333896e0cd1722d5810bfd70cd4397b251c8b803e4797aef04cb3843c2d",
-    "web/src/components/ui/icons.ts": "e4c1a31b87950fa0da1b6dab3678dfc091d78a0e5c35140ade9f6a31cb66ef76"
+    "web/src/components/ui/icons.ts": "7bc7b2947b1edfb3e7fc8b6fee20548863052a38a8cac1fa0e5db0618fdf92b0",
+    "web/src/components/AscendedCard.vue": "d4e820277834f2a9cb58091048195eba47b763cb1f742dc5d2b877c50fc143b3",
+    "web/src/components/EncounterPanel.vue": "35026558f448263f2ce32372d3eb82688b528adc87d11fee86a17aeb56ed6f14",
+    "src/ascension/squad.py": "f584e1510c9c5d3186d06dd90bb81929ea82b3a5b7946721fbdf6c4329937a62",
+    "tests/ascension/test_squad.py": "773e4827fa4964df3ac127ecd3d1bda42ff4e7a855c95f0c3cf2e8b65d020021"
   }
 }
