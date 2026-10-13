@@ -81,11 +81,32 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       await page.screenshot({ animations: "disabled", path: testInfo.outputPath("battle-plan-controls.png") });
     }
     await fits(page);
+    const pick = await page.locator('.matchup .player').boundingBox();
+    const opponent = await page.locator('.matchup .wild').boundingBox();
+    expect(pick!.x).toBeLessThan(opponent!.x);
+    await expect(page.locator('.matchup .arena')).toHaveCount(1);
     await page.getByRole("button", { name: "Begin battle", exact: true }).click();
     await expect(page.locator(".arena")).toBeVisible();
-    await expect(page.locator("button.action")).toHaveCount(4);
+    await expect(page.locator("button.action")).toHaveCount(5);
+    await expect(page.locator('button.action.unavailable')).toHaveCount(1);
+    await expect(page.locator('button.action.unavailable')).toBeDisabled();
+    await expect(page.locator('button.action.unavailable')).toContainText('Requires level 5');
     await expect(page.getByRole("button", { name: "Skip animation" })).toHaveCount(0);
     await expect(page.locator(".battle-side .controls")).toBeVisible();
+    const arenaHeight = (await page.locator('.arena').boundingBox())!.height;
+    await page.locator('.round-log').evaluate(el => { (el as HTMLElement).style.minHeight = '700px'; });
+    expect((await page.locator('.arena').boundingBox())!.height).toBe(arenaHeight);
+    await page.locator('.round-log').evaluate(el => { (el as HTMLElement).style.minHeight = ''; });
+    if (viewport.width > 900) {
+      const arena = await page.locator('.arena').boundingBox();
+      const actions = await page.locator('.action-bar').boundingBox();
+      expect(actions!.y - (arena!.y + arena!.height)).toBeLessThanOrEqual(8);
+    }
+    expect(await page.locator('.arena .fighter').evaluateAll(fighters => fighters.every(fighter => {
+      const health = fighter.querySelector('.health')!.getBoundingClientRect();
+      const art = fighter.querySelector('.art')!.getBoundingClientRect();
+      return health.top >= art.top && health.bottom <= art.bottom;
+    }))).toBe(true);
     if (viewport.width <= 900) { const move = await page.locator(".action-bar").boundingBox(); const log = await page.locator(".round-log").boundingBox(); expect(move!.y + move!.height).toBeLessThanOrEqual(log!.y); }
     await page.getByRole("main", { name: "Screen content", exact: true }).evaluate(el => { el.scrollTop = 0; });
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath("battle.png"), fullPage: true });

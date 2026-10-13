@@ -171,6 +171,24 @@ describe("RoundLog", () => {
 });
 
 describe("ActionBar", () => {
+  it("shows all catalog moves and disables moves not equipped or below their required level", async () => {
+    const view = manual();
+    view.player.level = 10;
+    view.player.abilities = view.player.abilities.filter(a => a.id === 'guardian_strike');
+    const store = withBattle(view);
+    store.catalog = { ...CATALOG, ascendeds: CATALOG.ascendeds.map(a => a.id === 'guardian' ? {
+      ...a, abilities: [...a.abilities, { ...a.abilities[0]!, id: 'guardian_nova', name: 'Nova', unlock_level: 20 }],
+    } : a) };
+    const wrapper = mount(ActionBar, { props: { battle: view } });
+    const buttons = wrapper.findAll('button.action');
+    expect(buttons.map(b => b.find('.action-name').text())).toEqual(['Attack', 'Strike', 'Rally', 'Nova', 'Flee', 'Catch']);
+    expect(buttons[2]!.attributes('disabled')).toBeDefined();
+    expect(buttons[2]!.text()).toContain('Not equipped for this battle');
+    expect(buttons[3]!.attributes('disabled')).toBeDefined();
+    expect(buttons[3]!.text()).toContain('Requires level 20');
+    await buttons[3]!.trigger('click');
+    expect(client.action).not.toHaveBeenCalled();
+  });
   it("offers one button per legal action and shows abilities cooling down", () => {
     const view = manual();
     withBattle(view);

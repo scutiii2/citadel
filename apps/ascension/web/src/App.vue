@@ -170,9 +170,15 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 .menu-link { display:flex; align-items:center; padding:0; border:0; color:inherit; background:transparent; font:inherit; cursor:pointer; }
 .back-arrow { transform:rotate(180deg); } .screen-brand { margin:0; flex:none; font-size:28px; font-weight:700; color:var(--em-accent); letter-spacing:.25px; }
 .subtle-settings { display:flex; align-items:center; justify-content:center; width:28px; height:32px; padding:0; border:0; color:var(--em-muted); background:transparent; cursor:pointer; }
-.battle-stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:6px; align-items:stretch; } .battle-bottom { margin-top:6px; } .status { margin-bottom:8px; } .state { max-width:680px; margin:48px auto; display:flex; flex-direction:column; align-items:center; gap:16px; padding:32px; text-align:center; } .state p { color:var(--em-muted); } .skeletons { display:flex; gap:12px; } .skeleton { width:100px; height:120px; background:var(--em-raised); } .settings-content { display:flex; flex-direction:column; gap:16px; }
+.battle-stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:6px; align-items:start; } .battle-bottom { margin-top:6px; } .status { margin-bottom:8px; } .state { max-width:680px; margin:48px auto; display:flex; flex-direction:column; align-items:center; gap:16px; padding:32px; text-align:center; } .state p { color:var(--em-muted); } .skeletons { display:flex; gap:12px; } .skeleton { width:100px; height:120px; background:var(--em-raised); } .settings-content { display:flex; flex-direction:column; gap:16px; }
 @media(max-width:1100px) { .screen-brand { font-size:22px; } }
 @media(max-width:900px) { .battle-view{display:flex;flex-direction:column;gap:6px}.battle-stage{display:contents}.battle-stage>.arena{order:1}.battle-bottom{order:2;margin-top:0}.battle-side{order:3} }
 @media(max-width:700px) { .ascension-page { padding:6px; } .screen-brand { font-size:16px; } }
 .battle-side{display:flex;flex-direction:column;gap:6px;min-width:0}.screen-brand{white-space:nowrap}.screen-brand + :deep(.em-tabs){padding:0;gap:0}.screen-brand + :deep(.tab){min-height:34px;font-size:12px;padding:7px 10px}@media(max-width:1100px){.screen-brand + :deep(.tab){padding:6px;font-size:11px}}
+@media(min-width:901px) {
+  .battle-stage { position:relative; }
+  .battle-side { position:absolute; top:0; right:0; bottom:0; width:300px; overflow:hidden; }
+  .battle-side :deep(.round-log) { display:flex; flex-direction:column; flex:1; min-height:0; }
+  .battle-side :deep(.rounds) { min-height:0; max-height:none; overflow-y:auto; }
+}
 </style>

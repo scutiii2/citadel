@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { ActionChoice, BattleView, LegalAction } from "../api/AscensionClient";
+import type { AbilityInfo, ActionChoice, BattleView, LegalAction } from "../api/AscensionClient";
 import { ROUND_PACE_MS, useAscensionStore } from "../stores/ascension";
 import { usePlaybackStore } from "../stores/playback";
 import { effectText, titleCase } from "../utils/ascension";
@@ -10,9 +10,9 @@ import EmEmblem from "./ui/EmEmblem.vue";
 import EmDialog from "./ui/EmDialog.vue";
 import EmPanel from "./ui/EmPanel.vue";
 
-/** "Your move": in manual mode one button per legal action, in the colour of its
- * category (the category is also written). Abilities still cooling down are shown
- * disabled with how long. A catch asks which EMBLEM to throw. */
+/** "Your move": every active ability remains visible in catalog order. Only legal
+ * actions can be selected; unequipped, level-locked and cooling moves are disabled
+ * with a reason. A catch asks which EMBLEM to throw. */
 const props = defineProps<{ battle: BattleView }>();
 const store = useAscensionStore();
 const playback = usePlaybackStore();
@@ -26,14 +26,26 @@ const BASIC_NOTES: Record<string, string> = { flee: "Try to escape", catch: "Cho
 const paceSeconds = ROUND_PACE_MS / 1000;
 
 const locked = computed(() => props.battle.status !== "active" || props.battle.phase !== "choosing" || store.battleBusy || playback.busy);
-type Slot = { key: string; action: LegalAction } | { key: string; cooling: BattleView["player"]["abilities"][number] };
+type Slot = { key: string; action: LegalAction } | { key: string; cooling: BattleView["player"]["abilities"][number] }
+  | { key: string; unavailable: AbilityInfo | BattleView["player"]["abilities"][number]; reason: string };
 /** Fixed order: the legal basics before the abilities, abilities in the Ascended's own order
  * (a cooling one keeps its slot), then the rest, so buttons never move as cooldowns change. */
 const slots = computed<Slot[]>(() => {
   const legal = props.battle.actions;
-  const abilities = props.battle.player.abilities.map((a): Slot => {
+  const info = store.catalog?.ascendeds.find(a => a.id === props.battle.player.ascended_id);
+  const equipped = new Map(props.battle.player.abilities.map(a => [a.id, a]));
+  const catalogMoves = info?.abilities ?? [];
+  const catalogIds = new Set(catalogMoves.map(a => a.id));
+  const allMoves = [...catalogMoves, ...props.battle.player.abilities.filter(a => !catalogIds.has(a.id))];
+  const abilities = allMoves.map((a): Slot => {
     const action = legal.find((l) => l.kind === "ability" && l.ability_id === a.id);
-    return action ? { key: `ability:${a.id}`, action } : { key: `cooldown:${a.id}`, cooling: a };
+    const battleMove = equipped.get(a.id);
+    if (action) return { key: `ability:${a.id}`, action };
+    if (battleMove && !battleMove.ready) return { key: `ability:${a.id}`, cooling: battleMove };
+    const requiredLevel = info?.tree.find(n => n.id === a.id)?.unlock_level ?? ('unlock_level' in a ? a.unlock_level : 1);
+    const reason = battleMove ? 'Unavailable this turn' : props.battle.player.level < requiredLevel
+      ? `Requires level ${requiredLevel}` : 'Not equipped for this battle';
+    return { key: `ability:${a.id}`, unavailable: a, reason };
   });
   const keyed = (l: LegalAction): Slot => ({ key: `${l.kind}:${l.ability_id ?? ""}`, action: l });
   const before = legal.filter((l) => l.kind === "attack").map(keyed);
@@ -97,9 +109,14 @@ function throwEmblem(tier: string): void {
         <span class="action-name">{{ label(slot.action) }}</span>
         <span class="action-detail">{{ detail(slot.action) }}</span>
       </button>
-      <button v-else type="button" class="action cooling" disabled>
+      <button v-else-if="'cooling' in slot" type="button" class="action cooling" disabled>
         <EmIcon class="action-icon" name="clock" :size="30" /><span class="action-name">{{ slot.cooling.name }}</span>
         <span class="action-detail">Cooling down ({{ slot.cooling.cooldown }} {{ slot.cooling.cooldown === 1 ? "round" : "rounds" }})</span>
+      </button>
+      <button v-else type="button" class="action cooling unavailable" disabled>
+        <EmIcon class="action-icon" :name="slot.unavailable.category === 'DEFENSE' ? 'shield' : slot.unavailable.category === 'SUPPORT' ? 'flame' : 'sword'" :size="26" />
+        <span class="action-name">{{ slot.unavailable.name }}</span>
+        <span class="action-detail">{{ slot.reason }}</span>
       </button>
       </template>
     </div>
