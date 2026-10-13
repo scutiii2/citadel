@@ -199,7 +199,7 @@ describe("BattleControls", () => {
     withBattle(view);
     const wrapper = mount(BattleControls, { props: { battle: view } });
 
-    const autonomous = wrapper.findAll("[role=tab]").find((b) => b.text() === "Autonomous")!;
+    const autonomous = wrapper.findAll("[role=tab]").find((b) => b.attributes("aria-label") === "Autonomous")!;
     expect(autonomous.attributes("disabled")).toBeDefined();
     await autonomous.trigger("click");
 
@@ -212,7 +212,7 @@ describe("BattleControls", () => {
     client.setMode.mockResolvedValue(battleView());
     const wrapper = mount(BattleControls, { props: { battle: view } });
 
-    await wrapper.findAll("[role=tab]").find((b) => b.text() === "Autonomous")!.trigger("click");
+    await wrapper.findAll("[role=tab]").find((b) => b.attributes("aria-label") === "Autonomous")!.trigger("click");
     await flushPromises();
 
     expect(client.setMode).toHaveBeenCalledExactlyOnceWith("b1", { round: 1, revision: 1 }, "autonomous", null);

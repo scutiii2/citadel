@@ -11,7 +11,7 @@ import CollectionPanel from "./components/CollectionPanel.vue";
 import EmShell from "./components/EmShell.vue";
 import HowToPlayDialog from "./components/HowToPlayDialog.vue";
 import EmblemPrompt from "./components/EmblemPrompt.vue";
-import EncounterPanel, { type EncounterStage } from "./components/EncounterPanel.vue";
+import EncounterPanel from "./components/EncounterPanel.vue";
 import RoundLog from "./components/RoundLog.vue";
 import MainMenu, { type PlayTarget } from "./components/MainMenu.vue";
 import ShopPanel from "./components/ShopPanel.vue";
@@ -21,7 +21,6 @@ import EmDialog from "./components/ui/EmDialog.vue";
 import EmConfirm from "./components/ui/EmConfirm.vue";
 import EmIcon from "./components/ui/EmIcon.vue";
 import EmNotice from "./components/ui/EmNotice.vue";
-import EmPageHead from "./components/ui/EmPageHead.vue";
 import EmPanel from "./components/ui/EmPanel.vue";
 import EmTabs, { type EmTabOption } from "./components/ui/EmTabs.vue";
 import { useSessionStore } from "./stores/session";
@@ -37,7 +36,6 @@ const session = useSessionStore();
 const store = useAscensionStore();
 const playback = usePlaybackStore();
 const page = ref<HTMLElement | null>(null);
-const collectionControls = ref<HTMLElement | null>(null);
 let observer: ResizeObserver | null = null;
 let stopMessages: (() => void) | null = null;
 function notifyContentSize(): void {
@@ -60,27 +58,6 @@ const tabs: EmTabOption[] = [
   { value: "battle", label: "Battle", icon: "play" },
   { value: "collection", label: "Collection", icon: "book" },
 ];
-const encounterStage = ref<EncounterStage>("look");
-/** The page title and the line under it, from the tab and, in Battle, the step. */
-const heading = computed<{ title: string; subtitle: string }>(() => {
-  if (tab.value === "collection") {
-    const n = store.profile?.ascendeds.length ?? 0;
-    return { title: "Your collection", subtitle: `${n} Ascended. Every one has a story.` };
-  }
-  if (tab.value === "shop") return { title: "The forge shop", subtitle: "A little preparation goes a long way." };
-  const battle = store.battle;
-  if (battle !== null) {
-    if (battle.result) return { title: "Battle complete", subtitle: "A new chapter for your collection." };
-    return { title: "The forge arena", subtitle: `${battle.player.name} vs. wild ${battle.wild.name} · Round ${battle.round}` };
-  }
-  const wild = store.encounter;
-  if (encounterStage.value === "setup" && wild !== null) {
-    return { title: "Prepare for battle", subtitle: "Choose who steps into the arena, then set your battle plan." };
-  }
-  if (encounterStage.value === "preview") return { title: "A wild Ascended appeared", subtitle: "Take a look. Choose your moment." };
-  return { title: "Into the wild", subtitle: "Your next Ascended is waiting." };
-});
-
 function play(target: PlayTarget): void {
   tab.value = target;
   screen.value = "game";
@@ -149,13 +126,6 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
         <h1 class="screen-brand em-pixel">ASCENSION</h1>
         <EmTabs v-if="screen === 'game'" :model-value="tab" :options="tabs" ariaLabel="Ascension sections" @update:model-value="selectTab" />
       </template>
-      <template v-if="session.status === 'ready' && store.loaded && !store.unavailable && screen !== 'menu'" #heading>
-        <EmPageHead v-if="screen === 'starter'" title="Choose your first Ascended" subtitle="One companion. A whole world of possibilities." />
-        <EmPageHead v-else :title="heading.title" :subtitle="heading.subtitle">
-          <div v-if="tab === 'collection'" ref="collectionControls" class="screen-options" />
-          <BattleControls v-else-if="tab === 'battle' && store.battle && !(store.battle.result && !playback.busy)" :battle="store.battle" />
-        </EmPageHead>
-      </template>
       <EmPanel v-if="session.status !== 'ready'" class="state" :role="session.status === 'connecting' ? 'status' : 'alert'">
         <EmIcon name="flame" :size="40" />
         <h2 class="em-pixel">{{ session.status === 'connecting' ? 'Connecting to Ember…' : session.status === 'ended' ? 'Session ended, reopen the game from Ember' : 'Open this game from Ember' }}</h2>
@@ -187,7 +157,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
           <EmNotice v-if="store.error" tone="error" class="status">{{ store.error }}</EmNotice>
 
           <div v-if="tab === 'collection'" class="tab-body">
-            <CollectionPanel :controls-target="collectionControls" />
+            <CollectionPanel />
           </div>
 
           <div v-else-if="tab === 'battle'" class="tab-body">
@@ -196,13 +166,16 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
               <template v-else>
                 <div class="battle-stage">
                   <BattleArena :battle="store.battle" />
-                  <RoundLog :battle="store.battle" />
+                  <div class="battle-side">
+                    <BattleControls :battle="store.battle" />
+                    <RoundLog :battle="store.battle" />
+                  </div>
                 </div>
                 <div class="battle-bottom"><ActionBar :battle="store.battle" /></div>
                 <EmblemPrompt />
               </template>
             </template>
-            <EncounterPanel v-else @stage="encounterStage = $event" />
+            <EncounterPanel v-else />
           </div>
 
           <ShopPanel v-else class="tab-body" />
@@ -287,11 +260,9 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 .tab-body {
   min-width: 0;
 }
-.screen-options { max-width: 680px; }
 .settings-content { display: flex; flex-direction: column; align-items: flex-start; gap: var(--em-space-4); }
 .settings-content p { color: var(--em-muted); }
 .reset-notice { margin-bottom: var(--em-space-4); }
-.screen-options :deep(.filters), :deep(.screen-heading .controls) { margin-bottom: 0; }
 @media (max-width: 700px) {
   .action-label { display: none; }
   .account-action { min-width: var(--em-target); padding-inline: 12px; }
@@ -312,17 +283,14 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
     gap: var(--em-space-3);
     margin-top: var(--em-space-3);
   }
-  .fighting :deep(.screen-heading) { padding: var(--em-space-2) var(--em-space-3); }
-  .fighting :deep(.screen-heading .head) { gap: var(--em-space-2); }
-  .fighting :deep(.screen-heading .em-eyebrow),
-  .fighting :deep(.screen-heading .subtitle) { display: none; }
-  .fighting :deep(.screen-heading .title) { margin: 0; font-size: 14px; }
   .fighting :deep(.main) { padding: var(--em-space-3) var(--em-space-3) var(--em-space-4); }
 }
 </style>
 
 <style scoped>
 .screen-brand { margin:0; flex:none; font-size:20px; color:var(--em-accent); text-shadow:0 2px 0 #84522d; }
+.battle-side { display:flex; flex-direction:column; min-width:0; }
+.battle-side > :last-child { flex:1; }
 .battle-stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:stretch; }
 @media(max-width:1100px) { .screen-brand { font-size:15px; } }
 @media(max-width:900px) { .battle-stage { grid-template-columns:minmax(0,1fr); } }

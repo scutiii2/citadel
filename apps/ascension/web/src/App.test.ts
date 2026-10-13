@@ -67,7 +67,7 @@ describe("AscensionView", () => {
     expect(wrapper.findAll("nav .label").map((t) => t.text())).toEqual(["New game", "How to play", "Tavern Coming soon / Locked"]);
 
     await wrapper.find("button.primary").trigger("click");
-    expect(wrapper.text()).toContain("Choose your first Ascended");
+    expect(wrapper.text()).toContain("Your chosen starter");
     expect(wrapper.findAll("[role=radio]").map((c) => c.attributes("aria-label"))).toEqual(["Guardian", "Striker"]);
 
     client.createProfile.mockResolvedValue(PROFILE);
@@ -133,16 +133,15 @@ describe("AscensionView", () => {
     wrapper.unmount();
   });
 
-  it("shows Insignia in the masthead and a title for each tab", async () => {
+  it("shows Insignia in the masthead and no page header", async () => {
     const wrapper = await mountView();
 
     expect(wrapper.find(".wallet").text()).toBe("100 Insignia");
     await wrapper.findAll("nav button")[1]!.trigger("click");
-    expect(wrapper.find(".subtitle").text()).toBe("1 Ascended. Every one has a story.");
+    expect(wrapper.find(".subtitle").exists()).toBe(false);
 
     await tab(wrapper, "Battle").trigger("click");
-    expect(wrapper.find("h2").text()).toBe("Into the wild");
-    expect(wrapper.find(".subtitle").text()).toBe("Your next Ascended is waiting.");
+    expect(wrapper.find(".em-eyebrow").exists()).toBe(false);
   });
 
   it("restores an active battle on the Battle tab instead of rolling", async () => {

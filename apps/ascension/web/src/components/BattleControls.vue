@@ -6,7 +6,7 @@ import { usePlaybackStore } from "../stores/playback";
 import EmButton from "./ui/EmButton.vue";
 import EmConfirm from "./ui/EmConfirm.vue";
 import EmIcon from "./ui/EmIcon.vue";
-import EmTabs from "./ui/EmTabs.vue";
+import EmTabs, { type EmTabOption } from "./ui/EmTabs.vue";
 
 /** Above the arena: who plays (manual or autonomous, switched between rounds) and
  * Forfeit, which asks first. A battle started without an EMBLEM limit stays manual:
@@ -17,9 +17,9 @@ const playback = usePlaybackStore();
 
 const active = computed(() => props.battle.status === "active");
 const locked = computed(() => !active.value || props.battle.phase !== "choosing" || store.battleBusy || playback.busy);
-const modeOptions = computed(() => [
-  { value: "manual", label: "Manual", disabled: locked.value },
-  { value: "autonomous", label: "Autonomous", disabled: locked.value || props.battle.emblem_limit === null },
+const modeOptions = computed<EmTabOption[]>(() => [
+  { value: "manual", label: "Manual", icon: "arrow", disabled: locked.value },
+  { value: "autonomous", label: "Autonomous", icon: "play", disabled: locked.value || props.battle.emblem_limit === null },
 ]);
 const forfeitOpen = ref(false);
 
@@ -35,8 +35,8 @@ function forfeit(): void {
 
 <template>
   <div class="controls">
-    <EmTabs :model-value="battle.mode" :options="modeOptions" ariaLabel="Who plays" @update:model-value="setMode" />
-    <EmButton variant="danger" :disabled="!active || store.battleBusy" @click="forfeitOpen = true"><EmIcon name="battle" /> Forfeit</EmButton>
+    <EmTabs :model-value="battle.mode" :options="modeOptions" ariaLabel="Who plays" icon-only @update:model-value="setMode" />
+    <EmButton class="forfeit" variant="danger" aria-label="Forfeit" title="Forfeit" :disabled="!active || store.battleBusy" @click="forfeitOpen = true"><EmIcon name="close" /></EmButton>
 
     <EmConfirm
       :open="forfeitOpen"
@@ -70,7 +70,8 @@ function forfeit(): void {
 }
 
 .controls { padding: 8px 10px; margin-bottom: 10px; border: 1px solid var(--em-divider); background: linear-gradient(180deg, var(--em-raised), var(--em-header)); }
-.controls :deep(.em-button) { min-height: 34px; font-size: 12px; padding: 6px 12px; }
-.controls :deep(.tab) { min-height: 34px; font-size: 12px; }
+.controls :deep(.em-button) { min-height: 34px; padding: 6px 10px; }
+.controls :deep(.tab) { min-height: 34px; padding: 6px 10px; }
+.controls :deep(.em-tabs) { width: auto; }
 
 </style>
