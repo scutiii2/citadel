@@ -247,9 +247,8 @@ function show(ascended: OwnedAscended): void {
               @keydown.enter.prevent="show(member)"
               @keydown.space.prevent="show(member)"
             >
-              <img v-if="spriteFor(catalogById.get(member.ascended_id)?.art, 'battle')" class="squad-portrait" :src="spriteFor(catalogById.get(member.ascended_id)?.art, 'battle')!" alt="" draggable="false" />
-              <span v-else class="squad-placeholder">◇</span>
-              <div class="squad-member-info"><strong>{{ member.name }}</strong><span class="em-num">Lv. {{ member.level }}</span><span class="squad-stars em-num">★ {{ member.stars }}</span><span v-if="faintOf(member) > 0" class="squad-fainted"><EmIcon name="clock" :size="14" /> Fainted · <strong class="em-num">{{ formatCountdown(faintOf(member)) }}</strong></span><div class="squad-types"><TypeSymbol v-for="id in member.ascension_types" :key="id" :type-id="id" :size="18" decorative /><EmTierBadge :tier-id="member.tier_id" /></div></div>
+              <AscendedPreviewCard class="squad-face" :ascended="catalogById.get(member.ascended_id)!" :level="member.level" :tier-id="member.tier_id" :stars="member.stars" show-level />
+              <span v-if="faintOf(member) > 0" class="squad-fainted"><EmIcon name="clock" :size="14" /> Fainted · <strong class="em-num">{{ formatCountdown(faintOf(member)) }}</strong></span>
             </div>
           </template>
           <span v-else>Empty slot</span>
@@ -404,20 +403,13 @@ function show(ascended: OwnedAscended): void {
 .collection-main { min-width: 0; }
 .squad-section h3 { margin: 0 0 12px; font-size: 15px; }
 h3 small { color: var(--em-muted); font-size: 12px; margin-left: 12px; }
-.squad-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; padding: 0; margin: 0; list-style: none; }
-.squad-slot { min-width: 0; border: 1px solid var(--em-border); padding: 6px; background: var(--em-panel); display: flex; flex-direction: column; gap: 6px; }
-.squad-slot.selected { border-color: var(--em-accent); box-shadow: 0 0 0 1px var(--em-accent); }
-.squad-card { cursor: pointer; min-width: 0; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; align-items: center; min-height: 100px; }
-.squad-portrait, .squad-placeholder { width: 64px; height: 94px; object-fit: contain; image-rendering: pixelated; background: #060d15; }
-.squad-placeholder { display: grid; place-items: center; color: var(--em-muted); font-size: 32px; }
-.squad-member-info { display: flex; flex-direction: column; gap: 5px; overflow-wrap: anywhere; }
-.squad-member-info strong { font-size: 13px; }
-.squad-member-info > span { font-size: 12px; color: var(--em-muted); }
-.squad-card.down .squad-portrait { filter: grayscale(1); opacity: 0.72; }
-.squad-member-info > .squad-fainted { display: flex; align-items: center; gap: 4px; color: var(--em-danger); }
-.squad-member-info .squad-stars { color: var(--em-accent); }
-.squad-types { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-.squad-card :deep(.card) { --card-width: 100%; }
+.squad-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; padding: 0; margin: 0; list-style: none; }
+.squad-slot { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.squad-slot.selected { outline: 2px solid var(--em-accent); outline-offset: 2px; }
+.squad-card { cursor: pointer; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.squad-face { --card-width: 100%; }
+.squad-card.down .squad-face { filter: grayscale(1); opacity: 0.72; }
+.squad-fainted { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--em-danger); }
 .squad-section h3 { display: flex; align-items: center; gap: 8px; }
 .squad-help { position: relative; display: inline-flex; }
 .help-icon { display: inline-flex; padding: 2px; border: 0; background: none; color: var(--em-muted); cursor: help; }
@@ -427,7 +419,7 @@ h3 small { color: var(--em-muted); font-size: 12px; margin-left: 12px; }
 .help-tip strong:first-child { margin-top: 0; }
 .squad-help:hover .help-tip, .squad-help:focus-within .help-tip { display: flex; }
 .squad-slot :deep(.em-btn) { min-height: 30px; font-size: 11px; padding: 3px 8px; }
-.squad-empty { min-height: 142px; justify-content: center; align-items: center; border-style: dashed; color: var(--em-muted); font-size: 12px; }
+.squad-empty { min-height: 142px; border: 1px dashed var(--em-border); padding: 6px; justify-content: center; align-items: center; color: var(--em-muted); font-size: 12px; }
 .drop-over { outline: 2px dashed var(--em-accent); outline-offset: 4px; }
 .section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 22px 0 12px; }
 .section-head h3 { margin: 0; font-size: 15px; }
@@ -503,5 +495,5 @@ h3 small { color: var(--em-muted); font-size: 12px; margin-left: 12px; }
 button:focus-visible, input:focus-visible, select:focus-visible, .squad-card:focus-visible { outline: 2px solid var(--em-accent); outline-offset: 3px; }
 @media (max-width: 1180px) { .collection { grid-template-columns: 160px minmax(0, 1fr) 230px; gap: 12px; } .details { grid-template-columns: 180px minmax(0, 1fr); } .progression-panel { grid-column: 2; } .inspector-portrait { height: 190px; } }
 @media (max-width: 900px) { .details { height: auto; } .details.tree-expanded .side { grid-column: 1; } .details > * { overflow-y: visible; } .collection { grid-template-columns: 150px minmax(0, 1fr); } .collection-inspector { position: static; grid-column: 2; display: grid; grid-template-columns: 120px minmax(0, 1fr); } .inspector-portrait { grid-column: 1; grid-row: 2 / span 3; height: 140px; } .collection-inspector .current-stats { grid-column: 2; } .collection-inspector .open-details, .collection-inspector > .em-btn { grid-column: 1 / -1; } .details.tree-expanded { grid-template-columns: minmax(0, 1fr); } .tree-expanded .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); align-items: start; } .tree-expanded .summary .detail-portrait { grid-row: 1 / span 4; height: 150px; } .tree-expanded .summary .battle-status, .tree-expanded .summary .squad-control { grid-column: 1 / -1; } }
-@media (max-width: 600px) { .collection { grid-template-columns: minmax(0, 1fr); } .filter-rail { position: static; gap: 12px; } .chips { flex-direction: row; flex-wrap: wrap; } .filters { gap: 12px; } .collection-inspector { grid-column: 1; } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-card { grid-template-columns: 48px minmax(0, 1fr); } .squad-portrait, .squad-placeholder { width: 48px; height: 80px; } .squad-empty { min-height: 90px; } .details { grid-template-columns: minmax(0, 1fr); } .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); } .summary .detail-portrait { grid-row: span 4; height: 150px; } .summary .battle-status { grid-column: 1 / -1; } .progression-panel { grid-column: 1; } .collection :deep(.em-dialog.ascended-details) { padding: 14px; } }
+@media (max-width: 600px) { .collection { grid-template-columns: minmax(0, 1fr); } .filter-rail { position: static; gap: 12px; } .chips { flex-direction: row; flex-wrap: wrap; } .filters { gap: 12px; } .collection-inspector { grid-column: 1; } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-empty { min-height: 90px; } .details { grid-template-columns: minmax(0, 1fr); } .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); } .summary .detail-portrait { grid-row: span 4; height: 150px; } .summary .battle-status { grid-column: 1 / -1; } .progression-panel { grid-column: 1; } .collection :deep(.em-dialog.ascended-details) { padding: 14px; } }
 </style>

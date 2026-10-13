@@ -3,10 +3,13 @@ import { describe, expect, it } from "vitest";
 import { ascendedInfo } from "../api/AscensionClient.fixtures";
 import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 describe("AscendedPreviewCard", () => {
-  it("shows name, readable tier and optional level", () => {
+  it("shows name, optional stars and optional level, with the frame in the tier colour", () => {
     const plain = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("striker"), tierId: "royal" } });
     expect(plain.find(".ascended-name").text()).toBe("Striker");
-    expect(plain.find(".tier").text()).toBe("Royal");
+    expect(plain.find(".stars").exists()).toBe(false);
+    expect(plain.attributes("style")).toContain("--em-tier-royal");
+    const starred = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("striker"), stars: 3 } });
+    expect(starred.find(".stars").text()).toBe("★ 3");
     expect(plain.find(".level").exists()).toBe(false);
     const leveled = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("striker"), level: 7, showLevel: true } });
     expect(leveled.find(".level").text()).toBe("Lv 7");

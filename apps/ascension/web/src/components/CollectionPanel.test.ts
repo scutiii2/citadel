@@ -65,10 +65,9 @@ describe("CollectionPanel", () => {
 
     const cards = wrapper.findAll(".ascended-card");
     expect(cards).toHaveLength(1);
-    const text = cards[0]!.text();
-    expect(cards[0]!.find(".em-tier").text()).toBe("Rare");
-    expect(text).toContain("3 copies");
-    expect(text).toContain("40 / 300 XP");
+    expect(cards[0]!.find(".em-tier").exists()).toBe(false);
+    expect(cards[0]!.text()).not.toMatch(/copies|XP/);
+    expect(cards[0]!.find(".stars").text()).toBe("★ 0");
     expect(cards[0]!.find(".ascended-name").text()).toBe("Guardian");
     expect(cards[0]!.find(".level").text()).toBe("Lv 3");
     expect(cards[0]!.find("img.portrait").attributes("src")).toContain("sprite_battle.webp");
@@ -80,7 +79,7 @@ describe("CollectionPanel", () => {
     ]);
   });
 
-  it("hides the XP bar at the level cap and counts a faint down", () => {
+  it("counts a faint down", () => {
     const wrapper = mountPanel({
       ...PROFILE,
       ascendeds: [ownedAscended("guardian", { xp_needed: null, faint_until: Date.now() / 1000 + 65 })],
@@ -88,15 +87,7 @@ describe("CollectionPanel", () => {
 
     const text = wrapper.find(".ascended-card").text();
     expect(text).toMatch(/Fainted, ready in 1:0[56]/);
-    expect(wrapper.find(".ascended-card .xp").exists()).toBe(false);
     expect(wrapper.find(".ascended-card").classes()).toContain("down");
-  });
-
-  it("says Highest level reached at the cap", () => {
-    const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian", { xp_needed: null })] });
-
-    expect(wrapper.find(".ascended-card").text()).toContain("Highest level reached");
-    expect(wrapper.find(".ascended-card .em-bar").exists()).toBe(false);
   });
 
   it("opens an Ascended's abilities, personalities (paged) and presets", async () => {
