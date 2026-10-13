@@ -1,7 +1,7 @@
 # Ascension UI changes, 2026-10-13
 
 Record of the UI edits made on `main` after `7a149df` (`feat(ascension): checkpoint UI redesign progress`),
-up to `9cfa4c6`. `manifest.json` holds the SHA-256 of every file below as committed at `9cfa4c6`.
+up to `7030ea6`. `manifest.json` holds the SHA-256 of every file below as committed at `7030ea6`.
 After merging another branch, run `python design_references/verify.py` from `apps/ascension/`.
 A file reported `CHANGED` was edited by the merge: check that these changes survived.
 
@@ -36,7 +36,8 @@ Paths are relative to `apps/ascension/`.
 | Battle preparation: wild opponent and your fighter are two preview cards side by side (new `wildMultiplier` prop), the squad options sit below them as bare preview cards, the Battle plan stays in a right column | `web/src/components/BattleMatchup.vue`, `web/src/components/BattleMatchup.test.ts`, `web/src/components/EncounterPanel.vue` |
 | Picked card on the starter and battle preparation screens: no padding, no outline and no ring; it keeps a glow and a subtle vertical drift, hover rises, grows and blooms in the tier colour | `web/src/components/ui/EmPickCard.vue`, `web/src/components/StarterPick.test.ts` |
 | Battle: Skip button, click-to-skip and `skip()` removed, so every round animation plays to the end | `web/src/components/BattleArena.vue`, `web/src/stores/playback.ts`, `web/src/stores/playback.test.ts` |
-| Portrait battle (900px and below): the "Your move" bar sits above the round log | `web/src/App.vue` |
+| Portrait battle (900px and below): the "Your move" bar sits above the round log | `web/src/App.vue` || Collection filter rail: the Collection/Battle/Shop nav is removed (the header already navigates) | `web/src/components/CollectionPanel.vue`, `web/src/components/CollectionPanel.test.ts`, `web/src/App.vue` |
+| Capture result: a suspense roulette laps the revealed personalities, slows and stops on the awarded one (glow, "(now yours)", others dim); clicking the list skips it | `web/src/components/BattleResult.vue`, `web/src/components/BattlePanels.test.ts` |
 
 ## Commits
 
@@ -51,3 +52,5 @@ Paths are relative to `apps/ascension/`.
 - `aa18682` tier-coloured card frame with stars, slimmer collection caption, squad uses preview card
 - `8a9e571` preview card everywhere it fits, details open on press, ornate rounded frame with stats
 - `9cfa4c6` preview-card matchup and squad picker, glow-only pick animation, no skip, portrait move bar above log
+- `63e9d86` align UI with approved designs
+- `7030ea6` suspense roulette for captured personality, drop collection nav rail
