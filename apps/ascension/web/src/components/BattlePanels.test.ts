@@ -361,6 +361,7 @@ describe("BattleResult", () => {
     expect(wrapper.findAll(".reward")[0]!.text()).toBe("+30 XPfor Guardian, now level 4");
     expect(text).toContain("+12 Insignia");
     expect(wrapper.findAll(".reward")[2]!.text()).toBe("+2 Rare essencefor upgrading stars");
+    expect(wrapper.findAll(".reward")[2]!.find("img.em-essence").attributes("src")).toContain("essence_rare.webp");
     expect(wrapper.findAll(".reward")[3]!.text()).toBe("+2 copiesof Bruiser, at Rare");
     expect(text).toContain("Cautious · tier 1");
     expect(text).not.toContain("(now yours)");

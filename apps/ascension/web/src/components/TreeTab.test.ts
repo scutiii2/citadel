@@ -138,6 +138,8 @@ describe("TreeTab", () => {
 
     await wrapper.find('[data-node="g_wall"]').trigger("click");
     expect(wrapper.find(".node-detail").text()).toContain("3 common essence");
+    expect(wrapper.findAll(".node-detail img.em-essence")).toHaveLength(2);
+    expect(wrapper.find(".requirements img.em-essence").attributes("src")).toContain("essence_common.webp");
     await wrapper.find(".node-detail button.learn").trigger("click");
     await flushPromises();
 

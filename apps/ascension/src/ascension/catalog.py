@@ -53,6 +53,7 @@ class TierSpec:
     stars_to_advance: int | None  # stars that unlock the next tier; None = top of the ladder (Legendary, Forbidden)
     essence_cost: int  # essence of this tier spent per star, and earned from beating an enemy of this tier
     copy_reward: int
+    max_stars: int | None = None  # star upgrades available in a final tier without advancing
 
 
 @dataclass(frozen=True)
@@ -428,6 +429,9 @@ class Catalog:
             raise CatalogError("each regular tier but the last needs stars_to_advance of at least 1; the last needs null")
         if any(isinstance(t.essence_cost, bool) or not isinstance(t.essence_cost, int) or t.essence_cost < 1 for t in self.tiers):
             raise CatalogError("every tier needs an essence_cost of at least 1")
+        if any(t.max_stars is not None and (isinstance(t.max_stars, bool) or not isinstance(t.max_stars, int)
+                                           or t.max_stars < 1 or t.stars_to_advance is not None) for t in self.tiers):
+            raise CatalogError("max_stars must be a positive integer on a final tier")
         regular_ids = {t.id for t in self.regular_tiers}
         if set(self.shop.stock) != regular_ids or set(self.shop.tier_weights) != regular_ids:
             raise CatalogError("shop stock and tier_weights must list exactly the regular tiers")
@@ -615,6 +619,10 @@ class Catalog:
     def stars_to_advance(self, ascended_id: str, tier_id: str) -> int | None:
         """Stars that unlock the next tier; None at the end of this Ascended's ladder."""
         return None if self.next_tier(ascended_id, tier_id) is None else self.tier(tier_id).stars_to_advance
+
+    def star_limit(self, ascended_id: str, tier_id: str) -> int | None:
+        """The star cap, including final tiers that can gain stars without promotion."""
+        return self.stars_to_advance(ascended_id, tier_id) or self.tier(tier_id).max_stars
 
     def ascendeds_at_tier(self, tier_id: str) -> tuple[AscendedSpec, ...]:
         """Regular Ascended whose ladder includes `tier_id`, by id."""

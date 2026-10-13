@@ -40,6 +40,9 @@ for (const width of [1440, 768, 375]) {
     await page.locator(".ascended-card").click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.locator(".copy-summary")).toContainText("4 spare copies");
+    await expect(dialog.locator(".progression-panel .em-essence")).toHaveCount(2);
+    await expect.poll(() => dialog.locator(".progression-panel .em-essence").evaluateAll(images => images.every(img => (img as HTMLImageElement).naturalWidth > 0))).toBe(true);
+    await page.screenshot({ animations: "disabled", path: testInfo.outputPath(`overview-${width}.png`) });
     await expect(dialog.locator(".copy-summary")).toBeVisible();
     await dialog.getByRole("tab", { name: "Personalities", exact: true }).click();
     await expect(dialog.locator(".personality-description").first()).toContainText("3 preference weight");

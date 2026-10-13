@@ -51,6 +51,7 @@
     },
     {
       "id": "legendary",
+      "max_stars": 20,
       "stat_multiplier": 2.5,
       "capture_multiplier": 16,
       "hp_floor": 0.65,
@@ -63,6 +64,7 @@
     },
     {
       "id": "forbidden",
+      "max_stars": 50,
       "stat_multiplier": 4.0,
       "capture_multiplier": 128,
       "hp_floor": 0.8,

@@ -29,11 +29,12 @@ class UpgradeService:
         async def work(tx: AscendedTransaction) -> dict[str, Any]:
             owned, tier_id = await self._owned(tx, owner, ascended_id)
             tier = self._catalog.tier(tier_id)
-            stars_needed = self._catalog.stars_to_advance(ascended_id, tier_id)
+            stars_needed = self._catalog.star_limit(ascended_id, tier_id)
             if stars_needed is None:
                 raise UpgradeNotReady("that Ascended is at the top of its ladder and cannot gain stars")
             if owned.stars >= stars_needed:
-                raise UpgradeNotReady("the stars are full; raise the tier instead")
+                upper = self._catalog.next_tier(ascended_id, tier_id)
+                raise UpgradeNotReady("the stars are full; raise the tier instead" if upper else "the stars are full; maximum stars reached")
             if owned.copies < 1:
                 raise InsufficientCopies("a star needs one spare copy and you have none")
             have = (await tx.essence_counts(owner)).get(tier_id, 0)
@@ -44,7 +45,8 @@ class UpgradeService:
             await tx.put_ascended(replace(owned, copies=owned.copies - 1, stars=stars, tier_id=tier_id))
             return {"kind": "star", "ascended_id": ascended_id, "tier_id": tier_id, "stars": stars,
                     "stars_needed": stars_needed, "essence_spent": tier.essence_cost,
-                    "copies": owned.copies - 1, "can_tier_up": stars >= stars_needed}
+                    "copies": owned.copies - 1,
+                    "can_tier_up": stars >= stars_needed and self._catalog.next_tier(ascended_id, tier_id) is not None}
 
         return await self._writer.commit(owner, key, "upgrade.star", {"ascended": ascended_id}, work)
 

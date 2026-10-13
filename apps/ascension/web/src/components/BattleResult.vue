@@ -10,6 +10,7 @@ import EmIcon from "./ui/EmIcon.vue";
 import EmPanel from "./ui/EmPanel.vue";
 import EmBar from "./ui/EmBar.vue";
 import EmEmblem from "./ui/EmEmblem.vue";
+import EmEssence from "./ui/EmEssence.vue";
 
 
 /** A finished battle: one banner per outcome (the outcome is always written), what it
@@ -114,7 +115,7 @@ const story = computed(() => {
         <strong class="em-pixel em-num">+{{ result.insignia }} Insignia</strong>
         <span>added to your wallet</span>
       </div>
-      <div v-if="result.essence !== undefined && result.essence_tier_id" class="reward"><EmIcon class="reward-icon" name="flame" :size="34" />
+      <div v-if="result.essence !== undefined && result.essence_tier_id" class="reward"><EmEssence class="reward-icon" :tier-id="result.essence_tier_id" :size="34" />
         <strong class="em-pixel em-num">+{{ result.essence }} {{ titleCase(result.essence_tier_id) }} essence</strong>
         <span>for upgrading stars</span>
       </div>

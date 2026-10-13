@@ -14,6 +14,28 @@ vi.mock("../api/AscensionClient", () => {
 
 const client = vi.mocked(useAscensionClient());
 
+it("shows matching essence art in the collection and detail costs", async () => {
+  const wrapper = mountPanel({ ...PROFILE, essences: { rare: 7 }, ascendeds: [ownedAscended("guardian", { tier_id: "rare" })] });
+  expect(wrapper.find(".essences img.em-essence").attributes("src")).toContain("essence_rare.webp");
+  await wrapper.find(".ascended-card").trigger("click");
+  await flushPromises();
+  expect(wrapper.findAll(".progression-panel img.em-essence")).toHaveLength(2);
+  expect(wrapper.findAll(".progression-panel img.em-essence").every(img => img.attributes("src")?.includes("essence_rare.webp"))).toBe(true);
+});
+
+it.each([['legendary', 20], ['forbidden', 50]] as const)("shows %s stars as a capped upgrade without a tier target", async (tier, cap) => {
+  const wrapper = mountPanel({ ...PROFILE, essences: { [tier]: 10 }, ascendeds: [ownedAscended("guardian", {
+    tier_id: tier, stars: cap, stars_needed: cap, next_tier_id: null, can_star_up: false, can_tier_up: false,
+  })] });
+  await wrapper.find(".ascended-card").trigger("click");
+  await flushPromises();
+  const panel = wrapper.find(".progression-panel");
+  expect(panel.text()).toContain(`Stars ${cap} / ${cap}`);
+  expect(panel.text()).toContain("Maximum stars reached");
+  expect(panel.text()).not.toContain("to reach");
+  expect(panel.text()).not.toContain("Raise to");
+});
+
 it("opens the details when a collected card is pressed", async () => {
   const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian")] });
   expect(wrapper.find(".ascended-details").attributes("open")).toBeUndefined();

@@ -18,6 +18,7 @@ import EmIcon from "./ui/EmIcon.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmSwitch from "./ui/EmSwitch.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
+import EmEssence from "./ui/EmEssence.vue";
 import EmTabs from "./ui/EmTabs.vue";
 import TypeSymbol from "./ui/TypeSymbol.vue";
 
@@ -210,7 +211,7 @@ function show(ascended: OwnedAscended): void {
     <main class="collection-main">
     <ul v-if="essences.length" class="essences" aria-label="Essence">
       <li v-for="[tierId, count] in essences" :key="tierId" :style="{ '--tier': `var(--em-tier-${tierId}, var(--em-tier-common))` }">
-        <EmTierBadge :tier-id="tierId" :label="`${titleCase(tierId)} essence`" /> <strong class="em-num">{{ count }}</strong>
+        <EmEssence :tier-id="tierId" /><EmTierBadge :tier-id="tierId" :label="`${titleCase(tierId)} essence`" /> <strong class="em-num">{{ count }}</strong>
       </li>
     </ul>
     <section class="squad-section" aria-label="Squad">
@@ -340,20 +341,21 @@ function show(ascended: OwnedAscended): void {
           </section>
           <section v-if="treeVisited" v-show="detailTab === 'tree'" role="tabpanel" aria-label="Ability tree"><TreeTab :key="open.ascended_id" :ascended="open" /></section>
         </div>
-        <aside v-if="detailTab === 'overview'" class="progression-panel" aria-label="Progression"><h3 class="em-pixel">Progression</h3><div class="progression-resources"><div><small>Spare copies</small><strong class="em-num">{{ open.copies }}</strong></div><div><small>{{ titleCase(open.tier_id) }} essence</small><strong class="em-num">{{ essenceOf(open.tier_id) }}</strong></div></div><h4 class="em-pixel">Star progression</h4>
+        <aside v-if="detailTab === 'overview'" class="progression-panel" aria-label="Progression"><h3 class="em-pixel">Progression</h3><div class="progression-resources"><div><small>Spare copies</small><strong class="em-num">{{ open.copies }}</strong></div><div><small class="essence-label"><EmEssence :tier-id="open.tier_id" />{{ titleCase(open.tier_id) }} essence</small><strong class="em-num">{{ essenceOf(open.tier_id) }}</strong></div></div><h4 class="em-pixel">Star progression</h4>
           <div class="upgrade">
             <template v-if="open.stars_needed !== null">
               <EmBar :value="open.stars" :max="open.stars_needed" :label="`${open.name} stars`" />
-              <span class="em-num">Stars {{ open.stars }} / {{ open.stars_needed }} to reach {{ titleCase(open.next_tier_id ?? "") }}</span>
+              <span class="em-num">Stars {{ open.stars }} / {{ open.stars_needed }}<template v-if="open.next_tier_id"> to reach {{ titleCase(open.next_tier_id) }}</template></span>
               <h5 class="cost-head">A star costs</h5>
               <ul class="star-cost">
                 <li :class="{ met: open.copies >= 1 }"><span>1 spare copy</span><small class="em-num">You have {{ open.copies }}</small></li>
-                <li :class="{ met: essenceOf(open.tier_id) >= open.star_essence_cost }"><span>{{ open.star_essence_cost }} {{ titleCase(open.tier_id) }} essence</span><small class="em-num">You have {{ essenceOf(open.tier_id) }}</small></li>
+                <li :class="{ met: essenceOf(open.tier_id) >= open.star_essence_cost }"><span class="essence-label"><EmEssence :tier-id="open.tier_id" />{{ open.star_essence_cost }} {{ titleCase(open.tier_id) }} essence</span><small class="em-num">You have {{ essenceOf(open.tier_id) }}</small></li>
               </ul>
               <div class="upgrade-actions">
                 <EmButton v-if="open.can_tier_up" variant="primary" :disabled="store.busy" @click="raiseTier(open)">
                   Raise to {{ titleCase(open.next_tier_id ?? "") }}
                 </EmButton>
+                <span v-else-if="open.stars >= open.stars_needed">Maximum stars reached</span>
                 <EmButton v-else variant="primary" :disabled="!open.can_star_up || store.busy" @click="addStar(open)">Add a star</EmButton>
               </div>
             </template>
@@ -411,6 +413,7 @@ h3 small { color: var(--em-muted); font-size: 12px; margin-left: 12px; }
 .back { --card-width: 100%; opacity: .6; }
 .essences { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; padding: 0; list-style: none; }
 .essences li { display: flex; gap: 6px; align-items: center; font-size: 12px; }
+.essence-label { display: inline-flex; gap: 6px; align-items: center; }
 .group { margin-bottom: 18px; }
 .group-name { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14px; }
 .group-name small { color: var(--em-muted); }

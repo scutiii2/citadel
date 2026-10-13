@@ -9,6 +9,7 @@ import { spriteFor, spriteFocus } from "../utils/sprites";
 import EmButton from "./ui/EmButton.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmIcon from "./ui/EmIcon.vue";
+import EmEssence from "./ui/EmEssence.vue";
 import type { IconName } from "./ui/icons";
 
 /** One Ascended's ability tree: nodes at their own places, learn a node, equip it in a slot. */
@@ -87,9 +88,9 @@ const learned = computed(() => tree.value?.nodes.filter(n => n.state === 'learne
 const requirements = computed(() => {
   if (!selected.value || !tree.value) return [];
   const node = selected.value;
-  const items = [{ label: `Level ${node.unlock_level}`, met: tree.value.level >= node.unlock_level, hint: `You are level ${tree.value.level}` }];
+  const items: { label: string; met: boolean; hint: string; essenceTier?: string }[] = [{ label: `Level ${node.unlock_level}`, met: tree.value.level >= node.unlock_level, hint: `You are level ${tree.value.level}` }];
   for (const id of node.requires) items.push({ label: `${byId.value.get(id)?.name ?? id} learned`, met: byId.value.get(id)?.state === 'learned', hint: '' });
-  if (node.cost) items.push({ label: costText(node), met: (tree.value.essences[node.cost.tier] ?? 0) >= node.cost.amount, hint: `You have ${tree.value.essences[node.cost.tier] ?? 0}` });
+  if (node.cost) items.push({ label: costText(node), met: (tree.value.essences[node.cost.tier] ?? 0) >= node.cost.amount, hint: `You have ${tree.value.essences[node.cost.tier] ?? 0}`, essenceTier: node.cost.tier });
   return items;
 });
 /** Zooms around a point in the viewport (its centre by default), so what is under it stays put. */
@@ -297,9 +298,9 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
         <p>{{ detail(selected) }}</p>
         <dl v-if="selected.kind === 'ability'" class="ability-facts"><div><dt>Power</dt><dd class="em-num">{{ selected.percentage }}%</dd></div><div><dt>Cooldown</dt><dd class="em-num">{{ selected.cooldown }} rounds</dd></div></dl>
         <h5>{{ selected.state === 'learned' ? 'Unlock requirements (already learned)' : 'Requirements' }}</h5>
-        <ul class="requirements"><li v-for="item in requirements" :key="item.label" :class="{ met: item.met }"><span>{{ item.met ? '✓' : '○' }} {{ item.label }}</span><small v-if="item.hint">{{ item.hint }}</small></li></ul>
+        <ul class="requirements"><li v-for="item in requirements" :key="item.label" :class="{ met: item.met }"><span>{{ item.met ? '✓' : '○' }} <EmEssence v-if="item.essenceTier" :tier-id="item.essenceTier" :size="24" /> {{ item.label }}</span><small v-if="item.hint">{{ item.hint }}</small></li></ul>
         <p v-if="selected.state === 'locked'" class="reason">{{ selected.reason }}</p>
-        <EmButton v-if="selected.state === 'learnable'" class="learn" variant="primary" :disabled="store.busy || loading" @click="learn(selected)">Learn · {{ costText(selected) }}</EmButton>
+        <EmButton v-if="selected.state === 'learnable'" class="learn" variant="primary" :disabled="store.busy || loading" @click="learn(selected)"><EmEssence v-if="selected.cost" :tier-id="selected.cost.tier" :size="24" />Learn · {{ costText(selected) }}</EmButton>
         <div v-if="selected.state === 'learned'" class="equip">
           <EmButton v-for="slot in equipSlots" :key="slot.id" :data-slot="slot.id" :disabled="store.busy || loading" @click="equip(selected, slot.id)">Equip {{ slot.id.toUpperCase() }}<small>{{ slotLabel(slot.id) }}</small></EmButton>
           <EmButton v-if="equippedSlot(selected)" class="unequip" :disabled="store.busy || loading" @click="unequip(selected)">Unequip</EmButton>

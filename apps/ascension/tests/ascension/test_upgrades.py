@@ -73,19 +73,46 @@ def test_stars_stop_at_the_tiers_limit_and_the_tier_then_rises(tmp_path):
     assert (ascended.tier_id, ascended.stars, ascended.copies) == ("rare", 0, 4) and essences == {"common": 4}
 
 
-def test_the_top_of_the_ladder_takes_no_stars_and_cannot_rise(tmp_path):
+def test_the_top_of_a_shorter_ladder_takes_no_stars_and_cannot_rise(tmp_path):
     async def scenario():
         env = make(tmp_path)
         await env.start_player()
-        await env.give(guardian=AscendedRecord("ann", "guardian", 5, 1, 0, tier_id="legendary"),
-                       cindrax=AscendedRecord("ann", "cindrax", 5, 1, 0))
-        await env.give_essence("legendary", 9)
-        await env.give_essence("cindrax", 99)
-        for ascended_id in ("guardian", "cindrax"):
+        await env.give(guardian=AscendedRecord("ann", "guardian", 5, 1, 0, tier_id="unique"))
+        await env.give_essence("unique", 9)
+        for ascended_id in ("guardian",):
             with pytest.raises(UpgradeNotReady):
                 await env.upgrades.add_star("ann", f"s-{ascended_id}", ascended_id)
             with pytest.raises(InvalidRequest):
                 await env.upgrades.raise_tier("ann", f"t-{ascended_id}", ascended_id)
+        await env.close()
+
+    run(scenario())
+
+
+@pytest.mark.parametrize("ascended_id,tier,cap,cost", [
+    ("twoychi", "legendary", 20, 5), ("cindrax", "forbidden", 50, 10),
+])
+def test_terminal_tiers_gain_stars_to_their_cap_without_unlocking_a_tier(tmp_path, ascended_id, tier, cap, cost):
+    async def scenario():
+        env = make(tmp_path)
+        await env.start_player()
+        await env.give(**{ascended_id: AscendedRecord("ann", ascended_id, 2, 1, 0, tier_id=tier, stars=cap - 1)})
+        await env.give_essence(tier, cost * 2)
+        before = next(a for a in (await env.collection.profile("ann"))["ascendeds"] if a["ascended_id"] == ascended_id)
+        assert (before["stars_needed"], before["can_star_up"], before["can_tier_up"], before["next_tier_id"]) == (cap, True, False, None)
+        result = await env.upgrades.add_star("ann", "last-star", ascended_id)
+        assert (result["stars"], result["stars_needed"], result["can_tier_up"]) == (cap, cap, False)
+        saved = await state(env, ascended_id)
+        with pytest.raises(UpgradeNotReady, match="stars are full"):
+            await env.upgrades.add_star("ann", "over-cap", ascended_id)
+        with pytest.raises(InvalidRequest):
+            await env.upgrades.raise_tier("ann", "raise", ascended_id)
+        assert await state(env, ascended_id) == saved
+        ascended, essences = saved
+        assert (ascended.stars, ascended.copies, ascended.tier_id) == (cap, 1, tier)
+        assert essences == {tier: cost}
+        after = next(a for a in (await env.collection.profile("ann"))["ascendeds"] if a["ascended_id"] == ascended_id)
+        assert (after["stars_needed"], after["can_star_up"], after["can_tier_up"]) == (cap, False, False)
         await env.close()
 
     run(scenario())
