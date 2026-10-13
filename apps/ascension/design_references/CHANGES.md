@@ -1,7 +1,7 @@
 # Ascension UI changes, 2026-10-13
 
 Record of the UI edits made on `main` after `7a149df` (`feat(ascension): checkpoint UI redesign progress`),
-up to `8a9e571`. `manifest.json` holds the SHA-256 of every file below as committed at `8a9e571`.
+up to `9cfa4c6`. `manifest.json` holds the SHA-256 of every file below as committed at `9cfa4c6`.
 After merging another branch, run `python design_references/verify.py` from `apps/ascension/`.
 A file reported `CHANGED` was edited by the merge: check that these changes survived.
 
@@ -33,6 +33,10 @@ Paths are relative to `apps/ascension/`.
 | Not collected cards are only the face-down preview card (no name, no hint, no wrapper), with the same hover lift | `web/src/components/CollectionPanel.vue`, `web/src/components/CollectionPanel.test.ts` |
 | Starter screen uses the preview card (stars, level, stats) in a row with a single "Start with ..." button; the large template card and the "Your chosen starter" panel are removed | `web/src/components/StarterPick.vue`, `web/src/components/StarterPick.test.ts`, `web/src/App.test.ts` |
 | Main menu cards and the wild encounter card show stars and stats; the Encounter squad picker uses preview cards (fainted ones greyed with a countdown). Remaining screens are listed in `TODO.md` | `web/src/components/MainMenu.vue`, `web/src/components/MainMenu.test.ts`, `web/src/components/EncounterPanel.vue`, `web/src/components/EncounterPanel.test.ts` |
+| Battle preparation: wild opponent and your fighter are two preview cards side by side (new `wildMultiplier` prop), the squad options sit below them as bare preview cards, the Battle plan stays in a right column | `web/src/components/BattleMatchup.vue`, `web/src/components/BattleMatchup.test.ts`, `web/src/components/EncounterPanel.vue` |
+| Picked card on the starter and battle preparation screens: no padding, no outline and no ring; it keeps a glow and a subtle vertical drift, hover rises, grows and blooms in the tier colour | `web/src/components/ui/EmPickCard.vue`, `web/src/components/StarterPick.test.ts` |
+| Battle: Skip button, click-to-skip and `skip()` removed, so every round animation plays to the end | `web/src/components/BattleArena.vue`, `web/src/stores/playback.ts`, `web/src/stores/playback.test.ts` |
+| Portrait battle (900px and below): the "Your move" bar sits above the round log | `web/src/App.vue` |
 
 ## Commits
 
@@ -46,3 +50,4 @@ Paths are relative to `apps/ascension/`.
 - `759a78a` empty squad allowed, fainted indicators, star cost list, squad help tooltip
 - `aa18682` tier-coloured card frame with stars, slimmer collection caption, squad uses preview card
 - `8a9e571` preview card everywhere it fits, details open on press, ornate rounded frame with stats
+- `9cfa4c6` preview-card matchup and squad picker, glow-only pick animation, no skip, portrait move bar above log

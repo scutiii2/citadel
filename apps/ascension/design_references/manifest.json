@@ -1,7 +1,7 @@
 {
-  "recorded_at_commit": "8a9e571",
+  "recorded_at_commit": "9cfa4c6",
   "files": {
-    "web/src/App.vue": "74229e7c2ceee759a857e0880935def72b99d4640a0dc6c7e8dead90ccee708e",
+    "web/src/App.vue": "990be6164544e6a04162a3eb5b0dff01eaec06ddfa11b9d0c52e50f0d25294ed",
     "web/src/App.test.ts": "bd19eb4a58b1f01d25c546bfc5fc70b686a9236f068e8f8ba83650d24d68d8d3",
     "web/src/components/BattleControls.vue": "f7b3f7100d8f2a6844c8619dc720023d5d2584b14341fa2380bad206ea2c47cf",
     "web/src/components/BattlePanels.test.ts": "8d53549b60688483a9dada22421c67acf446d6f368fe5165ad81b8ecec6fcce9",
@@ -14,7 +14,7 @@
     "web/src/components/ui/EmTabs.vue": "70647333896e0cd1722d5810bfd70cd4397b251c8b803e4797aef04cb3843c2d",
     "web/src/components/ui/icons.ts": "7bc7b2947b1edfb3e7fc8b6fee20548863052a38a8cac1fa0e5db0618fdf92b0",
     "web/src/components/AscendedCard.vue": "256f039927a16e735aa1c859ece3ef09d9a4c3a39beeafab2fe7eabb34a9cd6a",
-    "web/src/components/EncounterPanel.vue": "ba43adb7cce74609d08bec13217fb2ef7b62e0b6e786ba059cf5a1b428e445cc",
+    "web/src/components/EncounterPanel.vue": "f66bb531ba5f6225945aff5fb02b23028f7c150519591e5d34fba8e249916c07",
     "src/ascension/squad.py": "f584e1510c9c5d3186d06dd90bb81929ea82b3a5b7946721fbdf6c4329937a62",
     "tests/ascension/test_squad.py": "773e4827fa4964df3ac127ecd3d1bda42ff4e7a855c95f0c3cf2e8b65d020021",
     "web/src/components/AscendedPreviewCard.vue": "56337895b5d3635e14c5d298a5d26fd828c9cd829e2242a0a66e2d1d65640759",
@@ -24,7 +24,13 @@
     "web/src/components/MainMenu.test.ts": "af2fcdb6a9ee74947222139231b6ff9095d2b0fbcec453007057f3a3558fe129",
     "web/src/components/EncounterPanel.test.ts": "122382f87c3ab88deb21699c93674f7ca9ecb49cebd9154b5d489a460002d382",
     "web/src/components/StarterPick.vue": "8b81d5978ee79924eee5756dc049667d32c90c342d9275e87b08a9d1265390a7",
-    "web/src/components/StarterPick.test.ts": "f0c92d82961d72e1acfbeeaad2eed24a448cb897e56867e7decaadfdb09410c2",
-    "web/src/utils/ascension.ts": "7a8b56e0cdcedd8d5276bb86fb99031cb1319a7b4870ed7c526492c8d621cc0e"
+    "web/src/components/StarterPick.test.ts": "2aa9993f8ae0391043d96ad5c9c02766f1436e7b2251cb1f26ec536adaf8d9ef",
+    "web/src/utils/ascension.ts": "7a8b56e0cdcedd8d5276bb86fb99031cb1319a7b4870ed7c526492c8d621cc0e",
+    "web/src/components/BattleMatchup.vue": "632397dd88965f9f0ce9cde510116d2c7cc69e76dba61bfc05e8fede182d032c",
+    "web/src/components/BattleMatchup.test.ts": "4c2265f31b08cdc679e83749491562aebb5c41df3c0ed6ad3e13adbd1b8240c3",
+    "web/src/components/BattleArena.vue": "02e5309d935f75edcec7159c2012723539e7bb6131f2f621f35076fbc0235b18",
+    "web/src/components/ui/EmPickCard.vue": "f17adfd08fe00eb10dcd95035393d7fd809cdeb39b8335ca38ef334a46030fda",
+    "web/src/stores/playback.ts": "736ebe153d7cd26ea8836537edb16ef693b310f6d7141f370aee3ab782798eec",
+    "web/src/stores/playback.test.ts": "453e9fb03872765caae27169bf7203e1b0364a92eba6b13fc3faf9cbb153d23c"
   }
 }
