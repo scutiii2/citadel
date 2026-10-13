@@ -481,22 +481,51 @@ function pose(key: string) {
 }
 @media (max-width: 700px) {
   .arena {
-    padding: 18px;
+    padding: var(--em-space-3);
   }
   .fighters {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
+    position: relative;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--em-space-2);
   }
   .versus {
-    order: 2;
-    margin: 12px 0;
-    font-size: 18px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 1;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    text-shadow: 0 2px 0 #000a;
   }
-  .wild {
-    order: 3;
+  .head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    margin-bottom: 4px;
+  }
+  .head h3 {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .badges :deep(svg),
+  .badges :deep(img) {
+    max-width: 20px;
+    max-height: 20px;
+  }
+  .hp {
+    margin-top: 2px;
+    font-size: 11px;
   }
   .art {
-    height: 155px;
+    height: 110px;
+    margin-top: var(--em-space-2);
+  }
+  .stats,
+  .effects {
+    font-size: 11px;
   }
 }
 </style>

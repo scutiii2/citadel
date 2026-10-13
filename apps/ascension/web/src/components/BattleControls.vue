@@ -61,4 +61,11 @@ function forfeit(): void {
   gap: var(--em-space-3);
   margin-bottom: var(--em-space-4);
 }
+@media (max-width: 700px) {
+  .controls {
+    flex-wrap: nowrap;
+    gap: var(--em-space-2);
+    margin-bottom: 0;
+  }
+}
 </style>

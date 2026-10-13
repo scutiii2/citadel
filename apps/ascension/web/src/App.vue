@@ -53,6 +53,8 @@ const showingSettings = ref(false);
 const confirmingReset = ref(false);
 const hasAccount = computed(() => session.status === "ready" && store.loaded && !store.unavailable && store.profile !== null);
 const inBattle = computed(() => store.profile?.active_battle != null || store.battle?.status === "active");
+/** A battle being fought (or replayed): on a narrow screen only the battle shows, the masthead steps aside. */
+const fighting = computed(() => screen.value === "game" && tab.value === "battle" && !!store.battle && !(store.battle.result && !playback.busy));
 const tab = ref<Tab>("collection");
 const tabs: EmTabOption[] = [
   { value: "battle", label: "Battle", icon: "play" },
@@ -145,7 +147,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 </script>
 
 <template>
-  <section ref="page" class="em-root ascension-page">
+  <section ref="page" class="em-root ascension-page" :class="{ fighting }">
     <EmShell :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
       <template v-if="hasAccount" #actions>
         <EmButton class="account-action" aria-label="How to play" title="How to play" @click="showingHelp = true"><EmIcon name="book" /><span class="action-label">How to play</span></EmButton>
@@ -315,7 +317,15 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 @media (max-width: 700px) {
   .battle-bottom {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--em-space-4);
+    gap: var(--em-space-3);
+    margin-top: var(--em-space-3);
   }
+  .fighting :deep(.mast) { display: none; }
+  .fighting :deep(.screen-heading) { padding: var(--em-space-2) var(--em-space-3); }
+  .fighting :deep(.screen-heading .head) { gap: var(--em-space-2); }
+  .fighting :deep(.screen-heading .em-eyebrow),
+  .fighting :deep(.screen-heading .subtitle) { display: none; }
+  .fighting :deep(.screen-heading .title) { margin: 0; font-size: 14px; }
+  .fighting :deep(.main) { padding: var(--em-space-3) var(--em-space-3) var(--em-space-4); }
 }
 </style>

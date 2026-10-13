@@ -187,6 +187,19 @@ function throwEmblem(tier: string): void {
 @media (max-width: 700px) {
   .actions {
     grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .head {
+    margin-bottom: var(--em-space-2);
+  }
+  .head h3 {
+    font-size: 14px;
+  }
+  .action {
+    padding: 6px 4px;
+  }
+  .action-detail {
+    font-size: 11px;
   }
 }
 </style>
