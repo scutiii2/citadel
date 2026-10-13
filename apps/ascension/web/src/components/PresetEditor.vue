@@ -74,9 +74,8 @@ async function save(): Promise<void> {
   <section class="preset-editor">
     <div class="personality-library"><h4 class="heading em-pixel">Revealed personalities</h4>
     <EmNotice v-if="loadError" tone="error">{{ loadError }}</EmNotice>
-    <p v-else-if="loading" class="muted">Loading …</p>
     <p v-else-if="personalities.length === 0" class="muted">This Ascended has no personalities yet.</p>
-    <ul v-else class="choices personalities">
+    <ul v-else class="choices personalities" :class="{ busy: loading }" :aria-busy="loading">
       <li v-for="p in personalities" :key="p.id" :class="{ selected: chosen.includes(p.id) }">
         <EmSwitch :model-value="chosen.includes(p.id)" :label="titleCase(p.type)" :disabled="loading || (!chosen.includes(p.id) && full)" @update:model-value="toggle(p.id, $event)">
           <EmTierBadge tier-id="common" :label="`Tier ${p.tier}`" class="badge" />
@@ -116,6 +115,8 @@ async function save(): Promise<void> {
 .slots :deep(.tab) { flex: 1; min-width: 0; padding-inline: 8px; }
 .count { font-size: 12px; color: var(--em-muted); margin: 0; }
 .choices { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.choices { transition: opacity 150ms ease 250ms; }
+.choices.busy { opacity: 0.6; }
 .choices li { padding: 14px; border: 1px solid var(--em-border); background: linear-gradient(135deg, var(--em-panel), var(--em-bg)); }
 .choices li.selected { border-color: var(--em-accent); box-shadow: inset 3px 0 var(--em-accent); }
 .personality-description { color: var(--em-muted); font-size: 12px; margin: 8px 0 0; }

@@ -23,7 +23,6 @@ import TypeSymbol from "./ui/TypeSymbol.vue";
 /** Collection filters, squad strip and selected Ascended inspector, with full
  * progression, personalities and ability-tree operations in the details dialog. */
 const store = useAscensionStore();
-defineProps<{ controlsTarget?: HTMLElement | null }>();
 const ascensionClient = useAscensionClient();
 const PAGE_SIZE = 50;
 
@@ -431,11 +430,11 @@ h3 small { color: var(--em-muted); font-size: 12px; margin-left: 12px; }
 .group-name { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14px; }
 .group-name small { color: var(--em-muted); }
 .collection :deep(.em-dialog.ascended-details) { width: min(1440px, calc(100vw - 32px)); box-sizing: border-box; padding: 20px; }
-.details { display: grid; grid-template-columns: 218px minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
-.details.tree-expanded { grid-template-columns: 190px minmax(0, 1fr); }
+.details { display: grid; grid-template-columns: 218px minmax(0, 1fr) 280px; gap: 16px; align-items: stretch; height: min(820px, calc(100dvh - 150px)); }
+.details.tree-expanded .side { grid-column: 2 / -1; }
+.details > * { min-height: 0; overflow-y: auto; }
 .summary { display: flex; flex-direction: column; gap: 12px; padding: 12px; min-width: 0; }
 .detail-portrait { width: 100%; height: 260px; object-fit: contain; image-rendering: pixelated; background: #060d15; border: 1px solid var(--em-border); }
-.tree-expanded .detail-portrait { height: 150px; }
 .name { margin: 0; font-size: 17px; }
 .level { color: var(--em-muted); margin: 0; font-size: 13px; }
 .copy-summary { padding-block: 12px; border-block: 1px solid var(--em-divider); font-size: 13px; }
@@ -475,6 +474,6 @@ h3 small { color: var(--em-muted); font-size: 12px; margin-left: 12px; }
 .more { min-height: 44px; color: var(--em-accent); background: transparent; border: 0; font: inherit; cursor: pointer; }
 button:focus-visible, input:focus-visible, select:focus-visible, .squad-card:focus-visible { outline: 2px solid var(--em-accent); outline-offset: 3px; }
 @media (max-width: 1180px) { .collection { grid-template-columns: 160px minmax(0, 1fr) 230px; gap: 12px; } .details { grid-template-columns: 180px minmax(0, 1fr); } .progression-panel { grid-column: 2; } .inspector-portrait { height: 190px; } }
-@media (max-width: 900px) { .collection { grid-template-columns: 150px minmax(0, 1fr); } .collection-inspector { position: static; grid-column: 2; display: grid; grid-template-columns: 120px minmax(0, 1fr); } .inspector-portrait { grid-column: 1; grid-row: 2 / span 3; height: 140px; } .collection-inspector .current-stats { grid-column: 2; } .collection-inspector .open-details, .collection-inspector > .em-btn { grid-column: 1 / -1; } .details.tree-expanded { grid-template-columns: minmax(0, 1fr); } .tree-expanded .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); align-items: start; } .tree-expanded .summary .detail-portrait { grid-row: 1 / span 4; height: 150px; } .tree-expanded .summary .battle-status, .tree-expanded .summary .squad-control { grid-column: 1 / -1; } }
+@media (max-width: 900px) { .details { height: auto; } .details.tree-expanded .side { grid-column: 1; } .details > * { overflow-y: visible; } .collection { grid-template-columns: 150px minmax(0, 1fr); } .collection-inspector { position: static; grid-column: 2; display: grid; grid-template-columns: 120px minmax(0, 1fr); } .inspector-portrait { grid-column: 1; grid-row: 2 / span 3; height: 140px; } .collection-inspector .current-stats { grid-column: 2; } .collection-inspector .open-details, .collection-inspector > .em-btn { grid-column: 1 / -1; } .details.tree-expanded { grid-template-columns: minmax(0, 1fr); } .tree-expanded .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); align-items: start; } .tree-expanded .summary .detail-portrait { grid-row: 1 / span 4; height: 150px; } .tree-expanded .summary .battle-status, .tree-expanded .summary .squad-control { grid-column: 1 / -1; } }
 @media (max-width: 600px) { .collection { grid-template-columns: minmax(0, 1fr); } .filter-rail { position: static; gap: 12px; } .chips { flex-direction: row; flex-wrap: wrap; } .filters { gap: 12px; } .collection-inspector { grid-column: 1; } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-card { grid-template-columns: 48px minmax(0, 1fr); } .squad-portrait, .squad-placeholder { width: 48px; height: 80px; } .squad-empty { min-height: 90px; } .details { grid-template-columns: minmax(0, 1fr); } .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); } .summary .detail-portrait { grid-row: span 4; height: 150px; } .summary .battle-status { grid-column: 1 / -1; } .progression-panel { grid-column: 1; } .collection :deep(.em-dialog.ascended-details) { padding: 14px; } }
 </style>
