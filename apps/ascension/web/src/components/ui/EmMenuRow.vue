@@ -35,10 +35,10 @@ withDefaults(defineProps<{ icon: IconName; variant?: "primary" | "secondary" | "
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  transition: background-color 120ms ease;
+  transition: filter 120ms ease;
 }
 .em-row:hover:not(:disabled) {
-  background: #2f4153;
+  filter: brightness(1.25);
 }
 .label {
   flex: 1;
@@ -55,7 +55,7 @@ withDefaults(defineProps<{ icon: IconName; variant?: "primary" | "secondary" | "
   box-shadow: 0 3px 0 var(--em-accent-edge);
 }
 .primary:hover:not(:disabled) {
-  background: #f7c394;
+  filter: brightness(1.08);
 }
 .danger {
   border-color: var(--em-danger);
