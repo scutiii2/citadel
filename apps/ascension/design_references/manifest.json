@@ -4,7 +4,7 @@
     "web/src/App.vue": "43fdd48978c21d918a593b04c12de4d8673eabf376100cbff2aa6f85473aa714",
     "web/src/App.test.ts": "49267b964f1f56c8bff139f34a7e20f3125c8a69c8617c2f26c8bfb09fb157b9",
     "web/src/components/BattleControls.vue": "f2e834451f0a8a9a61726472e924862de187eb5ec1943f5c1fdf1e45f31228c3",
-    "web/src/components/BattlePanels.test.ts": "8f8eb695454784611b8b02b1ca55d01524ccd65fb1375fddc7cca7dfcc5440a4",
+    "web/src/components/BattlePanels.test.ts": "7b4f3b786ae95b928561002359f0ff6180684651b47c05f9d27eda39e5e8fbf2",
     "web/src/components/CollectionPanel.vue": "031c7453ba5252ff252f1e8120f54038ee3b1b7e7be8fc9dfca8d66e11bfd235",
     "web/src/components/PresetEditor.vue": "68993b6e23bf22f2bbc46aa574ef3afb6091b3694de04204260afd56a5df5851",
     "web/src/components/TreeTab.vue": "cdbef926478de3d82e5f721c78a1e2d45cc0d9e8391bff39223ea97e160074ea",
@@ -32,6 +32,6 @@
     "web/src/components/ui/EmPickCard.vue": "f17adfd08fe00eb10dcd95035393d7fd809cdeb39b8335ca38ef334a46030fda",
     "web/src/stores/playback.ts": "736ebe153d7cd26ea8836537edb16ef693b310f6d7141f370aee3ab782798eec",
     "web/src/stores/playback.test.ts": "453e9fb03872765caae27169bf7203e1b0364a92eba6b13fc3faf9cbb153d23c",
-    "web/src/components/BattleResult.vue": "f10827561bafb16a47ce7a90a2f9600bd6d7dccae36319b9ea5f607c45317314"
+    "web/src/components/BattleResult.vue": "92aac7fa2cdc93c29fb4dae68d1c2b2687870578ee174b63cfaad76b99ccb5bd"
   }
 }

@@ -1,7 +1,7 @@
 # Ascension UI changes, 2026-10-13
 
 Record of the UI edits made on `main` after `7a149df` (`feat(ascension): checkpoint UI redesign progress`),
-up to `7030ea6`. `manifest.json` holds the SHA-256 of every file below as committed at `7030ea6`.
+up to `40ea9ec`. `manifest.json` holds the SHA-256 of every file below as committed at `40ea9ec`.
 After merging another branch, run `python design_references/verify.py` from `apps/ascension/`.
 A file reported `CHANGED` was edited by the merge: check that these changes survived.
 
@@ -38,6 +38,9 @@ Paths are relative to `apps/ascension/`.
 | Battle: Skip button, click-to-skip and `skip()` removed, so every round animation plays to the end | `web/src/components/BattleArena.vue`, `web/src/stores/playback.ts`, `web/src/stores/playback.test.ts` |
 | Portrait battle (900px and below): the "Your move" bar sits above the round log | `web/src/App.vue` || Collection filter rail: the Collection/Battle/Shop nav is removed (the header already navigates) | `web/src/components/CollectionPanel.vue`, `web/src/components/CollectionPanel.test.ts`, `web/src/App.vue` |
 | Capture result: a suspense roulette laps the revealed personalities, slows and stops on the awarded one (glow, "(now yours)", others dim); clicking the list skips it | `web/src/components/BattleResult.vue`, `web/src/components/BattlePanels.test.ts` |
+| Capture result roulette fix: the backend now sends `awarded_index` (the award gets a new id, so id matching never worked) | `src/ascension/progression.py`, `tests/ascension/test_progression.py`, `web/src/api/AscensionClient.ts`, `web/src/components/BattleResult.vue`, `web/src/components/BattlePanels.test.ts` |
+| Turn options by category colour: basic attack orange, attack red, defense blue, support green, catch yellow, flee purple, cooldown grey | `web/src/components/ActionBar.vue` |
+| Turn options keep a fixed order (Attack, abilities in own order, Flee, Catch); a cooling ability keeps its slot | `web/src/components/ActionBar.vue`, `web/src/components/BattlePanels.test.ts` |
 
 ## Commits
 
@@ -54,3 +57,5 @@ Paths are relative to `apps/ascension/`.
 - `9cfa4c6` preview-card matchup and squad picker, glow-only pick animation, no skip, portrait move bar above log
 - `63e9d86` align UI with approved designs
 - `7030ea6` suspense roulette for captured personality, drop collection nav rail
+- `1296fc8` category colours on turn options, roulette fix via `awarded_index`
+- `40ea9ec` stable turn option order while abilities cool down
