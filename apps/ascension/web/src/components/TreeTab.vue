@@ -20,7 +20,9 @@ const client = useAscensionClient();
 
 const NODE_W = 96;
 const NODE_H = 96;
-const ICON_RADIUS = 48;
+const ICON_RADIUS = NODE_W * 0.47;
+const ORIGIN_W = 105;
+const ORIGIN_H = 92;
 /** Ability art belongs to its Ascended: ascended/<id>/icon_<node-id>.webp. */
 const abilityIcons = import.meta.glob<string>("../../../ascended/*/icon_*.webp", { eager: true, import: "default" });
 const nodeSprite = (node: TreeNodeState): string => abilityIcons[`../../../ascended/${props.ascended.ascended_id}/icon_${node.id}.webp`] ?? placeholderIcon;
@@ -71,6 +73,17 @@ const layout = computed(() => {
   return { ...radial, positions, width, height: (maxDepth + 1) * 146 + 180, center: { x: width / 2, y: (maxDepth + 1) * 146 + 65 } };
 });
 const point = (id: string) => layout.value.positions.get(id) ?? layout.value.center;
+/** Intersect a ray with the actual circle or octagon outline, rather than its bounding box. */
+function nodeEdge(node: TreeNodeState, toward: { x: number; y: number }): { x: number; y: number } {
+  const center = point(node.id);
+  const dx = toward.x - center.x, dy = toward.y - center.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const ux = dx / length, uy = dy / length;
+  const distance = node.kind === 'passive' ? ICON_RADIUS : Math.min(
+    ICON_RADIUS / Math.abs(ux), ICON_RADIUS / Math.abs(uy), NODE_W * 0.67 / (Math.abs(ux) + Math.abs(uy)),
+  );
+  return { x: center.x + ux * distance, y: center.y + uy * distance };
+}
 const width = computed(() => layout.value.width);
 const height = computed(() => layout.value.height);
 const info = computed(() => store.catalog?.ascendeds.find(n => n.id === props.ascended.ascended_id));
@@ -86,6 +99,17 @@ const highlighted = computed(() => {
   return ids;
 });
 const rootNodes = computed(() => tree.value?.nodes.filter(n => n.root || n.requires.length === 0) ?? []);
+const equippedPaths = computed(() => {
+  const ids = new Set<string>();
+  const pending = Object.values(tree.value?.loadout ?? {}).filter((id): id is string => !!id);
+  while (pending.length) {
+    const id = pending.pop()!;
+    if (ids.has(id)) continue;
+    ids.add(id);
+    pending.push(...(byId.value.get(id)?.requires ?? []));
+  }
+  return ids;
+});
 const nodeIcon = (node: TreeNodeState): IconName => node.kind === "passive" ? "flame" : node.category === "DEFENSE" ? "shield" : node.category === "SUPPORT" ? "arrow" : node.category === "FLEE" ? "feather" : node.category === "INTERCEPT" ? "ascended" : "sword";
 const learned = computed(() => tree.value?.nodes.filter(n => n.state === 'learned').length ?? 0);
 const requirements = computed(() => {
@@ -142,17 +166,17 @@ function swallowClick(event: MouseEvent): void {
 }
 
 const lines = computed(() => {
-  const out: { key: string; path: string; highlighted: boolean; shared: boolean; learned: boolean }[] = [];
+  const out: { key: string; path: string; highlighted: boolean; shared: boolean; learned: boolean; equipped: boolean }[] = [];
   for (const node of tree.value?.nodes ?? []) {
     for (const required of node.requires) {
       const from = byId.value.get(required);
       if (from) {
         const a = point(from.id), b = point(node.id);
-        const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy) || 1;
-        const cut = ICON_RADIUS + 4;
+        const cut = ICON_RADIUS;
+        const start = nodeEdge(from, b), end = nodeEdge(node, a);
         const elbow = (a.y + b.y) / 2;
-        const path = (tree.value?.nodes.length ?? 0) <= 20 ? `M ${a.x} ${a.y - cut} L ${a.x} ${elbow} L ${b.x} ${elbow} L ${b.x} ${b.y + cut}` : `M ${a.x + dx / length * cut} ${a.y + dy / length * cut} L ${b.x - dx / length * cut} ${b.y - dy / length * cut}`;
-        out.push({ key: `${required}>${node.id}`, path, highlighted: highlighted.value.has(node.id) && highlighted.value.has(required), shared: layout.value.sharedIds.has(node.id), learned: from.state === 'learned' && node.state === 'learned' });
+        const path = (tree.value?.nodes.length ?? 0) <= 20 ? `M ${a.x} ${a.y - cut} L ${a.x} ${elbow} L ${b.x} ${elbow} L ${b.x} ${b.y + cut}` : `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+        out.push({ key: `${required}>${node.id}`, path, highlighted: highlighted.value.has(node.id) && highlighted.value.has(required), shared: layout.value.sharedIds.has(node.id), learned: from.state === 'learned' && node.state === 'learned', equipped: equippedPaths.value.has(node.id) });
       }
     }
   }
@@ -160,10 +184,13 @@ const lines = computed(() => {
 });
 const rootLines = computed(() => rootNodes.value.map(node => {
   const a = layout.value.center, b = point(node.id);
-  const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy) || 1;
-  const elbow = (a.y - 60 + b.y + ICON_RADIUS) / 2;
-  const path = (tree.value?.nodes.length ?? 0) <= 20 ? `M ${b.x} ${b.y + ICON_RADIUS} L ${b.x} ${elbow} L ${a.x} ${elbow} L ${a.x} ${a.y - 60}` : `M ${a.x + dx / length * 70} ${a.y + dy / length * 70} L ${b.x - dx / length * (ICON_RADIUS + 4)} ${b.y - dy / length * (ICON_RADIUS + 4)}`;
-  return { id: node.id, highlighted: highlighted.value.has(node.id), path };
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const horizontal = Math.abs(dx) / ORIGIN_W > Math.abs(dy) / ORIGIN_H;
+  const anchor = horizontal ? { x: a.x + Math.sign(dx) * ORIGIN_W / 2, y: a.y } : { x: a.x, y: a.y + Math.sign(dy) * ORIGIN_H / 2 };
+  const end = nodeEdge(node, anchor);
+  const elbow = (a.y - ORIGIN_H / 2 + b.y + ICON_RADIUS) / 2;
+  const path = (tree.value?.nodes.length ?? 0) <= 20 ? `M ${b.x} ${b.y + ICON_RADIUS} L ${b.x} ${elbow} L ${a.x} ${elbow} L ${a.x} ${a.y - ORIGIN_H / 2}` : `M ${anchor.x} ${anchor.y} L ${end.x} ${end.y}`;
+  return { id: node.id, highlighted: highlighted.value.has(node.id), equipped: equippedPaths.value.has(node.id), path };
 }));
 
 async function load(): Promise<void> {
@@ -260,12 +287,11 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
           <svg class="lines" :width="width" :height="height" aria-hidden="true">
             <circle class="orbit" :cx="layout.center.x" :cy="layout.center.y" r="210" />
             <circle class="orbit" :cx="layout.center.x" :cy="layout.center.y" r="360" />
-            <path v-for="l in rootLines" :key="l.id" class="origin-line" :class="{ highlighted: l.highlighted }" :d="l.path" />
-            <path v-for="l in lines" :key="l.key" class="tree-line" :class="{ learned: l.learned, highlighted: l.highlighted, 'shared-link': l.shared, concealed: l.shared && !l.highlighted }" :d="l.path" />
+            <path v-for="l in rootLines" :key="l.id" class="origin-line" :data-to="l.id" :data-origin-start="tree.nodes.length > 20" :class="{ highlighted: l.highlighted, equipped: l.equipped }" :d="l.path" />
+            <path v-for="l in lines" :key="l.key" class="tree-line" :data-from="l.key.split('>')[0]" :data-to="l.key.split('>')[1]" :class="{ learned: l.learned, highlighted: l.highlighted, equipped: l.equipped, 'shared-link': l.shared, concealed: l.shared && !l.highlighted && !l.equipped }" :d="l.path" />
           </svg>
-          <div class="origin-hub" :style="{ left: `${layout.center.x}px`, top: `${layout.center.y}px` }">
+          <div class="origin-hub" :style="{ left: `${layout.center.x}px`, top: `${layout.center.y}px`, width: `${ORIGIN_W}px`, height: `${ORIGIN_H}px` }">
             <div class="hub-portrait"><img v-if="portrait" :src="portrait" :alt="ascended.name" :style="{ objectPosition: `50% ${spriteFocus(info?.art, 'battle')}%` }" /><EmIcon v-else name="ascended" :size="44" /></div>
-            <strong>{{ ascended.name }}</strong><small class="em-num">Level {{ ascended.level }} · Origin</small>
           </div>
           <button
             v-for="node in tree.nodes"
@@ -278,12 +304,12 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
             :data-kind="node.kind"
             :aria-pressed="node.id === selectedId"
             :aria-label="`${node.name}, ${node.kind === 'passive' ? 'passive' : 'active ability'}, ${stateLabel(node)}`"
-            :title="`${node.name} · ${node.kind === 'passive' ? 'Passive' : titleCase(node.category ?? '')} · ${stateLabel(node)}`"
             :style="{ left: `${point(node.id).x - NODE_W / 2}px`, top: `${point(node.id).y - NODE_H / 2}px`, width: `${NODE_W}px`, height: `${NODE_H}px` }"
             @click="selectedId = node.id"
           >
             <span class="node-symbol" aria-hidden="true"><svg class="node-shape" viewBox="0 0 100 100"><circle v-if="node.kind === 'passive'" class="node-outline" cx="50" cy="50" r="47" /><polygon v-else class="node-outline" points="30,3 70,3 97,30 97,70 70,97 30,97 3,70 3,30" /></svg><img class="node-icon" :src="nodeSprite(node)" width="64" height="64" alt="" draggable="false" @error="($event.target as HTMLImageElement).src = placeholderIcon" /></span>
             <span class="node-level em-num" aria-hidden="true">{{ node.unlock_level }}</span>
+            <span class="node-tooltip" aria-hidden="true" :style="{ transform: `translate(-50%, -8px) scale(${1 / zoom})` }">{{ node.name }}</span>
           </button>
         </div>
       </div>
@@ -340,6 +366,7 @@ button.slot { padding: 10px 12px; min-height: var(--em-target); border: 1px soli
 .tree-line.highlighted, .origin-line.highlighted { stroke: var(--em-accent); stroke-width: 3; }
 .tree-line.shared-link { stroke-dasharray: 5 6; }
 .tree-line.concealed { visibility: hidden; }
+.tree-line.equipped, .origin-line.equipped { stroke: #ffcf32; filter: drop-shadow(0 0 4px #ffcf3299) drop-shadow(0 0 10px #ffcf3266); }
 .orbit { stroke: var(--em-divider); stroke-width: 1; stroke-dasharray: 2 10; fill: none; opacity: 0.35; }
 button.tree-node { position: absolute; display: grid; place-items: center; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--em-text); font: inherit; cursor: pointer; --node-color: #ffcf32; }
 .tree-node[data-state="locked"] { --node-color: #69737d; }
@@ -353,11 +380,13 @@ button.tree-node { position: absolute; display: grid; place-items: center; paddi
 .tree-node.equipped .node-shape { filter: drop-shadow(0 0 6px #ffcf3299) drop-shadow(0 0 14px #ffcf3266); }
 .node-level { position: absolute; left: 0; bottom: -6px; display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid var(--node-color); border-radius: var(--radius-full); background: #10212d; color: var(--em-text); font-size: 13px; line-height: 1; }
 .tree-node:focus-visible { outline: 2px solid var(--em-text); outline-offset: 7px; border-radius: var(--radius-full); }
-.origin-hub { position: absolute; width: 148px; transform: translate(-50%, -66px); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; text-align: center; }
-.hub-portrait { display: flex; align-items: center; justify-content: center; width: 132px; height: 132px; border: 2px solid var(--em-accent); padding: 6px; border-radius: var(--em-radius); color: var(--em-accent); background: #060d15; }
-.hub-portrait img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; border-radius: var(--em-radius); }
-.origin-hub strong { font-size: 14px; }
-.origin-hub small { color: var(--em-accent); font-size: 11px; }
+.node-tooltip { position: absolute; left: 50%; bottom: 100%; transform-origin: center bottom; padding: 6px 10px; border: 1px solid var(--em-border); border-radius: var(--em-radius); background: #10212d; color: var(--em-text); font-size: 13px; white-space: nowrap; pointer-events: none; visibility: hidden; }
+.tree-node:hover, .tree-node:focus-visible { z-index: 2; }
+.tree-node:hover .node-tooltip, .tree-node:focus-visible .node-tooltip { visibility: visible; }
+.scroll.panning .node-tooltip { visibility: hidden; }
+ .origin-hub { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+.hub-portrait { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; height: 100%; border: 2px solid var(--em-accent); padding: 6px; border-radius: var(--radius-lg); color: var(--em-accent); background: #060d15; overflow: hidden; }
+.hub-portrait img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; border-radius: var(--radius-md); }
 .legend { display: flex; flex-wrap: wrap; gap: var(--em-space-3); color: var(--em-muted); font-size: 11px; margin-top: var(--em-space-2); }
 .legend span { display: flex; align-items: center; gap: 5px; }
 .legend svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; }
@@ -382,7 +411,7 @@ button.tree-node { position: absolute; display: grid; place-items: center; paddi
 .tree-layout{grid-template-columns:minmax(0,1fr) 300px;gap:12px;}.scroll{height:385px;min-height:385px;max-height:480px;background:radial-gradient(ellipse at bottom,#143041,#081b28);}.tree-controls :deep(.em-button){min-height:30px;padding:4px 8px;font-size:11px;}
 .slots{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:12px;}
 button.slot{display:grid;grid-template-columns:30px 32px minmax(0,1fr);gap:8px;align-items:center;padding:6px;min-height:48px;background:linear-gradient(120deg,#173345,#0c2231);border:1px solid var(--em-border);}.slot .slot-number{display:grid;place-items:center;border:1px solid var(--em-border);height:30px;font-size:11px;}.slot .branch-hint{grid-column:3;}.slot>span{font-weight:700;}
-.orbit{display:none;}.node-detail{border-color:var(--em-border);padding:14px;}.node-detail h4{font-size:20px;}.hub-portrait{width:105px;height:92px;}.origin-hub{transform:translate(-50%,-55px);}.origin-hub small{font-size:12px;}.tree-line,.origin-line{stroke-width:3;}.legend{font-size:11px;}
+.orbit{display:none;}.node-detail{border-color:var(--em-border);padding:14px;}.node-detail h4{font-size:20px;}.tree-line,.origin-line{stroke-width:3;}.legend{font-size:11px;}
 @media(max-width:1050px){.tree-layout{grid-template-columns:minmax(0,1fr);}.node-detail{display:flex;}.slots{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:650px){.scroll{height:350px;min-height:350px;}.tree-heading{gap:8px;}.tree-heading p{font-size:11px;}.path-labels{font-size:10px;}.tree-controls{gap:5px;}}
 

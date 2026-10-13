@@ -26,7 +26,7 @@ for (const width of [1440, 768, 375]) {
       ascended_id: "striker", level: 14, essences: { common: 12, rare: 8 },
       slots: [{ id: "a1", kind: "ability", branches: null }, { id: "a2", kind: "ability", branches: null },
         { id: "a3", kind: "ability", branches: null }, { id: "p1", kind: "passive", branches: null }],
-      loadout: { a1: "striker_rending_strike", a2: "striker_battle_focus", a3: "striker_brace", p1: "striker_passive" },
+      loadout: { a1: "striker_flurry", a2: "striker_battle_focus", a3: "striker_brace", p1: "striker_passive" },
       nodes: definitions.map((n: Partial<TreeNodeState> & { id: string }) => {
         const ability = spec.abilities.find((a: { id: string }) => a.id === n.id);
         return { kind: "ability", name: "Low HP Attack Bonus", unlock_level: 1, cost: null, requires: [], ...ability, ...n,
@@ -52,10 +52,31 @@ for (const width of [1440, 768, 375]) {
     await expect(dialog.locator(".copy-summary")).toBeVisible();
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath(`personalities-${width}.png`) });
     await dialog.getByRole("tab", { name: "Ability tree", exact: true }).click();
-    await expect(dialog.locator(".origin-hub")).toContainText("Striker");
+    await expect(dialog.locator(".origin-hub")).toHaveText('');
+    expect(await dialog.locator('.hub-portrait').evaluate(el => parseFloat(getComputedStyle(el).borderRadius))).toBeGreaterThan(0);
     await expect(dialog.locator('[data-node="striker_scorching_edge"] polygon')).toHaveCount(1);
     await expect(dialog.locator('[data-node="striker_passive"] circle.node-outline')).toHaveCount(1);
     await dialog.getByRole("button", { name: "Fit tree", exact: true }).click();
+    expect(await dialog.locator('.canvas').evaluate(canvas => {
+      const pointAt = (path: SVGPathElement, end: boolean) => {
+        const p = path.getPointAtLength(end ? path.getTotalLength() : 0);
+        return new DOMPoint(p.x, p.y).matrixTransform(path.getScreenCTM()!);
+      };
+      const touches = (id: string, p: DOMPoint) => {
+        const shape = canvas.querySelector<SVGGeometryElement>(`.tree-node[data-node="${id}"] .node-outline`)!;
+        return shape.isPointInStroke(p.matrixTransform(shape.getScreenCTM()!.inverse()));
+      };
+      const broken = Array.from(canvas.querySelectorAll<SVGPathElement>('.tree-line')).filter(path =>
+        !touches(path.dataset.from!, pointAt(path, false)) || !touches(path.dataset.to!, pointAt(path, true)));
+      const origin = canvas.querySelector('.hub-portrait')!.getBoundingClientRect();
+      const brokenRoots = Array.from(canvas.querySelectorAll<SVGPathElement>('.origin-line')).filter(path => {
+        const startsAtOrigin = path.dataset.originStart === 'true';
+        const p = pointAt(path, !startsAtOrigin);
+        const onBorder = Math.min(Math.abs(p.x - origin.left), Math.abs(p.x - origin.right), Math.abs(p.y - origin.top), Math.abs(p.y - origin.bottom)) < 2;
+        return !onBorder || !touches(path.dataset.to!, pointAt(path, startsAtOrigin));
+      });
+      return broken.length + brokenRoots.length;
+    })).toBe(0);
     await dialog.locator('[data-node="striker_scorching_edge"]').click();
     await expect(dialog.locator(".node-detail")).toContainText("Flurry learned");
     await expect(dialog.locator(".node-detail")).toContainText("You have 12");
@@ -65,11 +86,18 @@ for (const width of [1440, 768, 375]) {
     expect(await dialog.locator('.tree-node').first().evaluate(el => ({ background: getComputedStyle(el).backgroundImage, shadow: getComputedStyle(el).boxShadow }))).toEqual({ background: 'none', shadow: 'none' });
     expect(await dialog.locator('.node-symbol').first().evaluate(el => getComputedStyle(el).borderTopWidth)).toBe('0px');
     await expect(dialog.locator('[data-node="striker_scorching_edge"] .node-level')).toContainText(String(definitions.find((n: TreeNodeState) => n.id === "striker_scorching_edge").unlock_level));
-    const equipped = dialog.locator('[data-node="striker_rending_strike"]');
+    const equipped = dialog.locator('[data-node="striker_flurry"]');
     await expect(equipped).toHaveClass(/equipped/);
     expect(await equipped.locator('.node-shape').evaluate(el => getComputedStyle(el).filter)).toContain('drop-shadow');
-    expect(await dialog.locator('[data-node="striker_flurry"] .node-shape').evaluate(el => getComputedStyle(el).filter)).toBe('none');
-    expect(await dialog.locator('.tree-line.highlighted').first().evaluate(el => getComputedStyle(el).filter)).toBe('none');
+    expect(await dialog.locator('[data-node="striker_rending_strike"] .node-shape').evaluate(el => getComputedStyle(el).filter)).toBe('none');
+    expect(await dialog.locator('.tree-line.equipped').first().evaluate(el => getComputedStyle(el).filter)).toContain('drop-shadow');
+    expect(await dialog.locator('.tree-line:not(.equipped)').first().evaluate(el => getComputedStyle(el).filter)).toBe('none');
+    expect(await dialog.locator('.origin-line.equipped').first().evaluate(el => getComputedStyle(el).filter)).toContain('drop-shadow');
+    await equipped.hover();
+    await expect(equipped.locator('.node-tooltip')).toBeVisible();
+    await expect(equipped.locator('.node-tooltip')).toHaveText('Flurry');
+    await dialog.getByRole('button', { name: 'Fit tree', exact: true }).hover();
+    await expect(equipped.locator('.node-tooltip')).toBeHidden();
     expect(await dialog.locator('[data-node="striker_sunsteel_cleave"] .node-icon').evaluate(el => getComputedStyle(el).filter)).toBe('grayscale(1)');
     await expect.poll(() => dialog.locator('.node-icon').evaluateAll(images => images.every(img => (img as HTMLImageElement).naturalWidth > 0))).toBe(true);
     await dialog.getByRole("button", { name: "Zoom in", exact: true }).click();

@@ -49,6 +49,17 @@ const mountTab = async () => {
 };
 
 describe("TreeTab", () => {
+  it("lights the prerequisite paths to equipped nodes without lighting their ancestors", async () => {
+    const tree = structuredClone(TREE);
+    tree.nodes[3] = { ...tree.nodes[3]!, state: 'learned' };
+    tree.loadout = { a1: 'g_wall', a2: null, a3: null, p1: null };
+    client.tree.mockResolvedValue(tree);
+    const wrapper = await mountTab();
+    expect(wrapper.findAll('.tree-line.equipped')).toHaveLength(1);
+    expect(wrapper.findAll('.origin-line.equipped')).toHaveLength(1);
+    expect(wrapper.findAll('.tree-node.equipped').map(n => n.attributes('data-node'))).toEqual(['g_wall']);
+    expect(wrapper.find('[data-node="g_wall"] .node-tooltip').text()).toBe('WALL');
+  });
   it("uses the battle sprite for the graph origin", async () => {
     const wrapper = await mountTab();
     expect(wrapper.find(".hub-portrait img").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
@@ -77,7 +88,8 @@ describe("TreeTab", () => {
   });
   it("uses octagons for active abilities and circles for passives around a portrait hub", async () => {
     const wrapper = await mountTab();
-    expect(wrapper.find(".origin-hub").text()).toContain("Guardian");
+    expect(wrapper.find(".origin-hub").text()).toBe('');
+    expect(wrapper.find(".origin-hub img").attributes('alt')).toBe('Guardian');
     expect(wrapper.find('[data-node="g_a"] polygon').exists()).toBe(true);
     expect(wrapper.find('[data-node="g_pass"] circle.node-outline').exists()).toBe(true);
     await wrapper.find('[data-node="g_far"]').trigger("click");
