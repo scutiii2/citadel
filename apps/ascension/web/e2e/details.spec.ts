@@ -108,6 +108,25 @@ for (const width of [1440, 768, 375]) {
     await dialog.getByRole("button", { name: "Fit tree", exact: true }).click();
     await dialog.locator('[data-node="striker_sunsteel_cleave"]').click();
     await expect(dialog.locator(".tree-line.shared-link.highlighted")).toHaveCount(6);
+    for (const control of ['slider', 'wheel']) {
+      await dialog.getByRole('button', { name: 'Zoom in', exact: true }).click();
+      if (control === 'slider') {
+        await dialog.locator('input[aria-label="Zoom"]').evaluate(el => {
+          const input = el as HTMLInputElement;
+          input.value = input.min;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      } else {
+        await dialog.locator('.scroll').evaluate(el => {
+          const box = el.getBoundingClientRect();
+          for (let i = 0; i < 40; i++) el.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, clientX: box.left + 10, clientY: box.top + 10, bubbles: true }));
+        });
+      }
+      await expect.poll(() => dialog.locator('.scroll').evaluate(el => {
+        const view = el.getBoundingClientRect(), canvas = el.querySelector('.canvas')!.getBoundingClientRect();
+        return canvas.left >= view.left - 1 && canvas.right <= view.right + 1 && canvas.top >= view.top - 1 && canvas.bottom <= view.bottom + 1;
+      })).toBe(true);
+    }
     await page.keyboard.press("Escape");
     await expect(dialog).not.toBeVisible();
     expect(api.unexpected).toEqual([]);

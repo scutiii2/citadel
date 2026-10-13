@@ -285,3 +285,27 @@ it("keeps the graph point beneath the cursor stable during wheel zoom", async ()
   expect((150 - after.x) / after.zoom).toBeCloseTo((150 - before.x) / before.zoom);
   expect((90 - after.y) / after.zoom).toBeCloseTo((90 - before.y) / before.zoom);
 });
+
+it.each(['wheel', 'slider'])("can zoom out to fit the whole tree with the %s", async control => {
+  const wrapper = await mountTab();
+  const viewport = wrapper.find('.scroll');
+  Object.defineProperties(viewport.element, {
+    clientWidth: { value: 220 }, clientHeight: { value: 150 },
+  });
+  window.dispatchEvent(new Event('resize'));
+  await flushPromises();
+  if (control === 'wheel') {
+    for (let i = 0; i < 40; i++) viewport.element.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, clientX: 10, clientY: 10, bubbles: true }));
+    await flushPromises();
+  } else {
+    await wrapper.find('input[aria-label="Zoom"]').setValue('0.01');
+  }
+  const canvas = wrapper.find('.canvas').element as HTMLElement;
+  const values = canvas.style.transform.match(/translate\(([^p]+)px, ([^p]+)px\) scale\(([^)]+)\)/)!;
+  const x = Number(values[1]), y = Number(values[2]), scale = Number(values[3]);
+  expect(scale).toBeLessThan(0.3);
+  expect(x).toBeGreaterThanOrEqual(0);
+  expect(y).toBeGreaterThanOrEqual(0);
+  expect(x + parseFloat(canvas.style.width) * scale).toBeLessThanOrEqual(220);
+  expect(y + parseFloat(canvas.style.height) * scale).toBeLessThanOrEqual(150);
+});

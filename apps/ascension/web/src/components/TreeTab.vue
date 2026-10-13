@@ -32,6 +32,7 @@ const selectedId = ref<string | null>(null);
 const error = ref("");
 const loading = ref(false);
 const scroll = ref<HTMLElement | null>(null);
+const viewportSize = ref({ width: 0, height: 0 });
 const zoom = ref(1);
 const pan = ref({ x: 0, y: 0 });
 const panning = ref(false);
@@ -86,6 +87,20 @@ function nodeEdge(node: TreeNodeState, toward: { x: number; y: number }): { x: n
 }
 const width = computed(() => layout.value.width);
 const height = computed(() => layout.value.height);
+const fitZoom = computed(() => viewportSize.value.width && viewportSize.value.height
+  ? Math.min(1, viewportSize.value.width / width.value, viewportSize.value.height / height.value) : MIN_ZOOM);
+const minimumZoom = computed(() => Math.min(MIN_ZOOM, fitZoom.value));
+function measureViewport(): void {
+  viewportSize.value = { width: scroll.value?.clientWidth ?? 0, height: scroll.value?.clientHeight ?? 0 };
+}
+watch(scroll, (el, _, onCleanup) => {
+  measureViewport();
+  if (!el) return;
+  const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measureViewport) : null;
+  observer?.observe(el);
+  window.addEventListener('resize', measureViewport);
+  onCleanup(() => { observer?.disconnect(); window.removeEventListener('resize', measureViewport); });
+}, { flush: 'post' });
 const info = computed(() => store.catalog?.ascendeds.find(n => n.id === props.ascended.ascended_id));
 const portrait = computed(() => spriteFor(info.value?.art, "battle"));
 const highlighted = computed(() => {
@@ -122,10 +137,16 @@ const requirements = computed(() => {
 });
 /** Zooms around a point in the viewport (its centre by default), so what is under it stays put. */
 function setZoom(next: number, cx?: number, cy?: number): void {
+  measureViewport();
   const el = scroll.value;
   const x = cx ?? (el?.clientWidth ?? 0) / 2;
   const y = cy ?? (el?.clientHeight ?? 0) / 2;
-  const value = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next));
+  const value = Math.max(minimumZoom.value, Math.min(MAX_ZOOM, next));
+  if (value === minimumZoom.value && viewportSize.value.width && viewportSize.value.height) {
+    zoom.value = value;
+    pan.value = { x: (viewportSize.value.width - width.value * value) / 2, y: (viewportSize.value.height - height.value * value) / 2 };
+    return;
+  }
   const wx = (x - pan.value.x) / zoom.value, wy = (y - pan.value.y) / zoom.value;
   zoom.value = value;
   pan.value = { x: x - wx * value, y: y - wy * value };
@@ -137,6 +158,7 @@ function centre(value: number): void {
   pan.value = { x: (el?.clientWidth ?? 0) / 2 - layout.value.center.x * value, y: (el?.clientHeight ?? 0) / 2 - layout.value.center.y * value };
 }
 function fit(): void {
+  measureViewport();
   const el = scroll.value;
   if (!el?.clientWidth) return;
   const value = Math.min(1, el.clientWidth / width.value, el.clientHeight / height.value);
@@ -277,7 +299,7 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
       <div class="graph-area">
       <div class="tree-controls">
         <EmButton class="icon-btn" aria-label="Zoom out" title="Zoom out" @click="setZoom(zoom - 0.1)"><EmIcon name="zoomOut" /></EmButton>
-        <input class="zoom-range" type="range" aria-label="Zoom" :min="MIN_ZOOM" :max="MAX_ZOOM" step="0.05" :value="zoom" @input="setZoom(Number(($event.target as HTMLInputElement).value))" />
+        <input class="zoom-range" type="range" aria-label="Zoom" :min="minimumZoom" :max="MAX_ZOOM" step="any" :value="zoom" @input="setZoom(Number(($event.target as HTMLInputElement).value))" />
         <EmButton class="icon-btn" aria-label="Zoom in" title="Zoom in" @click="setZoom(zoom + 0.1)"><EmIcon name="zoomIn" /></EmButton>
         <EmButton class="icon-btn" aria-label="Fit tree" title="Fit tree" @click="fit"><EmIcon name="fit" /></EmButton>
         <span class="em-num zoom-value">{{ Math.round(zoom * 100) }}%</span>
