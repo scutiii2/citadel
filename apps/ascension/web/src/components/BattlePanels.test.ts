@@ -55,6 +55,20 @@ const manual = () =>
   });
 
 describe("BattleArena", () => {
+  it("shows each equipped passive effect directly below its fighter's stats", () => {
+    const view = battleView({ player: { ...fighter('guardian'), passives: [
+      { kind: 'defense_rating_bonus', params: { power_fraction: 0.4 } },
+      { kind: 'low_hp_attack_bonus', params: { hp_below: 0.5, power_fraction: 0.2 } },
+    ] } });
+    withBattle(view);
+    const wrapper = mount(BattleArena, { props: { battle: view } });
+    const passives = wrapper.find('.player .passives');
+    expect(wrapper.find('.player .stats').element.nextElementSibling).toBe(passives.element);
+    expect(passives.findAll('li')).toHaveLength(2);
+    expect(passives.text()).toContain('Defense rating rises by 40% of its Power.');
+    expect(passives.text()).toContain('Below 50% HP');
+    expect(wrapper.find('.wild .passives').exists()).toBe(false);
+  });
   it("lists statuses beside buffs", () => {
     const view = battleView({
       player: fighter("guardian", { statuses: [{ id: "mark:prey", amount: 0, rounds_left: 2 }] }),

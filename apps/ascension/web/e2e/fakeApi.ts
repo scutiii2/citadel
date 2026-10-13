@@ -81,7 +81,10 @@ export class FakeGameApi {
         this.battle = battleView({ round: 3, revision: 3, history: [
           { round: 1, actions: { player: ["attack", "ATTACK"], wild: ["attack", "ATTACK"] }, events: [{ type: "attack", side: "player", damage: 10, protected: false, target_hp: 90 }, { type: "attack", side: "wild", damage: 10, protected: false, target_hp: 90 }] },
           { round: 2, actions: { player: ["ability:guardian_strike", "ATTACK"], wild: ["attack", "ATTACK"] }, events: [{ type: "attack", side: "player", damage: 10, protected: false, target_hp: 80 }, { type: "attack", side: "wild", damage: 10, protected: false, target_hp: 80 }] },
-        ], mode: input.mode, emblem_limit: input.emblem_limit, player: fighter(input.ascended_id), wild: fighter(this.encounter.ascended_id, { name: this.encounter.name, tier_id: this.encounter.tier_id, level: this.encounter.level }) });
+        ], mode: input.mode, emblem_limit: input.emblem_limit,
+        player: fighter(input.ascended_id, { passives: [{ kind: 'defense_rating_bonus', params: { power_fraction: 0.4 } }] }),
+        wild: fighter(this.encounter.ascended_id, { name: this.encounter.name, tier_id: this.encounter.tier_id, level: this.encounter.level,
+          passives: [{ kind: 'low_hp_attack_bonus', params: { hp_below: 0.5, power_fraction: 0.2 } }] }) });
         profile.active_battle = this.battle.id;
         profile.pending_encounter = null;
         return route.fulfill({ status: 201, json: this.battle });

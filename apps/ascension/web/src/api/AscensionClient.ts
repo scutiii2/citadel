@@ -216,6 +216,8 @@ export interface FighterAbility {
 }
 
 export interface Fighter {
+  /** Equipped passive effects frozen when this battle started. */
+  passives?: { kind: string; params: Record<string, unknown> }[];
   statuses?: Status[];
   ascended_id: string;
   name: string;

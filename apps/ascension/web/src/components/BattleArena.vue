@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import type { AscendedInfo, BattleView, Buff, Fighter } from "../api/AscensionClient";
 import { usePlaybackStore } from "../stores/playback";
 import { useAscensionStore } from "../stores/ascension";
-import { statusText } from "../utils/ascension";
+import { passiveText, statusText } from "../utils/ascension";
 import { spriteFor } from "../utils/sprites";
 import EmBar from "./ui/EmBar.vue";
 import EmEmblem from "./ui/EmEmblem.vue";
@@ -104,6 +104,9 @@ function art(fighter: Fighter): string | null {
             >{{ playback.floating.text }}</span>
           </div>
           <p v-if="side.fighter.ascended_id" class="stats em-num">Power {{ side.fighter.power }} · Speed {{ side.fighter.speed }}</p>
+          <ul v-if="side.fighter.passives?.length" class="passives" :aria-label="`${side.fighter.name} passive effects`">
+            <li v-for="(passive, index) in side.fighter.passives" :key="index">{{ passiveText(passive.kind, passive.params) }}</li>
+          </ul>
           <ul v-if="effects(side.fighter).length" class="effects">
             <li v-for="text in effects(side.fighter)" :key="text">{{ side.label }} · {{ text }}</li>
           </ul>
@@ -119,6 +122,8 @@ function art(fighter: Fighter): string | null {
 .player .sprite {
   --dir: 1;
 }
+.passives { margin: 6px 0 0; padding: 0; list-style: none; color: var(--em-muted); font-size: 11px; line-height: 1.5; text-shadow: 0 1px #000; }
+.passives li + li { margin-top: 4px; }
 .wild .sprite {
   --dir: -1;
 }

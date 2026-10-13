@@ -93,6 +93,10 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await expect(page.locator('button.action.unavailable')).toContainText('Requires level 5');
     await expect(page.getByRole("button", { name: "Skip animation" })).toHaveCount(0);
     await expect(page.locator(".battle-side .controls")).toBeVisible();
+    await expect(page.locator('.arena .player .passives')).toContainText('Defense rating rises by 40% of its Power.');
+    await expect(page.locator('.arena .wild .passives')).toContainText('Below 50% HP');
+    expect(await page.locator('.arena .fighter').evaluateAll(fighters => fighters.every(f =>
+      f.querySelector('.passives')!.getBoundingClientRect().top >= f.querySelector('.stats')!.getBoundingClientRect().bottom))).toBe(true);
     const arenaHeight = (await page.locator('.arena').boundingBox())!.height;
     await page.locator('.round-log').evaluate(el => { (el as HTMLElement).style.minHeight = '700px'; });
     expect((await page.locator('.arena').boundingBox())!.height).toBe(arenaHeight);
