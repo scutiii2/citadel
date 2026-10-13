@@ -26,7 +26,20 @@ const BASIC_NOTES: Record<string, string> = { flee: "Try to escape", catch: "Cho
 const paceSeconds = ROUND_PACE_MS / 1000;
 
 const locked = computed(() => props.battle.status !== "active" || props.battle.phase !== "choosing" || store.battleBusy || playback.busy);
-const coolingDown = computed(() => props.battle.player.abilities.filter((a) => !a.ready));
+type Slot = { key: string; action: LegalAction } | { key: string; cooling: BattleView["player"]["abilities"][number] };
+/** Fixed order: the legal basics before the abilities, abilities in the Ascended's own order
+ * (a cooling one keeps its slot), then the rest, so buttons never move as cooldowns change. */
+const slots = computed<Slot[]>(() => {
+  const legal = props.battle.actions;
+  const abilities = props.battle.player.abilities.map((a): Slot => {
+    const action = legal.find((l) => l.kind === "ability" && l.ability_id === a.id);
+    return action ? { key: `ability:${a.id}`, action } : { key: `cooldown:${a.id}`, cooling: a };
+  });
+  const keyed = (l: LegalAction): Slot => ({ key: `${l.kind}:${l.ability_id ?? ""}`, action: l });
+  const before = legal.filter((l) => l.kind === "attack").map(keyed);
+  const after = legal.filter((l) => l.kind !== "attack" && l.kind !== "ability").map(keyed);
+  return [...before, ...abilities, ...after];
+});
 const ownedTiers = computed(() => (store.catalog?.tiers ?? []).filter((t) => (props.battle.emblems[t.id] ?? 0) > 0));
 const catchOpen = ref(false);
 
@@ -71,23 +84,24 @@ function throwEmblem(tier: string): void {
 
     <p v-if="battle.mode === 'autonomous'" class="muted">Your Ascended chooses on its own, one round every {{ paceSeconds }} seconds.</p>
     <div v-else class="actions">
+      <template v-for="slot in slots" :key="slot.key">
       <button
-        v-for="action in battle.actions"
-        :key="`${action.kind}:${action.ability_id ?? ''}`"
+        v-if="'action' in slot"
         type="button"
         class="action"
-        :class="[categoryOf(action), { 'basic-attack': action.kind === 'attack' }]"
+        :class="[categoryOf(slot.action), { 'basic-attack': slot.action.kind === 'attack' }]"
         :disabled="locked"
-        @click="choose(action)"
+        @click="choose(slot.action)"
       >
-        <EmIcon class="action-icon" :name="action.kind === 'catch' ? 'ascended' : action.kind === 'flee' ? 'arrow' : action.category === 'DEFENSE' ? 'shield' : action.category === 'SUPPORT' ? 'flame' : 'sword'" :size="26" />
-        <span class="action-name">{{ label(action) }}</span>
-        <span class="action-detail">{{ detail(action) }}</span>
+        <EmIcon class="action-icon" :name="slot.action.kind === 'catch' ? 'ascended' : slot.action.kind === 'flee' ? 'arrow' : slot.action.category === 'DEFENSE' ? 'shield' : slot.action.category === 'SUPPORT' ? 'flame' : 'sword'" :size="26" />
+        <span class="action-name">{{ label(slot.action) }}</span>
+        <span class="action-detail">{{ detail(slot.action) }}</span>
       </button>
-      <button v-for="ability in coolingDown" :key="`cooldown:${ability.id}`" type="button" class="action cooling" disabled>
-        <EmIcon class="action-icon" name="clock" :size="30" /><span class="action-name">{{ ability.name }}</span>
-        <span class="action-detail">Cooling down ({{ ability.cooldown }} {{ ability.cooldown === 1 ? "round" : "rounds" }})</span>
+      <button v-else type="button" class="action cooling" disabled>
+        <EmIcon class="action-icon" name="clock" :size="30" /><span class="action-name">{{ slot.cooling.name }}</span>
+        <span class="action-detail">Cooling down ({{ slot.cooling.cooldown }} {{ slot.cooling.cooldown === 1 ? "round" : "rounds" }})</span>
       </button>
+      </template>
     </div>
 
     <EmDialog :open="catchOpen" title="Throw which EMBLEM?" @close="catchOpen = false">

@@ -178,10 +178,10 @@ describe("ActionBar", () => {
     const wrapper = mount(ActionBar, { props: { battle: view } });
 
     const buttons = wrapper.findAll("button.action");
-    expect(buttons.map((b) => b.find(".action-name").text())).toEqual(["Attack", "Strike", "Flee", "Catch", "Rally"]);
+    expect(buttons.map((b) => b.find(".action-name").text())).toEqual(["Attack", "Strike", "Rally", "Flee", "Catch"]);
     expect(buttons[1]!.attributes("disabled")).toBeUndefined();
-    expect(buttons[4]!.attributes("disabled")).toBeDefined();
-    expect(buttons[4]!.text()).toContain("Cooling down (3 rounds)");
+    expect(buttons[2]!.attributes("disabled")).toBeDefined();
+    expect(buttons[2]!.text()).toContain("Cooling down (3 rounds)");
   });
 
   it("describes an ability's effects on its button", () => {
@@ -212,7 +212,7 @@ describe("ActionBar", () => {
     client.action.mockResolvedValue(battleView({ mode: "manual", round: 2, revision: 2 }));
     const wrapper = mount(ActionBar, { props: { battle: view } });
 
-    await wrapper.findAll("button.action")[3]!.trigger("click");
+    await wrapper.findAll("button.action")[4]!.trigger("click");
     expect(client.action).not.toHaveBeenCalled();
     await wrapper.findAll("button").find((b) => b.text() === "Common (2)")!.trigger("click");
     await flushPromises();
