@@ -211,7 +211,7 @@ function show(ascended: OwnedAscended): void {
     <main class="collection-main">
     <ul v-if="essences.length" class="essences" aria-label="Essence">
       <li v-for="[tierId, count] in essences" :key="tierId" :style="{ '--tier': `var(--em-tier-${tierId}, var(--em-tier-common))` }">
-        <EmEssence :tier-id="tierId" /><EmTierBadge :tier-id="tierId" :label="`${titleCase(tierId)} essence`" /> <strong class="em-num">{{ count }}</strong>
+        <EmEssence :tier-id="tierId" /><span class="essence-name">{{ titleCase(tierId) }} essence</span> <strong class="em-num">{{ count }}</strong>
       </li>
     </ul>
     <section class="squad-section" aria-label="Squad">
@@ -413,6 +413,7 @@ h3 small { color: var(--em-muted); font-size: 12px; margin-left: 12px; }
 .back { --card-width: 100%; opacity: .6; }
 .essences { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; padding: 0; list-style: none; }
 .essences li { display: flex; gap: 6px; align-items: center; font-size: 12px; }
+.essence-name { color: var(--tier); font-weight: 600; white-space: nowrap; }
 .essence-label { display: inline-flex; gap: 6px; align-items: center; }
 .group { margin-bottom: 18px; }
 .group-name { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14px; }

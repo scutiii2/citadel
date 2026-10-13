@@ -10,6 +10,7 @@ import EmButton from "./ui/EmButton.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmEssence from "./ui/EmEssence.vue";
+import placeholderIcon from "../assets/abilities/ability_placeholder.webp";
 import type { IconName } from "./ui/icons";
 
 /** One Ascended's ability tree: nodes at their own places, learn a node, equip it in a slot. */
@@ -17,10 +18,12 @@ const props = defineProps<{ ascended: OwnedAscended }>();
 const store = useAscensionStore();
 const client = useAscensionClient();
 
-const NODE_W = 216;
-const NODE_H = 108;
-const ICON_RADIUS = 30;
-const showNames = ref(true);
+const NODE_W = 96;
+const NODE_H = 96;
+const ICON_RADIUS = 48;
+/** Ability art belongs to its Ascended: ascended/<id>/icon_<node-id>.webp. */
+const abilityIcons = import.meta.glob<string>("../../../ascended/*/icon_*.webp", { eager: true, import: "default" });
+const nodeSprite = (node: TreeNodeState): string => abilityIcons[`../../../ascended/${props.ascended.ascended_id}/icon_${node.id}.webp`] ?? placeholderIcon;
 
 const tree = ref<TreeView | null>(null);
 const selectedId = ref<string | null>(null);
@@ -147,8 +150,8 @@ const lines = computed(() => {
         const a = point(from.id), b = point(node.id);
         const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy) || 1;
         const cut = ICON_RADIUS + 4;
-        const elbow = (a.y - 32 + b.y + 76) / 2;
-        const path = (tree.value?.nodes.length ?? 0) <= 20 ? `M ${a.x} ${a.y - 32} L ${a.x} ${elbow} L ${b.x} ${elbow} L ${b.x} ${b.y + 76}` : `M ${a.x + dx / length * cut} ${a.y + dy / length * cut} L ${b.x - dx / length * cut} ${b.y - dy / length * cut}`;
+        const elbow = (a.y + b.y) / 2;
+        const path = (tree.value?.nodes.length ?? 0) <= 20 ? `M ${a.x} ${a.y - cut} L ${a.x} ${elbow} L ${b.x} ${elbow} L ${b.x} ${b.y + cut}` : `M ${a.x + dx / length * cut} ${a.y + dy / length * cut} L ${b.x - dx / length * cut} ${b.y - dy / length * cut}`;
         out.push({ key: `${required}>${node.id}`, path, highlighted: highlighted.value.has(node.id) && highlighted.value.has(required), shared: layout.value.sharedIds.has(node.id), learned: from.state === 'learned' && node.state === 'learned' });
       }
     }
@@ -158,8 +161,8 @@ const lines = computed(() => {
 const rootLines = computed(() => rootNodes.value.map(node => {
   const a = layout.value.center, b = point(node.id);
   const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy) || 1;
-  const elbow = (a.y - 60 + b.y + 76) / 2;
-  const path = (tree.value?.nodes.length ?? 0) <= 20 ? `M ${b.x} ${b.y + 76} L ${b.x} ${elbow} L ${a.x} ${elbow} L ${a.x} ${a.y - 60}` : `M ${a.x + dx / length * 70} ${a.y + dy / length * 70} L ${b.x - dx / length * 34} ${b.y - dy / length * 34}`;
+  const elbow = (a.y - 60 + b.y + ICON_RADIUS) / 2;
+  const path = (tree.value?.nodes.length ?? 0) <= 20 ? `M ${b.x} ${b.y + ICON_RADIUS} L ${b.x} ${elbow} L ${a.x} ${elbow} L ${a.x} ${a.y - 60}` : `M ${a.x + dx / length * 70} ${a.y + dy / length * 70} L ${b.x - dx / length * (ICON_RADIUS + 4)} ${b.y - dy / length * (ICON_RADIUS + 4)}`;
   return { id: node.id, highlighted: highlighted.value.has(node.id), path };
 }));
 
@@ -246,7 +249,6 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
       <div class="tree-layout">
       <div class="graph-area">
       <div class="tree-controls">
-        <EmButton class="icon-btn" :aria-pressed="showNames" :aria-label="showNames ? 'Hide names' : 'Show names'" :title="showNames ? 'Hide names' : 'Show names'" @click="showNames = !showNames"><EmIcon name="eye" /></EmButton>
         <EmButton class="icon-btn" aria-label="Zoom out" title="Zoom out" @click="setZoom(zoom - 0.1)"><EmIcon name="zoomOut" /></EmButton>
         <input class="zoom-range" type="range" aria-label="Zoom" :min="MIN_ZOOM" :max="MAX_ZOOM" step="0.05" :value="zoom" @input="setZoom(Number(($event.target as HTMLInputElement).value))" />
         <EmButton class="icon-btn" aria-label="Zoom in" title="Zoom in" @click="setZoom(zoom + 0.1)"><EmIcon name="zoomIn" /></EmButton>
@@ -277,17 +279,15 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
             :aria-pressed="node.id === selectedId"
             :aria-label="`${node.name}, ${node.kind === 'passive' ? 'passive' : 'active ability'}, ${stateLabel(node)}`"
             :title="`${node.name} · ${node.kind === 'passive' ? 'Passive' : titleCase(node.category ?? '')} · ${stateLabel(node)}`"
-            :style="{ left: `${point(node.id).x - NODE_W / 2}px`, top: `${point(node.id).y - 32}px`, width: `${NODE_W}px`, height: `${NODE_H}px` }"
+            :style="{ left: `${point(node.id).x - NODE_W / 2}px`, top: `${point(node.id).y - NODE_H / 2}px`, width: `${NODE_W}px`, height: `${NODE_H}px` }"
             @click="selectedId = node.id"
           >
-            <span class="node-symbol" aria-hidden="true"><svg class="node-shape" viewBox="0 0 70 70"><circle v-if="node.kind === 'passive'" class="node-outline" cx="35" cy="35" r="30" /><polygon v-else class="node-outline" points="20,4 50,4 66,20 66,50 50,66 20,66 4,50 4,20" /></svg><EmIcon :name="nodeIcon(node)" :size="26" /><span v-if="equippedSlot(node)" class="equipped-mark"><EmIcon name="check" :size="11" /></span></span>
-            <strong v-show="showNames" class="node-name">{{ node.name }}</strong>
-            <small v-show="showNames" class="node-state">{{ stateLabel(node) }}</small>
-            <small v-if="layout.sharedIds.has(node.id) && showNames" class="shared-label">Shared · {{ node.requires.length }} prerequisites</small>
+            <span class="node-symbol" aria-hidden="true"><svg class="node-shape" viewBox="0 0 100 100"><circle v-if="node.kind === 'passive'" class="node-outline" cx="50" cy="50" r="47" /><polygon v-else class="node-outline" points="30,3 70,3 97,30 97,70 70,97 30,97 3,70 3,30" /></svg><img class="node-icon" :src="nodeSprite(node)" width="64" height="64" alt="" draggable="false" @error="($event.target as HTMLImageElement).src = placeholderIcon" /></span>
+            <span class="node-level em-num" aria-hidden="true">{{ node.unlock_level }}</span>
           </button>
         </div>
       </div>
-      <div class="legend"><span><svg viewBox="0 0 20 20"><polygon points="6,1 14,1 19,6 19,14 14,19 6,19 1,14 1,6"/></svg>Active ability</span><span><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="9"/></svg>Passive</span><span>✓ Learned / equipped</span><span>◇ Available</span><span>Locked · level required</span></div>
+      <div class="legend"><span><svg viewBox="0 0 20 20"><polygon points="6,1 14,1 19,6 19,14 14,19 6,19 1,14 1,6"/></svg>Active ability</span><span><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="9"/></svg>Passive</span><span>Yellow · available / learned</span><span>Gray · locked</span><span>Glow · equipped</span><span>Badge · required level</span></div>
       <p class="graph-help muted">Hold and drag to move · Scroll to zoom · Tab to select nodes</p>
       <p v-if="layout.sharedIds.size" class="graph-help muted">Select a shared ability to reveal its connections across paths.</p>
       </div>
@@ -341,24 +341,18 @@ button.slot { padding: 10px 12px; min-height: var(--em-target); border: 1px soli
 .tree-line.shared-link { stroke-dasharray: 5 6; }
 .tree-line.concealed { visibility: hidden; }
 .orbit { stroke: var(--em-divider); stroke-width: 1; stroke-dasharray: 2 10; fill: none; opacity: 0.35; }
-button.tree-node { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; padding: 0; border: 1px solid var(--em-border); border-radius: var(--em-radius); background: linear-gradient(135deg, var(--em-panel), var(--em-bg)); color: var(--em-text); font: inherit; text-align: center; cursor: pointer; }
-.tree-node.selected { border-color: var(--em-accent); box-shadow: 0 0 0 1px var(--em-accent); }
-.tree-node[data-state="locked"] { opacity: .65; }
-.tree-node strong { font-size: 12px; line-height: 1.25; }
-.tree-node small { color: var(--em-muted); font-size: 10px; line-height: 1.2; }
-.node-symbol { position: relative; display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; flex: none; color: var(--em-muted); }
-.node-shape { position: absolute; inset: 0; width: 100%; height: 100%; }
-.node-outline { stroke: var(--em-border); stroke-width: 1.8; fill: var(--em-panel); }
-.node-symbol > .em-icon { position: relative; }
-.tree-node[data-state="learned"] .node-outline { stroke: var(--em-success); fill: var(--em-success-surface); }
-.tree-node[data-state="learned"] .node-symbol { color: var(--em-success); }
-.tree-node[data-state="learned"] .node-state { color: var(--em-success); }
-.tree-node[data-state="learnable"] .node-outline { stroke: var(--em-accent); fill: var(--em-warning-surface); stroke-dasharray: 3 3; }
-.tree-node[data-state="learnable"] .node-symbol { color: var(--em-accent); }
-.tree-node[data-state="learnable"] .node-state { color: var(--em-accent); }
-.tree-node.selected .node-outline { stroke: var(--em-accent); stroke-width: 3; stroke-dasharray: none; }
-.tree-node.selected .node-symbol { color: var(--em-accent); filter: drop-shadow(0 0 5px color-mix(in srgb, var(--em-accent) 35%, transparent)); }
-.equipped-mark { position: absolute; right: 0; top: 0; width: 16px; height: 16px; border-radius: var(--radius-full); background: var(--em-success); color: var(--em-bg); display: flex; align-items: center; justify-content: center; }
+button.tree-node { position: absolute; display: grid; place-items: center; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--em-text); font: inherit; cursor: pointer; --node-color: #ffcf32; }
+.tree-node[data-state="locked"] { --node-color: #69737d; }
+.node-symbol { position: relative; display: grid; place-items: center; width: 96px; height: 96px; }
+.node-shape { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.node-outline { stroke: var(--node-color); stroke-width: 2.5; fill: #10212d; }
+.node-icon { position: relative; width: 64px; height: 64px; object-fit: contain; image-rendering: pixelated; }
+.tree-node[data-state="locked"] .node-icon { filter: grayscale(1); opacity: .35; }
+.tree-node[data-state="locked"] .node-outline { fill: #17212a; }
+.tree-node.selected .node-outline { stroke-width: 4; }
+.tree-node.equipped .node-shape { filter: drop-shadow(0 0 6px #ffcf3299) drop-shadow(0 0 14px #ffcf3266); }
+.node-level { position: absolute; left: 0; bottom: -6px; display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid var(--node-color); border-radius: var(--radius-full); background: #10212d; color: var(--em-text); font-size: 13px; line-height: 1; }
+.tree-node:focus-visible { outline: 2px solid var(--em-text); outline-offset: 7px; border-radius: var(--radius-full); }
 .origin-hub { position: absolute; width: 148px; transform: translate(-50%, -66px); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; text-align: center; }
 .hub-portrait { display: flex; align-items: center; justify-content: center; width: 132px; height: 132px; border: 2px solid var(--em-accent); padding: 6px; border-radius: var(--em-radius); color: var(--em-accent); background: #060d15; }
 .hub-portrait img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; border-radius: var(--em-radius); }
@@ -388,8 +382,6 @@ button.tree-node { position: absolute; display: flex; flex-direction: column; al
 .tree-layout{grid-template-columns:minmax(0,1fr) 300px;gap:12px;}.scroll{height:385px;min-height:385px;max-height:480px;background:radial-gradient(ellipse at bottom,#143041,#081b28);}.tree-controls :deep(.em-button){min-height:30px;padding:4px 8px;font-size:11px;}
 .slots{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:12px;}
 button.slot{display:grid;grid-template-columns:30px 32px minmax(0,1fr);gap:8px;align-items:center;padding:6px;min-height:48px;background:linear-gradient(120deg,#173345,#0c2231);border:1px solid var(--em-border);}.slot .slot-number{display:grid;place-items:center;border:1px solid var(--em-border);height:30px;font-size:11px;}.slot .branch-hint{grid-column:3;}.slot>span{font-weight:700;}
-button.tree-node{display:grid;grid-template-columns:76px minmax(0,1fr);grid-template-rows:40px 28px 22px;align-items:center;text-align:left;padding:7px 10px;gap:0 10px;box-sizing:border-box;background:linear-gradient(120deg,#173446,#0c2231);box-shadow:inset 0 0 0 3px #0004;}
-.node-symbol{grid-row:1 / span 3;width:72px;height:78px;border:1px solid var(--em-border);background:linear-gradient(135deg,#25435c,#0c1f2b);box-shadow:inset 0 0 0 3px #0005;}.node-shape{inset:5px;width:62px;height:68px;}.tree-node strong{font-size:13px;}.tree-node small{font-size:11px;}.tree-node[data-state=locked]{opacity:.8;}.tree-node.selected{box-shadow:0 0 0 2px var(--em-accent),inset 0 0 0 3px #0004;}
 .orbit{display:none;}.node-detail{border-color:var(--em-border);padding:14px;}.node-detail h4{font-size:20px;}.hub-portrait{width:105px;height:92px;}.origin-hub{transform:translate(-50%,-55px);}.origin-hub small{font-size:12px;}.tree-line,.origin-line{stroke-width:3;}.legend{font-size:11px;}
 @media(max-width:1050px){.tree-layout{grid-template-columns:minmax(0,1fr);}.node-detail{display:flex;}.slots{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:650px){.scroll{height:350px;min-height:350px;}.tree-heading{gap:8px;}.tree-heading p{font-size:11px;}.path-labels{font-size:10px;}.tree-controls{gap:5px;}}

@@ -82,9 +82,12 @@ describe("TreeTab", () => {
     expect(wrapper.find('[data-node="g_pass"] circle.node-outline').exists()).toBe(true);
     await wrapper.find('[data-node="g_far"]').trigger("click");
     expect(wrapper.findAll(".tree-line.highlighted")).toHaveLength(2);
-    await wrapper.find('button[aria-label="Hide names"]').trigger("click");
     expect(wrapper.find('[data-node="g_a"]').attributes('aria-label')).toContain('A');
-    expect(wrapper.find('[data-node="g_a"] .node-name').isVisible()).toBe(false);
+    expect(wrapper.find('.node-name, .node-state, .equipped-mark').exists()).toBe(false);
+    expect(wrapper.find('button[aria-label="Hide names"]').exists()).toBe(false);
+    expect(wrapper.find('[data-node="g_far"] .node-level').text()).toBe('20');
+    expect(wrapper.find('[data-node="g_a"] img.node-icon').attributes('width')).toBe('64');
+    expect(wrapper.find('[data-node="g_a"] img.node-icon').attributes('src')).toContain('ability_placeholder.webp');
   });
   it("refreshes requirements after an upgrade consumes essence", async () => {
     const wrapper = await mountTab();
@@ -117,7 +120,7 @@ describe("TreeTab", () => {
     expect(nodes).toHaveLength(5);
     expect(wrapper.find('[data-node="g_wall"]').attributes("data-state")).toBe("learnable");
     expect(wrapper.find('[data-node="g_far"]').attributes("data-state")).toBe("locked");
-    expect(wrapper.find('[data-node="g_wall"]').text()).toContain("Available");
+    expect(wrapper.find('[data-node="g_wall"]').attributes('aria-label')).toContain("Available");
     expect(wrapper.findAll(".tree-line")).toHaveLength(2);
     expect(wrapper.find(".slots").text()).toContain("empty");
   });
@@ -129,7 +132,7 @@ describe("TreeTab", () => {
     expect(detail.text()).toContain("Level 20");
     expect(detail.text()).toContain("WALL");
     expect(detail.text()).toContain("You have 0");
-    expect(wrapper.find('[data-node="g_far"]').text()).toContain("Locked");
+    expect(wrapper.find('[data-node="g_far"]').attributes('aria-label')).toContain("Locked");
   });
 
   it("learns a node and reloads the tree", async () => {
