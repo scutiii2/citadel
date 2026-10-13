@@ -43,7 +43,6 @@ def test_starter_profile_and_squad_replacement(tmp_path):
 @pytest.mark.parametrize(
     "ids,error",
     [
-        ([], InvalidRequest),
         (["guardian"] * 6, InvalidRequest),
         (["guardian", "guardian"], InvalidRequest),
         (["scout"], NotFound),
@@ -62,6 +61,22 @@ def test_squad_invalid_requests(tmp_path, ids, error):
             service = SquadService(env.repo, env.writer, env.catalog)
             with pytest.raises(error):
                 await service.put("ann", env.key(), ids)
+        finally:
+            await env.close()
+
+    run(work())
+
+
+def test_squad_can_be_emptied_and_an_empty_squad_cannot_start_a_battle(tmp_path):
+    async def work():
+        env = Env(tmp_path / "db")
+        try:
+            await env.start_player()
+            from src.ascension.squad import SquadService
+
+            service = SquadService(env.repo, env.writer, env.catalog)
+            assert await service.put("ann", env.key(), []) == {"ascended_ids": [], "size": 5}
+            assert (await service.get("ann"))["ascended_ids"] == []
         finally:
             await env.close()
 

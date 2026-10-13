@@ -35,6 +35,7 @@ const faintLeft = computed(() => (props.ascended.faint_until === null ? 0 : Math
   >
     <AscendedPreviewCard v-if="info" class="face" :ascended="info" :level="ascended.level" :tier-id="ascended.tier_id" show-level />
     <span v-else class="ascended-name">{{ ascended.name }}</span>
+    <span v-if="faintLeft > 0" class="ko-badge" aria-hidden="true"><EmIcon name="clock" :size="12" /> Fainted</span>
     <span class="caption">
       <strong class="caption-name">{{ ascended.name }}</strong>
       <span class="star-count em-num" :aria-label="`${ascended.stars} stars`">★ {{ ascended.stars }}</span>
@@ -56,6 +57,7 @@ const faintLeft = computed(() => (props.ascended.faint_until === null ? 0 : Math
 
 <style scoped>
 .ascended-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--em-space-2);
@@ -80,6 +82,7 @@ const faintLeft = computed(() => (props.ascended.faint_until === null ? 0 : Math
   filter: grayscale(1);
   opacity: 0.72;
 }
+.ko-badge { position: absolute; top: 12px; left: 12px; z-index: 1; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--em-danger); background: var(--em-danger-surface); color: var(--em-danger); font-size: 11px; font-weight: 700; pointer-events: none; }
 .star-count { color: var(--em-accent); font-size: 12px; }
 .caption {
   display: flex;

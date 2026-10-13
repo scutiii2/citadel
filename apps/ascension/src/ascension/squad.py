@@ -20,8 +20,8 @@ class SquadService:
         size = self._catalog.economy.squad_size
         if not isinstance(ascended_ids, list) or any(not isinstance(a, str) for a in ascended_ids):
             raise InvalidRequest("ascended_ids must be a list of strings")
-        if not 1 <= len(ascended_ids) <= size:
-            raise InvalidRequest(f"squad must contain from 1 to {size} Ascended")
+        if len(ascended_ids) > size:
+            raise InvalidRequest(f"squad can contain at most {size} Ascended")
         if len(set(ascended_ids)) != len(ascended_ids):
             raise InvalidRequest("squad cannot contain duplicates")
 

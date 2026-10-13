@@ -167,7 +167,8 @@ async function fight(): Promise<void> {
           <EmButton variant="primary" :disabled="store.busy || ready.length === 0" @click="openForm"><EmIcon name="battle" /> Fight</EmButton>
           <EmButton :disabled="store.busy" @click="store.declineEncounter()"><EmIcon name="arrow" /> Decline · free</EmButton>
         </div>
-        <p v-if="ready.length === 0" class="caption">All your Ascended are fainted. Wait until one is ready again.</p>
+        <p v-if="ascendeds.length === 0" class="caption">Your squad is empty. Add an Ascended in Collection to battle.</p>
+        <p v-else-if="ready.length === 0" class="caption">All your Ascended are fainted. Wait until one is ready again.</p>
         <p v-else class="caption">The encounter waits until you choose.</p>
       </div>
     </EmPanel>

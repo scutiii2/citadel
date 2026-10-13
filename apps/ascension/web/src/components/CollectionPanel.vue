@@ -14,6 +14,7 @@ import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 import EmBar from "./ui/EmBar.vue";
 import EmButton from "./ui/EmButton.vue";
 import EmDialog from "./ui/EmDialog.vue";
+import EmIcon from "./ui/EmIcon.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmSwitch from "./ui/EmSwitch.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
@@ -52,9 +53,7 @@ const squadSlots = computed(() => Array.from({ length: store.profile?.squad_size
 const battleActive = computed(() => !!store.profile?.active_battle || store.battle?.status === "active");
 const squadReason = computed(() => {
   if (battleActive.value) return "Finish your battle first.";
-  if (open.value && store.squadIds.includes(open.value.ascended_id)) {
-    return store.squadIds.length <= 1 ? "Keep at least one Ascended." : "";
-  }
+  if (open.value && store.squadIds.includes(open.value.ascended_id)) return "";
   return store.squadIds.length >= (store.profile?.squad_size ?? 0) ? "Squad full. Remove a member first." : "";
 });
 function toggleSquad(): void {
@@ -67,6 +66,8 @@ const treeVisited = ref(false);
 const detailTabs = [{ value: "overview", label: "Overview" }, { value: "personalities", label: "Personalities" }, { value: "tree", label: "Ability tree" }];
 const now = useNowSeconds();
 const openInfo = computed(() => store.catalog?.ascendeds.find((s) => s.id === open.value?.ascended_id) ?? null);
+/** Seconds until a squad member is ready again; 0 when it is ready. */
+const faintOf = (m: OwnedAscended): number => (m.faint_until === null ? 0 : Math.max(0, m.faint_until - now.value));
 const faintLeft = computed(() => Math.max(0, (open.value?.faint_until ?? 0) - now.value));
 const stats = computed(() => {
   const info = openInfo.value;
@@ -168,7 +169,7 @@ async function dropOnCollected(): Promise<void> {
   const id = dragId.value;
   const fromSquad = dragFromSquad.value;
   dragEnd();
-  if (id === null || !fromSquad || store.busy || battleActive.value || store.squadIds.length <= 1) return;
+  if (id === null || !fromSquad || store.busy || battleActive.value) return;
   await store.removeFromSquad(id);
 }
 
@@ -216,13 +217,25 @@ function show(ascended: OwnedAscended): void {
       </li>
     </ul>
     <section class="squad-section" aria-label="Squad">
-      <h3 class="em-pixel">Your squad <small class="em-num">{{ store.squadIds.length }} / {{ store.profile?.squad_size }}</small></h3>
+      <h3 class="em-pixel">Your squad <small class="em-num">{{ store.squadIds.length }} / {{ store.profile?.squad_size }}</small>
+        <span class="squad-help">
+          <button type="button" class="help-icon" aria-label="About your squad" aria-describedby="squad-help-tip"><EmIcon name="info" :size="18" /></button>
+          <span id="squad-help-tip" role="tooltip" class="help-tip">
+            <strong>Your squad</strong>
+            Your squad is who can fight in battle. You pick one ready member for each fight, and the rest share a smaller XP reward. With an empty squad you cannot battle.
+            <strong>Add</strong>
+            Drag an Ascended from Collected onto a squad slot, or open its details and choose Add to squad.
+            <strong>Remove</strong>
+            Drag a member out of the squad back to Collected, or open its details and choose Remove from squad.
+          </span>
+        </span></h3>
       <ul class="squad-strip">
         <li v-for="(member, index) in squadSlots" :key="index" class="squad-slot" :class="{ 'squad-empty': !member, selected: member?.ascended_id === openId, 'drop-over': dragId !== null && overSlot === index }" @dragover="dragOverSlot($event, index)" @dragleave="overSlot = null" @drop.prevent="dropOnSlot(index)">
           <template v-if="member">
             <div
               v-if="store.catalog?.ascendeds.find(a => a.id === member.ascended_id)"
               class="squad-card em-lift"
+              :class="{ down: faintOf(member) > 0 }"
               :style="{ '--tier': `var(--em-tier-${member.tier_id}, var(--em-tier-common))` }"
               role="button"
               tabindex="0"
@@ -236,9 +249,8 @@ function show(ascended: OwnedAscended): void {
             >
               <img v-if="spriteFor(catalogById.get(member.ascended_id)?.art, 'battle')" class="squad-portrait" :src="spriteFor(catalogById.get(member.ascended_id)?.art, 'battle')!" alt="" draggable="false" />
               <span v-else class="squad-placeholder">◇</span>
-              <div class="squad-member-info"><strong>{{ member.name }}</strong><span class="em-num">Lv. {{ member.level }}</span><span class="squad-stars em-num">★ {{ member.stars }}</span><div class="squad-types"><TypeSymbol v-for="id in member.ascension_types" :key="id" :type-id="id" :size="18" decorative /><EmTierBadge :tier-id="member.tier_id" /></div></div>
+              <div class="squad-member-info"><strong>{{ member.name }}</strong><span class="em-num">Lv. {{ member.level }}</span><span class="squad-stars em-num">★ {{ member.stars }}</span><span v-if="faintOf(member) > 0" class="squad-fainted"><EmIcon name="clock" :size="14" /> Fainted · <strong class="em-num">{{ formatCountdown(faintOf(member)) }}</strong></span><div class="squad-types"><TypeSymbol v-for="id in member.ascension_types" :key="id" :type-id="id" :size="18" decorative /><EmTierBadge :tier-id="member.tier_id" /></div></div>
             </div>
-            <EmButton :disabled="store.squadIds.length <= 1 || battleActive || store.busy" :aria-label="`Remove ${member.name} from squad`" :aria-busy="store.busy" @click="store.removeFromSquad(member.ascended_id)">Remove</EmButton>
           </template>
           <span v-else>Empty slot</span>
         </li>
@@ -353,10 +365,11 @@ function show(ascended: OwnedAscended): void {
             <template v-if="open.stars_needed !== null">
               <EmBar :value="open.stars" :max="open.stars_needed" :label="`${open.name} stars`" />
               <span class="em-num">Stars {{ open.stars }} / {{ open.stars_needed }} to reach {{ titleCase(open.next_tier_id ?? "") }}</span>
-              <span class="em-num">
-                A star costs 1 spare copy and {{ open.star_essence_cost }} {{ titleCase(open.tier_id) }} essence.
-                You have {{ open.copies }} {{ open.copies === 1 ? "copy" : "copies" }} and {{ essenceOf(open.tier_id) }} essence.
-              </span>
+              <h5 class="cost-head">A star costs</h5>
+              <ul class="star-cost">
+                <li :class="{ met: open.copies >= 1 }"><span>1 spare copy</span><small class="em-num">You have {{ open.copies }}</small></li>
+                <li :class="{ met: essenceOf(open.tier_id) >= open.star_essence_cost }"><span>{{ open.star_essence_cost }} {{ titleCase(open.tier_id) }} essence</span><small class="em-num">You have {{ essenceOf(open.tier_id) }}</small></li>
+              </ul>
               <div class="upgrade-actions">
                 <EmButton v-if="open.can_tier_up" variant="primary" :disabled="store.busy" @click="raiseTier(open)">
                   Raise to {{ titleCase(open.next_tier_id ?? "") }}
@@ -400,9 +413,19 @@ h3 small { color: var(--em-muted); font-size: 12px; margin-left: 12px; }
 .squad-member-info { display: flex; flex-direction: column; gap: 5px; overflow-wrap: anywhere; }
 .squad-member-info strong { font-size: 13px; }
 .squad-member-info > span { font-size: 12px; color: var(--em-muted); }
+.squad-card.down .squad-portrait { filter: grayscale(1); opacity: 0.72; }
+.squad-member-info > .squad-fainted { display: flex; align-items: center; gap: 4px; color: var(--em-danger); }
 .squad-member-info .squad-stars { color: var(--em-accent); }
 .squad-types { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .squad-card :deep(.card) { --card-width: 100%; }
+.squad-section h3 { display: flex; align-items: center; gap: 8px; }
+.squad-help { position: relative; display: inline-flex; }
+.help-icon { display: inline-flex; padding: 2px; border: 0; background: none; color: var(--em-muted); cursor: help; }
+.help-icon:hover, .help-icon:focus-visible { color: var(--em-accent); }
+.help-tip { position: absolute; left: 0; top: calc(100% + 8px); z-index: 30; display: none; flex-direction: column; gap: 4px; width: 300px; padding: 12px; border: 1px solid var(--em-accent); background: var(--em-header); box-shadow: 0 8px 24px #000a; color: var(--em-text); font: 12px/1.5 var(--em-font-body); text-transform: none; letter-spacing: 0; }
+.help-tip strong { color: var(--em-accent); font-size: 11px; text-transform: uppercase; margin-top: 4px; }
+.help-tip strong:first-child { margin-top: 0; }
+.squad-help:hover .help-tip, .squad-help:focus-within .help-tip { display: flex; }
 .squad-slot :deep(.em-btn) { min-height: 30px; font-size: 11px; padding: 3px 8px; }
 .squad-empty { min-height: 142px; justify-content: center; align-items: center; border-style: dashed; color: var(--em-muted); font-size: 12px; }
 .drop-over { outline: 2px dashed var(--em-accent); outline-offset: 4px; }
@@ -466,6 +489,11 @@ h3 small { color: var(--em-muted); font-size: 12px; margin-left: 12px; }
 .progression-resources strong { font-size: 24px; }
 .upgrade, .xp { display: flex; flex-direction: column; gap: 10px; margin: 0; font-size: 12px; color: var(--em-muted); }
 .xp { margin-top: 12px; }
+.cost-head { margin: 0; font-size: 12px; color: var(--em-muted); }
+.star-cost { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.star-cost li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--em-border); background: var(--em-bg); color: var(--em-text); }
+.star-cost li.met { border-color: var(--em-success); }
+.star-cost small { color: var(--em-muted); }
 .upgrade-actions :deep(.em-btn) { width: 100%; }
 .upgrade-note { color: var(--em-text); }
 .people-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }

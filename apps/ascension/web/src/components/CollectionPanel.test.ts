@@ -176,7 +176,9 @@ describe("stars and tiers", () => {
     await flushPromises();
     const upgrade = wrapper.find(".upgrade");
     expect(upgrade.text()).toContain("Stars 0 / 2 to reach Unique");
-    expect(upgrade.text()).toContain("A star costs 1 spare copy and 2 Rare essence");
+    expect(upgrade.text()).toContain("1 spare copy");
+    expect(upgrade.text()).toContain("2 Rare essence");
+    expect(upgrade.findAll(".star-cost li")).toHaveLength(2);
     await upgrade.findAll("button").find((b) => b.text() === "Add a star")!.trigger("click");
     await flushPromises();
 
@@ -231,6 +233,17 @@ describe("not collected", () => {
     expect(ready!.classes()).not.toContain("is-off");
     expect(fainted!.classes()).toContain("is-off");
     expect(wrapper.find(".missing-ascended").classes()).toContain("em-lift");
+  });
+
+  it("marks a fainted Ascended in the squad and the collected grid without opening it", () => {
+    const wrapper = mountPanel({
+      ...PROFILE,
+      squad: ["guardian"],
+      ascendeds: [ownedAscended("guardian", { in_squad: true, faint_until: Date.now() / 1000 + 600 }), ownedAscended("striker", { faint_until: Date.now() / 1000 + 600 })],
+    });
+
+    expect(wrapper.find(".squad-card.down .squad-fainted").text()).toContain("Fainted");
+    expect(wrapper.find(".ascended-card .ko-badge").text()).toContain("Fainted");
   });
 
   it("shows a face-down card with the Ascended's name and how to get it", () => {
@@ -389,19 +402,20 @@ describe("collection squad controls", () => {
     expect(wrapper.find(".inspector-portrait").exists()).toBe(false);
     expect(wrapper.findAll("img").some(img => img.attributes("src")?.includes("legacy"))).toBe(false);
   });
-  it("renders the configured slots, marks members and prevents removing the last", async () => {
+  it("renders the configured slots, marks members and lets the last one be removed", async () => {
     const wrapper = mountPanel({ ...PROFILE, squad_size: 3 });
     expect(wrapper.findAll(".squad-slot")).toHaveLength(3);
     expect(wrapper.findAll(".squad-empty")).toHaveLength(2);
-    expect(wrapper.find(".squad-strip button").attributes("disabled")).toBeDefined();
+    expect(wrapper.find(".squad-strip .squad-slot button").exists()).toBe(false);
+    expect(wrapper.find(".squad-help [role=tooltip]").text()).toContain("Drag an Ascended");
     expect(wrapper.find(".owned-entry").exists()).toBe(false);
     expect(wrapper.find(".empty").text()).toBe("Everyone you collected is in your squad.");
     await wrapper.find(".squad-card").trigger("click");
     await wrapper.find(".open-details").trigger("click");
     await flushPromises();
     expect(wrapper.find(".squad-control button").text()).toBe("Remove from squad");
-    expect(wrapper.find(".squad-control button").attributes("disabled")).toBeDefined();
-    expect(wrapper.find(".squad-control").text()).toContain("Keep at least one Ascended.");
+    expect(wrapper.find(".squad-control button").attributes("disabled")).toBeUndefined();
+    expect(wrapper.find(".squad-control").text()).not.toContain("Keep at least one");
   });
 
   it("adds an outsider and removes a member through the store", async () => {
