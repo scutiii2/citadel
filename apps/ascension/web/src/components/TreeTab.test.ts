@@ -56,15 +56,24 @@ describe("TreeTab", () => {
   it("centers the first successful load even after a failed initial request", async () => {
     client.tree.mockRejectedValueOnce(new Error("Try again"));
     const wrapper = await mountTab();
-    const scrollTo = vi.fn();
-    HTMLElement.prototype.scrollTo = scrollTo;
-    try {
-      await wrapper.findAll("button").find(b => b.text() === "Retry")!.trigger("click");
-      await flushPromises();
-      expect(scrollTo).toHaveBeenCalled();
-    } finally {
-      delete (HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
-    }
+    await wrapper.findAll("button").find(b => b.text() === "Retry")!.trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".canvas").attributes("style")).toContain("translate(");
+  });
+  it("zooms with the wheel and pans by dragging", async () => {
+    const wrapper = await mountTab();
+    const view = wrapper.find(".scroll");
+    const canvas = wrapper.find(".canvas");
+    const before = canvas.attributes("style");
+    await view.trigger("wheel", { deltaY: -100 });
+    expect(canvas.attributes("style")).not.toBe(before);
+    const zoomed = canvas.attributes("style");
+    const fire = (type: string, x: number, y: number) => view.element.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y, bubbles: true }));
+    fire("pointerdown", 10, 10);
+    fire("pointermove", 60, 40);
+    fire("pointerup", 60, 40);
+    await flushPromises();
+    expect(canvas.attributes("style")).not.toBe(zoomed);
   });
   it("uses octagons for active abilities and circles for passives around a portrait hub", async () => {
     const wrapper = await mountTab();
@@ -73,7 +82,7 @@ describe("TreeTab", () => {
     expect(wrapper.find('[data-node="g_pass"] circle.node-outline').exists()).toBe(true);
     await wrapper.find('[data-node="g_far"]').trigger("click");
     expect(wrapper.findAll(".tree-line.highlighted")).toHaveLength(2);
-    await wrapper.findAll("button").find(b => b.text() === "Hide names")!.trigger("click");
+    await wrapper.find('button[aria-label="Hide names"]').trigger("click");
     expect(wrapper.find('[data-node="g_a"]').attributes('aria-label')).toContain('A');
     expect(wrapper.find('[data-node="g_a"] .node-name').isVisible()).toBe(false);
   });

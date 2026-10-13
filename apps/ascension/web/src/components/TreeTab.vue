@@ -27,9 +27,14 @@ const error = ref("");
 const loading = ref(false);
 const scroll = ref<HTMLElement | null>(null);
 const zoom = ref(1);
+const pan = ref({ x: 0, y: 0 });
+const panning = ref(false);
+const MIN_ZOOM = 0.3;
+const MAX_ZOOM = 1.5;
 let request = 0;
 let viewportInitialized = false;
-let drag: { x: number; y: number; left: number; top: number } | null = null;
+let drag: { x: number; y: number; panX: number; panY: number; id: number } | null = null;
+let moved = false;
 /** A failed load, else the failure of the last learn or equip (the store keeps it). */
 const shownError = computed(() => error.value || store.error);
 
@@ -66,21 +71,49 @@ const requirements = computed(() => {
   if (node.cost) items.push({ label: costText(node), met: (tree.value.essences[node.cost.tier] ?? 0) >= node.cost.amount, hint: `You have ${tree.value.essences[node.cost.tier] ?? 0}` });
   return items;
 });
+/** Zooms around a point in the viewport (its centre by default), so what is under it stays put. */
+function setZoom(next: number, cx?: number, cy?: number): void {
+  const el = scroll.value;
+  const x = cx ?? (el?.clientWidth ?? 0) / 2;
+  const y = cy ?? (el?.clientHeight ?? 0) / 2;
+  const value = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next));
+  const wx = (x - pan.value.x) / zoom.value, wy = (y - pan.value.y) / zoom.value;
+  zoom.value = value;
+  pan.value = { x: x - wx * value, y: y - wy * value };
+}
+/** Puts the Ascended at the middle of the viewport at the given zoom. */
+function centre(value: number): void {
+  const el = scroll.value;
+  zoom.value = value;
+  pan.value = { x: (el?.clientWidth ?? 0) / 2 - layout.value.center.x * value, y: (el?.clientHeight ?? 0) / 2 - layout.value.center.y * value };
+}
 function fit(): void {
-  if (!scroll.value?.clientWidth) return;
-  zoom.value = Math.max(0.3, Math.min(1, scroll.value.clientWidth / width.value, 700 / height.value));
-  scroll.value.scrollTo?.({ left: 0, top: 0 });
+  const el = scroll.value;
+  if (!el?.clientWidth) return;
+  const value = Math.max(MIN_ZOOM, Math.min(1, el.clientWidth / width.value, el.clientHeight / height.value));
+  zoom.value = value;
+  pan.value = { x: (el.clientWidth - width.value * value) / 2, y: (el.clientHeight - height.value * value) / 2 };
 }
-function changeZoom(delta: number): void { zoom.value = Math.max(0.3, Math.min(1.5, zoom.value + delta)); }
+function onWheel(event: WheelEvent): void {
+  const rect = scroll.value?.getBoundingClientRect();
+  setZoom(zoom.value * (event.deltaY < 0 ? 1.1 : 1 / 1.1), rect ? event.clientX - rect.left : undefined, rect ? event.clientY - rect.top : undefined);
+}
 function startPan(event: PointerEvent): void {
-  if ((event.target as HTMLElement).closest('button') || event.button !== 0 || event.pointerType === 'touch' || !scroll.value) return;
-  drag = { x: event.clientX, y: event.clientY, left: scroll.value.scrollLeft, top: scroll.value.scrollTop };
-  scroll.value.setPointerCapture?.(event.pointerId);
+  if (event.button !== 0 || !scroll.value) return;
+  drag = { x: event.clientX, y: event.clientY, panX: pan.value.x, panY: pan.value.y, id: event.pointerId };
+  moved = false;
 }
-function pan(event: PointerEvent): void {
+function movePan(event: PointerEvent): void {
   if (!drag || !scroll.value) return;
-  scroll.value.scrollLeft = drag.left - (event.clientX - drag.x);
-  scroll.value.scrollTop = drag.top - (event.clientY - drag.y);
+  const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
+  if (!moved && Math.hypot(dx, dy) < 4) return;
+  if (!moved) { moved = true; panning.value = true; scroll.value.setPointerCapture?.(drag.id); }
+  pan.value = { x: drag.panX + dx, y: drag.panY + dy };
+}
+function endPan(): void { drag = null; panning.value = false; }
+/** A drag that moved must not also select the node it ended on. */
+function swallowClick(event: MouseEvent): void {
+  if (moved) { event.stopPropagation(); event.preventDefault(); moved = false; }
 }
 
 const lines = computed(() => {
@@ -117,10 +150,7 @@ async function load(): Promise<void> {
     await nextTick();
     if (token !== request) return;
     if (!viewportInitialized && scroll.value) {
-      zoom.value = (scroll.value?.clientWidth ?? 0) >= 600 && result.nodes.length <= 20 ? Math.max(0.8, Math.min(1, (scroll.value?.clientWidth ?? 0) / width.value)) : 1;
-      await nextTick();
-      if (token !== request) return;
-      scroll.value?.scrollTo?.({ left: Math.max(0, layout.value.center.x * zoom.value - (scroll.value?.clientWidth ?? 0) / 2), top: Math.max(0, layout.value.center.y * zoom.value - 340) });
+      centre((scroll.value?.clientWidth ?? 0) >= 600 && result.nodes.length <= 20 ? Math.max(0.8, Math.min(1, (scroll.value?.clientWidth ?? 0) / width.value)) : 1);
       viewportInitialized = true;
     }
   } catch (err) {
@@ -182,16 +212,23 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
     <p v-if="loading" class="muted" role="status">Loading ability tree…</p>
     <EmButton v-if="error" @click="load">Retry</EmButton>
     <template v-if="tree">
-      <div class="tree-heading"><div><h3>Ability tree</h3><p class="muted em-num">{{ learned }} / {{ tree.nodes.length }} learned · {{ layout.branches.length }} paths from the Ascended</p></div><div class="tree-controls"><EmButton :aria-pressed="showNames" @click="showNames = !showNames">{{ showNames ? 'Hide names' : 'Show names' }}</EmButton><EmButton aria-label="Zoom out" @click="changeZoom(-0.1)">−</EmButton><span class="em-num">{{ Math.round(zoom * 100) }}%</span><EmButton aria-label="Zoom in" @click="changeZoom(0.1)">+</EmButton><EmButton @click="fit">Fit tree</EmButton></div></div>
+      <div class="tree-heading"><div><h3>Ability tree</h3><p class="muted em-num">{{ learned }} / {{ tree.nodes.length }} learned · {{ layout.branches.length }} paths from the Ascended</p></div></div>
       <p class="path-labels muted">Paths: {{ layout.branches.map(b => b.label).join(' · ') }}</p>
       <div class="slots" aria-label="Equipped">
         <button v-for="slot in slotList" :key="slot.id" type="button" class="slot" :disabled="!tree.loadout[slot.id]" @click="selectedId = tree.loadout[slot.id] ?? null"><small>{{ slot.id.toUpperCase() }}</small> {{ slotLabel(slot.id) }}<small v-if="slot.branches" class="branch-hint">{{ slot.branches.join(" / ") }}</small></button>
       </div>
       <div class="tree-layout">
       <div class="graph-area">
-      <div ref="scroll" class="scroll" tabindex="0" aria-label="Ability tree graph. Use the zoom controls or scroll to explore." @pointerdown="startPan" @pointermove="pan" @pointerup="drag = null" @pointercancel="drag = null" @lostpointercapture="drag = null" @wheel.ctrl.prevent="changeZoom($event.deltaY < 0 ? 0.1 : -0.1)">
-        <div class="canvas-wrap" :style="{ width: `${width * zoom}px`, height: `${height * zoom}px` }">
-        <div class="canvas" :style="{ width: `${width}px`, height: `${height}px`, transform: `scale(${zoom})` }">
+      <div class="tree-controls">
+        <EmButton class="icon-btn" :aria-pressed="showNames" :aria-label="showNames ? 'Hide names' : 'Show names'" :title="showNames ? 'Hide names' : 'Show names'" @click="showNames = !showNames"><EmIcon name="eye" /></EmButton>
+        <EmButton class="icon-btn" aria-label="Zoom out" title="Zoom out" @click="setZoom(zoom - 0.1)"><EmIcon name="zoomOut" /></EmButton>
+        <input class="zoom-range" type="range" aria-label="Zoom" :min="MIN_ZOOM" :max="MAX_ZOOM" step="0.05" :value="zoom" @input="setZoom(Number(($event.target as HTMLInputElement).value))" />
+        <EmButton class="icon-btn" aria-label="Zoom in" title="Zoom in" @click="setZoom(zoom + 0.1)"><EmIcon name="zoomIn" /></EmButton>
+        <EmButton class="icon-btn" aria-label="Fit tree" title="Fit tree" @click="fit"><EmIcon name="fit" /></EmButton>
+        <span class="em-num zoom-value">{{ Math.round(zoom * 100) }}%</span>
+      </div>
+      <div ref="scroll" class="scroll" :class="{ panning }" tabindex="0" aria-label="Ability tree graph. Drag to move, scroll to zoom." @pointerdown="startPan" @pointermove="movePan" @pointerup="endPan" @pointercancel="endPan" @lostpointercapture="endPan" @click.capture="swallowClick" @selectstart.prevent @dragstart.prevent @wheel.prevent="onWheel">
+        <div class="canvas" :style="{ width: `${width}px`, height: `${height}px`, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }">
           <svg class="lines" :width="width" :height="height" aria-hidden="true">
             <circle class="orbit" :cx="layout.center.x" :cy="layout.center.y" r="210" />
             <circle class="orbit" :cx="layout.center.x" :cy="layout.center.y" r="360" />
@@ -223,10 +260,9 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
             <small v-if="layout.sharedIds.has(node.id) && showNames" class="shared-label">Shared · {{ node.requires.length }} prerequisites</small>
           </button>
         </div>
-        </div>
       </div>
       <div class="legend"><span><svg viewBox="0 0 20 20"><polygon points="6,1 14,1 19,6 19,14 14,19 6,19 1,14 1,6"/></svg>Active ability</span><span><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="9"/></svg>Passive</span><span>✓ Learned / equipped</span><span>◇ Available</span><span>Locked · level required</span></div>
-      <p class="graph-help muted">Drag the background to pan · Ctrl + scroll to zoom · Tab to select nodes</p>
+      <p class="graph-help muted">Hold and drag to move · Scroll to zoom · Tab to select nodes</p>
       <p v-if="layout.sharedIds.size" class="graph-help muted">Select a shared ability to reveal its connections across paths.</p>
       </div>
       <aside v-if="selected" class="node-detail" aria-label="Selected ability" aria-live="polite">
@@ -254,7 +290,10 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
 .tree-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--em-space-3); margin-bottom: var(--em-space-4); }
 .tree-heading h3 { margin: 0; font-size: 20px; }
 .tree-heading p { margin: 4px 0 0; font-size: 12px; }
-.tree-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-2); }
+.tree-controls { display: flex; align-items: center; gap: var(--em-space-2); margin-bottom: var(--em-space-2); }
+.icon-btn { min-width: var(--em-target); padding: 8px; }
+.zoom-range { flex: 0 1 180px; min-width: 80px; accent-color: var(--em-accent); }
+.zoom-value { min-width: 4ch; color: var(--em-muted); font-size: 12px; }
 .path-labels { font-size: 12px; margin-bottom: var(--em-space-3); }
 .slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--em-space-2); margin-bottom: var(--em-space-4); }
 button.slot { padding: 10px 12px; min-height: var(--em-target); border: 1px solid var(--em-divider); border-radius: var(--em-radius); font: inherit; font-size: 12px; color: var(--em-text); background: var(--em-bg); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
@@ -262,9 +301,11 @@ button.slot { padding: 10px 12px; min-height: var(--em-target); border: 1px soli
 .slot small { display: block; color: var(--em-muted); font-weight: 700; }
 .tree-layout { display: grid; grid-template-columns: minmax(0, 1fr) 264px; gap: var(--em-space-4); align-items: start; }
 .graph-area { min-width: 0; }
-.scroll { max-width: 100%; max-height: 560px; min-height: 340px; overflow: auto; border: 1px solid var(--em-divider); border-radius: var(--em-radius); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--em-accent) 4%, var(--em-bg)), var(--em-bg)); cursor: grab; }
-.canvas { position: relative; transform-origin: top left; }
-.canvas-wrap { margin-inline: auto; }
+.scroll { position: relative; max-width: 100%; height: 560px; overflow: hidden; touch-action: none; user-select: none; border: 1px solid var(--em-divider); border-radius: var(--em-radius); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--em-accent) 4%, var(--em-bg)), var(--em-bg)); cursor: grab; }
+.canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.scroll.panning { cursor: grabbing; }
+.scroll, .scroll :deep(*) { -webkit-user-select: none; user-select: none; -webkit-user-drag: none; }
+.scroll img { pointer-events: none; }
 .branch-hint { margin-top: 2px; font-weight: 400; }
 .lines { position: absolute; inset: 0; }
 .tree-line, .origin-line { stroke: var(--em-divider); stroke-width: 2; fill: none; }
