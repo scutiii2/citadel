@@ -1,7 +1,7 @@
 # Ascension UI changes, 2026-10-13
 
 Record of the UI edits made on `main` after `7a149df` (`feat(ascension): checkpoint UI redesign progress`),
-up to `759a78a`. `manifest.json` holds the SHA-256 of every file below as committed at `759a78a`.
+up to `aa18682`. `manifest.json` holds the SHA-256 of every file below as committed at `aa18682`.
 After merging another branch, run `python design_references/verify.py` from `apps/ascension/`.
 A file reported `CHANGED` was edited by the merge: check that these changes survived.
 
@@ -23,6 +23,9 @@ Paths are relative to `apps/ascension/`.
 | Touch-first devices get an "Ascension is PC only" notice instead of the game | `web/src/App.vue`, `web/src/App.test.ts` |
 | Squad can be emptied (server accepts 0 to N); an empty squad cannot battle (Fight disabled, caption says so) | `src/ascension/squad.py`, `tests/ascension/test_squad.py`, `web/src/components/CollectionPanel.vue`, `web/src/components/EncounterPanel.vue` |
 | Squad slots lose their Remove button; help icon beside "Your squad" explains the squad and how to add or remove (new `info` icon) | `web/src/components/CollectionPanel.vue`, `web/src/components/ui/icons.ts` |
+| Preview card frame and corner brackets take the tier colour; the tier label is replaced by `★ N` stars (new `stars` prop, shown where passed) beside the type symbols | `web/src/components/AscendedPreviewCard.vue`, `web/src/components/AscendedPreviewCard.test.ts`, `web/src/components/AscendedCard.vue` |
+| Collection card caption keeps only the name (and the fainted countdown); stars, tier badge, copies and XP bar removed from it | `web/src/components/AscendedCard.vue`, `web/src/components/CollectionPanel.test.ts` |
+| Squad slots show the same preview card as the collected grid (same 136px sizing, greyed when fainted, countdown below) | `web/src/components/CollectionPanel.vue`, `web/src/components/CollectionPanel.test.ts` |
 
 ## Commits
 
@@ -34,3 +37,4 @@ Paths are relative to `apps/ascension/`.
 - `b60619f` disable text selection across the game UI
 - `f817e14` PC-only notice on touch-first devices
 - `759a78a` empty squad allowed, fainted indicators, star cost list, squad help tooltip
+- `aa18682` tier-coloured card frame with stars, slimmer collection caption, squad uses preview card
