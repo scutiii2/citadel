@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AscendedInfo, OwnedAscended } from '../api/AscensionClient';
-import { titleCase, passiveText, abilityEffect } from '../utils/ascension';
+import { titleCase } from '../utils/ascension';
 import EmBar from './ui/EmBar.vue';
 import EmButton from './ui/EmButton.vue';
 import EmTierIcon from './ui/EmTierIcon.vue';
@@ -59,7 +59,6 @@ defineEmits<{ addStar: []; raiseTier: [] }>();
       <template v-if="ascended.xp_needed !== null"><EmBar :value="ascended.xp" :max="ascended.xp_needed" :label="ascended.name + ' XP'" /><p class="muted em-num">{{ ascended.xp }} / {{ ascended.xp_needed }} XP</p><p class="level-hint">Earn experience in battle.</p></template>
       <p v-else class="muted">Highest level reached</p>
       <img v-if="info?.art.main_card" class="progression-art" :src="info.art.main_card" alt="" draggable="false" />
-      <div v-if="info" class="foundation-summary"><h4>Innate passive</h4><strong>{{ titleCase(info.passive.kind) }}</strong><p>{{ passiveText(info.passive.kind, info.passive.params) }}</p><h4>Foundation abilities</h4><article v-for="ability in info.abilities" :key="ability.id"><strong>{{ ability.name }}</strong><p>{{ abilityEffect(ability) }} · Level {{ ability.unlock_level }}</p></article></div>
     </aside>
   </section>
 </template>

@@ -185,7 +185,7 @@ describe("CollectionPanel", () => {
     const details = wrapper.find(".details");
     expect(details.find(".big-card").exists()).toBe(false);
     await progression(wrapper);
-    expect(details.findAll(".foundation-summary article strong").map((a) => a.text())).toEqual(["Strike", "Rally"]);
+    expect(details.find(".foundation-summary").exists()).toBe(false);
     await wrapper.findAll('[role="tab"]').find((b) => b.text() === "Personalities")!.trigger("click");
     expect(details.find(".personalities").text()).toContain("Aggressive");
     expect(details.find(".personalities").text()).toContain("Tier 2");

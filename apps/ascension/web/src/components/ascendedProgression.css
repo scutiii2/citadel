@@ -40,10 +40,6 @@
 .progression-side>.muted { font-size:13px; }
 .level-hint { margin-top:16px; }
 .progression-art { width:100%; height:260px; object-fit:cover; margin-top:24px; border-radius:var(--em-radius); }
-.foundation-summary { border-top:1px solid var(--em-divider); margin-top:24px; padding-top:16px; font-size:12px; }
-.foundation-summary h4 { font:700 20px var(--em-font-heading); margin:16px 0 12px; }
-.foundation-summary article { margin-top:12px; }
-.foundation-summary p { color:var(--em-muted); font-size:11px; margin-top:6px; }
 @media(max-width:1000px) { .progression-tab { grid-template-columns:minmax(0,1fr); padding:24px; } .progression-side { border-left:0; border-top:1px solid var(--em-divider); padding:24px 0 0; } .progression-art { object-fit:contain; } }
 @media(max-width:600px) {
  .progression-tab { flex:none; overflow:visible; padding:20px 16px; gap:24px; }
