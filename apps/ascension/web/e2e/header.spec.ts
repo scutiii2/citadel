@@ -4,7 +4,7 @@ import { PROFILE } from "../src/api/AscensionClient.fixtures";
 
 test("header uses icons and reveals labels after a second of hovering", async ({ page }, testInfo) => {
   const api = await installFakeApi(page);
-  api.ascension.profile = structuredClone(PROFILE);
+  api.ascension.profile = { ...structuredClone(PROFILE) };
   await page.goto("/#ticket=e2e-launch");
   await page.getByRole("button", { name: "Collection", exact: true }).click();
   const header = page.locator(".mast");
