@@ -3,7 +3,7 @@ import type { AscendedInfo, OwnedAscended } from '../api/AscensionClient';
 import { titleCase, passiveText, abilityEffect } from '../utils/ascension';
 import EmBar from './ui/EmBar.vue';
 import EmButton from './ui/EmButton.vue';
-import EmEmblem from './ui/EmEmblem.vue';
+import EmTierIcon from './ui/EmTierIcon.vue';
 import EmEssence from './ui/EmEssence.vue';
 import EmIcon from './ui/EmIcon.vue';
 import EmTierBadge from './ui/EmTierBadge.vue';
@@ -23,10 +23,10 @@ defineEmits<{ addStar: []; raiseTier: [] }>();
       <div class="upgrade">
         <template v-if="ascended.stars_needed !== null">
           <div class="star-journey" :class="{ 'has-target': ascended.next_tier_id }">
-            <div class="journey-tier"><EmEmblem :tier-id="ascended.tier_id" :size="56" /><EmTierBadge :tier-id="ascended.tier_id" /></div>
+            <div class="journey-tier"><EmTierIcon :tier-id="ascended.tier_id" :size="56" /><EmTierBadge :tier-id="ascended.tier_id" :show-icon="false" /></div>
             <div v-if="ascended.stars_needed <= 10" class="milestones" role="img" :aria-label="`${ascended.stars} of ${ascended.stars_needed} stars`"><span v-for="n in ascended.stars_needed" :key="n" class="milestone" :class="{ earned: n <= ascended.stars }"><EmIcon name="ascended" :size="36" /></span></div>
             <EmBar v-else :value="ascended.stars" :max="ascended.stars_needed" :label="ascended.name + ' stars'" />
-            <div v-if="ascended.next_tier_id" class="journey-tier next"><EmEmblem :tier-id="ascended.next_tier_id" :size="56" /><span>{{ titleCase(ascended.next_tier_id) }}</span></div>
+            <div v-if="ascended.next_tier_id" class="journey-tier next"><EmTierIcon :tier-id="ascended.next_tier_id" :size="56" /><EmTierBadge :tier-id="ascended.next_tier_id" :show-icon="false" /></div>
           </div>
           <p class="journey-caption em-num">Stars {{ ascended.stars }} / {{ ascended.stars_needed }}<template v-if="ascended.next_tier_id"> to reach {{ titleCase(ascended.next_tier_id) }}</template></p>
           <div class="upgrade-columns">
@@ -43,7 +43,7 @@ defineEmits<{ addStar: []; raiseTier: [] }>();
               <p v-else class="muted">Maximum stars reached</p>
             </section>
             <section v-if="ascended.next_tier_id" class="next-ascension">
-              <h4>Next ascension</h4><EmEmblem :tier-id="ascended.next_tier_id" :size="72" /><strong>{{ titleCase(ascended.next_tier_id) }}</strong>
+              <h4>Next ascension</h4><EmTierIcon :tier-id="ascended.next_tier_id" :size="72" /><strong>{{ titleCase(ascended.next_tier_id) }}</strong>
               <EmButton :variant="ascended.can_tier_up ? 'primary' : 'secondary'" :disabled="!ascended.can_tier_up || busy" :aria-busy="busy" @click="$emit('raiseTier')">Raise to {{ titleCase(ascended.next_tier_id) }}</EmButton>
               <p v-if="!ascended.can_tier_up">Reach {{ ascended.stars_needed }} stars first.</p>
             </section>

@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { titleCase } from "../../utils/ascension";
+import EmTierIcon from "./EmTierIcon.vue";
 
-/** A tier's name in its colour, with a small square marker. The name is always
+/** A tier's name in its colour, with its artwork. The name is always
  * written (or `label`, for example "Tier 2"), so the colour is never the only signal. */
-const props = defineProps<{ tierId: string; label?: string }>();
+const props = withDefaults(defineProps<{ tierId: string; label?: string; showIcon?: boolean }>(), { showIcon: true });
 const text = computed(() => props.label ?? titleCase(props.tierId));
 </script>
 
 <template>
-  <span class="em-tier" :style="{ '--tier': `var(--em-tier-${tierId}, var(--em-tier-common))` }">{{ text }}</span>
+  <span class="em-tier" :style="{ '--tier': `var(--em-tier-${tierId}, var(--em-tier-common))` }"><EmTierIcon v-if="showIcon" :tier-id="tierId" />{{ text }}</span>
 </template>
 
 <style scoped>
@@ -25,11 +26,5 @@ const text = computed(() => props.label ?? titleCase(props.tierId));
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
-}
-.em-tier::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  background: currentColor;
 }
 </style>

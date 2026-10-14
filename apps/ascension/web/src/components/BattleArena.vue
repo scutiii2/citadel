@@ -8,6 +8,7 @@ import { spriteFor } from "../utils/sprites";
 import EmBar from "./ui/EmBar.vue";
 import EmEmblem from "./ui/EmEmblem.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
+import EmTierIcon from "./ui/EmTierIcon.vue";
 import TypeSymbol from "./ui/TypeSymbol.vue";
 
 /** Both Ascended facing each other across a VS marker: name, level, tier, health, their
@@ -73,11 +74,11 @@ function art(fighter: Fighter): string | null {
       <template v-for="side in sides" :key="side.key">
 
         <article class="fighter" :class="side.key" :aria-label="`${side.label}: ${side.fighter.name}`">
-          <div class="head"><EmEmblem v-if="side.fighter.ascended_id" class="fighter-emblem" :tier-id="side.fighter.tier_id" :size="42" />
+          <div class="head"><EmTierIcon v-if="side.fighter.ascended_id" class="fighter-emblem" :tier-id="side.fighter.tier_id" :size="42" />
             <h3><span class="ascended-name">{{ side.fighter.name }}</span> <small v-if="side.fighter.ascended_id" class="em-num">Lv. {{ side.fighter.level }}</small></h3>
             <span v-if="side.fighter.ascended_id" class="badges">
               <TypeSymbol v-for="id in typesOf(side.fighter)" :key="id" :type-id="id" :size="28" />
-              <EmTierBadge :tier-id="side.fighter.tier_id" />
+              <EmTierBadge :tier-id="side.fighter.tier_id" :show-icon="false" />
             </span>
           </div>
           <div class="art">

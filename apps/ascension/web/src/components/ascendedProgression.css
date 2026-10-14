@@ -11,7 +11,7 @@
 .star-journey { display:grid; grid-template-columns:90px minmax(0,1fr); align-items:center; gap:16px; margin-top:32px; }
 .star-journey.has-target { grid-template-columns:90px minmax(0,1fr) 90px; }
 .journey-tier { display:flex; flex-direction:column; align-items:center; gap:12px; font-weight:600; font-size:14px; }
-.journey-tier.next { color:var(--em-tier-royal); }
+.journey-tier.next { color:var(--em-text); }
 .milestones { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; min-width:0; }
 .milestone { display:flex; align-items:center; color:#708494; }
 .milestone.earned { color:var(--em-accent); }
@@ -52,7 +52,7 @@
  .progression-resources strong { font-size:23px; }
  .star-journey,.star-journey.has-target { grid-template-columns:56px minmax(0,1fr) 56px; gap:8px; }
  .star-journey:not(.has-target) { grid-template-columns:56px minmax(0,1fr); }
- .journey-tier { font-size:12px; } .journey-tier .em-emblem { max-width:48px; }
+ .journey-tier { font-size:12px; } .journey-tier .em-tier-icon { width:48px; height:48px; }
  .milestones { gap:4px; } .milestone>.em-icon { width:24px; height:24px; }
  .milestone+.milestone::before { width:6px; margin-right:4px; }
  .upgrade-columns { grid-template-columns:minmax(0,1fr); gap:28px; }
