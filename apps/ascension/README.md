@@ -31,8 +31,8 @@ in Phase 4.
 
 ## Squad
 
-Equip between one and `economy.squad_size` Ascended (default five) in the Collection tab.
-Only squad members can start battles. Squad edits are locked during an active battle.
+Equip up to `economy.squad_size` Ascended (default five) in the Collection tab. An empty squad is allowed,
+but only squad members can start battles. Squad edits are locked during an active battle.
 The starter joins immediately; a newly captured or first-purchased Ascended joins when
 there is a free slot. Full squads leave new arrivals in the collection.
 
@@ -47,7 +47,7 @@ receive nothing. Knock-outs and forfeits pay no XP.
 an `Idempotency-Key`. Profiles include `squad`, `squad_size` and each member's
 `in_squad` flag. Rewarded battle results include a `squad_xp` breakdown.
 
-SQLite schema 6 upgrades existing players by equipping their highest-level Ascended
+The squad table arrived with SQLite schema 6, which upgraded existing players by equipping their highest-level Ascended
 first, breaking ties by Ascended id, up to the configured squad size.
 
 ## How an Ascended chooses on its own
@@ -130,8 +130,8 @@ in Ascension's local environment that `ember_api` uses. This token is used only
 for outgoing server-to-server ticket redemption. Game routes always require a
 bearer session, including when the internal token is missing. Game data lives
 in `.data/ascension.sqlite3` (gitignored).
-The database was renamed with the game (it was `data/sparks.sqlite3`, schema version 1; now `.data/ascension.sqlite3`, schema version 5).
-Version 2, 3 and 4 files are upgraded to 5 on start (shop purchases, stars/essence and ability trees as needed). Version 1 fails with
+The database was renamed with the game (it was `data/sparks.sqlite3`, schema version 1; now `.data/ascension.sqlite3`, schema version 7).
+Version 2 to 6 files are upgraded to 7 on start (shop purchases, stars/essence, ability trees, squads and the default preset as needed). Version 1 fails with
 `database schema version 1 is not supported`.
 Delete the old file, or point `database_path` at a new one, to start fresh.
 
@@ -172,7 +172,9 @@ green, blue, purple, gold, red), as in the Unity project.
 - The first copy is the Ascended itself. Any further copy, from a capture or the shop, is a **spare copy** (`copies`).
 - **A star** costs one spare copy and the tier's `essence_cost` in that tier's essence. Each tier has
   `stars_to_advance` (the Unity star ladder): Common 1, Rare 2, Unique 3, Royal 5. Legendary and Forbidden have none,
-  and neither has the last tier of an Ascended's own ladder: it takes no stars and cannot rise.
+  and neither has the last tier of an Ascended's own ladder: it cannot rise. A final tier may set `max_stars` in
+  `configs/ascension_catalog.json` (Legendary 20, Forbidden 50): stars can then still be added up to that cap, and past it
+  the request is refused with "maximum stars reached".
 - With enough stars an Ascended can **raise its tier** (free). The stars then start again from zero.
 - Beating or collecting an enemy pays that enemy's tier `essence_cost` in its tier essence (Common 1, Rare 2, Unique 3,
   Royal 4, Legendary 5, Forbidden 10). Essence is never lost when a battle is lost.
@@ -363,6 +365,7 @@ last saw; a stale pair is a 409.
 | `GET /ascension/profile` | Wallet, Ascended, timers, pending encounter, active battle |
 | `GET /ascension/ascendeds/{id}/personalities` | Collected personality instances (paginated) |
 | `GET`/`PUT /ascension/ascendeds/{id}/presets/{slot}` | One of five presets (up to three instances) |
+| `PUT /ascension/ascendeds/{id}/default-preset` | Choose which preset slot (1 to 5) this Ascended uses by default (`{slot}`); schema 7 stores it as `default_preset_slot` |
 | `POST /ascension/encounters` | Roll a preview (one per 30 seconds) |
 | `GET /ascension/encounters/{id}` | The same preview, never rerolled |
 | `POST /ascension/encounters/{id}/decline` | Decline for free |
