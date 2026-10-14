@@ -1,4 +1,5 @@
 .collection :deep(.em-dialog.ascended-details){width:min(1500px,calc(100vw - 32px));padding:0;border:1px solid #466071;border-radius:var(--radius-md);background:#061824 url('../assets/scenes/ascended-sanctum.png') center/cover;overflow:hidden;max-height:calc(100dvh - 32px)}
+.collection :deep(.em-dialog.ascended-details),.collection :deep(.em-dialog.ascended-details *){-webkit-user-select:none;user-select:none}
 .collection :deep(.ascended-details .head){position:relative;z-index:5;align-items:center;gap:20px;margin:0;padding:18px 24px 10px;background:#061824d9}
 .collection :deep(.ascended-details .title){margin-right:auto;font:600 28px/1.2 Georgia,serif;text-decoration:none;border:0;color:#f4f3eb;min-width:0;overflow-wrap:anywhere}
 .collection :deep(.ascended-details .close){border:0;background:none;width:36px;height:36px}
