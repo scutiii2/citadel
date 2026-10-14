@@ -3,11 +3,11 @@ import { describe, expect, it } from "vitest";
 import EmShell from "./EmShell.vue";
 
 describe("EmShell", () => {
-  it("shows one header with the logo, destination, wallet and content", () => {
+  it("shows one header with the logo, wallet and content", () => {
     const wrapper = mount(EmShell, { props: { insignia: 240 }, slots: { default: "<p class='body'>Hello</p>" } });
 
     expect(wrapper.find("h1").attributes("aria-label")).toBe("ASCENSION");
-    expect(wrapper.find('.destination').attributes('aria-label')).toBe('Main menu');
+    expect(wrapper.find('.destination').exists()).toBe(false);
     expect(wrapper.find('.navigation').text()).toBe('');
     expect(wrapper.find('.screen-heading').exists()).toBe(false);
     expect(wrapper.find(".wallet").text()).toBe("");

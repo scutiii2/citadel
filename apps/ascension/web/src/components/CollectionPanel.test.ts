@@ -49,7 +49,7 @@ it("filters collected cards by search and rarity and can hide concealed cards", 
   const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian"), ownedAscended("striker", { tier_id: "rare" })] });
   await wrapper.find('input[type="search"]').setValue("str");
   expect(wrapper.findAll(".ascended-card")).toHaveLength(1);
-  await wrapper.find('select[aria-label="Filter by rarity"]').setValue("common");
+  await wrapper.find('[data-tier-filter="common"]').trigger("click");
   expect(wrapper.findAll(".ascended-card")).toHaveLength(0);
   await wrapper.find('input[aria-label="Show uncollected"]').setValue(false);
   expect(wrapper.findAll(".missing-ascended")).toHaveLength(0);
@@ -331,32 +331,33 @@ describe("PresetEditor", () => {
       useAscensionStore().catalog = TYPED;
       return wrapper;
     }
-    const chip = (wrapper: ReturnType<typeof mountTyped>, label: string) => wrapper.findAll(".chip").find((c) => c.text() === label)!;
+    const chip = (wrapper: ReturnType<typeof mountTyped>, label: string) => wrapper.findAll(".type-filters .chip").find((c) => c.text() === label)!;
     const names = (wrapper: ReturnType<typeof mountTyped>) => wrapper.findAll(".ascended-card .ascended-name").map((n) => n.text());
 
-    it("offers a chip per type in the catalog and starts with All", async () => {
+    it("offers all type toggles with no filters selected", async () => {
       const wrapper = mountTyped();
       await flushPromises();
-      expect(wrapper.findAll(".chip").map((c) => c.text())).toEqual(["All", "Abyss", "Divine", "Enchant"]);
-      expect(chip(wrapper, "All").attributes("aria-pressed")).toBe("true");
+      expect(wrapper.findAll(".type-filters .chip").map((c) => c.text())).toEqual(["Pure", "Abyss", "Divine", "Crimson", "Enchant", "Synthetic"]);
+      expect(wrapper.findAll(".type-filters .chip").every(c => c.attributes("aria-pressed") === "false")).toBe(true);
       expect(names(wrapper)).toEqual(["Guardian", "Striker", "Bruiser"]);
     });
 
-    it("filters owned and not-collected cards by one type, and a second click clears it", async () => {
+    it("combines type toggles and clears a filter on a second click", async () => {
       const wrapper = mountTyped();
       await chip(wrapper, "Enchant").trigger("click");
       expect(names(wrapper)).toEqual(["Guardian", "Striker"]);
       expect(wrapper.findAll(".missing-ascended")).toHaveLength(0);
+      await chip(wrapper, "Enchant").trigger("click");
       await chip(wrapper, "Abyss").trigger("click");
-      expect(wrapper.find(".empty").text()).toBe("No Abyss Ascended collected yet.");
+      expect(wrapper.find(".empty").text()).toBe("No Ascended match your filters.");
       expect(wrapper.findAll(".missing-ascended")).toHaveLength(1);
       await chip(wrapper, "Abyss").trigger("click");
-      expect(chip(wrapper, "All").attributes("aria-pressed")).toBe("true");
+      expect(wrapper.findAll(".type-filters .chip").every(c => c.attributes("aria-pressed") === "false")).toBe(true);
     });
 
-    it("groups owned cards by type when the switch is on", async () => {
+    it("groups owned cards by type when its radio is selected", async () => {
       const wrapper = mountTyped();
-      await wrapper.find("input[role=switch]").setValue(true);
+      await wrapper.find('input[name="collection-grouping"][value="type"]').setValue();
       const groups = wrapper.findAll(".group").map((g) => [g.find(".group-name").text(), g.findAll(".ascended-name").map((n) => n.text())]);
       expect(groups).toEqual([
         ["Divine 1", ["Striker"]],
@@ -453,4 +454,19 @@ it("keeps the personality list visible while another preset is loading", async (
   expect(wrapper.find(".personalities").text()).toContain("Aggressive");
   expect(wrapper.text()).not.toContain("Loading");
   expect(wrapper.find("input[role=switch]").attributes("disabled")).toBeDefined();
+});
+
+it("combines multiple tiers with type filters and preserves the acquired count", async () => {
+  const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian"), ownedAscended("striker", { tier_id: "rare", ascension_types: ["divine"] })] });
+  expect(wrapper.find(".rail-count").text()).toBe("2/4 Acquired");
+  expect(wrapper.findAll(".collected-zone .group").map(g => g.attributes("data-tier"))).toEqual(["common", "rare"]);
+  await wrapper.find('[data-tier-filter="common"]').trigger("click");
+  expect(wrapper.findAll(".ascended-card")).toHaveLength(1);
+  await wrapper.find('[data-tier-filter="rare"]').trigger("click");
+  expect(wrapper.findAll(".ascended-card")).toHaveLength(2);
+  await wrapper.find('[data-type-filter="divine"]').trigger("click");
+  expect(wrapper.findAll(".ascended-card .ascended-name").map(n => n.text())).toEqual(["Striker"]);
+  expect(wrapper.find(".rail-count").text()).toBe("2/4 Acquired");
+  await wrapper.find('[data-type-filter="enchant"]').trigger("click");
+  expect(wrapper.findAll(".ascended-card")).toHaveLength(2);
 });

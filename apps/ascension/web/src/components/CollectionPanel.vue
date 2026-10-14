@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { useAscensionClient, type OwnedAscended, type PersonalityItem } from "../api/AscensionClient";
 import { useAscensionStore } from "../stores/ascension";
 import { errorMessage } from "../utils/errors";
-import { filterByType, groupByType, typeLabel, typesPresent } from "../utils/ascensionTypes";
+import { ASCENSION_TYPES, groupByType, typeLabel, typesPresent } from "../utils/ascensionTypes";
 import { ascendedStats, formatCountdown, titleCase, passiveText, abilityEffect } from "../utils/ascension";
 import { spriteFor, spriteFocus } from "../utils/sprites";
 import { useNowSeconds } from "../composables/useNowSeconds";
@@ -16,7 +16,6 @@ import EmButton from "./ui/EmButton.vue";
 import EmDialog from "./ui/EmDialog.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmNotice from "./ui/EmNotice.vue";
-import EmSwitch from "./ui/EmSwitch.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
 import EmEssence from "./ui/EmEssence.vue";
 import EmTabs from "./ui/EmTabs.vue";
@@ -29,24 +28,46 @@ defineProps<{ controlsTarget?: HTMLElement | null }>();
 const ascensionClient = useAscensionClient();
 const PAGE_SIZE = 50;
 
-const typeFilter = ref<string | null>(null);
-const grouped = ref(false);
+const selectedTypes = ref<string[]>([]);
+const selectedTiers = ref<string[]>([]);
+const groupBy = ref<"tier" | "type">("tier");
+const configurationExpanded = ref(false);
 const search = ref("");
-const rarity = ref("");
 const showUncollected = ref(true);
-const matches = (name: string, tier: string) => name.toLowerCase().includes(search.value.trim().toLowerCase()) && (!rarity.value || tier === rarity.value);
+function toggleFilter(selected: string[], id: string): void {
+  const index = selected.indexOf(id);
+  if (index < 0) selected.push(id);
+  else selected.splice(index, 1);
+}
+const matches = (name: string, tier: string, types: readonly string[]) =>
+  name.toLowerCase().includes(search.value.trim().toLowerCase())
+  && (!selectedTiers.value.length || selectedTiers.value.includes(tier))
+  && (!selectedTypes.value.length || types.some(id => selectedTypes.value.includes(id)));
 const allOwned = computed(() => store.profile?.ascendeds ?? []);
 const allNotOwned = computed(() => {
   const ids = new Set(allOwned.value.map((s) => s.ascended_id));
   return (store.catalog?.ascendeds ?? []).filter((s) => !ids.has(s.id));
 });
-/** The types to offer as filters: those any Ascended in the catalog has. */
-const types = computed(() => typesPresent(store.catalog?.ascendeds ?? []));
+/** Offer every type, including any future catalog types. */
+const types = computed(() => [...new Set([...ASCENSION_TYPES.map(type => type.id), ...typesPresent(store.catalog?.ascendeds ?? [])])]);
 const catalogById = computed(() => new Map((store.catalog?.ascendeds ?? []).map(info => [info.id, info])));
-/** Squad members show in the squad strip, so the collected list leaves them out. */
-const owned = computed(() => filterByType(allOwned.value.filter((s) => !s.in_squad && matches(s.name, s.tier_id)), typeFilter.value));
-const notOwned = computed(() => filterByType(allNotOwned.value.filter(s => matches(s.name, s.start_tier)), typeFilter.value));
-const groups = computed(() => groupByType(owned.value));
+/** Squad members stay in their own strip. */
+const owned = computed(() => allOwned.value.filter(s => !s.in_squad && matches(s.name, s.tier_id, s.ascension_types)));
+const notOwned = computed(() => allNotOwned.value.filter(s => matches(s.name, s.start_tier, s.ascension_types)));
+function groupCards<T extends { ascension_types: readonly string[] }>(items: T[], tierOf: (item: T) => string) {
+  if (groupBy.value === "type") return groupByType(items).map(group => ({ ...group, key: group.typeId ?? "none", tierId: null }));
+  const tiers = [...new Set([...(store.catalog?.tiers.map(tier => tier.id) ?? []), ...items.map(tierOf)])];
+  return tiers.flatMap(tierId => {
+    const members = items.filter(item => tierOf(item) === tierId);
+    return members.length ? [{ key: tierId, tierId, typeId: null, label: titleCase(tierId), items: members }] : [];
+  });
+}
+const groups = computed(() => groupCards(owned.value, item => item.tier_id));
+const missingGroups = computed(() => groupCards(notOwned.value, item => item.start_tier));
+const emptyMessage = computed(() => {
+  if (search.value.trim() || selectedTypes.value.length || selectedTiers.value.length) return "No Ascended match your filters.";
+  return allOwned.value.length ? "Everyone you collected is in your squad." : "None collected yet.";
+});
 
 const openId = ref<string | null>(null);
 const detailsOpen = ref(false);
@@ -184,29 +205,36 @@ function show(ascended: OwnedAscended): void {
 
 <template>
   <section class="collection">
-    <aside class="filter-rail" aria-label="Collection filters">
-      <h3 class="em-pixel">Filters</h3><button class="all-filter" type="button" @click="typeFilter = null; rarity = ''; search = ''">All Ascended</button>
-      <label class="filter-label">Search<input v-model="search" type="search" placeholder="Find an Ascended" aria-label="Search collection" /></label>
-    <div v-if="types.length" class="filters">
-      <div class="chips" role="group" aria-label="Filter by Ascension Type">
-        <button type="button" class="chip" :aria-pressed="typeFilter === null" @click="typeFilter = null">All</button>
-        <button
-          v-for="id in types"
-          :key="id"
-          type="button"
-          class="chip"
-          :aria-pressed="typeFilter === id"
-          @click="typeFilter = typeFilter === id ? null : id"
-        >
-          <TypeSymbol :type-id="id" :size="20" decorative />{{ typeLabel(id) }}
-        </button>
+    <aside class="filter-rail" :class="{ expanded: configurationExpanded }" aria-label="Collection filters">
+      <button type="button" class="configuration-toggle" :aria-expanded="configurationExpanded" aria-controls="collection-configuration" @click="configurationExpanded = !configurationExpanded">
+        <EmIcon name="settings" />Configuration<EmIcon class="configuration-arrow" name="arrow" />
+      </button>
+      <div id="collection-configuration" class="configuration-content">
+        <label class="filter-label">Search<input v-model="search" type="search" placeholder="Find an Ascended" aria-label="Search collection" /></label>
+        <fieldset class="filter-group type-filters">
+          <legend>Ascension Type</legend>
+          <div class="chips">
+            <button v-for="id in types" :key="id" type="button" class="chip" :data-type-filter="id" :aria-pressed="selectedTypes.includes(id)" @click="toggleFilter(selectedTypes, id)">
+              <TypeSymbol :type-id="id" :size="20" decorative />{{ typeLabel(id) }}
+            </button>
+          </div>
+        </fieldset>
+        <fieldset class="filter-group tier-filters">
+          <legend>Tier</legend>
+          <div class="chips">
+            <button v-for="tier in store.catalog?.tiers" :key="tier.id" type="button" class="chip" :data-tier-filter="tier.id" :aria-pressed="selectedTiers.includes(tier.id)" @click="toggleFilter(selectedTiers, tier.id)">
+              <EmTierBadge :tier-id="tier.id" />
+            </button>
+          </div>
+        </fieldset>
+        <fieldset class="filter-group grouping-filters">
+          <legend>Group by</legend>
+          <label><input v-model="groupBy" type="radio" name="collection-grouping" value="tier" />Tier</label>
+          <label><input v-model="groupBy" type="radio" name="collection-grouping" value="type" />Ascension Type</label>
+        </fieldset>
+        <label class="uncollected"><input v-model="showUncollected" type="checkbox" aria-label="Show uncollected" />Show uncollected</label>
       </div>
-      <EmSwitch v-model="grouped" label="Group by type" />
-    </div>
-
-      <label class="filter-label">Rarity<select v-model="rarity" aria-label="Filter by rarity"><option value="">All rarities</option><option v-for="tier in store.catalog?.tiers" :key="tier.id" :value="tier.id">{{ titleCase(tier.id) }}</option></select></label>
-      <label class="uncollected"><input v-model="showUncollected" type="checkbox" aria-label="Show uncollected" />Show uncollected</label>
-      <p class="rail-count em-num">{{ allOwned.length }} / {{ store.catalog?.ascendeds.length ?? 0 }} collected</p>
+      <p class="rail-count em-num">{{ allOwned.length }}/{{ store.catalog?.ascendeds.length ?? 0 }} Acquired</p>
     </aside>
     <main class="collection-main">
     <ul v-if="essences.length" class="essences" aria-label="Essence">
@@ -260,8 +288,7 @@ function show(ascended: OwnedAscended): void {
         <h3 class="em-pixel">Collected <small class="em-num">{{ owned.length }}</small></h3>
         <small>Press a card for details</small>
       </div>
-      <template v-if="grouped">
-        <section v-for="group in groups" :key="group.typeId ?? 'none'" class="group" :data-type="group.typeId ?? 'none'">
+        <section v-for="group in groups" :key="group.key" class="group" :data-type="group.typeId ?? undefined" :data-tier="group.tierId ?? undefined">
           <h4 class="group-name"><TypeSymbol v-if="group.typeId" :type-id="group.typeId" :size="40" decorative />{{ group.label }} <small class="em-num">{{ group.items.length }}</small></h4>
           <div class="grid">
             <div v-for="ascended in group.items" :key="ascended.ascended_id" class="owned-entry" draggable="true" @dragstart="dragStart($event, ascended.ascended_id, false)" @dragend="dragEnd">
@@ -269,13 +296,8 @@ function show(ascended: OwnedAscended): void {
             </div>
           </div>
         </section>
-      </template>
-      <div v-else class="grid">
-        <div v-for="ascended in owned" :key="ascended.ascended_id" class="owned-entry" draggable="true" @dragstart="dragStart($event, ascended.ascended_id, false)" @dragend="dragEnd">
-          <AscendedCard :ascended="ascended" :selected="openId === ascended.ascended_id" @open="show(ascended)" />
-        </div>
-      </div>
-      <p v-if="owned.length === 0" class="empty">{{ allOwned.length > owned.length && typeFilter === null ? "Everyone you collected is in your squad." : typeFilter === null ? "None collected yet." : `No ${typeLabel(typeFilter)} Ascended collected yet.` }}</p>
+
+      <p v-if="owned.length === 0" class="empty">{{ emptyMessage }}</p>
 
     </div>
 
@@ -284,11 +306,14 @@ function show(ascended: OwnedAscended): void {
         <h3 class="em-pixel">Not collected yet</h3>
         <small>{{ notOwned.length }} still to find</small>
       </div>
-      <ul class="grid missing">
-        <li v-for="ascended in notOwned" :key="ascended.id" class="missing-ascended">
-          <AscendedPreviewCard class="back preview-lift" :ascended="ascended" :tier-id="ascended.start_tier" flipped />
-        </li>
-      </ul>
+      <section v-for="group in missingGroups" :key="group.key" class="missing-group" :data-type="group.typeId ?? undefined" :data-tier="group.tierId ?? undefined">
+        <h4 class="group-name"><TypeSymbol v-if="group.typeId" :type-id="group.typeId" :size="40" decorative />{{ group.label }} <small class="em-num">{{ group.items.length }}</small></h4>
+        <ul class="grid missing">
+          <li v-for="ascended in group.items" :key="ascended.id" class="missing-ascended">
+            <AscendedPreviewCard class="back preview-lift" :ascended="ascended" :tier-id="ascended.start_tier" flipped />
+          </li>
+        </ul>
+      </section>
     </template>
 
     </main>
@@ -371,7 +396,7 @@ function show(ascended: OwnedAscended): void {
 
 <style scoped>
 .collection { display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 18px; align-items: start; }
-.filter-rail, .summary, .progression-panel, .stats-panel, .overview-effects { border: 1px solid var(--em-border); background: linear-gradient(135deg, var(--em-panel), var(--em-bg)); box-shadow: inset 0 0 0 3px rgb(255 255 255 / 2%); }
+.summary, .progression-panel, .stats-panel, .overview-effects { border: 1px solid var(--em-border); background: linear-gradient(135deg, var(--em-panel), var(--em-bg)); box-shadow: inset 0 0 0 3px rgb(255 255 255 / 2%); }
 .filter-rail { padding: 16px 12px; display: flex; flex-direction: column; gap: 18px; position: sticky; top: 18px; }
 .filter-rail h3 { font-size: 14px; margin: 0; }
 .filter-label { display: flex; flex-direction: column; gap: 8px; color: var(--em-muted); font-size: 12px; }
@@ -472,7 +497,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .squad-card:foc
 @media (max-width: 600px) { .collection { grid-template-columns: minmax(0, 1fr); } .filter-rail { position: static; gap: 12px; } .chips { flex-direction: row; flex-wrap: wrap; } .filters { gap: 12px; } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .squad-empty { min-height: 90px; } .details { grid-template-columns: minmax(0, 1fr); } .summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); } .summary .detail-portrait { grid-row: span 4; height: 150px; } .summary .battle-status { grid-column: 1 / -1; } .progression-panel { grid-column: 1; } .collection :deep(.em-dialog.ascended-details) { padding: 14px; } }
 
 .collection {grid-template-columns:200px minmax(0,1fr);gap:12px;}
-.filter-rail,.summary,.progression-panel,.stats-panel,.overview-effects {border-radius:var(--em-radius);background:linear-gradient(125deg,#102735,#091c29);}
+.summary,.progression-panel,.stats-panel,.overview-effects {border-radius:var(--em-radius);background:linear-gradient(125deg,#102735,#091c29);}
 .filter-rail {padding:8px 12px 14px;gap:14px;}.filter-rail h3{font-size:11px;color:var(--em-muted);}
 .all-filter{padding:10px 12px;color:var(--em-text);background:linear-gradient(#193243,#102737);border:1px solid var(--em-border);border-left:4px solid var(--em-accent);border-radius:var(--em-radius);font:inherit;font-size:13px;text-align:left;cursor:pointer;}
 .filter-label input,.filter-label select {border-radius:var(--em-radius);background:linear-gradient(#193243,#0e2231);}
@@ -484,4 +509,27 @@ button:focus-visible, input:focus-visible, select:focus-visible, .squad-card:foc
 .side :deep(.tab.active),:deep(.em-button.primary:not(:disabled)){background:linear-gradient(#fac88a,#de9655);border-color:#f5b56f;color:#15222e;box-shadow:inset 0 1px #ffdeb0;}
 @media(max-width:1180px){.collection{grid-template-columns:170px minmax(0,1fr);}}
 @media(max-width:600px){.collection{grid-template-columns:minmax(0,1fr);}}
+.filter-rail { padding:8px 0; border:0; border-radius:0; background:transparent; box-shadow:none; }
+.configuration-content { display:flex; flex-direction:column; gap:18px; }
+.configuration-toggle { display:none; }
+.filter-group { display:flex; flex-direction:column; gap:8px; min-width:0; border:0; padding:0; margin:0; }
+.filter-group legend { padding:0; margin-bottom:8px; color:var(--em-muted); font-size:12px; }
+.grouping-filters label { display:flex; align-items:center; gap:8px; min-height:32px; font-size:12px; }
+.grouping-filters input { accent-color:var(--em-accent); }
+.rail-count { border:0; padding-top:0; }
+.missing-group { margin-bottom:18px; }
+@media (orientation:landscape) {
+  .collection { grid-template-columns:200px minmax(0,1fr); }
+  .filter-rail { position:static; }
+}
+@media (orientation:portrait) {
+  .collection { grid-template-columns:minmax(0,1fr); }
+  .filter-rail { position:static; gap:12px; }
+  .configuration-toggle { display:flex; align-items:center; gap:8px; width:100%; min-height:44px; padding:8px 0; border:0; background:transparent; color:var(--em-text); font:inherit; cursor:pointer; }
+  .configuration-arrow { margin-left:auto; transform:rotate(90deg); }
+  .expanded .configuration-arrow { transform:rotate(-90deg); }
+  .configuration-content { display:none; }
+  .expanded .configuration-content { display:flex; }
+  .chips { flex-direction:row; flex-wrap:wrap; }
+}
 </style>

@@ -16,7 +16,6 @@ import EmTierBadge from "./ui/EmTierBadge.vue";
 import EmQuantity from "./ui/EmQuantity.vue";
 
 const store = useAscensionStore();
-defineProps<{ controlsTarget?: HTMLElement | null }>();
 const basket = useShopBasketStore();
 const { mode, processing, message, interrupted } = storeToRefs(basket);
 const baskets = basket.baskets;
@@ -181,14 +180,12 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
 
 <template>
   <section class="shop" :aria-busy="processing">
-    <Teleport :to="controlsTarget ?? 'body'" :disabled="!controlsTarget">
     <div class="shop-toolbar">
       <div class="mode-tabs" role="group" aria-label="Shop mode">
-        <button type="button" data-mode="buy" aria-label="Buy" :data-label="controlsTarget ? 'Buy' : undefined" :aria-pressed="mode === 'buy'" :disabled="locked" @click="switchMode('buy')"><EmIcon v-if="controlsTarget" name="shop" /><template v-else>Buy</template></button>
-        <button type="button" data-mode="sell" aria-label="Sell" :data-label="controlsTarget ? 'Sell' : undefined" :aria-pressed="mode === 'sell'" :disabled="locked" @click="switchMode('sell')"><EmIcon v-if="controlsTarget" name="coin" /><template v-else>Sell</template></button>
+        <button type="button" data-mode="buy" aria-label="Buy" title="Buy" :aria-pressed="mode === 'buy'" :disabled="locked" @click="switchMode('buy')"><EmIcon name="shop" /></button>
+        <button type="button" data-mode="sell" aria-label="Sell" title="Sell" :aria-pressed="mode === 'sell'" :disabled="locked" @click="switchMode('sell')"><EmIcon name="coin" /></button>
       </div>
     </div>
-    </Teleport>
     <p v-if="message" class="notice" :class="{ interrupted }" role="status"><EmIcon :name="interrupted ? 'warning' : 'check'" />{{ message }}</p>
     <EmNotice v-if="store.error" tone="error">{{ store.error }}</EmNotice>
     <div class="trading-floor">

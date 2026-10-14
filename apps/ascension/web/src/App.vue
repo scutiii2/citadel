@@ -34,7 +34,6 @@ const session = useSessionStore();
 const store = useAscensionStore();
 const playback = usePlaybackStore();
 const page = ref<HTMLElement | null>(null);
-const shopControls = ref<HTMLElement | null>(null);
 let observer: ResizeObserver | null = null;
 let stopMessages: (() => void) | null = null;
 function notifyContentSize(): void {
@@ -103,7 +102,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 <template>
   <section ref="page" class="em-root ascension-page" :class="{ fighting }">
     <EmPanel v-if="touchOnly" class="state" role="alert"><EmIcon name="warning" :size="40" /><h2 class="em-pixel">Ascension is PC only</h2><p>Open this game on a computer with a mouse and keyboard.</p></EmPanel>
-    <EmShell v-else :destination="screen === 'starter' ? 'Choose your starter' : tab === 'collection' ? 'Your collection' : tab === 'shop' ? 'Forge Shop' : store.battle?.result ? 'Battle result' : store.battle ? 'Forge Arena' : 'Quick battle'" :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
+    <EmShell v-else :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
       <template v-if="session.status === 'ready' && store.loaded && !store.unavailable" #navigation>
         <h1 class="screen-brand em-pixel" aria-label="ASCENSION" data-label="ASCENSION" tabindex="0"><EmIcon name="flame" :size="24" /></h1>
         <EmTabs v-if="screen === 'game'" class="section-tabs" :model-value="tab" :options="tabs" icon-only delayed-labels ariaLabel="Ascension sections" @update:model-value="value => play(value as Tab)" />
@@ -112,9 +111,6 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
       <template v-if="session.status === 'ready' && store.loaded && !store.unavailable" #actions>
         <button type="button" class="header-action" aria-label="Help" data-label="Help" @click="showingHelp = true"><EmIcon name="info" :size="22" /></button>
         <button type="button" class="header-action" aria-label="Settings" data-label="Settings" @click="showingSettings = true"><EmIcon name="settings" :size="22" /></button>
-      </template>
-      <template #tools>
-        <div v-if="screen === 'game' && tab === 'shop'" id="shop-mode-controls" ref="shopControls" class="header-controls" />
       </template>
       <EmPanel v-if="session.status !== 'ready'" class="state" :role="session.status === 'connecting' ? 'status' : 'alert'">
         <EmIcon name="flame" :size="40" />
@@ -166,7 +162,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
             <EncounterPanel v-else />
           </div>
 
-          <ShopPanel v-else class="tab-body" :controls-target="shopControls" />
+          <ShopPanel v-else class="tab-body" />
         </template>
       </template>
       <EmDialog :open="showingHelp" title="Help" @close="showingHelp = false">
