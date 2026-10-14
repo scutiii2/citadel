@@ -217,7 +217,8 @@ def run_interpret(text: str) -> ChatResult:
     run_interpret. Unlike run_chat, this never registers/clears
     cancellation: it's always one call, not a multi-round loop a user
     could need to interrupt mid-way."""
-    return _PROVIDER_MODULE.run_interpret(text, MODEL)
+    model = model_tiers.clamp_default(MODEL, getattr(_PROVIDER_MODULE, "DEFAULT_MODEL", None), agent_spec.current().id).model
+    return _PROVIDER_MODULE.run_interpret(text, model)
 
 
 def cancel(request_id: str) -> bool:

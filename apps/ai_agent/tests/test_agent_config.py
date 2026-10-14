@@ -541,3 +541,19 @@ def test_a_delegated_turn_does_not_recall(monkeypatch):
 
     assert recall_calls == []
     assert provider.call_args.args[0] == "hi"
+
+
+def test_run_interpret_runs_on_the_clamped_default_model(monkeypatch):
+    from types import SimpleNamespace
+
+    from src.agents import agent_config
+
+    seen = {}
+    monkeypatch.setattr(agent_config, "MODEL", None)
+    monkeypatch.setattr(agent_config, "_PROVIDER_MODULE", SimpleNamespace(
+        DEFAULT_MODEL="sonnet", run_interpret=lambda text, model: seen.setdefault("model", model),
+    ))
+    monkeypatch.setattr(agent_config.model_tiers, "clamp_default", lambda m, d, a: SimpleNamespace(model="haiku"))
+    monkeypatch.setattr(agent_config.agent_spec, "current", lambda: SimpleNamespace(id="ember"))
+    agent_config.run_interpret("text")
+    assert seen["model"] == "haiku"
