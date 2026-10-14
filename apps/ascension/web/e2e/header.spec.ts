@@ -6,9 +6,27 @@ test("header uses icons and reveals labels after a second of hovering", async ({
   const api = await installFakeApi(page);
   api.ascension.profile = { ...structuredClone(PROFILE) };
   await page.goto("/#ticket=e2e-launch");
-  await page.getByRole("button", { name: "Collection", exact: true }).click();
+  await page.getByRole("tab", { name: "Collection", exact: true }).click();
   const header = page.locator(".mast");
   expect((await header.innerText()).trim()).toBe("");
+  const navigationStyle = await header.locator(".section-tabs").evaluate(el => {
+    const group = getComputedStyle(el);
+    const active = getComputedStyle(el.querySelector(".active")!);
+    return { border: group.borderTopWidth, background: group.backgroundColor, activeBackground: active.backgroundImage, activeShadow: active.boxShadow };
+  });
+  expect(navigationStyle).toEqual({ border: "0px", background: "rgba(0, 0, 0, 0)", activeBackground: "none", activeShadow: "none" });
+  await expect(header.getByRole("button", { name: /Tavern/ })).toBeDisabled();
+  const actions = await header.locator(".account-actions button").evaluateAll(buttons => buttons.map(button => ({ label: button.getAttribute("aria-label"), x: button.getBoundingClientRect().x })));
+  expect(actions.map(action => action.label)).toEqual(["Open shop, 100 Insignia", "Help", "Settings"]);
+  expect(actions[0]!.x).toBeLessThan(actions[1]!.x);
+  expect(actions[1]!.x).toBeLessThan(actions[2]!.x);
+  await header.getByRole("button", { name: "Help", exact: true }).click();
+  await page.getByRole("dialog", { name: "Help", exact: true }).getByRole("button", { name: "How to play", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Keep the fire going", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Ready to play", exact: true }).click();
+  await header.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Settings", exact: true }).getByRole("button", { name: "Reset progress", exact: true })).toBeEnabled();
+  await page.getByRole("dialog", { name: "Settings", exact: true }).getByRole("button", { name: "Close", exact: true }).click();
   const battle = header.getByRole("tab", { name: "Battle", exact: true });
   const tooltip = () => battle.evaluate(el => getComputedStyle(el, "::after").visibility);
   expect(await tooltip()).toBe("hidden");

@@ -14,8 +14,8 @@ const emit = defineEmits<{ shop: [] }>();
         <span class="destination" :aria-label="destination ?? 'Main menu'" :data-label="destination ?? 'Main menu'" tabindex="0"><EmIcon :name="destinationIcons[destination ?? 'Main menu'] ?? 'info'" :size="22" /></span>
       </div>
       <div class="header-tools"><slot name="tools" /></div>
-      <div v-if="insignia !== null" class="account-actions">
-        <component :is="shopEnabled ? 'button' : 'div'" class="wallet" :type="shopEnabled ? 'button' : undefined" :tabindex="shopEnabled ? undefined : 0" :data-label="insignia.toLocaleString() + ' Insignia' + (shopEnabled ? ' · Open shop' : '')" :aria-label="shopEnabled ? 'Open shop, ' + insignia + ' Insignia' : insignia + ' Insignia'" :aria-pressed="shopEnabled ? shopOpen : undefined" @click="shopEnabled && emit('shop')">
+      <div class="account-actions">
+        <component v-if="insignia !== null" :is="shopEnabled ? 'button' : 'div'" class="wallet" :type="shopEnabled ? 'button' : undefined" :tabindex="shopEnabled ? undefined : 0" :data-label="insignia.toLocaleString() + ' Insignia' + (shopEnabled ? ' · Open shop' : '')" :aria-label="shopEnabled ? 'Open shop, ' + insignia + ' Insignia' : insignia + ' Insignia'" :aria-pressed="shopEnabled ? shopOpen : undefined" @click="shopEnabled && emit('shop')">
           <EmIcon name="coin" :size="24" />
         </component>
         <slot name="actions" />

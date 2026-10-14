@@ -59,14 +59,13 @@ type Wrapper = Awaited<ReturnType<typeof mountView>>;
 const tab = (wrapper: Wrapper, label: string) => wrapper.findAll("[role=tab]").find((b) => (b.attributes("aria-label") ?? b.text()) === label)!;
 
 describe("AscensionView", () => {
-  it("a first visit opens the menu, then New game picks a starter and opens the collection", async () => {
+  it("a first visit directly picks a starter and opens the collection", async () => {
     client.profile.mockRejectedValue(new ApiError(404, "no profile yet; choose a starter first"));
     const wrapper = await mountView();
 
     expect(wrapper.find("[role=tab]").exists()).toBe(false);
-    expect(wrapper.findAll("nav .label").map((t) => t.text())).toEqual(["New game", "How to play", "Tavern Hire Ascended · Coming soon"]);
-
-    await wrapper.find("button.primary").trigger("click");
+    expect(wrapper.find(".hero").exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Help"]').exists()).toBe(true);
     expect(wrapper.find("button.start").text()).toBe("Start with Guardian");
     expect(wrapper.findAll("[role=radio]").map((c) => c.attributes("aria-label"))).toEqual(["Guardian", "Striker"]);
 
@@ -80,12 +79,12 @@ describe("AscensionView", () => {
     expect(tab(wrapper, "Collection").classes()).toContain("active");
   });
 
-  it("opens the menu for returning players and uses Insignia to open the shop", async () => {
+  it("opens Collection for returning players and uses Insignia to open the shop", async () => {
     const wrapper = await mountView();
-    expect(wrapper.find(".hero").exists()).toBe(true);
-    await wrapper.findAll("nav button")[1]!.trigger("click");
+    expect(wrapper.find(".hero").exists()).toBe(false);
     expect(tab(wrapper, "Collection").classes()).toContain("active");
-    expect(wrapper.find("button.menu-link").exists()).toBe(true);
+    expect(wrapper.find("button.menu-link").exists()).toBe(false);
+    expect(wrapper.find("button.tavern").attributes("disabled")).toBeDefined();
     expect(wrapper.findAll(".navigation [role=tab]").map(t => t.attributes("aria-label"))).toEqual(["Battle", "Collection"]);
     expect(wrapper.find(".navigation").text()).toBe("");
     await wrapper.find("button.wallet").trigger("click");
@@ -110,17 +109,23 @@ describe("AscensionView", () => {
     }
   });
 
-  it("has no help or settings buttons in the header", async () => {
+  it("opens How to play from Help in the header", async () => {
     const wrapper = await mountView();
-    expect(wrapper.find(".account-actions [aria-label=\"How to play\"]").exists()).toBe(false);
-    expect(wrapper.find('[aria-label="Settings"]').exists()).toBe(false);
+    expect(wrapper.findAll(".account-actions button").map(b => b.attributes("aria-label"))).toEqual(["Open shop, 100 Insignia", "Help", "Settings"]);
+    await wrapper.find('[aria-label="Help"]').trigger("click");
+    await flushPromises();
+    await wrapper.find('dialog[aria-label="Help"] .em-button').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('dialog[aria-label="Keep the fire going"]').attributes("open")).toBeDefined();
     wrapper.unmount();
   });
 
-  it("resets only after confirmation from the main menu", async () => {
+  it("resets only after confirmation from Settings and opens starter selection", async () => {
     client.resetProfile.mockResolvedValue({ reset: true });
     const wrapper = await mountView();
-    await wrapper.find("nav button.danger").trigger("click");
+    await wrapper.find('[aria-label="Settings"]').trigger("click");
+    await flushPromises();
+    await wrapper.find('dialog[aria-label="Settings"] button.danger').trigger("click");
     await flushPromises();
     const confirmation = wrapper.find('dialog[aria-label="Reset all Ascension progress?"]');
     expect((confirmation.find("button.confirm").element as HTMLButtonElement).disabled).toBe(true);
@@ -129,7 +134,7 @@ describe("AscensionView", () => {
     await confirmation.find("button.confirm").trigger("click");
     await flushPromises();
     expect(client.resetProfile).toHaveBeenCalledTimes(1);
-    expect(wrapper.find(".hero").exists()).toBe(true);
+    expect(wrapper.find(".starters").exists()).toBe(true);
     wrapper.unmount();
   });
 
@@ -138,7 +143,6 @@ describe("AscensionView", () => {
 
     expect(wrapper.find(".wallet").text()).toBe("");
     expect(wrapper.find(".wallet").attributes("data-label")).toBe("100 Insignia · Open shop");
-    await wrapper.findAll("nav button")[1]!.trigger("click");
     expect(wrapper.find(".subtitle").exists()).toBe(false);
 
     await tab(wrapper, "Battle").trigger("click");
@@ -150,24 +154,25 @@ describe("AscensionView", () => {
     client.battle.mockResolvedValue(battleView({ mode: "manual" }));
     const wrapper = await mountView();
 
-    await wrapper.find("nav button.primary").trigger("click");
     expect(tab(wrapper, "Battle").classes()).toContain("active");
     expect(wrapper.find(".arena").exists()).toBe(true);
     expect(wrapper.find(".action-bar").exists()).toBe(true);
   });
 
-  it("returns to the menu from a live battle without ending it", async () => {
+  it("switches away from a live battle without ending it and blocks reset", async () => {
     client.profile.mockResolvedValue({ ...PROFILE, active_battle: "b1" });
     client.battle.mockResolvedValue(battleView({ mode: "manual" }));
     const wrapper = await mountView();
-    await wrapper.find("nav button.primary").trigger("click");
     expect(wrapper.find(".navigation").text()).toBe("");
-    expect(wrapper.find(".menu-link svg").exists()).toBe(true);
-    await wrapper.find('button[aria-label="Main menu"]').trigger("click");
-    expect(wrapper.find(".hero").exists()).toBe(true);
+    await tab(wrapper, "Collection").trigger("click");
+    expect(wrapper.find(".collection").exists()).toBe(true);
+    await wrapper.find('[aria-label="Settings"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('dialog[aria-label="Settings"] button.danger').attributes("disabled")).toBeDefined();
+    await wrapper.find('dialog[aria-label="Settings"] button.close').trigger("click");
     expect(useAscensionStore().profile?.active_battle).toBe("b1");
     expect(useAscensionStore().battle?.status).toBe("active");
-    await wrapper.find("nav button.primary").trigger("click");
+    await tab(wrapper, "Battle").trigger("click");
     expect(wrapper.find(".arena").exists()).toBe(true);
     expect(client.advance).not.toHaveBeenCalled();
     wrapper.unmount();
@@ -184,7 +189,7 @@ describe("AscensionView", () => {
     await flushPromises();
 
     expect(wrapper.find(".unavailable").exists()).toBe(false);
-    expect(wrapper.find(".hero").exists()).toBe(true);
+    expect(wrapper.find(".collection").exists()).toBe(true);
   });
 
   it("stops the battle loop when the page goes away", async () => {

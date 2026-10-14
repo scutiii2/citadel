@@ -11,7 +11,7 @@ async function fits(page: Page) {
 }
 
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
-  test(`menu, collection, basket and active battle remain usable at ${viewport.width}px`, async ({ page }, testInfo) => {
+  test(`collection, basket and active battle remain usable at ${viewport.width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     const api = await installFakeApi(page);
     api.ascension.profile = { ...structuredClone(PROFILE), insignia: 300,
@@ -24,12 +24,12 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     api.catalog.ascendeds.push(ascendedInfo("scout"), ascendedInfo("channeler"));
     api.encounter = { ...api.encounter, ascended_id: "channeler", name: "Channeler", tier_id: "unique" };
     await page.goto("/#ticket=e2e-launch");
-    await expect(page.getByRole("button", { name: "Quick battle", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Collection", exact: true })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("button", { name: "Continue", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Tavern/ })).toBeDisabled();
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath("menu.png"), fullPage: true });
     await fits(page);
-    await page.getByRole("button", { name: "Collection", exact: true }).click();
+    await page.getByRole("tab", { name: "Collection", exact: true }).click();
     const guardian = page.getByRole("button", { name: "Guardian, details", exact: true });
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath("collection.png"), fullPage: true });
     await guardian.focus();
@@ -38,8 +38,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath("overview.png"), fullPage: true });
     await page.getByRole("button", { name: "Close", exact: true }).click();
     await fits(page);
-    await page.getByRole("button", { name: "Main menu", exact: true }).click();
-    await page.getByRole("button", { name: "Shop", exact: true }).click();
+    await page.getByRole("button", { name: /Open shop/ }).click();
     await page.locator('[data-offer="0"] button[data-add]').click();
     await page.locator('[data-basket] input').fill("2");
     await page.locator('[data-tier="common"] button[data-add]').click();
@@ -61,8 +60,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     expect(api.trades.filter(t => t.kind === "sale")).toHaveLength(0);
     await page.getByRole("dialog").getByRole("button", { name: /Confirm|Sell/, exact: false }).last().click();
     await expect.poll(() => api.trades.filter(t => t.kind === "sale").length).toBe(1);
-    await page.getByRole("button", { name: "Main menu", exact: true }).click();
-    await page.getByRole("button", { name: "Quick battle", exact: true }).click();
+    await page.getByRole("tab", { name: "Battle", exact: true }).click();
     await page.getByRole("button", { name: "Look for a wild Ascended", exact: true }).click();
     await page.getByRole("button", { name: "Fight", exact: true }).click();
     await expect(page.getByRole("radio", { name: "Scout", exact: true })).toHaveAttribute("aria-disabled", "true");
@@ -119,9 +117,9 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       await page.screenshot({ animations: "disabled", path: testInfo.outputPath("battle-actions.png") });
     }
     await fits(page);
-    await page.getByRole("button", { name: "Main menu", exact: true }).click();
+    await page.getByRole("tab", { name: "Collection", exact: true }).click();
     expect(api.battle?.status).toBe("active");
-    await page.getByRole("button", { name: "Quick battle", exact: true }).click();
+    await page.getByRole("tab", { name: "Battle", exact: true }).click();
     await expect(page.locator(".arena")).toBeVisible();
     expect(api.battle?.status).toBe("active");
     expect(api.artRequests.every(path => path.endsWith("/sprite_battle.webp"))).toBe(true);
@@ -132,7 +130,6 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await page.setViewportSize(viewport);
     const api = await installFakeApi(page);
     await page.goto("/#ticket=e2e-launch");
-    await page.getByRole("button", { name: "New game", exact: true }).click();
     await page.getByRole("radio", { name: "Striker", exact: true }).click();
     await expect(page.getByRole("button", { name: "Start with Striker", exact: true })).toBeEnabled();
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath("starter.png"), fullPage: true });
@@ -160,7 +157,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
         squad_xp: [{ ascended_id: "striker", name: "Striker", xp: 30, level_before: 3, level_after: 3 }, { ascended_id: "scout", name: "Scout", xp: 30, level_before: 3, level_after: 4 }],
       } });
       await page.goto("/#ticket=e2e-launch");
-      await page.getByRole("button", { name: "Quick battle", exact: true }).click();
+      await page.getByRole("tab", { name: "Battle", exact: true }).click();
       await expect(page.locator(".result-scene")).toBeVisible();
       await expect(page.locator(".reward")).toHaveCount(kind === "captured" ? 4 : 3);
       await expect(page.locator(".squad-xp li")).toHaveCount(3);
