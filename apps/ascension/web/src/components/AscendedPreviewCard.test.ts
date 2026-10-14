@@ -29,9 +29,9 @@ describe("AscendedPreviewCard", () => {
   });
   it("preserves detailed and flat type symbols", () => {
     const one = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("x", { ascension_types: ["enchant"] }) } });
-    expect(one.find(".types img").attributes("src")).toBe("/assets/types/enchant.webp");
+    expect(one.find(".front-types img").attributes("src")).toBe("/assets/types/enchant.webp");
     const two = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("x", { ascension_types: ["enchant", "divine"] }) } });
-    expect(two.findAll(".types img").map(s => s.attributes("src"))).toEqual(["/assets/types/enchant_flat.webp", "/assets/types/divine_flat.webp"]);
+    expect(two.findAll(".front-types img").map(s => s.attributes("src"))).toEqual(["/assets/types/enchant_flat.webp", "/assets/types/divine_flat.webp"]);
   });
   it("conceals character artwork and name when uncollected", () => {
     const card = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("guardian"), flipped: true } });
@@ -44,5 +44,18 @@ describe("AscendedPreviewCard", () => {
     expect(card.classes()).toContain("back");
     expect(card.find(".card-back.concealed").exists()).toBe(true);
     expect(card.find("img.portrait").exists()).toBe(false);
+  });
+  it.each(["common", "rare", "unique", "royal", "legendary", "forbidden"])("uses the %s WebP frame and matching back", (tierId) => {
+    const front = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("guardian"), tierId } });
+    expect(front.find("img.tier-frame").attributes("src")).toContain(`frame_${tierId}.webp`);
+    const back = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("guardian"), tierId, flipped: true } });
+    expect(back.find("img.tier-back").attributes("src")).toContain(`back_${tierId}.webp`);
+    expect(back.find(".type-symbol").exists()).toBe(false);
+    expect(back.find(".front-types").exists()).toBe(false);
+    expect(back.find(".unknown").text()).toBe("UNCOLLECTED");
+  });
+  it("falls back to Common artwork for an unknown tier", () => {
+    const card = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("guardian"), tierId: "unknown" } });
+    expect(card.find("img.tier-frame").attributes("src")).toContain("frame_common.webp");
   });
 });
