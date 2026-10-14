@@ -96,6 +96,7 @@ References: [ascendedDetails.css](web/src/components/ascendedDetails.css), [Asce
 - Put **Offers**, **Sell Copies**, and **search on the same row**, including narrow layouts. The refresh timer may occupy a second row when space is limited.
 - In Offers → All Items, separate **Ascended offers** and **EMBLEMs** into clearly headed groups. Search applies to both; omit groups with no matching items.
 - Keep category selection available. Show the rarity filter only in Sell Copies.
+- Keep the existing shop layout, grid, typography, colors, sidebars, and controls. Limit compactness changes to item artwork dimensions. Ascended items and basket thumbnails use framed preview cards with `sprite_preview_card.webp`.
 - Use open item layouts with sprites, names, tier cues, stock/copy information, prices, and compact add/quantity controls. Avoid enclosing every item in a strongly outlined tile.
 - Desktop uses a supporting basket rail with a reachable total and checkout action. Portrait uses a sticky basket bar that opens a native modal.
 - Checkout feedback must be visible inside the open basket modal. Preserve quantities on dismissal, sale confirmation, stock checks, partial results, and retry behavior.

@@ -3,6 +3,14 @@ import { describe, expect, it } from "vitest";
 import { ascendedInfo } from "../api/AscensionClient.fixtures";
 import AscendedPreviewCard from "./AscendedPreviewCard.vue";
 describe("AscendedPreviewCard", () => {
+  it("can use preview artwork without falling back to a battle sprite", () => {
+    const ascended = ascendedInfo('guardian');
+    const card = mount(AscendedPreviewCard, { props: { ascended, artSlot: 'preview_card' } });
+    expect(card.get('img.portrait').attributes('src')).toBe('/ascended/guardian/sprite_preview_card.webp');
+    const missing = mount(AscendedPreviewCard, { props: { ascended: { ...ascended, art: { ...ascended.art!, preview_card: null } }, artSlot: 'preview_card' } });
+    expect(missing.find('img.portrait').exists()).toBe(false);
+    expect(missing.get('.letter').text()).toBe('G');
+  });
   it("shows name, optional stars and optional level, with the frame in the tier colour", () => {
     const plain = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("striker"), tierId: "royal" } });
     expect(plain.find(".ascended-name").text()).toBe("Striker");

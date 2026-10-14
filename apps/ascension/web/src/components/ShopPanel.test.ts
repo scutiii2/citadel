@@ -100,11 +100,23 @@ describe("ShopPanel", () => {
     const cards = wrapper.findAll("[data-offer]");
     expect(cards).toHaveLength(2);
     expect(cards[0]!.text()).toContain("Guardian");
-    expect(cards[0]!.find("img").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
+    expect(cards[0]!.find("img.portrait").attributes("src")).toBe("/ascended/guardian/sprite_preview_card.webp");
+    expect(cards[0]!.find(".tier-frame").attributes("src")).toContain("ascended_card_front_common.webp");
     expect(cards[0]!.text()).toContain("3 left");
     expect(cards[0]!.text()).toContain("40");
     expect(cards[1]!.text()).toContain("1 left");
     expect(wrapper.find(".refresh").text()).toContain("Refreshes in 3:12:");
+  });
+
+  it("keeps framed preview cards in both baskets and when selling spare copies", async () => {
+    const { wrapper } = mountShop(500);
+    await wrapper.get('[data-offer="0"] [data-add]').trigger('click');
+    expect(wrapper.get('[data-basket] img.portrait').attributes('src')).toBe('/ascended/guardian/sprite_preview_card.webp');
+    await wrapper.get('[data-mode="sell"]').trigger('click');
+    expect(wrapper.get('[data-sell="guardian"] img.portrait').attributes('src')).toBe('/ascended/guardian/sprite_preview_card.webp');
+    await wrapper.get('[data-sell="guardian"] [data-add]').trigger('click');
+    expect(wrapper.get('[data-basket] img.portrait').attributes('src')).toBe('/ascended/guardian/sprite_preview_card.webp');
+    wrapper.unmount();
   });
 
   it("buys an offer and says what it bought", async () => {

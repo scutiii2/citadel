@@ -6,8 +6,34 @@ import { PROFILE, ascendedInfo, ownedAscended, battleView, fighter } from "../sr
 async function fits(page: Page) {
   const overflow = await page.evaluate(() => Array.from(document.querySelectorAll('*')).filter(el => el.getBoundingClientRect().right > innerWidth + 1 && getComputedStyle(el).position !== 'fixed').slice(0, 8).map(el => ({ tag: el.tagName, class: el.className, right: el.getBoundingClientRect().right })));
   expect.soft(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), JSON.stringify(overflow)).toBe(true);
-  const sources = await page.locator('img[src^="/ascended/"]').evaluateAll(images => images.map(img => img.getAttribute("src")));
-  expect(sources.every(src => src?.endsWith("/sprite_battle.webp"))).toBe(true);
+  const sources = await page.locator('img[src^="/ascended/"]').evaluateAll(images => images.map(img => ({ src: img.getAttribute("src"), shop: !!img.closest('.shop') })));
+  expect(sources.every(({ src, shop }) => src?.endsWith(shop ? "/sprite_preview_card.webp" : "/sprite_battle.webp"))).toBe(true);
+}
+
+for (const viewport of [{ width: 1440, height: 1000 }, { width: 768, height: 1024 }, { width: 375, height: 812 }]) {
+  test(`compact shop preview cards fit at ${viewport.width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport);
+    const api = await installFakeApi(page);
+    api.ascension.profile = { ...structuredClone(PROFILE), insignia: 1000,
+      ascendeds: [ownedAscended('guardian', { copies: 3, sale_value: 25 })] };
+    await page.goto('/#ticket=e2e-launch');
+    await page.getByRole('button', { name: 'Shop', exact: true }).click();
+    const offer = page.locator('[data-offer="0"]');
+    await expect(offer.locator('img.portrait')).toHaveAttribute('src', '/ascended/guardian/sprite_preview_card.webp');
+    await expect(offer.locator('img.portrait')).toBeVisible();
+    expect((await offer.locator('.item-art').boundingBox())!.height).toBeLessThanOrEqual(96);
+    await offer.locator('[data-add]').click();
+    await expect(offer.locator('.em-quantity')).toBeVisible();
+    await fits(page);
+    await page.screenshot({ path: testInfo.outputPath('compact-shop-buy.png'), fullPage: true });
+    await page.locator('[data-mode="sell"]').click();
+    const sale = page.locator('[data-sell="guardian"]');
+    await expect(sale.locator('img.portrait')).toHaveAttribute('src', '/ascended/guardian/sprite_preview_card.webp');
+    await sale.locator('[data-add]').click();
+    await expect(sale.locator('.em-quantity')).toBeVisible();
+    await fits(page);
+    await page.screenshot({ path: testInfo.outputPath('compact-shop-sell.png'), fullPage: true });
+  });
 }
 
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
@@ -128,7 +154,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await page.getByRole("tab", { name: "Battle", exact: true }).click();
     await expect(page.locator(".arena")).toBeVisible();
     expect(api.battle?.status).toBe("active");
-    expect(api.artRequests.every(path => /\/sprite_(battle|main_card)\.webp$/.test(path))).toBe(true);
+    expect(api.artRequests.every(path => /\/sprite_(battle|main_card|preview_card)\.webp$/.test(path))).toBe(true);
     expect(api.unexpected).toEqual([]);
   });
 

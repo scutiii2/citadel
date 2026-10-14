@@ -7,15 +7,15 @@ import TypeSymbol from "./ui/TypeSymbol.vue";
 import ascensionLogo from "../assets/brand/ascension-logo-icon.webp";
 const frameAssets = import.meta.glob<string>("../assets/ascended_card/ascended_card_front_*.webp", { eager: true, query: "?url", import: "default" });
 const backAssets = import.meta.glob<string>("../assets/ascended_card/ascended_card_back_*.webp", { eager: true, query: "?url", import: "default" });
-const props = withDefaults(defineProps<{ ascended: AscendedInfo; level?: number; tierId?: string; stars?: number; stats?: StatLine[]; showLevel?: boolean; flipped?: boolean }>(), { level: 1, tierId: "common", stars: undefined, stats: undefined, showLevel: false, flipped: false });
-const artUrl = computed(() => spriteFor(props.ascended.art, "battle"));
+const props = withDefaults(defineProps<{ ascended: AscendedInfo; level?: number; tierId?: string; stars?: number; stats?: StatLine[]; showLevel?: boolean; flipped?: boolean; artSlot?: "battle" | "preview_card" }>(), { level: 1, tierId: "common", stars: undefined, stats: undefined, showLevel: false, flipped: false, artSlot: "battle" });
+const artUrl = computed(() => props.artSlot === "preview_card" ? props.ascended.art?.preview_card : spriteFor(props.ascended.art, "battle"));
 const tierVar = computed(() => `var(--em-tier-${props.tierId}, var(--em-tier-common))`);
 const types = computed(() => props.ascended.ascension_types);
 const frameUrl = computed(() => frameAssets[`../assets/ascended_card/ascended_card_front_${props.tierId}.webp`] ?? frameAssets["../assets/ascended_card/ascended_card_front_common.webp"]);
 const backUrl = computed(() => backAssets[`../assets/ascended_card/ascended_card_back_${props.tierId}.webp`] ?? backAssets["../assets/ascended_card/ascended_card_back_common.webp"]);
 </script>
 <template>
-  <article class="card" :class="[`tier-${tierId}`, { flipped }]" :style="{ '--tier': tierVar }" :aria-label="flipped ? 'Uncollected Ascended' : `${ascended.name}, ${titleCase(tierId)}, level ${level}`">
+  <article class="card" :class="[`tier-${tierId}`, { flipped, 'preview-art': artSlot === 'preview_card' }]" :style="{ '--tier': tierVar }" :aria-label="flipped ? 'Uncollected Ascended' : `${ascended.name}, ${titleCase(tierId)}, level ${level}`">
     <img v-if="!flipped" class="tier-frame" :src="frameUrl" alt="" aria-hidden="true" draggable="false" />
     <div v-if="!flipped" class="face front">
       <div class="art" aria-hidden="true"><img v-if="artUrl" class="portrait" :src="artUrl" alt="" draggable="false" /><span v-else class="letter">{{ ascended.name.slice(0, 1) }}</span><dl v-if="stats" class="stats"><div v-for="stat in stats" :key="stat.key"><dt>{{ stat.label }}</dt><dd class="em-num">{{ stat.value }}</dd></div></dl></div>
@@ -35,6 +35,7 @@ const backUrl = computed(() => backAssets[`../assets/ascended_card/ascended_card
 .stats { position:absolute; inset:auto 0 0; z-index:2; display:flex; justify-content:space-between; gap:1cqw; margin:0; padding:5cqw 4cqw 2cqw; background:linear-gradient(transparent,#0b1b28cc 40%); }
 .stats div { min-width:0; } .stats dt { font-size:4cqw; color:#c5d2dc; } .stats dd { margin:0; font-size:7.5cqw; font-weight:700; line-height:1.1; }
 .portrait { width:100%; height:100%; position:absolute; inset:0; padding:6% 4% 3%; object-fit:contain; image-rendering:pixelated; z-index:1; }
+.preview-art .portrait { padding:0; }
 .letter { font:30cqw var(--em-font-display); color:var(--em-accent); }
 .header { display:flex; justify-content:center; align-items:center; gap:3cqw; padding:5cqw 2cqw 1cqw; }
 .ascended-name { margin:0; font:clamp(10px,6.4cqw,18px) var(--em-font-display); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
