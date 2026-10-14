@@ -390,8 +390,8 @@ Agent files give each instance its own id, so any number of same-provider agents
 
 ## Project layout
 
-- **`agents/*.json`** - tracked agent definitions; admin UI changes appear
-  in Git. See [`agents/README.md`](agents/README.md).
+- **`agents/*.json`** - tracked default agent definitions; admin UI changes go
+  to the untracked `.data/agent_overrides.json` instead. See [`agents/README.md`](agents/README.md).
 - **`gateways/<provider>/*.json`** - tracked individual gateway presets,
   read directly. See [`gateways/README.md`](gateways/README.md).
 - **`configs/*.json`** - structured settings, mostly gitignored. See

@@ -1,7 +1,11 @@
-"""Create, read, update and delete `agents/<id>.json` files for the admin UI.
+"""Create, read, update and delete agents for the admin UI.
 
-The files stay the single source of truth: the supervisor watches the folder
-and starts, restarts or stops children to match (see supervisor.py). Every
+`agents/<id>.json` is the tracked, shared default. The admin never writes it:
+its edits go to the untracked `.data/agent_overrides.json` (see
+agent_spec.overrides_path_for), which replaces an agent's file on this
+machine, so a machine-specific model, cap or enabled switch never shows up in
+git. The supervisor re-reads both and starts, restarts or stops children to
+match (see supervisor.py). Delete is the exception: it removes both. Every
 write is validated with agent_spec.load_file plus the set-wide rules
 load_dir enforces (distinct enabled ports, exactly one enabled entry agent),
 so a bad edit is refused here instead of stopping the supervisor's reload.
@@ -68,52 +72,80 @@ def gateway_catalog() -> dict[str, list[dict[str, Any]]]:
 def list_agents(directory: Path = agent_spec.AGENTS_DIR) -> list[dict[str, Any]]:
     """Every agent file as its JSON plus `id`; an unreadable one carries `error`."""
     rows = []
-    for path in sorted(directory.glob("*.json")):
+    for agent_id in _ids(directory):
         try:
-            data = _read_json(path)
-            rows.append({"id": path.stem, **data})
+            rows.append({"id": agent_id, **_effective(agent_id, directory)})
         except AgentStoreError as error:
-            rows.append({"id": path.stem, "error": str(error)})
+            rows.append({"id": agent_id, "error": str(error)})
     return rows
 
 
 def get_agent(agent_id: str, directory: Path = agent_spec.AGENTS_DIR) -> dict[str, Any]:
-    path = _path_of(agent_id, directory)
-    if not path.is_file():
-        raise AgentStoreError(f"agent {agent_id!r} does not exist", 404)
-    return {"id": agent_id, **_read_json(path)}
+    return {"id": agent_id, **_effective(agent_id, directory)}
 
 
 def create_agent(agent_id: str, data: dict[str, Any], directory: Path = agent_spec.AGENTS_DIR) -> dict[str, Any]:
     with _LOCK:
-        path = _path_of(agent_id, directory)
-        if path.exists():
+        _path_of(agent_id, directory)
+        if agent_id in _ids(directory):
             raise AgentStoreError(f"agent {agent_id!r} already exists", 409)
         _validate_change(agent_id, data, directory)
-        _write_json(path, data)
+        _save_override(agent_id, data, directory)
     return {"id": agent_id, **data}
 
 
 def update_agent(agent_id: str, data: dict[str, Any], directory: Path = agent_spec.AGENTS_DIR) -> dict[str, Any]:
     with _LOCK:
-        path = _path_of(agent_id, directory)
-        if not path.is_file():
-            raise AgentStoreError(f"agent {agent_id!r} does not exist", 404)
+        _effective(agent_id, directory)
         _validate_change(agent_id, data, directory)
-        _write_json(path, data)
+        _save_override(agent_id, data, directory)
     return {"id": agent_id, **data}
 
 
 def delete_agent(agent_id: str, directory: Path = agent_spec.AGENTS_DIR) -> None:
-    """Remove an agent's file. The entry agent cannot be removed: pick
-    another entry agent first, or the set would have none."""
+    """Remove an agent: its tracked file and its override. The entry agent
+    cannot be removed: pick another entry agent first, or the set would have none."""
     with _LOCK:
         path = _path_of(agent_id, directory)
-        if not path.is_file():
-            raise AgentStoreError(f"agent {agent_id!r} does not exist", 404)
-        if _read_json(path).get("entry") is True:
+        if _effective(agent_id, directory).get("entry") is True:
             raise AgentStoreError(f"{agent_id!r} is the entry agent; make another agent the entry first", 409)
-        path.unlink()
+        path.unlink(missing_ok=True)
+        overrides = _read_overrides(directory)
+        if overrides.pop(agent_id, None) is not None:
+            _write_json(agent_spec.overrides_path_for(directory), overrides)
+
+
+def _read_overrides(directory: Path) -> dict[str, dict[str, Any]]:
+    try:
+        return agent_spec.read_overrides(directory)
+    except AgentSpecError as error:
+        raise AgentStoreError(str(error), 500) from error
+
+
+def _ids(directory: Path) -> list[str]:
+    try:
+        return agent_spec.agent_ids(directory)
+    except AgentSpecError as error:
+        raise AgentStoreError(str(error), 500) from error
+
+
+def _effective(agent_id: str, directory: Path) -> dict[str, Any]:
+    """The agent's JSON as it runs here: its override, else its tracked file."""
+    path = _path_of(agent_id, directory)
+    override = _read_overrides(directory).get(agent_id)
+    if override is not None:
+        return override
+    if not path.is_file():
+        raise AgentStoreError(f"agent {agent_id!r} does not exist", 404)
+    return _read_json(path)
+
+
+def _save_override(agent_id: str, data: dict[str, Any], directory: Path) -> None:
+    overrides = _read_overrides(directory)
+    overrides[agent_id] = data
+    target = agent_spec.overrides_path_for(directory)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    _write_json(target, overrides)
 
 
 def _path_of(agent_id: str, directory: Path) -> Path:
@@ -185,11 +217,11 @@ def _other_specs(agent_id: str, directory: Path) -> list[AgentSpec]:
     """Valid specs of every other agent file; a broken one is skipped (it
     cannot clash with anything the supervisor would run)."""
     specs = []
-    for path in sorted(directory.glob("*.json")):
-        if path.stem == agent_id:
+    for other in _ids(directory):
+        if other == agent_id:
             continue
         try:
-            specs.append(agent_spec.load_file(path))
+            specs.append(agent_spec.load_file(directory / f"{other}.json"))
         except AgentSpecError:
             continue
     return specs

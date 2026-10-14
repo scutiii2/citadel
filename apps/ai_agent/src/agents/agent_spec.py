@@ -226,16 +226,50 @@ def _agent_url(check: _Checker, data: dict[str, Any]) -> str | None:
     return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
 
 
+def overrides_path_for(directory: Path) -> Path:
+    """Where the admin's edits to the agent files in `directory` live: the
+    untracked `.data/agent_overrides.json` of the project (`{id: <whole agent
+    file>}`). A tracked agents/<id>.json is the shared default; an entry here
+    replaces it on this machine. Any other folder (tests) keeps its own
+    overrides inside it, in a subfolder the `*.json` scan never matches."""
+    if directory == AGENTS_DIR:
+        return AGENTS_DIR.parent / ".data" / "agent_overrides.json"
+    return directory / ".overrides" / "agent_overrides.json"
+
+
+def read_overrides(directory: Path) -> dict[str, dict[str, Any]]:
+    """The overrides for `directory`; {} when there is no file."""
+    path = overrides_path_for(directory)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as error:
+        raise AgentSpecError(f"{path}: cannot be read as JSON ({error})") from error
+    if not isinstance(data, dict) or not all(isinstance(entry, dict) for entry in data.values()):
+        raise AgentSpecError(f"{path}: must be an object of agent objects")
+    return data
+
+
+def agent_ids(directory: Path) -> list[str]:
+    """Ids of the tracked agent files in `directory` plus agents that exist
+    only as an override, sorted."""
+    return sorted({p.stem for p in directory.glob("*.json")} | set(read_overrides(directory)))
+
+
 def load_file(path: Path) -> AgentSpec:
-    """Read and validate one agent file. The id is the file name stem."""
+    """Read and validate one agent file, or its override when the admin
+    edited it on this machine. The id is the file name stem."""
     check = _Checker(path)
     agent_id = path.stem
     if not _ID_RE.match(agent_id):
         raise check.fail("id", f"{agent_id!r} must be lowercase letters, digits and dashes (from the file name)")
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        raise check.fail("file", f"cannot be read as JSON ({error})") from error
+    data = read_overrides(path.parent).get(agent_id)
+    if data is None:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            raise check.fail("file", f"cannot be read as JSON ({error})") from error
     if not isinstance(data, dict):
         raise check.fail("file", "must contain a JSON object")
     check.keys(data, _TOP_KEYS)
@@ -319,10 +353,10 @@ def load_file(path: Path) -> AgentSpec:
 def load_dir(directory: Path) -> list[AgentSpec]:
     """Every agent file in `directory`, validated one by one and as a set:
     enabled agents need distinct ports and exactly one entry agent."""
-    paths = sorted(directory.glob("*.json"))
-    if not paths:
+    ids = agent_ids(directory)
+    if not ids:
         raise AgentSpecError(f"{directory}: no agent files found (create <id>.json)")
-    specs = [load_file(path) for path in paths]
+    specs = [load_file(directory / f"{agent_id}.json") for agent_id in ids]
     enabled = [s for s in specs if s.enabled]
 
     by_port: dict[int, list[str]] = {}

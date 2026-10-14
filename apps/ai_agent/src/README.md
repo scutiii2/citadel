@@ -90,7 +90,8 @@ to sit alongside the modules that write to them:
 - **`../.data/`** - state the program writes, gitignored:
   `agent_registry.json` (the running agents, see `agents/agent_registry.py`),
   `agent_definitions.json` (every agent file, enabled or not; the supervisor
-  writes it at start) and `usage/YYYY-MM-DD.<agent id>.jsonl` (one usage row per finished `ask`,
+  writes it at start), `agent_overrides.json` (the admin UI's edits, which
+  replace `agents/<id>.json` on this machine - see `agents/agent_store.py`) and `usage/YYYY-MM-DD.<agent id>.jsonl` (one usage row per finished `ask`,
   see `core/usage_log.py`; `AI_AGENT_USAGE_DIR` overrides the folder).
 
 There is no `logs/` folder and no database: output goes to the console

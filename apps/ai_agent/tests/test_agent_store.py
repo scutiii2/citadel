@@ -1,4 +1,4 @@
-"""agent_store.py: validated create/update/delete of agents/<id>.json."""
+"""agent_store.py: validated create/update/delete of agents; edits go to the untracked overrides file."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from src.agents import agent_store
+from src.agents import agent_spec, agent_store
 from src.agents.agent_store import AgentStoreError
 
 
@@ -20,11 +20,16 @@ def folder(tmp_path):
     return tmp_path
 
 
-def test_create_writes_file_and_lists_it(folder):
+def _overrides(folder):
+    return json.loads((folder / ".overrides" / "agent_overrides.json").read_text())
+
+
+def test_create_writes_an_override_and_lists_it(folder):
     agent_store.create_agent("calc", _cfg(9103), folder)
-    assert json.loads((folder / "calc.json").read_text())["port"] == 9103
+    assert _overrides(folder)["calc"]["port"] == 9103
+    assert not (folder / "calc.json").exists()
     assert [row["id"] for row in agent_store.list_agents(folder)] == ["calc", "ember"]
-    assert not list(folder.glob("*.tmp"))
+    assert not list(folder.rglob("*.tmp"))
 
 
 def test_create_refuses_duplicate_bad_id_port_clash_and_unknown_gateway(folder):
@@ -39,7 +44,7 @@ def test_create_refuses_duplicate_bad_id_port_clash_and_unknown_gateway(folder):
         agent_store.create_agent("calc", {"port": 9103, "llm": {"provider": "anthropic", "gateway": "nope"}}, folder)
     with pytest.raises(AgentStoreError, match="llm.provider"):
         agent_store.create_agent("calc", {"port": 9103, "llm": {"provider": "x"}}, folder)
-    assert not (folder / "calc.json").exists()
+    assert not (folder / ".overrides").exists()
 
 
 def test_second_entry_agent_is_refused(folder):
@@ -47,7 +52,15 @@ def test_second_entry_agent_is_refused(folder):
         agent_store.create_agent("calc", _cfg(9103, entry=True), folder)
 
 
-def test_update_replaces_file_and_keeps_own_port(folder):
+def test_update_never_touches_the_tracked_file(folder):
+    tracked = (folder / "ember.json").read_text()
+    agent_store.update_agent("ember", _cfg(9100, entry=True, persona="local"), folder)
+    assert (folder / "ember.json").read_text() == tracked
+    assert agent_store.get_agent("ember", folder)["persona"] == "local"
+    assert agent_spec.load_file(folder / "ember.json").persona == "local"
+
+
+def test_update_replaces_agent_and_keeps_own_port(folder):
     agent_store.create_agent("calc", _cfg(9103), folder)
     agent_store.update_agent("calc", _cfg(9103, persona="hi"), folder)
     assert agent_store.get_agent("calc", folder)["persona"] == "hi"
@@ -61,10 +74,12 @@ def test_cannot_unset_the_only_entry_agent(folder):
         agent_store.update_agent("ember", _cfg(9100, entry=False), folder)
 
 
-def test_delete_removes_file_but_not_the_entry_agent(folder):
-    agent_store.create_agent("calc", _cfg(9103), folder)
+def test_delete_removes_file_and_override_but_not_the_entry_agent(folder):
+    (folder / "calc.json").write_text(json.dumps(_cfg(9103)), encoding="utf-8")
+    agent_store.update_agent("calc", _cfg(9103, persona="x"), folder)
     agent_store.delete_agent("calc", folder)
     assert not (folder / "calc.json").exists()
+    assert "calc" not in _overrides(folder)
     with pytest.raises(AgentStoreError, match="entry agent"):
         agent_store.delete_agent("ember", folder)
     with pytest.raises(AgentStoreError) as missing:

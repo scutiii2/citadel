@@ -365,3 +365,18 @@ def test_only_the_entry_agent_has_memory_recall_on():
     specs = {spec.id: spec for spec in agent_spec.load_dir(agent_spec.AGENTS_DIR)}
     assert specs["ember"].entry and specs["ember"].memory_recall is True
     assert [agent_id for agent_id, spec in specs.items() if spec.memory_recall] == ["ember"]
+
+
+def test_an_override_replaces_the_tracked_file_and_can_add_an_agent(tmp_path):
+    (tmp_path / "ember.json").write_text(json.dumps(
+        {"port": 9100, "entry": True, "llm": {"provider": "anthropic"}}), encoding="utf-8")
+    overrides = tmp_path / ".overrides"
+    overrides.mkdir()
+    (overrides / "agent_overrides.json").write_text(json.dumps({
+        "ember": {"port": 9100, "entry": True, "llm": {"provider": "anthropic", "max_tier": "light"}},
+        "calc": {"port": 9103, "llm": {"provider": "anthropic"}},
+    }), encoding="utf-8")
+    specs = {spec.id: spec for spec in agent_spec.load_dir(tmp_path)}
+    assert specs["ember"].llm.max_tier == "light"
+    assert "calc" in specs
+    assert agent_spec.load_file(tmp_path / "calc.json").port == 9103
