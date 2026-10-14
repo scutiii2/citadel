@@ -117,3 +117,41 @@ def test_own_tiers_falls_back_to_the_providers_default_gateway(monkeypatch):
 def test_own_tiers_of_a_laya_agent_is_empty(monkeypatch):
     _use_spec(monkeypatch, provider="laya")
     assert model_tiers.own_tiers() == []
+
+
+def _own(monkeypatch, **llm):
+    _gateway(monkeypatch)
+    _use_spec(monkeypatch, **llm)
+    monkeypatch.setenv("AI_AGENT_GATEWAY", "claude")
+
+
+def test_clamp_default_without_a_cap_keeps_the_model(monkeypatch):
+    _own(monkeypatch)
+    assert model_tiers.clamp_default(None, "sonnet", "calc") == model_tiers.Resolution(None, None)
+
+
+def test_clamp_default_pulls_a_default_above_the_cap_down(monkeypatch):
+    _own(monkeypatch, max_tier="light")
+    res = model_tiers.clamp_default(None, "sonnet", "calc")
+    assert (res.model, res.tier) == ("haiku", "light")
+    assert res.note
+
+
+def test_clamp_default_matches_an_alias_that_prefixes_a_tier_id(monkeypatch):
+    _own(monkeypatch, max_tier="light")
+    assert model_tiers.clamp_default(None, "sonn", "calc").model == "haiku"
+
+
+def test_clamp_default_pulls_a_pinned_model_up_to_the_floor(monkeypatch):
+    _own(monkeypatch, min_tier="standard")
+    assert model_tiers.clamp_default("haiku", None, "calc").model == "sonnet"
+
+
+def test_clamp_default_keeps_a_model_inside_the_range(monkeypatch):
+    _own(monkeypatch, max_tier="standard")
+    assert model_tiers.clamp_default(None, "sonnet", "calc") == model_tiers.Resolution(None, None)
+
+
+def test_clamp_default_keeps_an_unknown_model(monkeypatch):
+    _own(monkeypatch, max_tier="light")
+    assert model_tiers.clamp_default("custom-model", None, "calc") == model_tiers.Resolution("custom-model", None)

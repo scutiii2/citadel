@@ -148,7 +148,9 @@ async def run_chat(
     )
     resolution = (
         model_tiers.resolve(model_tier, model_tiers.own_tiers(), MODEL, agent_spec.current().id)
-        if model_tier else model_tiers.Resolution(MODEL, None)
+        if model_tier else model_tiers.clamp_default(
+            MODEL, getattr(_PROVIDER_MODULE, "DEFAULT_MODEL", None), agent_spec.current().id
+        )
     )
     effort = effort_limits.resolve(reasoning_effort, agent_spec.current().llm.max_effort, agent_spec.current().id)
     cancellation.register(request_id)

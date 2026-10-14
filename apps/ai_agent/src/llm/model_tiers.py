@@ -71,6 +71,32 @@ def resolve(requested: str | None, effective: Sequence[TierInfo], default_model:
     return Resolution(chosen.id, chosen.tier, f"{requested} is not available for {agent_id}; ran on {chosen.tier}")
 
 
+def clamp_default(model: str | None, provider_default: str | None, agent_id: str) -> Resolution:
+    """The model for a turn that requested no tier. The pinned `model` (else
+    the provider default) is kept unless it is one of the gateway's tiers
+    (exact id, or an alias that is a prefix of a tier id) outside this agent's
+    min_tier/max_tier range; then the nearest effective tier is used, so the
+    cap also holds for the agent's own turns. An unknown model is kept."""
+    spec = agent_spec.current()
+    if not (spec.llm.min_tier or spec.llm.max_tier):
+        return Resolution(model, None)
+    effective = own_tiers()
+    name = model or provider_default
+    if not effective or not name:
+        return Resolution(model, None)
+    provider = spec.llm.provider
+    gateway = os.getenv("AI_AGENT_GATEWAY") or agent_spec.default_gateway(provider)
+    defined = llm_config.tiers(provider, gateway)
+    tier = next((t for t, m in defined.items() if m.id == name), None) or next(
+        (t for t, m in defined.items() if m.id.startswith(name)), None
+    )
+    if tier is None or any(t.tier == tier for t in effective):
+        return Resolution(model, None)
+    want = TIERS.index(tier)
+    chosen = min(effective, key=lambda t: (abs(TIERS.index(t.tier) - want), TIERS.index(t.tier)))
+    return Resolution(chosen.id, chosen.tier, f"default model is outside {agent_id}'s tier range; ran on {chosen.tier}")
+
+
 def own_tiers() -> list[TierInfo]:
     """This process's agent's effective tiers (its gateway from
     AI_AGENT_GATEWAY, which the supervisor pins - see agent_spec.apply_to_environ)."""

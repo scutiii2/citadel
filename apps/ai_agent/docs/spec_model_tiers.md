@@ -22,7 +22,7 @@ same model. The orchestrator (ember) picks which specialist handles a task
 
 ## Non-goals
 
-- Changing the orchestrator's own model per turn.
+- Changing the orchestrator's own model per turn. (The cap still applies to it: see Default model.)
 - Automatic escalation (retry on a stronger tier when an answer is poor).
 - Cost-based or Laya-based tier selection; the model decides from the tier
   descriptions.
@@ -40,8 +40,12 @@ subset of the ladder.
 with the agent's `[min_tier, max_tier]` range.
 
 **Default model.** The model the agent runs when no tier is requested:
-`llm.model` from the agent file if set, else the gateway's `model`. Unchanged
-from today.
+`llm.model` from the agent file if set, else the gateway's `model`. When the
+agent sets `min_tier` / `max_tier`, a default that is one of the gateway's tiers
+(exact id, or an alias that is a prefix of a tier id, e.g. `claude-sonnet-5` for
+`claude-sonnet-5-5`) outside that range is clamped to the nearest effective tier
+(`model_tiers.clamp_default`), so the cap also holds for the agent's own turns.
+A model that matches no tier is kept as is.
 
 ## Changes
 
