@@ -150,8 +150,4 @@ time { white-space: nowrap; }
   .card-description, .board-footer span:last-child { display: none; }
   .board-footer { font-size: 0.7em; }
 }
-@media (prefers-reduced-motion: reduce) {
-  button.ticket-card { transition: none; }
-  button.ticket-card:hover { transform: none; }
-}
 </style>

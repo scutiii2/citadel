@@ -32,9 +32,4 @@ const offset = computed(() => CIRCUMFERENCE * (1 - (props.total > 0 ? Math.max(0
 .arc {
   transition: stroke-dashoffset 1s linear;
 }
-@media (prefers-reduced-motion: reduce) {
-  .arc {
-    transition: none;
-  }
-}
 </style>

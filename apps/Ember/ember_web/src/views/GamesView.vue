@@ -63,7 +63,6 @@ button.play { position: absolute; top: 12px; right: 12px; background: var(--acce
 button.play:focus-visible, .game-card:hover button.play, .game-card[data-launching] button.play { opacity: 1; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (hover: none) { .shade p { max-height: 3em; opacity: 1; } button.play { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .game-card, .shade p, button.play { transition: none; } .game-card:hover, .game-card:focus-within { transform: none; } }
 button:disabled { opacity: .6; cursor: default; } button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 p.error { color: var(--danger); }
 /* While a game runs it takes the whole page: no heading, no column, no page scroll. */

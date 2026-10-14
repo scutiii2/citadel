@@ -84,5 +84,4 @@ h3 { margin: 0; font-size: 1em; font-weight: 600; }
 .control { display: grid; justify-items: center; flex-shrink: 0; gap: 2px; }
 .scope { font-size: .7em; color: var(--muted); }
 .page-link { margin-top: 10px; width: fit-content; }
-@media (prefers-reduced-motion: reduce) { .card { transition: none; } }
 </style>

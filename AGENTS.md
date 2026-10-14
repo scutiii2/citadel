@@ -7,3 +7,6 @@ This file is the one instruction file for every coding agent. Codex reads it dir
 
 ## Skills
 Edit skills only in `.agents/skills/` (Codex reads it). Then run `python sync_skills.py` to copy them into `.claude/skills/` for Claude Code. `python sync_skills.py --check` reports drift. Never edit `.claude/skills/` directly; the next sync overwrites it. A pre-commit hook (`.githooks/pre-commit`) blocks a commit that touches either skills folder while they differ or have unstaged changes. After a fresh clone, enable it once with `git config core.hooksPath .githooks`.
+
+## No reduced motion
+Never add a reduced-motion setting, a `prefers-reduced-motion` media query or a reduced-motion test, in any app or doc. Animations always play. Remove one if found in code you touch. Repeats across every skill and plan: do not write it back in.

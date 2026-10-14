@@ -2,12 +2,10 @@ import { expect, test } from '@playwright/test';
 import { PROFILE, battleView, fighter } from '../src/api/AscensionClient.fixtures';
 import { installFakeApi } from './fakeApi';
 
-const scenarios = [1440, 375].flatMap(width => [true, false].map(success => ({ width, success, reducedMotion: false })));
-scenarios.push({ width: 375, success: false, reducedMotion: true });
-for (const { width, success, reducedMotion } of scenarios) {
-    test(`engraved stone ${success ? 'seals' : 'breaks'} at ${width}px${reducedMotion ? ' with reduced motion' : ''}`, async ({ page }, info) => {
+const scenarios = [1440, 375].flatMap(width => [true, false].map(success => ({ width, success })));
+for (const { width, success } of scenarios) {
+    test(`engraved stone ${success ? 'seals' : 'breaks'} at ${width}px`, async ({ page }, info) => {
       await page.setViewportSize({ width, height: 1000 });
-      if (reducedMotion) await page.emulateMedia({ reducedMotion: 'reduce' });
       const api = await installFakeApi(page);
       api.ascension.profile = { ...structuredClone(PROFILE), active_battle: 'b1' };
       api.battle = battleView({ mode: 'manual', emblems: { rare: 2 }, wild: fighter('striker', { tier_id: 'rare' }) });
@@ -46,10 +44,6 @@ for (const { width, success, reducedMotion } of scenarios) {
       }
       await page.clock.runFor(250);
       await page.locator('.arena').evaluate(el => el.getAnimations({ subtree: true }).forEach(animation => { animation.pause(); animation.currentTime = 250; }));
-      if (reducedMotion) {
-        expect(await stone.locator('.stone-fragment').first().evaluate(el => getComputedStyle(el).animationName)).toBe('none');
-        expect(await page.locator('.wild .sprite').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
-      }
       await page.screenshot({ path: info.outputPath(`${success ? 'sealed' : 'broken'}-${width}.png`) });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.clock.runFor(800);

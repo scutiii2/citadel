@@ -51,7 +51,7 @@ A nested corner is `calc(outer - padding)`. An element flush to an edge is squar
 
 **Surfaces** - cards: `1px solid --border`, `--radius-lg`, `--surface`, `12px 14px` padding. Raised tiles use a soft shadow (`0 2px 10px rgba(0,0,0,.14)`, lifting 2px on hover). No heavy shadows elsewhere; modals use a `rgb(0 0 0 / 45%)` backdrop.
 
-**Motion** - 0.15s ease for hover and state, 0.18s for sliding thumbs; always honour `prefers-reduced-motion: reduce` (drop transitions or slow loops). Animation follows state; it never delays or replaces the action.
+**Motion** - 0.15s ease for hover and state, 0.18s for sliding thumbs; animations always play, so never add a reduced-motion setting or `prefers-reduced-motion` media query. Animation follows state; it never delays or replaces the action.
 
 **Focus** - `:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }` on every interactive element. Never `outline: none` without a replacement.
 
@@ -77,7 +77,7 @@ A nested corner is `calc(outer - padding)`. An element flush to an edge is squar
 - [ ] Every interactive element has a visible focus ring and a name
 - [ ] Status shown by icon and text, not colour alone
 - [ ] Destructive action: modal, red Danger zone, type-to-confirm if severe
-- [ ] Motion respects `prefers-reduced-motion`
+- [ ] No `prefers-reduced-motion` rule or reduced-motion setting
 - [ ] Scoped component CSS that a parent page also styles uses a more specific selector (`button.delete-button`, not `.delete-button`): a later same-specificity rule had overridden its padding
 
 ## Common mistakes

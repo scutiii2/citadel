@@ -190,5 +190,4 @@ h4, h5, p { margin: 0; }
   .tester { padding: 20px 16px; }
   .empty-selection { padding: 32px 20px; }
 }
-@media (prefers-reduced-motion: reduce) { .tool-list button { transition: none; } }
 </style>

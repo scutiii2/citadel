@@ -144,7 +144,7 @@ These are optional implementation ideas; the exported images are static:
 | Save toast | Opacity fade | 160 ms |
 | Deadline | Ring decreases linearly; numeral updates each second | 5,000 ms total |
 
-With `prefers-reduced-motion: reduce`, remove position, particle and width animations. Change bars directly; update the timer number and ring directly. Keep every status label, action and deadline. No shaking, flashing, auto-scrolling round log or perpetual selected-card pulsing. Countdown expiry is a timed game rule, not an animation dependency.
+Animations always play: never add a reduced-motion setting or `prefers-reduced-motion` rule. Keep every status label, action and deadline. No shaking, flashing, auto-scrolling round log or perpetual selected-card pulsing. Countdown expiry is a timed game rule, not an animation dependency.
 
 ## Deliverable map and assumptions
 

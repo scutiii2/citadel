@@ -173,19 +173,4 @@ button.delete-button:disabled {
     transform: rotate(360deg);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  button.delete-button,
-  .bin,
-  .lid,
-  .letter,
-  .collapsed .letter,
-  .collapsed .bin,
-  .ring {
-    transition: none;
-    transition-delay: 0s;
-  }
-  .collapsed .ring {
-    animation-duration: 2.4s;
-  }
-}
 </style>

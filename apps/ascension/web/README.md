@@ -46,8 +46,8 @@ preparation screens at desktop and mobile sizes.
 ## Squad and battle preparation
 
 The Collection tab shows one slot per configured squad position. Use the detail
-dialog to add or remove a member, or remove one directly from the strip. The last
-member cannot be removed, and active battles lock equipment changes.
+dialog to add or remove a member, or remove one directly from the strip. The squad may be
+empty, though only squad members can start a battle, and active battles lock equipment changes.
 
 Battle preparation shows the selected fighter beside the wild opponent in a cinematic
 matchup. `BattleMatchup` uses the catalog artwork and crop positions, falls back to a
@@ -57,7 +57,7 @@ slots and fainting countdowns. The first ready member is selected; click a card 
 Enter or Space to choose another. Fainted members cannot be selected.
 
 The shared `EmPickCard` component owns the starter and squad pickers' copper outline
-and breathing glow, including its reduced motion rule. On phones the fighters stay
+and breathing glow. On phones the fighters stay
 side by side and the squad scrolls horizontally. Battle settings are grouped below the
 squad; autonomous play needs a preset and an EMBLEM limit. The limit is disabled in
 manual play, where the player chooses an EMBLEM while catching. Controls are locked
@@ -90,8 +90,7 @@ server events to them): attack lunge, hit shake with a floating damage number, d
 EMBLEM throw with wobble, caught or broke free, flee. The arena shows the old health until a hit lands.
 While it plays, the action buttons are locked and the result screen waits; the Skip button or a click on
 the arena jumps to the end. Nothing plays when a battle is opened or restored, or while an EMBLEM prompt is
-open (its countdown is running). It always plays, even with `prefers-reduced-motion`: `.em-glow` on the arena
-exempts it from the global reduced-motion rule in `theme.css`.
+open (its countdown is running). It always plays.
 
 ## Shop
 
@@ -100,8 +99,7 @@ The Shop tab loads `GET /ascension/shop`: this account's copy offers for the cur
 (`store.shopEndsAt`), never from the server's timestamp. At zero, after a purchase and after any refusal the page
 loads the window again, so a rotation, a sold-out offer or a stale `rotation` (409 "the shop has refreshed") never
 leaves old cards on screen. Sold-out and unaffordable cards carry `is-off`. `.em-lift` in `theme.css` is the shared
-hover glow (rise, crisp tier-coloured ring and a wide soft bloom) used by the shop, collection and starter cards; it is off under
-`prefers-reduced-motion` and for `is-off` cards.
+hover glow (rise, crisp tier-coloured ring and a wide soft bloom) used by the shop, collection and starter cards; it is off for `is-off` cards.
 
 ## Sprites
 

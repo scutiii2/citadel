@@ -832,9 +832,4 @@ textarea {
     transform: translate(46px, -52px) scale(0.6);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .plane {
-    display: none;
-  }
-}
 </style>

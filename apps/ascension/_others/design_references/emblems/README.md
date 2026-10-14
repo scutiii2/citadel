@@ -29,4 +29,4 @@ Each remaining tier used `emblem_common.png` as the material/style reference and
 
 Exports use RGBA, nearest-neighbor downsampling to 256 × 256, and lossless WebP. Preserve alpha and the full square canvas. The UI displays the stones at 28–84px with `image-rendering: pixelated`.
 
-`EmCaptureStone.vue` adds the active core, incoming particles, resistance fissures, sealing ring, and two escaping fragments. `battleCues.ts` defines the throw → absorb → three resistance beats → still → caught/open sequence. Outcomes come from the server. Reduced-motion playback retains static glow and split-state cues without particle, shake or flash animations.
+`EmCaptureStone.vue` adds the active core, incoming particles, resistance fissures, sealing ring, and two escaping fragments. `battleCues.ts` defines the throw → absorb → three resistance beats → still → caught/open sequence. Outcomes come from the server.

@@ -10,4 +10,3 @@
 .spark-card.large .ability{font-size:max(12px,3cqw);line-height:1}
 .spark-card.large .ability b{font-size:max(12px,3.3cqw)}
 @media(max-width:700px){.hand .spark-card{width:150px;margin-right:-60px;transform:rotate(-8deg)}.hand .spark-card:nth-child(2){transform:translateY(-15px)}.hand .spark-card:nth-child(3){margin-right:0;transform:rotate(8deg)}.hand{height:295px}}
-@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

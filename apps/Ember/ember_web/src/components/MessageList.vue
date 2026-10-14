@@ -498,12 +498,6 @@ onBeforeUnmount(() => {
   opacity: 0;
   transform: translateY(8px);
 }
-@media (prefers-reduced-motion: reduce) {
-  .pill-enter-active,
-  .pill-leave-active {
-    transition: none;
-  }
-}
 .column {
   max-width: 820px;
   margin: 0 auto;

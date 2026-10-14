@@ -411,7 +411,6 @@ button.refresh { display: inline-flex; align-items: center; gap: 6px; padding: 7
 .refresh svg { width: 16px; height: 16px; }
 .spinning { animation: ticket-refresh 0.8s linear infinite; }
 @keyframes ticket-refresh { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }
 .ticket-summary { display: flex; align-items: center; gap: 16px; color: var(--muted); font-size: 0.8em; margin-bottom: 22px; }
 .ticket-summary strong { color: var(--text); font-weight: 500; }
 .summary-urgent { display: inline-flex; align-items: center; gap: 5px; color: var(--status-failed); }

@@ -26,7 +26,7 @@ button:disabled { cursor: default; opacity: 0.5; }
 
 Card-style action button (`SaveButton.vue`): `--radius-md`, `1px solid --border`, `--surface` fill, `box-shadow: 0 1px 4px rgba(0,0,0,.15)`; toggled state inverts to `--text` on `--bg`.
 
-`DeleteButton.vue`: red pill with bin icon; while `busy` the label letters fall into the bin, the button shrinks to a circle and a ring spins. Pattern to reuse: a busy state shown on the control itself, with a reduced-motion fallback.
+`DeleteButton.vue`: red pill with bin icon; while `busy` the label letters fall into the bin, the button shrinks to a circle and a ring spins. Pattern to reuse: a busy state shown on the control itself.
 
 ## Input
 

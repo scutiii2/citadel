@@ -121,11 +121,6 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
   60% { transform: scale(0.98, 1.02) skewX(1.5deg); filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 35%, transparent)); }
 }
 @keyframes ember-breathe { 0%, 100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.04); } }
-@media (prefers-reduced-motion: reduce) {
-  .orbit.inner, .flame, .spark { animation: none; }
-  .spark { transform: rotate(-40deg) translateX(84px); }
-  .spark.small { transform: rotate(140deg) translateX(84px); }
-}
 .section-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 11px; }
 h3 { font-size: 1em; font-weight: 600; margin: 0; }
 .section-head span { color: var(--muted); font-size: 0.8em; }
@@ -153,5 +148,4 @@ h3 { font-size: 1em; font-weight: 600; margin: 0; }
   .grid, .grid.work { grid-template-columns: 1fr; gap: 8px; }
   .card { padding: 15px; }
 }
-@media (prefers-reduced-motion: reduce) { .card { transition: none; } }
 </style>

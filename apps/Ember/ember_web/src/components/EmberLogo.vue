@@ -43,8 +43,4 @@
 @keyframes logo-orbit {
   to { transform: rotate(360deg); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .flame, .orbit { animation: none; }
-  .orbit { transform: rotate(40deg); }
-}
 </style>

@@ -70,10 +70,4 @@ withDefaults(defineProps<{ tierId: string; phase: BallPhase; strain?: 1 | 2 | 3 
 @keyframes stone-sealed { 40% { transform:scale(1.15); filter:drop-shadow(0 0 20px var(--tier)); } to { transform:scale(1); filter:drop-shadow(0 0 6px var(--tier)); } }
 @keyframes stone-break { from { transform:translateX(0); opacity:1; } to { transform:translate(calc(var(--split) * 36px),20px) rotate(calc(var(--split) * 28deg)); opacity:0; } }
 @keyframes core-release { 0% { opacity:1; transform:scale(.3); } 40% { opacity:.9; transform:scale(3); } to { opacity:0; transform:scale(4); } }
-@media(prefers-reduced-motion:reduce) {
-  .em-capture-stone * { animation:none !important; }
-  .capture-flow,.stone-core,.stone-cracks,.stone-seal { display:none; }
-  .ball-absorb .stone-shell,.ball-caught .stone-shell { filter:drop-shadow(0 0 8px var(--tier)); }
-  .fragment-left { transform:translateX(-5px); } .fragment-right { transform:translateX(5px); }
-}
 </style>

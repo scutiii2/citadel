@@ -114,5 +114,4 @@ button.segment:focus-visible {
   outline-offset: -2px;
 }
 @media (max-width: 767px) { button.segment { padding: 7px 10px; } }
-@media (prefers-reduced-motion: reduce) { .thumb, button.segment { transition: none; } }
 </style>

@@ -91,8 +91,7 @@ URL, token or key.
   ember_api's `/api/server/download`. A card whose URL is not that route shows as
   unavailable, with no link. The agent's provider and model come from ai_agent, so there are no pickers for them.
 - The input grows with what you type, up to 5 lines, then scrolls. A small
-  paper plane flies off the send button on each send (hidden when the system
-  asks for reduced motion). Four built-in commands run in the browser with no
+  paper plane flies off the send button on each send. Four built-in commands run in the browser with no
   tool and no AI, as the keyboard form of the buttons above the input:
   `/clear`, `/compact` (Summarize), `/export` and `/share`. Only the bare
   command counts ("/clear now" is sent as a normal message), the chat needs

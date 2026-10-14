@@ -306,10 +306,6 @@ function art(fighter: Fighter): string | null {
 .head { flex-wrap:wrap; min-height:70px; gap:8px; }
 .head h3 { font-size:16px; }
 .fighter-emblem { width:30px; height:30px; }
-@media(prefers-reduced-motion:reduce) {
- .fx-absorb,.fx-release,.float { animation:none; }
- .fx-absorb { opacity:0; }
-}
 .badges :deep(img) { max-width:22px; max-height:22px; }
 .health :deep(.em-bar.hp) { border:0; box-shadow:none; height:16px; }
 .hp { font-size:10px; line-height:16px; }

@@ -459,11 +459,4 @@ svg {
     box-shadow: 0 0 0 6px var(--surface), inset 0 -4px 0 var(--accent);
   }
 }
-@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
-  .tabs a,
-  .tabs a::before,
-  .tabs a.chat {
-    transition: none;
-  }
-}
 </style>

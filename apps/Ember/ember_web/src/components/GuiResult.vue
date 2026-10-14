@@ -116,7 +116,6 @@ const scalars = computed(() =>
 .fill.fair { background: var(--warning); }
 .fill.strong, .fill.excellent { background: var(--success); }
 .strength-meta { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.8em; color: var(--muted); }
-@media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
 .error { color: var(--danger); }
 .fields { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; }
 table { border-collapse: collapse; }

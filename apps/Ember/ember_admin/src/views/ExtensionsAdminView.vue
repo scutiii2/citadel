@@ -144,7 +144,6 @@ onMounted(load);
 button.open-card:focus-visible { outline: none; }
 .open-card:focus-visible::after { box-shadow: inset 0 0 0 2px var(--accent); }
 .who strong { flex-basis: 100%; }
-@media (prefers-reduced-motion: reduce) { .card.ext { transition: none; } }
 .top {
   display: flex;
   align-items: center;

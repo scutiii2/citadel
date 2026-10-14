@@ -41,12 +41,6 @@ gap: 14px;
 .admin-panel .chip.fixed {
   overflow-wrap: anywhere;
 }
-@media (prefers-reduced-motion: reduce) {
-  .admin-view *, .admin-view *::before, .admin-view *::after {
-    transition: none !important;
-    animation: none !important;
-  }
-}
 .admin-panel input[type="text"],
 .admin-panel input[type="email"],
 .admin-panel select {
