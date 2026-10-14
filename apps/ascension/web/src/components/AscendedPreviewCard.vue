@@ -26,7 +26,7 @@ const backUrl = computed(() => backAssets[`../assets/ascended_card/ascended_card
   </article>
 </template>
 <style scoped>
-.card { container-type: inline-size; position: relative; width: var(--card-width, 150px); aspect-ratio: 265 / 371; padding: 0; border: 0; background: transparent; color: #f4f1e8; text-align: center; }
+.card { container-type: inline-size; position: relative; width: var(--card-width, var(--em-preview-card-width, 160px)); min-width:var(--em-preview-card-width, 160px); flex-shrink:0; aspect-ratio: 265 / 371; padding: 0; border: 0; background: transparent; color: #f4f1e8; text-align: center; }
 .tier-frame,.tier-back { position:absolute; inset:0; width:100%; height:100%; object-fit:fill; image-rendering:pixelated; pointer-events:none; }
 .tier-frame { z-index:3; }
 .front { position:absolute; inset:6% 8%; border-radius:var(--radius-sm); overflow:hidden; display:flex; flex-direction:column; background:#0b1b28; }

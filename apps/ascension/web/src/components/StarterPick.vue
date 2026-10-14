@@ -79,10 +79,10 @@ async function start(): Promise<void> {
 }
 .back-arrow { transform: scaleX(-1); }
 .picker { display: flex; flex-direction: column; gap: var(--em-space-6); }
-.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 220px)); gap: 18px; justify-content: center; }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--em-preview-card-width), 220px)); gap: 18px; justify-content: center; }
 .item { min-width: 0; --card-width: 100%; }
 .note { padding: 9px 6px; margin: 0; text-align: center; font-size: 12px; color: var(--em-muted); border-bottom: 1px solid var(--em-accent-edge); }
 .start { align-self: center; width: min(320px, 100%); }
 .empty { color: var(--em-muted); }
-@media (max-width: 600px) { .choices { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .choices { grid-template-columns: repeat(auto-fit, minmax(var(--em-preview-card-width), 1fr)); } }
 </style>

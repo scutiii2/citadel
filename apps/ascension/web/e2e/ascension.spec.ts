@@ -17,16 +17,26 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 768, height: 102
     api.ascension.profile = { ...structuredClone(PROFILE), insignia: 1000,
       ascendeds: [ownedAscended('guardian', { copies: 3, sale_value: 25 })] };
     await page.goto('/#ticket=e2e-launch');
+    const collectionCard = page.locator('.owned-entry .card').first();
+    await expect(collectionCard).toBeVisible();
+    expect((await collectionCard.boundingBox())!.width).toBe(160);
     await page.getByRole('button', { name: 'Shop', exact: true }).click();
     const offer = page.locator('[data-offer="0"]');
     await expect(offer.locator('img.portrait')).toHaveAttribute('src', '/ascended/guardian/sprite_preview_card.webp');
     await expect(offer.locator('img.portrait')).toBeVisible();
-    expect((await offer.locator('.item-art').boundingBox())!.height).toBeLessThanOrEqual(96);
+    const preview = offer.locator('.item-art .card');
+    expect((await preview.boundingBox())!.width).toBe(160);
+    expect((await preview.boundingBox())!.height).toBeCloseTo(224, 0);
+    await preview.evaluate(el => (el as HTMLElement).style.setProperty('--card-width', '40px'));
+    expect((await preview.boundingBox())!.width).toBe(160);
     const initialHeight = (await offer.boundingBox())!.height;
     await offer.locator('[data-add]').click();
     expect((await offer.boundingBox())!.height).toBe(initialHeight);
     await expect(offer.locator('.in-basket')).toHaveText('In basket');
     await expect(offer.locator('.em-quantity')).toBeVisible();
+    if (viewport.width < 1000) await page.locator('.basket-toggle').click();
+    expect((await page.locator('[data-basket] .basket-preview').boundingBox())!.width).toBe(160);
+    if (viewport.width < 1000) await page.keyboard.press('Escape');
     await fits(page);
     await page.screenshot({ path: testInfo.outputPath('compact-shop-buy.png'), fullPage: true });
     await page.locator('[data-mode="sell"]').click();

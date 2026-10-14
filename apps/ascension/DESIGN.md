@@ -51,6 +51,7 @@ References: [App.vue](web/src/App.vue), [EmShell.vue](web/src/components/EmShell
 
 ## Collection
 
+- Preview cards default to 160 × 224 pixels, matching the collection. Their shared minimum width is 160 pixels, including shop and basket cards. Preserve the 265:371 aspect ratio; allow larger cards, and wrap or scroll containers instead of shrinking cards below this size. Use `--em-preview-card-width` for supporting layout dimensions.
 - Start with “Your Ascended,” a short introduction, and compact essence counters.
 - Use a softly shaded filter rail on desktop. Portrait layouts expose configuration through a disclosure control.
 - Present the squad first, then collected groups, then uncollected cards. Separate sections with headings and subtle dividers.

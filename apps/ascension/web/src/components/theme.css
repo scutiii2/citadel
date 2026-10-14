@@ -3,6 +3,7 @@
    to the rest of Ember, and Ember's tokens are not used inside the page. */
 
 .em-root {
+  --em-preview-card-width: 160px;
   --em-sanctuary-scene: url("../assets/scenes/sanctuary.webp");
   --em-font-heading: Georgia, "Times New Roman", serif;
   /* Palette (STYLE-SHEET section 1) */
