@@ -111,6 +111,9 @@ class RosterEntry:
     tiers: tuple[TierInfo, ...] = ()
     # Reasoning efforts it accepts from a delegator, weakest first.
     efforts: tuple[str, ...] = ()
+    # Its tools.allow globs; with them the orchestrator can tell that the
+    # specialist has nothing to work with (see agent_routing.is_usable).
+    tool_allow: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

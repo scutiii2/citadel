@@ -211,6 +211,7 @@ def test_main_registers_with_the_spec_flags(monkeypatch):
         "entry": server.SPEC.entry, "orchestrator": server.SPEC.orchestrator, "focus": server.SPEC.focus,
         "tiers": [{"tier": "light", "id": "haiku", "use_for": "quick"}],
         "efforts": ["off", "low"],
+        "tool_allow": list(server.SPEC.tools.allow),
     }
     assert calls["deregister"] == server._AGENT_ID
 

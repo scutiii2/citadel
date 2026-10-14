@@ -64,3 +64,28 @@ def test_specialists_carry_their_published_tiers(monkeypatch):
 
     assert calc.tiers == (agent_spec.TierInfo("light", "haiku", "quick"),)
     assert poet.tiers == ()
+
+
+def test_is_usable_needs_one_own_tool_besides_the_support_tool():
+    from src.agents.agent_spec import RosterEntry
+
+    web = RosterEntry("researcher", "R", "", tool_allow=("tool_web_search", "tool_ticket_createTicket"))
+    assert not agent_routing.is_usable(web, ["tool_mem_search", "tool_ticket_createTicket"])
+    assert agent_routing.is_usable(web, ["tool_web_search"])
+    assert agent_routing.is_usable(RosterEntry("planner", "P", ""), [])
+    assert agent_routing.is_usable(RosterEntry("t", "T", "", tool_allow=("tool_ticket_createTicket",)), [])
+    pdf = RosterEntry("pdf", "P", "", tool_allow=("pdf_merger__*",))
+    assert agent_routing.is_usable(pdf, ["pdf_merger__merge"])
+
+
+def test_roster_leaves_out_specialists_whose_tools_are_switched_off(registry, monkeypatch):
+    monkeypatch.setattr(agent_routing, "_live_tool_names", lambda: ["tool_mem_search"])
+    monkeypatch.setattr(agent_routing, "specialists", lambda: [
+        agent_spec.RosterEntry("calc", "Calc", "", tool_allow=("tool_calc_*",)),
+        agent_spec.RosterEntry("poet", "Poet", ""),
+    ])
+    monkeypatch.setattr(agent_spec, "current", lambda: agent_spec.AgentSpec(
+        id="ember", label="E", port=1, llm=agent_spec.LlmSpec(provider="anthropic"), orchestrator=True))
+    assert [r.id for r in asyncio.run(agent_routing.roster_for())] == ["poet"]
+    monkeypatch.setattr(agent_routing, "_live_tool_names", lambda: None)
+    assert [r.id for r in asyncio.run(agent_routing.roster_for())] == ["calc", "poet"]

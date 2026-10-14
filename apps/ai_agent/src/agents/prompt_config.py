@@ -33,7 +33,9 @@ DEFAULTS: dict[str, str] = {
     ),
     "roster_intro": (
         "You coordinate these specialist agents. When a part of the request fits one of them "
-        "better than you, hand that part to it with delegate_to_agent, then combine the answers:"
+        "better than you, hand that part to it with delegate_to_agent, then combine the answers. "
+        "Only these agents are available right now; if a request needs an agent that is not listed, "
+        "say that area is currently unavailable instead of offering it:"
     ),
     "caveman_instructions": (
         "Respond terse, like a smart caveman. Keep all technical substance; cut "
