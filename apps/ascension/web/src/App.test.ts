@@ -56,7 +56,7 @@ async function mountView() {
 }
 
 type Wrapper = Awaited<ReturnType<typeof mountView>>;
-const tab = (wrapper: Wrapper, label: string) => wrapper.findAll("[role=tab]").find((b) => b.text() === label)!;
+const tab = (wrapper: Wrapper, label: string) => wrapper.findAll("[role=tab]").find((b) => (b.attributes("aria-label") ?? b.text()) === label)!;
 
 describe("AscensionView", () => {
   it("a first visit opens the menu, then New game picks a starter and opens the collection", async () => {
@@ -86,7 +86,8 @@ describe("AscensionView", () => {
     await wrapper.findAll("nav button")[1]!.trigger("click");
     expect(tab(wrapper, "Collection").classes()).toContain("active");
     expect(wrapper.find("button.menu-link").exists()).toBe(true);
-    expect(wrapper.findAll(".navigation [role=tab]").map(t => t.text())).toEqual(["Battle", "Collection"]);
+    expect(wrapper.findAll(".navigation [role=tab]").map(t => t.attributes("aria-label"))).toEqual(["Battle", "Collection"]);
+    expect(wrapper.find(".navigation").text()).toBe("");
     await wrapper.find("button.wallet").trigger("click");
     await flushPromises();
     expect(wrapper.find(".shop").exists()).toBe(true);
@@ -135,7 +136,8 @@ describe("AscensionView", () => {
   it("shows Insignia in the masthead and no page header", async () => {
     const wrapper = await mountView();
 
-    expect(wrapper.find(".wallet").text()).toBe("100 Insignia");
+    expect(wrapper.find(".wallet").text()).toBe("");
+    expect(wrapper.find(".wallet").attributes("data-label")).toBe("100 Insignia · Open shop");
     await wrapper.findAll("nav button")[1]!.trigger("click");
     expect(wrapper.find(".subtitle").exists()).toBe(false);
 
@@ -159,7 +161,8 @@ describe("AscensionView", () => {
     client.battle.mockResolvedValue(battleView({ mode: "manual" }));
     const wrapper = await mountView();
     await wrapper.find("nav button.primary").trigger("click");
-    expect(wrapper.find(".navigation").text()).toContain("ASCENSION");
+    expect(wrapper.find(".navigation").text()).toBe("");
+    expect(wrapper.find(".menu-link svg").exists()).toBe(true);
     await wrapper.find('button[aria-label="Main menu"]').trigger("click");
     expect(wrapper.find(".hero").exists()).toBe(true);
     expect(useAscensionStore().profile?.active_battle).toBe("b1");

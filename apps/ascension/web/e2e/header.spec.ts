@@ -1,0 +1,34 @@
+import { expect, test } from "@playwright/test";
+import { installFakeApi } from "./fakeApi";
+import { PROFILE } from "../src/api/AscensionClient.fixtures";
+
+test("header uses icons and reveals labels after a second of hovering", async ({ page }, testInfo) => {
+  const api = await installFakeApi(page);
+  api.ascension.profile = structuredClone(PROFILE);
+  await page.goto("/#ticket=e2e-launch");
+  await page.getByRole("button", { name: "Collection", exact: true }).click();
+  const header = page.locator(".mast");
+  expect((await header.innerText()).trim()).toBe("");
+  const battle = header.getByRole("tab", { name: "Battle", exact: true });
+  const tooltip = () => battle.evaluate(el => getComputedStyle(el, "::after").visibility);
+  expect(await tooltip()).toBe("hidden");
+  await battle.hover();
+  await page.waitForTimeout(500);
+  expect(await tooltip()).toBe("hidden");
+  await expect.poll(tooltip).toBe("visible");
+  expect(await battle.evaluate(el => getComputedStyle(el, "::after").content)).toBe('"Battle"');
+  await page.mouse.move(0, 0);
+  expect(await tooltip()).toBe("hidden");
+  await page.keyboard.press("Tab");
+  await battle.focus();
+  expect(await tooltip()).toBe("visible");
+  await battle.click();
+  await expect(page.locator(".destination")).toHaveAttribute("aria-label", "Quick battle");
+  await header.getByRole("button", { name: /Open shop/ }).click();
+  await expect(header.getByRole("button", { name: "Buy", exact: true })).toBeVisible();
+  expect((await header.innerText()).trim()).toBe("");
+  await header.getByRole("button", { name: "Sell", exact: true }).click();
+  await expect(header.getByRole("button", { name: "Sell", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: testInfo.outputPath("header-icons.png") });
+});

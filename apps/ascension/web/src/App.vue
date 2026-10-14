@@ -97,8 +97,8 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
     <EmPanel v-if="touchOnly" class="state" role="alert"><EmIcon name="warning" :size="40" /><h2 class="em-pixel">Ascension is PC only</h2><p>Open this game on a computer with a mouse and keyboard.</p></EmPanel>
     <EmShell v-else :destination="screen === 'menu' ? 'Main menu' : screen === 'starter' ? 'Choose your starter' : tab === 'collection' ? 'Your collection' : tab === 'shop' ? 'Forge Shop' : store.battle?.result ? 'Battle result' : store.battle ? 'Forge Arena' : 'Quick battle'" :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
       <template v-if="session.status === 'ready' && store.loaded && !store.unavailable && screen !== 'menu'" #navigation>
-        <h1 class="screen-brand em-pixel"><button type="button" class="menu-link" aria-label="Main menu" title="Main menu" @click="screen = 'menu'">ASCENSION</button></h1>
-        <EmTabs v-if="screen === 'game'" :model-value="tab" :options="tabs" ariaLabel="Ascension sections" @update:model-value="value => play(value as PlayTarget)" />
+        <h1 class="screen-brand em-pixel" aria-label="ASCENSION"><button type="button" class="menu-link" aria-label="Main menu" data-label="ASCENSION · Main menu" @click="screen = 'menu'"><EmIcon name="flame" :size="24" /></button></h1>
+        <EmTabs v-if="screen === 'game'" :model-value="tab" :options="tabs" icon-only delayed-labels ariaLabel="Ascension sections" @update:model-value="value => play(value as PlayTarget)" />
       </template>
       <template #tools>
         <div v-if="screen === 'game' && tab === 'shop'" id="shop-mode-controls" ref="shopControls" class="header-controls" />
@@ -167,7 +167,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 
 <style scoped>
 .ascension-page { flex:1; height:100%; min-height:0; box-sizing:border-box; padding:12px 16px; overflow:hidden; }
-.menu-link { display:flex; align-items:center; padding:0; border:0; color:inherit; background:transparent; font:inherit; cursor:pointer; }
+.menu-link { display:flex; align-items:center; justify-content:center; width:var(--em-target); height:var(--em-target); padding:0; border:0; color:inherit; background:transparent; font:inherit; cursor:pointer; }
 .back-arrow { transform:rotate(180deg); } .screen-brand { margin:0; flex:none; font-size:28px; font-weight:700; color:var(--em-accent); letter-spacing:.25px; }
 .subtle-settings { display:flex; align-items:center; justify-content:center; width:28px; height:32px; padding:0; border:0; color:var(--em-muted); background:transparent; cursor:pointer; }
 .battle-stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:6px; align-items:start; } .battle-bottom { margin-top:6px; } .status { margin-bottom:8px; } .state { max-width:680px; margin:48px auto; display:flex; flex-direction:column; align-items:center; gap:16px; padding:32px; text-align:center; } .state p { color:var(--em-muted); } .skeletons { display:flex; gap:12px; } .skeleton { width:100px; height:120px; background:var(--em-raised); } .settings-content { display:flex; flex-direction:column; gap:16px; }

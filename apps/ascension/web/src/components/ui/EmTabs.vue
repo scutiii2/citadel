@@ -12,7 +12,7 @@ export interface EmTabOption {
   disabled?: boolean;
 }
 
-const props = defineProps<{ modelValue: string; options: EmTabOption[]; ariaLabel: string; iconOnly?: boolean }>();
+const props = defineProps<{ modelValue: string; options: EmTabOption[]; ariaLabel: string; iconOnly?: boolean; delayedLabels?: boolean }>();
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
 const tabs = ref<HTMLButtonElement[]>([]);
 const tabStop = computed(() => props.options.find(option => option.value === props.modelValue && !option.disabled)?.value
@@ -49,7 +49,8 @@ function move(from: number, step: number | "first" | "last"): void {
       :tabindex="option.value === tabStop ? 0 : -1"
       :disabled="option.disabled"
       :aria-label="iconOnly ? option.label : undefined"
-      :title="iconOnly ? option.label : undefined"
+      :title="iconOnly && !delayedLabels ? option.label : undefined"
+      :data-label="delayedLabels ? option.label : undefined"
       @click="select(option)"
       @keydown.right.prevent="move(i, 1)"
       @keydown.left.prevent="move(i, -1)"

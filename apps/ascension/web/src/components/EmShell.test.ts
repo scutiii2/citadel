@@ -6,10 +6,12 @@ describe("EmShell", () => {
   it("shows one header with the logo, destination, wallet and content", () => {
     const wrapper = mount(EmShell, { props: { insignia: 240 }, slots: { default: "<p class='body'>Hello</p>" } });
 
-    expect(wrapper.find("h1").text()).toBe("ASCENSION");
-    expect(wrapper.find('.destination').text()).toBe('Main menu');
+    expect(wrapper.find("h1").attributes("aria-label")).toBe("ASCENSION");
+    expect(wrapper.find('.destination').attributes('aria-label')).toBe('Main menu');
+    expect(wrapper.find('.navigation').text()).toBe('');
     expect(wrapper.find('.screen-heading').exists()).toBe(false);
-    expect(wrapper.find(".wallet").text()).toBe("240 Insignia");
+    expect(wrapper.find(".wallet").text()).toBe("");
+    expect(wrapper.find(".wallet").attributes("data-label")).toBe("240 Insignia");
     expect(wrapper.find(".body").text()).toBe("Hello");
   });
 

@@ -184,8 +184,8 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
     <Teleport :to="controlsTarget ?? 'body'" :disabled="!controlsTarget">
     <div class="shop-toolbar">
       <div class="mode-tabs" role="group" aria-label="Shop mode">
-        <button type="button" data-mode="buy" :aria-pressed="mode === 'buy'" :disabled="locked" @click="switchMode('buy')">Buy</button>
-        <button type="button" data-mode="sell" :aria-pressed="mode === 'sell'" :disabled="locked" @click="switchMode('sell')">Sell</button>
+        <button type="button" data-mode="buy" aria-label="Buy" :data-label="controlsTarget ? 'Buy' : undefined" :aria-pressed="mode === 'buy'" :disabled="locked" @click="switchMode('buy')"><EmIcon v-if="controlsTarget" name="shop" /><template v-else>Buy</template></button>
+        <button type="button" data-mode="sell" aria-label="Sell" :data-label="controlsTarget ? 'Sell' : undefined" :aria-pressed="mode === 'sell'" :disabled="locked" @click="switchMode('sell')"><EmIcon v-if="controlsTarget" name="coin" /><template v-else>Sell</template></button>
       </div>
     </div>
     </Teleport>
