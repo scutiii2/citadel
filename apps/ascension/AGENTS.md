@@ -2,6 +2,8 @@
 
 The game (backend `src/`, web UI `web/`). The parent monorepo rules in `../../AGENTS.md` apply too.
 
+Before designing, changing, or reviewing Ascension UI, read [DESIGN.md](DESIGN.md) and follow its sanctuary style, screen layouts, and responsive interaction rules.
+
 ## Where an Ascended's files live
 Everything that belongs to one Ascended lives in its own folder, `ascended/<id>/`, next to its `catalog.json` and `tree.json` (ability nodes and graph positions).
 Never put a file for a single Ascended in `web/src/assets` or any shared folder.
