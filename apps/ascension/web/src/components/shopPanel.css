@@ -23,7 +23,7 @@ input[type=checkbox] { accent-color:var(--em-accent); }
 .group-heading { display:flex; align-items:baseline; gap:12px; padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid var(--em-divider); font:700 24px var(--em-font-heading); }
 .group-heading small { color:var(--em-muted); font:12px var(--em-font-body); }
 .refresh { display:flex; gap:8px; align-items:center; color:var(--em-muted); font-size:11px; margin-left:auto; }
-.item-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr)); gap:0 20px; }
+.item-grid { display:grid; grid-template-columns:repeat(auto-fill,min(100%,284px)); gap:0 20px; }
 .item-card { position:relative; display:grid; grid-template-columns:var(--em-preview-card-width) minmax(0,1fr) 76px; align-items:center; gap:12px; min-width:0; padding:12px 4px; border:0; border-bottom:1px solid var(--em-divider); background:linear-gradient(180deg,transparent,#0413218c); }
 .item-art { display:flex; align-items:center; justify-content:center; min-width:0; }
 .item-info { min-width:0; }
@@ -40,6 +40,14 @@ input[type=checkbox] { accent-color:var(--em-accent); }
 .item-actions > .em-quantity { min-width:0; min-height:44px; border-color:var(--em-border); background:#102a3d99; color:var(--em-accent); }
 .item-actions :deep(.em-quantity button) { min-width:26px; padding:3px 4px; }
 .item-actions :deep(.em-quantity span) { border:0; }
+.ascended-offer { grid-template-columns:var(--em-preview-card-width) minmax(0,104px); }
+.offer-details { gap:0; text-align:left; }
+.offer-details .pack-size,.offer-details .offer-stock { color:var(--em-muted); font-size:11px; line-height:1.6; }
+.offer-details .offer-stock { margin-top:4px; }
+.offer-details .item-price { justify-content:flex-start; margin-top:20px; font-size:20px; }
+.offer-details .selection-slot { display:flex; align-items:center; min-height:32px; }
+.offer-details .in-basket { margin-top:0; }
+.ascended-offer.is-off .offer-details { opacity:.5; }
 .item-card.selected { background:linear-gradient(180deg,transparent,#f3b47a12); border-bottom-color:var(--em-accent); }
 .emblem-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); }
 .emblem-grid .item-card { grid-template-columns:40px minmax(0,1fr) 76px; min-height:84px; gap:8px; }

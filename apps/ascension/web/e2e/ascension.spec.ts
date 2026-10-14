@@ -22,6 +22,9 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 768, height: 102
     expect((await collectionCard.boundingBox())!.width).toBe(160);
     await page.getByRole('button', { name: 'Shop', exact: true }).click();
     const offer = page.locator('[data-offer="0"]');
+    expect((await offer.boundingBox())!.width).toBe(284);
+    await expect(offer.locator('.offer-details .em-tier')).toHaveCount(0);
+    await expect(offer.locator('.offer-details h4')).toHaveCount(0);
     await expect(offer.locator('img.portrait')).toHaveAttribute('src', '/ascended/guardian/sprite_preview_card.webp');
     await expect(offer.locator('img.portrait')).toBeVisible();
     const preview = offer.locator('.item-art .card');

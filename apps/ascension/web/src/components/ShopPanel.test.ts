@@ -42,6 +42,20 @@ function mountShop(insignia = 25) {
 const buyIn = (wrapper: ReturnType<typeof mountShop>["wrapper"], tier: string) => wrapper.find(`[data-tier="${tier}"] button`);
 
 describe("ShopPanel", () => {
+  it("keeps Ascended identity on the preview card and only trade details beside it", async () => {
+    const { wrapper } = mountShop(500);
+    const offer = wrapper.get('[data-offer="0"]');
+    expect(offer.get('.offer-details').text()).toContain('1 copy / pack');
+    expect(offer.get('.offer-details').text()).toContain('3 left');
+    expect(offer.get('.offer-details').text()).not.toContain('Guardian');
+    expect(offer.get('.offer-details').find('.em-tier').exists()).toBe(false);
+    expect(offer.get('.ascended-name').text()).toBe('Guardian');
+    await wrapper.get('[data-mode="sell"]').trigger('click');
+    const sale = wrapper.get('[data-sell="guardian"]');
+    expect(sale.get('.offer-details').text()).toContain('2 spare copies');
+    expect(sale.get('.offer-details').text()).not.toContain('Guardian');
+    wrapper.unmount();
+  });
   it("keeps search in the mode toolbar and separates All Items into labelled groups", async () => {
     const { wrapper } = mountShop(500);
     expect(wrapper.find('.shop-toolbar input[aria-label="Search shop"]').exists()).toBe(true);
