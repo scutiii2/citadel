@@ -6,7 +6,7 @@ import { useAscensionStore } from "../stores/ascension";
 import { passiveText, statusText } from "../utils/ascension";
 import { spriteFor } from "../utils/sprites";
 import EmBar from "./ui/EmBar.vue";
-import EmEmblem from "./ui/EmEmblem.vue";
+import EmCaptureStone from "./ui/EmCaptureStone.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
 import EmTierIcon from "./ui/EmTierIcon.vue";
 import TypeSymbol from "./ui/TypeSymbol.vue";
@@ -89,13 +89,13 @@ function art(fighter: Fighter): string | null {
               <img v-if="art(side.fighter)" :src="art(side.fighter)!" alt="" draggable="false" @error="failedImages.push(art(side.fighter)!)" />
               <span v-else class="letter" aria-hidden="true">{{ side.fighter.name.slice(0, 1) }}</span>
             </div>
-            <span
+            <EmCaptureStone
               v-if="playback.ball[side.key as 'player' | 'wild']"
               class="ball"
-              :class="[`ball-${playback.ball[side.key as 'player' | 'wild']!.phase}`, playback.ball[side.key as 'player' | 'wild']!.strain ? `strain-${playback.ball[side.key as 'player' | 'wild']!.strain}` : '']"
-              :style="{ '--tier': `var(--em-tier-${playback.ball[side.key as 'player' | 'wild']!.emblem}, var(--em-tier-common))` }"
-              aria-hidden="true"
-            ><EmEmblem :tier-id="playback.ball[side.key as 'player' | 'wild']!.emblem" :size="52" /></span>
+              :tier-id="playback.ball[side.key as 'player' | 'wild']!.emblem"
+              :phase="playback.ball[side.key as 'player' | 'wild']!.phase"
+              :strain="playback.ball[side.key as 'player' | 'wild']!.strain"
+            />
             <span
               v-if="playback.floating && playback.floating.side === side.key"
               :key="playback.floating.id"
@@ -163,7 +163,7 @@ function art(fighter: Fighter): string | null {
   animation: shake-small 600ms linear;
 }
 .fx-absorb {
-  animation: absorb 400ms ease-in forwards;
+  animation: absorb 600ms ease-in forwards;
 }
 .fx-release {
   animation: release 400ms ease-out;
@@ -174,53 +174,16 @@ function art(fighter: Fighter): string | null {
   left: 50%;
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
-  margin: -26px 0 0 -26px;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  z-index: 1;
 }
 .player .ball {
   --from: 220px;
 }
 .wild .ball {
   --from: -220px;
-}
-.ball-throw {
-  animation: throw 650ms ease-out both;
-}
-/* The Ascended fights the EMBLEM: three tugs, each harder and longer, then a held breath. */
-.ball-wobble,
-.ball-still {
-  filter: drop-shadow(0 0 8px var(--tier));
-}
-.ball-wobble::after {
-  position: absolute;
-  inset: -3px;
-  border: 2px solid var(--em-danger);
-  border-radius: var(--radius-full);
-  content: "";
-  opacity: 0;
-  animation: strain-ring 450ms ease-out infinite;
-}
-.strain-1 {
-  --amp: 1;
-  animation: ball-struggle 520ms ease-in-out infinite;
-}
-.strain-2 {
-  --amp: 1.6;
-  animation: ball-struggle 420ms ease-in-out infinite;
-}
-.strain-3 {
-  --amp: 2.2;
-  animation: ball-struggle 320ms ease-in-out infinite;
-}
-.ball-still {
-  animation: hush 600ms ease-in-out both;
-}
-.ball-caught {
-  animation: caught 800ms ease-out forwards;
-}
-.ball-open {
-  animation: pop 400ms ease-out forwards;
 }
 .float {
   position: absolute;
@@ -311,6 +274,9 @@ function art(fighter: Fighter): string | null {
   }
 }
 @keyframes absorb {
+  40% {
+    filter: brightness(1.8) drop-shadow(0 0 8px #d7e9ff);
+  }
   to {
     transform: scale(0.05);
     opacity: 0;
@@ -319,49 +285,6 @@ function art(fighter: Fighter): string | null {
 @keyframes release {
   from {
     transform: scale(0.05);
-    opacity: 0;
-  }
-}
-@keyframes throw {
-  from {
-    transform: translate(var(--from), 50px) scale(0.6);
-  }
-  50% {
-    transform: translate(calc(var(--from) * 0.4), -70px) scale(1);
-  }
-  to {
-    transform: translate(0, 0) scale(1);
-  }
-}
-/* The EMBLEM pulses in size, bounces and rotates as the Ascended fights it; --amp grows each tug. */
-@keyframes ball-struggle {
-  0%, 100% { transform: translateY(0) scale(1) rotate(0); }
-  20% { transform: translateY(calc(var(--amp) * -8px)) scale(calc(1 + var(--amp) * 0.12)) rotate(calc(var(--amp) * -14deg)); }
-  50% { transform: translateY(0) scale(calc(1 - var(--amp) * 0.04)) rotate(0); }
-  70% { transform: translateY(calc(var(--amp) * -6px)) scale(calc(1 + var(--amp) * 0.1)) rotate(calc(var(--amp) * 14deg)); }
-}
-@keyframes hush {
-  0% { transform: scale(1.3); filter: drop-shadow(0 0 8px var(--tier)); }
-  50% { transform: scale(1.12); filter: drop-shadow(0 0 16px var(--tier)); }
-  100% { transform: scale(1.2); filter: drop-shadow(0 0 24px var(--tier)); }
-}
-@keyframes strain-ring {
-  from { transform: scale(1); opacity: 0.9; }
-  to { transform: scale(2.2); opacity: 0; }
-}
-@keyframes caught {
-  40% {
-    transform: scale(1.4);
-    filter: drop-shadow(0 0 18px var(--tier));
-  }
-  to {
-    transform: scale(1);
-    filter: drop-shadow(0 0 10px var(--em-success));
-  }
-}
-@keyframes pop {
-  to {
-    transform: scale(2.2);
     opacity: 0;
   }
 }
@@ -383,6 +306,10 @@ function art(fighter: Fighter): string | null {
 .head { flex-wrap:wrap; min-height:70px; gap:8px; }
 .head h3 { font-size:16px; }
 .fighter-emblem { width:30px; height:30px; }
+@media(prefers-reduced-motion:reduce) {
+ .fx-absorb,.fx-release,.float { animation:none; }
+ .fx-absorb { opacity:0; }
+}
 .badges :deep(img) { max-width:22px; max-height:22px; }
 .health :deep(.em-bar.hp) { border:0; box-shadow:none; height:16px; }
 .hp { font-size:10px; line-height:16px; }

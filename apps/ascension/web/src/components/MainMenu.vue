@@ -8,7 +8,6 @@ import EmConfirm from "./ui/EmConfirm.vue";
 import EmMenuRow from "./ui/EmMenuRow.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmIcon from "./ui/EmIcon.vue";
-import EmEmblem from "./ui/EmEmblem.vue";
 
 /** The Ascension main menu, the first screen: the title, the menu rows and a fanned
  * hand of small cards. Without a save it offers New game and previews the starters;
@@ -62,7 +61,7 @@ async function reset(): Promise<void> {
     <div class="intro">
       <h2 class="em-pixel title">FORGE YOUR<br />LEGEND</h2>
       <p class="tagline">Collect. Forge. Battle.</p>
-      <p v-if="hasSave" class="save"><EmEmblem tier-id="common" :size="40" /><strong>{{ ascendedCount }} Ascended</strong> <span>· Progress saved</span></p>
+      <p v-if="hasSave" class="save"><EmIcon name="book" :size="40" /><strong>{{ ascendedCount }} Ascended</strong> <span>· Progress saved</span></p>
       <p v-else class="save">Three Ascended. Your first choice.</p>
 
       <EmNotice v-if="store.error" tone="error">{{ store.error }}</EmNotice>

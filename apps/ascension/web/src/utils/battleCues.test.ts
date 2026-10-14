@@ -28,15 +28,24 @@ describe("stepsFor", () => {
 
   it("throws an EMBLEM at the other side, wobbles, then closes or breaks free", () => {
     const caught = stepsFor([{ type: "capture_attempt", side: "player", emblem: "rare", chance: 0.4, success: true }]);
-    expect(caught.map((s) => s.ball?.wild?.phase)).toEqual(["throw", "throw", "wobble", "wobble", "wobble", "still", "caught"]);
+    expect(caught.map((s) => s.ball?.wild?.phase)).toEqual(["throw", "absorb", "wobble", "wobble", "wobble", "still", "caught"]);
+    expect(caught[1]!.fx).toEqual({ wild: "absorb" });
+    expect(caught[1]!.ms).toBe(600);
     expect(caught[0]!.ball!.wild!.emblem).toBe("rare");
     expect(caught.slice(2, 5).map((s) => s.ball?.wild?.strain)).toEqual([1, 2, 3]);
     expect(caught.slice(2, 6).every((s) => s.fx?.wild === "absorb")).toBe(true);
     expect(caught[6]!.float!.text).toBe("Caught!");
 
     const free = stepsFor([{ type: "capture_attempt", side: "player", emblem: "common", chance: 0.58, success: false }]);
-    expect(free.map((s) => s.ball?.wild?.phase)).toEqual(["throw", "throw", "wobble", "wobble", "wobble", "still", "open"]);
+    expect(free.map((s) => s.ball?.wild?.phase)).toEqual(["throw", "absorb", "wobble", "wobble", "wobble", "still", "open"]);
     expect(free[6]!.fx).toEqual({ wild: "release" });
+  });
+
+  it("draws into the player's stone when the wild side initiates capture", () => {
+    const steps = stepsFor([{ type: "capture_attempt", side: "wild", emblem: "royal", success: false }]);
+    expect(steps[1]!.ball?.player).toEqual({ phase: "absorb", emblem: "royal" });
+    expect(steps[6]!.ball?.player?.phase).toBe("open");
+    expect(steps[6]!.fx).toEqual({ player: "release" });
   });
 
   it("shows no effect for a catch that does nothing and ignores events without a picture", () => {

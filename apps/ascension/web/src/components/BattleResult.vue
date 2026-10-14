@@ -9,7 +9,6 @@ import EmButton from "./ui/EmButton.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmPanel from "./ui/EmPanel.vue";
 import EmBar from "./ui/EmBar.vue";
-import EmEmblem from "./ui/EmEmblem.vue";
 import EmEssence from "./ui/EmEssence.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
 
@@ -98,7 +97,7 @@ const story = computed(() => {
 <template>
   <EmPanel v-if="result" class="battle-result" role="status">
     <div class="result-scene">
-    <div class="result-title"><EmEmblem tier-id="common" :size="36" /><h2 class="em-pixel title">{{ RESULT_LABELS[result.kind] }}</h2><EmEmblem tier-id="common" :size="36" /></div>
+    <div class="result-title"><h2 class="em-pixel title">{{ RESULT_LABELS[result.kind] }}</h2></div>
     <p class="story">{{ story }}</p>
     <img v-if="featuredArt && !imageFailed" class="result-art" :src="featuredArt" alt="" draggable="false" @error="imageFailed = true" />
     <span v-else class="result-letter em-pixel" aria-hidden="true">{{ featured.name.slice(0, 1) }}</span>
@@ -112,7 +111,7 @@ const story = computed(() => {
         <span>for {{ battle.player.name }}<template v-if="levelledUp">, now level {{ result.level_after }}</template></span>
 
       </div>
-      <div v-if="result.insignia !== undefined" class="reward"><EmEmblem class="reward-icon" tier-id="common" :size="34" />
+      <div v-if="result.insignia !== undefined" class="reward"><EmIcon class="reward-icon" name="coin" :size="34" />
         <strong class="em-pixel em-num">+{{ result.insignia }} Insignia</strong>
         <span>added to your wallet</span>
       </div>

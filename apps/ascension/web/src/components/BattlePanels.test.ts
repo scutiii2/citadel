@@ -113,6 +113,11 @@ describe("BattleArena animation", () => {
     const store = withBattle(battleView());
     const playback = usePlaybackStore();
     const wrapper = mount(BattleArena, { props: { battle: store.battle! } });
+    playback.ball = { player: null, wild: { phase: "absorb", emblem: "rare" } };
+    playback.fx = { player: null, wild: "absorb" };
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".wild .sprite").classes()).not.toContain("concealed");
+    expect(wrapper.find(".wild .capture-flow").exists()).toBe(true);
     for (const phase of ["wobble", "still", "caught"] as const) {
       playback.ball = { player: null, wild: { phase, emblem: "common", strain: 2 } };
       await wrapper.vm.$nextTick();
@@ -122,6 +127,7 @@ describe("BattleArena animation", () => {
     playback.ball = { player: null, wild: { phase: "open", emblem: "common" } };
     await wrapper.vm.$nextTick();
     expect(wrapper.find(".wild .sprite").classes()).not.toContain("concealed");
+    expect(wrapper.findAll(".wild .stone-fragment")).toHaveLength(2);
   });
 
   const sheet = {
