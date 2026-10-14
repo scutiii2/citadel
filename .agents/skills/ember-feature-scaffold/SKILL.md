@@ -66,7 +66,11 @@ in routes), `src/models/` (SQLAlchemy 2 typed models), `src/deps.py`
    table or column) needs an Alembic migration: stop ember_api, run
    `python -m scripts.migrate_db revision "what changed"`, read the file it
    writes (a new `NOT NULL` column needs a `server_default`). Startup applies
-   it after a backup; `tests/test_migrations.py` fails if it is missing.
+   it after a backup; `tests/test_migrations.py` fails if it is missing. Bump its
+   `HEAD`/`NEXT` and the `"00NN*"` ignore list, and for a new column on an
+   existing table add a `drop_<column>` helper beside `drop_log_prompts` and call
+   it wherever a test rewinds a model-built database (they build from the
+   models, so the column already exists).
 3. **Service**: a class with `__init__(self, session: AsyncSession)`.
    Anything blocking (hashing, SMTP, file I/O) goes through
    `asyncio.to_thread`. Secrets/codes/tokens are stored hashed, never raw.

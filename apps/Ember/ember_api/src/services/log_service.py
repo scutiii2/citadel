@@ -40,7 +40,13 @@ class LogWriter:
         self._database = database
 
     async def write(
-        self, kind: LogKind, account_id: int | None, source: str, message: str, details: str | None = None
+        self,
+        kind: LogKind,
+        account_id: int | None,
+        source: str,
+        message: str,
+        details: str | None = None,
+        prompts: str | None = None,
     ) -> None:
         try:
             async with self._database.sessions() as session:
@@ -51,6 +57,8 @@ class LogWriter:
                         source=_clip(source, SOURCE_MAX),
                         message=_clip(message, MESSAGE_MAX),
                         details=_clip(details, DETAILS_MAX) if details else None,
+                        # Never clipped: the caller bounds it, and a clipped JSON text cannot be read.
+                        prompts=prompts or None,
                     )
                 )
                 await session.commit()
@@ -64,8 +72,8 @@ class LogWriter:
     async def error(self, account_id: int | None, source: str, message: str, details: str | None = None) -> None:
         await self.write("error", account_id, source, message, details)
 
-    async def chat_trace(self, account_id: int, message: str, details: str) -> None:
-        await self.write("chat_trace", account_id, "chat.turn", message, details)
+    async def chat_trace(self, account_id: int, message: str, details: str, prompts: str | None = None) -> None:
+        await self.write("chat_trace", account_id, "chat.turn", message, details, prompts)
 
     async def purge_old(self) -> int:
         cutoff = utcnow() - timedelta(days=RETENTION_DAYS)

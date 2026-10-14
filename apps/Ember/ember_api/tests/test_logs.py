@@ -86,6 +86,78 @@ def test_chat_turns_are_traced_and_agent_failures_logged(client: TestClient, age
     assert messages(client, "error", root) == [f"{AGENTS[0]['id']}: provider rate limited"]
 
 
+TRACE_ROWS = [
+    {
+        "agent_id": "claude-agent", "agent_label": "Ember", "provider_id": "anthropic", "gateway": "openrouter",
+        "model": "claude-test", "input_tokens": 70, "output_tokens": 30, "total_tokens": 100,
+        "started_at": "2026-10-04T09:12:03.512Z", "finished_at": "2026-10-04T09:12:07.044Z", "delegated_by": None,
+        "model_tier": "heavy", "reasoning_effort": "low",
+        "prompt": [{"role": "user", "content": "earlier"}, {"role": "user", "content": "add 2 and 3"}],
+    },
+    {
+        "agent_id": "calc", "agent_label": "Calculator", "provider_id": "openai", "gateway": None,
+        "model": "gpt-x", "input_tokens": 20, "output_tokens": 5, "total_tokens": 25,
+        "started_at": "2026-10-04T09:12:04.000Z", "finished_at": "2026-10-04T09:12:05.250Z", "delegated_by": "claude-agent",
+        "prompt": [{"role": "user", "content": "2 + 3"}],
+    },
+]
+
+
+def test_chat_trace_lists_each_agent_and_hides_prompts_without_the_permission(
+    client: TestClient, agent: FakeAgent, email: FakeEmailSender
+) -> None:
+    agent.result_extra = {"agent_usage": TRACE_ROWS}
+    agent.tool_calls = ["notes"]
+    as_admin(client)
+    root = my_id(client)
+    chat_id = str(uuid.uuid4())
+    body = {"question": "add 2 and 3", "agent_id": AGENTS[0]["id"], "enabled_extensions": []}
+    assert client.post(f"/api/chats/{chat_id}/turns", json=body).status_code == 202
+    events(client, chat_id)
+
+    trace = client.get("/api/logs/chat_trace", params={"actor": root}).json()[0]
+    # Admin holds every permission, so the prompts come back too.
+    import json
+
+    details = json.loads(trace["details"])
+    assert [a["agent_id"] for a in details["agents"]] == ["claude-agent", "calc"]
+    first, second = details["agents"]
+    assert (first["model_tier"], first["reasoning_effort"], first.get("delegated_by")) == ("heavy", "low", None)
+    assert second["delegated_by"] == "claude-agent"
+    assert first["tools"] == ["notes"] and second["tools"] == []
+    assert "prompt" not in first and "earlier" not in trace["details"]
+    prompts = json.loads(trace["prompts"])
+    assert [p["messages"][-1]["content"] for p in prompts] == ["add 2 and 3", "2 + 3"]
+    assert prompts[0]["truncated"] is False
+
+    # A role with only logs.chat.view reads the entry but never the prompts.
+    member_role = role_by_name(client, "Member")["id"]
+    assert client.put(f"/api/admin/roles/{member_role}/permissions/logs.chat.view").status_code == 200
+    make_member(client, email)
+    client.post("/api/auth/logout", json={})
+    login(client, "alice")
+    seen = client.get("/api/logs/chat_trace", params={"actor": root}).json()[0]
+    assert seen["prompts"] is None and "earlier" not in str(seen)
+    assert json.loads(seen["details"])["agents"][0]["agent_id"] == "claude-agent"
+
+
+def test_chat_trace_prompts_are_clipped_to_a_budget_keeping_the_newest(client: TestClient, agent: FakeAgent) -> None:
+    import json
+
+    big = [{"role": "user", "content": "old " * 5000}, {"role": "user", "content": "the question"}]
+    agent.result_extra = {"agent_usage": [{**TRACE_ROWS[0], "prompt": big}]}
+    as_admin(client)
+    root = my_id(client)
+    chat_id = str(uuid.uuid4())
+    client.post(f"/api/chats/{chat_id}/turns", json={"question": "x", "agent_id": AGENTS[0]["id"], "enabled_extensions": []})
+    events(client, chat_id)
+
+    prompt = json.loads(client.get("/api/logs/chat_trace", params={"actor": root}).json()[0]["prompts"])[0]
+    assert prompt["truncated"] is True
+    assert prompt["messages"][-1]["content"] == "the question"
+    assert sum(len(m["content"]) for m in prompt["messages"]) <= 12_000
+
+
 def test_unexpected_errors_are_logged_under_the_account(client: TestClient, monkeypatch) -> None:
     as_admin(client)
     root = my_id(client)

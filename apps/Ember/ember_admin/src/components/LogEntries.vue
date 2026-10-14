@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { logsClient, type LogActor, type LogEntry, type LogKind } from "../api/LogsClient";
+import ChatTurnEntry from "./ChatTurnEntry.vue";
 import SegmentedControl from "./SegmentedControl.vue";
 import { useAuthStore } from "../stores/auth";
 import { errorMessage } from "../utils/errors";
@@ -22,6 +23,12 @@ const actors = ref<Record<LogKind, LogActor>>({ action: "server", error: "server
 const entries = ref<LogEntry[]>([]);
 const loading = ref(false);
 const error = ref("");
+
+// Chat turns can show each agent's run and prompt, for accounts allowed to read prompts.
+type ChatView = "normal" | "advanced";
+const CHAT_VIEWS: { value: ChatView; label: string }[] = [{ value: "normal", label: "Normal" }, { value: "advanced", label: "Advanced" }];
+const chatView = ref<ChatView>("normal");
+const canSeePrompts = computed(() => auth.hasPermission("logs.chat.prompts.view"));
 
 const tabOptions = computed(() => kinds.value.map((k) => ({ value: k, label: KIND_LABELS[k] })));
 // The segmented control needs a chosen kind; the tabs only show once there are kinds.
@@ -85,6 +92,13 @@ watch(
         <option v-for="o in actorOptions" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
       </select>
     </label>
+    <SegmentedControl
+      v-if="tab === 'chat_trace' && canSeePrompts"
+      v-model="chatView"
+      :options="CHAT_VIEWS"
+      label="Detail"
+      aria-label="Chat turn detail"
+    />
     <button type="button" class="chip" :disabled="loading" @click="loadEntries">Refresh</button>
   </div>
 
@@ -99,7 +113,8 @@ watch(
         <code class="source">{{ e.source }}</code>
         <span class="message">{{ e.message }}</span>
       </div>
-      <details v-if="e.details">
+      <ChatTurnEntry v-if="e.kind === 'chat_trace'" :entry="e" :advanced="canSeePrompts && chatView === 'advanced'" />
+      <details v-else-if="e.details">
         <summary>Details</summary>
         <pre>{{ e.details }}</pre>
       </details>

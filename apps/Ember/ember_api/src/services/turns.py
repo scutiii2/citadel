@@ -56,6 +56,10 @@ MAX_AGENT_USAGE_ROWS = 20
 # Caps on what a delegated agent's live events may carry to a browser.
 AGENT_QUESTION_MAX = 500
 AGENT_TEXT_MAX = 4000
+# How much of one agent's prompt the chat-turn log keeps (newest messages first),
+# and how many tool names it lists per agent.
+TRACE_PROMPT_MAX = 12_000
+TRACE_TOOLS_MAX = 10
 
 
 class TurnConflict(Exception):
@@ -141,6 +145,9 @@ class Turn:
     # Questions waiting for the user's answer, by step id: {id, questions}.
     pending_questions: dict[str, dict[str, Any]] = field(default_factory=dict)
     plans: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # What the chat-turn log says about each agent that ran, and the prompts it got (same order).
+    trace_agents: list[dict[str, Any]] = field(default_factory=list)
+    trace_prompts: list[dict[str, Any]] = field(default_factory=list)
     sequence: int = 0
     events: deque = field(default_factory=lambda: deque(maxlen=EVENT_BUFFER))
     condition: asyncio.Condition = field(default_factory=asyncio.Condition)
@@ -554,6 +561,7 @@ class TurnRegistry:
             # The whole turn (auto-summary and tool calls included), as in the chat-turn log line.
             "duration_s": round(monotonic() - turn.started_at, 1),
         }
+        turn.trace_agents, turn.trace_prompts = _trace_parts(result, turn)
         rows = usage_rows(result)
         # Several agents ran (the answer's agent plus delegated ones): keep who used
         # what. One agent only repeats the answer's own totals.
@@ -643,11 +651,73 @@ class TurnRegistry:
             "enabled_extensions": list(turn.options.enabled_extensions),
             "response": str(message.get("content", ""))[:TRACE_RESPONSE_MAX],
         }
+        if turn.trace_agents:
+            details["agents"] = turn.trace_agents
         await self._logs.chat_trace(
             turn.account_id,
             f"{question} → {turn.agent.id}/{message.get('model') or status}, {elapsed}s",
             json.dumps(details, ensure_ascii=False, indent=2),
+            json.dumps(turn.trace_prompts, ensure_ascii=False) if turn.trace_prompts else None,
         )
+
+
+def _clip_prompt(messages: Any) -> dict[str, Any]:
+    """The newest messages of one agent's prompt that fit TRACE_PROMPT_MAX characters;
+    `truncated` says whether anything was cut."""
+    kept: list[dict[str, str]] = []
+    budget = TRACE_PROMPT_MAX
+    truncated = False
+    for message in reversed(messages if isinstance(messages, list) else []):
+        if not isinstance(message, dict):
+            continue
+        content = str(message.get("content") or "")
+        if budget <= 0:
+            truncated = True
+            break
+        if len(content) > budget:
+            content, truncated = content[-budget:], True
+        budget -= len(content)
+        kept.append({"role": str(message.get("role") or "")[:20], "content": content})
+    return {"messages": kept[::-1], "truncated": truncated}
+
+
+def _trace_parts(result: dict[str, Any], turn: Turn) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """For the chat-turn log: one entry per agent that ran (who, where, tokens, timing,
+    tools) and, in the same order, the prompt it received. The prompts are kept apart
+    because only some admins may read them."""
+    agents: list[dict[str, Any]] = []
+    prompts: list[dict[str, Any]] = []
+    for entry in (result.get("agent_usage") or [])[:MAX_AGENT_USAGE_ROWS]:
+        if not isinstance(entry, dict):
+            continue
+        agent_id = str(entry.get("agent_id") or entry.get("provider_id") or "unknown")[:120]
+        delegated_by = entry.get("delegated_by")
+        # Steps of the answering agent carry no agent_id; a delegate's steps carry its own.
+        tools = [
+            s["tool"] for s in turn.steps
+            if (s.get("agent_id") == agent_id if delegated_by else not s.get("agent_id"))
+        ][:TRACE_TOOLS_MAX]
+        info = {
+            "agent_id": agent_id,
+            "agent_label": str(entry.get("agent_label") or "")[:AGENT_LABEL_MAX] or None,
+            "delegated_by": str(delegated_by)[:120] if delegated_by else None,
+            "provider_id": entry.get("provider_id"),
+            "gateway": entry.get("gateway"),
+            "model": entry.get("model"),
+            "model_tier": entry.get("model_tier"),
+            "reasoning_effort": entry.get("reasoning_effort"),
+            "input_tokens": entry.get("input_tokens"),
+            "output_tokens": entry.get("output_tokens"),
+            "total_tokens": entry.get("total_tokens"),
+            "started_at": entry.get("started_at"),
+            "finished_at": entry.get("finished_at"),
+            "tools": tools,
+        }
+        agents.append({k: v for k, v in info.items() if v is not None})
+        prompts.append(_clip_prompt(entry.get("prompt")))
+    if not any(p["messages"] for p in prompts):
+        prompts = []
+    return agents, prompts
 
 
 def _clamped(event: dict[str, Any]) -> dict[str, Any]:

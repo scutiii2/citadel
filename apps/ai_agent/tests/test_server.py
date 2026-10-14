@@ -84,6 +84,23 @@ def test_ask_records_delegated_by_and_appends_to_the_usage_log():
     asyncio.run(_run())
 
 
+def test_ask_reports_the_prompt_in_the_reply_row_but_not_the_usage_log():
+    """The prompt (history + question, never the system prompt) rides back in agent_usage
+    for ember_api's chat-turn log; the local JSONL copy stays small."""
+    async def _run():
+        with patch("src.server.agent_config.run_chat", new_callable=AsyncMock, return_value=ChatResult(response="hi")), \
+             patch("src.server.agent_config.status", return_value={"model": "m", "context_window": 1}), \
+             patch("src.server.usage_log.append", new_callable=AsyncMock) as append:
+            result = await server.ask("now?", history=[{"role": "user", "content": "before"}])
+
+        assert result["agent_usage"][0]["prompt"] == [
+            {"role": "user", "content": "before"}, {"role": "user", "content": "now?"},
+        ]
+        assert "prompt" not in append.await_args.args[0]
+
+    asyncio.run(_run())
+
+
 def test_ask_defaults_none_arguments_to_empty():
     """ask should default None history/extensions to empty lists."""
     async def _run():

@@ -26,4 +26,7 @@ class LogEntry(Base):
     source: Mapped[str] = mapped_column(String(100))
     message: Mapped[str] = mapped_column(String(500))
     details: Mapped[str | None] = mapped_column(Text)
+    # A chat turn's per-agent prompts (JSON). Kept apart from `details` so the
+    # list route can leave it out for accounts without logs.chat.prompts.view.
+    prompts: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(default=utcnow, index=True)

@@ -10,6 +10,8 @@ export interface LogEntry {
   source: string;
   message: string;
   details: string | null;
+  /** A chat turn's per-agent prompts (JSON); null unless the account holds logs.chat.prompts.view. */
+  prompts: string | null;
   /** Naive UTC. */
   created_at: string;
 }

@@ -209,7 +209,10 @@ label, provider, gateway, model, tokens, `started_at`/`finished_at`,
 `delegated_by`, `request_id`, `depth`) to `.data/usage/YYYY-MM-DD.<agent id>.jsonl`
 (`AI_AGENT_USAGE_DIR` overrides; a write failure warns and never fails the
 turn). A new provider fills those fields from its `ChatResult`; it does not
-write the file itself. ember_api owns usage limits and the usage reports.
+write the file itself. The reply row (not the file) also carries `prompt`, the
+`{role, content}` messages this agent received (`core/usage_log.prompt_messages`,
+never the system prompt); ember_api keeps it for the admin Advanced chat-turn view.
+ember_api owns usage limits and the usage reports.
 
 ## Verify before calling it done
 

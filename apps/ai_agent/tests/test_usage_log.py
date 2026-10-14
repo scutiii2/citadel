@@ -50,6 +50,19 @@ def test_usage_dir_honours_the_env(monkeypatch, tmp_path):
     assert usage_log.usage_dir() == tmp_path
 
 
+def test_prompt_messages_are_history_then_the_question_as_plain_text():
+    history = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": [{"type": "text", "text": "yo"}]}]
+    assert usage_log.prompt_messages(history, "next?") == [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": '[{"type": "text", "text": "yo"}]'},
+        {"role": "user", "content": "next?"},
+    ]
+
+
+def test_prompt_messages_skip_non_dict_entries():
+    assert usage_log.prompt_messages(["junk", None], "q") == [{"role": "user", "content": "q"}]
+
+
 def test_own_row_records_model_tier_only_when_given():
     result = ChatResult(response="x", provider_id="anthropic", model="haiku")
     common = dict(

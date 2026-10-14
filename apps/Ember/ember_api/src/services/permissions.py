@@ -25,6 +25,7 @@ EXTENSIONS_MANAGE = "extensions.manage"
 LOGS_VIEW = "logs.view"
 LOGS_ERRORS_VIEW = "logs.errors.view"
 LOGS_CHAT_VIEW = "logs.chat.view"
+LOGS_CHAT_PROMPTS_VIEW = "logs.chat.prompts.view"
 CONFIG_ISSUES_VIEW = "config.issues.view"
 TRAFFIC_VIEW = "traffic.view"
 AGENTS_MANAGE = "agents.manage"
@@ -54,6 +55,7 @@ ALL_PERMISSIONS = MappingProxyType({
     LOGS_VIEW: "Read the activity log (logins, account and admin changes)",
     LOGS_ERRORS_VIEW: "Read the error log",
     LOGS_CHAT_VIEW: "Read the chat-turn log (every account's questions and answers)",
+    LOGS_CHAT_PROMPTS_VIEW: "Read the prompts each agent received in the chat-turn log (needs logs.chat.view)",
     CONFIG_ISSUES_VIEW: "See problems in ember_api's config and secret files",
     TRAFFIC_VIEW: "See network traffic charts (requests, latency, upstream calls)",
     AGENTS_MANAGE: "Create, edit and remove ai_agent agents (provider, gateway, persona, tools)",

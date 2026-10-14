@@ -19,7 +19,7 @@ from src.deps import get_db_session, require_any_permission
 from src.models import Account, LogEntry
 from src.services import log_service
 from src.services.log_analytics import AnalyticsReport, LogAnalytics, Period
-from src.services.permissions import LOGS_CHAT_VIEW, LOGS_ERRORS_VIEW, LOGS_VIEW
+from src.services.permissions import LOGS_CHAT_PROMPTS_VIEW, LOGS_CHAT_VIEW, LOGS_ERRORS_VIEW, LOGS_VIEW
 
 router = APIRouter(prefix="/api/logs", tags=["logs"])
 
@@ -35,11 +35,14 @@ class LogEntryOut(BaseModel):
     source: str
     message: str
     details: str | None
+    # The prompts each agent received; None unless the account holds logs.chat.prompts.view.
+    prompts: str | None = None
     created_at: datetime
 
     @classmethod
-    def of(cls, entry: LogEntry) -> LogEntryOut:
+    def of(cls, entry: LogEntry, *, with_prompts: bool = False) -> LogEntryOut:
         return cls(
+            prompts=entry.prompts if with_prompts else None,
             id=entry.id,
             kind=entry.kind,
             account_id=entry.account_id,
@@ -100,4 +103,5 @@ async def list_logs(
     if KIND_PERMISSIONS[kind] not in account.permission_names:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"Missing permission: {KIND_PERMISSIONS[kind]}")
     account_id = None if actor == "server" else int(actor)
-    return [LogEntryOut.of(e) for e in await log_service.list_entries(session, kind, account_id)]
+    with_prompts = LOGS_CHAT_PROMPTS_VIEW in account.permission_names
+    return [LogEntryOut.of(e, with_prompts=with_prompts) for e in await log_service.list_entries(session, kind, account_id)]

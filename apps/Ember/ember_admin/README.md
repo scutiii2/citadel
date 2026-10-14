@@ -32,7 +32,7 @@ scoped by port, so the same ember_api session cookie is sent.
 | Extensions (`/extensions`) | `extensions.manage` |
 | Agents (`/agents`) | `agents.manage` |
 | Tickets (`/tickets`) | `tickets.manage` |
-| Analytics (`/analytics`) | any of `logs.view`, `logs.errors.view`, `logs.chat.view`, `traffic.view` |
+| Analytics (`/analytics`) | any of `logs.view`, `logs.errors.view`, `logs.chat.view`, `traffic.view`. Entries → Chat turns lists each agent used; with `logs.chat.prompts.view` an Advanced view adds each agent's run and the prompt it received (never the system prompt). |
 | Workspace overview (`/admin`) | any account, role, invitation, or workspace settings permission |
 | Accounts (`/admin/accounts`) | any of `accounts.view`, `accounts.manage`, `accounts.delete`, `roles.assign` |
 | Roles & permissions (`/admin/roles`) | any of `roles.view`, `roles.manage`, `roles.assign` |

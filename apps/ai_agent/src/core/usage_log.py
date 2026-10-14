@@ -65,6 +65,21 @@ def own_row(
     return row
 
 
+def prompt_messages(history: list[Any], question: str) -> list[dict[str, str]]:
+    """The messages an ask() received (its history, then the question) as plain
+    {role, content} text, for the chat-turn log. The system prompt is left out
+    on purpose: it is agent configuration, not something a user sent."""
+    messages = [*history, {"role": "user", "content": question}]
+    return [
+        {
+            "role": str(message.get("role") or ""),
+            "content": content if isinstance(content := message.get("content"), str) else json.dumps(content, default=str),
+        }
+        for message in messages
+        if isinstance(message, dict)
+    ]
+
+
 def _write(row: dict[str, Any], directory: Path) -> None:
     path = directory / f"{row['finished_at'][:10]}.{row['agent_id']}.jsonl"
     with _lock:

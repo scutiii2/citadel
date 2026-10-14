@@ -246,6 +246,7 @@ row the `ask` result carries, plus `request_id` and `depth`:
 - `provider_id`, `gateway` (`null` when the provider is used directly), `model`
 - `input_tokens`, `output_tokens`, `total_tokens`
 - `started_at`, `finished_at` (UTC ISO-8601 with milliseconds)
+- `prompt` is added to the row the `ask` result returns, not to the file: the history and question this agent received as `{role, content}` messages (`core/usage_log.prompt_messages`). A delegate's row therefore carries the question its orchestrator sent. The system prompt is never included. ember_api stores it for the Advanced chat-turn view.
 - `delegated_by` (`null` for the top-level agent)
 - `request_id`, `depth`
 

@@ -244,7 +244,7 @@ async def ask(
         "total_tokens": result.total_tokens,
         # Own usage first, then every delegated agent's, so callers can
         # break tokens down per agent (who, which provider/gateway, when).
-        "agent_usage": [own_usage, *result.delegated_usage],
+        "agent_usage": [{**own_usage, "prompt": usage_log.prompt_messages(history or [], question)}, *result.delegated_usage],
         "input_tokens": result.input_tokens,
         "output_tokens": result.output_tokens,
         "context_tokens": result.context_tokens,
