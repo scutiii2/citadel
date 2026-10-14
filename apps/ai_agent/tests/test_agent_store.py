@@ -87,6 +87,30 @@ def test_delete_removes_file_and_override_but_not_the_entry_agent(folder):
     assert missing.value.status == 404
 
 
+def test_reset_drops_the_override_and_restores_the_tracked_file(folder):
+    agent_store.update_agent("ember", _cfg(9100, entry=True, persona="local"), folder)
+    listed = {row["id"]: row for row in agent_store.list_agents(folder)}
+    assert listed["ember"]["overridden"] is True
+    reset = agent_store.reset_agent("ember", folder)
+    assert reset["overridden"] is False
+    assert "persona" not in reset
+    assert "persona" not in agent_store.get_agent("ember", folder)
+    assert agent_store.list_agents(folder)[0]["overridden"] is False
+    assert (folder / "ember.json").is_file()
+
+
+def test_reset_refuses_without_an_override_or_a_tracked_default(folder):
+    with pytest.raises(AgentStoreError, match="already uses its default") as plain:
+        agent_store.reset_agent("ember", folder)
+    assert plain.value.status == 409
+    agent_store.create_agent("calc", _cfg(9103), folder)
+    assert agent_store.list_agents(folder)[0]["overridden"] is False
+    with pytest.raises(AgentStoreError, match="no default file"):
+        agent_store.reset_agent("calc", folder)
+    with pytest.raises(AgentStoreError, match="already uses its default"):
+        agent_store.reset_agent("ghost", folder)
+
+
 def test_gateway_catalog_lists_providers_and_local_laya():
     catalog = agent_store.gateway_catalog()
     assert {"anthropic", "openai", "laya"} <= set(catalog)

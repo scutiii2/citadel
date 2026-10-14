@@ -9,7 +9,7 @@ import type { AgentFile, AgentStatus, AgentTier } from "../../api/AgentsAdminCli
  * Disabled and the others show no state. The status is an icon and a word,
  * never colour alone. */
 const props = defineProps<{ agent: AgentFile; status?: AgentStatus; tiers?: AgentTier[] }>();
-defineEmits<{ edit: []; remove: [] }>();
+defineEmits<{ edit: []; remove: []; reset: [] }>();
 
 const STATUS_TEXT: Record<AgentStatus, string> = { running: "Running", offline: "Offline", disabled: "Disabled" };
 const STATUS_ICON: Record<AgentStatus, string> = { running: "●", offline: "○", disabled: "–" };
@@ -57,6 +57,14 @@ const rows = computed(() =>
     </template>
     <div class="buttons">
       <button type="button" class="chip" data-test="edit" :disabled="Boolean(agent.error)" @click="$emit('edit')">Edit</button>
+      <button
+        v-if="agent.overridden"
+        type="button"
+        class="chip"
+        data-test="reset"
+        title="Discard this machine's edits and use the tracked default file"
+        @click="$emit('reset')"
+      >Reset to defaults</button>
       <button
         type="button"
         class="remove"

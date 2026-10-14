@@ -93,6 +93,19 @@ async def update_agent(
     return updated
 
 
+@router.post("/{agent_id}/reset")
+async def reset_agent(
+    agent_id: str = Path(pattern=AGENT_ID_PATTERN),
+    account: Account = Depends(require_agents_manage),
+    admin: AgentAdmin = Depends(get_agent_admin),
+    logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    """Drop this machine's edits to an agent so its tracked default file applies again."""
+    reset = await _call(admin.reset(account, agent_id))
+    await logs.action(account, "agents.reset", f"Reset agent '{agent_id}' to its defaults")
+    return reset
+
+
 @router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_agent(
     agent_id: str = Path(pattern=AGENT_ID_PATTERN),

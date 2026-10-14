@@ -28,6 +28,10 @@ def ai_agent(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"id": "calc", **json.loads(request.content)})
     if path == "/agents/files/ember" and method == "DELETE":
         return httpx.Response(409, json={"error": "'ember' is the entry agent"})
+    if path == "/agents/files/calc/reset" and method == "POST":
+        return httpx.Response(200, json={"id": "calc", **CONFIG, "overridden": False})
+    if path == "/agents/files/ember/reset" and method == "POST":
+        return httpx.Response(409, json={"error": "agent 'ember' already uses its default"})
     if path == "/agents/files/calc" and method == "DELETE":
         return httpx.Response(200, json={"deleted": "calc"})
     if path == "/agents/prompts" and method == "GET":
@@ -58,6 +62,9 @@ def test_admin_lists_creates_updates_and_deletes(client, upstream: FakeUpstream)
 
     assert client.put("/api/admin/agents/calc", json={"config": CONFIG}).json()["id"] == "calc"
     assert json.loads(upstream.requests[-1].content) == CONFIG
+    reset = client.post("/api/admin/agents/calc/reset", json={})
+    assert (reset.status_code, reset.json()["overridden"]) == (200, False)
+    assert str(upstream.requests[-1].url) == "http://agent-a.internal/agents/files/calc/reset"
     assert client.delete("/api/admin/agents/calc").status_code == 204
 
 
@@ -68,6 +75,7 @@ def test_ai_agent_refusals_pass_through(client, upstream: FakeUpstream) -> None:
     clash = client.post("/api/admin/agents", json={"id": "ember", "config": CONFIG})
     assert (clash.status_code, clash.json()["detail"]) == (409, "agent 'ember' already exists")
     assert client.delete("/api/admin/agents/ember").status_code == 409
+    assert client.post("/api/admin/agents/ember/reset", json={}).status_code == 409
     assert client.put("/api/admin/agents/ghost", json={"config": CONFIG}).status_code == 404
 
 

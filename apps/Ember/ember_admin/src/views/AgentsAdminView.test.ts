@@ -148,6 +148,22 @@ describe("AgentsAdminView", () => {
     expect(wrapper.find("[data-id=calc]").exists()).toBe(false);
   });
 
+  it("offers Reset to defaults only for an overridden agent, and resets after confirming", async () => {
+    vi.spyOn(agentsAdminClient, "list").mockResolvedValue([EMBER, { ...CALC, overridden: true }]);
+    const reset = vi.spyOn(agentsAdminClient, "reset").mockResolvedValue(CALC);
+    const wrapper = await mounted();
+
+    expect(wrapper.find("[data-id=ember] [data-test=reset]").exists()).toBe(false);
+    await wrapper.find("[data-id=calc] [data-test=reset]").trigger("click");
+    const confirm = wrapper.findAllComponents({ name: "ConfirmModal" }).find((c) => c.props("title") === "Reset agent")!;
+    expect(reset).not.toHaveBeenCalled();
+    await confirm.vm.$emit("confirm");
+    await flushPromises();
+
+    expect(reset).toHaveBeenCalledWith("calc");
+    expect(wrapper.find("[data-test=notice]").text()).toContain("Reset calc");
+  });
+
   it("previews which tiers an agent may use and saves the range", async () => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
     const wrapper = await mounted();

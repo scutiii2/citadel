@@ -367,6 +367,15 @@ async def agent_files_delete(request: Request) -> JSONResponse:
     return JSONResponse({"deleted": request.path_params["agent_id"]})
 
 
+@mcp.custom_route("/agents/files/{agent_id}/reset", methods=["POST"])
+async def agent_files_reset(request: Request) -> JSONResponse:
+    """Drop this machine's override of an agent; its tracked file applies again."""
+    try:
+        return JSONResponse(await asyncio.to_thread(agent_store.reset_agent, request.path_params["agent_id"]))
+    except agent_store.AgentStoreError as error:
+        return _store_error(error)
+
+
 @mcp.custom_route("/agents/prompts", methods=["GET"])
 async def agent_prompts_get(_request: Request) -> JSONResponse:
     """The shared prompt texts every agent's system prompt is built from."""

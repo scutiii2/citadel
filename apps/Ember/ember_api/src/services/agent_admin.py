@@ -100,6 +100,9 @@ class AgentAdmin:
     async def update(self, account: Account, agent_id: str, config: dict[str, Any]) -> dict[str, Any]:
         return await self._request("PUT", f"/agents/files/{quote(agent_id, safe='')}", account, json=config)
 
+    async def reset(self, account: Account, agent_id: str) -> dict[str, Any]:
+        return await self._request("POST", f"/agents/files/{quote(agent_id, safe='')}/reset", account)
+
     async def delete(self, account: Account, agent_id: str) -> None:
         await self._request("DELETE", f"/agents/files/{quote(agent_id, safe='')}", account)
 

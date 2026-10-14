@@ -70,11 +70,17 @@ def gateway_catalog() -> dict[str, list[dict[str, Any]]]:
 
 
 def list_agents(directory: Path = agent_spec.AGENTS_DIR) -> list[dict[str, Any]]:
-    """Every agent file as its JSON plus `id`; an unreadable one carries `error`."""
+    """Every agent as its JSON plus `id`; an unreadable one carries `error`.
+    `overridden` is true when this machine's override replaces a tracked default
+    (so it can be reset)."""
     rows = []
+    overrides = _read_overrides(directory)
     for agent_id in _ids(directory):
         try:
-            rows.append({"id": agent_id, **_effective(agent_id, directory)})
+            rows.append({
+                "id": agent_id, **_effective(agent_id, directory),
+                "overridden": agent_id in overrides and _path_of(agent_id, directory).is_file(),
+            })
         except AgentStoreError as error:
             rows.append({"id": agent_id, "error": str(error)})
     return rows
@@ -113,6 +119,25 @@ def delete_agent(agent_id: str, directory: Path = agent_spec.AGENTS_DIR) -> None
         overrides = _read_overrides(directory)
         if overrides.pop(agent_id, None) is not None:
             _write_json(agent_spec.overrides_path_for(directory), overrides)
+
+
+def reset_agent(agent_id: str, directory: Path = agent_spec.AGENTS_DIR) -> dict[str, Any]:
+    """Drop the agent's override so its tracked file applies again. Refused
+    when there is no override, or no tracked file to fall back to (removing
+    the override would delete the agent: use delete_agent). The tracked file
+    must itself leave the whole set valid."""
+    with _LOCK:
+        path = _path_of(agent_id, directory)
+        overrides = _read_overrides(directory)
+        if agent_id not in overrides:
+            raise AgentStoreError(f"agent {agent_id!r} already uses its default", 409)
+        if not path.is_file():
+            raise AgentStoreError(f"agent {agent_id!r} has no default file to reset to", 409)
+        defaults = _read_json(path)
+        _validate_change(agent_id, defaults, directory)
+        del overrides[agent_id]
+        _write_json(agent_spec.overrides_path_for(directory), overrides)
+    return {"id": agent_id, **defaults, "overridden": False}
 
 
 def _read_overrides(directory: Path) -> dict[str, dict[str, Any]]:

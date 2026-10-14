@@ -143,7 +143,7 @@ function buildConfig(): AgentConfig | null {
     localError.value = "The weakest tier cannot be stronger than the strongest tier.";
     return null;
   }
-  const { id: _id, error: _error, ...kept } = props.initial ?? { id: "" };
+  const { id: _id, error: _error, overridden: _overridden, ...kept } = props.initial ?? { id: "" };
   const llm: AgentConfig["llm"] = { ...(kept.llm ?? {}), provider: provider.value };
   const setOrDrop = (key: string, value: string): void => {
     if (value) llm[key] = value;

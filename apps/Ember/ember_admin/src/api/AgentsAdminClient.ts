@@ -43,8 +43,9 @@ export interface AgentConfig {
   [key: string]: unknown;
 }
 
-/** A listed agent: its file plus the id; a file ai_agent could not read has only `error`. */
-export type AgentFile = Partial<AgentConfig> & { id: string; error?: string };
+/** A listed agent: its file plus the id; a file ai_agent could not read has only `error`.
+ * `overridden`: this machine's edits replace the tracked default file, which can be reset to. */
+export type AgentFile = Partial<AgentConfig> & { id: string; error?: string; overridden?: boolean };
 
 export type AgentStatus = "running" | "offline" | "disabled";
 
@@ -74,6 +75,8 @@ export const agentsAdminClient = {
   list: async () => (await apiRequest<{ agents: AgentFile[] }>("GET", "/api/admin/agents")).agents,
   create: (id: string, config: AgentConfig) => apiRequest<AgentFile>("POST", "/api/admin/agents", { id, config }),
   update: (id: string, config: AgentConfig) => apiRequest<AgentFile>("PUT", `/api/admin/agents/${encodeURIComponent(id)}`, { config }),
+  /** Drops this machine's edits so the tracked default file applies again. */
+  reset: (id: string) => apiRequest<AgentFile>("POST", `/api/admin/agents/${encodeURIComponent(id)}/reset`),
   remove: (id: string) => apiRequest<void>("DELETE", `/api/admin/agents/${encodeURIComponent(id)}`),
   prompts: () => apiRequest<SharedPrompts>("GET", "/api/admin/agent-prompts"),
   /** `null` (or blank) resets a text to its default. ai_agent restarts every agent to apply it. */

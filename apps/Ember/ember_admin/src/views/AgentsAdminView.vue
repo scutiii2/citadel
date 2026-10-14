@@ -38,6 +38,10 @@ const removing = ref<AgentFile | null>(null);
 const removeBusy = ref(false);
 const removeError = ref("");
 
+const resetting = ref<AgentFile | null>(null);
+const resetBusy = ref(false);
+const resetError = ref("");
+
 let settleTimer: ReturnType<typeof setTimeout> | undefined;
 
 const suggestedPort = computed(() => Math.max(9100, ...agents.value.map((a) => a.port ?? 0)) + 1);
@@ -139,6 +143,23 @@ async function confirmRemove(): Promise<void> {
   }
 }
 
+async function confirmReset(): Promise<void> {
+  const target = resetting.value;
+  if (!target) return;
+  resetBusy.value = true;
+  resetError.value = "";
+  try {
+    await agentsAdminClient.reset(target.id);
+    agents.value = await agentsAdminClient.list();
+    resetting.value = null;
+    settleSoon(`Reset ${target.id} to its defaults. It restarts in a few seconds.`);
+  } catch (err) {
+    resetError.value = errorMessage(err);
+  } finally {
+    resetBusy.value = false;
+  }
+}
+
 onMounted(load);
 onBeforeUnmount(() => clearTimeout(settleTimer));
 </script>
@@ -169,6 +190,7 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
           :tiers="live[a.id]?.tiers"
           @edit="openEdit(a)"
           @remove="removing = a; removeError = ''"
+          @reset="resetting = a; resetError = ''"
         />
       </div>
     </div>
@@ -188,6 +210,15 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
       @close="formOpen = false"
     />
     <SharedPromptsModal :open="promptsOpen" @close="promptsOpen = false" @saved="settleSoon('Shared prompts saved. Every agent restarts in a few seconds.')" />
+    <ConfirmModal
+      :open="resetting !== null"
+      title="Reset agent"
+      :message="resetError || `Reset ${resetting?.label || resetting?.id || ''} to its defaults? Every change made here (model, tier limits, enabled, persona...) is discarded and the tracked file in agents/ applies again.`"
+      confirm-label="Reset to defaults"
+      :busy="resetBusy"
+      @confirm="confirmReset"
+      @close="resetting = null"
+    />
     <ConfirmModal
       :open="removing !== null"
       title="Remove agent"
