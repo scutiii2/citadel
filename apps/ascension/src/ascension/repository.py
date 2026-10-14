@@ -29,7 +29,7 @@ from src.ascension.records import (
     AscendedRecord,
 )
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 BASE_SCHEMA = """
 CREATE TABLE players (
     owner TEXT PRIMARY KEY, insignia INTEGER NOT NULL CHECK (insignia >= 0),
@@ -98,7 +98,8 @@ CREATE TABLE squad (
     owner TEXT NOT NULL, ascended_id TEXT NOT NULL, position INTEGER NOT NULL CHECK (position >= 1),
     PRIMARY KEY (owner, ascended_id), UNIQUE (owner, position));
 """
-SCHEMA = BASE_SCHEMA + SHOP_SCHEMA + STAR_MIGRATION + TREE_SCHEMA + SQUAD_SCHEMA
+DEFAULT_PRESET_SCHEMA = "ALTER TABLE ascendeds ADD COLUMN default_preset_slot INTEGER NOT NULL DEFAULT 1 CHECK (default_preset_slot BETWEEN 1 AND 5);"
+SCHEMA = BASE_SCHEMA + SHOP_SCHEMA + STAR_MIGRATION + TREE_SCHEMA + SQUAD_SCHEMA + DEFAULT_PRESET_SCHEMA
 
 
 class AscendedTransaction(Protocol):
@@ -227,7 +228,7 @@ class _SqliteTransaction:
     @staticmethod
     def _ascended(row: sqlite3.Row) -> AscendedRecord:
         return AscendedRecord(row["owner"], row["ascended_id"], row["copies"], row["level"], row["xp"], row["faint_until"],
-                              row["tier_id"], row["stars"])
+                              row["tier_id"], row["stars"], row["default_preset_slot"])
 
     async def get_ascended(self, owner: str, ascended_id: str) -> AscendedRecord | None:
         row = await self._run("SELECT * FROM ascendeds WHERE owner = ? AND ascended_id = ?", (owner, ascended_id), "one")
@@ -239,12 +240,12 @@ class _SqliteTransaction:
 
     async def put_ascended(self, record: AscendedRecord) -> None:
         await self._run(
-            "INSERT INTO ascendeds (owner, ascended_id, copies, level, xp, faint_until, tier_id, stars) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+            "INSERT INTO ascendeds (owner, ascended_id, copies, level, xp, faint_until, tier_id, stars, default_preset_slot) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT (owner, ascended_id) DO UPDATE SET copies = excluded.copies, level = excluded.level, "
-            "xp = excluded.xp, faint_until = excluded.faint_until, tier_id = excluded.tier_id, stars = excluded.stars",
+            "xp = excluded.xp, faint_until = excluded.faint_until, tier_id = excluded.tier_id, stars = excluded.stars, default_preset_slot = excluded.default_preset_slot",
             (record.owner, record.ascended_id, record.copies, record.level, record.xp, record.faint_until,
-             record.tier_id, record.stars),
+             record.tier_id, record.stars, record.default_preset_slot),
         )
 
     async def get_squad(self, owner: str) -> tuple[str, ...]:
@@ -493,8 +494,11 @@ class SqliteAscendedRepository:
                              "SELECT owner, ascended_id, ROW_NUMBER() OVER "
                              "(PARTITION BY owner ORDER BY level DESC, ascended_id ASC) AS position FROM ascendeds) "
                              "WHERE position <= ?", (self._squad_size,))
+                conn.execute(DEFAULT_PRESET_SCHEMA)
                 conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
                 conn.execute("COMMIT")
+            elif version == 6:
+                conn.executescript(f"BEGIN; {DEFAULT_PRESET_SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
             elif version != SCHEMA_VERSION:
                 raise RuntimeError(f"database schema version {version} is not supported (expected {SCHEMA_VERSION})")
         except BaseException:

@@ -425,4 +425,31 @@ def test_a_version_4_database_gets_the_tree_tables(db_path):
     check = sqlite3.connect(str(db_path))
     version = check.execute("PRAGMA user_version").fetchone()[0]
     check.close()
-    assert (kept.tier_id, kept.copies) == ("rare", 2) and learned == {"g_wall"} and version == SCHEMA_VERSION == 6
+    assert (kept.tier_id, kept.copies) == ("rare", 2) and learned == {"g_wall"} and version == SCHEMA_VERSION
+
+
+def test_version_6_adds_default_preset_without_changing_collection_or_squad(db_path):
+    from src.ascension.repository import BASE_SCHEMA, SHOP_SCHEMA, STAR_MIGRATION, TREE_SCHEMA, SQUAD_SCHEMA
+    db_path.parent.mkdir(parents=True)
+    conn = sqlite3.connect(str(db_path))
+    conn.executescript(BASE_SCHEMA + SHOP_SCHEMA + STAR_MIGRATION + TREE_SCHEMA + SQUAD_SCHEMA)
+    conn.execute("INSERT INTO ascendeds (owner, ascended_id, copies, level, xp, tier_id, stars) VALUES ('ann', 'guardian', 2, 5, 7, 'rare', 1)")
+    conn.execute("INSERT INTO squad VALUES ('ann', 'guardian', 1)")
+    conn.execute("PRAGMA user_version = 6")
+    conn.commit()
+    conn.close()
+
+    async def scenario():
+        repo = SqliteAscendedRepository(db_path)
+        async with repo.transaction() as tx:
+            kept = await tx.get_ascended("ann", "guardian")
+            assert (kept.copies, kept.level, kept.xp, kept.tier_id, kept.stars, kept.default_preset_slot) == (2, 5, 7, "rare", 1, 1)
+            assert await tx.get_squad("ann") == ("guardian",)
+            await tx.put_ascended(replace(kept, default_preset_slot=4))
+        await repo.close()
+        repo = SqliteAscendedRepository(db_path)
+        async with repo.transaction() as tx:
+            assert (await tx.get_ascended("ann", "guardian")).default_preset_slot == 4
+        await repo.close()
+
+    run(scenario())

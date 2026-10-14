@@ -14,7 +14,8 @@ import placeholderIcon from "../assets/abilities/ability_placeholder.webp";
 import type { IconName } from "./ui/icons";
 
 /** One Ascended's ability tree: nodes at their own places, learn a node, equip it in a slot. */
-const props = defineProps<{ ascended: OwnedAscended }>();
+const props = defineProps<{ ascended: OwnedAscended; initialSelectedId?: string | null; selectionRequest?: number }>();
+const emit = defineEmits<{ loaded: [tree: TreeView] }>();
 const store = useAscensionStore();
 const client = useAscensionClient();
 
@@ -45,8 +46,9 @@ let moved = false;
 /** A failed load, else the failure of the last learn or equip (the store keeps it). */
 const shownError = computed(() => error.value || store.error);
 
-const slotList = computed(() => tree.value?.slots ?? []);
-const equipSlots = computed(() => slotList.value.filter((slot) => slot.kind === selected.value?.kind
+const slotList = computed(() => (["p1", "p2", "a1", "a2", "a3", "a4"] as LoadoutSlot[]).map(id =>
+  tree.value?.slots.find(slot => slot.id === id) ?? { id, kind: id.startsWith("p") ? "passive" as const : "ability" as const, branches: null }));
+const equipSlots = computed(() => (tree.value?.slots ?? []).filter((slot) => slot.kind === selected.value?.kind
   && (slot.branches === null || (selected.value?.branch != null && slot.branches.includes(selected.value.branch)))));
 
 const selected = computed(() => tree.value?.nodes.find((n) => n.id === selectedId.value) ?? null);
@@ -224,6 +226,8 @@ async function load(): Promise<void> {
     const result = await client.tree(id);
     if (token !== request) return;
     tree.value = result;
+    emit("loaded", result);
+    if (!selectedId.value && props.initialSelectedId && result.nodes.some(n => n.id === props.initialSelectedId)) selectedId.value = props.initialSelectedId;
     if (!selected.value) selectedId.value = result.nodes.find(n => n.state === 'learnable')?.id ?? result.nodes[0]?.id ?? null;
     await nextTick();
     if (token !== request) return;
@@ -242,7 +246,9 @@ watch(() => [props.ascended.ascended_id, props.ascended.level, props.ascended.ti
   void load();
 }, { immediate: true });
 
+watch(() => [props.initialSelectedId, props.selectionRequest] as const, ([id]) => { if (id && byId.value.has(id)) selectedId.value = id; });
 const slotLabel = (slot: LoadoutSlot): string => {
+  if (!tree.value?.slots.some(s => s.id === slot)) return "Not available on this Ascended";
   const id = tree.value?.loadout[slot];
   return id ? (byId.value.get(id)?.name ?? id) : "empty";
 };
@@ -293,7 +299,7 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
       <div class="tree-heading"><div><h3>Ability tree</h3><p class="muted em-num">{{ learned }} / {{ tree.nodes.length }} learned · {{ layout.branches.length }} paths from the Ascended</p></div></div>
       <p class="path-labels muted">Paths: {{ layout.branches.map(b => b.label).join(' · ') }}</p>
       <h4 class="loadout-heading em-pixel">Equipped abilities</h4><div class="slots" aria-label="Equipped">
-        <button v-for="slot in slotList" :key="slot.id" type="button" class="slot" :disabled="!tree.loadout[slot.id]" @click="selectedId = tree.loadout[slot.id] ?? null"><small class="slot-number">{{ slot.id.toUpperCase() }}</small><EmIcon :name="byId.get(tree.loadout[slot.id] ?? '') ? nodeIcon(byId.get(tree.loadout[slot.id] ?? '')!) : 'ascended'" :size="28" /><span>{{ slotLabel(slot.id) }}</span><small v-if="slot.branches" class="branch-hint">{{ slot.branches.join(" / ") }}</small></button>
+        <button v-for="slot in slotList" :key="slot.id" type="button" class="slot" :data-kind="slot.kind" :title="slotLabel(slot.id)" :disabled="!tree.loadout[slot.id]" @click="selectedId = tree.loadout[slot.id] ?? null"><svg class="slot-shape" viewBox="0 0 100 100" aria-hidden="true"><circle v-if="slot.kind === 'passive'" cx="50" cy="50" r="46" /><polygon v-else points="30,4 70,4 96,30 96,70 70,96 30,96 4,70 4,30" /></svg><small class="slot-number">{{ slot.id.toUpperCase() }}</small><EmIcon :name="byId.get(tree.loadout[slot.id] ?? '') ? nodeIcon(byId.get(tree.loadout[slot.id] ?? '')!) : 'ascended'" :size="28" /><span>{{ slotLabel(slot.id) }}</span><small v-if="slot.branches" class="branch-hint">{{ slot.branches.join(" / ") }}</small></button>
       </div>
       <div class="tree-layout">
       <div class="graph-area">
@@ -335,7 +341,7 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
           </button>
         </div>
       </div>
-      <div class="legend"><span><svg viewBox="0 0 20 20"><polygon points="6,1 14,1 19,6 19,14 14,19 6,19 1,14 1,6"/></svg>Active ability</span><span><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="9"/></svg>Passive</span><span>Yellow · available / learned</span><span>Gray · locked</span><span>Glow · equipped</span><span>Badge · required level</span></div>
+      <div class="legend"><span><svg viewBox="0 0 20 20"><polygon points="6,1 14,1 19,6 19,14 14,19 6,19 1,14 1,6"/></svg>Active ability</span><span><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="9"/></svg>Passive</span><span>Cyan · learned</span><span>Gold · available</span><span>Gray · locked</span><span>Glow · equipped</span><span>Badge · required level</span></div>
       <p class="graph-help muted">Hold and drag to move · Scroll to zoom · Tab to select nodes</p>
       <p v-if="layout.sharedIds.size" class="graph-help muted">Select a shared ability to reveal its connections across paths.</p>
       </div>
@@ -438,3 +444,4 @@ button.slot{display:grid;grid-template-columns:30px 32px minmax(0,1fr);gap:8px;a
 @media(max-width:650px){.scroll{height:350px;min-height:350px;}.tree-heading{gap:8px;}.tree-heading p{font-size:11px;}.path-labels{font-size:10px;}.tree-controls{gap:5px;}}
 
 </style>
+<style scoped src="./treeTab.css" />

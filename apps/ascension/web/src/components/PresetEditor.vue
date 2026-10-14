@@ -15,14 +15,22 @@ import EmToast from "./ui/EmToast.vue";
 
 /** An Ascended's five presets: up to three personality instances each. An autonomous Ascended
  * lets one of them lead each round. */
-const props = defineProps<{ ascendedId: string; ascendedName: string; personalities: PersonalityItem[] }>();
+const props = defineProps<{ ascendedId: string; ascendedName: string; personalities: PersonalityItem[]; defaultSlot?: number }>();
+const emit = defineEmits<{ saved: [] }>();
 const store = useAscensionStore();
 const ascensionClient = useAscensionClient();
 
 const MAX_EQUIPPED = 3;
-const SLOT_OPTIONS = [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }));
+const SLOT_OPTIONS = computed(() => [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n), disabled: loading.value || store.busy || (dirty.value && String(n) !== slot.value) })));
 
-const slot = ref("1");
+const slot = ref(String(props.defaultSlot ?? 1));
+const query = ref("");
+const category = ref("all");
+const resolved = ref<PersonalityItem[]>([]);
+const knownPersonalities = computed(() => [...props.personalities, ...resolved.value.filter(p => !props.personalities.some(item => item.id === p.id))]);
+const chosenItems = computed(() => chosen.value.map(id => ({ id, item: knownPersonalities.value.find(p => p.id === id) })));
+const categories = computed(() => [...new Set(props.personalities.flatMap(p => personalityInfo(p.type)?.categories ?? []))]);
+const filtered = computed(() => props.personalities.filter(p => titleCase(p.type).toLowerCase().includes(query.value.trim().toLowerCase()) && (category.value === 'all' || personalityInfo(p.type)?.categories.includes(category.value))));
 const chosen = ref<string[]>([]);
 const saved = ref<string[]>([]);
 const loading = ref(false);
@@ -33,71 +41,82 @@ const dirty = computed(() => chosen.value.join(",") !== saved.value.join(","));
 const full = computed(() => chosen.value.length >= MAX_EQUIPPED);
 const personalityInfo = (type: string) => store.catalog?.personalities.find(p => p.id === type);
 const offMood = computed(() => store.catalog?.personality_off_mood_factor);
+let loadRequest = 0;
 
 async function load(): Promise<void> {
+  const request = ++loadRequest;
   const ascendedId = props.ascendedId;
   const wanted = slot.value;
   loading.value = true;
   loadError.value = "";
   try {
     const preset = await ascensionClient.preset(ascendedId, Number(wanted));
-    if (ascendedId !== props.ascendedId || wanted !== slot.value) return;
+    if (request !== loadRequest || ascendedId !== props.ascendedId || wanted !== slot.value) return;
+    resolved.value = preset.personalities ?? [];
     saved.value = preset.instance_ids;
     chosen.value = [...preset.instance_ids];
   } catch (err) {
-    loadError.value = errorMessage(err);
+    if (request === loadRequest) loadError.value = errorMessage(err);
   } finally {
-    loading.value = false;
+    if (request === loadRequest) loading.value = false;
   }
 }
 
 watch([() => props.ascendedId, slot], () => void load(), { immediate: true });
+watch(() => props.defaultSlot, value => { if (!dirty.value && value !== undefined) slot.value = String(value); });
 
 function toggle(id: string, on: boolean): void {
+  if (loading.value || store.busy || loadError.value) return;
   if (on && !chosen.value.includes(id) && chosen.value.length < MAX_EQUIPPED) chosen.value = [...chosen.value, id];
   else if (!on) chosen.value = chosen.value.filter((c) => c !== id);
 }
 
 async function save(): Promise<void> {
+  if (loading.value || store.busy || loadError.value) return;
+  const ascendedId = props.ascendedId;
   const slotNumber = Number(slot.value);
-  const preset = await store.savePreset(props.ascendedId, slotNumber, chosen.value);
-  if (preset) {
+  const preset = await store.savePreset(ascendedId, slotNumber, chosen.value);
+  if (preset && ascendedId === props.ascendedId && slotNumber === Number(slot.value)) {
     saved.value = preset.instance_ids;
     chosen.value = [...preset.instance_ids];
     toastMessage.value = `Preset ${slotNumber} saved. ${props.ascendedName} is ready.`;
     toastOpen.value = true;
+    emit("saved");
   }
 }
 </script>
 
 <template>
-  <section class="preset-editor">
-    <div class="personality-library"><h4 class="heading em-pixel">Revealed personalities</h4>
+  <section class="preset-editor"><nav class="preset-rail" aria-label="Personality presets"><h4>Presets</h4><EmTabs v-model="slot" class="slots" :options="SLOT_OPTIONS" ariaLabel="Preset slot" /><p class="rail-default">★ Preset {{ defaultSlot ?? 1 }} is the battle default</p><p class="hint">Change your battle default in Overview.</p></nav>
+    <div class="personality-library"><h4 class="heading em-pixel">Personality library</h4><label class="library-search"><span class="sr-only">Search personalities</span><input v-model="query" type="search" placeholder="Search personalities…" aria-label="Search personalities" /></label><div class="library-filters"><button type="button" :aria-pressed="category === 'all'" @click="category = 'all'">All</button><button v-for="item in categories" :key="item" type="button" :aria-pressed="category === item" @click="category = item">{{ personalityCategory(item) }}</button></div>
     <EmNotice v-if="loadError" tone="error">{{ loadError }}</EmNotice>
     <p v-else-if="personalities.length === 0" class="muted">This Ascended has no personalities yet.</p>
     <ul v-else class="choices personalities" :class="{ busy: loading }" :aria-busy="loading">
-      <li v-for="p in personalities" :key="p.id" :class="{ selected: chosen.includes(p.id) }">
+      <li v-for="p in filtered" :key="p.id" :class="{ selected: chosen.includes(p.id) }">
         <span class="personality-art"><EmIcon :name="p.type.includes('AGGRESS') ? 'battle' : p.type.includes('DEFEN') ? 'shield' : p.type.includes('CALM') ? 'feather' : 'ascended'" :size="38" /></span>
         <div class="personality-name"><strong>{{ titleCase(p.type) }}</strong><EmTierBadge tier-id="common" :label="`Tier ${p.tier}`" class="badge" /><div class="category-tags"><span v-for="category in personalityInfo(p.type)?.categories" :key="category">{{ personalityCategory(category) }}</span><span v-if="personalityInfo(p.type)?.rules?.length">Conditional</span></div></div>
         <p class="personality-description">{{ personalityDescription(personalityInfo(p.type), p.tier) }}</p>
-        <EmSwitch :model-value="chosen.includes(p.id)" :label="chosen.includes(p.id) ? 'Selected' : 'Not selected'" :disabled="loading || (!chosen.includes(p.id) && full)" :aria-label="titleCase(p.type)" @update:model-value="toggle(p.id, $event)" />
+        <EmSwitch :model-value="chosen.includes(p.id)" :label="chosen.includes(p.id) ? 'Selected' : 'Not selected'" :disabled="loading || store.busy || !!loadError || (!chosen.includes(p.id) && full)" :aria-label="titleCase(p.type)" @update:model-value="toggle(p.id, $event)" />
       </li>
     </ul>
 
     </div>
     <aside class="preset-inspector" aria-label="Personality preset">
-      <h4 class="heading em-pixel">Personality preset</h4>
-          <EmTabs v-model="slot" class="slots" :options="SLOT_OPTIONS" ariaLabel="Preset slot" />
+      <h4 class="heading em-pixel">Preset {{ slot }}</h4>
+      <span v-if="Number(slot) === (defaultSlot ?? 1)" class="default-label">★ Battle default</span>
     <p class="count em-num">Preset {{ slot }} · {{ chosen.length }} of {{ MAX_EQUIPPED }} personalities equipped</p>
     <p class="hint">One equipped personality leads each autonomous round. Others contribute {{ offMood === undefined ? "at reduced strength" : `at ${Math.round(offMood * 100)}% strength` }}. These change preferences, not guaranteed actions. Conditional numbers below show this tier's effect when leading.</p>
 
 
       <h5>Selected personalities</h5>
-      <ul class="selected-personalities"><li v-for="id in chosen" :key="id"><EmIcon name="ascended" /><div><strong>{{ titleCase(personalities.find(p => p.id === id)?.type ?? 'Collected personality') }}</strong><small>{{ personalities.find(p => p.id === id) ? 'Tier ' + personalities.find(p => p.id === id)!.tier : 'Load more to reveal this instance' }}</small></div><button type="button" :disabled="loading" :aria-label="'Remove personality ' + id" @click="toggle(id, false)">×</button></li></ul>
+      <ul class="selected-personalities">
+        <li v-for="{ id, item } in chosenItems" :key="id"><EmIcon name="ascended" /><div><strong>{{ titleCase(item?.type ?? 'Collected personality') }}</strong><small>{{ item ? 'Tier ' + item.tier : 'Load more to reveal this instance' }}</small><p v-if="item" class="equipped-effect">{{ personalityDescription(personalityInfo(item.type), item.tier) }}</p></div><button type="button" :disabled="loading || store.busy || !!loadError" :aria-label="'Remove personality ' + id" @click="toggle(id, false)">×</button></li>
+        <li v-for="index in Math.max(0, MAX_EQUIPPED - chosen.length)" :key="'empty-' + index" class="empty-personality"><EmIcon name="ascended" /><small>Empty personality slot</small></li>
+      </ul>
       <p v-if="chosen.length === 0" class="muted">Select personalities for this preset.</p>
-      <p v-if="dirty" class="unsaved" role="status">Unsaved changes<small>Save this preset to use your selections in battle.</small></p>
+      <p v-if="dirty" class="unsaved" role="status">Unsaved changes<small>Save this preset to use your selections in battle.</small><button class="discard" type="button" :disabled="store.busy" @click="chosen = [...saved]">Discard changes</button></p>
       <p class="hint">Equip up to {{ MAX_EQUIPPED }} collected personalities per preset. Each card is a separate collected instance.</p>
-      <EmButton variant="primary" class="save" :disabled="!dirty || store.busy || loading" @click="save"><EmIcon name="check" /> Save preset</EmButton>
+      <EmButton variant="primary" class="save" :disabled="!dirty || store.busy || loading || !!loadError" @click="save"><EmIcon name="check" /> Save preset</EmButton>
     </aside>
     <EmToast :open="toastOpen" :message="toastMessage" @close="toastOpen = false" />
   </section>
@@ -139,3 +158,5 @@ async function save(): Promise<void> {
 @media(max-width:650px){.choices li{grid-template-columns:42px minmax(0,1fr);}.personality-description{grid-column:1 / -1;border:0;padding:0;font-size:12px;}.choices :deep(.em-switch){grid-column:1 / -1;}.personality-library{padding:10px;}}
 
 </style>
+
+<style scoped src="./presetEditor.css" />

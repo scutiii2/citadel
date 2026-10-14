@@ -39,6 +39,7 @@ function onClick(event: MouseEvent): void {
   >
     <header class="head">
       <h2 class="em-pixel title">{{ title }}</h2>
+      <slot name="header-actions" />
       <button type="button" class="close" aria-label="Close" @click="emit('close')">
         <EmIcon name="close" />
       </button>

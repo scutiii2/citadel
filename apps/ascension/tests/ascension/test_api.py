@@ -46,6 +46,18 @@ def start_profile(client, owner="ann", starter="guardian"):
 
 # -- access --------------------------------------------------------------------------
 
+def test_default_preset_route_validates_and_persists_the_owner_preference(client):
+    start_profile(client)
+    path = "/ascension/ascendeds/guardian/default-preset"
+    response = client.put(path, json={"slot": 4}, headers=headers(client))
+    assert response.status_code == 200 and response.json()["slot"] == 4
+    profile = client.get("/ascension/profile", headers=headers(client, key=False)).json()
+    assert profile["ascendeds"][0]["default_preset_slot"] == 4
+    assert client.put(path, json={"slot": 6}, headers=headers(client)).status_code == 400
+    assert client.put(path, json={"slot": True}, headers=headers(client)).status_code == 400
+    assert client.put(path, json={"slot": 2}, headers=headers(client, owner="bob")).status_code == 404
+    assert client.put(path, json={"slot": 2}, headers=headers(client, key=False)).status_code == 400
+
 def test_health_needs_no_token(client):
     assert client.get("/health").json() == {"status": "ok"}
 

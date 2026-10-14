@@ -124,6 +124,7 @@ export interface Catalog {
 }
 
 export interface OwnedAscended {
+  default_preset_slot?: number;
   in_squad: boolean;
   ascended_id: string;
   name: string;
@@ -176,6 +177,7 @@ export interface PersonalityPage {
 }
 
 export interface Preset {
+  personalities?: PersonalityItem[];
   ascended_id: string;
   slot: number;
   instance_ids: string[];
@@ -425,6 +427,8 @@ export class AscensionClient {
     return this.http.request<PersonalityPage>("GET", `${BASE}/ascendeds/${part(ascendedId)}/personalities${text ? `?${text}` : ""}`);
   };
   preset = (ascendedId: string, slot: number) => this.http.request<Preset>("GET", `${BASE}/ascendeds/${part(ascendedId)}/presets/${slot}`);
+  setDefaultPreset = (ascendedId: string, slot: number, key: string = newIdempotencyKey()) =>
+    this.http.request<{ ascended_id: string; slot: number }>("PUT", `${BASE}/ascendeds/${part(ascendedId)}/default-preset`, { slot }, withKey(key));
   savePreset = (ascendedId: string, slot: number, instanceIds: string[], key: string = newIdempotencyKey()) =>
     this.http.request<Preset>("PUT", `${BASE}/ascendeds/${part(ascendedId)}/presets/${slot}`, { instance_ids: instanceIds }, withKey(key));
   rollEncounter = (key: string = newIdempotencyKey()) =>

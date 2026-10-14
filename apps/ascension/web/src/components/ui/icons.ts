@@ -2,6 +2,7 @@
  * strokes, miter joins, square caps; drawn with the text colour. Heart = HP, flame =
  * Power and EMBLEM, feather = Speed, shield = Defense, sword = Attack. */
 export const ICONS = {
+  tree: "M12 3V10M5 14L12 10L19 14M5 14V20M19 14V20M9 3H15V8H9ZM2 16H8V22H2ZM16 16H22V22H16Z",
   play: "M7 4L19 12L7 20Z",
   battle: "M4 3L16 15M8 3L19 14L15 18L4 7ZM12 16L7 21M3 17L7 21L11 17",
   shop: "M3 8L5 3H19L21 8V11H3ZM5 11V21H19V11M9 21V15H15V21",

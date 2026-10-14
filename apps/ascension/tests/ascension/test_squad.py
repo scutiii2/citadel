@@ -177,7 +177,8 @@ def test_migration_backfills_squad_in_level_order(tmp_path, version):
 
     run(work())
     with sqlite3.connect(db) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 6
+        from src.ascension.repository import SCHEMA_VERSION
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
 
 def test_non_squad_fighter_cannot_start(tmp_path):

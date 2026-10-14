@@ -9,6 +9,54 @@ const definitions = JSON.parse(readFileSync(new URL("../../ascended/striker/tree
 const configuration = JSON.parse(readFileSync(new URL("../../configs/ascension_catalog.json", import.meta.url), "utf8"));
 const personalities = configuration.personalities;
 
+test("Twoychi uses main card art and a saved preset across all three detail tabs", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const api = await installFakeApi(page);
+  const character = JSON.parse(readFileSync(new URL("../../ascended/twoychi/catalog.json", import.meta.url), "utf8"));
+  const nodes = JSON.parse(readFileSync(new URL("../../ascended/twoychi/tree.json", import.meta.url), "utf8")).nodes;
+  api.ascension.profile = { ...PROFILE, squad: ["twoychi"], ascendeds: [ownedAscended("twoychi", { name: "Twoychi", in_squad: true, default_preset_slot: 2, level: 7, tier_id: "unique", xp: 664, xp_needed: 700 })] };
+  const pool = [{ id: "p1", type: "AGGRESSIVE", tier: 2 }, { id: "p2", type: "RECKLESS", tier: 1 }, { id: "p3", type: "BOLD", tier: 1 }];
+  const art = { main_card: "/ascended/twoychi/sprite_main_card.webp", preview_card: "/ascended/twoychi/sprite_preview_card.webp", battle: "/ascended/twoychi/sprite_battle.webp", focus: 50, focus_preview: 50, animation: null };
+  await page.route("**/ascension/catalog", route => route.fulfill({ json: { ...CATALOG, personalities, ascendeds: [ascendedInfo("twoychi", { ...character, art })] } }));
+  await page.route("**/ascended/twoychi/sprite_*.webp", route => route.fulfill({ contentType: "image/webp", body: readFileSync(new URL("../../ascended/twoychi/" + new URL(route.request().url()).pathname.split("/").pop(), import.meta.url)) }));
+  await page.route("**/ascension/ascendeds/twoychi/personalities*", route => route.fulfill({ json: { items: pool.slice(0, 1), next_cursor: null } }));
+  await page.route("**/ascension/ascendeds/twoychi/presets/*", route => {
+    const slot = Number(new URL(route.request().url()).pathname.split("/").pop());
+    return route.fulfill({ json: { ascended_id: "twoychi", slot, instance_ids: pool.map(p => p.id), personalities: pool } });
+  });
+  await page.route("**/ascension/ascendeds/twoychi/default-preset", route => {
+    const { slot } = route.request().postDataJSON();
+    return route.fulfill({ json: { ascended_id: "twoychi", slot } });
+  });
+  await page.route("**/ascension/ascendeds/twoychi/tree", route => route.fulfill({ json: {
+    ascended_id: "twoychi", level: 7, essences: { common: 33 },
+    slots: ["p1", "p2", "a1", "a2", "a3", "a4"].map(id => ({ id, kind: id.startsWith("p") ? "passive" : "ability", branches: null })),
+    loadout: { a1: "twoychi_tidecall" },
+    nodes: nodes.map((node: any) => ({ kind: "ability", name: node.id, requires: [], root: false, unlock_level: 1, cost: null, ...character.abilities.find((a: any) => a.id === node.id), ...node, state: node.root ? "learned" : "locked", reason: "Requirements not met" })),
+  } }));
+  await page.goto("/#ticket=e2e-launch");
+  await page.getByRole("tab", { name: "Collection", exact: true }).click();
+  await page.locator(".squad-card").click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator(".detail-portrait")).toHaveAttribute("src", "/ascended/twoychi/sprite_main_card.webp");
+  await expect(dialog.locator(".preset-preview li")).toHaveCount(3);
+  await expect(dialog.locator(".preset-preview")).toContainText("Reckless");
+  await dialog.getByRole("button", { name: "Use preset 3 as battle default", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "Use preset 3 as battle default", exact: true })).toHaveAttribute("aria-pressed", "true");
+  expect(await dialog.locator(".title").evaluate(el => getComputedStyle(el).textDecorationLine)).toBe("none");
+  await page.screenshot({ animations: "disabled", path: testInfo.outputPath("twoychi-overview.png") });
+  await dialog.getByRole("tab", { name: "Personalities", exact: true }).click();
+  await expect(dialog.locator(".preset-inspector h4")).toHaveText("Preset 3");
+  await expect(dialog.locator(".selected-personalities strong")).toHaveCount(3);
+  await expect(dialog.getByRole("tablist", { name: "Preset slot" })).toHaveCount(1);
+  await page.screenshot({ animations: "disabled", path: testInfo.outputPath("twoychi-personality.png") });
+  await dialog.getByRole("tab", { name: "Ability tree", exact: true }).click();
+  await dialog.getByRole("button", { name: "Fit tree", exact: true }).click();
+  await expect(dialog.locator(".slots .slot")).toHaveCount(6);
+  await page.screenshot({ animations: "disabled", path: testInfo.outputPath("twoychi-tree.png") });
+  expect(api.unexpected).toEqual([]);
+});
+
 for (const width of [1440, 768, 375]) {
   test(`Ascended details show copies, personality effects and ability requirements at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });

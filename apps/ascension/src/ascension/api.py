@@ -54,6 +54,10 @@ class PresetBody(_Body):
     instance_ids: list[str]
 
 
+class DefaultPresetBody(_Body):
+    slot: StrictInt
+
+
 class LoadoutBody(_Body):
     slots: dict[str, str | None]
 
@@ -180,6 +184,10 @@ def build_router(services: AscendedServices) -> APIRouter:
     @router.get("/ascendeds/{ascended_id}/presets/{slot}")
     async def get_preset(ascended_id: str, slot: int, owner: str = Depends(requester)):
         return await collection.get_preset(owner, ascended_id, slot)
+
+    @router.put("/ascendeds/{ascended_id}/default-preset")
+    async def put_default_preset(ascended_id: str, body: DefaultPresetBody, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
+        return await collection.set_default_preset(owner, key, ascended_id, body.slot)
 
     @router.put("/ascendeds/{ascended_id}/presets/{slot}")
     async def put_preset(ascended_id: str, slot: int, body: PresetBody, owner: str = Depends(requester), key: str = Depends(idempotency_key)):

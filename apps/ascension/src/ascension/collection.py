@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from dataclasses import replace
 
 from src.ascension.squad import SquadService
 from src.ascension.catalog import Catalog
@@ -58,6 +59,7 @@ class CollectionService:
                 "can_tier_up": needed is not None and ascended.stars >= needed
                                and self._catalog.next_tier(ascended.ascended_id, tier_id) is not None,
                 "faint_until": ascended.faint_until,
+                "default_preset_slot": ascended.default_preset_slot,
                 "fainted": ascended.faint_until is not None and ascended.faint_until > now,
             })
         pending = await tx.pending_encounter(owner)
@@ -135,7 +137,22 @@ class CollectionService:
         async with self._repo.transaction() as tx:
             await self._require_ascended(tx, owner, ascended_id)
             preset = await tx.get_preset(owner, ascended_id, slot)
-        return {"ascended_id": ascended_id, "slot": slot, "instance_ids": list(preset.instance_ids) if preset else []}
+            ids = list(preset.instance_ids) if preset else []
+            personalities = await tx.get_personalities(owner, ascended_id, ids)
+        return {"ascended_id": ascended_id, "slot": slot, "instance_ids": ids,
+                "personalities": [{"id": p.id, "type": p.type_id, "tier": p.tier} for p in personalities]}
+
+    async def set_default_preset(self, owner: str, key: str, ascended_id: str, slot: int) -> dict[str, Any]:
+        """Persist the battle-start preference without changing any preset contents."""
+        self._check_slot(slot)
+
+        async def work(tx: AscendedTransaction) -> dict[str, Any]:
+            await self._require_ascended(tx, owner, ascended_id)
+            ascended = await tx.get_ascended(owner, ascended_id)
+            await tx.put_ascended(replace(ascended, default_preset_slot=slot))
+            return {"ascended_id": ascended_id, "slot": slot}
+
+        return await self._writer.commit(owner, key, "preset.default", {"ascended": ascended_id, "slot": slot}, work)
 
     @staticmethod
     def _check_slot(slot: int) -> None:

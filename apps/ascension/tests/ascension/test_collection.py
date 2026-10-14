@@ -9,6 +9,29 @@ def make(tmp_path, *draws):
     return Env(tmp_path / "s.sqlite3", ScriptedRandom(*draws) if draws else None)
 
 
+def test_battle_default_is_persistent_owner_scoped_and_does_not_edit_presets(tmp_path):
+    async def scenario():
+        env = make(tmp_path)
+        await env.start_player("ann")
+        await env.start_player("bob")
+        before = await env.collection.get_preset("ann", "guardian", 1)
+        result = await env.collection.set_default_preset("ann", "default-3", "guardian", 3)
+        assert result["slot"] == 3
+        assert (await env.collection.profile("ann"))["ascendeds"][0]["default_preset_slot"] == 3
+        assert (await env.collection.profile("bob"))["ascendeds"][0]["default_preset_slot"] == 1
+        assert await env.collection.get_preset("ann", "guardian", 1) == before
+        with pytest.raises(InvalidRequest):
+            await env.collection.set_default_preset("ann", "invalid", "guardian", 6)
+        with pytest.raises(NotFound):
+            await env.collection.set_default_preset("other", "forbidden", "guardian", 2)
+        await env.close()
+        reopened = make(tmp_path)
+        assert (await reopened.collection.profile("ann"))["ascendeds"][0]["default_preset_slot"] == 3
+        await reopened.close()
+
+    run(scenario())
+
+
 def test_initialize_creates_the_starter_setup(tmp_path):
     async def scenario():
         env = make(tmp_path, 0.0)  # first personality type: AGGRESSIVE

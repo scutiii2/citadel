@@ -26,6 +26,7 @@ class AscendedRecord:
     faint_until: float | None = None
     tier_id: str | None = None  # None = the Ascended's start tier; Forbidden ignores it
     stars: int = 0  # earned at this tier; reset when it moves up
+    default_preset_slot: int = 1
 
 
 @dataclass(frozen=True)

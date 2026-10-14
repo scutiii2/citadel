@@ -49,6 +49,26 @@ const mountTab = async () => {
 };
 
 describe("TreeTab", () => {
+  it("selects the same Overview ability again after the player inspected another node", async () => {
+    const wrapper = mount(TreeTab, { props: { ascended: ownedAscended("guardian", { level: 12 }), initialSelectedId: "g_a", selectionRequest: 1 } });
+    await flushPromises();
+    await wrapper.get('[data-node="g_wall"]').trigger("click");
+    await wrapper.setProps({ selectionRequest: 2 });
+    expect(wrapper.get('[data-node="g_a"]').attributes("aria-pressed")).toBe("true");
+  });
+  it("keeps a newly selected ability after entering from Overview and learning it", async () => {
+    const wrapper = mount(TreeTab, { props: { ascended: ownedAscended("guardian", { level: 12 }), initialSelectedId: "g_a" } });
+    await flushPromises();
+    await wrapper.get('[data-node="g_wall"]').trigger("click");
+    const learned = structuredClone(TREE);
+    learned.nodes[3] = { ...learned.nodes[3]!, state: "learned" };
+    client.tree.mockResolvedValue(learned);
+    client.learnNode.mockResolvedValue({ kind: "learn", ascended_id: "guardian", node_id: "g_wall", essence_tier: "common", essence_spent: 3 });
+    await wrapper.get(".learn").trigger("click");
+    await flushPromises();
+    expect(wrapper.get(".node-detail h4").text()).toBe("WALL");
+    expect(wrapper.get('[data-node="g_wall"]').attributes("aria-pressed")).toBe("true");
+  });
   it("lights the prerequisite paths to equipped nodes without lighting their ancestors", async () => {
     const tree = structuredClone(TREE);
     tree.nodes[3] = { ...tree.nodes[3]!, state: 'learned' };
@@ -234,8 +254,8 @@ describe("TreeTab", () => {
     const chips = wrapper.findAll(".slots .slot");
     expect(chips).toHaveLength(6);
     expect(chips.map((chip) => chip.text())).toEqual([
-      expect.stringContaining("wolf"), expect.stringContaining("bear"), expect.stringContaining("dog"),
-      expect.stringContaining("aya"), expect.stringContaining("wolf"), expect.stringContaining("aya"),
+      expect.stringContaining("wolf"), expect.stringContaining("aya"), expect.stringContaining("wolf"),
+      expect.stringContaining("bear"), expect.stringContaining("dog"), expect.stringContaining("aya"),
     ]);
     await wrapper.find('[data-node="g_wolf"]').trigger("click");
     expect(wrapper.findAll(".equip button[data-slot]").map((button) => button.text())).toEqual([expect.stringMatching(/^Equip A1/)]);

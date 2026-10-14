@@ -90,14 +90,17 @@ watch(
 
 function openForm(): void {
   ascendedId.value = ready.value[0]?.ascended_id ?? "";
-  presetSlot.value = "none";
+  presetSlot.value = String(chosen.value?.default_preset_slot ?? "none");
   mode.value = "manual";
   emblemLimit.value = "none";
   formOpen.value = true;
 }
 
 function pick(id: string): void {
-  if (!store.busy && ready.value.some(s => s.ascended_id === id)) ascendedId.value = id;
+  if (!store.busy && ready.value.some(s => s.ascended_id === id)) {
+    ascendedId.value = id;
+    presetSlot.value = String(chosen.value?.default_preset_slot ?? "none");
+  }
 }
 
 function setMode(value: string): void {

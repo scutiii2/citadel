@@ -44,6 +44,18 @@ function button(buttons: DOMWrapper<HTMLButtonElement>[], text: string | RegExp)
 }
 
 describe("EncounterPanel", () => {
+  it("starts with the saved battle default while allowing a temporary override", async () => {
+    client.startBattle.mockResolvedValue(battleView({ mode: "manual" }));
+    const profile = { ...PROFILE, ascendeds: [ownedAscended("guardian", { default_preset_slot: 3 })] };
+    client.profile.mockResolvedValue(profile);
+    const { wrapper, store } = mountPanel(profile, ENCOUNTER);
+    await button(wrapper.findAll("button"), "Fight").trigger("click");
+    expect((wrapper.get("select[name='preset']").element as HTMLSelectElement).value).toBe("3");
+    await wrapper.get("select[name='preset']").setValue("2");
+    await wrapper.get("form.start-form").trigger("submit");
+    expect(client.startBattle).toHaveBeenCalledWith(expect.objectContaining({ preset_slot: 2 }));
+    expect(store.profile!.ascendeds[0]!.default_preset_slot).toBe(3);
+  });
   it("shows the squad as preview cards with stats, using battle art", async () => {
     const { wrapper } = mountPanel(PROFILE, ENCOUNTER);
     await button(wrapper.findAll("button"), "Fight").trigger("click");

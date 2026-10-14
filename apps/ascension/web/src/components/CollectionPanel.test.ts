@@ -6,9 +6,10 @@ import { CATALOG, PROFILE, ownedAscended, ascendedInfo } from "../api/AscensionC
 import { useAscensionStore } from "../stores/ascension";
 import CollectionPanel from "./CollectionPanel.vue";
 import PresetEditor from "./PresetEditor.vue";
+import TreeTab from "./TreeTab.vue";
 
 vi.mock("../api/AscensionClient", () => {
-  const client = { putSquad: vi.fn(), personalities: vi.fn(), preset: vi.fn(), savePreset: vi.fn(), profile: vi.fn(), addStar: vi.fn(), raiseTier: vi.fn() };
+  const client = { tree: vi.fn(), setDefaultPreset: vi.fn(), putSquad: vi.fn(), personalities: vi.fn(), preset: vi.fn(), savePreset: vi.fn(), profile: vi.fn(), addStar: vi.fn(), raiseTier: vi.fn() };
   return { useAscensionClient: () => client };
 });
 
@@ -41,7 +42,7 @@ it("opens the details when a collected card is pressed", async () => {
   expect(wrapper.find(".ascended-details").attributes("open")).toBeUndefined();
   await wrapper.find(".ascended-card").trigger("click");
   await flushPromises();
-  expect(wrapper.find(".details .detail-portrait").attributes("src")).toBe("/ascended/guardian/sprite_battle.webp");
+  expect(wrapper.find(".details .detail-portrait").attributes("src")).toBe("/ascended/guardian/sprite_main_card.webp");
   expect(wrapper.find(".progression-panel").text()).toContain("A star costs");
 });
 
@@ -70,6 +71,7 @@ beforeEach(() => {
   setActivePinia(createPinia());
   client.personalities.mockResolvedValue({ items: [], next_cursor: null });
   client.preset.mockResolvedValue({ ascended_id: "guardian", slot: 1, instance_ids: [] });
+  client.tree.mockResolvedValue({ ascended_id: "guardian", level: 1, essences: {}, nodes: [], slots: [], loadout: {} });
 });
 
 function mountPanel(profile: Profile = PROFILE) {
@@ -78,6 +80,38 @@ function mountPanel(profile: Profile = PROFILE) {
   store.profile = profile;
   return mount(CollectionPanel);
 }
+
+it("uses main card art and persists the Overview battle default with its three-personality preview", async () => {
+  client.preset.mockImplementation(async (_id, slot) => ({ ascended_id: "guardian", slot, instance_ids: slot === 3 ? ["outside-page"] : [], personalities: slot === 3 ? [{ id: "outside-page", type: "BOLD", tier: 2 }] : [] }));
+  client.setDefaultPreset.mockResolvedValue({ ascended_id: "guardian", slot: 3 });
+  const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian")] });
+  await wrapper.find(".ascended-card").trigger("click");
+  await flushPromises();
+  expect(wrapper.find(".detail-portrait").attributes("src")).toBe("/ascended/guardian/sprite_main_card.webp");
+  expect(wrapper.findAll(".overview-loadout .ability-slot")).toHaveLength(6);
+  await wrapper.get('button[aria-label="Use preset 3 as battle default"]').trigger("click");
+  await flushPromises();
+  expect(client.setDefaultPreset).toHaveBeenCalledWith("guardian", 3);
+  expect(wrapper.find(".preset-preview").text()).toContain("Bold");
+  expect(wrapper.findAll(".preset-preview li")).toHaveLength(3);
+  expect(useAscensionStore().profile!.ascendeds[0]!.default_preset_slot).toBe(3);
+});
+
+it("ignores an initial Overview response delivered after a newer tree snapshot", async () => {
+  let finish!: (tree: any) => void;
+  client.tree.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian")] });
+  await wrapper.get(".ascended-card").trigger("click");
+  await flushPromises();
+  await wrapper.findAll('[role="tab"]').find(tab => tab.text() === "Ability tree")!.trigger("click");
+  await flushPromises();
+  const fresh = { ascended_id: "guardian", level: 1, essences: {}, slots: [{ id: "a1", kind: "ability", branches: null }], loadout: { a1: "fresh" }, nodes: [{ id: "fresh", name: "Fresh ability", kind: "ability", x: 0, y: 0, requires: [], unlock_level: 1, root: true, cost: null, state: "learned", reason: null }] };
+  wrapper.getComponent(TreeTab).vm.$emit("loaded", fresh);
+  finish({ ascended_id: "guardian", level: 1, essences: {}, nodes: [], slots: [], loadout: {} });
+  await flushPromises();
+  await wrapper.findAll('[role="tab"]').find(tab => tab.text() === "Overview")!.trigger("click");
+  expect(wrapper.find('.overview-loadout button[aria-label="A1: Fresh ability"]').exists()).toBe(true);
+});
 
 describe("CollectionPanel", () => {
   it("shows a card per owned Ascended and lists the others as not collected", () => {
@@ -118,7 +152,7 @@ describe("CollectionPanel", () => {
     const details = wrapper.find(".details");
     expect(details.find(".big-card").exists()).toBe(false);
     expect(details.findAll(".overview-effects article strong").map((a) => a.text())).toEqual(["Strike", "Rally"]);
-    await details.findAll('[role="tab"]').find((b) => b.text() === "Personalities")!.trigger("click");
+    await wrapper.findAll('[role="tab"]').find((b) => b.text() === "Personalities")!.trigger("click");
     expect(details.find(".personalities").text()).toContain("Aggressive");
     expect(details.find(".personalities").text()).toContain("Tier 2");
     expect(details.text()).toContain("1+ collected");
@@ -388,13 +422,12 @@ describe("collection squad controls", () => {
     expect(wrapper.find(".ascended-card").attributes("aria-pressed")).toBe("true");
   });
 
-  it("conceals the portrait when battle art is absent even when legacy art exists", async () => {
+  it("uses main card art in Overview independently of battle art", async () => {
     const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian")] });
     useAscensionStore().catalog = { ...CATALOG, ascendeds: [ascendedInfo("guardian", { art: { main_card: "/legacy-main.webp", preview_card: "/legacy-preview.webp", battle: null, focus: 50, focus_preview: 50, animation: null } })] };
     await wrapper.find(".ascended-card").trigger("click");
     await flushPromises();
-    expect(wrapper.find(".detail-portrait").exists()).toBe(false);
-    expect(wrapper.findAll("img").some(img => img.attributes("src")?.includes("legacy"))).toBe(false);
+    expect(wrapper.find(".detail-portrait").attributes("src")).toBe("/legacy-main.webp");
   });
   it("renders the configured slots, marks members and lets the last one be removed", async () => {
     const wrapper = mountPanel({ ...PROFILE, squad_size: 3 });

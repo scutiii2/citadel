@@ -468,6 +468,13 @@ export const useAscensionStore = defineStore("ascension", () => {
     return mutate(() => ascensionClient.raiseTier(ascendedId), () => refreshProfile());
   }
 
+  function setDefaultPreset(ascendedId: string, slot: number) {
+    return mutate(() => ascensionClient.setDefaultPreset(ascendedId, slot), result => {
+      if (profile.value) profile.value = { ...profile.value, ascendeds: profile.value.ascendeds.map(a =>
+        a.ascended_id === ascendedId ? { ...a, default_preset_slot: result.slot } : a) };
+    });
+  }
+
   /** Deletes all progress. Resolves false (state kept) when another change is
    * running or the server refuses, e.g. 409 while a battle is active. */
   async function resetProgress(): Promise<boolean> {
@@ -554,6 +561,7 @@ export const useAscensionStore = defineStore("ascension", () => {
     raiseTier,
     learnNode,
     saveLoadout,
+    setDefaultPreset,
     resetProgress,
     act,
     answerEmblem,
