@@ -37,12 +37,8 @@ def _load_secrets_into_environ() -> None:
 # Must run BEFORE importing anthropic_provider/openai_provider below: each
 # resolves its own DEFAULT_MODEL/VENDOR_LABEL from AI_AGENT_GATEWAY (see
 # their resolve_default_model/resolve_vendor_label) once, at ITS OWN import
-# time. If .env's AI_AGENT_GATEWAY were loaded any later (e.g.
-# inside _resolve(), as this used to do), a gateway chosen only via the
-# file - not via server.py's --gateway CLI flag, which sets the env var
-# before any import happens - would never take effect: the provider module
-# would already have resolved "claude"/"gpt" (no gateway set yet) by the
-# time this function's caller got around to loading the file.
+# time. server.py sets AI_AGENT_GATEWAY from the agent file before this
+# module is imported; .env only fills in what is still unset (setdefault).
 _load_secrets_into_environ()
 
 from src.llm import cancellation, cooldown  # noqa: E402

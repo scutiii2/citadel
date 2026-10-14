@@ -1,5 +1,6 @@
-"""Primes a valid pinned-provider config before any test module imports
-src.agents.agent_config / src.server - both resolve PROVIDER_ID/MODEL once at
+"""Primes a valid agent file and pinned-provider config before any test
+module imports src.agents.agent_config / src.server - agent_spec.current()
+needs AI_AGENT_FILE, and both modules resolve PROVIDER_ID/MODEL once at
 import time (see agent_config.py's module docstring) and raise
 AgentConfigError immediately if AI_AGENT_PROVIDER or its API key isn't
 set, which would otherwise break collection of test_server.py.
@@ -11,8 +12,18 @@ freely override/clear these per test via monkeypatch - that only affects
 the duration of each test, never this module-level default.
 """
 
+import json
 import os
+import tempfile
+from pathlib import Path
 
+# An anthropic orchestrator on port 9100, id "claude-agent".
+_AGENT_FILE = Path(tempfile.mkdtemp(prefix="ai_agent_spec_")) / "claude-agent.json"
+_AGENT_FILE.write_text(
+    json.dumps({"port": 9100, "entry": True, "llm": {"provider": "anthropic"}, "orchestrator": True}),
+    encoding="utf-8",
+)
+os.environ.setdefault("AI_AGENT_FILE", str(_AGENT_FILE))
 os.environ.setdefault("AI_AGENT_PROVIDER", "anthropic")
 os.environ.setdefault("CLAUDE_API_KEY", "test-key")
 

@@ -12,8 +12,7 @@ Originally adapted from the retired chat_app's LLM layer.
   `ChatResult`). No per-request provider or model choice lives here:
   each instance has exactly one.
 - **`anthropic_provider.py`** - Anthropic Messages API provider, pinned
-  when the provider is `anthropic` (agent file `llm.provider`, or
-  `AI_AGENT_PROVIDER` for an instance started without one).
+  when the agent file's `llm.provider` is `anthropic`.
 - **`openai_provider.py`** - OpenAI Responses API provider, pinned when
   the provider is `openai`.
 - **`laya_provider.py`** - local typed-question answerer: the caller sends JSON

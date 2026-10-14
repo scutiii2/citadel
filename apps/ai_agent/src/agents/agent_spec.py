@@ -1,5 +1,4 @@
-"""One ai_agent instance's definition: an `agents/<id>.json` file, or the
-same shape built from today's env vars when no file is given.
+"""One ai_agent instance's definition: an `agents/<id>.json` file.
 
 Pure on purpose (stdlib only, no provider imports): server.py loads the
 file and calls apply_to_environ() BEFORE importing agent_config, because
@@ -34,9 +33,6 @@ TIERS = ("light", "standard", "heavy", "extreme")
 # The gateway each provider uses when a file names none - pinned in the env
 # so .env's AI_AGENT_GATEWAY cannot silently re-point the agent.
 _DEFAULT_GATEWAY = {"anthropic": "claude", "openai": "gpt", "laya": "local"}
-# Same mapping as agent_registry.agent_id_for (kept here so this module
-# stays import-free): the legacy ids predate the "claude" -> "anthropic" rename.
-_LEGACY_ID_PREFIX = {"anthropic": "claude", "openai": "openai"}
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 _TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "orchestrator", "memory_recall"}
@@ -141,10 +137,8 @@ class AgentSpec:
 
     def effective_gateway(self) -> str | None:
         """The gateway to report in usage rows: the file's own gateway (None
-        = the provider used directly), or AI_AGENT_GATEWAY on the env path."""
-        if self.source is not None:
-            return self.llm.gateway
-        return os.getenv("AI_AGENT_GATEWAY") or None
+        = the provider used directly)."""
+        return self.llm.gateway
 
 
 class _Checker:
@@ -376,39 +370,21 @@ def load_dir(directory: Path) -> list[AgentSpec]:
     return specs
 
 
-def from_env() -> AgentSpec:
-    """The spec of an instance started the old way (python -m src.server
-    with AI_AGENT_PROVIDER/AI_AGENT_PORT/...). It is an orchestrator so it
-    still gets delegate_to_agent."""
-    provider = os.getenv("AI_AGENT_PROVIDER") or ""
-    raw_port = os.getenv("AI_AGENT_PORT", "9100")
-    try:
-        port = int(raw_port)
-    except ValueError:
-        raise AgentSpecError(f"AI_AGENT_PORT must be a whole number from 1 to 65535 (got {raw_port!r})") from None
-    return AgentSpec(
-        id=f"{_LEGACY_ID_PREFIX.get(provider, provider)}-agent",
-        label="",
-        port=port,
-        llm=LlmSpec(
-            provider=provider,
-            gateway=os.getenv("AI_AGENT_GATEWAY") or None,
-            model=os.getenv("AI_AGENT_MODEL") or None,
-        ),
-        orchestrator=True,
-    )
-
-
 _current: AgentSpec | None = None
 
 
 def current() -> AgentSpec:
-    """This process's spec: AI_AGENT_FILE when set, else from_env(). Read
+    """This process's spec, from the agent file named in AI_AGENT_FILE. Read
     once and cached - an agent's definition never changes while it runs."""
     global _current
     if _current is None:
         file = os.getenv("AI_AGENT_FILE")
-        _current = load_file(Path(file)) if file else from_env()
+        if not file:
+            raise AgentSpecError(
+                "AI_AGENT_FILE is not set - start agents with run.bat (python -m src.supervisor), "
+                "or set AI_AGENT_FILE to an agents/<id>.json path"
+            )
+        _current = load_file(Path(file))
     return _current
 
 

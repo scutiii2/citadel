@@ -19,8 +19,8 @@ file, not code - except a new provider.
 | A model family that isn't Claude or OpenAI (Gemini, a native SDK) | **Provider** | Yes |
 
 The retired pieces: roles in `prompts.json` and a hand-run
-instance per `AI_AGENT_PROVIDER`/`AI_AGENT_PORT` still work for a lone
-`python -m src.server` run but are not how agents are added now. Don't
+instance per `AI_AGENT_PROVIDER`/`AI_AGENT_PORT` (and the `--gateway` flag)
+are not how agents are added now; every agent is an `agents/<id>.json`. Don't
 hand-edit `.data/agent_registry.json` - it is the runtime registry the children
 write (atomic temp file + `os.replace`); ember_api reads it.
 
@@ -73,8 +73,7 @@ block before designing the interface from scratch.
    Only one enabled file may set `"entry": true`; ember sends **every** turn
    there (`GET /api/agent`).
 6. Name an agent for its job (`ember`, `server-ops`), never for its LLM
-   (`claude-agent`). Only instances started the old way derive a
-   provider-based id.
+   (`claude-agent`).
 
 ## Path 2 - Make an agent the entry or an orchestrator
 
@@ -181,7 +180,7 @@ Google's native SDK rather than an OpenAI-compatible endpoint):
    _PROVIDERS["<provider_id>"] = <name>_provider
    ```
 
-   This is the single point that makes `AI_AGENT_PROVIDER=<provider_id>`
+   This is the single point that makes `llm.provider: "<provider_id>"`
    a valid value — an id missing from this dict fails loudly at startup
    with the list of valid alternatives, by design (no silent fallback).
 3. Add a tracked `gateways/<provider_id>/<default_gateway>.json` with the

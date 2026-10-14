@@ -185,11 +185,11 @@ def test_cancel_delegates_to_agent_config():
     assert result == {"cancelled": True}
 
 
-def test_server_uses_the_env_spec_identity_without_an_agent_file():
-    # conftest sets AI_AGENT_PROVIDER=anthropic and no AI_AGENT_FILE.
-    assert server.SPEC.source is None
+def test_server_takes_its_identity_from_the_agent_file():
+    # conftest points AI_AGENT_FILE at a temp claude-agent.json.
+    assert server.SPEC.source is not None
     assert server._AGENT_ID == "claude-agent"
-    assert server._AGENT_LABEL.endswith(" Agent")
+    assert server._AGENT_LABEL == "claude-agent"
 
 
 def test_main_registers_with_the_spec_flags(monkeypatch):

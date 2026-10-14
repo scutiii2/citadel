@@ -3,9 +3,8 @@ tools to chat_app, backed by one pinned LLM provider (agent_config.py)
 that itself talks to mcp_server as an MCP client (mcp_upstream.py).
 
 Run with:
-    python -m src.server
-    python -m src.server --gateway openrouter
-    python -m src.server --mcp-url http://127.0.0.1:8010/mcp
+    python -m src.supervisor   (starts one python -m src.server child per agent file)
+    python -m src.server --mcp-url http://127.0.0.1:8010/mcp   (with AI_AGENT_FILE set)
 """
 
 from __future__ import annotations
@@ -20,18 +19,6 @@ from urllib.parse import urlsplit
 
 _parser = argparse.ArgumentParser(add_help=False)
 _parser.add_argument(
-    "--gateway",
-    help=(
-        "Override this run's gateway block (gateways/<provider>/<gateway>.json), "
-        "e.g. openrouter/bedrock/vertex/litellm/helicone/portkey for "
-        "anthropic, or azure/together/groq/fireworks/deepinfra/"
-        "perplexity/ollama/vllm for openai. Takes precedence over "
-        "AI_AGENT_GATEWAY. Set before importing "
-        "agent_config, since the provider resolves its client/default "
-        "model from the gateway at import time."
-    ),
-)
-_parser.add_argument(
     "--mcp-url",
     help=(
         "Override the mcp_server URL this agent connects to as an MCP "
@@ -42,8 +29,6 @@ _parser.add_argument(
     ),
 )
 _args, _ = _parser.parse_known_args()
-if _args.gateway:
-    os.environ["AI_AGENT_GATEWAY"] = _args.gateway
 if _args.mcp_url:
     os.environ["MCP_SERVER_URL"] = _args.mcp_url
 
@@ -53,12 +38,11 @@ if _args.mcp_url:
 # this runs first. agent_spec imports nothing from this project.
 from src.agents import agent_spec
 
-if os.getenv("AI_AGENT_FILE"):
-    try:
-        agent_spec.apply_to_environ(agent_spec.current())
-    except agent_spec.AgentSpecError as _exc:
-        sys.stderr.write(f"\nai_agent cannot start - agent file error:\n  {_exc}\n\n")
-        sys.exit(1)
+try:
+    agent_spec.apply_to_environ(agent_spec.current())
+except agent_spec.AgentSpecError as _exc:
+    sys.stderr.write(f"\nai_agent cannot start - agent file error:\n  {_exc}\n\n")
+    sys.exit(1)
 
 import uvicorn
 from mcp.server.fastmcp import Context, FastMCP
@@ -114,8 +98,7 @@ def _agent_url(host: str, port: int, advertise: str | None) -> str:
 
 SPEC = agent_spec.current()
 _AGENT_ID = SPEC.id
-# An env-var instance has no label of its own: keep today's "<vendor> Agent".
-_AGENT_LABEL = SPEC.label or f"{agent_config.status()['vendor_label']} Agent"
+_AGENT_LABEL = SPEC.label
 try:
     # The agent file's own `url` wins over the host/port/env derived one.
     _AGENT_URL = SPEC.url or _agent_url(HOST, PORT, os.getenv("AI_AGENT_ADVERTISE_URL"))

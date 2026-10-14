@@ -1,5 +1,5 @@
 """agent_spec.py tests: defaults, every validation error, the set-level
-checks (ports, exactly one entry), the env-var fallback spec, and the
+checks (ports, exactly one entry), the AI_AGENT_FILE requirement, and the
 env-var hand-off a child does before importing agent_config."""
 
 from __future__ import annotations
@@ -174,30 +174,11 @@ def test_tool_scope_allow_deny_and_unmatched():
     assert scope.unmatched(["calc_add", "calc_secret"]) == ["convert_*"]
 
 
-def test_from_env_builds_a_legacy_orchestrator(monkeypatch):
-    monkeypatch.setenv("AI_AGENT_PROVIDER", "openai")
-    monkeypatch.setenv("AI_AGENT_PORT", "9102")
-    monkeypatch.setenv("AI_AGENT_MODEL", "gpt-x")
-    monkeypatch.setenv("AI_AGENT_GATEWAY", "azure")
-
-    spec = agent_spec.from_env()
-
-    assert spec.id == "openai-agent"
-    assert spec.port == 9102
-    assert spec.label == ""
-    assert spec.persona == ""
-    assert spec.orchestrator is True
-    assert spec.llm.model == "gpt-x"
-    assert spec.source is None
-    assert spec.effective_gateway() == "azure"
-
-
-@pytest.mark.parametrize("value", ["abc", "9x", "1.5"])
-def test_from_env_rejects_a_non_numeric_port(monkeypatch, value):
-    monkeypatch.setenv("AI_AGENT_PROVIDER", "openai")
-    monkeypatch.setenv("AI_AGENT_PORT", value)
-    with pytest.raises(AgentSpecError, match="AI_AGENT_PORT must be a whole number from 1 to 65535"):
-        agent_spec.from_env()
+def test_current_requires_ai_agent_file(monkeypatch):
+    monkeypatch.delenv("AI_AGENT_FILE", raising=False)
+    monkeypatch.setattr(agent_spec, "_current", None)
+    with pytest.raises(AgentSpecError, match="AI_AGENT_FILE is not set"):
+        agent_spec.current()
 
 
 def test_effective_gateway_for_a_file_spec_ignores_the_env(tmp_path, monkeypatch):

@@ -17,8 +17,8 @@ and an MCP *client* (to `mcp_server`, via a persistent connection - see
 
 1. Copy `.env.example` to `.env` and
    fill in `CLAUDE_API_KEY` and/or `GPT_API_KEY` (whichever provider(s)
-   you're running), or the key(s) for whichever `AI_AGENT_GATEWAY` you're
-   pointing at instead. Both can be set at once - one file backs every agent.
+   you're running), or the key(s) for whichever `llm.gateway` your agent
+   files point at instead. Both can be set at once - one file backs every agent.
 
 2. Make sure `mcp_server` is running (`apps/mcp_server/run.bat`) -
    `apps/ai_agent/configs/config_servers.json` points at its default
@@ -115,12 +115,10 @@ and start an app when explicitly requested, which also starts its owner notifica
 It reports watched status; URL/port monitoring and recurring schedules are unavailable. Stop/restart requests
 go to `server-ops`. Restart the supervisor to load the updated agent definition.
 
-The gateway for a supervised agent comes from `llm.gateway` in
-`agents/<id>.json`. Omitted, it is the provider's default gateway (`claude`
-for anthropic, `gpt` for openai), pinned over `AI_AGENT_GATEWAY` and
-`.env`. `--gateway` and `AI_AGENT_GATEWAY` only affect an instance started the old way (`python -m
-src.server`, no agent file). Saved launcher presets that pass `--gateway` no
-longer affect the supervisor.
+The gateway for an agent comes from `llm.gateway` in `agents/<id>.json`.
+Omitted, it is the provider's default gateway (`claude` for anthropic, `gpt`
+for openai). Provider, gateway and model are never set in `.env`. There is no
+`--gateway` flag; saved launcher presets that pass one have no effect.
 
 Exactly one enabled file must set `entry: true`. The supervisor validates
 every file before it starts anything and refuses to start, naming the file
@@ -133,20 +131,8 @@ spawns one `python -m src.server` child per enabled file (env
 restarts a crashed child with backoff (1s, 2s, 4s... capped at 60s; left
 stopped after 5 crashes within 5 minutes, the others keep running).
 
-To run a single instance the old way (provider from env vars, no agent
-file), skip `run.bat`:
-
-```
-set AI_AGENT_PROVIDER=openai
-set AI_AGENT_PORT=9101
-.venv_ai_agent\Scripts\python -m src.server --gateway openrouter
-```
-
-An instance started this way is an orchestrator, and `--gateway` takes
-precedence over `AI_AGENT_GATEWAY`. Because `specialists()` excludes
-orchestrators, two instances started the old way cannot delegate to each
-other. The example above registers `openai-agent`; don't run it next to an
-agent file that uses the `openai` provider and the same id.
+To run one agent alone, set `AI_AGENT_FILE` to its file and run
+`python -m src.server`.
 
 ## Running on another machine
 
