@@ -20,6 +20,8 @@ from typing import Any, AsyncContextManager, AsyncIterator, Protocol, Sequence
 from src.ascension.errors import ActiveBattleExists, BattleAlreadyExists, StaleBattle
 from src.ascension.models import BattleSetup, BattleState, PersonalityInstance
 from src.ascension.records import (
+    ActivityContext,
+    ExpeditionRecord,
     BattleRecord,
     EncounterRecord,
     IdempotencyRecord,
@@ -29,7 +31,7 @@ from src.ascension.records import (
     AscendedRecord,
 )
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 BASE_SCHEMA = """
 CREATE TABLE players (
     owner TEXT PRIMARY KEY, insignia INTEGER NOT NULL CHECK (insignia >= 0),
@@ -99,12 +101,28 @@ CREATE TABLE squad (
     PRIMARY KEY (owner, ascended_id), UNIQUE (owner, position));
 """
 DEFAULT_PRESET_SCHEMA = "ALTER TABLE ascendeds ADD COLUMN default_preset_slot INTEGER NOT NULL DEFAULT 1 CHECK (default_preset_slot BETWEEN 1 AND 5);"
-SCHEMA = BASE_SCHEMA + SHOP_SCHEMA + STAR_MIGRATION + TREE_SCHEMA + SQUAD_SCHEMA + DEFAULT_PRESET_SCHEMA
+ACTIVITY_SCHEMA = """
+ALTER TABLE encounters ADD COLUMN activity TEXT NOT NULL DEFAULT '{}';
+ALTER TABLE battles ADD COLUMN activity TEXT NOT NULL DEFAULT '{}';
+CREATE TABLE trial_clears (owner TEXT NOT NULL, type_id TEXT NOT NULL, stage INTEGER NOT NULL,
+    PRIMARY KEY(owner, type_id, stage));
+CREATE TABLE expeditions (id TEXT PRIMARY KEY, owner TEXT NOT NULL, ascended_id TEXT NOT NULL,
+    started_at REAL NOT NULL, ends_at REAL NOT NULL, duration_hours INTEGER NOT NULL,
+    xp_reward INTEGER NOT NULL, insignia_reward INTEGER NOT NULL, claimed_at REAL, receipt TEXT);
+CREATE UNIQUE INDEX one_unclaimed_expedition ON expeditions(owner) WHERE claimed_at IS NULL;
+"""
+SCHEMA = BASE_SCHEMA + SHOP_SCHEMA + STAR_MIGRATION + TREE_SCHEMA + SQUAD_SCHEMA + DEFAULT_PRESET_SCHEMA + ACTIVITY_SCHEMA
 
 
 class AscendedTransaction(Protocol):
     """Everything a service may read or write inside one transaction."""
 
+    async def trial_clears(self, owner: str, type_id: str) -> set[int]: ...
+    async def mark_trial_clear(self, owner: str, type_id: str, stage: int) -> bool: ...
+    async def get_expedition(self, owner: str, expedition_id: str) -> ExpeditionRecord | None: ...
+    async def unclaimed_expedition(self, owner: str) -> ExpeditionRecord | None: ...
+    async def add_expedition(self, record: ExpeditionRecord) -> None: ...
+    async def claim_expedition(self, owner: str, expedition_id: str, claimed_at: float, receipt: dict[str, Any]) -> None: ...
     async def get_player(self, owner: str) -> PlayerRecord | None: ...
     async def create_player(self, owner: str, now: float) -> None: ...
     async def add_insignia(self, owner: str, delta: int) -> None: ...
@@ -326,14 +344,14 @@ class _SqliteTransaction:
     @staticmethod
     def _encounter(row: sqlite3.Row) -> EncounterRecord:
         return EncounterRecord(row["id"], row["owner"], row["ascended_id"], row["tier_id"], row["level"], row["status"],
-                               _instances(row["wild_personalities"]), row["created_at"])
+                               _instances(row["wild_personalities"]), row["created_at"], ActivityContext.from_dict(json.loads(row["activity"])))
 
     async def add_encounter(self, record: EncounterRecord) -> None:
         await self._run(
-            "INSERT INTO encounters (id, owner, ascended_id, tier_id, level, status, wild_personalities, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO encounters (id, owner, ascended_id, tier_id, level, status, wild_personalities, created_at, activity) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (record.id, record.owner, record.ascended_id, record.tier_id, record.level, record.status,
-             _dumps([i.to_dict() for i in record.wild_personalities]), record.created_at),
+             _dumps([i.to_dict() for i in record.wild_personalities]), record.created_at, _dumps(record.activity.to_dict())),
         )
 
     async def get_encounter(self, owner: str, encounter_id: str) -> EncounterRecord | None:
@@ -359,6 +377,7 @@ class _SqliteTransaction:
             player_personalities=_instances(row["player_personalities"]), wild_personalities=_instances(row["wild_personalities"]),
             emblem_limit=row["emblem_limit"], rng_seed=row["rng_seed"], rng_counter=row["rng_counter"],
             created_at=row["created_at"], updated_at=row["updated_at"],
+            activity=ActivityContext.from_dict(json.loads(row["activity"])),
             pending=json.loads(row["pending"]) if row["pending"] else None,
             result=json.loads(row["result"]) if row["result"] else None,
         )
@@ -369,15 +388,15 @@ class _SqliteTransaction:
             r.status, r.phase, r.mode, r.revision, _dumps(r.setup.to_dict()), _dumps(r.state.to_dict()),
             _dumps([i.to_dict() for i in r.player_personalities]), _dumps([i.to_dict() for i in r.wild_personalities]),
             r.emblem_limit, r.rng_seed, r.rng_counter, _dumps(r.pending) if r.pending is not None else None,
-            _dumps(r.result) if r.result is not None else None, r.updated_at,
+            _dumps(r.result) if r.result is not None else None, r.updated_at, _dumps(r.activity.to_dict()),
         )
 
     async def add_battle(self, record: BattleRecord) -> None:
         try:
             await self._run(
                 "INSERT INTO battles (id, owner, encounter_id, created_at, status, phase, mode, revision, setup, state, "
-                "player_personalities, wild_personalities, emblem_limit, rng_seed, rng_counter, pending, result, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "player_personalities, wild_personalities, emblem_limit, rng_seed, rng_counter, pending, result, updated_at, activity) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (record.id, record.owner, record.encounter_id, record.created_at, *self._battle_values(record)),
             )
         except sqlite3.IntegrityError as error:
@@ -400,7 +419,7 @@ class _SqliteTransaction:
         changed = await self._run(
             "UPDATE battles SET status = ?, phase = ?, mode = ?, revision = ?, setup = ?, state = ?, "
             "player_personalities = ?, wild_personalities = ?, emblem_limit = ?, rng_seed = ?, rng_counter = ?, "
-            "pending = ?, result = ?, updated_at = ? WHERE id = ? AND revision = ?",
+            "pending = ?, result = ?, updated_at = ?, activity = ? WHERE id = ? AND revision = ?",
             (*self._battle_values(record), record.id, expected_revision),
         )
         if changed != 1:
@@ -424,6 +443,37 @@ class _SqliteTransaction:
             (owner, key, request_hash, _dumps(response), now),
         )
 
+    async def trial_clears(self, owner: str, type_id: str) -> set[int]:
+        rows = await self._run("SELECT stage FROM trial_clears WHERE owner=? AND type_id=?", (owner, type_id), "all")
+        return {r["stage"] for r in rows}
+
+    async def mark_trial_clear(self, owner: str, type_id: str, stage: int) -> bool:
+        return bool(await self._run("INSERT OR IGNORE INTO trial_clears VALUES (?, ?, ?)", (owner, type_id, stage)))
+
+    @staticmethod
+    def _expedition(row: sqlite3.Row) -> ExpeditionRecord:
+        values = dict(row)
+        values["receipt"] = json.loads(values["receipt"]) if values["receipt"] else None
+        return ExpeditionRecord(**values)
+
+    async def get_expedition(self, owner: str, expedition_id: str) -> ExpeditionRecord | None:
+        row = await self._run("SELECT * FROM expeditions WHERE owner=? AND id=?", (owner, expedition_id), "one")
+        return self._expedition(row) if row else None
+
+    async def unclaimed_expedition(self, owner: str) -> ExpeditionRecord | None:
+        row = await self._run("SELECT * FROM expeditions WHERE owner=? AND claimed_at IS NULL", (owner,), "one")
+        return self._expedition(row) if row else None
+
+    async def add_expedition(self, record: ExpeditionRecord) -> None:
+        await self._run("INSERT INTO expeditions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (record.id, record.owner, record.ascended_id, record.started_at, record.ends_at,
+                         record.duration_hours, record.xp_reward, record.insignia_reward, record.claimed_at,
+                         _dumps(record.receipt) if record.receipt is not None else None))
+
+    async def claim_expedition(self, owner: str, expedition_id: str, claimed_at: float, receipt: dict[str, Any]) -> None:
+        await self._run("UPDATE expeditions SET claimed_at=?, receipt=? WHERE owner=? AND id=? AND claimed_at IS NULL",
+                        (claimed_at, _dumps(receipt), owner, expedition_id))
+
     # -- reset ---------------------------------------------------------------------
 
     # -- rotating shop ---------------------------------------------------------------
@@ -443,6 +493,8 @@ class _SqliteTransaction:
         await self._run("DELETE FROM shop_purchases WHERE owner = ? AND rotation < ?", (owner, rotation))
 
     async def delete_player_data(self, owner: str) -> None:
+        await self._run("DELETE FROM expeditions WHERE owner = ?", (owner,))
+        await self._run("DELETE FROM trial_clears WHERE owner = ?", (owner,))
         # Rounds carry no owner, so they go first, through the owner's battle ids.
         await self._run("DELETE FROM rounds WHERE battle_id IN (SELECT id FROM battles WHERE owner = ?)", (owner,))
         await self._run("DELETE FROM battles WHERE owner = ?", (owner,))
@@ -495,10 +547,15 @@ class SqliteAscendedRepository:
                              "(PARTITION BY owner ORDER BY level DESC, ascended_id ASC) AS position FROM ascendeds) "
                              "WHERE position <= ?", (self._squad_size,))
                 conn.execute(DEFAULT_PRESET_SCHEMA)
+                for statement in ACTIVITY_SCHEMA.split(";"):
+                    if statement.strip():
+                        conn.execute(statement)
                 conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
                 conn.execute("COMMIT")
             elif version == 6:
-                conn.executescript(f"BEGIN; {DEFAULT_PRESET_SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
+                conn.executescript(f"BEGIN; {DEFAULT_PRESET_SCHEMA} {ACTIVITY_SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
+            elif version == 7:
+                conn.executescript(f"BEGIN; {ACTIVITY_SCHEMA} PRAGMA user_version = {SCHEMA_VERSION}; COMMIT;")
             elif version != SCHEMA_VERSION:
                 raise RuntimeError(f"database schema version {version} is not supported (expected {SCHEMA_VERSION})")
         except BaseException:

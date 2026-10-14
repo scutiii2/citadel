@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 from dataclasses import replace
 
+from src.ascension.expeditions import require_available
 from src.ascension.squad import SquadService
 from src.ascension.catalog import Catalog
 from src.ascension.errors import AlreadyInitialized, BattleInProgress, InvalidRequest, NotFound
@@ -39,6 +40,8 @@ class CollectionService:
         now = self._clock.now()
         essences = await tx.essence_counts(owner)
         squad = await tx.get_squad(owner)
+        from src.ascension.expeditions import expedition_view
+        expedition = await tx.unclaimed_expedition(owner)
         ascendeds = []
         for ascended in await tx.list_ascendeds(owner):
             spec = self._catalog.ascended(ascended.ascended_id)
@@ -46,7 +49,11 @@ class CollectionService:
             tier_id = self._catalog.tier_of(ascended.ascended_id, ascended.tier_id)
             tier = self._catalog.tier(tier_id)
             needed = self._catalog.star_limit(ascended.ascended_id, tier_id)
+            dispatched = expedition is not None and expedition.ascended_id == ascended.ascended_id
             ascendeds.append({
+                "overall": self._catalog.activities.overall(ascended.ascended_id, tier_id, ascended.level),
+                "on_expedition": dispatched, "expedition_id": expedition.id if dispatched else None,
+                "availability_reason": "On expedition; claim rewards before using or upgrading" if dispatched else None,
                 "ascended_id": ascended.ascended_id, "name": spec.name, "in_squad": ascended.ascended_id in squad,
                 "ascension_types": [t.value for t in spec.ascension_types], "level": ascended.level, "xp": ascended.xp,
                 "xp_needed": None if ascended.level >= level_cap else self._catalog.levels.xp_per_level * ascended.level,
@@ -54,9 +61,9 @@ class CollectionService:
                 "sale_value": self._catalog.sale_value(ascended.ascended_id, tier_id, ascended.level),
                 "stars": ascended.stars, "stars_needed": needed, "star_essence_cost": tier.essence_cost,
                 "next_tier_id": self._catalog.next_tier(ascended.ascended_id, tier_id),
-                "can_star_up": needed is not None and ascended.stars < needed and ascended.copies >= 1
+                "can_star_up": not dispatched and needed is not None and ascended.stars < needed and ascended.copies >= 1
                                and essences.get(tier_id, 0) >= tier.essence_cost,
-                "can_tier_up": needed is not None and ascended.stars >= needed
+                "can_tier_up": not dispatched and needed is not None and ascended.stars >= needed
                                and self._catalog.next_tier(ascended.ascended_id, tier_id) is not None,
                 "faint_until": ascended.faint_until,
                 "default_preset_slot": ascended.default_preset_slot,
@@ -65,6 +72,7 @@ class CollectionService:
         pending = await tx.pending_encounter(owner)
         active = await tx.active_battle(owner)
         return {
+            "server_now": now, "expedition": expedition_view(expedition, now),
             "owner": owner, "insignia": player.insignia, "emblems": await tx.emblem_counts(owner), "essences": essences,
             "ascendeds": ascendeds, "squad": list(squad), "squad_size": self._catalog.economy.squad_size,
             "pending_encounter": pending.id if pending else None, "active_battle": active.id if active else None,
@@ -148,6 +156,7 @@ class CollectionService:
 
         async def work(tx: AscendedTransaction) -> dict[str, Any]:
             await self._require_ascended(tx, owner, ascended_id)
+            await require_available(tx, owner, ascended_id)
             ascended = await tx.get_ascended(owner, ascended_id)
             await tx.put_ascended(replace(ascended, default_preset_slot=slot))
             return {"ascended_id": ascended_id, "slot": slot}
@@ -167,6 +176,7 @@ class CollectionService:
 
         async def work(tx: AscendedTransaction) -> dict[str, Any]:
             await self._require_ascended(tx, owner, ascended_id)
+            await require_available(tx, owner, ascended_id)
             found = await tx.get_personalities(owner, ascended_id, instance_ids)
             if len(found) != len(instance_ids):
                 raise InvalidRequest("every instance must be one of this Ascended's collected personalities")

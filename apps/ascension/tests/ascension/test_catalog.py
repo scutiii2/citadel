@@ -144,10 +144,10 @@ def test_a_bad_shop_section_is_refused(raw, mutate):
 def test_sprites_are_found_in_the_folder_and_crops_come_from_catalog_json(catalog):
     guardian = catalog.ascended("guardian").art
     assert (guardian.main_card, guardian.preview_card, guardian.battle) == (True, True, True)
-    assert (guardian.focus, guardian.focus_preview) == (21, 50)
+    assert (guardian.focus, guardian.focus_preview) == (50, 50)
     assert catalog.ascended("sentinel").art.focus_preview == 14
     bruiser = catalog.ascended("bruiser").art
-    assert (bruiser.main_card, bruiser.preview_card, bruiser.battle) == (False, False, False)
+    assert (bruiser.main_card, bruiser.preview_card, bruiser.battle) == (True, True, True)
     assert (bruiser.focus, bruiser.focus_preview) == (50, 50)
 
 
@@ -176,7 +176,7 @@ def test_a_bad_animation_is_refused(raw, animation):
 
 def test_sprite_path_only_answers_for_catalog_ids_and_exact_names(catalog):
     assert catalog.sprite_path("guardian", "sprite_battle.webp").is_file()
-    assert catalog.sprite_path("bruiser", "sprite_battle.webp") is None  # no such file
+    assert catalog.sprite_path("bruiser", "sprite_battle.webp").is_file()
     assert catalog.sprite_path("nobody", "sprite_battle.webp") is None
     for bad in ("catalog.json", "../guardian/sprite_battle.webp", "sprite_battle.png", "SPRITE_BATTLE.WEBP", ""):
         assert catalog.sprite_path("guardian", bad) is None

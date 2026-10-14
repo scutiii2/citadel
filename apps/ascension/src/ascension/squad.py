@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from typing import Any
+from src.ascension.expeditions import require_available
 from src.ascension.catalog import Catalog
 from src.ascension.errors import BattleInProgress, InvalidRequest, NotFound
 from src.ascension.idempotency import IdempotentWriter
@@ -31,6 +32,8 @@ class SquadService:
                     raise NotFound("you do not own that Ascended")
             if await tx.active_battle(owner) is not None:
                 raise BattleInProgress("finish your active battle before editing your squad")
+            for ascended_id in ascended_ids:
+                await require_available(tx, owner, ascended_id)
             await tx.set_squad(owner, ascended_ids)
             return {"ascended_ids": list(ascended_ids), "size": size}
 
@@ -38,6 +41,9 @@ class SquadService:
 
     @staticmethod
     async def auto_equip(tx: AscendedTransaction, owner: str, ascended_id: str, size: int) -> None:
+        expedition = await tx.unclaimed_expedition(owner)
+        if expedition is not None and expedition.ascended_id == ascended_id:
+            return
         squad = await tx.get_squad(owner)
         if ascended_id not in squad and len(squad) < size:
             await tx.set_squad(owner, (*squad, ascended_id))

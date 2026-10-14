@@ -93,7 +93,7 @@ def test_a_roll_creates_a_preview_without_personalities_and_starts_the_cooldown(
         return preview, profile, again, fetched, env.clock.now()
 
     preview, profile, again, fetched, now = run(scenario())
-    assert set(preview) == {"id", "ascended_id", "name", "tier_id", "level", "status", "created_at"}
+    assert set(preview) == {"id", "ascended_id", "name", "tier_id", "level", "status", "created_at", "activity", "overall"}
     assert preview == again == fetched and preview["status"] == "pending"
     assert profile["pending_encounter"] == preview["id"] and profile["next_roll_at"] == now + COOLDOWN
 

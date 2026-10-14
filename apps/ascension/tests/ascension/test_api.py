@@ -30,7 +30,7 @@ def clock():
 
 @pytest.fixture
 def client(config, tmp_path, clock):
-    config = dataclasses.replace(config, database_path=tmp_path / "api.sqlite3")
+    config = dataclasses.replace(config, database_path=tmp_path / "api.sqlite3", encounter_cooldown_seconds=30)
     app = create_app()
     services = build_ascended_services(config, LayaClient(FakeEngine(fail=True)), clock=clock, rng=SeededRandom(5))
     mount_ascendeds(app, services)
@@ -273,9 +273,10 @@ def test_the_catalog_lists_each_ascended_s_sprites(client):
         "main_card": "/ascended/guardian/sprite_main_card.webp",
         "preview_card": "/ascended/guardian/sprite_preview_card.webp",
         "battle": "/ascended/guardian/sprite_battle.webp",
-        "focus": 21, "focus_preview": 50, "animation": None,
+        "focus": 50, "focus_preview": 50, "animation": None,
     }
-    assert by_id["bruiser"]["art"]["main_card"] is None and by_id["bruiser"]["art"]["battle"] is None
+    assert by_id["bruiser"]["art"]["main_card"] == "/ascended/bruiser/sprite_main_card.webp"
+    assert by_id["bruiser"]["art"]["battle"] == "/ascended/bruiser/sprite_battle.webp"
 
 
 def test_an_ascended_with_a_sheet_lists_its_animation(client):
@@ -296,7 +297,7 @@ def test_sprites_are_public_and_never_stale(client):
 
 
 @pytest.mark.parametrize("path", [
-    "/ascended/nobody/sprite_battle.webp", "/ascended/bruiser/sprite_battle.webp", "/ascended/guardian/catalog.json",
+    "/ascended/nobody/sprite_battle.webp", "/ascended/missing/sprite_battle.webp", "/ascended/guardian/catalog.json",
     "/ascended/guardian/sprite_battle.png", "/ascended/guardian/%2e%2e/guardian/sprite_battle.webp",
     "/ascended/%2e%2e/configs/ascension_catalog.json", "/ascended/guardian/..%5ccatalog.json", "/ascended/guardian",
 ])

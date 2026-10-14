@@ -339,6 +339,8 @@ class Catalog:
         self.ascendeds_path: Path | None = None
         try:
             self._build(raw)
+            from src.ascension.activity_rules import ActivityRules
+            self.activities = ActivityRules(self, raw.get('activities'))
         except CatalogError:
             raise
         except (TypeError, KeyError, AttributeError, ValueError, IndexError) as error:

@@ -2,10 +2,43 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from src.ascension.models import BattleSetup, BattleState, PersonalityInstance
+
+
+@dataclass(frozen=True)
+class ActivityContext:
+    kind: str = 'legacy'
+    difficulty_id: str | None = None
+    trial_type: str | None = None
+    trial_stage: int | None = None
+    overall: int | None = None
+    reward_multiplier: float = 1.0
+    recommended_min: int | None = None
+    recommended_max: int | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> ActivityContext:
+        return cls(**raw)
+
+
+@dataclass(frozen=True)
+class ExpeditionRecord:
+    id: str
+    owner: str
+    ascended_id: str
+    started_at: float
+    ends_at: float
+    duration_hours: int
+    xp_reward: int
+    insignia_reward: int
+    claimed_at: float | None = None
+    receipt: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -61,6 +94,7 @@ class EncounterRecord:
     status: str  # pending, declined, started or expired
     wild_personalities: tuple[PersonalityInstance, ...]  # hidden until a capture
     created_at: float
+    activity: ActivityContext = field(default_factory=ActivityContext)
 
 
 @dataclass(frozen=True)
@@ -83,6 +117,7 @@ class BattleRecord:
     updated_at: float
     pending: dict[str, Any] | None = None  # private: wild action and EMBLEM prompt while awaiting_emblem
     result: dict[str, Any] | None = None
+    activity: ActivityContext = field(default_factory=ActivityContext)
 
 
 @dataclass(frozen=True)

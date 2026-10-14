@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt, StrictStr
 
@@ -24,6 +24,8 @@ from src.ascension.squad import SquadService
 from src.ascension.shop import ShopService
 from src.ascension.trees import TreeService
 from src.ascension.upgrades import UpgradeService
+from src.ascension.expeditions import ExpeditionService
+from src.ascension.trials import TrialService
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,8 @@ class AscendedServices:
     trees: TreeService
     coordinator: RoundCoordinator
     squad: SquadService
+    trials: TrialService
+    expeditions: ExpeditionService
 
 
 class _Body(BaseModel):
@@ -64,6 +68,21 @@ class LoadoutBody(_Body):
 
 class SquadBody(_Body):
     ascended_ids: list[StrictStr]
+
+
+class EncounterBody(_Body):
+    difficulty_id: StrictStr | None = None
+
+
+class ExpeditionBody(_Body):
+    ascended_id: StrictStr
+    duration_hours: StrictInt
+
+
+class TrialBody(_Body):
+    ascended_id: StrictStr
+    preset_slot: StrictInt | None = None
+    mode: StrictStr = 'manual'
 
 
 class StartBody(_Body):
@@ -126,6 +145,7 @@ def catalog_summary(catalog: Catalog) -> dict[str, Any]:
     """Public catalog data: Ascended, abilities, tiers, personalities and shop metadata."""
     return {
         "version": catalog.version,
+        "activities": catalog.activities.to_public(),
         "tiers": [
             {"id": t.id, "stat_multiplier": t.stat_multiplier, "stars_to_advance": t.stars_to_advance, "essence_cost": t.essence_cost,
              "copy_reward": t.copy_reward,
@@ -149,6 +169,48 @@ def catalog_summary(catalog: Catalog) -> dict[str, Any]:
 def build_router(services: AscendedServices) -> APIRouter:
     router = APIRouter(prefix="/ascension", dependencies=[Depends(requester)])
     collection, encounters, shop, coordinator = services.collection, services.encounters, services.shop, services.coordinator
+
+    @router.get('/activities')
+    async def activities():
+        return services.catalog.activities.to_public()
+
+    @router.get('/activities/hunts/{difficulty_id}/prepare')
+    async def prepare_hunt(difficulty_id: str, ascended_id: str, owner: str = Depends(requester)):
+        from src.ascension.activity_rules import hunt_multiplier
+        profile = await collection.profile(owner)
+        owned = next((a for a in profile['ascendeds'] if a['ascended_id'] == ascended_id), None)
+        if owned is None:
+            from src.ascension.errors import NotFound
+            raise NotFound('you do not own that Ascended')
+        hunt = services.catalog.activities.hunt(difficulty_id)
+        multiplier = hunt_multiplier(owned['overall'], hunt.recommended_max)
+        return dict(overall=owned['overall'], recommended_min=hunt.recommended_min, recommended_max=hunt.recommended_max,
+                    reward_multiplier=multiplier, penalty_percent=int((1-multiplier)*100+.5), below_range=owned['overall'] < hunt.recommended_min)
+
+    @router.get('/trials')
+    async def trials(owner: str = Depends(requester)):
+        return await services.trials.progress(owner)
+
+    @router.get('/trials/{type_id}/stages/{stage}/prepare')
+    async def prepare_trial(type_id: str, stage: int, owner: str = Depends(requester)):
+        return await services.trials.prepare(owner, type_id, stage)
+
+    @router.post('/trials/{type_id}/stages/{stage}/battles', status_code=201)
+    async def start_trial(type_id: str, stage: int, body: TrialBody, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
+        return await coordinator.start_trial(owner, key, type_id=type_id, stage=stage, ascended_id=body.ascended_id,
+                                             preset_slot=body.preset_slot, mode=body.mode)
+
+    @router.get('/expeditions')
+    async def expeditions(owner: str = Depends(requester)):
+        return await services.expeditions.get(owner)
+
+    @router.post('/expeditions', status_code=201)
+    async def depart(body: ExpeditionBody, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
+        return await services.expeditions.start(owner, key, body.ascended_id, body.duration_hours)
+
+    @router.post('/expeditions/{expedition_id}/claim')
+    async def claim_expedition(expedition_id: str, owner: str = Depends(requester), key: str = Depends(idempotency_key)):
+        return await services.expeditions.claim(owner, key, expedition_id)
 
     @router.get("/catalog")
     async def catalog() -> dict[str, Any]:
@@ -194,8 +256,8 @@ def build_router(services: AscendedServices) -> APIRouter:
         return await collection.put_preset(owner, key, ascended_id, slot, body.instance_ids)
 
     @router.post("/encounters", status_code=201)
-    async def roll_encounter(owner: str = Depends(requester), key: str = Depends(idempotency_key)):
-        return await encounters.roll(owner, key)
+    async def roll_encounter(body: EncounterBody | None = Body(default=None), owner: str = Depends(requester), key: str = Depends(idempotency_key)):
+        return await encounters.roll(owner, key, body.difficulty_id if body else None)
 
     @router.get("/encounters/{encounter_id}")
     async def get_encounter(encounter_id: str, owner: str = Depends(requester)):

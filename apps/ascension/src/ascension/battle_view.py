@@ -56,7 +56,7 @@ class BattleViewBuilder:
         if not finished:
             names = {a.id: a.name for a in record.setup.player.abilities}
             effects = {a.id: [e.to_dict() for e in a.effects] for a in record.setup.player.abilities}
-            for action in self._engine.legal_actions(record.setup, record.state, PLAYER, can_collect=bool(emblems)):
+            for action in self._engine.legal_actions(record.setup, record.state, PLAYER, can_collect=record.activity.kind != "trial" and bool(emblems)):
                 actions.append({"kind": action.kind, "category": action.category, "ability_id": action.ability_id,
                                 "name": names.get(action.ability_id), "percentage": action.percentage,
                                 "effects": effects.get(action.ability_id, [])})
@@ -66,6 +66,8 @@ class BattleViewBuilder:
             prompt = {"deadline": deadline, "seconds_left": max(0.0, deadline - now),
                       "permitted_tiers": self.permitted_tiers(emblems, record.emblem_limit), "owned": emblems}
         return {
+            "activity": record.activity.to_dict(),
+            "can_autonomous": bool(record.player_personalities) and (record.activity.kind == "trial" or record.emblem_limit is not None),
             "id": record.id, "status": record.status, "phase": record.phase, "mode": record.mode,
             "round": record.state.round, "revision": record.revision, "emblem_limit": record.emblem_limit,
             "player": self._fighter(record, PLAYER), "wild": self._fighter(record, WILD),

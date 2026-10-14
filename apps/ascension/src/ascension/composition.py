@@ -23,6 +23,8 @@ from src.ascension.shop import ShopService
 from src.ascension.shop_offers import ShopOffers
 from src.ascension.trees import TreeService
 from src.ascension.upgrades import UpgradeService
+from src.ascension.expeditions import ExpeditionService
+from src.ascension.trials import TrialService
 from src.ascension.situation import (
     FallbackSituationReader,
     HeuristicSituationReader,
@@ -56,6 +58,8 @@ def build_ascended_services(
     )
     return AscendedServices(
         catalog=catalog,
+        trials=TrialService(repository, catalog, clock, progression),
+        expeditions=ExpeditionService(repository, writer, catalog, progression, clock),
         collection=CollectionService(repository, writer, catalog, clock, rng, config.encounter_cooldown_seconds),
         encounters=EncounterService(repository, writer, catalog, clock, rng, config.encounter_cooldown_seconds),
         shop=ShopService(repository, writer, catalog, progression,

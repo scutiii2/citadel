@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+from src.ascension.expeditions import require_available
 from src.ascension.catalog import Catalog
 from src.ascension.errors import InsufficientCopies, InsufficientEssence, InvalidRequest, NotFound, UpgradeNotReady
 from src.ascension.idempotency import IdempotentWriter
@@ -21,6 +22,7 @@ class UpgradeService:
         owned = await tx.get_ascended(owner, ascended_id)
         if owned is None:
             raise NotFound("you do not own that Ascended")
+        await require_available(tx, owner, ascended_id)
         return owned, self._catalog.tier_of(ascended_id, owned.tier_id)
 
     async def add_star(self, owner: str, key: str, ascended_id: str) -> dict[str, Any]:

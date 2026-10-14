@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from src.ascension.catalog import Catalog
 from src.ascension.errors import ActiveBattleExists, EncounterCooldown, InvalidRequest, NotFound, WrongPhase
 from src.ascension.idempotency import IdempotentWriter
 from src.ascension.models import PersonalityInstance
-from src.ascension.records import EncounterRecord
+from src.ascension.records import ActivityContext, EncounterRecord
 from src.ascension.repository import AscendedRepository, AscendedTransaction
 from src.ascension.runtime import Clock, RandomSource, new_id
 
@@ -52,6 +52,9 @@ class EncounterRoller:
         low = min(max(highest_level - window, 1), cap)
         high = min(max(highest_level + window, 1), cap)
         level = low + self._pick(high - low + 1, rng.next())
+        return RolledEncounter(spec.id, tier_id, level, self.personalities(rng))
+
+    def personalities(self, rng: RandomSource) -> tuple[PersonalityInstance, ...]:
         types = list(self._catalog.personalities)
         tier_odds = self._catalog.economy.personality_tier_probabilities
         instances = []
@@ -64,7 +67,25 @@ class EncounterRoller:
                     tier = number
                     break
             instances.append(PersonalityInstance(new_id(), type_id, tier))
-        return RolledEncounter(spec.id, tier_id, level, tuple(instances))
+        return tuple(instances)
+
+
+    def roll_hunt(self, difficulty_id: str, rng: RandomSource) -> RolledEncounter:
+        candidates = self._catalog.activities.candidates(difficulty_id)
+        weights = [(tier, self._catalog.tier(tier).encounter_probability) for tier in candidates]
+        draw = rng.next() * sum(w for _, w in weights)
+        tier_id = weights[-1][0]
+        for tier, weight in weights:
+            draw -= weight
+            if draw < 0:
+                tier_id = tier
+                break
+        species = candidates[tier_id]
+        ids = list(species)
+        ascended_id = ids[self._pick(len(ids), rng.next())]
+        levels = species[ascended_id]
+        level = levels[self._pick(len(levels), rng.next())]
+        return RolledEncounter(ascended_id, tier_id, level, self.personalities(rng))
 
 
 class EncounterService:
@@ -79,9 +100,10 @@ class EncounterService:
         spec = self._catalog.ascended(record.ascended_id)
         return {"id": record.id, "ascended_id": record.ascended_id, "name": spec.name,
                 "tier_id": record.tier_id, "level": record.level, "status": record.status,
-                "created_at": record.created_at}
+                "created_at": record.created_at, "activity": record.activity.to_dict(),
+                "overall": self._catalog.activities.overall(record.ascended_id, record.tier_id, record.level)}
 
-    async def roll(self, owner: str, key: str) -> dict[str, Any]:
+    async def roll(self, owner: str, key: str, difficulty_id: str | None = None) -> dict[str, Any]:
         async def work(tx: AscendedTransaction) -> dict[str, Any]:
             player = await tx.get_player(owner)
             if player is None:
@@ -95,14 +117,14 @@ class EncounterService:
             if previous is not None:
                 await tx.set_encounter_status(previous.id, "expired")
             highest = max(s.level for s in await tx.list_ascendeds(owner))
-            rolled = self._roller.roll(highest, self._rng)
+            rolled = self._roller.roll(highest, self._rng) if difficulty_id is None else self._roller.roll_hunt(difficulty_id, self._rng)
             record = EncounterRecord(new_id(), owner, rolled.ascended_id, rolled.tier_id, rolled.level, "pending",
-                                     rolled.personalities, now)
+                                     rolled.personalities, now, ActivityContext() if difficulty_id is None else ActivityContext(kind="hunt", difficulty_id=difficulty_id))
             await tx.add_encounter(record)
             await tx.set_last_roll(owner, now)
             return self.preview(record)
 
-        return await self._writer.commit(owner, key, "encounter.roll", {}, work)
+        return await self._writer.commit(owner, key, "encounter.roll", {} if difficulty_id is None else {"difficulty_id": difficulty_id}, work)
 
     async def get(self, owner: str, encounter_id: str) -> dict[str, Any]:
         async with self._repo.transaction() as tx:

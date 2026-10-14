@@ -70,14 +70,25 @@ class ProgressionService:
         """Apply the consequences of `terminal` and return the public result."""
         owner = battle.owner
         fighter, enemy = battle.setup.player, battle.setup.wild
+        if battle.activity.kind == "trial" and terminal == "captured":
+            from src.ascension.errors import InvalidRequest
+            raise InvalidRequest("capture is unavailable in Trials")
         result: dict[str, Any] = {"kind": terminal}
         ascended = await tx.get_ascended(owner, fighter.ascended_id)
 
         if terminal in REWARDED:
             xp, insignia = self.rewards_for(enemy.level, enemy.tier_id)
+            multiplier = battle.activity.reward_multiplier
+            if battle.activity.kind == "trial":
+                first_clear = await tx.mark_trial_clear(owner, battle.activity.trial_type, battle.activity.trial_stage)
+                result["first_clear"] = first_clear
+                multiplier = 2 if first_clear else 1
+            xp, insignia = math.floor(xp * multiplier + _EPS), math.floor(insignia * multiplier + _EPS)
             level, new_xp = self.add_xp(fighter.ascended_id, ascended.level, ascended.xp, xp)
             await tx.put_ascended(replace(ascended, level=level, xp=new_xp))
             bench = [a for a in await tx.get_squad(owner) if a != fighter.ascended_id]
+            if battle.activity.kind == "trial":
+                bench = [a for a in bench if battle.activity.trial_type in self._catalog.ascended(a).ascension_types]
             share = self.squad_share(xp, len(bench))
             result["squad_xp"] = []
             for ascended_id in bench:
@@ -89,7 +100,7 @@ class ProgressionService:
                 result["squad_xp"].append({"ascended_id": ascended_id, "name": self._catalog.ascended(ascended_id).name,
                                            "xp": share, "level_before": member.level, "level_after": bench_level})
             await tx.add_insignia(owner, insignia)
-            essence = self._catalog.tier(enemy.tier_id).essence_cost
+            essence = math.floor(self._catalog.tier(enemy.tier_id).essence_cost * multiplier + _EPS)
             await tx.add_essence(owner, enemy.tier_id, essence)
             result.update(xp=xp, insignia=insignia, essence=essence, essence_tier_id=enemy.tier_id,
                           level_before=ascended.level, level_after=level)

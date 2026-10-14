@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.ascension.expeditions import require_available
 from src.ascension.catalog import Catalog
 from src.ascension.errors import InsufficientEssence, InvalidRequest, NotFound, UpgradeNotReady, WrongPhase
 from src.ascension.idempotency import IdempotentWriter
@@ -98,6 +99,7 @@ class TreeService:
     async def learn(self, owner: str, key: str, ascended_id: str, node_id: str) -> dict[str, Any]:
         async def work(tx: AscendedTransaction) -> dict[str, Any]:
             record = await self._owned(tx, owner, ascended_id)
+            await require_available(tx, owner, ascended_id)
             tree = self._catalog.ascended(ascended_id).tree
             node = tree.node(node_id)
             if node is None:
@@ -124,6 +126,7 @@ class TreeService:
 
         async def work(tx: AscendedTransaction) -> dict[str, Any]:
             await self._owned(tx, owner, ascended_id)
+            await require_available(tx, owner, ascended_id)
             tree = self._catalog.ascended(ascended_id).tree
             for slot, node_id in slots.items():
                 if slot not in tree.slot_ids:

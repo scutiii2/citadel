@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from typing import Any, AsyncIterator
 
+from src.ascension.expeditions import require_available
 from src.ascension.battle_view import BattleViewBuilder
 from src.ascension.catalog import Catalog, CatalogError
 from src.ascension.collection import check_preset_slot
@@ -40,7 +41,7 @@ from src.ascension.errors import (
 from src.ascension.idempotency import IdempotentWriter
 from src.ascension.models import PLAYER, WILD, Action, BattleSetup
 from src.ascension.progression import ProgressionService
-from src.ascension.records import BattleRecord
+from src.ascension.records import ActivityContext, BattleRecord, EncounterRecord
 from src.ascension.trees import TreeService
 from src.ascension.repository import AscendedRepository, AscendedTransaction
 from src.ascension.runtime import Clock, SeededRandom, new_id, new_seed
@@ -148,38 +149,74 @@ class RoundCoordinator:
                 raise NotFound("no such encounter")
             if encounter.status != "pending":
                 raise WrongPhase(f"this encounter is already {encounter.status}")
-            ascended = await tx.get_ascended(owner, ascended_id)
-            if ascended is None:
-                raise NotFound("you do not own that Ascended")
-            if ascended_id not in await tx.get_squad(owner):
-                raise InvalidRequest("that Ascended is not in your squad")
-            now = self._clock.now()
-            if ascended.faint_until is not None and ascended.faint_until > now:
-                raise AscendedFainted(f"that Ascended is fainted for another {ascended.faint_until - now:.0f} seconds")
-            instances = ()
-            if preset_slot is not None:
-                preset = await tx.get_preset(owner, ascended_id, preset_slot)
-                ids = list(preset.instance_ids) if preset else []
-                by_id = {p.id: p.instance() for p in await tx.get_personalities(owner, ascended_id, ids)}
-                instances = tuple(by_id[i] for i in ids if i in by_id)  # frozen for the whole battle
-            if mode == "autonomous" and not instances:
-                raise InvalidRequest("that preset has no personalities; equip at least one")
-            loadout = await self._trees.loadout_in(tx, owner, ascended_id) if self._trees else None
-            setup = BattleSetup(
-                self._engine.build_fighter(PLAYER, ascended_id, self._catalog.tier_of(ascended_id, ascended.tier_id), ascended.level, loadout),
-                self._engine.build_fighter(WILD, encounter.ascended_id, encounter.tier_id, encounter.level),
-            )
-            record = BattleRecord(
-                id=new_id(), owner=owner, encounter_id=encounter.id, status="active", phase="choosing", mode=mode,
-                revision=1, setup=setup, state=self._engine.start_state(setup), player_personalities=instances,
-                wild_personalities=encounter.wild_personalities, emblem_limit=emblem_limit, rng_seed=new_seed(),
-                rng_counter=0, created_at=now, updated_at=now,
-            )
-            await tx.add_battle(record)
-            await tx.set_encounter_status(encounter.id, "started")
-            return self._battle_views.build(record, await tx.emblem_counts(owner), now)
+            return await self._start_in(tx, owner, encounter, ascended_id, preset_slot, mode, emblem_limit)
 
         return await self._writer.commit(owner, key, "battle.start", payload, work)
+
+    async def _start_in(self, tx, owner, encounter, ascended_id, preset_slot, mode, emblem_limit):
+        if mode not in MODES:
+            raise InvalidRequest('unknown control mode')
+        if preset_slot is not None:
+            check_preset_slot(preset_slot)
+        if mode == 'autonomous' and (preset_slot is None or (encounter.activity.kind != 'trial' and emblem_limit is None)):
+            raise InvalidRequest('autonomous play needs a preset and, for Hunts, an EMBLEM limit')
+        ascended = await tx.get_ascended(owner, ascended_id)
+        if ascended is None:
+            raise NotFound("you do not own that Ascended")
+        await require_available(tx, owner, ascended_id)
+        if ascended_id not in await tx.get_squad(owner):
+            raise InvalidRequest("that Ascended is not in your squad")
+        now = self._clock.now()
+        if ascended.faint_until is not None and ascended.faint_until > now:
+            raise AscendedFainted(f"that Ascended is fainted for another {ascended.faint_until - now:.0f} seconds")
+        instances = ()
+        if preset_slot is not None:
+            preset = await tx.get_preset(owner, ascended_id, preset_slot)
+            ids = list(preset.instance_ids) if preset else []
+            by_id = {p.id: p.instance() for p in await tx.get_personalities(owner, ascended_id, ids)}
+            instances = tuple(by_id[i] for i in ids if i in by_id)  # frozen for the whole battle
+        if mode == "autonomous" and not instances:
+            raise InvalidRequest("that preset has no personalities; equip at least one")
+        loadout = await self._trees.loadout_in(tx, owner, ascended_id) if self._trees else None
+        setup = BattleSetup(
+            self._engine.build_fighter(PLAYER, ascended_id, self._catalog.tier_of(ascended_id, ascended.tier_id), ascended.level, loadout),
+            self._engine.build_fighter(WILD, encounter.ascended_id, encounter.tier_id, encounter.level),
+        )
+        activity = encounter.activity
+        if activity.kind == 'hunt':
+            from src.ascension.activity_rules import hunt_multiplier
+            hunt = self._catalog.activities.hunt(activity.difficulty_id)
+            overall = self._catalog.activities.overall(ascended_id, setup.player.tier_id, ascended.level)
+            activity = replace(activity, overall=overall, reward_multiplier=hunt_multiplier(overall, hunt.recommended_max),
+                               recommended_min=hunt.recommended_min, recommended_max=hunt.recommended_max)
+        record = BattleRecord(
+            id=new_id(), owner=owner, encounter_id=encounter.id, status="active", phase="choosing", mode=mode,
+            activity=activity, revision=1, setup=setup, state=self._engine.start_state(setup), player_personalities=instances,
+            wild_personalities=encounter.wild_personalities, emblem_limit=emblem_limit, rng_seed=new_seed(),
+            rng_counter=0, created_at=now, updated_at=now,
+        )
+        await tx.add_battle(record)
+        await tx.set_encounter_status(encounter.id, "started")
+        return self._battle_views.build(record, await tx.emblem_counts(owner), now)
+
+    async def start_trial(self, owner: str, key: str, *, type_id: str, stage: int, ascended_id: str,
+                          preset_slot: int | None, mode: str) -> dict[str, Any]:
+        from src.ascension.trials import TrialService
+        from src.ascension.encounters import EncounterRoller
+        trials = TrialService(self._repo, self._catalog, self._clock)
+        payload = dict(type_id=type_id, stage=stage, ascended_id=ascended_id, preset_slot=preset_slot, mode=mode)
+        async def work(tx):
+            spec = await trials.validate_in(tx, owner, type_id, stage, ascended_id)
+            previous = await tx.pending_encounter(owner)
+            if previous is not None:
+                await tx.set_encounter_status(previous.id, 'expired')
+            rng = SeededRandom(new_seed())
+            encounter = EncounterRecord(new_id(), owner, spec.ascended_id, spec.tier_id, spec.level, 'pending',
+                                        EncounterRoller(self._catalog).personalities(rng), self._clock.now(),
+                                        ActivityContext(kind='trial', trial_type=type_id, trial_stage=stage))
+            await tx.add_encounter(encounter)
+            return await self._start_in(tx, owner, encounter, ascended_id, preset_slot, mode, None)
+        return await self._writer.commit(owner, key, 'trial.start', payload, work)
 
     # -- deciding ------------------------------------------------------------------
 
@@ -198,6 +235,8 @@ class RoundCoordinator:
             if fresh is None or fresh.revision != record.revision or fresh.status != "active":
                 raise StaleBattle("the battle moved on; reload it and try again")
             emblems = await tx.emblem_counts(owner)
+            if player_action.kind == "catch" and fresh.activity.kind == "trial":
+                raise InvalidRequest("capture is unavailable in Trials")
             if player_action.kind == "catch" and emblems.get(player_action.emblem_tier, 0) < 1:
                 raise InsufficientEmblems(f"you have no {player_action.emblem_tier} EMBLEM")
             outcome = self._engine.resolve_round(fresh.setup, fresh.state, player_action, wild_action, rng)
@@ -235,7 +274,7 @@ class RoundCoordinator:
             self._require(record, round=round, revision=revision)
             if record.mode != "manual":
                 raise WrongPhase("this battle is autonomous; switch to manual or use advance")
-            legal = self._engine.legal_actions(record.setup, record.state, PLAYER, can_collect=bool(emblems))
+            legal = self._engine.legal_actions(record.setup, record.state, PLAYER, can_collect=record.activity.kind != "trial" and bool(emblems))
             try:
                 player_action = self._engine.resolve_action(legal, action)
             except (ActionError, CatalogError) as error:
@@ -270,7 +309,7 @@ class RoundCoordinator:
                 return self._release_if_finished(battle_id, await self._settle_prompt(owner, key, payload, record, emblems))
             rng = SeededRandom(record.rng_seed, record.rng_counter)
             permitted = self._battle_views.permitted_tiers(emblems, record.emblem_limit)
-            player = await self._decide(record, PLAYER, rng, can_collect=bool(permitted))
+            player = await self._decide(record, PLAYER, rng, can_collect=record.activity.kind != "trial" and bool(permitted))
             wild = await self._decide(record, WILD, rng, can_collect=False)
             if player.action.kind == "catch":
                 return await self._open_prompt(owner, key, payload, record, wild, player, rng)
@@ -332,6 +371,8 @@ class RoundCoordinator:
             if cached is not None:
                 return cached
             record, emblems = await self._load(owner, battle_id)
+            if record.activity.kind == "trial":
+                raise InvalidRequest("capture is unavailable in Trials")
             self._require(record, round=round, revision=revision, phase="awaiting_emblem")
             if self._clock.now() >= record.pending["deadline"]:
                 raise DeadlinePassed("the prompt has expired; advance the battle instead")
@@ -362,7 +403,7 @@ class RoundCoordinator:
                     raise NotFound("no such battle")
                 self._require(record, round=round, revision=revision)
                 limit = emblem_limit or record.emblem_limit
-                if mode == "autonomous" and (not record.player_personalities or limit is None):
+                if mode == "autonomous" and (not record.player_personalities or (record.activity.kind != "trial" and limit is None)):
                     raise InvalidRequest("autonomous play needs equipped personalities and an EMBLEM tier limit")
                 try:
                     if limit is not None:

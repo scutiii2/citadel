@@ -233,5 +233,68 @@
         "wild_flee_share": 1.0
       }
     }
+  },
+  "activities": {
+    "hunts": [
+      {
+        "id": "outskirts",
+        "name": "Outskirts",
+        "recommended_min": 100,
+        "recommended_max": 299,
+        "enemy_min": 100,
+        "enemy_max": 299
+      },
+      {
+        "id": "frontier",
+        "name": "Frontier",
+        "recommended_min": 300,
+        "recommended_max": 599,
+        "enemy_min": 300,
+        "enemy_max": 599
+      },
+      {
+        "id": "forbidden_grounds",
+        "name": "Forbidden Grounds",
+        "recommended_min": 600,
+        "recommended_max": 1599,
+        "enemy_min": 600,
+        "enemy_max": 1599
+      }
+    ],
+    "trial_stages": [
+      {
+        "stage": 1,
+        "ascended_id": "guardian",
+        "tier_id": "common",
+        "level": 3
+      },
+      {
+        "stage": 2,
+        "ascended_id": "bruiser",
+        "tier_id": "rare",
+        "level": 8
+      },
+      {
+        "stage": 3,
+        "ascended_id": "twoychi",
+        "tier_id": "unique",
+        "level": 15
+      },
+      {
+        "stage": 4,
+        "ascended_id": "twoychi",
+        "tier_id": "legendary",
+        "level": 25
+      }
+    ],
+    "expeditions": {
+      "durations_hours": [
+        2,
+        4,
+        8
+      ],
+      "xp_per_hour": 100,
+      "insignia_per_hour": 25
+    }
   }
 }
