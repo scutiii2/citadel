@@ -94,7 +94,7 @@ async function save(): Promise<void> {
     <ul v-else class="choices personalities" :class="{ busy: loading }" :aria-busy="loading">
       <li v-for="p in filtered" :key="p.id" :class="{ selected: chosen.includes(p.id) }">
         <span class="personality-art"><EmIcon :name="p.type.includes('AGGRESS') ? 'battle' : p.type.includes('DEFEN') ? 'shield' : p.type.includes('CALM') ? 'feather' : 'ascended'" :size="38" /></span>
-        <div class="personality-name"><strong>{{ titleCase(p.type) }}</strong><EmTierBadge tier-id="common" :label="`Tier ${p.tier}`" class="badge" /><div class="category-tags"><span v-for="category in personalityInfo(p.type)?.categories" :key="category">{{ personalityCategory(category) }}</span><span v-if="personalityInfo(p.type)?.rules?.length">Conditional</span></div></div>
+        <div class="personality-name"><strong>{{ titleCase(p.type) }}</strong><EmTierBadge tier-id="common" :label="`Tier ${p.tier}`" :show-icon="false" class="badge" /><div class="category-tags"><span v-for="category in personalityInfo(p.type)?.categories" :key="category">{{ personalityCategory(category) }}</span><span v-if="personalityInfo(p.type)?.rules?.length">Conditional</span></div></div>
         <p class="personality-description">{{ personalityDescription(personalityInfo(p.type), p.tier) }}</p>
         <EmSwitch :model-value="chosen.includes(p.id)" :label="chosen.includes(p.id) ? 'Selected' : 'Not selected'" :disabled="loading || store.busy || !!loadError || (!chosen.includes(p.id) && full)" :aria-label="titleCase(p.type)" @update:model-value="toggle(p.id, $event)" />
       </li>

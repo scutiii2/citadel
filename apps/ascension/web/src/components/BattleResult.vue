@@ -11,6 +11,7 @@ import EmPanel from "./ui/EmPanel.vue";
 import EmBar from "./ui/EmBar.vue";
 import EmEmblem from "./ui/EmEmblem.vue";
 import EmEssence from "./ui/EmEssence.vue";
+import EmTierBadge from "./ui/EmTierBadge.vue";
 
 
 /** A finished battle: one banner per outcome (the outcome is always written), what it
@@ -121,7 +122,7 @@ const story = computed(() => {
       </div>
       <div v-if="result.copies_granted !== undefined" class="reward"><img v-if="memberArt(battle.wild.ascended_id)" class="reward-icon copy-icon" :src="memberArt(battle.wild.ascended_id)!" alt="" />
         <strong class="em-pixel em-num">+{{ result.copies_granted }} {{ result.copies_granted === 1 ? "copy" : "copies" }}</strong>
-        <span>of {{ battle.wild.name }}<template v-if="result.tier_id">, at {{ titleCase(result.tier_id) }}</template></span>
+        <span>of {{ battle.wild.name }}<template v-if="result.tier_id">, at <EmTierBadge :tier-id="result.tier_id" /></template></span>
       </div>
     </div>
 

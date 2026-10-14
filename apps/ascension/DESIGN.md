@@ -122,6 +122,8 @@ Keep per-Ascended assets under `ascended/<id>/`, served as `/ascended/<id>/<file
 
 Shared tier card fronts/backs live in `web/src/assets/ascended_card/`; brand assets live in `web/src/assets/brand/`. Reuse original artwork and preserve its proportions and transparency. Mockup illustrations are visual references, not replacements for the shipped sprites.
 
+Ascended tier icons live in `design_references/tiers/tier_<tier>.webp` and are bundled through `EmTierIcon`. Use them beside tier names through `EmTierBadge`, or as larger tier markers in battle and progression with a visible tier label nearby. Capture EMBLEMs and essence retain their own artwork. Numbered personality tiers are a separate scale and do not use Ascended tier icons.
+
 ## Review before finishing
 
 1. Compare the screen with the sanctuary direction above: restrained surfaces, clear hierarchy, readable text, and artwork as the focus.

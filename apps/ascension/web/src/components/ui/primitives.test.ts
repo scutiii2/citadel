@@ -88,6 +88,26 @@ describe("EmTabs", () => {
 });
 
 describe("EmTierBadge", () => {
+  it.each(["common", "rare", "unique", "royal", "legendary", "forbidden"])("shows the %s tier artwork alongside its name", (tierId) => {
+    const badge = mount(EmTierBadge, { props: { tierId } });
+    const icon = badge.get("img");
+    expect(icon.attributes("src")).toContain(`tier_${tierId}.webp`);
+    expect(icon.attributes("alt")).toBe("");
+    expect(badge.text().toLowerCase()).toBe(tierId);
+  });
+
+  it("can omit artwork for numbered personality tiers", () => {
+    const badge = mount(EmTierBadge, { props: { tierId: "common", label: "Tier 2", showIcon: false } });
+    expect(badge.text()).toBe("Tier 2");
+    expect(badge.find("img").exists()).toBe(false);
+  });
+
+  it("keeps unknown tiers readable without assigning another tier's artwork", () => {
+    const badge = mount(EmTierBadge, { props: { tierId: "unknown" } });
+    expect(badge.text()).toBe("Unknown");
+    expect(badge.find("img").exists()).toBe(false);
+  });
+
   it("writes the tier's name", () => {
     expect(mount(EmTierBadge, { props: { tierId: "unique" } }).text()).toBe("Unique");
   });

@@ -16,6 +16,7 @@ import EmDialog from "./ui/EmDialog.vue";
 import EmIcon from "./ui/EmIcon.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
+import EmTierIcon from "./ui/EmTierIcon.vue";
 import EmEssence from "./ui/EmEssence.vue";
 import EmTabs from "./ui/EmTabs.vue";
 import TypeSymbol from "./ui/TypeSymbol.vue";
@@ -348,7 +349,7 @@ function show(ascended: OwnedAscended): void {
         <small>Press a card for details</small>
       </div>
         <section v-for="group in groups" :key="group.key" class="group" :data-type="group.typeId ?? undefined" :data-tier="group.tierId ?? undefined">
-          <h4 class="group-name"><TypeSymbol v-if="group.typeId" :type-id="group.typeId" :size="40" decorative />{{ group.label }} <small class="em-num">{{ group.items.length }}</small></h4>
+          <h4 class="group-name"><TypeSymbol v-if="group.typeId" :type-id="group.typeId" :size="40" decorative /><EmTierIcon v-else-if="group.tierId" :tier-id="group.tierId" :size="32" />{{ group.label }} <small class="em-num">{{ group.items.length }}</small></h4>
           <div class="grid">
             <div v-for="ascended in group.items" :key="ascended.ascended_id" class="owned-entry" draggable="true" @dragstart="dragStart($event, ascended.ascended_id, false)" @dragend="dragEnd">
               <AscendedCard :ascended="ascended" :selected="openId === ascended.ascended_id" @open="show(ascended)" />
@@ -366,7 +367,7 @@ function show(ascended: OwnedAscended): void {
         <small>{{ notOwned.length }} still to find</small>
       </div>
       <section v-for="group in missingGroups" :key="group.key" class="missing-group" :data-type="group.typeId ?? undefined" :data-tier="group.tierId ?? undefined">
-        <h4 class="group-name"><TypeSymbol v-if="group.typeId" :type-id="group.typeId" :size="40" decorative />{{ group.label }} <small class="em-num">{{ group.items.length }}</small></h4>
+        <h4 class="group-name"><TypeSymbol v-if="group.typeId" :type-id="group.typeId" :size="40" decorative /><EmTierIcon v-else-if="group.tierId" :tier-id="group.tierId" :size="32" />{{ group.label }} <small class="em-num">{{ group.items.length }}</small></h4>
         <ul class="grid missing">
           <li v-for="ascended in group.items" :key="ascended.id" class="missing-ascended">
             <AscendedPreviewCard class="back preview-lift" :ascended="ascended" :tier-id="ascended.start_tier" flipped />
