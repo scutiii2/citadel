@@ -54,6 +54,17 @@ const manual = () =>
     }),
   });
 
+it('lets a Trial switch to Autonomous without an EMBLEM limit', async () => {
+  const view=battleView({mode:'manual',emblem_limit:null,activity:{kind:'trial',difficulty_id:null,trial_type:'enchant',trial_stage:1,overall:null,reward_multiplier:1,recommended_min:null,recommended_max:null}});
+  withBattle(view);
+  client.setMode.mockResolvedValue({...view,mode:'autonomous'});
+  const wrapper=mount(BattleControls,{props:{battle:view}});
+  const autonomous=wrapper.find('[aria-label="Autonomous"]');
+  expect(autonomous.attributes('disabled')).toBeUndefined();
+  await autonomous.trigger('click'); await flushPromises();
+  expect(client.setMode).toHaveBeenCalledWith(view.id,{round:view.round,revision:view.revision},'autonomous',null);
+});
+
 describe("BattleArena", () => {
   it("shows each equipped passive effect directly below its fighter's stats", () => {
     const view = battleView({ player: { ...fighter('guardian'), passives: [
@@ -412,7 +423,7 @@ describe("BattleResult", () => {
     expect(wrapper.findAll(".revealed li.dim")).toHaveLength(1);
     vi.useRealTimers();
 
-    await wrapper.findAll("button").find((b) => b.text() === "Back to encounters")!.trigger("click");
+    await wrapper.findAll("button").find((b) => b.text() === "Back to hunts")!.trigger("click");
     await flushPromises();
 
     expect(store.battle).toBeNull();

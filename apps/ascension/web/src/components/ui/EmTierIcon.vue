@@ -3,8 +3,8 @@ import { computed } from "vue";
 
 /** Decorative Ascended tier art. Callers keep a visible tier name beside it. */
 const props = withDefaults(defineProps<{ tierId: string; size?: number }>(), { size: 24 });
-const TIERS = import.meta.glob<string>("../../../../design_references/tiers/tier_*.webp", { eager: true, import: "default" });
-const url = computed(() => TIERS[`../../../../design_references/tiers/tier_${props.tierId}.webp`]);
+const TIERS = import.meta.glob<string>("../../../../_others/design_references/tiers/tier_*.webp", { eager: true, import: "default" });
+const url = computed(() => TIERS[`../../../../_others/design_references/tiers/tier_${props.tierId}.webp`]);
 </script>
 
 <template>

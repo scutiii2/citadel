@@ -77,6 +77,7 @@ const open = computed(() => store.profile?.ascendeds.find(s => s.ascended_id ===
 const squadSlots = computed(() => Array.from({ length: store.profile?.squad_size ?? 0 }, (_, index) => store.squadMembers[index] ?? null));
 const battleActive = computed(() => !!store.profile?.active_battle || store.battle?.status === "active");
 const squadReason = computed(() => {
+  if (open.value?.on_expedition) return open.value.availability_reason ?? "On expedition; claim rewards first.";
   if (battleActive.value) return "Finish your battle first.";
   if (open.value && store.squadIds.includes(open.value.ascended_id)) return "";
   return store.squadIds.length >= (store.profile?.squad_size ?? 0) ? "Squad full. Remove a member first." : "";
@@ -117,7 +118,7 @@ async function loadPresetPreview(): Promise<void> {
 watch([openId, defaultSlot, detailsOpen], () => { if (!detailsOpen.value) ++previewRequest; else void loadPresetPreview(); });
 watch(detailTab, tab => { if (tab === "overview") void loadPresetPreview(); });
 async function chooseDefault(slot: number): Promise<void> {
-  if (open.value && !store.busy) await store.setDefaultPreset(open.value.ascended_id, slot);
+  if (open.value && !open.value.on_expedition && !store.busy) await store.setDefaultPreset(open.value.ascended_id, slot);
 }
 async function loadOverviewTree(id: string): Promise<void> {
   const request = ++overviewRequest;
@@ -200,7 +201,7 @@ const dragFromSquad = ref(false);
 const overSlot = ref<number | null>(null);
 const overCollected = ref(false);
 function dragStart(event: DragEvent, id: string, fromSquad: boolean): void {
-  if (store.busy || battleActive.value) { event.preventDefault(); return; }
+  if (store.busy || battleActive.value || store.profile?.ascendeds.find(a => a.ascended_id === id)?.on_expedition) { event.preventDefault(); return; }
   dragId.value = id;
   dragFromSquad.value = fromSquad;
   if (event.dataTransfer) { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", id); }
@@ -351,8 +352,9 @@ function show(ascended: OwnedAscended): void {
         <section v-for="group in groups" :key="group.key" class="group" :data-type="group.typeId ?? undefined" :data-tier="group.tierId ?? undefined">
           <h4 class="group-name"><TypeSymbol v-if="group.typeId" :type-id="group.typeId" :size="40" decorative /><EmTierIcon v-else-if="group.tierId" :tier-id="group.tierId" :size="32" />{{ group.label }} <small class="em-num">{{ group.items.length }}</small></h4>
           <div class="grid">
-            <div v-for="ascended in group.items" :key="ascended.ascended_id" class="owned-entry" draggable="true" @dragstart="dragStart($event, ascended.ascended_id, false)" @dragend="dragEnd">
+            <div v-for="ascended in group.items" :key="ascended.ascended_id" class="owned-entry" :draggable="!ascended.on_expedition" @dragstart="dragStart($event, ascended.ascended_id, false)" @dragend="dragEnd">
               <AscendedCard :ascended="ascended" :selected="openId === ascended.ascended_id" @open="show(ascended)" />
+              <p v-if="ascended.on_expedition" class="muted" role="status">{{ store.expeditionStatus?.expedition?.can_claim ? "Ready to claim" : "On expedition" }}</p>
             </div>
           </div>
         </section>
@@ -378,7 +380,7 @@ function show(ascended: OwnedAscended): void {
 
     </main>
     <EmDialog class="ascended-details" :open="detailsOpen && open !== null" :title="open?.name ?? 'Ascended details'" wide @close="closeDetails">
-      <template #subtitle><p v-if="open" class="battle-status" :class="{ fainted: faintLeft > 0 }">{{ faintLeft > 0 ? 'Fainted, ready in ' + formatCountdown(faintLeft) : 'Ready for battle' }}</p></template>
+      <template #subtitle><p v-if="open" class="battle-status" :class="{ fainted: faintLeft > 0 }">{{ open.on_expedition ? (store.expeditionStatus?.expedition?.can_claim ? 'Expedition ready to claim' : 'On expedition') : faintLeft > 0 ? 'Fainted, ready in ' + formatCountdown(faintLeft) : 'Ready for battle' }}</p></template>
       <template #header-actions><EmTabs v-model="detailTab" :options="detailTabs" ariaLabel="Ascended detail sections" @update:model-value="value => { if (value === 'tree') treeVisited = true; }" /></template>
       <div v-if="open && detailsOpen" class="details" :class="{ 'tree-expanded': detailTab !== 'overview' }">
         <EmNotice v-if="store.error" tone="error">{{ store.error }}</EmNotice>
@@ -397,7 +399,7 @@ function show(ascended: OwnedAscended): void {
           <div class="overview-loadout"><h4>Equipped abilities</h4><AbilitySlots :tree="overviewTree" :ascended-id="open.ascended_id" @select="openAbility" /></div>
           <aside class="overview-presets" aria-label="Battle default preset">
             <div class="preset-preview"><h4>Preset {{ defaultSlot }}</h4><span class="default-badge">★ Battle default</span><p class="muted">Used when battle begins</p><p v-if="presetLoading" role="status">Loading preset…</p><EmNotice v-else-if="presetError" tone="error">{{ presetError }}</EmNotice><ul v-else><li v-for="index in 3" :key="index"><EmIcon name="ascended" /><span>{{ presetPreview[index - 1] ? titleCase(presetPreview[index - 1]!.type) : 'Empty personality slot' }}</span></li></ul><button class="edit-personalities" type="button" @click="detailTab = 'personalities'">Edit personalities <EmIcon name="arrow" :size="14" /></button></div>
-            <div class="default-slots"><button v-for="slot in 5" :key="slot" type="button" :class="{ active: defaultSlot === slot }" :aria-label="'Use preset ' + slot + ' as battle default'" :aria-pressed="defaultSlot === slot" :disabled="store.busy" @click="chooseDefault(slot)">{{ slot }}<small v-if="defaultSlot === slot">★</small></button></div>
+            <div class="default-slots"><button v-for="slot in 5" :key="slot" type="button" :class="{ active: defaultSlot === slot }" :aria-label="'Use preset ' + slot + ' as battle default'" :aria-pressed="defaultSlot === slot" :disabled="store.busy || open.on_expedition" @click="chooseDefault(slot)">{{ slot }}<small v-if="defaultSlot === slot">★</small></button></div>
           </aside>
           <EmNotice v-if="detailError" class="overview-error" tone="error">{{ detailError }}</EmNotice>
         </section>

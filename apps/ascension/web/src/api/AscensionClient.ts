@@ -7,6 +7,21 @@ import { HttpClient } from "./http";
  * key of the action it is retrying. Times (`next_roll_at`, `faint_until`,
  * `deadline`, `created_at`) are server epoch seconds. */
 
+export interface ActivityContext {
+  kind: 'legacy' | 'hunt' | 'trial'; difficulty_id: string | null; trial_type: string | null;
+  trial_stage: number | null; overall: number | null; reward_multiplier: number;
+  recommended_min: number | null; recommended_max: number | null;
+}
+export interface HuntDefinition { id: string; name: string; recommended_min: number; recommended_max: number; enemy_min: number; enemy_max: number }
+export interface TrialStage { stage: number; ascended_id: string; tier_id: string; level: number; cleared: boolean; unlocked: boolean; first_clear: boolean }
+export interface ActivityDefinitions { hunts: HuntDefinition[]; trial_types: string[]; trial_stages: TrialStage[]; expeditions: { durations_hours: number[]; xp_per_hour: number; insignia_per_hour: number }; max_hunt_penalty: number; trial_first_clear_multiplier: number }
+export interface HuntPreparation { overall: number; recommended_min: number; recommended_max: number; reward_multiplier: number; penalty_percent: number; below_range: boolean }
+export interface TrialProgress { trials: { type_id: string; stages: TrialStage[] }[] }
+export interface TrialPreparation { type_id: string; stage: number; unlocked: boolean; first_clear: boolean; eligible_ascended_ids: string[]; reason: string | null; rewards?: { xp: number; insignia: number; essence: number; essence_tier_id: string }; opponent: { ascended_id: string; name: string; tier_id: string; level: number; overall: number } }
+export interface ExpeditionView { id: string; ascended_id: string; started_at: number; ends_at: number; duration_hours: number; xp_reward: number; insignia_reward: number; state: 'on_expedition' | 'ready_to_claim'; can_claim: boolean; seconds_remaining: number }
+export interface ExpeditionStatus { server_now: number; expedition: ExpeditionView | null }
+export interface ExpeditionReceipt { id: string; ascended_id: string; xp: number; insignia: number; level_before: number; level_after: number; claimed_at: number }
+
 export type BattleMode = "manual" | "autonomous";
 export type ActionKind = "attack" | "ability" | "flee" | "catch";
 export type ResultKind = "won" | "knocked_out" | "captured" | "escaped" | "wild_escaped" | "forfeited";
@@ -114,6 +129,7 @@ export interface PersonalityRule {
 export interface PersonalityInfo { id: string; categories: string[]; rules?: PersonalityRule[] }
 
 export interface Catalog {
+  activities?: ActivityDefinitions;
   version: number;
   /** Weakest first. */
   tiers: TierInfo[];
@@ -124,6 +140,7 @@ export interface Catalog {
 }
 
 export interface OwnedAscended {
+  overall?: number; on_expedition?: boolean; expedition_id?: string | null; availability_reason?: string | null;
   default_preset_slot?: number;
   in_squad: boolean;
   ascended_id: string;
@@ -152,6 +169,7 @@ export interface OwnedAscended {
 }
 
 export interface Profile {
+  server_now?: number; expedition?: ExpeditionView | null;
   squad: string[];
   squad_size: number;
   owner: string;
@@ -184,6 +202,7 @@ export interface Preset {
 }
 
 export interface EncounterPreview {
+  activity?: ActivityContext; overall?: number;
   id: string;
   ascended_id: string;
   name: string;
@@ -271,6 +290,7 @@ export interface RevealedPersonality {
 }
 
 export interface BattleResult {
+  first_clear?: boolean;
   squad_xp?: { ascended_id: string; name: string; xp: number; level_before: number; level_after: number }[];
   kind: ResultKind;
   xp?: number;
@@ -291,6 +311,8 @@ export interface BattleResult {
 }
 
 export interface BattleView {
+  can_autonomous?: boolean;
+  activity?: ActivityContext;
   id: string;
   status: "active" | "terminal";
   phase: "choosing" | "awaiting_emblem" | "terminal";
@@ -408,6 +430,14 @@ const round = (at: RoundRef) => ({ round: at.round, revision: at.revision });
 export class AscensionClient {
   private readonly http: HttpClient;
   constructor(http: HttpClient) { this.http = http; }
+  activities = () => this.http.request<ActivityDefinitions>('GET', `${BASE}/activities`);
+  prepareHunt = (difficultyId: string, ascendedId: string) => this.http.request<HuntPreparation>('GET', `${BASE}/activities/hunts/${part(difficultyId)}/prepare?ascended_id=${part(ascendedId)}`);
+  trialProgress = () => this.http.request<TrialProgress>('GET', `${BASE}/trials`);
+  prepareTrial = (typeId: string, stage: number) => this.http.request<TrialPreparation>('GET', `${BASE}/trials/${part(typeId)}/stages/${stage}/prepare`);
+  startTrial = (typeId: string, stage: number, input: { ascended_id: string; preset_slot: number | null; mode: BattleMode }, key: string = newIdempotencyKey()) => this.http.request<BattleView>('POST', `${BASE}/trials/${part(typeId)}/stages/${stage}/battles`, input, withKey(key));
+  expedition = () => this.http.request<ExpeditionStatus>('GET', `${BASE}/expeditions`);
+  startExpedition = (ascendedId: string, durationHours: number, key: string = newIdempotencyKey()) => this.http.request<ExpeditionStatus>('POST', `${BASE}/expeditions`, { ascended_id: ascendedId, duration_hours: durationHours }, withKey(key));
+  claimExpedition = (id: string, key: string = newIdempotencyKey()) => this.http.request<ExpeditionReceipt>('POST', `${BASE}/expeditions/${part(id)}/claim`, undefined, withKey(key));
   catalog = () => this.http.request<Catalog>("GET", `${BASE}/catalog`);
   /** 404 (ApiError) until the account has chosen a starter. */
   profile = () => this.http.request<Profile>("GET", `${BASE}/profile`);
@@ -431,8 +461,8 @@ export class AscensionClient {
     this.http.request<{ ascended_id: string; slot: number }>("PUT", `${BASE}/ascendeds/${part(ascendedId)}/default-preset`, { slot }, withKey(key));
   savePreset = (ascendedId: string, slot: number, instanceIds: string[], key: string = newIdempotencyKey()) =>
     this.http.request<Preset>("PUT", `${BASE}/ascendeds/${part(ascendedId)}/presets/${slot}`, { instance_ids: instanceIds }, withKey(key));
-  rollEncounter = (key: string = newIdempotencyKey()) =>
-    this.http.request<EncounterPreview>("POST", `${BASE}/encounters`, undefined, withKey(key));
+  rollEncounter = (key: string = newIdempotencyKey(), difficultyId?: string) =>
+    this.http.request<EncounterPreview>("POST", `${BASE}/encounters`, difficultyId ? { difficulty_id: difficultyId } : undefined, withKey(key));
   encounter = (id: string) => this.http.request<EncounterPreview>("GET", `${BASE}/encounters/${part(id)}`);
   declineEncounter = (id: string, key: string = newIdempotencyKey()) =>
     this.http.request<EncounterPreview>("POST", `${BASE}/encounters/${part(id)}/decline`, undefined, withKey(key));

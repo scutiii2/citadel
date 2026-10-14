@@ -109,6 +109,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await expect.poll(() => api.trades.filter(t => t.kind === "sale").length).toBe(1);
     if (viewport.width < 700) await page.keyboard.press('Escape');
     await page.getByRole("tab", { name: "Battle", exact: true }).click();
+    await page.getByRole("button", { name: "Explore hunts", exact: true }).click();
     await page.getByRole("button", { name: "Look for a wild Ascended", exact: true }).click();
     await page.getByRole("button", { name: "Fight", exact: true }).click();
     await expect(page.getByRole("radio", { name: "Scout", exact: true })).toHaveAttribute("aria-disabled", "true");
@@ -220,7 +221,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
         expect(Math.abs(scene!.y - rewards!.y)).toBeLessThan(2);
       }
       api.ascension.profile.active_battle = null;
-      await page.getByRole("button", { name: "Back to encounters", exact: true }).click();
+      await page.getByRole("button", { name: "Back to hunts", exact: true }).click();
       await expect(page.locator(".encounter-panel")).toBeVisible();
       expect(api.unexpected).toEqual([]);
     });

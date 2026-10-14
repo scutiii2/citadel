@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useAscensionClient, type AscendedInfo, type BattleMode, type PersonalityItem } from "../api/AscensionClient";
+import { useAscensionClient, type AscendedInfo, type BattleMode, type PersonalityItem, type TrialPreparation, type HuntPreparation } from "../api/AscensionClient";
 import { useNowSeconds } from "../composables/useNowSeconds";
 import { useAscensionStore } from "../stores/ascension";
 import { ascendedStats, formatCountdown, titleCase } from "../utils/ascension";
@@ -22,6 +22,7 @@ import EmTierBadge from "./ui/EmTierBadge.vue";
 export type EncounterStage = "look" | "preview" | "setup";
 const emit = defineEmits<{ stage: [stage: EncounterStage] }>();
 
+const props = defineProps<{ trial?: TrialPreparation | null }>();
 const store = useAscensionStore();
 const client = useAscensionClient();
 const now = useNowSeconds();
@@ -37,7 +38,7 @@ const rollWait = computed(() => {
   const at = store.profile?.next_roll_at ?? null;
   return at === null ? 0 : Math.max(0, at - now.value);
 });
-const ascendeds = computed(() => store.squadMembers);
+const ascendeds = computed(() => store.squadMembers.filter(a => !a.on_expedition && (!props.trial || props.trial.eligible_ascended_ids.includes(a.ascended_id))));
 const squadSlots = computed(() => Array.from({ length: store.profile?.squad_size ?? 0 }, (_, i) => {
   const member = ascendeds.value[i];
   const info = store.catalog?.ascendeds.find(s => s.id === member?.ascended_id);
@@ -56,9 +57,10 @@ const ownedEmblems = computed(() =>
 );
 /** HP, Power and Speed of an Ascended at a level and tier, for the card strip. */
 const statsAt = (info: AscendedInfo, level: number, tierId: string) => ascendedStats(info, level, tiers.value.find((t) => t.id === tierId)?.stat_multiplier ?? 1);
-const wildInfo = computed(() => store.catalog?.ascendeds.find((s) => s.id === store.encounter?.ascended_id) ?? null);
+const previewEncounter = computed(() => props.trial ? { ...props.trial.opponent, id: 'trial-preview', status: 'pending', created_at: 0 } : store.encounter);
+const wildInfo = computed(() => store.catalog?.ascendeds.find(s => s.id === previewEncounter.value?.ascended_id) ?? null);
 
-const formOpen = ref(false);
+const formOpen = ref(!!props.trial);
 const ascendedId = ref("");
 const presetSlot = ref("none");
 const battleTraits = ref<PersonalityItem[]>([]);
@@ -84,11 +86,12 @@ const emblemLimit = ref("none");
 const chosen = computed(() => ready.value.find((s) => s.ascended_id === ascendedId.value) ?? null);
 const chosenInfo = computed(() => store.catalog?.ascendeds.find((s) => s.id === chosen.value?.ascended_id) ?? null);
 const chosenMultiplier = computed(() => tiers.value.find(t => t.id === chosen.value?.tier_id)?.stat_multiplier ?? 1);
-const wildMultiplier = computed(() => tiers.value.find(t => t.id === store.encounter?.tier_id)?.stat_multiplier ?? 1);
+const wildMultiplier = computed(() => tiers.value.find(t => t.id === previewEncounter.value?.tier_id)?.stat_multiplier ?? 1);
 const autonomousIncomplete = computed(
-  () => mode.value === "autonomous" && (presetSlot.value === "none" || emblemLimit.value === "none"),
+  () => mode.value === "autonomous" && (presetSlot.value === "none" || (!props.trial && emblemLimit.value === "none")),
 );
-const canFight = computed(() => chosen.value !== null && !autonomousIncomplete.value && !store.busy);
+const canFight = computed(() => chosen.value !== null && !autonomousIncomplete.value && !store.busy &&
+  (props.trial || store.activitySelection !== 'hunt' || !!huntPreparation.value));
 const limitHint = computed(() => {
   if (mode.value === "manual") return "Choose an EMBLEM when you catch in manual play.";
   const index = tiers.value.findIndex((t) => t.id === emblemLimit.value);
@@ -97,7 +100,7 @@ const limitHint = computed(() => {
   const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
   return `Your Ascended may use ${list} EMBLEMs. Higher tiers stay in your wallet.`;
 });
-const stage = computed<EncounterStage>(() => (store.encounter === null ? "look" : formOpen.value ? "setup" : "preview"));
+const stage = computed<EncounterStage>(() => (props.trial ? "setup" : store.encounter === null ? "look" : formOpen.value ? "setup" : "preview"));
 watch(stage, (value) => emit("stage", value), { immediate: true });
 // A new encounter always starts at its preview.
 watch(
@@ -108,7 +111,7 @@ watch(
 );
 
 function openForm(): void {
-  ascendedId.value = ready.value[0]?.ascended_id ?? "";
+  ascendedId.value = ready.value.some(a => a.ascended_id === ascendedId.value) ? ascendedId.value : ready.value[0]?.ascended_id ?? "";
   presetSlot.value = String(chosen.value?.default_preset_slot ?? "none");
   mode.value = "manual";
   emblemLimit.value = "none";
@@ -126,7 +129,30 @@ function setMode(value: string): void {
   if (!store.busy) mode.value = value as BattleMode;
 }
 
+const huntPreparation = ref<HuntPreparation | null>(null);
+const preparingHunt = ref(false);
+const previewRetry = ref(0);
+watch([() => chosen.value?.ascended_id, () => store.encounter?.activity?.difficulty_id ?? store.huntDifficultyId, () => store.activitySelection, previewRetry], async ([id, difficulty, selection], _, onCleanup) => {
+  let current = true; onCleanup(() => { current = false; }); huntPreparation.value = null;
+  preparingHunt.value = false;
+  if (props.trial || !id || selection !== 'hunt') return;
+  preparingHunt.value = true;
+  try { const preview = await client.prepareHunt(difficulty, id); if (current) huntPreparation.value = preview; }
+  catch { if (current) store.error = 'Could not load reward preview. Select your fighter again to retry.'; }
+  finally { if (current) preparingHunt.value = false; }
+}, { immediate: true });
+watch(ready, values => {
+  if (!ascendedId.value) {
+    ascendedId.value = values[0]?.ascended_id ?? '';
+    presetSlot.value = String(chosen.value?.default_preset_slot ?? 'none');
+  }
+}, { immediate: true });
+
 async function fight(): Promise<void> {
+  if (props.trial) {
+    if (canFight.value) await store.startTrial({ ascended_id: ascendedId.value, preset_slot: presetSlot.value === 'none' ? null : Number(presetSlot.value), mode: mode.value });
+    return;
+  }
   const current = store.encounter;
   if (current === null || !canFight.value) return;
   const view = await store.startBattle({
@@ -142,6 +168,12 @@ async function fight(): Promise<void> {
 
 <template>
   <section class="encounter-panel">
+    <div v-if="!trial && store.activitySelection === 'hunt'" class="hunt-rating">
+      <label v-if="stage === 'look'" class="field"><span>Ascended to bring</span><select v-model="ascendedId" :disabled="store.busy"><option v-for="member in ready" :key="member.ascended_id" :value="member.ascended_id">{{ member.name }} · Overall {{ member.overall }}</option></select></label>
+      <p v-if="preparingHunt" role="status">Loading reward preview…</p>
+      <EmButton v-else-if="chosen && !huntPreparation" :disabled="store.busy" @click="previewRetry++">Retry reward preview</EmButton>
+      <template v-if="huntPreparation"><p>Overall {{ huntPreparation.overall }} · Recommended {{ huntPreparation.recommended_min }}–{{ huntPreparation.recommended_max }}</p><EmNotice v-if="huntPreparation.penalty_percent">{{ huntPreparation.penalty_percent }}% fewer XP, Insignia &amp; essence. Capture chance unaffected.</EmNotice><EmNotice v-else-if="huntPreparation.below_range">Below the recommended range. Rewards have no penalty.</EmNotice><p v-else class="muted">Full rewards · Capture chance unaffected</p></template>
+    </div>
     <div v-if="stage === 'look'" class="split">
       <EmPanel class="look">
         <EmIcon name="battle" :size="40" class="big-icon" />
@@ -200,9 +232,9 @@ async function fight(): Promise<void> {
     <form v-else class="start-form" @submit.prevent="fight">
       <div class="setup-heading">
         <div><h2 class="page-heading">Prepare for battle</h2><p class="page-intro">One fighter. Your whole squad behind you.</p></div>
-        <EmButton class="back-to-encounter" :disabled="store.busy" @click="formOpen = false"><EmIcon name="arrow" /> Back to encounter</EmButton>
+        <EmButton v-if="!trial" class="back-to-encounter" :disabled="store.busy" @click="formOpen = false"><EmIcon name="arrow" /> Back to encounter</EmButton>
       </div>
-      <BattleMatchup class="setup-matchup" :player="chosen" :player-info="chosenInfo" :wild="store.encounter" :wild-info="wildInfo" :player-multiplier="chosenMultiplier" :wild-multiplier="wildMultiplier" />
+      <BattleMatchup class="setup-matchup" :player="chosen" :player-info="chosenInfo" :wild="previewEncounter" :wild-info="wildInfo" :player-multiplier="chosenMultiplier" :wild-multiplier="wildMultiplier" />
       <EmNotice v-if="!chosen" tone="error">{{ ready.length ? "Select a ready squad member to continue." : "No squad member is ready. Wait until one is ready again." }}</EmNotice>
 
       <section class="squad-section" aria-label="Choose from your squad">
@@ -240,7 +272,7 @@ async function fight(): Promise<void> {
             <ul v-if="battleTraits.length" class="battle-traits" aria-label="Equipped personalities"><li v-for="trait in battleTraits" :key="trait.id"><EmIcon name="ascended" :size="16" />{{ titleCase(trait.type) }}<small>Tier {{ trait.tier }}</small></li></ul>
             <p v-else-if="traitsMessage" class="caption" role="status">{{ traitsMessage }}</p>
           </div>
-          <div>
+          <div v-if="!trial">
             <label class="field">
               <span>Autonomous EMBLEM limit</span>
               <select v-model="emblemLimit" name="limit" :disabled="mode === 'manual' || store.busy">
@@ -251,13 +283,13 @@ async function fight(): Promise<void> {
             <p class="caption">{{ limitHint }}</p>
           </div>
         </div>
-        <EmNotice v-if="autonomousIncomplete" class="plan-error" tone="error">Autonomous play needs a preset and an EMBLEM limit.</EmNotice>
+        <EmNotice v-if="autonomousIncomplete" class="plan-error" tone="error">{{ trial ? 'Autonomous play needs an equipped personality preset.' : 'Autonomous play needs a preset and an EMBLEM limit.' }}</EmNotice>
         <EmButton type="submit" class="begin-battle" variant="primary" :disabled="!canFight" :aria-busy="store.busy">Begin battle <EmIcon name="arrow" /></EmButton>
-        <EmButton class="decline" :disabled="store.busy" @click="store.declineEncounter()">Decline encounter</EmButton>
+        <EmButton v-if="!trial" class="decline" :disabled="store.busy" @click="store.declineEncounter()">Decline encounter</EmButton>
       </EmPanel>
 
       <div class="battle-footer">
-        <p v-if="chosen" class="xp-note"><EmIcon name="ascended" /><span>{{ chosen.name }} gets full XP if you win or capture.<small>The other squad members share a smaller XP pool.</small></span></p>
+        <p v-if="chosen" class="xp-note"><EmIcon name="ascended" /><span>{{ trial ? chosen.name + ' earns XP on victory.' : store.activitySelection === 'hunt' ? chosen.name + ' earns XP on victory or capture.' : chosen.name + ' gets full XP if you win or capture.' }}<small>{{ trial ? 'Only matching squad members share the XP pool.' : 'The other squad members share a smaller XP pool, after any Hunt penalty.' }}</small></span></p>
 
       </div>
     </form>

@@ -9,8 +9,8 @@ import EmIcon from "./ui/EmIcon.vue";
 import EmTabs, { type EmTabOption } from "./ui/EmTabs.vue";
 
 /** Above the round log: who plays (manual or autonomous, switched between rounds) and
- * Forfeit, which asks first. A battle started without an EMBLEM limit stays manual:
- * Ascension needs a limit for autonomous play. */
+ * Forfeit, which asks first. Hunts need an EMBLEM limit for autonomous play;
+ * Trials require an equipped preset only. */
 const props = defineProps<{ battle: BattleView }>();
 const store = useAscensionStore();
 const playback = usePlaybackStore();
@@ -19,7 +19,7 @@ const active = computed(() => props.battle.status === "active");
 const locked = computed(() => !active.value || props.battle.phase !== "choosing" || store.battleBusy || playback.busy);
 const modeOptions = computed<EmTabOption[]>(() => [
   { value: "manual", label: "Manual", icon: "arrow", disabled: locked.value },
-  { value: "autonomous", label: "Autonomous", icon: "play", disabled: locked.value || props.battle.emblem_limit === null },
+  { value: "autonomous", label: "Autonomous", icon: "play", disabled: locked.value || !(props.battle.can_autonomous ?? (props.battle.activity?.kind === "trial" || props.battle.emblem_limit !== null)) },
 ]);
 const forfeitOpen = ref(false);
 

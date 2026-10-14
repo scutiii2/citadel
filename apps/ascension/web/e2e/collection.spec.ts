@@ -13,7 +13,10 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 1024
     const toggle = rail.getByRole("button", { name: "Configuration", exact: true });
     const search = rail.getByRole("searchbox", { name: "Search collection" });
     await expect(rail).toBeVisible();
-    expect(await rail.evaluate(el => ({ border: getComputedStyle(el).borderTopWidth, background: getComputedStyle(el).backgroundImage, shadow: getComputedStyle(el).boxShadow }))).toEqual({ border: "0px", background: "none", shadow: "none" });
+    const surface = await rail.evaluate(el => ({ border: getComputedStyle(el).borderTopWidth, background: getComputedStyle(el).backgroundImage, shadow: getComputedStyle(el).boxShadow }));
+    expect(surface.border).toBe('0px');
+    expect(surface.shadow).toBe('none');
+    expect(surface.background).toBe(viewport.height > viewport.width ? 'none' : 'linear-gradient(90deg, rgba(4, 21, 34, 0.6), rgba(0, 0, 0, 0))');
     if (viewport.height > viewport.width) {
       await expect(toggle).toBeVisible();
       await expect(search).toBeHidden();

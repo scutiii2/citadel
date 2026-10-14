@@ -31,8 +31,15 @@ vi.mock("../api/AscensionClient", () => {
     buyOffer: vi.fn(),
     sellCopy: vi.fn(),
     resetProfile: vi.fn(),
+    startTrial: vi.fn(),
+    trialProgress: vi.fn(),
+    prepareTrial: vi.fn(),
+    expedition: vi.fn(),
+    startExpedition: vi.fn(),
+    claimExpedition: vi.fn(),
   };
-  return { useAscensionClient: () => client };
+  let nextKey = 0;
+  return { useAscensionClient: () => client, newIdempotencyKey: () => 'activity-key-' + ++nextKey };
 });
 
 const client = vi.mocked(useAscensionClient());
@@ -78,6 +85,59 @@ afterEach(() => {
   store?.detach();
   store = null;
   vi.useRealTimers();
+});
+
+describe('activity recovery', () => {
+  const expedition = { id:'x', ascended_id:'guardian', started_at:100, ends_at:7300, duration_hours:2, xp_reward:200, insignia_reward:50, state:'on_expedition' as const, can_claim:false, seconds_remaining:7200 };
+  it('reuses the Trial key after an uncertain successful response', async () => {
+    const s = await attached();
+    s.trialTypeId = 'enchant'; s.trialStage = 1;
+    const view = battleView({mode:'manual',activity:{kind:'trial',difficulty_id:null,trial_type:'enchant',trial_stage:1,overall:null,reward_multiplier:1,recommended_min:null,recommended_max:null}});
+    const input = { ascended_id:'guardian', preset_slot:1, mode:'manual' as const };
+    client.startTrial.mockRejectedValueOnce(new TypeError('response lost')).mockResolvedValueOnce(view);
+    expect(await s.startTrial(input)).toBeNull();
+    await s.startTrial(input);
+    const firstKey = client.startTrial.mock.calls[0]![3];
+    expect(firstKey).toBeTypeOf('string');
+    expect(client.startTrial.mock.calls[1]![3]).toBe(firstKey);
+    expect(s.battle?.id).toBe(view.id);
+  });
+  it('does not let a stale empty expedition read erase a departure', async () => {
+    const s = await attached();
+    let resolveRead!: (value: {server_now:number; expedition:null}) => void;
+    client.expedition.mockReturnValueOnce(new Promise(resolve => {resolveRead=resolve;}));
+    const reading = s.refreshExpedition();
+    client.startExpedition.mockResolvedValue({server_now:100,expedition});
+    client.profile.mockResolvedValue({...PROFILE,server_now:100,expedition,squad:[]});
+    await s.startExpedition('guardian',2);
+    resolveRead({server_now:99,expedition:null}); await reading;
+    expect(s.expeditionStatus?.expedition?.id).toBe('x');
+  });
+  it('does not let an older profile restore a claimed expedition or its squad', async () => {
+    const s = await attached();
+    let resolveRead!: (value: typeof PROFILE) => void;
+    client.profile.mockReturnValueOnce(new Promise(resolve => {resolveRead=resolve;})).mockResolvedValue({...PROFILE,server_now:8000,expedition:null,squad:[]});
+    setVisibility('hidden'); setVisibility('visible');
+    client.claimExpedition.mockResolvedValue({id:'x',ascended_id:'guardian',xp:200,insignia:50,level_before:1,level_after:2,claimed_at:8000});
+    await s.claimExpedition('x');
+    resolveRead({...PROFILE,server_now:7000,expedition}); await flushPromises();
+    expect(s.expeditionStatus?.expedition).toBeNull();
+    expect(s.profile?.squad).toEqual([]);
+  });
+  it('discards an expedition mutation response after changing accounts', async () => {
+    const s = await attached();
+    let resolveDeparture!: (value: {server_now:number;expedition:typeof expedition}) => void;
+    client.startExpedition.mockReturnValueOnce(new Promise(resolve=>{resolveDeparture=resolve;}));
+    const sending=s.startExpedition('guardian',2);
+    client.profile.mockResolvedValue({...PROFILE,owner:'bob',server_now:100,expedition:null});
+    useSessionStore().revision += 1; await flushPromises();
+    resolveDeparture({server_now:100,expedition}); await sending;
+    expect(s.profile).toBeNull();
+    await s.retry();
+    expect(s.profile?.owner).toBe('bob');
+    expect(s.expeditionStatus?.expedition).toBeNull();
+    expect(s.activitySelection).toBe('hub');
+  });
 });
 
 describe("loading", () => {

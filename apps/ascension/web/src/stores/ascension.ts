@@ -20,6 +20,11 @@ import {
   type LoadoutResult,
   type LoadoutSlot,
   type StartBattleInput,
+  type TrialProgress,
+  type TrialPreparation,
+  type ExpeditionReceipt,
+  type ExpeditionStatus,
+  newIdempotencyKey,
 } from "../api/AscensionClient";
 import { ApiError, UnauthorizedError } from "../api/http";
 import { errorMessage } from "../utils/errors";
@@ -41,6 +46,28 @@ export const useAscensionStore = defineStore("ascension", () => {
   const session = useSessionStore();
   const ascensionClient = useAscensionClient();
 
+  let observationEpoch = 0;
+  let profileReadSerial = 0;
+  let expeditionReadSerial = 0;
+  const activitySelection = ref<'hub' | 'hunt' | 'trial' | 'expedition'>('hub');
+  const huntDifficultyId = ref('outskirts');
+  const trialTypeId = ref('enchant');
+  const trialStage = ref(1);
+  const trials = ref<TrialProgress | null>(null);
+  const trialPreparation = ref<TrialPreparation | null>(null);
+  const expeditionStatus = ref<ExpeditionStatus | null>(null);
+  const expeditionObservedAt = ref(0);
+  const expeditionReceipt = ref<ExpeditionReceipt | null>(null);
+  const activities = computed(() => catalog.value?.activities ?? null);
+  function observeExpedition(status: ExpeditionStatus): void {
+    expeditionStatus.value = status;
+    expeditionObservedAt.value = performance.now();
+  }
+  function restoreActivity(context: BattleView['activity']): void {
+    if (context?.kind === 'trial') {
+      activitySelection.value = 'trial'; trialTypeId.value = context.trial_type ?? 'enchant'; trialStage.value = context.trial_stage ?? 1;
+    } else { activitySelection.value = 'hunt'; huntDifficultyId.value = context?.difficulty_id ?? 'outskirts'; }
+  }
   const catalog = ref<Catalog | null>(null);
   const profile = ref<Profile | null>(null);
   const squadIds = computed(() => profile.value?.squad ?? []);
@@ -135,9 +162,10 @@ export const useAscensionStore = defineStore("ascension", () => {
   function setBattle(view: BattleView): void {
     const justFinished = view.status !== "active" && battle.value?.status === "active";
     battle.value = view;
+    restoreActivity(view.activity);
     if (profile.value !== null) profile.value = { ...profile.value, emblems: view.emblems };
     // XP, Insignia, copies and faint times changed with the result.
-    if (justFinished) void refreshProfile();
+    if (justFinished) { observationEpoch += 1; void refreshProfile(); }
     schedule();
   }
 
@@ -153,11 +181,13 @@ export const useAscensionStore = defineStore("ascension", () => {
 
   async function refreshProfile(): Promise<void> {
     const started = generation;
+    const epoch = observationEpoch;
+    const read = ++profileReadSerial;
     try {
       const next = await ascensionClient.profile();
-      if (started === generation) profile.value = next;
+      if (started === generation && epoch === observationEpoch && read === profileReadSerial) { profile.value = next; if (next.server_now !== undefined) observeExpedition({ server_now: next.server_now, expedition: next.expedition ?? null }); }
     } catch (err) {
-      if (started === generation) report(err);
+      if (started === generation && epoch === observationEpoch && read === profileReadSerial) report(err);
     }
   }
 
@@ -245,19 +275,23 @@ export const useAscensionStore = defineStore("ascension", () => {
   /** Leaves a finished battle's result for the encounter screen. */
   function closeBattle(): void {
     clearTimers();
+    restoreActivity(battle.value?.activity);
     battle.value = null;
+    if (activitySelection.value === "trial") void loadTrials();
     reconnecting.value = false;
     error.value = "";
     void refreshProfile();
   }
 
   async function loadProfile(started: number): Promise<void> {
+    const epoch = observationEpoch;
+    const read = ++profileReadSerial;
     let next: Profile;
     try {
       next = await ascensionClient.profile();
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
-        if (started === generation) {
+        if (started === generation && epoch === observationEpoch && read === profileReadSerial) {
           profile.value = null;
           needsStarter.value = true;
           encounter.value = null;
@@ -267,19 +301,21 @@ export const useAscensionStore = defineStore("ascension", () => {
       }
       throw err;
     }
-    if (started !== generation) return;
+    if (started !== generation || epoch !== observationEpoch || read !== profileReadSerial) return;
     profile.value = next;
+    if (next.server_now !== undefined) observeExpedition({ server_now: next.server_now, expedition: next.expedition ?? null });
     needsStarter.value = false;
     // A reload restores what was open; it never rolls again.
     if (next.active_battle !== null) {
       const view = await ascensionClient.battle(next.active_battle);
-      if (started !== generation) return;
+      if (started !== generation || epoch !== observationEpoch || read !== profileReadSerial) return;
       encounter.value = null;
       setBattle(view);
     } else if (next.pending_encounter !== null) {
       const preview = await ascensionClient.encounter(next.pending_encounter);
-      if (started !== generation) return;
+      if (started !== generation || epoch !== observationEpoch || read !== profileReadSerial) return;
       encounter.value = preview;
+      restoreActivity(preview.activity);
     } else {
       encounter.value = null;
     }
@@ -317,6 +353,7 @@ export const useAscensionStore = defineStore("ascension", () => {
       return;
     }
     if (battle.value?.status === "active") await refreshBattle();
+    else await refreshProfile();
   }
 
   function onVisibilityChange(): void {
@@ -342,15 +379,17 @@ export const useAscensionStore = defineStore("ascension", () => {
 
   async function mutate<T>(call: () => Promise<T>, apply: (result: T) => void | Promise<void>): Promise<T | null> {
     const started = generation;
+    observationEpoch += 1;
     busy.value = true;
     error.value = "";
     try {
       const result = await call();
       if (started !== generation) return null;
+      observationEpoch += 1;
       await apply(result);
       return result;
     } catch (err) {
-      if (started === generation) report(err);
+      if (started === generation) { observationEpoch += 1; report(err); }
       return null;
     } finally {
       if (started === generation) busy.value = false;
@@ -369,9 +408,10 @@ export const useAscensionStore = defineStore("ascension", () => {
 
   function rollEncounter(): Promise<EncounterPreview | null> {
     return mutate(
-      () => ascensionClient.rollEncounter(),
+      () => ascensionClient.rollEncounter(undefined, activitySelection.value === "hunt" ? huntDifficultyId.value : undefined),
       async (preview) => {
         encounter.value = preview;
+        restoreActivity(preview.activity);
         await refreshProfile();
       },
     );
@@ -477,6 +517,50 @@ export const useAscensionStore = defineStore("ascension", () => {
 
   /** Deletes all progress. Resolves false (state kept) when another change is
    * running or the server refuses, e.g. 409 while a battle is active. */
+  async function loadTrials(): Promise<void> {
+    const started = generation;
+    try { const result = await ascensionClient.trialProgress(); if (started === generation) trials.value = result; }
+    catch (err) { if (started === generation) report(err); }
+  }
+  async function prepareTrial(typeId: string, stage: number): Promise<void> {
+    const started = generation;
+    trialTypeId.value = typeId; trialStage.value = stage; trialPreparation.value = null;
+    try { const result = await ascensionClient.prepareTrial(typeId, stage); if (started === generation && typeId === trialTypeId.value && stage === trialStage.value) trialPreparation.value = result; }
+    catch (err) { if (started === generation) report(err); }
+  }
+  let trialStartKey: string | null = null;
+  let trialStartChoices = '';
+  function startTrial(input: { ascended_id: string; preset_slot: number | null; mode: BattleMode }): Promise<BattleView | null> {
+    if (busy.value) return Promise.resolve(null);
+    const choices = JSON.stringify([trialTypeId.value, trialStage.value, input]);
+    if (trialStartKey === null || choices !== trialStartChoices) { trialStartKey = newIdempotencyKey(); trialStartChoices = choices; }
+    return mutate(() => ascensionClient.startTrial(trialTypeId.value, trialStage.value, input, trialStartKey!), view => { trialStartKey = null; encounter.value = null; setBattle(view); });
+  }
+  let departureKey: string | null = null;
+  let departureChoices = '';
+  function startExpedition(id: string, hours: number): Promise<ExpeditionStatus | null> {
+    if (busy.value) return Promise.resolve(null);
+    const choices = JSON.stringify([id, hours]);
+    if (departureKey === null || departureChoices !== choices) { departureKey = newIdempotencyKey(); departureChoices = choices; }
+    return mutate(() => ascensionClient.startExpedition(id, hours, departureKey!), async status => { observeExpedition(status); departureKey = null; expeditionReceipt.value = null; await refreshProfile(); });
+  }
+  async function refreshExpedition(): Promise<void> {
+    const started = generation;
+    const epoch = observationEpoch;
+    const read = ++expeditionReadSerial;
+    try { const status = await ascensionClient.expedition(); if (started === generation && epoch === observationEpoch && read === expeditionReadSerial) observeExpedition(status); }
+    catch (err) { if (started === generation && epoch === observationEpoch && read === expeditionReadSerial) report(err); }
+  }
+  function claimExpedition(id: string): Promise<ExpeditionReceipt | null> {
+    if (busy.value) return Promise.resolve(null);
+    return mutate(() => ascensionClient.claimExpedition(id), async receipt => { expeditionReceipt.value = receipt; await refreshProfile(); });
+  }
+  function resetActivities(): void {
+    observationEpoch += 1; trialStartKey = null;
+    activitySelection.value = 'hub'; huntDifficultyId.value = 'outskirts'; trialTypeId.value = 'enchant'; trialStage.value = 1;
+    trials.value = null; trialPreparation.value = null; expeditionStatus.value = null; expeditionReceipt.value = null; departureKey = null;
+  }
+
   async function resetProgress(): Promise<boolean> {
     if (busy.value) return false;
     clearTimers();
@@ -486,6 +570,7 @@ export const useAscensionStore = defineStore("ascension", () => {
         profile.value = null;
         encounter.value = null;
         battle.value = null;
+        resetActivities();
         needsStarter.value = true;
         reconnecting.value = false;
         promptRemaining.value = 0;
@@ -502,6 +587,7 @@ export const useAscensionStore = defineStore("ascension", () => {
     () => session.revision,
     () => {
       generation += 1;
+      resetActivities();
       clearTimers();
       catalog.value = null;
       profile.value = null;
@@ -523,6 +609,8 @@ export const useAscensionStore = defineStore("ascension", () => {
   );
 
   return {
+    activitySelection, huntDifficultyId, trialTypeId, trialStage, activities, trials, trialPreparation,
+    expeditionStatus, expeditionObservedAt, expeditionReceipt, loadTrials, prepareTrial, startTrial, startExpedition, refreshExpedition, claimExpedition,
     catalog,
     profile,
     squadIds,

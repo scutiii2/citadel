@@ -1,0 +1,25 @@
+.em-root .game-modes { max-width:1440px; margin-inline:auto; }
+.em-root .mode-paths { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--em-space-6); margin-block:32px; }
+.em-root .mode-path { display:flex; flex-direction:column; align-items:flex-start; gap:12px; min-width:0; }
+.em-root .mode-path h3,.em-root .expedition-details h3 { margin:0; font:26px var(--em-font-heading); }
+.em-root .mode-path p { margin:0; color:var(--em-muted); }
+.em-root .mode-path small { color:var(--em-muted); }
+.em-root .mode-path .em-button { margin-top:12px; }
+.em-root .mode-scene { width:100%; height:180px; background:linear-gradient(transparent,#03101d88),var(--em-sanctuary-scene) center / cover; border-radius:var(--em-radius); }
+.em-root .trial .mode-scene { background-position:20% center; }
+.em-root .expedition .mode-scene { background-position:80% center; }
+.em-root .mode-back { margin-bottom:16px; }
+.em-root .hunt-options,.em-root .trial-types,.em-root .trial-stages,.em-root .expedition-durations { display:flex; flex-wrap:wrap; gap:12px; margin-block:24px; }
+.em-root .hunt-options > button { display:flex; flex:1 1 240px; flex-direction:column; gap:8px; padding:16px 24px; min-height:64px; border:1px solid var(--em-border); border-radius:var(--em-radius); color:var(--em-text); background:var(--em-panel); font:inherit; text-align:left; cursor:pointer; }
+.em-root .hunt-options > button[aria-pressed=true] { border-color:var(--em-accent); color:var(--em-accent); }
+.em-root .hunt-options > button span { color:var(--em-muted); }
+.em-root .hunt-options > button:focus-visible { outline:2px solid var(--em-accent); outline-offset:4px; }
+.em-root .activity-facts { color:var(--em-muted); margin-block:24px; }
+.em-root .expedition-summary { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; padding-block:16px; border-block:1px solid var(--em-divider); }
+.em-root .expedition-active { display:flex; align-items:flex-start; flex-wrap:wrap; gap:32px; margin-block:32px; }
+.em-root .expedition-details { flex:1 1 280px; max-width:650px; min-width:0; }
+.em-root .expedition-timer { display:block; margin-block:16px; font:32px var(--em-font-heading); }
+.em-root .expedition-choices { display:flex; flex-wrap:wrap; gap:24px; margin-block:24px; }
+.em-root .game-modes .muted { color:var(--em-muted); }
+.em-root .hunt-rating { margin-block:16px; }
+@media(max-width:768px) { .em-root .mode-paths { grid-template-columns:1fr; } .em-root .mode-scene { height:120px; } .em-root .expedition-details { flex-basis:100%; } }

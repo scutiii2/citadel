@@ -14,6 +14,7 @@ defineEmits<{ addStar: []; raiseTier: [] }>();
 
 <template>
   <section class="progression-tab" role="tabpanel" aria-label="Progression">
+    <p v-if="ascended.on_expedition" role="status">On expedition. Claim rewards before upgrading.</p>
     <div class="progression-panel">
       <header class="progression-heading"><h3>{{ ascended.next_tier_id ? `Path to ${titleCase(ascended.next_tier_id)}` : 'Star progression' }}</h3><p>Strengthen {{ ascended.name }} through stars and ascension.</p></header>
       <div class="progression-resources" aria-label="Upgrade resources">
@@ -38,13 +39,13 @@ defineEmits<{ addStar: []; raiseTier: [] }>();
                   <li :class="{ met: ascended.copies >= 1 }"><EmIcon :name="ascended.copies >= 1 ? 'check' : 'warning'" /><span>1 spare copy</span><small>You have {{ ascended.copies }}</small></li>
                   <li :class="{ met: essence >= ascended.star_essence_cost }"><EmEssence :tier-id="ascended.tier_id" :size="24" /><span>{{ ascended.star_essence_cost }} {{ titleCase(ascended.tier_id) }} essence</span><small>You have {{ essence }}</small></li>
                 </ul>
-                <EmButton variant="primary" :disabled="!ascended.can_star_up || busy" :aria-busy="busy" @click="$emit('addStar')">Add a star</EmButton>
+                <EmButton variant="primary" :disabled="ascended.on_expedition || !ascended.can_star_up || busy" :aria-busy="busy" @click="$emit('addStar')">Add a star</EmButton>
               </template>
               <p v-else class="muted">Maximum stars reached</p>
             </section>
             <section v-if="ascended.next_tier_id" class="next-ascension">
               <h4>Next ascension</h4><EmTierIcon :tier-id="ascended.next_tier_id" :size="72" /><strong>{{ titleCase(ascended.next_tier_id) }}</strong>
-              <EmButton :variant="ascended.can_tier_up ? 'primary' : 'secondary'" :disabled="!ascended.can_tier_up || busy" :aria-busy="busy" @click="$emit('raiseTier')">Raise to {{ titleCase(ascended.next_tier_id) }}</EmButton>
+              <EmButton :variant="ascended.can_tier_up ? 'primary' : 'secondary'" :disabled="ascended.on_expedition || !ascended.can_tier_up || busy" :aria-busy="busy" @click="$emit('raiseTier')">Raise to {{ titleCase(ascended.next_tier_id) }}</EmButton>
               <p v-if="!ascended.can_tier_up">Reach {{ ascended.stars_needed }} stars first.</p>
             </section>
           </div>

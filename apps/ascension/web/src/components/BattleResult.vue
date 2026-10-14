@@ -144,7 +144,7 @@ const story = computed(() => {
       </ul>
     </template>
 
-    <EmButton variant="primary" @click="store.closeBattle()"><EmIcon name="arrow" class="back-arrow" /> Back to encounters</EmButton>
+    <EmButton variant="primary" @click="store.closeBattle()"><EmIcon name="arrow" class="back-arrow" /> {{ battle.activity?.kind === 'trial' ? 'Back to trials' : 'Back to hunts' }}</EmButton>
     </div>
   </EmPanel>
 </template>

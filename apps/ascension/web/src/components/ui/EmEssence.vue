@@ -4,8 +4,8 @@ import { computed } from "vue";
 /** Decorative essence art; callers keep the tier label beside it. Vite bundles the
  * original design references so all six tiers share one source of artwork. */
 const props = withDefaults(defineProps<{ tierId: string; size?: number }>(), { size: 28 });
-const ESSENCES = import.meta.glob<string>("../../../../design_references/essences/*.webp", { eager: true, import: "default" });
-const url = computed(() => ESSENCES[`../../../../design_references/essences/essence_${props.tierId}.webp`]);
+const ESSENCES = import.meta.glob<string>("../../../../_others/design_references/essences/*.webp", { eager: true, import: "default" });
+const url = computed(() => ESSENCES[`../../../../_others/design_references/essences/essence_${props.tierId}.webp`]);
 </script>
 
 <template>

@@ -266,12 +266,14 @@ const detail = (node: TreeNodeState): string => {
 };
 
 async function learn(node: TreeNodeState): Promise<void> {
+  if (props.ascended.on_expedition) return;
   const result = await store.learnNode(props.ascended.ascended_id, node.id);
   if (result) await load();
 }
 
 /** The replaced slot loses its node; the node leaves any other slot first. */
 async function equip(node: TreeNodeState, slot: LoadoutSlot): Promise<void> {
+  if (props.ascended.on_expedition) return;
   const next: Partial<Record<LoadoutSlot, string | null>> = { ...(tree.value as TreeView).loadout };
   for (const key of Object.keys(next) as LoadoutSlot[]) if (next[key] === node.id) next[key] = null;
   next[slot] = node.id;
@@ -279,6 +281,7 @@ async function equip(node: TreeNodeState, slot: LoadoutSlot): Promise<void> {
 }
 
 async function unequip(node: TreeNodeState): Promise<void> {
+  if (props.ascended.on_expedition) return;
   const next: Partial<Record<LoadoutSlot, string | null>> = { ...(tree.value as TreeView).loadout };
   for (const key of Object.keys(next) as LoadoutSlot[]) if (next[key] === node.id) next[key] = null;
   await save(next);
@@ -353,11 +356,12 @@ async function save(next: Partial<Record<LoadoutSlot, string | null>>): Promise<
         <dl v-if="selected.kind === 'ability'" class="ability-facts"><div><dt>Power</dt><dd class="em-num">{{ selected.percentage }}%</dd></div><div><dt>Cooldown</dt><dd class="em-num">{{ selected.cooldown }} rounds</dd></div></dl>
         <h5>{{ selected.state === 'learned' ? 'Unlock requirements (already learned)' : 'Requirements' }}</h5>
         <ul class="requirements"><li v-for="item in requirements" :key="item.label" :class="{ met: item.met }"><span>{{ item.met ? '✓' : '○' }} <EmEssence v-if="item.essenceTier" :tier-id="item.essenceTier" :size="24" /> {{ item.label }}</span><small v-if="item.hint">{{ item.hint }}</small></li></ul>
+        <p v-if="ascended.on_expedition" role="status">On expedition. Claim rewards before changing abilities.</p>
         <p v-if="selected.state === 'locked'" class="reason">{{ selected.reason }}</p>
-        <EmButton v-if="selected.state === 'learnable'" class="learn" variant="primary" :disabled="store.busy || loading" @click="learn(selected)"><EmEssence v-if="selected.cost" :tier-id="selected.cost.tier" :size="24" />Learn · {{ costText(selected) }}</EmButton>
+        <EmButton v-if="selected.state === 'learnable'" class="learn" variant="primary" :disabled="ascended.on_expedition || store.busy || loading" @click="learn(selected)"><EmEssence v-if="selected.cost" :tier-id="selected.cost.tier" :size="24" />Learn · {{ costText(selected) }}</EmButton>
         <div v-if="selected.state === 'learned'" class="equip">
-          <EmButton v-for="slot in equipSlots" :key="slot.id" :data-slot="slot.id" :disabled="store.busy || loading" @click="equip(selected, slot.id)">Equip {{ slot.id.toUpperCase() }}<small>{{ slotLabel(slot.id) }}</small></EmButton>
-          <EmButton v-if="equippedSlot(selected)" class="unequip" :disabled="store.busy || loading" @click="unequip(selected)">Unequip</EmButton>
+          <EmButton v-for="slot in equipSlots" :key="slot.id" :data-slot="slot.id" :disabled="ascended.on_expedition || store.busy || loading" @click="equip(selected, slot.id)">Equip {{ slot.id.toUpperCase() }}<small>{{ slotLabel(slot.id) }}</small></EmButton>
+          <EmButton v-if="equippedSlot(selected)" class="unequip" :disabled="ascended.on_expedition || store.busy || loading" @click="unequip(selected)">Unequip</EmButton>
         </div>
         <p v-if="selected.state !== 'learned'" class="muted">Learning unlocks this {{ selected.kind }}. Equip it in a battle slot to use it.</p>
       </aside>

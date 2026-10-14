@@ -11,7 +11,7 @@ import CollectionPanel from "./components/CollectionPanel.vue";
 import EmShell from "./components/EmShell.vue";
 
 import EmblemPrompt from "./components/EmblemPrompt.vue";
-import EncounterPanel from "./components/EncounterPanel.vue";
+import GameModesPanel from "./components/GameModesPanel.vue";
 import RoundLog from "./components/RoundLog.vue";
 import HowToPlayDialog from "./components/HowToPlayDialog.vue";
 import EmDialog from "./components/ui/EmDialog.vue";
@@ -161,7 +161,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
                 <EmblemPrompt />
               </template>
             </template>
-            <EncounterPanel v-else />
+            <GameModesPanel v-else @collection="play('collection')" />
           </div>
 
           <ShopPanel v-else class="tab-body" />

@@ -20,6 +20,7 @@ const emit = defineEmits<{ saved: [] }>();
 const store = useAscensionStore();
 const ascensionClient = useAscensionClient();
 
+const expeditionLocked = computed(() => !!store.profile?.ascendeds.find(a => a.ascended_id === props.ascendedId)?.on_expedition);
 const MAX_EQUIPPED = 3;
 const SLOT_OPTIONS = computed(() => [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n), disabled: loading.value || store.busy || (dirty.value && String(n) !== slot.value) })));
 
@@ -66,13 +67,13 @@ watch([() => props.ascendedId, slot], () => void load(), { immediate: true });
 watch(() => props.defaultSlot, value => { if (!dirty.value && value !== undefined) slot.value = String(value); });
 
 function toggle(id: string, on: boolean): void {
-  if (loading.value || store.busy || loadError.value) return;
+  if (expeditionLocked.value || loading.value || store.busy || loadError.value) return;
   if (on && !chosen.value.includes(id) && chosen.value.length < MAX_EQUIPPED) chosen.value = [...chosen.value, id];
   else if (!on) chosen.value = chosen.value.filter((c) => c !== id);
 }
 
 async function save(): Promise<void> {
-  if (loading.value || store.busy || loadError.value) return;
+  if (expeditionLocked.value || loading.value || store.busy || loadError.value) return;
   const ascendedId = props.ascendedId;
   const slotNumber = Number(slot.value);
   const preset = await store.savePreset(ascendedId, slotNumber, chosen.value);
@@ -96,7 +97,7 @@ async function save(): Promise<void> {
         <span class="personality-art"><EmIcon :name="p.type.includes('AGGRESS') ? 'battle' : p.type.includes('DEFEN') ? 'shield' : p.type.includes('CALM') ? 'feather' : 'ascended'" :size="38" /></span>
         <div class="personality-name"><strong>{{ titleCase(p.type) }}</strong><EmTierBadge tier-id="common" :label="`Tier ${p.tier}`" :show-icon="false" class="badge" /><div class="category-tags"><span v-for="category in personalityInfo(p.type)?.categories" :key="category">{{ personalityCategory(category) }}</span><span v-if="personalityInfo(p.type)?.rules?.length">Conditional</span></div></div>
         <p class="personality-description">{{ personalityDescription(personalityInfo(p.type), p.tier) }}</p>
-        <EmSwitch :model-value="chosen.includes(p.id)" :label="chosen.includes(p.id) ? 'Selected' : 'Not selected'" :disabled="loading || store.busy || !!loadError || (!chosen.includes(p.id) && full)" :aria-label="titleCase(p.type)" @update:model-value="toggle(p.id, $event)" />
+        <EmSwitch :model-value="chosen.includes(p.id)" :label="chosen.includes(p.id) ? 'Selected' : 'Not selected'" :disabled="expeditionLocked || loading || store.busy || !!loadError || (!chosen.includes(p.id) && full)" :aria-label="titleCase(p.type)" @update:model-value="toggle(p.id, $event)" />
       </li>
     </ul>
 
@@ -110,13 +111,14 @@ async function save(): Promise<void> {
 
       <h5>Selected personalities</h5>
       <ul class="selected-personalities">
-        <li v-for="{ id, item } in chosenItems" :key="id"><EmIcon name="ascended" /><div><strong>{{ titleCase(item?.type ?? 'Collected personality') }}</strong><small>{{ item ? 'Tier ' + item.tier : 'Load more to reveal this instance' }}</small><p v-if="item" class="equipped-effect">{{ personalityDescription(personalityInfo(item.type), item.tier) }}</p></div><button type="button" :disabled="loading || store.busy || !!loadError" :aria-label="'Remove personality ' + id" @click="toggle(id, false)">×</button></li>
+        <li v-for="{ id, item } in chosenItems" :key="id"><EmIcon name="ascended" /><div><strong>{{ titleCase(item?.type ?? 'Collected personality') }}</strong><small>{{ item ? 'Tier ' + item.tier : 'Load more to reveal this instance' }}</small><p v-if="item" class="equipped-effect">{{ personalityDescription(personalityInfo(item.type), item.tier) }}</p></div><button type="button" :disabled="expeditionLocked || loading || store.busy || !!loadError" :aria-label="'Remove personality ' + id" @click="toggle(id, false)">×</button></li>
         <li v-for="index in Math.max(0, MAX_EQUIPPED - chosen.length)" :key="'empty-' + index" class="empty-personality"><EmIcon name="ascended" /><small>Empty personality slot</small></li>
       </ul>
       <p v-if="chosen.length === 0" class="muted">Select personalities for this preset.</p>
+      <p v-if="expeditionLocked" role="status">On expedition. Claim rewards before saving personality changes.</p>
       <p v-if="dirty" class="unsaved" role="status">Unsaved changes<small>Save this preset to use your selections in battle.</small><button class="discard" type="button" :disabled="store.busy" @click="chosen = [...saved]">Discard changes</button></p>
       <p class="hint">Equip up to {{ MAX_EQUIPPED }} collected personalities per preset. Each card is a separate collected instance.</p>
-      <EmButton variant="primary" class="save" :disabled="!dirty || store.busy || loading || !!loadError" @click="save"><EmIcon name="check" /> Save preset</EmButton>
+      <EmButton variant="primary" class="save" :disabled="expeditionLocked || !dirty || store.busy || loading || !!loadError" @click="save"><EmIcon name="check" /> Save preset</EmButton>
     </aside>
     <EmToast :open="toastOpen" :message="toastMessage" @close="toastOpen = false" />
   </section>

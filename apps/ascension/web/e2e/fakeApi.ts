@@ -1,7 +1,10 @@
 import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import type { BattleView, Profile } from "../src/api/AscensionClient.ts";
+import type { ActivityDefinitions, ExpeditionView, BattleView, Catalog, Profile } from "../src/api/AscensionClient.ts";
 import { CATALOG, ENCOUNTER, PROFILE, battleView, fighter, ownedAscended, shopWindow } from "../src/api/AscensionClient.fixtures.ts";
+
+const rawActivities = JSON.parse(readFileSync(new URL('../../configs/ascension_catalog.json', import.meta.url), 'utf8')).activities;
+const activityDefinitions: ActivityDefinitions = { ...rawActivities, trial_types: ['pure','abyss','divine','crimson','enchant','synthetic'], max_hunt_penalty:.75, trial_first_clear_multiplier:2 };
 
 export class FakeGameApi {
   readonly ascension = { profile: null as Record<string, unknown> | null, keys: [] as string[] };
@@ -9,7 +12,8 @@ export class FakeGameApi {
   readonly trades: { kind: string; quantity?: number }[] = [];
   readonly artRequests: string[] = [];
   battle: BattleView | null = null;
-  catalog = structuredClone(CATALOG);
+  catalog: Catalog = { ...structuredClone(CATALOG), activities: structuredClone(activityDefinitions) };
+  expedition: ExpeditionView | null = null;
   encounter = { ...ENCOUNTER };
   shop = shopWindow();
   private readonly page: Page;
@@ -40,6 +44,7 @@ export class FakeGameApi {
       if (method === "GET" && path === "/ascension/profile") {
         if (this.ascension.profile) {
           const saved = this.ascension.profile as unknown as Profile;
+          saved.server_now = Date.now()/1000; saved.expedition = this.expedition;
           saved.ascendeds = saved.ascendeds.map(member => ({ ...member, sale_value: member.sale_value ?? 25 }));
         }
         return route.fulfill({ status: this.ascension.profile ? 200 : 404, json: this.ascension.profile ?? { error: "Choose a starter first" } });
@@ -51,6 +56,38 @@ export class FakeGameApi {
         return route.fulfill({ status: 201, json: this.ascension.profile });
       }
       const profile = this.ascension.profile as unknown as Profile | null;
+      if (method === 'GET' && path === '/ascension/activities') return route.fulfill({ json: activityDefinitions });
+      if (method === 'GET' && path.startsWith('/ascension/activities/hunts/') && profile) {
+        const difficulty = path.split('/')[4]; const hunt = activityDefinitions.hunts.find(h => h.id === difficulty)!;
+        const id = new URL(req.url()).searchParams.get('ascended_id'); const owned = profile.ascendeds.find(a => a.ascended_id === id)!;
+        const overall = owned.overall ?? 185; const multiplier = 1-Math.min(.75, Math.max(0,(overall-hunt.recommended_max)/hunt.recommended_max));
+        return route.fulfill({ json: { overall, recommended_min:hunt.recommended_min, recommended_max:hunt.recommended_max, reward_multiplier:multiplier, penalty_percent:Math.round((1-multiplier)*100), below_range:overall<hunt.recommended_min } });
+      }
+      if (method === 'GET' && path === '/ascension/trials') return route.fulfill({ json:{trials:activityDefinitions.trial_types.map(type_id => ({type_id, stages:activityDefinitions.trial_stages.map(s => ({...s, cleared:false, unlocked:s.stage===1, first_clear:true}))}))} });
+      const trial = /^\/ascension\/trials\/(\w+)\/stages\/(\d+)\/(prepare|battles)$/.exec(path);
+      if (trial && profile) {
+        const type_id=trial[1]!; const stage=Number(trial[2]); const spec=activityDefinitions.trial_stages[stage-1]!;
+        const eligible = profile.ascendeds.filter(a => profile.squad.includes(a.ascended_id) && a.ascension_types.includes(type_id) && !a.fainted && !a.on_expedition).map(a => a.ascended_id);
+        if (method==='GET') return route.fulfill({json:{type_id,stage,unlocked:stage===1,first_clear:true,eligible_ascended_ids:eligible,reason:eligible.length?null:'No eligible Ascended',opponent:{...spec,name:spec.ascended_id.charAt(0).toUpperCase()+spec.ascended_id.slice(1),overall:222}}});
+        const input=req.postDataJSON(); this.battle=battleView({mode:input.mode,player:fighter(input.ascended_id),wild:fighter(spec.ascended_id),activity:{kind:'trial',difficulty_id:null,trial_type:type_id,trial_stage:stage,overall:null,reward_multiplier:1,recommended_min:null,recommended_max:null}});
+        this.battle.actions=this.battle.actions.filter(a=>a.kind!=='catch'); profile.active_battle=this.battle.id;
+        return route.fulfill({status:201,json:this.battle});
+      }
+      if (path === '/ascension/expeditions' && profile) {
+        if (method==='POST') {
+          const input=req.postDataJSON(); const now=Date.now()/1000;
+          this.expedition={id:'expedition-1',ascended_id:input.ascended_id,started_at:now,ends_at:now+input.duration_hours*3600,duration_hours:input.duration_hours,xp_reward:input.duration_hours*100,insignia_reward:input.duration_hours*25,state:'on_expedition',can_claim:false,seconds_remaining:input.duration_hours*3600};
+          profile.squad=profile.squad.filter(id=>id!==input.ascended_id); profile.ascendeds=profile.ascendeds.map(a=>a.ascended_id===input.ascended_id?{...a,in_squad:false,on_expedition:true,can_star_up:false,can_tier_up:false}:a);
+        }
+        if (this.expedition) { this.expedition.can_claim=this.expedition.ends_at<=Date.now()/1000; this.expedition.state=this.expedition.can_claim?'ready_to_claim':'on_expedition'; }
+        return route.fulfill({status:method==='POST'?201:200,json:{server_now:Date.now()/1000,expedition:this.expedition}});
+      }
+      if (method==='POST' && path.endsWith('/claim') && path.startsWith('/ascension/expeditions/') && profile && this.expedition) {
+        const expedition=this.expedition;
+        if (expedition.ends_at>Date.now()/1000) return route.fulfill({status:409,json:{error:'The expedition has not finished yet'}});
+        profile.insignia+=expedition.insignia_reward; profile.ascendeds=profile.ascendeds.map(a=>a.ascended_id===expedition.ascended_id?{...a,on_expedition:false,xp:a.xp+expedition.xp_reward}:a); this.expedition=null;
+        return route.fulfill({json:{id:expedition.id,ascended_id:expedition.ascended_id,xp:expedition.xp_reward,insignia:expedition.insignia_reward,level_before:3,level_after:3,claimed_at:Date.now()/1000}});
+      }
       if (path === "/ascension/squad" && (method === "GET" || method === "PUT")) {
         if (!profile) return route.fulfill({ status: 404, json: { error: "Choose a starter first" } });
         if (method === "PUT") {
@@ -67,6 +104,8 @@ export class FakeGameApi {
         return route.fulfill({ json: { ascended_ids: profile.squad, size: profile.squad_size } });
       }
       if (method === "POST" && path === "/ascension/encounters" && profile) {
+        const input = req.postDataJSON() ?? {};
+        this.encounter = { ...this.encounter, activity:{kind:input.difficulty_id?"hunt":"legacy",difficulty_id:input.difficulty_id??null,trial_type:null,trial_stage:null,overall:null,reward_multiplier:1,recommended_min:null,recommended_max:null},overall:185 };
         profile.pending_encounter = this.encounter.id;
         return route.fulfill({ status: 201, json: this.encounter });
       }
@@ -81,7 +120,7 @@ export class FakeGameApi {
         this.battle = battleView({ round: 3, revision: 3, history: [
           { round: 1, actions: { player: ["attack", "ATTACK"], wild: ["attack", "ATTACK"] }, events: [{ type: "attack", side: "player", damage: 10, protected: false, target_hp: 90 }, { type: "attack", side: "wild", damage: 10, protected: false, target_hp: 90 }] },
           { round: 2, actions: { player: ["ability:guardian_strike", "ATTACK"], wild: ["attack", "ATTACK"] }, events: [{ type: "attack", side: "player", damage: 10, protected: false, target_hp: 80 }, { type: "attack", side: "wild", damage: 10, protected: false, target_hp: 80 }] },
-        ], mode: input.mode, emblem_limit: input.emblem_limit,
+        ], mode: input.mode, emblem_limit: input.emblem_limit, activity:this.encounter.activity,
         player: fighter(input.ascended_id, { passives: [{ kind: 'defense_rating_bonus', params: { power_fraction: 0.4 } }] }),
         wild: fighter(this.encounter.ascended_id, { name: this.encounter.name, tier_id: this.encounter.tier_id, level: this.encounter.level,
           passives: [{ kind: 'low_hp_attack_bonus', params: { hp_below: 0.5, power_fraction: 0.2 } }] }) });

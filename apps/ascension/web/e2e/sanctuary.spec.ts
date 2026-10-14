@@ -68,6 +68,7 @@ for (const width of [1440, 768, 375]) {
       await page.keyboard.press('Escape');
     }
     await header.getByRole('tab', { name: 'Battle', exact: true }).click();
+    await page.getByRole('button', { name: 'Explore hunts', exact: true }).click();
     await page.getByRole('button', { name: 'Look for a wild Ascended', exact: true }).click();
     await page.screenshot({ path: info.outputPath(`encounter-${width}.png`) });
     await page.getByRole('button', { name: 'Fight', exact: true }).click();
@@ -92,8 +93,8 @@ for (const width of [1440, 375]) {
       await expect(page.locator('.battle-result')).toBeVisible();
       await fits(page);
       await page.screenshot({ path: info.outputPath(`${kind}-${width}.png`) });
-      await page.getByRole('button', { name: 'Back to encounters', exact: true }).scrollIntoViewIfNeeded();
-      await expect(page.getByRole('button', { name: 'Back to encounters', exact: true })).toBeEnabled();
+      await page.getByRole('button', { name: 'Back to hunts', exact: true }).scrollIntoViewIfNeeded();
+      await expect(page.getByRole('button', { name: 'Back to hunts', exact: true })).toBeEnabled();
       await page.goto('about:blank');
     }
     expect(api.unexpected).toEqual([]);
