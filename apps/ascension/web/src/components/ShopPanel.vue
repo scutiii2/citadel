@@ -227,22 +227,24 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
             <div class="item-grid">
             <article v-for="offer in visibleOffers" :key="offerKey(offer)" class="item-card" :class="{ 'is-off': offerOff(offer), selected: selected(offerKey(offer)) }" :data-offer="offer.slot" :style="{ '--tier': 'var(--em-tier-' + offer.tier_id + ')' }">
               <div class="item-art"><AscendedPreviewCard v-if="ascendedOf(offer.ascended_id)" :ascended="ascendedOf(offer.ascended_id)!" :tier-id="offer.tier_id" art-slot="preview_card" /><span v-else class="letter">{{ nameOf(offer.ascended_id).slice(0, 1) }}</span></div>
-              <div class="item-info"><h4>{{ nameOf(offer.ascended_id) }}</h4><EmTierBadge :tier-id="offer.tier_id" /><p>{{ offer.copies_granted }} {{ offer.copies_granted === 1 ? 'copy' : 'copies' }} / pack</p><p class="stock">{{ offer.left <= 0 ? 'Sold out' : offer.left + ' left' }}</p><p class="item-price em-num"><EmIcon name="coin" />{{ money(offer.price) }} <small>/ pack</small></p></div>
-              <EmIcon v-if="selected(offerKey(offer))" class="selection-check" name="check" />
-              <EmQuantity v-if="selected(offerKey(offer))" :quantity="selected(offerKey(offer))!.quantity" :max="available(selected(offerKey(offer))!)" :name="selected(offerKey(offer))!.name" :disabled="locked || !!selected(offerKey(offer))!.requestKey" suffix="packs" @change="setQuantity(selected(offerKey(offer))!, $event)" />
-              <EmButton v-else data-add :variant="selected(offerKey(offer)) ? 'primary' : 'secondary'" :disabled="locked || offerOff(offer) || !!selected(offerKey(offer))" @click="addOffer(offer)">{{ selected(offerKey(offer)) ? 'In basket' : fighting(offer.ascended_id) ? 'In active battle' : 'Add' }}</EmButton>
+              <div class="item-info"><h4>{{ nameOf(offer.ascended_id) }}</h4><EmTierBadge :tier-id="offer.tier_id" /><p>{{ offer.copies_granted }} {{ offer.copies_granted === 1 ? 'copy' : 'copies' }} / pack <span aria-hidden="true">&middot;</span> {{ offer.left <= 0 ? 'Sold out' : offer.left + ' left' }}</p><small v-if="selected(offerKey(offer))" class="in-basket"><EmIcon name="check" :size="12" />In basket</small></div>
+              <div class="item-actions"><p class="item-price em-num"><EmIcon name="coin" />{{ money(offer.price) }} <small>/ pack</small></p>
+              <EmQuantity v-if="selected(offerKey(offer))" :quantity="selected(offerKey(offer))!.quantity" :max="available(selected(offerKey(offer))!)" :name="selected(offerKey(offer))!.name" :disabled="locked || !!selected(offerKey(offer))!.requestKey" @change="setQuantity(selected(offerKey(offer))!, $event)" />
+              <EmButton v-else data-add :variant="selected(offerKey(offer)) ? 'primary' : 'secondary'" :disabled="locked || offerOff(offer) || !!selected(offerKey(offer))" @click="addOffer(offer)">{{ selected(offerKey(offer)) ? 'In basket' : fighting(offer.ascended_id) ? 'In active battle' : '+ Add' }}</EmButton>
+              </div>
             </article>
             </div>
             </section>
             <section v-if="visibleTiers.length" class="catalog-group" aria-label="EMBLEMs">
             <h3 class="group-heading">EMBLEMs <small>{{ visibleTiers.length }}</small></h3>
-            <div class="item-grid">
+            <div class="item-grid emblem-grid">
             <article v-for="t in visibleTiers" :key="t.id" class="item-card" :class="{ 'is-off': t.emblem_price > insignia, selected: selected('emblem:' + t.id) }" :data-tier="t.id" :style="{ '--tier': 'var(--em-tier-' + t.id + ')' }">
-              <div class="item-art"><EmEmblem :tier-id="t.id" :size="84" /></div>
-              <div class="item-info"><h4>{{ titleCase(t.id) }} EMBLEM</h4><EmTierBadge :tier-id="t.id" /><p>Owned {{ store.profile?.emblems[t.id] ?? 0 }}</p><p class="item-price em-num"><EmIcon name="coin" />{{ money(t.emblem_price) }} <small>each</small></p></div>
-              <EmIcon v-if="selected('emblem:' + t.id)" class="selection-check" name="check" />
+              <div class="item-art"><EmEmblem :tier-id="t.id" :size="40" /></div>
+              <div class="item-info"><h4>{{ titleCase(t.id) }} EMBLEM</h4><p class="item-price em-num"><EmIcon name="coin" />{{ money(t.emblem_price) }} <small>each</small></p></div>
+              <div class="item-actions">
               <EmQuantity v-if="selected('emblem:' + t.id)" :quantity="selected('emblem:' + t.id)!.quantity" :max="available(selected('emblem:' + t.id)!)" :name="selected('emblem:' + t.id)!.name" :disabled="locked || !!selected('emblem:' + t.id)!.requestKey"  @change="setQuantity(selected('emblem:' + t.id)!, $event)" />
-              <EmButton v-else data-add :variant="selected('emblem:' + t.id) ? 'primary' : 'secondary'" :disabled="locked || t.emblem_price > insignia || !!selected('emblem:' + t.id)" @click="add({ key: 'emblem:' + t.id, kind: 'emblem', id: t.id, name: titleCase(t.id) + ' EMBLEM', tierId: t.id, unitPrice: t.emblem_price, quantity: 1 })">{{ selected('emblem:' + t.id) ? 'In basket' : 'Add' }}</EmButton>
+              <EmButton v-else data-add :variant="selected('emblem:' + t.id) ? 'primary' : 'secondary'" :disabled="locked || t.emblem_price > insignia || !!selected('emblem:' + t.id)" @click="add({ key: 'emblem:' + t.id, kind: 'emblem', id: t.id, name: titleCase(t.id) + ' EMBLEM', tierId: t.id, unitPrice: t.emblem_price, quantity: 1 })">{{ selected('emblem:' + t.id) ? 'In basket' : '+ Add' }}</EmButton>
+              </div>
             </article>
             </div>
             </section>
@@ -250,10 +252,11 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
           <template v-else>
             <article v-for="a in sellable" :key="a.ascended_id" class="item-card" :class="{ 'is-off': a.copies <= 0 || fighting(a.ascended_id) || a.sale_value === undefined, selected: selected('sale:' + a.ascended_id) }" :data-sell="a.ascended_id" :style="{ '--tier': 'var(--em-tier-' + a.tier_id + ')' }">
               <div class="item-art"><AscendedPreviewCard v-if="ascendedOf(a.ascended_id)" :ascended="ascendedOf(a.ascended_id)!" :tier-id="a.tier_id" art-slot="preview_card" /><span v-else class="letter">{{ a.name.slice(0, 1) }}</span></div>
-              <div class="item-info"><h4>{{ a.name }}</h4><EmTierBadge :tier-id="a.tier_id" /><p>{{ a.copies }} spare {{ a.copies === 1 ? 'copy' : 'copies' }}</p><p v-if="a.sale_value !== undefined" class="item-price em-num"><EmIcon name="coin" />{{ money(a.sale_value) }} <small>each</small></p><p v-else class="stock">Sale quote unavailable</p></div>
-              <EmIcon v-if="selected('sale:' + a.ascended_id)" class="selection-check" name="check" />
+              <div class="item-info"><h4>{{ a.name }}</h4><EmTierBadge :tier-id="a.tier_id" /><p>{{ a.copies }} spare {{ a.copies === 1 ? 'copy' : 'copies' }}</p><small v-if="selected('sale:' + a.ascended_id)" class="in-basket"><EmIcon name="check" :size="12" />In basket</small><p v-if="a.sale_value === undefined" class="stock">Sale quote unavailable</p></div>
+              <div class="item-actions"><p v-if="a.sale_value !== undefined" class="item-price em-num"><EmIcon name="coin" />{{ money(a.sale_value) }} <small>each</small></p>
               <EmQuantity v-if="selected('sale:' + a.ascended_id)" :quantity="selected('sale:' + a.ascended_id)!.quantity" :max="available(selected('sale:' + a.ascended_id)!)" :name="selected('sale:' + a.ascended_id)!.name" :disabled="locked || !!selected('sale:' + a.ascended_id)!.requestKey"  @change="setQuantity(selected('sale:' + a.ascended_id)!, $event)" />
-              <EmButton v-else data-add :variant="selected('sale:' + a.ascended_id) ? 'primary' : 'secondary'" :disabled="locked || a.copies <= 0 || fighting(a.ascended_id) || a.sale_value === undefined || !!selected('sale:' + a.ascended_id)" @click="add({ key: 'sale:' + a.ascended_id, kind: 'sale', id: a.ascended_id, name: a.name, tierId: a.tier_id, unitPrice: a.sale_value!, quantity: 1 })">{{ selected('sale:' + a.ascended_id) ? 'In basket' : fighting(a.ascended_id) ? 'In active battle' : a.copies <= 0 ? 'No spare copies' : 'Add' }}</EmButton>
+              <EmButton v-else data-add :variant="selected('sale:' + a.ascended_id) ? 'primary' : 'secondary'" :disabled="locked || a.copies <= 0 || fighting(a.ascended_id) || a.sale_value === undefined || !!selected('sale:' + a.ascended_id)" @click="add({ key: 'sale:' + a.ascended_id, kind: 'sale', id: a.ascended_id, name: a.name, tierId: a.tier_id, unitPrice: a.sale_value!, quantity: 1 })">{{ selected('sale:' + a.ascended_id) ? 'In basket' : fighting(a.ascended_id) ? 'In active battle' : a.copies <= 0 ? 'No spare copies' : '+ Add' }}</EmButton>
+              </div>
             </article>
           </template>
         </div>
