@@ -4,14 +4,14 @@ import type { AscendedInfo } from "../api/AscensionClient";
 import { titleCase, type StatLine } from "../utils/ascension";
 import { spriteFor } from "../utils/sprites";
 import TypeSymbol from "./ui/TypeSymbol.vue";
-const frameAssets = import.meta.glob<string>("../assets/frames/frame_*.webp", { eager: true, query: "?url", import: "default" });
-const backAssets = import.meta.glob<string>("../assets/preview_card/back_*.webp", { eager: true, query: "?url", import: "default" });
+const frameAssets = import.meta.glob<string>("../assets/ascended_card/ascended_card_front_*.webp", { eager: true, query: "?url", import: "default" });
+const backAssets = import.meta.glob<string>("../assets/ascended_card/ascended_card_back_*.webp", { eager: true, query: "?url", import: "default" });
 const props = withDefaults(defineProps<{ ascended: AscendedInfo; level?: number; tierId?: string; stars?: number; stats?: StatLine[]; showLevel?: boolean; flipped?: boolean }>(), { level: 1, tierId: "common", stars: undefined, stats: undefined, showLevel: false, flipped: false });
 const artUrl = computed(() => spriteFor(props.ascended.art, "battle"));
 const tierVar = computed(() => `var(--em-tier-${props.tierId}, var(--em-tier-common))`);
 const types = computed(() => props.ascended.ascension_types);
-const frameUrl = computed(() => frameAssets[`../assets/frames/frame_${props.tierId}.webp`] ?? frameAssets["../assets/frames/frame_common.webp"]);
-const backUrl = computed(() => backAssets[`../assets/preview_card/back_${props.tierId}.webp`] ?? backAssets["../assets/preview_card/back_common.webp"]);
+const frameUrl = computed(() => frameAssets[`../assets/ascended_card/ascended_card_front_${props.tierId}.webp`] ?? frameAssets["../assets/ascended_card/ascended_card_front_common.webp"]);
+const backUrl = computed(() => backAssets[`../assets/ascended_card/ascended_card_back_${props.tierId}.webp`] ?? backAssets["../assets/ascended_card/ascended_card_back_common.webp"]);
 </script>
 <template>
   <article class="card" :class="[`tier-${tierId}`, { flipped }]" :style="{ '--tier': tierVar }" :aria-label="flipped ? 'Uncollected Ascended' : `${ascended.name}, ${titleCase(tierId)}, level ${level}`">

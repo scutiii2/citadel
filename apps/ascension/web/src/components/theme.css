@@ -3,6 +3,8 @@
    to the rest of Ember, and Ember's tokens are not used inside the page. */
 
 .em-root {
+  --em-sanctuary-scene: url("../assets/scenes/sanctuary.webp");
+  --em-font-heading: Georgia, "Times New Roman", serif;
   /* Palette (STYLE-SHEET section 1) */
   --em-forge-scene: url("../assets/scenes/forge-hall.png");
   --em-menu-scene: url("../assets/scenes/menu-forge.png");
@@ -15,8 +17,8 @@
   --em-raised: #253443;
   --em-text: #f5f0e6;
   --em-muted: #b8c6d2;
-  --em-border: #6b7f90;
-  --em-divider: #435463;
+  --em-border: #36546a;
+  --em-divider: #29425599;
   --em-accent: #f3b47a;
   --em-accent-edge: #8b5c36;
   --em-on-accent: #20180f;
@@ -96,6 +98,9 @@
 .em-root .em-num {
   font-variant-numeric: tabular-nums;
 }
+
+.em-root .page-heading { font:700 clamp(28px, 3vw, 42px)/1.15 var(--em-font-heading); color:var(--em-text); }
+.em-root .page-intro { color:var(--em-muted); font-size:14px; margin-top:8px; }
 
 .em-root .em-eyebrow {
   font-size: 11px;

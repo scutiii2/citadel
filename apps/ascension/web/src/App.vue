@@ -24,6 +24,7 @@ import EmPanel from "./components/ui/EmPanel.vue";
 import EmTabs from "./components/ui/EmTabs.vue";
 import { useSessionStore } from "./stores/session";
 import { useAscensionStore } from "./stores/ascension";
+import brandIcon from "./assets/brand/ascension-logo-icon.webp";
 
 /** Ascension: collect Ascended, battle wild ones, spend Insignia.
  * The game has its own theme (components/theme.css). Its store's loop runs
@@ -104,9 +105,9 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
     <EmPanel v-if="touchOnly" class="state" role="alert"><EmIcon name="warning" :size="40" /><h2 class="em-pixel">Ascension is PC only</h2><p>Open this game on a computer with a mouse and keyboard.</p></EmPanel>
     <EmShell v-else :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
       <template v-if="session.status === 'ready' && store.loaded && !store.unavailable" #navigation>
-        <h1 class="screen-brand em-pixel" aria-label="ASCENSION" data-label="ASCENSION" tabindex="0"><EmIcon name="flame" :size="24" /></h1>
-        <EmTabs v-if="screen === 'game'" class="section-tabs" :model-value="tab" :options="tabs" icon-only delayed-labels ariaLabel="Ascension sections" @update:model-value="value => play(value as Tab)" />
-        <button type="button" class="header-action tavern" aria-label="Tavern - Locked - Coming soon" data-label="Tavern - Locked - Coming soon" disabled><EmIcon name="tavern" :size="22" /><EmIcon class="tavern-lock" name="lock" :size="10" /></button>
+        <h1 class="screen-brand" aria-label="ASCENSION"><img class="brand-icon" :src="brandIcon" alt="" /><span class="brand-label">ASCENSION</span></h1>
+        <EmTabs v-if="screen === 'game'" class="section-tabs" :model-value="tab" :options="tabs" delayed-labels ariaLabel="Ascension sections" @update:model-value="value => play(value as Tab)" />
+        <button type="button" class="header-action tavern" aria-label="Tavern - Locked - Coming soon" title="Tavern — locked, coming soon" disabled><EmIcon name="tavern" :size="22" /><span class="nav-label">Tavern</span><EmIcon class="tavern-lock" name="lock" :size="10" /></button>
       </template>
       <template v-if="session.status === 'ready' && store.loaded && !store.unavailable" #actions>
         <button type="button" class="header-action" aria-label="Help" data-label="Help" @click="showingHelp = true"><EmIcon name="info" :size="22" /></button>
@@ -189,7 +190,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 
 
 <style scoped>
-.ascension-page { flex:1; height:100%; min-height:0; box-sizing:border-box; padding:12px 16px; overflow:hidden; }
+.ascension-page { flex:1; height:100%; min-height:0; box-sizing:border-box; padding:0; overflow:hidden; }
 .header-action { display:flex; align-items:center; justify-content:center; width:var(--em-target); height:var(--em-target); padding:0; border:0; color:var(--em-muted); background:transparent; font:inherit; cursor:pointer; }
 .back-arrow { transform:rotate(180deg); } .screen-brand { margin:0; flex:none; font-size:28px; font-weight:700; color:var(--em-accent); letter-spacing:.25px; }
 .subtle-settings { display:flex; align-items:center; justify-content:center; width:28px; height:32px; padding:0; border:0; color:var(--em-muted); background:transparent; cursor:pointer; }
@@ -210,4 +211,26 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
 .tavern-lock { position:absolute; right:3px; bottom:5px; }
 .section-tabs { border:0; background:transparent; }
 .section-tabs :deep(.tab.active) { background:transparent; box-shadow:none; color:var(--em-accent); }
+.screen-brand { display:flex; align-items:center; gap:18px; padding-right:24px; border-right:1px solid var(--em-divider); }
+.brand-label { color:var(--em-text); font:14px var(--em-font-heading); letter-spacing:6px; }
+.brand-icon { width:36px; height:44px; object-fit:contain; }
+.header-action.tavern { width:auto; gap:8px; padding:0 12px; font:14px var(--em-font-heading); }
+.tavern-lock { position:static; }
+.section-tabs { width:auto; flex:none; }
+.section-tabs :deep(.tab) { min-height:70px; border-bottom:3px solid transparent; border-radius:0; padding:12px 18px; font:15px var(--em-font-heading); }
+.section-tabs :deep(.tab.active) { border-bottom-color:var(--em-accent); }
+.battle-side :deep(.em-panel),.battle-side :deep(.controls) { border:0; border-left:1px solid var(--em-divider); box-shadow:none; background:#051725cc; }
+.battle-side :deep(.round-log) { border:0; box-shadow:none; background:#051725aa; }
+@media(max-width:1100px) { .brand-label { display:none; } .screen-brand { padding-right:12px; } }
+@media(orientation:portrait), (max-width:700px) {
+ .ascension-page { padding:0; }
+ .screen-brand { padding:0; border:0; } .screen-brand :deep(svg) { width:24px; }
+ .brand-icon { width:24px; height:36px; }
+ .brand-label,.nav-label,.tavern-lock { display:none; }
+ .section-tabs :deep(.tab-label) { display:none; }
+ .section-tabs :deep(.tab) { min-height:60px; min-width:36px; padding:6px; }
+ .header-action { width:36px; min-width:0; }
+ .header-action.tavern { width:36px; padding:6px; position:relative; }
+ .tavern-lock { display:block; position:absolute; right:1px; bottom:13px; }
+}
 </style>

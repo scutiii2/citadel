@@ -293,11 +293,13 @@ function show(ascended: OwnedAscended): void {
       <p class="rail-count em-num">{{ allOwned.length }}/{{ store.catalog?.ascendeds.length ?? 0 }} Acquired</p>
     </aside>
     <main class="collection-main">
+    <header class="collection-heading"><div><h2 class="page-heading">Your Ascended</h2><p class="page-intro">Build your squad. Discover your collection.</p></div>
     <ul v-if="essences.length" class="essences" aria-label="Essence">
       <li v-for="[tierId, count] in essences" :key="tierId" :style="{ '--tier': `var(--em-tier-${tierId}, var(--em-tier-common))` }">
         <EmEssence :tier-id="tierId" /><span class="essence-name">{{ titleCase(tierId) }} essence</span> <strong class="em-num">{{ count }}</strong>
       </li>
     </ul>
+    </header>
     <section class="squad-section" aria-label="Squad">
       <h3 class="em-pixel">Your squad <small class="em-num">{{ store.squadIds.length }} / {{ store.profile?.squad_size }}</small>
         <span class="squad-help">
@@ -576,3 +578,4 @@ button:focus-visible, input:focus-visible, select:focus-visible, .squad-card:foc
 }
 </style>
 <style scoped src="./ascendedDetails.css" />
+<style scoped src="./collectionScreen.css" />

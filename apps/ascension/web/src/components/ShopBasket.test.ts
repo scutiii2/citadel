@@ -15,6 +15,7 @@ const client = vi.mocked(useAscensionClient());
 let profile: Profile;
 let window: ShopWindow;
 const mounted: ReturnType<typeof mount>[] = [];
+const originalMatchMedia = globalThis.window.matchMedia;
 
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal ??= function () { this.setAttribute("open", ""); };
@@ -50,7 +51,7 @@ beforeEach(() => {
     return { kind: "sale", ascended_id: id, value, copies: owned.copies, tier_id: owned.tier_id };
   });
 });
-afterEach(() => { mounted.splice(0).forEach(w => w.unmount()); });
+afterEach(() => { mounted.splice(0).forEach(w => w.unmount()); globalThis.window.matchMedia = originalMatchMedia; });
 async function setup() {
   const store = useAscensionStore();
   store.catalog = CATALOG;
@@ -62,6 +63,39 @@ async function setup() {
 }
 
 describe("shop basket", () => {
+  it.each([false, true])('keeps portrait checkout feedback inside the open basket (failure: %s)', async (failure) => {
+    globalThis.window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    if (failure) client.buyEmblems.mockRejectedValueOnce(new ApiError(503, 'Forge unavailable'));
+    const { wrapper } = await setup();
+    await wrapper.get('[data-tier="common"] button[data-add]').trigger('click');
+    await wrapper.get('.basket-toggle').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-checkout]').trigger('click');
+    await flushPromises();
+    const dialog = wrapper.get('dialog.basket-panel');
+    expect(dialog.get('[role=status]').text()).toContain(failure ? 'Stopped:' : 'Purchased 1 units');
+    if (failure) expect(dialog.text()).toContain('Forge unavailable');
+    expect(wrapper.findAll('[data-basket]')).toHaveLength(failure ? 1 : 0);
+  });
+
+  it("opens a portrait basket dialog without losing selected items when dismissed", async () => {
+    globalThis.window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    const { wrapper } = await setup();
+    await wrapper.get('[data-tier="common"] button[data-add]').trigger('click');
+    expect(wrapper.get('.basket-toggle').text()).toContain('1');
+    await wrapper.get('.basket-toggle').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('dialog.basket-panel').attributes('open')).toBeDefined();
+    await wrapper.get('dialog.basket-panel .close').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('dialog.basket-panel').attributes('open')).toBeUndefined();
+    await wrapper.get('.basket-toggle').trigger('click');
+    await flushPromises();
+    expect(wrapper.findAll('[data-basket]')).toHaveLength(1);
+    expect(wrapper.get('[data-total]').text()).toContain('10');
+    expect(client.buyEmblems).not.toHaveBeenCalled();
+  });
+
   it("buys multiple offer packs and emblem quantities together with an accurate total", async () => {
     const { wrapper } = await setup();
     await wrapper.get('[data-offer="0"] button[data-add]').trigger("click");

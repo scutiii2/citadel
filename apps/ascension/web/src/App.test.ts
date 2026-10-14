@@ -79,18 +79,19 @@ describe("AscensionView", () => {
     expect(tab(wrapper, "Collection").classes()).toContain("active");
   });
 
-  it("opens Collection for returning players and uses Insignia to open the shop", async () => {
+  it("opens Collection for returning players with a separate Shop button and visible balance", async () => {
     const wrapper = await mountView();
     expect(wrapper.find(".hero").exists()).toBe(false);
     expect(tab(wrapper, "Collection").classes()).toContain("active");
     expect(wrapper.find("button.menu-link").exists()).toBe(false);
     expect(wrapper.find("button.tavern").attributes("disabled")).toBeDefined();
     expect(wrapper.findAll(".navigation [role=tab]").map(t => t.attributes("aria-label"))).toEqual(["Battle", "Collection"]);
-    expect(wrapper.find(".navigation").text()).toBe("");
-    await wrapper.find("button.wallet").trigger("click");
+    expect(wrapper.find(".navigation").text()).toContain("Battle");
+    expect(wrapper.find(".navigation").text()).toContain("Tavern");
+    await wrapper.find("button.shop-action").trigger("click");
     await flushPromises();
     expect(wrapper.find(".shop").exists()).toBe(true);
-    expect(wrapper.find("button.wallet").attributes("aria-pressed")).toBe("true");
+    expect(wrapper.find("button.shop-action").attributes("aria-pressed")).toBe("true");
     await tab(wrapper, "Collection").trigger("click");
     expect(wrapper.find(".collection").exists()).toBe(true);
     wrapper.unmount();
@@ -111,7 +112,7 @@ describe("AscensionView", () => {
 
   it("opens How to play from Help in the header", async () => {
     const wrapper = await mountView();
-    expect(wrapper.findAll(".account-actions button").map(b => b.attributes("aria-label"))).toEqual(["Open shop, 100 Insignia", "Help", "Settings"]);
+    expect(wrapper.findAll(".account-actions button").map(b => b.attributes("aria-label"))).toEqual(["Shop", "Help", "Settings"]);
     await wrapper.find('[aria-label="Help"]').trigger("click");
     await flushPromises();
     await wrapper.find('dialog[aria-label="Help"] .em-button').trigger("click");
@@ -141,8 +142,8 @@ describe("AscensionView", () => {
   it("shows Insignia in the masthead and no page header", async () => {
     const wrapper = await mountView();
 
-    expect(wrapper.find(".wallet").text()).toBe("");
-    expect(wrapper.find(".wallet").attributes("data-label")).toBe("100 Insignia · Open shop");
+    expect(wrapper.find(".wallet").text()).toBe("100");
+    expect(wrapper.find(".wallet").attributes("aria-label")).toBe("100 Insignia");
     expect(wrapper.find(".subtitle").exists()).toBe(false);
 
     await tab(wrapper, "Battle").trigger("click");
@@ -163,7 +164,7 @@ describe("AscensionView", () => {
     client.profile.mockResolvedValue({ ...PROFILE, active_battle: "b1" });
     client.battle.mockResolvedValue(battleView({ mode: "manual" }));
     const wrapper = await mountView();
-    expect(wrapper.find(".navigation").text()).toBe("");
+    expect(wrapper.find(".navigation").text()).toContain("Collection");
     await tab(wrapper, "Collection").trigger("click");
     expect(wrapper.find(".collection").exists()).toBe(true);
     await wrapper.find('[aria-label="Settings"]').trigger("click");

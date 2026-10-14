@@ -47,15 +47,15 @@ describe("AscendedPreviewCard", () => {
   });
   it.each(["common", "rare", "unique", "royal", "legendary", "forbidden"])("uses the %s WebP frame and matching back", (tierId) => {
     const front = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("guardian"), tierId } });
-    expect(front.find("img.tier-frame").attributes("src")).toContain(`frame_${tierId}.webp`);
+    expect(front.find("img.tier-frame").attributes("src")).toContain(`ascended_card_front_${tierId}.webp`);
     const back = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("guardian"), tierId, flipped: true } });
-    expect(back.find("img.tier-back").attributes("src")).toContain(`back_${tierId}.webp`);
+    expect(back.find("img.tier-back").attributes("src")).toContain(`ascended_card_back_${tierId}.webp`);
     expect(back.find(".type-symbol").exists()).toBe(false);
     expect(back.find(".front-types").exists()).toBe(false);
     expect(back.find(".unknown").text()).toBe("UNCOLLECTED");
   });
   it("falls back to Common artwork for an unknown tier", () => {
     const card = mount(AscendedPreviewCard, { props: { ascended: ascendedInfo("guardian"), tierId: "unknown" } });
-    expect(card.find("img.tier-frame").attributes("src")).toContain("frame_common.webp");
+    expect(card.find("img.tier-frame").attributes("src")).toContain("ascended_card_front_common.webp");
   });
 });

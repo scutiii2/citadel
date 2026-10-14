@@ -14,6 +14,7 @@ import EmIcon from "./ui/EmIcon.vue";
 import EmNotice from "./ui/EmNotice.vue";
 import EmTierBadge from "./ui/EmTierBadge.vue";
 import EmQuantity from "./ui/EmQuantity.vue";
+import EmDialog from "./ui/EmDialog.vue";
 
 const store = useAscensionStore();
 const basket = useShopBasketStore();
@@ -24,6 +25,14 @@ const rarity = ref("");
 const search = ref("");
 const hideUnavailable = ref(false);
 const reviewOpen = ref(false);
+const basketOpen = ref(false);
+const filtersOpen = ref(false);
+const portrait = ref(false);
+let compactQuery: MediaQueryList | undefined;
+function updateCompact(): void {
+  portrait.value = compactQuery?.matches ?? false;
+  basketOpen.value = false;
+}
 let alive = true;
 const now = useNowSeconds();
 const secondsLeft = computed(() => Math.max(0, store.shopEndsAt - now.value));
@@ -172,24 +181,32 @@ async function trade(): Promise<void> {
   }
 }
 
-onMounted(() => void store.loadShop());
-onUnmounted(() => { alive = false; });
+onMounted(() => {
+  void store.loadShop();
+  compactQuery = window.matchMedia?.('(orientation: portrait), (max-width: 760px)');
+  updateCompact();
+  compactQuery?.addEventListener('change', updateCompact);
+});
+onUnmounted(() => { alive = false; compactQuery?.removeEventListener('change', updateCompact); });
 watch(() => secondsLeft.value <= 0 && store.shop !== null, over => { if (over) void store.loadShop(); });
 watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
 </script>
 
 <template>
   <section class="shop" :aria-busy="processing">
+    <h2 class="page-heading">Shop</h2>
+    <p class="page-intro">Acquire new allies and stock up on EMBLEMs.</p>
     <div class="shop-toolbar">
       <div class="mode-tabs" role="group" aria-label="Shop mode">
-        <button type="button" data-mode="buy" aria-label="Buy" title="Buy" :aria-pressed="mode === 'buy'" :disabled="locked" @click="switchMode('buy')"><EmIcon name="shop" /></button>
-        <button type="button" data-mode="sell" aria-label="Sell" title="Sell" :aria-pressed="mode === 'sell'" :disabled="locked" @click="switchMode('sell')"><EmIcon name="coin" /></button>
+        <button type="button" data-mode="buy" aria-label="Buy" :aria-pressed="mode === 'buy'" :disabled="locked" @click="switchMode('buy')"><EmIcon name="shop" />Offers</button>
+        <button type="button" data-mode="sell" aria-label="Sell" :aria-pressed="mode === 'sell'" :disabled="locked" @click="switchMode('sell')"><EmIcon name="coin" />Sell copies</button>
       </div>
     </div>
-    <p v-if="message" class="notice" :class="{ interrupted }" role="status"><EmIcon :name="interrupted ? 'warning' : 'check'" />{{ message }}</p>
-    <EmNotice v-if="store.error" tone="error">{{ store.error }}</EmNotice>
+    <p v-if="message && (!portrait || !basketOpen)" class="notice" :class="{ interrupted }" role="status"><EmIcon :name="interrupted ? 'warning' : 'check'" />{{ message }}</p>
+    <EmNotice v-if="store.error && (!portrait || !basketOpen)" tone="error">{{ store.error }}</EmNotice>
     <div class="trading-floor">
-      <aside class="category-rail" aria-label="Shop filters">
+      <button class="filter-toggle" type="button" :aria-expanded="filtersOpen" aria-controls="shop-filters" @click="filtersOpen = !filtersOpen"><EmIcon name="settings" />Filters</button>
+      <aside id="shop-filters" class="category-rail" :class="{ expanded: filtersOpen }" aria-label="Shop filters">
         <p class="em-eyebrow">Browse</p>
         <template v-if="mode === 'buy'">
           <button v-for="c in [{ id: 'all', name: 'All items', icon: 'shop' as const }, { id: 'offers', name: 'Ascended offers', icon: 'ascended' as const }, { id: 'emblems', name: 'EMBLEMs', icon: 'shield' as const }]" :key="c.id" type="button" :aria-pressed="category === c.id" :disabled="locked" @click="category = c.id"><EmIcon :name="c.icon" />{{ c.name }}</button>
@@ -238,7 +255,11 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
         <p class="hint"><EmIcon name="check" />{{ mode === 'buy' ? 'Add several items, then adjust quantities in your basket.' : 'Choose spare copies, then review the batch before selling.' }}</p>
       </div>
 
-      <aside class="basket-panel" aria-label="Shop basket">
+      <component :is="portrait ? EmDialog : 'aside'" class="basket-panel" aria-label="Shop basket" :open="basketOpen" :title="mode === 'buy' ? 'Purchase basket' : 'Sale basket'" @close="basketOpen = false">
+        <template v-if="portrait && basketOpen">
+          <p v-if="message" class="notice" :class="{ interrupted }" role="status"><EmIcon :name="interrupted ? 'warning' : 'check'" />{{ message }}</p>
+          <EmNotice v-if="store.error" tone="error">{{ store.error }}</EmNotice>
+        </template>
         <header class="basket-head"><EmIcon :name="mode === 'buy' ? 'shop' : 'coin'" :size="25" /><div><h3 class="em-pixel">{{ mode === 'buy' ? 'Purchase basket' : 'Sale basket' }}</h3><p>{{ items.length }} item {{ items.length === 1 ? 'type' : 'types' }} · {{ units }} {{ mode === 'buy' ? 'units' : 'copies' }}</p></div></header>
         <div class="basket-items">
           <p v-if="!items.length" class="basket-empty"><EmIcon name="shop" :size="32" />Your basket is empty.<small>Choose items from the grid to begin.</small></p>
@@ -261,78 +282,11 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
           <p v-if="mode === 'sell'" class="hint">Only spare copies are sold. Your Ascended stays in your collection.</p>
           <EmButton data-checkout variant="primary" :disabled="!canCheckout" @click="checkout">{{ processing ? 'Processing…' : mode === 'buy' ? 'Buy selected · ' + money(total) : 'Review sale · ' + money(total) }}</EmButton>
         </footer>
-      </aside>
+      </component>
     </div>
+    <button v-if="portrait" type="button" class="basket-toggle" :aria-expanded="basketOpen" @click="basketOpen = true"><EmIcon name="shop" /><span>{{ mode === 'buy' ? 'Purchase basket' : 'Sale basket' }} · {{ units }}</span><strong class="em-num"><EmIcon name="coin" />{{ money(total) }}</strong><EmIcon name="arrow" /></button>
     <EmConfirm :open="reviewOpen" title="Review selected copies" :message="saleReview" :confirm-label="'Sell for ' + money(total) + ' Insignia'" :busy="processing || store.busy" @confirm="trade" @close="reviewOpen = false" />
   </section>
 </template>
 
-<style scoped>
-.shop { min-width:0; }
-.shop-toolbar { margin:0; display:flex; justify-content:center; }
-.mode-tabs { display:flex; width:220px; border:1px solid #435c70; border-radius:var(--em-radius); overflow:hidden; }
-.mode-tabs button { flex:1; min-height:38px; padding:6px 18px; font:inherit; font-size:12px; font-weight:700; text-transform:uppercase; color:var(--em-muted); background:linear-gradient(#223545,#152632); border:0; cursor:pointer; }
-.mode-tabs button[aria-pressed="true"] { color:var(--em-on-accent); background:linear-gradient(#fac892,#e9a363); }
-.notice { display:flex; align-items:center; gap:10px; padding:10px 14px; margin-bottom:8px; border:1px solid var(--em-success); color:var(--em-success); background:var(--em-success-surface); font-size:12px; }
-.notice.interrupted { color:var(--em-warning); border-color:var(--em-warning); background:var(--em-warning-surface); }
-.trading-floor { display:grid; grid-template-columns:210px minmax(0,1fr) 340px; min-height:440px; border:1px solid #405d72; border-radius:var(--em-radius); background:linear-gradient(110deg,#14232f,#142733 60%,#14212b); box-shadow:inset 0 0 0 2px #0b1b26; }
-.category-rail { display:flex; flex-direction:column; gap:8px; padding:10px; border-right:1px solid #3b5264; }
-.category-rail>.em-eyebrow { display:none; }
-.category-rail>button,.rail-selected { display:flex; align-items:center; gap:12px; width:100%; min-height:42px; padding:10px 12px; color:var(--em-text); background:transparent; border:0; font:inherit; font-size:13px; text-align:left; cursor:pointer; }
-.category-rail>button[aria-pressed="true"],.rail-selected { background:linear-gradient(90deg,#73594099,#3d3c3a99); border-left:4px solid var(--em-accent); border-radius:var(--em-radius); }
-.rail-field { display:flex; flex-direction:column; gap:12px; border-top:1px solid #3b5264; padding-top:28px; margin-top:24px; }
-select,.catalog-toolbar input { width:100%; min-height:36px; padding:8px 10px; border:1px solid #476278; border-radius:var(--em-radius); background:linear-gradient(#203342,#142634); color:var(--em-text); font:inherit; font-size:12px; }
-.hide-unavailable { display:flex; align-items:center; gap:10px; min-height:44px; font-size:12px; }
-input[type=checkbox] { width:18px; height:18px; accent-color:var(--em-accent); }
-.rail-note { display:none; }
-.shop-catalog { min-width:0; padding:8px; }
-.catalog-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
-.catalog-toolbar input { flex:1; min-width:0; max-width:440px; }
-.catalog-toolbar small { display:flex; align-items:center; gap:8px; font-size:11px; white-space:nowrap; color:var(--em-muted); }
-.item-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
-.item-card { position:relative; display:grid; grid-template-columns:86px minmax(0,1fr); grid-template-rows:minmax(112px,auto) 32px; gap:4px 8px; min-width:0; padding:10px 8px 8px; border:1px solid #476075; border-bottom:3px solid var(--tier); border-radius:var(--em-radius); background:linear-gradient(140deg,#233747,#1c2f3e); }
-.item-card.selected { outline:2px solid var(--em-accent); outline-offset:-2px; }
-.item-card.is-off .item-art,.item-card.is-off .item-info { opacity:.5; }
-.item-card>.em-quantity,.item-card>.em-button { grid-column:1/-1; min-height:32px; width:100%; padding:4px; font-size:12px; box-shadow:none; }
-.item-art { display:flex; align-items:center; justify-content:center; min-width:0; }
-.item-art img { display:block; width:100%; max-height:112px; object-fit:contain; image-rendering:pixelated; }
-.item-art .em-emblem { width:80px; height:auto; }
-.item-info { display:flex; flex-direction:column; gap:5px; min-width:0; }
-.item-info h4 { padding-right:12px; font-size:12px; overflow-wrap:anywhere; }
-.item-info p { font-size:10px; color:var(--em-muted); }
-.item-info :deep(.em-tier) { padding:0; border:0; background:transparent; font-size:10px; }
-.item-info .stock { color:var(--tier); }
-.item-info .item-price { display:flex; align-items:center; flex-wrap:wrap; gap:4px; font-size:14px; font-weight:700; color:var(--em-text); margin-top:auto; }
-.item-price small { font-weight:400; font-size:10px; color:var(--em-muted); }
-.selection-check { position:absolute; top:6px; right:6px; padding:2px; color:var(--em-on-accent); background:var(--em-accent); border-radius:var(--em-radius); }
-.letter { font:32px var(--em-font-display); color:var(--em-accent); }
-.hint { display:flex; align-items:start; gap:6px; color:var(--em-muted); font-size:11px; line-height:1.5; margin-top:10px; }
-.empty { color:var(--em-muted); padding:28px; text-align:center; }
-.basket-panel { display:flex; flex-direction:column; min-width:0; padding:16px; border-left:1px solid #3b5264; background:#0c1b2666; }
-.basket-head { display:flex; align-items:center; gap:12px; padding-bottom:16px; border-bottom:1px solid #3b5264; }
-.basket-head>.em-icon { color:var(--em-accent); }
-.basket-head h3 { font-size:16px; font-weight:700; }
-.basket-head p { font-size:11px; color:var(--em-muted); margin-top:4px; }
-.basket-items { flex:1; min-height:0; }
-.basket-empty { display:flex; flex-direction:column; align-items:center; gap:12px; padding:44px 8px; color:var(--em-muted); text-align:center; font-size:12px; }
-.basket-empty>.em-icon { color:var(--em-accent); } .basket-empty small { font-size:11px; }
-.basket-item { display:grid; grid-template-columns:52px minmax(0,1fr) 28px; align-items:center; gap:8px; padding:16px 0; border-bottom:1px solid #3b5264; }
-.basket-art { width:52px; height:60px; object-fit:contain; image-rendering:pixelated; }
-.basket-line { min-width:0; } .basket-line strong { font-size:12px; display:block; } .basket-line small { display:block; font-size:11px; color:var(--em-muted); margin-top:6px; }
-.remove { display:flex; align-items:center; justify-content:center; width:28px; height:32px; padding:0; align-self:start; color:var(--em-muted); background:#1a2c3b; border:1px solid #3b5264; cursor:pointer; }
-.quantity-control { display:flex; grid-column:1/3; max-width:140px; }
-.quantity-control button,.quantity-control input { min-width:0; min-height:32px; padding:4px; border:1px solid #3b5264; background:#203545; color:var(--em-text); font:inherit; text-align:center; }
-.quantity-control button { width:32px; cursor:pointer; } .quantity-control input { width:60px; appearance:textfield; } .quantity-control input::-webkit-inner-spin-button { -webkit-appearance:none; }
-.quantity-control button:disabled { opacity:.4; cursor:default; }
-.line-total { grid-column:3; justify-self:end; font-size:13px; }
-.item-problem { grid-column:1/-1; color:var(--em-danger); font-size:11px; }
-.basket-footer { padding-top:24px; border-top:1px solid #3b5264; margin-top:18px; }
-.total,.balance-after { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.total { font-size:17px; font-weight:700; } .total strong { font-size:21px; } .total small { font-size:11px; }
-.balance-after { font-size:12px; color:var(--em-muted); margin-top:14px; } .balance-after strong { max-width:150px; text-align:right; }
-.basket-footer>.em-button { margin-top:20px; width:100%; min-height:48px; font-size:14px; }
-@media(max-width:1250px) { .trading-floor { grid-template-columns:170px minmax(0,1fr) 285px; } .item-card { grid-template-columns:64px minmax(0,1fr); } .item-art .em-emblem { width:64px; } .catalog-toolbar small { font-size:10px; } .basket-head h3 { font-size:13px; } }
-@media(max-width:1050px) { .trading-floor { grid-template-columns:150px minmax(0,1fr) 255px; } .item-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .catalog-toolbar { flex-wrap:wrap; gap:8px; } .catalog-toolbar input { flex-basis:100%; max-width:none; } .basket-head h3 { font-size:12px; } }
-@media(max-width:760px) { .trading-floor { grid-template-columns:minmax(0,1fr); } .category-rail { flex-direction:row; flex-wrap:wrap; padding:8px; border-right:0; border-bottom:1px solid #3b5264; } .category-rail>button,.rail-selected { flex:1; width:auto; justify-content:center; padding:8px; font-size:11px; } .rail-field { flex:1; min-width:120px; padding:0; margin:0; border:0; } .rail-field>span { display:none; } .hide-unavailable { flex:1; white-space:nowrap; } .item-card { grid-template-columns:64px minmax(0,1fr); padding:8px; } .item-grid { gap:6px; } .item-card>.em-quantity,.item-card>.em-button { min-height:44px; } .basket-panel { border-left:0; border-top:1px solid #3b5264; padding:14px; } .basket-footer { position:sticky; bottom:0; z-index:2; padding:16px 0 4px; background:var(--em-panel); } .quantity-control button,.quantity-control input,.remove { min-height:44px; } }
-@media(max-width:460px) { .item-card { grid-template-columns:minmax(0,1fr); grid-template-rows:96px auto 44px; } .item-art img { height:96px; } .item-art .em-emblem { width:72px; } .item-info h4 { font-size:12px; } .item-info .item-price { margin-top:4px; } }
-</style>
+<style scoped src="./shopPanel.css" />

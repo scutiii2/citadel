@@ -48,7 +48,7 @@ function move(from: number, step: number | "first" | "last"): void {
       :aria-selected="option.value === modelValue"
       :tabindex="option.value === tabStop ? 0 : -1"
       :disabled="option.disabled"
-      :aria-label="iconOnly ? option.label : undefined"
+      :aria-label="option.label"
       :title="iconOnly && !delayedLabels ? option.label : undefined"
       :data-label="delayedLabels ? option.label : undefined"
       @click="select(option)"
@@ -58,7 +58,7 @@ function move(from: number, step: number | "first" | "last"): void {
       @keydown.end.prevent="move(i, 'last')"
     >
       <EmIcon v-if="option.icon" :name="option.icon" />
-      <template v-if="!iconOnly">{{ option.label }}</template>
+      <span v-if="!iconOnly" class="tab-label">{{ option.label }}</span>
     </button>
   </div>
 </template>

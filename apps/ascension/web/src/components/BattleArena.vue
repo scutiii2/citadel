@@ -377,4 +377,25 @@ function art(fighter: Fighter): string | null {
 
 @media(max-width:700px){.arena{padding:45px 10px 10px;min-height:315px}.round-number{top:12px;font-size:15px}.fighters{gap:8%}.head,.wild .head{flex-direction:column;align-items:flex-start;gap:4px;text-align:left;min-height:72px}.head h3{font-size:13px}.badges :deep(img){max-width:22px;max-height:22px}.health :deep(.em-bar.hp){height:19px}.hp{font-size:10px;line-height:19px}.art{height:195px}.stats{font-size:10px}.effects{top:122px;max-width:100%;font-size:9px}.ball{transform:scale(.8)}}
 .no-fighter{align-self:center;color:var(--em-muted);font-size:13px}.health :deep(.fill){background:linear-gradient(#7ab788,#3d8d55)}.wild .health :deep(.fill){background:linear-gradient(#db6576,#a12d40)}
+.arena { border:0; background:linear-gradient(180deg,#03132100,#03132166); box-shadow:none; padding:20px 24px 16px; min-height:420px; }
+.fighters { gap:14%; }
+.head { flex-wrap:wrap; min-height:70px; gap:8px; }
+.head h3 { font-size:16px; }
+.fighter-emblem { width:30px; height:30px; }
+.badges :deep(img) { max-width:22px; max-height:22px; }
+.health :deep(.em-bar.hp) { border:0; box-shadow:none; height:16px; }
+.hp { font-size:10px; line-height:16px; }
+.round-number { font:700 20px var(--em-font-heading); }
+@media(orientation:portrait), (max-width:700px) {
+ .arena { min-height:330px; padding:32px 4px 12px; }
+ .fighters { gap:16px; }
+ .head,.wild .head { flex-direction:row; align-content:start; align-items:center; gap:5px; min-height:88px; justify-content:start; }
+ .head h3 { font-size:12px; } .head small { font-size:10px; }
+ .badges { flex-wrap:wrap; gap:4px; } .badges :deep(.em-tier) { font-size:9px; }
+ .fighter-emblem { width:24px; height:24px; }
+ .art { height:210px; }
+ .health :deep(.em-bar.hp) { height:16px; }
+ .hp { font-size:9px; line-height:16px; }
+ .stats { font-size:10px; }
+}
 </style>

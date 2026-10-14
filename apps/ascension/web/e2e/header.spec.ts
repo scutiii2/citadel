@@ -2,13 +2,14 @@ import { expect, test } from "@playwright/test";
 import { installFakeApi } from "./fakeApi";
 import { PROFILE } from "../src/api/AscensionClient.fixtures";
 
-test("header uses icons and reveals labels after a second of hovering", async ({ page }, testInfo) => {
+test("header shows labelled desktop tabs, a locked Tavern and a balance beside Shop", async ({ page }, testInfo) => {
   const api = await installFakeApi(page);
   api.ascension.profile = { ...structuredClone(PROFILE) };
   await page.goto("/#ticket=e2e-launch");
   await page.getByRole("tab", { name: "Collection", exact: true }).click();
   const header = page.locator(".mast");
-  expect((await header.innerText()).trim()).toBe("");
+  await expect(header).toContainText('Collection');
+  await expect(header.locator('.wallet')).toHaveText('100');
   const navigationStyle = await header.locator(".section-tabs").evaluate(el => {
     const group = getComputedStyle(el);
     const active = getComputedStyle(el.querySelector(".active")!);
@@ -17,7 +18,7 @@ test("header uses icons and reveals labels after a second of hovering", async ({
   expect(navigationStyle).toEqual({ border: "0px", background: "rgba(0, 0, 0, 0)", activeBackground: "none", activeShadow: "none" });
   await expect(header.getByRole("button", { name: /Tavern/ })).toBeDisabled();
   const actions = await header.locator(".account-actions button").evaluateAll(buttons => buttons.map(button => ({ label: button.getAttribute("aria-label"), x: button.getBoundingClientRect().x })));
-  expect(actions.map(action => action.label)).toEqual(["Open shop, 100 Insignia", "Help", "Settings"]);
+  expect(actions.map(action => action.label)).toEqual(["Shop", "Help", "Settings"]);
   expect(actions[0]!.x).toBeLessThan(actions[1]!.x);
   expect(actions[1]!.x).toBeLessThan(actions[2]!.x);
   await header.getByRole("button", { name: "Help", exact: true }).click();
@@ -43,11 +44,11 @@ test("header uses icons and reveals labels after a second of hovering", async ({
   await battle.click();
   await expect(page.locator(".destination")).toHaveCount(0);
   await expect(battle).toHaveAttribute("aria-selected", "true");
-  await header.getByRole("button", { name: /Open shop/ }).click();
+  await header.getByRole("button", { name: 'Shop', exact: true }).click();
   await expect(header.getByRole("button", { name: "Buy", exact: true })).toHaveCount(0);
   const shop = page.locator(".shop");
   await expect(shop.getByRole("button", { name: "Buy", exact: true })).toBeVisible();
-  expect((await header.innerText()).trim()).toBe("");
+  await expect(header.locator('.wallet')).toHaveText('100');
   await shop.getByRole("button", { name: "Sell", exact: true }).click();
   await expect(shop.getByRole("button", { name: "Sell", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.mouse.move(0, 0);

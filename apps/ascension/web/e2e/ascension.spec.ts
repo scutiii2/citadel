@@ -38,12 +38,15 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath("overview.png"), fullPage: true });
     await page.getByRole("button", { name: "Close", exact: true }).click();
     await fits(page);
-    await page.getByRole("button", { name: /Open shop/ }).click();
+    await page.getByRole("button", { name: 'Shop', exact: true }).click();
     await page.locator('[data-offer="0"] button[data-add]').click();
+    if (viewport.width < 700) await page.locator('.basket-toggle').click();
     await page.locator('[data-basket] input').fill("2");
+    if (viewport.width < 700) await page.keyboard.press('Escape');
     await page.locator('[data-tier="common"] button[data-add]').click();
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath("shop.png"), fullPage: true });
     if (viewport.width < 700) {
+      await page.locator('.basket-toggle').click();
       await page.locator('[data-checkout]').scrollIntoViewIfNeeded();
       await page.screenshot({ animations: "disabled", path: testInfo.outputPath("shop-basket.png") });
     }
@@ -52,14 +55,17 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await expect.poll(() => api.trades.length).toBe(3);
     expect(api.trades.map(t => t.kind)).toEqual(["copies", "copies", "emblems"]);
     await expect(page.locator('[data-basket] input')).toHaveCount(0);
+    if (viewport.width < 700) await page.keyboard.press('Escape');
     await page.locator('[data-mode="sell"]').click();
     await page.locator('[data-sell="guardian"] button[data-add]').click();
+    if (viewport.width < 700) await page.locator('.basket-toggle').click();
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath("shop-sell.png"), fullPage: true });
     await page.locator('[data-checkout]').click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: 'Review selected copies', exact: true })).toBeVisible();
     expect(api.trades.filter(t => t.kind === "sale")).toHaveLength(0);
-    await page.getByRole("dialog").getByRole("button", { name: /Confirm|Sell/, exact: false }).last().click();
+    await page.getByRole("dialog", { name: 'Review selected copies', exact: true }).getByRole("button", { name: /Confirm|Sell/, exact: false }).last().click();
     await expect.poll(() => api.trades.filter(t => t.kind === "sale").length).toBe(1);
+    if (viewport.width < 700) await page.keyboard.press('Escape');
     await page.getByRole("tab", { name: "Battle", exact: true }).click();
     await page.getByRole("button", { name: "Look for a wild Ascended", exact: true }).click();
     await page.getByRole("button", { name: "Fight", exact: true }).click();
@@ -122,7 +128,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await page.getByRole("tab", { name: "Battle", exact: true }).click();
     await expect(page.locator(".arena")).toBeVisible();
     expect(api.battle?.status).toBe("active");
-    expect(api.artRequests.every(path => path.endsWith("/sprite_battle.webp"))).toBe(true);
+    expect(api.artRequests.every(path => /\/sprite_(battle|main_card)\.webp$/.test(path))).toBe(true);
     expect(api.unexpected).toEqual([]);
   });
 

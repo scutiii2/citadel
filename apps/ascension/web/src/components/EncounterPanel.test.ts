@@ -7,7 +7,7 @@ import { useAscensionStore } from "../stores/ascension";
 import EncounterPanel from "./EncounterPanel.vue";
 
 vi.mock("../api/AscensionClient", () => {
-  const client = { rollEncounter: vi.fn(), declineEncounter: vi.fn(), startBattle: vi.fn(), profile: vi.fn() };
+  const client = { rollEncounter: vi.fn(), declineEncounter: vi.fn(), startBattle: vi.fn(), profile: vi.fn(), preset: vi.fn() };
   return { useAscensionClient: () => client };
 });
 
@@ -26,6 +26,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   setActivePinia(createPinia());
   client.profile.mockResolvedValue(PROFILE);
+  client.preset.mockResolvedValue({ ascended_id: 'guardian', slot: 3, instance_ids: ['p1'], personalities: [{ id: 'p1', type: 'BOLD', tier: 2 }] });
 });
 
 function mountPanel(profile: Profile = PROFILE, encounter: EncounterPreview | null = null) {
@@ -51,6 +52,9 @@ describe("EncounterPanel", () => {
     const { wrapper, store } = mountPanel(profile, ENCOUNTER);
     await button(wrapper.findAll("button"), "Fight").trigger("click");
     expect((wrapper.get("select[name='preset']").element as HTMLSelectElement).value).toBe("3");
+    expect(wrapper.get("select[name='preset'] option[value='3']").text()).toContain("Battle default");
+    await flushPromises();
+    expect(wrapper.get('.battle-traits').text()).toContain('Bold');
     await wrapper.get("select[name='preset']").setValue("2");
     await wrapper.get("form.start-form").trigger("submit");
     expect(client.startBattle).toHaveBeenCalledWith(expect.objectContaining({ preset_slot: 2 }));

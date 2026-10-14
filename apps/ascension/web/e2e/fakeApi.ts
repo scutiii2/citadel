@@ -96,6 +96,8 @@ export class FakeGameApi {
         return route.fulfill({ json: this.battle });
       }
       if (method === "GET" && /^\/ascension\/ascendeds\/[a-z0-9_-]+\/personalities$/.test(path)) return route.fulfill({ json: { items: [], next_cursor: null } });
+      const tree = /^\/ascension\/ascendeds\/([a-z0-9_-]+)\/tree$/.exec(path);
+      if (method === "GET" && tree) return route.fulfill({ json: { ascended_id: tree[1], level: 3, essences: {}, slots: [], loadout: {}, nodes: [] } });
       const preset = /^\/ascension\/ascendeds\/([a-z0-9_-]+)\/presets\/(\d+)$/.exec(path);
       if (method === "GET" && preset) return route.fulfill({ json: { ascended_id: preset[1], slot: Number(preset[2]), instance_ids: [] } });
       const sale = /^\/ascension\/ascendeds\/([a-z0-9_-]+)\/sales$/.exec(path);
