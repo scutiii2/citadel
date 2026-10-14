@@ -7,6 +7,8 @@ describe("EmShell", () => {
     const wrapper = mount(EmShell, { props: { insignia: 240 }, slots: { default: "<p class='body'>Hello</p>" } });
 
     expect(wrapper.find("h1").attributes("aria-label")).toBe("ASCENSION");
+    expect(wrapper.find(".brand-icon").attributes("src")).toContain("ascension-logo-icon.webp");
+    expect(wrapper.find(".brand-wordmark").exists()).toBe(false);
     expect(wrapper.find('.destination').exists()).toBe(false);
     expect(wrapper.find('.navigation').text()).toBe('ASCENSION');
     expect(wrapper.find('.screen-heading').exists()).toBe(false);

@@ -4,7 +4,7 @@
 .result-title>.em-emblem { display:none; }
 .result-title .title { font:700 clamp(32px,4vw,52px) var(--em-font-heading); text-transform:none; text-shadow:none; color:var(--em-text); }
 .story { margin-top:12px; color:var(--em-muted); font-size:14px; }
-.result-art { width:100%; height:380px; object-fit:contain; object-position:bottom; margin-top:24px; image-rendering:pixelated; mix-blend-mode:lighten; }
+.result-art { width:100%; height:380px; object-fit:contain; object-position:bottom; margin-top:24px; image-rendering:pixelated; mix-blend-mode:normal; }
 .result-letter { display:grid; place-items:center; width:100%; min-height:300px; font:80px var(--em-font-heading); }
 .rewards { display:flex; flex-direction:column; gap:24px; padding-top:20px; }
 .rewards-heading,.squad-xp h3,.revealed-title { display:flex; align-items:center; gap:8px; font:700 24px var(--em-font-heading); text-transform:none; }

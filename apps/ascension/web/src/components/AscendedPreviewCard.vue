@@ -4,6 +4,7 @@ import type { AscendedInfo } from "../api/AscensionClient";
 import { titleCase, type StatLine } from "../utils/ascension";
 import { spriteFor } from "../utils/sprites";
 import TypeSymbol from "./ui/TypeSymbol.vue";
+import ascensionLogo from "../assets/brand/ascension-logo-icon.webp";
 const frameAssets = import.meta.glob<string>("../assets/ascended_card/ascended_card_front_*.webp", { eager: true, query: "?url", import: "default" });
 const backAssets = import.meta.glob<string>("../assets/ascended_card/ascended_card_back_*.webp", { eager: true, query: "?url", import: "default" });
 const props = withDefaults(defineProps<{ ascended: AscendedInfo; level?: number; tierId?: string; stars?: number; stats?: StatLine[]; showLevel?: boolean; flipped?: boolean }>(), { level: 1, tierId: "common", stars: undefined, stats: undefined, showLevel: false, flipped: false });
@@ -21,11 +22,11 @@ const backUrl = computed(() => backAssets[`../assets/ascended_card/ascended_card
       <header class="header"><h4 class="ascended-name">{{ ascended.name }}</h4><span v-if="showLevel" class="level">Lv {{ level }}</span></header>
       <footer class="card-meta"><span v-if="stars !== undefined" class="stars em-num" :aria-label="`${stars} stars`">★ {{ stars }}</span><div class="front-types"><TypeSymbol v-for="id in types" :key="id" :type-id="id" size="12cqw" :flat="types.length > 1" /></div></footer>
     </div>
-    <div v-if="flipped" class="face card-back concealed"><img class="tier-back" :src="backUrl" alt="" aria-hidden="true" draggable="false" /><span class="unknown">UNCOLLECTED</span></div>
+    <div v-if="flipped" class="face card-back concealed"><img class="tier-back" :src="backUrl" alt="" aria-hidden="true" draggable="false" /><div class="back-brand" aria-hidden="true"><img class="back-logo" :src="ascensionLogo" alt="" draggable="false" /></div><span class="unknown">UNCOLLECTED</span></div>
   </article>
 </template>
 <style scoped>
-.card { container-type: inline-size; position: relative; width: var(--card-width, 150px); aspect-ratio: 265 / 371; padding: 0; border: 0; background: transparent; filter:drop-shadow(0 5px 6px #0007); color: #f4f1e8; text-align: center; }
+.card { container-type: inline-size; position: relative; width: var(--card-width, 150px); aspect-ratio: 265 / 371; padding: 0; border: 0; background: transparent; color: #f4f1e8; text-align: center; }
 .tier-frame,.tier-back { position:absolute; inset:0; width:100%; height:100%; object-fit:fill; image-rendering:pixelated; pointer-events:none; }
 .tier-frame { z-index:3; }
 .front { position:absolute; inset:6% 8%; border-radius:var(--radius-sm); overflow:hidden; display:flex; flex-direction:column; background:#0b1b28; }
@@ -41,5 +42,7 @@ const backUrl = computed(() => backAssets[`../assets/ascended_card/ascended_card
 .card-meta { display:flex; align-items:center; justify-content:space-between; padding:1cqw 5cqw 4cqw; min-height:16cqw; }
 .stars { font-size:6cqw; color:var(--em-accent); } .front-types { display:flex; gap:2cqw; }
 .card > .card-back { position:absolute; inset:0; }
-.unknown { position:absolute; left:12%; right:12%; top:68%; transform:translateY(-50%); font:5cqw var(--em-font-display); color:#e3e9ef; text-shadow:0 1px 2px #000; }
+.back-brand { position:absolute; left:35%; top:44%; transform:translateY(-50%); width:30%; pointer-events:none; }
+.back-logo { display:block; width:100%; height:auto; object-fit:contain; }
+.unknown { position:absolute; left:12%; right:12%; top:83%; transform:translateY(-50%); font:5cqw var(--em-font-display); color:#e3e9ef; text-shadow:0 1px 2px #000; }
 </style>

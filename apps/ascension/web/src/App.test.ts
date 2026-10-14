@@ -88,6 +88,7 @@ describe("AscensionView", () => {
     expect(wrapper.findAll(".navigation [role=tab]").map(t => t.attributes("aria-label"))).toEqual(["Battle", "Collection"]);
     expect(wrapper.find(".navigation").text()).toContain("Battle");
     expect(wrapper.find(".navigation").text()).toContain("Tavern");
+    expect(wrapper.find(".screen-brand .brand-icon").exists()).toBe(true);
     await wrapper.find("button.shop-action").trigger("click");
     await flushPromises();
     expect(wrapper.find(".shop").exists()).toBe(true);

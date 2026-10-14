@@ -7,7 +7,7 @@ describe("EmPickCard", () => {
     const wrapper = mount(EmPickCard, { props: { selected: true }, attrs: { "aria-label": "Guardian" }, slots: { default: "Card" } });
     expect(wrapper.attributes("role")).toBe("radio");
     expect(wrapper.attributes("aria-checked")).toBe("true");
-    expect(wrapper.classes()).toContain("em-glow");
+    expect(wrapper.classes()).toContain("selected");
     await wrapper.trigger("click");
     await wrapper.trigger("keydown.enter");
     await wrapper.trigger("keydown.space");

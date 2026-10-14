@@ -9,7 +9,7 @@ const emit = defineEmits<{ shop: [] }>();
   <div class="shell">
     <header class="mast" :class="{ 'has-account': shopEnabled }">
       <div class="navigation">
-        <slot name="navigation"><h1 class="brand" aria-label="ASCENSION"><img class="brand-icon" :src="brandIcon" alt="" /><span class="brand-label">ASCENSION</span></h1></slot>
+        <slot name="navigation"><h1 class="brand" aria-label="ASCENSION"><img class="brand-icon" :src="brandIcon" alt="" aria-hidden="true" draggable="false" /><span class="brand-label">ASCENSION</span></h1></slot>
       </div>
       <div class="header-tools"><slot name="tools" /></div>
       <div class="account-actions">

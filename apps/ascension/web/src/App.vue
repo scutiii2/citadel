@@ -9,6 +9,7 @@ import BattleControls from "./components/BattleControls.vue";
 import BattleResult from "./components/BattleResult.vue";
 import CollectionPanel from "./components/CollectionPanel.vue";
 import EmShell from "./components/EmShell.vue";
+
 import EmblemPrompt from "./components/EmblemPrompt.vue";
 import EncounterPanel from "./components/EncounterPanel.vue";
 import RoundLog from "./components/RoundLog.vue";
@@ -105,7 +106,7 @@ onUnmounted(() => { observer?.disconnect(); stopMessages?.(); store.detach(); })
     <EmPanel v-if="touchOnly" class="state" role="alert"><EmIcon name="warning" :size="40" /><h2 class="em-pixel">Ascension is PC only</h2><p>Open this game on a computer with a mouse and keyboard.</p></EmPanel>
     <EmShell v-else :insignia="hasAccount ? store.profile!.insignia : null" :shop-enabled="hasAccount" :shop-open="tab === 'shop'" @shop="play('shop')">
       <template v-if="session.status === 'ready' && store.loaded && !store.unavailable" #navigation>
-        <h1 class="screen-brand" aria-label="ASCENSION"><img class="brand-icon" :src="brandIcon" alt="" /><span class="brand-label">ASCENSION</span></h1>
+        <h1 class="screen-brand" aria-label="ASCENSION"><img class="brand-icon" :src="brandIcon" alt="" aria-hidden="true" draggable="false" /><span class="brand-label">ASCENSION</span></h1>
         <EmTabs v-if="screen === 'game'" class="section-tabs" :model-value="tab" :options="tabs" delayed-labels ariaLabel="Ascension sections" @update:model-value="value => play(value as Tab)" />
         <button type="button" class="header-action tavern" aria-label="Tavern - Locked - Coming soon" title="Tavern — locked, coming soon" disabled><EmIcon name="tavern" :size="22" /><span class="nav-label">Tavern</span><EmIcon class="tavern-lock" name="lock" :size="10" /></button>
       </template>
