@@ -42,6 +42,32 @@ function mountShop(insignia = 25) {
 const buyIn = (wrapper: ReturnType<typeof mountShop>["wrapper"], tier: string) => wrapper.find(`[data-tier="${tier}"] button`);
 
 describe("ShopPanel", () => {
+  it("keeps search in the mode toolbar and separates All Items into labelled groups", async () => {
+    const { wrapper } = mountShop(500);
+    expect(wrapper.find('.shop-toolbar input[aria-label="Search shop"]').exists()).toBe(true);
+    expect(wrapper.get('section[aria-label="Ascended offers"]').findAll('[data-offer]')).toHaveLength(2);
+    expect(wrapper.get('section[aria-label="EMBLEMs"]').findAll('[data-tier]')).toHaveLength(CATALOG.tiers.length);
+    await wrapper.get('input[aria-label="Search shop"]').setValue('guardian');
+    expect(wrapper.findAll('[data-offer]')).toHaveLength(1);
+    expect(wrapper.find('section[aria-label="EMBLEMs"]').exists()).toBe(false);
+    await wrapper.get('input[aria-label="Search shop"]').setValue('emblem');
+    expect(wrapper.find('section[aria-label="Ascended offers"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-tier]')).toHaveLength(CATALOG.tiers.length);
+  });
+
+  it("only offers the rarity filter when selling copies", async () => {
+    const { store, wrapper } = mountShop(500);
+    expect(wrapper.find('select[aria-label="Filter shop by rarity"]').exists()).toBe(false);
+    store.profile!.ascendeds.push({ ...ownedAscended('striker', { tier_id: 'rare', copies: 2 }), sale_value: 20 });
+    await wrapper.get('[data-mode="sell"]').trigger('click');
+    await wrapper.get('select[aria-label="Filter shop by rarity"]').setValue('rare');
+    expect(wrapper.findAll('[data-sell]')).toHaveLength(1);
+    expect(wrapper.get('[data-sell]').attributes('data-sell')).toBe('striker');
+    await wrapper.get('[data-mode="buy"]').trigger('click');
+    expect(wrapper.find('select[aria-label="Filter shop by rarity"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-offer]')).toHaveLength(2);
+  });
+
   it("disables EMBLEMs the Insignia does not cover", async () => {
     const { wrapper } = mountShop(25);
 

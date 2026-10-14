@@ -9,12 +9,12 @@ const definitions = JSON.parse(readFileSync(new URL("../../ascended/striker/tree
 const configuration = JSON.parse(readFileSync(new URL("../../configs/ascension_catalog.json", import.meta.url), "utf8"));
 const personalities = configuration.personalities;
 
-test("Twoychi uses main card art and a saved preset across all three detail tabs", async ({ page }, testInfo) => {
+test("Twoychi uses main card art and a saved preset across the detail tabs", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const api = await installFakeApi(page);
   const character = JSON.parse(readFileSync(new URL("../../ascended/twoychi/catalog.json", import.meta.url), "utf8"));
   const nodes = JSON.parse(readFileSync(new URL("../../ascended/twoychi/tree.json", import.meta.url), "utf8")).nodes;
-  api.ascension.profile = { ...PROFILE, squad: ["twoychi"], ascendeds: [ownedAscended("twoychi", { name: "Twoychi", in_squad: true, default_preset_slot: 2, level: 7, tier_id: "unique", xp: 664, xp_needed: 700 })] };
+  api.ascension.profile = { ...PROFILE, essences: { unique: 15 }, squad: ["twoychi"], ascendeds: [ownedAscended("twoychi", { name: "Twoychi", in_squad: true, default_preset_slot: 2, level: 7, tier_id: "unique", xp: 664, xp_needed: 700, copies: 2, stars_needed: 3, star_essence_cost: 3, next_tier_id: 'royal', can_star_up: true })] };
   const pool = [{ id: "p1", type: "AGGRESSIVE", tier: 2 }, { id: "p2", type: "RECKLESS", tier: 1 }, { id: "p3", type: "BOLD", tier: 1 }];
   const art = { main_card: "/ascended/twoychi/sprite_main_card.webp", preview_card: "/ascended/twoychi/sprite_preview_card.webp", battle: "/ascended/twoychi/sprite_battle.webp", focus: 50, focus_preview: 50, animation: null };
   await page.route("**/ascension/catalog", route => route.fulfill({ json: { ...CATALOG, personalities, ascendeds: [ascendedInfo("twoychi", { ...character, art })] } }));
@@ -45,6 +45,11 @@ test("Twoychi uses main card art and a saved preset across all three detail tabs
   await expect(dialog.getByRole("button", { name: "Use preset 3 as battle default", exact: true })).toHaveAttribute("aria-pressed", "true");
   expect(await dialog.locator(".title").evaluate(el => getComputedStyle(el).textDecorationLine)).toBe("none");
   await page.screenshot({ animations: "disabled", path: testInfo.outputPath("twoychi-overview.png") });
+  await dialog.getByRole('tab', { name: 'Progression', exact: true }).click();
+  await expect(dialog.getByRole('heading', { name: 'Path to Royal', exact: true })).toBeVisible();
+  await expect(dialog.locator('.progression-resources')).toContainText('Spare copies2');
+  await expect(dialog.getByRole('button', { name: 'Add a star', exact: true })).toBeEnabled();
+  await page.screenshot({ animations: 'disabled', path: testInfo.outputPath('twoychi-progression.png') });
   await dialog.getByRole("tab", { name: "Personalities", exact: true }).click();
   await expect(dialog.locator(".preset-inspector h4")).toHaveText("Preset 3");
   await expect(dialog.locator(".selected-personalities strong")).toHaveCount(3);
@@ -87,17 +92,25 @@ for (const width of [1440, 768, 375]) {
     await page.getByRole("tab", { name: "Collection", exact: true }).click();
     await page.locator(".ascended-card").click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog.locator(".copy-summary")).toContainText("4 spare copies");
+    await expect(dialog.locator('.head .battle-status')).toHaveText('Ready for battle');
+    await expect(dialog.locator('.progression-drawer, .copy-summary')).toHaveCount(0);
+    expect(await dialog.locator('.title').evaluate(el => getComputedStyle(el, '::after').content)).toBe('none');
+    await page.screenshot({ animations: "disabled", path: testInfo.outputPath(`overview-${width}.png`) });
+    await dialog.getByRole('tab', { name: 'Progression', exact: true }).click();
+    await expect(dialog.getByRole('tabpanel', { name: 'Progression', exact: true })).toBeVisible();
+    await expect(dialog.locator('.progression-resources')).toContainText('Spare copies4');
     await expect(dialog.locator(".progression-panel .em-essence")).toHaveCount(2);
     await expect.poll(() => dialog.locator(".progression-panel .em-essence").evaluateAll(images => images.every(img => (img as HTMLImageElement).naturalWidth > 0))).toBe(true);
-    await page.screenshot({ animations: "disabled", path: testInfo.outputPath(`overview-${width}.png`) });
-    await expect(dialog.locator(".copy-summary")).toBeVisible();
+    expect(await dialog.locator('.progression-tab').evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    await page.screenshot({ animations: "disabled", path: testInfo.outputPath(`progression-${width}.png`) });
+    await dialog.getByRole('button', { name: 'Add a star', exact: true }).scrollIntoViewIfNeeded();
+    await expect(dialog.getByRole('button', { name: 'Add a star', exact: true })).toBeEnabled();
     await dialog.getByRole("tab", { name: "Personalities", exact: true }).click();
     await expect(dialog.locator(".personality-description").first()).toContainText("3 preference weight");
     await expect(dialog.locator(".personality-description").last()).toContainText("HP is below 50%");
     await dialog.locator("input[role=switch]").first().check();
     await expect(dialog.getByRole("button", { name: "Save preset", exact: true })).toBeEnabled();
-    await expect(dialog.locator(".copy-summary")).toBeVisible();
+    await expect(dialog.locator('.head .battle-status')).toHaveText('Ready for battle');
     await page.screenshot({ animations: "disabled", path: testInfo.outputPath(`personalities-${width}.png`) });
     await dialog.getByRole("tab", { name: "Ability tree", exact: true }).click();
     await expect(dialog.locator(".origin-hub")).toHaveText('');

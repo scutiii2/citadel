@@ -38,7 +38,7 @@ function onClick(event: MouseEvent): void {
     @click="onClick"
   >
     <header class="head">
-      <h2 class="em-pixel title">{{ title }}</h2>
+      <div class="dialog-heading"><h2 class="em-pixel title">{{ title }}</h2><slot name="subtitle" /></div>
       <slot name="header-actions" />
       <button type="button" class="close" aria-label="Close" @click="emit('close')">
         <EmIcon name="close" />
@@ -49,6 +49,7 @@ function onClick(event: MouseEvent): void {
 </template>
 
 <style scoped>
+.dialog-heading { flex:1; min-width:0; }
 .em-dialog {
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100dvh - 48px);

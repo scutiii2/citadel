@@ -15,11 +15,42 @@ vi.mock("../api/AscensionClient", () => {
 
 const client = vi.mocked(useAscensionClient());
 
+async function progression(wrapper: ReturnType<typeof mountPanel>) {
+  await wrapper.get('[role="tab"][aria-label="Progression"]').trigger('click');
+}
+
+it('uses a dedicated Progression tab and places readiness directly under the name', async () => {
+  const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended('guardian', { copies: 2 })] });
+  await wrapper.find('.ascended-card').trigger('click');
+  await flushPromises();
+  const header = wrapper.get('.ascended-details .head');
+  expect(header.find('.battle-status').text()).toBe('Ready for battle');
+  expect(header.find('.copy-summary').exists()).toBe(false);
+  expect(wrapper.find('.progression-drawer').exists()).toBe(false);
+  expect(wrapper.find('.progression-panel').exists()).toBe(false);
+  await progression(wrapper);
+  expect(wrapper.get('[role=tabpanel][aria-label=Progression]').text()).toContain('Spare copies');
+  expect(wrapper.find('.overview').exists()).toBe(false);
+  await wrapper.get('[role=tab][aria-label="Overview"]').trigger('click');
+  expect(wrapper.find('.overview-loadout').exists()).toBe(true);
+});
+
+it('shows fainted status in the header and capped XP without an upgrade button', async () => {
+  const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended('guardian', { stars_needed: null, next_tier_id: null, level: 30, xp_needed: null, faint_until: Date.now() / 1000 + 120 })] });
+  await wrapper.find('.ascended-card').trigger('click');
+  await flushPromises();
+  expect(wrapper.get('.ascended-details .head .battle-status').text()).toContain('Fainted, ready in');
+  await progression(wrapper);
+  expect(wrapper.get('.progression-side').text()).toContain('Highest level reached');
+  expect(wrapper.find('.upgrade button').exists()).toBe(false);
+});
+
 it("shows matching essence art in the collection and detail costs", async () => {
   const wrapper = mountPanel({ ...PROFILE, essences: { rare: 7 }, ascendeds: [ownedAscended("guardian", { tier_id: "rare" })] });
   expect(wrapper.find(".essences img.em-essence").attributes("src")).toContain("essence_rare.webp");
   await wrapper.find(".ascended-card").trigger("click");
   await flushPromises();
+  await progression(wrapper);
   expect(wrapper.findAll(".progression-panel img.em-essence")).toHaveLength(2);
   expect(wrapper.findAll(".progression-panel img.em-essence").every(img => img.attributes("src")?.includes("essence_rare.webp"))).toBe(true);
 });
@@ -30,6 +61,7 @@ it.each([['legendary', 20], ['forbidden', 50]] as const)("shows %s stars as a ca
   })] });
   await wrapper.find(".ascended-card").trigger("click");
   await flushPromises();
+  await progression(wrapper);
   const panel = wrapper.find(".progression-panel");
   expect(panel.text()).toContain(`Stars ${cap} / ${cap}`);
   expect(panel.text()).toContain("Maximum stars reached");
@@ -43,6 +75,7 @@ it("opens the details when a collected card is pressed", async () => {
   await wrapper.find(".ascended-card").trigger("click");
   await flushPromises();
   expect(wrapper.find(".details .detail-portrait").attributes("src")).toBe("/ascended/guardian/sprite_main_card.webp");
+  await progression(wrapper);
   expect(wrapper.find(".progression-panel").text()).toContain("A star costs");
 });
 
@@ -151,7 +184,8 @@ describe("CollectionPanel", () => {
     expect(client.preset).toHaveBeenCalledWith("guardian", 1);
     const details = wrapper.find(".details");
     expect(details.find(".big-card").exists()).toBe(false);
-    expect(details.findAll(".overview-effects article strong").map((a) => a.text())).toEqual(["Strike", "Rally"]);
+    await progression(wrapper);
+    expect(details.findAll(".foundation-summary article strong").map((a) => a.text())).toEqual(["Strike", "Rally"]);
     await wrapper.findAll('[role="tab"]').find((b) => b.text() === "Personalities")!.trigger("click");
     expect(details.find(".personalities").text()).toContain("Aggressive");
     expect(details.find(".personalities").text()).toContain("Tier 2");
@@ -167,13 +201,14 @@ describe("CollectionPanel", () => {
   });
 });
 
-it("keeps the spare-copy count visible at the top tier and across detail tabs", async () => {
+it("shows copies inside Progression at the top tier and readiness across tabs", async () => {
   const wrapper = mountPanel({ ...PROFILE, ascendeds: [ownedAscended("guardian", { copies: 0, stars_needed: null })] });
   await wrapper.find(".ascended-card").trigger("click");
   await flushPromises();
-  expect(wrapper.find(".copy-summary").text()).toContain("0 spare copies");
+  await progression(wrapper);
+  expect(wrapper.find(".progression-resources").text()).toContain("Spare copies0");
   await wrapper.findAll('[role="tab"]').find((b) => b.text() === "Personalities")!.trigger("click");
-  expect(wrapper.find(".copy-summary").isVisible()).toBe(true);
+  expect(wrapper.get(".ascended-details .head .battle-status").text()).toBe("Ready for battle");
 });
 
 it("explains a personality beside its preset control", async () => {
@@ -191,7 +226,8 @@ it("updates the summary when learning an ability refreshes the profile", async (
   await flushPromises();
   useAscensionStore().profile = { ...PROFILE, ascendeds: [ownedAscended("guardian", { copies: 4, can_star_up: false })] };
   await flushPromises();
-  expect(wrapper.find(".copy-summary").text()).toContain("4 spare copies");
+  await progression(wrapper);
+  expect(wrapper.find(".progression-resources").text()).toContain("Spare copies4");
 });
 
 describe("stars and tiers", () => {
@@ -210,6 +246,7 @@ describe("stars and tiers", () => {
 
     await wrapper.find(".ascended-card").trigger("click");
     await flushPromises();
+    await progression(wrapper);
     const upgrade = wrapper.find(".upgrade");
     expect(upgrade.text()).toContain("Stars 0 / 2 to reach Unique");
     expect(upgrade.text()).toContain("1 spare copy");
@@ -231,6 +268,7 @@ describe("stars and tiers", () => {
 
     await wrapper.find(".ascended-card").trigger("click");
     await flushPromises();
+    await progression(wrapper);
     const buttons = wrapper.find(".upgrade").findAll("button").map((b) => b.text());
     expect(buttons).toEqual(["Raise to Unique"]);
     await wrapper.find(".upgrade button").trigger("click");
@@ -246,9 +284,11 @@ describe("stars and tiers", () => {
 
     await wrapper.find(".ascended-card").trigger("click");
     await flushPromises();
+    await progression(wrapper);
     expect(wrapper.find(".upgrade button").attributes("disabled")).toBeDefined();
     await wrapper.findAll(".ascended-card")[1]!.trigger("click");
     await flushPromises();
+    await progression(wrapper);
     expect(wrapper.find(".upgrade").text()).toContain("Top of its ladder");
     expect(wrapper.find(".upgrade button").exists()).toBe(false);
   });

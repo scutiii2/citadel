@@ -4,7 +4,7 @@ import { useAscensionClient, type OwnedAscended, type PersonalityItem, type Tree
 import { useAscensionStore } from "../stores/ascension";
 import { errorMessage } from "../utils/errors";
 import { ASCENSION_TYPES, groupByType, typeLabel, typesPresent } from "../utils/ascensionTypes";
-import { ascendedStats, formatCountdown, titleCase, passiveText, abilityEffect } from "../utils/ascension";
+import { ascendedStats, formatCountdown, titleCase } from "../utils/ascension";
 import { useNowSeconds } from "../composables/useNowSeconds";
 import TreeTab from "./TreeTab.vue";
 import PresetEditor from "./PresetEditor.vue";
@@ -20,6 +20,7 @@ import EmEssence from "./ui/EmEssence.vue";
 import EmTabs from "./ui/EmTabs.vue";
 import TypeSymbol from "./ui/TypeSymbol.vue";
 import AbilitySlots from "./AbilitySlots.vue";
+import AscendedProgression from "./AscendedProgression.vue";
 
 /** Collection filters, squad strip and collected cards; pressing a card opens its details
  * dialog with full progression, personalities and ability-tree operations. */
@@ -86,7 +87,7 @@ function toggleSquad(): void {
 }
 const detailTab = ref("overview");
 const treeVisited = ref(false);
-const detailTabs = [{ value: "overview", label: "Overview", icon: "book" as const }, { value: "tree", label: "Ability tree", icon: "tree" as const }, { value: "personalities", label: "Personalities", icon: "ascended" as const }];
+const detailTabs = [{ value: "overview", label: "Overview", icon: "book" as const }, { value: "progression", label: "Progression", icon: "shield" as const }, { value: "tree", label: "Ability tree", icon: "tree" as const }, { value: "personalities", label: "Personalities", icon: "ascended" as const }];
 const overviewTree = ref<TreeView | null>(null);
 const selectedAbility = ref<string | null>(null);
 const abilitySelectionRequest = ref(0);
@@ -376,9 +377,9 @@ function show(ascended: OwnedAscended): void {
 
     </main>
     <EmDialog class="ascended-details" :open="detailsOpen && open !== null" :title="open?.name ?? 'Ascended details'" wide @close="closeDetails">
+      <template #subtitle><p v-if="open" class="battle-status" :class="{ fainted: faintLeft > 0 }">{{ faintLeft > 0 ? 'Fainted, ready in ' + formatCountdown(faintLeft) : 'Ready for battle' }}</p></template>
       <template #header-actions><EmTabs v-model="detailTab" :options="detailTabs" ariaLabel="Ascended detail sections" @update:model-value="value => { if (value === 'tree') treeVisited = true; }" /></template>
       <div v-if="open && detailsOpen" class="details" :class="{ 'tree-expanded': detailTab !== 'overview' }">
-        <div class="detail-meta"><span class="copy-summary"><strong>{{ open.copies }}</strong> {{ open.copies === 1 ? 'spare copy' : 'spare copies' }}</span><span class="battle-status" :class="{ fainted: faintLeft > 0 }">{{ faintLeft > 0 ? 'Fainted, ready in ' + formatCountdown(faintLeft) : 'Ready for battle' }}</span></div>
         <EmNotice v-if="store.error" tone="error">{{ store.error }}</EmNotice>
         <section v-if="detailTab === 'overview'" class="overview" role="tabpanel" aria-label="Overview">
           <img v-if="openInfo?.art.main_card" class="detail-portrait" :src="openInfo.art.main_card" :alt="open.name" />
@@ -391,33 +392,6 @@ function show(ascended: OwnedAscended): void {
             <dl class="current-stats" aria-label="Current stats"><div v-for="stat in stats" :key="stat.key"><dt><EmIcon :name="stat.key === 'hp' ? 'heart' : stat.key === 'speed' ? 'feather' : 'flame'" />{{ stat.label }}</dt><dd class="em-num">{{ stat.value }}</dd></div></dl>
             <div class="badges"><span v-for="id in open.ascension_types" :key="id" class="type-chip"><TypeSymbol :type-id="id" :size="22" decorative />{{ typeLabel(id) }}</span></div>
             <div class="squad-control"><EmButton :disabled="!!squadReason || store.busy" :aria-busy="store.busy" @click="toggleSquad">{{ store.busy ? 'Saving squad…' : store.squadIds.includes(open.ascended_id) ? 'Remove from squad' : 'Add to squad' }}</EmButton><p v-if="squadReason" class="muted">{{ squadReason }}</p></div>
-            <details class="progression-drawer"><summary>Progression & abilities</summary>
-        <aside class="progression-panel" aria-label="Progression"><h3 class="em-pixel">Progression</h3><div class="progression-resources"><div><small>Spare copies</small><strong class="em-num">{{ open.copies }}</strong></div><div><small class="essence-label"><EmEssence :tier-id="open.tier_id" />{{ titleCase(open.tier_id) }} essence</small><strong class="em-num">{{ essenceOf(open.tier_id) }}</strong></div></div><h4 class="em-pixel">Star progression</h4>
-          <div class="upgrade">
-            <template v-if="open.stars_needed !== null">
-              <EmBar :value="open.stars" :max="open.stars_needed" :label="`${open.name} stars`" />
-              <span class="em-num">Stars {{ open.stars }} / {{ open.stars_needed }}<template v-if="open.next_tier_id"> to reach {{ titleCase(open.next_tier_id) }}</template></span>
-              <h5 class="cost-head">A star costs</h5>
-              <ul class="star-cost">
-                <li :class="{ met: open.copies >= 1 }"><span>1 spare copy</span><small class="em-num">You have {{ open.copies }}</small></li>
-                <li :class="{ met: essenceOf(open.tier_id) >= open.star_essence_cost }"><span class="essence-label"><EmEssence :tier-id="open.tier_id" />{{ open.star_essence_cost }} {{ titleCase(open.tier_id) }} essence</span><small class="em-num">You have {{ essenceOf(open.tier_id) }}</small></li>
-              </ul>
-              <div class="upgrade-actions">
-                <EmButton v-if="open.can_tier_up" variant="primary" :disabled="store.busy" @click="raiseTier(open)">
-                  Raise to {{ titleCase(open.next_tier_id ?? "") }}
-                </EmButton>
-                <span v-else-if="open.stars >= open.stars_needed">Maximum stars reached</span>
-                <EmButton v-else variant="primary" :disabled="!open.can_star_up || store.busy" @click="addStar(open)">Add a star</EmButton>
-              </div>
-            </template>
-            <span v-else>Top of its ladder: no more stars.</span>
-            <p v-if="upgradeMessage" class="upgrade-note" role="status">{{ upgradeMessage }}</p>
-          </div>
-
-        </aside>
-
-            <div v-if="openInfo" class="overview-effects"><h4>Innate passive</h4><strong>{{ titleCase(openInfo.passive.kind) }}</strong><p>{{ passiveText(openInfo.passive.kind, openInfo.passive.params) }}</p><h4>Foundation abilities</h4><article v-for="ability in openInfo.abilities" :key="ability.id"><strong>{{ ability.name }}</strong><p>{{ abilityEffect(ability) }} · Level {{ ability.unlock_level }}</p></article></div>
-            </details>
           </aside>
           <div class="overview-loadout"><h4>Equipped abilities</h4><AbilitySlots :tree="overviewTree" :ascended-id="open.ascended_id" @select="openAbility" /></div>
           <aside class="overview-presets" aria-label="Battle default preset">
@@ -426,6 +400,7 @@ function show(ascended: OwnedAscended): void {
           </aside>
           <EmNotice v-if="detailError" class="overview-error" tone="error">{{ detailError }}</EmNotice>
         </section>
+        <AscendedProgression v-if="detailTab === 'progression'" :ascended="open" :info="openInfo" :essence="essenceOf(open.tier_id)" :busy="store.busy" :message="upgradeMessage" @add-star="addStar(open)" @raise-tier="raiseTier(open)" />
         <section v-show="detailTab === 'personalities'" class="personality-tab" role="tabpanel" aria-label="Personalities">
           <div class="people-head"><h4>Personalities</h4><small>{{ personalities.length }}{{ nextCursor !== null ? '+' : '' }} collected</small></div>
           <EmNotice v-if="detailError" tone="error">{{ detailError }}</EmNotice><p v-if="loadingMore" class="muted" role="status">Loading personalities…</p>

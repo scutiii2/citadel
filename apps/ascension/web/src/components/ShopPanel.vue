@@ -199,8 +199,10 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
     <div class="shop-toolbar">
       <div class="mode-tabs" role="group" aria-label="Shop mode">
         <button type="button" data-mode="buy" aria-label="Buy" :aria-pressed="mode === 'buy'" :disabled="locked" @click="switchMode('buy')"><EmIcon name="shop" />Offers</button>
-        <button type="button" data-mode="sell" aria-label="Sell" :aria-pressed="mode === 'sell'" :disabled="locked" @click="switchMode('sell')"><EmIcon name="coin" />Sell copies</button>
+        <button type="button" data-mode="sell" aria-label="Sell" :aria-pressed="mode === 'sell'" :disabled="locked" @click="switchMode('sell')"><EmIcon name="coin" />Sell Copies</button>
       </div>
+      <input v-model="search" class="shop-search" type="search" placeholder="Search items…" aria-label="Search shop" :disabled="locked" />
+      <small v-if="mode === 'buy'" class="refresh em-num"><EmIcon name="clock" />Refreshes in {{ formatCountdown(secondsLeft) }}</small>
     </div>
     <p v-if="message && (!portrait || !basketOpen)" class="notice" :class="{ interrupted }" role="status"><EmIcon :name="interrupted ? 'warning' : 'check'" />{{ message }}</p>
     <EmNotice v-if="store.error && (!portrait || !basketOpen)" tone="error">{{ store.error }}</EmNotice>
@@ -212,19 +214,17 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
           <button v-for="c in [{ id: 'all', name: 'All items', icon: 'shop' as const }, { id: 'offers', name: 'Ascended offers', icon: 'ascended' as const }, { id: 'emblems', name: 'EMBLEMs', icon: 'shield' as const }]" :key="c.id" type="button" :aria-pressed="category === c.id" :disabled="locked" @click="category = c.id"><EmIcon :name="c.icon" />{{ c.name }}</button>
         </template>
         <div v-else class="rail-selected"><EmIcon name="ascended" />Spare copies</div>
-        <label class="rail-field"><span class="em-eyebrow">Rarity</span><select v-model="rarity" :disabled="locked" aria-label="Filter shop by rarity"><option value="">All rarities</option><option v-for="t in tiers" :key="t.id" :value="t.id">{{ titleCase(t.id) }}</option></select></label>
+        <label v-if="mode === 'sell'" class="rail-field"><span class="em-eyebrow">Rarity</span><select v-model="rarity" :disabled="locked" aria-label="Filter shop by rarity"><option value="">All rarities</option><option v-for="t in tiers" :key="t.id" :value="t.id">{{ titleCase(t.id) }}</option></select></label>
         <label v-if="mode === 'sell'" class="hide-unavailable"><input v-model="hideUnavailable" type="checkbox" :disabled="locked" />Hide unavailable</label>
         <div class="rail-note"><EmIcon :name="mode === 'buy' ? 'clock' : 'shield'" /><p>{{ mode === 'buy' ? 'Offers are yours alone. New stock every rotation.' : 'Sell only spare copies. Your collected Ascended stays with you.' }}</p></div>
       </aside>
 
       <div class="shop-catalog">
-        <header class="catalog-toolbar">
-          <input v-model="search" type="search" placeholder="Search items…" aria-label="Search shop" :disabled="locked" />
-          <small v-if="mode === 'buy'" class="refresh em-num"><EmIcon name="clock" />Refreshes in {{ formatCountdown(secondsLeft) }}</small>
-          <small v-else class="em-eyebrow">Your spare copies</small>
-        </header>
-        <div class="item-grid">
+        <div :class="mode === 'buy' ? 'offer-groups' : 'item-grid'">
           <template v-if="mode === 'buy'">
+            <section v-if="visibleOffers.length" class="catalog-group" aria-label="Ascended offers">
+            <h3 class="group-heading">Ascended offers <small>{{ visibleOffers.length }}</small></h3>
+            <div class="item-grid">
             <article v-for="offer in visibleOffers" :key="offerKey(offer)" class="item-card" :class="{ 'is-off': offerOff(offer), selected: selected(offerKey(offer)) }" :data-offer="offer.slot" :style="{ '--tier': 'var(--em-tier-' + offer.tier_id + ')' }">
               <div class="item-art"><img v-if="artOf(offer.ascended_id)" :src="artOf(offer.ascended_id)!" alt="" draggable="false" /><span v-else class="letter">{{ nameOf(offer.ascended_id).slice(0, 1) }}</span></div>
               <div class="item-info"><h4>{{ nameOf(offer.ascended_id) }}</h4><EmTierBadge :tier-id="offer.tier_id" /><p>{{ offer.copies_granted }} {{ offer.copies_granted === 1 ? 'copy' : 'copies' }} / pack</p><p class="stock">{{ offer.left <= 0 ? 'Sold out' : offer.left + ' left' }}</p><p class="item-price em-num"><EmIcon name="coin" />{{ money(offer.price) }} <small>/ pack</small></p></div>
@@ -232,6 +232,11 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
               <EmQuantity v-if="selected(offerKey(offer))" :quantity="selected(offerKey(offer))!.quantity" :max="available(selected(offerKey(offer))!)" :name="selected(offerKey(offer))!.name" :disabled="locked || !!selected(offerKey(offer))!.requestKey" suffix="packs" @change="setQuantity(selected(offerKey(offer))!, $event)" />
               <EmButton v-else data-add :variant="selected(offerKey(offer)) ? 'primary' : 'secondary'" :disabled="locked || offerOff(offer) || !!selected(offerKey(offer))" @click="addOffer(offer)">{{ selected(offerKey(offer)) ? 'In basket' : fighting(offer.ascended_id) ? 'In active battle' : 'Add' }}</EmButton>
             </article>
+            </div>
+            </section>
+            <section v-if="visibleTiers.length" class="catalog-group" aria-label="EMBLEMs">
+            <h3 class="group-heading">EMBLEMs <small>{{ visibleTiers.length }}</small></h3>
+            <div class="item-grid">
             <article v-for="t in visibleTiers" :key="t.id" class="item-card" :class="{ 'is-off': t.emblem_price > insignia, selected: selected('emblem:' + t.id) }" :data-tier="t.id" :style="{ '--tier': 'var(--em-tier-' + t.id + ')' }">
               <div class="item-art"><EmEmblem :tier-id="t.id" :size="84" /></div>
               <div class="item-info"><h4>{{ titleCase(t.id) }} EMBLEM</h4><EmTierBadge :tier-id="t.id" /><p>Owned {{ store.profile?.emblems[t.id] ?? 0 }}</p><p class="item-price em-num"><EmIcon name="coin" />{{ money(t.emblem_price) }} <small>each</small></p></div>
@@ -239,6 +244,8 @@ watch(() => store.profile?.owner, () => { reviewOpen.value = false; });
               <EmQuantity v-if="selected('emblem:' + t.id)" :quantity="selected('emblem:' + t.id)!.quantity" :max="available(selected('emblem:' + t.id)!)" :name="selected('emblem:' + t.id)!.name" :disabled="locked || !!selected('emblem:' + t.id)!.requestKey"  @change="setQuantity(selected('emblem:' + t.id)!, $event)" />
               <EmButton v-else data-add :variant="selected('emblem:' + t.id) ? 'primary' : 'secondary'" :disabled="locked || t.emblem_price > insignia || !!selected('emblem:' + t.id)" @click="add({ key: 'emblem:' + t.id, kind: 'emblem', id: t.id, name: titleCase(t.id) + ' EMBLEM', tierId: t.id, unitPrice: t.emblem_price, quantity: 1 })">{{ selected('emblem:' + t.id) ? 'In basket' : 'Add' }}</EmButton>
             </article>
+            </div>
+            </section>
           </template>
           <template v-else>
             <article v-for="a in sellable" :key="a.ascended_id" class="item-card" :class="{ 'is-off': a.copies <= 0 || fighting(a.ascended_id) || a.sale_value === undefined, selected: selected('sale:' + a.ascended_id) }" :data-sell="a.ascended_id" :style="{ '--tier': 'var(--em-tier-' + a.tier_id + ')' }">

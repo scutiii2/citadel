@@ -43,6 +43,15 @@ for (const width of [1440, 768, 375]) {
     await page.screenshot({ path: info.outputPath(`collection-${width}.png`) });
     await header.getByRole('button', { name: 'Shop', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Shop', exact: true })).toBeVisible();
+    const tabRow = await page.locator('.mode-tabs').boundingBox();
+    const searchBox = await page.getByRole('searchbox', { name: 'Search shop', exact: true }).boundingBox();
+    expect(Math.abs(tabRow!.y + tabRow!.height / 2 - searchBox!.y - searchBox!.height / 2)).toBeLessThan(8);
+    await expect(page.locator('section[aria-label="Ascended offers"] [data-offer]')).toHaveCount(5);
+    await expect(page.locator('section[aria-label="EMBLEMs"] [data-tier]')).toHaveCount(config.tiers.length);
+    await expect(page.getByLabel('Filter shop by rarity')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Sell', exact: true }).click();
+    await expect(page.getByLabel('Filter shop by rarity')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Buy', exact: true }).click();
     await page.locator('[data-tier="common"] button[data-add]').click();
     await fits(page);
     await page.locator('.main').evaluate(el => { el.scrollTop = 0; });
