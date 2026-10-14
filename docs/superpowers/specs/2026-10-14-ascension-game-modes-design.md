@@ -1,7 +1,7 @@
 # Ascension game modes
 
 Date: 2026-10-14
-Status: written spec awaiting owner review
+Status: approved by owner on 2026-10-14
 
 ## Intent and approved direction
 
