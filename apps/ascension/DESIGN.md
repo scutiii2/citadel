@@ -107,6 +107,21 @@ References: [ShopPanel.vue](web/src/components/ShopPanel.vue), [shopPanel.css](w
 
 ## Encounters, battles, and results
 
+- The Battle content starts with a three-mode hub: Wild Hunts, Ascension Trials,
+  and Expeditions. Mode controls belong beneath the existing header; reuse the
+  current header and preview-card components without restyling them.
+- Wild Hunts show three recommended overall ranges and a server-provided reward
+  penalty before battle starts. Overall rating and penalty copy sit outside the
+  preview cards. Capture receives no rating penalty.
+- Trials show six type choices, unlocked/cleared stages, and only matching rested
+  squad fighters. Empty trials explain eligibility. Capture controls are absent;
+  first-clear rewards and the matching-only squad XP rule are visible.
+- Expeditions show 2/4/8-hour choices and total rewards before departure, then a
+  countdown and Claim & Return. Departing removes the Ascended from the squad;
+  battle use and progression/loadout mutations remain locked until claim. Show
+  On expedition / Ready to claim beside cards and in details, without changing
+  preview-card metadata. Returning leaves squad membership for the player to set.
+
 - Encounter preview: emphasize the opponent, tier, level, and Fight / Decline choice over the shared sanctuary. Opponent personalities remain hidden until capture.
 - Preparation: show both fighters and their health side by side, then squad selection. Put the battle plan beside the arena on desktop and below it in portrait layouts.
 - Keep Manual / Autonomous, the chosen personality preset, saved-default annotation, personality preview, and EMBLEM limit readable. Begin battle is the primary action.
