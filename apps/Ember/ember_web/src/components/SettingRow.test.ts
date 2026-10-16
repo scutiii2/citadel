@@ -14,6 +14,14 @@ describe("SettingRow", () => {
     expect(wrapper.get("[data-setting-id]").attributes("data-setting-id")).toBe("chat-chime");
   });
 
+  it("shows the token cost note only when one is given", () => {
+    expect(mount(SettingRow, { props }).find("[data-test=cost]").exists()).toBe(false);
+
+    const wrapper = mount(SettingRow, { props: { ...props, cost: "No token cost." } });
+
+    expect(wrapper.get("[data-test=cost]").text()).toBe("No token cost.");
+  });
+
   it("shows no dot and no reset while the setting is at its default", () => {
     const wrapper = mount(SettingRow, { props });
 

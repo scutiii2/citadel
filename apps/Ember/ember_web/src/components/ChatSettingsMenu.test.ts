@@ -118,6 +118,17 @@ describe("ChatSettingsMenu", () => {
     expect(w.emitted("update:chime")).toEqual([[false]]);
   });
 
+  it("puts each setting's token cost in its tooltip", async () => {
+    const w = open();
+    await gear(w).trigger("click");
+
+    const titles = w.findAll("label").map((l) => l.attributes("title") ?? "");
+
+    expect(titles).toHaveLength(5);
+    for (const title of titles) expect(title).toMatch(/token/i);
+    expect(titles[1]).toContain("200 input tokens");
+  });
+
   it("hides 'Update only on change' while the task checklist is off", async () => {
     const w = open({ plan: false });
     await gear(w).trigger("click");

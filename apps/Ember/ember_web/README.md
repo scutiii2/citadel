@@ -185,7 +185,7 @@ URL, token or key.
 - "Task checklist" and "Update only on change" toggles in the chat settings menu (on by default, remembered
   per account, also on the Settings page). Off sends `plan: false` / `plan_lean: false` with the turn: the
   agent gets no `update_plan` tool, or is told to change the checklist only when an item starts or
-  finishes. An agent can also turn the tool off for itself (`plan_tool`, in ember_admin's agent form).
+  finishes. An agent can also turn the tool off for itself (`plan_tool`, in ember_admin's agent form). Every chat setting shows a short token-cost note (Settings rows, menu tooltips); the figures are rough and live in `src/utils/tokenCosts.ts`, so re-check them when ai_agent's prompts change.
 - Settings page (`/settings`, `chat.use`): your preferences in one place, grouped by task: Chat (terse
   replies, task checklist, ask before tools, chime, desktop notifications), Appearance (theme), Sidebar (see below). Workspace tool approval and the pages hidden from every sidebar (Games, Usage and others; `GET /api/settings/pages`) are configured in ember_admin. Games shows for every verified account.
   A search box filters them as you type (label, description and extra keywords; Enter focuses the first

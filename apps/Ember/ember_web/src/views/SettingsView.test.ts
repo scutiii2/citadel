@@ -139,6 +139,16 @@ describe("SettingsView", () => {
   });
 
 
+  it("notes the token cost of every chat setting", async () => {
+    const w = await mountView();
+
+    for (const id of ["chat-terse", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions"]) {
+      expect(row(w, id).get("[data-test=cost]").text(), id).toMatch(/token/i);
+    }
+    expect(row(w, "chat-plan").get("[data-test=cost]").text()).toContain("200 input tokens");
+    expect(row(w, "chat-chime").get("[data-test=cost]").text()).toMatch(/^No token cost/);
+  });
+
   it("shows no modified badge, dot or reset while everything is at its default", async () => {
     const w = await mountView();
 

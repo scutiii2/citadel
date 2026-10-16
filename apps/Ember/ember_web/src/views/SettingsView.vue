@@ -6,6 +6,7 @@ import { navPreferencesClient } from "../api/NavPreferencesClient";
 import ConfirmModal from "../components/ConfirmModal.vue";
 import { errorMessage } from "../utils/errors";
 import SettingRow from "../components/SettingRow.vue";
+import { TOKEN_COSTS } from "../utils/tokenCosts";
 import SidebarEditor from "../components/SidebarEditor.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
@@ -67,7 +68,7 @@ const DEFS: SettingDef[] = [
     id: "chat-plan-lean",
     group: "chat",
     label: "Update checklist only on change",
-    description: "Ask the agent to change the checklist only when an item starts or finishes. Uses fewer tokens.",
+    description: "Ask the agent to change the checklist only when an item starts or finishes.",
     keywords: ["plan", "tokens", "cost", "checklist"],
   },
   {
@@ -95,7 +96,7 @@ const DEFS: SettingDef[] = [
     id: "chat-suggestions",
     group: "chat",
     label: "Suggest next prompt",
-    description: "Show a predicted next message in the chat box; press Tab to use it. Uses a small model call per answer. Saved to your account.",
+    description: "Show a predicted next message in the chat box; press Tab to use it. Saved to your account.",
     keywords: ["autocomplete", "tab", "placeholder", "prediction", "follow-up"],
   },
   {
@@ -319,6 +320,7 @@ onMounted(() => {
             label="Terse replies"
             description="Ask the agent for short, terse answers."
             :modified="modified['chat-terse']"
+            :cost="TOKEN_COSTS.terse"
             @reset="draft.caveman = false"
           >
             <ToggleSwitch small aria-label="Terse replies" :checked="draft.caveman" @change="draft.caveman = checked($event)" />
@@ -329,6 +331,7 @@ onMounted(() => {
             label="Task checklist"
             description="Let the agent show a checklist while it works through a multi-step task."
             :modified="modified['chat-plan']"
+            :cost="TOKEN_COSTS.plan"
             @reset="draft.plan = true"
           >
             <ToggleSwitch small aria-label="Task checklist" :checked="draft.plan" @change="draft.plan = checked($event)" />
@@ -337,8 +340,9 @@ onMounted(() => {
             v-if="shown.has('chat-plan-lean')"
             setting-id="chat-plan-lean"
             label="Update checklist only on change"
-            description="Ask the agent to change the checklist only when an item starts or finishes. Uses fewer tokens."
+            description="Ask the agent to change the checklist only when an item starts or finishes."
             :modified="modified['chat-plan-lean']"
+            :cost="TOKEN_COSTS.planLean"
             @reset="draft.planLean = true"
           >
             <ToggleSwitch
@@ -359,6 +363,7 @@ onMounted(() => {
                 : 'Ask you before the agent runs each tool.'
             "
             :modified="modified['chat-ask-tools']"
+            :cost="TOKEN_COSTS.askTools"
             @reset="draft.askBeforeTools = false"
           >
             <ToggleSwitch
@@ -375,6 +380,7 @@ onMounted(() => {
             label="Chime when done"
             description="Play a short chime when an answer arrives while this tab is in the background."
             :modified="modified['chat-chime']"
+            :cost="TOKEN_COSTS.chime"
             @reset="draft.chime = true"
           >
             <ToggleSwitch small aria-label="Chime when done" :checked="draft.chime" @change="draft.chime = checked($event)" />
@@ -385,6 +391,7 @@ onMounted(() => {
             label="Desktop notifications"
             description="Show a notification when an answer finishes while this tab is in the background. Click it to open the chat."
             :modified="modified['chat-notifications']"
+            :cost="TOKEN_COSTS.notifications"
             @reset="draft.browserNotifications = false"
           >
             <ToggleSwitch small aria-label="Desktop notifications" :checked="draft.browserNotifications" :disabled="requestingNotifications" @change="changeNotifications" />
@@ -394,8 +401,9 @@ onMounted(() => {
             v-if="shown.has('chat-suggestions')"
             setting-id="chat-suggestions"
             label="Suggest next prompt"
-            description="Show a predicted next message in the chat box; press Tab to use it. Uses a small model call per answer. Saved to your account."
+            description="Show a predicted next message in the chat box; press Tab to use it. Saved to your account."
             :modified="modified['chat-suggestions']"
+            :cost="TOKEN_COSTS.suggestions"
             @reset="draft.suggestions = true"
           >
             <ToggleSwitch

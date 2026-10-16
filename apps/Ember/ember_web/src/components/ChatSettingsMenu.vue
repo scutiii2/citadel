@@ -4,6 +4,7 @@
 // panel opens upward, since the bar is at the bottom of the page.
 import { nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef } from "vue";
 import { RouterLink } from "vue-router";
+import { withTokenCost } from "../utils/tokenCosts";
 import ToggleSwitch from "./ToggleSwitch.vue";
 
 defineProps<{
@@ -78,7 +79,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
       <p class="note">Applies instantly. Saved on this device.</p>
       <ToggleSwitch
         small
-        title="Ask the agent for short, terse answers"
+        :title="withTokenCost('Ask the agent for short, terse answers', 'terse')"
         :checked="caveman"
         @change="emit('update:caveman', checked($event))"
       >
@@ -86,7 +87,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
       </ToggleSwitch>
       <ToggleSwitch
         small
-        title="Let the agent show a checklist while it works through a multi-step task"
+        :title="withTokenCost('Let the agent show a checklist while it works through a multi-step task', 'plan')"
         :checked="plan"
         @change="emit('update:plan', checked($event))"
       >
@@ -96,7 +97,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
         v-if="plan"
         small
         class="sub"
-        title="Ask the agent to change the checklist only when an item starts or finishes. Uses fewer tokens."
+        :title="withTokenCost('Ask the agent to change the checklist only when an item starts or finishes', 'planLean')"
         :checked="planLean"
         @change="emit('update:planLean', checked($event))"
       >
@@ -105,9 +106,12 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
       <ToggleSwitch
         small
         :title="
-          forceToolApproval
-            ? 'Your administrator requires approval before every tool'
-            : 'Ask you before the agent runs each tool'
+          withTokenCost(
+            forceToolApproval
+              ? 'Your administrator requires approval before every tool'
+              : 'Ask you before the agent runs each tool',
+            'askTools',
+          )
         "
         :checked="askBeforeTools || forceToolApproval"
         :disabled="forceToolApproval"
@@ -126,7 +130,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
       </button>
       <ToggleSwitch
         small
-        title="Play a short chime when an answer arrives while this tab is in the background"
+        :title="withTokenCost('Play a short chime when an answer arrives while this tab is in the background', 'chime')"
         :checked="chime"
         @change="emit('update:chime', checked($event))"
       >

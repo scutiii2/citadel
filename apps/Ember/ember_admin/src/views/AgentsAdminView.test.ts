@@ -223,7 +223,10 @@ describe("AgentsAdminView", () => {
     await flushPromises();
     expect(update.mock.calls[0]![1]).not.toHaveProperty("plan_tool");
 
+    expect(wrapper.find("[data-test=plan-tool-cost]").text()).toContain("200 input tokens");
+
     await wrapper.find("input[data-test=plan-tool]").setValue(false);
+    expect(wrapper.find("[data-test=plan-tool-cost]").exists()).toBe(false);
     await wrapper.find("form").trigger("submit");
     await flushPromises();
     expect(update.mock.calls[1]![1]).toMatchObject({ plan_tool: false });
