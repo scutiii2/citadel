@@ -223,6 +223,18 @@ through `Field(json_schema_extra={...})`:
   stays non-binding (a hand-typed value in a full command still works);
   `enum` is what the server enforces.
 
+## Declaring a tool read-only (`readOnlyHint`)
+
+A tool that only reads, and changes nothing here or elsewhere, declares it:
+`@mcp.tool(..., annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=...))`
+(`openWorldHint=True` when it reaches outside this machine, like a web search). It is a
+decision with a consequence: ember's **Auto** approval mode (ai_agent's `allow_read_only`) runs a
+built-in tool that declares it **without asking the user**, while every other tool still asks.
+So declare it only when running the tool unasked is harmless. A tool that writes, sends, deletes,
+runs a command, or spends credits or crawls (firecrawl) must not. Extension tools can never earn
+this: only built-in tools count. `tests/test_read_only_declarations.py` pins the exact list, so
+adding or removing a declaration means changing that test too.
+
 ## Add a new capability
 
 1. `mkdir capabilities/<name>/` with an `__init__.py`.

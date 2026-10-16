@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from src.capabilities.web_research import domain
@@ -21,8 +22,12 @@ def _client() -> TavilyClient:
     return TavilyClient(settings.tavily_api_key)
 
 
+# Every tool here only reads: ember's "Auto" approval mode runs it without asking.
+_READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
+
+
 @command(name="search", description="Search the web")
-@mcp.tool(meta={"keywords": ["web", "search", "internet", "google", "look up", "research", "news", "find"], "display_label": "Searching the web"})
+@mcp.tool(meta={"keywords": ["web", "search", "internet", "google", "look up", "research", "news", "find"], "display_label": "Searching the web"}, annotations=_READ_ONLY)
 @offload
 def tool_web_search(
     query: Annotated[str, Field(description="What to search for, as a plain search query.")],
@@ -37,7 +42,7 @@ def tool_web_search(
 
 
 @command(name="read", description="Read a web page")
-@mcp.tool(meta={"keywords": ["web", "page", "url", "read", "open", "fetch", "article", "link"], "display_label": "Reading web page"})
+@mcp.tool(meta={"keywords": ["web", "page", "url", "read", "open", "fetch", "article", "link"], "display_label": "Reading web page"}, annotations=_READ_ONLY)
 @offload
 def tool_web_readPage(
     url: Annotated[str, Field(description="The full http:// or https:// address, e.g. one from `tool_web_search`.")],

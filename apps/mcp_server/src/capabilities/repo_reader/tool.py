@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from src.capabilities.repo_reader import domain
@@ -22,8 +23,12 @@ def _workspace():
     return domain.open_workspace(settings.workspace_dir)
 
 
+# Every tool here only reads: ember's "Auto" approval mode runs it without asking.
+_READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
+
+
 @command(name="list", description="List git repos")
-@mcp.tool(meta={"keywords": ["repo", "git", "project", "projects", "list", "code", "workspace"], "display_label": "Listing repos"})
+@mcp.tool(meta={"keywords": ["repo", "git", "project", "projects", "list", "code", "workspace"], "display_label": "Listing repos"}, annotations=_READ_ONLY)
 @offload
 def tool_repo_listRepos() -> RepoListResult:
     """List the git repos in the workspace. Run this first to get the exact
@@ -32,7 +37,7 @@ def tool_repo_listRepos() -> RepoListResult:
 
 
 @command(name="log", description="Recent commits of a repo")
-@mcp.tool(meta={"keywords": ["git", "log", "commits", "history", "changed", "recent", "repo", "who"], "display_label": "Reading git history"})
+@mcp.tool(meta={"keywords": ["git", "log", "commits", "history", "changed", "recent", "repo", "who"], "display_label": "Reading git history"}, annotations=_READ_ONLY)
 @offload
 def tool_repo_log(
     repo: Repo,
@@ -47,7 +52,7 @@ def tool_repo_log(
 
 
 @command(name="diff", description="Changes between two points of a repo")
-@mcp.tool(meta={"keywords": ["git", "diff", "changes", "changed", "compare", "difference", "repo", "uncommitted"], "display_label": "Reading git diff"})
+@mcp.tool(meta={"keywords": ["git", "diff", "changes", "changed", "compare", "difference", "repo", "uncommitted"], "display_label": "Reading git diff"}, annotations=_READ_ONLY)
 @offload
 def tool_repo_diff(
     repo: Repo,
@@ -63,7 +68,7 @@ def tool_repo_diff(
 
 
 @command(name="grep", description="Search tracked code of a repo")
-@mcp.tool(meta={"keywords": ["git", "grep", "search", "code", "find", "function", "text", "repo", "where"], "display_label": "Searching repo code"})
+@mcp.tool(meta={"keywords": ["git", "grep", "search", "code", "find", "function", "text", "repo", "where"], "display_label": "Searching repo code"}, annotations=_READ_ONLY)
 @offload
 def tool_repo_grep(
     repo: Repo,

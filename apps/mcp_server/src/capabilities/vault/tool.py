@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from src.capabilities.vault import domain
@@ -21,8 +22,12 @@ def _vault():
     return domain.open_vault(settings.vault_dir)
 
 
+# Every tool here only reads: ember's "Auto" approval mode runs it without asking.
+_READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
+
+
 @command(name="search", description="Search the vault")
-@mcp.tool(meta={"keywords": ["vault", "notes", "obsidian", "search", "find", "second brain", "brain", "note"], "display_label": "Searching the vault"})
+@mcp.tool(meta={"keywords": ["vault", "notes", "obsidian", "search", "find", "second brain", "brain", "note"], "display_label": "Searching the vault"}, annotations=_READ_ONLY)
 @offload
 def tool_vault_search(
     query: Annotated[str, Field(description="Text to look for, case-insensitive. Matches note titles and lines.")],
@@ -37,7 +42,7 @@ def tool_vault_search(
 
 
 @command(name="list", description="List vault notes")
-@mcp.tool(meta={"keywords": ["vault", "notes", "obsidian", "list", "folder", "brain", "index"], "display_label": "Listing vault notes"})
+@mcp.tool(meta={"keywords": ["vault", "notes", "obsidian", "list", "folder", "brain", "index"], "display_label": "Listing vault notes"}, annotations=_READ_ONLY)
 @offload
 def tool_vault_listNotes(folder: Folder = "") -> NoteListResult:
     """List the note paths in a vault folder (or the whole vault). Read-only."""
@@ -45,7 +50,7 @@ def tool_vault_listNotes(folder: Folder = "") -> NoteListResult:
 
 
 @command(name="read", description="Read a vault note")
-@mcp.tool(meta={"keywords": ["vault", "note", "obsidian", "read", "open", "brain", "summarize"], "display_label": "Reading vault note"})
+@mcp.tool(meta={"keywords": ["vault", "note", "obsidian", "read", "open", "brain", "summarize"], "display_label": "Reading vault note"}, annotations=_READ_ONLY)
 @offload
 def tool_vault_readNote(
     path: Annotated[str, Field(description="The note's path inside the vault, e.g. Notes/Idea.md, from search or list.")],

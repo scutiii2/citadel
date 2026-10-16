@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from src.capabilities.usage_report import domain
@@ -14,8 +15,12 @@ from src.offload import offload
 from src.server import mcp
 
 
+# Every tool here only reads: ember's "Auto" approval mode runs it without asking.
+_READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
+
+
 @command(name="summary", description="Token usage per agent, model or day")
-@mcp.tool(meta={"keywords": ["usage", "tokens", "cost", "spend", "agent", "model", "report", "consumption"], "display_label": "Adding up usage"})
+@mcp.tool(meta={"keywords": ["usage", "tokens", "cost", "spend", "agent", "model", "report", "consumption"], "display_label": "Adding up usage"}, annotations=_READ_ONLY)
 @offload
 def tool_usage_summary(
     days: Annotated[int, Field(description="How many days back, today included.", ge=1, le=90)] = 7,

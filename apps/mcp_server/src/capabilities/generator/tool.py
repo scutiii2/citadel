@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from src.capabilities.generator import domain
@@ -21,8 +22,12 @@ from src.offload import offload
 from src.server import mcp
 
 
+# Every tool here only reads: ember's "Auto" approval mode runs it without asking.
+_READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
+
+
 @command(name="password", description="Generate a random password")
-@mcp.tool(meta={"keywords": ["generator", "password", "random", "secure", "generate"], "display_label": "Generating password"})
+@mcp.tool(meta={"keywords": ["generator", "password", "random", "secure", "generate"], "display_label": "Generating password"}, annotations=_READ_ONLY)
 @offload
 def tool_gen_generatePassword(
     length: Annotated[int, Field(description="Password length in characters.", ge=8, le=128, json_schema_extra={"input": "range"})] = 20,
@@ -39,7 +44,7 @@ def tool_gen_generatePassword(
 
 
 @command(name="passphrase", description="Generate a random passphrase")
-@mcp.tool(meta={"keywords": ["generator", "passphrase", "words", "diceware", "random", "generate"], "display_label": "Generating passphrase"})
+@mcp.tool(meta={"keywords": ["generator", "passphrase", "words", "diceware", "random", "generate"], "display_label": "Generating passphrase"}, annotations=_READ_ONLY)
 @offload
 def tool_gen_generatePassphrase(
     words: Annotated[int, Field(description="How many words.", ge=3, le=12, json_schema_extra={"input": "range"})] = 6,
@@ -54,7 +59,7 @@ def tool_gen_generatePassphrase(
 
 
 @command(name="pin", description="Generate a random PIN or one-time code")
-@mcp.tool(meta={"keywords": ["generator", "pin", "otp", "one-time", "code", "digits", "random", "generate"], "display_label": "Generating code"})
+@mcp.tool(meta={"keywords": ["generator", "pin", "otp", "one-time", "code", "digits", "random", "generate"], "display_label": "Generating code"}, annotations=_READ_ONLY)
 @offload
 def tool_gen_generatePin(
     length: Annotated[int, Field(description="How many digits.", ge=4, le=12, json_schema_extra={"input": "range"})] = 6,
@@ -66,7 +71,7 @@ def tool_gen_generatePin(
 
 
 @command(name="totp_secret", description="Generate a TOTP secret for an authenticator app")
-@mcp.tool(meta={"keywords": ["generator", "totp", "otp", "secret", "authenticator", "2fa", "mfa", "generate"], "display_label": "Generating TOTP secret"})
+@mcp.tool(meta={"keywords": ["generator", "totp", "otp", "secret", "authenticator", "2fa", "mfa", "generate"], "display_label": "Generating TOTP secret"}, annotations=_READ_ONLY)
 @offload
 def tool_gen_generateTotpSecret(
     issuer: Annotated[str, Field(description="Service name shown in the authenticator app, e.g. Ember. Optional.")] = "",
@@ -79,7 +84,7 @@ def tool_gen_generateTotpSecret(
 
 
 @command(name="totp", description="Show the current TOTP code for a secret")
-@mcp.tool(meta={"keywords": ["generator", "totp", "otp", "code", "authenticator", "2fa", "mfa", "current"], "display_label": "Computing TOTP code"})
+@mcp.tool(meta={"keywords": ["generator", "totp", "otp", "code", "authenticator", "2fa", "mfa", "current"], "display_label": "Computing TOTP code"}, annotations=_READ_ONLY)
 @offload
 def tool_gen_getTotpCode(
     secret: Annotated[
