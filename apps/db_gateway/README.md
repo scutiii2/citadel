@@ -58,6 +58,18 @@ single database call. "Not found" is cached briefly. `ttl_seconds: 0` turns the 
 Limits: a change made outside the gateway shows up only after the TTL expires. A write racing an
 in-flight read of the same key can leave that one entry stale until its TTL.
 
+## Postgres
+Install the driver once: `.venv_db_gateway\Scripts\pip install -e ".[postgres]"`. Put the DSN in
+`.env` (`PG_DSN=postgresql://user:pass@host/db`) and add a connection:
+
+```json
+"warehouse": {"type": "postgres", "dsn": "${PG_DSN}", "max_pool_size": 5}
+```
+
+It uses the same `documents` table (created on first connect). Filters use jsonb containment, so an
+array field matches when it contains the filter value. Raw SQL takes `$1, $2` parameters, not `?`.
+Status: unit-tested against a fake pool only; not yet run against a real Postgres server.
+
 ## Adding a database type
 Implement `DatabaseBackend` (`src/backends/base.py`) and add one entry to `BACKEND_TYPES` in
-`src/backends/factory.py`. Postgres (`asyncpg`) and Firestore are not built yet.
+`src/backends/factory.py`. Firestore is not built yet.

@@ -18,7 +18,19 @@ def _sqlite(options: dict[str, Any]) -> DatabaseBackend:
     return SqliteBackend(path if path == ":memory:" else ROOT / path)
 
 
-BACKEND_TYPES: dict[str, Callable[[dict[str, Any]], DatabaseBackend]] = {"sqlite": _sqlite}
+def _postgres(options: dict[str, Any]) -> DatabaseBackend:
+    from src.backends.postgres import PostgresBackend
+
+    dsn = options.get("dsn")
+    if not isinstance(dsn, str) or not dsn:
+        raise ConfigError("postgres connection needs a 'dsn' (use \"${NAME}\" and keep the value in .env)")
+    size = options.get("max_pool_size", 5)
+    if isinstance(size, bool) or not isinstance(size, int) or size < 1:
+        raise ConfigError("postgres max_pool_size must be a whole number of at least 1")
+    return PostgresBackend(dsn, size)
+
+
+BACKEND_TYPES: dict[str, Callable[[dict[str, Any]], DatabaseBackend]] = {"sqlite": _sqlite, "postgres": _postgres}
 
 
 def build_backend(spec: ConnectionSpec) -> DatabaseBackend:
