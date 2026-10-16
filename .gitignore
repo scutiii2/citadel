@@ -109,3 +109,4 @@ node_modules/
 # db_gateway: real credentials and the SQLite files it creates stay local.
 /apps/db_gateway/.env
 /apps/db_gateway/data/
+/apps/db_gateway/firestore-debug.log

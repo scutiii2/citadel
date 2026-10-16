@@ -1,4 +1,10 @@
 @echo off
+rem Run inside a window that stays open, so output survives a double-click or an error.
+if not "%PG_TEST_CHILD%"=="1" (
+    set "PG_TEST_CHILD=1"
+    cmd /k ""%~f0" %*"
+    exit /b
+)
 setlocal
 cd /d "%~dp0"
 title DB Gateway - Postgres contract test

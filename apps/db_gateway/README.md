@@ -70,7 +70,8 @@ Install the driver once: `.venv_db_gateway\Scripts\pip install -e ".[postgres]"`
 
 It uses the same `documents` table (created on first connect). Filters use jsonb containment, so an
 array field matches when it contains the filter value. Raw SQL takes `$1, $2` parameters, not `?`.
-Status: unit-tested against a fake pool only; not yet run against a real Postgres server.
+Status: unit-tested against a fake pool, and the backend contract test passes against a real
+Postgres 16 server (`test_postgres.bat` sets one up and runs it).
 
 ## Firestore
 Install the driver once: `.venv_db_gateway\Scripts\pip install -e ".[firestore]"`. Add a connection:
@@ -84,7 +85,8 @@ application default credentials. Keep the key file path in `.env`, never the key
 Collections and documents map one to one (key = document id, no `/`). Filters are equality on
 document fields, results are ordered by document id, and raw SQL is unsupported. Set
 `FIRESTORE_EMULATOR_HOST` to use the local emulator. Each read is billed, so keep the cache on.
-Status: unit-tested against a fake client only; not yet run against a real project or the emulator.
+Status: unit-tested against a fake client, and the backend contract test passes against the local
+emulator (`test_firestore.bat` runs it). Not yet run against a real Firebase project.
 
 ## Testing against real databases
 `tests/test_backend_contract.py` runs one behaviour contract (put, get, replace, delete, filters,
