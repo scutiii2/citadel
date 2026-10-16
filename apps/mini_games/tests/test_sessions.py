@@ -4,7 +4,10 @@ import pytest
 
 from src.games.base import GameError, IllegalMove, InvalidOptions
 from src.games.registry import build_games
+from tests.fake_laya import FakeEngine
 from src.opponent.engine_picker import EnginePicker
+from src.opponent.laya_client import LayaClient
+from src.opponent.laya_picker import LayaPicker
 from src.opponent.variety_picker import VarietyPicker
 from src.sessions import GameOver, SessionLimit, SessionNotFound, SessionStore, WrongTurn
 
@@ -24,7 +27,11 @@ def clock():
 
 @pytest.fixture
 def store(config, clock):
-    pickers = {"engine": EnginePicker(), "variety": VarietyPicker()}
+    pickers = {
+        "engine": EnginePicker(),
+        "variety": VarietyPicker(),
+        "laya": LayaPicker(LayaClient(FakeEngine())),
+    }
     return SessionStore(build_games(), pickers, config, clock)
 
 
@@ -38,7 +45,7 @@ def create(store, owner="ann", game="chess", options=None, difficulty="easy", pi
 
 def test_create_uses_the_default_picker_and_assigns_sides(store):
     session = run(store.create("ann", "chess", {"player_side": "black"}, "easy", None))
-    assert (session.player_side, session.bot_side, session.picker) == ("black", "white", "variety")
+    assert (session.player_side, session.bot_side, session.picker) == ("black", "white", "laya")
     view = store.view(session)
     assert view["turn"] == "bot" and view["status"]["finished"] is False
 

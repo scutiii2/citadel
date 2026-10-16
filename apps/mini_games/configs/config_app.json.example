@@ -4,7 +4,7 @@
   "session_ttl_seconds": 3600,
   "max_sessions_per_user": 5,
   "laya_timeout_seconds": 5.0,
-  "default_picker": {"chess": "variety", "tetris": "variety"},
+  "default_picker": {"chess": "laya", "tetris": "laya"},
   "difficulties": {
     "easy": {"depth": 1, "k": 5, "time_limit": 1.0, "trust_uncertain": true},
     "medium": {"depth": 2, "k": 4, "time_limit": 2.0, "trust_uncertain": false},

@@ -9,7 +9,7 @@ from tests.conftest import EXAMPLE_CONFIG
 def test_example_config_loads(config):
     assert config.port == 8060
     assert config.difficulties["medium"].depth == 2
-    assert config.default_picker == {"chess": "variety", "tetris": "variety"}
+    assert config.default_picker == {"chess": "laya", "tetris": "laya"}
 
 
 @pytest.fixture
