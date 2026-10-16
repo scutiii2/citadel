@@ -55,8 +55,10 @@ Per connection, in process (L1): TTL + LRU, write-through. Writes go to the data
 drop that record and every cached query of that collection. Concurrent misses on one key share a
 single database call. "Not found" is cached briefly. `ttl_seconds: 0` turns the cache off.
 
-Limits: a change made outside the gateway shows up only after the TTL expires. A write racing an
-in-flight read of the same key can leave that one entry stale until its TTL.
+A read that was already in flight when a write to its collection (or a raw SQL statement) landed
+is returned to its caller but not cached, so it cannot overwrite fresher data.
+
+Limit: a change made outside the gateway shows up only after the TTL expires.
 
 ## Postgres
 Install the driver once: `.venv_db_gateway\Scripts\pip install -e ".[postgres]"`. Put the DSN in

@@ -80,6 +80,11 @@ class CachedBackend(DatabaseBackend):
         self._records = TtlLruCache(settings.max_entries, clock)
         self._queries = TtlLruCache(settings.max_entries, clock)
         self._inflight: dict[Hashable, asyncio.Future[Document | None]] = {}
+        # Bumped on every write. A read stores its result only if no write to its
+        # collection (or raw SQL) happened while it was in flight, else it could
+        # overwrite fresher data with what it read before the write.
+        self._epochs: dict[str, int] = {}
+        self._sql_epoch = 0
 
     async def connect(self) -> None:
         await self._inner.connect()
@@ -101,6 +106,7 @@ class CachedBackend(DatabaseBackend):
             return copy.deepcopy(await asyncio.shield(pending))
         future: asyncio.Future[Document | None] = asyncio.get_running_loop().create_future()
         self._inflight[cache_key] = future
+        stamp = self._stamp(collection)
         try:
             doc = await self._inner.get(collection, key)
         except BaseException as error:
@@ -109,7 +115,7 @@ class CachedBackend(DatabaseBackend):
             raise
         else:
             ttl = self._settings.ttl_seconds if doc is not None else self._settings.negative_ttl_seconds
-            if ttl > 0:
+            if ttl > 0 and stamp == self._stamp(collection):
                 self._records.set(cache_key, copy.deepcopy(doc), ttl)
             future.set_result(doc)
             return copy.deepcopy(doc)
@@ -134,16 +140,23 @@ class CachedBackend(DatabaseBackend):
         cached = self._queries.get(cache_key)
         if cached is not _MISS:
             return copy.deepcopy(cached)
+        stamp = self._stamp(collection)
         docs = await self._inner.query(collection, filters, limit, offset)
-        self._queries.set(cache_key, copy.deepcopy(docs), self._settings.ttl_seconds)
+        if stamp == self._stamp(collection):
+            self._queries.set(cache_key, copy.deepcopy(docs), self._settings.ttl_seconds)
         return docs
 
     async def execute_sql(self, sql: str, params: list[Any] | None = None) -> list[dict[str, Any]]:
         rows = await self._inner.execute_sql(sql, params)
+        self._sql_epoch += 1
         self._records.clear()  # raw SQL can change any collection
         self._queries.clear()
         return rows
 
+    def _stamp(self, collection: str) -> tuple[int, int]:
+        return self._sql_epoch, self._epochs.get(collection, 0)
+
     def _invalidate(self, collection: str, key: str) -> None:
+        self._epochs[collection] = self._epochs.get(collection, 0) + 1
         self._records.discard((collection, key))
         self._queries.discard_where(lambda cache_key: cache_key[0] == collection)

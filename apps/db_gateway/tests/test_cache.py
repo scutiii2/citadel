@@ -107,3 +107,61 @@ async def test_ttl_zero_disables_cache_in_factory():
 
     assert not isinstance(build_backend(memory_spec("x", ttl=0)), CachedBackend)
     assert isinstance(build_backend(memory_spec("x", ttl=5)), CachedBackend)
+
+
+class GatedBackend(CountingBackend):
+    """get() reads the stored value at once, then waits for `gate` before returning it."""
+
+    def __init__(self, inner) -> None:
+        super().__init__(inner)
+        self.gate = asyncio.Event()
+
+    async def get(self, collection, key):
+        value = await super().get(collection, key)
+        await self.gate.wait()
+        return value
+
+    async def query(self, collection, filters=None, limit=100, offset=0):
+        value = await super().query(collection, filters, limit, offset)
+        await self.gate.wait()
+        return value
+
+
+async def test_write_during_an_inflight_read_is_not_overwritten_by_it():
+    backend = GatedBackend(SqliteBackend(":memory:"))
+    cached = CachedBackend(backend, CacheSettings(ttl_seconds=10, max_entries=100))
+    await cached.connect()
+    await cached.put("c", "k", {"v": 1})
+
+    backend.gate.clear()
+    stale_read = asyncio.create_task(cached.get("c", "k"))  # reads v=1, then waits
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    await cached.put("c", "k", {"v": 2})  # lands while that read is still in flight
+    backend.gate.set()
+    assert (await stale_read) == {"v": 1}  # the in-flight caller sees what it read
+
+    try:
+        assert await cached.get("c", "k") == {"v": 2}  # but it must not have been cached
+    finally:
+        await cached.close()
+
+
+async def test_write_during_an_inflight_query_is_not_overwritten_by_it():
+    backend = GatedBackend(SqliteBackend(":memory:"))
+    cached = CachedBackend(backend, CacheSettings(ttl_seconds=10, max_entries=100))
+    await cached.connect()
+    await cached.put("c", "k", {"v": 1})
+
+    backend.gate.clear()
+    stale_query = asyncio.create_task(cached.query("c", {}))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    await cached.put("c", "k", {"v": 2})
+    backend.gate.set()
+    await stale_query
+
+    try:
+        assert await cached.query("c", {}) == [{"v": 2}]
+    finally:
+        await cached.close()
