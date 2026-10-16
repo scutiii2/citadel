@@ -113,6 +113,7 @@ _PROJECT_PORT_ENV = {
     "video_downloader_web": ("VIDEO_DOWNLOADER_WEB_PORT", 5175),
     "ascension": ("ASCENSION_PORT", 8060),
     "chess": ("CHESS_PORT", 8070),
+    "db_gateway": ("DB_GATEWAY_PORT", 8071),
 }
 
 _POLL_MS = 500
