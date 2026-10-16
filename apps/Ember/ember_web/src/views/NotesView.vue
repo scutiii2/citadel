@@ -15,6 +15,7 @@ import {
 import { ApiError } from "../api/http";
 import ConfirmModal from "../components/ConfirmModal.vue";
 import "../components/infoPage.css";
+import TagInput from "../components/TagInput.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { errorMessage, formatUtc } from "../utils/errors";
 
@@ -34,8 +35,9 @@ const notice = ref("");
 const selected = ref<string | null>(null);
 const form = reactive({ title: "", body: "", tags: [] as string[], agentReadable: false });
 const saved = reactive({ title: "", body: "", tags: [] as string[], agentReadable: false });
+// What is typed in the tag box but not added yet (TagInput's v-model:text) and the component itself.
 const tagInput = ref("");
-const tagError = ref("");
+const tagField = ref<InstanceType<typeof TagInput> | null>(null);
 // Who saved the open note last. Not part of the draft: only a save from this page changes it.
 const savedEditor = ref<Note["last_editor"]>("user");
 // The updated_at of the version the editor opened. A save sends it, so the server can refuse to
@@ -70,36 +72,8 @@ const knownTags = computed(() => {
   return [...counts]
     .filter(([tag]) => !form.tags.includes(tag))
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([tag]) => tag);
+    .map(([tag, count]) => ({ tag, count }));
 });
-
-/** Adds a tag to the note. False when it is refused (too many); a repeat counts as added. */
-function addTag(tag: string): boolean {
-  if (form.tags.includes(tag)) return true;
-  if (form.tags.length >= NOTE_TAGS_MAX) {
-    tagError.value = `A note can have at most ${NOTE_TAGS_MAX} tags.`;
-    return false;
-  }
-  form.tags.push(tag);
-  tagError.value = "";
-  return true;
-}
-
-/** Moves what is typed in the tag box into the note's tags. */
-function commitTag(): void {
-  const raw = tagInput.value;
-  if (raw.trim() === "") {
-    tagInput.value = "";
-    return;
-  }
-  const tag = normalizeTag(raw);
-  if (tag === "") {
-    tagError.value = "A tag needs letters or digits.";
-    tagInput.value = "";
-  } else if (addTag(tag)) {
-    tagInput.value = "";
-  }
-}
 
 // Laya's suggestions: existing tags that may fit this note. Nothing is applied until the user picks one.
 const suggestion = ref<TagSuggestions | null>(null);
@@ -113,7 +87,7 @@ const suggestedTags = computed(() => (suggestion.value?.suggested ?? []).filter(
 
 async function suggest(): Promise<void> {
   if (!canSuggest.value) return;
-  commitTag();
+  tagField.value?.commit();
   const run = ++suggestRun;
   suggesting.value = true;
   suggestError.value = "";
@@ -127,19 +101,6 @@ async function suggest(): Promise<void> {
     if (run === suggestRun) suggesting.value = false;
   }
 }
-function tagKey(event: KeyboardEvent): void {
-  if (event.key === "Enter" || event.key === ",") {
-    event.preventDefault(); // Enter must not save the note
-    commitTag();
-  } else if (event.key === "Backspace" && tagInput.value === "" && form.tags.length > 0) {
-    form.tags.pop();
-  }
-}
-function removeTag(tag: string): void {
-  form.tags = form.tags.filter((t) => t !== tag);
-  tagError.value = "";
-}
-
 async function load(): Promise<void> {
   try {
     notes.value = await notesClient.list();
@@ -170,7 +131,6 @@ function fillEditor(note: Note | undefined): void {
   openedAt.value = note?.updated_at ?? "";
   conflict.value = null;
   tagInput.value = "";
-  tagError.value = "";
   suggestRun++; // an answer still on its way belongs to the note that was open
   suggestion.value = null;
   suggestError.value = "";
@@ -230,7 +190,7 @@ function startNew(): void {
 
 async function save(): Promise<void> {
   if (selected.value === null) return;
-  commitTag(); // a tag still in the box is part of the note
+  tagField.value?.commit(); // a tag still in the box is part of the note
   if (tagInput.value.trim() !== "") return; // it could not be added (too many tags): its message is showing
   if (!canSave.value) return;
   saving.value = true;
@@ -378,27 +338,17 @@ function preview(note: Note): string {
                 {{ suggesting ? "Suggesting …" : "Suggest tags" }}
               </button>
             </div>
-            <ul v-if="form.tags.length" class="tag-list" aria-label="Tags">
-              <li v-for="tag in form.tags" :key="tag" class="tag">
-                {{ tag }}
-                <button type="button" :aria-label="`Remove tag ${tag}`" :disabled="saving || removing" @click="removeTag(tag)">×</button>
-              </li>
-            </ul>
-            <input
-              v-model="tagInput"
-              type="text"
-              list="note-tag-options"
-              aria-label="Add a tag"
-              placeholder="Add a tag, then press Enter"
-              :maxlength="NOTE_TAG_MAX * 2"
+            <TagInput
+              :key="selected ?? ''"
+              ref="tagField"
+              v-model="form.tags"
+              v-model:text="tagInput"
+              :known="knownTags"
+              :normalize="normalizeTag"
+              :max="NOTE_TAGS_MAX"
+              :max-length="NOTE_TAG_MAX"
               :disabled="saving || removing"
-              @keydown="tagKey"
-              @blur="commitTag"
             />
-            <datalist id="note-tag-options">
-              <option v-for="tag in knownTags" :key="tag" :value="tag" />
-            </datalist>
-            <p v-if="tagError" class="error" role="alert">{{ tagError }}</p>
             <div v-if="suggestion" class="suggestions" role="status">
               <template v-if="suggestedTags.length">
                 <span class="muted">Laya suggests:</span>
@@ -408,7 +358,7 @@ function preview(note: Note): string {
                   type="button"
                   class="tag pick"
                   :aria-label="`Add suggested tag ${tag}`"
-                  @click="addTag(tag)"
+                  @click="tagField?.add(tag)"
                 >
                   + {{ tag }}
                 </button>
@@ -552,8 +502,7 @@ function preview(note: Note): string {
   margin: 6px 0 0;
   font-size: 0.8em;
 }
-.row-tags,
-.tag-list {
+.row-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -571,18 +520,6 @@ function preview(note: Note): string {
   color: var(--text);
   background: var(--bg);
   font-size: 0.8em;
-}
-.tag button {
-  padding: 0;
-  border: none;
-  color: var(--muted);
-  background: none;
-  font: inherit;
-  line-height: 1;
-  cursor: pointer;
-}
-.tag button:hover:not(:disabled) {
-  color: var(--danger);
 }
 .agent-mark {
   border-color: var(--warning);

@@ -256,11 +256,12 @@ describe("NotesView tags", () => {
     ]);
     await rows(w)[0]!.get("button").trigger("click");
 
-    const options = w.findAll("datalist option").map((o) => o.attributes("value"));
+    await tagBox(w).trigger("focus");
+    const options = () => w.findAll("[role=option] .name").map((o) => o.text());
 
-    expect(options).toEqual(["zeta"]); // "work" and "home" are on the open note already
+    expect(options()).toEqual(["zeta"]); // "work" and "home" are on the open note already
     await w.get("button[aria-label='Remove tag home']").trigger("click");
-    expect(w.findAll("datalist option").map((o) => o.attributes("value"))).toEqual(["home", "zeta"]);
+    expect(options()).toEqual(["home", "zeta"]);
   });
 
   it("adds a tag still in the box when saving, and sends the tags", async () => {

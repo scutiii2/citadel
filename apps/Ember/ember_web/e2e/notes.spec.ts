@@ -140,6 +140,52 @@ test("notes: Suggest tags offers existing tags that fit, and nothing is added un
   expect(api.unexpected).toEqual([]);
 });
 
+test("notes: the tag box offers your existing tags in its own list, by keyboard and by mouse", async ({ page }) => {
+  const api = await installFakeApi(page);
+  const seed = (n: number, title: string, tags: string[]) =>
+    api.notes.set("0".repeat(31) + n, {
+      id: "0".repeat(31) + n, title, body: "", tags, agent_readable: false, last_editor: "user",
+      created_at: "2026-01-0" + n + "T00:00:00", updated_at: "2026-01-0" + n + "T00:00:00",
+    });
+  seed(1, "A", ["movies", "money"]);
+  seed(2, "B", ["movies"]);
+  await logIn(page);
+  await page.goto("/notes");
+
+  await page.getByRole("button", { name: "New note" }).click();
+  await page.getByLabel("Title").fill("Cinema night");
+  const box = page.getByRole("combobox", { name: "Add a tag" });
+  await box.focus();
+  const options = page.getByRole("listbox", { name: "Your tags" }).getByRole("option");
+  await expect(options).toHaveText([/movies\s*2 notes/, /money\s*1 note/]);
+
+  // Keyboard: arrow to the second, Enter takes it.
+  await box.press("ArrowDown");
+  await box.press("ArrowDown");
+  await box.press("Enter");
+  await expect(page.getByRole("list", { name: "Tags" })).toContainText("money");
+  await expect(options).toHaveText([/movies/]); // a taken tag leaves the list
+
+  // Typing narrows it; Esc closes it without leaving the page.
+  await box.fill("mov");
+  await expect(options).toHaveCount(1);
+  await box.press("Escape");
+  await expect(page.getByRole("listbox", { name: "Your tags" })).toBeHidden();
+  await expect(page).toHaveURL(/\/notes$/);
+
+  // Mouse: clicking an option adds it and the box keeps focus.
+  await box.fill("");
+  await box.press("ArrowDown");
+  await options.first().click();
+  await expect(page.getByRole("list", { name: "Tags" })).toContainText("movies");
+  await expect(box).toBeFocused();
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
+  expect([...api.notes.values()].find((n) => n.title === "Cinema night")?.tags).toEqual(["money", "movies"]);
+  expect(api.unexpected).toEqual([]);
+});
+
 test("notes: a note an agent changed is marked until you save it yourself", async ({ page }) => {
   const api = await installFakeApi(page);
   api.notes.set("0".repeat(31) + "1", {
