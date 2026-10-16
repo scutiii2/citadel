@@ -1,4 +1,4 @@
-# mini_games
+# chess
 
 Game backend for Ember: chess and Tetris against a bot, over HTTP. It holds the
 game engines, the opponent and the per-user game sessions. It never calls an LLM,
@@ -46,7 +46,7 @@ A game is one plugin file in `src/games/` implementing the `Game` protocol in
 run.bat
 ```
 
-The first start creates `.venv_mini_games`, installs the project, and creates
+The first start creates `.venv_chess`, installs the project, and creates
 `configs/config_app.json` and `.env` from their `.example` twins. Both
 real files are gitignored. Put the same `INTERNAL_API_TOKEN` in `.env`
 that `mcp_server`, `ai_agent` and `ember_api` use; once it is set, every route
@@ -83,8 +83,8 @@ Sessions live in memory only: a restart ends all games, and idle sessions expire
 ## Tests and the Laya eval
 
 ```
-.venv_mini_games\Scripts\python -m pytest
-.venv_mini_games\Scripts\python -m src.eval.laya_eval
+.venv_chess\Scripts\python -m pytest
+.venv_chess\Scripts\python -m src.eval.laya_eval
 ```
 
 The tests use a fake Laya engine. The eval needs the real model and is run by

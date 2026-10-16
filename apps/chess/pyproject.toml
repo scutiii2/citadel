@@ -1,5 +1,5 @@
 [project]
-name = "mini-games"
+name = "chess-backend"
 description = "Game backend: chess and Tetris engines, a Laya-assisted opponent and per-user game sessions behind an HTTP API"
 version = "0.1.0"
 requires-python = ">=3.11"
@@ -15,7 +15,7 @@ dev = ["pytest>=8.0", "httpx>=0.27"]
 laya = ["laya"]
 
 [project.scripts]
-mini-games = "src.run:main"
+chess-backend = "src.run:main"
 
 [build-system]
 requires = ["hatchling"]

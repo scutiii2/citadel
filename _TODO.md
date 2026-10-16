@@ -114,7 +114,7 @@ Items 1 to 6 are complete; item 7 remains open.
 
 ## Build mini_games: chess and Tetris against a Laya-assisted bot (added 2026-10-09)
 
-**Context**: Player fights a bot in chess or Tetris inside Ember, at no billing cost. Designed 2026-10-09 as three specs; only spec 1 is written and planned. Laya reads text only (512-token window), so a conventional engine proposes and scores moves and Laya picks among the top candidates, with the engine's best move as fallback. Standalone project `apps/mini_games/` (port 8060), no LLM calls.
+**Context**: Player fights a bot in chess or Tetris inside Ember, at no billing cost. Designed 2026-10-09 as three specs; only spec 1 is written and planned. Laya reads text only (512-token window), so a conventional engine proposes and scores moves and Laya picks among the top candidates, with the engine's best move as fallback. Standalone project `apps/chess/` (renamed from mini_games 2026-10-16) (port 8060), no LLM calls.
 
 - **Spec 1, backend** (designed, planned, not built): `docs/superpowers/specs/2026-10-09-mini-games-backend-design.md`, plan `docs/superpowers/plans/2026-10-09-mini-games-backend.md` (12 tasks; its code was run against 144 passing tests in a scratch copy). Task 12 needs the real `laya` package and decides per game whether Laya or `variety` is the default picker.
 - **Spec 2, not written**: `ember_api` proxy routes for mini_games and an `ember_web` `/mini_games` page with the boards. The Tetris gravity loop runs in the browser.

@@ -1,4 +1,4 @@
-"""Start the mini_games backend: `python -m src.run`."""
+"""Start the chess backend: `python -m src.run`."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from src.opponent.laya_picker import LayaPicker
 from src.opponent.variety_picker import VarietyPicker
 from src.sessions import SessionStore
 
-log = logging.getLogger("mini_games")
+log = logging.getLogger("chess")
 
 
 def build_app():

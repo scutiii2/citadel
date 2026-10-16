@@ -44,7 +44,7 @@ def _error(status: int):
 
 
 def create_app(store: SessionStore, games: dict[str, Game], token: str = "") -> FastAPI:
-    app = FastAPI(title="mini_games", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="chess", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(InternalTokenMiddleware, token=token)
 
     for error, status in (

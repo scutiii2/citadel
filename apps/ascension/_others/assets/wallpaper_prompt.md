@@ -1,6 +1,6 @@
 # Ascension game-card wallpaper
 
-Generated with the built-in imagegen tool using `../mini_games/WALLPAPER_PROMPT.md`.
+Generated with the built-in imagegen tool using `../chess/WALLPAPER_PROMPT.md`.
 Original wallpaper: `web/public/assets/wallpaper.webp` (1280 × 800, under 200 KB).
 Current cover: `web/public/assets/cover.webp` (1280 × 800, under 200 KB).
 The revised brief explicitly adds the title, starter trio, and six type teasers,
