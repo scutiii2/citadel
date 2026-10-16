@@ -44,11 +44,11 @@ test("notes: write one, edit it, and delete it after a confirmation", async ({ p
 test("notes: leaving unsaved changes asks first", async ({ page }) => {
   const api = await installFakeApi(page);
   api.notes.set("0".repeat(31) + "1", {
-    id: "0".repeat(31) + "1", title: "First", body: "one", tags: [], agent_readable: false,
+    id: "0".repeat(31) + "1", title: "First", body: "one", tags: [], agent_readable: false, last_editor: "user",
     created_at: "2026-01-01T00:00:00", updated_at: "2026-01-01T00:00:00",
   });
   api.notes.set("0".repeat(31) + "2", {
-    id: "0".repeat(31) + "2", title: "Second", body: "two", tags: [], agent_readable: false,
+    id: "0".repeat(31) + "2", title: "Second", body: "two", tags: [], agent_readable: false, last_editor: "user",
     created_at: "2026-01-02T00:00:00", updated_at: "2026-01-02T00:00:00",
   });
   await logIn(page);
@@ -115,7 +115,7 @@ test("notes: tags and the agent switch are saved, with a warning while agents ca
 test("notes: Suggest tags offers existing tags that fit, and nothing is added until one is picked", async ({ page }) => {
   const api = await installFakeApi(page);
   api.notes.set("0".repeat(31) + "1", {
-    id: "0".repeat(31) + "1", title: "Budget", body: "rent", tags: ["money", "garden"], agent_readable: false,
+    id: "0".repeat(31) + "1", title: "Budget", body: "rent", tags: ["money", "garden"], agent_readable: false, last_editor: "user",
     created_at: "2026-01-01T00:00:00", updated_at: "2026-01-01T00:00:00",
   });
   await logIn(page);
@@ -137,6 +137,30 @@ test("notes: Suggest tags offers existing tags that fit, and nothing is added un
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
   expect([...api.notes.values()].find((n) => n.title === "Pay the money I owe")?.tags).toEqual(["money"]);
+  expect(api.unexpected).toEqual([]);
+});
+
+test("notes: a note an agent changed is marked until you save it yourself", async ({ page }) => {
+  const api = await installFakeApi(page);
+  api.notes.set("0".repeat(31) + "1", {
+    id: "0".repeat(31) + "1", title: "Sci-fi picks", body: "Arrival", tags: ["movies"], agent_readable: true,
+    last_editor: "agent", created_at: "2026-01-01T00:00:00", updated_at: "2026-01-01T00:00:00",
+  });
+  await logIn(page);
+  await page.goto("/notes");
+
+  const list = page.getByRole("list", { name: "Notes" });
+  await expect(list.getByText("Agent edit")).toBeVisible();
+  await list.getByRole("button", { name: /Sci-fi picks/ }).click();
+  await expect(page.getByText("An agent last changed this note")).toBeVisible();
+  await expect(page.getByText("Unsaved changes")).toHaveCount(0);
+
+  await page.getByLabel("Note text").fill("Arrival, Primer");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
+  await expect(page.getByText("An agent last changed this note")).toHaveCount(0);
+  await expect(list.getByText("Agent edit")).toHaveCount(0);
+  expect(api.notes.get("0".repeat(31) + "1")?.last_editor).toBe("user");
   expect(api.unexpected).toEqual([]);
 });
 

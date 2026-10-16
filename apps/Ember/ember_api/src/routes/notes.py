@@ -3,7 +3,7 @@ Needs chat.use. A note is visible only to its owner."""
 
 from __future__ import annotations
 
-from typing import Annotated, NoReturn
+from typing import Annotated, Literal, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field, StringConstraints, field_validator
@@ -49,6 +49,7 @@ class NoteOut(BaseModel):
     body: str
     tags: list[str]
     agent_readable: bool
+    last_editor: Literal["user", "agent"]
     created_at: str
     updated_at: str
 
@@ -56,7 +57,8 @@ class NoteOut(BaseModel):
     def of(cls, note: Note) -> NoteOut:
         return cls(
             id=note.id, title=note.title, body=note.body, tags=list(note.tags),
-            agent_readable=note.agent_readable, created_at=note.created_at, updated_at=note.updated_at,
+            agent_readable=note.agent_readable, last_editor=note.last_editor,
+            created_at=note.created_at, updated_at=note.updated_at,
         )
 
 

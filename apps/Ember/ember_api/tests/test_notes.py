@@ -41,9 +41,9 @@ def test_create_read_update_delete(client: TestClient) -> None:
     assert client.get(URL).json() == []
 
     note = add(client)
-    assert set(note) == {"id", "title", "body", "tags", "agent_readable", "created_at", "updated_at"}
+    assert set(note) == {"id", "title", "body", "tags", "agent_readable", "last_editor", "created_at", "updated_at"}
     assert (note["title"], note["body"]) == ("Groceries", "milk")
-    assert (note["tags"], note["agent_readable"]) == ([], False)
+    assert (note["tags"], note["agent_readable"], note["last_editor"]) == ([], False, "user")
     assert client.get(f"{URL}/{note['id']}").json() == note
 
     changed = client.put(f"{URL}/{note['id']}", json={"title": "Shopping", "body": "milk, eggs"})
@@ -156,6 +156,64 @@ def test_a_note_saved_before_tags_existed_reads_as_untagged_and_locked(
 
     assert (old["tags"], old["agent_readable"]) == ([], False)
     assert client.get(f"{URL}/tags").json() == []
+
+
+def put_agent_note(db_gateway: FakeDbGateway, client: TestClient, key: str = "a" * 32, **extra) -> str:
+    """A note as mcp_server's notes tools store it: shared, last edited by an agent."""
+    db_gateway.records[("notes", key)] = {
+        "id": key, "owner": uids(client)["root"], "title": "From an agent", "body": "Arrival", "tags": ["movies"],
+        "agent_readable": True, "last_editor": "agent", "created_at": "2026-02-01T10:00:00",
+        "updated_at": "2026-02-01T10:00:00", **extra,
+    }
+    return key
+
+
+def test_a_note_written_by_an_agent_says_so_and_a_page_save_takes_it_back(
+    client: TestClient, db_gateway: FakeDbGateway
+) -> None:
+    as_admin(client)
+    key = put_agent_note(db_gateway, client)
+
+    assert client.get(f"{URL}/{key}").json()["last_editor"] == "agent"
+    assert [n["last_editor"] for n in client.get(URL).json()] == ["agent"]
+
+    saved = client.put(f"{URL}/{key}", json={"title": "Mine now", "body": "Arrival, Primer", "tags": ["movies"], "agent_readable": True})
+
+    assert saved.status_code == 200
+    assert saved.json()["last_editor"] == "user"
+    assert client.get(f"{URL}/{key}").json()["last_editor"] == "user"
+    assert db_gateway.records[("notes", key)]["last_editor"] == "user"
+
+
+def test_notes_made_on_the_page_and_older_notes_read_as_written_by_the_user(
+    client: TestClient, db_gateway: FakeDbGateway
+) -> None:
+    as_admin(client)
+    made = add(client)
+    old_key = "b" * 32
+    db_gateway.records[("notes", old_key)] = {
+        "id": old_key, "owner": uids(client)["root"], "title": "old", "body": "", "created_at": "2026-01-01T00:00:00",
+        "updated_at": "2026-01-01T00:00:00",  # no tags, no flag, no last_editor
+    }
+
+    assert made["last_editor"] == "user"
+    assert db_gateway.records[("notes", made["id"])]["last_editor"] == "user"
+    assert client.get(f"{URL}/{old_key}").json()["last_editor"] == "user"
+
+
+def test_an_unknown_last_editor_value_reads_as_the_user(client: TestClient, db_gateway: FakeDbGateway) -> None:
+    as_admin(client)
+    key = put_agent_note(db_gateway, client, last_editor="somebody else")
+
+    assert client.get(f"{URL}/{key}").json()["last_editor"] == "user"
+
+
+def test_the_page_cannot_claim_an_agent_edit(client: TestClient) -> None:
+    as_admin(client)
+    note = client.post(URL, json={"title": "t", "last_editor": "agent"}).json()
+
+    assert note["last_editor"] == "user"
+    assert client.put(f"{URL}/{note['id']}", json={"title": "t", "last_editor": "agent"}).json()["last_editor"] == "user"
 
 
 def test_agent_access_changes_are_audited_only_when_the_switch_flips(client: TestClient) -> None:

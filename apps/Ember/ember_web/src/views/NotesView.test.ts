@@ -13,7 +13,8 @@ vi.mock("../api/NotesClient", async (importOriginal) => ({
 const client = vi.mocked(notesClient);
 const note = (
   id: string, title: string, body = "", updated = "2026-01-01T00:00:00", tags: string[] = [], agent_readable = false,
-): Note => ({ id, title, body, tags, agent_readable, created_at: updated, updated_at: updated });
+  last_editor: Note["last_editor"] = "user",
+): Note => ({ id, title, body, tags, agent_readable, last_editor, created_at: updated, updated_at: updated });
 
 let wrapper: VueWrapper | null = null;
 
@@ -387,6 +388,64 @@ describe("NotesView tag suggestions", () => {
 
     expect(pickers(w)).toEqual([]);
     expect(suggestButton(w)!.text()).toBe("Suggest tags");
+  });
+});
+
+describe("NotesView agent edits", () => {
+  // A list row or the whole component: anything that can look for elements.
+  const mark = (w: { findAll: (selector: string) => { text: () => string }[] }) =>
+    w.findAll(".tag").filter((t) => t.text() === "Agent edit");
+  const notice = (w: VueWrapper) => w.find(".agent-edit-note");
+
+  it("marks a note an agent last changed in the list, and not one the user saved", async () => {
+    const w = await setup([
+      note("a", "By agent", "", "2026-01-02T00:00:00", [], true, "agent"),
+      note("b", "By me", "", "2026-01-01T00:00:00", [], true, "user"),
+    ]);
+
+    expect(mark(rows(w)[0]!)).toHaveLength(1);
+    expect(mark(rows(w)[1]!)).toHaveLength(0);
+  });
+
+  it("shows the mark even when the note has no tags and is not shared", async () => {
+    const w = await setup([note("a", "By agent", "", "2026-01-02T00:00:00", [], false, "agent")]);
+
+    expect(mark(rows(w)[0]!)).toHaveLength(1);
+  });
+
+  it("tells you in the editor that an agent last changed the open note", async () => {
+    const w = await setup([note("a", "By agent", "x", "2026-01-02T00:00:00", [], true, "agent"), note("b", "By me", "y")]);
+
+    await rows(w)[0]!.get("button").trigger("click");
+    expect(notice(w).text()).toContain("An agent last changed this note");
+
+    await rows(w)[1]!.get("button").trigger("click");
+    expect(notice(w).exists()).toBe(false);
+  });
+
+  it("does not show it for a new note", async () => {
+    const w = await setup([note("a", "By agent", "x", "2026-01-02T00:00:00", [], true, "agent")]);
+
+    await buttonByText(w, "New note")!.trigger("click");
+
+    expect(notice(w).exists()).toBe(false);
+  });
+
+  it("takes the mark away once you save, and does not count as an unsaved edit before", async () => {
+    client.update.mockResolvedValue(note("a", "By agent", "x!", "2026-02-01T00:00:00", [], true, "user"));
+    const w = await setup([note("a", "By agent", "x", "2026-01-02T00:00:00", [], true, "agent")]);
+    await rows(w)[0]!.get("button").trigger("click");
+    expect(w.text()).not.toContain("Unsaved changes");
+
+    await w.get("textarea").setValue("x!");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(notice(w).exists()).toBe(false);
+    expect(mark(rows(w)[0]!)).toHaveLength(0);
+    expect(client.update).toHaveBeenCalledExactlyOnceWith("a", {
+      title: "By agent", body: "x!", tags: [], agent_readable: true, // the marker is never sent
+    });
   });
 });
 

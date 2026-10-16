@@ -52,6 +52,7 @@ export interface StoredNote {
   body: string;
   tags: string[];
   agent_readable: boolean;
+  last_editor: "user" | "agent";
   created_at: string;
   updated_at: string;
 }
@@ -425,7 +426,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
       const now = new Date().toISOString().slice(0, 19);
       const note = {
         id, title: title.trim(), body: body ?? "", tags: tags ?? [], agent_readable: agent_readable ?? false,
-        created_at: now, updated_at: now,
+        last_editor: "user" as const, created_at: now, updated_at: now,
       };
       api.notes.set(id, note);
       return json(route, note, 201);
@@ -444,7 +445,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
         // PUT replaces every field: one left out is reset, as ember_api does.
         Object.assign(note, {
           title: title.trim(), body: body ?? "", tags: tags ?? [], agent_readable: agent_readable ?? false,
-          updated_at: new Date().toISOString().slice(0, 19),
+          last_editor: "user", updated_at: new Date().toISOString().slice(0, 19),
         });
         return json(route, note);
       }

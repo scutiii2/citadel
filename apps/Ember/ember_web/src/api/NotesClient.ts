@@ -8,6 +8,8 @@ export interface Note {
   tags: string[];
   /** The owner allows agents to read this note. */
   agent_readable: boolean;
+  /** Who saved it last: the Notes page ("user") or an agent through mcp_server's notes tools. */
+  last_editor: "user" | "agent";
   created_at: string;
   updated_at: string;
 }

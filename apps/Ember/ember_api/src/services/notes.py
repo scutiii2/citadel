@@ -60,13 +60,18 @@ class Note:
     updated_at: str
     tags: tuple[str, ...] = ()
     agent_readable: bool = False
+    # Who saved the note last: "user" (the Notes page) or "agent" (mcp_server's notes tools write
+    # `last_editor: "agent"` straight to the document).
+    last_editor: str = "user"
 
     @classmethod
     def from_doc(cls, doc: dict[str, Any]) -> Note:
         # Notes saved before tags and the agent flag existed have neither: no tags, agents locked out.
+        # A note with no last_editor was saved by its owner.
         return cls(
             doc["id"], doc["title"], doc["body"], doc["created_at"], doc["updated_at"],
             tuple(doc.get("tags") or ()), doc.get("agent_readable") is True,
+            "agent" if doc.get("last_editor") == "agent" else "user",
         )
 
 
@@ -95,7 +100,7 @@ class NotesService:
         now = _now()
         doc = {
             "id": uuid.uuid4().hex, "owner": self._owner, "title": title, "body": body,
-            "tags": list(tags or []), "agent_readable": agent_readable,
+            "tags": list(tags or []), "agent_readable": agent_readable, "last_editor": "user",
             "created_at": now, "updated_at": now,
         }
         await self._store.put(COLLECTION, doc["id"], doc)
@@ -105,7 +110,11 @@ class NotesService:
         self, note_id: str, title: str, body: str, tags: list[str] | None = None, agent_readable: bool = False
     ) -> Note:
         doc = await self._owned(note_id)
-        doc.update(title=title, body=body, tags=list(tags or []), agent_readable=agent_readable, updated_at=_now())
+        # Saving from the page makes the user the last editor, whoever changed the note before.
+        doc.update(
+            title=title, body=body, tags=list(tags or []), agent_readable=agent_readable,
+            last_editor="user", updated_at=_now(),
+        )
         await self._store.put(COLLECTION, note_id, doc)
         return Note.from_doc(doc)
 

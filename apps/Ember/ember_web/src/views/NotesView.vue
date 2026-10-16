@@ -35,6 +35,8 @@ const form = reactive({ title: "", body: "", tags: [] as string[], agentReadable
 const saved = reactive({ title: "", body: "", tags: [] as string[], agentReadable: false });
 const tagInput = ref("");
 const tagError = ref("");
+// Who saved the open note last. Not part of the draft: only a save from this page changes it.
+const savedEditor = ref<Note["last_editor"]>("user");
 const saving = ref(false);
 const removing = ref(false);
 const formError = ref("");
@@ -156,6 +158,7 @@ function fillEditor(note: Note | undefined): void {
   form.tags = [...(note?.tags ?? [])];
   saved.tags = [...form.tags];
   saved.agentReadable = form.agentReadable = note?.agent_readable ?? false;
+  savedEditor.value = note?.last_editor ?? "user";
   tagInput.value = "";
   tagError.value = "";
   suggestRun++; // an answer still on its way belongs to the note that was open
@@ -298,9 +301,10 @@ function preview(note: Note): string {
               <button type="button" :class="['note-row', { active: n.id === selected }]" :aria-current="n.id === selected" @click="go(n.id)">
                 <span class="title">{{ n.id === selected && form.title.trim() ? form.title.trim() : n.title }}</span>
                 <span v-if="preview(n)" class="snippet">{{ preview(n) }}</span>
-                <span v-if="n.tags.length || n.agent_readable" class="row-tags">
+                <span v-if="n.tags.length || n.agent_readable || n.last_editor === 'agent'" class="row-tags">
                   <span v-for="tag in n.tags" :key="tag" class="tag">{{ tag }}</span>
                   <span v-if="n.agent_readable" class="tag agent-mark">Agents can read</span>
+                  <span v-if="n.last_editor === 'agent'" class="tag agent-mark">Agent edit</span>
                 </span>
                 <span class="muted">{{ formatUtc(n.updated_at) }}</span>
               </button>
@@ -311,6 +315,9 @@ function preview(note: Note): string {
 
         <form v-if="selected !== null" class="editor" @submit.prevent="save">
           <button type="button" class="chip back" @click="go(null)">‹ All notes</button>
+          <p v-if="savedEditor === 'agent'" class="agent-edit-note">
+            An agent last changed this note. Saving your own changes removes this mark.
+          </p>
           <label>
             Title
             <input v-model="form.title" type="text" :maxlength="NOTE_TITLE_MAX" aria-label="Title" :disabled="saving || removing" />
@@ -561,6 +568,14 @@ function preview(note: Note): string {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+.agent-edit-note {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: 0.85em;
 }
 .agent-warning {
   margin: 0;
