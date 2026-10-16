@@ -30,7 +30,23 @@ def _postgres(options: dict[str, Any]) -> DatabaseBackend:
     return PostgresBackend(dsn, size)
 
 
-BACKEND_TYPES: dict[str, Callable[[dict[str, Any]], DatabaseBackend]] = {"sqlite": _sqlite, "postgres": _postgres}
+def _firestore(options: dict[str, Any]) -> DatabaseBackend:
+    from src.backends.firestore import FirestoreBackend
+
+    values: dict[str, str | None] = {}
+    for name in ("project", "credentials_file", "database"):
+        value = options.get(name)
+        if value is not None and (not isinstance(value, str) or not value):
+            raise ConfigError(f"firestore {name} must be a non-empty string")
+        values[name] = value
+    return FirestoreBackend(**values)
+
+
+BACKEND_TYPES: dict[str, Callable[[dict[str, Any]], DatabaseBackend]] = {
+    "sqlite": _sqlite,
+    "postgres": _postgres,
+    "firestore": _firestore,
+}
 
 
 def build_backend(spec: ConnectionSpec) -> DatabaseBackend:
