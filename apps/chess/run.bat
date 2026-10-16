@@ -6,6 +6,9 @@ REM DESCRIPTION: Game backend for Ember (chess, Tetris): engines, a Laya-assiste
 
 cd /d "%~dp0"
 
+REM server_launcher reads this default port; src\config.py lets CHESS_PORT override the config.
+set CHESS_PORT=8070
+
 if not exist ".venv_chess\Scripts\python.exe" (
     echo Creating virtual environment .venv_chess ...
     py -m venv .venv_chess
