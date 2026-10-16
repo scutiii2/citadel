@@ -11,6 +11,11 @@ A provider's tool loop calls `review()` between announcing a step
 * ``deny``  - a tool needing approval is refused outright. A delegated agent
   gets this: it has no channel back to the user, so it cannot ask.
 
+With `read_only_check` set (mode ``ask`` only), a tool the check calls read-only runs
+without asking: "Auto" in ember. The check is mcp_upstream's, which says yes only for a
+built-in mcp_server tool that declares `readOnlyHint`; an extension's tool, a private tool and
+every tool once the turn is tainted still ask.
+
 A tool named in the policy's `ask_prefixes` asks even when the mode is
 ``off`` (and is refused under ``deny``). Once a private tool has run in a
 turn the policy is `tainted`: from then on every tool asks, because the
@@ -30,6 +35,7 @@ from __future__ import annotations
 
 import asyncio
 from contextvars import ContextVar, Token
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -62,15 +68,26 @@ class ApprovalPolicy:
     # we do not control and could steer the model, so from then on every tool
     # asks (see mcp_upstream._call_private).
     tainted: bool = False
+    # Says whether a tool only reads (see the module docstring). None: every tool needing approval asks.
+    read_only_check: Callable[[str], bool] | None = None
 
     def __post_init__(self) -> None:
         if self.mode not in APPROVAL_MODES:
             raise ValueError(f"approval_mode must be one of {', '.join(APPROVAL_MODES)}, not {self.mode!r}")
 
     def needs_approval(self, tool: str) -> bool:
-        return tool not in self.allowed_tools and (
-            self.mode != "off" or self.tainted or tool.startswith(self.ask_prefixes)
-        )
+        if tool in self.allowed_tools:
+            return False
+        if not (self.mode != "off" or self.tainted or tool.startswith(self.ask_prefixes)):
+            return False
+        # "Auto": a read-only built-in tool runs unasked, unless a private tool already ran this
+        # turn (its output could steer the model) or the tool is a private one.
+        if (
+            self.mode == "ask" and self.read_only_check is not None and not self.tainted
+            and not tool.startswith(self.ask_prefixes) and self.read_only_check(tool)
+        ):
+            return False
+        return True
 
 _DEFAULT = ApprovalPolicy()
 _policy: ContextVar[ApprovalPolicy] = ContextVar("approval_policy", default=_DEFAULT)

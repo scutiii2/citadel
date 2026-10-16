@@ -167,6 +167,7 @@ async def ask(
     ask_user: bool = False,
     plan: bool = True,
     plan_lean: bool = True,
+    allow_read_only: bool = False,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Ask this agent a question. Runs its own tool-calling loop against
@@ -229,7 +230,7 @@ async def ask(
             question, history or [], enabled_extensions or [], request_id, depth,
             on_event=on_event, caveman=caveman, approval_mode=approval_mode, allowed_tools=allowed_tools,
             disabled_tools=disabled_tools, ask_user=ask_user, plan=plan, plan_lean=plan_lean,
-            **tier_args, **private_args,
+            allow_read_only=allow_read_only, **tier_args, **private_args,
         )
     except ChatCancelled:
         return _cancelled_result()
@@ -434,7 +435,8 @@ def status() -> dict[str, Any]:
     about can refuse an agent that would ignore it; `tool_filter` says the same
     of disabled_tools; `user_questions` says ask() understands ask_user;
     `plan_toggle` says ask() understands plan and plan_lean;
-    `private_extensions` says ask() understands private_extensions."""
+    `private_extensions` says ask() understands private_extensions;
+    `read_only_approval` says ask() understands allow_read_only."""
     return {
         **agent_config.status(),
         "tool_approval": True,
@@ -442,6 +444,7 @@ def status() -> dict[str, Any]:
         "tool_filter_all": True,
         "user_questions": True,
         "plan_toggle": True,
+        "read_only_approval": True,
         # laya answers typed questions locally and never lists tools through mcp_upstream.
         "private_extensions": agent_config.PROVIDER_ID != "laya",
     }

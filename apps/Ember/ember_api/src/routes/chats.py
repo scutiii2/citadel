@@ -230,6 +230,9 @@ class TurnRequest(BaseModel):
     # allowed for this chat, which run without asking.
     ask_before_tools: bool = False
     allowed_tools: list[str] = Field(default_factory=list, max_length=MAX_ALLOWED_TOOLS)
+    # "Auto" (needs ask_before_tools): built-in tools that only read run without asking. Ignored while
+    # the administrator requires approval for every tool.
+    allow_read_only: bool = False
     # The browser can show the agent's clickable questions (answers go to
     # POST /api/chats/{id}/questions). Off for clients that cannot, e.g. chat_cli.
     can_ask: bool = False
@@ -709,6 +712,7 @@ async def start_turn(
             enabled_extensions=tuple(dict.fromkeys(body.enabled_extensions)),
             ask_before_tools=body.ask_before_tools or forced,
             allowed_tools=() if forced else tuple(dict.fromkeys(body.allowed_tools)),
+            allow_read_only=body.allow_read_only and body.ask_before_tools and not forced,
             disabled_tools=tuple(dict.fromkeys(body.disabled_tools)) if TOOLS_EXECUTE in account.permission_names else ("*",),
             can_ask=body.can_ask,
             private_extensions=private.items,

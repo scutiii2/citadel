@@ -206,6 +206,65 @@ class TestAfterItIsSwitchedOff:
         assert agent.asks[0]["allowed_tools"] == ["tool_a"]
 
 
+class TestAutoMode:
+    """Auto: ask_before_tools plus allow_read_only. The administrator's switch overrides it."""
+
+    def test_a_turn_passes_it_to_the_agent(self, client: TestClient, agent: FakeAgent) -> None:
+        as_admin(client)
+        chat_id = new_id()
+
+        start(client, chat_id, "hi", ask_before_tools=True, allow_read_only=True)
+        events(client, chat_id)
+
+        assert (agent.asks[0]["approval_mode"], agent.asks[0]["allow_read_only"]) == ("ask", True)
+
+    def test_it_is_off_unless_asked_for(self, client: TestClient, agent: FakeAgent) -> None:
+        as_admin(client)
+        chat_id = new_id()
+
+        start(client, chat_id, "hi", ask_before_tools=True)
+        events(client, chat_id)
+
+        assert agent.asks[0]["allow_read_only"] is False
+
+    def test_it_means_nothing_without_asking(self, client: TestClient, agent: FakeAgent) -> None:
+        as_admin(client)
+        chat_id = new_id()
+
+        start(client, chat_id, "hi", ask_before_tools=False, allow_read_only=True)
+        events(client, chat_id)
+
+        assert (agent.asks[0]["approval_mode"], agent.asks[0]["allow_read_only"]) == ("off", False)
+
+    def test_the_admin_switch_overrides_it(self, client: TestClient, agent: FakeAgent) -> None:
+        as_admin(client)
+        force(client)
+        chat_id = new_id()
+
+        start(client, chat_id, "hi", ask_before_tools=True, allow_read_only=True)
+        events(client, chat_id)
+
+        assert (agent.asks[0]["approval_mode"], agent.asks[0]["allow_read_only"]) == ("ask", False)
+
+    def test_it_is_available_again_when_the_switch_goes_off(self, client: TestClient, agent: FakeAgent) -> None:
+        as_admin(client)
+        force(client)
+        force(client, False)
+        chat_id = new_id()
+
+        start(client, chat_id, "hi", ask_before_tools=True, allow_read_only=True)
+        events(client, chat_id)
+
+        assert agent.asks[0]["allow_read_only"] is True
+
+    def test_a_non_boolean_is_refused(self, client: TestClient) -> None:
+        as_admin(client)
+
+        response = client.post(f"/api/chats/{new_id()}/turns", json={"question": "hi", "allow_read_only": "maybe"})
+
+        assert response.status_code == 422
+
+
 class TestSettingsService:
     def test_set_returns_the_value_it_replaced(self, client: TestClient) -> None:
         async def go() -> list[bool]:

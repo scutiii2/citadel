@@ -63,6 +63,7 @@ class AgentGateway(Protocol):
         plan: bool = True,
         plan_lean: bool = True,
         private_extensions: list[dict[str, Any]] | None = None,
+        allow_read_only: bool = False,
     ) -> dict[str, Any]: ...
 
     async def interpret(self, url: str, caller: Caller, text: str) -> dict[str, Any]: ...
@@ -142,6 +143,7 @@ class McpAgentGateway:
         plan=True,
         plan_lean=True,
         private_extensions=None,
+        allow_read_only=False,
     ):
         arguments = {
             "question": question,
@@ -163,6 +165,10 @@ class McpAgentGateway:
                 )
             arguments["approval_mode"] = approval_mode
             arguments["allowed_tools"] = allowed_tools or []
+            # "Auto": built-in read-only tools run without asking. Not fail-closed like the options
+            # around it: an agent that predates this simply asks about every tool, the stricter way.
+            if allow_read_only and approval_mode == "ask" and status.get("read_only_approval"):
+                arguments["allow_read_only"] = True
         if disabled_tools:
             # Fail closed, like approvals: an ai_agent that predates this option
             # would offer every tool, including the ones the user switched off.

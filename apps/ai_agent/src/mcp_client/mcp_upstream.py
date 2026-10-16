@@ -42,6 +42,10 @@ _log = logging.getLogger(__name__)
 
 client = SyncMcpClient()
 
+# The built-in mcp_server tools (agent-facing names, "main__<tool>") that declare readOnlyHint, from
+# the last list_tools(). A new frozenset each time, so a reader never sees a half-built one.
+_read_only_builtins: frozenset[str] = frozenset()
+
 # Sessions to the users' own MCP servers (see src/private_extensions/); they
 # live on the same connection loop as `client`.
 private_pool = PrivateSessionPool()
@@ -98,6 +102,7 @@ def list_tools(enabled_extensions: list[str] | None = None) -> list[Any]:
     tool is only kept when its extension id is in enabled_extensions - and
     without the tools this turn's user switched off (see core/tool_filter.py)."""
     tools = client.list_tools()
+    _remember_read_only(tools)
     enabled = set(enabled_extensions or [])
     scope = agent_spec.current().tools
     result = []
@@ -117,6 +122,23 @@ def list_tools(enabled_extensions: list[str] | None = None) -> list[Any]:
         # Fetched before the provider started (prefetch_private), so this never waits on a network.
         result.extend(tool for tool in turn.tools() if scope.allows(tool.name) and not tool_filter.is_blocked(tool.name))
     return result
+
+
+def _remember_read_only(tools: list[Any]) -> None:
+    global _read_only_builtins
+    _read_only_builtins = frozenset(
+        tool.name
+        for tool in tools
+        if tool.name.startswith(_PREFIX)
+        and "__" not in unprefixed(tool.name)  # an extension's tool arrives as main__<ext>__<tool>
+        and getattr(getattr(tool, "annotations", None), "readOnlyHint", None) is True
+    )
+
+
+def is_read_only_builtin(name: str) -> bool:
+    """True for a built-in mcp_server tool that declares itself read-only. An extension's tool, a
+    private tool and a tool this process has not listed yet are False, so they ask."""
+    return name in _read_only_builtins
 
 
 def call_tool(name: str, arguments: dict[str, Any]) -> str:

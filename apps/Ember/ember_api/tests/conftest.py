@@ -140,6 +140,7 @@ class FakeAgent:
         plan=True,
         plan_lean=True,
         private_extensions=None,
+        allow_read_only=False,
     ):
         self.asks.append(
             {
@@ -157,6 +158,7 @@ class FakeAgent:
                 "plan": plan,
                 "plan_lean": plan_lean,
                 "private_extensions": private_extensions,
+                "allow_read_only": allow_read_only,
             }
         )
         for event in self.events:

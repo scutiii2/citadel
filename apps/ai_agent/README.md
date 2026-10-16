@@ -339,6 +339,14 @@ private extensions.
 - `deny`: a tool that would need asking is refused at once. A delegated agent
   gets this from a turn that asks, since it cannot reach the user.
 
+`ask(allow_read_only=True)` with `approval_mode="ask"` is "Auto": a built-in mcp_server tool
+that declares `readOnlyHint` (its `main__<tool>` name, no extension id) runs without asking.
+Everything else still asks: tools with no declaration, an extension's tools (they could vouch
+for themselves), private extension tools, and every tool once a private tool has run in the
+turn. A delegated agent (`deny`) still cannot run a tool that would need asking. The tool
+names come from the last `list_tools()` (`mcp_upstream.is_read_only_builtin`). `status`
+reports `read_only_approval: true`.
+
 `status` reports `tool_approval: true`, so a caller that needs tools asked about
 (ember_api) can refuse an older agent that would ignore the option.
 

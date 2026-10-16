@@ -84,6 +84,16 @@ PROVIDER_ID, _PROVIDER_MODULE = _resolve()
 MODEL = os.getenv("AI_AGENT_MODEL") or None
 
 
+def _read_only_check():
+    """The check "Auto" approval uses, or None for an agent that lists no mcp_server tools (laya)."""
+    if PROVIDER_ID == "laya":
+        return None
+    # Imported here: laya agents never load mcp_upstream.
+    from src.mcp_client import mcp_upstream
+
+    return mcp_upstream.is_read_only_builtin
+
+
 async def run_chat(
     question: str,
     history: list[dict[str, Any]],
@@ -101,6 +111,7 @@ async def run_chat(
     reasoning_effort: str | None = None,
     plan: bool = True,
     plan_lean: bool = True,
+    allow_read_only: bool = False,
 ) -> ChatResult:
     """Run a chat completion request through the configured provider.
 
@@ -132,6 +143,8 @@ async def run_chat(
     approval_mode / allowed_tools: see approvals.py - with "ask" a tool runs
     only after the user allows it (tools in allowed_tools were allowed
     already); "deny" refuses any tool that would need asking.
+    allow_read_only: with "ask", built-in tools that declare readOnlyHint run
+    without asking ("Auto" in ember); ignored with any other mode.
 
     Both anthropic_provider and openai_provider's run_chat are async
     (support streaming, forwarding on_event for live step_start/step_end/
@@ -147,7 +160,8 @@ async def run_chat(
     private = private_turn.PrivateTurn.from_raw(private_extensions, requester.email or requester.username)
     # Validated before anything is registered: a bad mode must not start a turn.
     policy = approvals.ApprovalPolicy(
-        approval_mode, set(allowed_tools or ()), ask_prefixes=(private_turn.TOOL_PREFIX,) if private else ()
+        approval_mode, set(allowed_tools or ()), ask_prefixes=(private_turn.TOOL_PREFIX,) if private else (),
+        read_only_check=_read_only_check() if allow_read_only and approval_mode == "ask" else None,
     )
     resolution = (
         model_tiers.resolve(model_tier, model_tiers.own_tiers(), MODEL, agent_spec.current().id)

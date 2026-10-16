@@ -88,6 +88,8 @@ class TurnOptions:
     # allowed for this chat.
     ask_before_tools: bool = False
     allowed_tools: tuple[str, ...] = ()
+    # With ask_before_tools: built-in tools that only read run without asking ("Auto").
+    allow_read_only: bool = False
     # Tools the account switched off for its own chats; the agent neither offers nor runs them.
     disabled_tools: tuple[str, ...] = ()
     # The browser can show the agent's clickable questions and send answers back.
@@ -524,6 +526,7 @@ class TurnRegistry:
                 on_event=on_event,
                 approval_mode="ask" if turn.options.ask_before_tools else "off",
                 allowed_tools=list(turn.options.allowed_tools),
+                allow_read_only=turn.options.allow_read_only,
                 disabled_tools=list(turn.options.disabled_tools),
                 ask_user=turn.options.can_ask,
                 plan=turn.options.plan,

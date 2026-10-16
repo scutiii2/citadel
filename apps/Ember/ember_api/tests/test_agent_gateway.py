@@ -27,9 +27,11 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
-def _build_agent(approvals: bool = True, private: bool | None = None) -> FastMCP:
+def _build_agent(approvals: bool = True, private: bool | None = None, read_only: bool | None = None) -> FastMCP:
     """`approvals` False: an agent from before tool approval existed - its
-    status says nothing about it and its ask() has no such options."""
+    status says nothing about it and its ask() has no such options. `read_only` False: an agent
+    from before "Auto" - its status lacks read_only_approval and its ask() has no such option."""
+    read_only = approvals if read_only is None else read_only
     private = approvals if private is None else private
     mcp = FastMCP("fake-ai-agent")
     seen: dict = {}
@@ -49,6 +51,7 @@ def _build_agent(approvals: bool = True, private: bool | None = None) -> FastMCP
         plan: bool = True,
         plan_lean: bool = True,
         private_extensions: list[dict] | None = None,
+        allow_read_only: bool = False,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         headers = ctx.request_context.request.headers
@@ -68,12 +71,14 @@ def _build_agent(approvals: bool = True, private: bool | None = None) -> FastMCP
             "ask_user": ask_user,
             "plan": [plan, plan_lean],
             "private": private_extensions,
+            "allow_read_only": allow_read_only,
         }
 
     @mcp.tool()
     def status() -> dict[str, Any]:
         flags = {"tool_approval": True, "tool_filter": True, "user_questions": True, "plan_toggle": True} if approvals else {}
-        return {"available": True, **flags, **({"private_extensions": True} if private else {})}
+        extras = {**({"private_extensions": True} if private else {}), **({"read_only_approval": True} if read_only else {})}
+        return {"available": True, **flags, **extras}
 
     @mcp.tool()
     def probe_extension(url: str, headers: dict[str, str] | None = None) -> dict[str, Any]:
@@ -132,6 +137,12 @@ def agent_url() -> Iterator[str]:
 @pytest.fixture(scope="module")
 def old_agent_url() -> Iterator[str]:
     yield from _serve(_build_agent(approvals=False).streamable_http_app())
+
+
+@pytest.fixture(scope="module")
+def before_auto_agent_url() -> Iterator[str]:
+    """Asks about tools, but predates "Auto" (read_only_approval)."""
+    yield from _serve(_build_agent(read_only=False).streamable_http_app())
 
 
 def test_ask_streams_events_and_sends_identity(agent_url: str) -> None:
@@ -352,3 +363,25 @@ def test_probe_extension_of_an_unreachable_agent_raises_agent_call_error() -> No
                 f"http://127.0.0.1:{_free_port()}/mcp", CALLER, extension_url="https://x.example.com/mcp", headers=None
             )
         )
+
+
+def test_auto_is_passed_on_when_asking_is_on_and_the_agent_understands_it(agent_url: str) -> None:
+    result = _ask(McpAgentGateway(None), agent_url, approval_mode="ask", allowed_tools=[], allow_read_only=True)
+
+    assert result["allow_read_only"] is True
+
+
+def test_auto_is_left_out_when_not_asked_for_or_when_asking_is_off(agent_url: str) -> None:
+    gateway = McpAgentGateway(None)
+
+    assert _ask(gateway, agent_url, approval_mode="ask", allowed_tools=[])["allow_read_only"] is False
+    assert _ask(gateway, agent_url, allow_read_only=True)["allow_read_only"] is False  # no approvals: nothing to skip
+
+
+def test_an_agent_from_before_auto_just_asks_about_every_tool(before_auto_agent_url: str) -> None:
+    # Not fail-closed: asking about everything is the stricter way, so the turn still runs, and the
+    # unknown argument is not sent to an agent that does not have it.
+    result = _ask(McpAgentGateway(None), before_auto_agent_url, approval_mode="ask", allowed_tools=[], allow_read_only=True)
+
+    assert result["approval"] == {"mode": "ask", "allowed": []}
+    assert result["allow_read_only"] is False
