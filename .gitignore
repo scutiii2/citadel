@@ -102,3 +102,6 @@ dev_rfc.log
 
 # Dependencies, never tracked.
 node_modules/
+
+# mini_games real credentials - only .env.example is committed (config_*.json is ignored above).
+/apps/mini_games/.env
