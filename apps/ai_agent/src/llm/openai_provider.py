@@ -240,13 +240,15 @@ def _tool_schemas(
                 "display_label": None,
             }
         )
-    schemas.append({
-        "type": "function",
-        "name": plan.TOOL_NAME,
-        "description": plan.tool_description(),
-        "parameters": plan.tool_parameters(),
-        "display_label": "Plan",
-    })
+    policy = plan.current()
+    if policy.offered:
+        schemas.append({
+            "type": "function",
+            "name": plan.TOOL_NAME,
+            "description": plan.tool_description(policy.lean),
+            "parameters": plan.tool_parameters(),
+            "display_label": "Plan",
+        })
     return schemas
 
 

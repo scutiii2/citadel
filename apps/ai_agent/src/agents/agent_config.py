@@ -16,6 +16,7 @@ import anyio
 from dotenv import dotenv_values
 
 from src.agents import agent_spec, delegation, memory_recall
+from src.agents import plan as plan_policy
 
 from src.core import approvals, internal_auth, questions, tool_filter
 from src.private_extensions import turn as private_turn
@@ -98,6 +99,8 @@ async def run_chat(
     private_extensions: list[dict[str, Any]] | None = None,
     model_tier: str | None = None,
     reasoning_effort: str | None = None,
+    plan: bool = True,
+    plan_lean: bool = True,
 ) -> ChatResult:
     """Run a chat completion request through the configured provider.
 
@@ -116,6 +119,10 @@ async def run_chat(
 
     disabled_tools: tools the asking user switched off for their own chats
     (see core/tool_filter.py); they are not offered and not run.
+
+    plan / plan_lean: the chat's checklist toggles (agents/plan.py). The
+    update_plan tool is offered only when `plan` is on and this agent's file
+    has plan_tool on; `plan_lean` asks for an update only on a status change.
 
     private_extensions: the user's own MCP servers for this turn, as ember_api
     sent them (see private_extensions/turn.py). Their tools are offered after
@@ -156,6 +163,7 @@ async def run_chat(
     approval_token = approvals.bind(policy)
     question_token = questions.bind(questions.QuestionPolicy(ask_user and depth == 0))
     filter_token = tool_filter.bind(disabled_tools or ())
+    plan_token = plan_policy.bind(plan_policy.PlanPolicy(plan, agent_spec.current().plan_tool, plan_lean))
     private_token = private_turn.bind(private)
     effort_token = llm_options.bind_effort(effort.effort)
     try:
@@ -199,6 +207,7 @@ async def run_chat(
     finally:
         llm_options.reset_effort(effort_token)
         private_turn.reset(private_token)
+        plan_policy.reset(plan_token)
         tool_filter.reset(filter_token)
         questions.reset(question_token)
         approvals.reset(approval_token)

@@ -137,6 +137,8 @@ class FakeAgent:
         allowed_tools=None,
         disabled_tools=None,
         ask_user=False,
+        plan=True,
+        plan_lean=True,
         private_extensions=None,
     ):
         self.asks.append(
@@ -152,6 +154,8 @@ class FakeAgent:
                 "allowed_tools": allowed_tools,
                 "disabled_tools": disabled_tools,
                 "ask_user": ask_user,
+                "plan": plan,
+                "plan_lean": plan_lean,
                 "private_extensions": private_extensions,
             }
         )

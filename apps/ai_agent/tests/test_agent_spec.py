@@ -361,3 +361,15 @@ def test_an_override_replaces_the_tracked_file_and_can_add_an_agent(tmp_path):
     assert specs["ember"].llm.max_tier == "light"
     assert "calc" in specs
     assert agent_spec.load_file(tmp_path / "calc.json").port == 9103
+
+
+def test_plan_tool_defaults_to_true_and_loads_false(tmp_path):
+    base = {"port": 9103, "llm": {"provider": "anthropic"}}
+    assert agent_spec.load_file(_write(tmp_path, "calc", base)).plan_tool is True
+    assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "plan_tool": False})).plan_tool is False
+
+
+def test_plan_tool_must_be_a_boolean(tmp_path):
+    path = _write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "anthropic"}, "plan_tool": "no"})
+    with pytest.raises(AgentSpecError, match="plan_tool"):
+        agent_spec.load_file(path)

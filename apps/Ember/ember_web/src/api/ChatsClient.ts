@@ -36,6 +36,10 @@ export interface ChatImportItem extends ChatWrite {
 export interface TurnStart {
   question: string;
   caveman: boolean;
+  /** Sent only when off: the agent may not keep a task checklist this turn. */
+  plan?: boolean;
+  /** Sent only when off: the agent may update its checklist on any step, not just a status change. */
+  plan_lean?: boolean;
   /** mcp_server extensions whose tools the agent may use. */
   enabled_extensions: string[];
   /** Tools of the built-in capabilities this account switched off for its own chats. */

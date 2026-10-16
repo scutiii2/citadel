@@ -4,6 +4,8 @@ import ChatSettingsMenu from "./ChatSettingsMenu.vue";
 
 const BASE = {
   caveman: false,
+  plan: true,
+  planLean: true,
   askBeforeTools: false,
   forceToolApproval: false,
   chime: true,
@@ -95,26 +97,39 @@ describe("ChatSettingsMenu", () => {
 
     expect(w.findAll("label").map((l) => l.text())).toEqual([
       "Terse replies",
+      "Task checklist",
+      "Update only on change",
       "Ask before tools",
       "Chime when done",
     ]);
     const boxes = w.findAll("input[type=checkbox]");
-    expect(boxes.map((b) => (b.element as HTMLInputElement).checked)).toEqual([false, false, true]);
+    expect(boxes.map((b) => (b.element as HTMLInputElement).checked)).toEqual([false, true, true, false, true]);
 
     await boxes[0]!.setValue(true);
-    await boxes[1]!.setValue(true);
+    await boxes[1]!.setValue(false);
     await boxes[2]!.setValue(false);
+    await boxes[3]!.setValue(true);
+    await boxes[4]!.setValue(false);
 
     expect(w.emitted("update:caveman")).toEqual([[true]]);
+    expect(w.emitted("update:plan")).toEqual([[false]]);
+    expect(w.emitted("update:planLean")).toEqual([[false]]);
     expect(w.emitted("update:askBeforeTools")).toEqual([[true]]);
     expect(w.emitted("update:chime")).toEqual([[false]]);
+  });
+
+  it("hides 'Update only on change' while the task checklist is off", async () => {
+    const w = open({ plan: false });
+    await gear(w).trigger("click");
+
+    expect(w.findAll("label").map((l) => l.text())).not.toContain("Update only on change");
   });
 
   it("locks 'Ask before tools' on when an administrator forces it", async () => {
     const w = open({ forceToolApproval: true });
     await gear(w).trigger("click");
 
-    const box = w.findAll("input[type=checkbox]")[1]!.element as HTMLInputElement;
+    const box = w.findAll("input[type=checkbox]")[3]!.element as HTMLInputElement;
     expect(box.checked).toBe(true);
     expect(box.disabled).toBe(true);
     expect(w.find("button.allowed").exists()).toBe(false);

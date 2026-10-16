@@ -165,6 +165,8 @@ async def ask(
     model_tier: str | None = None,
     reasoning_effort: str | None = None,
     ask_user: bool = False,
+    plan: bool = True,
+    plan_lean: bool = True,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Ask this agent a question. Runs its own tool-calling loop against
@@ -196,6 +198,9 @@ async def ask(
     ask_user: the caller can show the user clickable questions and send their
     answers back through answer_question(); only then is the ask_user tool
     offered (top-level turns only).
+    plan: the chat allows the update_plan checklist tool (default on); it is
+    offered only when this agent's plan_tool is on too. plan_lean: ask the
+    model to update the checklist only when an item changes status.
     ctx, if the MCP client requested it, is FastMCP's injected Context -
     used below only to relay run_chat's live step/token events as MCP
     progress notifications; chat_app's own tool call never needs to pass
@@ -223,7 +228,8 @@ async def ask(
         result = await agent_config.run_chat(
             question, history or [], enabled_extensions or [], request_id, depth,
             on_event=on_event, caveman=caveman, approval_mode=approval_mode, allowed_tools=allowed_tools,
-            disabled_tools=disabled_tools, ask_user=ask_user, **tier_args, **private_args,
+            disabled_tools=disabled_tools, ask_user=ask_user, plan=plan, plan_lean=plan_lean,
+            **tier_args, **private_args,
         )
     except ChatCancelled:
         return _cancelled_result()
@@ -427,6 +433,7 @@ def status() -> dict[str, Any]:
     says ask() understands approval_mode, so a caller that needs tools asked
     about can refuse an agent that would ignore it; `tool_filter` says the same
     of disabled_tools; `user_questions` says ask() understands ask_user;
+    `plan_toggle` says ask() understands plan and plan_lean;
     `private_extensions` says ask() understands private_extensions."""
     return {
         **agent_config.status(),
@@ -434,6 +441,7 @@ def status() -> dict[str, Any]:
         "tool_filter": True,
         "tool_filter_all": True,
         "user_questions": True,
+        "plan_toggle": True,
         # laya answers typed questions locally and never lists tools through mcp_upstream.
         "private_extensions": agent_config.PROVIDER_ID != "laya",
     }

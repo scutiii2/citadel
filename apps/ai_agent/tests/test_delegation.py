@@ -280,3 +280,24 @@ def test_attachment_references_survive_rewritten_delegation_and_reset(monkeypatc
         delegation.reset_attachments(token)
     assert delegation._attachments.get() == ""
 
+
+
+def test_call_forwards_the_chats_plan_toggles_only_when_they_are_off(monkeypatch):
+    from src.agents import plan
+    _configure_agents(monkeypatch, [{"id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
+    seen = []
+
+    async def _fake_call_tool(url, name, arguments, on_progress=None):
+        seen.append(arguments)
+        return {"response": "4"}
+
+    with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool):
+        delegation.call("calc", "2+2?", depth=0)
+        token = plan.bind(plan.PlanPolicy(chat=False, lean=False))
+        try:
+            delegation.call("calc", "2+2?", depth=0)
+        finally:
+            plan.reset(token)
+
+    assert "plan" not in seen[0] and "plan_lean" not in seen[0]
+    assert seen[1]["plan"] is False and seen[1]["plan_lean"] is False

@@ -8,6 +8,9 @@ import ToggleSwitch from "./ToggleSwitch.vue";
 
 defineProps<{
   caveman: boolean;
+  plan: boolean;
+  /** Ask the agent to update its checklist only when an item changes status. */
+  planLean: boolean;
   askBeforeTools: boolean;
   /** An administrator requires approval before every tool: not changeable. */
   forceToolApproval: boolean;
@@ -21,6 +24,8 @@ defineProps<{
 
 const emit = defineEmits<{
   "update:caveman": [value: boolean];
+  "update:plan": [value: boolean];
+  "update:planLean": [value: boolean];
   "update:askBeforeTools": [value: boolean];
   "update:chime": [value: boolean];
   "clear-allowed": [];
@@ -78,6 +83,24 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
         @change="emit('update:caveman', checked($event))"
       >
         Terse replies
+      </ToggleSwitch>
+      <ToggleSwitch
+        small
+        title="Let the agent show a checklist while it works through a multi-step task"
+        :checked="plan"
+        @change="emit('update:plan', checked($event))"
+      >
+        Task checklist
+      </ToggleSwitch>
+      <ToggleSwitch
+        v-if="plan"
+        small
+        class="sub"
+        title="Ask the agent to change the checklist only when an item starts or finishes. Uses fewer tokens."
+        :checked="planLean"
+        @change="emit('update:planLean', checked($event))"
+      >
+        Update only on change
       </ToggleSwitch>
       <ToggleSwitch
         small
@@ -176,6 +199,9 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.sub {
+  margin-left: 40px;
 }
 .allowed {
   margin-left: 40px;

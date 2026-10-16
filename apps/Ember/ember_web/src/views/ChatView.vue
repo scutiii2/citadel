@@ -45,6 +45,8 @@ const {
   livePlans,
   busy,
   caveman,
+  plan,
+  planLean,
   listLoading,
   listReady,
   chatLoading,
@@ -439,6 +441,8 @@ useChatShortcuts({
           <template #tools>
             <ChatSettingsMenu
               :caveman="caveman"
+              :plan="plan"
+              :plan-lean="planLean"
               :ask-before-tools="askBeforeTools"
               :force-tool-approval="forceToolApproval"
               :chime="chime"
@@ -446,6 +450,8 @@ useChatShortcuts({
               :enabled-extensions="enabledExtensions"
               :attention="pendingApprovals.length > 0"
               @update:caveman="chat.setCaveman"
+              @update:plan="chat.setPlan"
+              @update:plan-lean="chat.setPlanLean"
               @update:ask-before-tools="chat.setAskBeforeTools"
               @update:chime="chat.setChime"
               @clear-allowed="chat.clearAllowedTools()"

@@ -35,7 +35,7 @@ TIERS = ("light", "standard", "heavy", "extreme")
 _DEFAULT_GATEWAY = {"anthropic": "claude", "openai": "gpt", "laya": "local"}
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
-_TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "orchestrator", "memory_recall"}
+_TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "orchestrator", "memory_recall", "plan_tool"}
 _LLM_KEYS = {"provider", "gateway", "model", "temperature", "reasoning_effort", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort"}
 _TOOLS_KEYS = {"allow", "deny"}
 
@@ -130,6 +130,8 @@ class AgentSpec:
     orchestrator: bool = False
     # Load the user's newest saved notes at the start of each top-level turn (agents/memory_recall.py).
     memory_recall: bool = False
+    # Offer the update_plan checklist tool (agents/plan.py); the chat's own toggle can still switch it off.
+    plan_tool: bool = True
     # Address peers and ember_api reach this agent at (what it registers);
     # None = derived from the host and port it listens on.
     url: str | None = None
@@ -343,6 +345,7 @@ def load_file(path: Path) -> AgentSpec:
         tools=tools,
         orchestrator=orchestrator,
         memory_recall=memory_recall,
+        plan_tool=check.boolean(data, "plan_tool", True),
         source=path,
     )
 

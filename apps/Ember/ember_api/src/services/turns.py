@@ -79,6 +79,9 @@ class TurnOptions:
     """What the browser chose for this question."""
 
     caveman: bool = False
+    # Task checklist toggles: the agent may use update_plan, and updates it only on a status change.
+    plan: bool = True
+    plan_lean: bool = True
     # Extensions whose tools the agent may use (none by default).
     enabled_extensions: tuple[str, ...] = ()
     # Ask the user before each tool runs, except the tools they already
@@ -523,6 +526,8 @@ class TurnRegistry:
                 allowed_tools=list(turn.options.allowed_tools),
                 disabled_tools=list(turn.options.disabled_tools),
                 ask_user=turn.options.can_ask,
+                plan=turn.options.plan,
+                plan_lean=turn.options.plan_lean,
                 private_extensions=list(turn.options.private_extensions) or None,
             )
         except AgentCallError as error:

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from contextvars import ContextVar, Token
+from dataclasses import dataclass
 from typing import Any
 
 from src.core.catalog import catalog
@@ -10,14 +12,54 @@ from src.llm.base_provider import OnEvent, step_event
 
 TOOL_NAME = "update_plan"
 STATUSES = ["pending", "in_progress", "done"]
+UNCHANGED = "The plan is unchanged, so it was not updated. Continue the task."
 
 
-def tool_description() -> str:
-    return (
-        "Keep a short checklist for a multi-step task. Send the full updated list each time, "
+@dataclass(frozen=True)
+class PlanPolicy:
+    """Whether this turn's agent is offered update_plan, and how it should use it.
+
+    `chat` is the user's chat toggle, `agent` the agent file's plan_tool key; the
+    tool is offered only when both allow it. `lean` asks for an update only when
+    an item changes status. Same ContextVar shape as questions.py: set per ask()
+    call, so a provider's tool list needs no extra parameters."""
+
+    chat: bool = True
+    agent: bool = True
+    lean: bool = True
+
+    @property
+    def offered(self) -> bool:
+        return self.chat and self.agent
+
+
+_policy: ContextVar[PlanPolicy] = ContextVar("plan_policy", default=PlanPolicy())
+
+
+def bind(policy: PlanPolicy) -> Token:
+    return _policy.set(policy)
+
+
+def reset(token: Token) -> None:
+    _policy.reset(token)
+
+
+def current() -> PlanPolicy:
+    return _policy.get()
+
+
+def tool_description(lean: bool = False) -> str:
+    text = (
+        "Keep a short checklist for a task with three or more distinct steps. Send the full updated list each time, "
         "with pending, in_progress, or done for each item. Use at most one in_progress item. "
-        "Skip this tool for simple tasks. An empty list clears the plan."
+        "Do not use this tool for a single answer or a task of one or two steps. An empty list clears the plan."
     )
+    if lean:
+        text += (
+            " Call it only when an item changes status (an item starts or finishes) or when the steps change. "
+            "Never call it to resend an unchanged list."
+        )
+    return text
 
 
 def tool_parameters() -> dict[str, Any]:
@@ -59,6 +101,8 @@ class Checklist:
             items.append({"text": text.strip(), "status": item["status"]})
         if sum(item["status"] == "in_progress" for item in items) > 1:
             return "Only one plan item may be in_progress.", False
+        if current().lean and items == self.items:
+            return UNCHANGED, True
         self.items = items
         if on_event:
             await on_event(step_event("plan_update", items=items))

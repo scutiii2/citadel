@@ -57,6 +57,20 @@ const DEFS: SettingDef[] = [
     keywords: ["caveman", "brief", "short"],
   },
   {
+    id: "chat-plan",
+    group: "chat",
+    label: "Task checklist",
+    description: "Let the agent show a checklist while it works through a multi-step task.",
+    keywords: ["plan", "steps", "todo", "progress"],
+  },
+  {
+    id: "chat-plan-lean",
+    group: "chat",
+    label: "Update checklist only on change",
+    description: "Ask the agent to change the checklist only when an item starts or finishes. Uses fewer tokens.",
+    keywords: ["plan", "tokens", "cost", "checklist"],
+  },
+  {
     id: "chat-ask-tools",
     group: "chat",
     label: "Ask before tools",
@@ -132,7 +146,7 @@ const groups = computed(() =>
 const noMatches = computed(() => shown.value.size === 0);
 
 const saved = computed(() => ({
-  caveman: chat.caveman, askBeforeTools: chat.askBeforeTools, chime: chat.chime,
+  caveman: chat.caveman, plan: chat.plan, planLean: chat.planLean, askBeforeTools: chat.askBeforeTools, chime: chat.chime,
   browserNotifications: chat.browserNotifications,
   suggestions: auth.promptSuggestions, theme: theme.value,
   sidebar: { order: [...navPrefs.prefs.order], pinned: [...navPrefs.prefs.pinned], hidden: [...navPrefs.prefs.hidden] },
@@ -184,6 +198,8 @@ async function save(): Promise<void> {
       draft.value.sidebar = structuredClone(result);
     }
     chat.setCaveman(next.caveman);
+    chat.setPlan(next.plan);
+    chat.setPlanLean(next.planLean);
     if (!chat.forceToolApproval) chat.setAskBeforeTools(next.askBeforeTools);
     else draft.value.askBeforeTools = chat.askBeforeTools;
     chat.setChime(next.chime);
@@ -215,6 +231,8 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
 
 const modified = computed(() => ({
   "chat-terse": draft.value.caveman !== false,
+  "chat-plan": draft.value.plan !== true,
+  "chat-plan-lean": draft.value.planLean !== true,
   "chat-ask-tools": draft.value.askBeforeTools !== false,
   "chat-chime": draft.value.chime !== true,
   "chat-notifications": draft.value.browserNotifications === true,
@@ -304,6 +322,32 @@ onMounted(() => {
             @reset="draft.caveman = false"
           >
             <ToggleSwitch small aria-label="Terse replies" :checked="draft.caveman" @change="draft.caveman = checked($event)" />
+          </SettingRow>
+          <SettingRow
+            v-if="shown.has('chat-plan')"
+            setting-id="chat-plan"
+            label="Task checklist"
+            description="Let the agent show a checklist while it works through a multi-step task."
+            :modified="modified['chat-plan']"
+            @reset="draft.plan = true"
+          >
+            <ToggleSwitch small aria-label="Task checklist" :checked="draft.plan" @change="draft.plan = checked($event)" />
+          </SettingRow>
+          <SettingRow
+            v-if="shown.has('chat-plan-lean')"
+            setting-id="chat-plan-lean"
+            label="Update checklist only on change"
+            description="Ask the agent to change the checklist only when an item starts or finishes. Uses fewer tokens."
+            :modified="modified['chat-plan-lean']"
+            @reset="draft.planLean = true"
+          >
+            <ToggleSwitch
+              small
+              aria-label="Update checklist only on change"
+              :checked="draft.planLean"
+              :disabled="!draft.plan"
+              @change="draft.planLean = checked($event)"
+            />
           </SettingRow>
           <SettingRow
             v-if="shown.has('chat-ask-tools')"

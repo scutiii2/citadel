@@ -182,8 +182,12 @@ URL, token or key.
   answer. A reload brings the card back. Saved answers show the questions and what you chose under "Ran N tools".
 - "Terse replies" toggle in the chat header (ai_agent's `caveman`
   option), remembered per account.
+- "Task checklist" and "Update only on change" toggles in the chat settings menu (on by default, remembered
+  per account, also on the Settings page). Off sends `plan: false` / `plan_lean: false` with the turn: the
+  agent gets no `update_plan` tool, or is told to change the checklist only when an item starts or
+  finishes. An agent can also turn the tool off for itself (`plan_tool`, in ember_admin's agent form).
 - Settings page (`/settings`, `chat.use`): your preferences in one place, grouped by task: Chat (terse
-  replies, ask before tools, chime, desktop notifications), Appearance (theme), Sidebar (see below). Workspace tool approval and the pages hidden from every sidebar (Games, Usage and others; `GET /api/settings/pages`) are configured in ember_admin. Games shows for every verified account.
+  replies, task checklist, ask before tools, chime, desktop notifications), Appearance (theme), Sidebar (see below). Workspace tool approval and the pages hidden from every sidebar (Games, Usage and others; `GET /api/settings/pages`) are configured in ember_admin. Games shows for every verified account.
   A search box filters them as you type (label, description and extra keywords; Enter focuses the first
   match, Esc clears it). A setting that differs from its default shows an accent dot and a reset
   button ("Back to default"), and the header counts how many are changed. Chat and theme apply instantly and

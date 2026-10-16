@@ -84,3 +84,44 @@ def test_plan_runs_locally_in_both_provider_loops(monkeypatch, provider):
         assert [event for event in events if event["type"] == "plan_update"] == [{"type": "plan_update", "items": items}]
     finally:
         llm_options.reset_cache()
+
+
+@pytest.mark.parametrize("provider", [anthropic_provider, openai_provider])
+@pytest.mark.parametrize("chat,agent,offered", [(True, True, True), (False, True, False), (True, False, False), (False, False, False)])
+def test_plan_is_offered_only_when_chat_and_agent_both_allow_it(monkeypatch, provider, chat, agent, offered):
+    monkeypatch.setattr(provider, "list_tools", lambda *_: [])
+    token = plan.bind(plan.PlanPolicy(chat=chat, agent=agent))
+    try:
+        assert any(s["name"] == "update_plan" for s in provider._tool_schemas()) is offered
+    finally:
+        plan.reset(token)
+
+
+def test_description_limits_the_tool_to_tasks_of_three_or_more_steps():
+    assert "three or more" in plan.tool_description()
+    assert "one or two steps" in plan.tool_description()
+
+
+def test_lean_policy_adds_the_status_change_instruction_to_the_description():
+    assert "status" not in plan.tool_description(False).split("Do not use")[1]
+    assert "changes status" in plan.tool_description(True)
+
+
+def test_lean_skips_an_unchanged_list_and_non_lean_resends_it():
+    async def run(lean):
+        events = []
+        async def emit(event):
+            events.append(event)
+        token = plan.bind(plan.PlanPolicy(lean=lean))
+        try:
+            checklist = plan.Checklist()
+            items = [{"text": "Inspect", "status": "in_progress"}]
+            await checklist.handle("update_plan", {"items": items}, emit)
+            result = await checklist.handle("update_plan", {"items": items}, emit)
+        finally:
+            plan.reset(token)
+        return result, events
+    result, events = asyncio.run(run(True))
+    assert result == (plan.UNCHANGED, True) and len(events) == 1
+    _, events = asyncio.run(run(False))
+    assert len(events) == 2

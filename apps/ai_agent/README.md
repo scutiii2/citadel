@@ -94,6 +94,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `tools.deny` | no | `[]` | Globs removed after `allow`. Deny wins. |
 | `orchestrator` | no | `false` | Gets `delegate_to_agent` and the roster. |
 | `memory_recall` | no | `false` | At the start of each top-level turn, load the user's newest saved notes (`tool_mem_search`, up to 10) and put them in front of the question. Needs the `memory` capability online and an agent that may call `tool_mem_*`. Not allowed for Laya. Only `ember` has it on. |
+| `plan_tool` | no | `true` | Offer the `update_plan` checklist tool (`src/agents/plan.py`) for tasks of three or more steps. A chat can also switch it off per turn (`ask(plan=False)`), and the tool is offered only when both allow it. Set `false` to never offer it from this agent. |
 
 An orchestrator file:
 
@@ -345,6 +346,8 @@ private extensions.
 skip through `answer_question(request_id, step_id, answers, skipped)`. Questions
 emit `question_request` / `question_resolved`, wait up to 60 minutes with
 keepalive events, and Stop cancels the turn. `status()` reports `user_questions: true`.
+
+`ask(plan=False)` withholds the `update_plan` checklist tool for a turn, and `ask(plan_lean=False)` drops the instruction to update it only when an item changes status (with it on, an unchanged list is also skipped without an event). Both default on and are sent to specialists too; `status()` reports `plan_toggle: true`.
 
 ## Prompts
 

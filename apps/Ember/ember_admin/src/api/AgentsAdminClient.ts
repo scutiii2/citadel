@@ -33,6 +33,8 @@ export interface AgentConfig {
   enabled?: boolean;
   entry?: boolean;
   orchestrator?: boolean;
+  /** Offer the update_plan checklist tool; on when unset. */
+  plan_tool?: boolean;
   llm: AgentLlm;
   persona?: string;
   instructions?: string;

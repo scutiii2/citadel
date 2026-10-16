@@ -213,6 +213,22 @@ describe("AgentsAdminView", () => {
     expect(config).not.toHaveProperty("routing");
   });
 
+  it("leaves plan_tool out while the checklist is on and writes false when it is switched off", async () => {
+    const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(EMBER);
+    const wrapper = await mounted();
+    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    expect((wrapper.find("input[data-test=plan-tool]").element as HTMLInputElement).checked).toBe(true);
+
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(update.mock.calls[0]![1]).not.toHaveProperty("plan_tool");
+
+    await wrapper.find("input[data-test=plan-tool]").setValue(false);
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(update.mock.calls[1]![1]).toMatchObject({ plan_tool: false });
+  });
+
   it("refuses a model setting that is out of range before calling the server", async () => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
     const wrapper = await mounted();

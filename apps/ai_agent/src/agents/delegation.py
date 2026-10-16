@@ -31,7 +31,7 @@ from typing import Any
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-from src.agents import agent_events, agent_registry, agent_spec
+from src.agents import agent_events, agent_registry, agent_spec, plan
 
 from src.core import approvals, internal_auth, tool_filter
 from src.core.catalog import catalog
@@ -250,6 +250,13 @@ def call(
             # What the user switched off holds for the specialist too.
             "disabled_tools": sorted(tool_filter.blocked()),
         }
+        # The chat's checklist toggles hold for the specialist too; sent only
+        # when off, so an agent that predates them is not handed new arguments.
+        policy = plan.current()
+        if not policy.chat:
+            arguments["plan"] = False
+        if not policy.lean:
+            arguments["plan_lean"] = False
         if model_tier:
             arguments["model_tier"] = model_tier
         if reasoning_effort:

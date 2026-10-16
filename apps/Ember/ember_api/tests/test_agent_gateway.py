@@ -46,6 +46,8 @@ def _build_agent(approvals: bool = True, private: bool | None = None) -> FastMCP
         allowed_tools: list[str] | None = None,
         disabled_tools: list[str] | None = None,
         ask_user: bool = False,
+        plan: bool = True,
+        plan_lean: bool = True,
         private_extensions: list[dict] | None = None,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
@@ -64,12 +66,13 @@ def _build_agent(approvals: bool = True, private: bool | None = None) -> FastMCP
             "approval": {"mode": approval_mode, "allowed": allowed_tools},
             "disabled": disabled_tools,
             "ask_user": ask_user,
+            "plan": [plan, plan_lean],
             "private": private_extensions,
         }
 
     @mcp.tool()
     def status() -> dict[str, Any]:
-        flags = {"tool_approval": True, "tool_filter": True, "user_questions": True} if approvals else {}
+        flags = {"tool_approval": True, "tool_filter": True, "user_questions": True, "plan_toggle": True} if approvals else {}
         return {"available": True, **flags, **({"private_extensions": True} if private else {})}
 
     @mcp.tool()
@@ -273,6 +276,26 @@ def test_an_agent_that_does_not_know_ask_user_just_does_not_get_it(old_agent_url
     result = _ask(McpAgentGateway(None), old_agent_url, ask_user=True)
 
     assert result["ask_user"] is False  # the question tool is simply not offered; the turn still runs
+
+
+# --- task checklist toggles --------------------------------------------------------------
+
+
+def test_ask_leaves_the_plan_toggles_at_their_defaults_when_both_are_on(agent_url: str) -> None:
+    assert _ask(McpAgentGateway(None), agent_url)["plan"] == [True, True]
+
+
+def test_ask_sends_each_plan_toggle_that_is_off(agent_url: str) -> None:
+    gateway = McpAgentGateway(None)
+
+    assert _ask(gateway, agent_url, plan=False)["plan"] == [False, True]
+    assert _ask(gateway, agent_url, plan_lean=False)["plan"] == [True, False]
+
+
+def test_an_agent_that_does_not_know_the_plan_toggles_just_ignores_them(old_agent_url: str) -> None:
+    result = _ask(McpAgentGateway(None), old_agent_url, plan=False, plan_lean=False)
+
+    assert result["plan"] == [True, True]  # the checklist stays as it was; the turn still runs
 
 
 def test_answer_reports_whether_the_question_was_waiting(agent_url: str) -> None:

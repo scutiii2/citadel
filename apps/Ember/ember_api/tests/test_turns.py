@@ -769,3 +769,15 @@ def test_turn_passes_only_valid_extension_ids(client: TestClient, agent: FakeAge
     events(client, chat_id)
     assert agent.asks[-1]["enabled_extensions"] == ["notes", "wiki_2"]
     assert start(client, new_id(), enabled_extensions=["../etc"]).status_code == 422
+
+
+def test_the_checklist_toggles_default_on_and_reach_the_agent(client: TestClient, agent: FakeAgent) -> None:
+    as_admin(client)
+    first, second = new_id(), new_id()
+
+    assert start(client, first).status_code == 202
+    events(client, first)
+    assert start(client, second, plan=False, plan_lean=False).status_code == 202
+    events(client, second)
+
+    assert [(a["plan"], a["plan_lean"]) for a in agent.asks] == [(True, True), (False, False)]

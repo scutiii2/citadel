@@ -62,6 +62,14 @@ function cavemanKey(accountId: number): string {
   return `ember_web.caveman.${accountId}`;
 }
 
+function planKey(accountId: number): string {
+  return `ember_web.plan.${accountId}`;
+}
+
+function planLeanKey(accountId: number): string {
+  return `ember_web.planLean.${accountId}`;
+}
+
 function chimeKey(accountId: number): string {
   return `ember_web.chime.${accountId}`;
 }
@@ -155,6 +163,11 @@ export const useChatStore = defineStore("chat", () => {
   const starting = ref(false); // question sent, turn not confirmed yet
   // "Terse replies": asks ai_agent for short answers. Remembered per account.
   const caveman = ref(false);
+  // "Task checklist": the agent may keep a step-by-step checklist for multi-step
+  // tasks. On by default; remembered per account. "Lean updates" asks it to
+  // change the list only when an item changes status (fewer tokens).
+  const plan = ref(true);
+  const planLean = ref(true);
   // "Ask before running tools": each tool the agent wants to run waits for the
   // user's answer. Off by default; remembered per account.
   const askBeforeTools = ref(false);
@@ -430,6 +443,8 @@ export const useChatStore = defineStore("chat", () => {
       listReady.value = false;
       setSearch("");
       caveman.value = accountId !== null && readPreference(cavemanKey(accountId)) === "1";
+      plan.value = accountId === null || readPreference(planKey(accountId)) !== "0";
+      planLean.value = accountId === null || readPreference(planLeanKey(accountId)) !== "0";
       askBeforeTools.value = accountId !== null && readPreference(askBeforeToolsKey(accountId)) === "1";
       chime.value = accountId === null || readPreference(chimeKey(accountId)) !== "0";
       browserNotifications.value = accountId !== null && readPreference(`ember_web.notifications.${accountId}`) === "1";
@@ -749,6 +764,8 @@ export const useChatStore = defineStore("chat", () => {
       const turn = await chatsClient.startTurn(id, {
         question,
         caveman: caveman.value,
+        ...(plan.value ? {} : { plan: false }),
+        ...(planLean.value ? {} : { plan_lean: false }),
         can_ask: true,
         enabled_extensions: enabledExtensions.value,
         ...(disabledTools.length ? { disabled_tools: disabledTools } : {}),
@@ -1074,6 +1091,18 @@ export const useChatStore = defineStore("chat", () => {
     return sendQuestionAnswer(stepId, [], true);
   }
 
+  function setPlan(on: boolean): void {
+    plan.value = on;
+    const accountId = auth.account?.id;
+    if (accountId !== undefined) writePreference(planKey(accountId), on ? "1" : "0");
+  }
+
+  function setPlanLean(on: boolean): void {
+    planLean.value = on;
+    const accountId = auth.account?.id;
+    if (accountId !== undefined) writePreference(planLeanKey(accountId), on ? "1" : "0");
+  }
+
   function setCaveman(on: boolean): void {
     caveman.value = on;
     const accountId = auth.account?.id;
@@ -1247,6 +1276,10 @@ export const useChatStore = defineStore("chat", () => {
     clearSearch,
     caveman,
     setCaveman,
+    plan,
+    setPlan,
+    planLean,
+    setPlanLean,
     askBeforeTools,
     forceToolApproval,
     refreshSettings,

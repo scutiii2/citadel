@@ -18,11 +18,15 @@ vi.mock("../api/NavPreferencesClient", () => ({
 // four preferences on it, so a plain stand-in is enough.
 const chat = reactive({
   caveman: false,
+  plan: true,
+  planLean: true,
   askBeforeTools: false,
   chime: true,
   browserNotifications: false,
   forceToolApproval: false,
   setCaveman: vi.fn((on: boolean) => (chat.caveman = on)),
+  setPlan: vi.fn((on: boolean) => (chat.plan = on)),
+  setPlanLean: vi.fn((on: boolean) => (chat.planLean = on)),
   setAskBeforeTools: vi.fn((on: boolean) => (chat.askBeforeTools = on)),
   setChime: vi.fn((on: boolean) => (chat.chime = on)),
   setBrowserNotifications: vi.fn((on: boolean) => (chat.browserNotifications = on)),
@@ -64,6 +68,8 @@ beforeEach(() => {
   localStorage.clear();
   document.body.innerHTML = "";
   chat.caveman = false;
+  chat.plan = true;
+  chat.planLean = true;
   chat.askBeforeTools = false;
   chat.chime = true;
   chat.browserNotifications = false;
@@ -128,7 +134,7 @@ describe("SettingsView", () => {
     const w = await mountView();
 
     expect(w.findAll("h3").map((h) => h.text())).toEqual(["Chat", "Appearance", "Sidebar"]);
-    expect(rowIds(w)).toEqual(["chat-terse", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions", "appearance-theme", "sidebar-pages"]);
+    expect(rowIds(w)).toEqual(["chat-terse", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions", "appearance-theme", "sidebar-pages"]);
     expect(w.text()).not.toContain("Tool approval");
   });
 
@@ -155,6 +161,22 @@ describe("SettingsView", () => {
     expect(chat.setCaveman).not.toHaveBeenCalled();
     expect(row(w, "chat-terse").find(".dot").exists()).toBe(false);
     expect(w.find(".badge").exists()).toBe(false);
+  });
+
+  it("saves the checklist switches on Save and locks the lean one while the checklist is off", async () => {
+    const w = await mountView();
+    expect((row(w, "chat-plan-lean").get("input").element as HTMLInputElement).disabled).toBe(false);
+
+    await row(w, "chat-plan").get("input").setValue(false);
+    expect((row(w, "chat-plan-lean").get("input").element as HTMLInputElement).disabled).toBe(true);
+    expect(chat.setPlan).not.toHaveBeenCalled();
+    expect(w.get(".badge").text()).toBe("1 modified");
+
+    await w.get("button.save").trigger("click");
+    await flushPromises();
+
+    expect(chat.setPlan).toHaveBeenCalledWith(false);
+    expect(chat.setPlanLean).toHaveBeenCalledWith(true);
   });
 
   it("resets the chime to on, which is its default", async () => {
@@ -221,7 +243,7 @@ describe("modified filter", () => {
   it("is a pill that shows only the changed settings, and toggles back", async () => {
     chat.caveman = true;
     const w = await mountView();
-    expect(rowIds(w)).toHaveLength(7);
+    expect(rowIds(w)).toHaveLength(9);
     expect(w.get(".badge").attributes("aria-pressed")).toBe("false");
 
     await w.get(".badge").trigger("click");
@@ -231,7 +253,7 @@ describe("modified filter", () => {
     expect(w.get(".badge").attributes("aria-pressed")).toBe("true");
 
     await w.get(".badge").trigger("click");
-    expect(rowIds(w)).toHaveLength(7);
+    expect(rowIds(w)).toHaveLength(9);
   });
 
   it("drops the filter once nothing is modified any more", async () => {
@@ -242,7 +264,7 @@ describe("modified filter", () => {
     await row(w, "chat-terse").get("button.reset").trigger("click");
 
     expect(w.find(".badge").exists()).toBe(false);
-    expect(rowIds(w)).toHaveLength(7);
+    expect(rowIds(w)).toHaveLength(9);
   });
 });
 
@@ -273,7 +295,7 @@ describe("search", () => {
     expect(w.text()).toContain('No settings match "zzz"');
     expect(rowIds(w)).toEqual([]);
     await w.get("button.link").trigger("click");
-    expect(rowIds(w)).toHaveLength(7);
+    expect(rowIds(w)).toHaveLength(9);
     expect((search(w).element as HTMLInputElement).value).toBe("");
   });
 
@@ -286,7 +308,7 @@ describe("search", () => {
 
     await search(w).trigger("keydown", { key: "Escape" });
     expect((search(w).element as HTMLInputElement).value).toBe("");
-    expect(rowIds(w)).toHaveLength(7);
+    expect(rowIds(w)).toHaveLength(9);
   });
 });
 
@@ -294,7 +316,7 @@ it("keeps workspace tool approval in Ember Admin", async () => {
   const w = await mountView(ADMIN);
   expect(w.text()).not.toContain("Tool approval");
   expect(w.text()).not.toContain("Applies to all accounts");
-  expect(rowIds(w)).toHaveLength(7);
+  expect(rowIds(w)).toHaveLength(9);
 });
 
 it("reverts chat, theme and sidebar drafts without persisting anything", async () => {

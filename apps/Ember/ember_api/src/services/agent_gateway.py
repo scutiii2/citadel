@@ -60,6 +60,8 @@ class AgentGateway(Protocol):
         allowed_tools: list[str] | None = None,
         disabled_tools: list[str] | None = None,
         ask_user: bool = False,
+        plan: bool = True,
+        plan_lean: bool = True,
         private_extensions: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]: ...
 
@@ -137,6 +139,8 @@ class McpAgentGateway:
         allowed_tools=None,
         disabled_tools=None,
         ask_user=False,
+        plan=True,
+        plan_lean=True,
         private_extensions=None,
     ):
         arguments = {
@@ -175,6 +179,14 @@ class McpAgentGateway:
             status = await self._call(url, caller, "status", {})
             if status.get("user_questions"):
                 arguments["ask_user"] = True
+        if not plan or not plan_lean:
+            # Not fail-closed: an agent from before the toggles keeps its checklist as it was.
+            status = await self._call(url, caller, "status", {})
+            if status.get("plan_toggle"):
+                if not plan:
+                    arguments["plan"] = False
+                if not plan_lean:
+                    arguments["plan_lean"] = False
         if private_extensions:
             # Fail closed, like approvals: an ai_agent that predates this would ignore the
             # argument and the user's private tools would silently be missing (or, worse, a

@@ -212,6 +212,9 @@ class TurnRequest(BaseModel):
     # Ignored: every question goes to the entry agent. Kept so older browsers still validate.
     agent_id: str | None = Field(default=None, max_length=120)
     caveman: bool = False
+    # The agent may keep a task checklist (update_plan); plan_lean asks it to update the list only on a status change.
+    plan: bool = True
+    plan_lean: bool = True
     # mcp_server extension ids whose tools the agent may use.
     enabled_extensions: list[str] = Field(default_factory=list, max_length=50)
 
@@ -701,6 +704,8 @@ async def start_turn(
     try:
         options = TurnOptions(
             caveman=body.caveman,
+            plan=body.plan,
+            plan_lean=body.plan_lean,
             enabled_extensions=tuple(dict.fromkeys(body.enabled_extensions)),
             ask_before_tools=body.ask_before_tools or forced,
             allowed_tools=() if forced else tuple(dict.fromkeys(body.allowed_tools)),

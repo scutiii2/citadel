@@ -32,6 +32,7 @@ const url = ref("");
 const enabled = ref(true);
 const entry = ref(false);
 const orchestrator = ref(false);
+const planTool = ref(true);
 const provider = ref("anthropic");
 const gateway = ref("");
 const model = ref("");
@@ -86,6 +87,7 @@ watch(
     enabled.value = a?.enabled ?? true;
     entry.value = a?.entry ?? false;
     orchestrator.value = a?.orchestrator ?? false;
+    planTool.value = a?.plan_tool !== false;
     provider.value = a?.llm?.provider ?? providerIds.value[0] ?? "anthropic";
     gateway.value = a?.llm?.gateway ?? "";
     model.value = a?.llm?.model ?? "";
@@ -185,6 +187,9 @@ function buildConfig(): AgentConfig | null {
     focus: focus.value,
     tools: { allow: globs(allow.value), deny: globs(deny.value) },
   };
+  // On is the default: leave the key out so existing agent files stay as they are.
+  if (planTool.value) delete config.plan_tool;
+  else config.plan_tool = false;
   delete config.routing; // ai_agent rejects the retired routing option, also in files saved earlier
   for (const key of ["label", "url", "identity", "persona", "instructions", "focus"]) if (!config[key]) delete config[key];
   return config;
@@ -276,6 +281,7 @@ function previewPrompt(): void {
       <div class="switches">
         <ToggleSwitch :checked="enabled" data-test="enabled" @change="enabled = ($event.target as HTMLInputElement).checked">Enabled</ToggleSwitch>
         <ToggleSwitch :checked="orchestrator" :disabled="isLaya" data-test="orchestrator" @change="orchestrator = ($event.target as HTMLInputElement).checked">Orchestrator (can hand work to other agents)</ToggleSwitch>
+        <ToggleSwitch :checked="planTool" :disabled="isLaya" data-test="plan-tool" @change="planTool = ($event.target as HTMLInputElement).checked">Task checklist (can show a step-by-step plan; chats can also turn it off)</ToggleSwitch>
         <ToggleSwitch :checked="entry" :disabled="isLaya" data-test="entry" @change="entry = ($event.target as HTMLInputElement).checked">Entry agent (receives every new question)</ToggleSwitch>
       </div>
       <p v-if="entry" class="hint">Only one enabled agent can be the entry agent. To move it, unset it on the current one first.</p>

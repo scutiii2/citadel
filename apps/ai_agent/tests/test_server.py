@@ -141,7 +141,7 @@ def test_ask_relays_events_via_ctx_report_progress():
     0/None - chat_app cares only about the message payload, not a
     percentage), and pass it through to run_chat as on_event=..."""
     async def _run():
-        async def fake_run_chat(question, history, enabled_extensions, request_id, depth, on_event=None, caveman=False, approval_mode="off", allowed_tools=None, disabled_tools=None, ask_user=False):
+        async def fake_run_chat(question, history, enabled_extensions, request_id, depth, on_event=None, caveman=False, approval_mode="off", allowed_tools=None, disabled_tools=None, ask_user=False, plan=True, plan_lean=True):
             await on_event({"type": "step_start", "id": "1", "tool": "x"})
             return ChatResult(response="done")
 
@@ -168,7 +168,7 @@ def test_ask_on_event_is_a_noop_without_ctx():
     client that doesn't support progress), on_event must not blow up -
     it should just do nothing."""
     async def _run():
-        async def fake_run_chat(question, history, enabled_extensions, request_id, depth, on_event=None, caveman=False, approval_mode="off", allowed_tools=None, disabled_tools=None, ask_user=False):
+        async def fake_run_chat(question, history, enabled_extensions, request_id, depth, on_event=None, caveman=False, approval_mode="off", allowed_tools=None, disabled_tools=None, ask_user=False, plan=True, plan_lean=True):
             await on_event({"type": "step_start", "id": "1", "tool": "x"})
             return ChatResult(response="done")
 
@@ -190,6 +190,7 @@ def test_status_delegates_to_agent_config():
             "tool_filter": True,
             "tool_filter_all": True,
             "user_questions": True,
+            "plan_toggle": True,
             "private_extensions": True,
         }
 
