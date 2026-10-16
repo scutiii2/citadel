@@ -50,8 +50,18 @@ export interface StoredNote {
   id: string;
   title: string;
   body: string;
+  tags: string[];
+  agent_readable: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** What the page sends when it saves a note. */
+interface NoteBody {
+  title: string;
+  body?: string;
+  tags?: string[];
+  agent_readable?: boolean;
 }
 
 export interface StoredAccount {
@@ -399,11 +409,14 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
     // Private notes, newest edit first. Ids are 32 hex characters, as ember_api makes them.
     if (path === "/api/notes" && (method === "GET" || method === "POST")) {
       if (method === "GET") return json(route, [...api.notes.values()].sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
-      const { title, body } = request.postDataJSON() as { title: string; body?: string };
+      const { title, body, tags, agent_readable } = request.postDataJSON() as NoteBody;
       if (!title?.trim()) return json(route, { detail: "String should have at least 1 character" }, 422);
       const id = (api.notes.size + 1).toString(16).padStart(32, "0");
       const now = new Date().toISOString().slice(0, 19);
-      const note = { id, title: title.trim(), body: body ?? "", created_at: now, updated_at: now };
+      const note = {
+        id, title: title.trim(), body: body ?? "", tags: tags ?? [], agent_readable: agent_readable ?? false,
+        created_at: now, updated_at: now,
+      };
       api.notes.set(id, note);
       return json(route, note, 201);
     }
@@ -417,8 +430,12 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
         return route.fulfill({ status: 204, body: "" });
       }
       if (method === "PUT") {
-        const { title, body } = request.postDataJSON() as { title: string; body?: string };
-        Object.assign(note, { title: title.trim(), body: body ?? "", updated_at: new Date().toISOString().slice(0, 19) });
+        const { title, body, tags, agent_readable } = request.postDataJSON() as NoteBody;
+        // PUT replaces every field: one left out is reset, as ember_api does.
+        Object.assign(note, {
+          title: title.trim(), body: body ?? "", tags: tags ?? [], agent_readable: agent_readable ?? false,
+          updated_at: new Date().toISOString().slice(0, 19),
+        });
         return json(route, note);
       }
     }

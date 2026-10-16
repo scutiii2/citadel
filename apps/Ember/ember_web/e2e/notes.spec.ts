@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { installFakeApi } from "./fakeApi.ts";
-import { logIn } from "./helpers.ts";
+import { flipSwitch, logIn } from "./helpers.ts";
 
 test("notes: write one, edit it, and delete it after a confirmation", async ({ page }) => {
   const api = await installFakeApi(page);
@@ -44,10 +44,12 @@ test("notes: write one, edit it, and delete it after a confirmation", async ({ p
 test("notes: leaving unsaved changes asks first", async ({ page }) => {
   const api = await installFakeApi(page);
   api.notes.set("0".repeat(31) + "1", {
-    id: "0".repeat(31) + "1", title: "First", body: "one", created_at: "2026-01-01T00:00:00", updated_at: "2026-01-01T00:00:00",
+    id: "0".repeat(31) + "1", title: "First", body: "one", tags: [], agent_readable: false,
+    created_at: "2026-01-01T00:00:00", updated_at: "2026-01-01T00:00:00",
   });
   api.notes.set("0".repeat(31) + "2", {
-    id: "0".repeat(31) + "2", title: "Second", body: "two", created_at: "2026-01-02T00:00:00", updated_at: "2026-01-02T00:00:00",
+    id: "0".repeat(31) + "2", title: "Second", body: "two", tags: [], agent_readable: false,
+    created_at: "2026-01-02T00:00:00", updated_at: "2026-01-02T00:00:00",
   });
   await logIn(page);
   await page.goto("/notes");
@@ -65,6 +67,49 @@ test("notes: leaving unsaved changes asks first", async ({ page }) => {
   await dialog.getByRole("button", { name: "Discard" }).click();
   await expect(page.getByLabel("Note text")).toHaveValue("two");
   expect(api.notes.get("0".repeat(31) + "1")?.body).toBe("one");
+});
+
+test("notes: tags and the agent switch are saved, with a warning while agents can read", async ({ page }) => {
+  const api = await installFakeApi(page);
+  await logIn(page);
+  await page.goto("/notes");
+
+  await page.getByRole("button", { name: "New note" }).click();
+  await page.getByLabel("Title").fill("Wifi");
+  const tagBox = page.getByLabel("Add a tag");
+  await tagBox.fill("Home Network");
+  await tagBox.press("Enter");
+  await tagBox.fill("it");
+  await tagBox.press(",");
+  const chips = page.getByRole("list", { name: "Tags" });
+  await expect(chips.getByRole("listitem")).toHaveCount(2);
+  await expect(chips).toContainText("home-network");
+
+  // The switch is off at first; turning it on shows the warning, turning it off removes it.
+  const agents = page.getByRole("switch", { name: "Let agents read this note" });
+  await expect(agents).not.toBeChecked();
+  await expect(page.getByRole("note")).toHaveCount(0);
+  await flipSwitch(page, "Let agents read this note");
+  await expect(agents).toBeChecked();
+  await expect(page.getByRole("note")).toContainText("Agents can read this note");
+  await flipSwitch(page, "Let agents read this note");
+  await expect(page.getByRole("note")).toHaveCount(0);
+  await flipSwitch(page, "Let agents read this note");
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
+  expect([...api.notes.values()].map((n) => [n.tags, n.agent_readable])).toEqual([[["home-network", "it"], true]]);
+  const list = page.getByRole("list", { name: "Notes" });
+  await expect(list.getByText("Agents can read")).toBeVisible();
+  await expect(list.getByText("home-network")).toBeVisible();
+
+  // Removing a tag is an unsaved change until saved.
+  await page.getByRole("button", { name: "Remove tag it" }).click();
+  await expect(page.getByText("Unsaved changes")).toBeVisible();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Unsaved changes")).toHaveCount(0);
+  expect([...api.notes.values()][0]?.tags).toEqual(["home-network"]);
+  expect(api.unexpected).toEqual([]);
 });
 
 test("notes: leaving the page with unsaved text asks first", async ({ page }) => {

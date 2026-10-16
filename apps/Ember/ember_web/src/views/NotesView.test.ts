@@ -11,9 +11,9 @@ vi.mock("../api/NotesClient", async (importOriginal) => ({
 }));
 
 const client = vi.mocked(notesClient);
-const note = (id: string, title: string, body = "", updated = "2026-01-01T00:00:00"): Note => ({
-  id, title, body, created_at: updated, updated_at: updated,
-});
+const note = (
+  id: string, title: string, body = "", updated = "2026-01-01T00:00:00", tags: string[] = [], agent_readable = false,
+): Note => ({ id, title, body, tags, agent_readable, created_at: updated, updated_at: updated });
 
 let wrapper: VueWrapper | null = null;
 
@@ -91,7 +91,9 @@ describe("NotesView", () => {
     await w.get("form").trigger("submit");
     await flushPromises();
 
-    expect(client.create).toHaveBeenCalledExactlyOnceWith("Groceries", "milk");
+    expect(client.create).toHaveBeenCalledExactlyOnceWith({
+      title: "Groceries", body: "milk", tags: [], agent_readable: false,
+    });
     expect(rows(w)).toHaveLength(1);
     expect(w.text()).toContain("Saved.");
     expect(w.text()).not.toContain("Unsaved changes");
@@ -108,7 +110,9 @@ describe("NotesView", () => {
     await w.get("form").trigger("submit");
     await flushPromises();
 
-    expect(client.update).toHaveBeenCalledExactlyOnceWith("b", "Second!", "x");
+    expect(client.update).toHaveBeenCalledExactlyOnceWith("b", {
+      title: "Second!", body: "x", tags: [], agent_readable: false,
+    });
     expect(rows(w)[0]!.text()).toContain("Second!");
     expect(w.text()).not.toContain("Unsaved changes");
   });
@@ -182,6 +186,165 @@ describe("NotesView", () => {
 
     expect(w.find("form").exists()).toBe(false);
     expect(w.text()).toContain("at most 200 notes");
+  });
+});
+
+describe("NotesView tags", () => {
+  const tagBox = (w: VueWrapper) => w.get("input[aria-label='Add a tag']");
+  const chips = (w: VueWrapper) => w.findAll("ul[aria-label='Tags'] li").map((li) => li.text().replace("×", "").trim());
+
+  it("adds tags with Enter or a comma, cleans them and drops repeats", async () => {
+    const w = await setup([note("a", "First")]);
+    await rows(w)[0]!.get("button").trigger("click");
+
+    await tagBox(w).setValue("  Work Stuff ");
+    await tagBox(w).trigger("keydown", { key: "Enter" });
+    await tagBox(w).setValue("home");
+    await tagBox(w).trigger("keydown", { key: "," });
+    await tagBox(w).setValue("WORK-stuff");
+    await tagBox(w).trigger("keydown", { key: "Enter" });
+
+    expect(chips(w)).toEqual(["work-stuff", "home"]);
+    expect((tagBox(w).element as HTMLInputElement).value).toBe("");
+    expect(w.text()).toContain("Unsaved changes");
+  });
+
+  it("does not save the note when Enter is pressed in the tag box", async () => {
+    const w = await setup([note("a", "First")]);
+    await rows(w)[0]!.get("button").trigger("click");
+
+    await tagBox(w).setValue("x");
+    const event = new KeyboardEvent("keydown", { key: "Enter", cancelable: true });
+    tagBox(w).element.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(client.update).not.toHaveBeenCalled();
+  });
+
+  it("removes a tag with its button and with Backspace in an empty box", async () => {
+    const w = await setup([note("a", "First", "", "2026-01-01T00:00:00", ["a", "b", "c"])]);
+    await rows(w)[0]!.get("button").trigger("click");
+
+    await w.get("button[aria-label='Remove tag b']").trigger("click");
+    expect(chips(w)).toEqual(["a", "c"]);
+    await tagBox(w).trigger("keydown", { key: "Backspace" });
+    expect(chips(w)).toEqual(["a"]);
+  });
+
+  it("refuses an 11th tag and a tag with nothing usable in it", async () => {
+    const ten = Array.from({ length: 10 }, (_, i) => `t${i}`);
+    const w = await setup([note("a", "First", "", "2026-01-01T00:00:00", ten)]);
+    await rows(w)[0]!.get("button").trigger("click");
+
+    await tagBox(w).setValue("one-more");
+    await tagBox(w).trigger("keydown", { key: "Enter" });
+    expect(w.get("[role=alert]").text()).toContain("at most 10 tags");
+    expect(chips(w)).toHaveLength(10);
+
+    await w.get("button[aria-label='Remove tag t0']").trigger("click");
+    await tagBox(w).setValue("!!!");
+    await tagBox(w).trigger("keydown", { key: "Enter" });
+    expect(w.get("[role=alert]").text()).toContain("letters or digits");
+  });
+
+  it("offers the tags the account already uses, most used first, minus the ones on this note", async () => {
+    const w = await setup([
+      note("a", "A", "", "2026-01-03T00:00:00", ["work", "home"]),
+      note("b", "B", "", "2026-01-02T00:00:00", ["home"]),
+      note("c", "C", "", "2026-01-01T00:00:00", ["zeta"]),
+    ]);
+    await rows(w)[0]!.get("button").trigger("click");
+
+    const options = w.findAll("datalist option").map((o) => o.attributes("value"));
+
+    expect(options).toEqual(["zeta"]); // "work" and "home" are on the open note already
+    await w.get("button[aria-label='Remove tag home']").trigger("click");
+    expect(w.findAll("datalist option").map((o) => o.attributes("value"))).toEqual(["home", "zeta"]);
+  });
+
+  it("adds a tag still in the box when saving, and sends the tags", async () => {
+    client.update.mockResolvedValue(note("a", "First", "", "2026-02-01T00:00:00", ["new"]));
+    const w = await setup([note("a", "First")]);
+    await rows(w)[0]!.get("button").trigger("click");
+
+    await tagBox(w).setValue("New");
+    expect(w.text()).toContain("Unsaved changes");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(client.update).toHaveBeenCalledExactlyOnceWith("a", {
+      title: "First", body: "", tags: ["new"], agent_readable: false,
+    });
+    expect(chips(w)).toEqual(["new"]);
+  });
+
+  it("shows tags in the list", async () => {
+    const w = await setup([note("a", "First", "", "2026-01-01T00:00:00", ["work", "home"])]);
+
+    expect(rows(w)[0]!.findAll(".tag").map((t) => t.text())).toEqual(["work", "home"]);
+  });
+});
+
+describe("NotesView agent access", () => {
+  const warning = (w: VueWrapper) => w.find("[role=note]");
+  const flag = (w: VueWrapper) => w.get("input[role=switch]");
+
+  it("is off by default and shows no warning", async () => {
+    const w = await setup();
+    await buttonByText(w, "New note")!.trigger("click");
+
+    expect((flag(w).element as HTMLInputElement).checked).toBe(false);
+    expect(warning(w).exists()).toBe(false);
+  });
+
+  it("warns as soon as it is turned on, and the warning goes when it is turned off", async () => {
+    const w = await setup();
+    await buttonByText(w, "New note")!.trigger("click");
+
+    await flag(w).setValue(true);
+
+    expect(warning(w).text()).toContain("Agents can read this note");
+    expect(warning(w).text()).toContain("do not store passwords");
+    await flag(w).setValue(false);
+    expect(warning(w).exists()).toBe(false);
+  });
+
+  it("counts as an unsaved change and is sent on save", async () => {
+    client.update.mockResolvedValue(note("a", "First", "", "2026-02-01T00:00:00", [], true));
+    const w = await setup([note("a", "First")]);
+    await rows(w)[0]!.get("button").trigger("click");
+    expect(w.text()).not.toContain("Unsaved changes");
+
+    await flag(w).setValue(true);
+    expect(w.text()).toContain("Unsaved changes");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(client.update).toHaveBeenCalledExactlyOnceWith("a", {
+      title: "First", body: "", tags: [], agent_readable: true,
+    });
+    expect(rows(w)[0]!.text()).toContain("Agents can read");
+    expect(w.text()).not.toContain("Unsaved changes");
+  });
+
+  it("opens a note that agents can read with the switch on and the warning showing", async () => {
+    const w = await setup([note("a", "First", "", "2026-01-01T00:00:00", [], true)]);
+
+    await rows(w)[0]!.get("button").trigger("click");
+
+    expect((flag(w).element as HTMLInputElement).checked).toBe(true);
+    expect(warning(w).exists()).toBe(true);
+  });
+
+  it("asks before leaving a note whose only change is the switch", async () => {
+    const w = await setup([note("a", "First"), note("b", "Second")]);
+    await rows(w)[0]!.get("button").trigger("click");
+    await flag(w).setValue(true);
+
+    await rows(w)[1]!.get("button").trigger("click");
+    await flushPromises();
+
+    expect(document.body.querySelector("dialog[open]")?.textContent).toContain("Discard your changes?");
   });
 });
 

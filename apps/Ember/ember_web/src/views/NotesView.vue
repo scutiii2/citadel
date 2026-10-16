@@ -1,14 +1,25 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, onMounted, onUnmounted, reactive, ref } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
-import { NOTE_BODY_MAX, NOTE_TITLE_MAX, NOTES_MAX, notesClient, type Note } from "../api/NotesClient";
+import {
+  NOTE_BODY_MAX,
+  NOTE_TAG_MAX,
+  NOTE_TAGS_MAX,
+  NOTE_TITLE_MAX,
+  NOTES_MAX,
+  normalizeTag,
+  notesClient,
+  type Note,
+} from "../api/NotesClient";
 import ConfirmModal from "../components/ConfirmModal.vue";
 import "../components/infoPage.css";
+import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { errorMessage, formatUtc } from "../utils/errors";
 
 /** The signed-in account's private notes (ember_api's /api/notes, kept in
  * db_gateway). A list on the left and an editor on the right; on a narrow
- * screen one at a time. Edits are a draft until Save. */
+ * screen one at a time. Edits are a draft until Save. Each note has tags and a
+ * switch that says whether agents may read it. */
 
 const NEW = "new";
 
@@ -19,15 +30,78 @@ const notice = ref("");
 
 // The open note: a note id, NEW for one not saved yet, or null for none.
 const selected = ref<string | null>(null);
-const form = reactive({ title: "", body: "" });
-const saved = reactive({ title: "", body: "" });
+const form = reactive({ title: "", body: "", tags: [] as string[], agentReadable: false });
+const saved = reactive({ title: "", body: "", tags: [] as string[], agentReadable: false });
+const tagInput = ref("");
+const tagError = ref("");
 const saving = ref(false);
 const removing = ref(false);
 const formError = ref("");
 
-const dirty = computed(() => selected.value !== null && (form.title !== saved.title || form.body !== saved.body));
+const sameTags = (a: string[], b: string[]) => a.length === b.length && a.every((tag, i) => tag === b[i]);
+// A tag typed but not added yet counts as an unsaved edit, so it is never lost silently.
+const dirty = computed(
+  () =>
+    selected.value !== null &&
+    (form.title !== saved.title ||
+      form.body !== saved.body ||
+      form.agentReadable !== saved.agentReadable ||
+      !sameTags(form.tags, saved.tags) ||
+      tagInput.value.trim() !== ""),
+);
 const canSave = computed(() => form.title.trim() !== "" && dirty.value && !saving.value && !removing.value);
 const atLimit = computed(() => notes.value.length >= NOTES_MAX);
+
+// The tags this account already uses (not on the open note yet), most used first: the input's suggestions.
+const knownTags = computed(() => {
+  const counts = new Map<string, number>();
+  for (const note of notes.value) for (const tag of note.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  return [...counts]
+    .filter(([tag]) => !form.tags.includes(tag))
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([tag]) => tag);
+});
+
+/** Adds a tag to the note. False when it is refused (too many); a repeat counts as added. */
+function addTag(tag: string): boolean {
+  if (form.tags.includes(tag)) return true;
+  if (form.tags.length >= NOTE_TAGS_MAX) {
+    tagError.value = `A note can have at most ${NOTE_TAGS_MAX} tags.`;
+    return false;
+  }
+  form.tags.push(tag);
+  tagError.value = "";
+  return true;
+}
+
+/** Moves what is typed in the tag box into the note's tags. */
+function commitTag(): void {
+  const raw = tagInput.value;
+  if (raw.trim() === "") {
+    tagInput.value = "";
+    return;
+  }
+  const tag = normalizeTag(raw);
+  if (tag === "") {
+    tagError.value = "A tag needs letters or digits.";
+    tagInput.value = "";
+  } else if (addTag(tag)) {
+    tagInput.value = "";
+  }
+}
+
+function tagKey(event: KeyboardEvent): void {
+  if (event.key === "Enter" || event.key === ",") {
+    event.preventDefault(); // Enter must not save the note
+    commitTag();
+  } else if (event.key === "Backspace" && tagInput.value === "" && form.tags.length > 0) {
+    form.tags.pop();
+  }
+}
+function removeTag(tag: string): void {
+  form.tags = form.tags.filter((t) => t !== tag);
+  tagError.value = "";
+}
 
 async function load(): Promise<void> {
   try {
@@ -46,8 +120,17 @@ function show(target: string | null): void {
   formError.value = "";
   notice.value = "";
   const note = target === null || target === NEW ? undefined : notes.value.find((n) => n.id === target);
+  fillEditor(note);
+}
+/** Fills the editor, and what counts as saved, from a note (or empty). */
+function fillEditor(note: Note | undefined): void {
   saved.title = form.title = note?.title ?? "";
   saved.body = form.body = note?.body ?? "";
+  form.tags = [...(note?.tags ?? [])];
+  saved.tags = [...form.tags];
+  saved.agentReadable = form.agentReadable = note?.agent_readable ?? false;
+  tagInput.value = "";
+  tagError.value = "";
 }
 
 // Leaving unsaved edits asks first; the target waits here meanwhile.
@@ -102,20 +185,27 @@ function startNew(): void {
 }
 
 async function save(): Promise<void> {
-  if (!canSave.value || selected.value === null) return;
+  if (selected.value === null) return;
+  commitTag(); // a tag still in the box is part of the note
+  if (tagInput.value.trim() !== "") return; // it could not be added (too many tags): its message is showing
+  if (!canSave.value) return;
   saving.value = true;
   formError.value = "";
   try {
-    const title = form.title.trim();
+    const draft = {
+      title: form.title.trim(),
+      body: form.body,
+      tags: [...form.tags],
+      agent_readable: form.agentReadable,
+    };
     const note =
       selected.value === NEW
-        ? await notesClient.create(title, form.body)
-        : await notesClient.update(selected.value, title, form.body);
+        ? await notesClient.create(draft)
+        : await notesClient.update(selected.value, draft);
     // The newest edit goes first, as the server lists them.
     notes.value = [note, ...notes.value.filter((n) => n.id !== note.id)];
     selected.value = note.id;
-    saved.title = form.title = note.title;
-    saved.body = form.body = note.body;
+    fillEditor(note);
     notice.value = "Saved.";
   } catch (err) {
     formError.value = errorMessage(err);
@@ -177,6 +267,10 @@ function preview(note: Note): string {
               <button type="button" :class="['note-row', { active: n.id === selected }]" :aria-current="n.id === selected" @click="go(n.id)">
                 <span class="title">{{ n.id === selected && form.title.trim() ? form.title.trim() : n.title }}</span>
                 <span v-if="preview(n)" class="snippet">{{ preview(n) }}</span>
+                <span v-if="n.tags.length || n.agent_readable" class="row-tags">
+                  <span v-for="tag in n.tags" :key="tag" class="tag">{{ tag }}</span>
+                  <span v-if="n.agent_readable" class="tag agent-mark">Agents can read</span>
+                </span>
                 <span class="muted">{{ formatUtc(n.updated_at) }}</span>
               </button>
             </li>
@@ -190,11 +284,47 @@ function preview(note: Note): string {
             Title
             <input v-model="form.title" type="text" :maxlength="NOTE_TITLE_MAX" aria-label="Title" :disabled="saving || removing" />
           </label>
+          <div class="field">
+            <span class="field-label">Tags</span>
+            <ul v-if="form.tags.length" class="tag-list" aria-label="Tags">
+              <li v-for="tag in form.tags" :key="tag" class="tag">
+                {{ tag }}
+                <button type="button" :aria-label="`Remove tag ${tag}`" :disabled="saving || removing" @click="removeTag(tag)">×</button>
+              </li>
+            </ul>
+            <input
+              v-model="tagInput"
+              type="text"
+              list="note-tag-options"
+              aria-label="Add a tag"
+              placeholder="Add a tag, then press Enter"
+              :maxlength="NOTE_TAG_MAX * 2"
+              :disabled="saving || removing"
+              @keydown="tagKey"
+              @blur="commitTag"
+            />
+            <datalist id="note-tag-options">
+              <option v-for="tag in knownTags" :key="tag" :value="tag" />
+            </datalist>
+            <p v-if="tagError" class="error" role="alert">{{ tagError }}</p>
+          </div>
           <label>
             Note
             <textarea v-model="form.body" rows="14" :maxlength="NOTE_BODY_MAX" aria-label="Note text" :disabled="saving || removing" />
             <span class="muted count">{{ form.body.length }}/{{ NOTE_BODY_MAX }}</span>
           </label>
+          <div class="agent-access">
+            <ToggleSwitch
+              :checked="form.agentReadable"
+              :disabled="saving || removing"
+              @change="form.agentReadable = ($event.target as HTMLInputElement).checked"
+            >
+              Let agents read this note
+            </ToggleSwitch>
+            <p v-if="form.agentReadable" class="agent-warning" role="note">
+              Agents can read this note. Be careful what you put in it: do not store passwords, keys or other private data.
+            </p>
+          </div>
           <p v-if="formError" class="error" role="alert">{{ formError }}</p>
           <div class="actions">
             <span v-if="dirty" class="unsaved" role="status"><i aria-hidden="true" />Unsaved changes</span>
@@ -299,6 +429,62 @@ function preview(note: Note): string {
 .count {
   margin: 6px 0 0;
   font-size: 0.8em;
+}
+.row-tags,
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text);
+  background: var(--bg);
+  font-size: 0.8em;
+}
+.tag button {
+  padding: 0;
+  border: none;
+  color: var(--muted);
+  background: none;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.tag button:hover:not(:disabled) {
+  color: var(--danger);
+}
+.agent-mark {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9em;
+}
+.agent-access {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.agent-warning {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background: color-mix(in srgb, var(--warning) 12%, var(--bg));
+  font-size: 0.9em;
 }
 .editor {
   display: flex;

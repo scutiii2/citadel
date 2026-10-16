@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,7 +20,10 @@ COLLECTION = "notes"
 MAX_NOTES = 200
 TITLE_MAX = 200
 BODY_MAX = 20_000
+TAG_MAX = 30
+MAX_TAGS = 10
 _NOTE_ID = re.compile(r"[0-9a-f]{32}")
+_TAG = re.compile(r"[a-z0-9][a-z0-9_-]*")
 _PURGE_PAGE = 500
 _PURGE_MAX_PAGES = 20
 
@@ -32,6 +36,21 @@ class NoteLimit(Exception):
     pass
 
 
+def normalize_tags(raw: list[str]) -> list[str]:
+    """Trimmed, lowercase tags without repeats, in the order given. Raises ValueError
+    for a tag that is empty, too long or has characters other than a-z, 0-9, - and _."""
+    tags: list[str] = []
+    for item in raw:
+        tag = item.strip().lower()
+        if not tag or len(tag) > TAG_MAX or not _TAG.fullmatch(tag):
+            raise ValueError(f"A tag is 1 to {TAG_MAX} characters: letters, digits, - and _")
+        if tag not in tags:
+            tags.append(tag)
+    if len(tags) > MAX_TAGS:
+        raise ValueError(f"A note can have at most {MAX_TAGS} tags")
+    return tags
+
+
 @dataclass(frozen=True)
 class Note:
     id: str
@@ -39,10 +58,16 @@ class Note:
     body: str
     created_at: str
     updated_at: str
+    tags: tuple[str, ...] = ()
+    agent_readable: bool = False
 
     @classmethod
     def from_doc(cls, doc: dict[str, Any]) -> Note:
-        return cls(doc["id"], doc["title"], doc["body"], doc["created_at"], doc["updated_at"])
+        # Notes saved before tags and the agent flag existed have neither: no tags, agents locked out.
+        return cls(
+            doc["id"], doc["title"], doc["body"], doc["created_at"], doc["updated_at"],
+            tuple(doc.get("tags") or ()), doc.get("agent_readable") is True,
+        )
 
 
 class NotesService:
@@ -57,20 +82,30 @@ class NotesService:
     async def get(self, note_id: str) -> Note:
         return Note.from_doc(await self._owned(note_id))
 
-    async def create(self, title: str, body: str) -> Note:
+    async def tags(self) -> list[tuple[str, int]]:
+        """Every tag the account uses with its note count: most used first, then by name."""
+        counts = Counter(tag for note in await self.list() for tag in note.tags)
+        return sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+
+    async def create(
+        self, title: str, body: str, tags: list[str] | None = None, agent_readable: bool = False
+    ) -> Note:
         if len(await self._store.query(COLLECTION, {"owner": self._owner}, limit=MAX_NOTES)) >= MAX_NOTES:
             raise NoteLimit(f"You can keep at most {MAX_NOTES} notes")
         now = _now()
         doc = {
             "id": uuid.uuid4().hex, "owner": self._owner, "title": title, "body": body,
+            "tags": list(tags or []), "agent_readable": agent_readable,
             "created_at": now, "updated_at": now,
         }
         await self._store.put(COLLECTION, doc["id"], doc)
         return Note.from_doc(doc)
 
-    async def update(self, note_id: str, title: str, body: str) -> Note:
+    async def update(
+        self, note_id: str, title: str, body: str, tags: list[str] | None = None, agent_readable: bool = False
+    ) -> Note:
         doc = await self._owned(note_id)
-        doc.update(title=title, body=body, updated_at=_now())
+        doc.update(title=title, body=body, tags=list(tags or []), agent_readable=agent_readable, updated_at=_now())
         await self._store.put(COLLECTION, note_id, doc)
         return Note.from_doc(doc)
 

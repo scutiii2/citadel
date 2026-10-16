@@ -41,8 +41,9 @@ def test_create_read_update_delete(client: TestClient) -> None:
     assert client.get(URL).json() == []
 
     note = add(client)
-    assert set(note) == {"id", "title", "body", "created_at", "updated_at"}
+    assert set(note) == {"id", "title", "body", "tags", "agent_readable", "created_at", "updated_at"}
     assert (note["title"], note["body"]) == ("Groceries", "milk")
+    assert (note["tags"], note["agent_readable"]) == ([], False)
     assert client.get(f"{URL}/{note['id']}").json() == note
 
     changed = client.put(f"{URL}/{note['id']}", json={"title": "Shopping", "body": "milk, eggs"})
@@ -77,6 +78,102 @@ def test_title_is_trimmed_and_required_and_limits(client: TestClient) -> None:
     assert client.post(URL, json={"title": "ok", "body": "x" * 20_001}).status_code == 422
     assert client.post(URL, json={"title": "ok", "body": "x" * 20_000}).status_code == 201
     assert client.post(URL, json={"title": "ok"}).json()["body"] == ""
+
+
+def test_tags_are_cleaned_and_stored(client: TestClient) -> None:
+    as_admin(client)
+
+    note = client.post(URL, json={"title": "t", "tags": [" Work ", "home", "work", "to-do_1"]}).json()
+
+    assert note["tags"] == ["work", "home", "to-do_1"]
+    assert client.get(f"{URL}/{note['id']}").json()["tags"] == ["work", "home", "to-do_1"]
+    changed = client.put(f"{URL}/{note['id']}", json={"title": "t", "tags": ["home"]}).json()
+    assert changed["tags"] == ["home"]
+    assert client.put(f"{URL}/{note['id']}", json={"title": "t"}).json()["tags"] == []  # PUT replaces
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [[""], ["   "], ["two words"], ["x" * 31], ["-lead"], ["ünï"], ["a/b"], [f"t{i}" for i in range(11)], [1], "work"],
+)
+def test_bad_tags_are_refused(client: TestClient, tags) -> None:
+    as_admin(client)
+
+    assert client.post(URL, json={"title": "t", "tags": tags}).status_code == 422
+
+
+def test_tag_limits_are_allowed_at_the_edge(client: TestClient) -> None:
+    as_admin(client)
+
+    tags = ["x" * 30] + [f"t{i}" for i in range(9)]
+
+    assert client.post(URL, json={"title": "t", "tags": tags}).status_code == 201
+
+
+def test_tag_list_counts_only_the_accounts_own_notes(client: TestClient, email: FakeEmailSender) -> None:
+    make_member(client, email, "alice")
+    make_member(client, email, "bob")
+    login(client, "alice")
+    assert client.get(f"{URL}/tags").json() == []
+    client.post(URL, json={"title": "1", "tags": ["work", "home"]})
+    client.post(URL, json={"title": "2", "tags": ["work"]})
+    client.post(URL, json={"title": "3"})
+    client.post("/api/auth/logout", json={})
+    login(client, "bob")
+    client.post(URL, json={"title": "b", "tags": ["secret"]})
+    client.post("/api/auth/logout", json={})
+
+    login(client, "alice")
+
+    assert client.get(f"{URL}/tags").json() == [{"tag": "work", "count": 2}, {"tag": "home", "count": 1}]
+
+
+def test_agent_flag_defaults_off_and_is_set_and_cleared(client: TestClient) -> None:
+    as_admin(client)
+
+    note = add(client)
+    assert note["agent_readable"] is False
+    on = client.put(f"{URL}/{note['id']}", json={"title": "t", "agent_readable": True}).json()
+    assert on["agent_readable"] is True
+    assert client.get(f"{URL}/{note['id']}").json()["agent_readable"] is True
+    off = client.put(f"{URL}/{note['id']}", json={"title": "t", "agent_readable": False}).json()
+    assert off["agent_readable"] is False
+    assert client.post(URL, json={"title": "t", "agent_readable": "yes please"}).status_code == 422
+
+
+def test_a_note_saved_before_tags_existed_reads_as_untagged_and_locked(
+    client: TestClient, db_gateway: FakeDbGateway
+) -> None:
+    as_admin(client)
+    owner = uids(client)["root"]
+    key = "1" * 32
+    db_gateway.records[("notes", key)] = {
+        "id": key, "owner": owner, "title": "old", "body": "b",
+        "created_at": "2026-01-01T00:00:00", "updated_at": "2026-01-01T00:00:00",
+    }
+
+    old = client.get(f"{URL}/{key}").json()
+
+    assert (old["tags"], old["agent_readable"]) == ([], False)
+    assert client.get(f"{URL}/tags").json() == []
+
+
+def test_agent_access_changes_are_audited_only_when_the_switch_flips(client: TestClient) -> None:
+    as_admin(client)
+    note = add(client, "very private title", "very private body")
+    client.put(f"{URL}/{note['id']}", json={"title": "t", "agent_readable": False})  # no change
+    client.put(f"{URL}/{note['id']}", json={"title": "t", "agent_readable": True})
+    client.put(f"{URL}/{note['id']}", json={"title": "t", "agent_readable": True})  # no change
+    client.put(f"{URL}/{note['id']}", json={"title": "t", "agent_readable": False})
+    client.post(URL, json={"title": "shared from the start", "agent_readable": True})
+
+    root = client.get("/api/auth/me").json()["id"]
+    entries = client.get("/api/logs/action", params={"actor": str(root)}).json()
+    messages = [e["message"] for e in entries]
+
+    assert messages.count("Let agents read a note") == 2
+    assert messages.count("Stopped agents reading a note") == 1
+    assert "very private" not in str(entries)
 
 
 def test_another_account_cannot_see_or_touch_a_note(client: TestClient, email: FakeEmailSender) -> None:
