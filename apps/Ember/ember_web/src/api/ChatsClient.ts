@@ -53,6 +53,8 @@ export interface TurnStart {
   ask_before_tools?: boolean;
   /** Tools the user already allowed for this chat: they run without asking. */
   allowed_tools?: string[];
+  /** "Auto" (with ask_before_tools): built-in tools that only read run without asking. */
+  allow_read_only?: boolean;
   /** This page can show the agent's clickable questions and send answers back. */
   can_ask?: boolean;
 }

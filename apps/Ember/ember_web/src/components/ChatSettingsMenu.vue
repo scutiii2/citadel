@@ -12,6 +12,7 @@ defineProps<{
   plan: boolean;
   /** Ask the agent to update its checklist only when an item changes status. */
   planLean: boolean;
+  /** The agent asks before at least some tools (the picker next to this menu says how). */
   askBeforeTools: boolean;
   /** An administrator requires approval before every tool: not changeable. */
   forceToolApproval: boolean;
@@ -27,7 +28,6 @@ const emit = defineEmits<{
   "update:caveman": [value: boolean];
   "update:plan": [value: boolean];
   "update:planLean": [value: boolean];
-  "update:askBeforeTools": [value: boolean];
   "update:chime": [value: boolean];
   "clear-allowed": [];
 }>();
@@ -102,22 +102,6 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
         @change="emit('update:planLean', checked($event))"
       >
         Update only on change
-      </ToggleSwitch>
-      <ToggleSwitch
-        small
-        :title="
-          withTokenCost(
-            forceToolApproval
-              ? 'Your administrator requires approval before every tool'
-              : 'Ask you before the agent runs each tool',
-            'askTools',
-          )
-        "
-        :checked="askBeforeTools || forceToolApproval"
-        :disabled="forceToolApproval"
-        @change="emit('update:askBeforeTools', checked($event))"
-      >
-        Ask before tools
       </ToggleSwitch>
       <button
         v-if="askBeforeTools && allowedCount && !forceToolApproval"

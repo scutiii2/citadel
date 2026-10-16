@@ -6,6 +6,12 @@ import { navPreferencesClient } from "../api/NavPreferencesClient";
 import ConfirmModal from "../components/ConfirmModal.vue";
 import { errorMessage } from "../utils/errors";
 import SettingRow from "../components/SettingRow.vue";
+import {
+  ALLOW_ALL_CONFIRM,
+  APPROVAL_MODES,
+  DEFAULT_APPROVAL_MODE,
+  type ApprovalMode,
+} from "../utils/approvalMode";
 import { TOKEN_COSTS } from "../utils/tokenCosts";
 import SidebarEditor from "../components/SidebarEditor.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
@@ -75,8 +81,8 @@ const DEFS: SettingDef[] = [
     id: "chat-ask-tools",
     group: "chat",
     label: "Ask before tools",
-    description: "Ask you before the agent runs each tool.",
-    keywords: ["approval", "allow", "permission"],
+    description: "Choose when the agent asks before it runs a tool.",
+    keywords: ["approval", "allow", "permission", "ask", "auto", "allow all", "read-only", "tools"],
   },
   {
     id: "chat-chime",
@@ -147,7 +153,7 @@ const groups = computed(() =>
 const noMatches = computed(() => shown.value.size === 0);
 
 const saved = computed(() => ({
-  caveman: chat.caveman, plan: chat.plan, planLean: chat.planLean, askBeforeTools: chat.askBeforeTools, chime: chat.chime,
+  caveman: chat.caveman, plan: chat.plan, planLean: chat.planLean, approvalMode: chat.approvalMode, chime: chat.chime,
   browserNotifications: chat.browserNotifications,
   suggestions: auth.promptSuggestions, theme: theme.value,
   sidebar: { order: [...navPrefs.prefs.order], pinned: [...navPrefs.prefs.pinned], hidden: [...navPrefs.prefs.hidden] },
@@ -172,6 +178,29 @@ async function changeNotifications(event: Event): Promise<void> {
     draft.value.browserNotifications = !message;
   } finally { requestingNotifications.value = false; }
 }
+// Tool approval: while an administrator requires it, "Ask every time" is all that can be chosen.
+const APPROVAL_OPTIONS = computed(() =>
+  APPROVAL_MODES.map((m) => ({ value: m.id, label: m.label, disabled: chat.forceToolApproval && m.id !== "ask" })),
+);
+const allowAllOpen = ref(false);
+const approvalChoice = computed<ApprovalMode>({
+  get: () => (chat.forceToolApproval ? "ask" : draft.value.approvalMode),
+  set: (mode) => {
+    if (chat.forceToolApproval) return;
+    // Nothing asks any more: say so first. The choice is a draft until Save, like the rest.
+    if (mode === "allow_all" && draft.value.approvalMode !== "allow_all") allowAllOpen.value = true;
+    else draft.value.approvalMode = mode;
+  },
+});
+function confirmAllowAll(): void {
+  allowAllOpen.value = false;
+  draft.value.approvalMode = "allow_all";
+}
+const approvalDescription = computed(() =>
+  chat.forceToolApproval
+    ? "Your administrator requires approval before every tool."
+    : (APPROVAL_MODES.find((m) => m.id === draft.value.approvalMode)?.description ?? ""),
+);
 const dirty = computed(() => JSON.stringify(draft.value) !== JSON.stringify(saved.value));
 watch(saved, (next, previous) => {
   if (saving.value) return;
@@ -201,8 +230,8 @@ async function save(): Promise<void> {
     chat.setCaveman(next.caveman);
     chat.setPlan(next.plan);
     chat.setPlanLean(next.planLean);
-    if (!chat.forceToolApproval) chat.setAskBeforeTools(next.askBeforeTools);
-    else draft.value.askBeforeTools = chat.askBeforeTools;
+    if (!chat.forceToolApproval) chat.setApprovalMode(next.approvalMode);
+    else draft.value.approvalMode = chat.approvalMode;
     chat.setChime(next.chime);
     chat.setBrowserNotifications(next.browserNotifications);
     setTheme(next.theme);
@@ -234,7 +263,7 @@ const modified = computed(() => ({
   "chat-terse": draft.value.caveman !== false,
   "chat-plan": draft.value.plan !== true,
   "chat-plan-lean": draft.value.planLean !== true,
-  "chat-ask-tools": draft.value.askBeforeTools !== false,
+  "chat-ask-tools": draft.value.approvalMode !== DEFAULT_APPROVAL_MODE,
   "chat-chime": draft.value.chime !== true,
   "chat-notifications": draft.value.browserNotifications === true,
   "chat-suggestions": !draft.value.suggestions,
@@ -357,22 +386,12 @@ onMounted(() => {
             v-if="shown.has('chat-ask-tools')"
             setting-id="chat-ask-tools"
             label="Ask before tools"
-            :description="
-              chat.forceToolApproval
-                ? 'Your administrator requires approval before every tool.'
-                : 'Ask you before the agent runs each tool.'
-            "
+            :description="approvalDescription"
             :modified="modified['chat-ask-tools']"
             :cost="TOKEN_COSTS.askTools"
-            @reset="draft.askBeforeTools = false"
+            @reset="draft.approvalMode = DEFAULT_APPROVAL_MODE"
           >
-            <ToggleSwitch
-              small
-              aria-label="Ask before tools"
-              :checked="draft.askBeforeTools || chat.forceToolApproval"
-              :disabled="chat.forceToolApproval"
-              @change="draft.askBeforeTools = checked($event)"
-            />
+            <SegmentedControl v-model="approvalChoice" :options="APPROVAL_OPTIONS" aria-label="Ask before tools" />
           </SettingRow>
           <SettingRow
             v-if="shown.has('chat-chime')"
@@ -439,6 +458,16 @@ onMounted(() => {
       <button type="button" class="revert" :disabled="saving || requestingNotifications" @click="revert">Revert</button>
       <button type="button" class="save" :disabled="saving || requestingNotifications" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
     </div>
+    <ConfirmModal
+      v-if="allowAllOpen"
+      :open="allowAllOpen"
+      :title="ALLOW_ALL_CONFIRM.title"
+      :message="ALLOW_ALL_CONFIRM.message"
+      :confirm-label="ALLOW_ALL_CONFIRM.confirmLabel"
+      danger
+      @confirm="confirmAllowAll"
+      @close="allowAllOpen = false"
+    />
     <ConfirmModal v-if="discardOpen" :open="discardOpen" title="Discard unsaved settings?" message="Your settings changes have not been saved." confirm-label="Discard changes" @confirm="answerDiscard(true)" @close="answerDiscard(false)" />
   </section>
 </template>

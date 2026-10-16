@@ -27,6 +27,7 @@ import { clearCompletionNotifications, notifyCompletion } from "../composables/u
 import { chimeIfAway } from "../composables/useNotify";
 import { SlashCommandRunner } from "../services/slashCommands";
 import { watchTurn } from "../services/turnStream";
+import { type ApprovalMode, DEFAULT_APPROVAL_MODE, isApprovalMode } from "../utils/approvalMode";
 import { splitAttachments, withAttachments } from "../utils/attachments";
 import { errorMessage } from "../utils/errors";
 import { toolTitle } from "../utils/toolTitles";
@@ -74,8 +75,20 @@ function chimeKey(accountId: number): string {
   return `ember_web.chime.${accountId}`;
 }
 
+function approvalModeKey(accountId: number): string {
+  return `ember_web.approvalMode.${accountId}`;
+}
+
+// Before the picker this was an on/off switch.
 function askBeforeToolsKey(accountId: number): string {
   return `ember_web.askBeforeTools.${accountId}`;
+}
+
+/** The saved mode; an account that only ever had the old switch keeps what it chose (on asks, off allows all). */
+function readApprovalMode(accountId: number): ApprovalMode {
+  const saved = readPreference(approvalModeKey(accountId));
+  if (isApprovalMode(saved)) return saved;
+  return readPreference(askBeforeToolsKey(accountId)) === "1" ? "ask" : DEFAULT_APPROVAL_MODE;
 }
 
 function allowedToolsKey(accountId: number): string {
@@ -168,9 +181,12 @@ export const useChatStore = defineStore("chat", () => {
   // change the list only when an item changes status (fewer tokens).
   const plan = ref(true);
   const planLean = ref(true);
-  // "Ask before running tools": each tool the agent wants to run waits for the
-  // user's answer. Off by default; remembered per account.
-  const askBeforeTools = ref(false);
+  // How the agent asks before it runs a tool (see utils/approvalMode.ts): every tool waits for the
+  // user's answer ("ask"), only tools that change something do ("auto"), or none does ("allow_all",
+  // the default). Remembered per account. An administrator's requirement overrides it.
+  const approvalMode = ref<ApprovalMode>(DEFAULT_APPROVAL_MODE);
+  // Whether the agent asks about some tool at all (kept for what only needs the yes or no).
+  const askBeforeTools = computed(() => approvalMode.value !== "allow_all");
   // The administrator requires approval for every tool: the checkbox is locked on,
   // nothing is pre-allowed and "allow for this chat" is not offered. ember_api
   // enforces it either way; this only keeps the page honest.
@@ -445,7 +461,7 @@ export const useChatStore = defineStore("chat", () => {
       caveman.value = accountId !== null && readPreference(cavemanKey(accountId)) === "1";
       plan.value = accountId === null || readPreference(planKey(accountId)) !== "0";
       planLean.value = accountId === null || readPreference(planLeanKey(accountId)) !== "0";
-      askBeforeTools.value = accountId !== null && readPreference(askBeforeToolsKey(accountId)) === "1";
+      approvalMode.value = accountId !== null ? readApprovalMode(accountId) : DEFAULT_APPROVAL_MODE;
       chime.value = accountId === null || readPreference(chimeKey(accountId)) !== "0";
       browserNotifications.value = accountId !== null && readPreference(`ember_web.notifications.${accountId}`) === "1";
       allowedTools.value = accountId !== null ? readAllowedTools(accountId) : {};
@@ -772,7 +788,12 @@ export const useChatStore = defineStore("chat", () => {
         title: conversation.title,
         ...(truncateTo === undefined ? {} : { truncate_to: truncateTo }),
         ...(askBeforeTools.value || forceToolApproval.value
-          ? { ask_before_tools: true, allowed_tools: forceToolApproval.value ? [] : (allowedTools.value[id] ?? []) }
+          ? {
+              ask_before_tools: true,
+              allowed_tools: forceToolApproval.value ? [] : (allowedTools.value[id] ?? []),
+              // Auto; ember_api drops it while approval is required for everyone.
+              ...(approvalMode.value === "auto" && !forceToolApproval.value ? { allow_read_only: true } : {}),
+            }
           : {}),
       });
       if (started !== generation) return true;
@@ -995,10 +1016,10 @@ export const useChatStore = defineStore("chat", () => {
     return find(id) !== undefined;
   }
 
-  function setAskBeforeTools(on: boolean): void {
-    askBeforeTools.value = on;
+  function setApprovalMode(mode: ApprovalMode): void {
+    approvalMode.value = mode;
     const accountId = auth.account?.id;
-    if (accountId !== undefined) writePreference(askBeforeToolsKey(accountId), on ? "1" : "0");
+    if (accountId !== undefined) writePreference(approvalModeKey(accountId), mode);
   }
 
   function setChime(on: boolean): void {
@@ -1280,10 +1301,11 @@ export const useChatStore = defineStore("chat", () => {
     setPlan,
     planLean,
     setPlanLean,
+    approvalMode,
     askBeforeTools,
     forceToolApproval,
     refreshSettings,
-    setAskBeforeTools,
+    setApprovalMode,
     chime,
     browserNotifications,
     setBrowserNotifications,

@@ -170,11 +170,16 @@ URL, token or key.
   their tools; those tools work in chats only (always asking first, and every later tool in that turn asks too) and cannot be run
   from the page. When a private extension could not be used in an answer, a banner above the messages says which and why until
   the next question. It is live only and not saved with the chat.
-- "Ask before tools" toggle (off by default, remembered per account): each
-  tool the agent wants to run waits for you. A card shows the tool's name and
+- Tool approval picker (`ApprovalModePicker`, a chip in the chat bar; also the "Ask before tools" row in Settings),
+  remembered per account on this device, with three modes: **Ask every time** (each tool waits for you), **Auto**
+  (built-in tools that only read run on their own; anything that changes something still asks) and **Allow all**
+  (nothing asks; the default, as before the picker, and it asks for a confirmation first). Auto is sent as
+  `allow_read_only`; which tools count as read-only is decided in ai_agent from each tool's own declaration, never here.
+  An account that only had the old on/off switch keeps what it chose. When an admin requires approval for every tool
+  the chip shows Ask every time, locked, and the other two modes are disabled. When a tool asks, a card shows its name and
   arguments with Allow once, Allow for this chat and Deny; nothing runs until
   you answer, and no answer within 4 minutes counts as Deny. "Allow for this
-  chat" is remembered in this browser per chat (a chip shows how many tools are
+  chat" is remembered in this browser per chat (a chip in the settings menu shows how many tools are
   allowed and resets them). Slash commands you type yourself never ask.
 - Clickable questions: the agent can stop mid-answer and ask 1-4 questions with options (single or multiple
   choice) plus your own typed answer. The question card appears inside the live answer; answer and Submit, or Skip
@@ -438,8 +443,8 @@ src/
   the card only sends an answer, and an answer is accepted only from the
   chat's own account for a step that is waiting. When an admin requires
   approval for every tool, ember_api forces it on each turn and turns
-  "allow for this chat" into "allow once"; the locked checkbox and the missing
-  button only show it.
+  "allow for this chat" into "allow once" and drops Auto; the locked picker and
+  the missing button only show it.
 - Access checks in the router only decide what the UI shows; ember_api
   enforces every permission itself. The one public page is `/shared/:token`
   (`meta.public`): the guard lets anyone in without loading an account, and

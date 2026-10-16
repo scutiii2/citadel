@@ -4,6 +4,7 @@ import { computed, onActivated, onDeactivated, onMounted, ref, watch } from "vue
 import ConfirmModal from "../components/ConfirmModal.vue";
 import ChatHeader from "../components/ChatHeader.vue";
 import ChatInput from "../components/ChatInput.vue";
+import ApprovalModePicker from "../components/ApprovalModePicker.vue";
 import ChatSettingsMenu from "../components/ChatSettingsMenu.vue";
 import CommandFormModal from "../components/CommandFormModal.vue";
 import ElapsedTime from "../components/ElapsedTime.vue";
@@ -58,6 +59,7 @@ const {
   contextUsage,
   commands,
   enabledExtensions,
+  approvalMode,
   askBeforeTools,
   forceToolApproval,
   chime,
@@ -452,13 +454,14 @@ useChatShortcuts({
               @update:caveman="chat.setCaveman"
               @update:plan="chat.setPlan"
               @update:plan-lean="chat.setPlanLean"
-              @update:ask-before-tools="chat.setAskBeforeTools"
               @update:chime="chat.setChime"
               @clear-allowed="chat.clearAllowedTools()"
             />
-            <span v-if="askBeforeTools || forceToolApproval" class="status-chip" title="The agent asks before each tool it runs">
-              Ask before tools: on
-            </span>
+            <ApprovalModePicker
+              :mode="approvalMode"
+              :forced="forceToolApproval"
+              @update:mode="chat.setApprovalMode"
+            />
             <span v-if="working" class="working">
               {{ working }}<template v-if="clockStart"> · <ElapsedTime :since="clockStart" /></template>
             </span>
@@ -528,13 +531,6 @@ useChatShortcuts({
 }
 .composer-area {
   flex-shrink: 0;
-}
-.status-chip {
-  padding: 1px 8px;
-  border-radius: var(--radius-full);
-  font-size: 0.75em;
-  color: var(--muted);
-  background: var(--code-bg);
 }
 .working {
   font-size: 0.8em;

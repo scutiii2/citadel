@@ -125,11 +125,21 @@ describe("a question while approval is required", () => {
   it("does not list tools allowed earlier", async () => {
     localStorage.setItem(ALLOWED_KEY, JSON.stringify({ c1: ["tool_a"] }));
     const chat = await storeWith(true);
-    chat.setAskBeforeTools(true);
+    chat.setApprovalMode("ask");
 
     await chat.send("hello");
 
     expect(client.startTurn.mock.calls[0]![1]).toMatchObject({ ask_before_tools: true, allowed_tools: [] });
+  });
+
+  it("does not send Auto: every tool asks while it is required", async () => {
+    const chat = await storeWith(true);
+    chat.setApprovalMode("auto");
+
+    await chat.send("hello");
+
+    expect(client.startTurn.mock.calls[0]![1]).toMatchObject({ ask_before_tools: true, allowed_tools: [] });
+    expect(client.startTurn.mock.calls[0]![1]).not.toHaveProperty("allow_read_only");
   });
 
   it("keeps the old behaviour when nothing is required", async () => {

@@ -34,7 +34,8 @@ const client = vi.mocked(chatsClient);
 const watch = vi.mocked(watchTurn);
 
 const ACCOUNT = { id: 1, username: "root", email: "root@example.com", email_verified: true, roles: [], permissions: ["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] };
-const ASK_KEY = "ember_web.askBeforeTools.1";
+const ASK_KEY = "ember_web.askBeforeTools.1"; // the old on/off switch
+const MODE_KEY = "ember_web.approvalMode.1";
 const ALLOWED_KEY = "ember_web.allowedTools.1";
 
 const summary = (id: string, count = 0): ChatSummary => ({
@@ -97,29 +98,61 @@ beforeEach(() => {
 });
 
 describe("the setting", () => {
-  it("is off until switched on, and remembered per account", async () => {
+  it("is Allow all until chosen, and every choice is remembered per account", async () => {
     const chat = await storeWith({ c1: FOUR });
+    expect(chat.approvalMode).toBe("allow_all");
     expect(chat.askBeforeTools).toBe(false);
 
-    chat.setAskBeforeTools(true);
-
-    expect(localStorage.getItem(ASK_KEY)).toBe("1");
-    chat.setAskBeforeTools(false);
-    expect(localStorage.getItem(ASK_KEY)).toBe("0");
+    chat.setApprovalMode("ask");
+    expect(localStorage.getItem(MODE_KEY)).toBe("ask");
+    expect(chat.askBeforeTools).toBe(true);
+    chat.setApprovalMode("auto");
+    expect(localStorage.getItem(MODE_KEY)).toBe("auto");
+    expect(chat.askBeforeTools).toBe(true); // Auto still asks about some tools
+    chat.setApprovalMode("allow_all");
+    expect(localStorage.getItem(MODE_KEY)).toBe("allow_all");
+    expect(chat.askBeforeTools).toBe(false);
   });
 
   it("is read back for the account on login, and not shared with another account", async () => {
-    localStorage.setItem(ASK_KEY, "1");
+    localStorage.setItem(MODE_KEY, "auto");
     const chat = await storeWith({ c1: FOUR });
-    expect(chat.askBeforeTools).toBe(true);
+    expect(chat.approvalMode).toBe("auto");
 
     useAuthStore().account = { ...ACCOUNT, id: 2 };
     await flushPromises();
-    expect(chat.askBeforeTools).toBe(false);
+    expect(chat.approvalMode).toBe("allow_all");
 
     useAuthStore().account = ACCOUNT;
     await flushPromises();
-    expect(chat.askBeforeTools).toBe(true);
+    expect(chat.approvalMode).toBe("auto");
+  });
+
+  it("keeps what an account chose with the old on/off switch", async () => {
+    localStorage.setItem(ASK_KEY, "1");
+    expect((await storeWith({ c1: FOUR })).approvalMode).toBe("ask");
+
+    localStorage.setItem(ASK_KEY, "0");
+    useAuthStore().account = { ...ACCOUNT, id: 1 };
+    const off = await storeWith({ c1: FOUR });
+    useAuthStore().account = null;
+    await flushPromises();
+    useAuthStore().account = ACCOUNT;
+    await flushPromises();
+    expect(off.approvalMode).toBe("allow_all");
+  });
+
+  it("prefers the new choice over the old switch, and ignores a value it does not know", async () => {
+    localStorage.setItem(ASK_KEY, "1");
+    localStorage.setItem(MODE_KEY, "allow_all");
+    expect((await storeWith({ c1: FOUR })).approvalMode).toBe("allow_all");
+
+    useAuthStore().account = null;
+    await flushPromises();
+    localStorage.setItem(MODE_KEY, "whenever");
+    useAuthStore().account = ACCOUNT;
+    await flushPromises();
+    expect(useChatStore().approvalMode).toBe("ask"); // falls back to the old switch, which said on
   });
 });
 
@@ -134,10 +167,42 @@ describe("what a question sends", () => {
     expect(client.startTurn.mock.calls[0]![1]).not.toHaveProperty("allowed_tools");
   });
 
+  it("Auto asks about tools and also says read-only tools may run unasked", async () => {
+    const chat = await storeWith({ c1: FOUR });
+    chat.setApprovalMode("auto");
+    await chat.selectChat("c1");
+
+    await chat.send("hello");
+
+    expect(client.startTurn.mock.calls[0]![1]).toMatchObject({ ask_before_tools: true, allow_read_only: true });
+  });
+
+  it("Ask every time does not send allow_read_only", async () => {
+    const chat = await storeWith({ c1: FOUR });
+    chat.setApprovalMode("ask");
+    await chat.selectChat("c1");
+
+    await chat.send("hello");
+
+    expect(client.startTurn.mock.calls[0]![1]).toMatchObject({ ask_before_tools: true });
+    expect(client.startTurn.mock.calls[0]![1]).not.toHaveProperty("allow_read_only");
+  });
+
+  it("Allow all sends neither", async () => {
+    const chat = await storeWith({ c1: FOUR });
+    chat.setApprovalMode("allow_all");
+    await chat.selectChat("c1");
+
+    await chat.send("hello");
+
+    expect(client.startTurn.mock.calls[0]![1]).not.toHaveProperty("ask_before_tools");
+    expect(client.startTurn.mock.calls[0]![1]).not.toHaveProperty("allow_read_only");
+  });
+
   it("turns asking on and lists the tools already allowed for this chat", async () => {
     localStorage.setItem(ALLOWED_KEY, JSON.stringify({ c1: ["tool_a", "tool_b"], other: ["tool_z"] }));
     const chat = await storeWith({ c1: FOUR });
-    chat.setAskBeforeTools(true);
+    chat.setApprovalMode("ask");
     await chat.selectChat("c1");
 
     await chat.send("hello");
@@ -147,7 +212,7 @@ describe("what a question sends", () => {
 
   it("sends an empty allow list for a chat with none", async () => {
     const chat = await storeWith({ c1: FOUR });
-    chat.setAskBeforeTools(true);
+    chat.setApprovalMode("ask");
     await chat.selectChat("c1");
 
     await chat.send("hello");
@@ -157,7 +222,7 @@ describe("what a question sends", () => {
 
   it("regenerate and edit ask too", async () => {
     const chat = await storeWith({ c1: FOUR });
-    chat.setAskBeforeTools(true);
+    chat.setApprovalMode("ask");
     await chat.selectChat("c1");
 
     await chat.regenerate();
@@ -319,7 +384,7 @@ describe("answering", () => {
 describe("allowing a tool for the chat", () => {
   it("'always' becomes a rule for this chat, kept in storage, and is sent with the next question", async () => {
     const chat = await running();
-    chat.setAskBeforeTools(true);
+    chat.setApprovalMode("ask");
     fire(REQUEST);
 
     await chat.decideApproval("step0", "always");
@@ -411,7 +476,7 @@ describe("allowing a tool for the chat", () => {
       messages: FOUR.slice(0, 2),
     });
     const chat = await storeWith({ c1: FOUR });
-    chat.setAskBeforeTools(true);
+    chat.setApprovalMode("ask");
     await chat.selectChat("c1");
 
     await chat.branchFrom(1);

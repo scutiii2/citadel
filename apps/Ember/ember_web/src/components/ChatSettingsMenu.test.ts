@@ -99,22 +99,19 @@ describe("ChatSettingsMenu", () => {
       "Terse replies",
       "Task checklist",
       "Update only on change",
-      "Ask before tools",
       "Chime when done",
     ]);
     const boxes = w.findAll("input[type=checkbox]");
-    expect(boxes.map((b) => (b.element as HTMLInputElement).checked)).toEqual([false, true, true, false, true]);
+    expect(boxes.map((b) => (b.element as HTMLInputElement).checked)).toEqual([false, true, true, true]);
 
     await boxes[0]!.setValue(true);
     await boxes[1]!.setValue(false);
     await boxes[2]!.setValue(false);
-    await boxes[3]!.setValue(true);
-    await boxes[4]!.setValue(false);
+    await boxes[3]!.setValue(false);
 
     expect(w.emitted("update:caveman")).toEqual([[true]]);
     expect(w.emitted("update:plan")).toEqual([[false]]);
     expect(w.emitted("update:planLean")).toEqual([[false]]);
-    expect(w.emitted("update:askBeforeTools")).toEqual([[true]]);
     expect(w.emitted("update:chime")).toEqual([[false]]);
   });
 
@@ -124,7 +121,7 @@ describe("ChatSettingsMenu", () => {
 
     const titles = w.findAll("label").map((l) => l.attributes("title") ?? "");
 
-    expect(titles).toHaveLength(5);
+    expect(titles).toHaveLength(4);
     for (const title of titles) expect(title).toMatch(/token/i);
     expect(titles[1]).toContain("200 input tokens");
   });
@@ -136,13 +133,17 @@ describe("ChatSettingsMenu", () => {
     expect(w.findAll("label").map((l) => l.text())).not.toContain("Update only on change");
   });
 
-  it("locks 'Ask before tools' on when an administrator forces it", async () => {
-    const w = open({ forceToolApproval: true });
+  it("no longer holds the tool approval switch: the picker next to it does", async () => {
+    const w = open({ askBeforeTools: true });
     await gear(w).trigger("click");
 
-    const box = w.findAll("input[type=checkbox]")[3]!.element as HTMLInputElement;
-    expect(box.checked).toBe(true);
-    expect(box.disabled).toBe(true);
+    expect(w.findAll("label").map((l) => l.text())).not.toContain("Ask before tools");
+  });
+
+  it("hides the allowed-tools reset while an administrator forces approval", async () => {
+    const w = open({ forceToolApproval: true, askBeforeTools: true, allowedCount: 2 });
+    await gear(w).trigger("click");
+
     expect(w.find("button.allowed").exists()).toBe(false);
   });
 

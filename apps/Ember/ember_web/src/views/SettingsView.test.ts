@@ -2,7 +2,7 @@ import { requestCompletionPermission } from "../composables/useCompletionNotify"
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { reactive } from "vue";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authClient } from "../api/AuthClient";
 import { navPreferencesClient } from "../api/NavPreferencesClient";
 import { settingsClient } from "../api/SettingsClient";
@@ -20,14 +20,14 @@ const chat = reactive({
   caveman: false,
   plan: true,
   planLean: true,
-  askBeforeTools: false,
+  approvalMode: "allow_all" as string,
   chime: true,
   browserNotifications: false,
   forceToolApproval: false,
   setCaveman: vi.fn((on: boolean) => (chat.caveman = on)),
   setPlan: vi.fn((on: boolean) => (chat.plan = on)),
   setPlanLean: vi.fn((on: boolean) => (chat.planLean = on)),
-  setAskBeforeTools: vi.fn((on: boolean) => (chat.askBeforeTools = on)),
+  setApprovalMode: vi.fn((mode: string) => (chat.approvalMode = mode)),
   setChime: vi.fn((on: boolean) => (chat.chime = on)),
   setBrowserNotifications: vi.fn((on: boolean) => (chat.browserNotifications = on)),
   refreshSettings: vi.fn(() => Promise.resolve()),
@@ -70,7 +70,7 @@ beforeEach(() => {
   chat.caveman = false;
   chat.plan = true;
   chat.planLean = true;
-  chat.askBeforeTools = false;
+  chat.approvalMode = "allow_all";
   chat.chime = true;
   chat.browserNotifications = false;
   chat.forceToolApproval = false;
@@ -217,16 +217,95 @@ describe("SettingsView", () => {
     expect(row(w, "appearance-theme").find(".dot").exists()).toBe(false);
   });
 
-  it("locks Ask before tools, and says why, while an administrator forces approval", async () => {
+  it("locks Ask before tools to Ask every time, and says why, while an administrator forces approval", async () => {
     const w = await mountView(MEMBER, true);
     chat.forceToolApproval = true;
     await flushPromises();
 
-    const box = row(w, "chat-ask-tools").get("input").element as HTMLInputElement;
-    expect(box.disabled).toBe(true);
-    expect(box.checked).toBe(true);
+    const buttons = row(w, "chat-ask-tools").findAll("button:not(.reset)");
+    expect(buttons.map((b) => b.text())).toEqual(["Ask every time", "Auto", "Allow all"]);
+    expect(buttons.map((b) => (b.element as HTMLButtonElement).disabled)).toEqual([false, true, true]);
+    expect(buttons[0]!.attributes("aria-pressed") ?? buttons[0]!.attributes("aria-checked")).toBe("true");
     expect(row(w, "chat-ask-tools").text()).toContain("Your administrator requires approval");
     expect(row(w, "chat-ask-tools").find("button.reset").exists()).toBe(false);
+  });
+
+  describe("tool approval", () => {
+    // jsdom does not implement <dialog>.showModal; give it the open flag the dialog reads.
+    const realShowModal = HTMLDialogElement.prototype.showModal;
+    const realClose = HTMLDialogElement.prototype.close;
+    beforeEach(() => {
+      HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+        this.setAttribute("open", "");
+      };
+      HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+        this.removeAttribute("open");
+        this.dispatchEvent(new Event("close"));
+      };
+    });
+    afterEach(() => {
+      HTMLDialogElement.prototype.showModal = realShowModal;
+      HTMLDialogElement.prototype.close = realClose;
+    });
+    const modeButtons = (w: Awaited<ReturnType<typeof mountView>>) => row(w, "chat-ask-tools").findAll("button:not(.reset)");
+    const dialogConfirm = () => document.body.querySelector<HTMLButtonElement>("dialog[open] .confirm");
+
+    it("starts on Allow all, as before the picker existed, and describes the chosen mode", async () => {
+      const w = await mountView();
+
+      expect(row(w, "chat-ask-tools").text()).toContain("No tool asks first.");
+      expect(row(w, "chat-ask-tools").find(".dot").exists()).toBe(false);
+    });
+
+    it("is a draft until Save: Auto then Save sets the mode", async () => {
+      const w = await mountView();
+
+      await modeButtons(w)[1]!.trigger("click");
+      expect(chat.setApprovalMode).not.toHaveBeenCalled();
+      expect(row(w, "chat-ask-tools").text()).toContain("Tools that only read run on their own");
+      expect(row(w, "chat-ask-tools").find(".dot").exists()).toBe(true);
+      await w.get("button.save, button[type=submit]").trigger("click");
+      await flushPromises();
+
+      expect(chat.setApprovalMode).toHaveBeenCalledExactlyOnceWith("auto");
+    });
+
+    it("asks before Allow all is even a draft, and Cancel keeps the old mode", async () => {
+      chat.approvalMode = "ask";
+      const w = await mountView();
+
+      await modeButtons(w)[2]!.trigger("click");
+      await flushPromises();
+      expect(document.body.querySelector("dialog[open]")?.textContent).toContain("Allow every tool to run without asking?");
+      document.body.querySelector<HTMLButtonElement>("dialog[open] button.cancel")!.click();
+      await flushPromises();
+
+      expect(row(w, "chat-ask-tools").text()).toContain("Every tool waits for your answer.");
+    });
+
+    it("takes Allow all after the confirmation", async () => {
+      chat.approvalMode = "ask";
+      const w = await mountView();
+      await modeButtons(w)[2]!.trigger("click");
+      await flushPromises();
+
+      dialogConfirm()!.click();
+      await flushPromises();
+
+      expect(row(w, "chat-ask-tools").text()).toContain("No tool asks first.");
+    });
+
+    it("needs no confirmation to go back to a stricter mode, and Back to default resets", async () => {
+      chat.approvalMode = "auto";
+      const w = await mountView();
+
+      await modeButtons(w)[0]!.trigger("click");
+      expect(document.body.querySelector("dialog[open]")).toBeNull();
+      await row(w, "chat-ask-tools").get("button.reset").trigger("click");
+      await flushPromises();
+
+      expect(row(w, "chat-ask-tools").text()).toContain("No tool asks first.");
+    });
   });
 
 
