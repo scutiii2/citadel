@@ -1,6 +1,6 @@
-# mini_games backend
+# chess backend
 
-Date: 2026-10-09. Scope: new project `apps/mini_games`. This is spec 1 of 3.
+Date: 2026-10-09. Scope: new project `apps/chess`. This is spec 1 of 3.
 
 ## Problem
 
@@ -12,7 +12,7 @@ cannot be trusted to find moves on its own.
 
 ## Decision
 
-1. `mini_games` is its own project in `apps/mini_games/`: a backend that hosts
+1. `chess` is its own project in `apps/chess/`: a backend that hosts
    the game engines, the opponent and the game sessions. It has no web UI.
 2. A conventional engine proposes and scores moves. Laya chooses among the
    engine's top candidates, described as short feature text. The engine's best
@@ -26,20 +26,20 @@ cannot be trusted to find moves on its own.
 | Spec | Scope |
 |---|---|
 | 1 (this) | Backend: game plugins, opponent, sessions, HTTP API, Laya eval |
-| 2 | `ember_api` proxy routes and the `ember_web` `/mini_games` page |
+| 2 | `ember_api` proxy routes and the `ember_web` `/chess` page |
 | 3 | MCP extension tools, chat "Play" card, floating modal |
 
 ## Project shape
 
 Follows `root-project-scaffold`:
 
-- `README.md`, `pyproject.toml`, `run.bat`, `configs/`, `secrets/`, `src/`,
+- `README.md`, `pyproject.toml`, `run.bat`, `configs/`, `src/`,
   `tests/`, and `docs/` for the Laya eval results.
 - Own venv. Dependencies: `fastapi`, `uvicorn`, `python-chess`. Optional extra
   `laya`, same name as in `ai_agent`.
-- Port 8060 (8010 mcp_server, 8020 catalog_service, 8030 ember_api,
+- Port 8070 (8010 mcp_server, 8020 catalog_service, 8030 ember_api,
   8040 pdf_merger, 8050 video_downloader are taken).
-- `secrets/.env` holds `INTERNAL_API_TOKEN`, the same shared value as the other
+- `.env` holds `INTERNAL_API_TOKEN`, the same shared value as the other
   projects, with a committed `.env.example`. Every route requires it
   (`X-Internal-Token`) once set, like `ai_agent` and `mcp_server`.
 - `configs/config_app.json` (gitignored, with a committed `.example`) holds the
@@ -185,7 +185,7 @@ is not part of the test suite.
 - API: token and header checks, every error status, happy path per route.
 - The eval harness is exercised by the fake engine in a smoke test; its real
   run is manual.
-- Run the whole `mini_games` suite.
+- Run the whole `chess` suite.
 
 ## Out of scope
 

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from src.seed import seed_from_example
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "config_app.json"
 PICKER_NAMES = ("engine", "variety", "laya")
 MAX_CANDIDATES = 10
+PORT_ENV_VAR = "CHESS_PORT"
 
 
 class ConfigError(ValueError):
@@ -90,4 +92,14 @@ def load_config(path: Path | None = None) -> AppConfig:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise ConfigError(f"cannot read {path}: {error}") from error
-    return parse_config(raw)
+    config = parse_config(raw)
+    override = os.getenv(PORT_ENV_VAR)
+    if override:  # server_launcher passes the port it assigned
+        try:
+            port = int(override)
+        except ValueError as error:
+            raise ConfigError(f"{PORT_ENV_VAR} must be a port number, got {override!r}") from error
+        if not 1 <= port <= 65535:
+            raise ConfigError(f"{PORT_ENV_VAR} must be from 1 to 65535, got {port}")
+        config = replace(config, port=port)
+    return config

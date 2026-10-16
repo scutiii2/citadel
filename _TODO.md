@@ -112,17 +112,17 @@ Items 1 to 6 are complete; item 7 remains open.
 
 **Revisit when**: user wants to tackle a sandboxed workspace; brainstorm that design first.
 
-## Build mini_games: chess and Tetris against a Laya-assisted bot (added 2026-10-09)
+## Chess and Tetris in Ember: web page and chat tools (added 2026-10-09, backend built 2026-10-16)
 
-**Context**: Player fights a bot in chess or Tetris inside Ember, at no billing cost. Designed 2026-10-09 as three specs; only spec 1 is written and planned. Laya reads text only (512-token window), so a conventional engine proposes and scores moves and Laya picks among the top candidates, with the engine's best move as fallback. Standalone project `apps/chess/` (renamed from mini_games 2026-10-16) (port 8060), no LLM calls.
+**Context**: Player fights a bot in chess or Tetris inside Ember, at no billing cost. Designed 2026-10-09 as three specs. Laya reads text only (512-token window), so a conventional engine proposes and scores moves and Laya picks among the top candidates, with the engine's best move as fallback. Standalone project `apps/chess/` (port 8070, renamed from `mini_games` 2026-10-16), no LLM calls. It holds both games.
 
-- **Spec 1, backend** (designed, planned, not built): `docs/superpowers/specs/2026-10-09-mini-games-backend-design.md`, plan `docs/superpowers/plans/2026-10-09-mini-games-backend.md` (12 tasks; its code was run against 144 passing tests in a scratch copy). Task 12 needs the real `laya` package and decides per game whether Laya or `variety` is the default picker.
-- **Spec 2, not written**: `ember_api` proxy routes for mini_games and an `ember_web` `/mini_games` page with the boards. The Tetris gravity loop runs in the browser.
-- **Spec 3, not written**: mcp_server extension entry (`config_extensions.json`) with tools to start and play a game from chat, a chat "Play" card, and a floating modal that opens from `/mini_games`. Overturns nothing: it reuses the same backend, and `ember` stays the only entry agent.
+- **Spec 1, backend: done.** Merged to main (`8c4dc28e`). 144 tests; the Laya eval (`apps/chess/docs/laya-eval.md`) made `laya` the default picker for both games (Tetris only just clears the 75% rule). Spec `docs/superpowers/specs/2026-10-09-mini-games-backend-design.md`, plan `docs/superpowers/plans/2026-10-09-mini-games-backend.md` (file names keep the old name). Not yet in the Ember game registry or run beside the other servers.
+- **Spec 2, not written**: `ember_api` proxy routes for the chess backend and an `ember_web` page with the boards. Chess is the smaller board (static grid, click to move); the Tetris gravity loop runs in the browser. Build chess first.
+- **Spec 3, not written**: mcp_server extension entry (`config_extensions.json`) with tools to start and play a game from chat, a chat "Play" card, and a floating modal. Overturns nothing: it reuses the same backend, and `ember` stays the only entry agent. Check first how the game host (`/games`, see below) changes this.
 
-**Open points**: Tetris garbage lines, session persistence across restarts, and more games are out of scope for v1.
+**Open points**: Tetris garbage lines, session persistence across restarts, and more games are out of scope for v1. The folder name `chess` is narrower than its contents.
 
-**Revisit when**: user picks execution for the plan (subagent-driven or inline), then write spec 2.
+**Revisit when**: user wants the Ember page; write spec 2 first.
 
 ## Ascension card images in the UI (added 2026-10-10)
 

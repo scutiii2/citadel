@@ -1,8 +1,8 @@
-# mini_games Backend Implementation Plan
+# chess Backend Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build `apps/mini_games`, a standalone backend that hosts chess and Tetris engines, a Laya-assisted opponent and per-user game sessions behind an HTTP API.
+**Goal:** Build `apps/chess`, a standalone backend that hosts chess and Tetris engines, a Laya-assisted opponent and per-user game sessions behind an HTTP API.
 
 **Architecture:** A `Game` protocol with one plugin per game (state is an immutable value, moves are JSON dicts). A conventional engine proposes and scores moves; a `Picker` chooses the bot's move from the engine's top candidates, and `LayaPicker` lets the local Laya model choose among them with the engine's best move as fallback. An in-memory `SessionStore` (per-session lock, turn check, owner isolation, TTL, per-user cap) sits behind a FastAPI app guarded by the shared internal token.
 
@@ -10,18 +10,20 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-09-mini-games-backend-design.md`
 
+> **Built 2026-10-16 as `apps/chess/`** (renamed from `mini_games`). Differences from the code below: `.env` and `.env.example` sit in the project root, not `secrets/` (`ENV_PATH` replaces `SECRETS_PATH`; read `secrets/` in the snippets as the root); port is 8070 (8060 is Ascension) and `CHESS_PORT` overrides it; the venv is `.venv_chess`; the distribution is `chess-backend`; the Laya eval chose `laya` as the default picker for both games.
+
 ## Global Constraints
 
-- Project folder is `apps/mini_games/`, shaped per `.agents/skills/root-project-scaffold/SKILL.md`: `README.md`, `pyproject.toml`, `run.bat`, `configs/`, `secrets/`, `src/`, `tests/`, plus `docs/` for the Laya eval. No other top-level folders.
-- Own venv `.venv_mini_games` (gitignored by the root `.venv_*/` rule). Never import another project (`ai_agent`, `mcp_server`, ...). The Laya wrapper is a copy, not an import.
-- Port 8060. Header names: `X-Internal-Token`, `X-Requester-Username`. `secrets/.env` holds `INTERNAL_API_TOKEN`; every route except `/health` rejects a missing or wrong token once it is set.
-- Real `configs/config_app.json` and `secrets/.env` are gitignored and seeded from committed `.example` twins on first run.
+- Project folder is `apps/chess/`, shaped per `.agents/skills/root-project-scaffold/SKILL.md`: `README.md`, `pyproject.toml`, `run.bat`, `configs/`, `secrets/`, `src/`, `tests/`, plus `docs/` for the Laya eval. No other top-level folders.
+- Own venv `.venv_chess` (gitignored by the root `.venv_*/` rule). Never import another project (`ai_agent`, `mcp_server`, ...). The Laya wrapper is a copy, not an import.
+- Port 8070. Header names: `X-Internal-Token`, `X-Requester-Username`. `.env` holds `INTERNAL_API_TOKEN`; every route except `/health` rejects a missing or wrong token once it is set.
+- Real `configs/config_app.json` and `.env` are gitignored and seeded from committed `.example` twins on first run.
 - Laya limits: 512-token context window, text at most 4000 characters, a `choice` question takes 2 to 10 options, default `min_confidence` 0.7. `k` (candidates per move) is at most 10.
 - The backend never calls an LLM and never bills. Laya is optional: if it is missing, slow or wrong, the engine's best move is used and the turn still succeeds.
 - Non-blocking: engine search and Laya inference run in worker threads (`asyncio.to_thread`); nothing blocks the event loop. Sessions use one `asyncio.Lock` each.
 - API errors: 400 illegal move, bad body, bad option or unknown game; 401 bad token; 404 unknown or foreign session; 409 wrong turn, game over or session cap.
 - Sessions are in memory only; a restart ends all games. Tetris is a lockstep versus race (player places piece n, then the bot places piece n) with no garbage lines.
-- All commands below run from the repo root `D:/User/Documents/Programming/Python/MCPServer` in Git Bash. The git repo is that root (paths in `git add` start with `apps/mini_games/`). Python is the project venv: `apps/mini_games/.venv_mini_games/Scripts/python`.
+- All commands below run from the repo root `D:/User/Documents/Programming/Python/MCPServer` in Git Bash. The git repo is that root (paths in `git add` start with `apps/chess/`). Python is the project venv: `apps/chess/.venv_chess/Scripts/python`.
 - Code files are given in full below. Every one was written and run against its tests before this plan was finalised (144 tests pass), so copy them exactly; if a test fails, fix the cause, do not loosen the test.
 
 ## File Structure
@@ -29,7 +31,7 @@
 | File | Responsibility |
 |---|---|
 | `pyproject.toml`, `run.bat`, `README.md` | Project metadata, launcher, docs |
-| `configs/config_app.json.example`, `secrets/.env.example` | Committed twins of the real, gitignored files |
+| `configs/config_app.json.example`, `.env.example` | Committed twins of the real, gitignored files |
 | `src/seed.py` | Create a missing config/secret file from its `.example` |
 | `src/config.py` | Typed `AppConfig` / `Difficulty` loader and validation |
 | `src/auth.py` | Token loading and the ASGI token middleware |
@@ -50,9 +52,9 @@
 ### Task 1: Project scaffold and config loader
 
 **Files:**
-- Create: `apps/mini_games/pyproject.toml`, `apps/mini_games/configs/config_app.json.example`, `apps/mini_games/secrets/.env.example`
-- Create: `apps/mini_games/src/__init__.py`, `apps/mini_games/src/seed.py`, `apps/mini_games/src/config.py`
-- Create: `apps/mini_games/tests/__init__.py`, `apps/mini_games/tests/conftest.py`, `apps/mini_games/tests/test_config.py`
+- Create: `apps/chess/pyproject.toml`, `apps/chess/configs/config_app.json.example`, `apps/chess/.env.example`
+- Create: `apps/chess/src/__init__.py`, `apps/chess/src/seed.py`, `apps/chess/src/config.py`
+- Create: `apps/chess/tests/__init__.py`, `apps/chess/tests/conftest.py`, `apps/chess/tests/test_config.py`
 - Modify: `.gitignore` (repo root)
 
 **Interfaces:**
@@ -61,17 +63,17 @@
 - [ ] **Step 1: Create the folders, the empty package files and the venv**
 
 ```bash
-mkdir -p apps/mini_games/{src,tests,configs,secrets}
-touch apps/mini_games/src/__init__.py apps/mini_games/tests/__init__.py
+mkdir -p apps/chess/{src,tests,configs,secrets}
+touch apps/chess/src/__init__.py apps/chess/tests/__init__.py
 ```
 
 - [ ] **Step 2: Write `pyproject.toml`, the two `.example` files and the gitignore block**
 
-`apps/mini_games/pyproject.toml`
+`apps/chess/pyproject.toml`
 
 ```toml
 [project]
-name = "mini-games"
+name = "chess-backend"
 description = "Game backend: chess and Tetris engines, a Laya-assisted opponent and per-user game sessions behind an HTTP API"
 version = "0.1.0"
 requires-python = ">=3.11"
@@ -87,7 +89,7 @@ dev = ["pytest>=8.0", "httpx>=0.27"]
 laya = ["laya"]
 
 [project.scripts]
-mini-games = "src.run:main"
+chess-backend = "src.run:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -101,12 +103,12 @@ pythonpath = ["."]
 testpaths = ["tests"]
 ```
 
-`apps/mini_games/configs/config_app.json.example`
+`apps/chess/configs/config_app.json.example`
 
 ```json
 {
   "host": "127.0.0.1",
-  "port": 8060,
+  "port": 8070,
   "session_ttl_seconds": 3600,
   "max_sessions_per_user": 5,
   "laya_timeout_seconds": 5.0,
@@ -119,10 +121,10 @@ testpaths = ["tests"]
 }
 ```
 
-`apps/mini_games/secrets/.env.example`
+`apps/chess/.env.example`
 
 ```text
-# mini_games' one credentials file. Copy to .env (the loader also creates it
+# chess' one credentials file. Copy to .env (the loader also creates it
 # from this file on first run). .env itself is gitignored.
 #
 # Set the same value as mcp_server's, ai_agent's and ember_api's
@@ -137,24 +139,24 @@ INTERNAL_API_TOKEN=
 Append to the repo-root `.gitignore`:
 
 ```gitignore
-# mini_games' real config and secrets - only the .example twins are committed.
-/apps/mini_games/configs/*
-!/apps/mini_games/configs/*.example
-/apps/mini_games/secrets/*
-!/apps/mini_games/secrets/*.example
+# chess' real config and secrets - only the .example twins are committed.
+/apps/chess/configs/*
+!/apps/chess/configs/*.example
+/apps/chess/secrets/*
+!/apps/chess/secrets/*.example
 ```
 
 - [ ] **Step 3: Create the venv and install**
 
 ```bash
-cd apps/mini_games && py -m venv .venv_mini_games && .venv_mini_games/Scripts/python -m pip install -e ".[dev]" && cd ../..
+cd apps/chess && py -m venv .venv_chess && .venv_chess/Scripts/python -m pip install -e ".[dev]" && cd ../..
 ```
 
 Expected: install succeeds (fastapi, uvicorn, python-chess, python-dotenv, pytest, httpx).
 
 - [ ] **Step 4: Write the failing tests**
 
-`apps/mini_games/tests/conftest.py`
+`apps/chess/tests/conftest.py`
 
 ```python
 """Shared fixtures. Tests never read the real configs/ or secrets/ files."""
@@ -173,7 +175,7 @@ def config() -> AppConfig:
     return load_config(EXAMPLE_CONFIG)
 ```
 
-`apps/mini_games/tests/test_config.py`
+`apps/chess/tests/test_config.py`
 
 ```python
 import json
@@ -185,7 +187,7 @@ from tests.conftest import EXAMPLE_CONFIG
 
 
 def test_example_config_loads(config):
-    assert config.port == 8060
+    assert config.port == 8070
     assert config.difficulties["medium"].depth == 2
     assert config.default_picker == {"chess": "variety", "tetris": "variety"}
 
@@ -226,12 +228,12 @@ def test_unreadable_file_is_a_config_error(tmp_path):
 
 - [ ] **Step 5: Run the tests to verify they fail**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_config.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_config.py -q`
 Expected: collection error `ModuleNotFoundError: No module named 'src.config'`.
 
 - [ ] **Step 6: Write the implementation**
 
-`apps/mini_games/src/seed.py`
+`apps/chess/src/seed.py`
 
 ```python
 """Auto-create a missing config/secret file from its `.example` sibling."""
@@ -248,7 +250,7 @@ def seed_from_example(path: Path) -> None:
         shutil.copyfile(example, path)
 ```
 
-`apps/mini_games/src/config.py`
+`apps/chess/src/config.py`
 
 ```python
 """Typed loader for configs/config_app.json (seeded from its .example)."""
@@ -348,15 +350,15 @@ def load_config(path: Path | None = None) -> AppConfig:
 
 - [ ] **Step 7: Run the tests to verify they pass**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_config.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_config.py -q`
 Expected: 6 passed.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add .gitignore apps/mini_games
-git status --short   # only the files listed above; no .venv_mini_games, no real config or .env
-git commit -m "feat(mini_games): project scaffold and config loader"
+git add .gitignore apps/chess
+git status --short   # only the files listed above; no .venv_chess, no real config or .env
+git commit -m "feat(chess): project scaffold and config loader"
 ```
 
 ---
@@ -364,8 +366,8 @@ git commit -m "feat(mini_games): project scaffold and config loader"
 ### Task 2: Internal token auth
 
 **Files:**
-- Create: `apps/mini_games/src/auth.py`
-- Test: `apps/mini_games/tests/test_auth.py`
+- Create: `apps/chess/src/auth.py`
+- Test: `apps/chess/tests/test_auth.py`
 
 **Interfaces:**
 - Consumes: `src.seed.seed_from_example`.
@@ -373,7 +375,7 @@ git commit -m "feat(mini_games): project scaffold and config loader"
 
 - [ ] **Step 1: Write the failing tests**
 
-`apps/mini_games/tests/test_auth.py`
+`apps/chess/tests/test_auth.py`
 
 ```python
 import asyncio
@@ -433,12 +435,12 @@ def test_environment_wins_over_the_file(tmp_path, monkeypatch):
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_auth.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_auth.py -q`
 Expected: `ModuleNotFoundError: No module named 'src.auth'`.
 
 - [ ] **Step 3: Write the implementation**
 
-`apps/mini_games/src/auth.py`
+`apps/chess/src/auth.py`
 
 ```python
 """The shared internal token, checked on every route but /health."""
@@ -461,7 +463,7 @@ OPEN_PATHS = ("/health",)
 
 
 def load_token(path: Path | None = None) -> str:
-    """INTERNAL_API_TOKEN from the environment, else from secrets/.env
+    """INTERNAL_API_TOKEN from the environment, else from .env
     (seeded from its .example on first run). "" = not configured."""
     if path is None:
         path = SECRETS_PATH
@@ -497,14 +499,14 @@ class InternalTokenMiddleware:
 
 - [ ] **Step 4: Run to verify pass**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_auth.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_auth.py -q`
 Expected: 7 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/mini_games/src/auth.py apps/mini_games/tests/test_auth.py
-git commit -m "feat(mini_games): internal token middleware"
+git add apps/chess/src/auth.py apps/chess/tests/test_auth.py
+git commit -m "feat(chess): internal token middleware"
 ```
 
 ---
@@ -512,8 +514,8 @@ git commit -m "feat(mini_games): internal token middleware"
 ### Task 3: Game protocol and the chess plugin
 
 **Files:**
-- Create: `apps/mini_games/src/games/__init__.py` (empty), `apps/mini_games/src/games/base.py`, `apps/mini_games/src/games/chess_game.py`
-- Test: `apps/mini_games/tests/test_chess.py`
+- Create: `apps/chess/src/games/__init__.py` (empty), `apps/chess/src/games/base.py`, `apps/chess/src/games/chess_game.py`
+- Test: `apps/chess/tests/test_chess.py`
 
 **Interfaces:**
 - Produces (`src.games.base`): `Move = dict[str, Any]`; `GameError`, `IllegalMove(GameError)`, `InvalidOptions(GameError)`; `Status(finished, winner=None, reason="")`; `Candidate(move, score, features={})`; `Game` protocol with `id`, `option_schema()`, `assign_sides(options) -> (player, bot)`, `new_state(options)`, `side_to_move(state) -> str | None`, `legal_moves(state)`, `apply(state, move)`, `status(state)`, `evaluate(state, side) -> float`, `candidates(state, k, depth, time_limit) -> list[Candidate]`, `summarize(state, candidate) -> str`, `describe_position(state) -> str`, `to_dict(state) -> dict`.
@@ -521,7 +523,7 @@ git commit -m "feat(mini_games): internal token middleware"
 
 - [ ] **Step 1: Write the failing tests**
 
-`apps/mini_games/tests/test_chess.py`
+`apps/chess/tests/test_chess.py`
 
 ```python
 import chess
@@ -624,16 +626,16 @@ def test_to_dict_lists_legal_moves():
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_chess.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_chess.py -q`
 Expected: `ModuleNotFoundError: No module named 'src.games'`.
 
 - [ ] **Step 3: Write the implementation**
 
 ```bash
-touch apps/mini_games/src/games/__init__.py
+touch apps/chess/src/games/__init__.py
 ```
 
-`apps/mini_games/src/games/base.py`
+`apps/chess/src/games/base.py`
 
 ```python
 """The Game protocol every plugin implements, and the types it exchanges.
@@ -716,7 +718,7 @@ class Game(Protocol):
         """The JSON shape the API sends for this state."""
 ```
 
-`apps/mini_games/src/games/chess_game.py`
+`apps/chess/src/games/chess_game.py`
 
 ```python
 """Chess plugin: python-chess rules plus a small alpha-beta engine.
@@ -906,14 +908,14 @@ class ChessGame:
 
 - [ ] **Step 4: Run to verify pass**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_chess.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_chess.py -q`
 Expected: 19 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/mini_games/src/games apps/mini_games/tests/test_chess.py
-git commit -m "feat(mini_games): game protocol and chess plugin"
+git add apps/chess/src/games apps/chess/tests/test_chess.py
+git commit -m "feat(chess): game protocol and chess plugin"
 ```
 
 ---
@@ -921,15 +923,15 @@ git commit -m "feat(mini_games): game protocol and chess plugin"
 ### Task 4: Tetris board functions
 
 **Files:**
-- Create: `apps/mini_games/src/games/tetris_board.py`
-- Test: `apps/mini_games/tests/test_tetris_board.py`
+- Create: `apps/chess/src/games/tetris_board.py`
+- Test: `apps/chess/tests/test_tetris_board.py`
 
 **Interfaces:**
 - Produces (`src.games.tetris_board`): constants `ROWS = 20`, `COLS = 10`, `PIECES`, `EMPTY_BOARD`, `ROTATIONS` (piece -> tuple of rotations, each a tuple of `(row, col)` cells normalised to the origin); `Board = tuple[tuple[int, ...], ...]`; `piece_at(seed, index) -> str` (stateless seeded 7-bag); `placements(piece) -> list[(rotation, column)]`; `landing_row(board, cells, column) -> int | None` (None = cannot spawn); `lock(board, cells, row, column) -> (Board, lines_cleared)`; `column_heights`, `count_holes`, `bumpiness`, `placement_score(board, lines) -> float`.
 
 - [ ] **Step 1: Write the failing tests**
 
-`apps/mini_games/tests/test_tetris_board.py`
+`apps/chess/tests/test_tetris_board.py`
 
 ```python
 import pytest
@@ -1021,12 +1023,12 @@ def test_flat_placement_scores_higher_than_a_tall_one():
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_tetris_board.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_tetris_board.py -q`
 Expected: `ModuleNotFoundError: No module named 'src.games.tetris_board'`.
 
 - [ ] **Step 3: Write the implementation**
 
-`apps/mini_games/src/games/tetris_board.py`
+`apps/chess/src/games/tetris_board.py`
 
 ```python
 """Tetris pieces, the 10 by 20 board and placement scoring. Pure functions."""
@@ -1146,14 +1148,14 @@ def placement_score(board: Board, lines: int) -> float:
 
 - [ ] **Step 4: Run to verify pass**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_tetris_board.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_tetris_board.py -q`
 Expected: 16 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/mini_games/src/games/tetris_board.py apps/mini_games/tests/test_tetris_board.py
-git commit -m "feat(mini_games): tetris board, pieces and placement scoring"
+git add apps/chess/src/games/tetris_board.py apps/chess/tests/test_tetris_board.py
+git commit -m "feat(chess): tetris board, pieces and placement scoring"
 ```
 
 ---
@@ -1161,8 +1163,8 @@ git commit -m "feat(mini_games): tetris board, pieces and placement scoring"
 ### Task 5: Tetris plugin and the game registry
 
 **Files:**
-- Create: `apps/mini_games/src/games/tetris_game.py`, `apps/mini_games/src/games/registry.py`
-- Test: `apps/mini_games/tests/test_tetris_game.py`, `apps/mini_games/tests/test_registry.py`
+- Create: `apps/chess/src/games/tetris_game.py`, `apps/chess/src/games/registry.py`
+- Test: `apps/chess/tests/test_tetris_game.py`, `apps/chess/tests/test_registry.py`
 
 **Interfaces:**
 - Consumes: everything from `src.games.base` and `src.games.tetris_board` (Tasks 3 and 4), `ChessGame`.
@@ -1171,7 +1173,7 @@ git commit -m "feat(mini_games): tetris board, pieces and placement scoring"
 
 - [ ] **Step 1: Write the failing tests**
 
-`apps/mini_games/tests/test_tetris_game.py`
+`apps/chess/tests/test_tetris_game.py`
 
 ```python
 import pytest
@@ -1305,7 +1307,7 @@ def test_evaluate_is_the_score_difference():
     assert game.evaluate(state, "player") == 200.0 and game.evaluate(state, "bot") == -200.0
 ```
 
-`apps/mini_games/tests/test_registry.py`
+`apps/chess/tests/test_registry.py`
 
 ```python
 import pytest
@@ -1331,12 +1333,12 @@ def test_unknown_game_lists_the_valid_ones(bad):
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_tetris_game.py tests/test_registry.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_tetris_game.py tests/test_registry.py -q`
 Expected: `ModuleNotFoundError: No module named 'src.games.tetris_game'`.
 
 - [ ] **Step 3: Write the implementation**
 
-`apps/mini_games/src/games/tetris_game.py`
+`apps/chess/src/games/tetris_game.py`
 
 ```python
 """Tetris versus plugin: player and bot stack the same seeded pieces on their
@@ -1548,7 +1550,7 @@ def _set(pair: tuple, index: int, value: Any) -> tuple:
     return tuple(value if i == index else v for i, v in enumerate(pair))
 ```
 
-`apps/mini_games/src/games/registry.py`
+`apps/chess/src/games/registry.py`
 
 ```python
 """The games the backend can host. A new game is one plugin file plus a line here."""
@@ -1572,14 +1574,14 @@ def get_game(games: dict[str, Game], game_id: object) -> Game:
 
 - [ ] **Step 4: Run to verify pass**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_tetris_game.py tests/test_registry.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_tetris_game.py tests/test_registry.py -q`
 Expected: 28 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/mini_games/src/games apps/mini_games/tests/test_tetris_game.py apps/mini_games/tests/test_registry.py
-git commit -m "feat(mini_games): tetris versus plugin and game registry"
+git add apps/chess/src/games apps/chess/tests/test_tetris_game.py apps/chess/tests/test_registry.py
+git commit -m "feat(chess): tetris versus plugin and game registry"
 ```
 
 ---
@@ -1587,9 +1589,9 @@ git commit -m "feat(mini_games): tetris versus plugin and game registry"
 ### Task 6: Laya client
 
 **Files:**
-- Create: `apps/mini_games/src/opponent/__init__.py` (empty), `apps/mini_games/src/opponent/laya_client.py`
-- Create: `apps/mini_games/tests/fake_laya.py`
-- Test: `apps/mini_games/tests/test_laya_client.py`
+- Create: `apps/chess/src/opponent/__init__.py` (empty), `apps/chess/src/opponent/laya_client.py`
+- Create: `apps/chess/tests/fake_laya.py`
+- Test: `apps/chess/tests/test_laya_client.py`
 
 **Interfaces:**
 - Produces (`src.opponent.laya_client`): `LayaClient(engine=None, timeout=5.0)` with `is_available() -> bool`, `prepare()`, `async choose(text, instructions, options: dict[str, str], min_confidence=0.7) -> LayaChoice`; `LayaChoice(key, confidence, uncertain)`; `LayaError`, `LayaUnavailable(LayaError)`; constants `DEFAULT_MODEL`, `CONTEXT_WINDOW = 512`, `MAX_TEXT_CHARS = 4000`, `MIN_OPTIONS = 2`, `MAX_OPTIONS = 10`.
@@ -1598,7 +1600,7 @@ git commit -m "feat(mini_games): tetris versus plugin and game registry"
 
 - [ ] **Step 1: Write the fake engine and the failing tests**
 
-`apps/mini_games/tests/fake_laya.py`
+`apps/chess/tests/fake_laya.py`
 
 ```python
 """A stand-in for the real Laya engine: tests inject it into LayaClient."""
@@ -1630,7 +1632,7 @@ class FakeEngine:
         return {"answers": answers, "usage": self.usage}
 ```
 
-`apps/mini_games/tests/test_laya_client.py`
+`apps/chess/tests/test_laya_client.py`
 
 ```python
 import asyncio
@@ -1725,16 +1727,16 @@ def test_injected_engine_counts_as_available():
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_laya_client.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_laya_client.py -q`
 Expected: `ModuleNotFoundError: No module named 'src.opponent'`.
 
 - [ ] **Step 3: Write the implementation**
 
 ```bash
-mkdir -p apps/mini_games/src/opponent && touch apps/mini_games/src/opponent/__init__.py
+mkdir -p apps/chess/src/opponent && touch apps/chess/src/opponent/__init__.py
 ```
 
-`apps/mini_games/src/opponent/laya_client.py`
+`apps/chess/src/opponent/laya_client.py`
 
 ```python
 """Local Laya wrapper: ask one typed `choice` question about a short text.
@@ -1845,14 +1847,14 @@ class LayaClient:
 
 - [ ] **Step 4: Run to verify pass**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_laya_client.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_laya_client.py -q`
 Expected: 18 passed (one test skips itself if the real `laya` package is installed).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/mini_games/src/opponent apps/mini_games/tests/fake_laya.py apps/mini_games/tests/test_laya_client.py
-git commit -m "feat(mini_games): local Laya client"
+git add apps/chess/src/opponent apps/chess/tests/fake_laya.py apps/chess/tests/test_laya_client.py
+git commit -m "feat(chess): local Laya client"
 ```
 
 ---
@@ -1860,8 +1862,8 @@ git commit -m "feat(mini_games): local Laya client"
 ### Task 7: Pickers
 
 **Files:**
-- Create: `apps/mini_games/src/opponent/base.py`, `engine_picker.py`, `variety_picker.py`, `laya_picker.py`
-- Test: `apps/mini_games/tests/test_pickers.py`
+- Create: `apps/chess/src/opponent/base.py`, `engine_picker.py`, `variety_picker.py`, `laya_picker.py`
+- Test: `apps/chess/tests/test_pickers.py`
 
 **Interfaces:**
 - Consumes: `Game`, `Candidate`, `GameError` (Task 3); `Difficulty` (Task 1); `LayaClient`, `LayaError`, `MAX_TEXT_CHARS` (Task 6); `FakeEngine` (tests).
@@ -1870,7 +1872,7 @@ git commit -m "feat(mini_games): local Laya client"
 
 - [ ] **Step 1: Write the failing tests**
 
-`apps/mini_games/tests/test_pickers.py`
+`apps/chess/tests/test_pickers.py`
 
 ```python
 import asyncio
@@ -1990,12 +1992,12 @@ def test_no_legal_move_is_a_game_error():
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_pickers.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_pickers.py -q`
 Expected: `ModuleNotFoundError: No module named 'src.opponent.engine_picker'`.
 
 - [ ] **Step 3: Write the implementation**
 
-`apps/mini_games/src/opponent/base.py`
+`apps/chess/src/opponent/base.py`
 
 ```python
 """The Picker interface: choose the bot's move for a position."""
@@ -2030,7 +2032,7 @@ async def top_candidates(game: Game, state: Any, difficulty: Difficulty) -> list
     return cands
 ```
 
-`apps/mini_games/src/opponent/engine_picker.py`
+`apps/chess/src/opponent/engine_picker.py`
 
 ```python
 """Always the engine's best move."""
@@ -2051,7 +2053,7 @@ class EnginePicker:
         return Pick((await top_candidates(game, state, difficulty))[0].move, "engine")
 ```
 
-`apps/mini_games/src/opponent/variety_picker.py`
+`apps/chess/src/opponent/variety_picker.py`
 
 ```python
 """A weighted random pick among the engine's top candidates: human-like play
@@ -2079,7 +2081,7 @@ class VarietyPicker:
         return Pick(self._rng.choices(cands, weights=weights)[0].move, "variety")
 ```
 
-`apps/mini_games/src/opponent/laya_picker.py`
+`apps/chess/src/opponent/laya_picker.py`
 
 ```python
 """Laya chooses among the engine's top candidates.
@@ -2132,14 +2134,14 @@ class LayaPicker:
 
 - [ ] **Step 4: Run to verify pass**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_pickers.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_pickers.py -q`
 Expected: 13 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/mini_games/src/opponent apps/mini_games/tests/test_pickers.py
-git commit -m "feat(mini_games): engine, variety and Laya pickers"
+git add apps/chess/src/opponent apps/chess/tests/test_pickers.py
+git commit -m "feat(chess): engine, variety and Laya pickers"
 ```
 
 ---
@@ -2147,8 +2149,8 @@ git commit -m "feat(mini_games): engine, variety and Laya pickers"
 ### Task 8: Sessions
 
 **Files:**
-- Create: `apps/mini_games/src/sessions.py`
-- Test: `apps/mini_games/tests/test_sessions.py`
+- Create: `apps/chess/src/sessions.py`
+- Test: `apps/chess/tests/test_sessions.py`
 
 **Interfaces:**
 - Consumes: `AppConfig` (Task 1), `Game`, `IllegalMove`, `InvalidOptions`, `GameError`, `Move` (Task 3), `get_game` (Task 5), `Picker` (Task 7).
@@ -2157,7 +2159,7 @@ git commit -m "feat(mini_games): engine, variety and Laya pickers"
 
 - [ ] **Step 1: Write the failing tests**
 
-`apps/mini_games/tests/test_sessions.py`
+`apps/chess/tests/test_sessions.py`
 
 ```python
 import asyncio
@@ -2326,12 +2328,12 @@ def test_view_names_the_winner_by_role(store):
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_sessions.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_sessions.py -q`
 Expected: `ModuleNotFoundError: No module named 'src.sessions'`.
 
 - [ ] **Step 3: Write the implementation**
 
-`apps/mini_games/src/sessions.py`
+`apps/chess/src/sessions.py`
 
 ```python
 """In-memory game sessions, owned by the asking user.
@@ -2511,14 +2513,14 @@ class SessionStore:
 
 - [ ] **Step 4: Run to verify pass**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_sessions.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_sessions.py -q`
 Expected: 17 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/mini_games/src/sessions.py apps/mini_games/tests/test_sessions.py
-git commit -m "feat(mini_games): per-user game sessions"
+git add apps/chess/src/sessions.py apps/chess/tests/test_sessions.py
+git commit -m "feat(chess): per-user game sessions"
 ```
 
 ---
@@ -2526,8 +2528,8 @@ git commit -m "feat(mini_games): per-user game sessions"
 ### Task 9: HTTP API, entry point and launcher
 
 **Files:**
-- Create: `apps/mini_games/src/api.py`, `apps/mini_games/src/run.py`, `apps/mini_games/run.bat`
-- Test: `apps/mini_games/tests/test_api.py`
+- Create: `apps/chess/src/api.py`, `apps/chess/src/run.py`, `apps/chess/run.bat`
+- Test: `apps/chess/tests/test_api.py`
 
 **Interfaces:**
 - Consumes: `SessionStore`, session errors (Task 8); `InternalTokenMiddleware` (Task 2); `build_games`, `load_config`, `load_token`, the three pickers, `LayaClient`.
@@ -2535,7 +2537,7 @@ git commit -m "feat(mini_games): per-user game sessions"
 
 - [ ] **Step 1: Write the failing tests**
 
-`apps/mini_games/tests/test_api.py`
+`apps/chess/tests/test_api.py`
 
 ```python
 import pytest
@@ -2637,12 +2639,12 @@ def test_session_cap_returns_409(client):
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_api.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_api.py -q`
 Expected: `ModuleNotFoundError: No module named 'src.api'`.
 
 - [ ] **Step 3: Write the implementation**
 
-`apps/mini_games/src/api.py`
+`apps/chess/src/api.py`
 
 ```python
 """HTTP API used by ember_api and, later, the MCP extension tools.
@@ -2691,7 +2693,7 @@ def _error(status: int):
 
 
 def create_app(store: SessionStore, games: dict[str, Game], token: str = "") -> FastAPI:
-    app = FastAPI(title="mini_games", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="chess", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(InternalTokenMiddleware, token=token)
 
     for error, status in (
@@ -2742,10 +2744,10 @@ def create_app(store: SessionStore, games: dict[str, Game], token: str = "") -> 
     return app
 ```
 
-`apps/mini_games/src/run.py`
+`apps/chess/src/run.py`
 
 ```python
-"""Start the mini_games backend: `python -m src.run`."""
+"""Start the chess backend: `python -m src.run`."""
 
 from __future__ import annotations
 
@@ -2763,7 +2765,7 @@ from src.opponent.laya_picker import LayaPicker
 from src.opponent.variety_picker import VarietyPicker
 from src.sessions import SessionStore
 
-log = logging.getLogger("mini_games")
+log = logging.getLogger("chess")
 
 
 def build_app():
@@ -2793,25 +2795,25 @@ if __name__ == "__main__":
     main()
 ```
 
-`apps/mini_games/run.bat`
+`apps/chess/run.bat`
 
 ```bat
 @echo off
-REM mini_games dev launcher - serves the chess and Tetris backend over HTTP on the
-REM port in configs\config_app.json (8060 by default).
-REM LABEL: Mini Games
+REM chess dev launcher - serves the chess and Tetris backend over HTTP on the
+REM port in configs\config_app.json (8070 by default).
+REM LABEL: Chess
 REM DESCRIPTION: Game backend for Ember (chess, Tetris): engines, a Laya-assisted opponent and per-user game sessions. No LLM, no billing.
 
 cd /d "%~dp0"
 
-if not exist ".venv_mini_games\Scripts\python.exe" (
-    echo Creating virtual environment .venv_mini_games ...
-    py -m venv .venv_mini_games
-    call .venv_mini_games\Scripts\activate
-    echo Installing mini_games in editable mode ...
+if not exist ".venv_chess\Scripts\python.exe" (
+    echo Creating virtual environment .venv_chess ...
+    py -m venv .venv_chess
+    call .venv_chess\Scripts\activate
+    echo Installing chess in editable mode ...
     pip install -e ".[dev]"
 ) else (
-    call .venv_mini_games\Scripts\activate
+    call .venv_chess\Scripts\activate
 )
 
 :run
@@ -2819,7 +2821,7 @@ py -m src.run
 
 echo.
 echo ----------------------------------------
-echo  mini_games stopped.
+echo  chess stopped.
 choice /C RQ /N /M "Press [R] to restart, [Q] to quit: "
 if errorlevel 2 goto :end
 if errorlevel 1 goto :run
@@ -2829,27 +2831,27 @@ if errorlevel 1 goto :run
 
 - [ ] **Step 4: Run to verify pass**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_api.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_api.py -q`
 Expected: 13 passed (a starlette `httpx` deprecation warning is harmless).
 
 - [ ] **Step 5: Smoke-test the real process**
 
-Run in one terminal: `apps/mini_games/run.bat` (creates `configs/config_app.json` and `secrets/.env` from the examples on first start).
+Run in one terminal: `apps/chess/run.bat` (creates `configs/config_app.json` and `.env` from the examples on first start).
 Then:
 
 ```bash
-curl -s http://127.0.0.1:8060/health
-curl -s -H "X-Requester-Username: ann" -X POST -H "Content-Type: application/json" -d '{"game":"chess","difficulty":"easy"}' http://127.0.0.1:8060/sessions
+curl -s http://127.0.0.1:8070/health
+curl -s -H "X-Requester-Username: ann" -X POST -H "Content-Type: application/json" -d '{"game":"chess","difficulty":"easy"}' http://127.0.0.1:8070/sessions
 ```
 
-Expected: `{"status":"ok"}`, then a session JSON with `"turn":"player"`. With a token set in `secrets/.env` the second call returns 401 until `-H "X-Internal-Token: <value>"` is added. Stop the server (Ctrl+C, then `Q`).
+Expected: `{"status":"ok"}`, then a session JSON with `"turn":"player"`. With a token set in `.env` the second call returns 401 until `-H "X-Internal-Token: <value>"` is added. Stop the server (Ctrl+C, then `Q`).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/mini_games/src/api.py apps/mini_games/src/run.py apps/mini_games/run.bat apps/mini_games/tests/test_api.py
-git status --short   # no configs/config_app.json, no secrets/.env
-git commit -m "feat(mini_games): HTTP API, entry point and launcher"
+git add apps/chess/src/api.py apps/chess/src/run.py apps/chess/run.bat apps/chess/tests/test_api.py
+git status --short   # no configs/config_app.json, no .env
+git commit -m "feat(chess): HTTP API, entry point and launcher"
 ```
 
 ---
@@ -2857,8 +2859,8 @@ git commit -m "feat(mini_games): HTTP API, entry point and launcher"
 ### Task 10: Laya eval harness
 
 **Files:**
-- Create: `apps/mini_games/src/eval/__init__.py` (empty), `apps/mini_games/src/eval/laya_eval.py`
-- Test: `apps/mini_games/tests/test_eval.py`
+- Create: `apps/chess/src/eval/__init__.py` (empty), `apps/chess/src/eval/laya_eval.py`
+- Test: `apps/chess/tests/test_eval.py`
 
 **Interfaces:**
 - Consumes: `Game`, `build_games`, `LayaClient`, `LayaError`, `DEFAULT_MODEL`, `INSTRUCTIONS`.
@@ -2866,7 +2868,7 @@ git commit -m "feat(mini_games): HTTP API, entry point and launcher"
 
 - [ ] **Step 1: Write the failing tests**
 
-`apps/mini_games/tests/test_eval.py`
+`apps/chess/tests/test_eval.py`
 
 ```python
 import asyncio
@@ -2929,16 +2931,16 @@ def test_report_renders_a_table_and_the_rule():
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest tests/test_eval.py -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest tests/test_eval.py -q`
 Expected: `ModuleNotFoundError: No module named 'src.eval'`.
 
 - [ ] **Step 3: Write the implementation**
 
 ```bash
-mkdir -p apps/mini_games/src/eval && touch apps/mini_games/src/eval/__init__.py
+mkdir -p apps/chess/src/eval && touch apps/chess/src/eval/__init__.py
 ```
 
-`apps/mini_games/src/eval/laya_eval.py`
+`apps/chess/src/eval/laya_eval.py`
 
 ```python
 """Does Laya pick better candidate moves than chance? Run manually:
@@ -3097,14 +3099,14 @@ if __name__ == "__main__":
 
 - [ ] **Step 4: Run the whole suite**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest -q`
 Expected: 144 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/mini_games/src/eval apps/mini_games/tests/test_eval.py
-git commit -m "feat(mini_games): Laya eval harness"
+git add apps/chess/src/eval apps/chess/tests/test_eval.py
+git commit -m "feat(chess): Laya eval harness"
 ```
 
 ---
@@ -3112,17 +3114,17 @@ git commit -m "feat(mini_games): Laya eval harness"
 ### Task 11: README, scaffold audit and launcher check
 
 **Files:**
-- Create: `apps/mini_games/README.md`
+- Create: `apps/chess/README.md`
 
 **Interfaces:**
 - Consumes: the finished project.
 
 - [ ] **Step 1: Write the README**
 
-`apps/mini_games/README.md`
+`apps/chess/README.md`
 
 ````markdown
-# mini_games
+# chess
 
 Game backend for Ember: chess and Tetris against a bot, over HTTP. It holds the
 game engines, the opponent and the per-user game sessions. It never calls an LLM,
@@ -3170,9 +3172,9 @@ A game is one plugin file in `src/games/` implementing the `Game` protocol in
 run.bat
 ```
 
-The first start creates `.venv_mini_games`, installs the project, and creates
-`configs/config_app.json` and `secrets/.env` from their `.example` twins. Both
-real files are gitignored. Put the same `INTERNAL_API_TOKEN` in `secrets/.env`
+The first start creates `.venv_chess`, installs the project, and creates
+`configs/config_app.json` and `.env` from their `.example` twins. Both
+real files are gitignored. Put the same `INTERNAL_API_TOKEN` in `.env`
 that `mcp_server`, `ai_agent` and `ember_api` use; once it is set, every route
 except `/health` needs the `X-Internal-Token` header.
 
@@ -3207,8 +3209,8 @@ Sessions live in memory only: a restart ends all games, and idle sessions expire
 ## Tests and the Laya eval
 
 ```
-.venv_mini_games\Scripts\python -m pytest
-.venv_mini_games\Scripts\python -m src.eval.laya_eval
+.venv_chess\Scripts\python -m pytest
+.venv_chess\Scripts\python -m src.eval.laya_eval
 ```
 
 The tests use a fake Laya engine. The eval needs the real model and is run by
@@ -3226,22 +3228,22 @@ hand; it writes `docs/laya-eval.md`.
 
 - [ ] **Step 2: Audit the folder against `root-project-scaffold`**
 
-Run: `ls -A apps/mini_games`
-Expected exactly: `.venv_mini_games  README.md  configs  pyproject.toml  run.bat  secrets  src  tests` (and `docs` once Task 12 writes it). Any other entry is a convention break: move it under `src/` or remove it.
+Run: `ls -A apps/chess`
+Expected exactly: `.venv_chess  README.md  configs  pyproject.toml  run.bat  secrets  src  tests` (and `docs` once Task 12 writes it). Any other entry is a convention break: move it under `src/` or remove it.
 
-Run: `git check-ignore apps/mini_games/configs/config_app.json apps/mini_games/secrets/.env apps/mini_games/.venv_mini_games`
-Expected: all three paths are printed (ignored). `git ls-files apps/mini_games/configs apps/mini_games/secrets` lists only the two `.example` files.
+Run: `git check-ignore apps/chess/configs/config_app.json apps/chess/.env apps/chess/.venv_chess`
+Expected: all three paths are printed (ignored). `git ls-files apps/chess/configs apps/chess/secrets` lists only the two `.example` files.
 
 - [ ] **Step 3: Check that server_launcher discovers it**
 
 Run: `apps/server_launcher/run.bat`, or start the launcher the usual way.
-Expected: "Mini Games" appears in the project list (it reads the `REM LABEL:` and `REM DESCRIPTION:` lines of `run.bat`) and starting it brings up port 8060. If the launcher keeps a hardcoded project list somewhere, add the entry there and say so in the commit message.
+Expected: "Chess" appears in the project list (it reads the `REM LABEL:` and `REM DESCRIPTION:` lines of `run.bat`) and starting it brings up port 8070. If the launcher keeps a hardcoded project list somewhere, add the entry there and say so in the commit message.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add apps/mini_games/README.md
-git commit -m "docs(mini_games): README"
+git add apps/chess/README.md
+git commit -m "docs(chess): README"
 ```
 
 ---
@@ -3249,22 +3251,22 @@ git commit -m "docs(mini_games): README"
 ### Task 12: Run the Laya eval and set the default pickers (manual, needs the real model)
 
 **Files:**
-- Create: `apps/mini_games/docs/laya-eval.md` (written by the harness)
-- Modify: `apps/mini_games/configs/config_app.json.example`, and the real `configs/config_app.json` (gitignored)
+- Create: `apps/chess/docs/laya-eval.md` (written by the harness)
+- Modify: `apps/chess/configs/config_app.json.example`, and the real `configs/config_app.json` (gitignored)
 
 This task needs the real `laya` package and checkpoint. If they cannot be installed here, do Step 4 instead and stop.
 
 - [ ] **Step 1: Install Laya into the project venv**
 
 ```bash
-cd apps/mini_games && .venv_mini_games/Scripts/python -m pip install -e ".[laya]" && cd ../..
+cd apps/chess && .venv_chess/Scripts/python -m pip install -e ".[laya]" && cd ../..
 ```
 
 Expected: `laya` installs. (`ai_agent` documents the same extra.)
 
 - [ ] **Step 2: Run the eval**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m src.eval.laya_eval --positions 60 --k 4 --depth 2 --seed 1`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m src.eval.laya_eval --positions 60 --k 4 --depth 2 --seed 1`
 Expected: prints the table and writes `docs/laya-eval.md`. Takes a few minutes; Laya latency is in the table.
 
 - [ ] **Step 3: Apply the decision rule from the table**
@@ -3279,16 +3281,16 @@ Do not lower `MIN_SAMPLES` or `LOSS_RATIO` to make a game qualify; if results lo
 
 - [ ] **Step 4: If Laya could not be run**
 
-Create `apps/mini_games/docs/laya-eval.md` containing the date, the reason it was not run, and that both games default to `variety` until `python -m src.eval.laya_eval` is run.
+Create `apps/chess/docs/laya-eval.md` containing the date, the reason it was not run, and that both games default to `variety` until `python -m src.eval.laya_eval` is run.
 
 - [ ] **Step 5: Run the whole suite and commit**
 
-Run: `cd apps/mini_games && .venv_mini_games/Scripts/python -m pytest -q`
+Run: `cd apps/chess && .venv_chess/Scripts/python -m pytest -q`
 Expected: 144 passed (a test that needs Laya to be absent will skip itself if it is installed).
 
 ```bash
-git add apps/mini_games/docs apps/mini_games/configs/config_app.json.example
-git commit -m "docs(mini_games): Laya eval results and default pickers"
+git add apps/chess/docs apps/chess/configs/config_app.json.example
+git commit -m "docs(chess): Laya eval results and default pickers"
 ```
 
 ---

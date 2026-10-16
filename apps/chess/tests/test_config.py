@@ -7,7 +7,7 @@ from tests.conftest import EXAMPLE_CONFIG
 
 
 def test_example_config_loads(config):
-    assert config.port == 8060
+    assert config.port == 8070
     assert config.difficulties["medium"].depth == 2
     assert config.default_picker == {"chess": "laya", "tetris": "laya"}
 
@@ -39,6 +39,18 @@ def test_missing_difficulties_is_rejected(raw):
     raw["difficulties"] = {}
     with pytest.raises(ConfigError, match="difficulties"):
         parse_config(raw)
+
+
+def test_chess_port_env_overrides_the_file(monkeypatch):
+    monkeypatch.setenv("CHESS_PORT", "9123")
+    assert load_config(EXAMPLE_CONFIG).port == 9123
+
+
+@pytest.mark.parametrize("value", ["abc", "0", "70000"])
+def test_bad_chess_port_env_is_rejected(monkeypatch, value):
+    monkeypatch.setenv("CHESS_PORT", value)
+    with pytest.raises(ConfigError, match="CHESS_PORT"):
+        load_config(EXAMPLE_CONFIG)
 
 
 def test_unreadable_file_is_a_config_error(tmp_path):
