@@ -86,6 +86,20 @@ document fields, results are ordered by document id, and raw SQL is unsupported.
 `FIRESTORE_EMULATOR_HOST` to use the local emulator. Each read is billed, so keep the cache on.
 Status: unit-tested against a fake client only; not yet run against a real project or the emulator.
 
+## Testing against real databases
+`tests/test_backend_contract.py` runs one behaviour contract (put, get, replace, delete, filters,
+order, limit, offset) against every backend that is available. SQLite always runs. Point it at your
+own server to run the others; each run uses a collection of its own and cleans up after itself:
+
+```
+set DB_GATEWAY_TEST_POSTGRES_DSN=postgresql://user:pass@localhost/testdb
+set FIRESTORE_EMULATOR_HOST=localhost:8080
+set GOOGLE_CLOUD_PROJECT=demo-test
+.venv_db_gateway\Scripts\python.exe -m pytest tests/test_backend_contract.py -rs
+```
+
+Use a throwaway Postgres database and the Firestore emulator, never a real project.
+
 ## Adding a database type
 Implement `DatabaseBackend` (`src/backends/base.py`) and add one entry to `BACKEND_TYPES` in
 `src/backends/factory.py`.
