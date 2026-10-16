@@ -406,6 +406,16 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
       return route.fulfill({ status: 204, body: "" });
     }
 
+    // Laya's tag suggestions. The fake "reads" the note: it suggests the account's tags that the text mentions.
+    if (path === "/api/notes/suggest-tags" && method === "POST") {
+      const { title, body, tags } = request.postDataJSON() as NoteBody;
+      const have = new Set(tags ?? []);
+      const used = new Set([...api.notes.values()].flatMap((n) => n.tags));
+      const text = `${title ?? ""} ${body ?? ""}`.toLowerCase();
+      const suggested = [...used].filter((tag) => !have.has(tag) && text.includes(tag)).sort();
+      return json(route, { suggested, checked: [...used].filter((tag) => !have.has(tag)).length, skipped: 0 });
+    }
+
     // Private notes, newest edit first. Ids are 32 hex characters, as ember_api makes them.
     if (path === "/api/notes" && (method === "GET" || method === "POST")) {
       if (method === "GET") return json(route, [...api.notes.values()].sort((a, b) => b.updated_at.localeCompare(a.updated_at)));

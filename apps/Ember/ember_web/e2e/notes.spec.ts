@@ -112,6 +112,34 @@ test("notes: tags and the agent switch are saved, with a warning while agents ca
   expect(api.unexpected).toEqual([]);
 });
 
+test("notes: Suggest tags offers existing tags that fit, and nothing is added until one is picked", async ({ page }) => {
+  const api = await installFakeApi(page);
+  api.notes.set("0".repeat(31) + "1", {
+    id: "0".repeat(31) + "1", title: "Budget", body: "rent", tags: ["money", "garden"], agent_readable: false,
+    created_at: "2026-01-01T00:00:00", updated_at: "2026-01-01T00:00:00",
+  });
+  await logIn(page);
+  await page.goto("/notes");
+
+  await page.getByRole("button", { name: "New note" }).click();
+  const suggest = page.getByRole("button", { name: "Suggest tags" });
+  await expect(suggest).toBeDisabled(); // nothing written yet
+  await page.getByLabel("Title").fill("Pay the money I owe");
+  await suggest.click();
+
+  await expect(page.getByText("Laya suggests:")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add suggested tag garden" })).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Tags" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Add suggested tag money" }).click();
+  await expect(page.getByRole("list", { name: "Tags" })).toContainText("money");
+  await expect(page.getByRole("button", { name: "Add suggested tag money" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
+  expect([...api.notes.values()].find((n) => n.title === "Pay the money I owe")?.tags).toEqual(["money"]);
+  expect(api.unexpected).toEqual([]);
+});
+
 test("notes: leaving the page with unsaved text asks first", async ({ page }) => {
   const api = await installFakeApi(page);
   await logIn(page);

@@ -249,6 +249,12 @@ class AgentDirectory:
             or next((a for a in agents if a.id == LEGACY_ENTRY_ID), None)
         )
 
+    async def find_by_provider(self, provider: str) -> AgentEntry | None:
+        """A running agent whose agent file uses this LLM provider (e.g. "laya").
+        None when none is running, or when the definitions are not published."""
+        ids = {d.id for d in await self._source.definitions() if d.provider == provider}
+        return next((a for a in await self.all() if a.id in ids), None)
+
     async def listing(self) -> list[AgentListing]:
         """Every agent for the Agents page: the running ones, plus those
         defined but stopped ("offline") or switched off ("disabled"). Running

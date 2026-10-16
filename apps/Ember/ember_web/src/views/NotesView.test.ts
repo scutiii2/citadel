@@ -7,7 +7,7 @@ import NotesView from "./NotesView.vue";
 
 vi.mock("../api/NotesClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/NotesClient")>()),
-  notesClient: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
+  notesClient: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), suggestTags: vi.fn() },
 }));
 
 const client = vi.mocked(notesClient);
@@ -282,6 +282,111 @@ describe("NotesView tags", () => {
     const w = await setup([note("a", "First", "", "2026-01-01T00:00:00", ["work", "home"])]);
 
     expect(rows(w)[0]!.findAll(".tag").map((t) => t.text())).toEqual(["work", "home"]);
+  });
+});
+
+describe("NotesView tag suggestions", () => {
+  const suggestButton = (w: VueWrapper) => buttonByText(w, "Suggest tags") ?? buttonByText(w, "Suggesting …");
+  const pickers = (w: VueWrapper) => w.findAll("button.pick").map((b) => b.text());
+  const chips = (w: VueWrapper) => w.findAll("ul[aria-label='Tags'] li").map((li) => li.text().replace("×", "").trim());
+  // One note with the tags the account uses, one to edit.
+  const library = () => [
+    note("a", "Roof", "call the builder", "2026-01-02T00:00:00"),
+    note("b", "Budget", "rent", "2026-01-01T00:00:00", ["money", "work"]),
+  ];
+
+  it("is not offered while the account has no tags to suggest", async () => {
+    const w = await setup([note("a", "Roof", "x")]);
+    await rows(w)[0]!.get("button").trigger("click");
+
+    expect(suggestButton(w)).toBeUndefined();
+  });
+
+  it("needs some text in the note before it can be used", async () => {
+    const w = await setup(library());
+    await buttonByText(w, "New note")!.trigger("click");
+
+    expect(suggestButton(w)!.attributes("disabled")).toBeDefined();
+    await w.get("input[aria-label=Title]").setValue("Roof");
+    expect(suggestButton(w)!.attributes("disabled")).toBeUndefined();
+  });
+
+  it("sends the note as it is in the editor, unsaved edits included", async () => {
+    client.suggestTags.mockResolvedValue({ suggested: [], checked: 2, skipped: 0 });
+    const w = await setup(library());
+    await rows(w)[0]!.get("button").trigger("click");
+    await w.get("input[aria-label=Title]").setValue("Roof repair");
+    await w.get("textarea").setValue("pay the builder");
+    await w.get("input[aria-label='Add a tag']").setValue("urgent");
+    await w.get("input[aria-label='Add a tag']").trigger("keydown", { key: "Enter" });
+
+    await suggestButton(w)!.trigger("click");
+    await flushPromises();
+
+    expect(client.suggestTags).toHaveBeenCalledExactlyOnceWith({
+      title: "Roof repair", body: "pay the builder", tags: ["urgent"],
+    });
+  });
+
+  it("shows what Laya suggests; picking one adds it and takes it off the list", async () => {
+    client.suggestTags.mockResolvedValue({ suggested: ["money", "work"], checked: 2, skipped: 0 });
+    const w = await setup(library());
+    await rows(w)[1]!.get("button").trigger("click");
+    await rows(w)[0]!.get("button").trigger("click");
+
+    await suggestButton(w)!.trigger("click");
+    await flushPromises();
+    expect(pickers(w)).toEqual(["+ money", "+ work"]);
+    expect(chips(w)).toEqual([]); // nothing is applied by itself
+
+    await w.get("button[aria-label='Add suggested tag work']").trigger("click");
+
+    expect(chips(w)).toEqual(["work"]);
+    expect(pickers(w)).toEqual(["+ money"]);
+    expect(w.text()).toContain("Unsaved changes");
+  });
+
+  it("says so when nothing fits and how many tags were not checked", async () => {
+    client.suggestTags.mockResolvedValue({ suggested: [], checked: 8, skipped: 3 });
+    const w = await setup(library());
+    await rows(w)[0]!.get("button").trigger("click");
+
+    await suggestButton(w)!.trigger("click");
+    await flushPromises();
+
+    expect(w.text()).toContain("None of your other tags seem to fit this note.");
+    expect(w.text()).toContain("3 of your tags were not checked.");
+  });
+
+  it("says why when Laya is unavailable, and the note stays editable", async () => {
+    client.suggestTags.mockRejectedValue(new ApiError(503, "Tag suggestions are unavailable: the Laya agent is not running"));
+    const w = await setup(library());
+    await rows(w)[0]!.get("button").trigger("click");
+
+    await suggestButton(w)!.trigger("click");
+    await flushPromises();
+
+    expect(w.get("[role=alert]").text()).toContain("the Laya agent is not running");
+    expect(suggestButton(w)!.attributes("disabled")).toBeUndefined();
+    expect(w.get("input[aria-label=Title]").attributes("disabled")).toBeUndefined();
+  });
+
+  it("shows a busy state while Laya works, and drops an answer for a note you left", async () => {
+    let finish!: (value: { suggested: string[]; checked: number; skipped: number }) => void;
+    client.suggestTags.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const w = await setup([...library(), note("c", "Other", "text", "2025-12-31T00:00:00")]);
+    await rows(w)[0]!.get("button").trigger("click");
+
+    await suggestButton(w)!.trigger("click");
+    expect(suggestButton(w)!.text()).toBe("Suggesting …");
+    expect(suggestButton(w)!.attributes("disabled")).toBeDefined();
+
+    await rows(w)[2]!.get("button").trigger("click"); // another untagged note (nothing was edited, so no prompt)
+    finish({ suggested: ["money"], checked: 1, skipped: 0 });
+    await flushPromises();
+
+    expect(pickers(w)).toEqual([]);
+    expect(suggestButton(w)!.text()).toBe("Suggest tags");
   });
 });
 

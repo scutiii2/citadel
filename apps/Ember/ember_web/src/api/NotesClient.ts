@@ -27,6 +27,14 @@ export const NOTES_MAX = 200;
 export const NOTE_TAG_MAX = 30;
 export const NOTE_TAGS_MAX = 10;
 
+/** Which of the account's existing tags Laya thinks fit a note. `skipped` tags were not
+ * checked: past the per-request cap, or too much text for Laya to read. */
+export interface TagSuggestions {
+  suggested: string[];
+  checked: number;
+  skipped: number;
+}
+
 const path = (id: string) => `/api/notes/${encodeURIComponent(id)}`;
 
 /** ember_api's /api/notes routes (chat.use). */
@@ -37,6 +45,9 @@ export const notesClient = {
   /** Replaces every field: leave one out and the server resets it. */
   update: (id: string, draft: NoteDraft) => apiRequest<Note>("PUT", path(id), draft),
   remove: (id: string) => apiRequest<void>("DELETE", path(id)),
+  /** Asks Laya (a local model) about the note as the editor holds it, saved or not. */
+  suggestTags: (draft: Pick<NoteDraft, "title" | "body" | "tags">) =>
+    apiRequest<TagSuggestions>("POST", "/api/notes/suggest-tags", draft),
 };
 
 /** A tag as the server keeps it: lowercase, spaces become "-", other characters go,

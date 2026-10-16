@@ -36,6 +36,14 @@ describe("notesClient", () => {
     ]);
   });
 
+  it("asks for tag suggestions with the note as the editor holds it", async () => {
+    await notesClient.suggestTags({ title: "Roof", body: "call the builder", tags: ["urgent"] });
+
+    expect(request).toHaveBeenCalledExactlyOnceWith("POST", "/api/notes/suggest-tags", {
+      title: "Roof", body: "call the builder", tags: ["urgent"],
+    });
+  });
+
   it("encodes an id so it cannot change the path", async () => {
     await notesClient.remove("../admin");
 

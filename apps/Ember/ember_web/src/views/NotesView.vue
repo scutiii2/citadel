@@ -10,6 +10,7 @@ import {
   normalizeTag,
   notesClient,
   type Note,
+  type TagSuggestions,
 } from "../api/NotesClient";
 import ConfirmModal from "../components/ConfirmModal.vue";
 import "../components/infoPage.css";
@@ -90,6 +91,32 @@ function commitTag(): void {
   }
 }
 
+// Laya's suggestions: existing tags that may fit this note. Nothing is applied until the user picks one.
+const suggestion = ref<TagSuggestions | null>(null);
+const suggesting = ref(false);
+const suggestError = ref("");
+let suggestRun = 0; // a late answer for a note the user has left is dropped
+const canSuggest = computed(
+  () => knownTags.value.length > 0 && !suggesting.value && (form.title.trim() !== "" || form.body.trim() !== ""),
+);
+const suggestedTags = computed(() => (suggestion.value?.suggested ?? []).filter((tag) => !form.tags.includes(tag)));
+
+async function suggest(): Promise<void> {
+  if (!canSuggest.value) return;
+  commitTag();
+  const run = ++suggestRun;
+  suggesting.value = true;
+  suggestError.value = "";
+  suggestion.value = null;
+  try {
+    const found = await notesClient.suggestTags({ title: form.title, body: form.body, tags: [...form.tags] });
+    if (run === suggestRun) suggestion.value = found;
+  } catch (err) {
+    if (run === suggestRun) suggestError.value = errorMessage(err);
+  } finally {
+    if (run === suggestRun) suggesting.value = false;
+  }
+}
 function tagKey(event: KeyboardEvent): void {
   if (event.key === "Enter" || event.key === ",") {
     event.preventDefault(); // Enter must not save the note
@@ -131,6 +158,10 @@ function fillEditor(note: Note | undefined): void {
   saved.agentReadable = form.agentReadable = note?.agent_readable ?? false;
   tagInput.value = "";
   tagError.value = "";
+  suggestRun++; // an answer still on its way belongs to the note that was open
+  suggestion.value = null;
+  suggestError.value = "";
+  suggesting.value = false;
 }
 
 // Leaving unsaved edits asks first; the target waits here meanwhile.
@@ -285,7 +316,20 @@ function preview(note: Note): string {
             <input v-model="form.title" type="text" :maxlength="NOTE_TITLE_MAX" aria-label="Title" :disabled="saving || removing" />
           </label>
           <div class="field">
-            <span class="field-label">Tags</span>
+            <div class="field-head">
+              <span class="field-label">Tags</span>
+              <button
+                v-if="knownTags.length"
+                type="button"
+                class="chip"
+                :disabled="!canSuggest"
+                :aria-busy="suggesting"
+                title="Ask Laya, a local model, which of your existing tags fit this note"
+                @click="suggest"
+              >
+                {{ suggesting ? "Suggesting …" : "Suggest tags" }}
+              </button>
+            </div>
             <ul v-if="form.tags.length" class="tag-list" aria-label="Tags">
               <li v-for="tag in form.tags" :key="tag" class="tag">
                 {{ tag }}
@@ -307,6 +351,26 @@ function preview(note: Note): string {
               <option v-for="tag in knownTags" :key="tag" :value="tag" />
             </datalist>
             <p v-if="tagError" class="error" role="alert">{{ tagError }}</p>
+            <div v-if="suggestion" class="suggestions" role="status">
+              <template v-if="suggestedTags.length">
+                <span class="muted">Laya suggests:</span>
+                <button
+                  v-for="tag in suggestedTags"
+                  :key="tag"
+                  type="button"
+                  class="tag pick"
+                  :aria-label="`Add suggested tag ${tag}`"
+                  @click="addTag(tag)"
+                >
+                  + {{ tag }}
+                </button>
+              </template>
+              <span v-else class="muted">None of your other tags seem to fit this note.</span>
+              <span v-if="suggestion.skipped" class="muted">
+                {{ suggestion.skipped }} of your tags {{ suggestion.skipped === 1 ? "was" : "were" }} not checked.
+              </span>
+            </div>
+            <p v-if="suggestError" class="error" role="alert">{{ suggestError }}</p>
           </div>
           <label>
             Note
@@ -471,6 +535,27 @@ function preview(note: Note): string {
   flex-direction: column;
   gap: 4px;
   font-size: 0.9em;
+}
+.field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.tag.pick {
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8em;
+  cursor: pointer;
+}
+.tag.pick:hover {
+  border-color: var(--accent);
 }
 .agent-access {
   display: flex;

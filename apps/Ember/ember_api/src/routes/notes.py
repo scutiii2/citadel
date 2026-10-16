@@ -8,12 +8,16 @@ from typing import Annotated, NoReturn
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 
-from src.deps import get_db_gateway, get_log_writer, require_permission
+from src.deps import get_agent_gateway, get_db_gateway, get_log_writer, require_permission
 from src.models import Account
+from src.routes.mcp import get_agent_directory
+from src.services.agent_directory import AgentDirectory
+from src.services.agent_gateway import AgentGateway, Caller
 from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.log_service import LogWriter
 from src.services.notes import BODY_MAX, TITLE_MAX, Note, NoteLimit, NoteNotFound, NotesService, normalize_tags
 from src.services.permissions import CHAT_USE
+from src.services.tag_suggestions import TagSuggester, TagSuggestionUnavailable
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
 
@@ -61,6 +65,20 @@ class TagOut(BaseModel):
     count: int
 
 
+class SuggestBody(BaseModel):
+    """The note as the editor holds it (maybe not saved yet)."""
+
+    title: str = Field(default="", max_length=TITLE_MAX)
+    body: str = Field(default="", max_length=BODY_MAX)
+    tags: list[str] = Field(default_factory=list, max_length=50)
+
+
+class SuggestionsOut(BaseModel):
+    suggested: list[str]
+    checked: int
+    skipped: int
+
+
 async def _log_agent_access(logs: LogWriter, account: Account, allowed: bool) -> None:
     # Only the switch is logged, never the note's text.
     await logs.action(
@@ -91,6 +109,28 @@ async def list_tags(notes: NotesService = Depends(get_notes_service)) -> list[Ta
         return [TagOut(tag=tag, count=count) for tag, count in await notes.tags()]
     except DbGatewayError as error:
         _fail(error)
+
+
+@router.post("/suggest-tags")
+async def suggest_tags(
+    body: SuggestBody,
+    account: Account = Depends(require_chat),
+    notes: NotesService = Depends(get_notes_service),
+    gateway: AgentGateway = Depends(get_agent_gateway),
+    directory: AgentDirectory = Depends(get_agent_directory),
+) -> SuggestionsOut:
+    """Which of the account's existing tags (not on the note yet) Laya thinks fit it."""
+    try:
+        have = {tag.strip().lower() for tag in body.tags}
+        candidates = [tag for tag, _count in await notes.tags() if tag not in have]
+    except DbGatewayError as error:
+        _fail(error)
+    caller = Caller(username=account.username, email=account.email, uid=account.uid)
+    try:
+        found = await TagSuggester(gateway, directory).suggest(caller, body.title, body.body, candidates)
+    except TagSuggestionUnavailable as error:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"Tag suggestions are unavailable: {error}") from error
+    return SuggestionsOut(suggested=found.suggested, checked=found.checked, skipped=found.skipped)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
