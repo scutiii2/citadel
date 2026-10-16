@@ -152,3 +152,12 @@ def test_search_text_over_mcp_is_a_json_envelope_whose_message_starts_with_the_c
 
     none = json.loads(call(capability, "tool_mem_search", {"query": "zebra"})[0][0].text)["message"]
     assert none == "No saved notes match."
+
+
+def test_memory_save_tells_the_model_it_is_not_the_users_notes_page(capability):
+    tools = {tool.name: tool for tool in asyncio.run(capability.list_tools())}
+
+    description = " ".join(tools["tool_mem_save"].description.split())
+
+    assert "NOT the user's Notes page" in description
+    assert "tool_notes_" in description

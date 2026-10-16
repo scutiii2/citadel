@@ -1,8 +1,9 @@
-"""Reads ember's notes from db_gateway (one instance and connection, over HTTP).
+"""Reads and writes ember's notes in db_gateway (one instance and connection, over HTTP).
 
-ember_api writes the notes; this only reads them. The record shape is ember_api's
-(`apps/Ember/ember_api/src/services/notes.py`): collection "notes", key a 32-hex id,
-fields id, owner, title, body, tags, agent_readable, created_at, updated_at.
+ember_api owns the notes and its Notes page; this is the agents' side door. The record shape
+is ember_api's (`apps/Ember/ember_api/src/services/notes.py`): collection "notes", key a
+32-hex id, fields id, owner, title, body, tags, agent_readable, created_at, updated_at. A note
+an agent wrote also carries `last_editor: "agent"`, which ember_api keeps as it is.
 """
 
 from __future__ import annotations
@@ -38,6 +39,15 @@ class NotesGateway:
             return self._send("GET", f"/records/{quote(key, safe='')}")["doc"]
         except _Missing:
             return None
+
+    def put(self, key: str, doc: dict[str, Any]) -> None:
+        """Store (replace) one note document."""
+        self._send("PUT", f"/records/{quote(key, safe='')}", {"doc": doc})
+
+    def count_owned(self, owner: str) -> int:
+        """How many notes `owner` has, shared with agents or not (ember_api caps it at MAX_NOTES)."""
+        body = {"filters": {"owner": owner}, "limit": MAX_NOTES, "offset": 0}
+        return len(self._send("POST", "/query", body)["docs"])
 
     def readable_by_agents(self, owner: str) -> list[dict[str, Any]]:
         """Every note of `owner` that the owner let agents read, newest edit first."""

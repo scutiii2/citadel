@@ -1,4 +1,4 @@
-"""The notes capability through its real MCP tools, and its db_gateway client against a local HTTP server."""
+"""The notes capability (read and write) through its real MCP tools, and its db_gateway client against a local HTTP server."""
 
 from __future__ import annotations
 
@@ -38,7 +38,16 @@ class FakeGateway:
 
     def get(self, key):
         self._check()
-        return self.docs.get(key)
+        doc = self.docs.get(key)
+        return None if doc is None else json.loads(json.dumps(doc))
+
+    def put(self, key, doc):
+        self._check()
+        self.docs[key] = json.loads(json.dumps(doc))
+
+    def count_owned(self, owner):
+        self._check()
+        return sum(1 for d in self.docs.values() if d["owner"] == owner)
 
     def readable_by_agents(self, owner):
         self._check()
@@ -203,16 +212,205 @@ def test_an_unreachable_gateway_is_a_clear_error(capability, library):
 
 def test_tools_commands_and_help_follow_the_contract(capability):
     tools = {tool.name: tool for tool in asyncio.run(capability.list_tools())}
-    assert set(tools) == {"tool_notes_listNotes", "tool_notes_searchNotes", "tool_notes_readNote"}
+    reads = {"tool_notes_listNotes", "tool_notes_searchNotes", "tool_notes_readNote"}
+    writes = {"tool_notes_createNote", "tool_notes_updateNote", "tool_notes_appendToNote"}
+    assert set(tools) == reads | writes
     assert all((tool.meta or {}).get("display_label") for tool in tools.values())
-    assert all(tool.annotations and tool.annotations.readOnlyHint for tool in tools.values())
+    assert all(tools[name].annotations.readOnlyHint is True for name in reads)
+    assert all(tools[name].annotations.readOnlyHint is False for name in writes)
+    assert not [name for name in tools if "delete" in name.lower() or "forget" in name.lower()]  # agents never delete
     for tool in tools.values():
         for prop in tool.inputSchema["properties"].values():
             assert prop.get("description")
         assert "uid" not in tool.inputSchema["properties"] and "owner" not in tool.inputSchema["properties"]
     help_result = capability_help.build_help("notes", target="all")
-    assert {row["slash_command"] for row in help_result["commands"]} == {"/notes list", "/notes search", "/notes read"}
+    assert {row["slash_command"] for row in help_result["commands"]} == {
+        "/notes list", "/notes search", "/notes read", "/notes create", "/notes update", "/notes append",
+    }
     assert not any((tool.meta or {}).get("ai_explain_result") for tool in tools.values())
+
+
+# ---- writing ----
+
+
+def stored(library, key):
+    return library.docs[key]
+
+
+def test_create_stores_a_note_ember_can_open_and_the_agent_can_read_back(capability, library):
+    made = structured(call(capability, "tool_notes_createNote", {
+        "title": "  Sci-fi picks ", "body": "Arrival\nPrimer", "tags": " Movies, sci-fi ,movies,",
+    }))
+
+    doc = stored(library, made["id"])
+    assert (doc["title"], doc["body"], doc["tags"]) == ("Sci-fi picks", "Arrival\nPrimer", ["movies", "sci-fi"])
+    assert (doc["owner"], doc["agent_readable"], doc["last_editor"]) == (ALICE, True, "agent")
+    assert doc["created_at"] == doc["updated_at"] and len(doc["created_at"]) == 19  # 2026-10-16T10:00:00, as ember writes it
+    assert set(doc) == {"id", "owner", "title", "body", "tags", "agent_readable", "last_editor", "created_at", "updated_at"}
+    assert made["tags"] == "movies, sci-fi" and made["id"] == doc["id"] and len(made["id"]) == 32
+    assert "last edited by an agent" in made["message"]
+    # Shared from the start, so the agent's own list and read already show it.
+    assert made["id"] in [n["id"] for n in structured(call(capability, "tool_notes_listNotes"))["notes"]]
+    assert "Primer" in structured(call(capability, "tool_notes_readNote", {"note_id": made["id"]}))["content"]
+
+
+@pytest.mark.parametrize("args, message", [
+    ({"title": "   ", "body": "x"}, "needs a title"),
+    ({"title": "x" * 201, "body": "x"}, "at most 200 characters"),
+    ({"title": "ok", "body": "x" * 20_001}, "at most 20000 characters"),
+    ({"title": "ok", "body": "x", "tags": "two words"}, "not allowed"),
+    ({"title": "ok", "body": "x", "tags": "-lead"}, "not allowed"),
+    ({"title": "ok", "body": "x", "tags": "x" * 31}, "not allowed"),
+    ({"title": "ok", "body": "x", "tags": ",".join(f"t{i}" for i in range(11))}, "at most 10 tags"),
+])
+def test_create_refuses_what_ember_would_refuse(capability, library, args, message):
+    before = dict(library.docs)
+
+    with pytest.raises(Exception, match=message):
+        call(capability, "tool_notes_createNote", args)
+
+    assert library.docs == before
+
+
+def test_create_accepts_the_limits_exactly(capability, library):
+    tags = ",".join(["x" * 30] + [f"t{i}" for i in range(9)])
+
+    made = structured(call(capability, "tool_notes_createNote", {"title": "t" * 200, "body": "b" * 20_000, "tags": tags}))
+
+    assert len(stored(library, made["id"])["tags"]) == 10
+
+
+def test_create_stops_at_the_note_limit(capability, library):
+    for i in range(200 - 3):  # Alice already has 3 (one switched off)
+        key = f"{i + 100:032x}"
+        library.docs[key] = note(key, ALICE, f"n{i}", shared=False)
+    assert library.count_owned(ALICE) == 200
+
+    with pytest.raises(Exception, match="already has 200 notes"):
+        call(capability, "tool_notes_createNote", {"title": "one too many", "body": "x"})
+
+
+def test_update_changes_only_the_parts_that_are_given(capability, library):
+    result = structured(call(capability, "tool_notes_updateNote", {"note_id": ID1, "body": "new text"}))
+
+    doc = stored(library, ID1)
+    assert (doc["title"], doc["body"], doc["tags"]) == ("Wifi", "new text", ["home", "it"])  # title and tags kept
+    assert doc["last_editor"] == "agent" and doc["updated_at"] > "2026-02-02T10:00:00" and doc["created_at"] == "2026-02-02T10:00:00"
+    assert (doc["owner"], doc["agent_readable"]) == (ALICE, True)  # the switch and the owner never change
+    assert result["title"] == "Wifi"
+
+    structured(call(capability, "tool_notes_updateNote", {"note_id": ID1, "title": "Home wifi", "tags": "network, home"}))
+    after = stored(library, ID1)
+    assert (after["title"], after["tags"], after["body"]) == ("Home wifi", ["network", "home"], "new text")
+
+
+def test_update_with_nothing_to_change_is_refused(capability):
+    with pytest.raises(Exception, match="Nothing to change"):
+        call(capability, "tool_notes_updateNote", {"note_id": ID1, "title": " ", "body": "", "tags": ""})
+
+
+def test_update_refuses_bad_values_without_changing_the_note(capability, library):
+    before = dict(stored(library, ID1))
+
+    for args in ({"title": "x" * 201}, {"body": "x" * 20_001}, {"tags": "bad tag"}):
+        with pytest.raises(Exception):
+            call(capability, "tool_notes_updateNote", {"note_id": ID1, **args})
+
+    assert stored(library, ID1) == before
+
+
+def test_append_adds_to_the_end_and_keeps_the_rest(capability, library):
+    result = structured(call(capability, "tool_notes_appendToNote", {"note_id": ID1, "text": "wifi name: Home5G"}))
+
+    doc = stored(library, ID1)
+    assert doc["body"] == "router: blue box\npassword is in the drawer\nwifi name: Home5G"
+    assert (doc["title"], doc["tags"], doc["last_editor"]) == ("Wifi", ["home", "it"], "agent")
+    assert "Added to" in result["message"]
+
+
+def test_append_to_an_empty_note_and_around_trailing_newlines(capability, library):
+    library.docs[ID1]["body"] = ""
+    call(capability, "tool_notes_appendToNote", {"note_id": ID1, "text": "first"})
+    assert stored(library, ID1)["body"] == "first"
+
+    library.docs[ID1]["body"] = "list\n\n"
+    call(capability, "tool_notes_appendToNote", {"note_id": ID1, "text": "- item"})
+    assert stored(library, ID1)["body"] == "list\n- item"
+
+
+def test_append_refuses_empty_text_and_a_note_that_would_overflow(capability, library):
+    with pytest.raises(Exception, match="the text is empty"):
+        call(capability, "tool_notes_appendToNote", {"note_id": ID1, "text": "  \n"})
+    library.docs[ID1]["body"] = "x" * 19_990
+
+    with pytest.raises(Exception, match="would pass 20000 characters"):
+        call(capability, "tool_notes_appendToNote", {"note_id": ID1, "text": "y" * 20})
+
+    assert len(stored(library, ID1)["body"]) == 19_990
+
+
+@pytest.mark.parametrize("note_id", [ID2, ID3, "9" * 32, "../etc", ""])
+def test_update_and_append_cannot_touch_a_note_that_is_off_foreign_or_missing(capability, library, note_id):
+    before = json.loads(json.dumps(library.docs))
+
+    with pytest.raises(Exception, match="No note with that id is available to agents"):
+        call(capability, "tool_notes_updateNote", {"note_id": note_id, "body": "hacked"})
+    with pytest.raises(Exception, match="No note with that id is available to agents"):
+        call(capability, "tool_notes_appendToNote", {"note_id": note_id, "text": "hacked"})
+
+    assert library.docs == before  # Diary (off) and Bob's note are exactly as they were
+
+
+def test_a_write_cannot_switch_a_note_on_or_hand_it_to_someone_else(capability, library):
+    call(capability, "tool_notes_updateNote", {"note_id": ID1, "title": "t"})
+    call(capability, "tool_notes_appendToNote", {"note_id": ID1, "text": "t"})
+    made = structured(call(capability, "tool_notes_createNote", {"title": "n", "body": "b"}))
+
+    assert stored(library, ID2)["agent_readable"] is False  # the Diary is still off
+    assert stored(library, ID1)["owner"] == ALICE and stored(library, made["id"])["owner"] == ALICE
+
+
+def test_the_write_tools_take_no_owner_or_switch_parameter(capability):
+    for tool in asyncio.run(capability.list_tools()):
+        names = set(tool.inputSchema["properties"])
+        assert not names & {"uid", "owner", "agent_readable", "shared", "delete"}, tool.name
+
+
+def test_every_write_tool_refuses_without_an_identity_or_on_an_exposed_host(capability, library, monkeypatch):
+    calls = (
+        ("tool_notes_createNote", {"title": "t", "body": "b"}),
+        ("tool_notes_updateNote", {"note_id": ID1, "body": "b"}),
+        ("tool_notes_appendToNote", {"note_id": ID1, "text": "b"}),
+    )
+    before = json.loads(json.dumps(library.docs))
+    monkeypatch.setattr(identity_context, "current_uid", lambda: "")
+    for name, args in calls:
+        with pytest.raises(Exception, match="signed-in user"):
+            call(capability, name, args)
+    monkeypatch.setattr(identity_context, "current_uid", lambda: ALICE)
+    domain = sys.modules["src.capabilities.notes.domain"]
+    monkeypatch.setattr(domain, "settings", dataclasses.replace(domain.settings, host="0.0.0.0", internal_api_token=""))
+    for name, args in calls:
+        with pytest.raises(Exception, match="INTERNAL_API_TOKEN"):
+            call(capability, name, args)
+
+    assert library.docs == before
+
+
+def test_an_unreachable_gateway_leaves_the_notes_alone_and_says_so(capability, library):
+    before = json.loads(json.dumps(library.docs))
+    library.down = True
+
+    for name, args in (
+        ("tool_notes_createNote", {"title": "t", "body": "b"}),
+        ("tool_notes_updateNote", {"note_id": ID1, "body": "b"}),
+        ("tool_notes_appendToNote", {"note_id": ID1, "text": "b"}),
+    ):
+        with pytest.raises(Exception, match="Notes are unavailable right now"):
+            call(capability, name, args)
+    library.down = False
+
+    assert library.docs == before
 
 
 # ---- the db_gateway client, against a real local HTTP server ----
@@ -245,8 +443,14 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         self._record(body)
-        owner = body["filters"]["owner"]
-        self._answer(200, {"docs": [d for d in self.docs.values() if d["owner"] == owner and d["agent_readable"]]})
+        filters = body["filters"]
+        self._answer(200, {"docs": [d for d in self.docs.values() if all(d.get(k) == v for k, v in filters.items())]})
+
+    def do_PUT(self):
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        self._record(body)
+        self.docs[self.path.rsplit("/", 1)[1]] = body["doc"]
+        self._answer(200, {"ok": True})
 
     def log_message(self, *args):
         pass
@@ -301,3 +505,18 @@ def test_the_client_encodes_names_so_they_cannot_change_the_path(server):
     NotesGateway(url, "a/b", "c d", "").get("../x")
 
     assert handler.seen[0]["path"] == "/instances/a%2Fb/connections/c%20d/collections/notes/records/..%2Fx"
+
+
+def test_the_client_puts_a_record_and_counts_a_users_notes(server):
+    url, handler = server
+    client = NotesGateway(url, "mcp_server", "data", "secret")
+
+    client.put(ID2, note(ID2, ALICE, "new", shared=False))  # counted although agents cannot read it
+    assert client.count_owned(ALICE) == 3  # the two seeded notes and this one
+
+    put, query = handler.seen
+    assert (put["method"], put["path"], put["token"]) == (
+        "PUT", f"/instances/mcp_server/connections/data/collections/notes/records/{ID2}", "secret",
+    )
+    assert put["body"]["doc"]["title"] == "new"
+    assert query["body"] == {"filters": {"owner": ALICE}, "limit": 200, "offset": 0}
