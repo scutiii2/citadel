@@ -14,6 +14,7 @@ from src.deps import (
     get_db_session,
     get_email_sender,
     get_log_writer,
+    get_db_gateway,
     get_memory_purger,
     get_otp_service,
     get_settings_service,
@@ -26,7 +27,9 @@ from src.models import Account, InviteCode, Permission, Role
 from src.services.admin_service import AccountStatus, AdminError, AdminService, DelegationError, NotFoundError
 from src.services.email_service import EmailDeliveryError, EmailSender
 from src.services.log_service import LogWriter
+from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.memory_purger import MemoryPurger
+from src.services.notes import purge_owner as purge_notes
 from src.services.otp_service import OtpService
 from src.services.permissions import (
     ADMIN_ROLE, is_known_permission, ADMIN_PERMISSIONS, ACCOUNTS_VIEW, ACCOUNTS_MANAGE,
@@ -294,6 +297,7 @@ async def delete_account(
     admin_service: AdminService = Depends(get_admin_service),
     logs: LogWriter = Depends(get_log_writer),
     purger: MemoryPurger = Depends(get_memory_purger),
+    store: DocumentStore = Depends(get_db_gateway),
 ) -> Response:
     try:
         target = await admin_service.account(account_id)
@@ -306,6 +310,10 @@ async def delete_account(
         await logs.error(
             admin.id, "admin.memory_purge", f"Memory notes of deleted account '{username}' were not purged (mcp_server did not confirm)"
         )
+    try:  # best effort, like the memory purge: the account is already gone
+        await purge_notes(store, uid)
+    except DbGatewayError as error:
+        await logs.error(admin.id, "admin.notes_purge", f"Notes of deleted account '{username}' were not purged ({error})")
     await logs.action(admin, "admin.delete_account", f"Deleted account '{username}'")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

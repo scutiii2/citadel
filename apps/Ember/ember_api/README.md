@@ -192,6 +192,11 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `GET` | `/api/nav-preferences` | any logged-in account | How this account arranges its nav rail: `{order, pinned, hidden}`, lists of page ids (route paths such as `/agents`). All empty means the default arrangement. |
 | `PUT` | `/api/nav-preferences` | any logged-in account | Replaces it with the same shape. At most 50 ids per list, each 1-64 characters (`422` otherwise). Repeats are dropped; `pinned` and `hidden` keep only ids in `order`, and a hidden page is never pinned. ember_api does not know the page list, so unknown ids are kept. Returns what was stored. |
 | `DELETE` | `/api/nav-preferences` | any logged-in account | Back to the default arrangement. `204`, also when nothing was saved. |
+| `GET` | `/api/notes` | `chat.use` | This account's private notes, newest edit first: `[{id, title, body, created_at, updated_at}]`. Kept in db_gateway, not in this database. |
+| `POST` | `/api/notes` | `chat.use` | `{title, body?}` (title 1-200 characters after trimming, body up to 20,000; `422` otherwise). `201` with the note; `409` at 200 notes. |
+| `GET` / `PUT` / `DELETE` | `/api/notes/{id}` | `chat.use` | Read, replace (`{title, body?}`) or delete one note. Another account's note, or a malformed id, is `404`. `DELETE` is `204`. |
+
+Every notes route answers `503` `Notes storage is unavailable` when db_gateway cannot be reached; the rest of the API is unaffected. Create, edit and delete are written to the action log without the note text. Deleting an account removes its notes (best effort: a failure is logged as an error and the deletion still succeeds).
 | `GET` | `/api/account-capabilities` | any logged-in account | Which built-in capabilities and server-listed extensions this account has added: `{capabilities, extensions, disabled_tools}`. A new account has nothing added. `disabled_tools` is the sorted tool names of every mcp_server capability not added, read from mcp_server's `/capabilities` (`502` if it is unreachable). |
 | `PUT` | `/api/account-capabilities/{kind}/{key}` | any logged-in account | `{enabled: bool}` adds or removes one item (`kind`: `capability` or `extension`; `key` 1-64 characters of `A-Za-z0-9_.-`, else `422`). Same reply as `GET`. Repeating a change is a no-op; at most 200 items per account (`409`). Logged as `account.capability_enable` / `_disable` (or `extension`). Removing an extension through `DELETE /api/extensions/{id}` clears it from every account. |
 | `GET` | `/api/user-extensions` | `chat.use` | This account's own MCP servers ("private extensions"): `[{id, label, description, url, header_names, enabled, status, error, tools}]`. `id` is a slug of the label, unique per account. `status` is `connected`, `error` or `unknown`, from `ai_agent`'s `probe_extension`, cached for 60 seconds; a disabled extension is not probed and reports `unknown`. Header **values** are never returned, only their names. |
@@ -512,9 +517,9 @@ src/
               AccountService, AdminService, AgentDirectory, AgentGateway, ChatService, ChatSearch, TemplateService, ShareService, PublicReadLimiter, TurnRegistry,
               UsageService, summarization, McpServerInfo, McpServerTools, mcp_session, LogWriter,
               text_extraction, config_validation, DeviceService, LoginRateLimiter, McpPolicy, McpProxy,
-              permissions, DbGatewayClient (db_gateway)
+              permissions, DbGatewayClient (db_gateway), NotesService (notes)
   routes/     auth, account, admin, settings, chats, templates, shares, usage, mcp, server_info, logs,
-              attachments, config_issues
+              attachments, config_issues, notes
   utils/      config_loader
 scripts/   import_chat_app.py                   one-off move of chat_app's data (see "Moving from chat_app")
            backup_db.py                         back up the database now
@@ -620,4 +625,4 @@ db_gateway's `configs/config_connections.json` (see its `.example`). Calls send 
 (equality filters). A missing record is `None` or `False`. An unreachable gateway raises
 `DbGatewayUnavailable`, so only a feature that uses it fails; ember_api starts without the
 gateway. Routes get it from `get_db_gateway` in `src/deps.py`; tests use `FakeDbGateway`
-(the `db_gateway` fixture). No route uses it yet.
+(the `db_gateway` fixture). The notes routes are the first user.

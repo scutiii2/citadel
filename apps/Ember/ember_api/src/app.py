@@ -32,6 +32,7 @@ from src.routes import (
     logs,
     mcp,
     nav_preferences,
+    notes,
     server_info,
     settings as settings_routes,
     shares,
@@ -209,6 +210,7 @@ def create_app(
     app.include_router(chat_folders.router)
     app.include_router(templates.router)
     app.include_router(nav_preferences.router)
+    app.include_router(notes.router)
     app.include_router(account_capabilities.router)
     app.include_router(user_extensions.router)
     app.include_router(shares.router)
