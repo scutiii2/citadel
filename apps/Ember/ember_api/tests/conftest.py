@@ -285,6 +285,28 @@ class FakeServerTools:
         return set(self.templates)
 
 
+class FakeDbGateway:
+    """In-memory DocumentStore: same behaviour as db_gateway for get/put/delete/query."""
+
+    def __init__(self) -> None:
+        self.records: dict[tuple[str, str], dict] = {}
+
+    async def get(self, collection, key):
+        doc = self.records.get((collection, key))
+        return None if doc is None else json.loads(json.dumps(doc))
+
+    async def put(self, collection, key, doc):
+        self.records[(collection, key)] = json.loads(json.dumps(doc))
+
+    async def delete(self, collection, key):
+        return self.records.pop((collection, key), None) is not None
+
+    async def query(self, collection, filters=None, limit=100, offset=0):
+        rows = sorted((k, d) for (c, k), d in self.records.items() if c == collection)
+        matching = [d for _, d in rows if all(d.get(f) == v for f, v in (filters or {}).items())]
+        return matching[offset : offset + limit]
+
+
 def make_settings(
     tmp_path: Path,
     *,
@@ -355,6 +377,11 @@ def server_tools() -> FakeServerTools:
 
 
 @pytest.fixture
+def db_gateway() -> FakeDbGateway:
+    return FakeDbGateway()
+
+
+@pytest.fixture
 def traffic() -> TrafficRecorder:
     """Counts in memory only (no database), so tests read it with pending()."""
     return TrafficRecorder()
@@ -368,6 +395,7 @@ def client_factory(
     agent: FakeAgent,
     server_tools: FakeServerTools,
     traffic: TrafficRecorder,
+    db_gateway: FakeDbGateway,
 ) -> Iterator[Callable[..., TestClient]]:
     """Builds a started app (lifespan run) per call; all are closed at the end."""
     opened: list[TestClient] = []
@@ -385,6 +413,7 @@ def client_factory(
                 server_tools=server_tools,
                 traffic=traffic,
                 game_fetcher=game_fetcher,
+                db_gateway=db_gateway,
             ),
             client=(address, 50000),
         )

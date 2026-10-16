@@ -12,6 +12,7 @@ from src.config import Settings
 from src.db import Database
 from src.models import Account
 from src.services.agent_gateway import AgentGateway
+from src.services.db_gateway import DocumentStore
 from src.services.email_service import EmailSender
 from src.services.log_service import LogWriter
 from src.services.memory_purger import MemoryPurger
@@ -83,6 +84,10 @@ def get_memory_purger(request: Request) -> MemoryPurger:
 
 def get_log_writer(request: Request) -> LogWriter:
     return request.app.state.logs
+
+
+def get_db_gateway(request: Request) -> DocumentStore:
+    return request.app.state.db_gateway
 
 
 def get_traffic(request: Request) -> TrafficRecorder:

@@ -1,10 +1,12 @@
 {
   "connections": {
     "main": {"type": "sqlite", "path": "data/main.db", "allow_raw_sql": false},
+    "data": {"type": "sqlite", "path": "data/ember.db"},
     "scratch": {"type": "sqlite", "path": "data/scratch.db", "allow_raw_sql": true, "cache": {"ttl_seconds": 0}}
   },
   "instances": {
     "default": ["main", "scratch"],
-    "reports": ["main"]
+    "reports": ["main"],
+    "ember": ["data"]
   }
 }

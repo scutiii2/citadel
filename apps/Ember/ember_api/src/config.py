@@ -126,6 +126,23 @@ class BackupSettings:
 
 
 @dataclass(frozen=True)
+class DbGatewaySettings:
+    """config_app.json's "db_gateway" block: where new document data is stored
+    (the db_gateway project), and which of its instances and connections to use."""
+
+    url: str = "http://127.0.0.1:8071"
+    instance: str = "ember"
+    connection: str = "data"
+
+    @classmethod
+    def from_config(cls, raw: dict) -> DbGatewaySettings:
+        url = str(raw.get("url") or cls.url).rstrip("/")
+        instance = str(raw.get("instance") or cls.instance)
+        connection = str(raw.get("connection") or cls.connection)
+        return cls(url=url, instance=instance, connection=connection)
+
+
+@dataclass(frozen=True)
 class Settings:
     host: str
     port: int
@@ -147,6 +164,7 @@ class Settings:
     security: SecuritySettings = field(default_factory=SecuritySettings)
     usage: UsageSettings = field(default_factory=UsageSettings)
     backup: BackupSettings = field(default_factory=BackupSettings)
+    db_gateway: DbGatewaySettings = field(default_factory=DbGatewaySettings)
     # Where these settings came from (the Config issues page re-reads it).
     config_path: Path = CONFIGS_DIR / "config_app.json"
 
@@ -188,6 +206,7 @@ def load_settings() -> Settings:
         security=SecuritySettings.from_config(raw.get("security", {})),
         usage=UsageSettings.from_config(raw.get("usage", {})),
         backup=BackupSettings.from_config(raw.get("backup", {})),
+        db_gateway=DbGatewaySettings.from_config(raw.get("db_gateway", {})),
         config_path=CONFIGS_DIR / "config_app.json",
     )
 

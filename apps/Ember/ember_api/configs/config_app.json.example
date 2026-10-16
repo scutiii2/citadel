@@ -10,6 +10,11 @@
   "agents_registry_path": "../../ai_agent/.data/agent_registry.json",
   "mcp_server_url": "http://127.0.0.1:8010/mcp",
   "games_allow_private_urls": true,
+  "db_gateway": {
+    "url": "http://127.0.0.1:8071",
+    "instance": "ember",
+    "connection": "data"
+  },
   "security": {
     "trusted_proxies": [
       "127.0.0.1",

@@ -82,6 +82,7 @@ def _check_app(data: dict[str, Any]) -> list[Problem]:
         ("security", lambda v: isinstance(v, dict), "an object"),
         ("usage", lambda v: isinstance(v, dict), "an object"),
         ("backup", lambda v: isinstance(v, dict), "an object"),
+        ("db_gateway", lambda v: isinstance(v, dict), "an object"),
     ]
     problems = [(key, f"must be {expected}") for key, check, expected in rules if key in data and not check(data[key])]
     usage = data.get("usage")
@@ -96,6 +97,13 @@ def _check_app(data: dict[str, Any]) -> list[Problem]:
         for key in ("keep", "every_hours"):
             if key in backup and not _is_int(backup[key], 1):
                 problems.append((f"backup.{key}", "must be a positive integer"))
+    gateway = data.get("db_gateway")
+    if isinstance(gateway, dict):
+        if "url" in gateway and not _is_http_url(gateway["url"]):
+            problems.append(("db_gateway.url", "must be an http(s) URL"))
+        for key in ("instance", "connection"):
+            if key in gateway and not _is_text(gateway[key]):
+                problems.append((f"db_gateway.{key}", "must be a non-empty string"))
     security = data.get("security")
     if isinstance(security, dict):
         rate = security.get("rate_limit", {})

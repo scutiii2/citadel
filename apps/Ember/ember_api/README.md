@@ -512,7 +512,7 @@ src/
               AccountService, AdminService, AgentDirectory, AgentGateway, ChatService, ChatSearch, TemplateService, ShareService, PublicReadLimiter, TurnRegistry,
               UsageService, summarization, McpServerInfo, McpServerTools, mcp_session, LogWriter,
               text_extraction, config_validation, DeviceService, LoginRateLimiter, McpPolicy, McpProxy,
-              permissions
+              permissions, DbGatewayClient (db_gateway)
   routes/     auth, account, admin, settings, chats, templates, shares, usage, mcp, server_info, logs,
               attachments, config_issues
   utils/      config_loader
@@ -604,3 +604,20 @@ both permission rows if necessary. Downgrade reverses the rename and removes
 the new tables. The old proxy has been removed. Ember launches games through
 `/api/games/{id}/launch`; game servers redeem tickets and issue their own bearer
 sessions. The browser never receives the shared internal token.
+
+## Document storage (db_gateway)
+
+Accounts, chats, usage and the rest stay in this project's SQLAlchemy database. New data that
+needs no joins or foreign keys can be kept as documents in the `db_gateway` project instead, so
+it can sit on SQLite, Postgres or Firestore and be shared with other apps.
+
+`config_app.json` has a `db_gateway` block: `url` (default `http://127.0.0.1:8071`), `instance`
+(`ember`) and `connection` (`data`). The connection must be listed in that instance in
+db_gateway's `configs/config_connections.json` (see its `.example`). Calls send the same
+`INTERNAL_API_TOKEN` as the other services.
+
+`src/services/db_gateway.py` has `DbGatewayClient` with `get`, `put`, `delete` and `query`
+(equality filters). A missing record is `None` or `False`. An unreachable gateway raises
+`DbGatewayUnavailable`, so only a feature that uses it fails; ember_api starts without the
+gateway. Routes get it from `get_db_gateway` in `src/deps.py`; tests use `FakeDbGateway`
+(the `db_gateway` fixture). No route uses it yet.

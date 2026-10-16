@@ -46,6 +46,7 @@ from src.services.auth_service import AuthService
 from src.services.backup_service import BackupScheduler, DatabaseBackup
 from src.services.migrations import MigrationRunner
 from src.services.chat_service import MAX_CHAT_BYTES
+from src.services.db_gateway import DbGatewayClient, DocumentStore
 from src.services.email_service import EmailSender, McpEmailSender
 from src.services.game_manifest import ManifestFetcher
 from src.services.game_sync import GameSyncScheduler
@@ -77,6 +78,8 @@ GAME_SYNC_EVERY = timedelta(minutes=10)
 # No read timeout: an MCP event stream stays open for as long as a chat turn
 # (or the session) lasts. Connect/write/pool still fail fast.
 _UPSTREAM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=10.0)
+# db_gateway answers quickly or not at all; a feature using it should fail fast.
+_DB_GATEWAY_TIMEOUT = httpx.Timeout(5.0)
 
 
 def create_app(
@@ -88,10 +91,12 @@ def create_app(
     traffic: TrafficRecorder | None = None,
     *,
     game_fetcher: ManifestFetcher | None = None,
+    db_gateway: DocumentStore | None = None,
 ) -> FastAPI:
     """email_sender defaults to the MCP Email capability,
     upstream_transport to real HTTP, agent_gateway to a real MCP client for
-    ai_agent and server_tools to one for mcp_server; tests pass fakes. traffic
+    ai_agent, server_tools to one for mcp_server and db_gateway to one for the
+    db_gateway service; tests pass fakes. traffic
     defaults to a recorder saving to the database; tests pass their own."""
 
     @asynccontextmanager
@@ -125,6 +130,11 @@ def create_app(
         manifest_client = httpx.AsyncClient(follow_redirects=False)
         app.state.game_fetcher = game_fetcher or ManifestFetcher(
             manifest_client, allow_private=settings.games_allow_private_urls
+        )
+
+        gateway_client = httpx.AsyncClient(base_url=settings.db_gateway.url, timeout=_DB_GATEWAY_TIMEOUT)
+        app.state.db_gateway = db_gateway or DbGatewayClient(
+            gateway_client, settings.db_gateway.instance, settings.db_gateway.connection, internal_token or None
         )
 
         app.state.settings = settings
@@ -174,6 +184,7 @@ def create_app(
             await recorder.stop()
             await upstream.aclose()
             await manifest_client.aclose()
+            await gateway_client.aclose()
             await database.dispose()
 
     app = FastAPI(title="ember_api", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
