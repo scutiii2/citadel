@@ -36,6 +36,22 @@ describe("notesClient", () => {
     ]);
   });
 
+  it("names the version it opened when it saves, and leaves the field out otherwise", async () => {
+    await notesClient.update("abc", draft, "2026-02-01T10:00:00");
+    await notesClient.update("abc", draft);
+
+    expect(request.mock.calls).toEqual([
+      ["PUT", "/api/notes/abc", { ...draft, expected_updated_at: "2026-02-01T10:00:00" }],
+      ["PUT", "/api/notes/abc", draft],
+    ]);
+  });
+
+  it("reads one note by id", async () => {
+    await notesClient.get("abc");
+
+    expect(request).toHaveBeenCalledExactlyOnceWith("GET", "/api/notes/abc");
+  });
+
   it("asks for tag suggestions with the note as the editor holds it", async () => {
     await notesClient.suggestTags({ title: "Roof", body: "call the builder", tags: ["urgent"] });
 

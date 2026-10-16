@@ -201,6 +201,96 @@ def test_notes_made_on_the_page_and_older_notes_read_as_written_by_the_user(
     assert client.get(f"{URL}/{old_key}").json()["last_editor"] == "user"
 
 
+def save(client: TestClient, key: str, **fields):
+    return client.put(f"{URL}/{key}", json={"title": "t", "body": "mine", **fields})
+
+
+def test_a_save_with_the_version_it_opened_goes_through(client: TestClient) -> None:
+    as_admin(client)
+    note = add(client)
+
+    saved = save(client, note["id"], expected_updated_at=note["updated_at"])
+
+    assert saved.status_code == 200 and saved.json()["body"] == "mine"
+    # The next save must name the new version, not the old one.
+    again = save(client, note["id"], body="again", expected_updated_at=saved.json()["updated_at"])
+    assert again.status_code == 200 and again.json()["body"] == "again"
+
+
+def test_a_save_after_an_agent_changed_the_note_is_refused_and_changes_nothing(
+    client: TestClient, db_gateway: FakeDbGateway
+) -> None:
+    as_admin(client)
+    key = put_agent_note(db_gateway, client)  # opened at updated_at 2026-02-01T10:00:00 ...
+    opened = client.get(f"{URL}/{key}").json()
+    db_gateway.records[("notes", key)].update(body="Arrival, Primer", updated_at="2026-02-01T10:05:00")  # ... then an agent writes
+
+    refused = save(client, key, expected_updated_at=opened["updated_at"])
+
+    assert refused.status_code == 412
+    assert refused.json()["detail"] == "This note changed since you opened it"
+    stored = db_gateway.records[("notes", key)]
+    assert (stored["body"], stored["updated_at"], stored["last_editor"]) == ("Arrival, Primer", "2026-02-01T10:05:00", "agent")
+
+
+def test_the_refused_save_can_be_repeated_with_the_newer_version_to_overwrite(
+    client: TestClient, db_gateway: FakeDbGateway
+) -> None:
+    as_admin(client)
+    key = put_agent_note(db_gateway, client)
+    db_gateway.records[("notes", key)]["updated_at"] = "2026-02-01T10:05:00"
+
+    assert save(client, key, expected_updated_at="2026-02-01T10:00:00").status_code == 412
+    current = client.get(f"{URL}/{key}").json()
+    forced = save(client, key, expected_updated_at=current["updated_at"])
+
+    assert forced.status_code == 200 and forced.json()["body"] == "mine" and forced.json()["last_editor"] == "user"
+
+
+def test_a_save_that_names_no_version_always_goes_through(client: TestClient, db_gateway: FakeDbGateway) -> None:
+    as_admin(client)
+    key = put_agent_note(db_gateway, client)
+
+    assert save(client, key).status_code == 200
+
+
+def test_a_refused_save_is_not_audited_as_an_edit(client: TestClient, db_gateway: FakeDbGateway) -> None:
+    as_admin(client)
+    key = put_agent_note(db_gateway, client)
+    save(client, key, expected_updated_at="1999-01-01T00:00:00")
+
+    root = client.get("/api/auth/me").json()["id"]
+    messages = [e["message"] for e in client.get("/api/logs/action", params={"actor": str(root)}).json()]
+
+    assert "Edited a note" not in messages
+
+
+def test_the_version_check_does_not_reveal_another_accounts_note(client: TestClient, email: FakeEmailSender) -> None:
+    make_member(client, email, "alice")
+    make_member(client, email, "bob")
+    login(client, "alice")
+    note = add(client)
+    client.post("/api/auth/logout", json={})
+    login(client, "bob")
+
+    assert save(client, note["id"], expected_updated_at=note["updated_at"]).status_code == 404
+    assert save(client, note["id"], expected_updated_at="wrong").status_code == 404
+
+
+@pytest.mark.parametrize("value", [5, "x" * 65, ["a"]])
+def test_a_malformed_version_is_a_validation_error(client: TestClient, value) -> None:
+    as_admin(client)
+    note = add(client)
+
+    assert save(client, note["id"], expected_updated_at=value).status_code == 422
+
+
+def test_creating_ignores_a_version(client: TestClient) -> None:
+    as_admin(client)
+
+    assert client.post(URL, json={"title": "t", "expected_updated_at": "whatever"}).status_code == 201
+
+
 def test_an_unknown_last_editor_value_reads_as_the_user(client: TestClient, db_gateway: FakeDbGateway) -> None:
     as_admin(client)
     key = put_agent_note(db_gateway, client, last_editor="somebody else")

@@ -12,6 +12,7 @@ import {
   type Note,
   type TagSuggestions,
 } from "../api/NotesClient";
+import { ApiError } from "../api/http";
 import ConfirmModal from "../components/ConfirmModal.vue";
 import "../components/infoPage.css";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
@@ -37,6 +38,11 @@ const tagInput = ref("");
 const tagError = ref("");
 // Who saved the open note last. Not part of the draft: only a save from this page changes it.
 const savedEditor = ref<Note["last_editor"]>("user");
+// The updated_at of the version the editor opened. A save sends it, so the server can refuse to
+// overwrite a change made since (by an agent, or this note open in another tab).
+const openedAt = ref("");
+// The newer version the server holds, while a refused save waits for the user's choice.
+const conflict = ref<Note | null>(null);
 const saving = ref(false);
 const removing = ref(false);
 const formError = ref("");
@@ -52,7 +58,9 @@ const dirty = computed(
       !sameTags(form.tags, saved.tags) ||
       tagInput.value.trim() !== ""),
 );
-const canSave = computed(() => form.title.trim() !== "" && dirty.value && !saving.value && !removing.value);
+const canSave = computed(
+  () => form.title.trim() !== "" && dirty.value && !saving.value && !removing.value && conflict.value === null,
+);
 const atLimit = computed(() => notes.value.length >= NOTES_MAX);
 
 // The tags this account already uses (not on the open note yet), most used first: the input's suggestions.
@@ -159,6 +167,8 @@ function fillEditor(note: Note | undefined): void {
   saved.tags = [...form.tags];
   saved.agentReadable = form.agentReadable = note?.agent_readable ?? false;
   savedEditor.value = note?.last_editor ?? "user";
+  openedAt.value = note?.updated_at ?? "";
+  conflict.value = null;
   tagInput.value = "";
   tagError.value = "";
   suggestRun++; // an answer still on its way belongs to the note that was open
@@ -235,17 +245,48 @@ async function save(): Promise<void> {
     const note =
       selected.value === NEW
         ? await notesClient.create(draft)
-        : await notesClient.update(selected.value, draft);
+        : await notesClient.update(selected.value, draft, openedAt.value);
     // The newest edit goes first, as the server lists them.
     notes.value = [note, ...notes.value.filter((n) => n.id !== note.id)];
     selected.value = note.id;
     fillEditor(note);
     notice.value = "Saved.";
   } catch (err) {
-    formError.value = errorMessage(err);
+    if (err instanceof ApiError && err.status === 412 && selected.value !== null && selected.value !== NEW) {
+      await loadConflict(selected.value);
+    } else {
+      formError.value = errorMessage(err);
+    }
   } finally {
     saving.value = false;
   }
+}
+
+/** The server refused a save because the note changed: fetch its newer version and ask what to do. */
+async function loadConflict(id: string): Promise<void> {
+  try {
+    conflict.value = await notesClient.get(id);
+  } catch (err) {
+    formError.value = errorMessage(err);
+  }
+}
+/** Drops the user's edits for the newer version. */
+function showTheirs(): void {
+  const theirs = conflict.value;
+  if (theirs === null) return;
+  notes.value = notes.value.some((n) => n.id === theirs.id)
+    ? notes.value.map((n) => (n.id === theirs.id ? theirs : n))
+    : [theirs, ...notes.value];
+  fillEditor(theirs);
+  notice.value = "Showing the newer version.";
+}
+/** Saves the user's edits over the newer version. */
+async function keepMine(): Promise<void> {
+  const theirs = conflict.value;
+  if (theirs === null) return;
+  openedAt.value = theirs.updated_at;
+  conflict.value = null;
+  await save();
 }
 
 const confirmDelete = ref(false);
@@ -397,6 +438,16 @@ function preview(note: Note): string {
             </p>
           </div>
           <p v-if="formError" class="error" role="alert">{{ formError }}</p>
+          <div v-if="conflict" class="conflict" role="alert">
+            <p>
+              {{ conflict.last_editor === "agent" ? "An agent" : "Another session" }} changed this note after you opened
+              it.
+            </p>
+            <div class="conflict-actions">
+              <button type="button" class="chip" @click="showTheirs">Show their version (drops my changes)</button>
+              <button type="button" class="chip" @click="keepMine">Save mine anyway</button>
+            </div>
+          </div>
           <div class="actions">
             <span v-if="dirty" class="unsaved" role="status"><i aria-hidden="true" />Unsaved changes</span>
             <button type="submit" class="primary" :disabled="!canSave" :aria-busy="saving">Save</button>
@@ -567,6 +618,23 @@ function preview(note: Note): string {
 .agent-access {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+.conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-md);
+  font-size: 0.9em;
+}
+.conflict p {
+  margin: 0;
+}
+.conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .agent-edit-note {

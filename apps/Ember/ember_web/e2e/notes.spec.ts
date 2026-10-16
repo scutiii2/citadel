@@ -164,6 +164,48 @@ test("notes: a note an agent changed is marked until you save it yourself", asyn
   expect(api.unexpected).toEqual([]);
 });
 
+test("notes: a save over a change an agent made meanwhile asks what to do", async ({ page }) => {
+  const api = await installFakeApi(page);
+  const id = "0".repeat(31) + "1";
+  api.notes.set(id, {
+    id, title: "Sci-fi picks", body: "Arrival", tags: [], agent_readable: true, last_editor: "user",
+    created_at: "2026-01-01T00:00:00", updated_at: "2026-01-01T00:00:00",
+  });
+  await logIn(page);
+  await page.goto("/notes");
+  const list = page.getByRole("list", { name: "Notes" });
+  const behindTheirBack = () =>
+    Object.assign(api.notes.get(id)!, { body: "Arrival\nPrimer", last_editor: "agent", updated_at: "2026-01-01T00:05:00" });
+
+  // 1. Keep mine: the panel names the agent, the editor keeps the text, Save is off until a choice.
+  await list.getByRole("button", { name: /Sci-fi picks/ }).click();
+  await page.getByLabel("Note text").fill("Arrival, mine");
+  behindTheirBack();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  const panel = page.locator(".conflict");
+  await expect(panel).toContainText("An agent changed this note after you opened it.");
+  await expect(page.getByLabel("Note text")).toHaveValue("Arrival, mine");
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  expect(api.notes.get(id)?.body).toBe("Arrival\nPrimer"); // nothing was overwritten yet
+  await panel.getByRole("button", { name: "Save mine anyway" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
+  await expect(panel).toHaveCount(0);
+  expect(api.notes.get(id)).toMatchObject({ body: "Arrival, mine", last_editor: "user" });
+
+  // 2. Show theirs: the agent writes again; the user's new edit is dropped for the agent's text.
+  Object.assign(api.notes.get(id)!, { body: "Arrival, mine\nTenet", last_editor: "agent", updated_at: "2026-01-01T00:10:00" });
+  await page.getByLabel("Note text").fill("something I will lose");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: /Show their version/ }).click();
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByLabel("Note text")).toHaveValue("Arrival, mine\nTenet");
+  await expect(page.getByText("Unsaved changes")).toHaveCount(0);
+  await expect(page.getByText("An agent last changed this note")).toBeVisible();
+  expect(api.notes.get(id)?.body).toBe("Arrival, mine\nTenet");
+  expect(api.unexpected).toEqual([]);
+});
+
 test("notes: leaving the page with unsaved text asks first", async ({ page }) => {
   const api = await installFakeApi(page);
   await logIn(page);

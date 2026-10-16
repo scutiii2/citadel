@@ -36,6 +36,10 @@ class NoteLimit(Exception):
     pass
 
 
+class NoteChanged(Exception):
+    """The stored note is newer than the version the caller opened."""
+
+
 def normalize_tags(raw: list[str]) -> list[str]:
     """Trimmed, lowercase tags without repeats, in the order given. Raises ValueError
     for a tag that is empty, too long or has characters other than a-z, 0-9, - and _."""
@@ -107,9 +111,16 @@ class NotesService:
         return Note.from_doc(doc)
 
     async def update(
-        self, note_id: str, title: str, body: str, tags: list[str] | None = None, agent_readable: bool = False
+        self, note_id: str, title: str, body: str, tags: list[str] | None = None, agent_readable: bool = False,
+        expected_updated_at: str | None = None,
     ) -> Note:
+        """Replaces the note. With `expected_updated_at` (the `updated_at` the caller opened) the save is
+        refused with NoteChanged when the note was saved since, so it never overwrites an unseen change.
+        Check then write, not atomic: the gateway has no compare-and-set, so a save landing in between
+        can still be lost."""
         doc = await self._owned(note_id)
+        if expected_updated_at is not None and doc.get("updated_at") != expected_updated_at:
+            raise NoteChanged(note_id)
         # Saving from the page makes the user the last editor, whoever changed the note before.
         doc.update(
             title=title, body=body, tags=list(tags or []), agent_readable=agent_readable,

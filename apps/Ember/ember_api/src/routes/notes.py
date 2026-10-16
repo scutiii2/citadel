@@ -15,7 +15,16 @@ from src.services.agent_directory import AgentDirectory
 from src.services.agent_gateway import AgentGateway, Caller
 from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.log_service import LogWriter
-from src.services.notes import BODY_MAX, TITLE_MAX, Note, NoteLimit, NoteNotFound, NotesService, normalize_tags
+from src.services.notes import (
+    BODY_MAX,
+    TITLE_MAX,
+    Note,
+    NoteChanged,
+    NoteLimit,
+    NoteNotFound,
+    NotesService,
+    normalize_tags,
+)
 from src.services.permissions import CHAT_USE
 from src.services.tag_suggestions import TagSuggester, TagSuggestionUnavailable
 
@@ -41,6 +50,11 @@ class NoteBody(BaseModel):
     @classmethod
     def _clean_tags(cls, tags: list[str]) -> list[str]:
         return normalize_tags(tags)
+
+
+class NoteUpdate(NoteBody):
+    # The updated_at of the version the editor opened; the save is refused (412) if the note changed since.
+    expected_updated_at: str | None = Field(default=None, max_length=64)
 
 
 class NoteOut(BaseModel):
@@ -93,6 +107,8 @@ def _fail(error: Exception) -> NoReturn:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Note not found") from error
     if isinstance(error, NoteLimit):
         raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+    if isinstance(error, NoteChanged):
+        raise HTTPException(status.HTTP_412_PRECONDITION_FAILED, "This note changed since you opened it") from error
     raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Notes storage is unavailable") from error
 
 
@@ -163,15 +179,17 @@ async def read_note(note_id: str, notes: NotesService = Depends(get_notes_servic
 @router.put("/{note_id}")
 async def update_note(
     note_id: str,
-    body: NoteBody,
+    body: NoteUpdate,
     account: Account = Depends(require_chat),
     notes: NotesService = Depends(get_notes_service),
     logs: LogWriter = Depends(get_log_writer),
 ) -> NoteOut:
     try:
         was_readable = (await notes.get(note_id)).agent_readable
-        note = await notes.update(note_id, body.title, body.body, body.tags, body.agent_readable)
-    except (NoteNotFound, DbGatewayError) as error:
+        note = await notes.update(
+            note_id, body.title, body.body, body.tags, body.agent_readable, body.expected_updated_at
+        )
+    except (NoteNotFound, NoteChanged, DbGatewayError) as error:
         _fail(error)
     await logs.action(account, "notes.update", "Edited a note")
     if note.agent_readable != was_readable:

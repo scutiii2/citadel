@@ -44,8 +44,11 @@ export const notesClient = {
   /** Most recently edited first. */
   list: () => apiRequest<Note[]>("GET", "/api/notes"),
   create: (draft: NoteDraft) => apiRequest<Note>("POST", "/api/notes", draft),
-  /** Replaces every field: leave one out and the server resets it. */
-  update: (id: string, draft: NoteDraft) => apiRequest<Note>("PUT", path(id), draft),
+  get: (id: string) => apiRequest<Note>("GET", path(id)),
+  /** Replaces every field: leave one out and the server resets it. With `expectedUpdatedAt` (the
+   * `updated_at` the editor opened) the server refuses with 412 when the note was saved since. */
+  update: (id: string, draft: NoteDraft, expectedUpdatedAt?: string) =>
+    apiRequest<Note>("PUT", path(id), expectedUpdatedAt === undefined ? draft : { ...draft, expected_updated_at: expectedUpdatedAt }),
   remove: (id: string) => apiRequest<void>("DELETE", path(id)),
   /** Asks Laya (a local model) about the note as the editor holds it, saved or not. */
   suggestTags: (draft: Pick<NoteDraft, "title" | "body" | "tags">) =>

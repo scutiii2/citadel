@@ -63,6 +63,7 @@ interface NoteBody {
   body?: string;
   tags?: string[];
   agent_readable?: boolean;
+  expected_updated_at?: string;
 }
 
 export interface StoredAccount {
@@ -441,7 +442,11 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
         return route.fulfill({ status: 204, body: "" });
       }
       if (method === "PUT") {
-        const { title, body, tags, agent_readable } = request.postDataJSON() as NoteBody;
+        const { title, body, tags, agent_readable, expected_updated_at } = request.postDataJSON() as NoteBody;
+        // A save that names the version it opened is refused when the note changed since, as ember_api does.
+        if (expected_updated_at !== undefined && expected_updated_at !== note.updated_at) {
+          return json(route, { detail: "This note changed since you opened it" }, 412);
+        }
         // PUT replaces every field: one left out is reset, as ember_api does.
         Object.assign(note, {
           title: title.trim(), body: body ?? "", tags: tags ?? [], agent_readable: agent_readable ?? false,

@@ -7,7 +7,7 @@ import NotesView from "./NotesView.vue";
 
 vi.mock("../api/NotesClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/NotesClient")>()),
-  notesClient: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), suggestTags: vi.fn() },
+  notesClient: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), suggestTags: vi.fn(), get: vi.fn() },
 }));
 
 const client = vi.mocked(notesClient);
@@ -113,7 +113,7 @@ describe("NotesView", () => {
 
     expect(client.update).toHaveBeenCalledExactlyOnceWith("b", {
       title: "Second!", body: "x", tags: [], agent_readable: false,
-    });
+    }, "2026-01-01T00:00:00"); // the version the editor opened
     expect(rows(w)[0]!.text()).toContain("Second!");
     expect(w.text()).not.toContain("Unsaved changes");
   });
@@ -275,7 +275,7 @@ describe("NotesView tags", () => {
 
     expect(client.update).toHaveBeenCalledExactlyOnceWith("a", {
       title: "First", body: "", tags: ["new"], agent_readable: false,
-    });
+    }, "2026-01-01T00:00:00");
     expect(chips(w)).toEqual(["new"]);
   });
 
@@ -391,6 +391,174 @@ describe("NotesView tag suggestions", () => {
   });
 });
 
+describe("NotesView save conflicts", () => {
+  const panel = (w: VueWrapper) => w.find(".conflict");
+  const choose = (w: VueWrapper, label: string) => w.findAll(".conflict button").find((b) => b.text().startsWith(label))!;
+  const changed = () => new ApiError(412, "This note changed since you opened it");
+  const mine = { title: "Sci-fi", body: "my text", tags: [], agent_readable: true };
+  // The editor opened this version; an agent has saved a newer one by the time the user saves.
+  const opened = () => note("a", "Sci-fi", "Arrival", "2026-02-01T10:00:00", [], true, "user");
+  const theirs = () => note("a", "Sci-fi", "Arrival, Primer", "2026-02-01T10:05:00", [], true, "agent");
+
+  async function conflicted() {
+    client.update.mockRejectedValueOnce(changed());
+    client.get.mockResolvedValue(theirs());
+    const w = await setup([opened()]);
+    await rows(w)[0]!.get("button").trigger("click");
+    await w.get("textarea").setValue("my text");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    return w;
+  }
+
+  it("sends the version it opened, and a clean save shows no panel", async () => {
+    client.update.mockResolvedValue(note("a", "Sci-fi", "my text", "2026-02-01T10:01:00", [], true, "user"));
+    const w = await setup([opened()]);
+    await rows(w)[0]!.get("button").trigger("click");
+    await w.get("textarea").setValue("my text");
+
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(client.update).toHaveBeenCalledExactlyOnceWith("a", mine, "2026-02-01T10:00:00");
+    expect(panel(w).exists()).toBe(false);
+    // The next save names the version this one produced.
+    await w.get("textarea").setValue("more");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(client.update.mock.calls[1]![2]).toBe("2026-02-01T10:01:00");
+  });
+
+  it("explains a refused save, names an agent, keeps the user's text and blocks Save", async () => {
+    const w = await conflicted();
+
+    expect(client.get).toHaveBeenCalledExactlyOnceWith("a");
+    expect(panel(w).text()).toContain("An agent changed this note after you opened it.");
+    expect((w.get("textarea").element as HTMLTextAreaElement).value).toBe("my text");
+    expect(buttonByText(w, "Save")!.attributes("disabled")).toBeDefined();
+    expect(w.text()).toContain("Unsaved changes");
+    expect(w.find("form [role=alert]").text()).not.toContain("Could not"); // a panel, not an error line
+  });
+
+  it("calls it another session when a person saved the newer version", async () => {
+    client.update.mockRejectedValueOnce(changed());
+    client.get.mockResolvedValue(note("a", "Sci-fi", "Arrival, Primer", "2026-02-01T10:05:00", [], true, "user"));
+    const w = await setup([opened()]);
+    await rows(w)[0]!.get("button").trigger("click");
+    await w.get("textarea").setValue("my text");
+
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(panel(w).text()).toContain("Another session changed this note");
+  });
+
+  it("Show their version replaces the editor and the list entry and drops the user's edits", async () => {
+    const w = await conflicted();
+
+    await choose(w, "Show their version").trigger("click");
+
+    expect(panel(w).exists()).toBe(false);
+    expect((w.get("textarea").element as HTMLTextAreaElement).value).toBe("Arrival, Primer");
+    expect(rows(w)[0]!.text()).toContain("Arrival, Primer");
+    expect(rows(w)[0]!.text()).toContain("Agent edit");
+    expect(w.text()).not.toContain("Unsaved changes");
+    expect(client.update).toHaveBeenCalledTimes(1); // nothing was saved
+    // A later save names the newer version.
+    client.update.mockResolvedValue(note("a", "Sci-fi", "Arrival, Primer!", "2026-02-01T10:06:00"));
+    await w.get("textarea").setValue("Arrival, Primer!");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(client.update.mock.calls[1]![2]).toBe("2026-02-01T10:05:00");
+  });
+
+  it("Save mine anyway saves again naming the newer version", async () => {
+    const w = await conflicted();
+    client.update.mockResolvedValue(note("a", "Sci-fi", "my text", "2026-02-01T10:07:00", [], true, "user"));
+
+    await choose(w, "Save mine anyway").trigger("click");
+    await flushPromises();
+
+    expect(client.update).toHaveBeenCalledTimes(2);
+    expect(client.update.mock.calls[1]).toEqual(["a", mine, "2026-02-01T10:05:00"]);
+    expect(panel(w).exists()).toBe(false);
+    expect(w.text()).toContain("Saved.");
+    expect((w.get("textarea").element as HTMLTextAreaElement).value).toBe("my text");
+  });
+
+  it("can be refused a second time and asks again", async () => {
+    const w = await conflicted();
+    client.update.mockRejectedValueOnce(changed());
+    client.get.mockResolvedValue(note("a", "Sci-fi", "Arrival, Primer, Tenet", "2026-02-01T10:09:00", [], true, "agent"));
+
+    await choose(w, "Save mine anyway").trigger("click");
+    await flushPromises();
+
+    expect(panel(w).exists()).toBe(true);
+    await choose(w, "Save mine anyway").trigger("click");
+    await flushPromises();
+    expect(client.update.mock.calls[2]![2]).toBe("2026-02-01T10:09:00");
+  });
+
+  it("leaves the panel when you open another note", async () => {
+    client.update.mockRejectedValueOnce(changed());
+    client.get.mockResolvedValue(theirs());
+    const w = await setup([opened(), note("b", "Other", "x", "2026-01-01T00:00:00")]);
+    await rows(w)[0]!.get("button").trigger("click");
+    await w.get("textarea").setValue("my text");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(panel(w).exists()).toBe(true);
+
+    await rows(w)[1]!.get("button").trigger("click");
+    dialogButton("Discard")!.click();
+    await flushPromises();
+
+    expect(panel(w).exists()).toBe(false);
+  });
+
+  it("shows an ordinary failure as an error line, with no panel", async () => {
+    client.update.mockRejectedValue(new ApiError(503, "Notes storage is unavailable"));
+    const w = await setup([opened()]);
+    await rows(w)[0]!.get("button").trigger("click");
+    await w.get("textarea").setValue("my text");
+
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(panel(w).exists()).toBe(false);
+    expect(w.get("form [role=alert]").text()).toBe("Notes storage is unavailable");
+    expect(client.get).not.toHaveBeenCalled();
+  });
+
+  it("says so when the newer version cannot be fetched (the note is gone)", async () => {
+    client.update.mockRejectedValueOnce(changed());
+    client.get.mockRejectedValue(new ApiError(404, "Note not found"));
+    const w = await setup([opened()]);
+    await rows(w)[0]!.get("button").trigger("click");
+    await w.get("textarea").setValue("my text");
+
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(panel(w).exists()).toBe(false);
+    expect(w.get("form [role=alert]").text()).toBe("Note not found");
+  });
+
+  it("does not send a version when creating a note", async () => {
+    client.create.mockResolvedValue(note("n1", "New", "x"));
+    const w = await setup();
+    await buttonByText(w, "New note")!.trigger("click");
+    await w.get("input[aria-label=Title]").setValue("New");
+
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(client.create).toHaveBeenCalledTimes(1);
+    expect(client.update).not.toHaveBeenCalled();
+  });
+});
+
 describe("NotesView agent edits", () => {
   // A list row or the whole component: anything that can look for elements.
   const mark = (w: { findAll: (selector: string) => { text: () => string }[] }) =>
@@ -445,7 +613,7 @@ describe("NotesView agent edits", () => {
     expect(mark(rows(w)[0]!)).toHaveLength(0);
     expect(client.update).toHaveBeenCalledExactlyOnceWith("a", {
       title: "By agent", body: "x!", tags: [], agent_readable: true, // the marker is never sent
-    });
+    }, "2026-01-02T00:00:00");
   });
 });
 
@@ -486,7 +654,7 @@ describe("NotesView agent access", () => {
 
     expect(client.update).toHaveBeenCalledExactlyOnceWith("a", {
       title: "First", body: "", tags: [], agent_readable: true,
-    });
+    }, "2026-01-01T00:00:00");
     expect(rows(w)[0]!.text()).toContain("Agents can read");
     expect(w.text()).not.toContain("Unsaved changes");
   });
