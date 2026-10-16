@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, getCurrentInstance, onMounted, onUnmounted, reactive, ref } from "vue";
+import { onBeforeRouteLeave, routerKey } from "vue-router";
 import { NOTE_BODY_MAX, NOTE_TITLE_MAX, NOTES_MAX, notesClient, type Note } from "../api/NotesClient";
 import ConfirmModal from "../components/ConfirmModal.vue";
 import "../components/infoPage.css";
@@ -61,6 +62,36 @@ function discard(): void {
   discardTarget.value = undefined;
   if (target !== undefined) show(target);
 }
+
+// Leaving the page with unsaved edits asks first, like the Settings page. The
+// router waits on this answer; a mount without a router (unit tests) skips it.
+const leaveOpen = ref(false);
+let leaveAnswer: ((leave: boolean) => void) | null = null;
+function answerLeave(leave: boolean): void {
+  leaveOpen.value = false;
+  leaveAnswer?.(leave);
+  leaveAnswer = null;
+}
+if (getCurrentInstance()?.appContext.provides[routerKey as symbol]) {
+  onBeforeRouteLeave(() => {
+    if (saving.value || removing.value) return false;
+    if (!dirty.value) return true;
+    leaveOpen.value = true;
+    return new Promise<boolean>((resolve) => (leaveAnswer = resolve));
+  });
+}
+// Closing or reloading the tab gets the browser's own warning.
+function beforeUnload(event: BeforeUnloadEvent): void {
+  if (dirty.value || saving.value) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+}
+onMounted(() => window.addEventListener("beforeunload", beforeUnload));
+onUnmounted(() => {
+  window.removeEventListener("beforeunload", beforeUnload);
+  answerLeave(false);
+});
 
 function startNew(): void {
   if (atLimit.value) {
@@ -187,6 +218,15 @@ function preview(note: Note): string {
       :busy="removing"
       @confirm="remove"
       @close="confirmDelete = false"
+    />
+    <ConfirmModal
+      :open="leaveOpen"
+      title="Leave without saving?"
+      message="This note has changes you have not saved."
+      confirm-label="Leave page"
+      danger
+      @confirm="answerLeave(true)"
+      @close="answerLeave(false)"
     />
     <ConfirmModal
       :open="discardTarget !== undefined"

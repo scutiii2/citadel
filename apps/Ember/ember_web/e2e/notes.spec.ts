@@ -66,3 +66,25 @@ test("notes: leaving unsaved changes asks first", async ({ page }) => {
   await expect(page.getByLabel("Note text")).toHaveValue("two");
   expect(api.notes.get("0".repeat(31) + "1")?.body).toBe("one");
 });
+
+test("notes: leaving the page with unsaved text asks first", async ({ page }) => {
+  const api = await installFakeApi(page);
+  await logIn(page);
+  await page.goto("/notes");
+
+  await page.getByRole("button", { name: "New note" }).click();
+  await page.getByLabel("Title").fill("Draft");
+  await page.getByRole("link", { name: "Capabilities", exact: true }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Leave without saving?" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page).toHaveURL(/notes$/);
+  await expect(page.getByLabel("Title")).toHaveValue("Draft");
+
+  await page.getByRole("link", { name: "Capabilities", exact: true }).click();
+  await dialog.getByRole("button", { name: "Leave page", exact: true }).click();
+  await expect(page).toHaveURL(/capabilities$/);
+  expect(api.notes.size).toBe(0);
+  expect(api.unexpected).toEqual([]);
+});

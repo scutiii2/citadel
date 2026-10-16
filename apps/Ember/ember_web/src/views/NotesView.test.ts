@@ -1,5 +1,6 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createMemoryHistory, createRouter, RouterView } from "vue-router";
 import { ApiError } from "../api/http";
 import { notesClient, type Note } from "../api/NotesClient";
 import NotesView from "./NotesView.vue";
@@ -181,5 +182,67 @@ describe("NotesView", () => {
 
     expect(w.find("form").exists()).toBe(false);
     expect(w.text()).toContain("at most 200 notes");
+  });
+});
+
+describe("NotesView leaving the page", () => {
+  async function setupRouted(notes: Note[]) {
+    client.list.mockResolvedValue(notes);
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/notes", component: NotesView },
+        { path: "/other", component: { template: "<p>other</p>" } },
+      ],
+    });
+    await router.push("/notes");
+    wrapper = mount(RouterView, { attachTo: document.body, global: { plugins: [router] } });
+    await flushPromises();
+    return { w: wrapper, router };
+  }
+
+  it("leaves at once when nothing is unsaved", async () => {
+    const { router } = await setupRouted([note("a", "First", "one")]);
+
+    await router.push("/other");
+
+    expect(router.currentRoute.value.path).toBe("/other");
+    expect(document.body.querySelector("dialog[open]")).toBeNull();
+  });
+
+  it("asks first with unsaved edits; Cancel stays and Leave page goes", async () => {
+    const { w, router } = await setupRouted([note("a", "First", "one")]);
+    await w.findAll("ul[aria-label='Notes'] li")[0]!.get("button").trigger("click");
+    await w.get("textarea").setValue("changed");
+
+    const stay = router.push("/other");
+    await flushPromises();
+    expect(document.body.querySelector("dialog[open]")?.textContent).toContain("Leave without saving?");
+    dialogButton("Cancel")!.click();
+    await stay;
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe("/notes");
+    expect((w.get("textarea").element as HTMLTextAreaElement).value).toBe("changed");
+
+    const go = router.push("/other");
+    await flushPromises();
+    dialogButton("Leave page")!.click();
+    await go;
+    expect(router.currentRoute.value.path).toBe("/other");
+  });
+
+  it("warns on tab close or reload only while there are unsaved edits", async () => {
+    const { w } = await setupRouted([note("a", "First", "one")]);
+    const closing = () => {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(closing()).toBe(false);
+
+    await w.findAll("ul[aria-label='Notes'] li")[0]!.get("button").trigger("click");
+    await w.get("textarea").setValue("changed");
+
+    expect(closing()).toBe(true);
   });
 });
