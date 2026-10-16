@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type {
   ApprovalDecision,
   ChatMessage,
@@ -247,6 +247,12 @@ watch(
   },
   { immediate: true, flush: "post" },
 );
+
+// A fresh list starts at the top; land on the latest message unless a search
+// jump is about to scroll somewhere else.
+onMounted(() => {
+  if (props.jumpIndex === null || props.jumpIndex === undefined) void scrollToBottomIfSticking();
+});
 
 onBeforeUnmount(() => {
   if (flashTimer !== null) clearTimeout(flashTimer);

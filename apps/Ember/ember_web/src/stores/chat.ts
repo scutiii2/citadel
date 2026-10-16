@@ -422,7 +422,10 @@ export const useChatStore = defineStore("chat", () => {
   /** Fetches a chat's transcript; watches its answer if one is running. */
   async function loadChat(id: string): Promise<void> {
     const started = generation;
-    chatLoading.value = true;
+    // Refreshing a chat already on screen stays silent: showing the loading
+    // text would unmount the message list and reset its scroll position.
+    const silent = find(id)?.messagesLoaded === true && id === activeId.value;
+    if (!silent) chatLoading.value = true;
     loadError.value = "";
     try {
       const detail = await storage.detail(id);
