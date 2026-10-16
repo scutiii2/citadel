@@ -105,3 +105,7 @@ node_modules/
 
 # chess real credentials - only .env.example is committed (config_*.json is ignored above).
 /apps/chess/.env
+
+# db_gateway: real credentials and the SQLite files it creates stay local.
+/apps/db_gateway/.env
+/apps/db_gateway/data/
