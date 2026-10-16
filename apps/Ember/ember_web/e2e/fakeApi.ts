@@ -46,6 +46,14 @@ export interface StoredFolder {
   position: number;
 }
 
+export interface StoredNote {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface StoredAccount {
   id: number;
   username: string;
@@ -119,6 +127,8 @@ export interface FakeApi {
   templates: Map<number, StoredTemplate>;
   /** The read-only links of the member's chats. */
   shares: Map<number, StoredShare>;
+  /** The member's private notes (/api/notes). */
+  notes: Map<string, StoredNote>;
   /** What the Settings tab saves: the administrator's "require approval for every tool". */
   settings: { forceToolApproval: boolean };
   /** The accounts the Admin page lists (an administrator login only). */
@@ -203,6 +213,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
     roles: new Map(),
     templates: new Map(),
     shares: new Map(),
+    notes: new Map(),
     unexpected: [],
     turns: [],
     chats: new Map(),
@@ -371,6 +382,9 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
     // An account with tools.use also asks for the slash commands; none are offered here.
     if (method === "GET" && path === "/api/commands") return json(route, []);
 
+    // No page is hidden from the sidebar for everyone.
+    if (method === "GET" && path === "/api/settings/pages") return json(route, { hidden: [] });
+
     // The nav rail arrangement: the default one (nothing saved).
     if (method === "GET" && path === "/api/nav-preferences") return json(route, { order: [], pinned: [], hidden: [] });
 
@@ -380,6 +394,33 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
     if (method === "DELETE" && templatePath) {
       if (!api.templates.delete(Number(templatePath[1]))) return json(route, { detail: "Prompt not found" }, 404);
       return route.fulfill({ status: 204, body: "" });
+    }
+
+    // Private notes, newest edit first. Ids are 32 hex characters, as ember_api makes them.
+    if (path === "/api/notes" && (method === "GET" || method === "POST")) {
+      if (method === "GET") return json(route, [...api.notes.values()].sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
+      const { title, body } = request.postDataJSON() as { title: string; body?: string };
+      if (!title?.trim()) return json(route, { detail: "String should have at least 1 character" }, 422);
+      const id = (api.notes.size + 1).toString(16).padStart(32, "0");
+      const now = new Date().toISOString().slice(0, 19);
+      const note = { id, title: title.trim(), body: body ?? "", created_at: now, updated_at: now };
+      api.notes.set(id, note);
+      return json(route, note, 201);
+    }
+    const notePath = /^\/api\/notes\/([0-9a-f]{32})$/.exec(path);
+    if (notePath) {
+      const note = api.notes.get(notePath[1]!);
+      if (!note) return json(route, { detail: "Note not found" }, 404);
+      if (method === "GET") return json(route, note);
+      if (method === "DELETE") {
+        api.notes.delete(note.id);
+        return route.fulfill({ status: 204, body: "" });
+      }
+      if (method === "PUT") {
+        const { title, body } = request.postDataJSON() as { title: string; body?: string };
+        Object.assign(note, { title: title.trim(), body: body ?? "", updated_at: new Date().toISOString().slice(0, 19) });
+        return json(route, note);
+      }
     }
 
     // Read-only chat links: listing them for one chat, and turning one off.

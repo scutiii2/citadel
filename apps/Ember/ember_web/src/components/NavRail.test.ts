@@ -64,7 +64,7 @@ describe("NavRail", () => {
     const links = pageLinks(wrapper);
 
     // chat.use -> Chat, Agents, Usage, Settings; tools.view or chat.use -> Capabilities
-    expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Capabilities", "Agents", "Usage", "Settings"]);
+    expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Capabilities", "Agents", "Usage", "Notes", "Settings"]);
     for (const link of links) {
       expect(link.text()).toBe("");
       expect(link.find("svg").exists()).toBe(true);
@@ -207,7 +207,7 @@ describe("NavRail", () => {
       arrangement({ order: ["/usage", "/agents"], pinned: ["/usage"], hidden: [] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Usage", "Agents", "Chat", "Capabilities", "Settings"]);
+      expect(labels(wrapper)).toEqual(["Usage", "Agents", "Chat", "Capabilities", "Notes", "Settings"]);
       expect(wrapper.findAll("nav .divider")).toHaveLength(1);
       expect(wrapper.find("nav.pages").element.children[1]!.classList.contains("divider")).toBe(true);
     });
@@ -216,7 +216,7 @@ describe("NavRail", () => {
       arrangement({ order: [], pinned: [], hidden: ["/agents", "/usage"] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Chat", "Capabilities", "Settings"]);
+      expect(labels(wrapper)).toEqual(["Chat", "Capabilities", "Notes", "Settings"]);
       expect(wrapper.find("nav .divider").exists()).toBe(false);
     });
 
@@ -229,7 +229,7 @@ describe("NavRail", () => {
       release({ order: [], pinned: [], hidden: [] });
       await flushPromises();
 
-      expect(pageLinks(wrapper)).toHaveLength(5);
+      expect(pageLinks(wrapper)).toHaveLength(6);
     });
   });
 
@@ -267,7 +267,7 @@ describe("pages hidden by the administrator", () => {
     vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/usage"] });
     const { wrapper } = await setup(ACCOUNT);
 
-    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Capabilities", "Agents", "Games", "Settings"]);
+    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Capabilities", "Agents", "Games", "Notes", "Settings"]);
   });
 
   it("never removes Chat or Settings, even if the list names them", async () => {
@@ -287,6 +287,6 @@ describe("pages hidden by the administrator", () => {
     expect(pageLinks(wrapper)).toHaveLength(0);
     release({ hidden: ["/games"] });
     await flushPromises();
-    expect(pageLinks(wrapper)).toHaveLength(5);
+    expect(pageLinks(wrapper)).toHaveLength(6);
   });
 });
