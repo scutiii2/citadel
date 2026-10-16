@@ -85,6 +85,12 @@ class Settings:
     # Blank LAYA_URL skips Laya; tickets still work.
     tickets_db_path: Path = Path(_env("MCP_TICKETS_DB_PATH", "specifics/tickets/.data/tickets.db"))
     laya_url: str = _env("LAYA_URL", "")
+    # db_gateway, where ember_api keeps per-account notes; the notes capability reads the ones an
+    # account shared with agents. The instance must list the connection (db_gateway's
+    # configs/config_connections.json). The request carries INTERNAL_API_TOKEN.
+    db_gateway_url: str = _env("DB_GATEWAY_URL", "http://127.0.0.1:8071")
+    db_gateway_instance: str = _env("DB_GATEWAY_INSTANCE", "mcp_server")
+    db_gateway_connection: str = _env("DB_GATEWAY_CONNECTION", "data")
     # Tavily API key for the web_research capability. Blank until set in .env;
     # the tools then fail with a message naming the variable.
     tavily_api_key: str = _env("TAVILY_API_KEY", "")

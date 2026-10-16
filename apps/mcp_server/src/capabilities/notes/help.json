@@ -1,0 +1,24 @@
+{
+  "summary": "Read the notes you chose to share with agents. Read-only; only notes with the agent switch turned on are visible.",
+  "tools": [
+    {"name": "tool_notes_listNotes", "purpose": "List the shared notes, optionally one tag.", "connection": "db_gateway (HTTP)", "commands": ["list"]},
+    {"name": "tool_notes_searchNotes", "purpose": "Search the titles and text of the shared notes.", "connection": "db_gateway (HTTP)", "commands": ["search"]},
+    {"name": "tool_notes_readNote", "purpose": "Read one shared note in full.", "connection": "db_gateway (HTTP)", "commands": ["read"]}
+  ],
+  "commands": [
+    {"name": "list", "tool": "tool_notes_listNotes", "params": [
+      {"name": "tag", "required": false, "default": "", "description": "Only notes with this tag."}
+    ]},
+    {"name": "search", "tool": "tool_notes_searchNotes", "params": [
+      {"name": "query", "required": true, "default": null, "description": "Text to look for, case-insensitive."}
+    ]},
+    {"name": "read", "tool": "tool_notes_readNote", "params": [
+      {"name": "note_id", "required": true, "default": null, "description": "The note's id, from the list or a search."}
+    ]}
+  ],
+  "workflow": [
+    {"sequence": "1", "tool": "tool_notes_listNotes", "ai_only_step": false, "explanation": "See which notes are shared, or filter by tag."},
+    {"sequence": "2", "tool": "tool_notes_searchNotes", "ai_only_step": false, "explanation": "Or search for a word."},
+    {"sequence": "3", "tool": "tool_notes_readNote", "ai_only_step": false, "explanation": "Read the notes that matter, by id."}
+  ]
+}
