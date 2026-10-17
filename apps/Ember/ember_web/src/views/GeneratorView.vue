@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { McpServerClient } from "../api/McpServerClient";
+import { onBeforeRouteLeave } from "vue-router";
+import ConfirmModal from "../components/ConfirmModal.vue";
 import CopyButton from "../components/CopyButton.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
@@ -131,17 +133,42 @@ async function run(which: Tab = tab.value): Promise<void> {
   }
 }
 
-// Nothing is generated on its own: only the Generate button makes a value.
-watch(tab, (_now, before) => {
+/** Throws away every generated value (and stops a TOTP refresh and a request in flight). */
+function discard(): void {
+  sequence++;
+  clearTimer();
+  busy.value = false;
+  for (const key of Object.keys(results) as Tab[]) delete results[key];
+}
+
+// Nothing is generated on its own: only the Generate button makes a value, and
+// a value does not outlive its tab or the page.
+watch(tab, () => {
   revealed.value = false;
   error.value = "";
-  // Leaving the TOTP code tab stops its refresh and drops the code, which would be stale
-  // on return; the Generate button makes a new one.
-  if (before === "totp") {
-    clearTimer();
-    delete results.totp;
-  }
+  discard();
 });
+
+/** The leave warning: asked before a tab change or a page change drops a generated value. */
+const leaving = ref<{ page: boolean; resolve: (leave: boolean) => void } | null>(null);
+
+function confirmLeave(page: boolean): Promise<boolean> {
+  return new Promise((resolve) => {
+    leaving.value = { page, resolve };
+  });
+}
+
+function answerLeave(leave: boolean): void {
+  leaving.value?.resolve(leave);
+  leaving.value = null;
+}
+
+async function requestTab(next: Tab): Promise<void> {
+  if (next === tab.value) return;
+  if (!result.value || (await confirmLeave(false))) tab.value = next;
+}
+
+onBeforeRouteLeave(() => (result.value ? confirmLeave(true) : true));
 
 onBeforeUnmount(() => {
   sequence++;
@@ -159,7 +186,15 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
-      <SegmentedControl v-model="tab" aria-label="Generator type" :options="TABS" />
+      <SegmentedControl :model-value="tab" aria-label="Generator type" :options="TABS" @update:model-value="requestTab" />
+      <ConfirmModal
+        :open="leaving !== null"
+        title="Discard the generated value?"
+        :message="`Generated values are not stored. Leaving this ${leaving?.page ? 'page' : 'tab'} removes the one you made, so copy it first if you still need it.`"
+        confirm-label="Discard and leave"
+        @confirm="answerLeave(true)"
+        @close="answerLeave(false)"
+      />
 
       <article class="card panel">
         <form class="options" @submit.prevent="canRun && generate()">

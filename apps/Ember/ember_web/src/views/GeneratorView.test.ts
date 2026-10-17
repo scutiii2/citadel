@@ -1,6 +1,17 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { createMemoryHistory, createRouter } from "vue-router";
 import GeneratorView from "./GeneratorView.vue";
+
+// jsdom has no <dialog> methods.
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+    this.setAttribute("open", "");
+  };
+  HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+    this.removeAttribute("open");
+  };
+});
 
 const mocks = vi.hoisted(() => ({ runTool: vi.fn() }));
 vi.mock("../api/McpServerClient", () => ({
@@ -23,7 +34,7 @@ async function show() {
 const tabButton = (w: Awaited<ReturnType<typeof show>>, label: string) =>
   w.findAll("button").find((b) => b.text() === label)!;
 
-async function generate(w: Awaited<ReturnType<typeof show>>) {
+async function generate(w: { get(selector: string): { trigger(event: string): Promise<void> } }) {
   await w.get("form").trigger("submit");
   await flushPromises();
 }
@@ -131,6 +142,84 @@ describe("GeneratorView", () => {
     await vi.advanceTimersByTimeAsync(20_300);
     expect(mocks.runTool).toHaveBeenCalledWith("tool_gen_getTotpCode", expect.objectContaining({ secret: "JBSWY3DPEHPK3PXP" }));
     w.unmount();
+  });
+
+  describe("leaving with a generated value", () => {
+    const dialogButton = (label: string) =>
+      [...document.body.querySelectorAll("dialog button")].find((b) => b.textContent?.trim() === label) as HTMLButtonElement | undefined;
+
+    it("switches tabs without a question when nothing was generated", async () => {
+      const w = await show();
+
+      await tabButton(w, "PIN").trigger("click");
+      await flushPromises();
+
+      expect(w.find("dialog[open]").exists()).toBe(false);
+      expect(w.text()).toContain("Digits: 6");
+    });
+
+    it("warns before another tab drops the value, and keeps it when cancelled", async () => {
+      const w = mount(GeneratorView, { attachTo: document.body });
+      await flushPromises();
+      await generate(w);
+
+      await tabButton(w, "PIN").trigger("click");
+      await flushPromises();
+      expect(document.body.querySelector("dialog[open]")?.textContent).toContain("Generated values are not stored");
+      dialogButton("Cancel")!.click();
+      await flushPromises();
+
+      expect(w.text()).toContain("Length: 20");
+      expect(w.find("[data-testid=generated-value]").exists()).toBe(true);
+      w.unmount();
+    });
+
+    it("removes every generated value once the tab change is confirmed", async () => {
+      const w = mount(GeneratorView, { attachTo: document.body });
+      await flushPromises();
+      await generate(w);
+
+      await tabButton(w, "PIN").trigger("click");
+      await flushPromises();
+      dialogButton("Discard and leave")!.click();
+      await flushPromises();
+
+      expect(w.text()).toContain("Digits: 6");
+      expect(w.find("[data-testid=generated-value]").exists()).toBe(false);
+      await tabButton(w, "Password").trigger("click");
+      await flushPromises();
+      expect(w.find("[data-testid=generated-value]").exists()).toBe(false);
+      w.unmount();
+    });
+
+    it("warns before the page is left, and stays when cancelled", async () => {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/generator", component: GeneratorView },
+          { path: "/other", component: { template: "<div />" } },
+        ],
+      });
+      await router.push("/generator");
+      const w = mount({ template: "<RouterView />" }, { global: { plugins: [router] }, attachTo: document.body });
+      await flushPromises();
+      await generate(w);
+
+      void router.push("/other");
+      await flushPromises();
+      expect(router.currentRoute.value.path).toBe("/generator");
+      expect(document.body.querySelector("dialog[open]")?.textContent).toContain("Leaving this page");
+      dialogButton("Cancel")!.click();
+      await flushPromises();
+      expect(router.currentRoute.value.path).toBe("/generator");
+
+      void router.push("/other");
+      await flushPromises();
+      dialogButton("Discard and leave")!.click();
+      await flushPromises();
+      expect(router.currentRoute.value.path).toBe("/other");
+      w.unmount();
+    });
   });
 
   it("shows the tool's error", async () => {
