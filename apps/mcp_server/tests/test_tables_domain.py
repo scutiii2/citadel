@@ -64,6 +64,41 @@ def test_head_returns_the_first_rows_capped(registry, table_id):
         domain.head(registry, "alice", table_id, limit=51)
 
 
+def test_rows_with_nothing_else_are_the_first_rows(registry, table_id):
+    assert domain.rows(registry, "alice", table_id, limit=2) == domain.head(registry, "alice", table_id, 2)
+    assert domain.rows(registry, "alice", table_id).shown == 5
+    assert domain.rows(registry, "alice", table_id, conditions=[], sort_by="  ") == domain.head(registry, "alice", table_id, 10)
+
+
+def test_rows_with_conditions_are_the_filtered_rows(registry, table_id):
+    conditions = [cond("region", "=", "EU"), cond("units", ">", 5)]
+
+    assert domain.rows(registry, "alice", table_id, conditions) == domain.filter_rows(registry, "alice", table_id, conditions, 10)
+
+
+def test_rows_with_sort_by_are_the_highest_or_lowest_rows(registry, table_id):
+    top = domain.rows(registry, "alice", table_id, sort_by="units", limit=2)
+    bottom = domain.rows(registry, "alice", table_id, sort_by="units", descending=False, limit=2)
+
+    assert top == domain.top_n(registry, "alice", table_id, "units", 2, True, None)
+    assert [row[2] for row in top.rows] == [20, 10]
+    assert [row[2] for row in bottom.rows] == [5, 7]
+
+
+def test_rows_filter_before_they_rank(registry, table_id):
+    result = domain.rows(registry, "alice", table_id, [cond("region", "=", "US")], sort_by="units", limit=5)
+
+    assert [row[2] for row in result.rows] == [20]
+    assert result.total_matches == 1
+
+
+def test_rows_keep_the_rules_of_the_function_they_call(registry, table_id):
+    with pytest.raises(ValueError, match="Rank by a number or date column"):
+        domain.rows(registry, "alice", table_id, sort_by="region")
+    with pytest.raises(ValueError):
+        domain.rows(registry, "alice", table_id, limit=0)
+
+
 def test_filter_combines_conditions_with_and(registry, table_id):
     result = domain.filter_rows(registry, "alice", table_id, [cond("units", ">=", 7), cond("region", "=", "eu")])
 

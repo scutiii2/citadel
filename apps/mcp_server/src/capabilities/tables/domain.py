@@ -85,6 +85,25 @@ def describe(registry: TableRegistry, owner: str, table_id: str) -> DescribeResu
     )
 
 
+def rows(
+    registry: TableRegistry,
+    owner: str,
+    table_id: str,
+    conditions: list[Condition] | None = None,
+    sort_by: str = "",
+    descending: bool = True,
+    limit: int = 10,
+) -> RowsResult:
+    """The rows of a table: ranked by `sort_by` when one is given, else those that
+    satisfy `conditions`, else the first ones. One entry point over `top_n`,
+    `filter_rows` and `head`, which keep their own rules and messages."""
+    if sort_by.strip():
+        return top_n(registry, owner, table_id, sort_by, limit, descending, conditions)
+    if conditions:
+        return filter_rows(registry, owner, table_id, conditions, limit)
+    return head(registry, owner, table_id, limit)
+
+
 def head(registry: TableRegistry, owner: str, table_id: str, limit: int = 10) -> RowsResult:
     table = _table(registry, owner, table_id)
     _check_limit(limit, MAX_ROWS_SHOWN)

@@ -16,18 +16,17 @@ A restart, or 30 minutes, drops the table: attach the file again.
 | --- | --- |
 | `tool_tables_listTables` | The caller's tables with ids and minutes left. |
 | `tool_tables_describe` | Per column: type, empty cells, distinct values, min / max / mean, common text values. |
-| `tool_tables_head` | The first rows. |
-| `tool_tables_filter` | Rows that satisfy up to 5 conditions (AND). |
+| `tool_tables_rows` | Rows of the table: with `sort_by` the highest or lowest by a number or date column (empty cells skipped), with `conditions` only rows that satisfy up to 5 conditions (AND), with neither the first rows. Conditions apply before ranking. |
 | `tool_tables_aggregate` | sum / mean / count / min / max per group (up to 2 group columns), optional filter, sort, limit. |
-| `tool_tables_topN` | Highest or lowest rows by a number or date column. |
 | `tool_tables_valueCounts` | How often each value appears in a column. |
 
 ## Slash commands
 
 `/data list`, `/data describe table_id=...`, `/data head table_id=... limit=10`,
-`/data top table_id=... column=... n=10 largest=true`, `/data counts table_id=... column=... limit=20`. The filter and
-aggregate tools take structured arguments, so they are for the agent only. `/data top` has no `conditions`; the agent
-can still pass them.
+`/data top table_id=... sort_by=... limit=10 descending=true`, `/data counts table_id=... column=... limit=20`.
+`/data head` and `/data top` are two commands over the one `tool_tables_rows`; without `sort_by`, `/data top` behaves
+like `head`. The aggregate tool takes structured arguments, so it is for the agent only, and `conditions` on `rows`
+cannot be given from a command; the agent can pass them.
 
 ## Limits
 
