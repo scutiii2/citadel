@@ -1,0 +1,300 @@
+"""Decision layer: ask a small classifier model "which option fits, and how sure".
+
+One interface, several backends. A backend is a module in this package with
+`ID`, `available()` and `ask_choice(subject, criteria, question, timeout)`:
+
+| id           | module                 | what it is                                          |
+|--------------|------------------------|-----------------------------------------------------|
+| `jev`        | typesafe_classifier    | TypeSafe's own Jev API (real probabilities)         |
+| `jev_vercel` | jev_classifier         | Jev through Vercel AI Gateway (self-reported 0-100) |
+| `laya`       | laya_classifier        | the local Laya model (512-token window)             |
+
+A feature (`triage`, `auto_tier`, `auto_route`) names a chain of backends in
+config_tuning.json's `classifier.chains`. The chain is walked in order: a backend
+without a key, one that fails, or (when the caller gives `min_confidence`) one that
+is not confident enough hands over to the next. The last answer is returned, so the
+caller still applies its own threshold. No usable answer raises ClassifierError,
+which a caller treats as "no answer" and carries on without.
+
+All off by default. A feature runs only when its section in `classifier` turns it
+on and a backend of its chain is available. Text sent to a remote backend leaves
+this machine, and each call is billed by that backend.
+"""
+
+from __future__ import annotations
+
+import importlib
+import json
+import logging
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, field
+from functools import lru_cache
+from typing import Any, Mapping
+
+from src.core.catalog import catalog
+from src.core.config_files import TUNING_PATH, read_section
+
+_log = logging.getLogger(__name__)
+
+_SECTION = "classifier"
+FEATURES = ("triage", "auto_tier", "auto_route")
+DEFAULT_CHAIN = ("jev", "jev_vercel")
+_BACKENDS = {
+    "jev": "src.llm.typesafe_classifier",
+    "jev_vercel": "src.llm.jev_classifier",
+    "laya": "src.llm.laya_classifier",
+}
+_KNOWN = {"typesafe", "vercel", "chains", "timeout_seconds", "max_input_chars", "triage_fallback", "auto_tier", "auto_route"}
+_BACKEND_KNOWN = {"url", "model"}
+_AUTO_TIER_KNOWN = {"enabled", "min_confidence", "tiers"}
+_AUTO_ROUTE_KNOWN = {"enabled", "min_confidence"}
+
+# How hard a request is, as the ClaudeRouters size classifier names it.
+SIZE_CRITERIA = {
+    "tiny": "a lookup, a rename, a one-line answer",
+    "everyday": "a normal email, post, or short document",
+    "large": "a multi-step build, research, a full report",
+    "hardest": "strategy, or anything where a wrong call is expensive",
+}
+SIZE_QUESTION = "How big is this request?"
+DEFAULT_SIZE_TIERS = (("tiny", "light"), ("everyday", "light"), ("large", "standard"), ("hardest", "heavy"))
+
+
+class ClassifierError(Exception):
+    """No backend gave a usable answer; the message says why."""
+
+
+@dataclass(frozen=True)
+class Choice:
+    choice: str
+    confidence: int  # 0-100; each backend's own measure, not a calibrated probability
+    prompt_tokens: int
+    backend: str = ""  # the backend id that answered
+    model: str = ""
+
+
+@dataclass(frozen=True)
+class BackendSettings:
+    url: str
+    model: str
+
+
+@dataclass(frozen=True)
+class AutoTierSettings:
+    """Choosing a turn's model tier from how hard the question looks (llm/auto_tier.py)."""
+
+    enabled: bool = False
+    # Confidence (0-100) needed before the size is used; below it the default model runs.
+    min_confidence: int = 60
+    # request size -> model tier; the agent's own min_tier/max_tier still clamp the result.
+    tiers: tuple[tuple[str, str], ...] = DEFAULT_SIZE_TIERS
+
+
+@dataclass(frozen=True)
+class AutoRouteSettings:
+    """Sending a question straight to a specialist, without the orchestrator's own model call
+    (agents/auto_route.py)."""
+
+    enabled: bool = False
+    # Confidence (0-100) needed before a specialist is picked; below it the orchestrator answers.
+    min_confidence: int = 60
+
+
+@dataclass(frozen=True)
+class ClassifierSettings:
+    typesafe: BackendSettings = BackendSettings("https://api.typesafe.ai/v1/systemone", "jev-latest")
+    vercel: BackendSettings = BackendSettings("https://ai-gateway.vercel.sh/v1/chat/completions", "typesafe-ai/jev")
+    # feature -> backend ids in the order they are tried; a feature not listed uses DEFAULT_CHAIN.
+    chains: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    timeout_seconds: float = 3.0
+    # Longest text sent for a typed question. Laya reads at most 4000 characters;
+    # a remote backend has a larger window, so longer texts go to it instead.
+    max_input_chars: int = 16_000
+    # Re-ask a remote backend about the answers Laya is unsure of, and about texts Laya cannot read.
+    triage_fallback: bool = False
+    auto_tier: AutoTierSettings = AutoTierSettings()
+    auto_route: AutoRouteSettings = AutoRouteSettings()
+
+    def chain(self, feature: str) -> tuple[str, ...]:
+        return self.chains.get(feature, DEFAULT_CHAIN)
+
+
+@catalog
+def settings() -> ClassifierSettings:
+    """The `classifier` section of config_tuning.json over the defaults above (all off)."""
+    return _load_settings()
+
+
+@lru_cache(maxsize=1)
+def _load_settings() -> ClassifierSettings:
+    raw = read_section(TUNING_PATH, _SECTION, {})
+    if not isinstance(raw, dict):
+        raise ValueError(f"config_tuning.json {_SECTION} must be an object")
+    unknown = set(raw) - _KNOWN
+    if unknown:
+        raise ValueError(f"config_tuning.json {_SECTION} has unknown field(s): {', '.join(sorted(unknown))}")
+    base = ClassifierSettings()
+    timeout = raw.get("timeout_seconds", base.timeout_seconds)
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 0 < timeout <= 60:
+        raise ValueError(f"config_tuning.json {_SECTION}.timeout_seconds must be a number above 0 and at most 60")
+    cap = raw.get("max_input_chars", base.max_input_chars)
+    if isinstance(cap, bool) or not isinstance(cap, int) or cap < 1:
+        raise ValueError(f"config_tuning.json {_SECTION}.max_input_chars must be a positive integer")
+    if not isinstance(raw.get("triage_fallback", False), bool):
+        raise ValueError(f"config_tuning.json {_SECTION}.triage_fallback must be true or false")
+    return ClassifierSettings(
+        typesafe=_backend_settings("typesafe", raw.get("typesafe", {}), base.typesafe),
+        vercel=_backend_settings("vercel", raw.get("vercel", {}), base.vercel),
+        chains=_chains(raw.get("chains", {})),
+        timeout_seconds=float(timeout), max_input_chars=cap, triage_fallback=raw.get("triage_fallback", False),
+        auto_tier=_auto_tier_settings(raw.get("auto_tier", {})),
+        auto_route=_auto_route_settings(raw.get("auto_route", {})),
+    )
+
+
+def _backend_settings(name: str, raw: Any, base: BackendSettings) -> BackendSettings:
+    where = f"config_tuning.json {_SECTION}.{name}"
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} must be an object")
+    unknown = set(raw) - _BACKEND_KNOWN
+    if unknown:
+        raise ValueError(f"{where} has unknown field(s): {', '.join(sorted(unknown))}")
+    values = {}
+    for key in ("url", "model"):
+        value = raw.get(key, getattr(base, key))
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{where}.{key} must be a non-empty string")
+        values[key] = value.strip()
+    return BackendSettings(**values)
+
+
+def _chains(raw: Any) -> dict[str, tuple[str, ...]]:
+    where = f"config_tuning.json {_SECTION}.chains"
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} must be an object of feature: [backend, ...]")
+    chains: dict[str, tuple[str, ...]] = {}
+    for feature, ids in raw.items():
+        if feature not in FEATURES:
+            raise ValueError(f"{where} names an unknown feature {feature!r} (use {', '.join(FEATURES)})")
+        if not isinstance(ids, list) or not ids or any(i not in _BACKENDS for i in ids) or len(set(ids)) != len(ids):
+            raise ValueError(f"{where}.{feature} must be a list of distinct backends from: {', '.join(_BACKENDS)}")
+        chains[feature] = tuple(ids)
+    return chains
+
+
+def _auto_route_settings(raw: Any) -> AutoRouteSettings:
+    where = f"config_tuning.json {_SECTION}.auto_route"
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} must be an object")
+    unknown = set(raw) - _AUTO_ROUTE_KNOWN
+    if unknown:
+        raise ValueError(f"{where} has unknown field(s): {', '.join(sorted(unknown))}")
+    if not isinstance(raw.get("enabled", False), bool):
+        raise ValueError(f"{where}.enabled must be true or false")
+    confidence = raw.get("min_confidence", AutoRouteSettings.min_confidence)
+    if isinstance(confidence, bool) or not isinstance(confidence, int) or not 0 <= confidence <= 100:
+        raise ValueError(f"{where}.min_confidence must be an integer from 0 to 100")
+    return AutoRouteSettings(enabled=raw.get("enabled", False), min_confidence=confidence)
+
+
+def _auto_tier_settings(raw: Any) -> AutoTierSettings:
+    from src.agents.agent_spec import TIERS  # imported here: agent_spec pulls in the llm package
+
+    where = f"config_tuning.json {_SECTION}.auto_tier"
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} must be an object")
+    unknown = set(raw) - _AUTO_TIER_KNOWN
+    if unknown:
+        raise ValueError(f"{where} has unknown field(s): {', '.join(sorted(unknown))}")
+    if not isinstance(raw.get("enabled", False), bool):
+        raise ValueError(f"{where}.enabled must be true or false")
+    confidence = raw.get("min_confidence", AutoTierSettings.min_confidence)
+    if isinstance(confidence, bool) or not isinstance(confidence, int) or not 0 <= confidence <= 100:
+        raise ValueError(f"{where}.min_confidence must be an integer from 0 to 100")
+    mapping = dict(DEFAULT_SIZE_TIERS)
+    given = raw.get("tiers", {})
+    if not isinstance(given, dict):
+        raise ValueError(f"{where}.tiers must be an object of size: tier")
+    for size, tier in given.items():
+        if size not in SIZE_CRITERIA or tier not in TIERS:
+            raise ValueError(f"{where}.tiers maps a size ({', '.join(SIZE_CRITERIA)}) to a tier ({', '.join(TIERS)})")
+        mapping[size] = tier
+    return AutoTierSettings(enabled=raw.get("enabled", False), min_confidence=confidence, tiers=tuple(mapping.items()))
+
+
+def reset_cache() -> None:
+    """Forget the loaded settings (tests, and a config edit in a long-lived process)."""
+    _load_settings.cache_clear()
+
+
+def post_json(url: str, payload: dict[str, Any], key: str, timeout: float, what: str) -> dict[str, Any]:
+    """POST `payload` as JSON with a bearer key; every failure is a ClassifierError naming `what`."""
+    request = urllib.request.Request(
+        url, data=json.dumps(payload).encode("utf-8"), method="POST",
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        raise ClassifierError(f"{what} answered HTTP {error.code}") from error
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        raise ClassifierError(f"{what} could not be reached: {error}") from error
+    except ValueError as error:
+        raise ClassifierError(f"{what} sent something that is not JSON") from error
+
+
+def _backend(backend_id: str) -> Any:
+    return importlib.import_module(_BACKENDS[backend_id])
+
+
+def _usable(feature: str, exclude: tuple[str, ...]) -> list[str]:
+    return [i for i in settings().chain(feature) if i not in exclude and _backend(i).available()]
+
+
+def available(feature: str, exclude: tuple[str, ...] = ()) -> bool:
+    """True when some backend of the feature's chain can be asked; whether the feature is switched on is `settings()`."""
+    return bool(_usable(feature, exclude))
+
+
+@catalog
+def ask_choice(
+    subject: str, criteria: Mapping[str, str], question: str, feature: str, *,
+    min_confidence: int | None = None, exclude: tuple[str, ...] = (), timeout: float | None = None,
+) -> Choice:
+    """Which of `criteria` (option -> one-line description) answers `question` about `subject`, and
+    how sure, walking the feature's backend chain. `min_confidence` (0-100) hands a less sure answer
+    on to the next backend; the last answer is returned either way. Raises ClassifierError when
+    nothing could be asked or every backend failed."""
+    if len(criteria) < 2:
+        raise ClassifierError("a choice needs at least two options")
+    if feature not in FEATURES:
+        raise ValueError(f"unknown classifier feature {feature!r}")
+    limit = timeout or settings().timeout_seconds
+    chain = _usable(feature, exclude)
+    if not chain:
+        raise ClassifierError(f"no classifier backend is available for {feature} (chain: {', '.join(settings().chain(feature))})")
+    answer: Choice | None = None
+    failure: ClassifierError | None = None
+    for backend_id in chain:
+        try:
+            answer = _backend(backend_id).ask_choice(subject, criteria, question, limit)
+        except ClassifierError as error:
+            _log.warning("classifier backend %s could not answer: %s", backend_id, error)
+            failure = error
+            continue
+        if min_confidence is None or answer.confidence >= min_confidence:
+            break
+    if answer is None:
+        raise failure or ClassifierError("no classifier backend answered")
+    return answer
+
+
+@catalog
+def classify_size(message: str, timeout: float | None = None) -> Choice:
+    """How hard `message` looks: one of SIZE_CRITERIA's names, with the backend's confidence."""
+    return ask_choice(
+        message, SIZE_CRITERIA, SIZE_QUESTION, "auto_tier",
+        min_confidence=settings().auto_tier.min_confidence, timeout=timeout,
+    )

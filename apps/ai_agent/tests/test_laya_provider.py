@@ -237,32 +237,32 @@ def test_other_model_ids_cannot_be_used(engine):
     assert not engine.calls
 
 
-# --- Jev as the remote fallback (llm/jev_classifier.py) ---------------------------------------------
+# --- Jev as the remote fallback (llm/decision.py) ---------------------------------------------
 
-from src.llm import jev_classifier  # noqa: E402
+from src.llm import decision  # noqa: E402
 
 
 def jev_on(monkeypatch, picks, max_input_chars=16_000):
     """Switch the fallback on; `picks` maps a question's instructions to a Choice or an error."""
-    config = jev_classifier.ClassifierSettings(triage_fallback=True, max_input_chars=max_input_chars)
-    monkeypatch.setattr(jev_classifier, "settings", lambda: config)
-    monkeypatch.setattr(jev_classifier, "available", lambda: True)
+    config = decision.ClassifierSettings(triage_fallback=True, max_input_chars=max_input_chars)
+    monkeypatch.setattr(decision, "settings", lambda: config)
+    monkeypatch.setattr(decision, "available", lambda *a, **k: True)
     asked = []
 
-    def ask_choice(subject, criteria, timeout=None):
-        asked.append((subject, dict(criteria)))
-        outcome = next(v for k, v in picks.items() if k in subject)
+    def ask_choice(subject, criteria, question, feature, **kwargs):
+        asked.append((question, dict(criteria)))
+        outcome = next(v for k, v in picks.items() if k in question)
         if isinstance(outcome, Exception):
             raise outcome
         return outcome
 
-    monkeypatch.setattr(jev_classifier, "ask_choice", ask_choice)
+    monkeypatch.setattr(decision, "ask_choice", ask_choice)
     return asked
 
 
 def test_jev_is_not_asked_unless_the_fallback_is_on(engine, monkeypatch):
     engine.result = prediction(confidence=0.2)
-    monkeypatch.setattr(jev_classifier, "ask_choice", lambda *a, **k: pytest.fail("Jev must not be called"))
+    monkeypatch.setattr(decision, "ask_choice", lambda *a, **k: pytest.fail("Jev must not be called"))
 
     result = payload(ask())
 
@@ -273,7 +273,7 @@ def test_an_uncertain_choice_goes_to_jev_and_a_sure_one_stays_with_laya(engine, 
     low = prediction()
     low["answers"]["category"]["answer_confidence"] = 0.3
     engine.result = low
-    asked = jev_on(monkeypatch, {"Which category?": jev_classifier.Choice("network", 90, 50)})
+    asked = jev_on(monkeypatch, {"Which category?": decision.Choice("network", 90, 50, "jev")})
 
     result = ask()
     answers = payload(result)["answers"]
@@ -290,9 +290,9 @@ def test_an_uncertain_choice_goes_to_jev_and_a_sure_one_stays_with_laya(engine, 
 def test_a_jev_answer_below_the_threshold_is_still_marked_uncertain(engine, monkeypatch):
     engine.result = prediction(confidence=0.2)
     jev_on(monkeypatch, {
-        "Which category?": jev_classifier.Choice("network", 60, 10),
-        "How severe?": jev_classifier.Choice("2", 95, 10),
-        "Is there a problem?": jev_classifier.Choice("false", 90, 10),
+        "Which category?": decision.Choice("network", 60, 10, "jev"),
+        "How severe?": decision.Choice("2", 95, 10, "jev"),
+        "Is there a problem?": decision.Choice("false", 90, 10, "jev"),
     })
 
     answers = payload(ask())["answers"]
@@ -305,9 +305,9 @@ def test_a_jev_answer_below_the_threshold_is_still_marked_uncertain(engine, monk
 def test_score_and_noul_questions_are_sent_to_jev_as_named_options(engine, monkeypatch):
     engine.result = prediction(confidence=0.2)
     asked = jev_on(monkeypatch, {
-        "Which category?": jev_classifier.Choice("network", 90, 1),
-        "How severe?": jev_classifier.Choice("1", 90, 1),
-        "Is there a problem?": jev_classifier.Choice("true", 80, 1),
+        "Which category?": decision.Choice("network", 90, 1, "jev"),
+        "How severe?": decision.Choice("1", 90, 1, "jev"),
+        "Is there a problem?": decision.Choice("true", 80, 1, "jev"),
     })
 
     result = payload(ask())
@@ -322,7 +322,7 @@ def test_score_and_noul_questions_are_sent_to_jev_as_named_options(engine, monke
 
 def test_a_failing_jev_leaves_layas_unsure_answer_as_it_was(engine, monkeypatch):
     engine.result = prediction(confidence=0.2)
-    jev_on(monkeypatch, {"?": jev_classifier.ClassifierError("down")})
+    jev_on(monkeypatch, {"?": decision.ClassifierError("down")})
 
     result = ask()
     data = payload(result)
@@ -333,9 +333,9 @@ def test_a_failing_jev_leaves_layas_unsure_answer_as_it_was(engine, monkeypatch)
 
 def test_a_text_too_long_for_laya_goes_to_jev_without_asking_laya(engine, monkeypatch):
     asked = jev_on(monkeypatch, {
-        "Which category?": jev_classifier.Choice("database", 90, 30),
-        "How severe?": jev_classifier.Choice("2", 90, 30),
-        "Is there a problem?": jev_classifier.Choice("true", 90, 30),
+        "Which category?": decision.Choice("database", 90, 30, "jev"),
+        "How severe?": decision.Choice("2", 90, 30, "jev"),
+        "Is there a problem?": decision.Choice("true", 90, 30, "jev"),
     })
     long_text = "x " * 3000
 
@@ -350,9 +350,9 @@ def test_input_laya_cannot_read_in_full_goes_to_jev(engine, monkeypatch):
     engine.result = prediction()
     engine.result["usage"]["truncated"] = True
     jev_on(monkeypatch, {
-        "Which category?": jev_classifier.Choice("database", 90, 5),
-        "How severe?": jev_classifier.Choice("1", 90, 5),
-        "Is there a problem?": jev_classifier.Choice("true", 90, 5),
+        "Which category?": decision.Choice("database", 90, 5, "jev"),
+        "How severe?": decision.Choice("1", 90, 5, "jev"),
+        "Is there a problem?": decision.Choice("true", 90, 5, "jev"),
     })
 
     answers = payload(ask())["answers"]
@@ -364,16 +364,16 @@ def test_input_laya_cannot_read_in_full_goes_to_jev(engine, monkeypatch):
 def test_unreadable_input_with_a_failing_jev_returns_no_answers(engine, monkeypatch):
     engine.result = prediction()
     engine.result["usage"]["truncated"] = True
-    jev_on(monkeypatch, {"?": jev_classifier.ClassifierError("the gateway answered HTTP 500")})
+    jev_on(monkeypatch, {"?": decision.ClassifierError("the gateway answered HTTP 500")})
 
-    with pytest.raises(ValueError, match="could not read the complete input.*Jev could not answer either.*HTTP 500"):
+    with pytest.raises(ValueError, match="could not read the complete input.*The fallback classifier could not answer either.*HTTP 500"):
         ask()
 
 
 def test_unreadable_input_with_jev_unavailable_keeps_the_old_message(engine, monkeypatch):
     engine.result = prediction()
     engine.result["usage"]["truncated"] = True
-    monkeypatch.setattr(jev_classifier, "available", lambda: False)
+    monkeypatch.setattr(decision, "available", lambda *a, **k: False)
 
     with pytest.raises(ValueError, match="could not read the complete input"):
         ask()

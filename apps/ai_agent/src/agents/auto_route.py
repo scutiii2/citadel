@@ -1,7 +1,7 @@
 """Send a question straight to a specialist, without the orchestrator's own model call.
 
-When config_tuning.json's `classifier.auto_route.enabled` is on and a key is set
-(llm/jev_classifier.py), an orchestrator's top-level turn first asks the remote
+When config_tuning.json's `classifier.auto_route.enabled` is on and a backend of the
+auto_route chain is available (llm/decision.py), an orchestrator's top-level turn first asks the
 classifier which specialist, if any, fits the question. A confident pick is handed
 to that specialist exactly as a `delegate_to_agent` call would be (same events,
 same usage rows) and its answer becomes the turn's answer, so the orchestrator's
@@ -12,7 +12,7 @@ planner is a helper the orchestrator chooses itself), and only when the turn nee
 no approval to delegate: with "ask" the orchestrator asks the user the usual way.
 A specialist that fails is reported, not retried: it may already have acted.
 The text sent to the classifier is the question and the last assistant message
-(clipped); it leaves this machine, and each call is billed by the gateway.
+(clipped); a remote backend sends it off this machine and bills each call.
 """
 
 from __future__ import annotations
@@ -27,12 +27,13 @@ import anyio.to_thread
 from src.agents import agent_routing, delegation
 from src.agents.agent_spec import RosterEntry
 from src.core import approvals
-from src.llm import cancellation, jev_classifier
+from src.llm import cancellation, decision
 from src.llm.base_provider import ChatCancelled, ChatResult, OnEvent, ToolCallRecord, dispatch_with_progress, step_event
 
 _log = logging.getLogger(__name__)
 
 NONE = "none"
+QUESTION = "Which specialist should handle the user's latest message?"
 _FOCUS_CHARS = 160
 # What the classifier sees of the assistant's last message: its end, where a follow-up points.
 _CLASSIFIER_CONTEXT_CHARS = 300
@@ -45,10 +46,12 @@ class Route:
     entry: RosterEntry
     confidence: int
     prompt_tokens: int
+    backend: str
+    model: str
 
 
 def enabled() -> bool:
-    return jev_classifier.settings().auto_route.enabled and jev_classifier.available()
+    return decision.settings().auto_route.enabled and decision.available("auto_route")
 
 
 def routable(roster: list[RosterEntry]) -> list[RosterEntry]:
@@ -64,7 +67,7 @@ def _last_assistant(history: list[dict[str, Any]]) -> str:
 
 
 def _subject(question: str, history: list[dict[str, Any]], cap: int) -> str:
-    lines = ["Which specialist should handle the user's latest message?"]
+    lines = []
     previous = _last_assistant(history)
     if previous:
         lines.append(f"Previous assistant message: {previous[-_CLASSIFIER_CONTEXT_CHARS:]}")
@@ -85,20 +88,23 @@ async def pick(question: str, history: list[dict[str, Any]], roster: list[Roster
     text = question.strip()
     if not candidates or not text:
         return None
-    config = jev_classifier.settings()
+    config = decision.settings()
     criteria = {entry.id: (entry.focus or entry.label)[:_FOCUS_CHARS] for entry in candidates}
     criteria[NONE] = "no specialist is needed: a general assistant should answer"
     try:
         picked = await anyio.to_thread.run_sync(
-            jev_classifier.ask_choice, _subject(text, history, config.max_input_chars), criteria
+            lambda: decision.ask_choice(
+                _subject(text, history, config.max_input_chars), criteria, QUESTION, "auto_route",
+                min_confidence=config.auto_route.min_confidence,
+            )
         )
-    except jev_classifier.ClassifierError as error:
+    except decision.ClassifierError as error:
         _log.warning("auto route skipped: %s", error)
         return None
     if picked.choice == NONE or picked.confidence < config.auto_route.min_confidence:
         return None
     entry = next((e for e in candidates if e.id == picked.choice), None)
-    return Route(entry, picked.confidence, picked.prompt_tokens) if entry else None
+    return Route(entry, picked.confidence, picked.prompt_tokens, picked.backend, picked.model) if entry else None
 
 
 async def try_route(
@@ -132,8 +138,8 @@ async def try_route(
         response=text,
         tools_used=[delegation.TOOL_NAME],
         tool_calls=[ToolCallRecord(name=delegation.TOOL_NAME, arguments=arguments, result=text)],
-        provider_id="jev",
-        model=jev_classifier.settings().model,
+        provider_id=route.backend,
+        model=route.model,
         total_tokens=route.prompt_tokens,
         input_tokens=route.prompt_tokens,
         output_tokens=0,

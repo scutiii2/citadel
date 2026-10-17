@@ -9,7 +9,7 @@ import pytest
 
 from src.agents import agent_config, agent_spec
 from src.agents.agent_spec import AgentSpec, LlmSpec, TierInfo
-from src.llm import auto_tier, jev_classifier, model_tiers
+from src.llm import auto_tier, decision, model_tiers
 from src.llm.base_provider import ChatResult
 
 LIGHT = TierInfo("light", "haiku", "quick")
@@ -19,27 +19,27 @@ HEAVY = TierInfo("heavy", "opus", "hard")
 
 @pytest.fixture(autouse=True)
 def fresh_settings():
-    jev_classifier.reset_cache()
+    decision.reset_cache()
     yield
-    jev_classifier.reset_cache()
+    decision.reset_cache()
 
 
 def switch_on(monkeypatch, *, enabled=True, key=True, section=None, size=("everyday", 90), error=None):
     """Settings with auto tier on, a key, and a fake classifier; returns the list of messages it was asked."""
-    config = jev_classifier.ClassifierSettings(
-        auto_tier=jev_classifier.AutoTierSettings(enabled=enabled, **(section or {}))
+    config = decision.ClassifierSettings(
+        auto_tier=decision.AutoTierSettings(enabled=enabled, **(section or {}))
     )
-    monkeypatch.setattr(jev_classifier, "settings", lambda: config)
-    monkeypatch.setattr(jev_classifier, "available", lambda: key)
+    monkeypatch.setattr(decision, "settings", lambda: config)
+    monkeypatch.setattr(decision, "available", lambda *a, **k: key)
     asked = []
 
     def classify_size(message, timeout=None):
         asked.append(message)
         if error:
             raise error
-        return jev_classifier.Choice(size[0], size[1], 20)
+        return decision.Choice(size[0], size[1], 20)
 
-    monkeypatch.setattr(jev_classifier, "classify_size", classify_size)
+    monkeypatch.setattr(decision, "classify_size", classify_size)
     return asked
 
 
@@ -80,7 +80,7 @@ def test_a_low_confidence_keeps_the_default_model(monkeypatch):
 
 
 def test_a_failing_classifier_keeps_the_default_model(monkeypatch):
-    switch_on(monkeypatch, error=jev_classifier.ClassifierError("down"))
+    switch_on(monkeypatch, error=decision.ClassifierError("down"))
     assert pick() is None
 
 
@@ -93,7 +93,7 @@ def test_a_short_follow_up_is_not_classified_but_a_first_message_is(monkeypatch)
 
 def test_the_classifier_gets_at_most_the_configured_characters(monkeypatch):
     asked = switch_on(monkeypatch)
-    cap = jev_classifier.settings().max_input_chars
+    cap = decision.settings().max_input_chars
     pick("x" * (cap + 500))
     assert len(asked[0]) == cap
 
@@ -101,19 +101,19 @@ def test_the_classifier_gets_at_most_the_configured_characters(monkeypatch):
 # --- the settings -----------------------------------------------------------------------------
 
 def use_section(monkeypatch, section):
-    monkeypatch.setattr(jev_classifier, "read_section", lambda path, name, default=None: section)
+    monkeypatch.setattr(decision, "read_section", lambda path, name, default=None: section)
 
 
 def test_auto_tier_is_off_by_default_with_the_documented_map(monkeypatch):
     use_section(monkeypatch, {})
-    config = jev_classifier.settings().auto_tier
+    config = decision.settings().auto_tier
     assert config.enabled is False and config.min_confidence == 60
     assert dict(config.tiers) == {"tiny": "light", "everyday": "light", "large": "standard", "hardest": "heavy"}
 
 
 def test_auto_tier_settings_are_read_and_a_partial_map_keeps_the_rest(monkeypatch):
     use_section(monkeypatch, {"auto_tier": {"enabled": True, "min_confidence": 75, "tiers": {"hardest": "extreme"}}})
-    config = jev_classifier.settings().auto_tier
+    config = decision.settings().auto_tier
     assert (config.enabled, config.min_confidence) == (True, 75)
     assert dict(config.tiers)["hardest"] == "extreme" and dict(config.tiers)["tiny"] == "light"
 
@@ -125,7 +125,7 @@ def test_auto_tier_settings_are_read_and_a_partial_map_keeps_the_rest(monkeypatc
 def test_a_bad_auto_tier_section_is_refused(monkeypatch, auto):
     use_section(monkeypatch, {"auto_tier": auto})
     with pytest.raises(ValueError, match="auto_tier"):
-        jev_classifier.settings()
+        decision.settings()
 
 
 # --- the turn --------------------------------------------------------------------------------

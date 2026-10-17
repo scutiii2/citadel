@@ -1,7 +1,7 @@
 """Choose a turn's model tier from how hard the question looks.
 
-When config_tuning.json's `classifier.auto_tier.enabled` is on and a key is set
-(llm/jev_classifier.py), the user's question is classified as tiny, everyday,
+When config_tuning.json's `classifier.auto_tier.enabled` is on and a backend of
+the auto_tier chain is available (llm/decision.py), the user's question is classified as tiny, everyday,
 large or hardest and mapped to a model tier. agent_config.run_chat resolves that
 tier like a delegated one, so the agent's own min_tier/max_tier still cap it: an
 agent capped at light stays on light. No answer (off, no key, a failure, low
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 import anyio.to_thread
 
-from src.llm import jev_classifier
+from src.llm import decision
 
 _log = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class AutoTier:
 
 
 def enabled() -> bool:
-    return jev_classifier.settings().auto_tier.enabled and jev_classifier.available()
+    return decision.settings().auto_tier.enabled and decision.available("auto_tier")
 
 
 async def pick(question: str, has_history: bool) -> AutoTier | None:
@@ -40,10 +40,10 @@ async def pick(question: str, has_history: bool) -> AutoTier | None:
     text = question.strip()
     if not text or (has_history and len(text) < _MIN_FOLLOW_UP_CHARS):
         return None
-    config = jev_classifier.settings()
+    config = decision.settings()
     try:
-        picked = await anyio.to_thread.run_sync(jev_classifier.classify_size, text[: config.max_input_chars])
-    except jev_classifier.ClassifierError as error:
+        picked = await anyio.to_thread.run_sync(decision.classify_size, text[: config.max_input_chars])
+    except decision.ClassifierError as error:
         _log.warning("auto tier skipped: %s", error)
         return None
     if picked.confidence < config.auto_tier.min_confidence:

@@ -209,26 +209,27 @@ errors propagate without an LLM fallback (Jev below is a classifier, not an LLM 
 `interpret`/summarization is unsupported. Cancellation is checked before and
 after inference.
 
-### Optional remote fallback (Jev)
+### Optional remote fallback (decision layer)
 
 With a `"classifier": {"triage_fallback": true}` section added to `configs/config_tuning.json` (it is not in the `.example` seed) and
-`VERCEL_GATEWAY_API_KEY` in `.env`, the remote classifier `typesafe-ai/jev` (Vercel AI
-Gateway, `src/llm/jev_classifier.py`) answers what Laya cannot:
+a key for a backend of the `triage` chain in `.env`, the remote classifier (`src/llm/decision.py`, see
+[Decision layer](#decision-layer-optional)) answers what Laya cannot:
 
 - each question Laya marks `uncertain` is asked again; the answer replaces Laya's
-  and carries `"answered_by": "jev"`, with its own `uncertain` flag against the same
+  and carries `"answered_by": "<backend id>"` (`jev` by default), with its own `uncertain` flag against the same
   `min_confidence`;
 - a text Laya cannot read in full (over its 4000 characters, or reported truncated)
-  goes to Jev for every question. `classifier.max_input_chars` (default 16000) caps
-  what is sent, since Jev's window is larger than Laya's.
+  goes to the classifier for every question. `classifier.max_input_chars` (default 16000) caps
+  what is sent, since a remote window is larger than Laya's.
 
-Jev only picks one option and reports a 0-100 confidence, which is no more calibrated
+The classifier only picks one option and reports a 0-100 confidence, which is no more calibrated
 than Laya's. Score questions are sent as levels `0`, `1`, ... (lowest first), and a
-noul question as `false` / `true`. If Jev fails, times out or has no key, Laya's
+noul question as `false` / `true`. If it fails, times out or has no key, Laya's
 answer is returned as it was (or, for unreadable input, the usual "could not read"
-error). Jev's prompt tokens are added to the turn's input tokens and the result's
+error). Its prompt tokens are added to the turn's input tokens and the result's
 `model_note` says how many answers came from it. It is **off by default**: the text
-sent to Jev leaves this machine and each call is billed by the gateway.
+sent to it leaves this machine and each call is billed by the backend. Laya is skipped in the
+triage chain here, since it is the provider asking.
 
 Escalating to a real LLM is otherwise the orchestrator's decision: when `uncertain` is
 true it can answer itself or delegate to another specialist. `0.70` is an
@@ -262,11 +263,38 @@ Specialist activity streams to the orchestrator's caller as `agent_start`,
 events pass through stamped with its `agent_id`. A specialist's step ids can
 collide with the orchestrator's, so consumers key on `(agent_id, id)`.
 
+## Decision layer (optional)
+
+`src/llm/decision.py` answers "which option fits, and how sure" for three features: Laya's
+`triage` fallback, `auto_tier` and `auto_route`. A feature names a chain of backends in
+`classifier.chains` of `configs/config_tuning.json`; the default chain is `["jev", "jev_vercel"]`.
+The chain is walked in order, so a backend without a key, one that fails, or (for `auto_tier`
+and `auto_route`) one below the feature's `min_confidence` hands over to the next, and the last
+answer is returned. Every feature is off until its own setting turns it on.
+
+| Backend id | Module | What it is | Key in `.env` |
+|---|---|---|---|
+| `jev` | `typesafe_classifier.py` | TypeSafe's own Jev API (`/v1/systemone`, `typesafe.model` default `jev-latest`). Confidence is the API's 0-1 `confidence` (how peaked the probabilities are) as a percentage. | `TYPESAFE_API_KEY` |
+| `jev_vercel` | `jev_classifier.py` | `typesafe-ai/jev` through Vercel AI Gateway; the model reports its own 0-100 confidence. | `VERCEL_GATEWAY_API_KEY` |
+| `laya` | `laya_classifier.py` | The local Laya model (512-token window). A text or option list that does not fit hands over to the next backend. Not in the default chains. | none |
+
+```json
+"classifier": {
+  "chains": {"triage": ["jev", "jev_vercel"], "auto_tier": ["laya", "jev"], "auto_route": ["jev"]},
+  "typesafe": {"model": "jev-latest"},
+  "vercel": {"url": "https://ai-gateway.vercel.sh/v1/chat/completions", "model": "typesafe-ai/jev"}
+}
+```
+
+A new model is one module with `ID`, `available()` and `ask_choice(subject, criteria, question, timeout)`
+plus a line in `decision._BACKENDS`. Confidence means something different per backend, so tune
+each feature's `min_confidence` against the backend you chain, not against the 60 default.
+
 ## Automatic model tier (optional)
 
 With `"classifier": {"auto_tier": {"enabled": true}}` in `configs/config_tuning.json` and
-`VERCEL_GATEWAY_API_KEY` in `.env`, a top-level turn that asked for no tier gets one from how
-hard its question looks. The remote classifier (`src/llm/jev_classifier.py`) names the
+a key for a backend of the `auto_tier` chain in `.env`, a top-level turn that asked for no tier gets one from how
+hard its question looks. The classifier (`src/llm/decision.py`) names the
 request `tiny`, `everyday`, `large` or `hardest`, and `src/llm/auto_tier.py` maps that to a
 tier (default `tiny` and `everyday` to `light`, `large` to `standard`, `hardest` to
 `heavy`; change it under `auto_tier.tiers`). `agent_config.run_chat` then resolves it
@@ -280,13 +308,13 @@ is a delegate's or already asked for a tier, the agent has no tiers, or the mess
 short follow-up (under 20 characters after the chat's first message). A chosen tier shows
 as the turn's tier plus a `model_note` such as `auto tier: hardest (90%) -> heavy`. Only the
 user's question is sent, never tool results, but it does leave this machine and each call
-is billed by the gateway.
+is billed by the backend.
 
 ## Routing straight to a specialist (optional)
 
 With `"classifier": {"auto_route": {"enabled": true}}` in `configs/config_tuning.json` and
-`VERCEL_GATEWAY_API_KEY` in `.env`, an orchestrator's top-level turn first asks the remote
-classifier (`src/llm/jev_classifier.py`) which specialist fits the question
+a key for a backend of the `auto_route` chain in `.env`, an orchestrator's top-level turn first asks the
+classifier (`src/llm/decision.py`) which specialist fits the question
 (`src/agents/auto_route.py`). If one is picked with confidence of at least
 `auto_route.min_confidence` (default 60), the question goes to it exactly as a
 `delegate_to_agent` call would (same `step_*` and `agent_*` events, same usage rows) and its
@@ -299,11 +327,11 @@ holds only the classifier's tokens, and `model_note` reads `routed straight to <
 - The classifier sees the user's message and the end of the last assistant message; the
   specialist gets the same context, since it never sees the chat.
 - No routing, and the orchestrator answers as usual, when the feature is off, there is no
-  key, the classifier fails or says `none`, confidence is low, the turn is a delegate's, or
+  usable backend, the classifier fails or says `none`, confidence is low, the turn is a delegate's, or
   the turn would need the user's approval to delegate (the orchestrator then asks as it does today).
 - A specialist that fails is reported to the user and not retried, because it may already
   have acted. You also lose the orchestrator's synthesis of the answer on routed turns.
-- The text sent to the classifier leaves this machine and each call is billed by the gateway.
+- The text sent to the classifier leaves this machine and each call is billed by the backend.
 
 ## Usage log
 

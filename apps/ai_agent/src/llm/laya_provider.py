@@ -1,10 +1,10 @@
 """Local typed-question provider: answers caller-supplied choice, score and
 noul questions about a short text. No generated text and no tool calls.
 
-When config_tuning.json's `classifier.triage_fallback` is on and a key is set
-(llm/jev_classifier.py), the remote Jev classifier answers what Laya cannot:
-questions Laya is unsure of, and texts too long for Laya's window. Without
-that, nothing here leaves the machine."""
+When config_tuning.json's `classifier.triage_fallback` is on and a backend of the
+triage chain is available (llm/decision.py), that classifier answers what Laya
+cannot: questions Laya is unsure of, and texts too long for Laya's window.
+Without that, nothing here leaves the machine."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from typing import Any
 import anyio.to_thread
 
 from src.core.catalog import catalog
-from src.llm import cancellation, jev_classifier
+from src.llm import cancellation, decision
 from src.llm.base_provider import ChatCancelled, ChatResult, step_event
 
 PROVIDER_ID = "laya"
@@ -166,13 +166,16 @@ _TOO_LONG = (
 )
 
 
-def _jev_enabled() -> bool:
-    config = jev_classifier.settings()
-    return config.triage_fallback and jev_classifier.available()
+# Laya is this provider; the fallback chain is every other backend of the triage chain.
+_FALLBACK_EXCLUDE = ("laya",)
 
 
-def _jev_options(spec: dict[str, Any]) -> dict[str, str]:
-    """The question's options as the classifier names them: choices as given, score levels
+def _fallback_enabled() -> bool:
+    return decision.settings().triage_fallback and decision.available("triage", _FALLBACK_EXCLUDE)
+
+
+def _fallback_options(spec: dict[str, Any]) -> dict[str, str]:
+    """The question's options as a classifier backend names them: choices as given, score levels
     as "0", "1", ... (lowest first) and a noul question as "false" and "true"."""
     if spec["type"] == "choice":
         return dict(spec["criteria"])
@@ -181,9 +184,9 @@ def _jev_options(spec: dict[str, Any]) -> dict[str, str]:
     return dict(spec.get("criteria") or _NOUL_DEFAULTS)
 
 
-def _jev_answer(request: Request, spec: dict[str, Any], picked: jev_classifier.Choice) -> dict[str, Any]:
-    """Jev's pick in the response shape of a Laya answer. Its confidence is the one number it
-    reports, so the other options share what is left; `answered_by` marks the source."""
+def _fallback_answer(request: Request, spec: dict[str, Any], picked: decision.Choice) -> dict[str, Any]:
+    """A backend's pick in the response shape of a Laya answer. Its confidence is the one number it
+    reports, so the other options share what is left; `answered_by` marks the backend."""
     confidence = picked.confidence / 100
     out: dict[str, Any] = {"type": spec["type"]}
     if spec["type"] == "choice":
@@ -198,29 +201,32 @@ def _jev_answer(request: Request, spec: dict[str, Any], picked: jev_classifier.C
         out["noul"] = confidence if picked.choice == "true" else round(1 - confidence, 4)
     out["answer_confidence"] = confidence
     out["uncertain"] = confidence < request.min_confidence
-    out["answered_by"] = "jev"
+    out["answered_by"] = picked.backend
     return out
 
 
-def _ask_jev(request: Request, qids: list[str]) -> tuple[dict[str, dict[str, Any]], int, list[str]]:
-    """Jev's answers for `qids`, the prompt tokens it used and why any question got none.
+def _ask_fallback(request: Request, qids: list[str]) -> tuple[dict[str, dict[str, Any]], int, list[str]]:
+    """The fallback backends' answers for `qids`, the prompt tokens they used and why any question got none.
     A failure never raises: that question just keeps Laya's answer, or none."""
     answers: dict[str, dict[str, Any]] = {}
     tokens = 0
     problems: list[str] = []
     for qid in qids:
         spec = request.questions[qid]
-        subject = f"{request.text}\n\nQuestion: {spec['instructions']}"
+        question = spec["instructions"]
         if spec["type"] == "score":
-            subject += " Pick the level that fits best; level 0 is the lowest."
+            question += " Pick the level that fits best; level 0 is the lowest."
         try:
-            picked = jev_classifier.ask_choice(subject, _jev_options(spec))
-        except jev_classifier.ClassifierError as error:
-            _log.warning("jev could not answer question %r: %s", qid, error)
+            picked = decision.ask_choice(
+                request.text, _fallback_options(spec), question, "triage",
+                min_confidence=round(request.min_confidence * 100), exclude=_FALLBACK_EXCLUDE,
+            )
+        except decision.ClassifierError as error:
+            _log.warning("the fallback classifier could not answer question %r: %s", qid, error)
             problems.append(str(error))
             continue
         tokens += picked.prompt_tokens
-        answers[qid] = _jev_answer(request, spec, picked)
+        answers[qid] = _fallback_answer(request, spec, picked)
     return answers, tokens, problems
 
 
@@ -251,8 +257,8 @@ class LayaQuestions:
             self._load()
 
     def answer(self, raw: str) -> ChatResult:
-        fallback = _jev_enabled()
-        request = parse_request(raw, jev_classifier.settings().max_input_chars if fallback else MAX_INPUT_CHARS)
+        fallback = _fallback_enabled()
+        request = parse_request(raw, decision.settings().max_input_chars if fallback else MAX_INPUT_CHARS)
         answers: dict[str, dict[str, Any]] | None = None
         input_tokens = 0
         unreadable: _InputTooLong | None = None
@@ -263,22 +269,22 @@ class LayaQuestions:
                 if not fallback:
                     raise
                 unreadable = error
-        # Jev takes every question when Laya could not read the text, else only those Laya is unsure of.
+        # The fallback takes every question when Laya could not read the text, else only those Laya is unsure of.
         pending = list(request.questions) if answers is None else [q for q, a in answers.items() if a["uncertain"]]
-        jev_answers: dict[str, dict[str, Any]] = {}
+        remote: dict[str, dict[str, Any]] = {}
         if fallback and pending:
-            jev_answers, jev_tokens, problems = _ask_jev(request, pending)
-            input_tokens += jev_tokens
-            if answers is None and len(jev_answers) < len(pending):
-                # Nothing readable from Laya and Jev could not cover it: no partial answers.
-                reason = f" Jev could not answer either ({problems[0]})." if problems else ""
+            remote, remote_tokens, problems = _ask_fallback(request, pending)
+            input_tokens += remote_tokens
+            if answers is None and len(remote) < len(pending):
+                # Nothing readable from Laya and the fallback could not cover it: no partial answers.
+                reason = f" The fallback classifier could not answer either ({problems[0]})." if problems else ""
                 raise _InputTooLong(str(unreadable or _TOO_LONG) + reason)
-        answers = {qid: (jev_answers.get(qid) or (answers or {})[qid]) for qid in request.questions}
+        answers = {qid: (remote.get(qid) or (answers or {})[qid]) for qid in request.questions}
         result = {"answers": answers, "uncertain": any(a["uncertain"] for a in answers.values())}
         note = (
-            f"Jev ({jev_classifier.settings().model}) answered {len(jev_answers)} question(s) that Laya was unsure "
-            "of or could not read."
-        ) if jev_answers else ""
+            f"{', '.join(sorted({a['answered_by'] for a in remote.values()}))} answered {len(remote)} question(s) "
+            "that Laya was unsure of or could not read."
+        ) if remote else ""
         return ChatResult(
             response=json.dumps(result), provider_id=PROVIDER_ID, model=DEFAULT_MODEL,
             input_tokens=input_tokens, output_tokens=0, total_tokens=input_tokens,
@@ -311,6 +317,12 @@ class LayaQuestions:
 
 
 _questions = LayaQuestions()
+
+
+def answer_typed(request: Request) -> tuple[dict[str, dict[str, Any]], int]:
+    """Laya's own answers to a validated request and the tokens it read; no remote fallback.
+    Raises ValueError when the text does not fit its window (llm/laya_classifier.py)."""
+    return _questions._laya_answers(request)
 
 
 def has_api_key() -> bool:

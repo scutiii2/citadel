@@ -10,7 +10,7 @@ import pytest
 from src.agents import agent_config, agent_routing, agent_spec, auto_route, delegation
 from src.agents.agent_spec import AgentSpec, LlmSpec, RosterEntry
 from src.core import approvals
-from src.llm import cancellation, jev_classifier
+from src.llm import cancellation, decision
 from src.llm.base_provider import ChatCancelled, ChatResult
 
 RESEARCHER = RosterEntry("researcher", "Researcher", "Web research: look up facts.", tool_allow=("tool_web_search", "tool_ticket_createTicket"))
@@ -22,27 +22,27 @@ HISTORY = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "
 
 @pytest.fixture(autouse=True)
 def fresh_settings():
-    jev_classifier.reset_cache()
+    decision.reset_cache()
     yield
-    jev_classifier.reset_cache()
+    decision.reset_cache()
 
 
 def switch_on(monkeypatch, *, enabled=True, key=True, pick=("researcher", 90), error=None, min_confidence=60):
     """Settings with auto route on and a fake classifier; returns the (subject, criteria) pairs it was asked."""
-    config = jev_classifier.ClassifierSettings(
-        auto_route=jev_classifier.AutoRouteSettings(enabled=enabled, min_confidence=min_confidence)
+    config = decision.ClassifierSettings(
+        auto_route=decision.AutoRouteSettings(enabled=enabled, min_confidence=min_confidence)
     )
-    monkeypatch.setattr(jev_classifier, "settings", lambda: config)
-    monkeypatch.setattr(jev_classifier, "available", lambda: key)
+    monkeypatch.setattr(decision, "settings", lambda: config)
+    monkeypatch.setattr(decision, "available", lambda *a, **k: key)
     asked = []
 
-    def ask_choice(subject, criteria, timeout=None):
+    def ask_choice(subject, criteria, question, feature, **kwargs):
         asked.append((subject, dict(criteria)))
         if error:
             raise error
-        return jev_classifier.Choice(pick[0], pick[1], 25)
+        return decision.Choice(pick[0], pick[1], 25, "jev", "jev-latest")
 
-    monkeypatch.setattr(jev_classifier, "ask_choice", ask_choice)
+    monkeypatch.setattr(decision, "ask_choice", ask_choice)
     return asked
 
 
@@ -74,7 +74,7 @@ def test_a_confident_pick_names_the_specialist(monkeypatch):
 
     route = run_pick()
 
-    assert (route.entry.id, route.confidence, route.prompt_tokens) == ("server-ops", 75, 25)
+    assert (route.entry.id, route.confidence, route.prompt_tokens, route.backend) == ("server-ops", 75, 25, "jev")
 
 
 @pytest.mark.parametrize("pick", [("none", 99), ("researcher", 59), ("planner", 99), ("ghost", 99)])
@@ -92,7 +92,7 @@ def test_the_threshold_is_the_configured_one(monkeypatch):
 
 
 def test_a_failing_classifier_means_no_route(monkeypatch):
-    switch_on(monkeypatch, error=jev_classifier.ClassifierError("down"))
+    switch_on(monkeypatch, error=decision.ClassifierError("down"))
     assert run_pick() is None
 
 
@@ -112,24 +112,24 @@ def test_the_classifier_sees_the_end_of_the_last_assistant_message_and_the_quest
 # --- the settings ---------------------------------------------------------------------------
 
 def use_section(monkeypatch, section):
-    monkeypatch.setattr(jev_classifier, "read_section", lambda path, name, default=None: section)
+    monkeypatch.setattr(decision, "read_section", lambda path, name, default=None: section)
 
 
 def test_auto_route_is_off_by_default(monkeypatch):
     use_section(monkeypatch, {})
-    assert jev_classifier.settings().auto_route == jev_classifier.AutoRouteSettings(False, 60)
+    assert decision.settings().auto_route == decision.AutoRouteSettings(False, 60)
 
 
 def test_auto_route_settings_are_read(monkeypatch):
     use_section(monkeypatch, {"auto_route": {"enabled": True, "min_confidence": 70}})
-    assert jev_classifier.settings().auto_route == jev_classifier.AutoRouteSettings(True, 70)
+    assert decision.settings().auto_route == decision.AutoRouteSettings(True, 70)
 
 
 @pytest.mark.parametrize("auto", [[], {"nope": 1}, {"enabled": 1}, {"min_confidence": 101}, {"min_confidence": True}])
 def test_a_bad_auto_route_section_is_refused(monkeypatch, auto):
     use_section(monkeypatch, {"auto_route": auto})
     with pytest.raises(ValueError, match="auto_route"):
-        jev_classifier.settings()
+        decision.settings()
 
 
 # --- routing a turn -------------------------------------------------------------------------
@@ -168,7 +168,7 @@ def test_a_routed_turn_is_the_specialists_answer_with_the_usual_events(monkeypat
     assert events[1]["ok"] is True and events[1]["id"] == events[0]["id"] and events[2]["text"] == "It was 2-1."
     assert result.tools_used == ["delegate_to_agent"]
     assert result.tool_calls[0].arguments["agent_id"] == "researcher" and result.tool_calls[0].result == "It was 2-1."
-    assert (result.provider_id, result.model, result.input_tokens, result.output_tokens) == ("jev", "typesafe-ai/jev", 25, 0)
+    assert (result.provider_id, result.model, result.input_tokens, result.output_tokens) == ("jev", "jev-latest", 25, 0)
     assert result.total_tokens == 25 and result.model_note == "routed straight to Researcher (researcher, 90%)"
 
 
