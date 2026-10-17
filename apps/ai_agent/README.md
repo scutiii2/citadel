@@ -220,8 +220,13 @@ model has its own confidence threshold, by number of options left (2 options: En
 (`{"3+": {"laya-typed": 0.6}}`) or, for one request, by sending `min_confidence`. Between the steps options far
 below the best (`triage_prune_ratio`) are dropped and the models asked again, and when nobody is ever sure the
 models' confidence-weighted values are compared pairwise: the answer then carries `also_check`, or `"unknown": true`
-with `candidates`. An answer says `answered_by` and `resolved_by`, and has a `rounds` trace when more than one model
-was consulted. Score and noul questions take the first model that meets its 3+ threshold.
+with `candidates`. Score and noul questions take the first model that meets its 3+ threshold.
+
+The answer is compact by default, because the orchestrator reads it on every turn: `type`, the pick (`choice`, `score`
+or `noul`), `answer_confidence`, `uncertain`, `answered_by`, `probabilities` (2 decimals) and, when they apply,
+`also_check`, `unknown` and `candidates` (about 75 tokens for a reviewed question). Send `"trace": true` in a request,
+or set `classifier.triage_trace`, for the full answer: also `resolved_by`, `eliminated`, `disagreement`, a `note` and a
+`rounds` trace of every model call (about 480 tokens). `check_triage_cases --rounds` always reads the full one.
 
 - Both checkpoints read `classifier.triage_window` tokens (default 4096) and are loaded before the agent registers:
   the second one downloads on first start (about 2 minutes) and the two models need roughly 1.6-3.4 GB of RAM.

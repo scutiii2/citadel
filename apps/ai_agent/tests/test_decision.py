@@ -104,6 +104,7 @@ def test_the_prune_ratio_defaults_to_a_quarter_and_can_be_changed_or_switched_of
     {"chains": []}, {"chains": {"nothing": ["jev"]}}, {"chains": {"triage": []}}, {"chains": {"triage": ["gpt"]}},
     {"chains": {"triage": ["jev", "jev"]}}, {"chains": {"triage": "jev"}},
     {"triage_prune_ratio": 1}, {"triage_prune_ratio": -0.1}, {"triage_prune_ratio": True}, {"triage_prune_ratio": "x"},
+    {"triage_trace": "yes"}, {"triage_trace": 1},
     {"triage_confidence_gap": 0}, {"triage_confidence_gap": 1.5}, {"triage_confidence_gap": True}, {"triage_confidence_gap": "x"},
     {"triage_pair_ratio": 0}, {"triage_pair_ratio": 1.5}, {"triage_pair_ratio": True}, {"triage_pair_ratio": "x"},
 ])

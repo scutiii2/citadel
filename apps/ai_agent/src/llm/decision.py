@@ -49,7 +49,7 @@ _BACKENDS = {
     "jev_vercel": "src.llm.jev_classifier",
     "laya": "src.llm.laya_classifier",
 }
-_KNOWN = {"typesafe", "vercel", "chains", "timeout_seconds", "max_input_chars", "triage_fallback", "triage_flow", "triage_window", "triage_thresholds", "triage_prune_ratio", "triage_confidence_gap",
+_KNOWN = {"typesafe", "vercel", "chains", "timeout_seconds", "max_input_chars", "triage_fallback", "triage_flow", "triage_trace", "triage_window", "triage_thresholds", "triage_prune_ratio", "triage_confidence_gap",
           "triage_pair_ratio", "auto_tier", "auto_route"}
 _BACKEND_KNOWN = {"url", "model"}
 _AUTO_TIER_KNOWN = {"enabled", "min_confidence", "tiers"}
@@ -126,6 +126,9 @@ class ClassifierSettings:
     # "sequential": Laya English, then Laya typed-decisions, then the fallback, each against its own threshold
     # (llm/triage_flow.py). The sequential flow loads a second checkpoint when the agent starts.
     triage_flow: str = "legacy"
+    # The sequential flow returns the full answer, with its rounds trace, instead of the compact one
+    # (a request can ask for it with "trace": true).
+    triage_trace: bool = False
     # Token window both Laya checkpoints read in the sequential flow (the English one alone reads 512 in the legacy flow).
     triage_window: int = 4096
     # count ("2" or "3+") -> voter -> the confidence (0-1) at which that voter's answer is taken, over the defaults in
@@ -175,6 +178,9 @@ def _load_settings() -> ClassifierSettings:
     flow = raw.get("triage_flow", base.triage_flow)
     if flow not in TRIAGE_FLOWS:
         raise ValueError(f"config_tuning.json {_SECTION}.triage_flow must be one of: {', '.join(TRIAGE_FLOWS)}")
+    trace = raw.get("triage_trace", base.triage_trace)
+    if not isinstance(trace, bool):
+        raise ValueError(f"config_tuning.json {_SECTION}.triage_trace must be true or false")
     window = raw.get("triage_window", base.triage_window)
     if isinstance(window, bool) or not isinstance(window, int) or not 512 <= window <= 32_768:
         raise ValueError(f"config_tuning.json {_SECTION}.triage_window must be an integer from 512 to 32768")
@@ -185,7 +191,7 @@ def _load_settings() -> ClassifierSettings:
     if isinstance(pair, bool) or not isinstance(pair, (int, float)) or not 0 < pair <= 1:
         raise ValueError(f"config_tuning.json {_SECTION}.triage_pair_ratio must be a number above 0 and at most 1")
     return ClassifierSettings(
-        triage_flow=flow, triage_window=window, triage_thresholds=_triage_thresholds(raw.get("triage_thresholds", {})),
+        triage_flow=flow, triage_trace=trace, triage_window=window, triage_thresholds=_triage_thresholds(raw.get("triage_thresholds", {})),
         triage_pair_ratio=float(pair),
         triage_prune_ratio=float(ratio),
         triage_confidence_gap=float(gap),

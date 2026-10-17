@@ -27,8 +27,13 @@ Default thresholds (confidence 0-1, "at or above"; `classifier.triage_thresholds
     3+ options:  laya-english 0.75, laya-typed 0.55, jev 0.90
 A `min_confidence` in a request replaces all of them for that request. Score and noul questions are not
 averaged: the first of English, typed, Jev that meets its 3+ threshold answers, else the most confident local
-one. Each answer carries `answered_by`, `resolved_by` and, when more than one model was consulted, a `rounds`
-trace of every model call. Nothing leaves the machine unless Jev is asked.
+one. Nothing leaves the machine unless Jev is asked.
+
+What is returned is compact by default, since the orchestrator reads it on every turn (a reviewed answer was
+about 560 tokens with its trace, about 65 without): `type`, the pick (`choice`, `score` or `noul`), `answer_confidence`,
+`uncertain`, `answered_by`, `probabilities` (2 decimals) and, when they apply, `also_check`, `unknown` and
+`candidates`. The full answer adds `resolved_by`, `eliminated`, `disagreement`, `note`, a `legend` for score questions and
+a `rounds` trace of every model call. Ask for it with `"trace": true` in a request, or set `classifier.triage_trace`.
 """
 
 from __future__ import annotations
@@ -51,6 +56,22 @@ DEFAULT_THRESHOLDS = {
     "2": {ENGLISH: 0.90, TYPED: 0.80, JEV: 0.90},
     "3+": {ENGLISH: 0.75, TYPED: 0.55, JEV: 0.90},
 }
+
+
+_COMPACT_KEYS = ("type", "choice", "score", "noul", "answer_confidence", "uncertain", "answered_by", "probabilities",
+                 "also_check", "unknown", "candidates")
+_ROUNDED = ("answer_confidence", "score", "noul")
+
+
+def compact(answer: dict[str, Any]) -> dict[str, Any]:
+    """The part of an answer the caller needs to act on (see the module docstring)."""
+    out = {key: answer[key] for key in _COMPACT_KEYS if key in answer}
+    for key in _ROUNDED:
+        if key in out:
+            out[key] = round(out[key], 2)
+    if "probabilities" in out:
+        out["probabilities"] = {option: round(p, 2) for option, p in out["probabilities"].items()}
+    return out
 
 
 def parse_threshold(text: str) -> tuple[str, str, float]:
@@ -123,14 +144,16 @@ def final_answer(voters: dict[str, dict[str, Any]], rounds: list[dict[str, Any]]
 
 class TriageFlow:
     """One request's worth of the sequential flow. `locals_` maps "laya-english" and "laya-typed" to a
-    LayaQuestions each; build a new one per request (it holds that request's state)."""
+    LayaQuestions each; build a new one per request (it holds that request's state). `trace` True always returns the
+    full answer, False the compact one; None follows the request and `classifier.triage_trace`."""
 
     def __init__(
         self, locals_: dict[str, LayaQuestions], use_fallback: bool = True,
-        thresholds: dict[str, dict[str, float]] | None = None,
+        thresholds: dict[str, dict[str, float]] | None = None, trace: bool | None = None,
     ) -> None:
         self.locals = locals_
         self.use_fallback = use_fallback
+        self.trace = trace
         configured = decision.settings().triage_thresholds
         self.thresholds = {
             count: {**row, **configured.get(count, {}), **(thresholds or {}).get(count, {})}
@@ -187,7 +210,11 @@ class TriageFlow:
             part for a in answers.values() for part in str(a.get("answered_by", ENGLISH)).split("+") if part != ENGLISH
         })
         note = f"Settled with help from {', '.join(beyond)}." if beyond else ""
-        result = {"answers": answers, "uncertain": any(a["uncertain"] for a in answers.values())}
+        full = self.trace if self.trace is not None else (request.trace or decision.settings().triage_trace)
+        result = {
+            "answers": answers if full else {qid: compact(a) for qid, a in answers.items()},
+            "uncertain": any(a["uncertain"] for a in answers.values()),
+        }
         return ChatResult(
             response=json.dumps(result), provider_id=laya_provider.PROVIDER_ID, model=laya_provider.DEFAULT_MODEL,
             input_tokens=self.tokens, output_tokens=0, total_tokens=self.tokens, context_tokens=None, model_note=note,

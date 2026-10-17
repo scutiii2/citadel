@@ -17,6 +17,7 @@
   "classifier": {
     "triage_flow": "legacy",
     "triage_fallback": false,
+    "triage_trace": false,
     "triage_window": 4096,
     "triage_thresholds": {
       "2": { "laya-english": 0.90, "laya-typed": 0.80, "jev": 0.90 },

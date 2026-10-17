@@ -40,7 +40,7 @@ MAX_QUESTIONS = 8
 MIN_OPTIONS = 2
 MAX_OPTIONS = 10
 
-_REQUEST_KEYS = {"text", "questions", "min_confidence"}
+_REQUEST_KEYS = {"text", "questions", "min_confidence", "trace"}
 _QUESTION_KEYS = {"type", "instructions", "criteria"}
 _QUESTION_TYPES = ("choice", "score", "noul")
 _NOUL_KEYS = {"false", "true"}
@@ -54,6 +54,8 @@ class Request:
     text: str
     questions: dict[str, dict[str, Any]]
     min_confidence: float
+    # Ask the sequential flow for the full answer with its rounds trace (llm/triage_flow.py).
+    trace: bool = False
 
 
 def _fail(message: str) -> ValueError:
@@ -126,7 +128,12 @@ def parse_request(raw: str, max_chars: int = MAX_INPUT_CHARS) -> Request:
     questions = data.get("questions")
     if not isinstance(questions, dict) or not 1 <= len(questions) <= MAX_QUESTIONS:
         raise _fail(f"questions must be an object with 1 to {MAX_QUESTIONS} entries")
-    return Request(text, {qid: _question(qid, spec) for qid, spec in questions.items()}, float(min_confidence))
+    trace = data.get("trace", False)
+    if not isinstance(trace, bool):
+        raise _fail("trace must be true or false")
+    return Request(
+        text, {qid: _question(qid, spec) for qid, spec in questions.items()}, float(min_confidence), trace,
+    )
 
 
 def _unit(value: Any) -> float:

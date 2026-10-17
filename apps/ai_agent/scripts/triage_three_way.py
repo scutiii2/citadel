@@ -12,7 +12,14 @@ from src.llm.triage_flow import (  # noqa: F401 - re-exported
 
 
 class ThreeWayTriage(TriageFlow):
-    """TriageFlow that can load its own checkpoints and be reused across requests (one at a time)."""
+    """TriageFlow that can load its own checkpoints and be reused across requests (one at a time). It always returns
+    the full answer: the script's tables and path labels read the trace."""
+
+    def __init__(
+        self, locals_: dict[str, LayaQuestions], use_fallback: bool = True,
+        thresholds: dict[str, dict[str, float]] | None = None, trace: bool | None = True,
+    ) -> None:
+        super().__init__(locals_, use_fallback, thresholds, trace)
 
     @classmethod
     def load(

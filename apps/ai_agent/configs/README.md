@@ -10,7 +10,7 @@ lives under `../.data/` instead (see the end of this file).
   caps, per provider and gateway (`src/llm/token_limits.py`). `classifier`
   (the `.example` seeds every key at its default, so every feature is off until you switch it on; a key
   you delete falls back to that default): the decision layer
-  (`src/llm/decision.py`) - `triage_fallback`, `triage_flow` (`legacy` or `sequential`), `triage_window`, `triage_thresholds`,
+  (`src/llm/decision.py`) - `triage_fallback`, `triage_flow` (`legacy` or `sequential`), `triage_trace` (full instead of compact answers), `triage_window`, `triage_thresholds`,
   `triage_prune_ratio`, `triage_confidence_gap`, `triage_pair_ratio`, `chains` (feature: backends tried in
   order; `jev`, `jev_vercel`, `laya`), `typesafe` and `vercel` (`url`, `model`),
   `timeout_seconds`, `max_input_chars`, `auto_tier` (`enabled`,
