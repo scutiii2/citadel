@@ -164,6 +164,16 @@ async def close_own_ticket(
     return _reporter_result(await _call(gateway.close_own(account, ticket_id)))
 
 
+@router.post("/{ticket_id}/reopen")
+async def reopen_own_ticket(
+    ticket_id: TicketId, account: Account = Depends(require_create), gateway: TicketGateway = Depends(get_ticket_gateway),
+    logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    result = await _call(gateway.reopen_own(account, ticket_id))
+    await logs.action(account, "tickets.reopen", f"Reopened ticket {ticket_id}")
+    return _reporter_result(result)
+
+
 # ---- staff routes ----------------------------------------------------------
 
 class TicketPatch(BaseModel):

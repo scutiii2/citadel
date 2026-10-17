@@ -154,6 +154,22 @@ async function closeTicket(): Promise<void> {
     closing.value = false;
   }
 }
+
+async function reopenTicket(): Promise<void> {
+  if (!current.value || closing.value || replying.value) return;
+  const seq = ++detailSeq;
+  closing.value = true;
+  detailError.value = "";
+  try {
+    const updated = await ticketsClient.reopen(current.value.id);
+    if (seq === detailSeq) current.value = updated;
+    await load();
+  } catch (err) {
+    if (seq === detailSeq) detailError.value = errorMessage(err);
+  } finally {
+    closing.value = false;
+  }
+}
 </script>
 
 <template>
@@ -234,7 +250,8 @@ async function closeTicket(): Promise<void> {
         <form class="form reply" @submit.prevent="sendReply">
           <textarea v-model="reply" rows="3" maxlength="2000" aria-label="Reply" placeholder="Add details or answer a question" :disabled="replying || closing" />
           <div class="actions">
-            <button v-if="current.status !== 'closed'" type="button" class="chip" @click="confirmOpen = true">Close ticket</button>
+            <button v-if="current.status === 'closed' || current.status === 'resolved'" type="button" class="chip" :disabled="closing || replying" :aria-busy="closing" @click="reopenTicket">Reopen ticket</button>
+            <button v-else type="button" class="chip" :disabled="closing || replying" @click="confirmOpen = true">Close ticket</button>
             <button type="submit" class="primary" :disabled="reply.trim() === '' || replying || closing" :aria-busy="replying">Send</button>
           </div>
         </form>

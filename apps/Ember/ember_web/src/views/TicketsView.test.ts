@@ -5,7 +5,7 @@ import { ticketsClient, type Ticket } from "../api/TicketsClient";
 import TicketsView from "./TicketsView.vue";
 
 vi.mock("../api/TicketsClient", () => ({
-  ticketsClient: { list: vi.fn(), get: vi.fn(), create: vi.fn(), comment: vi.fn(), close: vi.fn() },
+  ticketsClient: { list: vi.fn(), get: vi.fn(), create: vi.fn(), comment: vi.fn(), close: vi.fn(), reopen: vi.fn() },
 }));
 
 const client = vi.mocked(ticketsClient);
@@ -56,6 +56,17 @@ beforeEach(() => {
 });
 
 describe("TicketsView", () => {
+  it.each(["resolved", "closed"] as const)("reopens a %s ticket without confirmation", async status => {
+    client.get.mockResolvedValue(ticket(1, { status }));
+    client.reopen.mockResolvedValue(ticket(1));
+    const wrapper = await mountView();
+    await rows(wrapper)[1]!.trigger("click");
+    await flushPromises();
+    await button(wrapper, "Reopen ticket").trigger("click");
+    await flushPromises();
+    expect(client.reopen).toHaveBeenCalledWith(1);
+    expect(button(wrapper, "Close ticket").exists()).toBe(true);
+  });
   it("explains when the report is grouped with similar reports", async () => {
     client.create.mockResolvedValue({ ticket: ticket(9), duplicate: false, group_size: 4 });
     const wrapper = await mountView();

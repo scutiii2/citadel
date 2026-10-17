@@ -8,7 +8,7 @@ export interface TicketComment {
   ticket_id: number;
   author: string;
   /** reporter = you, ai = the assistant writing for you, staff = support. */
-  author_role: "reporter" | "staff" | "ai";
+  author_role: "reporter" | "staff" | "ai" | "system";
   body: string;
   created_at: string;
 }
@@ -50,4 +50,6 @@ export const ticketsClient = {
     (await apiRequest<{ ticket: Ticket }>("POST", `/api/tickets/${id}/comments`, { body })).ticket,
   close: async (id: number): Promise<Ticket> =>
     (await apiRequest<{ ticket: Ticket }>("POST", `/api/tickets/${id}/close`)).ticket,
+  reopen: async (id: number): Promise<Ticket> =>
+    (await apiRequest<{ ticket: Ticket }>("POST", `/api/tickets/${id}/reopen`)).ticket,
 };

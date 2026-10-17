@@ -11,6 +11,11 @@ including changes made outside Ember. Reporter lists include all owned tickets
 so old tickets contribute to unread counts. Migration `0018` adds cached staff
 activity timestamps and per-account ticket read receipts.
 
+`POST /api/tickets/{id}/reopen` requires `tickets.create` and upstream ownership.
+Only resolved or closed tickets may reopen. The core sets status to open, clears
+`closed_at` and adds a system comment in one transaction; other statuses return
+400, and foreign or unknown tickets return 404. The action is logged by id only.
+
 ## Memory page API
 
 The separate Memory page uses the existing mcp_server memory store. These routes

@@ -97,6 +97,20 @@ def test_gateway_drops_empty_filters_and_flags_possible(upstream: FakeUpstream) 
 
 # ---- reporter routes -------------------------------------------------------
 
+def test_reporter_reopen_is_scoped_and_keeps_staff_fields_private(client_factory, email, upstream) -> None:
+    member, _ = member_client(client_factory, email, upstream)
+    response = member.post("/api/tickets/7/reopen", json={})
+    assert response.status_code == 200
+    assert response.json()["ticket"]["id"] == 7
+    assert "priority" not in response.json()["ticket"]
+    assert upstream.requests[-1].url.path == "/tickets/7/reopen"
+    assert upstream.requests[-1].headers["x-requester-username"] == "alice"
+    assert member.post("/api/tickets/404/reopen", json={}).status_code == 404
+
+
+def test_reopen_requires_login(client) -> None:
+    assert client.post("/api/tickets/7/reopen", json={}).status_code == 401
+
 def member_client(client_factory, email, upstream):
     upstream.handler = tickets_server
     member = client_factory()

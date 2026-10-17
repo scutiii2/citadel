@@ -45,6 +45,9 @@ class TicketGateway:
     async def close_own(self, account: Account, ticket_id: int) -> dict[str, Any]:
         return await self._info.request("POST", f"/tickets/{int(ticket_id)}/close", account)
 
+    async def reopen_own(self, account: Account, ticket_id: int) -> dict[str, Any]:
+        return await self._info.request("POST", f"/tickets/{int(ticket_id)}/reopen", account)
+
     # ---- staff routes (everything) ----------------------------------------
 
     async def list_all(self, account: Account, filters: dict[str, Any]) -> dict[str, Any]:
