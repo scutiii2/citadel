@@ -95,6 +95,7 @@ def test_asks_laya_about_tags_not_yet_on_the_note_and_sends_the_text_and_identit
     asked = [re.search(r'"(.+)"', q["instructions"]).group(1) for q in call["request"]["questions"].values()]
     assert sorted(asked) == ["home", "money"]
     assert {q["type"] for q in call["request"]["questions"].values()} == {"noul"}
+    assert call["request"]["local_only"] is True  # Laya answers alone: no fallback to Jev
 
 
 def test_no_existing_tags_means_no_call(client: TestClient, agent: FakeAgent, tmp_path: Path, monkeypatch) -> None:

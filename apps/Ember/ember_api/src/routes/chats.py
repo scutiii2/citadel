@@ -432,7 +432,7 @@ def _busy() -> HTTPException:
     return HTTPException(status.HTTP_409_CONFLICT, "An answer is still being written for this chat")
 
 
-def _limit_reached(block: LimitBlock) -> HTTPException:
+def limit_reached(block: LimitBlock) -> HTTPException:
     minutes = max(1, int((block.reset_at - datetime.now(timezone.utc).replace(tzinfo=None)).total_seconds() // 60) + 1)
     wait = f"{minutes} min" if minutes < 60 else f"{minutes // 60} h {minutes % 60} min"
     return HTTPException(
@@ -700,7 +700,7 @@ async def start_turn(
         raise _busy()
     block = await UsageService(session, settings.usage).check(account.id)
     if block is not None:
-        raise _limit_reached(block)
+        raise limit_reached(block)
 
     question = {"role": "user", "content": body.question, "at": message_time()}
     try:
@@ -881,7 +881,7 @@ async def summarize_chat(
     usage = UsageService(session, settings.usage)
     block = await usage.check(account.id)
     if block is not None:
-        raise _limit_reached(block)
+        raise limit_reached(block)
 
     try:
         outcome = await summarization.summarize(gateway, agent.url, _caller(account), decode_messages(chat))

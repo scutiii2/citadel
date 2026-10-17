@@ -101,6 +101,31 @@ async function suggest(): Promise<void> {
     if (run === suggestRun) suggesting.value = false;
   }
 }
+
+// New tags written by a light model (tag-writer). Like suggestions, nothing is applied until the user picks one.
+const generated = ref<string[] | null>(null);
+const generating = ref(false);
+const generateError = ref("");
+let generateRun = 0;
+const canGenerate = computed(() => !generating.value && (form.title.trim() !== "" || form.body.trim() !== ""));
+const generatedTags = computed(() => (generated.value ?? []).filter((tag) => !form.tags.includes(tag)));
+
+async function generate(): Promise<void> {
+  if (!canGenerate.value) return;
+  tagField.value?.commit();
+  const run = ++generateRun;
+  generating.value = true;
+  generateError.value = "";
+  generated.value = null;
+  try {
+    const made = await notesClient.generateTags({ title: form.title, body: form.body, tags: [...form.tags] });
+    if (run === generateRun) generated.value = made.tags;
+  } catch (err) {
+    if (run === generateRun) generateError.value = errorMessage(err);
+  } finally {
+    if (run === generateRun) generating.value = false;
+  }
+}
 async function load(): Promise<void> {
   try {
     notes.value = await notesClient.list();
@@ -135,6 +160,10 @@ function fillEditor(note: Note | undefined): void {
   suggestion.value = null;
   suggestError.value = "";
   suggesting.value = false;
+  generateRun++;
+  generated.value = null;
+  generateError.value = "";
+  generating.value = false;
 }
 
 // Leaving unsaved edits asks first; the target waits here meanwhile.
@@ -337,6 +366,16 @@ function preview(note: Note): string {
               >
                 {{ suggesting ? "Suggesting …" : "Suggest tags" }}
               </button>
+              <button
+                type="button"
+                class="chip"
+                :disabled="!canGenerate"
+                :aria-busy="generating"
+                title="Ask a light model to write up to three new tags for this note"
+                @click="generate"
+              >
+                {{ generating ? "Generating …" : "Generate tag" }}
+              </button>
             </div>
             <TagInput
               :key="selected ?? ''"
@@ -369,6 +408,23 @@ function preview(note: Note): string {
               </span>
             </div>
             <p v-if="suggestError" class="error" role="alert">{{ suggestError }}</p>
+            <div v-if="generated" class="suggestions" role="status">
+              <template v-if="generatedTags.length">
+                <span class="muted">New tags:</span>
+                <button
+                  v-for="tag in generatedTags"
+                  :key="tag"
+                  type="button"
+                  class="tag pick"
+                  :aria-label="`Add generated tag ${tag}`"
+                  @click="tagField?.add(tag)"
+                >
+                  + {{ tag }}
+                </button>
+              </template>
+              <span v-else class="muted">No new tag came to mind for this note.</span>
+            </div>
+            <p v-if="generateError" class="error" role="alert">{{ generateError }}</p>
           </div>
           <label>
             Note
