@@ -114,8 +114,10 @@ def tool_parameters(roster: list[RosterEntry]) -> dict[str, Any]:
     return {"type": "object", "properties": properties, "required": ["agent_id", "question"]}
 
 
-def _roster_line(entry: RosterEntry) -> str:
-    line = f"{entry.id} ({entry.label}): {entry.focus or 'no focus given'}"
+def _roster_ref(entry: RosterEntry) -> str:
+    """One specialist as the tool names it: its id plus the model choices only the tool
+    can describe. What it is for stays in the system prompt's roster (agent_roles.roster_block)."""
+    line = entry.id
     if len(entry.tiers) > 1:
         line += " [model_tier: " + ", ".join(f"{t.tier} = {t.use_for}" for t in entry.tiers) + "]"
     if 1 < len(entry.efforts) < len(REASONING_EFFORTS):
@@ -124,7 +126,7 @@ def _roster_line(entry: RosterEntry) -> str:
 
 
 def tool_description(roster: list[RosterEntry]) -> str:
-    listing = "; ".join(_roster_line(r) for r in roster)
+    listing = "; ".join(_roster_ref(r) for r in roster)
     choice = (
         " Pick the lightest model_tier whose description fits the task; omit it when unsure."
         if _offers_choice(roster) else ""
@@ -134,7 +136,8 @@ def tool_description(roster: list[RosterEntry]) -> str:
         if _offers_effort(roster) else ""
     )
     return (
-        f"Hand a focused sub-question to a specialist agent and get its answer back. Specialists: {listing}.{choice}{effort} "
+        "Hand a focused sub-question to a specialist agent and get its answer back. "
+        f"What each specialist is for is in your instructions. Specialists: {listing}.{choice}{effort} "
         "Sequential: each call adds latency, so delegate only what a specialist does better."
     )
 

@@ -29,10 +29,16 @@ def test_tool_parameters_enumerate_the_roster():
     assert params["required"] == ["agent_id", "question"]
 
 
-def test_tool_description_lists_the_roster():
+def test_tool_description_names_the_specialists_and_leaves_what_they_do_to_the_system_prompt():
     description = delegation.tool_description(ROSTER)
-    assert "calc (Calculator): Arithmetic." in description
+    assert "Specialists: calc; explainer." in description
+    assert "Arithmetic." not in description and "Calculator" not in description
+    assert "is in your instructions" in description
     assert '"auto"' not in description
+
+    from src.llm.agent_roles import roster_block
+
+    assert "calc - Calculator: Arithmetic." in roster_block(ROSTER)
 
 
 def test_call_raises_at_the_depth_cap_without_any_network_call(monkeypatch):
@@ -206,9 +212,9 @@ def test_tool_parameters_offer_model_tier_when_a_specialist_has_a_choice():
 
 def test_tool_description_lists_tiers_only_for_specialists_with_a_choice():
     description = delegation.tool_description(TIERED)
-    assert "calc (Calculator): Arithmetic. [model_tier: light = quick sums, heavy = proofs]" in description
-    assert "fixed (Fixed): One model." in description
-    assert "fixed (Fixed): One model. [" not in description
+    assert "calc [model_tier: light = quick sums, heavy = proofs]" in description
+    assert "; fixed." in description
+    assert "fixed [" not in description
     assert "lightest model_tier" in description
     assert "lightest model_tier" not in delegation.tool_description(ROSTER)
 

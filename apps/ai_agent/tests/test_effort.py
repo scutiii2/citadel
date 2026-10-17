@@ -319,9 +319,9 @@ def test_tool_parameters_offer_reasoning_effort_only_when_there_is_a_choice():
 
 def test_tool_description_names_each_specialists_effort_limit():
     description = delegation.tool_description(EFFORT_ROSTER)
-    assert "calc (Calculator): Arithmetic. [reasoning_effort: up to low]" in description
-    assert "poet (Poet): Poems." in description
-    assert "poet (Poet): Poems. [" not in description
+    assert "calc [reasoning_effort: up to low]" in description
+    assert "; poet." in description
+    assert "poet [" not in description
     assert "lowest reasoning_effort" in description
     assert "lowest reasoning_effort" not in delegation.tool_description(NO_CHOICE)
 
