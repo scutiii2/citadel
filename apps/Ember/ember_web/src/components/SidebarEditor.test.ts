@@ -14,7 +14,7 @@ vi.mock("../api/NavPreferencesClient", () => ({
 
 const ACCOUNT: Account = { id: 1, username: "lex", email: "l@e.com", email_verified: true, roles: [], permissions: ["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] };
 // chat.use opens: Chat, Capabilities, Agents, Usage, Settings (in that default order).
-const DEFAULT_ORDER = ["Chat", "Capabilities", "Agents", "Usage", "Notes", "Memory", "Settings"];
+const DEFAULT_ORDER = ["Chat", "Capabilities", "Agents", "Usage", "Notes", "Memory", "Generator", "Settings"];
 const EMPTY: NavPrefs = { order: [], pinned: [], hidden: [] };
 
 async function setup(stored: NavPrefs = EMPTY) {
@@ -58,7 +58,7 @@ describe("SidebarEditor", () => {
     await row(wrapper, "Chat").find('button[aria-label="Move Chat down"]').trigger("click");
     await flushPromises();
 
-    expect(names(wrapper)).toEqual(["Capabilities", "Chat", "Agents", "Usage", "Notes", "Memory", "Settings"]);
+    expect(names(wrapper)).toEqual(["Capabilities", "Chat", "Agents", "Usage", "Notes", "Memory", "Generator", "Settings"]);
     expect(lastSaved().order.slice(0, 2)).toEqual(["/capabilities", "/"]);
   });
 
@@ -76,7 +76,7 @@ describe("SidebarEditor", () => {
     await row(wrapper, "Chat").trigger("drop");
     await flushPromises();
 
-    expect(names(wrapper)).toEqual(["Settings", "Chat", "Capabilities", "Agents", "Usage", "Notes", "Memory"]);
+    expect(names(wrapper)).toEqual(["Settings", "Chat", "Capabilities", "Agents", "Usage", "Notes", "Memory", "Generator"]);
   });
 
   it("shows a drop slot after the hovered row when moving down and before it when moving up", async () => {
@@ -85,12 +85,12 @@ describe("SidebarEditor", () => {
 
     await row(wrapper, "Chat").trigger("dragstart");
     await row(wrapper, "Agents").trigger("dragover");
-    expect(order()).toEqual(["Chat", "Capabilities", "Agents", "slot", "Usage", "Notes", "Memory", "Settings"]);
+    expect(order()).toEqual(["Chat", "Capabilities", "Agents", "slot", "Usage", "Notes", "Memory", "Generator", "Settings"]);
 
     await row(wrapper, "Chat").trigger("dragend");
     await row(wrapper, "Settings").trigger("dragstart");
     await row(wrapper, "Capabilities").trigger("dragover");
-    expect(order()).toEqual(["Chat", "slot", "Capabilities", "Agents", "Usage", "Notes", "Memory", "Settings"]);
+    expect(order()).toEqual(["Chat", "slot", "Capabilities", "Agents", "Usage", "Notes", "Memory", "Generator", "Settings"]);
   });
 
   it("shows no slot over the dragged row, after a drop or after the drag ends", async () => {
@@ -114,7 +114,7 @@ describe("SidebarEditor", () => {
     await wrapper.find(".slot").trigger("drop");
     await flushPromises();
 
-    expect(names(wrapper)).toEqual(["Capabilities", "Agents", "Chat", "Usage", "Notes", "Memory", "Settings"]);
+    expect(names(wrapper)).toEqual(["Capabilities", "Agents", "Chat", "Usage", "Notes", "Memory", "Generator", "Settings"]);
   });
 
   it("pins and unpins a page", async () => {
@@ -167,6 +167,6 @@ describe("pages hidden by the administrator", () => {
   it("are not offered to the account, and Games is when not hidden", async () => {
     vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/usage", "/agents"] });
 
-    expect(names(await setup())).toEqual(["Chat", "Capabilities", "Games", "Notes", "Memory", "Settings"]);
+    expect(names(await setup())).toEqual(["Chat", "Capabilities", "Games", "Notes", "Memory", "Generator", "Settings"]);
   });
 });

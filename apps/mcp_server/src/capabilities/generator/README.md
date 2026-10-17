@@ -31,7 +31,7 @@ Generate random passwords, passphrases, PINs and one-time codes, create TOTP sec
 
 ## Page
 
-`gui/page.json` gives the capability a page at `/capabilities/gen` in ember_web: one tabbed card (Password, Passphrase and PIN regenerate live as you change a control; TOTP secret and TOTP code run on request) with a strength bar from `entropy_bits`.
+ember_web has a dedicated Generator page at `/generator` (`GeneratorView.vue`, needs `tools.execute`): one tabbed card (Password, Passphrase and PIN regenerate live as you change a control; TOTP secret and TOTP code run on request) with a strength bar from `entropy_bits`. The capability has no `gui/page.json`.
 
 ## Configuration
 

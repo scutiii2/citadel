@@ -92,6 +92,12 @@ export const router = createRouter({
       meta: { permission: "chat.use" },
     },
     {
+      path: "/generator",
+      name: "generator",
+      component: () => import("../views/GeneratorView.vue"),
+      meta: { permission: "tools.execute" },
+    },
+    {
       path: "/tickets",
       name: "tickets",
       component: () => import("../views/TicketsView.vue"),

@@ -62,6 +62,13 @@ export const NAV_PAGES: NavPage[] = [
     permission: "chat.use",
   },
   {
+    to: "/generator",
+    label: "Generator",
+    icon: ["M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"],
+    description: "Make random passwords, passphrases, PINs and TOTP codes.",
+    permission: "tools.execute",
+  },
+  {
     to: "/tickets",
     label: "Tickets",
     icon: ["M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z", "M13 5v2", "M13 17v2", "M13 11v2"],

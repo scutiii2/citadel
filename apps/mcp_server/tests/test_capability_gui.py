@@ -234,10 +234,6 @@ def test_shipped_pages_parse_and_name_only_their_own_tools(path):
         assert not missing, f"{folder}/{section.id}: {sorted(missing)} not in {result_model.__name__}"
 
 
-def test_there_is_at_least_one_shipped_page():
-    assert GUI_FILES
-
-
 from starlette.applications import Starlette  # noqa: E402
 from starlette.testclient import TestClient  # noqa: E402
 

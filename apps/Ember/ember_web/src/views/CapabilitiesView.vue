@@ -115,13 +115,17 @@ function capabilitySummary(capability: CapabilityInfo, tools: number): string {
 }
 
 /** Capabilities that have a dedicated app page instead of a gui/page.json one. */
-const APP_PAGES: Record<string, string> = { notes: "/notes", memory: "/memory" };
+const APP_PAGES: Record<string, { to: string; permission: string }> = {
+  notes: { to: "/notes", permission: "chat.use" },
+  memory: { to: "/memory", permission: "chat.use" },
+  gen: { to: "/generator", permission: "tools.execute" },
+};
 
 /** Where a capability's Open button leads: its own page, while it is on. */
 function capabilityPage(capability: CapabilityInfo): SectionPage | null {
   if (!capability.enabled) return null;
   const appPage = APP_PAGES[capability.name];
-  if (appPage) return auth.hasPermission("chat.use") ? { to: appPage, external: false } : null;
+  if (appPage) return auth.hasPermission(appPage.permission) ? { to: appPage.to, external: false } : null;
   return capability.has_gui
     ? { to: `/capabilities/${encodeURIComponent(capability.name)}`, external: false }
     : null;
