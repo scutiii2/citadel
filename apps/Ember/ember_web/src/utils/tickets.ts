@@ -21,6 +21,7 @@ export const COMMENT_ROLE_LABELS: Record<TicketComment["author_role"], string> =
   reporter: "You",
   ai: "Assistant, for you",
   staff: "Support",
+  system: "System",
 };
 
 /** mcp_server times carry an offset ("+00:00"), so they parse as they are. */

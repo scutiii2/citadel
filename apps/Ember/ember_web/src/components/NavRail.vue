@@ -3,7 +3,8 @@
 // on hover or keyboard focus), then theme, account and log out. Visitors on
 // the login pages get just the wordmark and the theme button. The account's own
 // arrangement applies: pinned pages first, a divider, the rest, hidden ones left out.
-import { computed } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { ticketsClient } from "../api/TicketsClient";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import EmberLogo from "./EmberLogo.vue";
 import { useTheme } from "../composables/useTheme";
@@ -20,6 +21,37 @@ const { theme, next, cycle } = useTheme();
 const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" } as const;
 
 const auth = useAuthStore();
+const ticketUnread = ref(0);
+let unreadSeq = 0;
+async function refreshUnread(): Promise<void> {
+  const seq = ++unreadSeq;
+  const accountId = auth.account?.id;
+  if (!accountId || auth.needsVerification || !auth.hasPermission("tickets.create")) {
+    ticketUnread.value = 0;
+    return;
+  }
+  if (document.hidden) return;
+  try {
+    const count = await ticketsClient.unreadCount();
+    if (seq === unreadSeq && auth.account?.id === accountId) ticketUnread.value = count;
+  } catch { /* Keep navigation usable while support is unavailable. */ }
+}
+watch(() => [auth.account?.id, auth.needsVerification, auth.hasPermission("tickets.create")], () => {
+  ticketUnread.value = 0;
+  void refreshUnread();
+}, { immediate: true });
+let unreadTimer: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  unreadTimer = setInterval(() => void refreshUnread(), 30_000);
+  document.addEventListener("visibilitychange", refreshUnread);
+  window.addEventListener("tickets-seen", refreshUnread);
+});
+onUnmounted(() => {
+  ++unreadSeq;
+  clearInterval(unreadTimer);
+  document.removeEventListener("visibilitychange", refreshUnread);
+  window.removeEventListener("tickets-seen", refreshUnread);
+});
 const pageVisibility = usePageVisibilityStore();
 const route = useRoute();
 const router = useRouter();
@@ -86,6 +118,7 @@ const alertLabel = computed(() => {
 function isOpenedFromHere(to: string): boolean {
   return (
     (to === "/" && route.name === "chat-id") ||
+    (to === "/tickets" && route.path.startsWith("/tickets/")) ||
     (to === "/capabilities" && route.name === "capability-page")
   );
 }
@@ -138,12 +171,13 @@ async function logout(): Promise<void> {
           :key="p.to"
           :to="p.to"
           :data-label="p.label"
-          :aria-label="p.label"
+          :aria-label="p.to === '/tickets' && ticketUnread ? `${p.label}, ${ticketUnread} unread` : p.label"
           :class="{ current: isOpenedFromHere(p.to) }"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
             <path v-for="d in p.icon" :key="d" :d="d" />
           </svg>
+          <span v-if="p.to === '/tickets' && ticketUnread" class="ticket-count">{{ ticketUnread }}</span>
         </RouterLink>
       </template>
     </nav>
@@ -208,6 +242,7 @@ async function logout(): Promise<void> {
 </template>
 
 <style scoped>
+.ticket-count { position: absolute; top: 0; right: 0; min-width: 16px; padding: 0 3px; border-radius: var(--radius-full); background: var(--accent); color: var(--accent-contrast); font-size: 0.7em; text-align: center; }
 .rail {
   display: flex;
   flex-direction: column;

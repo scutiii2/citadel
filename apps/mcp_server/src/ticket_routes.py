@@ -126,6 +126,8 @@ async def create_ticket(request: Request) -> JSONResponse:
 async def list_own(request: Request) -> JSONResponse:
     filters = _filters(request)
     filters["possible_only"] = False
+    if request.query_params.get("all") == "1":
+        filters["limit"] = None
     result = await tickets.get_service().list_tickets(owner=_owner(request), **filters)
     return JSONResponse({"tickets": result})
 
@@ -150,6 +152,12 @@ async def comment_own(request: Request) -> JSONResponse:
 @_guarded
 async def close_own(request: Request) -> JSONResponse:
     ticket = await tickets.get_service().close_own(request.path_params["ticket_id"], _owner(request))
+    return JSONResponse({"ticket": ticket})
+
+
+@_guarded
+async def reopen_own(request: Request) -> JSONResponse:
+    ticket = await tickets.get_service().reopen_own(request.path_params["ticket_id"], _owner(request))
     return JSONResponse({"ticket": ticket})
 
 
@@ -228,6 +236,7 @@ def install_ticket_routes(app: Starlette) -> None:
     app.add_route("/tickets/{ticket_id:int}", get_own, methods=["GET"])
     app.add_route("/tickets/{ticket_id:int}/comments", comment_own, methods=["POST"])
     app.add_route("/tickets/{ticket_id:int}/close", close_own, methods=["POST"])
+    app.add_route("/tickets/{ticket_id:int}/reopen", reopen_own, methods=["POST"])
     app.add_route("/ticket-admin/tickets", staff_list, methods=["GET"])
     app.add_route("/ticket-admin/tickets/{ticket_id:int}", staff_get, methods=["GET"])
     app.add_route("/ticket-admin/tickets/{ticket_id:int}", staff_patch, methods=["PATCH"])

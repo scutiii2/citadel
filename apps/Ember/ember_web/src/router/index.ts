@@ -98,7 +98,7 @@ export const router = createRouter({
       meta: { permission: "tools.execute" },
     },
     {
-      path: "/tickets",
+      path: "/tickets/:id?",
       name: "tickets",
       component: () => import("../views/TicketsView.vue"),
       meta: { permission: "tickets.create" },

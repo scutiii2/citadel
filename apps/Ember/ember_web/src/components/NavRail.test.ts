@@ -10,6 +10,8 @@ import { settingsClient } from "../api/SettingsClient";
 import { NAV_PAGES } from "../router/pages";
 import { useAuthStore } from "../stores/auth";
 import NavRail from "./NavRail.vue";
+import { ticketsClient } from "../api/TicketsClient";
+vi.mock("../api/TicketsClient", () => ({ ticketsClient: { unreadCount: vi.fn(() => Promise.resolve(2)) } }));
 
 vi.mock("../api/AuthClient", () => ({ authClient: { logout: vi.fn(() => Promise.resolve()) } }));
 vi.mock("../api/SettingsClient", () => ({ settingsClient: { get: vi.fn(), pages: vi.fn() } }));
@@ -36,7 +38,7 @@ async function setup(account: Account | null) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      ...NAV_PAGES.map((p) => ({ path: p.to, component: stub })),
+      ...NAV_PAGES.map((p) => ({ path: p.to === "/tickets" ? "/tickets/:id?" : p.to, component: stub })),
       { path: "/capabilities/:name", name: "capability-page", component: stub },
       { path: "/account", component: stub },
       { path: "/overview", component: stub },
@@ -58,6 +60,23 @@ beforeEach(() => {
 });
 
 describe("NavRail", () => {
+  it("keeps Tickets selected while a deep link is open", async () => {
+    const { wrapper, router } = await setup({ ...ACCOUNT, permissions: [...ACCOUNT.permissions, "tickets.create"] });
+    await router.push("/tickets/7");
+    await flushPromises();
+    expect(wrapper.find('a[href="/tickets"]').classes()).toContain("current");
+    wrapper.unmount();
+  });
+  it("shows an unread badge for tickets and resets it after logout", async () => {
+    const { wrapper, auth } = await setup({ ...ACCOUNT, permissions: [...ACCOUNT.permissions, "tickets.create"] });
+    expect(wrapper.find(".ticket-count").text()).toBe("2");
+    expect(wrapper.find('a[href="/tickets"]').attributes("aria-label")).toBe("Tickets, 2 unread");
+    expect(ticketsClient.unreadCount).toHaveBeenCalled();
+    auth.account = null;
+    await flushPromises();
+    expect(wrapper.find(".ticket-count").exists()).toBe(false);
+    wrapper.unmount();
+  });
   it("shows one icon-only link per page the account may open", async () => {
     const { wrapper } = await setup(ACCOUNT);
 

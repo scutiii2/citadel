@@ -268,6 +268,48 @@ def test_close_own(make):
         run(service.close_own(ticket_id, "uid-bob"))
 
 
+@pytest.mark.parametrize("status", ["resolved", "closed"])
+def test_reopen_own(make, clock, status):
+    service = make()
+    ticket_id = create(service).ticket["id"]
+    run(service.update_ticket(ticket_id, status=status))
+    clock.advance(minutes=1)
+
+    reopened = run(service.reopen_own(ticket_id, "uid-alice"))
+    assert reopened["status"] == "open" and reopened["closed_at"] is None
+    assert reopened["comments"][-1]["author_role"] == "system"
+    assert reopened["updated_at"] == clock.now.isoformat()
+
+
+@pytest.mark.parametrize("status", ["open", "in_progress"])
+def test_reopen_own_rejects_active_tickets(make, status):
+    service = make()
+    ticket_id = create(service).ticket["id"]
+    run(service.update_ticket(ticket_id, status=status))
+    with pytest.raises(TicketError, match="resolved or closed"):
+        run(service.reopen_own(ticket_id, "uid-alice"))
+    assert run(service.get_ticket(ticket_id))["comments"] == []
+
+
+def test_reopen_own_requires_owner_and_hides_foreign_or_missing_tickets(make):
+    service = make()
+    ticket_id = create(service).ticket["id"]
+    run(service.close_own(ticket_id, "uid-alice"))
+    for requested_id, owner in [(ticket_id, "uid-bob"), (999, "uid-alice")]:
+        with pytest.raises(TicketNotFound):
+            run(service.reopen_own(requested_id, owner))
+    for owner in ["", " ", None]:
+        with pytest.raises(TicketError):
+            run(service.reopen_own(ticket_id, owner))
+    with pytest.raises(TicketError, match="role"):
+        run(service.add_comment(ticket_id, author="System", role="system", body="spoofed"))
+
+
+def test_unbounded_ticket_list_requires_an_owner(make):
+    with pytest.raises(TicketError, match="owner"):
+        run(make().list_tickets(limit=None))
+
+
 def test_staff_update_validates_values_and_clears_assignee(make):
     service = make()
     ticket_id = create(service).ticket["id"]

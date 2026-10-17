@@ -18,8 +18,8 @@ from src.db import Base, Database
 from src.services.migrations import BASELINE, MIGRATIONS_DIR, MigrationRunner
 
 # The newest real migration; the tests' throwaway one comes after it.
-HEAD = "0017"
-NEXT = "0018"
+HEAD = "0018"
+NEXT = "0019"
 
 
 def drop_account_uid(conn: sqlite3.Connection) -> None:
@@ -29,8 +29,31 @@ def drop_account_uid(conn: sqlite3.Connection) -> None:
 
 
 def drop_log_prompts(conn: sqlite3.Connection) -> None:
-    """Undo migration 0017 on a database built from the current models."""
+    """Undo the latest schema additions when rewinding a model-built database."""
     conn.execute("ALTER TABLE log_entries DROP COLUMN prompts")
+    conn.execute("DROP TABLE account_ticket_seen")
+    conn.execute("DROP TABLE ticket_staff_activity")
+
+
+def test_ticket_unread_migration_reverses_and_upgrades_existing_database(tmp_path: Path) -> None:
+    from alembic import command
+
+    run_with(make_database(tmp_path))
+
+    async def downgrade():
+        database = make_database(tmp_path)
+        runner = MigrationRunner(database.engine)
+        try:
+            async with database.engine.connect() as conn:
+                await conn.run_sync(lambda sync: command.downgrade(runner._config(sync), "0017"))
+        finally:
+            await database.dispose()
+
+    asyncio.run(downgrade())
+    assert revision_of(tmp_path / "ember.db") == "0017"
+    assert not {"account_ticket_seen", "ticket_staff_activity"} & tables_of(tmp_path / "ember.db")
+    assert run_with(make_database(tmp_path)) == "upgraded"
+    assert differences(make_database(tmp_path)) == []
 
 
 def test_permission_split_preserves_access_once_and_keeps_revocations(tmp_path: Path) -> None:
@@ -381,7 +404,7 @@ class TestDatabaseFromBeforeMigrations:
     def test_it_is_only_stamped_when_the_baseline_is_the_newest_revision(self, tmp_path: Path) -> None:
         path = self.build_legacy(tmp_path)
         scripts = tmp_path / "baseline_only"
-        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*"))
+        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*"))
         calls: list[int] = []
 
         async def backup() -> None:

@@ -220,3 +220,48 @@ def test_staff_comment_is_signed_with_the_display_name(client):
     response = client.post(f"/ticket-admin/tickets/{ticket['id']}/comments", json={"body": "hello"}, headers=headers("root"))
 
     assert response.json()["ticket"]["comments"][-1]["author"] == "root"
+
+
+@pytest.mark.parametrize("status", ["resolved", "closed"])
+def test_reporter_reopens_own_ticket_after_a_rename(client, status):
+    ticket_id = file_ticket(client)["id"]
+    client.patch(f"/ticket-admin/tickets/{ticket_id}", json={"status": status}, headers=headers("root"))
+    response = client.post(f"/tickets/{ticket_id}/reopen", headers=headers("renamed", uid="uid-alice"))
+    assert response.status_code == 200
+    ticket = response.json()["ticket"]
+    assert ticket["status"] == "open" and ticket["closed_at"] is None
+    assert ticket["comments"][-1]["author_role"] == "system"
+    assert client.post(f"/tickets/{ticket_id}/reopen", headers=headers()).status_code == 400
+
+
+def test_reopen_enforces_identity_and_ownership(client):
+    ticket_id = file_ticket(client)["id"]
+    client.post(f"/tickets/{ticket_id}/close", headers=headers())
+    assert client.post(f"/tickets/{ticket_id}/reopen", headers=headers(token=None)).status_code == 401
+    assert client.post(f"/tickets/{ticket_id}/reopen", headers=headers(uid=None)).status_code == 400
+    assert client.post(f"/tickets/{ticket_id}/reopen", headers=headers("alice", uid="another-uid")).status_code == 404
+    assert client.post("/tickets/999/reopen", headers=headers()).status_code == 404
+    ticket = client.get(f"/tickets/{ticket_id}", headers=headers()).json()["ticket"]
+    assert ticket["status"] == "closed" and ticket["comments"] == []
+
+
+def test_reporter_can_request_all_own_tickets_without_expanding_staff_list(client):
+    for _ in range(101):
+        file_ticket(client)
+    file_ticket(client, user="bob")
+    assert len(client.get("/tickets", headers=headers()).json()["tickets"]) == 100
+    all_rows = client.get("/tickets?all=1", headers=headers()).json()["tickets"]
+    assert len(all_rows) == 101 and all(row["owner"] == "uid-alice" for row in all_rows)
+    assert len(client.get("/ticket-admin/tickets?all=1", headers=headers("root")).json()["tickets"]) == 100
+    assert client.get("/tickets?all=1", headers=headers(uid=None)).status_code == 400
+
+
+def test_staff_routes_record_authoritative_activity(client):
+    ticket_id = file_ticket(client)["id"]
+    response = client.post(f"/ticket-admin/tickets/{ticket_id}/comments", json={"body": "reply"}, headers=headers("root"))
+    activity = response.json()["ticket"]["last_staff_activity_at"]
+    assert activity == response.json()["ticket"]["comments"][-1]["created_at"]
+    closed = client.post(f"/tickets/{ticket_id}/close", headers=headers()).json()["ticket"]
+    assert closed["last_staff_activity_at"] == activity
+    updated = client.patch(f"/ticket-admin/tickets/{ticket_id}", json={"status": "resolved"}, headers=headers("root")).json()["ticket"]
+    assert updated["last_staff_activity_at"] == updated["updated_at"]

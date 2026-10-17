@@ -5,13 +5,17 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from datetime import timedelta, timezone
 
 import httpx
 import pytest
+from sqlalchemy import select
 
-from src.models import Account
+from src.db import utcnow
+from src.models import Account, AccountTicketSeen, TicketStaffActivity
 from src.services.mcp_server_info import McpServerInfo
 from src.services.ticket_gateway import TicketGateway
+from src.services.ticket_unread import TicketUnreadService
 from tests.conftest import FakeUpstream
 from tests.test_admin import login, make_member, role_by_name
 from tests.test_permission_split import limited_account
@@ -25,6 +29,19 @@ TICKET = {
 }
 GROUP = {"id": 3, "title": "Email fails", "priority": "normal", "priority_pinned": False, "ticket_count": 1,
          "recent_count": 1, "open_count": 1, "tags": ["email"]}
+REPORTER_TICKET = {key: TICKET[key] for key in (
+    "id", "type", "title", "description", "status", "created_at", "updated_at", "closed_at",
+)}
+STAFF_ACTIVITY: dict[int, str] = {}
+
+
+@pytest.fixture(autouse=True)
+def reset_staff_activity():
+    STAFF_ACTIVITY.clear()
+
+
+def upstream_ticket(ticket_id=7):
+    return {**TICKET, "id": ticket_id, "last_staff_activity_at": STAFF_ACTIVITY.get(ticket_id)}
 
 
 def body_of(request: httpx.Request):
@@ -42,19 +59,21 @@ def tickets_server(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, json={"ticket": TICKET, "duplicate": True, "group_size": 1})
         return httpx.Response(201, json={"ticket": TICKET, "duplicate": False, "group_size": 1})
     if path == "/tickets" and method == "GET":
-        return httpx.Response(200, json={"tickets": [TICKET]})
+        return httpx.Response(200, json={"tickets": [upstream_ticket()]})
     if path == "/ticket-admin/tickets" and method == "GET":
         return httpx.Response(200, json={"tickets": [TICKET]})
     if path == "/ticket-admin/groups" and method == "GET":
         return httpx.Response(200, json={"groups": [GROUP]})
     if path == "/ticket-admin/stats":
         return httpx.Response(200, json={"open": 1, "urgent": 0, "groups": 1})
-    match = re.fullmatch(r"/(ticket-admin/)?tickets/(\d+)(?:/(comments|close|move))?", path)
+    match = re.fullmatch(r"/(ticket-admin/)?tickets/(\d+)(?:/(comments|close|reopen|move))?", path)
     if match:
         ticket_id, action = int(match.group(2)), match.group(3)
         if ticket_id == 404:
             return httpx.Response(404, json={"error": "No ticket 404."})
-        return httpx.Response(200, json={"ticket": {**TICKET, "id": ticket_id, "comments": []}})
+        if match.group(1) and method in ("POST", "PATCH"):
+            STAFF_ACTIVITY[ticket_id] = utcnow().replace(tzinfo=timezone.utc).isoformat()
+        return httpx.Response(200, json={"ticket": {**upstream_ticket(ticket_id), "comments": []}})
     match = re.fullmatch(r"/ticket-admin/groups/(\d+)", path)
     if match and method == "PATCH":
         return httpx.Response(200, json={"group": {**GROUP, **body_of(request)}})
@@ -78,6 +97,20 @@ def test_gateway_drops_empty_filters_and_flags_possible(upstream: FakeUpstream) 
 
 # ---- reporter routes -------------------------------------------------------
 
+def test_reporter_reopen_is_scoped_and_keeps_staff_fields_private(client_factory, email, upstream) -> None:
+    member, _ = member_client(client_factory, email, upstream)
+    response = member.post("/api/tickets/7/reopen", json={})
+    assert response.status_code == 200
+    assert response.json()["ticket"]["id"] == 7
+    assert "priority" not in response.json()["ticket"]
+    assert upstream.requests[-1].url.path == "/tickets/7/reopen"
+    assert upstream.requests[-1].headers["x-requester-username"] == "alice"
+    assert member.post("/api/tickets/404/reopen", json={}).status_code == 404
+
+
+def test_reopen_requires_login(client) -> None:
+    assert client.post("/api/tickets/7/reopen", json={}).status_code == 401
+
 def member_client(client_factory, email, upstream):
     upstream.handler = tickets_server
     member = client_factory()
@@ -91,7 +124,7 @@ def test_member_files_and_follows_own_tickets(client_factory, email, upstream) -
 
     created = member.post("/api/tickets", json={"type": "bug", "title": "Email fails", "description": "It does not send"})
     assert created.status_code == 201, created.text
-    assert created.json() == {"ticket": TICKET, "duplicate": False, "group_size": 1}
+    assert created.json() == {"ticket": REPORTER_TICKET, "duplicate": False, "group_size": 1}
     sent = upstream.requests[-1]
     assert (sent.method, sent.url.path) == ("POST", "/tickets")
     assert sent.headers["x-requester-username"] == "alice"
@@ -100,8 +133,10 @@ def test_member_files_and_follows_own_tickets(client_factory, email, upstream) -
         "verified_context": {"via": "ember_api", "account_id": str(member_id)},
     }
 
-    assert member.get("/api/tickets", params={"status": "open"}).json() == {"tickets": [TICKET]}
-    assert dict(upstream.requests[-1].url.params) == {"status": "open"}
+    assert member.get("/api/tickets", params={"status": "open"}).json() == {
+        "tickets": [{**REPORTER_TICKET, "has_unread": False}],
+    }
+    assert dict(upstream.requests[-1].url.params) == {"status": "open", "all": "1"}
     assert member.get("/api/tickets/7").json()["ticket"]["id"] == 7
     assert member.post("/api/tickets/7/comments", json={"body": "log attached"}).status_code == 200
     assert body_of(upstream.requests[-1]) == {"body": "log attached"}
@@ -115,6 +150,155 @@ def test_a_repeated_report_answers_200(client_factory, email, upstream) -> None:
     response = member.post("/api/tickets", json={"type": "bug", "title": "dup", "description": "again"})
 
     assert response.status_code == 200 and response.json()["duplicate"] is True
+
+
+def test_staff_replies_and_updates_are_unread_until_opened(client_factory, email, upstream) -> None:
+    member, _ = member_client(client_factory, email, upstream)
+    admin = as_admin(client_factory())
+    assert member.get("/api/tickets/unread-count").json() == {"count": 0}
+    assert admin.post("/api/admin/tickets/7/comments", json={"body": "Please retry"}).status_code == 200
+    assert member.get("/api/tickets").json()["tickets"][0]["has_unread"] is True
+    assert member.get("/api/tickets/unread-count").json() == {"count": 1}
+    assert member.get("/api/tickets/7").status_code == 200
+    assert member.get("/api/tickets/unread-count").json() == {"count": 0}
+    assert admin.patch("/api/admin/tickets/7", json={"status": "resolved"}).status_code == 200
+    assert member.get("/api/tickets").json()["tickets"][0]["has_unread"] is True
+    # Reporter replies and closing do not acknowledge an unopened staff update.
+    assert member.post("/api/tickets/7/comments", json={"body": "Thanks"}).status_code == 200
+    assert member.post("/api/tickets/7/close", json={}).status_code == 200
+    assert member.get("/api/tickets/unread-count").json() == {"count": 1}
+    assert member.get("/api/tickets/7").status_code == 200
+    assert member.get("/api/tickets/unread-count").json() == {"count": 0}
+
+
+def test_unread_count_is_ownership_scoped_and_foreign_reads_do_not_mark_seen(client_factory, email, upstream) -> None:
+    member, member_id = member_client(client_factory, email, upstream)
+    admin = as_admin(client_factory())
+    assert admin.post("/api/admin/tickets/7/comments", json={"body": "Your update"}).status_code == 200
+    assert admin.post("/api/admin/tickets/8/comments", json={"body": "Foreign update"}).status_code == 200
+
+    def ownership_server(request):
+        if request.url.path == "/tickets/8":
+            return httpx.Response(404, json={"error": "No ticket 8."})
+        return tickets_server(request)
+
+    upstream.handler = ownership_server
+    assert member.get("/api/tickets/unread-count").json() == {"count": 1}
+    assert member.get("/api/tickets/8").status_code == 404
+    assert member.get("/api/tickets/404").status_code == 404
+
+    async def read_receipts():
+        async with member.app.state.database.sessions() as session:
+            return list((await session.scalars(select(AccountTicketSeen).where(
+                AccountTicketSeen.account_id == member_id,
+            ))).all())
+
+    assert asyncio.run(read_receipts()) == []
+    assert member.get("/api/tickets/unread-count").json() == {"count": 1}
+
+
+def test_seen_receipts_are_per_account(client_factory, email, upstream) -> None:
+    member, _ = member_client(client_factory, email, upstream)
+    admin = as_admin(client_factory())
+    assert admin.post("/api/admin/tickets/7/comments", json={"body": "Update"}).status_code == 200
+    # The fake upstream deliberately returns the same ticket for both accounts.
+    assert admin.get("/api/tickets/7").status_code == 200
+    assert admin.get("/api/tickets/unread-count").json() == {"count": 0}
+    assert member.get("/api/tickets/unread-count").json() == {"count": 1}
+
+
+def test_staff_reply_arriving_during_detail_fetch_remains_unread(client_factory, email, upstream, monkeypatch) -> None:
+    member, _ = member_client(client_factory, email, upstream)
+    original = TicketGateway.get_own
+
+    async def get_with_concurrent_reply(gateway, account, ticket_id):
+        result = await original(gateway, account, ticket_id)
+        STAFF_ACTIVITY[ticket_id] = utcnow().replace(tzinfo=timezone.utc).isoformat()
+        result["ticket"]["last_staff_activity_at"] = STAFF_ACTIVITY[ticket_id]
+        return result
+
+    monkeypatch.setattr(TicketGateway, "get_own", get_with_concurrent_reply)
+    detail = member.get("/api/tickets/7")
+    assert detail.status_code == 200
+    assert detail.json()["ticket"]["has_unread"] is True
+    assert member.get("/api/tickets/unread-count").json() == {"count": 1}
+    monkeypatch.setattr(TicketGateway, "get_own", original)
+    assert member.get("/api/tickets/7").status_code == 200
+    assert member.get("/api/tickets/unread-count").json() == {"count": 0}
+
+
+def test_seen_receipts_never_move_backwards(client_factory, email, upstream) -> None:
+    member, member_id = member_client(client_factory, email, upstream)
+
+    async def reverse_order():
+        async with member.app.state.database.sessions() as session:
+            service = TicketUnreadService(session)
+            earlier = utcnow() - timedelta(seconds=1)
+            await service.reconcile({7: utcnow().isoformat()})
+            await service.mark_seen(member_id, 7, utcnow())
+            await service.mark_seen(member_id, 7, earlier)
+            return await service.unread_ids(member_id, [7])
+
+    assert asyncio.run(reverse_order()) == set()
+
+
+def test_direct_upstream_activity_is_unread_without_any_ember_staff_request(client_factory, email, upstream):
+    member, _ = member_client(client_factory, email, upstream)
+    assert member.get("/api/tickets/7").status_code == 200
+    # Changes through the MCP tool or another client still reach list/count.
+    STAFF_ACTIVITY[7] = utcnow().replace(tzinfo=timezone.utc).astimezone(
+        timezone(timedelta(hours=8)),
+    ).isoformat()
+    assert member.get("/api/tickets/unread-count").json() == {"count": 1}
+    assert member.get("/api/tickets").json()["tickets"][0]["has_unread"] is True
+    assert "last_staff_activity_at" not in member.get("/api/tickets").json()["tickets"][0]
+    assert member.get("/api/tickets/7").json()["ticket"]["has_unread"] is False
+    assert member.get("/api/tickets/unread-count").json() == {"count": 0}
+
+
+def test_reporter_lists_and_badges_request_all_owned_tickets(client_factory, email, upstream):
+    member, _ = member_client(client_factory, email, upstream)
+    timestamp = utcnow().replace(tzinfo=timezone.utc).isoformat()
+
+    def many_tickets(request):
+        if request.method == "GET" and request.url.path == "/tickets":
+            tickets = [{**TICKET, "id": index, "last_staff_activity_at": timestamp} for index in range(1, 122)]
+            return httpx.Response(200, json={"tickets": tickets if request.url.params.get("all") == "1" else tickets[:100]})
+        return tickets_server(request)
+
+    upstream.handler = many_tickets
+    assert len(member.get("/api/tickets").json()["tickets"]) == 121
+    assert member.get("/api/tickets/unread-count").json() == {"count": 121}
+
+
+@pytest.mark.parametrize("method,path,payload", [
+    ("post", "/api/tickets", {"type": "bug", "title": "test", "description": "details"}),
+    ("get", "/api/tickets/7", None),
+    ("post", "/api/tickets/7/comments", {"body": "More info"}),
+    ("post", "/api/tickets/7/close", {}),
+])
+def test_reporter_responses_strip_private_ticket_and_comment_fields(
+    client_factory, email, upstream, method, path, payload,
+) -> None:
+    member, _ = member_client(client_factory, email, upstream)
+    comment = {"id": 1, "ticket_id": 7, "author": "support", "author_role": "staff", "body": "Reply",
+               "created_at": TICKET["created_at"]}
+
+    def private_server(request):
+        result = {"ticket": {**TICKET, "comments": [{**comment, "private_context": "hidden"}]}, "staff_secret": "hidden"}
+        if request.url.path == "/tickets":
+            result.update(duplicate=False, group_size=2)
+        return httpx.Response(200, json=result)
+
+    upstream.handler = private_server
+    response = getattr(member, method)(path, **({"json": payload} if payload is not None else {}))
+    assert response.status_code in (200, 201)
+    result = response.json()
+    expected = {**REPORTER_TICKET, "comments": [comment]}
+    if method == "get":
+        expected["has_unread"] = False
+    assert result["ticket"] == expected
+    assert "staff_secret" not in result
 
 
 @pytest.mark.parametrize(
@@ -162,12 +346,14 @@ def test_ticket_routes_need_tickets_create(client_factory, email, upstream) -> N
 
     assert (refused.status_code, refused.json()["detail"]) == (403, "Missing permission: tickets.create")
     assert member.post("/api/tickets", json={"type": "bug", "title": "t", "description": "d"}).status_code == 403
+    assert member.get("/api/tickets/unread-count").status_code == 403
     assert len(upstream.requests) == 0
 
 
 def test_logged_out_visitors_get_401(client, upstream) -> None:
     upstream.handler = tickets_server
     assert client.get("/api/tickets").status_code == 401
+    assert client.get("/api/tickets/unread-count").status_code == 401
     assert client.post("/api/tickets", json={"type": "bug", "title": "t", "description": "d"}).status_code == 401
     assert len(upstream.requests) == 0
 
@@ -282,6 +468,13 @@ def test_failed_staff_change_is_not_logged(client, upstream) -> None:
 
     assert admin.patch("/api/admin/tickets/404", json={"status": "closed"}).status_code == 404
     assert upstream.requests[-1].url.path == "/ticket-admin/tickets/404"
+    assert admin.post("/api/admin/tickets/404/comments", json={"body": "retry"}).status_code == 404
+
+    async def activities():
+        async with client.app.state.database.sessions() as session:
+            return list((await session.scalars(select(TicketStaffActivity))).all())
+
+    assert asyncio.run(activities()) == []
     messages = [entry["message"] for entry in admin.get("/api/logs/action", params={"actor": admin.get("/api/auth/me").json()["id"]}).json()]
     assert not any("ticket 404" in message for message in messages)
 

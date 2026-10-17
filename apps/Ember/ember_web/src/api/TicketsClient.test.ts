@@ -12,6 +12,16 @@ beforeEach(() => {
 });
 
 describe("ticketsClient", () => {
+  it("reopens a ticket", async () => {
+    request.mockResolvedValue({ ticket: TICKET });
+    expect(await ticketsClient.reopen(7)).toEqual(TICKET);
+    expect(request).toHaveBeenLastCalledWith("POST", "/api/tickets/7/reopen");
+  });
+  it("fetches the unread count", async () => {
+    request.mockResolvedValue({ count: 3 });
+    expect(await ticketsClient.unreadCount()).toBe(3);
+    expect(request).toHaveBeenLastCalledWith("GET", "/api/tickets/unread-count");
+  });
   it("lists tickets, optionally by status, and unwraps the list", async () => {
     request.mockResolvedValue({ tickets: [TICKET] });
 

@@ -3,9 +3,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ApiError } from "../api/http";
 import { ticketsClient, type Ticket } from "../api/TicketsClient";
 import TicketsView from "./TicketsView.vue";
+import { createMemoryHistory, createRouter } from "vue-router";
 
 vi.mock("../api/TicketsClient", () => ({
-  ticketsClient: { list: vi.fn(), get: vi.fn(), create: vi.fn(), comment: vi.fn(), close: vi.fn() },
+  ticketsClient: { list: vi.fn(), get: vi.fn(), create: vi.fn(), comment: vi.fn(), close: vi.fn(), reopen: vi.fn() },
 }));
 
 const client = vi.mocked(ticketsClient);
@@ -36,11 +37,17 @@ const mounted: ReturnType<typeof mount>[] = [];
 
 afterEach(() => {
   mounted.splice(0).forEach((wrapper) => wrapper.unmount());
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   document.body.innerHTML = '';
 });
 
-async function mountView() {
-  const wrapper = mount(TicketsView, { attachTo: document.body });
+let router: ReturnType<typeof createRouter>;
+async function mountView(path = "/tickets") {
+  router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/tickets/:id?", component: TicketsView }] });
+  await router.push(path);
+  await router.isReady();
+  const wrapper = mount(TicketsView, { attachTo: document.body, global: { plugins: [router] } });
   mounted.push(wrapper);
   await flushPromises();
   return wrapper;
@@ -56,6 +63,93 @@ beforeEach(() => {
 });
 
 describe("TicketsView", () => {
+  it("keeps a ticket seen when its initial list response arrives after the detail", async () => {
+    let finishList!: (rows: Ticket[]) => void;
+    client.list.mockImplementationOnce(() => new Promise(resolve => { finishList = resolve; }));
+    client.get.mockResolvedValue(ticket(1, { has_unread: false }));
+    const wrapper = await mountView("/tickets/1");
+    finishList([ticket(1, { has_unread: true })]);
+    await flushPromises();
+    expect(rows(wrapper)[0]!.classes()).not.toContain("unread");
+  });
+  it("opens a deep link directly and returns to the list when dismissed", async () => {
+    client.get.mockResolvedValue(ticket(42));
+    const wrapper = await mountView("/tickets/42");
+    expect(client.get).toHaveBeenCalledWith(42);
+    expect(wrapper.find(".detail-title").text()).toBe("Ticket 42");
+    await wrapper.find('dialog[aria-label="Ticket #42"] button.close').trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe("/tickets");
+    expect(wrapper.find(".detail-title").exists()).toBe(false);
+  });
+
+  it("updates the address when a row opens", async () => {
+    client.get.mockResolvedValue(ticket(1));
+    const wrapper = await mountView();
+    await rows(wrapper)[1]!.trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe("/tickets/1");
+  });
+
+  it("shows the error for an unknown or foreign deep link", async () => {
+    client.get.mockRejectedValue(new ApiError(404, "No ticket 404."));
+    const wrapper = await mountView("/tickets/404");
+    expect(wrapper.find('dialog[aria-label="Ticket #404"] .error').text()).toContain("No ticket 404.");
+    expect(wrapper.find(".detail-title").exists()).toBe(false);
+  });
+
+  it("follows back and forward navigation without keeping the wrong ticket", async () => {
+    client.get.mockImplementation(async id => ticket(id));
+    const wrapper = await mountView("/tickets/1");
+    await router.push("/tickets/2");
+    await flushPromises();
+    expect(wrapper.find(".detail-title").text()).toBe("Ticket 2");
+    router.back();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await flushPromises();
+    expect(wrapper.find(".detail-title").text()).toBe("Ticket 1");
+    router.forward();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await flushPromises();
+    expect(wrapper.find(".detail-title").text()).toBe("Ticket 2");
+  });
+
+  it.each(["oops", "0", "9007199254740992"])("handles invalid deep link %s", async id => {
+    const wrapper = await mountView(`/tickets/${id}`);
+    expect(wrapper.find(".error").text()).toContain("Invalid ticket id.");
+    expect(client.get).not.toHaveBeenCalled();
+  });
+  it.each(["resolved", "closed"] as const)("reopens a %s ticket without confirmation", async status => {
+    client.get.mockResolvedValue(ticket(1, { status }));
+    client.reopen.mockResolvedValue(ticket(1));
+    const wrapper = await mountView();
+    await rows(wrapper)[1]!.trigger("click");
+    await flushPromises();
+    await button(wrapper, "Reopen ticket").trigger("click");
+    await flushPromises();
+    expect(client.reopen).toHaveBeenCalledWith(1);
+    expect(button(wrapper, "Close ticket").exists()).toBe(true);
+  });
+  it("explains when the report is grouped with similar reports", async () => {
+    client.create.mockResolvedValue({ ticket: ticket(9), duplicate: false, group_size: 4 });
+    const wrapper = await mountView();
+    await button(wrapper, "New ticket").trigger("click");
+    await wrapper.find("input[aria-label='Title']").setValue("Email fails");
+    await wrapper.find("textarea[aria-label='Description']").setValue("Details");
+    await wrapper.find("button.submit-ticket").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".notice").text()).toBe("Ticket #9 filed. 3 other people reported something similar, so yours is grouped with them.");
+  });
+  it("signals unread support activity and clears it after opening", async () => {
+    client.list.mockResolvedValue([ticket(1, { has_unread: true })]);
+    client.get.mockResolvedValue(ticket(1, { has_unread: false }));
+    const wrapper = await mountView();
+    expect(rows(wrapper)[0]!.classes()).toContain("unread");
+    expect(rows(wrapper)[0]!.text()).toContain("Support replied");
+    await rows(wrapper)[0]!.trigger("click");
+    await flushPromises();
+    expect(rows(wrapper)[0]!.classes()).not.toContain("unread");
+  });
   it("lists the account's tickets with a status word", async () => {
     const wrapper = await mountView();
 
@@ -69,10 +163,11 @@ describe("TicketsView", () => {
   it("filters by status", async () => {
     const wrapper = await mountView();
 
-    await wrapper.findAll("button.segment").find((b) => b.text() === "Closed")!.trigger("click");
+    await wrapper.findAll("button.segment").find((b) => b.attributes("data-value") === "closed")!.trigger("click");
     await flushPromises();
 
-    expect(client.list).toHaveBeenLastCalledWith("closed");
+    expect(client.list).toHaveBeenCalledTimes(1);
+    expect(rows(wrapper)).toHaveLength(0);
   });
 
   it("explains an empty list", async () => {
@@ -173,18 +268,55 @@ describe("TicketsView", () => {
     expect(wrapper.findAll("button").some((b) => b.text() === "Close ticket")).toBe(false);
   });
 
-  it("keeps the newest status result when an older request finishes later", async () => {
-    let finishOld!: (tickets: Ticket[]) => void;
-    client.list.mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; }));
+  it("counts and searches all statuses from one list and sorts by update time", async () => {
+    client.list.mockResolvedValue([
+      ticket(1, { title: "Email fails", updated_at: "2026-10-10T10:00:00Z" }),
+      ticket(2, { title: "Login fails", status: "closed", updated_at: "2026-10-12T10:00:00Z" }),
+    ]);
     const wrapper = await mountView();
-    client.list.mockResolvedValue([ticket(3, { status: "closed" })]);
-    await wrapper.findAll("button.segment").find((b) => b.text() === "Closed")!.trigger("click");
-    await flushPromises();
-    finishOld([ticket(1)]);
-    await flushPromises();
+    expect(wrapper.find('[data-value="all"]').text()).toBe("All (2)");
+    expect(wrapper.find('[data-value="closed"]').text()).toBe("Closed (1)");
+    expect(rows(wrapper)[0]!.text()).toContain("Login fails");
+    await wrapper.find('select[aria-label="Sort tickets"]').setValue("oldest");
+    expect(rows(wrapper)[0]!.text()).toContain("Email fails");
+    await wrapper.find('input[aria-label="Search ticket titles"]').setValue("EMAIL");
     expect(rows(wrapper)).toHaveLength(1);
-    expect(rows(wrapper)[0]!.text()).toContain("Ticket 3");
-    expect(rows(wrapper)[0]!.text()).toContain("Closed");
+    expect(rows(wrapper)[0]!.text()).toContain("Email fails");
+    expect(client.list).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows character counts and a dated status timeline without inventing a progress date", async () => {
+    client.get.mockResolvedValue(ticket(1, { status: "resolved", closed_at: "2026-10-12T10:00:00Z" }));
+    const wrapper = await mountView("/tickets/1");
+    expect(wrapper.findAll('.timeline time')).toHaveLength(2);
+    expect(wrapper.find('.timeline [aria-current="step"]').text()).toContain("Resolved");
+    await button(wrapper, "New ticket").trigger("click");
+    await wrapper.find("input[aria-label='Title']").setValue("Title");
+    await wrapper.find("textarea[aria-label='Description']").setValue("Details");
+    expect(wrapper.find("#ticket-title-count").text()).toBe("5/120");
+    expect(wrapper.find("#ticket-description-count").text()).toBe("7/4000");
+  });
+
+  it("polls every 30 seconds only while visible and cleans up after leaving", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    let hidden = false;
+    vi.spyOn(document, "hidden", "get").mockImplementation(() => hidden);
+    const wrapper = await mountView();
+    expect(client.list).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await flushPromises();
+    expect(client.list).toHaveBeenCalledTimes(2);
+    hidden = true;
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(client.list).toHaveBeenCalledTimes(2);
+    hidden = false;
+    document.dispatchEvent(new Event("visibilitychange"));
+    await flushPromises();
+    expect(client.list).toHaveBeenCalledTimes(3);
+    wrapper.unmount();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(client.list).toHaveBeenCalledTimes(3);
   });
 
   it("does not reopen a dismissed detail when its request finishes", async () => {
