@@ -62,6 +62,7 @@ const {
   contextParts,
   contextExact,
   contextPanel,
+  contextAccuracy,
   commands,
   enabledExtensions,
   approvalMode,
@@ -380,6 +381,8 @@ useChatShortcuts({
         :has-messages="!!active && messages.length > 0"
         :context-percent="contextPercent"
         :breakdown="contextBreakdown"
+        :accuracy="contextAccuracy"
+        @update:accuracy="chat.setContextAccuracy"
         :locked="busy || !!working"
         @export="exportActive"
         @share="shareOpen = true"

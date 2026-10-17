@@ -75,6 +75,20 @@ describe("ChatHeader", () => {
       expect(panel()?.textContent).toContain("Free space");
     });
 
+    it("passes the accuracy to the panel and on to its owner", async () => {
+      const w = mountHeader({ breakdown: BREAKDOWN, accuracy: "estimate" });
+      await w.get("button.context").trigger("click");
+
+      const exact = [...document.querySelectorAll<HTMLButtonElement>("[data-test=context-accuracy] button")].find(
+        (b) => b.textContent?.trim() === "Exact",
+      )!;
+      exact.click();
+      await w.vm.$nextTick();
+
+      expect(w.emitted("update:accuracy")).toEqual([["exact"]]);
+      expect(panel()).not.toBeNull(); // a press inside the panel keeps it open
+    });
+
     it("tells the panel whether the parts are exact", async () => {
       const w = mountHeader({ breakdown: { ...BREAKDOWN, exact: true } });
 

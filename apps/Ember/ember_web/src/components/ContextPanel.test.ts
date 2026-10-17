@@ -52,6 +52,21 @@ describe("ContextPanel", () => {
     expect(mountPanel({ exact: true }).get("[data-test=context-note]").text()).toContain("Counted by the model provider");
   });
 
+  it("has no accuracy switch unless it is given the setting", () => {
+    expect(mountPanel().find("[data-test=context-accuracy]").exists()).toBe(false);
+  });
+
+  it("shows the accuracy and emits the one chosen", async () => {
+    const w = mountPanel({ accuracy: "estimate" });
+    const button = (label: string) => w.findAll("[data-test=context-accuracy] button").find((b) => b.text() === label)!;
+
+    expect(button("Estimate").attributes("aria-pressed") ?? button("Estimate").classes().join(" ")).toBeTruthy();
+    await button("Exact").trigger("click");
+
+    expect(w.emitted("update:accuracy")).toEqual([["exact"]]);
+    expect(w.get("[data-test=context-accuracy]").text()).toContain("Applies from your next question");
+  });
+
   it("shows a tiny part as under 0.1%", () => {
     const w = mountPanel({ tokens: 10_001, parts: [{ id: "agents", label: "Delegable agents", tokens: 1 }] });
 

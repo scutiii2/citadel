@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from "vue";
 import type { ContextPart } from "../api/types";
 import type { MenuItem } from "../utils/chatMenu";
+import type { ContextAccuracy } from "../utils/contextAccuracy";
 import { useAuthStore } from "../stores/auth";
 import ActionButton from "./ActionButton.vue";
 import ContextPanel from "./ContextPanel.vue";
@@ -21,10 +22,12 @@ const props = defineProps<{
   /** What fills the context, for the panel the meter opens; leave out (or null)
    * and the meter is plain text. */
   breakdown?: { tokens: number; window: number; parts: ContextPart[]; exact?: boolean } | null;
+  /** How the next questions are counted; with it the panel shows an Estimate / Exact switch. */
+  accuracy?: ContextAccuracy;
   locked: boolean;
 }>();
 
-const emit = defineEmits<{ export: []; share: []; summarize: []; clear: [] }>();
+const emit = defineEmits<{ export: []; share: []; summarize: []; clear: []; "update:accuracy": [value: ContextAccuracy] }>();
 
 const auth = useAuthStore();
 
@@ -125,6 +128,8 @@ function choose(id: string): void {
         :window="breakdown.window"
         :parts="breakdown.parts"
         :exact="breakdown.exact"
+        :accuracy="accuracy"
+        @update:accuracy="(value) => emit('update:accuracy', value)"
       />
     </div>
     <template v-if="hasMessages">

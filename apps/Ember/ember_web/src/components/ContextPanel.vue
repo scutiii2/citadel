@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { ContextPart } from "../api/types";
+import { CONTEXT_ACCURACY_OPTIONS, type ContextAccuracy } from "../utils/contextAccuracy";
 import { compactNumber } from "../utils/usageFormat";
+import SegmentedControl from "./SegmentedControl.vue";
 
 /** What fills the agent's context window: one stacked bar and a row per part
  * (system prompt, tools, messages ...), then the free space left. The parts are
@@ -14,7 +16,16 @@ const props = defineProps<{
   parts: ContextPart[];
   /** The parts were counted by the model provider, not estimated. */
   exact?: boolean;
+  /** How the next questions are counted; leave out to hide the switch. */
+  accuracy?: ContextAccuracy;
 }>();
+
+const emit = defineEmits<{ "update:accuracy": [value: ContextAccuracy] }>();
+
+const choice = computed<ContextAccuracy>({
+  get: () => props.accuracy ?? "estimate",
+  set: (value) => emit("update:accuracy", value),
+});
 
 interface Row {
   id: string;
@@ -66,6 +77,10 @@ function formatPercent(percent: number): string {
         <strong class="percent">{{ formatPercent(row.percent) }}</strong>
       </li>
     </ul>
+    <div v-if="accuracy" class="accuracy" data-test="context-accuracy">
+      <SegmentedControl v-model="choice" :options="CONTEXT_ACCURACY_OPTIONS" aria-label="Breakdown accuracy" />
+      <span>Applies from your next question.</span>
+    </div>
     <p class="note" data-test="context-note">
       {{ exact ? "Counted by the model provider." : "Estimated from the prompt text." }}
       The total is what the model reported.
@@ -135,6 +150,15 @@ function formatPercent(percent: number): string {
 .percent {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+.accuracy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.8em;
+  color: var(--muted);
 }
 .note {
   margin: 0;
