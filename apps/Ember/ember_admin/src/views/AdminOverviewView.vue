@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { adminClient, type AdminSummary } from "../api/AdminClient";
 import { ticketsAdminClient, type TicketStats } from "../api/TicketsAdminClient";
-import { ADMIN_PAGES } from "../router/pages";
+import { ADMIN_NAV_PAGES } from "../router/pages";
 import { useAuthStore } from "../stores/auth";
 import { errorMessage } from "../utils/errors";
 import StatTile from "../components/admin/StatTile.vue";
@@ -13,7 +13,7 @@ const auth = useAuthStore();
 const summary = ref<AdminSummary | null>(null);
 const ticketStats = ref<TicketStats | null>(null);
 const error = ref("");
-const destinations = computed(() => ADMIN_PAGES.filter(s => s.to !== "/admin").filter((s) => Array.isArray(s.permission) ? s.permission.some(auth.hasPermission) : auth.hasPermission(s.permission)));
+const destinations = computed(() => ADMIN_NAV_PAGES.filter(s => s.to !== "/admin").filter((s) => Array.isArray(s.permission) ? s.permission.some(auth.hasPermission) : auth.hasPermission(s.permission)));
 const descriptions: Record<string, string> = {
   "/admin/accounts": "Manage profiles, account status, and assigned roles.",
   "/admin/roles": "Define exactly what each role can view and change.",

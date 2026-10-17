@@ -7,7 +7,7 @@
 import { computed, ref } from "vue";
 import SettingRow from "./SettingRow.vue";
 import ToggleSwitch from "./ToggleSwitch.vue";
-import { ADMIN_PAGES } from "../router/pages";
+import { ADMIN_NAV_PAGES } from "../router/pages";
 import { useAuthStore } from "../stores/auth";
 import { useNavPrefsStore } from "../stores/navPrefs";
 import type { NavPrefs } from "../stores/navPrefs";
@@ -31,7 +31,7 @@ function reset(): void {
   if (props.modelValue) emit('update:modelValue', { order: [], pinned: [], hidden: [] });
   else void navPrefs.reset();
 }
-const pages = computed(() => ADMIN_PAGES.filter(p => p.to !== "/admin" && (Array.isArray(p.permission) ? p.permission.some(auth.hasPermission) : auth.hasPermission(p.permission))));
+const pages = computed(() => ADMIN_NAV_PAGES.filter(p => p.to !== "/admin" && (Array.isArray(p.permission) ? p.permission.some(auth.hasPermission) : auth.hasPermission(p.permission))));
 const groups = computed(() => arrange(pages.value, prefs.value));
 const rows = computed(() => [
   ...groups.value.pinned.map((page) => ({ page, pinned: true })),

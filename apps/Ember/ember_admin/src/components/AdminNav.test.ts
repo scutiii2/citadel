@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import { beforeEach, expect, it } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import AdminNav from "./AdminNav.vue";
@@ -36,7 +36,14 @@ it("marks only the current administration page in the main rail", async () => {
   const w = await show(["accounts.view", "roles.view", "invites.manage", "settings.manage"], "/admin/roles");
   expect(w.findAll('nav a[aria-current="page"]').map(a => a.attributes('aria-label'))).toEqual(['Roles & permissions']);
   expect(w.get("a[aria-label='Overview']").attributes('aria-current')).toBeUndefined();
-  expect(w.findAll('nav a').map(a => a.attributes('aria-label'))).toEqual(['Accounts', 'Roles & permissions', 'Invites', 'Workspace settings']);
+  expect(w.findAll('nav a').map(a => a.attributes('aria-label'))).toEqual(['Roles & permissions', 'Accounts', 'Workspace settings', 'Invites']);
+});
+
+it("lists the pages in the default arrangement", async () => {
+  const w = await show(["accounts.manage", "roles.manage", "invites.manage", "settings.manage", "capabilities.manage", "extensions.manage", "agents.manage", "games.manage", "tickets.manage", "usage.all.view", "traffic.view"]);
+  expect(w.findAll("nav[aria-label='Admin sections'] a").map(a => a.attributes("aria-label"))).toEqual([
+    "Roles & permissions", "Accounts", "Capabilities", "Extensions", "Agents", "Analytics", "Usage", "Workspace settings", "Invites", "Games", "Tickets",
+  ]);
 });
 
 it("lets an extension manager reach Extensions without offering other pages", async () => {
@@ -57,10 +64,34 @@ it("lets visitors cycle and save their theme", async () => {
   expect(document.documentElement.style.colorScheme).toBe("light dark");
 });
 
-it("keeps personal pages reachable without admin grants", async () => {
+it("keeps personal pages reachable without admin grants, in the account menu", async () => {
   const w = await show([], "/profile");
-  expect(w.get("a[aria-label='Profile']").attributes("aria-current")).toBe("page");
-  expect(w.get("a[aria-label='Settings']").attributes("href")).toBe("/settings");
+  await w.get("button.account").trigger("click");
+  expect(w.get(".menu .email").text()).toBe("ada@example.com");
+  expect(w.findAll(".menu a.row").map(a => [a.text(), a.attributes("href")])).toEqual([["Profile", "/profile"], ["Settings", "/settings"]]);
+  expect(w.get(".menu a.router-link-exact-active").text()).toBe("Profile");
+  expect(w.find("nav a[aria-label='Settings']").exists()).toBe(false);
+});
+
+it("opens the account menu with Theme and Log out, and closes it on Escape", async () => {
+  const w = await show([]);
+  expect(w.find(".menu").exists()).toBe(false);
+  await w.get("button.account").trigger("click");
+  expect(w.get(".theme-row").text()).toContain("Theme");
+  await w.get(".theme-row").trigger("click");
+  expect(localStorage.getItem("ember_admin.theme")).toBe("light");
+  await w.get(".menu").trigger("keydown", { key: "Escape" });
+  expect(w.find(".menu").exists()).toBe(false);
+});
+
+it("logs out from the account menu", async () => {
+  const w = await show([]);
+  const auth = useAuthStore();
+  const logout = vi.spyOn(auth, "logout").mockResolvedValue(undefined as never);
+  await w.get("button.account").trigger("click");
+  await w.get("button.logout").trigger("click");
+  expect(logout).toHaveBeenCalled();
+  expect(w.find(".menu").exists()).toBe(false);
 });
 
 it("keeps Overview reachable when every administration page is hidden", async () => {
@@ -69,7 +100,7 @@ it("keeps Overview reachable when every administration page is hidden", async ()
   await flushPromises();
   expect(w.find("nav").exists()).toBe(false);
   expect(w.get("a[aria-label='Overview']").attributes("href")).toBe("/");
-  expect(w.find("a[aria-label='Settings']").exists()).toBe(true);
+  expect(w.find("button.account").exists()).toBe(true);
 });
 
 it("exposes Usage and Overview to a usage-only observer", async () => {

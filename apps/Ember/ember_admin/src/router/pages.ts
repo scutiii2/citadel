@@ -25,6 +25,26 @@ export const ADMIN_SECTIONS: AdminPage[] = [
   { to: "/admin/settings", label: "Workspace settings", icon: ["M4 6h3M11 6h9M4 12h9M17 12h3M4 18h5M13 18h7", "M11 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0M17 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0M13 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0"], permission: "settings.manage" },
 ];
 
+/** The rail's default arrangement (before an account saves its own). The Overview
+ * page is the wordmark, so it is not in this list. */
+const DEFAULT_ORDER = [
+  "/admin/roles",
+  "/admin/accounts",
+  "/capabilities",
+  "/extensions",
+  "/agents",
+  "/analytics",
+  "/usage",
+  "/admin/settings",
+  "/admin/invites",
+  "/games",
+  "/tickets",
+];
+const defaultRank = (page: AdminPage): number => {
+  const at = DEFAULT_ORDER.indexOf(page.to);
+  return at < 0 ? DEFAULT_ORDER.length : at;
+};
+
 export const ADMIN_PAGES: AdminPage[] = [
   ...ADMIN_SECTIONS,
   { to: "/usage", label: "Usage", icon: ["M3 3v16a2 2 0 0 0 2 2h16", "M18 17V9", "M13 17V5", "M8 17v-3"], permission: "usage.all.view" },
@@ -35,3 +55,7 @@ export const ADMIN_PAGES: AdminPage[] = [
   { to: "/tickets", label: "Tickets", icon: ["M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z", "M13 5v2", "M13 17v2", "M13 11v2"], permission: "tickets.manage" },
   { to: "/analytics", label: "Analytics", icon: ["M22 12h-4l-3 9L9 3l-3 9H2"], permission: ANALYTICS_PERMISSIONS },
 ];
+
+/** The same pages in the rail's default arrangement, for the rail, the Overview tiles and the
+ * sidebar editor. The router keeps using ADMIN_PAGES, whose order picks the home page. */
+export const ADMIN_NAV_PAGES: AdminPage[] = [...ADMIN_PAGES].sort((a, b) => defaultRank(a) - defaultRank(b));
