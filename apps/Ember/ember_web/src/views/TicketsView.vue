@@ -97,7 +97,11 @@ async function open(ticket: Ticket): Promise<void> {
   reply.value = "";
   try {
     const loaded = await ticketsClient.get(ticket.id);
-    if (seq === detailSeq) current.value = loaded;
+    if (seq === detailSeq) {
+      current.value = loaded;
+      tickets.value = tickets.value.map(row => row.id === ticket.id ? { ...row, has_unread: loaded.has_unread ?? false } : row);
+      window.dispatchEvent(new Event("tickets-seen"));
+    }
   } catch (err) {
     if (seq === detailSeq) detailError.value = errorMessage(err);
   }
@@ -171,8 +175,9 @@ async function closeTicket(): Promise<void> {
       </p>
       <ul v-else class="list">
         <li v-for="t in tickets" :key="t.id">
-          <button type="button" class="ticket-row card" @click="open(t)">
-            <span class="title">{{ t.title }}</span>
+          <button type="button" class="ticket-row card" :class="{ unread: t.has_unread }" @click="open(t)">
+            <span class="title"><span v-if="t.has_unread" class="unread-dot" aria-hidden="true" />{{ t.title }}</span>
+            <span v-if="t.has_unread" class="unread-label">Support replied</span>
             <span class="meta">
               <span class="badge">{{ TYPE_LABELS[t.type] }}</span>
               <span class="status">
@@ -275,6 +280,9 @@ async function closeTicket(): Promise<void> {
 .ticket-row:hover {
   border-color: var(--accent);
 }
+.ticket-row.unread { border-color: var(--accent); }
+.unread-label { color: var(--accent); font-size: 0.85em; }
+.unread-dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: var(--radius-full); background: var(--accent); }
 .title {
   font-weight: 600;
   overflow-wrap: anywhere;

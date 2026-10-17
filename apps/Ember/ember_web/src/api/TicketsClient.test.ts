@@ -12,6 +12,11 @@ beforeEach(() => {
 });
 
 describe("ticketsClient", () => {
+  it("fetches the unread count", async () => {
+    request.mockResolvedValue({ count: 3 });
+    expect(await ticketsClient.unreadCount()).toBe(3);
+    expect(request).toHaveBeenLastCalledWith("GET", "/api/tickets/unread-count");
+  });
   it("lists tickets, optionally by status, and unwraps the list", async () => {
     request.mockResolvedValue({ tickets: [TICKET] });
 

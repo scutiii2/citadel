@@ -17,6 +17,7 @@ from src.models.prompt_template import PromptTemplate
 from src.models.role import Permission, Role
 from src.models.shared_chat import SharedChat
 from src.models.traffic_bucket import TrafficBucket
+from src.models.ticket_activity import AccountTicketSeen, TicketStaffActivity
 from src.models.usage import UsageRecord
 from src.models.user_extension import UserExtension
 
@@ -25,6 +26,7 @@ __all__ = [
     "GameTicket",
     "Account",
     "AccountCapability",
+    "AccountTicketSeen",
     "AppSetting",
     "AuthSession",
     "Chat",
@@ -40,6 +42,7 @@ __all__ = [
     "Role",
     "SharedChat",
     "TrafficBucket",
+    "TicketStaffActivity",
     "UsageRecord",
     "UserExtension",
 ]

@@ -218,14 +218,17 @@ class TicketService:
     async def list_tickets(
         self, *, owner: str | None = None, status: str | None = None, type: str | None = None,
         tag: str | None = None, priority: str | None = None, assignee: str | None = None,
-        group_id: int | None = None, possible_only: bool = False, limit: int = 100,
+        group_id: int | None = None, possible_only: bool = False, limit: int | None = 100,
     ) -> list[dict[str, Any]]:
+        if limit is None and not owner:
+            raise TicketError("An owner is required for an unbounded ticket list.")
         self._check(status, rules.STATUSES, "status")
         self._check(type, rules.TYPES, "type")
         self._check(priority, rules.PRIORITIES, "priority")
         return await self._db(
             self._store.list_tickets, owner=owner, status=status, type=type, tag=tag, priority=priority,
-            assignee=assignee, group_id=group_id, possible_only=possible_only, limit=max(1, min(limit, 500)),
+            assignee=assignee, group_id=group_id, possible_only=possible_only,
+            limit=None if limit is None else max(1, min(limit, 500)),
         )
 
     async def list_groups(
@@ -259,6 +262,17 @@ class TicketService:
         await self._db(self._store.update_ticket, ticket_id, {"status": "closed"}, self._now().isoformat())
         return await self._with_comments(ticket_id)
 
+    async def reopen_own(self, ticket_id: int, owner: str) -> dict[str, Any]:
+        owner = str(owner or "").strip()
+        if not owner:
+            raise TicketError("No requester id was sent for this request.")
+        reopened = await self._db(self._store.reopen_own, ticket_id, owner, self._now().isoformat())
+        if reopened is None:
+            raise TicketNotFound(f"No ticket {ticket_id}.")
+        if not reopened:
+            raise TicketError("Only resolved or closed tickets can be reopened.")
+        return await self._with_comments(ticket_id)
+
     async def update_ticket(
         self, ticket_id: int, *, status: str | None = None, priority: str | None = None,
         assignee: str | None = None, tags: list[str] | None = None,
@@ -281,7 +295,7 @@ class TicketService:
             except ValueError as error:
                 raise TicketError(str(error)) from None
         if changes:
-            await self._db(self._store.update_ticket, ticket_id, changes, self._now().isoformat())
+            await self._db(self._store.update_ticket, ticket_id, changes, self._now().isoformat(), staff_activity=True)
         return await self._with_comments(ticket_id)
 
     async def move_ticket(self, ticket_id: int, group_id: int | None) -> dict[str, Any]:

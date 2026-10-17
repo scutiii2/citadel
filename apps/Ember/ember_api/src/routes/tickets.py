@@ -13,14 +13,17 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import Settings
-from src.deps import get_log_writer, get_settings, require_permission
+from src.db import utcnow
+from src.deps import get_db_session, get_log_writer, get_settings, require_permission
 from src.models import Account
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import McpServerInfo, McpServerRefused, McpServerUnavailable
 from src.services.permissions import TICKETS_CREATE, TICKETS_MANAGE
 from src.services.ticket_gateway import TicketGateway
+from src.services.ticket_unread import TicketUnreadService
 
 router = APIRouter(prefix="/api/tickets", tags=["tickets"])
 admin_router = APIRouter(prefix="/api/admin", tags=["tickets-admin"])
@@ -32,6 +35,30 @@ TicketType = Literal["bug", "feature", "other"]
 TicketStatus = Literal["open", "in_progress", "resolved", "closed"]
 TicketPriority = Literal["low", "normal", "high", "urgent"]
 TicketId = Annotated[int, Path(ge=1)]
+
+
+def get_ticket_unread(session: AsyncSession = Depends(get_db_session)) -> TicketUnreadService:
+    return TicketUnreadService(session)
+
+
+def _reporter_ticket(ticket: dict[str, Any]) -> dict[str, Any]:
+    """Project explicitly: upstream staff fields must never reach reporters."""
+    fields = ("id", "type", "title", "description", "status", "created_at", "updated_at", "closed_at")
+    result = {key: ticket[key] for key in fields if key in ticket}
+    if "comments" in ticket:
+        comment_fields = ("id", "ticket_id", "author", "author_role", "body", "created_at")
+        result["comments"] = [
+            {key: comment[key] for key in comment_fields if key in comment}
+            for comment in ticket["comments"]
+        ]
+    return result
+
+
+def _reporter_result(result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "ticket": _reporter_ticket(result["ticket"]),
+        **{key: result[key] for key in ("duplicate", "group_size") if key in result},
+    }
 
 
 def get_ticket_gateway(request: Request, settings: Settings = Depends(get_settings)) -> TicketGateway:
@@ -74,22 +101,52 @@ async def create_ticket(
         "verified_context": {"via": "ember_api", "account_id": str(account.id)},
     }
     result = await _call(gateway.create(account, payload))
-    return JSONResponse(result, status_code=200 if result.get("duplicate") else 201)
+    return JSONResponse(_reporter_result(result), status_code=200 if result.get("duplicate") else 201)
 
 
 @router.get("")
 async def list_own_tickets(
     status_filter: Annotated[TicketStatus | None, Query(alias="status")] = None,
     account: Account = Depends(require_create), gateway: TicketGateway = Depends(get_ticket_gateway),
+    unread: TicketUnreadService = Depends(get_ticket_unread),
 ) -> Any:
-    return await _call(gateway.list_own(account, status_filter))
+    result = await _call(gateway.list_own(account, status_filter))
+    unread_ids = await unread.unread_ids(
+        account.id, [ticket["id"] for ticket in result["tickets"]],
+        {ticket["id"]: ticket.get("last_staff_activity_at") for ticket in result["tickets"]},
+    )
+    return {"tickets": [
+        {**_reporter_ticket(ticket), "has_unread": ticket["id"] in unread_ids}
+        for ticket in result["tickets"]
+    ]}
+
+
+@router.get("/unread-count")
+async def unread_ticket_count(
+    account: Account = Depends(require_create), gateway: TicketGateway = Depends(get_ticket_gateway),
+    unread: TicketUnreadService = Depends(get_ticket_unread),
+) -> Any:
+    result = await _call(gateway.list_own(account, None))
+    unread_ids = await unread.unread_ids(
+        account.id, [ticket["id"] for ticket in result["tickets"]],
+        {ticket["id"]: ticket.get("last_staff_activity_at") for ticket in result["tickets"]},
+    )
+    return {"count": len(unread_ids)}
 
 
 @router.get("/{ticket_id}")
 async def get_own_ticket(
     ticket_id: TicketId, account: Account = Depends(require_create), gateway: TicketGateway = Depends(get_ticket_gateway),
+    unread: TicketUnreadService = Depends(get_ticket_unread),
 ) -> Any:
-    return await _call(gateway.get_own(account, ticket_id))
+    fetched_at = utcnow()
+    result = await _call(gateway.get_own(account, ticket_id))
+    await unread.mark_seen(account.id, ticket_id, fetched_at)
+    projected = _reporter_result(result)
+    projected["ticket"]["has_unread"] = ticket_id in await unread.unread_ids(
+        account.id, [ticket_id], {ticket_id: result["ticket"].get("last_staff_activity_at")},
+    )
+    return projected
 
 
 @router.post("/{ticket_id}/comments")
@@ -97,14 +154,14 @@ async def comment_own_ticket(
     ticket_id: TicketId, body: CommentIn,
     account: Account = Depends(require_create), gateway: TicketGateway = Depends(get_ticket_gateway),
 ) -> Any:
-    return await _call(gateway.comment_own(account, ticket_id, body.body))
+    return _reporter_result(await _call(gateway.comment_own(account, ticket_id, body.body)))
 
 
 @router.post("/{ticket_id}/close")
 async def close_own_ticket(
     ticket_id: TicketId, account: Account = Depends(require_create), gateway: TicketGateway = Depends(get_ticket_gateway),
 ) -> Any:
-    return await _call(gateway.close_own(account, ticket_id))
+    return _reporter_result(await _call(gateway.close_own(account, ticket_id)))
 
 
 # ---- staff routes ----------------------------------------------------------

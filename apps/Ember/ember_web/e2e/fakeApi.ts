@@ -246,6 +246,9 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
+    if (path === "/api/tickets/unread-count" && request.method() === "GET") {
+      return route.fulfill({ json: { count: 0 } });
+    }
     const method = request.method();
 
     if (method === "GET" && path === "/api/auth/me") {

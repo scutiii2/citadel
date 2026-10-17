@@ -56,6 +56,16 @@ beforeEach(() => {
 });
 
 describe("TicketsView", () => {
+  it("signals unread support activity and clears it after opening", async () => {
+    client.list.mockResolvedValue([ticket(1, { has_unread: true })]);
+    client.get.mockResolvedValue(ticket(1, { has_unread: false }));
+    const wrapper = await mountView();
+    expect(rows(wrapper)[0]!.classes()).toContain("unread");
+    expect(rows(wrapper)[0]!.text()).toContain("Support replied");
+    await rows(wrapper)[0]!.trigger("click");
+    await flushPromises();
+    expect(rows(wrapper)[0]!.classes()).not.toContain("unread");
+  });
   it("lists the account's tickets with a status word", async () => {
     const wrapper = await mountView();
 

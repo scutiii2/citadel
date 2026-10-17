@@ -3,7 +3,8 @@
 Every method is synchronous and opens its own short connection; callers on the
 event loop reach it through asyncio.to_thread. Reading never creates the
 database file. Ticket text is never logged. The only rules enforced here are the
-atomic ones that need one transaction: the automatic-report dedupe and cap.
+atomic ones that need one transaction: automatic-report dedupe and cap, and
+reporter reopening with its system comment.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ CREATE TABLE IF NOT EXISTS tickets (
     assignee TEXT, reporter TEXT NOT NULL, owner TEXT NOT NULL DEFAULT '', source TEXT NOT NULL,
     tags TEXT NOT NULL DEFAULT '[]', context TEXT NOT NULL DEFAULT '{}',
     fingerprint TEXT, possible_group_id INTEGER,
-    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, closed_at TEXT
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, closed_at TEXT, last_staff_activity_at TEXT
 );
 CREATE INDEX IF NOT EXISTS tickets_group ON tickets (group_id);
 CREATE TABLE IF NOT EXISTS ticket_comments (
@@ -93,12 +94,20 @@ class TicketStore:
 
     @staticmethod
     def _add_owner_column(db: sqlite3.Connection) -> None:
-        """A database from before tickets had an owner key gets one. `reporter` is the display
-        name the ticket was filed under; those rows used it as the key, so it seeds `owner`."""
+        """Upgrade older ticket rows with ownership and authoritative staff activity.
+        Legacy reporter names seed owner keys; existing staff comments seed activity."""
         columns = {row["name"] for row in db.execute("PRAGMA table_info(tickets)")}
         if "owner" not in columns:
             db.execute("ALTER TABLE tickets ADD COLUMN owner TEXT NOT NULL DEFAULT ''")
+        if "last_staff_activity_at" not in columns:
+            db.execute("ALTER TABLE tickets ADD COLUMN last_staff_activity_at TEXT")
         db.execute("UPDATE tickets SET owner = reporter WHERE owner = ''")
+        db.execute(
+            "UPDATE tickets SET last_staff_activity_at = "
+            "(SELECT MAX(created_at) FROM ticket_comments WHERE ticket_id = tickets.id AND author_role = 'staff') "
+            "WHERE last_staff_activity_at IS NULL AND EXISTS "
+            "(SELECT 1 FROM ticket_comments WHERE ticket_id = tickets.id AND author_role = 'staff')"
+        )
         db.commit()
 
     # ---- writes -------------------------------------------------------
@@ -150,23 +159,52 @@ class TicketStore:
                 "INSERT INTO ticket_comments (ticket_id, author, author_role, body, created_at) VALUES (?, ?, ?, ?, ?)",
                 (ticket_id, author, role, body, now),
             ).lastrowid
-            db.execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, ticket_id))
+            db.execute(
+                "UPDATE tickets SET updated_at = ?, last_staff_activity_at = CASE WHEN ? = 'staff' "
+                "THEN MAX(COALESCE(last_staff_activity_at, ?), ?) ELSE last_staff_activity_at END WHERE id = ?",
+                (now, role, now, now, ticket_id),
+            )
             return comment_id
 
-    def update_ticket(self, ticket_id: int, changes: dict[str, Any], now: str) -> bool:
+    def update_ticket(self, ticket_id: int, changes: dict[str, Any], now: str, *, staff_activity: bool = False) -> bool:
         unknown = set(changes) - set(_UPDATABLE)
         if unknown:
             raise ValueError(f"Cannot change: {', '.join(sorted(unknown))}")
         sets, args = ["updated_at = ?"], [now]
+        if staff_activity:
+            sets.append("last_staff_activity_at = MAX(COALESCE(last_staff_activity_at, ?), ?)")
+            args.extend((now, now))
         for key, value in changes.items():
             sets.append(f"{key} = ?")
             args.append(json.dumps(value) if key == "tags" else value)
         if "status" in changes:
             sets.append("closed_at = ?")
-            args.append(now if changes["status"] == "closed" else None)
+            args.append(now if changes["status"] in ("resolved", "closed") else None)
         with closing(self._connect()) as db, db:
             cursor = db.execute(f"UPDATE tickets SET {', '.join(sets)} WHERE id = ?", (*args, ticket_id))
             return cursor.rowcount == 1
+
+    def reopen_own(self, ticket_id: int, owner: str, now: str) -> bool | None:
+        """Reopen and record the event together. None hides missing/foreign tickets;
+        False means the owner's ticket is already active. Caller roles cannot
+        create this system comment through the ordinary comment service."""
+        if not self._path.exists():
+            return None
+        with closing(self._connect()) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT status FROM tickets WHERE id = ? AND owner = ?", (ticket_id, owner)).fetchone()
+            if row is None:
+                return None
+            if row["status"] not in ("resolved", "closed"):
+                return False
+            db.execute("UPDATE tickets SET status = 'open', closed_at = NULL, updated_at = ? "
+                       "WHERE id = ? AND owner = ?", (now, ticket_id, owner))
+            db.execute(
+                "INSERT INTO ticket_comments (ticket_id, author, author_role, body, created_at) "
+                "VALUES (?, 'System', 'system', 'Ticket reopened by the reporter.', ?)",
+                (ticket_id, now),
+            )
+            return True
 
     def move_ticket(self, ticket_id: int, group_id: int | None, now: str) -> int | None:
         with closing(self._connect()) as db, db:
@@ -183,8 +221,9 @@ class TicketStore:
             elif db.execute("SELECT 1 FROM ticket_groups WHERE id = ?", (group_id,)).fetchone() is None:
                 return None
             db.execute(
-                "UPDATE tickets SET group_id = ?, possible_group_id = NULL, updated_at = ? WHERE id = ?",
-                (group_id, now, ticket_id),
+                "UPDATE tickets SET group_id = ?, possible_group_id = NULL, updated_at = ?, "
+                "last_staff_activity_at = MAX(COALESCE(last_staff_activity_at, ?), ?) WHERE id = ?",
+                (group_id, now, now, now, ticket_id),
             )
             db.execute("UPDATE ticket_groups SET updated_at = ? WHERE id = ?", (now, group_id))
             return group_id
@@ -244,8 +283,10 @@ class TicketStore:
     def list_tickets(
         self, *, owner: str | None = None, status: str | None = None, type: str | None = None,
         tag: str | None = None, priority: str | None = None, assignee: str | None = None,
-        group_id: int | None = None, possible_only: bool = False, limit: int = 100,
+        group_id: int | None = None, possible_only: bool = False, limit: int | None = 100,
     ) -> list[dict[str, Any]]:
+        if limit is None and not owner:
+            raise ValueError("An owner is required for an unbounded ticket list.")
         if not self._path.exists():
             return []
         where: list[str] = []
@@ -273,7 +314,7 @@ class TicketStore:
             add("t.possible_group_id IS NOT NULL")
         sql = _SELECT + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY t.id DESC LIMIT ?"
         with closing(self._connect()) as db:
-            rows = db.execute(sql, (*args, limit)).fetchall()
+            rows = db.execute(sql, (*args, -1 if limit is None else limit)).fetchall()
         return [_ticket(row) for row in rows]
 
     def candidates(self, type: str, tags: list[str], limit: int) -> list[dict[str, Any]]:

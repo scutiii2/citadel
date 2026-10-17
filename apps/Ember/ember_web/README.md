@@ -8,6 +8,10 @@ URL, token or key.
 
 ## Features
 
+- Tickets highlight unread support activity with an accent dot, border and
+  “Support replied” label. The Tickets navigation badge refreshes while visible;
+  opening an owned ticket marks it seen.
+
 - Separate Notes (`/notes`) and Memory (`/memory`) pages use Ember's existing
   navigation rail, compact headings, theme tokens and responsive layouts. Notes
   keeps its list/editor, tags, explicit Save and agent-read switch. Memory lists

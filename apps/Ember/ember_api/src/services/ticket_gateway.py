@@ -34,7 +34,7 @@ class TicketGateway:
         return await self._info.request("POST", "/tickets", account, json=body)
 
     async def list_own(self, account: Account, status: str | None = None) -> dict[str, Any]:
-        return await self._info.request("GET", "/tickets", account, params=_params({"status": status}))
+        return await self._info.request("GET", "/tickets", account, params=_params({"status": status, "all": True}))
 
     async def get_own(self, account: Account, ticket_id: int) -> dict[str, Any]:
         return await self._info.request("GET", f"/tickets/{int(ticket_id)}", account)

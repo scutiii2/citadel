@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import sqlite3
+from contextlib import closing
+
 import pytest
 
 from src.services.ticket_store import AutoLimit, TicketStore
@@ -153,6 +156,112 @@ def test_update_ticket_whitelist_and_closed_at(store):
     with pytest.raises(ValueError):
         store.update_ticket(ticket_id, {"reporter": "mallory"}, T2)
     assert store.update_ticket(999, {"status": "open"}, T2) is False
+
+
+@pytest.mark.parametrize("status", ["resolved", "closed"])
+def test_reopen_own_atomically_updates_status_and_adds_system_comment(store, status):
+    ticket_id, _, _ = add(store)
+    store.update_ticket(ticket_id, {"status": status}, T1)
+    assert store.get_ticket(ticket_id)["closed_at"] == T1
+
+    assert store.reopen_own(ticket_id, "uid-alice", T2) is True
+
+    ticket = store.get_ticket(ticket_id)
+    assert (ticket["status"], ticket["closed_at"], ticket["updated_at"]) == ("open", None, T2)
+    comments = store.list_comments(ticket_id)
+    assert len(comments) == 1
+    assert (comments[0]["author"], comments[0]["author_role"], comments[0]["body"], comments[0]["created_at"]) == (
+        "System", "system", "Ticket reopened by the reporter.", T2,
+    )
+
+
+@pytest.mark.parametrize("status", ["open", "in_progress"])
+def test_reopen_own_rejects_active_tickets_without_changes(store, status):
+    ticket_id, _, _ = add(store)
+    store.update_ticket(ticket_id, {"status": status}, T1)
+    before = store.get_ticket(ticket_id)
+
+    assert store.reopen_own(ticket_id, "uid-alice", T2) is False
+    assert store.get_ticket(ticket_id) == before
+    assert store.list_comments(ticket_id) == []
+
+
+def test_reopen_own_hides_foreign_and_missing_tickets(store):
+    ticket_id, _, _ = add(store)
+    store.update_ticket(ticket_id, {"status": "closed"}, T1)
+    assert store.reopen_own(ticket_id, "uid-bob", T2) is None
+    assert store.reopen_own(999, "uid-alice", T2) is None
+    assert store.get_ticket(ticket_id)["status"] == "closed"
+    assert store.list_comments(ticket_id) == []
+
+
+def test_reopen_own_rolls_back_when_system_comment_fails(store):
+    ticket_id, _, _ = add(store)
+    store.update_ticket(ticket_id, {"status": "closed"}, T1)
+    before = store.get_ticket(ticket_id)
+    with closing(store._connect()) as db, db:
+        db.execute("CREATE TRIGGER reject_comment BEFORE INSERT ON ticket_comments "
+                   "BEGIN SELECT RAISE(ABORT, 'comment failed'); END")
+
+    with pytest.raises(sqlite3.IntegrityError, match="comment failed"):
+        store.reopen_own(ticket_id, "uid-alice", T2)
+    assert store.get_ticket(ticket_id) == before
+    assert store.list_comments(ticket_id) == []
+
+
+def test_staff_activity_is_preserved_across_reporter_actions(store):
+    ticket_id, _, _ = add(store)
+    assert store.get_ticket(ticket_id)["last_staff_activity_at"] is None
+    store.add_comment(ticket_id, "root", "staff", "looking", T1)
+    assert store.get_ticket(ticket_id)["last_staff_activity_at"] == T1
+    store.add_comment(ticket_id, "alice", "reporter", "thanks", T2)
+    store.update_ticket(ticket_id, {"status": "closed"}, T2)
+    store.reopen_own(ticket_id, "uid-alice", T2)
+    assert store.get_ticket(ticket_id)["last_staff_activity_at"] == T1
+    store.update_ticket(ticket_id, {"status": "resolved"}, T2, staff_activity=True)
+    assert store.get_ticket(ticket_id)["last_staff_activity_at"] == T2
+    store.add_comment(ticket_id, "root", "staff", "delayed old event", T1)
+    assert store.get_ticket(ticket_id)["last_staff_activity_at"] == T2
+
+
+def test_historical_staff_activity_backfills_from_staff_comments_only(store):
+    staff_ticket, _, _ = add(store)
+    reporter_ticket, _, _ = add(store)
+    with closing(store._connect()) as db, db:
+        db.execute("INSERT INTO ticket_comments (ticket_id, author, author_role, body, created_at) "
+                   "VALUES (?, 'root', 'staff', 'first', ?), (?, 'root', 'staff', 'last', ?), "
+                   "(?, 'alice', 'reporter', 'reporter', ?)",
+                   (staff_ticket, T0, staff_ticket, T1, reporter_ticket, T2))
+        db.execute("UPDATE tickets SET last_staff_activity_at = NULL")
+    assert store.get_ticket(staff_ticket)["last_staff_activity_at"] == T1
+    assert store.get_ticket(reporter_ticket)["last_staff_activity_at"] is None
+
+
+def test_move_records_staff_activity(store):
+    ticket_id, _, _ = add(store)
+    store.move_ticket(ticket_id, None, T1)
+    assert store.get_ticket(ticket_id)["last_staff_activity_at"] == T1
+
+
+def test_staff_comment_rolls_back_if_activity_update_fails(store):
+    ticket_id, _, _ = add(store)
+    with closing(store._connect()) as db, db:
+        db.execute("CREATE TRIGGER reject_staff_activity BEFORE UPDATE OF last_staff_activity_at ON tickets "
+                   "BEGIN SELECT RAISE(ABORT, 'activity failed'); END")
+    with pytest.raises(sqlite3.IntegrityError, match="activity failed"):
+        store.add_comment(ticket_id, "root", "staff", "reply", T1)
+    assert store.list_comments(ticket_id) == []
+    assert store.get_ticket(ticket_id)["last_staff_activity_at"] is None
+
+
+def test_unbounded_list_requires_owner_and_preserves_default_limit(store):
+    for _ in range(101):
+        add(store)
+    add(store, reporter="bob")
+    assert len(store.list_tickets(owner="uid-alice")) == 100
+    assert len(store.list_tickets(owner="uid-alice", limit=None)) == 101
+    with pytest.raises(ValueError, match="owner"):
+        store.list_tickets(limit=None)
 
 
 def test_move_ticket_between_groups_and_split_out(store):

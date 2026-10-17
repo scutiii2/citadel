@@ -15,6 +15,7 @@ export interface TicketComment {
 
 /** Only what a reporter may see: ember_api never sends tags, priority or other people's data here. */
 export interface Ticket {
+  has_unread?: boolean;
   id: number;
   type: TicketType;
   title: string;
@@ -40,6 +41,7 @@ export interface CreatedTicket {
 }
 
 export const ticketsClient = {
+  unreadCount: async (): Promise<number> => (await apiRequest<{ count: number }>("GET", "/api/tickets/unread-count")).count,
   list: async (status?: TicketStatus): Promise<Ticket[]> =>
     (await apiRequest<{ tickets: Ticket[] }>("GET", status ? `/api/tickets?status=${status}` : "/api/tickets")).tickets,
   get: async (id: number): Promise<Ticket> => (await apiRequest<{ ticket: Ticket }>("GET", `/api/tickets/${id}`)).ticket,
