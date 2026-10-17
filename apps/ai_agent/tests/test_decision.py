@@ -73,11 +73,21 @@ def test_settings_read_the_section_over_the_defaults(monkeypatch):
     assert config.chain("auto_route") == ("jev", "jev_vercel")
 
 
+def test_the_prune_ratio_defaults_to_a_quarter_and_can_be_changed_or_switched_off(monkeypatch):
+    use_section(monkeypatch, {})
+    assert decision.settings().triage_prune_ratio == 0.25
+    for given, expected in ((0, 0.0), (0.4, 0.4)):
+        decision.reset_cache()
+        use_section(monkeypatch, {"triage_prune_ratio": given})
+        assert decision.settings().triage_prune_ratio == expected
+
+
 @pytest.mark.parametrize("section", [
     [], {"nope": 1}, {"triage_fallback": "yes"}, {"timeout_seconds": 0}, {"timeout_seconds": True},
     {"max_input_chars": 0}, {"typesafe": []}, {"typesafe": {"nope": 1}}, {"typesafe": {"url": ""}}, {"vercel": {"model": 3}},
     {"chains": []}, {"chains": {"nothing": ["jev"]}}, {"chains": {"triage": []}}, {"chains": {"triage": ["gpt"]}},
     {"chains": {"triage": ["jev", "jev"]}}, {"chains": {"triage": "jev"}},
+    {"triage_prune_ratio": 1}, {"triage_prune_ratio": -0.1}, {"triage_prune_ratio": True}, {"triage_prune_ratio": "x"},
 ])
 def test_a_bad_section_is_refused(monkeypatch, section):
     use_section(monkeypatch, section)

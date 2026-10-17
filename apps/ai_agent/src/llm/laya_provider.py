@@ -156,6 +156,48 @@ def _answer(spec: dict[str, Any], raw: dict[str, Any], min_confidence: float) ->
     return out
 
 
+def _average(first: dict[str, float], second: dict[str, float]) -> dict[str, float]:
+    return {name: (first[name] + second[name]) / 2 for name in first}
+
+
+def _kept_options(average: dict[str, float], ratio: float) -> list[str]:
+    """The options worth asking about again, in the question's order: those at least `ratio` of the
+    leader's averaged probability, and never fewer than two."""
+    top = max(average.values())
+    kept = [name for name in average if average[name] >= ratio * top]
+    if len(kept) < MIN_OPTIONS:
+        kept = sorted(average, key=average.__getitem__, reverse=True)[:MIN_OPTIONS]
+    return [name for name in average if name in kept]
+
+
+def _blend(request: Request, laya: dict[str, Any], remote: dict[str, Any]) -> dict[str, Any]:
+    """Laya's and the fallback's answers to one choice question as a single answer: the averaged
+    distribution, the higher confidence when both pick the same option and the lower one when they do
+    not (that case is always uncertain and records who picked what)."""
+    average = _average(laya["probabilities"], remote["probabilities"])
+    agree = laya["choice"] == remote["choice"]
+    confidence = (max if agree else min)(laya["answer_confidence"], remote["answer_confidence"])
+    # A tie goes to the pick of the more confident of the two.
+    leader = laya["choice"] if laya["answer_confidence"] >= remote["answer_confidence"] else remote["choice"]
+    out: dict[str, Any] = {
+        "type": "choice", "choice": max(average, key=lambda name: (round(average[name], 6), name == leader)),
+        "probabilities": {name: round(value, 4) for name, value in average.items()},
+        "answer_confidence": confidence, "uncertain": not agree or confidence < request.min_confidence,
+        "answered_by": f"laya+{remote['answered_by']}",
+    }
+    if not agree:
+        out["disagreement"] = {"laya": laya["choice"], remote["answered_by"]: remote["choice"]}
+    return out
+
+
+def _with_eliminated(spec: dict[str, Any], answer: dict[str, Any], eliminated: list[str]) -> dict[str, Any]:
+    """A narrowed answer over the question's full option list: dropped options read 0."""
+    out = dict(answer)
+    out["probabilities"] = {name: answer["probabilities"].get(name, 0.0) for name in spec["criteria"]}
+    out["eliminated"] = eliminated
+    return out
+
+
 class _InputTooLong(ValueError):
     """Laya could not read the whole text, so it gave no answers."""
 
@@ -280,6 +322,12 @@ class LayaQuestions:
         if fallback and pending:
             remote, remote_tokens, problems = _ask_fallback(request, pending)
             input_tokens += remote_tokens
+            if answers is not None:
+                # Laya read the text: weigh its answer with the fallback's (choice questions only).
+                for qid in list(remote):
+                    if request.questions[qid]["type"] == "choice":
+                        remote[qid], extra_tokens = self._narrow(request, qid, answers[qid], remote[qid])
+                        input_tokens += extra_tokens
             if answers is None and len(remote) < len(pending):
                 # Nothing readable from Laya and the fallback could not cover it: no partial answers.
                 reason = f" The fallback classifier could not answer either ({problems[0]})." if problems else ""
@@ -287,8 +335,8 @@ class LayaQuestions:
         answers = {qid: (remote.get(qid) or (answers or {})[qid]) for qid in request.questions}
         result = {"answers": answers, "uncertain": any(a["uncertain"] for a in answers.values())}
         note = (
-            f"{', '.join(sorted({a['answered_by'] for a in remote.values()}))} answered {len(remote)} question(s) "
-            "that Laya was unsure of or could not read."
+            f"The fallback classifier reviewed {len(remote)} question(s) that Laya was unsure of or could not "
+            f"read (answered by {', '.join(sorted({a['answered_by'] for a in remote.values()}))})."
         ) if remote else ""
         return ChatResult(
             response=json.dumps(result), provider_id=PROVIDER_ID, model=DEFAULT_MODEL,
@@ -297,6 +345,35 @@ class LayaQuestions:
             # context-window reading or count the JSON as generated tokens.
             context_tokens=None, model_note=note,
         )
+
+    def _narrow(
+        self, request: Request, qid: str, laya: dict[str, Any], remote: dict[str, Any],
+    ) -> tuple[dict[str, Any], int]:
+        """One choice question Laya and the fallback both answered: average their probabilities, drop
+        the options far below the rest and ask again over what is left, Laya first and the fallback only
+        if Laya is still unsure. With nothing to drop, the two answers are blended. Returns the answer and
+        the extra tokens read; if Laya cannot take the narrowed question the fallback's answer stands."""
+        spec = request.questions[qid]
+        average = _average(laya["probabilities"], remote["probabilities"])
+        ratio = decision.settings().triage_prune_ratio
+        kept = _kept_options(average, ratio) if ratio > 0 else list(average)
+        if len(kept) == len(average):
+            return _blend(request, laya, remote), 0
+        eliminated = [name for name in average if name not in kept]
+        narrowed = Request(
+            request.text, {qid: {**spec, "criteria": {name: spec["criteria"][name] for name in kept}}}, request.min_confidence,
+        )
+        try:
+            laya_answers, tokens = self._laya_answers(narrowed)
+        except (ValueError, RuntimeError) as error:
+            _log.warning("Laya could not take the narrowed question %r: %s", qid, error)
+            return remote, 0
+        final = {**laya_answers[qid], "answered_by": "laya"}
+        if final["uncertain"]:
+            again, extra, _ = _ask_fallback(narrowed, [qid])
+            tokens += extra
+            final = again.get(qid, final)
+        return _with_eliminated(spec, final, eliminated), tokens
 
     def _laya_answers(self, request: Request) -> tuple[dict[str, dict[str, Any]], int]:
         with self._lock:

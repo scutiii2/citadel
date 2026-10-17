@@ -269,7 +269,7 @@ def test_jev_is_not_asked_unless_the_fallback_is_on(engine, monkeypatch):
     assert result["uncertain"] is True and "answered_by" not in json.dumps(result)
 
 
-def test_an_uncertain_choice_goes_to_jev_and_a_sure_one_stays_with_laya(engine, monkeypatch):
+def test_an_uncertain_choice_is_weighed_with_jevs_and_a_sure_one_stays_with_laya(engine, monkeypatch):
     low = prediction()
     low["answers"]["category"]["answer_confidence"] = 0.3
     engine.result = low
@@ -279,12 +279,14 @@ def test_an_uncertain_choice_goes_to_jev_and_a_sure_one_stays_with_laya(engine, 
     answers = payload(result)["answers"]
 
     assert len(asked) == 1 and asked[0][1] == {"database": "SQL and storage", "network": "Connections"}
-    assert answers["category"]["choice"] == "network" and answers["category"]["answered_by"] == "jev"
-    assert answers["category"]["probabilities"] == {"database": 0.1, "network": 0.9}
-    assert answers["category"]["uncertain"] is False
+    # Laya said database (0.9), Jev network (0.9 -> 0.1 elsewhere): a tie, so the more confident pick wins.
+    assert answers["category"]["choice"] == "network" and answers["category"]["answered_by"] == "laya+jev"
+    assert answers["category"]["probabilities"] == {"database": 0.5, "network": 0.5}
+    assert answers["category"]["answer_confidence"] == 0.3 and answers["category"]["uncertain"] is True
+    assert answers["category"]["disagreement"] == {"laya": "database", "jev": "network"}
     assert "answered_by" not in answers["severity"] and answers["severity"]["score"] == 1.4
-    assert payload(result)["uncertain"] is False
-    assert result.input_tokens == 120 + 50 and "answered 1 question" in result.model_note
+    assert payload(result)["uncertain"] is True
+    assert result.input_tokens == 120 + 50 and "reviewed 1 question" in result.model_note
 
 
 def test_a_jev_answer_below_the_threshold_is_still_marked_uncertain(engine, monkeypatch):
@@ -387,21 +389,21 @@ def test_a_text_over_the_jev_limit_is_refused_before_anything_runs(engine, monke
     assert engine.calls == []
 
 
-def test_a_backends_real_probabilities_replace_the_even_split(engine, monkeypatch):
+def test_a_backends_real_probabilities_are_averaged_with_layas(engine, monkeypatch):
     engine.result = prediction(confidence=0.2)
     jev_on(monkeypatch, {
-        "Which category?": decision.Choice("network", 55, 10, "jev", "", {"database": 0.15, "network": 0.55 - 0.0}),
+        "Which category?": decision.Choice("network", 70, 10, "jev", "", {"database": 0.3, "network": 0.7}),
         "How severe?": decision.Choice("1", 90, 10, "jev"),
         "Is there a problem?": decision.Choice("true", 90, 10, "jev"),
     })
 
-    answers = payload(ask())["answers"]
+    category = payload(ask())["answers"]["category"]
 
-    assert answers["category"]["probabilities"] == {"database": 0.15, "network": 0.55}
-    assert answers["category"]["answer_confidence"] == 0.55 and answers["category"]["uncertain"] is True
+    assert category["probabilities"] == {"database": 0.6, "network": 0.4} and category["choice"] == "database"
+    assert category["answer_confidence"] == 0.2 and category["uncertain"] is True
 
 
-def test_a_distribution_that_misses_an_option_falls_back_to_the_even_split(engine, monkeypatch):
+def test_a_distribution_that_misses_an_option_is_replaced_by_the_even_split_before_averaging(engine, monkeypatch):
     engine.result = prediction(confidence=0.2)
     jev_on(monkeypatch, {
         "Which category?": decision.Choice("network", 80, 10, "jev", "", {"network": 0.8}),
@@ -409,4 +411,163 @@ def test_a_distribution_that_misses_an_option_falls_back_to_the_even_split(engin
         "Is there a problem?": decision.Choice("true", 90, 10, "jev"),
     })
 
-    assert payload(ask())["answers"]["category"]["probabilities"] == {"database": 0.2, "network": 0.8}
+    assert payload(ask())["answers"]["category"]["probabilities"] == {"database": 0.55, "network": 0.45}
+
+
+def test_two_answers_that_agree_keep_the_higher_confidence(engine, monkeypatch):
+    low = prediction()
+    low["answers"]["category"]["answer_confidence"] = 0.6
+    engine.result = low
+    jev_on(monkeypatch, {"Which category?": decision.Choice("database", 65, 10, "jev", "", {"database": 0.8, "network": 0.2})})
+
+    category = payload(ask())["answers"]["category"]
+
+    assert category["choice"] == "database" and category["answer_confidence"] == 0.65
+    assert category["probabilities"] == {"database": 0.85, "network": 0.15}
+    assert "disagreement" not in category and category["uncertain"] is True  # 0.65 is still under the 0.7 gate
+
+
+# --- narrowing: drop the options both answers rank far below the rest, then ask again -------------
+
+AREA = {
+    "text": "The checkout page times out for about half of users since this morning.",
+    "questions": {"area": {"type": "choice", "instructions": "Which area is affected",
+                           "criteria": {"billing": "payments", "frontend": "web UI", "network": "connections"}}},
+}
+
+
+def area_prediction(probabilities, confidence, tokens=120):
+    choice = max(probabilities, key=probabilities.get)
+    return {
+        "answers": {"area": {"choice": choice, "probabilities": probabilities, "answer_confidence": confidence}},
+        "usage": {"input_tokens": tokens, "output_tokens": 0, "state_tokens": 12, "truncated": False},
+    }
+
+
+class ScriptedEngine:
+    """Laya answers from a list, one per call; an exception in the list is raised."""
+
+    def __init__(self, *results):
+        self.results, self.calls = list(results), []
+
+    def predict(self, state, questions, **kwargs):
+        self.calls.append(copy.deepcopy(questions))
+        outcome = self.results.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
+def scripted(monkeypatch, engine, *fallback, prune_ratio=0.25):
+    """Laya runs `engine`; the fallback answers from `fallback` in order and the options it was asked are recorded."""
+    monkeypatch.setattr(laya_provider, "_questions", laya_provider.LayaQuestions(engine))
+    config = decision.ClassifierSettings(triage_fallback=True, triage_prune_ratio=prune_ratio)
+    monkeypatch.setattr(decision, "settings", lambda: config)
+    monkeypatch.setattr(decision, "available", lambda *a, **k: True)
+    queue, asked = list(fallback), []
+
+    def ask_choice(subject, criteria, question, feature, **kwargs):
+        asked.append(list(criteria))
+        outcome = queue.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(decision, "ask_choice", ask_choice)
+    return asked
+
+
+JEV_FIRST = decision.Choice("billing", 56, 10, "jev", "", {"billing": 0.71, "frontend": 0.26, "network": 0.03})
+LAYA_FIRST = area_prediction({"billing": 0.24, "frontend": 0.66, "network": 0.10}, 0.55)
+
+
+def area():
+    return payload(ask(AREA))["answers"]["area"]
+
+
+def test_an_option_far_below_the_rest_is_dropped_and_laya_decides_the_narrowed_question(monkeypatch):
+    laya = ScriptedEngine(LAYA_FIRST, area_prediction({"billing": 0.2, "frontend": 0.8}, 0.9, tokens=60))
+    asked = scripted(monkeypatch, laya, JEV_FIRST)
+
+    result = ask(AREA)
+    answer = payload(result)["answers"]["area"]
+
+    assert list(laya.calls[1]["area"]["criteria"]) == ["billing", "frontend"]
+    assert asked == [["billing", "frontend", "network"]]  # the fallback was not needed again
+    assert answer["choice"] == "frontend" and answer["answered_by"] == "laya" and answer["eliminated"] == ["network"]
+    assert answer["probabilities"] == {"billing": 0.2, "frontend": 0.8, "network": 0.0}
+    assert answer["uncertain"] is False
+    assert result.input_tokens == 120 + 10 + 60
+
+
+def test_an_unsure_laya_hands_the_narrowed_question_to_the_fallback(monkeypatch):
+    laya = ScriptedEngine(LAYA_FIRST, area_prediction({"billing": 0.45, "frontend": 0.55}, 0.4, tokens=60))
+    second = decision.Choice("frontend", 80, 7, "jev", "", {"billing": 0.1, "frontend": 0.9})
+    asked = scripted(monkeypatch, laya, JEV_FIRST, second)
+
+    result = ask(AREA)
+    answer = payload(result)["answers"]["area"]
+
+    assert asked == [["billing", "frontend", "network"], ["billing", "frontend"]]
+    assert answer["choice"] == "frontend" and answer["answered_by"] == "jev" and answer["eliminated"] == ["network"]
+    assert answer["probabilities"] == {"billing": 0.1, "frontend": 0.9, "network": 0.0}
+    assert result.input_tokens == 120 + 10 + 60 + 7
+
+
+def test_when_the_fallback_fails_the_second_time_layas_narrowed_answer_stands(monkeypatch):
+    laya = ScriptedEngine(LAYA_FIRST, area_prediction({"billing": 0.45, "frontend": 0.55}, 0.4, tokens=60))
+    scripted(monkeypatch, laya, JEV_FIRST, decision.ClassifierError("down"))
+
+    answer = area()
+
+    assert answer["choice"] == "frontend" and answer["answered_by"] == "laya" and answer["uncertain"] is True
+    assert answer["eliminated"] == ["network"]
+
+
+def test_when_laya_cannot_take_the_narrowed_question_the_fallbacks_answer_stands(monkeypatch):
+    scripted(monkeypatch, ScriptedEngine(LAYA_FIRST, RuntimeError("gone")), JEV_FIRST)
+
+    answer = area()
+
+    assert answer["choice"] == "billing" and answer["answered_by"] == "jev" and "eliminated" not in answer
+
+
+def test_nothing_is_dropped_when_no_option_is_far_below_the_rest(monkeypatch):
+    laya = ScriptedEngine(area_prediction({"billing": 0.3, "frontend": 0.4, "network": 0.3}, 0.5))
+    asked = scripted(monkeypatch, laya, decision.Choice("frontend", 50, 5, "jev", "", {"billing": 0.3, "frontend": 0.4, "network": 0.3}))
+
+    answer = area()
+
+    assert len(laya.calls) == 1 and len(asked) == 1
+    assert answer["answered_by"] == "laya+jev" and answer["choice"] == "frontend" and "eliminated" not in answer
+
+
+def test_a_prune_ratio_of_zero_never_drops_an_option(monkeypatch):
+    laya = ScriptedEngine(LAYA_FIRST)
+    scripted(monkeypatch, laya, JEV_FIRST, prune_ratio=0)
+
+    answer = area()
+
+    assert len(laya.calls) == 1 and answer["answered_by"] == "laya+jev" and "eliminated" not in answer
+
+
+def test_at_least_two_options_always_stay(monkeypatch):
+    laya = ScriptedEngine(
+        area_prediction({"billing": 0.8, "frontend": 0.1, "network": 0.1}, 0.5),
+        area_prediction({"billing": 0.9, "frontend": 0.1}, 0.9, tokens=60),
+    )
+    scripted(monkeypatch, laya, decision.Choice("billing", 60, 5, "jev", "", {"billing": 0.9, "frontend": 0.05, "network": 0.05}))
+
+    area()
+
+    assert list(laya.calls[1]["area"]["criteria"]) == ["billing", "frontend"]  # the first of two tied options stays
+
+
+def test_a_text_laya_could_not_read_is_not_narrowed_or_blended(monkeypatch):
+    laya = ScriptedEngine()
+    asked = scripted(monkeypatch, laya, JEV_FIRST)
+
+    answer = payload(ask({**AREA, "text": "x " * 3000}))["answers"]["area"]
+
+    assert laya.calls == [] and asked == [["billing", "frontend", "network"]]
+    assert answer["answered_by"] == "jev" and "eliminated" not in answer and "disagreement" not in answer

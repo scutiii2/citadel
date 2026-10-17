@@ -45,7 +45,7 @@ _BACKENDS = {
     "jev_vercel": "src.llm.jev_classifier",
     "laya": "src.llm.laya_classifier",
 }
-_KNOWN = {"typesafe", "vercel", "chains", "timeout_seconds", "max_input_chars", "triage_fallback", "auto_tier", "auto_route"}
+_KNOWN = {"typesafe", "vercel", "chains", "timeout_seconds", "max_input_chars", "triage_fallback", "triage_prune_ratio", "auto_tier", "auto_route"}
 _BACKEND_KNOWN = {"url", "model"}
 _AUTO_TIER_KNOWN = {"enabled", "min_confidence", "tiers"}
 _AUTO_ROUTE_KNOWN = {"enabled", "min_confidence"}
@@ -115,6 +115,9 @@ class ClassifierSettings:
     max_input_chars: int = 16_000
     # Re-ask a remote backend about the answers Laya is unsure of, and about texts Laya cannot read.
     triage_fallback: bool = False
+    # After Laya and the fallback both answered a choice, options whose averaged probability is below
+    # this share of the leading option's are dropped and the question is asked again (0 = never drop).
+    triage_prune_ratio: float = 0.25
     auto_tier: AutoTierSettings = AutoTierSettings()
     auto_route: AutoRouteSettings = AutoRouteSettings()
 
@@ -145,7 +148,11 @@ def _load_settings() -> ClassifierSettings:
         raise ValueError(f"config_tuning.json {_SECTION}.max_input_chars must be a positive integer")
     if not isinstance(raw.get("triage_fallback", False), bool):
         raise ValueError(f"config_tuning.json {_SECTION}.triage_fallback must be true or false")
+    ratio = raw.get("triage_prune_ratio", base.triage_prune_ratio)
+    if isinstance(ratio, bool) or not isinstance(ratio, (int, float)) or not 0 <= ratio < 1:
+        raise ValueError(f"config_tuning.json {_SECTION}.triage_prune_ratio must be a number from 0 up to (not including) 1")
     return ClassifierSettings(
+        triage_prune_ratio=float(ratio),
         typesafe=_backend_settings("typesafe", raw.get("typesafe", {}), base.typesafe),
         vercel=_backend_settings("vercel", raw.get("vercel", {}), base.vercel),
         chains=_chains(raw.get("chains", {})),

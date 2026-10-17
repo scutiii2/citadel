@@ -215,9 +215,16 @@ With a `"classifier": {"triage_fallback": true}` section added to `configs/confi
 a key for a backend of the `triage` chain in `.env`, the remote classifier (`src/llm/decision.py`, see
 [Decision layer](#decision-layer-optional)) answers what Laya cannot:
 
-- each question Laya marks `uncertain` is asked again; the answer replaces Laya's
-  and carries `"answered_by": "<backend id>"` (`jev` by default), with its own `uncertain` flag against the same
-  `min_confidence`;
+- each question Laya marks `uncertain` is asked again, and for a `choice` question Laya's answer is
+  weighed with the classifier's instead of being thrown away: the two probability sets are averaged and
+  options far below the rest (under `classifier.triage_prune_ratio`, default 0.25, of the leader's
+  average; 0 turns it off; at least two always stay) are dropped. The question is then asked again over
+  the options left, Laya first and the classifier only if Laya is still unsure. The answer lists what
+  was dropped in `"eliminated"` (those options read 0) and `"answered_by"` says who decided (`laya`,
+  `jev`...). If nothing is far enough below, the two answers are blended instead
+  (`"answered_by": "laya+jev"`): the higher confidence when both pick the same option, the lower one and
+  an `"uncertain": true` plus a `"disagreement"` object (who picked what) when they differ.
+  `score` and `noul` questions take the classifier's answer as it is;
 - a text Laya cannot read in full (over its 4000 characters, or reported truncated)
   goes to the classifier for every question. `classifier.max_input_chars` (default 16000) caps
   what is sent, since a remote window is larger than Laya's.
