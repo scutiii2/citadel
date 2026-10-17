@@ -282,6 +282,29 @@ as the turn's tier plus a `model_note` such as `auto tier: hardest (90%) -> heav
 user's question is sent, never tool results, but it does leave this machine and each call
 is billed by the gateway.
 
+## Routing straight to a specialist (optional)
+
+With `"classifier": {"auto_route": {"enabled": true}}` in `configs/config_tuning.json` and
+`AI_GATEWAY_API_KEY` in `.env`, an orchestrator's top-level turn first asks the remote
+classifier (`src/llm/jev_classifier.py`) which specialist fits the question
+(`src/agents/auto_route.py`). If one is picked with confidence of at least
+`auto_route.min_confidence` (default 60), the question goes to it exactly as a
+`delegate_to_agent` call would (same `step_*` and `agent_*` events, same usage rows) and its
+answer is the turn's answer; the orchestrator's own model never runs. Its usage row then
+holds only the classifier's tokens, and `model_note` reads `routed straight to <label>`.
+
+- Only specialists with tools of their own are offered, among the ones the roster already
+  shows this turn (capabilities off, or tools the user switched off, hide them). Tool-less
+  helpers such as `planner` stay the orchestrator's to choose.
+- The classifier sees the user's message and the end of the last assistant message; the
+  specialist gets the same context, since it never sees the chat.
+- No routing, and the orchestrator answers as usual, when the feature is off, there is no
+  key, the classifier fails or says `none`, confidence is low, the turn is a delegate's, or
+  the turn would need the user's approval to delegate (the orchestrator then asks as it does today).
+- A specialist that fails is reported to the user and not retried, because it may already
+  have acted. You also lose the orchestrator's synthesis of the answer on routed turns.
+- The text sent to the classifier leaves this machine and each call is billed by the gateway.
+
 ## Usage log
 
 Every completed `ask` appends one JSON line to

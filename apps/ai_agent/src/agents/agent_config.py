@@ -16,7 +16,7 @@ from typing import Any
 import anyio
 from dotenv import dotenv_values
 
-from src.agents import agent_spec, delegation, memory_recall
+from src.agents import agent_spec, auto_route, delegation, memory_recall
 from src.agents import plan as plan_policy
 
 from src.core import approvals, internal_auth, questions, tool_filter
@@ -164,20 +164,6 @@ async def run_chat(
         approval_mode, set(allowed_tools or ()), ask_prefixes=(private_turn.TOOL_PREFIX,) if private else (),
         read_only_check=_read_only_check() if allow_read_only and approval_mode == "ask" else None,
     )
-    # A top-level turn that asked for no tier may get one from how hard its question looks (llm/auto_tier.py).
-    auto_note = ""
-    if not model_tier and depth == 0 and auto_tier.enabled() and model_tiers.own_tiers():
-        chosen = await auto_tier.pick(question, bool(history))
-        if chosen:
-            model_tier, auto_note = chosen.tier, chosen.note
-    resolution = (
-        model_tiers.resolve(model_tier, model_tiers.own_tiers(), MODEL, agent_spec.current().id)
-        if model_tier else model_tiers.clamp_default(
-            MODEL, getattr(_PROVIDER_MODULE, "DEFAULT_MODEL", None), agent_spec.current().id
-        )
-    )
-    if auto_note:
-        resolution = dataclasses.replace(resolution, note="; ".join(n for n in (auto_note, resolution.note) if n))
     effort = effort_limits.resolve(reasoning_effort, agent_spec.current().llm.max_effort, agent_spec.current().id)
     cancellation.register(request_id)
     request_token = cancellation.bind_request(request_id)
@@ -197,6 +183,26 @@ async def run_chat(
             from src.mcp_client import mcp_upstream
 
             await mcp_upstream.prefetch_private(private)
+        # A confident classifier pick sends the question straight to a specialist, and this
+        # agent's own model never runs (agents/auto_route.py; off unless configured).
+        routed = await auto_route.try_route(question, history, on_event, request_id, depth)
+        if routed is not None:
+            routed.delegated_usage = delegated_usage
+            return routed
+        # A top-level turn that asked for no tier may get one from how hard its question looks (llm/auto_tier.py).
+        auto_note = ""
+        if not model_tier and depth == 0 and auto_tier.enabled() and model_tiers.own_tiers():
+            chosen = await auto_tier.pick(question, bool(history))
+            if chosen:
+                model_tier, auto_note = chosen.tier, chosen.note
+        resolution = (
+            model_tiers.resolve(model_tier, model_tiers.own_tiers(), MODEL, agent_spec.current().id)
+            if model_tier else model_tiers.clamp_default(
+                MODEL, getattr(_PROVIDER_MODULE, "DEFAULT_MODEL", None), agent_spec.current().id
+            )
+        )
+        if auto_note:
+            resolution = dataclasses.replace(resolution, note="; ".join(n for n in (auto_note, resolution.note) if n))
         provider_question = question
         if depth == 0 and agent_spec.current().memory_recall:
             if cancellation.is_cancelled(request_id):

@@ -29,8 +29,9 @@ DEFAULT_MODEL = "typesafe-ai/jev"
 KEY_ENV = "AI_GATEWAY_API_KEY"
 
 _SECTION = "classifier"
-_KNOWN = {"url", "model", "timeout_seconds", "max_input_chars", "triage_fallback", "auto_tier"}
+_KNOWN = {"url", "model", "timeout_seconds", "max_input_chars", "triage_fallback", "auto_tier", "auto_route"}
 _AUTO_TIER_KNOWN = {"enabled", "min_confidence", "tiers"}
+_AUTO_ROUTE_KNOWN = {"enabled", "min_confidence"}
 
 # How hard a request is, as the ClaudeRouters size classifier names it.
 SIZE_CRITERIA = {
@@ -58,6 +59,16 @@ class AutoTierSettings:
 
 
 @dataclass(frozen=True)
+class AutoRouteSettings:
+    """Sending a question straight to a specialist, without the orchestrator's own model call
+    (agents/auto_route.py)."""
+
+    enabled: bool = False
+    # Jev's confidence (0-100) needed before it picks a specialist; below it the orchestrator answers.
+    min_confidence: int = 60
+
+
+@dataclass(frozen=True)
 class ClassifierSettings:
     url: str = DEFAULT_URL
     model: str = DEFAULT_MODEL
@@ -68,6 +79,7 @@ class ClassifierSettings:
     # Re-ask Jev about the answers Laya is unsure of, and about texts Laya cannot read.
     triage_fallback: bool = False
     auto_tier: AutoTierSettings = AutoTierSettings()
+    auto_route: AutoRouteSettings = AutoRouteSettings()
 
 
 @catalog
@@ -100,7 +112,23 @@ def _load_settings() -> ClassifierSettings:
         url=raw.get("url", base.url).strip(), model=raw.get("model", base.model).strip(),
         timeout_seconds=float(timeout), max_input_chars=cap, triage_fallback=raw.get("triage_fallback", False),
         auto_tier=_auto_tier_settings(raw.get("auto_tier", {})),
+        auto_route=_auto_route_settings(raw.get("auto_route", {})),
     )
+
+
+def _auto_route_settings(raw: Any) -> AutoRouteSettings:
+    where = f"config_tuning.json {_SECTION}.auto_route"
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} must be an object")
+    unknown = set(raw) - _AUTO_ROUTE_KNOWN
+    if unknown:
+        raise ValueError(f"{where} has unknown field(s): {', '.join(sorted(unknown))}")
+    if not isinstance(raw.get("enabled", False), bool):
+        raise ValueError(f"{where}.enabled must be true or false")
+    confidence = raw.get("min_confidence", AutoRouteSettings.min_confidence)
+    if isinstance(confidence, bool) or not isinstance(confidence, int) or not 0 <= confidence <= 100:
+        raise ValueError(f"{where}.min_confidence must be an integer from 0 to 100")
+    return AutoRouteSettings(enabled=raw.get("enabled", False), min_confidence=confidence)
 
 
 def _auto_tier_settings(raw: Any) -> AutoTierSettings:

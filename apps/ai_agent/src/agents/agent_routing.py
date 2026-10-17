@@ -27,11 +27,16 @@ _log = logging.getLogger(__name__)
 SUPPORT_TOOLS = ("tool_ticket_*",)
 
 
+def own_tools(entry: RosterEntry) -> list[str]:
+    """The tool globs `entry` works with: its tools.allow minus the support tools."""
+    return [g for g in entry.tool_allow if not any(fnmatchcase(g, support) for support in SUPPORT_TOOLS)]
+
+
 def is_usable(entry: RosterEntry, tool_names: Iterable[str]) -> bool:
     """False when `entry` has tools of its own (tools.allow minus the support
     tools) and none of them exists in `tool_names`. No tools.allow, or only
     support tools, means it works without mcp_server tools: usable."""
-    own = [g for g in entry.tool_allow if not any(fnmatchcase(g, support) for support in SUPPORT_TOOLS)]
+    own = own_tools(entry)
     if not own:
         return True
     names = list(tool_names)
