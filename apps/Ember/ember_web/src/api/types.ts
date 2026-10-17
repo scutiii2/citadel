@@ -47,11 +47,20 @@ export interface ChatMessage {
   /** How full the agent's context was after this answer. */
   context_tokens?: number;
   context_window?: number;
+  /** What filled context_tokens, estimated by the agent (answers from before this lack it). */
+  context_breakdown?: ContextPart[];
   /** The tools this answer ran. */
   steps?: ToolStep[];
   /** Who used the tokens, when the answer ran several agents (its own plus
    * delegated ones); absent when only one did. */
   agent_usage?: AgentUsage[];
+}
+
+/** One part of what filled an answer's context: the system prompt, the tools, the messages ... */
+export interface ContextPart {
+  id: string;
+  label: string;
+  tokens: number;
 }
 
 /** One agent's share of an answer that ran several. */

@@ -59,6 +59,8 @@ const {
   notices,
   working,
   contextUsage,
+  contextParts,
+  contextPanel,
   commands,
   enabledExtensions,
   approvalMode,
@@ -288,6 +290,14 @@ const contextPercent = computed(() => {
   return usage ? Math.min(100, Math.round((usage.tokens / usage.window) * 100)) : null;
 });
 
+// What fills that context, for the panel the meter opens: only when the setting
+// is on and the last answer says (older answers do not).
+const contextBreakdown = computed(() => {
+  const usage = contextUsage.value;
+  if (!contextPanel.value || !usage || contextParts.value.length === 0) return null;
+  return { tokens: usage.tokens, window: usage.window, parts: contextParts.value };
+});
+
 function onSelect(id: string, messageIndex?: number): void {
   route.open(id, { messageIndex });
   drawerOpen.value = false;
@@ -368,6 +378,7 @@ useChatShortcuts({
         :title="active?.title ?? 'New chat'"
         :has-messages="!!active && messages.length > 0"
         :context-percent="contextPercent"
+        :breakdown="contextBreakdown"
         :locked="busy || !!working"
         @export="exportActive"
         @share="shareOpen = true"

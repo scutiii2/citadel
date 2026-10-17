@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useTemplateRef } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from "vue";
+import type { ContextPart } from "../api/types";
 import type { MenuItem } from "../utils/chatMenu";
 import { useAuthStore } from "../stores/auth";
 import ActionButton from "./ActionButton.vue";
+import ContextPanel from "./ContextPanel.vue";
 import EntryAgentTag from "./EntryAgentTag.vue";
 import PopupMenu from "./PopupMenu.vue";
 
@@ -16,6 +18,9 @@ const props = defineProps<{
   hasMessages: boolean;
   /** Share of the agent's context in use, or null before an answer. */
   contextPercent: number | null;
+  /** What fills the context, for the panel the meter opens; leave out (or null)
+   * and the meter is plain text. */
+  breakdown?: { tokens: number; window: number; parts: ContextPart[] } | null;
   locked: boolean;
 }>();
 
@@ -23,7 +28,40 @@ const emit = defineEmits<{ export: []; share: []; summarize: []; clear: [] }>();
 
 const auth = useAuthStore();
 
+const CONTEXT_HINT = "How full the agent's memory of this chat is. At 60% the chat is summarized automatically.";
+const contextTitle = computed(() =>
+  props.breakdown ? `How full the agent's memory of this chat is. Click for what fills it. At 60% the chat is summarized automatically.` : CONTEXT_HINT,
+);
+
 const MENU_WIDTH = 210;
+
+// The context panel opens from the meter and closes on Esc or a press outside it.
+const panelOpen = ref(false);
+const contextBox = useTemplateRef<HTMLElement>("contextBox");
+
+function closePanelOnOutside(event: PointerEvent): void {
+  if (!contextBox.value?.contains(event.target as Node)) panelOpen.value = false;
+}
+
+function closePanelOnEscape(event: KeyboardEvent): void {
+  if (event.key !== "Escape") return;
+  panelOpen.value = false;
+  contextBox.value?.querySelector<HTMLElement>("button.context")?.focus();
+}
+
+watch(panelOpen, (open) => {
+  const method = open ? "addEventListener" : "removeEventListener";
+  document[method]("pointerdown", closePanelOnOutside);
+  document[method]("keydown", closePanelOnEscape);
+});
+// No breakdown any more (another chat, the setting off): nothing to show.
+watch(() => props.breakdown, (breakdown) => {
+  if (!breakdown) panelOpen.value = false;
+});
+onBeforeUnmount(() => {
+  document.removeEventListener("pointerdown", closePanelOnOutside);
+  document.removeEventListener("keydown", closePanelOnEscape);
+});
 
 const menuAt = ref<{ x: number; y: number } | null>(null);
 const more = useTemplateRef<InstanceType<typeof ActionButton>>("more");
@@ -64,17 +102,30 @@ function choose(id: string): void {
     <h2 class="title" :title="title">{{ title }}</h2>
     <EntryAgentTag />
     <span class="spacer" />
-    <span
-      v-if="contextPercent !== null"
-      :class="['context', { high: contextPercent >= 50 }]"
-      title="How full the agent's memory of this chat is. At 60% the chat is summarized automatically."
-    >
-      Context
-      <span class="meter" role="progressbar" aria-label="Context used" :aria-valuenow="contextPercent" aria-valuemin="0" aria-valuemax="100">
-        <i :style="{ width: `${contextPercent}%` }" />
-      </span>
-      {{ contextPercent }}%
-    </span>
+    <div v-if="contextPercent !== null" ref="contextBox" class="context-box">
+      <component
+        :is="breakdown ? 'button' : 'span'"
+        :type="breakdown ? 'button' : undefined"
+        :class="['context', { high: contextPercent >= 50 }]"
+        :aria-expanded="breakdown ? panelOpen : undefined"
+        :aria-haspopup="breakdown ? 'dialog' : undefined"
+        :title="contextTitle"
+        @click="breakdown && (panelOpen = !panelOpen)"
+      >
+        Context
+        <span class="meter" role="progressbar" aria-label="Context used" :aria-valuenow="contextPercent" aria-valuemin="0" aria-valuemax="100">
+          <i :style="{ width: `${contextPercent}%` }" />
+        </span>
+        {{ contextPercent }}%
+      </component>
+      <ContextPanel
+        v-if="breakdown && panelOpen"
+        class="panel"
+        :tokens="breakdown.tokens"
+        :window="breakdown.window"
+        :parts="breakdown.parts"
+      />
+    </div>
     <template v-if="hasMessages">
       <ActionButton icon="export" icon-only title="Download this chat as Markdown" @click="emit('export')">Export</ActionButton>
       <ActionButton v-if="auth.hasPermission('chat.share')" icon="share" icon-only title="Make a read-only link to this chat" @click="emit('share')">Share</ActionButton>
@@ -118,6 +169,28 @@ function choose(id: string): void {
 }
 .spacer {
   flex: 1;
+}
+.context-box {
+  position: relative;
+}
+.panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+}
+button.context {
+  padding: 2px 6px;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8em;
+}
+button.context:hover,
+button.context[aria-expanded="true"] {
+  background: var(--code-bg);
 }
 .context {
   display: inline-flex;

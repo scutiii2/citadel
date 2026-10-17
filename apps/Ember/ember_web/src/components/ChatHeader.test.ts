@@ -45,6 +45,75 @@ describe("ChatHeader", () => {
     expect(high.get(".context").classes()).toContain("high");
   });
 
+  describe("the context panel", () => {
+    const BREAKDOWN = {
+      tokens: 30_000,
+      window: 100_000,
+      parts: [
+        { id: "system_prompt", label: "System prompt", tokens: 5_000 },
+        { id: "messages", label: "Messages", tokens: 25_000 },
+      ],
+    };
+    const panel = () => document.querySelector("[data-test=context-panel]");
+
+    it("is plain text without a breakdown", async () => {
+      const w = mountHeader();
+
+      expect(w.find("button.context").exists()).toBe(false);
+      await w.get(".context").trigger("click");
+      expect(panel()).toBeNull();
+    });
+
+    it("opens from the meter and shows the parts", async () => {
+      const w = mountHeader({ breakdown: BREAKDOWN });
+      expect(w.get("button.context").attributes("aria-expanded")).toBe("false");
+
+      await w.get("button.context").trigger("click");
+
+      expect(w.get("button.context").attributes("aria-expanded")).toBe("true");
+      expect(panel()?.textContent).toContain("System prompt");
+      expect(panel()?.textContent).toContain("Free space");
+    });
+
+    it("closes with a second click, Esc, or a press outside", async () => {
+      const w = mountHeader({ breakdown: BREAKDOWN });
+
+      await w.get("button.context").trigger("click");
+      await w.get("button.context").trigger("click");
+      expect(panel()).toBeNull();
+
+      await w.get("button.context").trigger("click");
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      await w.vm.$nextTick();
+      expect(panel()).toBeNull();
+
+      await w.get("button.context").trigger("click");
+      document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+      await w.vm.$nextTick();
+      expect(panel()).toBeNull();
+    });
+
+    it("stays open for a press inside the panel", async () => {
+      const w = mountHeader({ breakdown: BREAKDOWN });
+      await w.get("button.context").trigger("click");
+
+      panel()!.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+      await w.vm.$nextTick();
+
+      expect(panel()).not.toBeNull();
+    });
+
+    it("closes when the breakdown goes away", async () => {
+      const w = mountHeader({ breakdown: BREAKDOWN });
+      await w.get("button.context").trigger("click");
+
+      await w.setProps({ breakdown: null });
+
+      expect(panel()).toBeNull();
+      expect(w.find("button.context").exists()).toBe(false);
+    });
+  });
+
   it("leaves out the meter before any answer", () => {
     expect(mountHeader({ contextPercent: null }).find(".context").exists()).toBe(false);
   });

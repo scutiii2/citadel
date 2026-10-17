@@ -53,6 +53,11 @@ MAX_STEPS = 50
 AGENT_LABEL_MAX = 120
 # Most agents one answer's usage is split into (its own plus delegated ones).
 MAX_AGENT_USAGE_ROWS = 20
+# Most parts, and the longest id and label, of an answer's context breakdown
+# (ContextPartIn's limits).
+MAX_CONTEXT_PARTS = 12
+CONTEXT_PART_ID_MAX = 40
+CONTEXT_PART_LABEL_MAX = 60
 # Caps on what a delegated agent's live events may carry to a browser.
 AGENT_QUESTION_MAX = 500
 AGENT_TEXT_MAX = 4000
@@ -122,6 +127,24 @@ def _agent_usage(row: dict[str, Any]) -> dict[str, Any]:
         "finished_at": _iso(row.get("finished_at")),
     }
     return {key: value for key, value in entry.items() if value is not None}
+
+
+def _context_breakdown(result: dict[str, Any]) -> dict[str, Any]:
+    """The answer's `context_breakdown` as {"context_breakdown": [...]} - or
+    nothing when ai_agent sent none or an entry is malformed. Only what the
+    route's ContextPartIn accepts is kept, so the saved answer can always be
+    sent back by the browser."""
+    parts: list[dict[str, Any]] = []
+    for part in result.get("context_breakdown") or []:
+        if not isinstance(part, dict):
+            return {}
+        part_id, label, tokens = part.get("id"), part.get("label"), part.get("tokens")
+        if not isinstance(part_id, str) or not isinstance(label, str):
+            return {}
+        if not isinstance(tokens, int) or isinstance(tokens, bool) or tokens < 0:
+            return {}
+        parts.append({"id": part_id[:CONTEXT_PART_ID_MAX], "label": label[:CONTEXT_PART_LABEL_MAX], "tokens": tokens})
+    return {"context_breakdown": parts[:MAX_CONTEXT_PARTS]} if parts else {}
 
 
 @dataclass(eq=False)
@@ -566,6 +589,7 @@ class TurnRegistry:
                 for k in ("model", "total_tokens", "input_tokens", "output_tokens", "context_tokens", "context_window")
                 if result.get(k) is not None
             },
+            **_context_breakdown(result),
             # The whole turn (auto-summary and tool calls included), as in the chat-turn log line.
             "duration_s": round(monotonic() - turn.started_at, 1),
         }

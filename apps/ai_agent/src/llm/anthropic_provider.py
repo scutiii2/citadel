@@ -51,7 +51,8 @@ from src.core.chat_history import validate_history
 
 from src.agents.agent_spec import RosterEntry
 from src.llm import cancellation, cooldown, llm_config, llm_options, token_limits
-from src.llm.agent_roles import SYSTEM_PROMPT, system_prompt_for
+from src.llm.agent_roles import SYSTEM_PROMPT, roster_block, system_prompt_for
+from src.llm.context_breakdown import build_breakdown
 from src.llm.base_provider import (
     BaseProvider, ChatCancelled, ChatResult, LiveUsage, OnEvent, ToolCallRecord, dispatch_with_progress, step_event,
 )
@@ -397,6 +398,10 @@ async def run_chat(
     # the *next* call is to the model's context window, so it's
     # overwritten each round rather than accumulated.
     context_tokens = 0
+    roster_text = roster_block(roster)
+
+    def breakdown() -> list[dict[str, Any]]:
+        return build_breakdown(context_tokens, system_prompt, roster_text, schemas)
 
     try:
         async with guard.timeout():
@@ -450,6 +455,7 @@ async def run_chat(
                         model=model_name,
                         total_tokens=total_tokens,
                         context_tokens=context_tokens,
+                        context_breakdown=breakdown(),
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
                         cached_input_tokens=cached_input_tokens,
@@ -518,6 +524,7 @@ async def run_chat(
         model=model_name,
         total_tokens=total_tokens,
         context_tokens=context_tokens,
+        context_breakdown=breakdown(),
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         cached_input_tokens=cached_input_tokens,

@@ -97,6 +97,38 @@ def test_turn_creates_chat_answers_and_saves(client: TestClient, agent: FakeAgen
     assert asked["caller"].username == "root"
 
 
+PARTS = [
+    {"id": "system_prompt", "label": "System prompt", "tokens": 300},
+    {"id": "messages", "label": "Messages", "tokens": 700},
+]
+
+
+def test_the_context_breakdown_is_saved_with_the_answer_and_survives_a_resave(client: TestClient, agent: FakeAgent) -> None:
+    agent.result_extra = {"context_breakdown": PARTS}
+    as_admin(client)
+    chat_id = new_id()
+
+    assert start(client, chat_id, "q").status_code == 202
+    events(client, chat_id)
+
+    saved = chat(client, chat_id)["messages"]
+    assert saved[1]["context_breakdown"] == PARTS
+    resaved = client.post(f"/api/chats/{chat_id}/messages", json={"title": "t", "messages": [saved[1]]})
+    assert resaved.status_code == 200
+    assert chat(client, chat_id)["messages"][-1]["context_breakdown"] == PARTS
+
+
+def test_a_malformed_context_breakdown_is_left_off_the_answer(client: TestClient, agent: FakeAgent) -> None:
+    agent.result_extra = {"context_breakdown": [{"id": "messages", "label": "Messages", "tokens": -5}]}
+    as_admin(client)
+    chat_id = new_id()
+
+    assert start(client, chat_id, "q").status_code == 202
+    events(client, chat_id)
+
+    assert "context_breakdown" not in chat(client, chat_id)["messages"][1]
+
+
 def test_the_entry_agent_answers_whatever_agent_the_browser_names(client: TestClient, agent: FakeAgent) -> None:
     as_admin(client)
     chat_id = new_id()

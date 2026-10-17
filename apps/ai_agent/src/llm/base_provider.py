@@ -147,6 +147,9 @@ class ChatResult:
     model: str = ""
     total_tokens: int | None = None
     context_tokens: int | None = None
+    # What fills context_tokens, as [{"id", "label", "tokens"}] (see
+    # llm/context_breakdown.py); empty when the provider reported no size.
+    context_breakdown: list[dict[str, Any]] = field(default_factory=list)
     # Sums across every round of the turn, like total_tokens.
     input_tokens: int | None = None
     output_tokens: int | None = None

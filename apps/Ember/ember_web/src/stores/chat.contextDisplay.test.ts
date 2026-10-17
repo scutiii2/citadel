@@ -112,3 +112,47 @@ describe("the context display settings", () => {
     vi.restoreAllMocks();
   });
 });
+
+describe("what fills the context", () => {
+  const PARTS = [
+    { id: "system_prompt", label: "System prompt", tokens: 300 },
+    { id: "messages", label: "Messages", tokens: 700 },
+  ];
+
+  async function openChat(messages: object[]) {
+    vi.mocked(chatsClient.list).mockResolvedValue([
+      { id: "c1", title: "Chat", agent_id: "a1", message_count: messages.length, created_at: "2026-01-01T00:00:00", updated_at: "2026-01-01T00:00:00", running: false },
+    ]);
+    vi.mocked(chatsClient.get).mockResolvedValue({
+      id: "c1", title: "Chat", agent_id: "a1", message_count: messages.length, created_at: "2026-01-01T00:00:00", updated_at: "2026-01-01T00:00:00", running: false,
+      messages,
+    } as never);
+    const chat = await store();
+    await chat.selectChat("c1");
+    await flushPromises();
+    return chat;
+  }
+
+  const answer = (extra: object = {}) => ({ role: "assistant", content: "a", context_tokens: 1000, context_window: 200_000, ...extra });
+
+  it("comes from the last answer that reported a context size", async () => {
+    const chat = await openChat([{ role: "user", content: "q" }, answer({ context_breakdown: PARTS })]);
+
+    expect(chat.contextParts).toEqual(PARTS);
+    expect(chat.contextUsage).toEqual({ tokens: 1000, window: 200_000 });
+  });
+
+  it("is empty for an answer saved before breakdowns existed", async () => {
+    const chat = await openChat([{ role: "user", content: "q" }, answer()]);
+
+    expect(chat.contextParts).toEqual([]);
+    expect(chat.contextUsage).not.toBeNull();
+  });
+
+  it("is empty after a summary, like the context size", async () => {
+    const chat = await openChat([answer({ context_breakdown: PARTS }), { role: "assistant", content: "s", kind: "summary" }]);
+
+    expect(chat.contextParts).toEqual([]);
+    expect(chat.contextUsage).toBeNull();
+  });
+});

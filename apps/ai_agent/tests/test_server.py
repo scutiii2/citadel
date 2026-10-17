@@ -28,6 +28,7 @@ def test_ask_returns_the_result_shape_chat_app_expects():
             model="claude-sonnet-5",
             total_tokens=42,
             context_tokens=30,
+            context_breakdown=[{"id": "messages", "label": "Messages", "tokens": 30}],
             input_tokens=30,
             output_tokens=12,
         )
@@ -55,6 +56,7 @@ def test_ask_returns_the_result_shape_chat_app_expects():
             "input_tokens": 30,
             "output_tokens": 12,
             "context_tokens": 30,
+            "context_breakdown": [{"id": "messages", "label": "Messages", "tokens": 30}],
             "context_window": 200_000,
             "provider_id": "anthropic",
             "model": "claude-sonnet-5",

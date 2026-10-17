@@ -255,6 +255,7 @@ async def ask(
         "input_tokens": result.input_tokens,
         "output_tokens": result.output_tokens,
         "context_tokens": result.context_tokens,
+        "context_breakdown": result.context_breakdown,
         "context_window": agent_config.status()["context_window"],
         "provider_id": result.provider_id,
         "model": result.model,

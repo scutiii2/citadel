@@ -44,7 +44,7 @@ class NotABranchPoint(Exception):
 # {"role": "user" | "assistant", "content": str} plus optional "kind"
 # ("summary", "log_attachment", "command"), "model", "total_tokens",
 # "input_tokens", "output_tokens", "duration_s", "context_tokens",
-# "context_window", "agent_usage", "at" (when it was written, UTC, see
+# "context_window", "context_breakdown", "agent_usage", "at" (when it was written, UTC, see
 # message_time) - validated by the route.
 ChatMessage = dict[str, Any]
 

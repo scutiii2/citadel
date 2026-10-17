@@ -46,7 +46,8 @@ from src.core import approvals, questions
 
 from src.agents.agent_spec import RosterEntry
 from src.llm import cancellation, cooldown, llm_config, llm_options, token_limits
-from src.llm.agent_roles import SYSTEM_PROMPT, system_prompt_for
+from src.llm.agent_roles import SYSTEM_PROMPT, roster_block, system_prompt_for
+from src.llm.context_breakdown import build_breakdown
 from src.core.chat_history import validate_history
 from src.llm.base_provider import (
     BaseProvider, ChatCancelled, ChatResult, LiveUsage, OnEvent, ToolCallRecord, dispatch_with_progress, step_event,
@@ -304,7 +305,8 @@ async def run_chat(
     model_name = model or DEFAULT_MODEL
     history = token_limits.trim_history_to_fit(history, PROVIDER_ID, _limit_gateway())
     roster = await agent_routing.roster_for()
-    messages: list[Any] = [{"role": "system", "content": system_prompt_for(caveman, roster)}, *history]
+    system_prompt = system_prompt_for(caveman, roster)
+    messages: list[Any] = [{"role": "system", "content": system_prompt}, *history]
     messages.append({"role": "user", "content": question})
     tools_used: list[str] = []
     tool_calls: list[ToolCallRecord] = []
@@ -329,6 +331,10 @@ async def run_chat(
     # rounds like total_tokens - overwritten each round rather than
     # accumulated, same reasoning as anthropic_provider.run_chat.
     context_tokens: int | None = None
+    roster_text = roster_block(roster)
+
+    def breakdown() -> list[dict[str, Any]]:
+        return build_breakdown(context_tokens, system_prompt, roster_text, schemas)
 
     try:
         async with guard.timeout():
@@ -391,6 +397,7 @@ async def run_chat(
                         model=model_name,
                         total_tokens=total_tokens,
                         context_tokens=context_tokens,
+                        context_breakdown=breakdown(),
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
                     )
@@ -457,6 +464,7 @@ async def run_chat(
         model=model_name,
         total_tokens=total_tokens,
         context_tokens=context_tokens,
+        context_breakdown=breakdown(),
         input_tokens=input_tokens,
         output_tokens=output_tokens,
     )

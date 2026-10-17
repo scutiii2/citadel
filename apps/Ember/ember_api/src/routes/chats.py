@@ -125,6 +125,17 @@ class AgentUsageIn(BaseModel):
     total_tokens: int = Field(ge=0)
 
 
+MAX_CONTEXT_PARTS = 12
+
+
+class ContextPartIn(BaseModel):
+    """One part of what filled an answer's context window."""
+
+    id: str = Field(max_length=40)
+    label: str = Field(max_length=60)
+    tokens: int = Field(ge=0)
+
+
 # What message_time() makes: 2026-10-06T14:03:09.123Z (a fraction is optional).
 MESSAGE_TIME_PATTERN = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$"
 
@@ -148,6 +159,8 @@ class MessageIn(BaseModel):
     duration_s: float | None = Field(default=None, ge=0)
     context_tokens: int | None = Field(default=None, ge=0)
     context_window: int | None = Field(default=None, ge=0)
+    # What filled context_tokens (system prompt, tools, messages ...), as ai_agent measured it.
+    context_breakdown: list[ContextPartIn] | None = Field(default=None, max_length=MAX_CONTEXT_PARTS)
     # The tool steps of an answer (saved by ember_api's turn; a browser
     # only sends them back when it re-saves or imports a chat).
     steps: list[StepIn] | None = Field(default=None, max_length=MAX_STEPS)

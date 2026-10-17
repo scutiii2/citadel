@@ -8,6 +8,7 @@ import type {
   ActiveAgent,
   ApprovalDecision,
   ChatMessage,
+  ContextPart,
   Conversation,
   JsonSchema,
   PendingApproval,
@@ -278,14 +279,20 @@ export const useChatStore = defineStore("chat", () => {
     [...conversations.value].sort((a, b) => b.updatedAt - a.updatedAt),
   );
   /** How full the agent's context is, from the last answer that said so. */
-  const contextUsage = computed<{ tokens: number; window: number } | null>(() => {
+  const lastContextAnswer = computed<ChatMessage | null>(() => {
     for (let i = messages.value.length - 1; i >= 0; i -= 1) {
       const m = messages.value[i]!;
       if (m.kind === "summary" || m.kind === "log_attachment") return null;
-      if (m.context_tokens && m.context_window) return { tokens: m.context_tokens, window: m.context_window };
+      if (m.context_tokens && m.context_window) return m;
     }
     return null;
   });
+  const contextUsage = computed<{ tokens: number; window: number } | null>(() => {
+    const m = lastContextAnswer.value;
+    return m ? { tokens: m.context_tokens!, window: m.context_window! } : null;
+  });
+  /** What filled that context, when the last answer says; empty otherwise. */
+  const contextParts = computed<ContextPart[]>(() => lastContextAnswer.value?.context_breakdown ?? []);
 
   function find(id: string): Conversation | undefined {
     return conversations.value.find((c) => c.id === id);
@@ -1314,6 +1321,7 @@ export const useChatStore = defineStore("chat", () => {
     busy,
     working,
     contextUsage,
+    contextParts,
     listLoading,
     listReady,
     chatLoading,
