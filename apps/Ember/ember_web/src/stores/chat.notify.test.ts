@@ -170,6 +170,30 @@ describe("the chime setting", () => {
   });
 });
 
+describe("the live token count", () => {
+  it("follows the usage events of the running answer", async () => {
+    const chat = await running();
+    expect(chat.liveUsage).toBeNull();
+
+    fire({ type: "usage", total_tokens: 40, estimated: true });
+    expect(chat.liveUsage).toEqual({ total: 40, estimated: true });
+
+    fire({ type: "usage", total_tokens: 500, estimated: false });
+    expect(chat.liveUsage).toEqual({ total: 500, estimated: false });
+  });
+
+  it("is cleared when the answer ends", async () => {
+    const chat = await running();
+    fire({ type: "usage", total_tokens: 40, estimated: true });
+
+    fire(finalEvent());
+    endStream("done");
+    await flushPromises();
+
+    expect(chat.liveUsage).toBeNull();
+  });
+});
+
 describe("chiming when an answer ends", () => {
   it("chimes once for an answer that arrives", async () => {
     await running();

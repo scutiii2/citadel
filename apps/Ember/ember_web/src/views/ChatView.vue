@@ -42,6 +42,8 @@ const {
   messages,
   streaming,
   activity,
+  liveUsage,
+  liveTokens,
   liveSteps,
   livePlans,
   busy,
@@ -398,6 +400,7 @@ useChatShortcuts({
         :messages="messages"
         :streaming="streaming"
         :activity="activity"
+        :live-tokens="liveTokens ? liveUsage : null"
         :steps="liveSteps"
         :plans="livePlans"
         :busy="busy"

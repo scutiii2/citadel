@@ -258,6 +258,14 @@ def _tool_schemas(
 # items are sent back as input ("Unknown parameter: input[3].parsed_arguments").
 _SDK_ONLY_FIELDS = {"parsed_arguments", "parsed"}
 
+# Stream events that carry tokens the user never sees as text (reasoning and
+# tool-call arguments); they only feed the live token meter.
+_REASONING_DELTAS = frozenset({
+    "response.reasoning_summary_text.delta",
+    "response.reasoning_text.delta",
+    "response.function_call_arguments.delta",
+})
+
 
 def _strip_sdk_fields(value: Any) -> Any:
     if isinstance(value, dict):
@@ -347,6 +355,10 @@ async def run_chat(
                                     text_parts.append(event.delta)
                                     if on_event:
                                         await on_event(step_event("token", text=event.delta))
+                                    await meter.chars(len(event.delta))
+                                elif event.type in _REASONING_DELTAS:
+                                    # Not shown as the answer, but the model is
+                                    # spending tokens: keep the live meter moving.
                                     await meter.chars(len(event.delta))
                             response = await stream.get_final_response()
                         break

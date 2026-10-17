@@ -181,6 +181,8 @@ export const useChatStore = defineStore("chat", () => {
 
   const streaming = ref(""); // the open chat's answer, as it arrives
   const activity = ref(""); // its current tool step, if any
+  // Tokens used so far by the running answer; an estimate until a model round ends.
+  const liveUsage = ref<{ total: number; estimated: boolean } | null>(null);
   const liveSteps = ref<ToolStep[]>([]); // the tools it ran so far
   const livePlans = ref<TurnPlan[]>([]);
   const activeAgents = ref<ActiveAgent[]>([]); // delegated agents working on the answer, outermost first
@@ -530,6 +532,9 @@ export const useChatStore = defineStore("chat", () => {
       case "token_reset":
         streaming.value = "";
         break;
+      case "usage":
+        liveUsage.value = { total: event.total_tokens, estimated: event.estimated };
+        break;
       case "step_start":
         activity.value = `running ${event.label ?? toolTitle(event.tool)} ...`;
         liveStepIndex.set(stepKey(event.agent_id, event.id), liveSteps.value.length);
@@ -644,6 +649,7 @@ export const useChatStore = defineStore("chat", () => {
     watcher = null;
     streaming.value = "";
     activity.value = "";
+    liveUsage.value = null;
     clockStart.value = null;
     liveSteps.value = [];
     livePlans.value = [];
@@ -1300,6 +1306,7 @@ export const useChatStore = defineStore("chat", () => {
     messages,
     streaming,
     activity,
+    liveUsage,
     activeAgents,
     agentText,
     liveSteps,

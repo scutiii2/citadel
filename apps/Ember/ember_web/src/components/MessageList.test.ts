@@ -496,6 +496,28 @@ describe("the running clock", () => {
   });
 });
 
+describe("the live token count", () => {
+  const live = (extra: Partial<Props> = {}) => mountList({ busy: true, ...extra });
+
+  it("marks an estimate with ~ and compacts large counts", () => {
+    const wrapper = live({ liveTokens: { total: 12_400, estimated: true } });
+
+    expect(wrapper.get("[data-test=live-tokens]").text()).toBe("~12.4k tokens");
+  });
+
+  it("shows an exact count without the ~", () => {
+    const wrapper = live({ liveTokens: { total: 850, estimated: false } });
+
+    expect(wrapper.get("[data-test=live-tokens]").text()).toBe("850 tokens");
+  });
+
+  it("is hidden when switched off, empty or nothing is running", () => {
+    expect(live({ liveTokens: null }).find("[data-test=live-tokens]").exists()).toBe(false);
+    expect(live({ liveTokens: { total: 0, estimated: true } }).find("[data-test=live-tokens]").exists()).toBe(false);
+    expect(mountList({ liveTokens: { total: 5, estimated: true } }).find("[data-test=live-tokens]").exists()).toBe(false);
+  });
+});
+
 describe("a slash command's reply", () => {
   const command = (extra: Partial<ChatMessage> = {}): ChatMessage[] => [
     { role: "user", kind: "command", content: "/files list" },

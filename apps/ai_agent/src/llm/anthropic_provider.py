@@ -29,7 +29,7 @@ as configured.
 from __future__ import annotations
 
 import os
-from typing import Any, Sequence
+from typing import Any, AsyncIterator, Sequence
 
 from anthropic import (
     Anthropic,
@@ -41,6 +41,7 @@ from anthropic import (
     BadRequestError,
     RateLimitError,
 )
+from anthropic.lib.streaming import AsyncMessageStream
 
 from src.llm.turn_guard import TurnStopped
 from src.agents import agent_routing, ask_user, delegation, plan
@@ -315,6 +316,24 @@ def _with_history_breakpoint(messages: list[dict[str, Any]]) -> list[dict[str, A
     return [*messages[:-1], {**last, "content": marked}]
 
 
+async def _stream_pieces(stream: Any) -> AsyncIterator[tuple[bool, str]]:
+    """Yield (is_text, chunk) for what a round streams. Only text goes to the
+    user; thinking and tool-call JSON are yielded too (is_text False) so the
+    live token meter keeps climbing while the model reasons or writes tool
+    arguments. A stream without SDK events (a test double) only has text."""
+    if not isinstance(stream, AsyncMessageStream):
+        async for chunk in stream.text_stream:
+            yield True, chunk
+        return
+    async for event in stream:
+        if event.type == "text":
+            yield True, event.text
+        elif event.type == "thinking":
+            yield False, event.thinking
+        elif event.type == "input_json":
+            yield False, event.partial_json
+
+
 def _usage_count(usage: Any, name: str) -> int:
     """One usage counter; a gateway may omit it or send null."""
     value = getattr(usage, name, 0)
@@ -400,10 +419,11 @@ async def run_chat(
                             tools=tools,
                             **options.extra_kwargs(model_name),
                         ) as stream:
-                            async for chunk in stream.text_stream:
-                                text_parts.append(chunk)
-                                if on_event:
-                                    await on_event(step_event("token", text=chunk))
+                            async for is_text, chunk in _stream_pieces(stream):
+                                if is_text:
+                                    text_parts.append(chunk)
+                                    if on_event:
+                                        await on_event(step_event("token", text=chunk))
                                 await meter.chars(len(chunk))
                             response = await stream.get_final_message()
                         break

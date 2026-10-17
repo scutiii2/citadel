@@ -15,6 +15,7 @@ import { FILE_ONLY_QUESTION, splitAttachments } from "../utils/attachments";
 import { hideDownloadMarkers, parseDownloads } from "../utils/downloads";
 import { clockTime, dayDividers, fullTime } from "../utils/messageTime";
 import { toolTitle } from "../utils/toolTitles";
+import { compactNumber } from "../utils/usageFormat";
 import ConfirmModal from "./ConfirmModal.vue";
 import AgentActivity from "./AgentActivity.vue";
 import CopyButton from "./CopyButton.vue";
@@ -32,6 +33,9 @@ const props = defineProps<{
   messages: ChatMessage[];
   streaming: string;
   activity: string;
+  /** Tokens used so far by the answer being written (an estimate until a model
+   * round ends); null hides the count. */
+  liveTokens?: { total: number; estimated: boolean } | null;
   /** The tools the answer being written ran so far. */
   steps: ToolStep[];
   plans?: TurnPlan[];
@@ -448,6 +452,9 @@ onBeforeUnmount(() => {
         <MarkdownContent v-if="streaming" :text="hideDownloadMarkers(streaming)" />
         <span v-else-if="!activity" class="activity"><span class="dot" />thinking ...</span>
         <ElapsedTime v-if="since" :since="since" class="elapsed" />
+        <span v-if="liveTokens && liveTokens.total > 0" class="elapsed live-tokens" data-test="live-tokens">
+          {{ liveTokens.estimated ? "~" : "" }}{{ compactNumber(liveTokens.total) }} tokens
+        </span>
       </div>
     </div>
   </div>
