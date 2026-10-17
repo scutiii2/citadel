@@ -45,6 +45,18 @@ class TriageRejected(Exception):
 
 
 @dataclass(frozen=True)
+class TitlesOutcome:
+    titles: list[str]
+    result: dict[str, Any]  # the raw interpret() result, so its tokens are still accounted for
+
+
+@dataclass(frozen=True)
+class AskOutcome:
+    answer: dict[str, Any]
+    result: dict[str, Any]  # the raw ask() result (agent_usage), likewise
+
+
+@dataclass(frozen=True)
 class Option:
     title: str
     description: str
@@ -142,7 +154,7 @@ class TriageQuestions:
         self._gateway = gateway
         self._directory = directory
 
-    async def titles(self, caller: Caller, descriptions: list[str]) -> list[str]:
+    async def titles(self, caller: Caller, descriptions: list[str]) -> TitlesOutcome:
         """One title per description, in order. Only the descriptions reach the model."""
         agent = await self._directory.get(TITLE_AGENT_ID)
         if agent is None:
@@ -152,11 +164,11 @@ class TriageQuestions:
         except AgentCallError as error:
             logger.info("option titles skipped: %s", error)
             raise TriageUnavailable("the title-writer agent did not answer") from error
-        return parse_titles(str(result.get("response") or ""), len(descriptions))
+        return TitlesOutcome(parse_titles(str(result.get("response") or ""), len(descriptions)), result)
 
     async def ask(
         self, caller: Caller, kind: Kind, text: str, question: str, options: list[Option], trace: bool = False
-    ) -> dict[str, Any]:
+    ) -> AskOutcome:
         """Asks the Triage Assistant directly (no orchestrator) and returns the readable answer."""
         agent = await self._directory.find_by_provider(LAYA_PROVIDER)
         if agent is None:
@@ -172,4 +184,4 @@ class TriageQuestions:
                 raise TriageRejected(message) from error
             logger.info("triage question failed: %s", error)
             raise TriageUnavailable("the Triage Assistant did not answer") from error
-        return read_answer(kind, str(result.get("response") or ""))
+        return AskOutcome(read_answer(kind, str(result.get("response") or "")), result)

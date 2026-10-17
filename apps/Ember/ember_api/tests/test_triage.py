@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from src.config import UsageSettings
 from src.services.agent_gateway import AgentCallError
 from src.services.triage_questions import parse_titles, read_answer, unique_titles
 from tests.conftest import AGENTS, FakeAgent, FakeEmailSender
@@ -36,7 +37,10 @@ def laya_answers(agent: FakeAgent, monkeypatch, answer: dict, calls: list | None
     async def ask(url, caller, *, question, **kwargs):
         if calls is not None:
             calls.append({"url": url, "caller": caller, "request": json.loads(question), **kwargs})
-        return {"response": json.dumps({"answers": {"q": answer}, "uncertain": answer["uncertain"]})}
+        return {
+            "response": json.dumps({"answers": {"q": answer}, "uncertain": answer["uncertain"]}),
+            "provider_id": "laya", "model": "convaiinnovations/laya", "total_tokens": 370, "input_tokens": 370,
+        }
 
     monkeypatch.setattr(agent, "ask", ask)
 
@@ -231,3 +235,72 @@ def test_the_form_is_validated(client: TestClient, tmp_path: Path) -> None:
     for body in (one_option, repeated, bad_title, yes_no_with_options, {**YES_NO, "text": "  "}, {**YES_NO, "text": "x" * 4001},
                  {**YES_NO, "kind": "score"}, {**YES_NO, "question": ""}):
         assert client.post(ASK, json=body).status_code == 422, body
+
+
+# -- accounting ----------------------------------------------------------------------------------------------
+def usage_kinds(client: TestClient) -> list[str]:
+    return [r["kind"] for r in client.get("/api/usage/records").json()]
+
+
+def log_lines(client: TestClient, kind: str) -> list[str]:
+    me = client.get("/api/auth/me").json()["id"]
+    return [e["message"] for e in client.get(f"/api/logs/{kind}", params={"actor": me}).json()]
+
+
+def test_titles_are_counted_in_usage_and_logged_without_the_descriptions(
+    client: TestClient, agent: FakeAgent, tmp_path: Path
+) -> None:
+    as_admin(client)
+    run_agents(tmp_path)
+    agent.summary = '["storage", "network"]'
+
+    client.post(TITLES, json={"descriptions": ["SQL and storage secret", "Connections"]})
+
+    assert usage_kinds(client) == ["triage_titles"]
+    assert log_lines(client, "action")[0] == "Wrote titles for 2 options"
+
+
+def test_a_question_is_counted_in_usage_and_logged_without_its_text(
+    client: TestClient, agent: FakeAgent, tmp_path: Path, monkeypatch
+) -> None:
+    as_admin(client)
+    run_agents(tmp_path)
+    laya_answers(agent, monkeypatch, {"type": "noul", "noul": 0.2, "answer_confidence": 0.6, "uncertain": True})
+
+    client.post(ASK, json=YES_NO)
+    client.post(ASK, json={**YES_NO, "question": "Which area?"})
+
+    rows = client.get("/api/usage/records").json()
+    assert [r["kind"] for r in rows] == ["triage", "triage"]
+    assert rows[0]["total_tokens"] == 370 and rows[0]["provider_id"] == "laya"
+    lines = log_lines(client, "action")
+    assert lines[:2] == ["Asked the Triage Assistant a yes or no question: no, uncertain"] * 2
+    assert not any("SQLite" in line or "Which area" in line for line in lines)
+
+
+def test_an_unavailable_agent_is_logged_as_an_error_and_costs_nothing(client: TestClient, tmp_path: Path) -> None:
+    as_admin(client)
+    run_agents(tmp_path, laya=False, titles=False)
+
+    assert client.post(ASK, json=YES_NO).status_code == 503
+    assert client.post(TITLES, json={"descriptions": ["a", "b"]}).status_code == 503
+
+    assert usage_kinds(client) == []
+    assert log_lines(client, "error") == [
+        "the title-writer agent is not running",
+        "the Triage Assistant is not running",
+    ]
+
+
+def test_the_usage_limit_blocks_both_routes(client_factory, agent: FakeAgent, tmp_path: Path, monkeypatch) -> None:
+    client = as_admin(client_factory(usage=UsageSettings(six_hour_token_limit=100)))
+    run_agents(tmp_path)
+    laya_answers(agent, monkeypatch, {"type": "noul", "noul": 0.9, "answer_confidence": 0.9, "uncertain": False})
+    assert client.post(ASK, json=YES_NO).status_code == 200  # 370 tokens: over the limit now
+
+    asked = client.post(ASK, json=YES_NO)
+    titled = client.post(TITLES, json={"descriptions": ["a", "b"]})
+
+    assert asked.status_code == titled.status_code == 429
+    assert "6-hour token limit" in asked.json()["detail"]
+    assert agent.interprets == []
