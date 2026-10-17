@@ -146,3 +146,13 @@ Items 1 to 6 are complete; item 7 remains open.
   roles grant `games.<id>.play`, and the old proxy is removed. Existing game data stays in place.
 
 See `docs/superpowers/plans/2026-10-11-game-host.md` for deployment setup.
+
+## Context breakdown for delegated agents (added 2026-10-17)
+
+**Context**: The context panel (opened from the header's context meter) breaks the answering agent's prompt into system prompt, delegable agents, built-in tools, MCP tools and messages, estimated or counted by the provider (`apps/ai_agent/src/llm/context_breakdown.py`). When the orchestrator delegates, each specialist runs its own prompt, and none of that is broken down.
+
+- Each agent would build its own breakdown; `ai_agent` already returns one usage row per agent in `agent_usage`.
+- `ember_api` would pass each agent's breakdown along with its usage row (`AgentUsageIn` in `routes/chats.py`), and the panel would add a per-agent section.
+- Open question: a specialist's prompt never fills the orchestrator's window, so this answers "what did each agent's prompt cost", not "how full is my context". Decide if that is worth a panel section before building.
+
+**Revisit when**: user wants to see where a delegated answer's tokens went.
