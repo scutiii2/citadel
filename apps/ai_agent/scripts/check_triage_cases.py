@@ -268,6 +268,8 @@ def rounds_table(row: Row) -> str:
     notes = [f"final: {row.got} ({final}); answered by {answer['answered_by']}; unsure: {'yes' if row.uncertain else 'no'}"]
     if answer.get("eliminated"):
         notes.append("dropped: " + ", ".join(answer["eliminated"]))
+    if answer.get("also_check"):
+        notes.append("also check: " + ", ".join(answer["also_check"]))
     return "\n".join([title, "", _grid(header, body), "", *notes])
 
 

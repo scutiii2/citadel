@@ -284,6 +284,8 @@ def test_an_uncertain_choice_is_weighed_with_jevs_and_a_sure_one_stays_with_laya
     category = answers["category"]
     assert category["answered_by"] == "laya+jev" and category["resolved_by"] == "pair"
     assert category["choice"] == "network" and category["candidates"] == ["database", "network"]
+    assert category["also_check"] == ["database"]
+    assert category["note"] == "Laya and Jev disagreed and the weighed answers are too close to call: it could be database or network; check both."
     assert category["probabilities"] == {"database": 0.4038, "network": 0.5962}
     assert category["answer_confidence"] == 0.5962 and category["uncertain"] is True
     assert category["disagreement"] == {"laya": "database", "jev": "network"}
@@ -730,6 +732,8 @@ def test_a_clearly_larger_difference_decides_the_pair(engine, monkeypatch):
     assert category["probabilities"] == {"database": 0.7, "network": 0.3} and category["answer_confidence"] == 0.7
     assert "candidates" not in category and category["disagreement"] == {"laya": "database", "jev": "network"}
     assert category["answered_by"] == "laya+jev"
+    assert category["also_check"] == ["network"]
+    assert category["note"] == "Laya and Jev disagreed; database is the stronger answer, but also check network."
 
 
 def test_two_similar_differences_leave_both_options_open(engine, monkeypatch):
@@ -763,6 +767,7 @@ def test_models_that_agree_on_a_pair_are_still_blended(engine, monkeypatch):
     category = payload(ask())["answers"]["category"]
 
     assert category["answered_by"] == "laya+jev" and "resolved_by" not in category and category["choice"] == "database"
+    assert "also_check" not in category and "note" not in category  # the pair rule only runs on a disagreement
 
 
 def test_the_pair_rule_also_closes_a_narrowed_round_that_still_disagrees(monkeypatch):
@@ -775,6 +780,7 @@ def test_the_pair_rule_also_closes_a_narrowed_round_that_still_disagrees(monkeyp
     # Weighed: Laya 0.18 / 0.22, Jev 0.2448 / 0.1152; differences 0.0648 and 0.1048: too close to call.
     assert answer["resolved_by"] == "pair" and answer["eliminated"] == ["network"] and answer["answered_by"] == "laya+jev"
     assert answer["candidates"] == ["billing", "frontend"] and answer["uncertain"] is True
+    assert answer["also_check"] == ["billing"] and "check both" in answer["note"]
     assert answer["choice"] == "frontend" and answer["probabilities"] == {"billing": 0.3821, "frontend": 0.6179, "network": 0.0}
 
 

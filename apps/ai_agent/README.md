@@ -231,7 +231,8 @@ a key for a backend of the `triage` chain in `.env`, the remote classifier (`src
   subtracted per option and the absolute differences compared: when the smaller one is under
   `classifier.triage_pair_ratio` (default 0.5) of the larger, the option with the bigger difference is the answer
   (`"resolved_by": "pair"`, `"probabilities"` are the shares of the two differences); otherwise the answer is
-  unsure and lists both options in `"candidates"`. Both carry a `"disagreement"` object.
+  unsure and lists both options in `"candidates"`. Both carry a `"disagreement"` object, `"also_check"` (the
+  option the reader should still look at, the loser) and a one-line `"note"` saying so.
   Such an answer carries a `"rounds"` trace, one entry per model call in order (`laya`, the classifier,
   `average` with what it dropped, then the narrowed `laya` and, if needed, classifier calls with their
   `options`): each shows its pick, probabilities and confidence, and a Laya that could not take the

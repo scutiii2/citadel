@@ -149,6 +149,12 @@ def test_the_rounds_table_lists_every_call_with_a_column_per_option():
     assert cells[4] == ["5", "Jev, narrowed", "billing, frontend", "billing", "0.69", "0.31", "-", "0.38"]
     assert lines[-2] == "final: billing (billing 0.69, frontend 0.31, network 0); answered by jev; unsure: yes"
     assert lines[-1] == "dropped: network"
+    assert "also check" not in "\n".join(lines)  # no pair rule ran in this answer
+
+
+def test_the_rounds_table_names_the_option_to_also_check():
+    pair = {**CHECKOUT, "resolved_by": "pair", "also_check": ["frontend"]}
+    assert cases.rounds_table(checkout_row(pair)).splitlines()[-1] == "also check: frontend"
 
 
 def test_the_rounds_table_shows_a_deferral_and_a_failed_rerun():

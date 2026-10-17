@@ -195,7 +195,8 @@ def _pair(
     """Two options are left and Laya and the fallback still pick differently. Weigh each model's
     probabilities by its own confidence, take the absolute difference per option, and compare the two
     differences: when they are far apart the option with the bigger one is the answer, otherwise the
-    answer is unsure and could be either (`candidates`). The steps are appended to `rounds`."""
+    answer is unsure and could be either (`candidates`). Either way `also_check` names the option(s) the
+    reader should still look at, with a one-line `note`. The steps are appended to `rounds`."""
     by = remote["answered_by"]
     options = list(laya["probabilities"])
     scaled_laya = {o: laya["answer_confidence"] * laya["probabilities"][o] for o in options}
@@ -219,8 +220,15 @@ def _pair(
         "uncertain": not decided, "answered_by": f"laya+{by}", "resolved_by": "pair",
         "disagreement": {"laya": laya["choice"], by: remote["choice"]},
     }
-    if not decided:
+    other = [o for o in options if o != choice]
+    who = {"jev": "Jev", "jev_vercel": "Jev (Vercel)"}.get(by, by)
+    # The models disagreed, so the reader is always pointed at the option that lost, too.
+    out["also_check"] = other
+    if decided:
+        out["note"] = f"Laya and {who} disagreed; {choice} is the stronger answer, but also check {' and '.join(other)}."
+    else:
         out["candidates"] = options
+        out["note"] = f"Laya and {who} disagreed and the weighed answers are too close to call: it could be {' or '.join(options)}; check both."
     return out
 
 
