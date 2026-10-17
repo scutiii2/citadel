@@ -1,11 +1,17 @@
 """Local typed-question provider: answers caller-supplied choice, score and
-noul questions about a short text. No generated text, tool calls or LLM fallback."""
+noul questions about a short text. No generated text and no tool calls.
+
+When config_tuning.json's `classifier.triage_fallback` is on and a key is set
+(llm/jev_classifier.py), the remote Jev classifier answers what Laya cannot:
+questions Laya is unsure of, and texts too long for Laya's window. Without
+that, nothing here leaves the machine."""
 
 from __future__ import annotations
 
 import importlib.util
 import json
 import math
+import logging
 import threading
 from dataclasses import dataclass
 from typing import Any
@@ -13,7 +19,7 @@ from typing import Any
 import anyio.to_thread
 
 from src.core.catalog import catalog
-from src.llm import cancellation
+from src.llm import cancellation, jev_classifier
 from src.llm.base_provider import ChatCancelled, ChatResult, step_event
 
 PROVIDER_ID = "laya"
@@ -33,6 +39,9 @@ _REQUEST_KEYS = {"text", "questions", "min_confidence"}
 _QUESTION_KEYS = {"type", "instructions", "criteria"}
 _QUESTION_TYPES = ("choice", "score", "noul")
 _NOUL_KEYS = {"false", "true"}
+_NOUL_DEFAULTS = {"false": "No: the statement is false.", "true": "Yes: the statement is true."}
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -88,9 +97,10 @@ def _question(qid: str, spec: Any) -> dict[str, Any]:
     return out
 
 
-def parse_request(raw: str) -> Request:
+def parse_request(raw: str, max_chars: int = MAX_INPUT_CHARS) -> Request:
     """Validate the JSON question. Text after the first JSON object is ignored:
-    delegation appends attachment references to the question string."""
+    delegation appends attachment references to the question string. `max_chars`
+    is Laya's own limit unless a larger classifier will take the long texts."""
     try:
         data, _ = json.JSONDecoder().raw_decode(raw.lstrip())
     except ValueError as error:
@@ -103,8 +113,8 @@ def parse_request(raw: str) -> Request:
     text = data.get("text")
     if not _is_text(text):
         raise _fail("text must be a non-empty string")
-    if len(text) > MAX_INPUT_CHARS:
-        raise _fail(f"text must be at most {MAX_INPUT_CHARS} characters; send a shorter excerpt")
+    if len(text) > max_chars:
+        raise _fail(f"text must be at most {max_chars} characters; send a shorter excerpt")
     min_confidence = data.get("min_confidence", MIN_CONFIDENCE)
     if not _is_number(min_confidence) or not 0 < min_confidence <= 1:
         raise _fail("min_confidence must be a number above 0 and at most 1")
@@ -146,6 +156,74 @@ def _answer(spec: dict[str, Any], raw: dict[str, Any], min_confidence: float) ->
     return out
 
 
+class _InputTooLong(ValueError):
+    """Laya could not read the whole text, so it gave no answers."""
+
+
+_TOO_LONG = (
+    "Laya could not read the complete input. Send a shorter text or fewer, shorter questions; "
+    "no answers were returned."
+)
+
+
+def _jev_enabled() -> bool:
+    config = jev_classifier.settings()
+    return config.triage_fallback and jev_classifier.available()
+
+
+def _jev_options(spec: dict[str, Any]) -> dict[str, str]:
+    """The question's options as the classifier names them: choices as given, score levels
+    as "0", "1", ... (lowest first) and a noul question as "false" and "true"."""
+    if spec["type"] == "choice":
+        return dict(spec["criteria"])
+    if spec["type"] == "score":
+        return {str(i): f"level {i}: {level}" for i, level in enumerate(spec["criteria"])}
+    return dict(spec.get("criteria") or _NOUL_DEFAULTS)
+
+
+def _jev_answer(request: Request, spec: dict[str, Any], picked: jev_classifier.Choice) -> dict[str, Any]:
+    """Jev's pick in the response shape of a Laya answer. Its confidence is the one number it
+    reports, so the other options share what is left; `answered_by` marks the source."""
+    confidence = picked.confidence / 100
+    out: dict[str, Any] = {"type": spec["type"]}
+    if spec["type"] == "choice":
+        others = [name for name in spec["criteria"] if name != picked.choice]
+        share = round((1 - confidence) / len(others), 4) if others else 0.0
+        out["choice"] = picked.choice
+        out["probabilities"] = {name: (confidence if name == picked.choice else share) for name in spec["criteria"]}
+    elif spec["type"] == "score":
+        out["score"] = float(picked.choice)
+        out["legend"] = {str(i): level for i, level in enumerate(spec["criteria"])}
+    else:
+        out["noul"] = confidence if picked.choice == "true" else round(1 - confidence, 4)
+    out["answer_confidence"] = confidence
+    out["uncertain"] = confidence < request.min_confidence
+    out["answered_by"] = "jev"
+    return out
+
+
+def _ask_jev(request: Request, qids: list[str]) -> tuple[dict[str, dict[str, Any]], int, list[str]]:
+    """Jev's answers for `qids`, the prompt tokens it used and why any question got none.
+    A failure never raises: that question just keeps Laya's answer, or none."""
+    answers: dict[str, dict[str, Any]] = {}
+    tokens = 0
+    problems: list[str] = []
+    for qid in qids:
+        spec = request.questions[qid]
+        subject = f"{request.text}\n\nQuestion: {spec['instructions']}"
+        if spec["type"] == "score":
+            subject += " Pick the level that fits best; level 0 is the lowest."
+        try:
+            picked = jev_classifier.ask_choice(subject, _jev_options(spec))
+        except jev_classifier.ClassifierError as error:
+            _log.warning("jev could not answer question %r: %s", qid, error)
+            problems.append(str(error))
+            continue
+        tokens += picked.prompt_tokens
+        answers[qid] = _jev_answer(request, spec, picked)
+    return answers, tokens, problems
+
+
 @catalog
 class LayaQuestions:
     """Load one English Laya checkpoint and answer typed questions about a text.
@@ -173,7 +251,43 @@ class LayaQuestions:
             self._load()
 
     def answer(self, raw: str) -> ChatResult:
-        request = parse_request(raw)
+        fallback = _jev_enabled()
+        request = parse_request(raw, jev_classifier.settings().max_input_chars if fallback else MAX_INPUT_CHARS)
+        answers: dict[str, dict[str, Any]] | None = None
+        input_tokens = 0
+        unreadable: _InputTooLong | None = None
+        if len(request.text) <= MAX_INPUT_CHARS:
+            try:
+                answers, input_tokens = self._laya_answers(request)
+            except _InputTooLong as error:
+                if not fallback:
+                    raise
+                unreadable = error
+        # Jev takes every question when Laya could not read the text, else only those Laya is unsure of.
+        pending = list(request.questions) if answers is None else [q for q, a in answers.items() if a["uncertain"]]
+        jev_answers: dict[str, dict[str, Any]] = {}
+        if fallback and pending:
+            jev_answers, jev_tokens, problems = _ask_jev(request, pending)
+            input_tokens += jev_tokens
+            if answers is None and len(jev_answers) < len(pending):
+                # Nothing readable from Laya and Jev could not cover it: no partial answers.
+                reason = f" Jev could not answer either ({problems[0]})." if problems else ""
+                raise _InputTooLong(str(unreadable or _TOO_LONG) + reason)
+        answers = {qid: (jev_answers.get(qid) or (answers or {})[qid]) for qid in request.questions}
+        result = {"answers": answers, "uncertain": any(a["uncertain"] for a in answers.values())}
+        note = (
+            f"Jev ({jev_classifier.settings().model}) answered {len(jev_answers)} question(s) that Laya was unsure "
+            "of or could not read."
+        ) if jev_answers else ""
+        return ChatResult(
+            response=json.dumps(result), provider_id=PROVIDER_ID, model=DEFAULT_MODEL,
+            input_tokens=input_tokens, output_tokens=0, total_tokens=input_tokens,
+            # State length alone excludes the question heads; don't invent a
+            # context-window reading or count the JSON as generated tokens.
+            context_tokens=None, model_note=note,
+        )
+
+    def _laya_answers(self, request: Request) -> tuple[dict[str, dict[str, Any]], int]:
         with self._lock:
             prediction = self._load().predict(request.text, request.questions, max_len=CONTEXT_WINDOW)
         try:
@@ -182,10 +296,7 @@ class LayaQuestions:
         except AttributeError as error:
             raise ValueError("Laya returned an invalid result; no answers were returned.") from error
         if incomplete:
-            raise ValueError(
-                "Laya could not read the complete input. Send a shorter text or fewer, shorter questions; "
-                "no answers were returned."
-            )
+            raise _InputTooLong(_TOO_LONG)
         try:
             answers = {
                 qid: _answer(spec, prediction["answers"][qid], request.min_confidence)
@@ -196,14 +307,7 @@ class LayaQuestions:
                 raise ValueError("invalid token usage")
         except (KeyError, TypeError, ValueError, AttributeError) as error:
             raise ValueError("Laya returned an invalid result; no answers were returned.") from error
-        result = {"answers": answers, "uncertain": any(a["uncertain"] for a in answers.values())}
-        return ChatResult(
-            response=json.dumps(result), provider_id=PROVIDER_ID, model=DEFAULT_MODEL,
-            input_tokens=input_tokens, output_tokens=0, total_tokens=input_tokens,
-            # State length alone excludes the question heads; don't invent a
-            # context-window reading or count the JSON as generated tokens.
-            context_tokens=None,
-        )
+        return answers, input_tokens
 
 
 _questions = LayaQuestions()

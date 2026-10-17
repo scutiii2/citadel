@@ -205,11 +205,32 @@ The English checkpoint has a 512-token limit including the question heads, so
 keep texts and criteria short. Input Laya reports as truncated is rejected
 instead of answering from partial evidence. The model loads before the agent
 registers as running; the first load may download weights. Loading/inference
-errors propagate without an LLM fallback. History is deliberately excluded and
+errors propagate without an LLM fallback (Jev below is a classifier, not an LLM answer). History is deliberately excluded and
 `interpret`/summarization is unsupported. Cancellation is checked before and
 after inference.
 
-Escalating to a real LLM is the orchestrator's decision: when `uncertain` is
+### Optional remote fallback (Jev)
+
+With a `"classifier": {"triage_fallback": true}` section added to `configs/config_tuning.json` (it is not in the `.example` seed) and
+`AI_GATEWAY_API_KEY` in `.env`, the remote classifier `typesafe-ai/jev` (Vercel AI
+Gateway, `src/llm/jev_classifier.py`) answers what Laya cannot:
+
+- each question Laya marks `uncertain` is asked again; the answer replaces Laya's
+  and carries `"answered_by": "jev"`, with its own `uncertain` flag against the same
+  `min_confidence`;
+- a text Laya cannot read in full (over its 4000 characters, or reported truncated)
+  goes to Jev for every question. `classifier.max_input_chars` (default 16000) caps
+  what is sent, since Jev's window is larger than Laya's.
+
+Jev only picks one option and reports a 0-100 confidence, which is no more calibrated
+than Laya's. Score questions are sent as levels `0`, `1`, ... (lowest first), and a
+noul question as `false` / `true`. If Jev fails, times out or has no key, Laya's
+answer is returned as it was (or, for unreadable input, the usual "could not read"
+error). Jev's prompt tokens are added to the turn's input tokens and the result's
+`model_note` says how many answers came from it. It is **off by default**: the text
+sent to Jev leaves this machine and each call is billed by the gateway.
+
+Escalating to a real LLM is otherwise the orchestrator's decision: when `uncertain` is
 true it can answer itself or delegate to another specialist. `0.70` is an
 experimental review gate, **not a calibrated accuracy claim**. Run
 `python -m scripts.check_laya_triage` for ten real-model smoke examples using
