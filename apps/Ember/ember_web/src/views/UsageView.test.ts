@@ -342,6 +342,51 @@ describe("the recent calls list", () => {
     expect(item.find(".call-tokens").text()).toBe("25");
   });
 
+  describe("grouped by response", () => {
+    const delegated = (turn: string) => [
+      row({ id: 11, turn_id: turn, agent: "helper", agent_id: "helper", delegated_by: "main", started_at: "2026-10-04T09:12:05", total_tokens: 30 }),
+      row({ id: 10, turn_id: turn, agent: "main", agent_id: "main", delegated_by: null, started_at: "2026-10-04T09:12:01", total_tokens: 70 }),
+      row({ id: 12, turn_id: turn, agent: "calc", agent_id: "calc", delegated_by: "main", started_at: "2026-10-04T09:12:08", total_tokens: 5 }),
+    ];
+
+    it("shows one collapsed header for the calls that share a turn, with their total", async () => {
+      records.mockResolvedValue(delegated("t1"));
+      const wrapper = await mountView();
+
+      expect(wrapper.findAll(".calls > li")).toHaveLength(1);
+      const head = wrapper.get(".turn-head");
+      expect(head.text()).toContain("main");
+      expect(head.text()).toContain("3 calls");
+      expect(head.get(".turn-total").text()).toBe("105");
+      expect(head.attributes("aria-expanded")).toBe("false");
+      expect(wrapper.find(".turn-calls").exists()).toBe(false);
+    });
+
+    it("opens a header to its calls, the orchestrator first and the rest in the order they ran", async () => {
+      records.mockResolvedValue(delegated("t1"));
+      const wrapper = await mountView();
+
+      await wrapper.get(".turn-head").trigger("click");
+
+      expect(wrapper.get(".turn-head").attributes("aria-expanded")).toBe("true");
+      expect(wrapper.findAll(".turn-calls .call-agent").map((a) => a.text())).toEqual(["main", "helper", "calc"]);
+      await wrapper.get(".turn-head").trigger("click");
+      expect(wrapper.find(".turn-calls").exists()).toBe(false);
+    });
+
+    it("keeps separate turns apart, and shows a lone call as a plain row with no header", async () => {
+      records.mockResolvedValue([...delegated("t1"), row({ id: 20, turn_id: "t2", agent_id: "solo" })]);
+      const wrapper = await mountView();
+
+      const items = wrapper.findAll(".calls > li");
+      expect(items).toHaveLength(2);
+      expect(items[0]!.classes()).toContain("turn");
+      expect(items[1]!.classes()).toContain("call");
+      expect(items[1]!.text()).toContain("solo");
+      expect(wrapper.findAll(".turn-head")).toHaveLength(1);
+    });
+  });
+
   it("is left out, and the report still shows, when its request fails", async () => {
     records.mockRejectedValue(new Error("boom"));
 
