@@ -118,6 +118,7 @@ const alertLabel = computed(() => {
 function isOpenedFromHere(to: string): boolean {
   return (
     (to === "/" && route.name === "chat-id") ||
+    (to === "/tickets" && route.path.startsWith("/tickets/")) ||
     (to === "/capabilities" && route.name === "capability-page")
   );
 }

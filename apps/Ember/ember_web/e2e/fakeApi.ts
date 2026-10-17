@@ -124,7 +124,21 @@ export interface StoredShare {
   expires_at: string | null;
 }
 
+export interface StoredTicket {
+  id: number;
+  type: "bug" | "feature" | "other";
+  title: string;
+  description: string;
+  status: "open" | "in_progress" | "resolved" | "closed";
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  has_unread?: boolean;
+  comments?: { id: number; ticket_id: number; author: string; author_role: "reporter" | "staff" | "ai" | "system"; body: string; created_at: string }[];
+}
+
 export interface FakeApi {
+  tickets: Map<number, StoredTicket>;
   /** What the account has added (GET and PUT /api/account-capabilities). */
   accountCapabilities: { capabilities: Set<string>; extensions: Set<string> };
 
@@ -216,8 +230,9 @@ const event = (sequence: number, body: Record<string, unknown>) =>
 export const ANSWER_PIECES = ["The capital ", "of France ", "is Paris."];
 export const ANSWER = ANSWER_PIECES.join("");
 
-export async function installFakeApi(page: Page, options: { admin?: boolean } = {}): Promise<FakeApi> {
+export async function installFakeApi(page: Page, options: { admin?: boolean; tickets?: boolean } = {}): Promise<FakeApi> {
   const api: FakeApi = {
+    tickets: new Map(),
     accountCapabilities: { capabilities: new Set(), extensions: new Set() },
     userExtensions: new Map(),
     settings: { forceToolApproval: false },
@@ -233,7 +248,8 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
     chats: new Map(),
     folders: new Map(),
   };
-  const account = options.admin ? ADMIN_ACCOUNT : ACCOUNT;
+  const baseAccount = options.admin ? ADMIN_ACCOUNT : ACCOUNT;
+  const account = { ...baseAccount, permissions: [...baseAccount.permissions, ...(options.tickets ? ["tickets.create"] : [])] };
   if (options.admin) {
     for (const a of ADMIN_ACCOUNTS) api.accounts.set(a.id, { ...a });
     for (const r of ADMIN_ROLES) api.roles.set(r.id, { ...r });
@@ -247,9 +263,51 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
     const url = new URL(request.url());
     const path = url.pathname;
     if (path === "/api/tickets/unread-count" && request.method() === "GET") {
-      return route.fulfill({ json: { count: 0 } });
+      return json(route, { count: [...api.tickets.values()].filter(ticket => ticket.has_unread).length });
     }
     const method = request.method();
+    if (path === "/api/tickets" && method === "GET") {
+      return json(route, { tickets: [...api.tickets.values()] });
+    }
+    if (path === "/api/tickets" && method === "POST") {
+      const draft = request.postDataJSON() as Pick<StoredTicket, "type" | "title" | "description">;
+      const id = Math.max(0, ...api.tickets.keys()) + 1;
+      const now = new Date().toISOString();
+      const ticket: StoredTicket = { ...draft, id, status: "open", created_at: now, updated_at: now, closed_at: null, has_unread: false, comments: [] };
+      api.tickets.set(id, ticket);
+      return json(route, { ticket, duplicate: false, group_size: 1 }, 201);
+    }
+    const ticketMatch = path.match(/^\/api\/tickets\/(\d+)(?:\/(comments|close|reopen))?$/);
+    if (ticketMatch) {
+      const ticket = api.tickets.get(Number(ticketMatch[1]));
+      if (!ticket) return json(route, { detail: `No ticket ${ticketMatch[1]}.` }, 404);
+      const action = ticketMatch[2];
+      if (method === "GET" && !action) {
+        ticket.has_unread = false;
+        return json(route, { ticket });
+      }
+      if (method === "POST") {
+        const now = new Date().toISOString();
+        if (action === "reopen") {
+          if (ticket.status !== "closed" && ticket.status !== "resolved") return json(route, { detail: "Ticket is already active." }, 400);
+          ticket.status = "open";
+          ticket.closed_at = null;
+          ticket.comments ??= [];
+          ticket.comments.push({ id: ticket.comments.length + 1, ticket_id: ticket.id, author: "System", author_role: "system", body: "Ticket reopened by the reporter.", created_at: now });
+        } else if (action === "close") {
+          ticket.status = "closed";
+          ticket.closed_at = now;
+        } else if (action === "comments") {
+          ticket.comments ??= [];
+          ticket.comments.push({ id: ticket.comments.length + 1, ticket_id: ticket.id, author: account.username, author_role: "reporter", body: request.postDataJSON().body, created_at: now });
+        } else {
+          api.unexpected.push(`${method} ${path}`);
+          return json(route, { detail: "No route" }, 404);
+        }
+        ticket.updated_at = now;
+        return json(route, { ticket });
+      }
+    }
 
     if (method === "GET" && path === "/api/auth/me") {
       return loggedIn ? json(route, account) : json(route, { detail: "Not logged in" }, 401);

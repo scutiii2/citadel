@@ -37,6 +37,8 @@ const mounted: ReturnType<typeof mount>[] = [];
 
 afterEach(() => {
   mounted.splice(0).forEach((wrapper) => wrapper.unmount());
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   document.body.innerHTML = '';
 });
 
@@ -161,10 +163,11 @@ describe("TicketsView", () => {
   it("filters by status", async () => {
     const wrapper = await mountView();
 
-    await wrapper.findAll("button.segment").find((b) => b.text() === "Closed")!.trigger("click");
+    await wrapper.findAll("button.segment").find((b) => b.attributes("data-value") === "closed")!.trigger("click");
     await flushPromises();
 
-    expect(client.list).toHaveBeenLastCalledWith("closed");
+    expect(client.list).toHaveBeenCalledTimes(1);
+    expect(rows(wrapper)).toHaveLength(0);
   });
 
   it("explains an empty list", async () => {
@@ -265,18 +268,55 @@ describe("TicketsView", () => {
     expect(wrapper.findAll("button").some((b) => b.text() === "Close ticket")).toBe(false);
   });
 
-  it("keeps the newest status result when an older request finishes later", async () => {
-    let finishOld!: (tickets: Ticket[]) => void;
-    client.list.mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; }));
+  it("counts and searches all statuses from one list and sorts by update time", async () => {
+    client.list.mockResolvedValue([
+      ticket(1, { title: "Email fails", updated_at: "2026-10-10T10:00:00Z" }),
+      ticket(2, { title: "Login fails", status: "closed", updated_at: "2026-10-12T10:00:00Z" }),
+    ]);
     const wrapper = await mountView();
-    client.list.mockResolvedValue([ticket(3, { status: "closed" })]);
-    await wrapper.findAll("button.segment").find((b) => b.text() === "Closed")!.trigger("click");
-    await flushPromises();
-    finishOld([ticket(1)]);
-    await flushPromises();
+    expect(wrapper.find('[data-value="all"]').text()).toBe("All (2)");
+    expect(wrapper.find('[data-value="closed"]').text()).toBe("Closed (1)");
+    expect(rows(wrapper)[0]!.text()).toContain("Login fails");
+    await wrapper.find('select[aria-label="Sort tickets"]').setValue("oldest");
+    expect(rows(wrapper)[0]!.text()).toContain("Email fails");
+    await wrapper.find('input[aria-label="Search ticket titles"]').setValue("EMAIL");
     expect(rows(wrapper)).toHaveLength(1);
-    expect(rows(wrapper)[0]!.text()).toContain("Ticket 3");
-    expect(rows(wrapper)[0]!.text()).toContain("Closed");
+    expect(rows(wrapper)[0]!.text()).toContain("Email fails");
+    expect(client.list).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows character counts and a dated status timeline without inventing a progress date", async () => {
+    client.get.mockResolvedValue(ticket(1, { status: "resolved", closed_at: "2026-10-12T10:00:00Z" }));
+    const wrapper = await mountView("/tickets/1");
+    expect(wrapper.findAll('.timeline time')).toHaveLength(2);
+    expect(wrapper.find('.timeline [aria-current="step"]').text()).toContain("Resolved");
+    await button(wrapper, "New ticket").trigger("click");
+    await wrapper.find("input[aria-label='Title']").setValue("Title");
+    await wrapper.find("textarea[aria-label='Description']").setValue("Details");
+    expect(wrapper.find("#ticket-title-count").text()).toBe("5/120");
+    expect(wrapper.find("#ticket-description-count").text()).toBe("7/4000");
+  });
+
+  it("polls every 30 seconds only while visible and cleans up after leaving", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    let hidden = false;
+    vi.spyOn(document, "hidden", "get").mockImplementation(() => hidden);
+    const wrapper = await mountView();
+    expect(client.list).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await flushPromises();
+    expect(client.list).toHaveBeenCalledTimes(2);
+    hidden = true;
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(client.list).toHaveBeenCalledTimes(2);
+    hidden = false;
+    document.dispatchEvent(new Event("visibilitychange"));
+    await flushPromises();
+    expect(client.list).toHaveBeenCalledTimes(3);
+    wrapper.unmount();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(client.list).toHaveBeenCalledTimes(3);
   });
 
   it("does not reopen a dismissed detail when its request finishes", async () => {

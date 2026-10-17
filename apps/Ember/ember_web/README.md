@@ -14,6 +14,11 @@ URL, token or key.
   Creating a ticket explains grouping with similar reports. Reporters can reopen
   resolved or closed tickets directly from the detail footer.
   `/tickets/{id}` opens ticket details directly; closing returns to `/tickets`.
+  Status chips count all owned tickets from a single list fetch. Title search
+  and update-time sorting run locally. Details include a status timeline;
+  ticket drafts show title and description character counts. The list refreshes
+  every 30 seconds while the page is visible, pauses when hidden and refreshes
+  immediately on return. Staff replies align left, your replies indent right.
 
 - Separate Notes (`/notes`) and Memory (`/memory`) pages use Ember's existing
   navigation rail, compact headings, theme tokens and responsive layouts. Notes

@@ -28,6 +28,16 @@ const TYPE_OPTIONS = [
 
 const filter = ref<Filter>("all");
 const tickets = ref<Ticket[]>([]);
+const search = ref("");
+const sort = ref("newest");
+const filterOptions = computed(() => FILTER_OPTIONS.map(option => ({
+  ...option,
+  label: `${option.label} (${option.value === "all" ? tickets.value.length : tickets.value.filter(ticket => ticket.status === option.value).length})`,
+})));
+const visibleTickets = computed(() => tickets.value
+  .filter(ticket => (filter.value === "all" || ticket.status === filter.value)
+    && ticket.title.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase()))
+  .sort((a, b) => (Date.parse(b.updated_at) - Date.parse(a.updated_at)) * (sort.value === "newest" ? 1 : -1)));
 const loading = ref(true);
 const loadError = ref("");
 const notice = ref("");
@@ -36,13 +46,15 @@ const router = useRouter();
 
 // Only the newest list request may fill the page.
 let loadSeq = 0;
+let listPending = false;
 let seenVersion = 0;
 const seenResults = new Map<number, { version: number; hasUnread: boolean }>();
 async function load(): Promise<void> {
   const seq = ++loadSeq;
+  listPending = true;
   const version = seenVersion;
   try {
-    const rows = await ticketsClient.list(filter.value === "all" ? undefined : filter.value);
+    const rows = await ticketsClient.list(undefined);
     if (seq !== loadSeq) return;
     tickets.value = rows.map(row => {
       const seen = seenResults.get(row.id);
@@ -52,11 +64,28 @@ async function load(): Promise<void> {
   } catch (err) {
     if (seq === loadSeq) loadError.value = errorMessage(err);
   } finally {
-    if (seq === loadSeq) loading.value = false;
+    if (seq === loadSeq) {
+      loading.value = false;
+      listPending = false;
+    }
   }
 }
-watch(filter, load);
-onMounted(load);
+let pollTimer: ReturnType<typeof setInterval> | undefined;
+function stopPolling(): void {
+  clearInterval(pollTimer);
+  pollTimer = undefined;
+}
+function updatePolling(): void {
+  stopPolling();
+  if (document.hidden) return;
+  if (!listPending) void load();
+  pollTimer = setInterval(() => { if (!listPending) void load(); }, 30_000);
+}
+onMounted(() => {
+  document.addEventListener("visibilitychange", updatePolling);
+  if (document.hidden) void load();
+  else updatePolling();
+});
 
 // ---- new ticket ----
 const newOpen = ref(false);
@@ -100,6 +129,12 @@ const reply = ref("");
 const replying = ref(false);
 const confirmOpen = ref(false);
 const closing = ref(false);
+const timelineStage = computed(() => current.value?.status === "open" ? 0 : current.value?.status === "in_progress" ? 1 : 2);
+const timeline = computed(() => [
+  { label: "Open", at: current.value?.created_at },
+  { label: "In progress", at: null },
+  { label: "Resolved", at: current.value?.closed_at },
+]);
 
 // Dismissal and a newer selection invalidate pending detail responses.
 let detailSeq = 0;
@@ -161,7 +196,12 @@ watch(() => route.params.id, value => {
   if (!detailOpen.value || activeDetailId !== id) void loadDetail(id);
 }, { immediate: true });
 
-onUnmounted(() => { ++detailSeq; ++loadSeq; });
+onUnmounted(() => {
+  ++detailSeq;
+  ++loadSeq;
+  stopPolling();
+  document.removeEventListener("visibilitychange", updatePolling);
+});
 
 async function sendReply(): Promise<void> {
   if (!current.value || reply.value.trim() === "" || replying.value || closing.value) return;
@@ -232,15 +272,19 @@ async function reopenTicket(): Promise<void> {
       </div>
 
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
-      <SegmentedControl v-model="filter" :options="FILTER_OPTIONS" label="Status" aria-label="Ticket status" />
+      <SegmentedControl v-model="filter" :options="filterOptions" label="Status" aria-label="Ticket status" />
+      <div class="list-controls">
+        <label class="search-control">Search titles<input v-model="search" type="search" aria-label="Search ticket titles" placeholder="Search your tickets" /></label>
+        <label>Sort<select v-model="sort" aria-label="Sort tickets"><option value="newest">Recently updated</option><option value="oldest">Oldest update first</option></select></label>
+      </div>
 
       <p v-if="loadError" class="error" role="alert">Could not load your tickets: {{ loadError }}</p>
       <p v-if="loading" class="muted">Loading …</p>
-      <p v-else-if="tickets.length === 0 && !loadError" class="muted">
-        {{ filter === "all" ? "You have no tickets yet." : "No tickets with this status." }}
+      <p v-else-if="visibleTickets.length === 0 && !loadError" class="muted">
+        {{ search.trim() ? "No tickets match your search." : filter === "all" ? "You have no tickets yet." : "No tickets with this status." }}
       </p>
       <ul v-else class="list">
-        <li v-for="t in tickets" :key="t.id">
+        <li v-for="t in visibleTickets" :key="t.id">
           <button type="button" class="ticket-row card" :class="{ unread: t.has_unread }" @click="open(t)">
             <span class="title"><span v-if="t.has_unread" class="unread-dot" aria-hidden="true" />{{ t.title }}</span>
             <span v-if="t.has_unread" class="unread-label">Support replied</span>
@@ -259,10 +303,11 @@ async function reopenTicket(): Promise<void> {
     <BaseModal :open="newOpen" title="New ticket" @close="newOpen = false">
       <form class="form" @submit.prevent="submit">
         <SegmentedControl v-model="draft.type" :options="TYPE_OPTIONS.map(option => ({ ...option, disabled: saving }))" label="Type" aria-label="Ticket type" />
-        <label>Title<input v-model="draft.title" type="text" maxlength="120" aria-label="Title" :disabled="saving" /></label>
+        <label>Title<input v-model="draft.title" type="text" maxlength="120" aria-label="Title" aria-describedby="ticket-title-count" :disabled="saving" /><span id="ticket-title-count" class="character-count">{{ draft.title.length }}/120</span></label>
         <label>
           Description
-          <textarea v-model="draft.description" rows="6" maxlength="4000" aria-label="Description" :disabled="saving" />
+          <textarea v-model="draft.description" rows="6" maxlength="4000" aria-label="Description" aria-describedby="ticket-description-count" :disabled="saving" />
+          <span id="ticket-description-count" class="character-count">{{ draft.description.length }}/4000</span>
         </label>
         <p v-if="formError" class="form-error error" role="alert">{{ formError }}</p>
         <div class="actions">
@@ -284,10 +329,16 @@ async function reopenTicket(): Promise<void> {
           </span>
           <span class="muted">Filed {{ formatTicketTime(current.created_at) }}</span>
         </p>
+        <ol class="timeline" aria-label="Ticket status timeline">
+          <li v-for="(step, index) in timeline" :key="step.label" :class="{ reached: index <= timelineStage }" :aria-current="index === timelineStage ? 'step' : undefined">
+            <span>{{ step.label }}</span>
+            <time v-if="step.at" :datetime="step.at">{{ formatTicketTime(step.at) }}</time>
+          </li>
+        </ol>
         <p class="text">{{ current.description }}</p>
 
         <ul v-if="current.comments?.length" class="thread" aria-label="Comments">
-          <li v-for="c in current.comments" :key="c.id">
+          <li v-for="c in current.comments" :key="c.id" :class="{ own: c.author_role === 'reporter' || c.author_role === 'ai', system: c.author_role === 'system' }">
             <div class="who">
               <b>{{ COMMENT_ROLE_LABELS[c.author_role] }}</b>
               <span class="muted">{{ formatTicketTime(c.created_at) }}</span>
@@ -320,6 +371,20 @@ async function reopenTicket(): Promise<void> {
 </template>
 
 <style scoped>
+.list-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-top: 12px; }
+.list-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85em; }
+.search-control { flex: 1; min-width: 160px; }
+.list-controls input, .list-controls select { padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); color: var(--text); font: inherit; }
+.character-count { color: var(--muted); font-size: 0.85em; text-align: right; }
+.timeline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0; margin: 16px 0; list-style: none; font-size: 0.85em; }
+.timeline li { display: flex; flex-direction: column; gap: 4px; border-top: 2px solid var(--border); padding-top: 8px; color: var(--muted); }
+.timeline li.reached { border-color: var(--accent); }
+.timeline li[aria-current="step"] > span { color: var(--text); font-weight: 600; }
+.timeline time { font-size: 0.9em; overflow-wrap: anywhere; }
+.thread li { margin-right: 24px; }
+.thread li.own { margin-left: 24px; margin-right: 0; }
+.thread li.system { margin: 0; }
+.reply .actions { justify-content: space-between; }
 .top {
   display: flex;
   align-items: flex-start;

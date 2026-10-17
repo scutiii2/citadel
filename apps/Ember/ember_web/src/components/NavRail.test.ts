@@ -38,7 +38,7 @@ async function setup(account: Account | null) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      ...NAV_PAGES.map((p) => ({ path: p.to, component: stub })),
+      ...NAV_PAGES.map((p) => ({ path: p.to === "/tickets" ? "/tickets/:id?" : p.to, component: stub })),
       { path: "/capabilities/:name", name: "capability-page", component: stub },
       { path: "/account", component: stub },
       { path: "/overview", component: stub },
@@ -60,6 +60,13 @@ beforeEach(() => {
 });
 
 describe("NavRail", () => {
+  it("keeps Tickets selected while a deep link is open", async () => {
+    const { wrapper, router } = await setup({ ...ACCOUNT, permissions: [...ACCOUNT.permissions, "tickets.create"] });
+    await router.push("/tickets/7");
+    await flushPromises();
+    expect(wrapper.find('a[href="/tickets"]').classes()).toContain("current");
+    wrapper.unmount();
+  });
   it("shows an unread badge for tickets and resets it after logout", async () => {
     const { wrapper, auth } = await setup({ ...ACCOUNT, permissions: [...ACCOUNT.permissions, "tickets.create"] });
     expect(wrapper.find(".ticket-count").text()).toBe("2");
