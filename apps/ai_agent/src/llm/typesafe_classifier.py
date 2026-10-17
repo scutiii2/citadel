@@ -53,7 +53,17 @@ def _parse(body: Any, criteria: Mapping[str, str]) -> Choice:
         raise ClassifierError("TypeSafe's answer has no usable confidence")
     if isinstance(tokens, bool) or not isinstance(tokens, int) or tokens < 0:
         tokens = 0
-    return Choice(choice, round(confidence * 100), tokens, ID, model)
+    return Choice(choice, round(confidence * 100), tokens, ID, model, _probabilities(answer, criteria))
+
+
+def _probabilities(answer: Any, criteria: Mapping[str, str]) -> dict[str, float] | None:
+    """The API's distribution over the offered options, or None when it is missing or does not cover them."""
+    raw = answer.get("probabilities") if isinstance(answer, dict) else None
+    if not isinstance(raw, dict) or set(raw) != set(criteria):
+        return None
+    if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 1 for v in raw.values()):
+        return None
+    return {name: float(raw[name]) for name in criteria}
 
 
 def ask_choice(subject: str, criteria: Mapping[str, str], question: str, timeout: float) -> Choice:

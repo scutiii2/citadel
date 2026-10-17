@@ -214,11 +214,13 @@ def fake_laya(monkeypatch, *, answer=None, error=None):
 
 
 def test_laya_answers_one_choice_question(monkeypatch):
-    sent = fake_laya(monkeypatch, answer={"type": "choice", "choice": "network", "answer_confidence": 0.82, "probabilities": {}})
+    sent = fake_laya(monkeypatch, answer={
+        "type": "choice", "choice": "network", "answer_confidence": 0.82, "probabilities": {"database": 0.18, "network": 0.82},
+    })
 
     picked = laya_classifier.ask_choice("connection reset", CRITERIA, "Which area?", 3.0)
 
-    assert picked == Choice("network", 82, 77, "laya", laya_provider.DEFAULT_MODEL)
+    assert picked == Choice("network", 82, 77, "laya", laya_provider.DEFAULT_MODEL, {"database": 0.18, "network": 0.82})
     assert sent[0].text == "connection reset" and sent[0].questions["answer"]["criteria"] == CRITERIA
     assert sent[0].questions["answer"]["instructions"] == "Which area?"
 

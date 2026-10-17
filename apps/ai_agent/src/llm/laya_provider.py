@@ -185,15 +185,20 @@ def _fallback_options(spec: dict[str, Any]) -> dict[str, str]:
 
 
 def _fallback_answer(request: Request, spec: dict[str, Any], picked: decision.Choice) -> dict[str, Any]:
-    """A backend's pick in the response shape of a Laya answer. Its confidence is the one number it
-    reports, so the other options share what is left; `answered_by` marks the backend."""
+    """A backend's pick in the response shape of a Laya answer. A backend that reports a distribution
+    keeps it; otherwise its confidence is the one number it gives, so the other options share what
+    is left. `answered_by` marks the backend."""
     confidence = picked.confidence / 100
     out: dict[str, Any] = {"type": spec["type"]}
     if spec["type"] == "choice":
         others = [name for name in spec["criteria"] if name != picked.choice]
         share = round((1 - confidence) / len(others), 4) if others else 0.0
         out["choice"] = picked.choice
-        out["probabilities"] = {name: (confidence if name == picked.choice else share) for name in spec["criteria"]}
+        real = picked.probabilities
+        out["probabilities"] = (
+            {name: round(real[name], 4) for name in spec["criteria"]} if real and set(real) == set(spec["criteria"])
+            else {name: (confidence if name == picked.choice else share) for name in spec["criteria"]}
+        )
     elif spec["type"] == "score":
         out["score"] = float(picked.choice)
         out["legend"] = {str(i): level for i, level in enumerate(spec["criteria"])}

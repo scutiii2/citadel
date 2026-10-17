@@ -72,6 +72,8 @@ class Choice:
     prompt_tokens: int
     backend: str = ""  # the backend id that answered
     model: str = ""
+    # Option -> probability when the backend reports a distribution (summing to about 1), else None.
+    probabilities: dict[str, float] | None = None
 
 
 @dataclass(frozen=True)

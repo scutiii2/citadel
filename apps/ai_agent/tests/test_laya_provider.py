@@ -385,3 +385,28 @@ def test_a_text_over_the_jev_limit_is_refused_before_anything_runs(engine, monke
     with pytest.raises(ValueError, match="at most 100 characters"):
         ask(request_with(text="x" * 101))
     assert engine.calls == []
+
+
+def test_a_backends_real_probabilities_replace_the_even_split(engine, monkeypatch):
+    engine.result = prediction(confidence=0.2)
+    jev_on(monkeypatch, {
+        "Which category?": decision.Choice("network", 55, 10, "jev", "", {"database": 0.15, "network": 0.55 - 0.0}),
+        "How severe?": decision.Choice("1", 90, 10, "jev"),
+        "Is there a problem?": decision.Choice("true", 90, 10, "jev"),
+    })
+
+    answers = payload(ask())["answers"]
+
+    assert answers["category"]["probabilities"] == {"database": 0.15, "network": 0.55}
+    assert answers["category"]["answer_confidence"] == 0.55 and answers["category"]["uncertain"] is True
+
+
+def test_a_distribution_that_misses_an_option_falls_back_to_the_even_split(engine, monkeypatch):
+    engine.result = prediction(confidence=0.2)
+    jev_on(monkeypatch, {
+        "Which category?": decision.Choice("network", 80, 10, "jev", "", {"network": 0.8}),
+        "How severe?": decision.Choice("1", 90, 10, "jev"),
+        "Is there a problem?": decision.Choice("true", 90, 10, "jev"),
+    })
+
+    assert payload(ask())["answers"]["category"]["probabilities"] == {"database": 0.2, "network": 0.8}

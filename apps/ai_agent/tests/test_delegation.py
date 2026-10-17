@@ -327,3 +327,13 @@ def test_call_forwards_the_chats_caveman_toggle_only_when_it_is_on(monkeypatch):
         delegation.call("calc", "2+2?", depth=0)
 
     assert "caveman" not in seen[0] and seen[1]["caveman"] is True and "caveman" not in seen[2]
+
+
+def test_dispatch_turns_a_structured_question_into_text(monkeypatch):
+    seen = []
+    monkeypatch.setattr(delegation, "call", lambda agent_id, question, depth, **extra: seen.append(question) or "ok")
+
+    delegation.dispatch({"agent_id": "calc", "question": {"text": "héllo", "n": [1, 2]}}, 0)
+    delegation.dispatch({"agent_id": "calc", "question": "plain"}, 0)
+
+    assert seen == ['{"text": "héllo", "n": [1, 2]}', "plain"]

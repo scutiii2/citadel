@@ -313,4 +313,8 @@ def dispatch(arguments: dict[str, Any], depth: int) -> str:
         for key in ("model_tier", "reasoning_effort")
         if isinstance(value := arguments.get(key), str) and value
     }
-    return call(arguments["agent_id"], arguments["question"], depth, **extra)
+    question = arguments["question"]
+    if isinstance(question, (dict, list)):
+        # Some models send a structured question as an object; the specialist's ask tool takes text.
+        question = json.dumps(question, ensure_ascii=False)
+    return call(arguments["agent_id"], question, depth, **extra)

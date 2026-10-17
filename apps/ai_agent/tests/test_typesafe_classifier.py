@@ -56,7 +56,7 @@ def test_one_choice_question_is_sent_and_confidence_becomes_a_percentage(monkeyp
 
     picked = typesafe_classifier.ask_choice("connection reset", CRITERIA, "Which area?", 2.5)
 
-    assert picked == decision.Choice("network", 84, 428, "jev", "jev-1.13.0")
+    assert picked == decision.Choice("network", 84, 428, "jev", "jev-1.13.0", {"network": 0.9, "database": 0.1})
     assert sent["url"] == "https://api.typesafe.ai/v1/systemone" and sent["key"] == "secret" and sent["timeout"] == 2.5
     assert sent["payload"] == {
         "state": "connection reset", "model": "jev-latest",
@@ -86,3 +86,18 @@ def test_a_missing_or_odd_token_count_reads_as_zero():
     assert typesafe_classifier._parse(body, CRITERIA).prompt_tokens == 0
     body["usage"] = {"input_tokens": -3}
     assert typesafe_classifier._parse(body, CRITERIA).prompt_tokens == 0
+
+
+def test_the_apis_probabilities_are_kept_when_they_cover_the_options():
+    picked = typesafe_classifier._parse(reply(), CRITERIA)
+    assert picked.probabilities == {"database": 0.1, "network": 0.9}
+
+
+@pytest.mark.parametrize("probabilities", [
+    None, {}, {"network": 1.0}, {"network": 0.9, "database": 0.1, "other": 0.0},
+    {"network": 0.9, "database": 1.4}, {"network": 0.9, "database": "x"}, {"network": True, "database": 0.1},
+])
+def test_probabilities_that_do_not_fit_are_dropped(probabilities):
+    body = reply()
+    body["answers"]["answer"]["probabilities"] = probabilities
+    assert typesafe_classifier._parse(body, CRITERIA).probabilities is None

@@ -32,6 +32,18 @@ import pytest  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
+def _default_classifier_settings(monkeypatch):
+    """Tests see the classifier defaults (everything off), never the developer's own `classifier`
+    section in configs/config_tuning.json. Tests that need a section patch read_section themselves."""
+    from src.llm import decision
+
+    monkeypatch.setattr(decision, "read_section", lambda path, name, default=None: {})
+    decision.reset_cache()
+    yield
+    decision.reset_cache()
+
+
+@pytest.fixture(autouse=True)
 def _isolated_agent_registry(monkeypatch, tmp_path):
     """Point the agent registry at empty, per-test files so no test reads or
     rewrites the developer's real agent registry (roster_for and

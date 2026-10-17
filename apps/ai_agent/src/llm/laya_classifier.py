@@ -31,4 +31,7 @@ def ask_choice(subject: str, criteria: Mapping[str, str], question: str, timeout
     except (ValueError, RuntimeError) as error:  # too long, too many options, not installed, bad result
         raise ClassifierError(f"Laya could not answer: {error}") from error
     answer = answers[_QUESTION_ID]
-    return Choice(answer["choice"], round(answer["answer_confidence"] * 100), tokens, ID, laya_provider.DEFAULT_MODEL)
+    return Choice(
+        answer["choice"], round(answer["answer_confidence"] * 100), tokens, ID, laya_provider.DEFAULT_MODEL,
+        dict(answer["probabilities"]),
+    )
