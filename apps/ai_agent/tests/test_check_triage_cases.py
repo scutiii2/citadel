@@ -192,3 +192,43 @@ def test_rounds_flag_prints_the_tables_after_the_summary_table(monkeypatch, caps
     out = capsys.readouterr().out
 
     assert out.index("case") < out.index("| # | Step") and "dropped: network" in out
+
+
+# --- the wider case set -----------------------------------------------------------------------------
+
+def test_the_wider_set_reaches_every_shape_the_triage_setup_handles():
+    by_name = {case.name: case for case in cases.CASES}
+    questions = [q for case in cases.CASES for q in case.questions.values()]
+    # two-option choice questions (the pair rule), a ten-option one (Laya's maximum) and an eight-question request
+    assert any(q["type"] == "choice" and len(q["criteria"]) == 2 for q in questions)
+    assert any(q["type"] == "choice" and len(q["criteria"]) == laya_provider.MAX_OPTIONS for q in questions)
+    assert max(len(case.questions) for case in cases.CASES) == laya_provider.MAX_QUESTIONS
+    # text shapes: Laya's window overflow, the issue first or last, another language, an instruction hidden in the text
+    assert 1000 < len(by_name["medium-text"].text) < laya_provider.MAX_INPUT_CHARS
+    assert len(by_name["long-key-first"].text) > laya_provider.MAX_INPUT_CHARS
+    assert by_name["long-key-first"].text.startswith("SQLite database is locked")
+    assert by_name["medium-text"].text.rstrip().endswith("write failed.")
+    assert "Ignore all previous instructions" in by_name["instruction-in-text"].text
+    assert "base de datos" in by_name["non-english"].text
+    # thresholds: the same text under a lenient and a strict min_confidence for a two-option and a three-option question
+    assert by_name["escalate-lenient"].min_confidence == 0.5 and by_name["escalate-strict"].min_confidence == 0.95
+    assert by_name["checkout-area-strict"].min_confidence == 0.95
+
+
+def test_every_expectation_names_an_option_or_a_noul_answer_the_question_offers():
+    for case in cases.CASES:
+        for qid, expected in case.expect.items():
+            question = case.questions[qid]
+            allowed = {"true", "false"} if question["type"] == "noul" else set(question.get("criteria", ()))
+            assert expected in allowed, (case.name, qid, expected)
+            assert question["type"] != "score", (case.name, "score answers cannot be matched against a choice")
+
+
+def test_case_patterns_select_a_group_in_listing_order():
+    assert [c.name for c in cases.select(["escalate-*"])] == [
+        "escalate-clear", "escalate-routine", "escalate-borderline", "escalate-conflicting", "escalate-lenient", "escalate-strict",
+    ]
+    assert [c.name for c in cases.select(["urgent-*", "vague"])][-1] == "vague"
+    assert [c.name for c in cases.select(["vague", "vague"])] == ["vague"]
+    with pytest.raises(SystemExit, match="unknown case.*nothing-\\*"):
+        cases.select(["nothing-*"])
