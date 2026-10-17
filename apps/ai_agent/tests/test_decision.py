@@ -278,3 +278,43 @@ def test_the_request_laya_gets_is_valid_json_for_its_parser():
     assert laya_provider.parse_request(json.dumps(
         {"text": "t", "questions": {"answer": {"type": "choice", "instructions": "q", "criteria": CRITERIA}}}
     )).questions["answer"]["type"] == "choice"
+
+
+# --- the shipped examples ------------------------------------------------------------------------------------
+
+def test_the_example_config_seeds_every_classifier_key_at_its_default(monkeypatch):
+    import dataclasses
+    import json
+    from pathlib import Path
+
+    from src.llm import triage_flow
+
+    path = Path(decision.__file__).resolve().parents[2] / "configs" / "config_tuning.json.example"
+    use_section(monkeypatch, json.loads(path.read_text(encoding="utf-8"))["classifier"])
+
+    seeded = decision.settings()
+
+    assert seeded.triage_thresholds == triage_flow.DEFAULT_THRESHOLDS
+    assert all(seeded.chain(feature) == ClassifierSettings().chain(feature) for feature in decision.FEATURES)
+    # nothing switched on, nothing off the default (the chains and thresholds were compared above)
+    assert dataclasses.replace(seeded, triage_thresholds={}, chains={}) == ClassifierSettings()
+    assert seeded.triage_flow == "legacy" and seeded.triage_fallback is False
+    assert seeded.auto_tier.enabled is False and seeded.auto_route.enabled is False
+
+
+def test_the_example_config_names_every_classifier_setting():
+    import json
+    from pathlib import Path
+
+    path = Path(decision.__file__).resolve().parents[2] / "configs" / "config_tuning.json.example"
+    assert set(json.loads(path.read_text(encoding="utf-8"))["classifier"]) == decision._KNOWN
+
+
+def test_the_example_env_lists_the_keys_the_classifier_backends_read():
+    from pathlib import Path
+
+    from src.llm import jev_classifier, typesafe_classifier
+
+    text = (Path(decision.__file__).resolve().parents[2] / ".env.example").read_text(encoding="utf-8")
+    keys = {line.split("=")[0] for line in text.splitlines() if "=" in line and not line.startswith("#")}
+    assert {typesafe_classifier.KEY_ENV, jev_classifier.KEY_ENV, "HF_TOKEN"} <= keys
