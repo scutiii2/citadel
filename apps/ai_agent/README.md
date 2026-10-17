@@ -209,6 +209,26 @@ errors propagate without an LLM fallback (Jev below is a classifier, not an LLM 
 `interpret`/summarization is unsupported. Cancellation is checked before and
 after inference.
 
+### Sequential flow (Laya English, Laya typed-decisions, Jev)
+
+Set `"classifier": {"triage_flow": "sequential"}` in `configs/config_tuning.json` and restart the Triage Assistant:
+the legacy single-model review below is replaced by `src/llm/triage_flow.py` (the whole flow is written at the top of
+that file). Laya English answers first; the `typed-decisions` checkpoint only if English is not sure; the fallback
+(Jev, still gated by `triage_fallback`, a key and the triage chain) only when those two cannot settle a question. Each
+model has its own confidence threshold, by number of options left (2 options: English 0.90, typed 0.80, Jev 0.90;
+3 or more: 0.75, 0.55, 0.90), changed with `classifier.triage_thresholds`
+(`{"3+": {"laya-typed": 0.6}}`) or, for one request, by sending `min_confidence`. Between the steps options far
+below the best (`triage_prune_ratio`) are dropped and the models asked again, and when nobody is ever sure the
+models' confidence-weighted values are compared pairwise: the answer then carries `also_check`, or `"unknown": true`
+with `candidates`. An answer says `answered_by` and `resolved_by`, and has a `rounds` trace when more than one model
+was consulted. Score and noul questions take the first model that meets its 3+ threshold.
+
+- Both checkpoints read `classifier.triage_window` tokens (default 4096) and are loaded before the agent registers:
+  the second one downloads on first start (about 2 minutes) and the two models need roughly 1.6-3.4 GB of RAM.
+- The checks measured so far: English 20/23 and typed 21/23 on the 47 cases in `scripts/check_triage_cases.py` with
+  Laya alone; both are confidently wrong on sarcasm and "the server room is on fire", where nothing asks Jev.
+- `legacy` (the default) keeps one Laya model and the review below.
+
 ### Optional remote fallback (decision layer)
 
 With a `"classifier": {"triage_fallback": true}` section added to `configs/config_tuning.json` (it is not in the `.example` seed) and
@@ -263,7 +283,7 @@ orchestrator, run `python -m scripts.check_triage_cases`: 47 cases that call the
 code, with `--list`, `--case NAME` (or a pattern such as `"escalate-*"`), `--rounds`, `--baseline` (Laya alone, for comparison), `--prune-ratio R` and
 `--json` (full answers with their traces). It uses your `config_tuning.json` and `.env` and sends the
 cases' texts to the fallback backend when that is on.
-`--three-way` is an experiment (the Triage Assistant itself is unchanged): Laya English answers first, the
+`--three-way` runs the Triage Assistant's sequential flow (below) over both checkpoints: Laya English answers first, the
 `typed-decisions` checkpoint only if English is not sure, and the fallback only when those two cannot settle it, each
 against its own confidence threshold (2 options: English 0.90, typed 0.80, Jev 0.90; 3 or more: 0.75, 0.55, 0.90;
 `--threshold laya-typed:3+=0.6` changes one). Between the steps, options far below the best are dropped and the

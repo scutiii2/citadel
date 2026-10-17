@@ -39,13 +39,18 @@ _log = logging.getLogger(__name__)
 
 _SECTION = "classifier"
 FEATURES = ("triage", "auto_tier", "auto_route")
+# The voters of the sequential triage flow (llm/triage_flow.py) and the option counts their thresholds are set for.
+TRIAGE_FLOWS = ("legacy", "sequential")
+TRIAGE_VOTERS = ("laya-english", "laya-typed", "jev")
+TRIAGE_COUNTS = ("2", "3+")
 DEFAULT_CHAIN = ("jev", "jev_vercel")
 _BACKENDS = {
     "jev": "src.llm.typesafe_classifier",
     "jev_vercel": "src.llm.jev_classifier",
     "laya": "src.llm.laya_classifier",
 }
-_KNOWN = {"typesafe", "vercel", "chains", "timeout_seconds", "max_input_chars", "triage_fallback", "triage_prune_ratio", "triage_confidence_gap", "triage_pair_ratio", "auto_tier", "auto_route"}
+_KNOWN = {"typesafe", "vercel", "chains", "timeout_seconds", "max_input_chars", "triage_fallback", "triage_flow", "triage_window", "triage_thresholds", "triage_prune_ratio", "triage_confidence_gap",
+          "triage_pair_ratio", "auto_tier", "auto_route"}
 _BACKEND_KNOWN = {"url", "model"}
 _AUTO_TIER_KNOWN = {"enabled", "min_confidence", "tiers"}
 _AUTO_ROUTE_KNOWN = {"enabled", "min_confidence"}
@@ -117,6 +122,15 @@ class ClassifierSettings:
     triage_fallback: bool = False
     # After Laya and the fallback both answered a choice, options whose averaged probability is below
     # this share of the leading option's are dropped and the question is asked again (0 = never drop).
+    # How Laya's triage settles a question. "legacy": one Laya model, the fallback for what it is unsure of.
+    # "sequential": Laya English, then Laya typed-decisions, then the fallback, each against its own threshold
+    # (llm/triage_flow.py). The sequential flow loads a second checkpoint when the agent starts.
+    triage_flow: str = "legacy"
+    # Token window both Laya checkpoints read in the sequential flow (the English one alone reads 512 in the legacy flow).
+    triage_window: int = 4096
+    # count ("2" or "3+") -> voter -> the confidence (0-1) at which that voter's answer is taken, over the defaults in
+    # llm/triage_flow.py. Only the entries given are changed.
+    triage_thresholds: dict[str, dict[str, float]] = field(default_factory=dict)
     triage_prune_ratio: float = 0.25
     # When Laya's and the fallback's confidence differ by at least this much, the more confident one's
     # answer is used as it is, without averaging or dropping (1 = practically never).
@@ -158,6 +172,12 @@ def _load_settings() -> ClassifierSettings:
     ratio = raw.get("triage_prune_ratio", base.triage_prune_ratio)
     if isinstance(ratio, bool) or not isinstance(ratio, (int, float)) or not 0 <= ratio < 1:
         raise ValueError(f"config_tuning.json {_SECTION}.triage_prune_ratio must be a number from 0 up to (not including) 1")
+    flow = raw.get("triage_flow", base.triage_flow)
+    if flow not in TRIAGE_FLOWS:
+        raise ValueError(f"config_tuning.json {_SECTION}.triage_flow must be one of: {', '.join(TRIAGE_FLOWS)}")
+    window = raw.get("triage_window", base.triage_window)
+    if isinstance(window, bool) or not isinstance(window, int) or not 512 <= window <= 32_768:
+        raise ValueError(f"config_tuning.json {_SECTION}.triage_window must be an integer from 512 to 32768")
     gap = raw.get("triage_confidence_gap", base.triage_confidence_gap)
     if isinstance(gap, bool) or not isinstance(gap, (int, float)) or not 0 < gap <= 1:
         raise ValueError(f"config_tuning.json {_SECTION}.triage_confidence_gap must be a number above 0 and at most 1")
@@ -165,6 +185,7 @@ def _load_settings() -> ClassifierSettings:
     if isinstance(pair, bool) or not isinstance(pair, (int, float)) or not 0 < pair <= 1:
         raise ValueError(f"config_tuning.json {_SECTION}.triage_pair_ratio must be a number above 0 and at most 1")
     return ClassifierSettings(
+        triage_flow=flow, triage_window=window, triage_thresholds=_triage_thresholds(raw.get("triage_thresholds", {})),
         triage_pair_ratio=float(pair),
         triage_prune_ratio=float(ratio),
         triage_confidence_gap=float(gap),
@@ -191,6 +212,23 @@ def _backend_settings(name: str, raw: Any, base: BackendSettings) -> BackendSett
             raise ValueError(f"{where}.{key} must be a non-empty string")
         values[key] = value.strip()
     return BackendSettings(**values)
+
+
+def _triage_thresholds(raw: Any) -> dict[str, dict[str, float]]:
+    where = f"config_tuning.json {_SECTION}.triage_thresholds"
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} must be an object of option count ({', '.join(TRIAGE_COUNTS)}): voter: confidence")
+    out: dict[str, dict[str, float]] = {}
+    for count, row in raw.items():
+        if count not in TRIAGE_COUNTS or not isinstance(row, dict):
+            raise ValueError(f"{where} has an entry {count!r}; the counts are {', '.join(TRIAGE_COUNTS)}, each an object")
+        for voter, value in row.items():
+            if voter not in TRIAGE_VOTERS:
+                raise ValueError(f"{where}.{count} names an unknown voter {voter!r} (use {', '.join(TRIAGE_VOTERS)})")
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < value <= 1:
+                raise ValueError(f"{where}.{count}.{voter} must be a number above 0 and at most 1")
+        out[count] = {voter: float(value) for voter, value in row.items()}
+    return out
 
 
 def _chains(raw: Any) -> dict[str, tuple[str, ...]]:

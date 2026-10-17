@@ -4,7 +4,11 @@ noul questions about a short text. No generated text and no tool calls.
 When config_tuning.json's `classifier.triage_fallback` is on and a backend of the
 triage chain is available (llm/decision.py), that classifier answers what Laya
 cannot: questions Laya is unsure of, and texts too long for Laya's window.
-Without that, nothing here leaves the machine."""
+Without that, nothing here leaves the machine.
+
+With `classifier.triage_flow` set to "sequential", `LayaQuestions.answer` hands the request to
+llm/triage_flow.py instead: Laya English, then the typed-decisions checkpoint, then the fallback,
+each against its own threshold."""
 
 from __future__ import annotations
 
@@ -24,6 +28,7 @@ from src.llm.base_provider import ChatCancelled, ChatResult, step_event
 
 PROVIDER_ID = "laya"
 DEFAULT_MODEL = "convaiinnovations/laya"
+TYPED_MODEL = "typed-decisions"  # the second local checkpoint of the sequential flow (llm/triage_flow.py)
 VENDOR_LABEL = "Laya (local)"
 SUPPORTS_STREAMING = True
 CONTEXT_WINDOW = 512
@@ -348,11 +353,19 @@ def _ask_fallback(request: Request, qids: list[str]) -> tuple[dict[str, dict[str
 class LayaQuestions:
     """Load one English Laya checkpoint and answer typed questions about a text.
 
-    Lazy load + lock; an engine can be injected for offline contract tests.
+    Lazy load + lock; an engine can be injected for offline contract tests. `checkpoint` picks the Laya
+    checkpoint (the English root unless told otherwise), `window` the token window a call reads (CONTEXT_WINDOW
+    unless told otherwise) and `typed` injects the typed-decisions model of the sequential flow.
     """
 
-    def __init__(self, engine: Any = None) -> None:
+    def __init__(
+        self, engine: Any = None, checkpoint: str = DEFAULT_MODEL, window: int | None = None,
+        typed: "LayaQuestions | None" = None,
+    ) -> None:
         self._engine = engine
+        self._checkpoint = checkpoint
+        self.window = window
+        self._typed = typed
         self._lock = threading.Lock()
 
     def _load(self) -> Any:
@@ -362,15 +375,39 @@ class LayaQuestions:
                 import laya
             except ImportError as error:
                 raise RuntimeError('Laya is not installed: pip install -e .') from error
-            self._engine = laya.load(DEFAULT_MODEL)
+            self._engine = laya.load(self._checkpoint)
         return self._engine
 
-    def prepare(self) -> None:
-        """Warm the model before registering this agent as running."""
+    def _sequential(self) -> bool:
+        return decision.settings().triage_flow == "sequential"
+
+    def _flow_models(self) -> dict[str, "LayaQuestions"]:
+        """The two local voters of the sequential flow: this (English) model and the typed-decisions one, both on the
+        flow's window. The typed model loads on first use."""
+        window = decision.settings().triage_window
+        if self._typed is None:
+            self._typed = LayaQuestions(checkpoint=TYPED_MODEL)
+        self.window = self._typed.window = window
+        english, typed = decision.TRIAGE_VOTERS[:2]
+        return {english: self, typed: self._typed}
+
+    def _warm(self) -> None:
+        """Load this one checkpoint now."""
         with self._lock:
             self._load()
 
+    def prepare(self) -> None:
+        """Warm the model(s) before registering this agent as running: the typed-decisions one too for the
+        sequential flow."""
+        self._warm()
+        if self._sequential():
+            self._flow_models()[decision.TRIAGE_VOTERS[1]]._warm()
+
     def answer(self, raw: str) -> ChatResult:
+        if self._sequential():
+            from src.llm import triage_flow  # imported here: triage_flow imports this module
+
+            return triage_flow.TriageFlow(self._flow_models()).answer(raw)
         fallback = _fallback_enabled()
         request = parse_request(raw, decision.settings().max_input_chars if fallback else MAX_INPUT_CHARS)
         answers: dict[str, dict[str, Any]] | None = None
@@ -465,7 +502,7 @@ class LayaQuestions:
 
     def _laya_answers(self, request: Request) -> tuple[dict[str, dict[str, Any]], int]:
         with self._lock:
-            prediction = self._load().predict(request.text, request.questions, max_len=CONTEXT_WINDOW)
+            prediction = self._load().predict(request.text, request.questions, max_len=self.window or CONTEXT_WINDOW)
         try:
             usage = prediction.get("usage", {})
             incomplete = usage.get("truncated") or usage.get("state_tokens_dropped", 0)

@@ -89,7 +89,7 @@ def test_a_sure_english_answer_is_taken_and_nothing_else_is_asked(monkeypatch):
 
     assert answer["choice"] == "a" and answer["answered_by"] == "laya-english" and answer["resolved_by"] == "local"
     assert answer["uncertain"] is False and typed.calls == [] and asked == [] and tokens == 10
-    assert steps(answer) == ["laya-english"] and answer["rounds"][0]["threshold"] == 0.75
+    assert "rounds" not in answer  # one model answered: no trace to read
     assert cases.path_of(answer) == "local"
 
 
@@ -146,7 +146,7 @@ def test_a_threshold_can_be_changed_and_a_request_can_replace_all_of_them(monkey
 
     lenient, _ = make(monkeypatch, Engine(prediction({"a": 0.9, "b": 0.05, "c": 0.05}, 0.6)), Engine())
     answer, _ = run(lenient, request_json(min_confidence=0.5))
-    assert answer["answered_by"] == "laya-english" and answer["rounds"][0]["threshold"] == 0.5
+    assert answer["answered_by"] == "laya-english" and answer["resolved_by"] == "local"  # 0.6 meets the request's 0.5
 
 
 # --- 3: drop the clearly worse options and ask the local models again ------------------------------------
