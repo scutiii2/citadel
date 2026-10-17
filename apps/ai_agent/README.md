@@ -249,6 +249,12 @@ experimental review gate, **not a calibrated accuracy claim**. Run
 a triage question set, then evaluate representative local inputs before
 relying on the answers.
 
+To exercise the whole triage setup (Laya, the fallback, narrowing, the `rounds` trace) without the
+orchestrator, run `python -m scripts.check_triage_cases`: 17 cases that call the Triage Assistant's own
+code, with `--list`, `--case NAME`, `--baseline` (Laya alone, for comparison), `--prune-ratio R` and
+`--json` (full answers with their traces). It uses your `config_tuning.json` and `.env` and sends the
+cases' texts to the fallback backend when that is on.
+
 Usage reports the model's actual input-token work and zero generated output
 tokens. Laya is restricted to a specialist with the pinned checkpoint and
 local gateway; generation settings, an entry role, or an orchestrator role are
