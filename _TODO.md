@@ -121,3 +121,16 @@ See `docs/superpowers/plans/2026-10-11-game-host.md` for deployment setup.
 - Open question: a specialist's prompt never fills the orchestrator's window, so this answers "what did each agent's prompt cost", not "how full is my context". Decide if that is worth a panel section before building.
 
 **Revisit when**: user wants to see where a delegated answer's tokens went.
+
+## Make chat Stop (cancel) near-instant (added 2026-10-18)
+
+**Context**: Stop in the Ember chat page is cooperative. `ember_web` `chat.stop()` calls `POST /chats/{id}/cancel`, `TurnRegistry.cancel` (`apps/Ember/ember_api/src/services/turns.py`) sets `cancel_requested`, publishes `cancelling`, and forwards `cancel` to ai_agent. There the flag in `apps/ai_agent/src/llm/cancellation.py` is checked only between provider rounds (`anthropic_provider.py`, `openai_provider.py`), so an LLM call or tool call already running finishes first. Approval and question waits already poll the flag.
+
+**Plan**, by payoff:
+1. **Abort the in-flight LLM call**: check the flag per streamed chunk and close the HTTP stream on cancel, then raise `ChatCancelled`. The partial text is already kept (`turns.py`). `bind_request` already carries a per-turn `threading.Event` into worker threads.
+2. **Abort running tool calls**: `dispatch_with_progress` stops waiting and raises `ChatCancelled`. Python cannot kill a thread, so the tool runs on as an orphan. Safe for read-only tools; decide per tool for ones with side effects. Check that the delegation loop (`delegation.py`) polls fast enough.
+3. **Instant UI in ember_api**: finish the turn at once on cancel (save the streamed text, publish `final` with `cancelled: true`, drop later agent events) while the agent cancel runs in the background. Risk: the next turn in that chat must not overlap the orphaned one.
+
+**Also check**: a failed gateway cancel is only logged (`turns.py` `cancel`), so the user sees "stopping ..." while the turn keeps running; and cancel arriving between `turn.asking = True` and the request being sent may be missed.
+
+**Revisit when**: user wants Stop to feel instant. Read the provider streaming code and `dispatch_with_progress` first, then propose the exact change for step 1.
