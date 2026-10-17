@@ -13,6 +13,7 @@ the keys in .env, and sends each case's text to the fallback backend when the se
 cents of tokens in all). Each row shows how a question was settled:
 
     laya       Laya was sure; nothing left the machine
+    deferred   Laya and the classifier differed a lot in confidence; the more confident one's answer stands
     fallback   the classifier answered alone (text too long for Laya, or Laya had no usable answer)
     blend      Laya and the classifier were averaged, nothing dropped
     narrowed   options far below the rest were dropped and the question asked again (then who decided)
@@ -147,6 +148,8 @@ def path_of(answer: dict[str, Any]) -> str:
     by = answer.get("answered_by")
     if by is None:
         return "laya"
+    if "deferred_to" in answer:
+        return f"deferred->{by}"
     if "eliminated" in answer:
         return f"narrowed->{by}"
     if "+" in by:

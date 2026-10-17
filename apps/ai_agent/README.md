@@ -215,7 +215,9 @@ With a `"classifier": {"triage_fallback": true}` section added to `configs/confi
 a key for a backend of the `triage` chain in `.env`, the remote classifier (`src/llm/decision.py`, see
 [Decision layer](#decision-layer-optional)) answers what Laya cannot:
 
-- each question Laya marks `uncertain` is asked again, and for a `choice` question Laya's answer is
+- each question Laya marks `uncertain` is asked again. For a `choice` question the two confidences are compared
+  first: if they differ by at least `classifier.triage_confidence_gap` (default 0.3), the more confident
+  model's answer stands as it is (`"deferred_to"` names it) and nothing is averaged. Otherwise Laya's answer is
   weighed with the classifier's instead of being thrown away: the two probability sets are averaged and
   options far below the rest (under `classifier.triage_prune_ratio`, default 0.25, of the leader's
   average; 0 turns it off; at least two always stay) are dropped. The question is then asked again over

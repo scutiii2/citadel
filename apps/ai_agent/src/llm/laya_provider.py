@@ -369,13 +369,25 @@ class LayaQuestions:
     def _narrow(
         self, request: Request, qid: str, laya: dict[str, Any], remote: dict[str, Any],
     ) -> tuple[dict[str, Any], int]:
-        """One choice question Laya and the fallback both answered: average their probabilities, drop
+        """One choice question Laya and the fallback both answered. If their confidences differ by at
+        least `triage_confidence_gap`, the more confident one's answer stands as it is. Otherwise: average their probabilities, drop
         the options far below the rest and ask again over what is left, Laya first and the fallback only
         if Laya is still unsure. With nothing to drop, the two answers are blended. Returns the answer and
         the extra tokens read; if Laya cannot take the narrowed question the fallback's answer stands."""
         spec = request.questions[qid]
+        settings = decision.settings()
+        laya_confidence, remote_confidence = laya["answer_confidence"], remote["answer_confidence"]
+        gap = abs(laya_confidence - remote_confidence)
+        if gap >= settings.triage_confidence_gap - 1e-9:
+            by = "laya" if laya_confidence > remote_confidence else remote["answered_by"]
+            winner = laya if laya_confidence > remote_confidence else remote
+            rounds = [
+                _round("laya", laya), _round(remote["answered_by"], remote),
+                {"step": "gap", "gap": round(gap, 4), "deferred_to": by},
+            ]
+            return {**winner, "answered_by": by, "deferred_to": by, "rounds": rounds}, 0
         average = _average(laya["probabilities"], remote["probabilities"])
-        ratio = decision.settings().triage_prune_ratio
+        ratio = settings.triage_prune_ratio
         kept = _kept_options(average, ratio) if ratio > 0 else list(average)
         if len(kept) == len(average):
             return _blend(request, laya, remote), 0

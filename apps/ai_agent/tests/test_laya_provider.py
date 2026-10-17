@@ -271,18 +271,18 @@ def test_jev_is_not_asked_unless_the_fallback_is_on(engine, monkeypatch):
 
 def test_an_uncertain_choice_is_weighed_with_jevs_and_a_sure_one_stays_with_laya(engine, monkeypatch):
     low = prediction()
-    low["answers"]["category"]["answer_confidence"] = 0.3
+    low["answers"]["category"]["answer_confidence"] = 0.5
     engine.result = low
-    asked = jev_on(monkeypatch, {"Which category?": decision.Choice("network", 90, 50, "jev")})
+    asked = jev_on(monkeypatch, {"Which category?": decision.Choice("network", 60, 50, "jev")})
 
     result = ask()
     answers = payload(result)["answers"]
 
     assert len(asked) == 1 and asked[0][1] == {"database": "SQL and storage", "network": "Connections"}
-    # Laya said database (0.9), Jev network (0.9 -> 0.1 elsewhere): a tie, so the more confident pick wins.
-    assert answers["category"]["choice"] == "network" and answers["category"]["answered_by"] == "laya+jev"
-    assert answers["category"]["probabilities"] == {"database": 0.5, "network": 0.5}
-    assert answers["category"]["answer_confidence"] == 0.3 and answers["category"]["uncertain"] is True
+    # Laya said database (0.9 / 0.1), Jev network (0.6 / 0.4): their confidences (0.5, 0.6) are close, so they are averaged.
+    assert answers["category"]["choice"] == "database" and answers["category"]["answered_by"] == "laya+jev"
+    assert answers["category"]["probabilities"] == {"database": 0.65, "network": 0.35}
+    assert answers["category"]["answer_confidence"] == 0.5 and answers["category"]["uncertain"] is True
     assert answers["category"]["disagreement"] == {"laya": "database", "jev": "network"}
     assert "answered_by" not in answers["severity"] and answers["severity"]["score"] == 1.4
     assert payload(result)["uncertain"] is True
@@ -390,7 +390,7 @@ def test_a_text_over_the_jev_limit_is_refused_before_anything_runs(engine, monke
 
 
 def test_a_backends_real_probabilities_are_averaged_with_layas(engine, monkeypatch):
-    engine.result = prediction(confidence=0.2)
+    engine.result = prediction(confidence=0.5)
     jev_on(monkeypatch, {
         "Which category?": decision.Choice("network", 70, 10, "jev", "", {"database": 0.3, "network": 0.7}),
         "How severe?": decision.Choice("1", 90, 10, "jev"),
@@ -400,11 +400,11 @@ def test_a_backends_real_probabilities_are_averaged_with_layas(engine, monkeypat
     category = payload(ask())["answers"]["category"]
 
     assert category["probabilities"] == {"database": 0.6, "network": 0.4} and category["choice"] == "database"
-    assert category["answer_confidence"] == 0.2 and category["uncertain"] is True
+    assert category["answer_confidence"] == 0.5 and category["uncertain"] is True
 
 
 def test_a_distribution_that_misses_an_option_is_replaced_by_the_even_split_before_averaging(engine, monkeypatch):
-    engine.result = prediction(confidence=0.2)
+    engine.result = prediction(confidence=0.6)
     jev_on(monkeypatch, {
         "Which category?": decision.Choice("network", 80, 10, "jev", "", {"network": 0.8}),
         "How severe?": decision.Choice("1", 90, 10, "jev"),
@@ -624,3 +624,73 @@ def test_the_trace_records_a_laya_that_could_not_take_the_narrowed_question(monk
 def test_an_answer_without_a_second_opinion_has_no_trace(engine):
     engine.result = prediction(confidence=0.2)
     assert "rounds" not in payload(ask())["answers"]["category"]
+
+
+# --- the confidence gap: a much more confident model decides alone -----------------------------
+
+def test_a_much_more_confident_fallback_decides_the_question_alone(engine, monkeypatch):
+    low = prediction()
+    low["answers"]["category"]["answer_confidence"] = 0.3
+    engine.result = low
+    jev_on(monkeypatch, {"Which category?": decision.Choice("network", 90, 50, "jev")})
+
+    category = payload(ask())["answers"]["category"]
+
+    assert category["choice"] == "network" and category["answered_by"] == "jev" and category["deferred_to"] == "jev"
+    assert category["answer_confidence"] == 0.9 and category["uncertain"] is False
+    assert category["probabilities"] == {"database": 0.1, "network": 0.9}  # its own, not averaged
+    assert [r["step"] for r in category["rounds"]] == ["laya", "jev", "gap"]
+    assert category["rounds"][2] == {"step": "gap", "gap": 0.6, "deferred_to": "jev"}
+    assert "eliminated" not in category and "disagreement" not in category
+
+
+def test_a_much_more_confident_laya_keeps_its_own_answer(engine, monkeypatch):
+    unsure = prediction()
+    unsure["answers"]["category"]["answer_confidence"] = 0.65
+    engine.result = unsure
+    jev_on(monkeypatch, {"Which category?": decision.Choice("network", 30, 50, "jev")})
+
+    category = payload(ask())["answers"]["category"]
+
+    assert category["choice"] == "database" and category["answered_by"] == "laya" and category["deferred_to"] == "laya"
+    assert category["uncertain"] is True  # 0.65 is still under the 0.7 gate
+
+
+@pytest.mark.parametrize("fallback_confidence, deferred", [(80, True), (79, False)])
+def test_the_gap_is_inclusive_at_the_setting(engine, monkeypatch, fallback_confidence, deferred):
+    low = prediction()
+    low["answers"]["category"]["answer_confidence"] = 0.5
+    engine.result = low
+    jev_on(monkeypatch, {"Which category?": decision.Choice("network", fallback_confidence, 5, "jev")})
+
+    category = payload(ask())["answers"]["category"]
+
+    assert ("deferred_to" in category) is deferred
+    assert category["answered_by"] == ("jev" if deferred else "laya+jev")
+
+
+def test_a_wider_gap_setting_keeps_averaging(engine, monkeypatch):
+    low = prediction()
+    low["answers"]["category"]["answer_confidence"] = 0.3
+    engine.result = low
+    jev_on(monkeypatch, {"Which category?": decision.Choice("network", 90, 50, "jev")})
+    config = decision.ClassifierSettings(triage_fallback=True, triage_confidence_gap=1.0)
+    monkeypatch.setattr(decision, "settings", lambda: config)
+
+    assert payload(ask())["answers"]["category"]["answered_by"] == "laya+jev"
+
+
+def test_the_small_talk_case_is_decided_by_the_certain_fallback_without_a_rerun(monkeypatch):
+    flat = {"database": 0.1921, "network": 0.1716, "authentication": 0.2052, "configuration": 0.1344, "unknown": 0.2966}
+    laya = ScriptedEngine(area_prediction(flat, 0.2966))
+    sure = {"database": 0.0, "network": 0.0, "authentication": 0.0, "configuration": 0.0, "unknown": 1.0}
+    asked = scripted(monkeypatch, laya, decision.Choice("unknown", 100, 5, "jev", "", sure))
+    request = {"text": "Hello, good morning!", "questions": {"area": {
+        "type": "choice", "instructions": "Which category?", "criteria": {name: name for name in flat},
+    }}}
+
+    answer = payload(ask(request))["answers"]["area"]
+
+    assert answer["choice"] == "unknown" and answer["answered_by"] == "jev" and answer["answer_confidence"] == 1.0
+    assert len(laya.calls) == 1 and len(asked) == 1  # no narrowed rerun for either model
+    assert answer["uncertain"] is False

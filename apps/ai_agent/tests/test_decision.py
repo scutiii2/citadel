@@ -73,6 +73,14 @@ def test_settings_read_the_section_over_the_defaults(monkeypatch):
     assert config.chain("auto_route") == ("jev", "jev_vercel")
 
 
+def test_the_confidence_gap_defaults_to_0_3_and_can_be_changed(monkeypatch):
+    use_section(monkeypatch, {})
+    assert decision.settings().triage_confidence_gap == 0.3
+    decision.reset_cache()
+    use_section(monkeypatch, {"triage_confidence_gap": 0.5})
+    assert decision.settings().triage_confidence_gap == 0.5
+
+
 def test_the_prune_ratio_defaults_to_a_quarter_and_can_be_changed_or_switched_off(monkeypatch):
     use_section(monkeypatch, {})
     assert decision.settings().triage_prune_ratio == 0.25
@@ -88,6 +96,7 @@ def test_the_prune_ratio_defaults_to_a_quarter_and_can_be_changed_or_switched_of
     {"chains": []}, {"chains": {"nothing": ["jev"]}}, {"chains": {"triage": []}}, {"chains": {"triage": ["gpt"]}},
     {"chains": {"triage": ["jev", "jev"]}}, {"chains": {"triage": "jev"}},
     {"triage_prune_ratio": 1}, {"triage_prune_ratio": -0.1}, {"triage_prune_ratio": True}, {"triage_prune_ratio": "x"},
+    {"triage_confidence_gap": 0}, {"triage_confidence_gap": 1.5}, {"triage_confidence_gap": True}, {"triage_confidence_gap": "x"},
 ])
 def test_a_bad_section_is_refused(monkeypatch, section):
     use_section(monkeypatch, section)
