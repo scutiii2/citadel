@@ -170,6 +170,25 @@ def _kept_options(average: dict[str, float], ratio: float) -> list[str]:
     return [name for name in average if name in kept]
 
 
+def _round(step: str, answer: dict[str, Any], options: list[str] | None = None) -> dict[str, Any]:
+    """One model call of a question's review, for the answer's `rounds` trace."""
+    out: dict[str, Any] = {
+        "step": step, "choice": answer["choice"],
+        "probabilities": {name: round(value, 4) for name, value in answer["probabilities"].items()},
+        "confidence": answer["answer_confidence"],
+    }
+    if options is not None:
+        out["options"] = options
+    return out
+
+
+def _average_round(average: dict[str, float], eliminated: list[str] | None = None) -> dict[str, Any]:
+    out: dict[str, Any] = {"step": "average", "probabilities": {name: round(value, 4) for name, value in average.items()}}
+    if eliminated:
+        out["eliminated"] = eliminated
+    return out
+
+
 def _blend(request: Request, laya: dict[str, Any], remote: dict[str, Any]) -> dict[str, Any]:
     """Laya's and the fallback's answers to one choice question as a single answer: the averaged
     distribution, the higher confidence when both pick the same option and the lower one when they do
@@ -187,6 +206,7 @@ def _blend(request: Request, laya: dict[str, Any], remote: dict[str, Any]) -> di
     }
     if not agree:
         out["disagreement"] = {"laya": laya["choice"], remote["answered_by"]: remote["choice"]}
+    out["rounds"] = [_round("laya", laya), _round(remote["answered_by"], remote), _average_round(average)]
     return out
 
 
@@ -360,6 +380,7 @@ class LayaQuestions:
         if len(kept) == len(average):
             return _blend(request, laya, remote), 0
         eliminated = [name for name in average if name not in kept]
+        rounds = [_round("laya", laya), _round(remote["answered_by"], remote), _average_round(average, eliminated)]
         narrowed = Request(
             request.text, {qid: {**spec, "criteria": {name: spec["criteria"][name] for name in kept}}}, request.min_confidence,
         )
@@ -367,13 +388,17 @@ class LayaQuestions:
             laya_answers, tokens = self._laya_answers(narrowed)
         except (ValueError, RuntimeError) as error:
             _log.warning("Laya could not take the narrowed question %r: %s", qid, error)
-            return remote, 0
+            rounds.append({"step": "laya", "options": kept, "failed": str(error)})
+            return {**remote, "rounds": rounds}, 0
         final = {**laya_answers[qid], "answered_by": "laya"}
+        rounds.append(_round("laya", final, kept))
         if final["uncertain"]:
             again, extra, _ = _ask_fallback(narrowed, [qid])
             tokens += extra
-            final = again.get(qid, final)
-        return _with_eliminated(spec, final, eliminated), tokens
+            if qid in again:
+                final = again[qid]
+                rounds.append(_round(final["answered_by"], final, kept))
+        return {**_with_eliminated(spec, final, eliminated), "rounds": rounds}, tokens
 
     def _laya_answers(self, request: Request) -> tuple[dict[str, dict[str, Any]], int]:
         with self._lock:

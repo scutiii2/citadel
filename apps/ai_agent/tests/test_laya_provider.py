@@ -571,3 +571,56 @@ def test_a_text_laya_could_not_read_is_not_narrowed_or_blended(monkeypatch):
 
     assert laya.calls == [] and asked == [["billing", "frontend", "network"]]
     assert answer["answered_by"] == "jev" and "eliminated" not in answer and "disagreement" not in answer
+
+
+# --- the rounds trace ------------------------------------------------------------------------------
+
+def test_a_narrowed_answer_lists_every_round_in_order(monkeypatch):
+    laya = ScriptedEngine(LAYA_FIRST, area_prediction({"billing": 0.45, "frontend": 0.55}, 0.4, tokens=60))
+    second = decision.Choice("billing", 36, 7, "jev", "", {"billing": 0.68, "frontend": 0.32})
+    scripted(monkeypatch, laya, JEV_FIRST, second)
+
+    rounds = area()["rounds"]
+
+    assert [r["step"] for r in rounds] == ["laya", "jev", "average", "laya", "jev"]
+    assert rounds[0] == {
+        "step": "laya", "choice": "frontend", "probabilities": {"billing": 0.24, "frontend": 0.66, "network": 0.1}, "confidence": 0.55,
+    }
+    assert rounds[1]["choice"] == "billing" and rounds[1]["confidence"] == 0.56
+    assert rounds[2] == {
+        "step": "average", "probabilities": {"billing": 0.475, "frontend": 0.46, "network": 0.065}, "eliminated": ["network"],
+    }
+    assert rounds[3]["options"] == ["billing", "frontend"] and rounds[3]["confidence"] == 0.4
+    assert rounds[4] == {
+        "step": "jev", "choice": "billing", "probabilities": {"billing": 0.68, "frontend": 0.32}, "confidence": 0.36,
+        "options": ["billing", "frontend"],
+    }
+
+
+def test_a_sure_narrowed_laya_ends_the_trace_there(monkeypatch):
+    laya = ScriptedEngine(LAYA_FIRST, area_prediction({"billing": 0.2, "frontend": 0.8}, 0.9, tokens=60))
+    scripted(monkeypatch, laya, JEV_FIRST)
+
+    assert [r["step"] for r in area()["rounds"]] == ["laya", "jev", "average", "laya"]
+
+
+def test_a_blended_answer_traces_both_answers_and_their_average(monkeypatch):
+    laya = ScriptedEngine(area_prediction({"billing": 0.3, "frontend": 0.4, "network": 0.3}, 0.5))
+    scripted(monkeypatch, laya, decision.Choice("frontend", 50, 5, "jev", "", {"billing": 0.3, "frontend": 0.4, "network": 0.3}))
+
+    rounds = area()["rounds"]
+
+    assert [r["step"] for r in rounds] == ["laya", "jev", "average"] and "eliminated" not in rounds[2]
+
+
+def test_the_trace_records_a_laya_that_could_not_take_the_narrowed_question(monkeypatch):
+    scripted(monkeypatch, ScriptedEngine(LAYA_FIRST, RuntimeError("gone")), JEV_FIRST)
+
+    answer = area()
+
+    assert answer["choice"] == "billing" and answer["rounds"][-1] == {"step": "laya", "options": ["billing", "frontend"], "failed": "gone"}
+
+
+def test_an_answer_without_a_second_opinion_has_no_trace(engine):
+    engine.result = prediction(confidence=0.2)
+    assert "rounds" not in payload(ask())["answers"]["category"]

@@ -224,6 +224,10 @@ a key for a backend of the `triage` chain in `.env`, the remote classifier (`src
   `jev`...). If nothing is far enough below, the two answers are blended instead
   (`"answered_by": "laya+jev"`): the higher confidence when both pick the same option, the lower one and
   an `"uncertain": true` plus a `"disagreement"` object (who picked what) when they differ.
+  Such an answer carries a `"rounds"` trace, one entry per model call in order (`laya`, the classifier,
+  `average` with what it dropped, then the narrowed `laya` and, if needed, classifier calls with their
+  `options`): each shows its pick, probabilities and confidence, and a Laya that could not take the
+  narrowed question is recorded as `failed`. It costs a few hundred characters of the answer.
   `score` and `noul` questions take the classifier's answer as it is;
 - a text Laya cannot read in full (over its 4000 characters, or reported truncated)
   goes to the classifier for every question. `classifier.max_input_chars` (default 16000) caps
