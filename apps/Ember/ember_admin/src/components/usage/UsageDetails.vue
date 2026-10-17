@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { MyUsage, UsageGroupBy, UsageRecordRow } from "../../api/UsageClient";
 import SegmentedControl from "../SegmentedControl.vue";
 import LineChart from "../analytics/LineChart.vue";
 import UsageHeatmap from "../UsageHeatmap.vue";
+import UsageCall from "./UsageCall.vue";
 import { formatUtc } from "../../utils/errors";
 import { parseServerTime, usagePercent as percent } from "../../utils/usageFormat";
 import { favoriteAgent, hourLabel, peakHour, utcDay } from "../../utils/usageStats";
@@ -16,6 +17,46 @@ const groupHeading = computed(() => GROUP_OPTIONS.find(o => o.value === props.us
 const groupTotal = computed(() => Math.max(1, props.usage.report.groups.reduce((sum, g) => sum + g.tokens, 0)));
 function tokens(n: number): string { return n.toLocaleString(); }
 function localTime(value: string): string { return new Date(parseServerTime(value)).toLocaleString(); }
+
+/** The calls of one response (they share a turn_id), newest response first. */
+interface Turn {
+  id: string;
+  /** The agent that took the question: the call nothing delegated, else the earliest. */
+  lead: string;
+  rows: UsageRecordRow[];
+  total: number;
+  /** When the response's first call began. */
+  at: string;
+}
+const startOf = (r: UsageRecordRow): string => r.started_at ?? r.created_at;
+const agentName = (r: UsageRecordRow): string => r.agent_id ?? r.agent ?? "unknown";
+const turns = computed<Turn[]>(() => {
+  const byTurn = new Map<string, UsageRecordRow[]>();
+  for (const r of props.records) {
+    const list = byTurn.get(r.turn_id);
+    if (list) list.push(r);
+    else byTurn.set(r.turn_id, [r]);
+  }
+  return [...byTurn].map(([id, rows]) => {
+    // The orchestrator first, then the specialists in the order they ran.
+    const ordered = [...rows].sort(
+      (a, b) => Number(a.delegated_by !== null) - Number(b.delegated_by !== null) || startOf(a).localeCompare(startOf(b)),
+    );
+    return {
+      id,
+      lead: agentName(ordered[0]!),
+      rows: ordered,
+      total: ordered.reduce((sum, r) => sum + r.total_tokens, 0),
+      at: ordered.map(startOf).sort()[0]!,
+    };
+  });
+});
+const openTurns = ref<Set<string>>(new Set());
+function toggleTurn(id: string): void {
+  const next = new Set(openTurns.value);
+  if (!next.delete(id)) next.add(id);
+  openTurns.value = next;
+}
 const peak = computed(() => peakHour(props.usage.report.hourly));
 const favorite = computed(() => favoriteAgent(props.usage.report.by_agent));
 const activitySeries = computed(() => {
@@ -114,23 +155,29 @@ const ACTIVITY_LINES = [{ id: "tokens", label: "Tokens", color: "var(--accent)" 
           <p v-if="recordsFailed" class="muted">Could not load recent calls.</p>
           <p v-else-if="records.length === 0" class="muted">None.</p>
           <ul v-else class="calls">
-            <li v-for="r in records" :key="r.id" class="call">
-              <div class="call-main">
-                <div>
-                  <span class="call-agent">{{ r.agent_id ?? r.agent ?? "unknown" }}</span>
-                  <span v-if="r.delegated_by" class="muted"> ← {{ r.delegated_by }}</span>
-                  <span v-if="r.provider_id" class="chip">{{ r.provider_id }}</span>
-                  <span v-if="r.gateway" class="chip">{{ r.gateway }}</span>
-                </div>
-                <div class="muted small">{{ localTime(r.started_at ?? r.created_at) }}<template v-if="r.model"> · {{ r.model }}</template></div>
-              </div>
-              <div class="call-tokens">
-                <strong>{{ tokens(r.total_tokens) }}</strong>
-                <span v-if="r.input_tokens !== null && r.output_tokens !== null" class="muted small">
-                  {{ tokens(r.input_tokens) }} in / {{ tokens(r.output_tokens) }} out
-                </span>
-              </div>
-            </li>
+            <template v-for="t in turns" :key="t.id">
+              <UsageCall v-if="t.rows.length === 1" :record="t.rows[0]!" />
+              <li v-else class="turn">
+                <button
+                  type="button"
+                  class="turn-head"
+                  :aria-expanded="openTurns.has(t.id)"
+                  :aria-label="`${t.lead} and ${t.rows.length - 1} more calls for one response`"
+                  @click="toggleTurn(t.id)"
+                >
+                  <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m6 3 5 5-5 5" /></svg>
+                  <span class="turn-main">
+                    <span class="call-agent">{{ t.lead }}</span>
+                    <span class="chip">{{ t.rows.length }} calls</span>
+                    <span class="muted small turn-time">{{ localTime(t.at) }}</span>
+                  </span>
+                  <strong class="turn-total">{{ tokens(t.total) }}</strong>
+                </button>
+                <ul v-if="openTurns.has(t.id)" class="turn-calls">
+                  <UsageCall v-for="r in t.rows" :key="r.id" :record="r" />
+                </ul>
+              </li>
+            </template>
           </ul>
         </div>
 
@@ -312,38 +359,66 @@ th {
   padding: 0;
   list-style: none;
 }
-.call {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 9px 0;
+/* A response with several calls: one header row, its calls indented under it. */
+.turn {
   border-top: 1px solid var(--border);
   font-size: 0.9em;
 }
-.call:first-child {
-  padding-top: 0;
+.turn:first-child {
   border-top: none;
 }
-.call-main {
+.turn-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 0;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+}
+.turn:first-child .turn-head {
+  padding-top: 0;
+}
+.chevron {
+  flex: none;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.15s ease;
+}
+.turn-head[aria-expanded='true'] .chevron {
+  transform: rotate(90deg);
+}
+.turn-main {
+  flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.call-agent {
+.turn-main .call-agent {
   font-weight: 500;
 }
-.call-main .small {
+.turn-time {
+  display: block;
   margin: 2px 0 0;
 }
-.call-tokens {
-  display: flex;
+.turn-total {
   flex: none;
-  flex-direction: column;
-  align-items: flex-end;
   font-variant-numeric: tabular-nums;
 }
-.call-tokens .small {
-  margin: 2px 0 0;
+.turn-calls {
+  margin: 0 0 6px 20px;
+  padding: 0 0 0 12px;
+  border-left: 2px solid var(--border);
+  list-style: none;
+}
+.turn-calls :deep(.call:first-child) {
+  padding-top: 4px;
 }
 .chip {
   margin-left: 6px;
