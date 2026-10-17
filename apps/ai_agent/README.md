@@ -227,7 +227,12 @@ An agent with `orchestrator: true` gets the `delegate_to_agent` tool;
 specialists never do. Each turn the orchestrator's roster is built from the
 registry: every registered agent that is not an orchestrator (and never the
 agent itself), as lines of `<id> - <label>: <focus>`. Because it is per turn,
-a specialist that starts or stops shows up without a restart. The
+a specialist that starts or stops shows up without a restart. A specialist with
+tools of its own (`tools.allow`, apart from the ticket tools) is left out when
+none of them is offered right now: its capability is switched off on mcp_server,
+or the asking user switched those tools off (`disabled_tools`). A specialist with
+no tools of its own always stays. If mcp_server's tool list cannot be read, or is
+empty, nobody is left out. The
 `agent_id` argument of `delegate_to_agent` is an enum of the roster ids. An
 orchestrator may still answer directly when no specialist fits.
 

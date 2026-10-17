@@ -9,6 +9,7 @@ import pytest
 
 from src.agents import agent_registry, agent_routing, agent_spec
 from src.agents.agent_spec import AgentSpec, LlmSpec
+from src.core import tool_filter
 
 AGENTS = [
     {"id": "orchestrator", "label": "Ember", "url": "u", "orchestrator": True, "focus": "coordination"},
@@ -89,3 +90,45 @@ def test_roster_leaves_out_specialists_whose_tools_are_switched_off(registry, mo
     assert [r.id for r in asyncio.run(agent_routing.roster_for())] == ["poet"]
     monkeypatch.setattr(agent_routing, "_live_tool_names", lambda: None)
     assert [r.id for r in asyncio.run(agent_routing.roster_for())] == ["calc", "poet"]
+
+
+def _roster_ids(monkeypatch, live, blocked=()):
+    """The roster ids for a turn where mcp_server offers `live` and the user switched off `blocked`."""
+    monkeypatch.setattr(agent_routing, "_live_tool_names", lambda: live)
+    monkeypatch.setattr(agent_routing, "specialists", lambda: [
+        agent_spec.RosterEntry("researcher", "Researcher", "", tool_allow=("tool_web_search", "tool_ticket_createTicket")),
+        agent_spec.RosterEntry("notes", "Notes", "", tool_allow=("tool_notes_*",)),
+        agent_spec.RosterEntry("poet", "Poet", ""),
+    ])
+    monkeypatch.setattr(agent_spec, "current", lambda: agent_spec.AgentSpec(
+        id="ember", label="E", port=1, llm=agent_spec.LlmSpec(provider="anthropic"), orchestrator=True))
+    token = tool_filter.bind(blocked)
+    try:
+        return [r.id for r in asyncio.run(agent_routing.roster_for())]
+    finally:
+        tool_filter.reset(token)
+
+
+LIVE = ["tool_web_search", "tool_notes_listNotes", "tool_mem_search"]
+
+
+def test_roster_is_unchanged_when_the_user_switched_nothing_off(monkeypatch):
+    assert _roster_ids(monkeypatch, LIVE) == ["researcher", "notes", "poet"]
+
+
+def test_a_specialist_whose_tool_the_user_switched_off_is_not_offered(monkeypatch):
+    assert _roster_ids(monkeypatch, LIVE, blocked=["tool_web_search"]) == ["notes", "poet"]
+
+
+def test_a_specialist_stays_while_one_of_its_tools_is_still_on(monkeypatch):
+    live = [*LIVE, "tool_notes_readNote"]
+    assert _roster_ids(monkeypatch, live, blocked=["tool_notes_listNotes"]) == ["researcher", "notes", "poet"]
+    assert _roster_ids(monkeypatch, live, blocked=["tool_notes_listNotes", "tool_notes_readNote"]) == ["researcher", "poet"]
+
+
+def test_blocking_every_tool_leaves_only_specialists_that_need_none(monkeypatch):
+    assert _roster_ids(monkeypatch, LIVE, blocked=["*"]) == ["poet"]
+
+
+def test_an_empty_catalog_offers_everyone_even_when_the_user_blocked_everything(monkeypatch):
+    assert _roster_ids(monkeypatch, [], blocked=["*"]) == ["researcher", "notes", "poet"]

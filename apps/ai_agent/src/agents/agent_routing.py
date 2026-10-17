@@ -2,8 +2,9 @@
 
 The roster is re-read from the registry every turn (specialists start and
 stop independently). A specialist whose tools mcp_server does not currently
-offer (its capability is switched off) is left out, so the orchestrator never
-promises work nobody can do.
+offer (its capability is switched off), or that the asking user switched off
+for their own chats, is left out, so the orchestrator never promises work
+nobody can do.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import anyio.to_thread
 
 from src.agents import agent_registry, agent_spec
 from src.agents.agent_spec import RosterEntry
+from src.core import tool_filter
 from src.llm import model_tiers, reasoning_effort
 
 
@@ -73,7 +75,12 @@ async def roster_for() -> list[RosterEntry]:
 
 def _usable_specialists() -> list[RosterEntry]:
     found = specialists()
-    names = _live_tool_names()
-    if names is None or not names:
+    live = _live_tool_names()
+    if not live:
+        # Unreadable or empty catalog: nothing can be judged, so nobody is left out.
         return found
+    # The user's own switches (core/tool_filter.py) count too: a specialist whose tools they
+    # turned off would only run empty-handed. Checked after the catalog test above, so
+    # blocking every tool hides specialists instead of offering all of them.
+    names = [name for name in live if not tool_filter.is_blocked(name)]
     return [entry for entry in found if is_usable(entry, names)]
