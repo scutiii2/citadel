@@ -262,6 +262,26 @@ Specialist activity streams to the orchestrator's caller as `agent_start`,
 events pass through stamped with its `agent_id`. A specialist's step ids can
 collide with the orchestrator's, so consumers key on `(agent_id, id)`.
 
+## Automatic model tier (optional)
+
+With `"classifier": {"auto_tier": {"enabled": true}}` in `configs/config_tuning.json` and
+`AI_GATEWAY_API_KEY` in `.env`, a top-level turn that asked for no tier gets one from how
+hard its question looks. The remote classifier (`src/llm/jev_classifier.py`) names the
+request `tiny`, `everyday`, `large` or `hardest`, and `src/llm/auto_tier.py` maps that to a
+tier (default `tiny` and `everyday` to `light`, `large` to `standard`, `hardest` to
+`heavy`; change it under `auto_tier.tiers`). `agent_config.run_chat` then resolves it
+like a delegated tier, so the agent's own `min_tier` / `max_tier` still cap it: an agent
+capped at `light` stays on `light`, and raising `max_tier` is what lets a hard question
+use a stronger model.
+
+It is skipped, and the default model runs, when the feature is off, there is no key, the
+classifier fails, its confidence is below `auto_tier.min_confidence` (default 60), the turn
+is a delegate's or already asked for a tier, the agent has no tiers, or the message is a
+short follow-up (under 20 characters after the chat's first message). A chosen tier shows
+as the turn's tier plus a `model_note` such as `auto tier: hardest (90%) -> heavy`. Only the
+user's question is sent, never tool results, but it does leave this machine and each call
+is billed by the gateway.
+
 ## Usage log
 
 Every completed `ask` appends one JSON line to

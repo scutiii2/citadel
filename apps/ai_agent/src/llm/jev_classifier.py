@@ -29,11 +29,32 @@ DEFAULT_MODEL = "typesafe-ai/jev"
 KEY_ENV = "AI_GATEWAY_API_KEY"
 
 _SECTION = "classifier"
-_KNOWN = {"url", "model", "timeout_seconds", "max_input_chars", "triage_fallback"}
+_KNOWN = {"url", "model", "timeout_seconds", "max_input_chars", "triage_fallback", "auto_tier"}
+_AUTO_TIER_KNOWN = {"enabled", "min_confidence", "tiers"}
+
+# How hard a request is, as the ClaudeRouters size classifier names it.
+SIZE_CRITERIA = {
+    "tiny": "a lookup, a rename, a one-line answer",
+    "everyday": "a normal email, post, or short document",
+    "large": "a multi-step build, research, a full report",
+    "hardest": "strategy, or anything where a wrong call is expensive",
+}
+DEFAULT_SIZE_TIERS = (("tiny", "light"), ("everyday", "light"), ("large", "standard"), ("hardest", "heavy"))
 
 
 class ClassifierError(Exception):
     """The classifier gave no usable answer; the message says why."""
+
+
+@dataclass(frozen=True)
+class AutoTierSettings:
+    """Choosing a turn's model tier from how hard the question looks (llm/auto_tier.py)."""
+
+    enabled: bool = False
+    # Jev's confidence (0-100) needed before its size is used; below it the default model runs.
+    min_confidence: int = 60
+    # request size -> model tier; the agent's own min_tier/max_tier still clamp the result.
+    tiers: tuple[tuple[str, str], ...] = DEFAULT_SIZE_TIERS
 
 
 @dataclass(frozen=True)
@@ -46,12 +67,17 @@ class ClassifierSettings:
     max_input_chars: int = 16_000
     # Re-ask Jev about the answers Laya is unsure of, and about texts Laya cannot read.
     triage_fallback: bool = False
+    auto_tier: AutoTierSettings = AutoTierSettings()
 
 
 @catalog
-@lru_cache(maxsize=1)
 def settings() -> ClassifierSettings:
     """The `classifier` section of config_tuning.json over the defaults above (all off)."""
+    return _load_settings()
+
+
+@lru_cache(maxsize=1)
+def _load_settings() -> ClassifierSettings:
     raw = read_section(TUNING_PATH, _SECTION, {})
     if not isinstance(raw, dict):
         raise ValueError(f"config_tuning.json {_SECTION} must be an object")
@@ -73,12 +99,38 @@ def settings() -> ClassifierSettings:
     return ClassifierSettings(
         url=raw.get("url", base.url).strip(), model=raw.get("model", base.model).strip(),
         timeout_seconds=float(timeout), max_input_chars=cap, triage_fallback=raw.get("triage_fallback", False),
+        auto_tier=_auto_tier_settings(raw.get("auto_tier", {})),
     )
+
+
+def _auto_tier_settings(raw: Any) -> AutoTierSettings:
+    from src.agents.agent_spec import TIERS  # imported here: agent_spec pulls in the llm package
+
+    where = f"config_tuning.json {_SECTION}.auto_tier"
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} must be an object")
+    unknown = set(raw) - _AUTO_TIER_KNOWN
+    if unknown:
+        raise ValueError(f"{where} has unknown field(s): {', '.join(sorted(unknown))}")
+    if not isinstance(raw.get("enabled", False), bool):
+        raise ValueError(f"{where}.enabled must be true or false")
+    confidence = raw.get("min_confidence", AutoTierSettings.min_confidence)
+    if isinstance(confidence, bool) or not isinstance(confidence, int) or not 0 <= confidence <= 100:
+        raise ValueError(f"{where}.min_confidence must be an integer from 0 to 100")
+    mapping = dict(DEFAULT_SIZE_TIERS)
+    given = raw.get("tiers", {})
+    if not isinstance(given, dict):
+        raise ValueError(f"{where}.tiers must be an object of size: tier")
+    for size, tier in given.items():
+        if size not in SIZE_CRITERIA or tier not in TIERS:
+            raise ValueError(f"{where}.tiers maps a size ({', '.join(SIZE_CRITERIA)}) to a tier ({', '.join(TIERS)})")
+        mapping[size] = tier
+    return AutoTierSettings(enabled=raw.get("enabled", False), min_confidence=confidence, tiers=tuple(mapping.items()))
 
 
 def reset_cache() -> None:
     """Forget the loaded settings (tests, and a config edit in a long-lived process)."""
-    settings.cache_clear()
+    _load_settings.cache_clear()
 
 
 def api_key() -> str:
@@ -168,3 +220,9 @@ def ask_choice(subject: str, criteria: Mapping[str, str], timeout: float | None 
     config = settings()
     body = _post(config.url, _payload(config.model, subject, criteria), key, timeout or config.timeout_seconds)
     return _parse(body, criteria)
+
+
+@catalog
+def classify_size(message: str, timeout: float | None = None) -> Choice:
+    """How hard `message` looks: one of SIZE_CRITERIA's names, with the classifier's confidence."""
+    return ask_choice(message, SIZE_CRITERIA, timeout)

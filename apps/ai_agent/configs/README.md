@@ -11,7 +11,9 @@ lives under `../.data/` instead (see the end of this file).
   (optional, not in the `.example` seed: add the section by hand; every feature is
   off without it): the remote Jev classifier
   (`src/llm/jev_classifier.py`) - `triage_fallback`, `url`, `model`,
-  `timeout_seconds`, `max_input_chars`. Needs `AI_GATEWAY_API_KEY` in `../.env`.
+  `timeout_seconds`, `max_input_chars`, and `auto_tier` (`enabled`,
+  `min_confidence`, `tiers`: the model tier chosen per request size). Needs
+  `AI_GATEWAY_API_KEY` in `../.env`.
 - **`config_servers.json`** - `servers`: the MCP servers this agent
   connects to as a client (currently just `main`, this repo's
   `mcp_server`). Loaded by `src/mcp_client/config.py`'s `load_servers_config` into

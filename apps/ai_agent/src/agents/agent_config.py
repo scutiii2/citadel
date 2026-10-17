@@ -6,6 +6,7 @@ real request.
 
 from __future__ import annotations
 
+import dataclasses
 import inspect
 import importlib
 import os
@@ -20,7 +21,7 @@ from src.agents import plan as plan_policy
 
 from src.core import approvals, internal_auth, questions, tool_filter
 from src.private_extensions import turn as private_turn
-from src.llm import llm_options, model_tiers
+from src.llm import auto_tier, llm_options, model_tiers
 from src.llm import reasoning_effort as effort_limits
 from src.core.seed import seed_from_example
 from src.core.chat_history import validate_history
@@ -163,12 +164,20 @@ async def run_chat(
         approval_mode, set(allowed_tools or ()), ask_prefixes=(private_turn.TOOL_PREFIX,) if private else (),
         read_only_check=_read_only_check() if allow_read_only and approval_mode == "ask" else None,
     )
+    # A top-level turn that asked for no tier may get one from how hard its question looks (llm/auto_tier.py).
+    auto_note = ""
+    if not model_tier and depth == 0 and auto_tier.enabled() and model_tiers.own_tiers():
+        chosen = await auto_tier.pick(question, bool(history))
+        if chosen:
+            model_tier, auto_note = chosen.tier, chosen.note
     resolution = (
         model_tiers.resolve(model_tier, model_tiers.own_tiers(), MODEL, agent_spec.current().id)
         if model_tier else model_tiers.clamp_default(
             MODEL, getattr(_PROVIDER_MODULE, "DEFAULT_MODEL", None), agent_spec.current().id
         )
     )
+    if auto_note:
+        resolution = dataclasses.replace(resolution, note="; ".join(n for n in (auto_note, resolution.note) if n))
     effort = effort_limits.resolve(reasoning_effort, agent_spec.current().llm.max_effort, agent_spec.current().id)
     cancellation.register(request_id)
     request_token = cancellation.bind_request(request_id)
