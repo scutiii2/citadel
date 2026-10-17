@@ -64,7 +64,9 @@ const navPrefs = useNavPrefsStore();
 // These pages live in the account menu, in two groups, outside the account's
 // pin/reorder/hide arrangement; an administrator's hide list still removes them.
 const MENU_GROUPS = [["/capabilities", "/agents", "/games"], ["/usage", "/settings"]];
-const MENU_PAGES = MENU_GROUPS.flat();
+// Chat sits in the header under the wordmark, not in the arrangement either.
+const HEADER_PAGE = "/";
+const MENU_PAGES = [...MENU_GROUPS.flat(), HEADER_PAGE];
 const openPages = computed(() =>
   canBrowse.value && pageVisibility.ready ? visiblePages((p) => auth.hasPermission(p), pageVisibility.hidden) : [],
 );
@@ -77,6 +79,7 @@ const pages = computed(() =>
     ? railPages(openPages.value.filter((p) => !MENU_PAGES.includes(p.to)), navPrefs.prefs)
     : { pinned: [], rest: [] },
 );
+const chatPage = computed(() => openPages.value.find((p) => p.to === HEADER_PAGE));
 const hasPages = computed(() => pages.value.pinned.length + pages.value.rest.length > 0);
 
 // Narrow screens show a fixed bar instead: Overview, Capabilities, Chat in the
@@ -173,6 +176,15 @@ async function logout(): Promise<void> {
         </svg>
       </RouterLink>
     </nav>
+
+    <nav v-if="chatPage" class="header" aria-label="Chat">
+      <RouterLink :to="chatPage.to" :data-label="chatPage.label" :aria-label="chatPage.label" :class="{ current: isOpenedFromHere(chatPage.to) }">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path v-for="d in chatPage.icon" :key="d" :d="d" />
+        </svg>
+      </RouterLink>
+    </nav>
+    <span v-if="chatPage && hasPages" class="divider" aria-hidden="true" />
 
     <nav v-if="hasPages" class="pages" aria-label="Pages">
       <template v-for="(group, i) in [pages.pinned, pages.rest]" :key="i">
@@ -401,6 +413,8 @@ svg {
     border-top: 1px solid var(--border);
   }
   .wordmark,
+  .header,
+  .divider,
   .pages,
   .alert,
   .bottom {

@@ -1,4 +1,4 @@
-import { flushPromises, mount } from "@vue/test-utils";
+﻿import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
@@ -40,6 +40,7 @@ async function setup(account: Account | null) {
     routes: [
       ...NAV_PAGES.map((p) => ({ path: p.to === "/tickets" ? "/tickets/:id?" : p.to, component: stub })),
       { path: "/capabilities/:name", name: "capability-page", component: stub },
+      { path: "/chat/:id", name: "chat-id", component: stub },
       { path: "/account", component: stub },
       { path: "/overview", component: stub },
       { path: "/config-issues", component: stub },
@@ -93,8 +94,8 @@ describe("NavRail", () => {
     const links = pageLinks(wrapper);
 
     // Capabilities, Agents, Games, Usage and Settings sit in the account menu.
-    expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Notes", "Memory", "Generator"]);
-    for (const link of links) {
+    expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Memory", "Generator"]);
+    for (const link of [...links, ...wrapper.findAll("nav.header a")]) {
       expect(link.text()).toBe("");
       expect(link.find("svg").exists()).toBe(true);
     }
@@ -103,10 +104,24 @@ describe("NavRail", () => {
   it("names each page for the hover tooltip", async () => {
     const { wrapper } = await setup(ACCOUNT);
 
-    const [chat] = pageLinks(wrapper);
+    const [notes] = pageLinks(wrapper);
 
-    expect(chat!.attributes("data-label")).toBe("Chat");
-    expect(chat!.attributes("href")).toBe("/");
+    expect(notes!.attributes("data-label")).toBe("Notes");
+    expect(notes!.attributes("href")).toBe("/notes");
+  });
+
+  it("puts Chat in the header under the wordmark, kept marked on a chat id", async () => {
+    const { wrapper, router } = await setup(ACCOUNT);
+    const chat = wrapper.get("nav.header a");
+
+    expect(chat.attributes("data-label")).toBe("Chat");
+    expect(chat.attributes("href")).toBe("/");
+    expect(wrapper.get(".wordmark").element.compareDocumentPosition(chat.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).not.toContain("Chat");
+
+    await router.push("/chat/abc");
+    await flushPromises();
+    expect(chat.classes()).toContain("current");
   });
 
   it("marks the page being viewed", async () => {
@@ -248,7 +263,7 @@ describe("NavRail", () => {
       arrangement({ order: ["/memory", "/notes"], pinned: ["/memory"], hidden: [] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Memory", "Notes", "Chat", "Generator"]);
+      expect(labels(wrapper)).toEqual(["Memory", "Notes", "Generator"]);
       expect(wrapper.findAll("nav .divider")).toHaveLength(1);
       expect(wrapper.find("nav.pages").element.children[1]!.classList.contains("divider")).toBe(true);
     });
@@ -257,7 +272,7 @@ describe("NavRail", () => {
       arrangement({ order: [], pinned: [], hidden: ["/memory", "/notes"] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Chat", "Generator"]);
+      expect(labels(wrapper)).toEqual(["Generator"]);
       expect(wrapper.find("nav .divider").exists()).toBe(false);
     });
 
@@ -278,7 +293,7 @@ describe("NavRail", () => {
       release({ order: [], pinned: [], hidden: [] });
       await flushPromises();
 
-      expect(pageLinks(wrapper)).toHaveLength(4);
+      expect(pageLinks(wrapper)).toHaveLength(3);
     });
   });
 
@@ -331,7 +346,7 @@ describe("pages hidden by the administrator", () => {
     vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/usage"] });
     const { wrapper } = await setup(ACCOUNT);
 
-    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Notes", "Memory", "Generator"]);
+    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Memory", "Generator"]);
     expect(await footerLabels(wrapper)).toEqual(["Capabilities", "Agents", "Games", "Settings", "Profile"]);
   });
 
@@ -339,7 +354,7 @@ describe("pages hidden by the administrator", () => {
     vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/", "/settings", "/games"] });
     const { wrapper } = await setup(ACCOUNT);
 
-    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toContain("Chat");
+    expect(wrapper.get("nav.header a").attributes("aria-label")).toBe("Chat");
     expect(await footerLabels(wrapper)).toContain("Settings");
   });
 
@@ -351,6 +366,6 @@ describe("pages hidden by the administrator", () => {
     expect(pageLinks(wrapper)).toHaveLength(0);
     release({ hidden: ["/games"] });
     await flushPromises();
-    expect(pageLinks(wrapper)).toHaveLength(4);
+    expect(pageLinks(wrapper)).toHaveLength(3);
   });
 });
