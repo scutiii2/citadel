@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { McpServerClient } from "../api/McpServerClient";
 import CopyButton from "../components/CopyButton.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
@@ -131,23 +131,18 @@ async function run(which: Tab = tab.value): Promise<void> {
   }
 }
 
-// The live tabs make a new value whenever an option changes.
-watch(
-  () => [options.password, options.passphrase, options.pin, tab.value] as const,
-  () => {
-    if (live.value && (tab.value !== "password" || characterTypes.value)) void run();
-  },
-  { deep: true },
-);
-watch(tab, () => {
+// Nothing is generated on its own: only the Generate button makes a value.
+watch(tab, (_now, before) => {
   revealed.value = false;
   error.value = "";
-  // Leaving the TOTP code tab stops its refresh; coming back runs it again.
-  if (tab.value !== "totp") clearTimer();
-  else if (options.totp.secret.trim() !== "" && results.totp) void run("totp");
+  // Leaving the TOTP code tab stops its refresh and drops the code, which would be stale
+  // on return; the Generate button makes a new one.
+  if (before === "totp") {
+    clearTimer();
+    delete results.totp;
+  }
 });
 
-onMounted(() => void run());
 onBeforeUnmount(() => {
   sequence++;
   clearTimer();
@@ -241,6 +236,7 @@ onBeforeUnmount(() => {
           <p v-if="result.detail" class="muted">{{ result.detail }}</p>
         </div>
         <p v-else-if="busy" class="muted" role="status">Generating…</p>
+        <p v-else class="muted hint">Nothing generated yet. Press {{ tab === "totp" ? "Generate code" : "Generate" }}.</p>
       </article>
 
       <p class="muted note">Nothing here is stored. A generated value travels through the chat like any tool result.</p>

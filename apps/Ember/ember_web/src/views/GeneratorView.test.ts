@@ -23,6 +23,11 @@ async function show() {
 const tabButton = (w: Awaited<ReturnType<typeof show>>, label: string) =>
   w.findAll("button").find((b) => b.text() === label)!;
 
+async function generate(w: Awaited<ReturnType<typeof show>>) {
+  await w.get("form").trigger("submit");
+  await flushPromises();
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.runTool.mockImplementation(async (name: string) => {
@@ -35,8 +40,21 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("GeneratorView", () => {
-  it("makes a password on open, hidden until Reveal is pressed, with its strength", async () => {
+  it("makes nothing on open or when a tab is opened, only a hint", async () => {
     const w = await show();
+
+    expect(mocks.runTool).not.toHaveBeenCalled();
+    expect(w.find("[data-testid=generated-value]").exists()).toBe(false);
+    expect(w.get(".hint").text()).toContain("Press Generate");
+
+    await tabButton(w, "PIN").trigger("click");
+    await flushPromises();
+    expect(mocks.runTool).not.toHaveBeenCalled();
+  });
+
+  it("makes a password when Generate is pressed, hidden until Reveal, with its strength", async () => {
+    const w = await show();
+    await generate(w);
 
     expect(mocks.runTool).toHaveBeenCalledWith("tool_gen_generatePassword", expect.objectContaining({ length: 20 }));
     expect(w.get("[data-testid=generated-value]").text()).toBe("•".repeat(10));
@@ -48,26 +66,26 @@ describe("GeneratorView", () => {
     expect(w.get("[data-testid=generated-value]").text()).not.toContain("Abc");
   });
 
-  it("keeps a revealed value revealed while an option changes, and hides it again on Regenerate", async () => {
+  it("hides a revealed value again when Regenerate is pressed", async () => {
     const w = await show();
+    await generate(w);
     await tabButton(w, "Reveal").trigger("click");
-
-    await w.get("input[type=checkbox]").setValue(false);
-    await flushPromises();
     expect(w.get("[data-testid=generated-value]").text()).toBe("Abc123!xyz");
 
-    await w.get("form").trigger("submit");
-    await flushPromises();
+    await generate(w);
     expect(w.get("[data-testid=generated-value]").text()).toBe("•".repeat(10));
   });
 
-  it("makes a new password when an option changes", async () => {
+  it("does not make a new value when an option changes, only when Generate is pressed", async () => {
     const w = await show();
+    await generate(w);
     mocks.runTool.mockClear();
 
     await w.get("input[type=checkbox]").setValue(false); // Uppercase
     await flushPromises();
+    expect(mocks.runTool).not.toHaveBeenCalled();
 
+    await generate(w);
     expect(mocks.runTool).toHaveBeenCalledWith("tool_gen_generatePassword", expect.objectContaining({ use_upper: false }));
   });
 
@@ -119,6 +137,7 @@ describe("GeneratorView", () => {
     mocks.runTool.mockResolvedValue({ text: "Secret is not valid base32.", isError: true });
 
     const w = await show();
+    await generate(w);
 
     expect(w.get("[role=alert]").text()).toBe("Secret is not valid base32.");
   });
