@@ -39,6 +39,24 @@ describe("ContextPanel", () => {
     expect(row(w, "free").text()).toContain("80.1%");
   });
 
+  it("gives every kind of part its own colour, in the bar and in its row", () => {
+    const parts = ["system_prompt", "agents", "builtin_tools", "mcp_tools", "messages"].map((id) => ({ id, label: id, tokens: 100 }));
+    const w = mountPanel({ parts });
+
+    const swatches = w.findAll("li:not([data-part=free]) .swatch").map((s) => s.attributes("style"));
+    expect(new Set(swatches).size).toBe(5);
+    expect(swatches[0]).toContain("--part-system_prompt");
+    expect(w.findAll(".bar i").map((i) => i.attributes("style"))).toEqual(
+      expect.arrayContaining([expect.stringContaining("--part-messages")]),
+    );
+  });
+
+  it("falls back to a neutral colour for a part it does not know", () => {
+    const w = mountPanel({ parts: [{ id: "something_new", label: "New", tokens: 100 }] });
+
+    expect(w.get("[data-part=something_new] .swatch").attributes("style")).toContain("var(--part-other)");
+  });
+
   it("draws one bar segment per part, not for the free space", () => {
     const w = mountPanel();
 

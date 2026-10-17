@@ -46,9 +46,10 @@ const rows = computed<Row[]>(() => {
 
 const usedPercent = computed(() => Math.min(100, Math.round(percentOf(props.tokens))));
 
-/** The first part is the strongest shade; each next one fades towards the track. */
-function shade(index: number): string {
-  return `color-mix(in srgb, var(--accent) ${Math.max(22, 100 - index * 17)}%, var(--code-bg))`;
+/** Each kind of part has its own colour, so a part keeps it whichever others are present.
+ * An id this page does not know gets the neutral one. */
+function partColor(id: string): string {
+  return `var(--part-${id}, var(--part-other))`;
 }
 
 function formatPercent(percent: number): string {
@@ -64,14 +65,14 @@ function formatPercent(percent: number): string {
     </p>
     <div class="bar" aria-hidden="true">
       <i
-        v-for="(row, index) in rows.filter((r) => !r.free)"
+        v-for="row in rows.filter((r) => !r.free)"
         :key="row.id"
-        :style="{ width: `${row.percent}%`, background: shade(index) }"
+        :style="{ width: `${row.percent}%`, background: partColor(row.id) }"
       />
     </div>
     <ul class="rows">
-      <li v-for="(row, index) in rows" :key="row.id" :data-part="row.id">
-        <i class="swatch" :class="{ free: row.free }" :style="row.free ? undefined : { background: shade(index) }" />
+      <li v-for="row in rows" :key="row.id" :data-part="row.id">
+        <i class="swatch" :class="{ free: row.free }" :style="row.free ? undefined : { background: partColor(row.id) }" />
         <span class="label">{{ row.label }}</span>
         <span class="tokens">{{ compactNumber(row.tokens) }}</span>
         <strong class="percent">{{ formatPercent(row.percent) }}</strong>
@@ -90,6 +91,12 @@ function formatPercent(percent: number): string {
 
 <style scoped>
 .context-panel {
+  --part-system_prompt: var(--accent);
+  --part-agents: light-dark(#7048e8, #9775fa);
+  --part-builtin_tools: light-dark(#2a78d6, #3987e5);
+  --part-mcp_tools: light-dark(#1baf7a, #20c38a);
+  --part-messages: light-dark(#d9a400, #f0b429);
+  --part-other: var(--muted);
   box-sizing: border-box;
   width: min(320px, calc(100vw - 32px));
   padding: 14px 16px;
