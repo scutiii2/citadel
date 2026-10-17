@@ -11,8 +11,8 @@ import { PROFILE_ICON, type NavPage } from "../router/pages";
 defineProps<{
   username: string;
   email: string;
-  /** Pages listed first, in order (Usage, Settings). */
-  pages: NavPage[];
+  /** Page rows listed first, in groups with a divider between them. */
+  groups: NavPage[][];
   /** Ember Admin's address, or null when the account may not open it. */
   adminUrl: string | null;
 }>();
@@ -75,6 +75,9 @@ function onPointerDown(event: Event): void {
   if (open.value && root.value && !root.value.contains(event.target as Node)) close();
 }
 
+/** A capability's own page keeps Capabilities marked. */
+const isCurrent = (to: string): boolean => to === "/capabilities" && route.name === "capability-page";
+
 function logout(): void {
   close();
   emit("logout");
@@ -103,10 +106,14 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onPointerDown)
     <div v-if="open" class="menu" role="menu" :aria-label="`${username} - account menu`">
       <div class="email" role="presentation">{{ email }}</div>
 
-      <RouterLink v-for="p in pages" :key="p.to" :to="p.to" class="row" role="menuitem">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path v-for="d in p.icon" :key="d" :d="d" /></svg>
-        <span>{{ p.label }}</span>
-      </RouterLink>
+      <template v-for="(group, i) in groups" :key="i">
+        <hr v-if="i > 0" role="separator" />
+        <RouterLink v-for="p in group" :key="p.to" :to="p.to" class="row" :class="{ current: isCurrent(p.to) }" role="menuitem">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path v-for="d in p.icon" :key="d" :d="d" /></svg>
+          <span>{{ p.label }}</span>
+        </RouterLink>
+      </template>
+      <hr v-if="groups.length" role="separator" />
       <RouterLink to="/account" class="row" role="menuitem">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path v-for="d in PROFILE_ICON" :key="d" :d="d" /></svg>
         <span>Profile</span>
@@ -207,7 +214,8 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onPointerDown)
   outline: none;
   background: var(--bg);
 }
-.row.router-link-exact-active {
+.row.router-link-exact-active,
+.row.current {
   box-shadow: inset 2px 0 0 var(--accent);
 }
 .value {

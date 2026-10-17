@@ -61,17 +61,20 @@ const adminUrl = emberAdminUrl();
 const canAdmin = computed(() => ADMIN_ACCESS_PERMISSIONS.some(auth.hasPermission));
 const canBrowse = computed(() => auth.account !== null && !auth.needsVerification);
 const navPrefs = useNavPrefsStore();
-// Usage and Settings sit in the footer, outside the account's pin/reorder/hide
-// arrangement; an administrator's hide list still removes Usage.
-const FOOTER_PAGES = ["/usage", "/settings"];
+// These pages live in the account menu, in two groups, outside the account's
+// pin/reorder/hide arrangement; an administrator's hide list still removes them.
+const MENU_GROUPS = [["/capabilities", "/agents", "/games"], ["/usage", "/settings"]];
+const MENU_PAGES = MENU_GROUPS.flat();
 const openPages = computed(() =>
   canBrowse.value && pageVisibility.ready ? visiblePages((p) => auth.hasPermission(p), pageVisibility.hidden) : [],
 );
-const footerPages = computed(() => FOOTER_PAGES.flatMap((to) => openPages.value.filter((p) => p.to === to)));
+const menuGroups = computed(() =>
+  MENU_GROUPS.map((group) => group.flatMap((to) => openPages.value.filter((p) => p.to === to))).filter((g) => g.length > 0),
+);
 // Nothing is drawn until the arrangement has loaded, so the icons don't jump.
 const pages = computed(() =>
   navPrefs.ready
-    ? railPages(openPages.value.filter((p) => !FOOTER_PAGES.includes(p.to)), navPrefs.prefs)
+    ? railPages(openPages.value.filter((p) => !MENU_PAGES.includes(p.to)), navPrefs.prefs)
     : { pinned: [], rest: [] },
 );
 const hasPages = computed(() => pages.value.pinned.length + pages.value.rest.length > 0);
@@ -212,7 +215,7 @@ async function logout(): Promise<void> {
         v-if="auth.account"
         :username="auth.account.username"
         :email="auth.account.email"
-        :pages="footerPages"
+        :groups="menuGroups"
         :admin-url="canAdmin ? adminUrl : null"
         @logout="logout"
       />

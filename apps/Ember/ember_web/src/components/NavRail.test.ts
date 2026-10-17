@@ -57,7 +57,7 @@ async function openMenu(wrapper: Wrapper): Promise<void> {
   if (!wrapper.find(".menu").exists()) await wrapper.get("button.account").trigger("click");
   await flushPromises();
 }
-/** The linked rows of the account menu (Usage, Settings, Profile), after opening it. */
+/** The linked rows of the account menu (its pages, then Profile), after opening it. */
 async function footerLabels(wrapper: Wrapper): Promise<string[]> {
   await openMenu(wrapper);
   return wrapper.findAll(".menu a.row:not(.admin-link)").map((l) => l.text());
@@ -92,8 +92,8 @@ describe("NavRail", () => {
 
     const links = pageLinks(wrapper);
 
-    // chat.use -> Chat, Agents; tools.view or chat.use -> Capabilities. Usage and Settings sit in the footer.
-    expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Capabilities", "Agents", "Notes", "Memory", "Generator"]);
+    // Capabilities, Agents, Games, Usage and Settings sit in the account menu.
+    expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Notes", "Memory", "Generator"]);
     for (const link of links) {
       expect(link.text()).toBe("");
       expect(link.find("svg").exists()).toBe(true);
@@ -111,22 +111,34 @@ describe("NavRail", () => {
 
   it("marks the page being viewed", async () => {
     const { wrapper, router } = await setup(ACCOUNT);
-    await router.push("/capabilities");
+    await router.push("/notes");
     await flushPromises();
 
     const current = pageLinks(wrapper).filter((l) => l.classes().includes("router-link-exact-active"));
 
-    expect(current.map((l) => l.attributes("aria-label"))).toEqual(["Capabilities"]);
+    expect(current.map((l) => l.attributes("aria-label"))).toEqual(["Notes"]);
   });
 
-  it("keeps Capabilities marked while one of its pages is open", async () => {
+  it("marks the page being viewed in the account menu", async () => {
+    const { wrapper, router } = await setup(ACCOUNT);
+    await router.push("/agents");
+    await flushPromises();
+    await openMenu(wrapper);
+
+    const current = wrapper.findAll(".menu a.row").filter((l) => l.classes().includes("router-link-exact-active"));
+
+    expect(current.map((l) => l.text())).toEqual(["Agents"]);
+  });
+
+  it("keeps Capabilities marked in the menu while one of its pages is open", async () => {
     const { wrapper, router } = await setup(ACCOUNT);
     await router.push("/capabilities/pdf");
     await flushPromises();
+    await openMenu(wrapper);
 
-    const current = pageLinks(wrapper).filter((l) => l.classes().includes("current"));
+    const current = wrapper.findAll(".menu a.row").filter((l) => l.classes().includes("current"));
 
-    expect(current.map((l) => l.attributes("aria-label"))).toEqual(["Capabilities"]);
+    expect(current.map((l) => l.text())).toEqual(["Capabilities"]);
   });
 
   it("shows no pages while the email still has to be verified", async () => {
@@ -233,27 +245,27 @@ describe("NavRail", () => {
     const labels = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) => pageLinks(wrapper).map((l) => l.attributes("aria-label"));
 
     it("puts pinned pages first, then a divider, then the rest", async () => {
-      arrangement({ order: ["/notes", "/agents"], pinned: ["/notes"], hidden: [] });
+      arrangement({ order: ["/memory", "/notes"], pinned: ["/memory"], hidden: [] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Notes", "Agents", "Chat", "Capabilities", "Memory", "Generator"]);
+      expect(labels(wrapper)).toEqual(["Memory", "Notes", "Chat", "Generator"]);
       expect(wrapper.findAll("nav .divider")).toHaveLength(1);
       expect(wrapper.find("nav.pages").element.children[1]!.classList.contains("divider")).toBe(true);
     });
 
     it("leaves hidden pages out", async () => {
-      arrangement({ order: [], pinned: [], hidden: ["/agents", "/notes"] });
+      arrangement({ order: [], pinned: [], hidden: ["/memory", "/notes"] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Chat", "Capabilities", "Memory", "Generator"]);
+      expect(labels(wrapper)).toEqual(["Chat", "Generator"]);
       expect(wrapper.find("nav .divider").exists()).toBe(false);
     });
 
-    it("keeps the footer pages out of the arrangement", async () => {
-      arrangement({ order: ["/usage", "/settings"], pinned: ["/usage"], hidden: ["/settings"] });
+    it("keeps the account menu pages out of the arrangement", async () => {
+      arrangement({ order: ["/usage", "/settings"], pinned: ["/usage"], hidden: ["/settings", "/agents"] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(await footerLabels(wrapper)).toEqual(["Usage", "Settings", "Profile"]);
+      expect(await footerLabels(wrapper)).toEqual(["Capabilities", "Agents", "Usage", "Settings", "Profile"]);
       expect(labels(wrapper)).not.toContain("Usage");
     });
 
@@ -266,7 +278,7 @@ describe("NavRail", () => {
       release({ order: [], pinned: [], hidden: [] });
       await flushPromises();
 
-      expect(pageLinks(wrapper)).toHaveLength(6);
+      expect(pageLinks(wrapper)).toHaveLength(4);
     });
   });
 
@@ -319,8 +331,8 @@ describe("pages hidden by the administrator", () => {
     vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/usage"] });
     const { wrapper } = await setup(ACCOUNT);
 
-    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Capabilities", "Agents", "Games", "Notes", "Memory", "Generator"]);
-    expect(await footerLabels(wrapper)).toEqual(["Settings", "Profile"]);
+    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Notes", "Memory", "Generator"]);
+    expect(await footerLabels(wrapper)).toEqual(["Capabilities", "Agents", "Games", "Settings", "Profile"]);
   });
 
   it("never removes Chat or Settings, even if the list names them", async () => {
@@ -339,6 +351,6 @@ describe("pages hidden by the administrator", () => {
     expect(pageLinks(wrapper)).toHaveLength(0);
     release({ hidden: ["/games"] });
     await flushPromises();
-    expect(pageLinks(wrapper)).toHaveLength(6);
+    expect(pageLinks(wrapper)).toHaveLength(4);
   });
 });
