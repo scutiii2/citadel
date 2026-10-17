@@ -119,6 +119,7 @@ const APP_PAGES: Record<string, { to: string; permission: string }> = {
   notes: { to: "/notes", permission: "chat.use" },
   memory: { to: "/memory", permission: "chat.use" },
   gen: { to: "/generator", permission: "tools.execute" },
+  ticket: { to: "/tickets", permission: "tickets.create" },
 };
 
 /** Where a capability's Open button leads: its own page, while it is on. */

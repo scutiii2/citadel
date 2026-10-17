@@ -159,21 +159,25 @@ describe("CapabilitiesView", () => {
     expect(links[0].attributes("href")).toBe("/capabilities/pdf");
   });
 
-  it("links notes, memory and the generator to their dedicated pages, for accounts allowed to use them", async () => {
+  it("links notes, memory, the generator and tickets to their dedicated pages, for accounts allowed to use them", async () => {
     const caps: CapabilityInfo[] = [
       { name: "notes", enabled: true, label: "Notes", tools: [], resources: [] },
       { name: "memory", enabled: true, label: "Memory", tools: [], resources: [] },
       { name: "gen", enabled: true, label: "Generator", tools: [], resources: [] },
+      { name: "ticket", enabled: true, label: "Tickets", tools: [], resources: [] },
     ];
     mocks.capabilities.mockResolvedValue(caps);
     mocks.listTools.mockResolvedValue([]);
     mocks.listResources.mockResolvedValue([]);
-    const withAccess = await show({ permissions: ["tools.view", "chat.use", "tools.execute"], added: { capabilities: ["notes", "memory", "gen"] } });
+    const withAccess = await show({
+      permissions: ["tools.view", "chat.use", "tools.execute", "tickets.create"],
+      added: { capabilities: ["notes", "memory", "gen", "ticket"] },
+    });
 
     const hrefs = withAccess.findAll("a").filter((a) => a.text() === "Open page").map((a) => a.attributes("href"));
-    expect(hrefs).toEqual(["/notes", "/memory", "/generator"]);
+    expect(hrefs).toEqual(["/notes", "/memory", "/generator", "/tickets"]);
 
-    const without = await show({ permissions: ["tools.view"], added: { capabilities: ["notes", "memory", "gen"] } });
+    const without = await show({ permissions: ["tools.view"], added: { capabilities: ["notes", "memory", "gen", "ticket"] } });
     expect(without.findAll("a").filter((a) => a.text() === "Open page")).toHaveLength(0);
   });
 
