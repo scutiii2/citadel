@@ -150,6 +150,8 @@ class ChatResult:
     # Sums across every round of the turn, like total_tokens.
     input_tokens: int | None = None
     output_tokens: int | None = None
+    # The part of input_tokens the provider served from its prompt cache.
+    cached_input_tokens: int = 0
     # Usage of every agent this turn delegated to; own usage is not repeated here.
     delegated_usage: list[dict[str, Any]] = field(default_factory=list)
     # The strength tier this turn ran on when the caller asked for one, and a

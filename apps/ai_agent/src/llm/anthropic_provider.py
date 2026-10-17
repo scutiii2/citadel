@@ -59,6 +59,8 @@ from src.mcp_client.mcp_upstream import call_tool, list_tools, tool_description
 
 PROVIDER_NAME = "anthropic"
 
+_CACHE_CONTROL = {"type": "ephemeral"}
+
 # Read by Task 4's agent_config.py to decide whether this provider's
 # run_chat() can be driven with a live on_event callback (streamed tokens +
 # step_start/step_end around tool calls) or only awaited for a final
@@ -272,6 +274,43 @@ def _tool_schemas(
     return schemas
 
 
+def _prompt_cache_enabled() -> bool:
+    """True when this gateway's block in gateways/anthropic/ sets "prompt_cache".
+    Opt-in: a gateway that routes to non-Claude models may reject cache_control."""
+    try:
+        return bool(llm_config.gateway(PROVIDER_NAME, _Anthropic._gateway_name()).get("prompt_cache"))
+    except KeyError:
+        return False
+
+
+def _cached_request(system_prompt: str, schemas: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """`system` and `tools` with cache breakpoints on the system block and the
+    last tool. Requests render tools, then system, then messages, so the tool
+    breakpoint survives a system prompt change (caveman, roster) and the system
+    breakpoint covers both."""
+    system = [{"type": "text", "text": system_prompt, "cache_control": _CACHE_CONTROL}]
+    tools = list(schemas)
+    if tools:
+        tools[-1] = {**tools[-1], "cache_control": _CACHE_CONTROL}
+    return system, tools
+
+
+def _usage_count(usage: Any, name: str) -> int:
+    """One usage counter; a gateway may omit it or send null."""
+    value = getattr(usage, name, 0)
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+def _prompt_tokens(usage: Any) -> int:
+    """The whole prompt of a round. Anthropic's input_tokens leaves out what the
+    cache wrote or served, so those are added back."""
+    return (
+        _usage_count(usage, "input_tokens")
+        + _usage_count(usage, "cache_creation_input_tokens")
+        + _usage_count(usage, "cache_read_input_tokens")
+    )
+
+
 async def run_chat(
     question: str,
     history: list[dict[str, Any]],
@@ -296,6 +335,7 @@ async def run_chat(
     # pop it into this name->label lookup here, once, rather than sending it
     # to the API or re-deriving it per tool_use block below.
     labels = {s["name"]: s.pop("display_label") for s in schemas}
+    system, tools = _cached_request(system_prompt, schemas) if _prompt_cache_enabled() else (system_prompt, schemas)
     # Every round of this loop is a real, separately-billed API call, so a
     # multi-tool-call answer's total is the sum across all rounds, not just
     # the final one. Anthropic's usage object has input_tokens/output_tokens
@@ -305,6 +345,7 @@ async def run_chat(
     total_tokens = 0
     input_tokens = 0
     output_tokens = 0
+    cached_input_tokens = 0
     meter = LiveUsage(on_event)
     options = llm_options.for_provider(PROVIDER_ID)
     guard = options.turn_guard()
@@ -333,9 +374,9 @@ async def run_chat(
                         async with client.messages.stream(
                             model=model_name,
                             max_tokens=options.max_tokens(token_limits.max_output_tokens(PROVIDER_ID)),
-                            system=system_prompt,
+                            system=system,
                             messages=messages,
-                            tools=schemas,
+                            tools=tools,
                             **options.extra_kwargs(model_name),
                         ) as stream:
                             async for chunk in stream.text_stream:
@@ -350,11 +391,13 @@ async def run_chat(
                         # streams; drop it and retry this round once without it.
                         if text_parts or not options.drop_rejected(str(error), model_name):
                             raise
-                total_tokens += response.usage.input_tokens + response.usage.output_tokens
-                input_tokens += response.usage.input_tokens
+                prompt_tokens = _prompt_tokens(response.usage)
+                total_tokens += prompt_tokens + response.usage.output_tokens
+                input_tokens += prompt_tokens
                 output_tokens += response.usage.output_tokens
-                await meter.round_done(response.usage.input_tokens + response.usage.output_tokens)
-                context_tokens = response.usage.input_tokens
+                cached_input_tokens += _usage_count(response.usage, "cache_read_input_tokens")
+                await meter.round_done(prompt_tokens + response.usage.output_tokens)
+                context_tokens = prompt_tokens
                 guard.check_tokens(total_tokens)
 
                 if response.stop_reason != "tool_use":
@@ -368,6 +411,7 @@ async def run_chat(
                         context_tokens=context_tokens,
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
+                        cached_input_tokens=cached_input_tokens,
                     )
 
                 if text_parts and on_event:
@@ -435,6 +479,7 @@ async def run_chat(
         context_tokens=context_tokens,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
+        cached_input_tokens=cached_input_tokens,
     )
 
 

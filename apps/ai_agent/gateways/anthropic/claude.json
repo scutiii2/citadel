@@ -1,5 +1,6 @@
 {
   "label": "Claude",
+  "prompt_cache": true,
   "api_key": "{CLAUDE_API_KEY}",
   "model": "claude-sonnet-5",
   "models": {

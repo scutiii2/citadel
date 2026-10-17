@@ -23,7 +23,9 @@ wrapper keys. For example, `anthropic/claude.json`:
 
 Use `{ENV_VAR_NAME}` placeholders for credentials; the actual values belong
 in `../.env`. Files can also specify gateway-specific fields such as
-`base_url`, `auth_token`, `azure_endpoint`, or `aws_region`. Optional `models`
+`base_url`, `auth_token`, `azure_endpoint`, or `aws_region`. An `anthropic`
+gateway that serves Claude models can set `"prompt_cache": true` to cache its system prompt
+and tool list between calls (leave it off for gateways that route to other models). Optional `models`
 defines the `light`, `standard`, `heavy`, and `extreme` tiers. Agent files keep their
 existing `llm.provider` and `llm.gateway` values.
 

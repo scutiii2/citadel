@@ -58,6 +58,8 @@ def own_row(
         "finished_at": finished_at,
         "delegated_by": delegated_by,
     }
+    if result.cached_input_tokens:
+        row["cached_input_tokens"] = result.cached_input_tokens
     if model_tier:
         row["model_tier"] = model_tier
     if reasoning_effort:
