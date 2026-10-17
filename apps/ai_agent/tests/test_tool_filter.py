@@ -145,3 +145,26 @@ def test_wildcard_refuses_a_delegate_without_block_all_support():
     finally:
         tool_filter.reset(token)
     assert seen == ["status"]
+
+
+def test_call_tool_reaches_a_built_in_tool_the_model_named_without_the_prefix():
+    tools = [_tool("tool_web_search")]
+    with patch.object(mcp_upstream.client, "list_tools", return_value=tools), \
+            patch.object(mcp_upstream.client, "call_tool", return_value=SimpleNamespace(content=[SimpleNamespace(text="ok")])) as call:
+        assert mcp_upstream.call_tool("tool_web_search", {"query": "x"}) == "ok"
+        assert call.call_args.args[0] == "main__tool_web_search"
+        # A name nothing lists is passed on as it was, so the registry reports it.
+        mcp_upstream.call_tool("tool_missing", {})
+        assert call.call_args.args[0] == "tool_missing"
+
+
+def test_a_bare_tool_name_is_still_checked_against_the_users_switched_off_tools():
+    token = tool_filter.bind(["tool_web_search"])
+    try:
+        with patch.object(mcp_upstream.client, "list_tools", return_value=[_tool("tool_web_search")]), \
+                patch.object(mcp_upstream.client, "call_tool") as call:
+            with pytest.raises(PermissionError, match="switched off"):
+                mcp_upstream.call_tool("tool_web_search", {})
+            call.assert_not_called()
+    finally:
+        tool_filter.reset(token)

@@ -141,7 +141,17 @@ def is_read_only_builtin(name: str) -> bool:
     return name in _read_only_builtins
 
 
+def _qualified(name: str) -> str:
+    """`name` as the registry lists it. A model that drops the "main__" prefix (tool descriptions and
+    instructions name tools bare) still reaches the built-in tool it meant; anything else is unchanged."""
+    if name.startswith((_PREFIX, private_turn.TOOL_PREFIX)):
+        return name
+    qualified = _PREFIX + name
+    return qualified if any(tool.name == qualified for tool in client.list_tools()) else name
+
+
 def call_tool(name: str, arguments: dict[str, Any]) -> str:
+    name = _qualified(name)
     if tool_filter.is_blocked(unprefixed(name) if name.startswith(_PREFIX) else name):
         raise PermissionError(f"tool {name!r} is switched off for this user")
     if name.startswith(private_turn.TOOL_PREFIX):
