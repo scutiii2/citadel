@@ -408,6 +408,20 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
       return route.fulfill({ status: 204, body: "" });
     }
 
+    // Typed questions to the Triage Assistant. The fake writes a title from each description's first word
+    // and answers the first option (or yes) every time.
+    if (path === "/api/triage/titles" && method === "POST") {
+      const { descriptions } = request.postDataJSON() as { descriptions: string[] };
+      const titles = descriptions.map((d, i) => d.toLowerCase().match(/[a-z0-9]+/)?.[0] ?? `option${i + 1}`);
+      return json(route, { titles: titles.map((t, i) => (titles.indexOf(t) === i ? t : `${t}${i + 1}`)) });
+    }
+    if (path === "/api/triage/ask" && method === "POST") {
+      const { kind, options } = request.postDataJSON() as { kind: "choice" | "yes_no"; options: { title: string }[] };
+      if (kind === "yes_no") return json(route, { kind, answer: "yes", yes: 0.9, confidence: 0.9, uncertain: false });
+      const probabilities = Object.fromEntries(options.map((o, i) => [o.title, i === 0 ? 0.8 : 0.2 / (options.length - 1)]));
+      return json(route, { kind, choice: options[0]!.title, probabilities, confidence: 0.8, uncertain: false });
+    }
+
     // Laya's tag suggestions. The fake "reads" the note: it suggests the account's tags that the text mentions.
     if (path === "/api/notes/suggest-tags" && method === "POST") {
       const { title, body, tags } = request.postDataJSON() as NoteBody;

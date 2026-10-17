@@ -69,8 +69,14 @@ export function formatClock(ms: number): string {
  * time and tools. Empty when the message carries none of them (old chats,
  * errors). `agentLabel` is the agent's name for display; without it the saved
  * agent id is shown. A slash command's reply was no model's answer: it says so,
- * with how long the call took. */
+ * with how long the call took. A triage answer came from the local Triage Assistant,
+ * asked directly. */
 export function usageSummary(m: ChatMessage, agentLabel?: string): string {
+  if (m.kind === "triage" && m.role === "assistant") {
+    return ["Triage Assistant", "local model", m.duration_s !== undefined ? formatDuration(m.duration_s) : ""]
+      .filter(Boolean)
+      .join(" · ");
+  }
   if (m.kind === "command" && m.role === "assistant") {
     return ["No AI used", "direct tool call", m.duration_s !== undefined ? formatDuration(m.duration_s) : ""]
       .filter(Boolean)

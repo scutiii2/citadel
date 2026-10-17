@@ -13,6 +13,7 @@ import FolderDialogs from "../components/FolderDialogs.vue";
 import MessageList from "../components/MessageList.vue";
 import ShareDialog from "../components/ShareDialog.vue";
 import TemplatesModal from "../components/TemplatesModal.vue";
+import TriageQuestionModal from "../components/TriageQuestionModal.vue";
 import TurnNotices from "../components/TurnNotices.vue";
 import { useEntryAgentStore } from "../stores/entryAgent";
 import { useAuthStore } from "../stores/auth";
@@ -147,6 +148,7 @@ function saveAsPrompt(text: string): void {
 const formCommand = ref<CommandInfo | null>(null);
 const formSchema = ref<JsonSchema | null>(null);
 const input = ref<InstanceType<typeof ChatInput> | null>(null);
+const triageOpen = ref(false);
 
 async function openCommandForm(command: CommandInfo): Promise<void> {
   const schema = await chat.commandSchema(command);
@@ -456,6 +458,7 @@ useChatShortcuts({
           @send="onSend"
           @stop="chat.stop"
           @form="openCommandForm"
+          @triage="triageOpen = true"
           @suggestion-used="chat.clearSuggestion"
         >
           <template #tools>
@@ -486,6 +489,7 @@ useChatShortcuts({
           </template>
         </ChatInput>
         <CommandFormModal :command="formCommand" :schema="formSchema" @submit="runCommandForm" @close="closeCommandForm" />
+        <TriageQuestionModal :open="triageOpen" :submit="chat.askTriage" @close="triageOpen = false" />
         <TemplatesModal :open="templatesOpen" :draft="templatesDraft" @close="templatesOpen = false" />
         <ShareDialog :open="shareOpen" :chat-id="activeId" @close="shareOpen = false" />
         <ConfirmModal

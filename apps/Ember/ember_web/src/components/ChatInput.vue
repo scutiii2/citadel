@@ -46,6 +46,7 @@ const props = withDefaults(
 // templatesNeeded: the picker or a "#" wants the saved prompts.
 // manageTemplates: open the templates dialog; `draft` is the typed text to
 // save as a new prompt ("" for none).
+// triage: open the form for a typed question to the Triage Assistant.
 const emit = defineEmits<{
   send: [question: string];
   stop: [];
@@ -53,6 +54,7 @@ const emit = defineEmits<{
   templatesNeeded: [];
   manageTemplates: [draft: string];
   suggestionUsed: [];
+  triage: [];
 }>();
 
 const draft = ref("");
@@ -558,6 +560,18 @@ function onKeydown(event: KeyboardEvent): void {
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <path
               d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+        <button type="button" class="attach" title="Ask a multiple choice or yes or no question" aria-label="Ask a multiple choice or yes or no question" @click="emit('triage')">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path
+              d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1.9-1.1 1.8M12 17h.01"
               fill="none"
               stroke="currentColor"
               stroke-width="1.8"

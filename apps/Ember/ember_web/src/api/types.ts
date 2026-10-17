@@ -31,8 +31,9 @@ export interface ChatMessage {
   content: string;
   /** summary: what the agent remembers of earlier messages; log_attachment:
    * the raw messages a summary or clear replaced (never sent to the agent);
-   * command: a slash command and its result. */
-  kind?: "summary" | "log_attachment" | "command";
+   * command: a slash command and its result; triage: a typed question put to the
+   * Triage Assistant from the chat page, and its answer. */
+  kind?: "summary" | "log_attachment" | "command" | "triage";
   /** When it was written: ISO 8601 UTC (messages saved before this existed lack it). */
   at?: string;
   /** Id of the ember agent that wrote this answer (answers from before this was saved lack it). */

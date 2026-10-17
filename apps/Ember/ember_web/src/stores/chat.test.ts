@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chatsClient, type ChatSearchHit, type ChatSummary } from "../api/ChatsClient";
 import { ApiError } from "../api/http";
+import { triageClient, type TriageForm } from "../api/TriageClient";
 import type { ChatMessage } from "../api/types";
 import { withAttachments } from "../utils/attachments";
 import { useAuthStore } from "./auth";
@@ -26,6 +27,10 @@ vi.mock("../api/ChatsClient", () => ({
     append: vi.fn(),
     branch: vi.fn(),
   },
+}));
+vi.mock("../api/TriageClient", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/TriageClient")>()),
+  triageClient: { titles: vi.fn(), ask: vi.fn() },
 }));
 // The live answer stream is not under test: a watch that ends at once.
 vi.mock("../services/turnStream", () => ({ watchTurn: vi.fn(() => Promise.resolve("aborted")) }));
@@ -748,5 +753,50 @@ describe("send without an agent", () => {
     const body = client.startTurn.mock.calls[0]![1];
     expect(body).not.toHaveProperty("agent_id");
     expect(chat.active?.agentId).toBe("main");
+  });
+});
+
+describe("askTriage (a typed question to the Triage Assistant)", () => {
+  const FORM: TriageForm = { kind: "yes_no", text: "It is down", question: "Is there a problem?", options: [] };
+
+  it("adds the question and its answer to the open chat and saves them, without a turn", async () => {
+    const chat = await openChat(FOUR);
+    vi.mocked(triageClient.ask).mockResolvedValue({ kind: "yes_no", answer: "yes", yes: 0.9, confidence: 0.9, uncertain: false });
+    client.append.mockResolvedValue(undefined as never);
+
+    await chat.askTriage(FORM);
+
+    expect(triageClient.ask).toHaveBeenCalledWith(FORM);
+    expect(client.startTurn).not.toHaveBeenCalled();
+    const [asked, answered] = chat.messages.slice(-2);
+    expect(asked).toMatchObject({ role: "user", kind: "triage" });
+    expect(asked!.content).toContain("Triage question: Is there a problem?");
+    expect(answered).toMatchObject({ role: "assistant", kind: "triage" });
+    expect(answered!.content).toContain("**Yes**, 90% sure.");
+    expect(chat.working).toBe("");
+    await flushPromises();
+    expect(client.append).toHaveBeenCalledWith("c1", expect.any(String), [asked, answered]);
+  });
+
+  it("starts a new chat titled after the question when none is open", async () => {
+    const chat = await storeWith({});
+    vi.mocked(triageClient.ask).mockResolvedValue({ kind: "yes_no", answer: "no", yes: 0.1, confidence: 0.9, uncertain: false });
+    client.append.mockResolvedValue(undefined as never);
+
+    await chat.askTriage(FORM);
+
+    expect(chat.active?.title).toBe("Is there a problem?");
+    expect(chat.messages).toHaveLength(2);
+  });
+
+  it("adds nothing and passes the error on when the question fails", async () => {
+    const chat = await openChat(FOUR);
+    vi.mocked(triageClient.ask).mockRejectedValue(new ApiError(503, "The Triage Assistant is unavailable: not running"));
+
+    await expect(chat.askTriage(FORM)).rejects.toThrow("not running");
+
+    expect(chat.messages).toHaveLength(4);
+    expect(chat.working).toBe("");
+    expect(client.append).not.toHaveBeenCalled();
   });
 });

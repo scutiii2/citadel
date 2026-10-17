@@ -551,6 +551,32 @@ describe("a slash command's reply", () => {
   });
 });
 
+describe("a triage question and its answer", () => {
+  const triage = (extra: Partial<ChatMessage> = {}): ChatMessage[] => [
+    { role: "user", kind: "triage", content: "Triage question: Is it down?" },
+    assistant("**Yes**, 90% sure.", { kind: "triage", ...extra }),
+  ];
+
+  it("shows the question as a bubble and the answer as markdown, like a command", () => {
+    const wrapper = mountList({ messages: triage({ duration_s: 0.8 }) });
+
+    expect(wrapper.findAll(".msg")[0]!.get(".user-bubble").classes()).toContain("triage");
+    expect(wrapper.findAll(".msg")[1]!.get(".command-result strong").text()).toBe("Yes");
+  });
+
+  it("says a local model answered it, not a direct tool call", () => {
+    const wrapper = mountList({ messages: triage({ duration_s: 0.8 }) });
+
+    expect(wrapper.find(".usage .chip").text()).toBe("Triage Assistant · local model · 0.8 s");
+  });
+
+  it("has no copy, regenerate or branch buttons", () => {
+    const wrapper = mountList({ messages: triage() });
+
+    expect(wrapper.findAll(".msg")[1]!.findAll("button").map((b) => b.classes())).toEqual([["chip"]]);
+  });
+});
+
 describe("the agent tag under an answer", () => {
   const tagged = (agent?: string): ChatMessage[] => [user("q"), assistant("a", { agent, model: "m", total_tokens: 10 })];
 

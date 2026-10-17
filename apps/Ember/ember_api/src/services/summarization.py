@@ -49,7 +49,8 @@ def render_messages(messages: list[dict[str, Any]], *, include_steps: bool = Fal
     built without it."""
     lines = []
     for message in messages:
-        header = "command" if message.get("kind") == "command" else str(message.get("role", "unknown"))
+        kind = message.get("kind")
+        header = kind if kind in ("command", "triage") else str(message.get("role", "unknown"))
         meta = []
         if message.get("model"):
             meta.append(str(message["model"]))

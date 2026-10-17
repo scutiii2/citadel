@@ -896,3 +896,13 @@ describe("original PDF attachments", () => {
     expect(wrapper.emitted("send")).toBeUndefined();
   });
 });
+
+describe("the triage question button", () => {
+  it("asks the page to open the form", async () => {
+    const wrapper = mountInput();
+
+    await wrapper.get('[aria-label="Ask a multiple choice or yes or no question"]').trigger("click");
+
+    expect(wrapper.emitted("triage")).toHaveLength(1);
+  });
+});

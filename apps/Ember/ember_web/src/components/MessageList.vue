@@ -282,8 +282,8 @@ onBeforeUnmount(() => {
           <h4>Summary of the earlier conversation</h4>
           <MarkdownContent :text="m.content" />
         </section>
-        <div v-else-if="m.kind === 'command' && m.role === 'user'" class="user-bubble command">{{ m.content }}</div>
-        <div v-else-if="m.kind === 'command'" class="assistant command-reply">
+        <div v-else-if="(m.kind === 'command' || m.kind === 'triage') && m.role === 'user'" class="user-bubble command" :class="{ triage: m.kind === 'triage' }">{{ m.content }}</div>
+        <div v-else-if="m.kind === 'command' || m.kind === 'triage'" class="assistant command-reply">
           <MarkdownContent class="command-result" :text="parseDownloads(m.content).text" />
           <DownloadCards :downloads="parseDownloads(m.content).downloads" />
           <div class="actions">
@@ -725,6 +725,12 @@ onBeforeUnmount(() => {
 .command {
   font-family: var(--mono);
   font-size: 0.9em;
+}
+/* A triage question is a few lines of prose, not a command line. */
+.command.triage {
+  font-family: inherit;
+  font-size: inherit;
+  white-space: pre-wrap;
 }
 .summary {
   padding: 10px 14px;

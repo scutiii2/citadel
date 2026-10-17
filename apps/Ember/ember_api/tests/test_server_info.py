@@ -158,6 +158,18 @@ def test_command_results_are_appended_to_a_chat(client: TestClient) -> None:
     assert bad.status_code == 422
 
 
+def test_triage_questions_are_appended_to_a_chat(client: TestClient) -> None:
+    as_admin(client)
+    chat_id = str(uuid.uuid4())
+    asked = {"role": "user", "kind": "triage", "content": "Is there a problem?"}
+    answer = {"role": "assistant", "kind": "triage", "content": "**Yes**"}
+
+    created = client.post(f"/api/chats/{chat_id}/messages", json={"title": "Is there a problem?", "messages": [asked, answer]})
+
+    assert created.status_code == 200
+    assert client.get(f"/api/chats/{chat_id}").json()["messages"][:2] == [asked, answer]
+
+
 def test_extensions_listed_for_chat_users_and_managed_by_admins(
     client_factory, email: FakeEmailSender, upstream: FakeUpstream
 ) -> None:

@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { chatsClient, type ChatSearchHit } from "../api/ChatsClient";
 import { settingsClient } from "../api/SettingsClient";
+import { triageClient, type TriageForm } from "../api/TriageClient";
 import type { CommandInfo } from "../api/CommandsClient";
 import { ApiError } from "../api/http";
 import type {
@@ -33,6 +34,7 @@ import { type ContextAccuracy, DEFAULT_CONTEXT_ACCURACY, isContextAccuracy } fro
 import { splitAttachments, withAttachments } from "../utils/attachments";
 import { errorMessage } from "../utils/errors";
 import { toolTitle } from "../utils/toolTitles";
+import { triageAnswerText, triageQuestionText } from "../utils/triageMessage";
 import { useAuthStore } from "./auth";
 import { useAccountCapabilitiesStore } from "./accountCapabilities";
 
@@ -760,6 +762,35 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
+  /** Puts a typed question to the Triage Assistant (Laya) directly, without the orchestrator, and
+   * adds the question and its answer to the chat like a command's result. Throws what went wrong
+   * (the form shows it); nothing is added then. */
+  async function askTriage(form: TriageForm): Promise<void> {
+    if (busy.value || chatLoading.value || working.value) throw new Error("Wait for the current answer to finish.");
+    if (active.value?.messagesLoaded === false) throw new Error("This chat did not load, so nothing can be added to it.");
+    working.value = "Asking the Triage Assistant ...";
+    const began = Date.now();
+    clockStart.value = began;
+    const started = generation;
+    try {
+      const answer = await triageClient.ask(form);
+      if (started !== generation) return;
+      const seconds = Number(((Date.now() - began) / 1000).toFixed(1));
+      await appendMessages(
+        [
+          { role: "user", kind: "triage", content: triageQuestionText(form), at: new Date(began).toISOString() },
+          { role: "assistant", kind: "triage", content: triageAnswerText(answer), duration_s: seconds, at: new Date().toISOString() },
+        ],
+        form.question,
+      );
+    } finally {
+      if (started === generation) {
+        working.value = "";
+        clockStart.value = null;
+      }
+    }
+  }
+
   /** Asks the main agent. ember_api saves the question and runs the
    * turn; this page shows it arriving. A leading "/" runs a command instead.
    *
@@ -1321,6 +1352,7 @@ export const useChatStore = defineStore("chat", () => {
     agentText,
     liveSteps,
     commandSchema,
+    askTriage,
     busy,
     working,
     contextUsage,

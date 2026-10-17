@@ -144,8 +144,9 @@ class MessageIn(BaseModel):
     role: Literal["user", "assistant"]
     content: str
     # summary / log_attachment: written by summarize and clear; command: a
-    # slash command's call and its result, shown but never asked about.
-    kind: Literal["summary", "log_attachment", "command"] | None = None
+    # slash command's call and its result, shown but never asked about; triage:
+    # a typed question put to the Triage Assistant from the chat page, and its answer.
+    kind: Literal["summary", "log_attachment", "command", "triage"] | None = None
     # When the message was written (UTC, as message_time makes it). Set by the
     # server for questions and answers; a browser sends back what it was given.
     at: str | None = Field(default=None, pattern=MESSAGE_TIME_PATTERN)

@@ -19,6 +19,7 @@ const rows = computed<Row[]>(() => {
   const m = props.message;
   const list: Row[] = [];
   if (m.kind === "command") list.push({ label: "Run as", value: "Direct tool call, no AI" });
+  if (m.kind === "triage") list.push({ label: "Run as", value: "Asked the Triage Assistant (a local model) directly, not through Ember" });
   const agent = props.agentLabel ?? m.agent;
   if (agent) list.push({ label: "Agent", value: agent });
   if (m.model) list.push({ label: "Model", value: m.model });
