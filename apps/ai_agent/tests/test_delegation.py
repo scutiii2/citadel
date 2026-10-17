@@ -307,3 +307,23 @@ def test_call_forwards_the_chats_plan_toggles_only_when_they_are_off(monkeypatch
 
     assert "plan" not in seen[0] and "plan_lean" not in seen[0]
     assert seen[1]["plan"] is False and seen[1]["plan_lean"] is False
+
+
+def test_call_forwards_the_chats_caveman_toggle_only_when_it_is_on(monkeypatch):
+    _configure_agents(monkeypatch, [{"id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
+    seen = []
+
+    async def _fake_call_tool(url, name, arguments, on_progress=None):
+        seen.append(arguments)
+        return {"response": "4"}
+
+    with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool):
+        delegation.call("calc", "2+2?", depth=0)
+        token = delegation.bind_caveman(True)
+        try:
+            delegation.call("calc", "2+2?", depth=0)
+        finally:
+            delegation.reset_caveman(token)
+        delegation.call("calc", "2+2?", depth=0)
+
+    assert "caveman" not in seen[0] and seen[1]["caveman"] is True and "caveman" not in seen[2]

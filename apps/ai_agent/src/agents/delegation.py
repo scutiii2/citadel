@@ -73,6 +73,18 @@ def reset_attachments(token: Token) -> None:
     _attachments.reset(token)
 
 
+_caveman: ContextVar[bool] = ContextVar("delegation_caveman", default=False)
+
+
+def bind_caveman(on: bool) -> Token:
+    """The chat's caveman toggle, so a specialist answers as tersely as the agent asked."""
+    return _caveman.set(on)
+
+
+def reset_caveman(token: Token) -> None:
+    _caveman.reset(token)
+
+
 # Each hop is itself a full up-to-6-round ask() call, so this bounds a
 # worst case that's real but not tiny. 2 hops makes a genuine multi-step
 # handoff possible (A -> B -> C, or A -> B -> A) without allowing
@@ -260,6 +272,8 @@ def call(
             arguments["plan"] = False
         if not policy.lean:
             arguments["plan_lean"] = False
+        if _caveman.get():
+            arguments["caveman"] = True
         if model_tier:
             arguments["model_tier"] = model_tier
         if reasoning_effort:

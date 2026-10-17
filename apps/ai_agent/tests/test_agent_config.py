@@ -557,3 +557,25 @@ def test_run_interpret_runs_on_the_clamped_default_model(monkeypatch):
     monkeypatch.setattr(agent_config.agent_spec, "current", lambda: SimpleNamespace(id="ember"))
     agent_config.run_interpret("text")
     assert seen["model"] == "haiku"
+
+
+def test_a_turns_caveman_flag_is_visible_to_delegation_only_during_the_turn(monkeypatch):
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    from src.agents import agent_config, delegation
+    from src.llm.base_provider import ChatResult
+
+    seen = []
+
+    async def provider(*args, **kwargs):
+        seen.append(delegation._caveman.get())
+        return ChatResult(response="x")
+
+    monkeypatch.setattr(agent_config._PROVIDER_MODULE, "run_chat", provider)
+    monkeypatch.setattr(agent_config.auto_route, "try_route", AsyncMock(return_value=None))
+
+    asyncio.run(agent_config.run_chat("q", [], [], caveman=True))
+    asyncio.run(agent_config.run_chat("q", [], []))
+
+    assert seen == [True, False] and delegation._caveman.get() is False
