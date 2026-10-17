@@ -14,7 +14,7 @@ Recipients = Annotated[str, Field(description="Recipient addresses separated by 
 Subject = Annotated[str, Field(description="Email subject. Keep the same subject when replying in a thread.")]
 Text = Annotated[str | None, Field(description="Plain-text body; required when HTML is omitted.", json_schema_extra={"input": "textarea"})]
 Html = Annotated[str | None, Field(description="Optional HTML body; plain text is derived if body_text is omitted.", json_schema_extra={"input": "textarea"})]
-Alias = Annotated[str, Field(description="Source name in the [EMBER | source] subject prefix.")]
+Alias = Annotated[str, Field(description="Source name for audit; not shown in the [EMBER] subject prefix.")]
 Prefix = Annotated[bool, Field(description="Add the standard Ember source prefix to the subject.")]
 Parent = Annotated[str, Field(description="Parent email's bracketed Message-ID returned by send or reply.")]
 References = Annotated[str, Field(description="Optional earlier bracketed Message-IDs separated by spaces.")]

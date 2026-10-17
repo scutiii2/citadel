@@ -94,13 +94,9 @@ def _validate_address(value: str) -> None:
         raise ValueError("Provide one email address per recipient entry.")
 
 
-def format_subject(capability_alias: str, subject: str) -> str:
-    """``[EMBER | <capability_alias>] <subject>``.
-
-    The alias is the capability's chat id (``capability_meta.CapabilityMeta.id``,
-    e.g. ``server``), so a recipient can filter mail by the capability that sent it.
-    """
-    return f"[{SUBJECT_PREFIX} | {capability_alias}] {subject}"
+def format_subject(subject: str) -> str:
+    """``[EMBER] <subject>``: the agent name, then the context of the message."""
+    return f"[{SUBJECT_PREFIX}] {subject}"
 
 
 def _html_to_text(body_html: str) -> str:
@@ -150,7 +146,7 @@ def send_email(
     produces multipart/alternative; ``body_html=None`` sends plain text only.
     Optional reply headers link this message to its parent and ancestry.
 
-    The subject is sent as ``[EMBER | <capability_alias>] <subject>`` and an
+    The subject is sent as ``[EMBER] <subject>`` and an
     auto-generated notice is appended to each part; callers pass neither.
     ``prefix_subject=False`` preserves the caller's subject for account emails.
     Build ``body_html`` with ``email_render.render_email_template`` for the
@@ -197,7 +193,7 @@ def send_email(
     text_part = body_text if body_text is not None else _html_to_text(body_html or "")
     plain = MIMEText(f"{text_part}\n\n{AUTO_GENERATED_NOTICE}", "plain")
     message = MIMEMultipart("alternative") if body_html is not None else plain
-    message["Subject"] = format_subject(capability_alias, subject) if prefix_subject else subject
+    message["Subject"] = format_subject(subject) if prefix_subject else subject
     message["From"] = config.from_address
     message["To"] = ", ".join(recipients)
     # Some receivers reject or penalize a message with no Date or
@@ -218,7 +214,7 @@ def send_email(
     # plain text must come first for the HTML to win.
     if body_html is not None:
         message.attach(plain)
-        message.attach(MIMEText(f'{body_html}\n<p style="color:#888;font-size:12px;">{AUTO_GENERATED_NOTICE}</p>', "html"))
+        message.attach(MIMEText(f'{body_html}\n<p style="color:#888;font-size:12px;font-style:italic;">{AUTO_GENERATED_NOTICE}</p>', "html"))
     raw_message = message.as_string()
 
     # smtplib exposes implicit TLS as a separate class rather than a flag,

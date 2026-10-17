@@ -74,7 +74,7 @@ def test_subject_and_html_body_reach_the_message():
         send_email(CONFIG, "test", "Deploy finished", "<h1>Done</h1>")
 
     _sender, _recipients, body = server.sendmail.call_args.args
-    assert "Subject: [EMBER | test] Deploy finished" in body
+    assert "Subject: [EMBER] Deploy finished" in body
     assert "<h1>Done</h1>" in body
 
 
@@ -258,13 +258,13 @@ def test_every_message_ends_with_the_auto_generated_notice(monkeypatch):
     assert sent[0].count(email_module.AUTO_GENERATED_NOTICE) == 2  # plain and HTML parts
 
 
-def test_subject_has_ember_capability_prefix():
+def test_subject_is_agent_name_then_context():
     smtp, server = _smtp_mock()
 
     with patch("smtplib.SMTP", smtp):
         send_email(CONFIG, "server", "Restarted db", "<p>Body</p>")
 
-    assert _sent_message(server)["Subject"] == "[EMBER | server] Restarted db"
+    assert _sent_message(server)["Subject"] == "[EMBER] Restarted db"
 
 
 def test_auto_generated_notice_ends_both_parts():
@@ -276,6 +276,7 @@ def test_auto_generated_notice_ends_both_parts():
     plain, html = (part.get_payload(decode=True).decode() for part in _sent_message(server).get_payload())
     assert plain.rstrip().endswith(AUTO_GENERATED_NOTICE)
     assert AUTO_GENERATED_NOTICE in html
+    assert "color:#888" in html and "font-style:italic" in html
 
 
 def test_render_template_escapes_values_but_not_html_suffixed_ones():

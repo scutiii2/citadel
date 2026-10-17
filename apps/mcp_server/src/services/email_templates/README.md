@@ -7,7 +7,7 @@ HTML body templates for `send_email()`. Plain `string.Template` files:
 - Every value is HTML-escaped, except names ending in `_html`, which are
   inserted as-is (use for markup the caller built itself).
 - A missing placeholder value raises `KeyError`; an extra one is ignored.
-- Do not add the auto-generated footer or the `[EMBER | alias]` subject
+- Do not add the auto-generated footer or the `[EMBER]` subject
   prefix here: `send_email()` adds both to every message.
 
 | Template | Placeholders |

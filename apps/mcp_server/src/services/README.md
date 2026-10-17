@@ -29,7 +29,7 @@ where that logic lives instead.
 - **`email.py`** - `send_email()`, stdlib `smtplib` wrapper supporting
   the three transports `config_email.json`'s `"security"` can name
   (`starttls` / `ssl` / `none`). Subjects go out as
-  `[EMBER | <capability_alias>] <subject>` and every message ends with an
+  `[EMBER] <subject>` and every message ends with an
   auto-generated notice.
 - **`email_render.py`** + **`email_templates/`** - HTML body templates
   (`notification`, `approval`) for `send_email()`; see
