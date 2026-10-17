@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { McpServerClient } from "../api/McpServerClient";
 import CopyButton from "../components/CopyButton.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
+import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { errorMessage } from "../utils/errors";
 import "../components/infoPage.css";
 
@@ -35,6 +36,8 @@ const TOOLS: Record<Tab, { tool: string; field: string }> = {
 };
 /** Strength bar scale: 128 bits and above counts as full. */
 const FULL_BITS = 128;
+
+const checked = (event: Event): boolean => (event.target as HTMLInputElement).checked;
 
 const server = new McpServerClient();
 const tab = ref<Tab>("password");
@@ -162,11 +165,11 @@ onBeforeUnmount(() => {
             <label class="field">Length: {{ options.password.length }}
               <input v-model.number="options.password.length" type="range" min="8" max="128" />
             </label>
-            <label class="check"><input v-model="options.password.use_upper" type="checkbox" /> Uppercase A-Z</label>
-            <label class="check"><input v-model="options.password.use_lower" type="checkbox" /> Lowercase a-z</label>
-            <label class="check"><input v-model="options.password.use_digits" type="checkbox" /> Digits 0-9</label>
-            <label class="check"><input v-model="options.password.use_symbols" type="checkbox" /> Symbols</label>
-            <label class="check"><input v-model="options.password.exclude_ambiguous" type="checkbox" /> Leave out look-alikes (I l 1 O 0 o)</label>
+            <ToggleSwitch small :checked="options.password.use_upper" @change="options.password.use_upper = checked($event)">Uppercase A-Z</ToggleSwitch>
+            <ToggleSwitch small :checked="options.password.use_lower" @change="options.password.use_lower = checked($event)">Lowercase a-z</ToggleSwitch>
+            <ToggleSwitch small :checked="options.password.use_digits" @change="options.password.use_digits = checked($event)">Digits 0-9</ToggleSwitch>
+            <ToggleSwitch small :checked="options.password.use_symbols" @change="options.password.use_symbols = checked($event)">Symbols</ToggleSwitch>
+            <ToggleSwitch small :checked="options.password.exclude_ambiguous" @change="options.password.exclude_ambiguous = checked($event)">Leave out look-alikes (I l 1 O 0 o)</ToggleSwitch>
             <p v-if="!characterTypes" class="error">Choose at least one kind of character.</p>
           </template>
           <template v-else-if="tab === 'passphrase'">
@@ -176,8 +179,8 @@ onBeforeUnmount(() => {
             <label class="field">Separator
               <input v-model="options.passphrase.separator" type="text" maxlength="3" aria-label="Separator" />
             </label>
-            <label class="check"><input v-model="options.passphrase.capitalize" type="checkbox" /> Capitalise each word</label>
-            <label class="check"><input v-model="options.passphrase.add_number" type="checkbox" /> Add a digit</label>
+            <ToggleSwitch small :checked="options.passphrase.capitalize" @change="options.passphrase.capitalize = checked($event)">Capitalise each word</ToggleSwitch>
+            <ToggleSwitch small :checked="options.passphrase.add_number" @change="options.passphrase.add_number = checked($event)">Add a digit</ToggleSwitch>
           </template>
           <template v-else-if="tab === 'pin'">
             <label class="field">Digits: {{ options.pin.length }}
@@ -242,7 +245,6 @@ onBeforeUnmount(() => {
 .panel { margin-top: 14px; }
 .options { display: grid; gap: 10px; }
 .field { display: grid; gap: 4px; font-size: 0.9em; }
-.check { display: flex; align-items: center; gap: 8px; font-size: 0.9em; }
 .actions { display: flex; gap: 8px; }
 .result { display: grid; gap: 8px; margin-top: 14px; }
 .value-row { display: flex; align-items: center; gap: 8px; }
