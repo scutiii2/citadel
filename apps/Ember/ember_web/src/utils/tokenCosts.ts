@@ -11,7 +11,10 @@ export type CostedSetting =
   | "askTools"
   | "chime"
   | "notifications"
-  | "suggestions";
+  | "suggestions"
+  | "liveTokens"
+  | "contextPanel"
+  | "contextAccuracy";
 
 export const TOKEN_COSTS: Record<CostedSetting, string> = {
   terse:
@@ -25,6 +28,10 @@ export const TOKEN_COSTS: Record<CostedSetting, string> = {
   notifications: "No token cost. It runs in your browser.",
   suggestions:
     "One extra small model call per answer: about 300-1000 input tokens and about 20 output tokens. Cached per answer.",
+  liveTokens: "No token cost. It only shows a count the agent already reports.",
+  contextPanel: "No token cost with Estimate. Exact adds token-count requests, see its own setting.",
+  contextAccuracy:
+    "Estimate costs no tokens. Exact asks the provider to count each part, which adds requests (no model output) each time the panel opens; results are cached.",
 };
 
 /** A tooltip: the setting's own hint, then its token cost. */

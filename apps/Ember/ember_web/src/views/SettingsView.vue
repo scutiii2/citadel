@@ -12,6 +12,7 @@ import {
   DEFAULT_APPROVAL_MODE,
   type ApprovalMode,
 } from "../utils/approvalMode";
+import { CONTEXT_ACCURACY_OPTIONS, DEFAULT_CONTEXT_ACCURACY } from "../utils/contextAccuracy";
 import { TOKEN_COSTS } from "../utils/tokenCosts";
 import SidebarEditor from "../components/SidebarEditor.vue";
 import SegmentedControl from "../components/SegmentedControl.vue";
@@ -31,7 +32,7 @@ import { filterSettings, type SearchableSetting } from "../utils/settingsSearch"
 
 interface SettingDef extends SearchableSetting {
   id: string;
-  group: "chat" | "appearance" | "sidebar";
+  group: "chat" | "context" | "appearance" | "sidebar";
 }
 
 // Icon paths are on a 16px grid, stroke only. The scope chip says where a group's
@@ -39,6 +40,12 @@ interface SettingDef extends SearchableSetting {
 const SCOPE_NOTE = "Applied when you save. Stored on this device.";
 const GROUPS = [
   { id: "chat", title: "Chat", icon: "M2 3h12v8H7l-3 3v-3H2z", scope: "This device" },
+  {
+    id: "context",
+    title: "Context display",
+    icon: "M2 12V8M6 12V4M10 12V6M14 12V2",
+    scope: "This device",
+  },
   {
     id: "appearance",
     title: "Appearance",
@@ -106,6 +113,27 @@ const DEFS: SettingDef[] = [
     keywords: ["autocomplete", "tab", "placeholder", "prediction", "follow-up"],
   },
   {
+    id: "context-live-tokens",
+    group: "context",
+    label: "Live token count",
+    description: "Show a running token count beside the activity line while the agent works.",
+    keywords: ["tokens", "usage", "thinking", "counter", "running"],
+  },
+  {
+    id: "context-panel",
+    group: "context",
+    label: "Context breakdown",
+    description: "Show what fills the context window: messages, system prompt, tools and free space.",
+    keywords: ["context", "window", "usage", "tokens", "panel", "breakdown"],
+  },
+  {
+    id: "context-accuracy",
+    group: "context",
+    label: "Breakdown accuracy",
+    description: "Estimate is quick and free. Exact asks the provider to count each part.",
+    keywords: ["estimate", "exact", "count", "tokens", "precise"],
+  },
+  {
     id: "appearance-theme",
     group: "appearance",
     label: "Theme",
@@ -120,6 +148,11 @@ const DEFS: SettingDef[] = [
     keywords: ["rearrange", "reorder", "navigation", "menu", "rail", "icons", "pin", "hide", "drag"],
   },
 ];
+
+// Exact counting is per part of the breakdown, so it is only meaningful while the panel shows.
+const ACCURACY_OPTIONS = computed(() =>
+  CONTEXT_ACCURACY_OPTIONS.map((o) => ({ ...o, disabled: !draft.value.contextPanel })),
+);
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: "system", label: "System" },
@@ -155,6 +188,7 @@ const noMatches = computed(() => shown.value.size === 0);
 const saved = computed(() => ({
   caveman: chat.caveman, plan: chat.plan, planLean: chat.planLean, approvalMode: chat.approvalMode, chime: chat.chime,
   browserNotifications: chat.browserNotifications,
+  liveTokens: chat.liveTokens, contextPanel: chat.contextPanel, contextAccuracy: chat.contextAccuracy,
   suggestions: auth.promptSuggestions, theme: theme.value,
   sidebar: { order: [...navPrefs.prefs.order], pinned: [...navPrefs.prefs.pinned], hidden: [...navPrefs.prefs.hidden] },
 }));
@@ -234,6 +268,9 @@ async function save(): Promise<void> {
     else draft.value.approvalMode = chat.approvalMode;
     chat.setChime(next.chime);
     chat.setBrowserNotifications(next.browserNotifications);
+    chat.setLiveTokens(next.liveTokens);
+    chat.setContextPanel(next.contextPanel);
+    chat.setContextAccuracy(next.contextAccuracy);
     setTheme(next.theme);
   } catch (err) { if (accountId === auth.account?.id) saveError.value = errorMessage(err); }
   finally { saving.value = false; }
@@ -267,6 +304,9 @@ const modified = computed(() => ({
   "chat-chime": draft.value.chime !== true,
   "chat-notifications": draft.value.browserNotifications === true,
   "chat-suggestions": !draft.value.suggestions,
+  "context-live-tokens": draft.value.liveTokens !== true,
+  "context-panel": draft.value.contextPanel !== true,
+  "context-accuracy": draft.value.contextAccuracy !== DEFAULT_CONTEXT_ACCURACY,
   "appearance-theme": draft.value.theme !== DEFAULT_THEME,
   "sidebar-pages": !isDefault(draft.value.sidebar),
 }));
@@ -430,6 +470,46 @@ onMounted(() => {
               aria-label="Suggest next prompt"
               :checked="draft.suggestions"
               @change="draft.suggestions = checked($event)"
+            />
+          </SettingRow>
+        </div>
+
+        <div v-else-if="g.id === 'context'" class="card">
+          <SettingRow
+            v-if="shown.has('context-live-tokens')"
+            setting-id="context-live-tokens"
+            label="Live token count"
+            description="Show a running token count beside the activity line while the agent works."
+            :modified="modified['context-live-tokens']"
+            :cost="TOKEN_COSTS.liveTokens"
+            @reset="draft.liveTokens = true"
+          >
+            <ToggleSwitch small aria-label="Live token count" :checked="draft.liveTokens" @change="draft.liveTokens = checked($event)" />
+          </SettingRow>
+          <SettingRow
+            v-if="shown.has('context-panel')"
+            setting-id="context-panel"
+            label="Context breakdown"
+            description="Show what fills the context window: messages, system prompt, tools and free space."
+            :modified="modified['context-panel']"
+            :cost="TOKEN_COSTS.contextPanel"
+            @reset="draft.contextPanel = true"
+          >
+            <ToggleSwitch small aria-label="Context breakdown" :checked="draft.contextPanel" @change="draft.contextPanel = checked($event)" />
+          </SettingRow>
+          <SettingRow
+            v-if="shown.has('context-accuracy')"
+            setting-id="context-accuracy"
+            label="Breakdown accuracy"
+            description="Estimate is quick and free. Exact asks the provider to count each part."
+            :modified="modified['context-accuracy']"
+            :cost="TOKEN_COSTS.contextAccuracy"
+            @reset="draft.contextAccuracy = DEFAULT_CONTEXT_ACCURACY"
+          >
+            <SegmentedControl
+              v-model="draft.contextAccuracy"
+              :options="ACCURACY_OPTIONS"
+              aria-label="Breakdown accuracy"
             />
           </SettingRow>
         </div>

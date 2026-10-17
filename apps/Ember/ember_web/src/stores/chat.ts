@@ -28,6 +28,7 @@ import { chimeIfAway } from "../composables/useNotify";
 import { SlashCommandRunner } from "../services/slashCommands";
 import { watchTurn } from "../services/turnStream";
 import { type ApprovalMode, DEFAULT_APPROVAL_MODE, isApprovalMode } from "../utils/approvalMode";
+import { type ContextAccuracy, DEFAULT_CONTEXT_ACCURACY, isContextAccuracy } from "../utils/contextAccuracy";
 import { splitAttachments, withAttachments } from "../utils/attachments";
 import { errorMessage } from "../utils/errors";
 import { toolTitle } from "../utils/toolTitles";
@@ -73,6 +74,18 @@ function planLeanKey(accountId: number): string {
 
 function chimeKey(accountId: number): string {
   return `ember_web.chime.${accountId}`;
+}
+
+function liveTokensKey(accountId: number): string {
+  return `ember_web.liveTokens.${accountId}`;
+}
+
+function contextPanelKey(accountId: number): string {
+  return `ember_web.contextPanel.${accountId}`;
+}
+
+function contextAccuracyKey(accountId: number): string {
+  return `ember_web.contextAccuracy.${accountId}`;
 }
 
 function approvalModeKey(accountId: number): string {
@@ -195,6 +208,12 @@ export const useChatStore = defineStore("chat", () => {
   // by default; remembered per account.
   const chime = ref(true);
   const browserNotifications = ref(false);
+  // The running token count beside the activity line; on by default, per account.
+  const liveTokens = ref(true);
+  // The context breakdown panel; on by default, per account.
+  const contextPanel = ref(true);
+  // How the breakdown is counted: a quick estimate, or exact counts from the provider.
+  const contextAccuracy = ref<ContextAccuracy>(DEFAULT_CONTEXT_ACCURACY);
   // The predicted next question, for the chat box's placeholder (Tab takes it).
   // A new request number makes a slower, older answer harmless.
   const suggestion = ref<string | null>(null);
@@ -467,6 +486,10 @@ export const useChatStore = defineStore("chat", () => {
       approvalMode.value = accountId !== null ? readApprovalMode(accountId) : DEFAULT_APPROVAL_MODE;
       chime.value = accountId === null || readPreference(chimeKey(accountId)) !== "0";
       browserNotifications.value = accountId !== null && readPreference(`ember_web.notifications.${accountId}`) === "1";
+      liveTokens.value = accountId === null || readPreference(liveTokensKey(accountId)) !== "0";
+      contextPanel.value = accountId === null || readPreference(contextPanelKey(accountId)) !== "0";
+      const savedAccuracy = accountId !== null ? readPreference(contextAccuracyKey(accountId)) : null;
+      contextAccuracy.value = isContextAccuracy(savedAccuracy) ? savedAccuracy : DEFAULT_CONTEXT_ACCURACY;
       allowedTools.value = accountId !== null ? readAllowedTools(accountId) : {};
       forceToolApproval.value = false;
       if (accountId !== null) void refreshSettings();
@@ -1031,6 +1054,24 @@ export const useChatStore = defineStore("chat", () => {
     if (accountId !== undefined) writePreference(chimeKey(accountId), on ? "1" : "0");
   }
 
+  function setLiveTokens(on: boolean): void {
+    liveTokens.value = on;
+    const accountId = auth.account?.id;
+    if (accountId !== undefined) writePreference(liveTokensKey(accountId), on ? "1" : "0");
+  }
+
+  function setContextPanel(on: boolean): void {
+    contextPanel.value = on;
+    const accountId = auth.account?.id;
+    if (accountId !== undefined) writePreference(contextPanelKey(accountId), on ? "1" : "0");
+  }
+
+  function setContextAccuracy(mode: ContextAccuracy): void {
+    contextAccuracy.value = mode;
+    const accountId = auth.account?.id;
+    if (accountId !== undefined) writePreference(contextAccuracyKey(accountId), mode);
+  }
+
   function setBrowserNotifications(on: boolean): void {
     browserNotifications.value = on;
     const accountId = auth.account?.id;
@@ -1312,6 +1353,12 @@ export const useChatStore = defineStore("chat", () => {
     chime,
     browserNotifications,
     setBrowserNotifications,
+    liveTokens,
+    setLiveTokens,
+    contextPanel,
+    setContextPanel,
+    contextAccuracy,
+    setContextAccuracy,
     suggestion,
     clearSuggestion,
     setChime,

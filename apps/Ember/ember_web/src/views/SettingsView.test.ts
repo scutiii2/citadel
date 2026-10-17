@@ -23,6 +23,9 @@ const chat = reactive({
   approvalMode: "allow_all" as string,
   chime: true,
   browserNotifications: false,
+  liveTokens: true,
+  contextPanel: true,
+  contextAccuracy: "estimate" as string,
   forceToolApproval: false,
   setCaveman: vi.fn((on: boolean) => (chat.caveman = on)),
   setPlan: vi.fn((on: boolean) => (chat.plan = on)),
@@ -30,6 +33,9 @@ const chat = reactive({
   setApprovalMode: vi.fn((mode: string) => (chat.approvalMode = mode)),
   setChime: vi.fn((on: boolean) => (chat.chime = on)),
   setBrowserNotifications: vi.fn((on: boolean) => (chat.browserNotifications = on)),
+  setLiveTokens: vi.fn((on: boolean) => (chat.liveTokens = on)),
+  setContextPanel: vi.fn((on: boolean) => (chat.contextPanel = on)),
+  setContextAccuracy: vi.fn((mode: string) => (chat.contextAccuracy = mode)),
   refreshSettings: vi.fn(() => Promise.resolve()),
 });
 vi.mock("../stores/chat", () => ({ useChatStore: () => chat }));
@@ -73,6 +79,9 @@ beforeEach(() => {
   chat.approvalMode = "allow_all";
   chat.chime = true;
   chat.browserNotifications = false;
+  chat.liveTokens = true;
+  chat.contextPanel = true;
+  chat.contextAccuracy = "estimate";
   chat.forceToolApproval = false;
   document.documentElement.style.colorScheme = "";
 });
@@ -133,8 +142,11 @@ describe("SettingsView", () => {
   it("lists the chat and appearance settings, grouped, and no administration for a member", async () => {
     const w = await mountView();
 
-    expect(w.findAll("h3").map((h) => h.text())).toEqual(["Chat", "Appearance", "Sidebar"]);
-    expect(rowIds(w)).toEqual(["chat-terse", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions", "appearance-theme", "sidebar-pages"]);
+    expect(w.findAll("h3").map((h) => h.text())).toEqual(["Chat", "Context display", "Appearance", "Sidebar"]);
+    expect(rowIds(w)).toEqual([
+      "chat-terse", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions",
+      "context-live-tokens", "context-panel", "context-accuracy", "appearance-theme", "sidebar-pages",
+    ]);
     expect(w.text()).not.toContain("Tool approval");
   });
 
@@ -198,6 +210,39 @@ describe("SettingsView", () => {
 
     expect(chat.setChime).not.toHaveBeenCalled();
     expect(w.find(".badge").exists()).toBe(false);
+  });
+
+  it("saves the context display switches on Save and locks the accuracy while the panel is hidden", async () => {
+    const w = await mountView();
+    const exact = () => row(w, "context-accuracy").findAll("button").find((b) => b.text() === "Exact")!;
+    expect(exact().attributes("disabled")).toBeUndefined();
+
+    await row(w, "context-live-tokens").get("input").setValue(false);
+    await exact().trigger("click");
+    await row(w, "context-panel").get("input").setValue(false);
+
+    expect(exact().attributes("disabled")).toBeDefined();
+    expect(chat.setLiveTokens).not.toHaveBeenCalled();
+    expect(w.get(".badge").text()).toBe("3 modified");
+
+    await w.get("button.save").trigger("click");
+    await flushPromises();
+
+    expect(chat.setLiveTokens).toHaveBeenCalledWith(false);
+    expect(chat.setContextPanel).toHaveBeenCalledWith(false);
+    expect(chat.setContextAccuracy).toHaveBeenCalledWith("exact");
+  });
+
+  it("resets the context display settings to their defaults", async () => {
+    chat.liveTokens = false;
+    chat.contextAccuracy = "exact";
+    const w = await mountView();
+
+    await row(w, "context-live-tokens").get("button.reset").trigger("click");
+    await row(w, "context-accuracy").get("button.reset").trigger("click");
+
+    expect(w.find(".badge").exists()).toBe(false);
+    expect(chat.setLiveTokens).not.toHaveBeenCalled();
   });
 
   it("changes the theme and resets it to System", async () => {
@@ -321,9 +366,9 @@ describe("group headers", () => {
     const w = await mountView();
 
     const scopes = w.findAll(".scope");
-    expect(scopes.map((c) => c.text())).toEqual(["This device", "This device", "Your account"]);
+    expect(scopes.map((c) => c.text())).toEqual(["This device", "This device", "This device", "Your account"]);
     expect(scopes[0]!.attributes("title")).toBe("Applied when you save. Stored on this device.");
-    expect(scopes[2]!.attributes("title")).toBe("Applied when you save. Stored on your account.");
+    expect(scopes[3]!.attributes("title")).toBe("Applied when you save. Stored on your account.");
     expect(w.text()).not.toContain("Applied when you save. Stored on this device.");
   });
 });
@@ -332,7 +377,7 @@ describe("modified filter", () => {
   it("is a pill that shows only the changed settings, and toggles back", async () => {
     chat.caveman = true;
     const w = await mountView();
-    expect(rowIds(w)).toHaveLength(9);
+    expect(rowIds(w)).toHaveLength(12);
     expect(w.get(".badge").attributes("aria-pressed")).toBe("false");
 
     await w.get(".badge").trigger("click");
@@ -342,7 +387,7 @@ describe("modified filter", () => {
     expect(w.get(".badge").attributes("aria-pressed")).toBe("true");
 
     await w.get(".badge").trigger("click");
-    expect(rowIds(w)).toHaveLength(9);
+    expect(rowIds(w)).toHaveLength(12);
   });
 
   it("drops the filter once nothing is modified any more", async () => {
@@ -353,7 +398,7 @@ describe("modified filter", () => {
     await row(w, "chat-terse").get("button.reset").trigger("click");
 
     expect(w.find(".badge").exists()).toBe(false);
-    expect(rowIds(w)).toHaveLength(9);
+    expect(rowIds(w)).toHaveLength(12);
   });
 });
 
@@ -384,7 +429,7 @@ describe("search", () => {
     expect(w.text()).toContain('No settings match "zzz"');
     expect(rowIds(w)).toEqual([]);
     await w.get("button.link").trigger("click");
-    expect(rowIds(w)).toHaveLength(9);
+    expect(rowIds(w)).toHaveLength(12);
     expect((search(w).element as HTMLInputElement).value).toBe("");
   });
 
@@ -397,7 +442,7 @@ describe("search", () => {
 
     await search(w).trigger("keydown", { key: "Escape" });
     expect((search(w).element as HTMLInputElement).value).toBe("");
-    expect(rowIds(w)).toHaveLength(9);
+    expect(rowIds(w)).toHaveLength(12);
   });
 });
 
@@ -405,7 +450,7 @@ it("keeps workspace tool approval in Ember Admin", async () => {
   const w = await mountView(ADMIN);
   expect(w.text()).not.toContain("Tool approval");
   expect(w.text()).not.toContain("Applies to all accounts");
-  expect(rowIds(w)).toHaveLength(9);
+  expect(rowIds(w)).toHaveLength(12);
 });
 
 it("reverts chat, theme and sidebar drafts without persisting anything", async () => {
