@@ -38,6 +38,7 @@ from src.routes import (
     shares,
     templates,
     traffic as traffic_routes,
+    triage,
     usage,
     user_extensions,
 )
@@ -211,6 +212,7 @@ def create_app(
     app.include_router(templates.router)
     app.include_router(nav_preferences.router)
     app.include_router(notes.router)
+    app.include_router(triage.router)
     app.include_router(account_capabilities.router)
     app.include_router(user_extensions.router)
     app.include_router(shares.router)
