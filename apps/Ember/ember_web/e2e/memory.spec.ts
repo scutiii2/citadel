@@ -1,0 +1,33 @@
+import { expect, test } from "@playwright/test";
+import { installFakeApi } from "./fakeApi.ts";
+import { logIn } from "./helpers.ts";
+
+test("memory is separate from notes: create, search, edit and confirm deletion", async ({ page }) => {
+  const api = await installFakeApi(page);
+  await logIn(page);
+  await page.goto("/memory");
+  await expect(page.getByText("No saved memories yet.")).toBeVisible();
+  await page.getByRole("button", { name: "Add memory", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Add memory", exact: true });
+  await editor.getByLabel("Memory", { exact: true }).fill("Prefers concise answers");
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("article")).toContainText("Prefers concise answers");
+  await page.getByRole("searchbox").fill("coffee");
+  await expect(page.getByText("No memories match your search.")).toBeVisible();
+  await page.getByRole("searchbox").fill("");
+  await page.getByRole("button", { name: "Edit memory 1", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "Edit memory", exact: true });
+  await edit.getByLabel("Memory", { exact: true }).fill("Prefers detailed answers");
+  await edit.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("article")).toContainText("Prefers detailed answers");
+  await page.getByRole("button", { name: "Delete memory 1", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Delete this memory?" });
+  await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(api.memories.size).toBe(1);
+  await page.getByRole("button", { name: "Delete memory 1", exact: true }).click();
+  await confirm.getByRole("button", { name: "Delete memory", exact: true }).click();
+  await expect(page.getByText("No saved memories yet.")).toBeVisible();
+  expect(api.memories.size).toBe(0);
+  expect(api.notes.size).toBe(0);
+  expect(api.unexpected).toEqual([]);
+});

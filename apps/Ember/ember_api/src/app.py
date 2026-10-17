@@ -31,6 +31,7 @@ from src.routes import (
     tickets as tickets_routes,
     logs,
     mcp,
+    memory,
     nav_preferences,
     notes,
     server_info,
@@ -56,6 +57,7 @@ from src.services.extension_probe import ExtensionProbe
 from src.services.log_service import LogWriter
 from src.services.mcp_proxy import McpProxy
 from src.services.memory_purger import MemoryPurger
+from src.services.memory import MemoryClient
 from src.services.otp_service import OtpService
 from src.services.secret_box import SecretBox, ensure_secrets_key
 from src.services.public_rate_limiter import PublicReadLimiter
@@ -152,6 +154,7 @@ def create_app(
         )
         app.state.mcp_proxy = McpProxy(upstream, internal_token or None, recorder)
         app.state.memory_purger = MemoryPurger(upstream, settings.mcp_server_url, internal_token or None)
+        app.state.memory = MemoryClient(upstream, settings.mcp_server_url, internal_token or None)
         app.state.agent_gateway = agent_gateway or McpAgentGateway(internal_token or None, recorder)
         app.state.extension_probe = ExtensionProbe(app.state.agent_gateway)
         app.state.server_tools = server_tools or McpServerTools(settings.mcp_server_url, internal_token or None, recorder)
@@ -212,6 +215,7 @@ def create_app(
     app.include_router(templates.router)
     app.include_router(nav_preferences.router)
     app.include_router(notes.router)
+    app.include_router(memory.router)
     app.include_router(triage.router)
     app.include_router(account_capabilities.router)
     app.include_router(user_extensions.router)

@@ -468,6 +468,9 @@ function preview(note: Note): string {
   padding: 0;
   list-style: none;
 }
+.list-pane,
+.editor { min-width: 0; }
+.new-note { flex-shrink: 0; }
 .note-row {
   display: flex;
   flex-direction: column;
@@ -594,7 +597,15 @@ function preview(note: Note): string {
 .editor {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 16px;
+}
+.editor input { width: 100%; }
+.editor textarea { width: 100%; min-height: 280px; }
+.notes button:focus-visible,
+.editor input:focus-visible,
+.editor textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .editor label {
   display: flex;
@@ -650,7 +661,7 @@ function preview(note: Note): string {
 }
 
 /* Narrow screens: the list, or the open note, one at a time. */
-@media (max-width: 700px) {
+@media (max-width: 767px) {
   .layout {
     grid-template-columns: 1fr;
   }

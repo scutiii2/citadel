@@ -86,6 +86,12 @@ export const router = createRouter({
       meta: { permission: "chat.use" },
     },
     {
+      path: "/memory",
+      name: "memory",
+      component: () => import("../views/MemoryView.vue"),
+      meta: { permission: "chat.use" },
+    },
+    {
       path: "/tickets",
       name: "tickets",
       component: () => import("../views/TicketsView.vue"),

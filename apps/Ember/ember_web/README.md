@@ -8,6 +8,16 @@ URL, token or key.
 
 ## Features
 
+- Separate Notes (`/notes`) and Memory (`/memory`) pages use Ember's existing
+  navigation rail, compact headings, theme tokens and responsive layouts. Notes
+  keeps its list/editor, tags, explicit Save and agent-read switch. Memory lists
+  the account's assistant memories, with local text search, 20-item pagination,
+  add/edit dialogs and confirmed deletion. Memory edits refuse stale text and
+  preserve creation dates. Categories and provenance are not stored or inferred.
+  Both pages need `chat.use`. Memory requires mcp_server's memory capability and
+  a shared internal token configured in ember_api and mcp_server; an unavailable
+  store shows an error with Retry. Unsaved memory drafts ask before being discarded.
+
 - Workspace administration, activity logs, and traffic analytics live in [ember_admin](../ember_admin).
 
 - Log in, register with an invite code, verify your email (ember_api

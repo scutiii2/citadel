@@ -141,6 +141,7 @@ export interface FakeApi {
   shares: Map<number, StoredShare>;
   /** The member's private notes (/api/notes). */
   notes: Map<string, StoredNote>;
+  memories: Map<number, { id: number; text: string; created_at: string }>;
   /** What the Settings tab saves: the administrator's "require approval for every tool". */
   settings: { forceToolApproval: boolean };
   /** The accounts the Admin page lists (an administrator login only). */
@@ -226,6 +227,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
     templates: new Map(),
     shares: new Map(),
     notes: new Map(),
+    memories: new Map(),
     unexpected: [],
     turns: [],
     chats: new Map(),
@@ -430,6 +432,28 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
       const text = `${title ?? ""} ${body ?? ""}`.toLowerCase();
       const suggested = [...used].filter((tag) => !have.has(tag) && text.includes(tag)).sort();
       return json(route, { suggested, checked: [...used].filter((tag) => !have.has(tag)).length, skipped: 0 });
+    }
+
+    if (path === "/api/memory" && method === "GET") return json(route, [...api.memories.values()].sort((a, b) => b.id - a.id));
+    if (path === "/api/memory" && method === "POST") {
+      const { text } = route.request().postDataJSON() as { text: string };
+      const existing = [...api.memories.values()].find((memory) => memory.text.toLowerCase() === text.toLowerCase());
+      if (existing) return json(route, existing, 201);
+      const id = Math.max(0, ...api.memories.keys()) + 1;
+      const memory = { id, text, created_at: new Date().toISOString() };
+      api.memories.set(id, memory);
+      return json(route, memory, 201);
+    }
+    const memoryPath = /^\/api\/memory\/(\d+)$/.exec(path);
+    if (memoryPath && (method === "PUT" || method === "DELETE")) {
+      const id = Number(memoryPath[1]);
+      const memory = api.memories.get(id);
+      if (!memory) return json(route, { detail: "Memory not found" }, 404);
+      if (method === "DELETE") { api.memories.delete(id); return route.fulfill({ status: 204 }); }
+      const body = route.request().postDataJSON() as { text: string; expected_text: string };
+      if (body.expected_text !== memory.text) return json(route, { detail: "Memory changed. Reload and try again." }, 409);
+      memory.text = body.text;
+      return json(route, memory);
     }
 
     // Private notes, newest edit first. Ids are 32 hex characters, as ember_api makes them.

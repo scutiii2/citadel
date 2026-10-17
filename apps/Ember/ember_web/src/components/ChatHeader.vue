@@ -53,9 +53,13 @@ function closePanelOnEscape(event: KeyboardEvent): void {
 }
 
 watch(panelOpen, (open) => {
-  const method = open ? "addEventListener" : "removeEventListener";
-  document[method]("pointerdown", closePanelOnOutside);
-  document[method]("keydown", closePanelOnEscape);
+  if (open) {
+    document.addEventListener("pointerdown", closePanelOnOutside);
+    document.addEventListener("keydown", closePanelOnEscape);
+  } else {
+    document.removeEventListener("pointerdown", closePanelOnOutside);
+    document.removeEventListener("keydown", closePanelOnEscape);
+  }
 });
 // No breakdown any more (another chat, the setting off): nothing to show.
 watch(() => props.breakdown, (breakdown) => {

@@ -30,6 +30,10 @@ class MemoryStoreError(ValueError):
     """A request memory cannot honour; the message is safe to show the model."""
 
 
+class MemoryConflict(MemoryStoreError):
+    """The note changed, or the replacement would duplicate another note."""
+
+
 @dataclass(frozen=True)
 class Note:
     id: int
@@ -138,6 +142,33 @@ def forget(path: Path, owner: str, note_id: int) -> bool:
         db.execute("DELETE FROM notes WHERE id = ?", (note_id,))
         db.execute("DELETE FROM notes_fts WHERE rowid = ?", (note_id,))
         return True
+
+
+@catalog
+def update(path: Path, owner: str, note_id: int, text: str, expected_text: str) -> Note | None:
+    """Atomically edit an owner's memory and its search index, refusing stale or duplicate text."""
+    owner = _owner(owner)
+    clean = " ".join(text.split())
+    if not clean or len(clean) > MAX_NOTE_CHARS:
+        raise MemoryStoreError(f"Memory must contain 1 to {MAX_NOTE_CHARS} characters.")
+    if not path.exists():
+        return None
+    with closing(_connect(path)) as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute("SELECT text, created_at FROM notes WHERE owner = ? AND id = ?", (owner, note_id)).fetchone()
+        if row is None:
+            return None
+        if row["text"] != expected_text:
+            raise MemoryConflict("This memory changed since you opened it. Reload before editing again.")
+        duplicate = db.execute("SELECT id FROM notes WHERE owner = ? AND norm = ? AND id != ?",
+                               (owner, clean.lower(), note_id)).fetchone()
+        if duplicate is not None:
+            raise MemoryConflict("Another memory already contains that text.")
+        db.execute("UPDATE notes SET text = ?, norm = ? WHERE owner = ? AND id = ?",
+                   (clean, clean.lower(), owner, note_id))
+        db.execute("DELETE FROM notes_fts WHERE rowid = ?", (note_id,))
+        db.execute("INSERT INTO notes_fts (rowid, text) VALUES (?, ?)", (note_id, clean))
+        return Note(id=note_id, text=clean, created_at=row["created_at"])
 
 
 @catalog

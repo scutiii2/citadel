@@ -1,5 +1,26 @@
 # ember_api
 
+## Memory page API
+
+The separate Memory page uses the existing mcp_server memory store. These routes
+require a verified account with `chat.use`; the owner is always the authenticated
+account's internal uid. Browser-supplied owner fields are ignored.
+
+| Method | Route | Behavior |
+| --- | --- | --- |
+| GET | `/api/memory` | All saved memories, newest first; `[{id, text, created_at}]`. |
+| POST | `/api/memory` | `{text}` creates a memory (201), or returns an identical existing memory. |
+| PUT | `/api/memory/{id}` | `{text, expected_text}` edits atomically; 409 for stale or duplicate text. |
+| DELETE | `/api/memory/{id}` | Deletes only an owned memory (204); 404 when missing. |
+
+Text is limited to 500 characters, whitespace is normalized, and the store holds
+at most 200 memories per account. Creation dates survive edits. Mutations log only
+the action, never memory text. No categories or source labels are inferred.
+ember_api forwards these requests to token-protected `/memory/owners/{uid}/notes`
+routes on mcp_server; both services need the same internal token and the memory
+capability must be enabled. Upstream failures return 503, missing/disabled memory
+returns 404, and redirects are refused. Private `/api/notes` remains separate.
+
 Backend for [ember_web](../ember_web). It owns ember_web's user accounts and
 login sessions (its own database, separate from chat_app's) and will proxy
 all of ember_web's MCP traffic to `ai_agent` and `mcp_server`, so the

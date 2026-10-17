@@ -71,7 +71,7 @@ describe("AccountView", () => {
     const wrapper = await mountView([]);
 
     // chat.use: Agents, Games and Settings; Chat, Capabilities and Usage are in the bar.
-    expect(wrapper.findAll(".more-list a").map((a) => a.text())).toEqual(["Agents", "Games", "Notes", "Settings"]);
+    expect(wrapper.findAll(".more-list a").map((a) => a.text())).toEqual(["Agents", "Games", "Notes", "Memory", "Settings"]);
     expect(wrapper.find(".more-list a.issues").exists()).toBe(false);
   });
 

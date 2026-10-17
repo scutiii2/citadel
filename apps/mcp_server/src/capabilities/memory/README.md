@@ -4,6 +4,14 @@ Short notes the assistant keeps about a user between chats. Four tools (one has 
 
 ## Tools
 
+Ember Web has a separate Memory page for reviewing, adding, editing and deleting
+these same memories. It is distinct from the private Notes page. ember_api calls
+token-protected internal HTTP routes under `/memory/owners/{uid}/notes`; only the
+signed-in account's uid is used. Edits preserve creation dates, atomically update
+the FTS index, and refuse stale text or a duplicate of another memory. This does
+not change the four MCP tools or their ten-result search limit. The page lists
+up to the full 200-memory account limit. Memory has no category or provenance fields.
+
 | Tool | Purpose | Connection |
 |---|---|---|
 | `tool_mem_save` | Save one short note that outlives the chat | Local SQLite |

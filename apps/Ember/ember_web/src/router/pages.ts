@@ -55,6 +55,13 @@ export const NAV_PAGES: NavPage[] = [
     permission: "chat.use",
   },
   {
+    to: "/memory",
+    label: "Memory",
+    icon: ["M12 18V5", "M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4", "M17.6 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.6 1.5 4 4 0 0 0-2.8 5.6 4 4 0 0 0 .6 6.9A4 4 0 0 0 12 20a4 4 0 0 0 7.8-1 4 4 0 0 0 .6-6.9 4 4 0 0 0-2.8-5.6"],
+    description: "Review and manage the context Ember remembers about you.",
+    permission: "chat.use",
+  },
+  {
     to: "/tickets",
     label: "Tickets",
     icon: ["M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z", "M13 5v2", "M13 17v2", "M13 11v2"],

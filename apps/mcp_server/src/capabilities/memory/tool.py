@@ -21,7 +21,7 @@ NoteId = Annotated[int, Field(description="Id of the note to delete, as shown by
 @offload
 def tool_mem_save(text: Text) -> SaveResult:
     """Save ONE short note to the assistant's own memory, which outlives this chat. This is NOT
-    the user's Notes page: the user cannot open or edit memory. When the user asks you to save,
+    the user's Notes page: memory has its own page in Ember. When the user asks you to save,
     create, write or update a NOTE (or "one of my notes"), use the `tool_notes_*` tools instead and
     never this one. Only save a fact, preference or
     instruction the user themselves stated in this conversation (for example a unit
