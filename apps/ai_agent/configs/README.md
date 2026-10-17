@@ -10,7 +10,7 @@ lives under `../.data/` instead (see the end of this file).
   caps, per provider and gateway (`src/llm/token_limits.py`). `classifier`
   (optional, not in the `.example` seed: add the section by hand; every feature is
   off without it): the decision layer
-  (`src/llm/decision.py`) - `triage_fallback`, `triage_prune_ratio`, `triage_confidence_gap`, `chains` (feature: backends tried in
+  (`src/llm/decision.py`) - `triage_fallback`, `triage_prune_ratio`, `triage_confidence_gap`, `triage_pair_ratio`, `chains` (feature: backends tried in
   order; `jev`, `jev_vercel`, `laya`), `typesafe` and `vercel` (`url`, `model`),
   `timeout_seconds`, `max_input_chars`, `auto_tier` (`enabled`,
   `min_confidence`, `tiers`: the model tier chosen per request size) and `auto_route`

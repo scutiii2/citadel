@@ -226,6 +226,12 @@ a key for a backend of the `triage` chain in `.env`, the remote classifier (`src
   `jev`...). If nothing is far enough below, the two answers are blended instead
   (`"answered_by": "laya+jev"`): the higher confidence when both pick the same option, the lower one and
   an `"uncertain": true` plus a `"disagreement"` object (who picked what) when they differ.
+  With exactly two options left (a two-option question, or after dropping) and the two models still picking
+  differently, each model's probabilities are multiplied by its own confidence, the two results are
+  subtracted per option and the absolute differences compared: when the smaller one is under
+  `classifier.triage_pair_ratio` (default 0.5) of the larger, the option with the bigger difference is the answer
+  (`"resolved_by": "pair"`, `"probabilities"` are the shares of the two differences); otherwise the answer is
+  unsure and lists both options in `"candidates"`. Both carry a `"disagreement"` object.
   Such an answer carries a `"rounds"` trace, one entry per model call in order (`laya`, the classifier,
   `average` with what it dropped, then the narrowed `laya` and, if needed, classifier calls with their
   `options`): each shows its pick, probabilities and confidence, and a Laya that could not take the

@@ -189,6 +189,45 @@ def _average_round(average: dict[str, float], eliminated: list[str] | None = Non
     return out
 
 
+def _pair(
+    request: Request, laya: dict[str, Any], remote: dict[str, Any], rounds: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Two options are left and Laya and the fallback still pick differently. Weigh each model's
+    probabilities by its own confidence, take the absolute difference per option, and compare the two
+    differences: when they are far apart the option with the bigger one is the answer, otherwise the
+    answer is unsure and could be either (`candidates`). The steps are appended to `rounds`."""
+    by = remote["answered_by"]
+    options = list(laya["probabilities"])
+    scaled_laya = {o: laya["answer_confidence"] * laya["probabilities"][o] for o in options}
+    scaled_remote = {o: remote["answer_confidence"] * remote["probabilities"][o] for o in options}
+    difference = {o: abs(scaled_remote[o] - scaled_laya[o]) for o in options}
+    larger, smaller = max(difference.values()), min(difference.values())
+    decided = larger > 0 and smaller < decision.settings().triage_pair_ratio * larger
+    total = sum(difference.values())
+    share = {o: (difference[o] / total if total else 1 / len(options)) for o in options}
+    # A tie goes to the pick of the more confident of the two.
+    leader = laya["choice"] if laya["answer_confidence"] >= remote["answer_confidence"] else remote["choice"]
+    choice = max(options, key=lambda o: (round(difference[o], 6), o == leader))
+    rounds += [
+        {"step": f"laya x confidence", "options": options, "probabilities": _rounded(scaled_laya)},
+        {"step": f"{by} x confidence", "options": options, "probabilities": _rounded(scaled_remote)},
+        {"step": "difference", "options": options, "probabilities": _rounded(difference),
+         "choice": choice if decided else "unsure: " + " or ".join(options)},
+    ]
+    out: dict[str, Any] = {
+        "type": "choice", "choice": choice, "probabilities": _rounded(share), "answer_confidence": round(share[choice], 4),
+        "uncertain": not decided, "answered_by": f"laya+{by}", "resolved_by": "pair",
+        "disagreement": {"laya": laya["choice"], by: remote["choice"]},
+    }
+    if not decided:
+        out["candidates"] = options
+    return out
+
+
+def _rounded(values: dict[str, float]) -> dict[str, float]:
+    return {name: round(value, 4) for name, value in values.items()}
+
+
 def _blend(request: Request, laya: dict[str, Any], remote: dict[str, Any]) -> dict[str, Any]:
     """Laya's and the fallback's answers to one choice question as a single answer: the averaged
     distribution, the higher confidence when both pick the same option and the lower one when they do
@@ -390,6 +429,9 @@ class LayaQuestions:
         ratio = settings.triage_prune_ratio
         kept = _kept_options(average, ratio) if ratio > 0 else list(average)
         if len(kept) == len(average):
+            if len(average) == 2 and laya["choice"] != remote["choice"]:
+                rounds = [_round("laya", laya), _round(remote["answered_by"], remote)]
+                return {**_pair(request, laya, remote, rounds), "rounds": rounds}, 0
             return _blend(request, laya, remote), 0
         eliminated = [name for name in average if name not in kept]
         rounds = [_round("laya", laya), _round(remote["answered_by"], remote), _average_round(average, eliminated)]
@@ -408,8 +450,9 @@ class LayaQuestions:
             again, extra, _ = _ask_fallback(narrowed, [qid])
             tokens += extra
             if qid in again:
-                final = again[qid]
-                rounds.append(_round(final["answered_by"], final, kept))
+                second = again[qid]
+                rounds.append(_round(second["answered_by"], second, kept))
+                final = _pair(request, final, second, rounds) if len(kept) == 2 and second["choice"] != final["choice"] else second
         return {**_with_eliminated(spec, final, eliminated), "rounds": rounds}, tokens
 
     def _laya_answers(self, request: Request) -> tuple[dict[str, dict[str, Any]], int]:

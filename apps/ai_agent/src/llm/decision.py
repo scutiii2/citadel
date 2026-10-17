@@ -45,7 +45,7 @@ _BACKENDS = {
     "jev_vercel": "src.llm.jev_classifier",
     "laya": "src.llm.laya_classifier",
 }
-_KNOWN = {"typesafe", "vercel", "chains", "timeout_seconds", "max_input_chars", "triage_fallback", "triage_prune_ratio", "triage_confidence_gap", "auto_tier", "auto_route"}
+_KNOWN = {"typesafe", "vercel", "chains", "timeout_seconds", "max_input_chars", "triage_fallback", "triage_prune_ratio", "triage_confidence_gap", "triage_pair_ratio", "auto_tier", "auto_route"}
 _BACKEND_KNOWN = {"url", "model"}
 _AUTO_TIER_KNOWN = {"enabled", "min_confidence", "tiers"}
 _AUTO_ROUTE_KNOWN = {"enabled", "min_confidence"}
@@ -121,6 +121,10 @@ class ClassifierSettings:
     # When Laya's and the fallback's confidence differ by at least this much, the more confident one's
     # answer is used as it is, without averaging or dropping (1 = practically never).
     triage_confidence_gap: float = 0.3
+    # With two options left and Laya and the fallback still disagreeing, each option's confidence-weighted
+    # probabilities are compared. The pick stands when the smaller of the two differences is below this
+    # share of the larger one; otherwise the answer is unsure between both options.
+    triage_pair_ratio: float = 0.5
     auto_tier: AutoTierSettings = AutoTierSettings()
     auto_route: AutoRouteSettings = AutoRouteSettings()
 
@@ -157,7 +161,11 @@ def _load_settings() -> ClassifierSettings:
     gap = raw.get("triage_confidence_gap", base.triage_confidence_gap)
     if isinstance(gap, bool) or not isinstance(gap, (int, float)) or not 0 < gap <= 1:
         raise ValueError(f"config_tuning.json {_SECTION}.triage_confidence_gap must be a number above 0 and at most 1")
+    pair = raw.get("triage_pair_ratio", base.triage_pair_ratio)
+    if isinstance(pair, bool) or not isinstance(pair, (int, float)) or not 0 < pair <= 1:
+        raise ValueError(f"config_tuning.json {_SECTION}.triage_pair_ratio must be a number above 0 and at most 1")
     return ClassifierSettings(
+        triage_pair_ratio=float(pair),
         triage_prune_ratio=float(ratio),
         triage_confidence_gap=float(gap),
         typesafe=_backend_settings("typesafe", raw.get("typesafe", {}), base.typesafe),

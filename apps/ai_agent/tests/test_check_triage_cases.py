@@ -38,6 +38,8 @@ def test_the_cases_cover_every_path_the_setup_has():
     ({"choice": "a", "answered_by": "laya+jev"}, "blend"),
     ({"choice": "a", "answered_by": "jev", "deferred_to": "jev"}, "deferred->jev"),
     ({"choice": "a", "answered_by": "laya", "deferred_to": "laya"}, "deferred->laya"),
+    ({"choice": "a", "answered_by": "laya+jev", "resolved_by": "pair"}, "pair"),
+    ({"choice": "a", "answered_by": "laya+jev", "resolved_by": "pair", "eliminated": ["c"]}, "narrowed->pair"),
     ({"choice": "a", "answered_by": "jev", "eliminated": ["c"]}, "narrowed->jev"),
     ({"choice": "a", "answered_by": "laya", "eliminated": ["c"]}, "narrowed->laya"),
 ])

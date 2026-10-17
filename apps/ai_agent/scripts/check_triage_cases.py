@@ -15,6 +15,8 @@ cents of tokens in all). Each row shows how a question was settled:
 
     laya       Laya was sure; nothing left the machine
     deferred   Laya and the classifier differed a lot in confidence; the more confident one's answer stands
+    pair       two options were left and the models still disagreed; their confidence-weighted
+               probabilities were compared (narrowed->pair when options were dropped first)
     fallback   the classifier answered alone (text too long for Laya, or Laya had no usable answer)
     blend      Laya and the classifier were averaged, nothing dropped
     narrowed   options far below the rest were dropped and the question asked again (then who decided)
@@ -151,6 +153,8 @@ def path_of(answer: dict[str, Any]) -> str:
         return "laya"
     if "deferred_to" in answer:
         return f"deferred->{by}"
+    if answer.get("resolved_by") == "pair":
+        return "narrowed->pair" if "eliminated" in answer else "pair"
     if "eliminated" in answer:
         return f"narrowed->{by}"
     if "+" in by:
@@ -240,13 +244,13 @@ def rounds_table(row: Row) -> str:
     options = list(answer["probabilities"])
     body = []
     for number, step in enumerate(rounds, 1):
-        name = _STEP_NAMES.get(step["step"], step["step"].capitalize())
+        name = _STEP_NAMES.get(step["step"]) or step["step"].replace("jev_vercel", "Jev (Vercel)").replace("jev", "Jev").capitalize().replace("laya", "Laya")
         offered = step.get("options")
         if step["step"] == "gap":
             body.append([str(number), "Gap", "", f"defers to {_STEP_NAMES.get(step['deferred_to'], step['deferred_to'])}",
                          *[""] * len(options), f"{step['gap']:g}"])
             continue
-        if offered:
+        if offered and step["step"] in _STEP_NAMES:
             name += ", narrowed"
         shown = ", ".join(offered) if offered and len(offered) < len(options) else f"all {len(options)}"
         if "failed" in step:

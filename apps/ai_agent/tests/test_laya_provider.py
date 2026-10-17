@@ -279,11 +279,14 @@ def test_an_uncertain_choice_is_weighed_with_jevs_and_a_sure_one_stays_with_laya
     answers = payload(result)["answers"]
 
     assert len(asked) == 1 and asked[0][1] == {"database": "SQL and storage", "network": "Connections"}
-    # Laya said database (0.9 / 0.1), Jev network (0.6 / 0.4): their confidences (0.5, 0.6) are close, so they are averaged.
-    assert answers["category"]["choice"] == "database" and answers["category"]["answered_by"] == "laya+jev"
-    assert answers["category"]["probabilities"] == {"database": 0.65, "network": 0.35}
-    assert answers["category"]["answer_confidence"] == 0.5 and answers["category"]["uncertain"] is True
-    assert answers["category"]["disagreement"] == {"laya": "database", "jev": "network"}
+    # Laya said database (0.9 / 0.1 at 0.5), Jev network (0.4 / 0.6 at 0.6): close confidences and two options, so the
+    # pair rule weighs them: 0.45/0.05 against 0.24/0.36 gives differences 0.21 and 0.31, too close to call.
+    category = answers["category"]
+    assert category["answered_by"] == "laya+jev" and category["resolved_by"] == "pair"
+    assert category["choice"] == "network" and category["candidates"] == ["database", "network"]
+    assert category["probabilities"] == {"database": 0.4038, "network": 0.5962}
+    assert category["answer_confidence"] == 0.5962 and category["uncertain"] is True
+    assert category["disagreement"] == {"laya": "database", "jev": "network"}
     assert "answered_by" not in answers["severity"] and answers["severity"]["score"] == 1.4
     assert payload(result)["uncertain"] is True
     assert result.input_tokens == 120 + 50 and "reviewed 1 question" in result.model_note
@@ -389,7 +392,7 @@ def test_a_text_over_the_jev_limit_is_refused_before_anything_runs(engine, monke
     assert engine.calls == []
 
 
-def test_a_backends_real_probabilities_are_averaged_with_layas(engine, monkeypatch):
+def test_a_backends_real_probabilities_are_weighed_against_layas(engine, monkeypatch):
     engine.result = prediction(confidence=0.5)
     jev_on(monkeypatch, {
         "Which category?": decision.Choice("network", 70, 10, "jev", "", {"database": 0.3, "network": 0.7}),
@@ -399,11 +402,12 @@ def test_a_backends_real_probabilities_are_averaged_with_layas(engine, monkeypat
 
     category = payload(ask())["answers"]["category"]
 
-    assert category["probabilities"] == {"database": 0.6, "network": 0.4} and category["choice"] == "database"
-    assert category["answer_confidence"] == 0.5 and category["uncertain"] is True
+    # 0.45/0.05 against 0.21/0.49: differences 0.24 and 0.44, so a real tie-break is not met.
+    assert category["probabilities"] == {"database": 0.3529, "network": 0.6471} and category["choice"] == "network"
+    assert category["answer_confidence"] == 0.6471 and category["uncertain"] is True and category["candidates"]
 
 
-def test_a_distribution_that_misses_an_option_is_replaced_by_the_even_split_before_averaging(engine, monkeypatch):
+def test_a_distribution_that_misses_an_option_is_replaced_by_the_even_split_before_weighing(engine, monkeypatch):
     engine.result = prediction(confidence=0.6)
     jev_on(monkeypatch, {
         "Which category?": decision.Choice("network", 80, 10, "jev", "", {"network": 0.8}),
@@ -411,7 +415,8 @@ def test_a_distribution_that_misses_an_option_is_replaced_by_the_even_split_befo
         "Is there a problem?": decision.Choice("true", 90, 10, "jev"),
     })
 
-    assert payload(ask())["answers"]["category"]["probabilities"] == {"database": 0.55, "network": 0.45}
+    # Jev's 0.8 on network is spread as 0.2 / 0.8; weighed: 0.54/0.06 against 0.16/0.64, differences 0.38 and 0.58.
+    assert payload(ask())["answers"]["category"]["probabilities"] == {"database": 0.3958, "network": 0.6042}
 
 
 def test_two_answers_that_agree_keep_the_higher_confidence(engine, monkeypatch):
@@ -582,7 +587,9 @@ def test_a_narrowed_answer_lists_every_round_in_order(monkeypatch):
 
     rounds = area()["rounds"]
 
-    assert [r["step"] for r in rounds] == ["laya", "jev", "average", "laya", "jev"]
+    assert [r["step"] for r in rounds] == [
+        "laya", "jev", "average", "laya", "jev", "laya x confidence", "jev x confidence", "difference",
+    ]
     assert rounds[0] == {
         "step": "laya", "choice": "frontend", "probabilities": {"billing": 0.24, "frontend": 0.66, "network": 0.1}, "confidence": 0.55,
     }
@@ -694,3 +701,90 @@ def test_the_small_talk_case_is_decided_by_the_certain_fallback_without_a_rerun(
     assert answer["choice"] == "unknown" and answer["answered_by"] == "jev" and answer["answer_confidence"] == 1.0
     assert len(laya.calls) == 1 and len(asked) == 1  # no narrowed rerun for either model
     assert answer["uncertain"] is False
+
+
+# --- the pair rule: two options left and the models still disagree -------------------------------
+
+def two_option_laya(engine, confidence, probabilities):
+    """Laya answers `category` with these probabilities at this confidence; its other answers are sure."""
+    result = prediction()
+    result["answers"]["category"] = {
+        "choice": max(probabilities, key=probabilities.get), "probabilities": probabilities, "answer_confidence": confidence,
+    }
+    engine.result = result
+
+
+def test_a_clearly_larger_difference_decides_the_pair(engine, monkeypatch):
+    two_option_laya(engine, 0.65, {"database": 0.95, "network": 0.05})
+    jev_on(monkeypatch, {"Which category?": decision.Choice("network", 40, 5, "jev", "", {"database": 0.45, "network": 0.55})})
+
+    category = payload(ask())["answers"]["category"]
+    steps = {r["step"]: r for r in category["rounds"]}
+
+    # Weighed: Laya 0.6175 / 0.0325, Jev 0.18 / 0.22; differences 0.4375 and 0.1875, and 0.1875 < half of 0.4375.
+    assert steps["laya x confidence"]["probabilities"] == {"database": 0.6175, "network": 0.0325}
+    assert steps["jev x confidence"]["probabilities"] == {"database": 0.18, "network": 0.22}
+    assert steps["difference"]["probabilities"] == {"database": 0.4375, "network": 0.1875}
+    assert steps["difference"]["choice"] == "database"
+    assert category["choice"] == "database" and category["resolved_by"] == "pair" and category["uncertain"] is False
+    assert category["probabilities"] == {"database": 0.7, "network": 0.3} and category["answer_confidence"] == 0.7
+    assert "candidates" not in category and category["disagreement"] == {"laya": "database", "jev": "network"}
+    assert category["answered_by"] == "laya+jev"
+
+
+def test_two_similar_differences_leave_both_options_open(engine, monkeypatch):
+    two_option_laya(engine, 0.6, {"database": 0.6, "network": 0.4})
+    jev_on(monkeypatch, {"Which category?": decision.Choice("network", 60, 5, "jev", "", {"database": 0.4, "network": 0.6})})
+
+    category = payload(ask())["answers"]["category"]
+
+    # 0.36/0.24 against 0.24/0.36: both differences are 0.12.
+    assert category["probabilities"] == {"database": 0.5, "network": 0.5}
+    assert category["uncertain"] is True and category["candidates"] == ["database", "network"]
+    assert category["rounds"][-1]["choice"] == "unsure: database or network"
+    assert category["choice"] == "database"  # a tie goes to the pick of the more confident model (equal: Laya)
+
+
+def test_the_pair_ratio_setting_moves_the_line(engine, monkeypatch):
+    two_option_laya(engine, 0.65, {"database": 0.95, "network": 0.05})
+    jev_on(monkeypatch, {"Which category?": decision.Choice("network", 40, 5, "jev", "", {"database": 0.45, "network": 0.55})})
+    config = decision.ClassifierSettings(triage_fallback=True, triage_pair_ratio=0.3)  # 0.1875 is not under 0.3 x 0.4375
+    monkeypatch.setattr(decision, "settings", lambda: config)
+
+    category = payload(ask())["answers"]["category"]
+
+    assert category["uncertain"] is True and category["candidates"] == ["database", "network"]
+
+
+def test_models_that_agree_on_a_pair_are_still_blended(engine, monkeypatch):
+    two_option_laya(engine, 0.6, {"database": 0.8, "network": 0.2})
+    jev_on(monkeypatch, {"Which category?": decision.Choice("database", 65, 5, "jev", "", {"database": 0.85, "network": 0.15})})
+
+    category = payload(ask())["answers"]["category"]
+
+    assert category["answered_by"] == "laya+jev" and "resolved_by" not in category and category["choice"] == "database"
+
+
+def test_the_pair_rule_also_closes_a_narrowed_round_that_still_disagrees(monkeypatch):
+    laya = ScriptedEngine(LAYA_FIRST, area_prediction({"billing": 0.45, "frontend": 0.55}, 0.4, tokens=60))
+    second = decision.Choice("billing", 36, 7, "jev", "", {"billing": 0.68, "frontend": 0.32})
+    scripted(monkeypatch, laya, JEV_FIRST, second)
+
+    answer = area()
+
+    # Weighed: Laya 0.18 / 0.22, Jev 0.2448 / 0.1152; differences 0.0648 and 0.1048: too close to call.
+    assert answer["resolved_by"] == "pair" and answer["eliminated"] == ["network"] and answer["answered_by"] == "laya+jev"
+    assert answer["candidates"] == ["billing", "frontend"] and answer["uncertain"] is True
+    assert answer["choice"] == "frontend" and answer["probabilities"] == {"billing": 0.3821, "frontend": 0.6179, "network": 0.0}
+
+
+def test_more_than_two_options_left_keeps_the_fallbacks_second_answer(monkeypatch):
+    # Five options, no one far below the rest to drop: not a pair, so the earlier blend/narrow rules apply.
+    flat = {"a": 0.3, "b": 0.25, "c": 0.2, "d": 0.15, "e": 0.1}
+    laya = ScriptedEngine(area_prediction(flat, 0.5))
+    scripted(monkeypatch, laya, decision.Choice("b", 55, 5, "jev", "", {"a": 0.2, "b": 0.3, "c": 0.2, "d": 0.2, "e": 0.1}))
+    request = {"text": "x", "questions": {"area": {"type": "choice", "instructions": "q", "criteria": {k: k for k in flat}}}}
+
+    answer = payload(ask(request))["answers"]["area"]
+
+    assert "resolved_by" not in answer
