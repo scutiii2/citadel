@@ -129,6 +129,8 @@ def tool_notes_appendToNote(
     text: Annotated[str, Field(description="The text to add after the current text.", json_schema_extra={"input": "textarea"})],
 ) -> NoteWriteResult:
     """Add text to the end of a note the user shared with agents, keeping everything already in
-    it. Use this to add items to a list or lines to a note. Only shared notes can be changed. The
-    note is marked as last edited by an agent. Never put secrets in a note."""
+    it. Use this to add items to a list or lines to a note. List items (`- x`, `* x`, `1. x`) the
+    note already has are left out and counted in the reply, so do not read the note first just to
+    avoid duplicates. Only shared notes can be changed. The note is marked as last edited by an
+    agent. Never put secrets in a note."""
     return domain.append_to_note(domain.open_gateway(), note_id, text)

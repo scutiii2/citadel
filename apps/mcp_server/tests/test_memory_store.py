@@ -35,6 +35,19 @@ def test_search_ranks_matches_and_ignores_non_matches(db):
     assert texts == ["my server is called app-01"]
 
 
+def test_a_query_word_also_matches_longer_words_that_start_with_it(db):
+    store.save(db, "alice", "Favorite movies: Moon, Primer")
+    assert [n.text for n in store.search(db, "alice", "movie")] == ["Favorite movies: Moon, Primer"]
+    assert [n.text for n in store.search(db, "alice", "fav")] == ["Favorite movies: Moon, Primer"]
+
+
+def test_a_short_query_word_matches_whole_words_only(db):
+    store.save(db, "alice", "I watch TV and trains")
+    assert len(store.search(db, "alice", "tv")) == 1
+    assert store.search(db, "alice", "t") == []
+    assert store.search(db, "alice", "tr") == []
+
+
 @pytest.mark.parametrize("query", ['"', "*", "a AND", "NEAR(", "x OR OR y", "(((", "col:val", "---", "???"])
 def test_awkward_queries_never_raise(db, query):
     store.save(db, "alice", "plain note")

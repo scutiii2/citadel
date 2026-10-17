@@ -43,7 +43,7 @@
     },
     {
       "name": "tool_notes_appendToNote",
-      "purpose": "Add text to the end of a shared note.",
+      "purpose": "Add text to the end of a shared note; list items it already has are left out and counted.",
       "connection": "db_gateway (HTTP)",
       "commands": [
         "append"
@@ -155,7 +155,7 @@
           "name": "text",
           "required": true,
           "default": null,
-          "description": "Text to add after the current text."
+          "description": "Text to add after the current text. List items already in the note are left out; other lines are always kept."
         }
       ]
     }

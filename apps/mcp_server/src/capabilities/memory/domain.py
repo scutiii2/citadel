@@ -1,5 +1,5 @@
 """Typed memory operations; memory_store owns storage, identity_context the owner."""
-from src.capabilities.memory.contract import ForgetResult, SaveResult, SearchResult
+from src.capabilities.memory.contract import ClearResult, ForgetResult, SaveResult, SearchResult
 from src.config import settings
 from src.services import identity_context, memory_store, untrusted
 from src.services.internal_token import is_exposed_without_token
@@ -31,6 +31,11 @@ def search(query: str = "") -> SearchResult:
     # Note text was typed by a user or written by the model earlier: treat it as data.
     body = untrusted.fence("\n".join(lines), source="your saved memory notes")
     return SearchResult(count=len(notes), message=f"{len(notes)} saved note(s):\n{body}")
+
+
+def clear() -> ClearResult:
+    count = memory_store.purge_owner(settings.memory_db_path, _owner())
+    return ClearResult(count=count, message=f"Deleted {count} saved note(s)." if count else "There were no saved notes to delete.")
 
 
 def forget(note_id: int) -> ForgetResult:

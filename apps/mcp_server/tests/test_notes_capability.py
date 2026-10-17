@@ -338,6 +338,41 @@ def test_append_to_an_empty_note_and_around_trailing_newlines(capability, librar
     assert stored(library, ID1)["body"] == "list\n- item"
 
 
+def test_append_leaves_out_list_items_the_note_already_has_and_says_how_many(capability, library):
+    library.docs[ID1]["body"] = "- Metropolis\n* Blade Runner\n1. Brazil"
+
+    result = structured(call(capability, "tool_notes_appendToNote", {
+        "note_id": ID1, "text": "- metropolis\n- BLADE   runner\n- Gattaca\n- Brazil\n- Gattaca",
+    }))
+
+    assert stored(library, ID1)["body"] == "- Metropolis\n* Blade Runner\n1. Brazil\n- Gattaca"
+    assert "4 item(s) already in it were left out" in result["message"]
+
+
+def test_append_keeps_every_line_that_is_not_a_list_item(capability, library):
+    library.docs[ID1]["body"] = "---\nintro\n- item"
+
+    result = structured(call(capability, "tool_notes_appendToNote", {"note_id": ID1, "text": "---\nintro\n- item\n- new"}))
+
+    assert stored(library, ID1)["body"] == "---\nintro\n- item\n---\nintro\n- new"
+    assert "1 item(s) already in it were left out" in result["message"]
+
+
+def test_append_of_only_known_items_changes_nothing(capability, library):
+    library.docs[ID1]["body"] = "- one\n- two"
+    before = dict(stored(library, ID1))
+
+    result = structured(call(capability, "tool_notes_appendToNote", {"note_id": ID1, "text": "- two\n- one"}))
+
+    assert stored(library, ID1) == before
+    assert "Nothing added" in result["message"] and "all 2 item(s)" in result["message"]
+
+
+def test_append_without_repeats_says_nothing_about_them(capability, library):
+    result = structured(call(capability, "tool_notes_appendToNote", {"note_id": ID1, "text": "- brand new"}))
+    assert "left out" not in result["message"]
+
+
 def test_append_refuses_empty_text_and_a_note_that_would_overflow(capability, library):
     with pytest.raises(Exception, match="the text is empty"):
         call(capability, "tool_notes_appendToNote", {"note_id": ID1, "text": "  \n"})

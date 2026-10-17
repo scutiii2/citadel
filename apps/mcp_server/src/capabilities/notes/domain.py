@@ -42,6 +42,7 @@ TAG_MAX = 30
 MAX_TAGS = 10
 _NOTE_ID = re.compile(r"[0-9a-f]{32}")
 _TAG = re.compile(r"[a-z0-9][a-z0-9_-]*")
+_LIST_ITEM = re.compile(r"\s*(?:[-*+]|\d+[.)])\s+")
 _NOT_AVAILABLE = "No note with that id is available to agents. List the notes first and use an id from the list."
 
 
@@ -211,12 +212,35 @@ def _call(fn, *args):
         raise NotesError(f"Notes are unavailable right now: {error}") from error
 
 
-def _written(key: str, doc: dict[str, Any], verb: str) -> NoteWriteResult:
+def _written(key: str, doc: dict[str, Any], verb: str, extra: str = "") -> NoteWriteResult:
     title = str(doc.get("title", ""))
-    return NoteWriteResult(
-        id=key, title=title, tags=", ".join(_tags(doc)),
-        message=f"{verb} note {title!r} (id {key}). It is marked as last edited by an agent.",
-    )
+    message = f"{verb} note {title!r} (id {key}). It is marked as last edited by an agent."
+    return NoteWriteResult(id=key, title=title, tags=", ".join(_tags(doc)), message=f"{message} {extra}" if extra else message)
+
+
+def _item_key(line: str) -> str | None:
+    """What identifies a list item (`- x`, `* x`, `1. x`) apart from its marker, case and
+    spacing; None for any other line."""
+    match = _LIST_ITEM.match(line)
+    return " ".join(line[match.end():].lower().split()) or None if match else None
+
+
+def _without_known_items(body: str, text: str) -> tuple[str, int]:
+    """`text` less the list items `body` (or an earlier line of `text`) already has, and how
+    many were left out. Lines that are not list items are always kept, so prose cannot lose a
+    line that happens to match."""
+    known = {key for line in body.splitlines() if (key := _item_key(line))}
+    kept: list[str] = []
+    skipped = 0
+    for line in text.splitlines():
+        key = _item_key(line)
+        if key is not None and key in known:
+            skipped += 1
+            continue
+        if key is not None:
+            known.add(key)
+        kept.append(line)
+    return ("\n".join(kept).strip("\n"), skipped) if skipped else (text, 0)
 
 
 def create_note(gateway: NotesGateway, title: str, body: str, tags: str = "") -> NoteWriteResult:
@@ -259,6 +283,13 @@ def append_to_note(gateway: NotesGateway, note_id: str, text: str) -> NoteWriteR
         raise NotesError("Nothing to add: the text is empty.")
     key, doc = _fetch_editable(gateway, owner, note_id)
     body = str(doc.get("body", ""))
+    text, skipped = _without_known_items(body, text)
+    if not text.strip():
+        title = str(doc.get("title", ""))
+        return NoteWriteResult(
+            id=key, title=title, tags=", ".join(_tags(doc)),
+            message=f"Nothing added to note {title!r} (id {key}): all {skipped} item(s) are already in it.",
+        )
     joined = body.rstrip("\n") + "\n" + text if body.strip() else text
     if len(joined) > BODY_MAX:
         raise NotesError(
@@ -268,4 +299,4 @@ def append_to_note(gateway: NotesGateway, note_id: str, text: str) -> NoteWriteR
     doc.update(body=joined, last_editor="agent", updated_at=_now())
     _call(gateway.put, key, doc)
     logger.info("notes: an agent added to a note of account %s", owner)
-    return _written(key, doc, "Added to")
+    return _written(key, doc, "Added to", f"{skipped} item(s) already in it were left out." if skipped else "")

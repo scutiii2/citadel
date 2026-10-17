@@ -5,7 +5,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from src.capabilities.memory import domain
-from src.capabilities.memory.contract import ForgetResult, SaveResult, SearchResult
+from src.capabilities.memory.contract import ClearResult, ForgetResult, SaveResult, SearchResult
 from src.commands import command
 from src.offload import offload
 from src.server import mcp
@@ -55,3 +55,15 @@ def tool_mem_forget(note_id: NoteId) -> ForgetResult:
     own notes can be deleted.
     """
     return domain.forget(note_id)
+
+
+# No @command: a slash command that wipes everything is too easy to run by accident.
+@mcp.tool(meta={"keywords": ["memory", "clear", "forget", "delete", "all"], "display_label": "Clearing saved notes"},
+          annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False))
+@offload
+def tool_mem_clear() -> ClearResult:
+    """Delete ALL of the user's saved memory notes at once. It cannot be undone, so call it
+    only after the user has clearly confirmed. To remove a single note use `tool_mem_forget`.
+    It does not touch the user's Notes page (`tool_notes_*`).
+    """
+    return domain.clear()

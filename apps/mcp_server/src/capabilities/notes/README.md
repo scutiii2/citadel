@@ -11,7 +11,7 @@ Lets agents use the notes a user chose to share. A user keeps private notes in e
 | `tool_notes_readNote` | Read one shared note in full. | db_gateway (HTTP) |
 | `tool_notes_createNote` | Create a note (shared with agents, marked as written by an agent). | db_gateway (HTTP) |
 | `tool_notes_updateNote` | Replace the title, text or tags of a shared note; an empty argument keeps that part. | db_gateway (HTTP) |
-| `tool_notes_appendToNote` | Add text to the end of a shared note. | db_gateway (HTTP) |
+| `tool_notes_appendToNote` | Add text to the end of a shared note; list items it already has are left out and counted. | db_gateway (HTTP) |
 
 ## Slash commands
 
@@ -22,7 +22,7 @@ Lets agents use the notes a user chose to share. A user keeps private notes in e
 | `tool_notes_readNote` | `/notes read` | <ul><li>`note_id` - required. The note's id, from the list or a search.</li></ul> |
 | `tool_notes_createNote` | `/notes create` | <ul><li>`title` - required. At most 200 characters.</li><li>`body` - required. At most 20,000 characters.</li><li>`tags` - optional, default empty. Comma-separated, at most 10.</li></ul> |
 | `tool_notes_updateNote` | `/notes update` | <ul><li>`note_id` - required. The note's id.</li><li>`title` - optional, default empty. A new title; empty keeps the current one.</li><li>`body` - optional, default empty. The new full text; empty keeps the current text.</li><li>`tags` - optional, default empty. The new full tag list; empty keeps the current tags.</li></ul> |
-| `tool_notes_appendToNote` | `/notes append` | <ul><li>`note_id` - required. The note's id.</li><li>`text` - required. Text to add after the current text.</li></ul> |
+| `tool_notes_appendToNote` | `/notes append` | <ul><li>`note_id` - required. The note's id.</li><li>`text` - required. Text to add after the current text. List items (`- x`, `* x`, `1. x`) already in the note are left out; other lines are always kept.</li></ul> |
 
 ## Typical workflow
 

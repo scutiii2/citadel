@@ -20,6 +20,8 @@ MAX_NOTE_CHARS = 500
 MAX_NOTES = 200
 DEFAULT_LIMIT = 10
 MAX_QUERY_WORDS = 10
+# Shorter query words match whole words only: "a"* would match nearly every note.
+_PREFIX_MIN = 3
 
 _NO_OWNER = "No account identity is known for this request, so memory is unavailable."
 
@@ -64,9 +66,11 @@ def _connect(path: Path) -> sqlite3.Connection:
 
 
 def _fts_expression(query: str) -> str:
-    """Quote every word so user text can never be read as FTS syntax; OR them for recall."""
+    """Quote every word so user text can never be read as FTS syntax; OR them for recall.
+    A word of three or more characters also matches longer words that start with it
+    ("movie" finds "movies"); the index does no stemming."""
     words = re.findall(r"\w+", query or "")[:MAX_QUERY_WORDS]
-    return " OR ".join(f'"{word}"' for word in words)
+    return " OR ".join(f'"{word}"*' if len(word) >= _PREFIX_MIN else f'"{word}"' for word in words)
 
 
 @catalog

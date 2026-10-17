@@ -3,7 +3,8 @@
   "tools": [
     {"name": "tool_mem_save", "purpose": "Save one short note that outlives the chat", "connection": "Local SQLite", "commands": ["save"]},
     {"name": "tool_mem_search", "purpose": "Search your notes; an empty query lists the newest", "connection": "Local SQLite", "commands": ["search"]},
-    {"name": "tool_mem_forget", "purpose": "Delete one of your notes by id", "connection": "Local SQLite", "commands": ["forget"]}
+    {"name": "tool_mem_forget", "purpose": "Delete one of your notes by id", "connection": "Local SQLite", "commands": ["forget"]},
+    {"name": "tool_mem_clear", "purpose": "Delete all of your notes at once (MCP-only: no slash command, so it is never run by accident)", "connection": "Local SQLite", "commands": []}
   ],
   "commands": [
     {"name": "save", "tool": "tool_mem_save", "params": [
@@ -19,6 +20,7 @@
   "workflow": [
     {"sequence": "1", "tool": "tool_mem_search", "ai_only_step": false, "explanation": "Look up saved notes at the start of a conversation."},
     {"sequence": "2", "tool": "tool_mem_save", "ai_only_step": false, "explanation": "Save a fact or preference the user stated."},
-    {"sequence": "3", "tool": "tool_mem_forget", "ai_only_step": false, "explanation": "Delete a note that is wrong or no longer wanted."}
+    {"sequence": "3", "tool": "tool_mem_forget", "ai_only_step": false, "explanation": "Delete a note that is wrong or no longer wanted."},
+    {"sequence": "4", "tool": "tool_mem_clear", "ai_only_step": true, "explanation": "Delete every note, only after the user clearly confirmed."}
   ]
 }

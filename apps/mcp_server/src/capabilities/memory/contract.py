@@ -14,3 +14,8 @@ class SearchResult(BaseModel):
 class ForgetResult(BaseModel):
     forgotten: bool = Field(description="True when a note was deleted.")
     message: str
+
+
+class ClearResult(BaseModel):
+    count: int = Field(description="Number of notes deleted.")
+    message: str

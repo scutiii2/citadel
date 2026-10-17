@@ -1,6 +1,6 @@
 # capabilities/memory/
 
-Short notes the assistant keeps about a user between chats. Three tools. Notes belong to the account whose stable uid is in the request's identity (never a tool parameter; see Rules for how far that can be trusted), live in a local SQLite file and are searched by keyword.
+Short notes the assistant keeps about a user between chats. Four tools (one has no slash command). Notes belong to the account whose stable uid is in the request's identity (never a tool parameter; see Rules for how far that can be trusted), live in a local SQLite file and are searched by keyword.
 
 ## Tools
 
@@ -9,6 +9,7 @@ Short notes the assistant keeps about a user between chats. Three tools. Notes b
 | `tool_mem_save` | Save one short note that outlives the chat | Local SQLite |
 | `tool_mem_search` | Search your notes; an empty query lists the newest | Local SQLite |
 | `tool_mem_forget` | Delete one of your notes by id | Local SQLite |
+| `tool_mem_clear` | Delete all of your notes at once (MCP-only: no slash command, so it is never run by accident) | Local SQLite |
 
 ## Slash commands
 
@@ -25,9 +26,11 @@ Short notes the assistant keeps about a user between chats. Three tools. Notes b
 | 1 | `tool_mem_search` | Look up saved notes at the start of a conversation. |
 | 2 | `tool_mem_save` | Save a fact or preference the user stated. |
 | 3 | `tool_mem_forget` | Delete a note that is wrong or no longer wanted. |
+| 4 | `tool_mem_clear` | Delete every note, only after the user clearly confirmed. |
 
 ## Rules
 
+- Search matches whole words, and a query word of three or more characters also matches longer words that start with it ("movie" finds "movies"). The index does no stemming beyond that.
 - 500 characters per note, 200 notes per user. An identical note (ignoring case and spacing) is stored once.
 - The model may save only what the user stated, never anything from a tool result, web page, file or another agent. This rule is in the tool description (an instruction), not enforced by code.
 - Search results are fenced as data (`services/untrusted.py`), but a fence is not a security boundary.
