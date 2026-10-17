@@ -263,6 +263,10 @@ orchestrator, run `python -m scripts.check_triage_cases`: 47 cases that call the
 code, with `--list`, `--case NAME` (or a pattern such as `"escalate-*"`), `--rounds`, `--baseline` (Laya alone, for comparison), `--prune-ratio R` and
 `--json` (full answers with their traces). It uses your `config_tuning.json` and `.env` and sends the
 cases' texts to the fallback backend when that is on.
+`--three-way` is an experiment (the Triage Assistant itself is unchanged): the English Laya checkpoint, the
+`typed-decisions` checkpoint and the fallback vote as three separate models and the same phases run over all of them
+(rules in `scripts/triage_three_way.py`; `--max-len` sets the Laya window, default 4096; with `--baseline` only the
+two Laya models vote).
 
 Usage reports the model's actual input-token work and zero generated output
 tokens. Laya is restricted to a specialist with the pinned checkpoint and

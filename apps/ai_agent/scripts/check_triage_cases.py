@@ -8,6 +8,7 @@ Run from ai_agent:
     python -m scripts.check_triage_cases --baseline      # the same cases with the fallback off (Laya alone)
     python -m scripts.check_triage_cases --prune-ratio 0.4 --json
     python -m scripts.check_triage_cases --rounds        # a table of every model call for each reviewed question
+    python -m scripts.check_triage_cases --three-way --rounds   # Laya English, Laya typed-decisions and Jev as separate voters
 
 It calls the same code the Triage Assistant runs (LayaQuestions.answer), so the orchestrator is not
 involved. It loads the local Laya model, reads the `classifier` section of configs/config_tuning.json and
@@ -21,6 +22,12 @@ cents of tokens in all). Each row shows how a question was settled:
     fallback   the classifier answered alone (text too long for Laya, or Laya had no usable answer)
     blend      Laya and the classifier were averaged, nothing dropped
     narrowed   options far below the rest were dropped and the question asked again (then who decided)
+
+With --three-way the cases run through scripts/triage_three_way.py instead: the English Laya checkpoint, the
+typed-decisions checkpoint and the fallback each vote on their own and the same phases (confidence gap, average
+and drop, pair rule) are applied to all of them; see that file for the exact rules. It loads both checkpoints
+(--max-len sets the window, default 4096). --baseline then leaves out the fallback, so the two Laya models vote alone.
+Extra path labels there: `local` (both Laya models agreed and one was sure, nothing left the machine).
 
 Expected choices are a smoke check, not a benchmark: a case with no expectation is for watching the
 paths and numbers. Exit code 1 with --strict when a case with an expectation got a different answer.
@@ -266,6 +273,8 @@ def path_of(answer: dict[str, Any]) -> str:
     by = answer.get("answered_by")
     if by is None:
         return "laya"
+    if answer.get("resolved_by") == "local":
+        return "local"
     if "deferred_to" in answer:
         return f"deferred->{by}"
     if answer.get("resolved_by") == "pair":
@@ -274,6 +283,8 @@ def path_of(answer: dict[str, Any]) -> str:
         return f"narrowed->{by}"
     if "+" in by:
         return "blend"
+    if by.startswith("laya"):
+        return "laya"
     return "fallback"
 
 
@@ -339,7 +350,9 @@ def table(rows: list[Row]) -> str:
     return "\n".join(lines)
 
 
-_STEP_NAMES = {"laya": "Laya", "jev": "Jev", "jev_vercel": "Jev (Vercel)"}
+_STEP_NAMES = {
+    "laya": "Laya", "jev": "Jev", "jev_vercel": "Jev (Vercel)", "laya-english": "Laya (English)", "laya-typed": "Laya (typed)",
+}
 
 
 def _grid(header: list[str], body: list[list[str]]) -> str:
@@ -442,6 +455,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="also print each answer in full (with its rounds trace)")
     parser.add_argument("--rounds", action="store_true", help="print a table of every model call for each reviewed question")
     parser.add_argument("--strict", action="store_true", help="exit 1 when an expectation is missed or a case fails")
+    parser.add_argument("--three-way", action="store_true",
+                        help="Laya English, Laya typed-decisions and the fallback as three separate voters")
+    parser.add_argument("--max-len", type=int, default=4096, metavar="N",
+                        help="token window for the Laya models with --three-way (default 4096)")
     args = parser.parse_args(argv)
 
     if args.list:
@@ -454,10 +471,16 @@ def main(argv: list[str] | None = None) -> int:
     load_env()
     sys.path.insert(0, str(PROJECT))
     apply_settings(args.baseline, args.prune_ratio)
-    from src.llm.laya_provider import LayaQuestions
+    if args.three_way:
+        from scripts.triage_three_way import ThreeWayTriage
 
-    laya = LayaQuestions()
-    print("loading Laya (the first run may download weights)...", flush=True)
+        print("loading Laya English and typed-decisions (the first run may download weights)...", flush=True)
+        laya = ThreeWayTriage.load(args.max_len, use_fallback=not args.baseline)
+    else:
+        from src.llm.laya_provider import LayaQuestions
+
+        laya = LayaQuestions()
+        print("loading Laya (the first run may download weights)...", flush=True)
     laya.prepare()
     rows: list[Row] = []
     errors: dict[str, str] = {}
