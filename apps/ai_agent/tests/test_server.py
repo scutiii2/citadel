@@ -235,6 +235,7 @@ def test_main_registers_with_the_spec_flags(monkeypatch):
         "tiers": [{"tier": "light", "id": "haiku", "use_for": "quick"}],
         "efforts": ["off", "low"],
         "tool_allow": list(server.SPEC.tools.allow),
+        "delegable": server.SPEC.delegable,
     }
     assert calls["deregister"] == server._AGENT_ID
 

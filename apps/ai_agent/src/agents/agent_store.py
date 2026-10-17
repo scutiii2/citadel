@@ -296,6 +296,6 @@ def preview_prompt(
     roster = [
         RosterEntry(id=o.id, label=o.label, focus=o.focus)
         for o in _other_specs(agent_id, directory)
-        if o.enabled
+        if o.enabled and o.delegable
     ]
     return agent_roles.preview(spec, roster, prompt_config.load(prompts_path), caveman)

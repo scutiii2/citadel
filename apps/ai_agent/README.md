@@ -94,6 +94,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `tools.deny` | no | `[]` | Globs removed after `allow`. Deny wins. |
 | `orchestrator` | no | `false` | Gets `delegate_to_agent` and the roster. |
 | `memory_recall` | no | `false` | At the start of each top-level turn, load the user's newest saved notes (`tool_mem_search`, up to 10) and put them in front of the question. Needs the `memory` capability online and an agent that may call `tool_mem_*`. Not allowed for Laya. Only `ember` has it on. |
+| `delegable` | no | `true` | `false` keeps the agent out of every orchestrator's roster: it is called directly (for example by ember_api), never delegated to. |
 | `plan_tool` | no | `true` | Offer the `update_plan` checklist tool (`src/agents/plan.py`) for tasks of three or more steps. A chat can also switch it off per turn (`ask(plan=False)`), and the tool is offered only when both allow it. Set `false` to never offer it from this agent. |
 
 An orchestrator file:

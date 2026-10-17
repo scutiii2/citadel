@@ -38,6 +38,13 @@ def test_specialists_exclude_self_and_orchestrators(registry, monkeypatch):
     assert [r.id for r in agent_routing.specialists()] == ["calc", "explainer", "poet", "blank"]
 
 
+def test_specialists_skip_an_agent_that_is_not_delegable(registry, monkeypatch):
+    _use(monkeypatch)
+    hidden = [*AGENTS, {"id": "titles", "label": "Titles", "url": "u", "focus": "titles", "delegable": False}]
+    monkeypatch.setattr(agent_registry, "_AGENTS", hidden)
+    assert "titles" not in [r.id for r in agent_routing.specialists()]
+
+
 def test_non_orchestrator_has_no_roster(registry, monkeypatch):
     _use(monkeypatch, orchestrator=False)
     assert asyncio.run(agent_routing.roster_for()) == []

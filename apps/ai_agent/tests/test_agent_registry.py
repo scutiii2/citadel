@@ -132,6 +132,15 @@ def test_missing_config_file_yields_no_agents(monkeypatch, tmp_path):
     assert agent_registry._load() == []
 
 
+def test_register_stores_delegable_only_when_false(monkeypatch, tmp_path):
+    config_path = _configure(monkeypatch, tmp_path, [])
+    agent_registry.register("titles", "Titles", "http://127.0.0.1:9115/mcp", delegable=False)
+    agent_registry.register("calc", "Calc", "http://127.0.0.1:9103/mcp")
+    records = {r["id"]: r for r in json.loads(config_path.read_text(encoding="utf-8"))["agents"]}
+    assert records["titles"]["delegable"] is False
+    assert "delegable" not in records["calc"]
+
+
 def test_register_writes_entry_orchestrator_and_focus(monkeypatch, tmp_path):
     config_path = _configure(monkeypatch, tmp_path, [])
 

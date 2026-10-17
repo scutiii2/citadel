@@ -512,6 +512,7 @@ def main() -> None:
         _AGENT_ID, _AGENT_LABEL, _AGENT_URL,
         entry=SPEC.entry, orchestrator=SPEC.orchestrator, focus=SPEC.focus,
         tiers=_OWN_TIERS, efforts=_OWN_EFFORTS, tool_allow=list(SPEC.tools.allow),
+        delegable=SPEC.delegable,
     )
     try:
         # Same app, host, port and log level mcp.run(transport="streamable-http")

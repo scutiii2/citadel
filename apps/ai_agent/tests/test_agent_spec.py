@@ -363,6 +363,18 @@ def test_an_override_replaces_the_tracked_file_and_can_add_an_agent(tmp_path):
     assert agent_spec.load_file(tmp_path / "calc.json").port == 9103
 
 
+def test_delegable_defaults_to_true_and_loads_false(tmp_path):
+    base = {"port": 9103, "llm": {"provider": "anthropic"}}
+    assert agent_spec.load_file(_write(tmp_path, "calc", base)).delegable is True
+    assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "delegable": False})).delegable is False
+
+
+def test_delegable_must_be_a_boolean(tmp_path):
+    path = _write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "anthropic"}, "delegable": "no"})
+    with pytest.raises(AgentSpecError, match="delegable"):
+        agent_spec.load_file(path)
+
+
 def test_plan_tool_defaults_to_true_and_loads_false(tmp_path):
     base = {"port": 9103, "llm": {"provider": "anthropic"}}
     assert agent_spec.load_file(_write(tmp_path, "calc", base)).plan_tool is True
