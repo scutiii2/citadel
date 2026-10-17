@@ -432,6 +432,13 @@ export async function installFakeApi(page: Page, options: { admin?: boolean } = 
       return json(route, { suggested, checked: [...used].filter((tag) => !have.has(tag)).length, skipped: 0 });
     }
 
+    // The tag-writer's proposal: the fake writes one tag from the note's first word.
+    if (path === "/api/notes/generate-tag" && method === "POST") {
+      const { title, body, tags } = request.postDataJSON() as NoteBody;
+      const word = `${title ?? ""} ${body ?? ""}`.toLowerCase().match(/[a-z0-9]{3,}/)?.[0];
+      return json(route, { tags: word && !(tags ?? []).includes(word) ? [word] : [] });
+    }
+
     // Private notes, newest edit first. Ids are 32 hex characters, as ember_api makes them.
     if (path === "/api/notes" && (method === "GET" || method === "POST")) {
       if (method === "GET") return json(route, [...api.notes.values()].sort((a, b) => b.updated_at.localeCompare(a.updated_at)));

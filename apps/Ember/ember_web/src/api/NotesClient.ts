@@ -37,6 +37,11 @@ export interface TagSuggestions {
   skipped: number;
 }
 
+/** Up to three new tags the tag-writer agent proposes for a note. None are applied. */
+export interface GeneratedTags {
+  tags: string[];
+}
+
 const path = (id: string) => `/api/notes/${encodeURIComponent(id)}`;
 
 /** ember_api's /api/notes routes (chat.use). */
@@ -53,6 +58,9 @@ export const notesClient = {
   /** Asks Laya (a local model) about the note as the editor holds it, saved or not. */
   suggestTags: (draft: Pick<NoteDraft, "title" | "body" | "tags">) =>
     apiRequest<TagSuggestions>("POST", "/api/notes/suggest-tags", draft),
+  /** Asks a light model (the tag-writer agent) for up to three new tags that fit the note. */
+  generateTags: (draft: Pick<NoteDraft, "title" | "body" | "tags">) =>
+    apiRequest<GeneratedTags>("POST", "/api/notes/generate-tag", draft),
 };
 
 /** A tag as the server keeps it: lowercase, spaces become "-", other characters go,

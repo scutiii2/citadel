@@ -7,7 +7,7 @@ import NotesView from "./NotesView.vue";
 
 vi.mock("../api/NotesClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/NotesClient")>()),
-  notesClient: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), suggestTags: vi.fn(), get: vi.fn() },
+  notesClient: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), suggestTags: vi.fn(), generateTags: vi.fn(), get: vi.fn() },
 }));
 
 const client = vi.mocked(notesClient);
@@ -389,6 +389,83 @@ describe("NotesView tag suggestions", () => {
 
     expect(pickers(w)).toEqual([]);
     expect(suggestButton(w)!.text()).toBe("Suggest tags");
+  });
+});
+
+describe("NotesView generated tags", () => {
+  const generateButton = (w: VueWrapper) => buttonByText(w, "Generate tag") ?? buttonByText(w, "Generating …");
+  const pickers = (w: VueWrapper) => w.findAll("button.pick").map((b) => b.text());
+  const chips = (w: VueWrapper) => w.findAll("ul[aria-label='Tags'] li").map((li) => li.text().replace("×", "").trim());
+
+  it("is offered even when the account has no tags yet, and needs some text first", async () => {
+    const w = await setup([note("a", "Roof", "x")]);
+    await buttonByText(w, "New note")!.trigger("click");
+
+    expect(generateButton(w)!.attributes("disabled")).toBeDefined();
+    await w.get("input[aria-label=Title]").setValue("Roof");
+    expect(generateButton(w)!.attributes("disabled")).toBeUndefined();
+  });
+
+  it("sends the note as it is in the editor and shows the new tags; picking one adds it", async () => {
+    client.generateTags.mockResolvedValue({ tags: ["roofing", "budget", "quotes"] });
+    const w = await setup([note("a", "Roof", "call the builder")]);
+    await rows(w)[0]!.get("button").trigger("click");
+    await w.get("textarea").setValue("pay the builder");
+
+    await generateButton(w)!.trigger("click");
+    await flushPromises();
+
+    expect(client.generateTags).toHaveBeenCalledExactlyOnceWith({ title: "Roof", body: "pay the builder", tags: [] });
+    expect(pickers(w)).toEqual(["+ roofing", "+ budget", "+ quotes"]);
+    expect(chips(w)).toEqual([]); // nothing is applied by itself
+
+    await w.get("button[aria-label='Add generated tag budget']").trigger("click");
+
+    expect(chips(w)).toEqual(["budget"]);
+    expect(pickers(w)).toEqual(["+ roofing", "+ quotes"]);
+    expect(w.text()).toContain("Unsaved changes");
+  });
+
+  it("says so when the model has no new tag", async () => {
+    client.generateTags.mockResolvedValue({ tags: [] });
+    const w = await setup([note("a", "Roof", "x")]);
+    await rows(w)[0]!.get("button").trigger("click");
+
+    await generateButton(w)!.trigger("click");
+    await flushPromises();
+
+    expect(w.text()).toContain("No new tag came to mind for this note.");
+  });
+
+  it("says why when the tag writer is unavailable, and the note stays editable", async () => {
+    client.generateTags.mockRejectedValue(new ApiError(503, "Tag generation is unavailable: the tag-writer agent is not running"));
+    const w = await setup([note("a", "Roof", "x")]);
+    await rows(w)[0]!.get("button").trigger("click");
+
+    await generateButton(w)!.trigger("click");
+    await flushPromises();
+
+    expect(w.get("[role=alert]").text()).toContain("the tag-writer agent is not running");
+    expect(generateButton(w)!.attributes("disabled")).toBeUndefined();
+    expect(w.get("input[aria-label=Title]").attributes("disabled")).toBeUndefined();
+  });
+
+  it("shows a busy state, and drops an answer for a note you left", async () => {
+    let finish!: (value: { tags: string[] }) => void;
+    client.generateTags.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const w = await setup([note("a", "Roof", "x", "2026-01-02T00:00:00"), note("b", "Other", "y", "2026-01-01T00:00:00")]);
+    await rows(w)[0]!.get("button").trigger("click");
+
+    await generateButton(w)!.trigger("click");
+    expect(generateButton(w)!.text()).toBe("Generating …");
+    expect(generateButton(w)!.attributes("disabled")).toBeDefined();
+
+    await rows(w)[1]!.get("button").trigger("click");
+    finish({ tags: ["roofing"] });
+    await flushPromises();
+
+    expect(pickers(w)).toEqual([]);
+    expect(generateButton(w)!.text()).toBe("Generate tag");
   });
 });
 
