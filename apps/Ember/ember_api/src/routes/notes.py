@@ -27,6 +27,7 @@ from src.services.notes import (
 )
 from src.services.permissions import CHAT_USE
 from src.services.tag_suggestions import TagSuggester, TagSuggestionUnavailable
+from src.services.tag_writer import TagWriter, TagWriterUnavailable
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
 
@@ -95,6 +96,10 @@ class SuggestionsOut(BaseModel):
     skipped: int
 
 
+class GeneratedTagsOut(BaseModel):
+    tags: list[str]
+
+
 async def _log_agent_access(logs: LogWriter, account: Account, allowed: bool) -> None:
     # Only the switch is logged, never the note's text.
     await logs.action(
@@ -149,6 +154,27 @@ async def suggest_tags(
     except TagSuggestionUnavailable as error:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"Tag suggestions are unavailable: {error}") from error
     return SuggestionsOut(suggested=found.suggested, checked=found.checked, skipped=found.skipped)
+
+
+@router.post("/generate-tag")
+async def generate_tag(
+    body: SuggestBody,
+    account: Account = Depends(require_chat),
+    notes: NotesService = Depends(get_notes_service),
+    gateway: AgentGateway = Depends(get_agent_gateway),
+    directory: AgentDirectory = Depends(get_agent_directory),
+) -> GeneratedTagsOut:
+    """Up to three new tags for the note, written by the tag-writer agent. Nothing is applied."""
+    try:
+        known = [tag for tag, _count in await notes.tags()]
+    except DbGatewayError as error:
+        _fail(error)
+    caller = Caller(username=account.username, email=account.email, uid=account.uid)
+    try:
+        tags = await TagWriter(gateway, directory).generate(caller, body.title, body.body, known, body.tags)
+    except TagWriterUnavailable as error:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"Tag generation is unavailable: {error}") from error
+    return GeneratedTagsOut(tags=tags)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

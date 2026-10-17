@@ -57,7 +57,8 @@ def build_request(excerpt: str, tags: list[str]) -> str:
         }
         for i, tag in enumerate(tags)
     }
-    return json.dumps({"text": excerpt, "questions": questions})
+    # local_only: Laya's own English model answers; a note never goes on to the fallback classifier (Jev).
+    return json.dumps({"text": excerpt, "questions": questions, "local_only": True})
 
 
 def confident_yes(response: str, tags: list[str]) -> dict[str, float]:
