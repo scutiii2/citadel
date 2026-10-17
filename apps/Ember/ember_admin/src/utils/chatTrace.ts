@@ -11,6 +11,8 @@ export interface TraceAgent {
   model_tier?: string;
   reasoning_effort?: string;
   input_tokens?: number;
+  /** The part of input_tokens the provider served from its prompt cache. */
+  cached_input_tokens?: number;
   output_tokens?: number;
   total_tokens?: number;
   started_at?: string;

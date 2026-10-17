@@ -43,6 +43,19 @@ describe("ChatTurnEntry", () => {
     expect(wrapper.text()).toContain("The system prompt is not recorded.");
   });
 
+  it("advanced view shows how much of an agent's input came from the prompt cache, only when some did", () => {
+    const details = JSON.stringify({
+      agents: [
+        { agent_id: "a", input_tokens: 1000, cached_input_tokens: 800, output_tokens: 5, total_tokens: 1005, tools: [] },
+        { agent_id: "b", input_tokens: 1000, output_tokens: 5, total_tokens: 1005, tools: [] },
+      ],
+    });
+    const wrapper = mount(ChatTurnEntry, { props: { entry: entry({ details }), advanced: true } });
+    const [first, second] = wrapper.findAll(".run");
+    expect(first!.text()).toContain("(800 cached)");
+    expect(second!.text()).not.toContain("cached");
+  });
+
   it("says so when an entry has no agents or no prompt", () => {
     const old = mount(ChatTurnEntry, { props: { entry: entry({ details: '{"response":"x"}', prompts: null }), advanced: true } });
     expect(old.text()).toContain("logged before agents were recorded");

@@ -46,7 +46,7 @@ function tokens(n: number | undefined): string {
         <span v-if="run.agent.reasoning_effort" class="chip">effort {{ run.agent.reasoning_effort }}</span>
       </div>
       <p class="muted facts">
-        {{ tokens(run.agent.input_tokens) }} in · {{ tokens(run.agent.output_tokens) }} out · {{ tokens(run.agent.total_tokens) }} total
+        {{ tokens(run.agent.input_tokens) }} in<template v-if="run.agent.cached_input_tokens"> ({{ tokens(run.agent.cached_input_tokens) }} cached)</template> · {{ tokens(run.agent.output_tokens) }} out · {{ tokens(run.agent.total_tokens) }} total
         <template v-if="run.seconds !== null"> · {{ run.seconds }}s</template>
       </p>
       <p v-if="run.agent.tools.length" class="muted facts">Tools: {{ run.agent.tools.join(", ") }}</p>

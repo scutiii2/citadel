@@ -173,6 +173,18 @@ def test_final_event_and_saved_answer_carry_the_usage_split_and_duration(client:
     assert final["duration_s"] == saved["duration_s"]
 
 
+def test_the_chat_trace_keeps_the_cached_input_tokens_when_there_are_some() -> None:
+    from src.services.turns import Turn, _trace_parts
+
+    turn = Turn(account_id=1, chat_id="c", agent=None, caller=None)  # type: ignore[arg-type]
+    row = {"agent_id": "ember", "model": "m", "input_tokens": 100, "output_tokens": 5, "total_tokens": 105}
+
+    agents, _ = _trace_parts({"agent_usage": [{**row, "cached_input_tokens": 80}, row]}, turn)
+
+    assert agents[0]["cached_input_tokens"] == 80
+    assert "cached_input_tokens" not in agents[1]
+
+
 def test_answer_without_a_token_split_still_saves(client: TestClient, agent: FakeAgent) -> None:
     agent.result_extra = {"input_tokens": None, "output_tokens": None}
     as_admin(client)

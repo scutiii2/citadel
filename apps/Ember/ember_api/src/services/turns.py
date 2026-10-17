@@ -715,6 +715,7 @@ def _trace_parts(result: dict[str, Any], turn: Turn) -> tuple[list[dict[str, Any
             "model_tier": entry.get("model_tier"),
             "reasoning_effort": entry.get("reasoning_effort"),
             "input_tokens": entry.get("input_tokens"),
+            "cached_input_tokens": entry.get("cached_input_tokens"),
             "output_tokens": entry.get("output_tokens"),
             "total_tokens": entry.get("total_tokens"),
             "started_at": entry.get("started_at"),
