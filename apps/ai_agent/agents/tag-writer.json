@@ -1,0 +1,23 @@
+{
+  "label": "Tag Writer",
+  "port": 9116,
+  "enabled": true,
+  "entry": false,
+  "delegable": false,
+  "llm": {
+    "provider": "anthropic",
+    "gateway": "openrouter",
+    "temperature": 0,
+    "max_tokens": 100,
+    "max_tool_rounds": 1,
+    "max_tier": "light"
+  },
+  "identity": "You write tags for notes.",
+  "persona": "",
+  "instructions": "You get a note and the tags the user already has. Reply with a JSON array of at most 3 new tags, best first. A tag is one lowercase word or short phrase joined by '-', letters and digits only. A tag names the main topic of the note. Never repeat an existing tag. If the note has no clear topic, reply []. Reply with the array and nothing else.",
+  "focus": "Internal: new tags for a note. Called by ember_api, never delegated to.",
+  "tools": {
+    "allow": [],
+    "deny": ["*"]
+  }
+}

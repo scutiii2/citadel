@@ -191,6 +191,9 @@ question, a JSON string:
 - `text` is at most 4,000 characters; 1 to 8 questions; `min_confidence` is
   optional (default 0.70, `MIN_CONFIDENCE` in `src/llm/laya_provider.py`).
   Text after the JSON object is ignored.
+- `local_only: true` (optional) makes Laya's English checkpoint answer alone: no typed-decisions round and no
+  fallback classifier (Jev), whatever `classifier` says. Unsure answers stay marked `uncertain`, and a text Laya
+  cannot read whole is an error. ember_api's tag suggestions use it, so a note never leaves the machine.
 
 The response is JSON: `{"answers": {id: {...}}, "uncertain": bool}`. Each
 answer has `type`, the result (`choice`/`score`/`noul`), `answer_confidence`

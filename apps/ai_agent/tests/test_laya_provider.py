@@ -269,6 +269,30 @@ def test_jev_is_not_asked_unless_the_fallback_is_on(engine, monkeypatch):
     assert result["uncertain"] is True and "answered_by" not in json.dumps(result)
 
 
+def test_a_local_only_request_never_reaches_jev_even_when_laya_is_unsure(engine, monkeypatch):
+    engine.result = prediction(confidence=0.2)
+    jev_on(monkeypatch, {})
+    monkeypatch.setattr(decision, "ask_choice", lambda *a, **k: pytest.fail("Jev must not be called"))
+
+    result = payload(ask(request_with(local_only=True)))
+
+    assert result["uncertain"] is True and "answered_by" not in json.dumps(result)
+
+
+def test_a_local_only_request_does_not_fall_back_for_a_text_laya_cannot_read(engine, monkeypatch):
+    engine.result["usage"]["truncated"] = True
+    jev_on(monkeypatch, {})
+    monkeypatch.setattr(decision, "ask_choice", lambda *a, **k: pytest.fail("Jev must not be called"))
+
+    with pytest.raises(laya_provider._InputTooLong):
+        ask(request_with(local_only=True))
+
+
+def test_local_only_must_be_true_or_false(engine):
+    with pytest.raises(ValueError, match="local_only must be true or false"):
+        laya_provider.parse_request(json.dumps(request_with(local_only="yes")))
+
+
 def test_an_uncertain_choice_is_weighed_with_jevs_and_a_sure_one_stays_with_laya(engine, monkeypatch):
     low = prediction()
     low["answers"]["category"]["answer_confidence"] = 0.5

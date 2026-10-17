@@ -40,7 +40,7 @@ MAX_QUESTIONS = 8
 MIN_OPTIONS = 2
 MAX_OPTIONS = 10
 
-_REQUEST_KEYS = {"text", "questions", "min_confidence", "trace"}
+_REQUEST_KEYS = {"text", "questions", "min_confidence", "trace", "local_only"}
 _QUESTION_KEYS = {"type", "instructions", "criteria"}
 _QUESTION_TYPES = ("choice", "score", "noul")
 _NOUL_KEYS = {"false", "true"}
@@ -56,6 +56,8 @@ class Request:
     min_confidence: float
     # Ask the sequential flow for the full answer with its rounds trace (llm/triage_flow.py).
     trace: bool = False
+    # Only Laya's English checkpoint answers: no typed-decisions round, no fallback classifier (Jev).
+    local_only: bool = False
 
 
 def _fail(message: str) -> ValueError:
@@ -131,9 +133,21 @@ def parse_request(raw: str, max_chars: int = MAX_INPUT_CHARS) -> Request:
     trace = data.get("trace", False)
     if not isinstance(trace, bool):
         raise _fail("trace must be true or false")
+    local_only = data.get("local_only", False)
+    if not isinstance(local_only, bool):
+        raise _fail("local_only must be true or false")
     return Request(
-        text, {qid: _question(qid, spec) for qid, spec in questions.items()}, float(min_confidence), trace,
+        text, {qid: _question(qid, spec) for qid, spec in questions.items()}, float(min_confidence), trace, local_only,
     )
+
+
+def _asks_local_only(raw: str) -> bool:
+    """True when the question is a JSON object with `local_only: true`. Anything else is left to parse_request."""
+    try:
+        data, _ = json.JSONDecoder().raw_decode(raw.lstrip())
+    except ValueError:
+        return False
+    return isinstance(data, dict) and data.get("local_only") is True
 
 
 def _unit(value: Any) -> float:
@@ -410,7 +424,19 @@ class LayaQuestions:
         if self._sequential():
             self._flow_models()[decision.TRIAGE_VOTERS[1]]._warm()
 
+    def _answer_local(self, raw: str) -> ChatResult:
+        """Laya's own English answers only. A text Laya cannot read whole raises, as without a fallback."""
+        request = parse_request(raw)
+        answers, input_tokens = self._laya_answers(request)
+        result = {"answers": answers, "uncertain": any(a["uncertain"] for a in answers.values())}
+        return ChatResult(
+            response=json.dumps(result), provider_id=PROVIDER_ID, model=DEFAULT_MODEL,
+            input_tokens=input_tokens, output_tokens=0, total_tokens=input_tokens, context_tokens=None, model_note="",
+        )
+
     def answer(self, raw: str) -> ChatResult:
+        if _asks_local_only(raw):
+            return self._answer_local(raw)
         if self._sequential():
             from src.llm import triage_flow  # imported here: triage_flow imports this module
 
