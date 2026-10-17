@@ -56,6 +56,16 @@ beforeEach(() => {
 });
 
 describe("TicketsView", () => {
+  it("explains when the report is grouped with similar reports", async () => {
+    client.create.mockResolvedValue({ ticket: ticket(9), duplicate: false, group_size: 4 });
+    const wrapper = await mountView();
+    await button(wrapper, "New ticket").trigger("click");
+    await wrapper.find("input[aria-label='Title']").setValue("Email fails");
+    await wrapper.find("textarea[aria-label='Description']").setValue("Details");
+    await wrapper.find("button.submit-ticket").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".notice").text()).toBe("Ticket #9 filed. 3 other people reported something similar, so yours is grouped with them.");
+  });
   it("signals unread support activity and clears it after opening", async () => {
     client.list.mockResolvedValue([ticket(1, { has_unread: true })]);
     client.get.mockResolvedValue(ticket(1, { has_unread: false }));

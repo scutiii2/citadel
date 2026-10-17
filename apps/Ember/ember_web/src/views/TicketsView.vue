@@ -67,7 +67,9 @@ async function submit(): Promise<void> {
   formError.value = "";
   try {
     const created = await ticketsClient.create({ type: draft.type, title: draft.title.trim(), description: draft.description.trim() });
-    notice.value = `Ticket ${created.ticket.id} filed. Support will review it.`;
+    notice.value = created.group_size > 1
+      ? `Ticket #${created.ticket.id} filed. ${created.group_size - 1} other ${created.group_size === 2 ? 'person' : 'people'} reported something similar, so yours is grouped with them.`
+      : `Ticket ${created.ticket.id} filed. Support will review it.`;
     draft.type = "bug";
     draft.title = "";
     draft.description = "";
