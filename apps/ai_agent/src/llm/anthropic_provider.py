@@ -52,7 +52,7 @@ from src.core.chat_history import validate_history
 from src.agents.agent_spec import RosterEntry
 from src.llm import cancellation, cooldown, llm_config, llm_options, token_limits
 from src.llm.agent_roles import SYSTEM_PROMPT, roster_block, system_prompt_for
-from src.llm.context_breakdown import build_breakdown
+from src.llm.context_breakdown import ProviderCounter, breakdown_fields
 from src.llm.base_provider import (
     BaseProvider, ChatCancelled, ChatResult, LiveUsage, OnEvent, ToolCallRecord, dispatch_with_progress, step_event,
 )
@@ -317,6 +317,26 @@ def _with_history_breakpoint(messages: list[dict[str, Any]]) -> list[dict[str, A
     return [*messages[:-1], {**last, "content": marked}]
 
 
+class _AnthropicRequestCounter:
+    """Anthropic's count_tokens endpoint, for a minimal request (see context_breakdown.ProviderCounter).
+    A client or gateway without it raises, and the caller settles for the estimate."""
+
+    def __init__(self, client: Any, model: str) -> None:
+        self._client = client
+        self._model = model
+
+    async def count(self, *, system: str = "", tools: Sequence[dict[str, Any]] = ()) -> int:
+        extra: dict[str, Any] = {}
+        if system:
+            extra["system"] = system
+        if tools:
+            extra["tools"] = list(tools)
+        counted = await self._client.messages.count_tokens(
+            model=self._model, messages=[{"role": "user", "content": "x"}], **extra
+        )
+        return int(counted.input_tokens)
+
+
 async def _stream_pieces(stream: Any) -> AsyncIterator[tuple[bool, str]]:
     """Yield (is_text, chunk) for what a round streams. Only text goes to the
     user; thinking and tool-call JSON are yielded too (is_text False) so the
@@ -400,8 +420,11 @@ async def run_chat(
     context_tokens = 0
     roster_text = roster_block(roster)
 
-    def breakdown() -> list[dict[str, Any]]:
-        return build_breakdown(context_tokens, system_prompt, roster_text, schemas)
+    async def breakdown() -> dict[str, Any]:
+        return await breakdown_fields(
+            context_tokens, system_prompt, roster_text, schemas,
+            lambda: ProviderCounter(_AnthropicRequestCounter(client, model_name), model_name),
+        )
 
     try:
         async with guard.timeout():
@@ -455,7 +478,7 @@ async def run_chat(
                         model=model_name,
                         total_tokens=total_tokens,
                         context_tokens=context_tokens,
-                        context_breakdown=breakdown(),
+                        **await breakdown(),
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
                         cached_input_tokens=cached_input_tokens,
@@ -524,7 +547,7 @@ async def run_chat(
         model=model_name,
         total_tokens=total_tokens,
         context_tokens=context_tokens,
-        context_breakdown=breakdown(),
+        **await breakdown(),
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         cached_input_tokens=cached_input_tokens,

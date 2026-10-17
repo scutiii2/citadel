@@ -454,6 +454,8 @@ keepalive events, and Stop cancels the turn. `status()` reports `user_questions:
 
 `ask(plan=False)` withholds the `update_plan` checklist tool for a turn, and `ask(plan_lean=False)` drops the instruction to update it only when an item changes status (with it on, an unchanged list is also skipped without an event). Both default on and are sent to specialists too; `status()` reports `plan_toggle: true`.
 
+`ask(exact_context=True)` counts what fills the context window with the provider's own token counter (`src/llm/context_breakdown.py`; Anthropic `count_tokens`, OpenAI `responses.input_tokens`) instead of estimating it at about four characters a token. The result's `context_breakdown` lists the parts (system prompt, delegable agents, built-in tools, MCP tools, messages) and `context_breakdown_exact` says whether the provider counted them. Counts are cached by model and content, so only the first turn after a change to the prompt, the tools or the model makes requests; any failure or a 3 second wait falls back to the estimate, so counting never fails a turn. `status()` reports `exact_context: true`.
+
 ## Prompts
 
 Each agent's system prompt comes from its own `agents/<id>.json`, in this order:

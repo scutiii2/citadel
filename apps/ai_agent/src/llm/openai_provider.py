@@ -47,7 +47,7 @@ from src.core import approvals, questions
 from src.agents.agent_spec import RosterEntry
 from src.llm import cancellation, cooldown, llm_config, llm_options, token_limits
 from src.llm.agent_roles import SYSTEM_PROMPT, roster_block, system_prompt_for
-from src.llm.context_breakdown import build_breakdown
+from src.llm.context_breakdown import ProviderCounter, breakdown_fields
 from src.core.chat_history import validate_history
 from src.llm.base_provider import (
     BaseProvider, ChatCancelled, ChatResult, LiveUsage, OnEvent, ToolCallRecord, dispatch_with_progress, step_event,
@@ -259,6 +259,27 @@ def _tool_schemas(
 # items are sent back as input ("Unknown parameter: input[3].parsed_arguments").
 _SDK_ONLY_FIELDS = {"parsed_arguments", "parsed"}
 
+class _OpenAIRequestCounter:
+    """The Responses API's input-token count, for a minimal request (see
+    context_breakdown.ProviderCounter). A client or gateway without it raises,
+    and the caller settles for the estimate."""
+
+    def __init__(self, client: Any, model: str) -> None:
+        self._client = client
+        self._model = model
+
+    async def count(self, *, system: str = "", tools: Sequence[dict[str, Any]] = ()) -> int:
+        extra: dict[str, Any] = {}
+        if system:
+            extra["instructions"] = system
+        if tools:
+            extra["tools"] = list(tools)
+        counted = await self._client.responses.input_tokens.count(
+            model=self._model, input=[{"role": "user", "content": "x"}], **extra
+        )
+        return int(counted.input_tokens)
+
+
 # Stream events that carry tokens the user never sees as text (reasoning and
 # tool-call arguments); they only feed the live token meter.
 _REASONING_DELTAS = frozenset({
@@ -333,8 +354,11 @@ async def run_chat(
     context_tokens: int | None = None
     roster_text = roster_block(roster)
 
-    def breakdown() -> list[dict[str, Any]]:
-        return build_breakdown(context_tokens, system_prompt, roster_text, schemas)
+    async def breakdown() -> dict[str, Any]:
+        return await breakdown_fields(
+            context_tokens, system_prompt, roster_text, schemas,
+            lambda: ProviderCounter(_OpenAIRequestCounter(client, model_name), model_name),
+        )
 
     try:
         async with guard.timeout():
@@ -397,7 +421,7 @@ async def run_chat(
                         model=model_name,
                         total_tokens=total_tokens,
                         context_tokens=context_tokens,
-                        context_breakdown=breakdown(),
+                        **await breakdown(),
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
                     )
@@ -464,7 +488,7 @@ async def run_chat(
         model=model_name,
         total_tokens=total_tokens,
         context_tokens=context_tokens,
-        context_breakdown=breakdown(),
+        **await breakdown(),
         input_tokens=input_tokens,
         output_tokens=output_tokens,
     )

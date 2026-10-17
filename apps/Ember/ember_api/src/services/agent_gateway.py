@@ -64,6 +64,7 @@ class AgentGateway(Protocol):
         plan_lean: bool = True,
         private_extensions: list[dict[str, Any]] | None = None,
         allow_read_only: bool = False,
+        exact_context: bool = False,
     ) -> dict[str, Any]: ...
 
     async def interpret(self, url: str, caller: Caller, text: str) -> dict[str, Any]: ...
@@ -144,6 +145,7 @@ class McpAgentGateway:
         plan_lean=True,
         private_extensions=None,
         allow_read_only=False,
+        exact_context=False,
     ):
         arguments = {
             "question": question,
@@ -193,6 +195,11 @@ class McpAgentGateway:
                     arguments["plan"] = False
                 if not plan_lean:
                     arguments["plan_lean"] = False
+        if exact_context:
+            # Not fail-closed: an agent from before this existed just gives the estimate.
+            status = await self._call(url, caller, "status", {})
+            if status.get("exact_context"):
+                arguments["exact_context"] = True
         if private_extensions:
             # Fail closed, like approvals: an ai_agent that predates this would ignore the
             # argument and the user's private tools would silently be missing (or, worse, a

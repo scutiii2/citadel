@@ -20,7 +20,7 @@ const props = defineProps<{
   contextPercent: number | null;
   /** What fills the context, for the panel the meter opens; leave out (or null)
    * and the meter is plain text. */
-  breakdown?: { tokens: number; window: number; parts: ContextPart[] } | null;
+  breakdown?: { tokens: number; window: number; parts: ContextPart[]; exact?: boolean } | null;
   locked: boolean;
 }>();
 
@@ -124,6 +124,7 @@ function choose(id: string): void {
         :tokens="breakdown.tokens"
         :window="breakdown.window"
         :parts="breakdown.parts"
+        :exact="breakdown.exact"
       />
     </div>
     <template v-if="hasMessages">

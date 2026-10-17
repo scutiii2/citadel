@@ -40,6 +40,8 @@ export interface TurnStart {
   plan?: boolean;
   /** Sent only when off: the agent may update its checklist on any step, not just a status change. */
   plan_lean?: boolean;
+  /** Sent only when on: the agent counts the context window's parts with its provider, not an estimate. */
+  exact_context?: boolean;
   /** mcp_server extensions whose tools the agent may use. */
   enabled_extensions: string[];
   /** Tools of the built-in capabilities this account switched off for its own chats. */

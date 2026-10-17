@@ -60,6 +60,7 @@ const {
   working,
   contextUsage,
   contextParts,
+  contextExact,
   contextPanel,
   commands,
   enabledExtensions,
@@ -295,7 +296,7 @@ const contextPercent = computed(() => {
 const contextBreakdown = computed(() => {
   const usage = contextUsage.value;
   if (!contextPanel.value || !usage || contextParts.value.length === 0) return null;
-  return { tokens: usage.tokens, window: usage.window, parts: contextParts.value };
+  return { tokens: usage.tokens, window: usage.window, parts: contextParts.value, exact: contextExact.value };
 });
 
 function onSelect(id: string, messageIndex?: number): void {

@@ -73,3 +73,149 @@ def test_the_estimate_is_about_four_characters_a_token():
     assert counter.count("") == 0
     assert counter.count("abcd") == 1
     assert counter.count("abcde") == 2
+
+
+# --- exact counting ------------------------------------------------------------
+
+import asyncio  # noqa: E402
+from unittest.mock import AsyncMock, MagicMock  # noqa: E402
+
+import pytest  # noqa: E402
+
+from src.llm import context_breakdown  # noqa: E402
+from src.llm.context_breakdown import ProviderCounter, breakdown_fields  # noqa: E402
+
+
+class FakeRequestCounter:
+    """A provider endpoint that charges 10 tokens for the bare message, 1 per character of system text and
+    2 per character of tool JSON."""
+
+    def __init__(self, fail: bool = False, delay: float = 0.0):
+        self.calls: list[tuple[str, int]] = []
+        self.fail = fail
+        self.delay = delay
+
+    async def count(self, *, system: str = "", tools=()):
+        self.calls.append((system, len(tools)))
+        if self.delay:
+            await asyncio.sleep(self.delay)
+        if self.fail:
+            raise RuntimeError("no count endpoint")
+        return 10 + len(system) + 2 * sum(len(str(t)) for t in tools)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_cache():
+    ProviderCounter._cache.clear()
+    yield
+    ProviderCounter._cache.clear()
+
+
+def _run(coro):
+    return asyncio.run(coro)
+
+
+def _exact(client, system="S" * 50 + "R" * 20, roster="R" * 20, schemas=(), total=1000):
+    token = context_breakdown.bind_exact(True)
+    try:
+        return _run(breakdown_fields(total, system, roster, list(schemas), lambda: ProviderCounter(client, "m1")))
+    finally:
+        context_breakdown.reset_exact(token)
+
+
+def test_exact_counts_each_part_less_the_baseline():
+    client = FakeRequestCounter()
+    schemas = [{"name": plan.TOOL_NAME}, {"name": "tool_srv_a"}]
+
+    fields = _exact(client, schemas=schemas)
+
+    assert fields["context_breakdown_exact"] is True
+    ids = _by_id(fields["context_breakdown"])
+    assert ids["system_prompt"] == 50
+    assert ids["agents"] == 20
+    assert ids["builtin_tools"] == 2 * len(str(schemas[0]))
+    assert ids["mcp_tools"] == 2 * len(str(schemas[1]))
+    assert sum(ids.values()) == 1000
+
+
+def test_a_part_that_did_not_change_is_not_counted_again():
+    client = FakeRequestCounter()
+    schemas = [{"name": "tool_srv_a"}]
+
+    _exact(client, schemas=schemas)
+    first = len(client.calls)
+    _exact(client, schemas=schemas)
+
+    assert first == 4  # the baseline, the system prompt, the roster, the MCP tools
+    assert len(client.calls) == first
+
+
+def test_a_changed_part_is_counted_again_and_the_rest_are_not():
+    client = FakeRequestCounter()
+
+    _exact(client, schemas=[{"name": "tool_srv_a"}])
+    before = len(client.calls)
+    _exact(client, schemas=[{"name": "tool_srv_b"}])
+
+    assert len(client.calls) == before + 1
+
+
+def test_a_failing_counter_falls_back_to_the_estimate():
+    fields = _exact(FakeRequestCounter(fail=True), system="s" * 400, roster="", schemas=[])
+
+    assert fields["context_breakdown_exact"] is False
+    assert _by_id(fields["context_breakdown"])["system_prompt"] == 100  # 400 chars / 4
+    assert sum(_by_id(fields["context_breakdown"]).values()) == 1000
+
+
+def test_a_slow_counter_falls_back_to_the_estimate(monkeypatch):
+    monkeypatch.setattr(context_breakdown, "EXACT_TIMEOUT_SECONDS", 0.05)
+
+    fields = _exact(FakeRequestCounter(delay=1.0))
+
+    assert fields["context_breakdown_exact"] is False
+
+
+def test_without_the_flag_nothing_is_counted_by_the_provider():
+    client = FakeRequestCounter()
+
+    fields = _run(breakdown_fields(1000, "s" * 40, "", [], lambda: ProviderCounter(client, "m1")))
+
+    assert fields["context_breakdown_exact"] is False
+    assert client.calls == []
+
+
+def test_the_flag_is_per_turn_and_resets():
+    assert context_breakdown.exact_requested() is False
+    token = context_breakdown.bind_exact(True)
+    assert context_breakdown.exact_requested() is True
+    context_breakdown.reset_exact(token)
+    assert context_breakdown.exact_requested() is False
+
+
+def test_anthropic_counter_sends_one_short_message_with_the_given_system_and_tools():
+    from src.llm.anthropic_provider import _AnthropicRequestCounter
+
+    client = MagicMock()
+    client.messages.count_tokens = AsyncMock(return_value=MagicMock(input_tokens=42))
+
+    counted = _run(_AnthropicRequestCounter(client, "claude-x").count(system="sys", tools=[{"name": "t"}]))
+
+    assert counted == 42
+    client.messages.count_tokens.assert_awaited_once_with(
+        model="claude-x", messages=[{"role": "user", "content": "x"}], system="sys", tools=[{"name": "t"}],
+    )
+
+
+def test_openai_counter_uses_the_responses_input_token_count():
+    from src.llm.openai_provider import _OpenAIRequestCounter
+
+    client = MagicMock()
+    client.responses.input_tokens.count = AsyncMock(return_value=MagicMock(input_tokens=17))
+
+    counted = _run(_OpenAIRequestCounter(client, "gpt-x").count(system="sys"))
+
+    assert counted == 17
+    client.responses.input_tokens.count.assert_awaited_once_with(
+        model="gpt-x", input=[{"role": "user", "content": "x"}], instructions="sys",
+    )

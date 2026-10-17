@@ -47,6 +47,11 @@ describe("ContextPanel", () => {
     expect(segments[2]!.attributes("style")).toContain("width: 17.21%");
   });
 
+  it("says whether the parts were estimated or counted by the provider", () => {
+    expect(mountPanel().get("[data-test=context-note]").text()).toContain("Estimated from the prompt text");
+    expect(mountPanel({ exact: true }).get("[data-test=context-note]").text()).toContain("Counted by the model provider");
+  });
+
   it("shows a tiny part as under 0.1%", () => {
     const w = mountPanel({ tokens: 10_001, parts: [{ id: "agents", label: "Delegable agents", tokens: 1 }] });
 

@@ -131,3 +131,33 @@ describe("what a question sends about the checklist", () => {
     expect(client.startTurn.mock.calls[0]![1]).toMatchObject({ plan: false, plan_lean: false });
   });
 });
+
+
+describe("what a question sends about exact context counts", () => {
+  it("sends nothing with the estimate, which is the default", async () => {
+    const chat = await storeWithChat();
+
+    await chat.send("hello");
+
+    expect(client.startTurn.mock.calls[0]![1]).not.toHaveProperty("exact_context");
+  });
+
+  it("asks for exact counts when the panel is on and the accuracy is Exact", async () => {
+    const chat = await storeWithChat();
+    chat.setContextAccuracy("exact");
+
+    await chat.send("hello");
+
+    expect(client.startTurn.mock.calls[0]![1]).toMatchObject({ exact_context: true });
+  });
+
+  it("does not ask for exact counts while the panel is hidden", async () => {
+    const chat = await storeWithChat();
+    chat.setContextAccuracy("exact");
+    chat.setContextPanel(false);
+
+    await chat.send("hello");
+
+    expect(client.startTurn.mock.calls[0]![1]).not.toHaveProperty("exact_context");
+  });
+});

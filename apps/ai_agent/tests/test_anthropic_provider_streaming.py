@@ -173,3 +173,35 @@ def test_run_chat_resets_streamed_text_from_a_tool_use_round(monkeypatch):
     types = [e["type"] for e in events]
     assert types.index("token_reset") < types.index("step_start")
     assert [e["text"] for e in events if e["type"] == "token"] == ["Let me check.", "All good."]
+
+
+def test_run_chat_counts_the_context_with_the_provider_when_the_turn_asks_for_it(monkeypatch):
+    from src.llm import context_breakdown
+
+    async def _run():
+        response = MagicMock(stop_reason="end_turn", content=[])
+        response.usage.input_tokens = 500
+        response.usage.output_tokens = 5
+        for name in ("cache_creation_input_tokens", "cache_read_input_tokens"):
+            setattr(response.usage, name, 0)
+
+        client = MagicMock()
+        client.messages.stream = MagicMock(return_value=_round_cm(["ok"], response))
+        client.messages.count_tokens = AsyncMock(return_value=MagicMock(input_tokens=100))
+        monkeypatch.setattr(anthropic_provider, "_get_client", lambda: client)
+        monkeypatch.setattr(anthropic_provider, "_tool_schemas", lambda enabled_extensions=None, roster=(): [])
+
+        token = context_breakdown.bind_exact(True)
+        try:
+            return await anthropic_provider.run_chat("hi", [])
+        finally:
+            context_breakdown.reset_exact(token)
+
+    from src.llm.context_breakdown import ProviderCounter
+
+    ProviderCounter._cache.clear()
+    result = asyncio.run(_run())
+    ProviderCounter._cache.clear()
+
+    assert result.context_breakdown_exact is True
+    assert sum(p["tokens"] for p in result.context_breakdown) == 500

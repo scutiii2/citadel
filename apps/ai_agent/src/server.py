@@ -168,6 +168,7 @@ async def ask(
     plan: bool = True,
     plan_lean: bool = True,
     allow_read_only: bool = False,
+    exact_context: bool = False,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Ask this agent a question. Runs its own tool-calling loop against
@@ -202,6 +203,8 @@ async def ask(
     plan: the chat allows the update_plan checklist tool (default on); it is
     offered only when this agent's plan_tool is on too. plan_lean: ask the
     model to update the checklist only when an item changes status.
+    exact_context: count what fills the context window with the provider's own
+    token counter; the result's `context_breakdown_exact` says whether that worked.
     ctx, if the MCP client requested it, is FastMCP's injected Context -
     used below only to relay run_chat's live step/token events as MCP
     progress notifications; chat_app's own tool call never needs to pass
@@ -230,7 +233,7 @@ async def ask(
             question, history or [], enabled_extensions or [], request_id, depth,
             on_event=on_event, caveman=caveman, approval_mode=approval_mode, allowed_tools=allowed_tools,
             disabled_tools=disabled_tools, ask_user=ask_user, plan=plan, plan_lean=plan_lean,
-            allow_read_only=allow_read_only, **tier_args, **private_args,
+            allow_read_only=allow_read_only, exact_context=exact_context, **tier_args, **private_args,
         )
     except ChatCancelled:
         return _cancelled_result()
@@ -256,6 +259,7 @@ async def ask(
         "output_tokens": result.output_tokens,
         "context_tokens": result.context_tokens,
         "context_breakdown": result.context_breakdown,
+        "context_breakdown_exact": result.context_breakdown_exact,
         "context_window": agent_config.status()["context_window"],
         "provider_id": result.provider_id,
         "model": result.model,
@@ -437,7 +441,8 @@ def status() -> dict[str, Any]:
     of disabled_tools; `user_questions` says ask() understands ask_user;
     `plan_toggle` says ask() understands plan and plan_lean;
     `private_extensions` says ask() understands private_extensions;
-    `read_only_approval` says ask() understands allow_read_only."""
+    `read_only_approval` says ask() understands allow_read_only;
+    `exact_context` says ask() understands exact_context."""
     return {
         **agent_config.status(),
         "tool_approval": True,
@@ -446,6 +451,7 @@ def status() -> dict[str, Any]:
         "user_questions": True,
         "plan_toggle": True,
         "read_only_approval": True,
+        "exact_context": True,
         # laya answers typed questions locally and never lists tools through mcp_upstream.
         "private_extensions": agent_config.PROVIDER_ID != "laya",
     }

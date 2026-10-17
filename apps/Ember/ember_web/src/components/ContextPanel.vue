@@ -12,6 +12,8 @@ const props = defineProps<{
   /** The model's context window. */
   window: number;
   parts: ContextPart[];
+  /** The parts were counted by the model provider, not estimated. */
+  exact?: boolean;
 }>();
 
 interface Row {
@@ -64,7 +66,10 @@ function formatPercent(percent: number): string {
         <strong class="percent">{{ formatPercent(row.percent) }}</strong>
       </li>
     </ul>
-    <p class="note">Estimated from the prompt text. The total is what the model reported.</p>
+    <p class="note" data-test="context-note">
+      {{ exact ? "Counted by the model provider." : "Estimated from the prompt text." }}
+      The total is what the model reported.
+    </p>
   </div>
 </template>
 

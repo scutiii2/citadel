@@ -293,6 +293,8 @@ export const useChatStore = defineStore("chat", () => {
   });
   /** What filled that context, when the last answer says; empty otherwise. */
   const contextParts = computed<ContextPart[]>(() => lastContextAnswer.value?.context_breakdown ?? []);
+  /** Whether those parts were counted by the model provider (true) or estimated. */
+  const contextExact = computed(() => lastContextAnswer.value?.context_breakdown_exact === true);
 
   function find(id: string): Conversation | undefined {
     return conversations.value.find((c) => c.id === id);
@@ -821,6 +823,7 @@ export const useChatStore = defineStore("chat", () => {
         caveman: caveman.value,
         ...(plan.value ? {} : { plan: false }),
         ...(planLean.value ? {} : { plan_lean: false }),
+        ...(contextPanel.value && contextAccuracy.value === "exact" ? { exact_context: true } : {}),
         can_ask: true,
         enabled_extensions: enabledExtensions.value,
         ...(disabledTools.length ? { disabled_tools: disabledTools } : {}),
@@ -1322,6 +1325,7 @@ export const useChatStore = defineStore("chat", () => {
     working,
     contextUsage,
     contextParts,
+    contextExact,
     listLoading,
     listReady,
     chatLoading,

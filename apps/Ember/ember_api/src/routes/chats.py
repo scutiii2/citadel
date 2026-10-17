@@ -161,6 +161,8 @@ class MessageIn(BaseModel):
     context_window: int | None = Field(default=None, ge=0)
     # What filled context_tokens (system prompt, tools, messages ...), as ai_agent measured it.
     context_breakdown: list[ContextPartIn] | None = Field(default=None, max_length=MAX_CONTEXT_PARTS)
+    # True when those parts were counted by the model provider, not estimated.
+    context_breakdown_exact: bool | None = None
     # The tool steps of an answer (saved by ember_api's turn; a browser
     # only sends them back when it re-saves or imports a chat).
     steps: list[StepIn] | None = Field(default=None, max_length=MAX_STEPS)
@@ -228,6 +230,8 @@ class TurnRequest(BaseModel):
     # The agent may keep a task checklist (update_plan); plan_lean asks it to update the list only on a status change.
     plan: bool = True
     plan_lean: bool = True
+    # Count what fills the context window with the provider's own token counter, not an estimate.
+    exact_context: bool = False
     # mcp_server extension ids whose tools the agent may use.
     enabled_extensions: list[str] = Field(default_factory=list, max_length=50)
 
@@ -722,6 +726,7 @@ async def start_turn(
             caveman=body.caveman,
             plan=body.plan,
             plan_lean=body.plan_lean,
+            exact_context=body.exact_context,
             enabled_extensions=tuple(dict.fromkeys(body.enabled_extensions)),
             ask_before_tools=body.ask_before_tools or forced,
             allowed_tools=() if forced else tuple(dict.fromkeys(body.allowed_tools)),

@@ -49,6 +49,8 @@ export interface ChatMessage {
   context_window?: number;
   /** What filled context_tokens, estimated by the agent (answers from before this lack it). */
   context_breakdown?: ContextPart[];
+  /** True when those parts were counted by the model provider, not estimated. */
+  context_breakdown_exact?: boolean;
   /** The tools this answer ran. */
   steps?: ToolStep[];
   /** Who used the tokens, when the answer ran several agents (its own plus

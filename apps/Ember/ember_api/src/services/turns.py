@@ -87,6 +87,8 @@ class TurnOptions:
     # Task checklist toggles: the agent may use update_plan, and updates it only on a status change.
     plan: bool = True
     plan_lean: bool = True
+    # Count the context window's parts with the provider's token counter (ai_agent falls back to an estimate).
+    exact_context: bool = False
     # Extensions whose tools the agent may use (none by default).
     enabled_extensions: tuple[str, ...] = ()
     # Ask the user before each tool runs, except the tools they already
@@ -131,7 +133,8 @@ def _agent_usage(row: dict[str, Any]) -> dict[str, Any]:
 
 def _context_breakdown(result: dict[str, Any]) -> dict[str, Any]:
     """The answer's `context_breakdown` as {"context_breakdown": [...]} - or
-    nothing when ai_agent sent none or an entry is malformed. Only what the
+    nothing when ai_agent sent none or an entry is malformed, plus
+    `context_breakdown_exact` when ai_agent counted with the provider. Only what the
     route's ContextPartIn accepts is kept, so the saved answer can always be
     sent back by the browser."""
     parts: list[dict[str, Any]] = []
@@ -144,7 +147,12 @@ def _context_breakdown(result: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(tokens, int) or isinstance(tokens, bool) or tokens < 0:
             return {}
         parts.append({"id": part_id[:CONTEXT_PART_ID_MAX], "label": label[:CONTEXT_PART_LABEL_MAX], "tokens": tokens})
-    return {"context_breakdown": parts[:MAX_CONTEXT_PARTS]} if parts else {}
+    if not parts:
+        return {}
+    return {
+        "context_breakdown": parts[:MAX_CONTEXT_PARTS],
+        **({"context_breakdown_exact": True} if result.get("context_breakdown_exact") is True else {}),
+    }
 
 
 @dataclass(eq=False)
@@ -554,6 +562,7 @@ class TurnRegistry:
                 ask_user=turn.options.can_ask,
                 plan=turn.options.plan,
                 plan_lean=turn.options.plan_lean,
+                exact_context=turn.options.exact_context,
                 private_extensions=list(turn.options.private_extensions) or None,
             )
         except AgentCallError as error:

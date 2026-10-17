@@ -75,6 +75,14 @@ describe("ChatHeader", () => {
       expect(panel()?.textContent).toContain("Free space");
     });
 
+    it("tells the panel whether the parts are exact", async () => {
+      const w = mountHeader({ breakdown: { ...BREAKDOWN, exact: true } });
+
+      await w.get("button.context").trigger("click");
+
+      expect(panel()?.textContent).toContain("Counted by the model provider");
+    });
+
     it("closes with a second click, Esc, or a press outside", async () => {
       const w = mountHeader({ breakdown: BREAKDOWN });
 

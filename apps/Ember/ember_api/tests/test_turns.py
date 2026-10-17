@@ -118,6 +118,44 @@ def test_the_context_breakdown_is_saved_with_the_answer_and_survives_a_resave(cl
     assert chat(client, chat_id)["messages"][-1]["context_breakdown"] == PARTS
 
 
+def test_an_exact_breakdown_is_marked_exact_and_survives_a_resave(client: TestClient, agent: FakeAgent) -> None:
+    agent.result_extra = {"context_breakdown": PARTS, "context_breakdown_exact": True}
+    as_admin(client)
+    chat_id = new_id()
+
+    assert start(client, chat_id, "q").status_code == 202
+    events(client, chat_id)
+
+    saved = chat(client, chat_id)["messages"]
+    assert saved[1]["context_breakdown_exact"] is True
+    resaved = client.post(f"/api/chats/{chat_id}/messages", json={"title": "t", "messages": [saved[1]]})
+    assert resaved.status_code == 200
+    assert chat(client, chat_id)["messages"][-1]["context_breakdown_exact"] is True
+
+
+def test_an_estimated_breakdown_carries_no_exact_marker(client: TestClient, agent: FakeAgent) -> None:
+    agent.result_extra = {"context_breakdown": PARTS, "context_breakdown_exact": False}
+    as_admin(client)
+    chat_id = new_id()
+
+    assert start(client, chat_id, "q").status_code == 202
+    events(client, chat_id)
+
+    assert "context_breakdown_exact" not in chat(client, chat_id)["messages"][1]
+
+
+def test_exact_context_is_passed_to_the_agent_only_when_asked(client: TestClient, agent: FakeAgent) -> None:
+    as_admin(client)
+    first, second = new_id(), new_id()
+
+    assert start(client, first).status_code == 202
+    events(client, first)
+    assert start(client, second, exact_context=True).status_code == 202
+    events(client, second)
+
+    assert [a["exact_context"] for a in agent.asks] == [False, True]
+
+
 def test_a_malformed_context_breakdown_is_left_off_the_answer(client: TestClient, agent: FakeAgent) -> None:
     agent.result_extra = {"context_breakdown": [{"id": "messages", "label": "Messages", "tokens": -5}]}
     as_admin(client)

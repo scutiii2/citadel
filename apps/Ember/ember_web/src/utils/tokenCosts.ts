@@ -31,7 +31,7 @@ export const TOKEN_COSTS: Record<CostedSetting, string> = {
   liveTokens: "No token cost. It only shows a count the agent already reports.",
   contextPanel: "No token cost with Estimate. Exact adds token-count requests, see its own setting.",
   contextAccuracy:
-    "Estimate costs no tokens. Exact asks the provider to count each part, which adds requests (no model output) each time the panel opens; results are cached.",
+    "Estimate costs no tokens. Exact asks the provider to count each part after the answer: about 5 extra count requests (no model output) when the prompt, tools or model change, none otherwise.",
 };
 
 /** A tooltip: the setting's own hint, then its token cost. */

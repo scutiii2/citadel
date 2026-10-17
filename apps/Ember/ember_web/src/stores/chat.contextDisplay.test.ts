@@ -142,6 +142,14 @@ describe("what fills the context", () => {
     expect(chat.contextUsage).toEqual({ tokens: 1000, window: 200_000 });
   });
 
+  it("says whether the provider counted it", async () => {
+    const exact = await openChat([answer({ context_breakdown: PARTS, context_breakdown_exact: true })]);
+    expect(exact.contextExact).toBe(true);
+
+    const estimated = await openChat([answer({ context_breakdown: PARTS })]);
+    expect(estimated.contextExact).toBe(false);
+  });
+
   it("is empty for an answer saved before breakdowns existed", async () => {
     const chat = await openChat([{ role: "user", content: "q" }, answer()]);
 

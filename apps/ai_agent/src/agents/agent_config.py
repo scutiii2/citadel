@@ -21,7 +21,7 @@ from src.agents import plan as plan_policy
 
 from src.core import approvals, internal_auth, questions, tool_filter
 from src.private_extensions import turn as private_turn
-from src.llm import auto_tier, llm_options, model_tiers
+from src.llm import auto_tier, context_breakdown, llm_options, model_tiers
 from src.llm import reasoning_effort as effort_limits
 from src.core.seed import seed_from_example
 from src.core.chat_history import validate_history
@@ -113,6 +113,7 @@ async def run_chat(
     plan: bool = True,
     plan_lean: bool = True,
     allow_read_only: bool = False,
+    exact_context: bool = False,
 ) -> ChatResult:
     """Run a chat completion request through the configured provider.
 
@@ -135,6 +136,10 @@ async def run_chat(
     plan / plan_lean: the chat's checklist toggles (agents/plan.py). The
     update_plan tool is offered only when `plan` is on and this agent's file
     has plan_tool on; `plan_lean` asks for an update only on a status change.
+
+    exact_context: count the parts of the context window with the provider's own
+    token counter (llm/context_breakdown.py) instead of estimating them; any failure
+    falls back to the estimate.
 
     private_extensions: the user's own MCP servers for this turn, as ember_api
     sent them (see private_extensions/turn.py). Their tools are offered after
@@ -174,6 +179,7 @@ async def run_chat(
     filter_token = tool_filter.bind(disabled_tools or ())
     plan_token = plan_policy.bind(plan_policy.PlanPolicy(plan, agent_spec.current().plan_tool, plan_lean))
     private_token = private_turn.bind(private)
+    exact_token = context_breakdown.bind_exact(exact_context)
     effort_token = llm_options.bind_effort(effort.effort)
     try:
         if cancellation.is_cancelled(request_id):
@@ -235,6 +241,7 @@ async def run_chat(
         return result
     finally:
         llm_options.reset_effort(effort_token)
+        context_breakdown.reset_exact(exact_token)
         private_turn.reset(private_token)
         plan_policy.reset(plan_token)
         tool_filter.reset(filter_token)

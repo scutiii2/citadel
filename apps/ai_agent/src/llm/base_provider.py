@@ -150,6 +150,8 @@ class ChatResult:
     # What fills context_tokens, as [{"id", "label", "tokens"}] (see
     # llm/context_breakdown.py); empty when the provider reported no size.
     context_breakdown: list[dict[str, Any]] = field(default_factory=list)
+    # True when the parts were counted by the provider, not estimated.
+    context_breakdown_exact: bool = False
     # Sums across every round of the turn, like total_tokens.
     input_tokens: int | None = None
     output_tokens: int | None = None

@@ -52,6 +52,7 @@ def _build_agent(approvals: bool = True, private: bool | None = None, read_only:
         plan_lean: bool = True,
         private_extensions: list[dict] | None = None,
         allow_read_only: bool = False,
+        exact_context: bool = False,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         headers = ctx.request_context.request.headers
@@ -72,11 +73,12 @@ def _build_agent(approvals: bool = True, private: bool | None = None, read_only:
             "plan": [plan, plan_lean],
             "private": private_extensions,
             "allow_read_only": allow_read_only,
+            "exact_context": exact_context,
         }
 
     @mcp.tool()
     def status() -> dict[str, Any]:
-        flags = {"tool_approval": True, "tool_filter": True, "user_questions": True, "plan_toggle": True} if approvals else {}
+        flags = {"tool_approval": True, "tool_filter": True, "user_questions": True, "plan_toggle": True, "exact_context": True} if approvals else {}
         extras = {**({"private_extensions": True} if private else {}), **({"read_only_approval": True} if read_only else {})}
         return {"available": True, **flags, **extras}
 
@@ -307,6 +309,23 @@ def test_an_agent_that_does_not_know_the_plan_toggles_just_ignores_them(old_agen
     result = _ask(McpAgentGateway(None), old_agent_url, plan=False, plan_lean=False)
 
     assert result["plan"] == [True, True]  # the checklist stays as it was; the turn still runs
+
+
+# --- exact context counting ----------------------------------------------------------------
+
+
+def test_ask_leaves_exact_context_out_unless_asked(agent_url: str) -> None:
+    assert _ask(McpAgentGateway(None), agent_url)["exact_context"] is False
+
+
+def test_ask_sends_exact_context_when_asked(agent_url: str) -> None:
+    assert _ask(McpAgentGateway(None), agent_url, exact_context=True)["exact_context"] is True
+
+
+def test_an_agent_that_does_not_know_exact_context_just_ignores_it(old_agent_url: str) -> None:
+    result = _ask(McpAgentGateway(None), old_agent_url, exact_context=True)
+
+    assert result["exact_context"] is False  # it gives the estimate; the turn still runs
 
 
 def test_answer_reports_whether_the_question_was_waiting(agent_url: str) -> None:
