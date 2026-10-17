@@ -14,7 +14,7 @@ lives under `../.data/` instead (see the end of this file).
   `timeout_seconds`, `max_input_chars`, `auto_tier` (`enabled`,
   `min_confidence`, `tiers`: the model tier chosen per request size) and `auto_route`
   (`enabled`, `min_confidence`: send a question straight to a specialist). Needs
-  `AI_GATEWAY_API_KEY` in `../.env`.
+  `VERCEL_GATEWAY_API_KEY` in `../.env`.
 - **`config_servers.json`** - `servers`: the MCP servers this agent
   connects to as a client (currently just `main`, this repo's
   `mcp_server`). Loaded by `src/mcp_client/config.py`'s `load_servers_config` into

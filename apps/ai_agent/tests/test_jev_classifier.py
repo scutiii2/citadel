@@ -59,7 +59,7 @@ def test_available_follows_the_key(monkeypatch):
 
 def test_asking_without_a_key_is_a_classifier_error(monkeypatch):
     monkeypatch.delenv(jev_classifier.KEY_ENV, raising=False)
-    with pytest.raises(ClassifierError, match="AI_GATEWAY_API_KEY"):
+    with pytest.raises(ClassifierError, match="VERCEL_GATEWAY_API_KEY"):
         jev_classifier.ask_choice("text", CRITERIA)
 
 

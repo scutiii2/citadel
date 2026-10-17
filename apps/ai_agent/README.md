@@ -212,7 +212,7 @@ after inference.
 ### Optional remote fallback (Jev)
 
 With a `"classifier": {"triage_fallback": true}` section added to `configs/config_tuning.json` (it is not in the `.example` seed) and
-`AI_GATEWAY_API_KEY` in `.env`, the remote classifier `typesafe-ai/jev` (Vercel AI
+`VERCEL_GATEWAY_API_KEY` in `.env`, the remote classifier `typesafe-ai/jev` (Vercel AI
 Gateway, `src/llm/jev_classifier.py`) answers what Laya cannot:
 
 - each question Laya marks `uncertain` is asked again; the answer replaces Laya's
@@ -265,7 +265,7 @@ collide with the orchestrator's, so consumers key on `(agent_id, id)`.
 ## Automatic model tier (optional)
 
 With `"classifier": {"auto_tier": {"enabled": true}}` in `configs/config_tuning.json` and
-`AI_GATEWAY_API_KEY` in `.env`, a top-level turn that asked for no tier gets one from how
+`VERCEL_GATEWAY_API_KEY` in `.env`, a top-level turn that asked for no tier gets one from how
 hard its question looks. The remote classifier (`src/llm/jev_classifier.py`) names the
 request `tiny`, `everyday`, `large` or `hardest`, and `src/llm/auto_tier.py` maps that to a
 tier (default `tiny` and `everyday` to `light`, `large` to `standard`, `hardest` to
@@ -285,7 +285,7 @@ is billed by the gateway.
 ## Routing straight to a specialist (optional)
 
 With `"classifier": {"auto_route": {"enabled": true}}` in `configs/config_tuning.json` and
-`AI_GATEWAY_API_KEY` in `.env`, an orchestrator's top-level turn first asks the remote
+`VERCEL_GATEWAY_API_KEY` in `.env`, an orchestrator's top-level turn first asks the remote
 classifier (`src/llm/jev_classifier.py`) which specialist fits the question
 (`src/agents/auto_route.py`). If one is picked with confidence of at least
 `auto_route.min_confidence` (default 60), the question goes to it exactly as a

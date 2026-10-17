@@ -7,7 +7,7 @@ not enough: Laya's uncertain triage answers and inputs too long for Laya
 treats as "no answer" and carries on without.
 
 Off by default. A feature runs only when config_tuning.json's `classifier`
-section turns it on and AI_GATEWAY_API_KEY is set (in `.env`). The text sent to
+section turns it on and VERCEL_GATEWAY_API_KEY is set (in `.env`). The text sent to
 it leaves this machine, and each call is billed by the gateway.
 """
 
@@ -26,7 +26,7 @@ from src.core.config_files import TUNING_PATH, read_section
 
 DEFAULT_URL = "https://ai-gateway.vercel.sh/v1/chat/completions"
 DEFAULT_MODEL = "typesafe-ai/jev"
-KEY_ENV = "AI_GATEWAY_API_KEY"
+KEY_ENV = "VERCEL_GATEWAY_API_KEY"
 
 _SECTION = "classifier"
 _KNOWN = {"url", "model", "timeout_seconds", "max_input_chars", "triage_fallback", "auto_tier", "auto_route"}
