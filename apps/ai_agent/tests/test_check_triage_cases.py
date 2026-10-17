@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from types import SimpleNamespace
 
@@ -105,3 +106,81 @@ def test_list_prints_each_case_and_runs_nothing(capsys):
     assert cases.main(["--list"]) == 0
     out = capsys.readouterr().out
     assert all(case.name in out for case in cases.CASES)
+
+
+# --- the rounds tables ---------------------------------------------------------------------------
+
+CHECKOUT = {
+    "type": "choice", "choice": "billing", "probabilities": {"billing": 0.69, "frontend": 0.31, "network": 0.0},
+    "answer_confidence": 0.38, "uncertain": True, "answered_by": "jev", "eliminated": ["network"],
+    "rounds": [
+        {"step": "laya", "choice": "frontend", "probabilities": {"billing": 0.2439, "frontend": 0.6642, "network": 0.0919}, "confidence": 0.6642},
+        {"step": "jev", "choice": "billing", "probabilities": {"billing": 0.71, "frontend": 0.26, "network": 0.03}, "confidence": 0.56},
+        {"step": "average", "probabilities": {"billing": 0.4769, "frontend": 0.4621, "network": 0.0609}, "eliminated": ["network"]},
+        {"step": "laya", "choice": "frontend", "probabilities": {"billing": 0.3005, "frontend": 0.6995}, "confidence": 0.6995,
+         "options": ["billing", "frontend"]},
+        {"step": "jev", "choice": "billing", "probabilities": {"billing": 0.69, "frontend": 0.31}, "confidence": 0.38,
+         "options": ["billing", "frontend"]},
+    ],
+}
+
+
+def checkout_row(answer=CHECKOUT, **changes):
+    row = cases.Row("checkout-area", "area", "", "billing", None, "narrowed->jev", 5, 0.38, True, 724, 1.2, answer)
+    return dataclasses.replace(row, **changes)
+
+
+def test_the_rounds_table_lists_every_call_with_a_column_per_option():
+    lines = cases.rounds_table(checkout_row()).splitlines()
+
+    assert lines[0] == "checkout-area / area: expected -, got billing"
+    header, rule, *body = [line for line in lines if line.startswith("|")]
+    assert [c.strip() for c in header.strip("|").split("|")] == [
+        "#", "Step", "Options", "Pick", "Billing", "Frontend", "Network", "Confidence",
+    ]
+    assert set(rule.replace("|", "").replace(" ", "")) == {"-"}
+    cells = [[c.strip() for c in line.strip("|").split("|")] for line in body]
+    assert cells[0] == ["1", "Laya", "all 3", "frontend", "0.2439", "0.6642", "0.0919", "0.6642"]
+    assert cells[1] == ["2", "Jev", "all 3", "billing", "0.71", "0.26", "0.03", "0.56"]
+    assert cells[2] == ["3", "Average", "all 3", "", "0.4769", "0.4621", "0.0609", ""]
+    assert cells[3] == ["4", "Laya, narrowed", "billing, frontend", "frontend", "0.3005", "0.6995", "-", "0.6995"]
+    assert cells[4] == ["5", "Jev, narrowed", "billing, frontend", "billing", "0.69", "0.31", "-", "0.38"]
+    assert lines[-2] == "final: billing (billing 0.69, frontend 0.31, network 0); answered by jev; unsure: yes"
+    assert lines[-1] == "dropped: network"
+
+
+def test_the_rounds_table_shows_a_deferral_and_a_failed_rerun():
+    deferred = {
+        "type": "choice", "choice": "unknown", "probabilities": {"auth": 0.0, "unknown": 1.0}, "answer_confidence": 1.0,
+        "uncertain": False, "answered_by": "jev", "deferred_to": "jev",
+        "rounds": [
+            {"step": "laya", "choice": "unknown", "probabilities": {"auth": 0.5, "unknown": 0.5}, "confidence": 0.3},
+            {"step": "jev", "choice": "unknown", "probabilities": {"auth": 0.0, "unknown": 1.0}, "confidence": 1.0},
+            {"step": "gap", "gap": 0.7, "deferred_to": "jev"},
+        ],
+    }
+    text = cases.rounds_table(checkout_row(deferred, got="unknown", uncertain=False))
+    assert "| 3 | Gap  |" in text and "defers to Jev" in text and "0.7" in text and "dropped" not in text
+
+    failed = {**CHECKOUT, "rounds": [*CHECKOUT["rounds"][:3], {"step": "laya", "options": ["billing", "frontend"], "failed": "gone"}]}
+    assert "failed: gone" in cases.rounds_table(checkout_row(failed))
+
+
+def test_an_answer_without_a_second_opinion_has_no_rounds_table():
+    plain = {k: v for k, v in CHECKOUT.items() if k != "rounds"}
+    assert cases.rounds_table(checkout_row(plain)) == ""
+
+
+def test_rounds_flag_prints_the_tables_after_the_summary_table(monkeypatch, capsys):
+    from src.llm import decision
+
+    monkeypatch.setattr(cases, "load_env", lambda: None)
+    monkeypatch.setattr(decision, "settings", decision.ClassifierSettings)
+    monkeypatch.setattr(laya_provider.LayaQuestions, "prepare", lambda self: None)
+    answers = {"category": CHECKOUT}
+    monkeypatch.setattr(laya_provider.LayaQuestions, "answer", lambda self, raw: FakeLaya(answers).answer(raw))
+
+    assert cases.main(["--case", "vague", "--rounds"]) == 0
+    out = capsys.readouterr().out
+
+    assert out.index("case") < out.index("| # | Step") and "dropped: network" in out

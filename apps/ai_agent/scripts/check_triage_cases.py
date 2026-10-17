@@ -6,6 +6,7 @@ Run from ai_agent:
     python -m scripts.check_triage_cases --case checkout-area --case clear-database
     python -m scripts.check_triage_cases --baseline      # the same cases with the fallback off (Laya alone)
     python -m scripts.check_triage_cases --prune-ratio 0.4 --json
+    python -m scripts.check_triage_cases --rounds        # a table of every model call for each reviewed question
 
 It calls the same code the Triage Assistant runs (LayaQuestions.answer), so the orchestrator is not
 involved. It loads the local Laya model, reads the `classifier` section of configs/config_tuning.json and
@@ -219,6 +220,53 @@ def table(rows: list[Row]) -> str:
     return "\n".join(lines)
 
 
+_STEP_NAMES = {"laya": "Laya", "jev": "Jev", "jev_vercel": "Jev (Vercel)"}
+
+
+def _grid(header: list[str], body: list[list[str]]) -> str:
+    """A markdown table with aligned columns, so it reads in the terminal and pastes as a table."""
+    widths = [max(len(line[i]) for line in [header, *body]) for i in range(len(header))]
+    line = lambda cells: "| " + " | ".join(cell.ljust(width) for cell, width in zip(cells, widths)) + " |"  # noqa: E731
+    return "\n".join([line(header), "| " + " | ".join("-" * width for width in widths) + " |", *(line(cells) for cells in body)])
+
+
+def rounds_table(row: Row) -> str:
+    """Every model call that settled one question, as a table, or '' when no second opinion was taken.
+    Columns: step, the options it was asked, its pick, one probability column per option, confidence."""
+    answer = row.answer
+    rounds = answer.get("rounds")
+    if not rounds:
+        return ""
+    options = list(answer["probabilities"])
+    body = []
+    for number, step in enumerate(rounds, 1):
+        name = _STEP_NAMES.get(step["step"], step["step"].capitalize())
+        offered = step.get("options")
+        if step["step"] == "gap":
+            body.append([str(number), "Gap", "", f"defers to {_STEP_NAMES.get(step['deferred_to'], step['deferred_to'])}",
+                         *[""] * len(options), f"{step['gap']:g}"])
+            continue
+        if offered:
+            name += ", narrowed"
+        shown = ", ".join(offered) if offered and len(offered) < len(options) else f"all {len(options)}"
+        if "failed" in step:
+            body.append([str(number), name, shown, f"failed: {step['failed']}", *["-"] * len(options), ""])
+            continue
+        probabilities = step["probabilities"]
+        body.append([
+            str(number), name, shown, step.get("choice", ""),
+            *[f"{probabilities[o]:g}" if o in probabilities else "-" for o in options],
+            f"{step['confidence']:g}" if "confidence" in step else "",
+        ])
+    title = f"{row.case} / {row.question}: expected {row.expected or '-'}, got {row.got}"
+    header = ["#", "Step", "Options", "Pick", *[o.capitalize() for o in options], "Confidence"]
+    final = ", ".join(f"{o} {answer['probabilities'][o]:g}" for o in options)
+    notes = [f"final: {row.got} ({final}); answered by {answer['answered_by']}; unsure: {'yes' if row.uncertain else 'no'}"]
+    if answer.get("eliminated"):
+        notes.append("dropped: " + ", ".join(answer["eliminated"]))
+    return "\n".join([title, "", _grid(header, body), "", *notes])
+
+
 def summary(rows: list[Row], errors: dict[str, str]) -> str:
     judged = [r for r in rows if r.ok is not None]
     paths: dict[str, int] = {}
@@ -266,6 +314,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--baseline", action="store_true", help="ignore config_tuning.json: Laya alone, no fallback")
     parser.add_argument("--prune-ratio", type=float, metavar="R", help="override classifier.triage_prune_ratio")
     parser.add_argument("--json", action="store_true", help="also print each answer in full (with its rounds trace)")
+    parser.add_argument("--rounds", action="store_true", help="print a table of every model call for each reviewed question")
     parser.add_argument("--strict", action="store_true", help="exit 1 when an expectation is missed or a case fails")
     args = parser.parse_args(argv)
 
@@ -295,6 +344,12 @@ def main(argv: list[str] | None = None) -> int:
             for row in new:
                 print(json.dumps({"case": row.case, "question": row.question, "answer": row.answer}, ensure_ascii=False))
     print(table(rows))
+    if args.rounds:
+        for row in rows:
+            text = rounds_table(row)
+            if text:
+                print("\n" + text)
+        print()
     for name, error in errors.items():
         print(f"FAILED {name}: {error}")
     print(summary(rows, errors))
