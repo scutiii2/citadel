@@ -13,6 +13,7 @@ URL, token or key.
   opening an owned ticket marks it seen.
   Creating a ticket explains grouping with similar reports. Reporters can reopen
   resolved or closed tickets directly from the detail footer.
+  `/tickets/{id}` opens ticket details directly; closing returns to `/tickets`.
 
 - Separate Notes (`/notes`) and Memory (`/memory`) pages use Ember's existing
   navigation rail, compact headings, theme tokens and responsive layouts. Notes

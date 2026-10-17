@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ApiError } from "../api/http";
 import { ticketsClient, type Ticket } from "../api/TicketsClient";
 import TicketsView from "./TicketsView.vue";
+import { createMemoryHistory, createRouter } from "vue-router";
 
 vi.mock("../api/TicketsClient", () => ({
   ticketsClient: { list: vi.fn(), get: vi.fn(), create: vi.fn(), comment: vi.fn(), close: vi.fn(), reopen: vi.fn() },
@@ -39,8 +40,12 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-async function mountView() {
-  const wrapper = mount(TicketsView, { attachTo: document.body });
+let router: ReturnType<typeof createRouter>;
+async function mountView(path = "/tickets") {
+  router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/tickets/:id?", component: TicketsView }] });
+  await router.push(path);
+  await router.isReady();
+  const wrapper = mount(TicketsView, { attachTo: document.body, global: { plugins: [router] } });
   mounted.push(wrapper);
   await flushPromises();
   return wrapper;
@@ -56,6 +61,62 @@ beforeEach(() => {
 });
 
 describe("TicketsView", () => {
+  it("keeps a ticket seen when its initial list response arrives after the detail", async () => {
+    let finishList!: (rows: Ticket[]) => void;
+    client.list.mockImplementationOnce(() => new Promise(resolve => { finishList = resolve; }));
+    client.get.mockResolvedValue(ticket(1, { has_unread: false }));
+    const wrapper = await mountView("/tickets/1");
+    finishList([ticket(1, { has_unread: true })]);
+    await flushPromises();
+    expect(rows(wrapper)[0]!.classes()).not.toContain("unread");
+  });
+  it("opens a deep link directly and returns to the list when dismissed", async () => {
+    client.get.mockResolvedValue(ticket(42));
+    const wrapper = await mountView("/tickets/42");
+    expect(client.get).toHaveBeenCalledWith(42);
+    expect(wrapper.find(".detail-title").text()).toBe("Ticket 42");
+    await wrapper.find('dialog[aria-label="Ticket #42"] button.close').trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe("/tickets");
+    expect(wrapper.find(".detail-title").exists()).toBe(false);
+  });
+
+  it("updates the address when a row opens", async () => {
+    client.get.mockResolvedValue(ticket(1));
+    const wrapper = await mountView();
+    await rows(wrapper)[1]!.trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe("/tickets/1");
+  });
+
+  it("shows the error for an unknown or foreign deep link", async () => {
+    client.get.mockRejectedValue(new ApiError(404, "No ticket 404."));
+    const wrapper = await mountView("/tickets/404");
+    expect(wrapper.find('dialog[aria-label="Ticket #404"] .error').text()).toContain("No ticket 404.");
+    expect(wrapper.find(".detail-title").exists()).toBe(false);
+  });
+
+  it("follows back and forward navigation without keeping the wrong ticket", async () => {
+    client.get.mockImplementation(async id => ticket(id));
+    const wrapper = await mountView("/tickets/1");
+    await router.push("/tickets/2");
+    await flushPromises();
+    expect(wrapper.find(".detail-title").text()).toBe("Ticket 2");
+    router.back();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await flushPromises();
+    expect(wrapper.find(".detail-title").text()).toBe("Ticket 1");
+    router.forward();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await flushPromises();
+    expect(wrapper.find(".detail-title").text()).toBe("Ticket 2");
+  });
+
+  it.each(["oops", "0", "9007199254740992"])("handles invalid deep link %s", async id => {
+    const wrapper = await mountView(`/tickets/${id}`);
+    expect(wrapper.find(".error").text()).toContain("Invalid ticket id.");
+    expect(client.get).not.toHaveBeenCalled();
+  });
   it.each(["resolved", "closed"] as const)("reopens a %s ticket without confirmation", async status => {
     client.get.mockResolvedValue(ticket(1, { status }));
     client.reopen.mockResolvedValue(ticket(1));

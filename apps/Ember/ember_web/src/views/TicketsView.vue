@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { ticketsClient, type NewTicket, type Ticket, type TicketStatus } from "../api/TicketsClient";
 import BaseModal from "../components/BaseModal.vue";
 import ConfirmModal from "../components/ConfirmModal.vue";
@@ -30,15 +31,23 @@ const tickets = ref<Ticket[]>([]);
 const loading = ref(true);
 const loadError = ref("");
 const notice = ref("");
+const route = useRoute();
+const router = useRouter();
 
 // Only the newest list request may fill the page.
 let loadSeq = 0;
+let seenVersion = 0;
+const seenResults = new Map<number, { version: number; hasUnread: boolean }>();
 async function load(): Promise<void> {
   const seq = ++loadSeq;
+  const version = seenVersion;
   try {
     const rows = await ticketsClient.list(filter.value === "all" ? undefined : filter.value);
     if (seq !== loadSeq) return;
-    tickets.value = rows;
+    tickets.value = rows.map(row => {
+      const seen = seenResults.get(row.id);
+      return seen && seen.version > version ? { ...row, has_unread: seen.hasUnread } : row;
+    });
     loadError.value = "";
   } catch (err) {
     if (seq === loadSeq) loadError.value = errorMessage(err);
@@ -84,6 +93,8 @@ async function submit(): Promise<void> {
 
 // ---- one ticket ----
 const current = ref<Ticket | null>(null);
+const detailOpen = ref(false);
+const detailLoading = ref(false);
 const detailError = ref("");
 const reply = ref("");
 const replying = ref(false);
@@ -92,28 +103,65 @@ const closing = ref(false);
 
 // Dismissal and a newer selection invalidate pending detail responses.
 let detailSeq = 0;
-async function open(ticket: Ticket): Promise<void> {
-  const seq = ++detailSeq;
+let activeDetailId: number | null = null;
+function open(ticket: Ticket): void {
   current.value = ticket;
+  void loadDetail(ticket.id);
+  void router.push(`/tickets/${ticket.id}`);
+}
+
+async function loadDetail(id: number): Promise<void> {
+  const seq = ++detailSeq;
+  activeDetailId = id;
+  current.value = current.value?.id === id ? current.value : tickets.value.find(ticket => ticket.id === id) ?? null;
+  detailOpen.value = true;
+  detailLoading.value = true;
   detailError.value = "";
   reply.value = "";
   try {
-    const loaded = await ticketsClient.get(ticket.id);
+    const loaded = await ticketsClient.get(id);
     if (seq === detailSeq) {
       current.value = loaded;
-      tickets.value = tickets.value.map(row => row.id === ticket.id ? { ...row, has_unread: loaded.has_unread ?? false } : row);
+      seenResults.set(id, { version: ++seenVersion, hasUnread: loaded.has_unread ?? false });
+      tickets.value = tickets.value.map(row => row.id === id ? { ...row, has_unread: loaded.has_unread ?? false } : row);
       window.dispatchEvent(new Event("tickets-seen"));
     }
   } catch (err) {
     if (seq === detailSeq) detailError.value = errorMessage(err);
+  } finally {
+    if (seq === detailSeq) detailLoading.value = false;
   }
 }
 
 function dismiss(): void {
   ++detailSeq;
+  activeDetailId = null;
   current.value = null;
+  detailOpen.value = false;
+  detailLoading.value = false;
   confirmOpen.value = false;
+  void router.replace("/tickets");
 }
+
+watch(() => route.params.id, value => {
+  if (!value) {
+    dismiss();
+    return;
+  }
+  const id = Number(value);
+  if (!/^\d+$/.test(String(value)) || !Number.isSafeInteger(id) || id < 1) {
+    ++detailSeq;
+    activeDetailId = null;
+    current.value = null;
+    detailOpen.value = true;
+    detailLoading.value = false;
+    detailError.value = "Invalid ticket id.";
+    return;
+  }
+  if (!detailOpen.value || activeDetailId !== id) void loadDetail(id);
+}, { immediate: true });
+
+onUnmounted(() => { ++detailSeq; ++loadSeq; });
 
 async function sendReply(): Promise<void> {
   if (!current.value || reply.value.trim() === "" || replying.value || closing.value) return;
@@ -224,7 +272,9 @@ async function reopenTicket(): Promise<void> {
       </form>
     </BaseModal>
 
-    <BaseModal :open="current !== null" :title="current ? `Ticket #${current.id}` : 'Ticket'" @close="dismiss">
+    <BaseModal :open="detailOpen" :title="current ? `Ticket #${current.id}` : route.params.id ? `Ticket #${route.params.id}` : 'Ticket'" @close="dismiss">
+      <p v-if="detailLoading && !current" class="muted" role="status">Loading …</p>
+      <p v-if="detailError" class="error" role="alert">{{ detailError }}</p>
       <template v-if="current">
         <h3 class="detail-title">{{ current.title }}</h3>
         <p class="meta">
@@ -235,7 +285,6 @@ async function reopenTicket(): Promise<void> {
           <span class="muted">Filed {{ formatTicketTime(current.created_at) }}</span>
         </p>
         <p class="text">{{ current.description }}</p>
-        <p v-if="detailError" class="error" role="alert">{{ detailError }}</p>
 
         <ul v-if="current.comments?.length" class="thread" aria-label="Comments">
           <li v-for="c in current.comments" :key="c.id">
