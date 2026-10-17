@@ -15,6 +15,32 @@ function mountPanel(props: Partial<InstanceType<typeof ContextPanel>["$props"]> 
 const row = (w: ReturnType<typeof mountPanel>, id: string) => w.get(`[data-part="${id}"]`);
 
 describe("ContextPanel", () => {
+  it("lists each agent call's prompt cost without adding it to the answering agent's window", () => {
+    const w = mountPanel({ agentUsage: [
+      { agent: "ember", agent_label: "Ember", total_tokens: 100, context_breakdown: PARTS, context_breakdown_exact: true },
+      { agent: "calc", agent_label: "Calculator", total_tokens: 25,
+        context_breakdown: [{ id: "messages", label: "Messages", tokens: 20 }], context_breakdown_exact: false },
+      { agent: "calc", agent_label: "Calculator", total_tokens: 35,
+        context_breakdown: [{ id: "system_prompt", label: "System prompt", tokens: 30 }] },
+      { agent: "old", total_tokens: 10 },
+    ] });
+    const agents = w.findAll("[data-test=agent-context]");
+    expect(agents).toHaveLength(4);
+    expect(agents[0]!.text()).toContain("Ember");
+    expect(agents[0]!.text()).toContain("Exact");
+    expect(agents[1]!.text()).toContain("Calculator");
+    expect(agents[1]!.text()).toContain("Estimated");
+    expect(agents[1]!.text()).toContain("20");
+    expect(agents[2]!.text()).toContain("System prompt");
+    expect(agents[3]!.text()).toContain("Breakdown unavailable");
+    expect(w.get("[data-test=agent-contexts]").text()).toContain("Prompt cost per agent");
+    expect(w.get("[data-test=agent-contexts]").text()).not.toContain("Free space");
+    expect(w.get(".summary").text()).toContain("20% used");
+  });
+
+  it("keeps the original view for answers without per-agent usage", () => {
+    expect(mountPanel().find("[data-test=agent-contexts]").exists()).toBe(false);
+  });
   it("says how much of the window is used", () => {
     const w = mountPanel();
 

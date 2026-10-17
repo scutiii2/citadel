@@ -150,6 +150,26 @@ describe("what fills the context", () => {
     expect(estimated.contextExact).toBe(false);
   });
 
+  it("keeps per-agent prompt costs tied to the same answer and clears them after a summary", async () => {
+    const usage = [{ agent: "calc", total_tokens: 5, context_breakdown: PARTS, context_breakdown_exact: true }];
+    const chat = await openChat([answer({ agent_usage: usage })]);
+    expect(chat.contextAgentUsage).toEqual(usage);
+    const summarized = await openChat([answer({ agent_usage: usage }), { role: "assistant", content: "s", kind: "summary" }]);
+    expect(summarized.contextAgentUsage).toEqual([]);
+    expect((await openChat([answer()])).contextAgentUsage).toEqual([]);
+  });
+
+  it("shows the current routed answer's agent costs even without a root context size", async () => {
+    const usage = [{ agent: "calc", total_tokens: 5, context_breakdown: PARTS }];
+    const routed = { role: "assistant", content: "routed answer", agent_usage: usage };
+    const chat = await openChat([answer({ context_breakdown: PARTS }), routed]);
+    expect(chat.contextAgentUsage).toEqual(usage);
+    expect(chat.contextUsage).toBeNull();
+    expect(chat.contextParts).toEqual([]);
+    const fresh = await openChat([routed]);
+    expect(fresh.contextAgentUsage).toEqual(usage);
+  });
+
   it("is empty for an answer saved before breakdowns existed", async () => {
     const chat = await openChat([{ role: "user", content: "q" }, answer()]);
 

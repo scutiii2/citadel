@@ -26,6 +26,7 @@ def test_own_row_shape():
         "model": "claude-sonnet-5-5", "input_tokens": 10, "output_tokens": 5, "total_tokens": 15,
         "started_at": "2026-10-04T09:12:03.512Z", "finished_at": "2026-10-04T09:12:07.044Z",
         "delegated_by": "claude-agent",
+        "context_breakdown": [], "context_breakdown_exact": False,
     }
 
 
@@ -35,6 +36,16 @@ def test_append_writes_one_line_per_turn_to_a_per_agent_daily_file(tmp_path):
 
     lines = (tmp_path / "2026-10-04.calc.jsonl").read_text(encoding="utf-8").splitlines()
     assert [json.loads(line)["request_id"] for line in lines] == ["r1", "r2"]
+
+
+def test_own_row_keeps_its_prompt_parts_and_accuracy():
+    parts = [{"id": "messages", "label": "Messages", "tokens": 10}]
+    result = ChatResult(response="x", provider_id="openai", model="gpt", context_breakdown=parts,
+                        context_breakdown_exact=True)
+    row = usage_log.own_row(result, agent_id="calc", agent_label="Calculator", gateway=None,
+                            started_at="start", finished_at="end", delegated_by="main")
+    assert row["context_breakdown"] == parts
+    assert row["context_breakdown_exact"] is True
 
 
 def test_append_failure_only_warns(tmp_path, caplog):

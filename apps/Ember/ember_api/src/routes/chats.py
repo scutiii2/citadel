@@ -109,6 +109,17 @@ class StepIn(BaseModel):
     agent_label: str | None = Field(default=None, max_length=120)
 
 
+MAX_CONTEXT_PARTS = 12
+
+
+class ContextPartIn(BaseModel):
+    """One part of what filled an answer's context window."""
+
+    id: str = Field(max_length=40)
+    label: str = Field(max_length=60)
+    tokens: int = Field(ge=0)
+
+
 class AgentUsageIn(BaseModel):
     """One agent's share of an answer that delegated to others."""
 
@@ -123,17 +134,8 @@ class AgentUsageIn(BaseModel):
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
     total_tokens: int = Field(ge=0)
-
-
-MAX_CONTEXT_PARTS = 12
-
-
-class ContextPartIn(BaseModel):
-    """One part of what filled an answer's context window."""
-
-    id: str = Field(max_length=40)
-    label: str = Field(max_length=60)
-    tokens: int = Field(ge=0)
+    context_breakdown: list[ContextPartIn] | None = Field(default=None, max_length=MAX_CONTEXT_PARTS)
+    context_breakdown_exact: bool | None = None
 
 
 # What message_time() makes: 2026-10-06T14:03:09.123Z (a fraction is optional).

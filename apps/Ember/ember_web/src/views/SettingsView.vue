@@ -500,8 +500,8 @@ onMounted(() => {
           <SettingRow
             v-if="shown.has('context-accuracy')"
             setting-id="context-accuracy"
-            label="Breakdown accuracy"
-            description="Estimate is quick and free. Exact asks the provider to count each part."
+            label="Breakdown accuracy (all agents)"
+            description="Applies to all agents. Estimate is quick and free. Exact asks each provider to count each part."
             :modified="modified['context-accuracy']"
             :cost="TOKEN_COSTS.contextAccuracy"
             @reset="draft.contextAccuracy = DEFAULT_CONTEXT_ACCURACY"

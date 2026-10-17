@@ -412,6 +412,30 @@ def test_put_takes_twenty_breakdown_rows_and_refuses_twenty_one(client: TestClie
     assert too_many.status_code == 422
 
 
+def test_put_preserves_twenty_agents_with_bounded_prompt_parts(client: TestClient) -> None:
+    as_admin(client)
+    parts = [{"id": f"part{i}", "label": "Part", "tokens": i} for i in range(12)]
+    rows = [{"agent": f"a{i}", "total_tokens": 50, "context_breakdown": parts,
+             "context_breakdown_exact": False} for i in range(20)]
+    chat_id = new_id()
+    answer = {"role": "assistant", "content": "ok", "agent_usage": rows}
+    assert put(client, chat_id, messages=[answer]).status_code == 200
+    assert client.get(f"/api/chats/{chat_id}").json()["messages"][0]["agent_usage"] == rows
+    rows[0]["context_breakdown"] = parts + [parts[0]]
+    assert put(client, new_id(), messages=[answer]).status_code == 422
+
+
+@pytest.mark.parametrize("part", [
+    {"id": "messages", "label": "Messages", "tokens": -1},
+    {"id": "x" * 41, "label": "Messages", "tokens": 1},
+    {"id": "messages", "label": "x" * 61, "tokens": 1},
+])
+def test_put_refuses_invalid_agent_prompt_parts(client: TestClient, part) -> None:
+    as_admin(client)
+    row = {"agent": "calc", "total_tokens": 1, "context_breakdown": [part]}
+    assert put(client, new_id(), messages=[{"role": "assistant", "content": "ok", "agent_usage": [row]}]).status_code == 422
+
+
 def test_put_refuses_negative_usage_fields(client: TestClient) -> None:
     as_admin(client)
     bad = {"role": "assistant", "content": "x", "duration_s": -1}

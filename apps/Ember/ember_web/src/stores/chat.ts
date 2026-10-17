@@ -285,18 +285,19 @@ export const useChatStore = defineStore("chat", () => {
     for (let i = messages.value.length - 1; i >= 0; i -= 1) {
       const m = messages.value[i]!;
       if (m.kind === "summary" || m.kind === "log_attachment") return null;
-      if (m.context_tokens && m.context_window) return m;
+      if ((m.context_tokens && m.context_window) || m.agent_usage?.length) return m;
     }
     return null;
   });
   const contextUsage = computed<{ tokens: number; window: number } | null>(() => {
     const m = lastContextAnswer.value;
-    return m ? { tokens: m.context_tokens!, window: m.context_window! } : null;
+    return m?.context_tokens && m.context_window ? { tokens: m.context_tokens, window: m.context_window } : null;
   });
   /** What filled that context, when the last answer says; empty otherwise. */
   const contextParts = computed<ContextPart[]>(() => lastContextAnswer.value?.context_breakdown ?? []);
   /** Whether those parts were counted by the model provider (true) or estimated. */
   const contextExact = computed(() => lastContextAnswer.value?.context_breakdown_exact === true);
+  const contextAgentUsage = computed(() => lastContextAnswer.value?.agent_usage ?? []);
 
   function find(id: string): Conversation | undefined {
     return conversations.value.find((c) => c.id === id);
@@ -1358,6 +1359,7 @@ export const useChatStore = defineStore("chat", () => {
     contextUsage,
     contextParts,
     contextExact,
+    contextAgentUsage,
     listLoading,
     listReady,
     chatLoading,

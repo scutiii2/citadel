@@ -68,6 +68,9 @@ export interface ContextPart {
 
 /** One agent's share of an answer that ran several. */
 export interface AgentUsage {
+  /** This call's prompt parts, separate from the answering agent's context window. */
+  context_breakdown?: ContextPart[];
+  context_breakdown_exact?: boolean;
   /** The agent's id (older answers: its provider's name). */
   agent: string;
   /** Display name; absent on older answers. */

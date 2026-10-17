@@ -57,7 +57,7 @@ def _text(value: Any, limit: int) -> str | None:
 
 
 # Keys of a usage row that are shown but not stored (no column).
-_DISPLAY_ONLY = {"agent_label"}
+_DISPLAY_ONLY = {"agent_label", "context_breakdown", "context_breakdown_exact"}
 
 
 def period_start(days: int, since_date: date | None = None) -> tuple[datetime, int]:
@@ -93,6 +93,7 @@ def usage_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
                     "started_at": _time(entry.get("started_at")),
                     "finished_at": _time(entry.get("finished_at")),
                     "delegated_by": _text(entry.get("delegated_by"), 120),
+                    **{key: entry[key] for key in ("context_breakdown", "context_breakdown_exact") if key in entry},
                 }
             )
     if not rows and _int(result.get("total_tokens")):

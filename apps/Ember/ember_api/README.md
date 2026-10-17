@@ -34,6 +34,11 @@ Chat turn streams relay bounded `plan_update` checklist snapshots by agent.
 Reconnect snapshots include the latest plans for that turn; plans are not
 stored in the chat transcript.
 
+Delegated answers retain bounded `context_breakdown` parts and
+`context_breakdown_exact` on each `agent_usage` row, including chat resaves
+and imports. These describe each call's prompt cost; the answering agent's
+top-level context fields still describe its own window.
+
 ## Status
 
 | Phase | What | State |
