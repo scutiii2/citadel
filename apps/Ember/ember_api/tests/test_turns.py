@@ -274,6 +274,37 @@ DELEGATED = [
 ]
 
 
+def test_delegated_prompt_parts_survive_stream_save_and_resave(client: TestClient, agent: FakeAgent) -> None:
+    rows = [
+        {**DELEGATED[0], "context_breakdown": PARTS, "context_breakdown_exact": True},
+        {**DELEGATED[1], "context_breakdown": [{"id": "messages", "label": "Messages", "tokens": 25}],
+         "context_breakdown_exact": False},
+    ]
+    agent.result_extra = {"agent_usage": rows}
+    as_admin(client)
+    chat_id = new_id()
+    assert start(client, chat_id).status_code == 202
+    final = events(client, chat_id)[-1]["message"]
+    saved = chat(client, chat_id)
+    for message in (final, saved["messages"][-1]):
+        for actual, original in zip(message["agent_usage"], rows):
+            assert actual["context_breakdown"] == original["context_breakdown"]
+            assert actual["context_breakdown_exact"] is original["context_breakdown_exact"]
+    assert client.post(f"/api/chats/{chat_id}/messages", json={"title": "resaved", "messages": saved["messages"]}).status_code == 200
+    assert chat(client, chat_id)["messages"][-1]["agent_usage"] == final["agent_usage"]
+
+
+@pytest.mark.parametrize("bad", [123, "bad", [{"id": "messages", "label": "Messages", "tokens": -1}]])
+def test_invalid_delegate_prompt_parts_do_not_fail_the_answer(client: TestClient, agent: FakeAgent, bad) -> None:
+    agent.result_extra = {"agent_usage": [DELEGATED[0], {**DELEGATED[1], "context_breakdown": bad}]}
+    as_admin(client)
+    chat_id = new_id()
+    assert start(client, chat_id).status_code == 202
+    final = events(client, chat_id)[-1]["message"]
+    assert final["content"] == "Hello!"
+    assert "context_breakdown" not in final["agent_usage"][1]
+
+
 def test_an_answer_that_delegated_saves_who_used_the_tokens(client: TestClient, agent: FakeAgent) -> None:
     agent.result_extra = {"agent_usage": DELEGATED}
     as_admin(client)

@@ -278,9 +278,25 @@ def call(
             arguments["model_tier"] = model_tier
         if reasoning_effort:
             arguments["reasoning_effort"] = reasoning_effort
-        if "*" in tool_filter.blocked():
-            status = asyncio.run(_call_tool(agent["url"], "status", {}))
-            if not status.get("tool_filter_all"):
+        # Imported here because context_breakdown also describes this tool.
+        from src.llm import context_breakdown
+
+        exact = context_breakdown.exact_requested()
+        if exact or "*" in tool_filter.blocked():
+            try:
+                status = asyncio.run(asyncio.wait_for(
+                    _call_tool(agent["url"], "status", {}),
+                    timeout=context_breakdown.EXACT_TIMEOUT_SECONDS,
+                ))
+            except Exception:
+                if "*" in tool_filter.blocked():
+                    raise
+                # Counting is optional; old or unavailable status tools must
+                # not prevent an otherwise supported ask from completing.
+                status = {}
+            if exact and status.get("exact_context"):
+                arguments["exact_context"] = True
+            if "*" in tool_filter.blocked() and not status.get("tool_filter_all"):
                 raise PermissionError("The delegated agent cannot block all tools; update and restart it")
         result = asyncio.run(
             _ask_linked(

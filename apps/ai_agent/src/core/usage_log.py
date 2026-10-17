@@ -57,6 +57,8 @@ def own_row(
         "started_at": started_at,
         "finished_at": finished_at,
         "delegated_by": delegated_by,
+        "context_breakdown": result.context_breakdown,
+        "context_breakdown_exact": result.context_breakdown_exact,
     }
     if result.cached_input_tokens:
         row["cached_input_tokens"] = result.cached_input_tokens

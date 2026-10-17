@@ -62,6 +62,7 @@ const {
   contextUsage,
   contextParts,
   contextExact,
+  contextAgentUsage,
   contextPanel,
   contextAccuracy,
   commands,
@@ -298,8 +299,9 @@ const contextPercent = computed(() => {
 // is on and the last answer says (older answers do not).
 const contextBreakdown = computed(() => {
   const usage = contextUsage.value;
-  if (!contextPanel.value || !usage || contextParts.value.length === 0) return null;
-  return { tokens: usage.tokens, window: usage.window, parts: contextParts.value, exact: contextExact.value };
+  if (!contextPanel.value) return null;
+  if ((!usage || contextParts.value.length === 0) && contextAgentUsage.value.length === 0) return null;
+  return { tokens: usage?.tokens ?? 0, window: usage?.window ?? 0, parts: contextParts.value, exact: contextExact.value, agentUsage: contextAgentUsage.value };
 });
 
 function onSelect(id: string, messageIndex?: number): void {

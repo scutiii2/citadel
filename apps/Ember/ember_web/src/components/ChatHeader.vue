@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from "vue";
-import type { ContextPart } from "../api/types";
+import type { AgentUsage, ContextPart } from "../api/types";
 import type { MenuItem } from "../utils/chatMenu";
 import type { ContextAccuracy } from "../utils/contextAccuracy";
 import { useAuthStore } from "../stores/auth";
@@ -21,7 +21,7 @@ const props = defineProps<{
   contextPercent: number | null;
   /** What fills the context, for the panel the meter opens; leave out (or null)
    * and the meter is plain text. */
-  breakdown?: { tokens: number; window: number; parts: ContextPart[]; exact?: boolean } | null;
+  breakdown?: { tokens: number; window: number; parts: ContextPart[]; exact?: boolean; agentUsage?: AgentUsage[] } | null;
   /** How the next questions are counted; with it the panel shows an Estimate / Exact switch. */
   accuracy?: ContextAccuracy;
   locked: boolean;
@@ -33,7 +33,8 @@ const auth = useAuthStore();
 
 const CONTEXT_HINT = "How full the agent's memory of this chat is. At 60% the chat is summarized automatically.";
 const contextTitle = computed(() =>
-  props.breakdown ? `How full the agent's memory of this chat is. Click for what fills it. At 60% the chat is summarized automatically.` : CONTEXT_HINT,
+  props.contextPercent === null && props.breakdown ? "Prompt cost for each agent that ran this answer."
+    : props.breakdown ? `How full the agent's memory of this chat is. Click for what fills it. At 60% the chat is summarized automatically.` : CONTEXT_HINT,
 );
 
 const MENU_WIDTH = 210;
@@ -53,9 +54,13 @@ function closePanelOnEscape(event: KeyboardEvent): void {
 }
 
 watch(panelOpen, (open) => {
-  const method = open ? "addEventListener" : "removeEventListener";
-  document[method]("pointerdown", closePanelOnOutside);
-  document[method]("keydown", closePanelOnEscape);
+  if (open) {
+    document.addEventListener("pointerdown", closePanelOnOutside);
+    document.addEventListener("keydown", closePanelOnEscape);
+  } else {
+    document.removeEventListener("pointerdown", closePanelOnOutside);
+    document.removeEventListener("keydown", closePanelOnEscape);
+  }
 });
 // No breakdown any more (another chat, the setting off): nothing to show.
 watch(() => props.breakdown, (breakdown) => {
@@ -105,21 +110,24 @@ function choose(id: string): void {
     <h2 class="title" :title="title">{{ title }}</h2>
     <EntryAgentTag />
     <span class="spacer" />
-    <div v-if="contextPercent !== null" ref="contextBox" class="context-box">
+    <div v-if="contextPercent !== null || breakdown" ref="contextBox" class="context-box">
       <component
         :is="breakdown ? 'button' : 'span'"
         :type="breakdown ? 'button' : undefined"
-        :class="['context', { high: contextPercent >= 50 }]"
+        :class="['context', { high: contextPercent !== null && contextPercent >= 50 }]"
         :aria-expanded="breakdown ? panelOpen : undefined"
         :aria-haspopup="breakdown ? 'dialog' : undefined"
         :title="contextTitle"
         @click="breakdown && (panelOpen = !panelOpen)"
       >
-        Context
-        <span class="meter" role="progressbar" aria-label="Context used" :aria-valuenow="contextPercent" aria-valuemin="0" aria-valuemax="100">
-          <i :style="{ width: `${contextPercent}%` }" />
-        </span>
-        {{ contextPercent }}%
+        <template v-if="contextPercent !== null">
+          Context
+          <span class="meter" role="progressbar" aria-label="Context used" :aria-valuenow="contextPercent" aria-valuemin="0" aria-valuemax="100">
+            <i :style="{ width: `${contextPercent}%` }" />
+          </span>
+          {{ contextPercent }}%
+        </template>
+        <template v-else>Prompt costs</template>
       </component>
       <ContextPanel
         v-if="breakdown && panelOpen"
@@ -128,6 +136,7 @@ function choose(id: string): void {
         :window="breakdown.window"
         :parts="breakdown.parts"
         :exact="breakdown.exact"
+        :agent-usage="breakdown.agentUsage"
         :accuracy="accuracy"
         @update:accuracy="(value) => emit('update:accuracy', value)"
       />

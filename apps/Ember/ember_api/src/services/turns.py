@@ -127,7 +127,10 @@ def _agent_usage(row: dict[str, Any]) -> dict[str, Any]:
         "total_tokens": row["total_tokens"],
         "started_at": _iso(row.get("started_at")),
         "finished_at": _iso(row.get("finished_at")),
+        **_context_breakdown(row),
     }
+    if entry.get("context_breakdown") and row.get("context_breakdown_exact") is False:
+        entry["context_breakdown_exact"] = False
     return {key: value for key, value in entry.items() if value is not None}
 
 
@@ -137,8 +140,11 @@ def _context_breakdown(result: dict[str, Any]) -> dict[str, Any]:
     `context_breakdown_exact` when ai_agent counted with the provider. Only what the
     route's ContextPartIn accepts is kept, so the saved answer can always be
     sent back by the browser."""
+    raw = result.get("context_breakdown")
+    if not isinstance(raw, list):
+        return {}
     parts: list[dict[str, Any]] = []
-    for part in result.get("context_breakdown") or []:
+    for part in raw[:MAX_CONTEXT_PARTS]:
         if not isinstance(part, dict):
             return {}
         part_id, label, tokens = part.get("id"), part.get("label"), part.get("tokens")

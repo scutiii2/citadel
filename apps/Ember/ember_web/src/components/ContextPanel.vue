@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { ContextPart } from "../api/types";
+import type { AgentUsage, ContextPart } from "../api/types";
 import { CONTEXT_ACCURACY_OPTIONS, type ContextAccuracy } from "../utils/contextAccuracy";
 import { compactNumber } from "../utils/usageFormat";
 import SegmentedControl from "./SegmentedControl.vue";
@@ -16,6 +16,8 @@ const props = defineProps<{
   parts: ContextPart[];
   /** The parts were counted by the model provider, not estimated. */
   exact?: boolean;
+  /** Each call's prompt cost; these do not fill the answering agent's window. */
+  agentUsage?: AgentUsage[];
   /** How the next questions are counted; leave out to hide the switch. */
   accuracy?: ContextAccuracy;
 }>();
@@ -59,6 +61,7 @@ function formatPercent(percent: number): string {
 
 <template>
   <div class="context-panel" role="dialog" aria-label="Context breakdown" data-test="context-panel">
+    <template v-if="window > 0 && parts.length">
     <p class="summary">
       <strong>{{ usedPercent }}% used</strong>
       <span>{{ compactNumber(tokens) }} / {{ compactNumber(window) }}</span>
@@ -78,14 +81,33 @@ function formatPercent(percent: number): string {
         <strong class="percent">{{ formatPercent(row.percent) }}</strong>
       </li>
     </ul>
+    </template>
     <div v-if="accuracy" class="accuracy" data-test="context-accuracy">
       <SegmentedControl v-model="choice" :options="CONTEXT_ACCURACY_OPTIONS" aria-label="Breakdown accuracy" />
       <span>Applies from your next question.</span>
     </div>
-    <p class="note" data-test="context-note">
+    <p v-if="window > 0 && parts.length" class="note" data-test="context-note">
       {{ exact ? "Counted by the model provider." : "Estimated from the prompt text." }}
       The total is what the model reported.
     </p>
+    <section v-if="agentUsage?.length" class="agent-contexts" data-test="agent-contexts" aria-label="Prompt cost per agent">
+      <h3>Prompt cost per agent</h3>
+      <p class="note">Each call's prompt, counted separately from the answering agent's context window.</p>
+      <section v-for="(agent, index) in agentUsage" :key="index" class="agent-context" data-test="agent-context">
+        <h4>
+          <span>{{ agent.agent_label || agent.agent }}</span>
+          <span v-if="agent.context_breakdown?.length" class="count-kind">{{ agent.context_breakdown_exact ? "Exact" : "Estimated" }}</span>
+        </h4>
+        <ul v-if="agent.context_breakdown?.length" class="rows agent-rows">
+          <li v-for="part in agent.context_breakdown" :key="part.id" :data-part="part.id">
+            <i class="swatch" :style="{ background: partColor(part.id) }" />
+            <span class="label">{{ part.label }}</span>
+            <span class="tokens">{{ compactNumber(part.tokens) }}</span>
+          </li>
+        </ul>
+        <p v-else class="note">Breakdown unavailable.</p>
+      </section>
+    </section>
   </div>
 </template>
 
@@ -99,6 +121,8 @@ function formatPercent(percent: number): string {
   --part-other: var(--muted);
   box-sizing: border-box;
   width: min(320px, calc(100vw - 32px));
+  max-height: 65vh;
+  overflow-y: auto;
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -171,5 +195,33 @@ function formatPercent(percent: number): string {
   margin: 0;
   font-size: 0.8em;
   color: var(--muted);
+}
+.agent-contexts {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.agent-contexts h3 {
+  margin: 0 0 6px;
+  font-size: 1em;
+  font-weight: 600;
+}
+.agent-context h4 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0 6px;
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+.count-kind {
+  color: var(--muted);
+  font-size: 0.85em;
+  font-weight: 400;
+}
+.agent-rows li {
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  overflow-wrap: anywhere;
 }
 </style>

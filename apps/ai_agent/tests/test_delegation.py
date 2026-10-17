@@ -11,10 +11,52 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from src.agents import agent_registry, delegation
 from src.agents.agent_spec import RosterEntry
 
 ROSTER = [RosterEntry("calc", "Calculator", "Arithmetic."), RosterEntry("explainer", "Explainer", "Explanations.")]
+
+
+@pytest.mark.parametrize("exact,supported", [(False, True), (True, True), (True, False)])
+def test_exact_context_is_forwarded_only_when_requested_and_supported(monkeypatch, exact, supported):
+    from src.llm import context_breakdown
+
+    _configure_agents(monkeypatch, [{"id": "calc", "url": "http://c/mcp"}])
+    calls = []
+
+    async def peer(url, name, arguments, on_progress=None):
+        calls.append((name, arguments))
+        return {"exact_context": supported} if name == "status" else {"response": "4"}
+
+    monkeypatch.setattr(delegation, "_call_tool", peer)
+    token = context_breakdown.bind_exact(exact)
+    try:
+        assert delegation.call("calc", "2+2", 0) == "4"
+    finally:
+        context_breakdown.reset_exact(token)
+    assert [name for name, _ in calls] == (["status", "ask"] if exact else ["ask"])
+    assert calls[-1][1].get("exact_context", False) is (exact and supported)
+
+
+def test_exact_capability_probe_failure_falls_back_without_failing_delegation(monkeypatch):
+    from src.llm import context_breakdown
+
+    _configure_agents(monkeypatch, [{"id": "calc", "url": "http://c/mcp"}])
+
+    async def peer(url, name, arguments, on_progress=None):
+        if name == "status":
+            raise RuntimeError("old peer has no status tool")
+        assert "exact_context" not in arguments
+        return {"response": "4"}
+
+    monkeypatch.setattr(delegation, "_call_tool", peer)
+    token = context_breakdown.bind_exact(True)
+    try:
+        assert delegation.call("calc", "2+2", 0) == "4"
+    finally:
+        context_breakdown.reset_exact(token)
 
 
 def _configure_agents(monkeypatch, agents):

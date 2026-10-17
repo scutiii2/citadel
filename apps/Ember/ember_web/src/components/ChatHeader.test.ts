@@ -75,6 +75,19 @@ describe("ChatHeader", () => {
       expect(panel()?.textContent).toContain("Free space");
     });
 
+    it("opens per-agent prompt costs when routing did not report an answering-agent window", async () => {
+      const w = mountHeader({ contextPercent: null, breakdown: {
+        tokens: 0, window: 0, parts: [],
+        agentUsage: [{ agent: "calc", agent_label: "Calculator", total_tokens: 10, context_breakdown: BREAKDOWN.parts }],
+      } });
+      expect(w.get("button.context").text()).toContain("Prompt costs");
+      expect(w.find(".meter").exists()).toBe(false);
+      await w.get("button.context").trigger("click");
+      expect(panel()?.textContent).toContain("Calculator");
+      expect(panel()?.textContent).not.toContain("Free space");
+      expect(panel()?.textContent).not.toContain("% used");
+    });
+
     it("passes the accuracy to the panel and on to its owner", async () => {
       const w = mountHeader({ breakdown: BREAKDOWN, accuracy: "estimate" });
       await w.get("button.context").trigger("click");

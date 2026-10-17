@@ -8,6 +8,12 @@ URL, token or key.
 
 ## Features
 
+- The context panel shows prompt cost per agent call for delegated answers,
+  with Exact or Estimated counts. Context accuracy applies to every agent;
+  Exact makes about five count requests per changed agent prompt, cached after that.
+  Routed answers without an answering-agent context size open the panel from
+  **Prompt costs** in the header.
+
 - Workspace administration, activity logs, and traffic analytics live in [ember_admin](../ember_admin).
 
 - Log in, register with an invite code, verify your email (ember_api
