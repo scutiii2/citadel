@@ -295,6 +295,26 @@ def _cached_request(system_prompt: str, schemas: list[dict[str, Any]]) -> tuple[
     return system, tools
 
 
+def _with_history_breakpoint(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """`messages` for one request, with a cache breakpoint on the last message's last
+    block, so the next round of a tool loop (or the next turn, within the cache's life)
+    reads everything up to here from cache. A copy: `messages` itself never carries
+    the marker, or each round would add one and pass the API's limit of four. The last
+    message of a request is always the user's question or its tool results, built here
+    as a string or dicts; any other shape is sent as it is."""
+    if not messages:
+        return messages
+    last = messages[-1]
+    content = last.get("content")
+    if isinstance(content, str) and content:
+        marked: Any = [{"type": "text", "text": content, "cache_control": _CACHE_CONTROL}]
+    elif isinstance(content, list) and content and isinstance(content[-1], dict):
+        marked = [*content[:-1], {**content[-1], "cache_control": _CACHE_CONTROL}]
+    else:
+        return messages
+    return [*messages[:-1], {**last, "content": marked}]
+
+
 def _usage_count(usage: Any, name: str) -> int:
     """One usage counter; a gateway may omit it or send null."""
     value = getattr(usage, name, 0)
@@ -335,7 +355,8 @@ async def run_chat(
     # pop it into this name->label lookup here, once, rather than sending it
     # to the API or re-deriving it per tool_use block below.
     labels = {s["name"]: s.pop("display_label") for s in schemas}
-    system, tools = _cached_request(system_prompt, schemas) if _prompt_cache_enabled() else (system_prompt, schemas)
+    use_cache = _prompt_cache_enabled()
+    system, tools = _cached_request(system_prompt, schemas) if use_cache else (system_prompt, schemas)
     # Every round of this loop is a real, separately-billed API call, so a
     # multi-tool-call answer's total is the sum across all rounds, not just
     # the final one. Anthropic's usage object has input_tokens/output_tokens
@@ -375,7 +396,7 @@ async def run_chat(
                             model=model_name,
                             max_tokens=options.max_tokens(token_limits.max_output_tokens(PROVIDER_ID)),
                             system=system,
-                            messages=messages,
+                            messages=_with_history_breakpoint(messages) if use_cache else messages,
                             tools=tools,
                             **options.extra_kwargs(model_name),
                         ) as stream:

@@ -96,6 +96,63 @@ def test_run_chat_sends_cache_breakpoints_and_counts_cached_tokens(monkeypatch):
     assert result.cached_input_tokens == 10_000
 
 
+def test_history_breakpoint_wraps_a_string_message_and_leaves_the_original_alone():
+    messages = [{"role": "user", "content": "earlier"}, {"role": "user", "content": "now"}]
+
+    marked = anthropic_provider._with_history_breakpoint(messages)
+
+    assert marked[-1]["content"] == [{"type": "text", "text": "now", "cache_control": _EPHEMERAL}]
+    assert marked[0] is messages[0]
+    assert messages[-1]["content"] == "now"
+
+
+def test_history_breakpoint_marks_the_last_tool_result_only():
+    results = [
+        {"type": "tool_result", "tool_use_id": "a", "content": "one"},
+        {"type": "tool_result", "tool_use_id": "b", "content": "two"},
+    ]
+    messages = [{"role": "user", "content": "q"}, {"role": "user", "content": results}]
+
+    marked = anthropic_provider._with_history_breakpoint(messages)
+
+    assert "cache_control" not in marked[-1]["content"][0]
+    assert marked[-1]["content"][1]["cache_control"] == _EPHEMERAL
+    assert "cache_control" not in results[1]
+
+
+def test_history_breakpoint_leaves_an_unmarkable_last_message_as_it_is():
+    for content in ("", [], [object()]):
+        messages = [{"role": "user", "content": content}]
+        assert anthropic_provider._with_history_breakpoint(messages) is messages
+    assert anthropic_provider._with_history_breakpoint([]) == []
+
+
+def test_each_round_of_a_tool_loop_carries_one_history_breakpoint_on_its_last_message(monkeypatch):
+    tool_block = MagicMock(type="tool_use", input={}, id="t1")
+    tool_block.name = "tool_srv_listApps"
+    first = MagicMock(stop_reason="tool_use", content=[tool_block])
+    first.usage = SimpleNamespace(input_tokens=10, output_tokens=5)
+    second = MagicMock(stop_reason="end_turn", content=[])
+    second.usage = SimpleNamespace(input_tokens=3, output_tokens=1)
+    client = MagicMock()
+    client.messages.stream = MagicMock(side_effect=[_round_cm(first), _round_cm(second)])
+    monkeypatch.setattr(anthropic_provider, "_get_client", lambda: client)
+    monkeypatch.setattr(anthropic_provider, "_prompt_cache_enabled", lambda: True)
+    monkeypatch.setattr(anthropic_provider, "_dispatch", lambda name, args, depth: "2 apps running")
+    monkeypatch.setattr(anthropic_provider, "_tool_schemas", lambda enabled_extensions=None, roster=(): [_schema("t")])
+
+    asyncio.run(anthropic_provider.run_chat("status?", []))
+
+    for call in client.messages.stream.call_args_list:
+        sent = call.kwargs["messages"]
+        marked = [
+            block for message in sent if isinstance(message["content"], list)
+            for block in message["content"] if isinstance(block, dict) and "cache_control" in block
+        ]
+        assert len(marked) == 1
+        assert marked[0] is sent[-1]["content"][-1]
+
+
 def test_run_chat_sends_plain_system_and_tools_when_the_gateway_has_not_opted_in(monkeypatch):
     usage = SimpleNamespace(input_tokens=50, output_tokens=20)
 
@@ -103,6 +160,7 @@ def test_run_chat_sends_plain_system_and_tools_when_the_gateway_has_not_opted_in
 
     assert isinstance(kwargs["system"], str)
     assert all("cache_control" not in tool for tool in kwargs["tools"])
+    assert kwargs["messages"] == [{"role": "user", "content": "hi"}]
     assert result.input_tokens == 50
     assert result.cached_input_tokens == 0
 
