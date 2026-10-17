@@ -69,13 +69,20 @@ const canRun = computed(() => {
   if (tab.value === "totp") return options.totp.secret.trim() !== "";
   return true;
 });
-/** A TOTP code is shown in groups of three, like an authenticator app. */
+/** Every generated value stays masked until Reveal is pressed. A revealed TOTP code is
+ * shown in groups of three, like an authenticator app. */
 const shown = computed(() => {
   const r = result.value;
   if (!r) return "";
-  if (tab.value === "totp") return r.value.replace(/(\d{3})(?=\d)/g, "$1 ");
-  return revealed.value || tab.value !== "totp-secret" ? r.value : "•".repeat(Math.min(r.value.length, 32));
+  if (!revealed.value) return "•".repeat(Math.min(r.value.length, 32));
+  return tab.value === "totp" ? r.value.replace(/(\d{3})(?=\d)/g, "$1 ") : r.value;
 });
+
+/** The form button: a fresh value starts hidden again. */
+function generate(): void {
+  revealed.value = false;
+  void run();
+}
 
 function argsFor(which: Tab): Record<string, unknown> {
   switch (which) {
@@ -160,7 +167,7 @@ onBeforeUnmount(() => {
       <SegmentedControl v-model="tab" aria-label="Generator type" :options="TABS" />
 
       <article class="card panel">
-        <form class="options" @submit.prevent="canRun && run()">
+        <form class="options" @submit.prevent="canRun && generate()">
           <template v-if="tab === 'password'">
             <label class="field">Length: {{ options.password.length }}
               <input v-model.number="options.password.length" type="range" min="8" max="128" />
@@ -212,7 +219,7 @@ onBeforeUnmount(() => {
           </template>
           <div class="actions">
             <button type="submit" class="primary" :disabled="!canRun">
-              {{ tab === "totp" ? "Show code" : live && result ? "Regenerate" : "Generate" }}
+              {{ tab === "totp" ? "Generate code" : live && result ? "Regenerate" : "Generate" }}
             </button>
           </div>
         </form>
@@ -221,8 +228,8 @@ onBeforeUnmount(() => {
         <div v-else-if="result" class="result" aria-live="polite">
           <div class="value-row">
             <code class="value" :class="{ code: tab === 'totp' }" data-testid="generated-value">{{ shown }}</code>
-            <button v-if="tab === 'totp-secret'" type="button" class="chip" @click="revealed = !revealed">
-              {{ revealed ? "Hide" : "Show" }}
+            <button type="button" class="chip" :aria-pressed="revealed" @click="revealed = !revealed">
+              {{ revealed ? "Hide" : "Reveal" }}
             </button>
             <CopyButton :text="result.value" label="Copy value" />
           </div>

@@ -35,12 +35,30 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("GeneratorView", () => {
-  it("makes a password on open and shows it with its strength", async () => {
+  it("makes a password on open, hidden until Reveal is pressed, with its strength", async () => {
     const w = await show();
 
     expect(mocks.runTool).toHaveBeenCalledWith("tool_gen_generatePassword", expect.objectContaining({ length: 20 }));
-    expect(w.get("[data-testid=generated-value]").text()).toBe("Abc123!xyz");
+    expect(w.get("[data-testid=generated-value]").text()).toBe("•".repeat(10));
     expect(w.get("[role=meter]").attributes("aria-valuenow")).toBe("64");
+
+    await tabButton(w, "Reveal").trigger("click");
+    expect(w.get("[data-testid=generated-value]").text()).toBe("Abc123!xyz");
+    await tabButton(w, "Hide").trigger("click");
+    expect(w.get("[data-testid=generated-value]").text()).not.toContain("Abc");
+  });
+
+  it("keeps a revealed value revealed while an option changes, and hides it again on Regenerate", async () => {
+    const w = await show();
+    await tabButton(w, "Reveal").trigger("click");
+
+    await w.get("input[type=checkbox]").setValue(false);
+    await flushPromises();
+    expect(w.get("[data-testid=generated-value]").text()).toBe("Abc123!xyz");
+
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(w.get("[data-testid=generated-value]").text()).toBe("•".repeat(10));
   });
 
   it("makes a new password when an option changes", async () => {
@@ -65,7 +83,7 @@ describe("GeneratorView", () => {
     expect(mocks.runTool).not.toHaveBeenCalled();
   });
 
-  it("hides a TOTP secret until Show is pressed", async () => {
+  it("hides a TOTP secret until Reveal is pressed", async () => {
     const w = await show();
 
     await tabButton(w, "TOTP secret").trigger("click");
@@ -73,7 +91,7 @@ describe("GeneratorView", () => {
     await flushPromises();
     expect(w.get("[data-testid=generated-value]").text()).not.toContain("JBSWY");
 
-    await tabButton(w, "Show").trigger("click");
+    await tabButton(w, "Reveal").trigger("click");
     expect(w.get("[data-testid=generated-value]").text()).toBe("JBSWY3DPEHPK3PXP");
   });
 
@@ -87,6 +105,8 @@ describe("GeneratorView", () => {
     await w.get("input[type=password]").setValue("JBSWY3DPEHPK3PXP");
     await w.get("form").trigger("submit");
     await flushPromises();
+    expect(w.get("[data-testid=generated-value]").text()).toBe("••••••");
+    await tabButton(w, "Reveal").trigger("click");
     expect(w.get("[data-testid=generated-value]").text()).toBe("123 456");
 
     mocks.runTool.mockClear();
