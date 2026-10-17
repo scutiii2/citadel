@@ -263,10 +263,13 @@ orchestrator, run `python -m scripts.check_triage_cases`: 47 cases that call the
 code, with `--list`, `--case NAME` (or a pattern such as `"escalate-*"`), `--rounds`, `--baseline` (Laya alone, for comparison), `--prune-ratio R` and
 `--json` (full answers with their traces). It uses your `config_tuning.json` and `.env` and sends the
 cases' texts to the fallback backend when that is on.
-`--three-way` is an experiment (the Triage Assistant itself is unchanged): the English Laya checkpoint, the
-`typed-decisions` checkpoint and the fallback vote as three separate models and the same phases run over all of them
-(rules in `scripts/triage_three_way.py`; `--max-len` sets the Laya window, default 4096; with `--baseline` only the
-two Laya models vote).
+`--three-way` is an experiment (the Triage Assistant itself is unchanged): Laya English answers first, the
+`typed-decisions` checkpoint only if English is not sure, and the fallback only when those two cannot settle it, each
+against its own confidence threshold (2 options: English 0.90, typed 0.80, Jev 0.90; 3 or more: 0.75, 0.55, 0.90;
+`--threshold laya-typed:3+=0.6` changes one). Between the steps, options far below the best are dropped and the
+question is asked again, and if nobody is ever sure the models' values are compared pairwise (answer, with
+`also_check`, or `unknown`). The exact flow is in `scripts/triage_three_way.py`; `--max-len` sets the Laya window
+(default 4096) and `--baseline` leaves Jev out.
 
 Usage reports the model's actual input-token work and zero generated output
 tokens. Laya is restricted to a specialist with the pinned checkpoint and

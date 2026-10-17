@@ -23,11 +23,13 @@ cents of tokens in all). Each row shows how a question was settled:
     blend      Laya and the classifier were averaged, nothing dropped
     narrowed   options far below the rest were dropped and the question asked again (then who decided)
 
-With --three-way the cases run through scripts/triage_three_way.py instead: the English Laya checkpoint, the
-typed-decisions checkpoint and the fallback each vote on their own and the same phases (confidence gap, average
-and drop, pair rule) are applied to all of them; see that file for the exact rules. It loads both checkpoints
-(--max-len sets the window, default 4096). --baseline then leaves out the fallback, so the two Laya models vote alone.
-Extra path labels there: `local` (both Laya models agreed and one was sure, nothing left the machine).
+With --three-way the cases run through scripts/triage_three_way.py instead: Laya English is asked first, Laya
+typed only if English is not sure, Jev only when they cannot settle it, each against its own confidence
+threshold (--threshold changes one); see that file for the exact flow. It loads both checkpoints (--max-len
+sets the window, default 4096). --baseline then leaves out Jev, so the two Laya models decide alone.
+Path labels there: `local` (English, or typed agreeing with it, was sure; nothing left the machine),
+`narrowed->X` (X decided after options were dropped), `final` (nobody was sure: the pairwise comparison decided or
+called it unknown), plus `fallback` when Jev decided on the original options.
 
 Expected choices are a smoke check, not a benchmark: a case with no expectation is for watching the
 paths and numbers. Exit code 1 with --strict when a case with an expectation got a different answer.
@@ -277,8 +279,8 @@ def path_of(answer: dict[str, Any]) -> str:
         return "local"
     if "deferred_to" in answer:
         return f"deferred->{by}"
-    if answer.get("resolved_by") == "pair":
-        return "narrowed->pair" if "eliminated" in answer else "pair"
+    if answer.get("resolved_by") in ("pair", "final"):
+        return ("narrowed->" if "eliminated" in answer else "") + answer["resolved_by"]
     if "eliminated" in answer:
         return f"narrowed->{by}"
     if "+" in by:
@@ -392,12 +394,17 @@ def rounds_table(row: Row) -> str:
         ])
     title = f"{row.case} / {row.question}: expected {row.expected or '-'}, got {row.got}"
     header = ["#", "Step", "Options", "Pick", *[o.capitalize() for o in options], "Confidence"]
+    if any("threshold" in step for step in rounds):  # the three-way flow records what each model needed to be sure
+        header.append("Needs")
+        body = [cells + [f"{step['threshold']:g}" if "threshold" in step else ""] for cells, step in zip(body, rounds)]
     final = ", ".join(f"{o} {answer['probabilities'][o]:g}" for o in options)
     notes = [f"final: {row.got} ({final}); answered by {answer['answered_by']}; unsure: {'yes' if row.uncertain else 'no'}"]
     if answer.get("eliminated"):
         notes.append("dropped: " + ", ".join(answer["eliminated"]))
     if answer.get("also_check"):
         notes.append("also check: " + ", ".join(answer["also_check"]))
+    if answer.get("unknown"):
+        notes.append("answer: unknown (could be " + " or ".join(answer["candidates"]) + ")")
     return "\n".join([title, "", _grid(header, body), "", *notes])
 
 
@@ -457,6 +464,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--strict", action="store_true", help="exit 1 when an expectation is missed or a case fails")
     parser.add_argument("--three-way", action="store_true",
                         help="Laya English, Laya typed-decisions and the fallback as three separate voters")
+    parser.add_argument("--threshold", action="append", default=[], metavar="MODEL:COUNT=VALUE",
+                        help="with --three-way, change one confidence threshold, e.g. laya-typed:3+=0.6 (repeatable)")
     parser.add_argument("--max-len", type=int, default=4096, metavar="N",
                         help="token window for the Laya models with --three-way (default 4096)")
     args = parser.parse_args(argv)
@@ -475,7 +484,13 @@ def main(argv: list[str] | None = None) -> int:
         from scripts.triage_three_way import ThreeWayTriage
 
         print("loading Laya English and typed-decisions (the first run may download weights)...", flush=True)
-        laya = ThreeWayTriage.load(args.max_len, use_fallback=not args.baseline)
+        from scripts.triage_three_way import parse_threshold
+
+        thresholds: dict[str, dict[str, float]] = {}
+        for text in args.threshold:
+            name, count, value = parse_threshold(text)
+            thresholds.setdefault(count, {})[name] = value
+        laya = ThreeWayTriage.load(args.max_len, use_fallback=not args.baseline, thresholds=thresholds)
     else:
         from src.llm.laya_provider import LayaQuestions
 

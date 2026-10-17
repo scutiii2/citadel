@@ -1,27 +1,32 @@
 """Experimental triage where every model is its own voter: Laya (English), Laya (typed-decisions) and the
 fallback classifier (Jev). Used by `check_triage_cases --three-way`; the Triage Assistant itself is unchanged.
 
-It is the two-model review (llm/laya_provider.py) generalised to any number of voters, in the same order:
+The flow, per `choice` question (each model has its own confidence threshold, by number of options):
 
-  0. Both Laya models answer locally. If they pick the same option and the more confident of them is at or
-     above the request's min_confidence, that is the answer (`resolved_by: local`) and nothing is sent out.
-     Otherwise the fallback is asked too (when classifier.triage_fallback is on and a backend is available).
-  1. Confidence gap: if the most confident voter leads the next one by at least `triage_confidence_gap`,
-     its answer stands as it is (`deferred_to`).
-  2. Average and drop: the probabilities of all voters are averaged and options under `triage_prune_ratio`
-     of the leader's average are dropped (never fewer than two stay). The question is asked again over what
-     is left, voter by voter in order (Laya English, Laya typed, then the fallback), and the first voter that
-     is sure decides. With nothing to drop the voters are blended instead.
-  3. Pair rule: two options left and the voters still disagree. Each voter's probabilities are multiplied by
-     its own confidence; per option the spread (largest minus smallest value across voters) is taken; if the
-     smaller spread is under `triage_pair_ratio` of the larger one, the option with the bigger spread is the
-     answer, otherwise it is unsure and both options are `candidates`. `also_check` names the other option.
+  1. Laya English answers. If its confidence meets its threshold, that is the answer.
+  2. Otherwise Laya typed answers. If it picks the same option as English and meets its own threshold, that
+     option is the answer (if English could not answer at all, a typed answer that meets its threshold stands).
+  3. Same pick but both under their thresholds, or the two disagree:
+     - With 3 or more options: average the two Laya models' probabilities, drop the options far below the best
+       (under `triage_prune_ratio` of its value, never fewer than two left) and ask again over what is left,
+       English first and then typed; the first one that meets its threshold decides. Repeat (at most 3 rounds)
+       while options can still be dropped.
+     - Then, with 2 options left or nothing more to drop, Jev is asked (if the fallback is on and available).
+  4. If Jev meets its threshold, its answer is the answer. If not, the options are narrowed once more by the
+     average of all the models, and Jev is asked again; if it now meets its threshold, that is the answer.
+  5. Still undecided: for each remaining option N the models' values are compared in pairs,
+     (|E-T| + |J-T| + |J-E|) / 3, where each value is the model's probability for N times its own confidence
+     (with fewer models, the pairs there are). When the top option's value clearly leads (the next is under
+     `triage_pair_ratio` of it) it is the answer and the other option(s) go in `also_check`; otherwise the
+     answer is `unknown`, with the leading options as `candidates`.
 
-Blending (nothing dropped, voters still unsure): the average distribution, the highest confidence when all
-agree and the lowest when they do not (then `uncertain` is true and `disagreement` says who picked what).
-Score and noul questions are not averaged: the first sure local answer, else the fallback's, else the most
-confident local one. With the fallback off, only the two Laya models vote. The thresholds are the
-`classifier` section of configs/config_tuning.json, as for the real triage.
+Default thresholds (confidence 0-1, "at or above"):
+    2 options:   laya-english 0.90, laya-typed 0.80, jev 0.90
+    3+ options:  laya-english 0.75, laya-typed 0.55, jev 0.90
+Override one with `--threshold laya-typed:3+=0.6` (count `2` or `3+`); a `min_confidence` in a request replaces
+all of them for that request. Score and noul questions are not averaged: the first of English, typed, Jev that
+meets its 3+ threshold answers, else the most confident local one. With the fallback off only the two Laya
+models vote. The other settings are the `classifier` section of configs/config_tuning.json.
 """
 
 from __future__ import annotations
@@ -38,7 +43,31 @@ _log = logging.getLogger(__name__)
 
 ENGLISH = "laya-english"
 TYPED = "laya-typed"
+JEV = "jev"
 CHECKPOINTS = {ENGLISH: "convaiinnovations/laya", TYPED: "typed-decisions"}
+MAX_NARROWING = 3
+DEFAULT_THRESHOLDS = {
+    "2": {ENGLISH: 0.90, TYPED: 0.80, JEV: 0.90},
+    "3+": {ENGLISH: 0.75, TYPED: 0.55, JEV: 0.90},
+}
+
+
+def parse_threshold(text: str) -> tuple[str, str, float]:
+    """`laya-typed:3+=0.6` -> ("laya-typed", "3+", 0.6)."""
+    try:
+        left, value = text.split("=")
+        name, count = left.split(":")
+        number = float(value)
+    except ValueError as error:
+        raise SystemExit(f"--threshold wants MODEL:COUNT=VALUE, for example laya-typed:3+=0.6 (got {text!r})") from error
+    if name not in (ENGLISH, TYPED, JEV) or count not in DEFAULT_THRESHOLDS or not 0 < number <= 1:
+        raise SystemExit(f"--threshold {text!r}: MODEL is one of {ENGLISH}, {TYPED}, {JEV}; COUNT is 2 or 3+; VALUE is 0-1")
+    return name, count, number
+
+
+def _key(name: str) -> str:
+    """The threshold row of a voter: any fallback backend counts as Jev."""
+    return name if name in (ENGLISH, TYPED) else JEV
 
 
 def _rounded(values: dict[str, float]) -> dict[str, float]:
@@ -50,208 +79,223 @@ def _mean(answers: dict[str, dict[str, Any]]) -> dict[str, float]:
     return {o: sum(a["probabilities"][o] for a in answers.values()) / len(answers) for o in options}
 
 
-def _leader(answers: dict[str, dict[str, Any]]) -> str:
-    """The pick of the most confident voter (the first of equals)."""
-    return max(answers.values(), key=lambda a: a["answer_confidence"])["choice"]
+def _restrict(answer: dict[str, Any], options: list[str]) -> dict[str, Any]:
+    """The answer's probabilities over only `options`, renormalised (a model answered before options were dropped)."""
+    kept = {o: answer["probabilities"].get(o, 0.0) for o in options}
+    total = sum(kept.values())
+    return {**answer, "probabilities": {o: (v / total if total else 1 / len(options)) for o, v in kept.items()}}
 
 
-def _blend(request: Request, answers: dict[str, dict[str, Any]], rounds: list[dict[str, Any]]) -> dict[str, Any]:
-    average = _mean(answers)
-    unanimous = len({a["choice"] for a in answers.values()}) == 1
-    confidences = [a["answer_confidence"] for a in answers.values()]
-    confidence = max(confidences) if unanimous else min(confidences)
-    leader = _leader(answers)
-    rounds.append(laya_provider._average_round(average))
-    out: dict[str, Any] = {
-        "type": "choice", "choice": max(average, key=lambda o: (round(average[o], 6), o == leader)),
-        "probabilities": _rounded(average), "answer_confidence": confidence,
-        "uncertain": not unanimous or confidence < request.min_confidence,
-        "answered_by": "+".join(answers), "resolved_by": "blend",
-    }
-    if not unanimous:
-        out["disagreement"] = {name: a["choice"] for name, a in answers.items()}
-    return out
-
-
-def _pair(request: Request, answers: dict[str, dict[str, Any]], rounds: list[dict[str, Any]]) -> dict[str, Any]:
-    options = list(next(iter(answers.values()))["probabilities"])
-    scaled = {name: {o: a["answer_confidence"] * a["probabilities"][o] for o in options} for name, a in answers.items()}
-    spread = {o: max(s[o] for s in scaled.values()) - min(s[o] for s in scaled.values()) for o in options}
-    larger, smaller = max(spread.values()), min(spread.values())
-    decided = larger > 0 and smaller < decision.settings().triage_pair_ratio * larger
-    total = sum(spread.values())
-    share = {o: (spread[o] / total if total else 1 / len(options)) for o in options}
-    leader = _leader(answers)
-    choice = max(options, key=lambda o: (round(spread[o], 6), o == leader))
-    rounds += [
-        {"step": f"{name} x confidence", "options": options, "probabilities": _rounded(values)} for name, values in scaled.items()
-    ]
+def final_answer(voters: dict[str, dict[str, Any]], rounds: list[dict[str, Any]]) -> dict[str, Any]:
+    """Step 5: pairwise differences of the confidence-weighted values, per option."""
+    options = list(next(iter(voters.values()))["probabilities"])
+    scaled = {name: {o: a["answer_confidence"] * a["probabilities"][o] for o in options} for name, a in voters.items()}
+    names = list(scaled)
+    pairs = [(x, y) for i, x in enumerate(names) for y in names[i + 1:]]
+    score = {o: sum(abs(scaled[x][o] - scaled[y][o]) for x, y in pairs) / len(pairs) for o in options}
+    # A tie goes to the pick of the most confident voter.
+    leader = max(voters.values(), key=lambda a: a["answer_confidence"])["choice"]
+    ranked = sorted(options, key=lambda o: (round(score[o], 6), o == leader), reverse=True)
+    top, runner_up = ranked[0], ranked[1]
+    decided = score[top] > 0 and score[runner_up] < decision.settings().triage_pair_ratio * score[top]
+    total = sum(score.values())
+    share = {o: (score[o] / total if total else 1 / len(options)) for o in options}
+    rounds += [{"step": f"{name} x confidence", "options": options, "probabilities": _rounded(v)} for name, v in scaled.items()]
     rounds.append({
-        "step": "difference", "options": options, "probabilities": _rounded(spread),
-        "choice": choice if decided else "unsure: " + " or ".join(options),
+        "step": "difference", "options": options, "probabilities": _rounded(score),
+        "choice": top if decided else "unknown: " + " or ".join(ranked[:2]),
     })
-    who = " and ".join(answers)
-    other = [o for o in options if o != choice]
+    who = " and ".join(names)
     out: dict[str, Any] = {
-        "type": "choice", "choice": choice, "probabilities": _rounded(share), "answer_confidence": round(share[choice], 4),
-        "uncertain": not decided, "answered_by": "+".join(answers), "resolved_by": "pair",
-        "disagreement": {name: a["choice"] for name, a in answers.items()}, "also_check": other,
+        "type": "choice", "choice": top, "probabilities": _rounded(share), "answer_confidence": round(share[top], 4),
+        "uncertain": not decided, "answered_by": "+".join(names), "resolved_by": "final",
+        "disagreement": {name: a["choice"] for name, a in voters.items()}, "also_check": ranked[1:3],
     }
     if decided:
-        out["note"] = f"{who} disagreed; {choice} is the stronger answer, but also check {' and '.join(other)}."
+        out["note"] = f"{who} did not settle it; {top} stands out most, but also check {' and '.join(ranked[1:3])}."
     else:
-        out["candidates"] = options
-        out["note"] = f"{who} disagreed and the weighed answers are too close to call: it could be {' or '.join(options)}; check both."
+        out["unknown"] = True
+        out["candidates"] = ranked[:2]
+        out["note"] = f"The answer is unknown: it could be {' or '.join(ranked[:2])}; check both."
     return out
-
-
-def settled_locally(votes: dict[str, dict[str, Any]], min_confidence: float) -> bool:
-    """All local voters pick the same option and the most confident of them is sure."""
-    picks = {a["choice"] for a in votes.values()}
-    return bool(votes) and len(picks) == 1 and max(a["answer_confidence"] for a in votes.values()) >= min_confidence - 1e-9
-
-
-def local_answer(votes: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    rounds = [laya_provider._round(name, a) for name, a in votes.items()]
-    if len(votes) == 1:
-        name, answer = next(iter(votes.items()))
-        return {**answer, "answered_by": name, "resolved_by": "local"}
-    average = _mean(votes)
-    rounds.append(laya_provider._average_round(average))
-    leader = _leader(votes)
-    return {
-        "type": "choice", "choice": max(average, key=lambda o: (round(average[o], 6), o == leader)),
-        "probabilities": _rounded(average), "answer_confidence": max(a["answer_confidence"] for a in votes.values()),
-        "uncertain": False, "answered_by": "+".join(votes), "resolved_by": "local", "rounds": rounds,
-    }
 
 
 class ThreeWayTriage:
     """Drop-in for LayaQuestions in check_triage_cases: `answer(raw)` returns an object with `response` and
     `input_tokens`."""
 
-    def __init__(self, locals_: dict[str, LayaQuestions], use_fallback: bool = True) -> None:
+    def __init__(
+        self, locals_: dict[str, LayaQuestions], use_fallback: bool = True,
+        thresholds: dict[str, dict[str, float]] | None = None,
+    ) -> None:
         self.locals = locals_
         self.use_fallback = use_fallback
+        self.thresholds = {count: {**row, **(thresholds or {}).get(count, {})} for count, row in DEFAULT_THRESHOLDS.items()}
         self.tokens = 0
+        self._request: Request | None = None
+        self._override: float | None = None
+        self._cache: dict[str, dict[str, dict[str, Any]] | None] = {}
 
     @classmethod
-    def load(cls, max_len: int, use_fallback: bool = True) -> "ThreeWayTriage":
+    def load(
+        cls, max_len: int, use_fallback: bool = True, thresholds: dict[str, dict[str, float]] | None = None,
+    ) -> "ThreeWayTriage":
         import laya
 
         laya_provider.CONTEXT_WINDOW = max_len
         laya_provider.MAX_INPUT_CHARS = 200_000
-        return cls({name: LayaQuestions(laya.load(model)) for name, model in CHECKPOINTS.items()}, use_fallback)
+        return cls({name: LayaQuestions(laya.load(model)) for name, model in CHECKPOINTS.items()}, use_fallback, thresholds)
 
     def prepare(self) -> None:
         for questions in self.locals.values():
             questions.prepare()
 
+    def threshold(self, name: str, count: int) -> float:
+        if self._override is not None:
+            return self._override
+        return self.thresholds["2" if count == 2 else "3+"][_key(name)]
+
     # -- asking ------------------------------------------------------------------------------------
     def _fallback_ready(self) -> bool:
         return self.use_fallback and decision.settings().triage_fallback and decision.available("triage", ("laya",))
 
-    def _ask_remote(self, request: Request, qid: str) -> dict[str, Any] | None:
-        answers, tokens, _ = laya_provider._ask_fallback(request, [qid])
+    def _run_local(self, name: str, request: Request) -> dict[str, dict[str, Any]] | None:
+        try:
+            answers, tokens = self.locals[name]._laya_answers(request)
+        except (ValueError, RuntimeError) as error:
+            _log.warning("%s could not answer: %s", name, error)
+            return None
         self.tokens += tokens
-        return answers.get(qid)
+        return answers
 
     def _ask_voter(self, name: str, request: Request, qid: str) -> dict[str, Any] | None:
-        """One voter's answer to one question of `request` (None when it could not answer)."""
-        if name in self.locals:
-            try:
-                answers, tokens = self.locals[name]._laya_answers(request)
-            except (ValueError, RuntimeError) as error:
-                _log.warning("%s could not answer %r: %s", name, qid, error)
-                return None
+        """One voter's answer to one question of `request`; the whole original request is asked once per model."""
+        if name == JEV:
+            answers, tokens, _ = laya_provider._ask_fallback(request, [qid])
             self.tokens += tokens
-            return answers[qid]
-        return self._ask_remote(request, qid)
+            return answers.get(qid)
+        if request is self._request:
+            if name not in self._cache:
+                self._cache[name] = self._run_local(name, request)
+            answers = self._cache[name]
+        else:
+            answers = self._run_local(name, request)
+        return None if answers is None else answers[qid]
 
     # -- settling ----------------------------------------------------------------------------------
     def answer(self, raw: str) -> Any:
         request = laya_provider.parse_request(raw, laya_provider.MAX_INPUT_CHARS)
-        self.tokens = 0
-        local: dict[str, dict[str, dict[str, Any]]] = {}
-        for name, questions in self.locals.items():
-            try:
-                answers, tokens = questions._laya_answers(request)
-            except (ValueError, RuntimeError) as error:
-                _log.warning("%s could not read the request: %s", name, error)
-                continue
-            local[name] = answers
-            self.tokens += tokens
+        data, _ = json.JSONDecoder().raw_decode(raw.lstrip())
+        self._override = float(data["min_confidence"]) if "min_confidence" in data else None
+        self._request, self._cache, self.tokens = request, {}, 0
         out = {}
         for qid, spec in request.questions.items():
-            votes = {name: answers[qid] for name, answers in local.items()}
-            out[qid] = self._settle(request, qid, spec, votes)
+            settle = self._settle_choice if spec["type"] == "choice" else self._settle_other
+            out[qid] = settle(request, qid, spec)
         return SimpleNamespace(response=json.dumps({"answers": out}), input_tokens=self.tokens)
 
-    def _settle(self, request: Request, qid: str, spec: dict[str, Any], votes: dict[str, dict[str, Any]]) -> dict[str, Any]:
-        if spec["type"] != "choice":
-            return self._settle_other(request, qid, votes)
-        if settled_locally(votes, request.min_confidence):
-            return local_answer(votes)
-        if self._fallback_ready():
-            remote = self._ask_remote(request, qid)
-            if remote is not None:
-                votes = {**votes, remote["answered_by"]: remote}
-        if not votes:
-            raise ValueError(f"no model could answer {qid!r}")
-        if len(votes) == 1:
-            name, answer = next(iter(votes.items()))
-            return {**answer, "answered_by": name, "resolved_by": "alone"}
-        return self._review(request, qid, spec, votes)
+    def _settle_choice(self, request: Request, qid: str, spec: dict[str, Any]) -> dict[str, Any]:
+        rounds: list[dict[str, Any]] = []
+        eliminated: list[str] = []
+        options = list(spec["criteria"])
+        current = request
+        latest: dict[str, dict[str, Any]] = {}
 
-    def _settle_other(self, request: Request, qid: str, votes: dict[str, dict[str, Any]]) -> dict[str, Any]:
-        for name, answer in votes.items():
-            if not answer["uncertain"]:
-                return {**answer, "answered_by": name, "resolved_by": "local"}
-        if self._fallback_ready():
-            remote = self._ask_remote(request, qid)
-            if remote is not None:
-                return remote
-        if not votes:
-            raise ValueError(f"no model could answer {qid!r}")
-        name, answer = max(votes.items(), key=lambda kv: kv[1]["answer_confidence"])
-        return {**answer, "answered_by": name}
-
-    def _review(self, request: Request, qid: str, spec: dict[str, Any], votes: dict[str, dict[str, Any]]) -> dict[str, Any]:
-        settings = decision.settings()
-        rounds = [laya_provider._round(name, answer) for name, answer in votes.items()]
-        ranked = sorted(votes.items(), key=lambda kv: kv[1]["answer_confidence"], reverse=True)
-        gap = ranked[0][1]["answer_confidence"] - ranked[1][1]["answer_confidence"]
-        if gap >= settings.triage_confidence_gap - 1e-9:
-            name, answer = ranked[0]
-            rounds.append({"step": "gap", "gap": round(gap, 4), "deferred_to": name})
-            return {**answer, "answered_by": name, "deferred_to": name, "resolved_by": "gap", "rounds": rounds}
-        average = _mean(votes)
-        ratio = settings.triage_prune_ratio
-        kept = laya_provider._kept_options(average, ratio) if ratio > 0 else list(average)
-        if len(kept) == len(average):
-            disagree = len({a["choice"] for a in votes.values()}) > 1
-            out = _pair(request, votes, rounds) if len(average) == 2 and disagree else _blend(request, votes, rounds)
-            return {**out, "rounds": rounds}
-        eliminated = [name for name in average if name not in kept]
-        rounds.append(laya_provider._average_round(average, eliminated))
-        narrowed = Request(request.text, {qid: {**spec, "criteria": {o: spec["criteria"][o] for o in kept}}}, request.min_confidence)
-        asked: dict[str, dict[str, Any]] = {}
-        for name in votes:
-            answer = self._ask_voter(name, narrowed, qid)
+        def ask(name: str) -> dict[str, Any] | None:
+            answer = self._ask_voter(name, current, qid)
+            narrowed = {"options": list(options)} if eliminated else {}
             if answer is None:
-                rounds.append({"step": name, "options": kept, "failed": "could not answer"})
-                continue
-            asked[name] = answer
-            rounds.append(laya_provider._round(name, answer, kept))
-            if not answer["uncertain"]:
+                rounds.append({"step": name, "failed": "could not answer", **narrowed})
+                return None
+            rounds.append({**laya_provider._round(name, answer, options if eliminated else None), "threshold": needs(name)})
+            latest[name] = answer
+            return answer
+
+        def needs(name: str) -> float:
+            return self.threshold(name, len(options))
+
+        def sure(name: str, answer: dict[str, Any] | None) -> bool:
+            return answer is not None and answer["answer_confidence"] >= needs(name) - 1e-9
+
+        def decided(answer: dict[str, Any], by: str, resolved_by: str) -> dict[str, Any]:
+            out = {**answer, "answered_by": by, "resolved_by": resolved_by, "uncertain": False, "rounds": rounds}
+            return laya_provider._with_eliminated(spec, out, eliminated) if eliminated else out
+
+        def narrow(average: dict[str, float]) -> bool:
+            """Drop the options far below the best; True when any went."""
+            nonlocal options, current
+            ratio = decision.settings().triage_prune_ratio
+            kept = laya_provider._kept_options(average, ratio) if ratio > 0 else list(average)
+            if len(kept) == len(options):
+                return False
+            gone = [o for o in options if o not in kept]
+            eliminated.extend(gone)
+            rounds.append(laya_provider._average_round(average, gone))
+            options = kept
+            current = Request(
+                request.text, {qid: {**spec, "criteria": {o: spec["criteria"][o] for o in kept}}}, request.min_confidence,
+            )
+            return True
+
+        # 1 and 2: the two local models, English first
+        english = ask(ENGLISH)
+        if sure(ENGLISH, english):
+            return decided(english, ENGLISH, "local")
+        typed = ask(TYPED)
+        if sure(TYPED, typed) and (english is None or typed["choice"] == english["choice"]):
+            return decided(typed, f"{ENGLISH}+{TYPED}" if english else TYPED, "local")
+
+        # 3: with 3 or more options, drop the clearly worse ones and ask the local models again
+        for _ in range(MAX_NARROWING):
+            voters = {n: a for n, a in latest.items() if n in (ENGLISH, TYPED)}
+            if len(options) <= 2 or not voters or not narrow(_mean(voters)):
                 break
-        if not asked:
-            return {**_blend(request, votes, rounds), "rounds": rounds}
-        name, last = list(asked.items())[-1]
-        if not last["uncertain"] or len(asked) == 1:
-            final = {**last, "answered_by": name}
-        elif len(kept) == 2 and len({a["choice"] for a in asked.values()}) > 1:
-            final = _pair(request, asked, rounds)
-        else:
-            final = _blend(request, asked, rounds)
-        return {**laya_provider._with_eliminated(spec, final, eliminated), "rounds": rounds}
+            latest = {}
+            english = ask(ENGLISH)
+            if sure(ENGLISH, english):
+                return decided(english, ENGLISH, "narrowed")
+            typed = ask(TYPED)
+            if sure(TYPED, typed):
+                return decided(typed, TYPED, "narrowed")
+
+        # 4: Jev, then Jev again over a narrower set
+        if self._fallback_ready():
+            jev = ask(JEV)
+            if sure(JEV, jev):
+                return decided(jev, JEV, "narrowed" if eliminated else "jev")
+            if jev is not None and len(options) > 2 and narrow(_mean(latest)):
+                jev = ask(JEV)
+                if sure(JEV, jev):
+                    return decided(jev, JEV, "narrowed")
+
+        # 5: nobody was sure: compare what they said
+        voters = {n: _restrict(a, options) for n, a in latest.items()}
+        if not voters:
+            raise ValueError(f"no model could answer {qid!r}")
+        if len(voters) == 1:
+            name, answer = next(iter(voters.items()))
+            out = {**answer, "answered_by": name, "uncertain": True, "rounds": rounds}
+            return laya_provider._with_eliminated(spec, out, eliminated) if eliminated else out
+        final = final_answer(voters, rounds)
+        final["rounds"] = rounds
+        return laya_provider._with_eliminated(spec, final, eliminated) if eliminated else final
+
+    def _settle_other(self, request: Request, qid: str, spec: dict[str, Any]) -> dict[str, Any]:
+        """Score and noul questions: the first model that meets its 3+ threshold answers."""
+        best: tuple[str, dict[str, Any]] | None = None
+        for name in (ENGLISH, TYPED):
+            answer = self._ask_voter(name, request, qid)
+            if answer is None:
+                continue
+            if answer["answer_confidence"] >= self.threshold(name, 3) - 1e-9:
+                return {**answer, "answered_by": name, "resolved_by": "local", "uncertain": False}
+            if best is None or answer["answer_confidence"] > best[1]["answer_confidence"]:
+                best = (name, answer)
+        if self._fallback_ready():
+            answer = self._ask_voter(JEV, request, qid)
+            if answer is not None:
+                answer["uncertain"] = answer["answer_confidence"] < self.threshold(JEV, 3)
+                return answer
+        if best is None:
+            raise ValueError(f"no model could answer {qid!r}")
+        return {**best[1], "answered_by": best[0], "uncertain": True}
