@@ -6,6 +6,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { ticketsClient } from "../api/TicketsClient";
 import { RouterLink, useRoute, useRouter } from "vue-router";
+import AccountMenu from "./AccountMenu.vue";
 import EmberLogo from "./EmberLogo.vue";
 import { useTheme } from "../composables/useTheme";
 import { CONFIG_ISSUES_ICON, OVERVIEW_ICON, PROFILE_ICON, visiblePages } from "../router/pages";
@@ -207,22 +208,16 @@ async function logout(): Promise<void> {
       <button v-if="gamePlaying" type="button" class="close-game" data-label="Close game" aria-label="Close game" @click="games.close()">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
       </button>
-      <a v-if="canAdmin" :href="adminUrl" target="_blank" rel="noopener noreferrer" class="admin-link" data-label="Ember Admin" aria-label="Open Ember Admin">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3 3 7v5c0 5 5 8 9 10 4-2 9-5 9-10V7zM8 12l3 3 5-6" /></svg>
-      </a>
-      <RouterLink
-        v-for="p in footerPages"
-        :key="p.to"
-        :to="p.to"
-        class="footer-page"
-        :data-label="p.label"
-        :aria-label="p.label"
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-          <path v-for="d in p.icon" :key="d" :d="d" />
-        </svg>
-      </RouterLink>
+      <AccountMenu
+        v-if="auth.account"
+        :username="auth.account.username"
+        :email="auth.account.email"
+        :pages="footerPages"
+        :admin-url="canAdmin ? adminUrl : null"
+        @logout="logout"
+      />
       <button
+        v-else
         type="button"
         class="theme"
         :data-label="`Theme: ${THEME_LABELS[theme]}`"
@@ -241,21 +236,6 @@ async function logout(): Promise<void> {
           <path d="M8 20h8M12 16v4" />
         </svg>
       </button>
-      <template v-if="auth.account">
-        <RouterLink
-          to="/account"
-          class="account"
-          :data-label="auth.account.username"
-          :aria-label="`${auth.account.username} - account settings`"
-        >
-          {{ auth.account.username.charAt(0).toUpperCase() }}
-        </RouterLink>
-        <button type="button" class="logout" data-label="Log out" aria-label="Log out" @click="logout">
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-          </svg>
-        </button>
-      </template>
     </div>
   </aside>
 </template>
@@ -313,11 +293,7 @@ nav {
 nav a,
 .alert,
 .theme,
-.admin-link,
-.footer-page,
-.close-game,
-.account,
-.logout {
+.close-game {
   position: relative;
   display: grid;
   place-items: center;
@@ -361,19 +337,13 @@ nav a,
   background: var(--tone);
 }
 nav a:hover,
-.admin-link:hover,
-.footer-page:hover,
 .theme:hover,
-.close-game:hover,
-.account:hover,
-.logout:hover {
+.close-game:hover {
   color: var(--text);
   background: var(--bg);
 }
 nav a.router-link-exact-active,
-nav a.current,
-.footer-page.router-link-exact-active,
-.account.router-link-exact-active {
+nav a.current {
   color: var(--text);
   background: var(--bg);
   box-shadow: inset 2px 0 0 var(--accent);

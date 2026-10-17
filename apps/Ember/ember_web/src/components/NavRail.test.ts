@@ -52,8 +52,16 @@ async function setup(account: Account | null) {
 }
 
 const pageLinks = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) => wrapper.findAll("nav.pages a");
-const footerLabels = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) =>
-  wrapper.findAll(".bottom a.footer-page").map((l) => l.attributes("aria-label"));
+type Wrapper = Awaited<ReturnType<typeof setup>>["wrapper"];
+async function openMenu(wrapper: Wrapper): Promise<void> {
+  if (!wrapper.find(".menu").exists()) await wrapper.get("button.account").trigger("click");
+  await flushPromises();
+}
+/** The linked rows of the account menu (Usage, Settings, Profile), after opening it. */
+async function footerLabels(wrapper: Wrapper): Promise<string[]> {
+  await openMenu(wrapper);
+  return wrapper.findAll(".menu a.row:not(.admin-link)").map((l) => l.text());
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -245,7 +253,7 @@ describe("NavRail", () => {
       arrangement({ order: ["/usage", "/settings"], pinned: ["/usage"], hidden: ["/settings"] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(footerLabels(wrapper)).toEqual(["Usage", "Settings"]);
+      expect(await footerLabels(wrapper)).toEqual(["Usage", "Settings", "Profile"]);
       expect(labels(wrapper)).not.toContain("Usage");
     });
 
@@ -262,12 +270,24 @@ describe("NavRail", () => {
     });
   });
 
-  it("links the account page by username and logs out to the login page", async () => {
-    const { wrapper, router, auth } = await setup(ACCOUNT);
+  it("opens an account menu with the email, Profile, theme and Log out, and closes it on Escape", async () => {
+    const { wrapper } = await setup(ACCOUNT);
+    const trigger = wrapper.get("button.account");
+    expect(trigger.attributes("aria-label")).toContain("lex");
+    expect(wrapper.find(".menu").exists()).toBe(false);
 
-    const account = wrapper.find(".account");
-    expect(account.attributes("href")).toBe("/account");
-    expect(account.attributes("aria-label")).toContain("lex");
+    await openMenu(wrapper);
+
+    expect(wrapper.get(".menu .email").text()).toBe("lex@example.com");
+    expect(wrapper.get('.menu a[href="/account"]').text()).toBe("Profile");
+    expect(wrapper.get(".menu .theme-row").text()).toContain("Theme");
+    await wrapper.get(".menu").trigger("keydown", { key: "Escape" });
+    expect(wrapper.find(".menu").exists()).toBe(false);
+  });
+
+  it("logs out to the login page from the account menu", async () => {
+    const { wrapper, router, auth } = await setup(ACCOUNT);
+    await openMenu(wrapper);
 
     await wrapper.find("button.logout").trigger("click");
     await flushPromises();
@@ -280,14 +300,17 @@ describe("NavRail", () => {
 
 it("offers Ember Admin to delegated admins and hides it for members and unverified accounts", async () => {
   const { wrapper, auth } = await setup(ACCOUNT);
+  await openMenu(wrapper);
   expect(wrapper.find(".admin-link").exists()).toBe(false);
   auth.account = { ...ACCOUNT, permissions: ["roles.view"] };
   await flushPromises();
+  await openMenu(wrapper);
   expect(wrapper.get(".admin-link").attributes("href")).toBe("http://localhost:5176/");
   expect(wrapper.get(".admin-link").attributes("target")).toBe("_blank");
   expect(wrapper.get(".admin-link").attributes("rel")).toBe("noopener noreferrer");
   auth.account = { ...auth.account, email_verified: false };
   await flushPromises();
+  await openMenu(wrapper);
   expect(wrapper.find(".admin-link").exists()).toBe(false);
 });
 
@@ -297,7 +320,7 @@ describe("pages hidden by the administrator", () => {
     const { wrapper } = await setup(ACCOUNT);
 
     expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Capabilities", "Agents", "Games", "Notes", "Memory", "Generator"]);
-    expect(footerLabels(wrapper)).toEqual(["Settings"]);
+    expect(await footerLabels(wrapper)).toEqual(["Settings", "Profile"]);
   });
 
   it("never removes Chat or Settings, even if the list names them", async () => {
@@ -305,7 +328,7 @@ describe("pages hidden by the administrator", () => {
     const { wrapper } = await setup(ACCOUNT);
 
     expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toContain("Chat");
-    expect(footerLabels(wrapper)).toContain("Settings");
+    expect(await footerLabels(wrapper)).toContain("Settings");
   });
 
   it("draws no pages until the hidden list has loaded", async () => {
