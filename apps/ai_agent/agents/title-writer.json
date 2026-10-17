@@ -1,6 +1,7 @@
 {
   "label": "Title Writer",
   "port": 9115,
+  "plan_tool": false,
   "enabled": true,
   "entry": false,
   "delegable": false,

@@ -1,6 +1,7 @@
 {
   "label": "Data Analyst",
   "port": 9113,
+  "plan_tool": false,
   "llm": {
     "provider": "anthropic",
     "gateway": "openrouter",

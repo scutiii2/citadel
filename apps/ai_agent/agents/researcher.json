@@ -1,6 +1,7 @@
 {
   "label": "Researcher",
   "port": 9107,
+  "plan_tool": false,
   "llm": {
     "provider": "anthropic",
     "gateway": "openrouter",

@@ -1,6 +1,7 @@
 {
   "label": "Repo Helper",
   "port": 9110,
+  "plan_tool": false,
   "llm": {
     "provider": "anthropic",
     "gateway": "openrouter",

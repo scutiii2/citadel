@@ -1,6 +1,7 @@
 {
   "label": "Tag Writer",
   "port": 9116,
+  "plan_tool": false,
   "enabled": true,
   "entry": false,
   "delegable": false,

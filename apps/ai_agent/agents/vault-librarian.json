@@ -1,6 +1,7 @@
 {
   "label": "Vault Librarian",
   "port": 9109,
+  "plan_tool": false,
   "llm": {
     "provider": "anthropic",
     "gateway": "openrouter",

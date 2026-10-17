@@ -1,6 +1,7 @@
 {
   "label": "App Monitor",
   "port": 9114,
+  "plan_tool": false,
   "llm": {
     "provider": "anthropic",
     "gateway": "openrouter",

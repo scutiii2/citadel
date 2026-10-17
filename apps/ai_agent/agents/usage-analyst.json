@@ -1,6 +1,7 @@
 {
   "label": "Usage Analyst",
   "port": 9108,
+  "plan_tool": false,
   "llm": {
     "provider": "anthropic",
     "gateway": "openrouter",

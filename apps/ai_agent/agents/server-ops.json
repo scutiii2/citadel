@@ -1,6 +1,7 @@
 {
   "label": "Server Ops",
   "port": 9103,
+  "plan_tool": false,
   "llm": {
     "provider": "anthropic",
     "gateway": "openrouter",

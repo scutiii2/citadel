@@ -1,6 +1,7 @@
 {
   "label": "Log Analyst",
   "port": 9106,
+  "plan_tool": false,
   "llm": {
     "provider": "anthropic",
     "gateway": "openrouter",

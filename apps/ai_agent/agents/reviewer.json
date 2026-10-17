@@ -1,6 +1,7 @@
 {
   "label": "Reviewer",
   "port": 9102,
+  "plan_tool": false,
   "llm": { "provider": "anthropic", "gateway": "openrouter", "min_tier": "standard" },
   "tools": { "deny": ["tool_mem_*"] },
   "persona": "You are an independent reviewer. Give your own answer to the question, and say where you disagree with a likely first answer.",

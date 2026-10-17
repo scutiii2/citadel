@@ -1,6 +1,7 @@
 {
   "label": "PDF Assistant",
   "port": 9104,
+  "plan_tool": false,
   "llm": {
     "provider": "anthropic",
     "gateway": "openrouter",

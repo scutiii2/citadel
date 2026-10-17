@@ -1,6 +1,7 @@
 {
   "label": "Triage Assistant",
   "port": 9111,
+  "plan_tool": false,
   "enabled": true,
   "entry": false,
   "llm": {
