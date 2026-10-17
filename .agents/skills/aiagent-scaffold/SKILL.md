@@ -9,7 +9,8 @@ Since multi-agent phase 1 (2026-10-04) **one file per agent**:
 `apps/ai_agent/agents/<id>.json`. `run.bat` starts `python -m src.supervisor`,
 which spawns one `python -m src.server` child per enabled file (env
 `AI_AGENT_FILE`), registers it under its file-name id, prefixes its output
-`[<id>] ` and restarts a crashed child with backoff. Adding an agent is a
+`[<id>] ` and restarts a crashed child with backoff. An agent file is required
+to start an instance; there is no env-var-only start. Adding an agent is a
 file, not code - except a new provider.
 
 | Want | What it is | Code change? |
@@ -24,7 +25,7 @@ are not how agents are added now; every agent is an `agents/<id>.json`. Don't
 hand-edit `.data/agent_registry.json` - it is the runtime registry the children
 write (atomic temp file + `os.replace`); ember_api reads it.
 
-`apps/ai_agent/README.md` ("Agents", "Orchestrator and routing", "Usage log") is
+`apps/ai_agent/README.md` ("Agents", "Orchestrator", "Decision layer", "Usage log") is
 the source of truth this skill compresses; read it first. Running shape:
 `ember_api --MCP--> ai_agent (entry) --delegate_to_agent--> specialists`, each
 agent one provider+model, all `--MCP-->` mcp_server.
@@ -54,19 +55,31 @@ block before designing the interface from scratch.
 
    Fields (full table in the README): `label`, `port` (required, unique across
    enabled files), `enabled`,
-   `entry`, `llm.{provider,gateway,model,temperature,reasoning_effort,max_tokens,max_tool_rounds}`,
-   `persona`, `focus`, `tools.{allow,deny}` (fnmatch on tool names without the
+   `entry`, `llm.{provider,gateway,model,temperature,reasoning_effort,max_effort,min_tier,max_tier,max_tokens,max_tool_rounds,max_turn_tokens,max_turn_seconds}`,
+   `persona`, `instructions`, `focus`, `tools.{allow,deny}` (fnmatch on tool names without the
    `main__` prefix; empty allow = all; deny wins), `orchestrator`,
-   `routing.{laya,top_k,allow_auto,min_score}` (orchestrators only).
+   `memory_recall` (entry agent only: loads the user's newest saved notes before
+   the question), `delegable` (`false` keeps the agent out of every roster; it is
+   called directly, like `title-writer` and `tag-writer`) and `plan_tool`
+   (`false` stops it offering `update_plan`; set it `false` on every specialist,
+   the checklist is the orchestrator's). There is no `routing` block any more.
 2. Write `focus` as one concrete line (what it is good at, with the nouns a
-   question would use). The orchestrator's roster and Laya routing use it; a
-   specialist without one is invisible to `"auto"` and to the shortlist.
+   question would use). The orchestrator's roster and the optional `auto_route`
+   classifier use it; a specialist without one is hard to pick. A specialist
+   whose `tools.allow` names tools that are all switched off drops out of the
+   roster for that turn.
 3. Agent definitions in `agents/*.json` and presets in
-   `gateways/<provider>/*.json` are tracked directly. Keep the README field
-   table in step when adding a field; admin UI edits produce Git changes.
+   `gateways/<provider>/*.json` are tracked and are the shared defaults. The
+   admin UI never writes them: its edits go to the untracked
+   `.data/agent_overrides.json` (`{id: whole agent file}`), which shadows the
+   tracked file on that machine; ember_admin's Reset to defaults drops it. Edit
+   the tracked file for a change everyone should get. Keep the README field
+   table in step when adding a field.
 4. Restart `run.bat` (the supervisor validates **every** file before starting
    anything and names the file and field on error; it also refuses a shared port
-   among enabled agents or anything but exactly one `entry: true`).
+   among enabled agents or anything but exactly one `entry: true`). It watches
+   `agents/` and the overrides file, so an admin edit is picked up without a
+   restart.
 5. Specialists never get `delegate_to_agent`. An agent with
    `"orchestrator": true` does, and sees a roster rebuilt each turn from the
    registry (so a specialist that starts or stops appears without a restart).
@@ -78,18 +91,14 @@ block before designing the interface from scratch.
 ## Path 2 - Make an agent the entry or an orchestrator
 
 Set `"entry": true` on exactly one enabled file and `"entry": false` on the
-one that had it. For delegation add `"orchestrator": true` and, optionally:
-
-```json
-"routing": { "laya": true, "top_k": 3, "allow_auto": true, "min_score": 0.2 }
-```
-
-`laya` shortlists the roster to `top_k` when there are more specialists with
-a `focus` than `top_k`; `allow_auto` adds `agent_id: "auto"` (always Laya,
-whatever `laya` says; result begins `Delegated to <id> (<label>).`);
-`min_score` is signed cosine (-1..1) below which `"auto"` is a tool error. No
-Laya installed (`pip install -e ".[laya]"`) or any failure: full roster, `"auto"`
-errors, the turn is never blocked. Specialist work streams to the caller as
+one that had it. For delegation add `"orchestrator": true`. The roster is always
+the full list of non-orchestrator agents (rebuilt each turn) and `agent_id` is an
+enum of their ids; Laya shortlisting, `agent_id: "auto"` and the `routing`
+block were removed (2026-10-09). Optional, off by default and configured in
+`configs/config_tuning.json` under `classifier` (needs `TYPESAFE_API_KEY` or
+`VERCEL_GATEWAY_API_KEY`; the text leaves the machine and is billed): `auto_route`
+sends a top-level question straight to the best specialist, and `auto_tier`
+picks a model tier from how hard the question looks. Specialist work streams to the caller as
 `agent_start` / `agent_end` / `agent_token` plus `step_*` events stamped with
 `agent_id`; a specialist's step ids can collide with the orchestrator's, so
 consumers key on `(agent_id, id)` - ember_api and ember_web already do.
@@ -120,7 +129,8 @@ Google's native SDK rather than an OpenAI-compatible endpoint):
      `has_api_key`, `is_available` (mirrors every existing provider
      module's tail — `agent_config.py` and `server.py`'s status route
      call these as bare module functions, not class methods).
-   - `run_chat(question, history, model, enabled_extensions, request_id, depth, on_event=None) -> ChatResult`
+   - `run_chat(question, history, model, enabled_extensions, request_id, depth, on_event=None, caveman=False) -> ChatResult`
+     (`caveman` is the chat's terse-replies toggle; pass it to `system_prompt_for`)
      — the tool-calling loop: fetch tool schemas from `src.mcp_upstream`,
      call the model, dispatch any tool/function calls through
      `_dispatch()` (checking `delegation.TOOL_NAME` first, same as
@@ -163,11 +173,11 @@ Google's native SDK rather than an OpenAI-compatible endpoint):
      did the same with its `usage.db`).
      Only the per-request `max_output_tokens`/`max_context_tokens`/`max_tool_rounds` in
      `configs/config_tuning.json` live here.
-     (`config_tuning.json` holds `token_limits` and `tool_selection`;
-     `config_servers.json` holds `servers`. Both are read via
+     (`config_tuning.json` holds `token_limits` and `classifier` (the optional
+     decision layer); `config_servers.json` holds `servers`. Both are read via
      `src/core/config_files.py`'s `read_section`. On first read, tuning
-     preserves sections from legacy `config_limits.json` and
-     `config_tool_selection.json`; retained legacy files are backups.
+     preserves sections from the legacy `config_limits.json`; the retained
+     legacy file is a backup. Laya tool shortlisting (`tool_selection`) is gone.
      Credentials live in a single `apps/ai_agent/.env`, seeded from `.env.example`;
      there is no `secrets/` folder.)
    - Wrap rate-limit errors into `cooldown.start_cooldown(PROVIDER_ID, seconds)`
@@ -191,12 +201,18 @@ Google's native SDK rather than an OpenAI-compatible endpoint):
 4. Add the real secret var name to `.env.example`
    (and your own gitignored `.env`) — whatever `{PLACEHOLDER}`
    you referenced in step 3.
-5. If the new model family's context window matters for the usage bar,
+5. Optional, per gateway: Anthropic prompt caching is opt-in with
+   `"prompt_cache": true` in the gateway file (a gateway that routes to non-Claude
+   models may reject `cache_control`); exact context counts come from a
+   provider-side token counter handed to `src/llm/context_breakdown.py`
+   (`RequestCounter`), and fall back to the estimate when absent. A new provider
+   needs neither to work.
+6. If the new model family's context window matters for the usage bar,
    add a substring-matched entry to `src/llm/model_limits.py`'s
    `CONTEXT_WINDOWS` (e.g. `"gemini-2": 1_000_000`) — unlisted models
    just get `DEFAULT_CONTEXT_WINDOW`, which is a safe but probably wrong
    fallback for a real provider you're adding deliberately.
-6. Point an agent file at it (Path 1) with `"llm": {"provider": "<provider_id>"}`;
+7. Point an agent file at it (Path 1) with `"llm": {"provider": "<provider_id>"}`;
    the supervisor starts it with the others.
 
 ## Logging and usage
@@ -221,10 +237,9 @@ ember_api owns usage limits and the usage reports.
   `[<id>]` lines appear and the agent is listed in `.data/agent_registry.json`;
   `GET /api/agent` on ember_api names the entry agent. Stop with Ctrl+C and
   confirm no child is left running and the entry leaves the registry.
-- **Orchestrator / routing**: ask the entry agent something that fits a
+- **Orchestrator**: ask the entry agent something that fits a
   specialist's `focus`; ember_web shows "Ember -> <Specialist>" while it works
-  and the usage chip lists both agents. With `allow_auto`, ask with no obvious
-  specialist and check the `min_score` error path. Tests: `ai_agent`
+  and the usage chip lists both agents. Tests: `ai_agent`
   `.venv_ai_agent\Scripts\python -m pytest` (the registry is isolated per
   test, keep it that way).
 - **Provider**: start an agent file naming the new `provider` - a missing/bad

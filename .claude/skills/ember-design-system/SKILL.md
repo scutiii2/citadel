@@ -16,7 +16,7 @@ The look and interaction rules of ember_web, extracted so a new UI feels like th
 3. Build from the patterns in [components.md](components.md): copy the CSS, keep the tokens.
 4. Check against the rules and checklist below.
 
-If the new UI is ember_web itself, reuse the existing components instead (`ember-feature-scaffold` lists them).
+If the new UI is ember_web or ember_admin (they carry the same shared components and tokens), reuse the existing components instead (`ember-feature-scaffold` lists them).
 
 ## Foundations
 

@@ -6,7 +6,8 @@ description: Create or audit a new top-level project directory under apps/ (a ne
 # root_project_scaffold
 
 Every Python project in this repo's `apps/` folder (`mcp_server`, `ai_agent`, `ember_api`,
-and `chat_cli`) shares one top-level shape. The three Ember projects sit together in
+`chat_cli`, `catalog_service`, `server_launcher`, `db_gateway`, `chess` and `ascension`;
+`PDFMerger` and `VideoDownloader` each hold a Python app and a web app) shares one top-level shape. The three Ember projects sit together in
 `apps/Ember/` (`ember_api`, plus the Node apps `ember_web` and `ember_admin`, which have their
 own layout - see ember-feature-scaffold); everything else is `apps/<name>/`. A new root-level project must match it, not
 invent its own layout — consistency here is what lets `server_launcher.py`,
@@ -22,8 +23,9 @@ Mandatory in every root project:
 | `README.md` | What the project does, setup steps, requirements — see apps/mcp_server/README.md as the fullest example |
 | `pyproject.toml` | Its own dependencies — each root project is a separate Python environment, never a shared venv |
 | `run.bat` | The one launcher, env-var-configured: don't copy the bat per instance, set env vars before calling it (ai_agent goes further: its bat starts a supervisor that runs one child per `agents/<id>.json`). Creates its own `.venv_<project>` on first run |
+| `shell.bat` | Opens a terminal with the project's venv active, in the project folder (`cmd /k "call .venv_<project>\Scripts\activate.bat"`); prints a hint and exits if the venv is missing. Copy `apps/chat_cli/shell.bat` and change the venv name |
 | `configs/` | JSON config, each real file gitignored with a committed `.example` twin (`config_x.json` + `config_x.json.example`) |
-| `.env`, `.env.example` | The project's one credentials file, in the project root beside `configs/` (no `secrets/` folder). The real `.env` is gitignored; `.env.example` is committed. `ascension`, `mcp_server` and `ai_agent` follow this |
+| `.env`, `.env.example` | The project's one credentials file, in the project root beside `configs/` (no `secrets/` folder). The real `.env` is gitignored; `.env.example` is committed. `ascension`, `mcp_server`, `ai_agent`, `db_gateway` and `chess` follow this |
 | `src/` | The actual code |
 | `tests/` | Its test suite |
 
@@ -65,9 +67,15 @@ changes the convention for every project after it.
 4. Write `README.md` covering: what the project does, requirements,
    setup steps, how to run it — model it on `apps/mcp_server/README.md`.
 5. Register it with `server_launcher` if it should be startable from there
-   (it discovers a project from its `run.bat`). A **long-running service** is
-   registered; an interactive program like `chat_cli` (a terminal client, not
-   a server) is not.
+   (add it with the launcher's Add button; it reads the project's `run.bat`, with
+   `REM LABEL:` and `REM DESCRIPTION:` lines for the name and blurb). A
+   **long-running service** is registered; an interactive program like `chat_cli`
+   (a terminal client, not a server) is not (`REM LAUNCHER: skip`). Give the
+   port a variable the bat sets (`set CHESS_PORT=8070`, read by `src/config.py`
+   as an override) and add the project to the launcher's `_PROJECT_PORT_ENV` so
+   a built launcher exe sees the default port. Pick a free port: 8010 mcp_server,
+   8020 catalog_service, 8030 ember_api, 8040 pdf_merger, 8060 ascension,
+   8070 chess, 8071 db_gateway, 9100+ ai_agent agents.
 6. Services reached over HTTP/MCP by other projects must take the shared
    `INTERNAL_API_TOKEN` from a secrets file (`.env` in each project) and, for
    `/mcp`, reject calls without it once set. Never import another root
@@ -103,5 +111,6 @@ Walk the table above against the folder in question. Flag:
 - Every `configs/*.json` file and the root `.env` has a committed `.example`
   counterpart, and neither the real file nor real secrets are staged in
   git (`git status` — they should show as untracked/ignored, not staged).
+- `shell.bat` opens a terminal with the venv active.
 - `run.bat` starts the project standalone (not just importable) before
   wiring it into `server_launcher.py`.

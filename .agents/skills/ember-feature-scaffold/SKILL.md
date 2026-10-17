@@ -5,7 +5,10 @@ description: Add a feature to ember_web (the Vue 3 + TypeScript browser app) and
 
 # ember_web + ember_api feature scaffolding
 
-Two root projects that ship together:
+Two projects that ship together (plus **ember_admin/**, a second Vue app in
+`apps/Ember/` for administrators on port 5176: same stack and shared control
+files as ember_web, talks only to ember_api; staff-only pages such as Tickets,
+Games, Capabilities, Agents and Analytics go there, not in ember_web):
 
 - **ember_web/** - Vue 3 + TS (Vite, Pinia, vue-router). Talks **only** to
   ember_api, same-origin: Vite forwards `/api` to ember_api (`vite.config.ts`),
@@ -54,11 +57,21 @@ Layout: `src/routes/` (one `APIRouter` per area, prefix `/api/...`),
 in routes), `src/models/` (SQLAlchemy 2 typed models), `src/deps.py`
 (dependencies), `src/services/permissions.py`.
 
-1. **Permission.** Reuse `chat.use` / `tools.use` / `admin.manage` when one
-   fits. A new one goes in `ALL_PERMISSIONS` (name -> description); the
-   Administrator role picks it up automatically on next start. It is *not*
-   added to existing roles such as `Member` (`ensure_default_role` only
-   seeds a role when creating it) - say so to the user if members need it.
+1. **Permission.** Reuse an existing one when it fits. The old broad
+   `admin.manage` / `tools.use` / `chat.use` were split (migration `0010`) into
+   finer names in `services/permissions.py`: `chat.use`, `chat.share`,
+   `tools.view`, `tools.execute`, `accounts.*`, `roles.*`, `invites.manage`,
+   `settings.manage`, `capabilities.manage`, `extensions.manage`,
+   `agents.manage`, `usage.all.view`, `logs.*`, `traffic.view`,
+   `tickets.create`, `tickets.manage`, `games.manage` and one
+   `games.<id>.play` per registered game. A new one goes in `ALL_PERMISSIONS`
+   (name -> description); the Administrator role picks it up automatically on
+   next start. It is *not* added to existing roles such as `Member`
+   (`ensure_default_role` only seeds a role when creating it): if members need
+   it, the migration that adds the feature grants it once to the roles that hold
+   a related permission (`0012` gave `tickets.create` to every role with
+   `chat.use`), so a later revocation sticks. A read-only permission never grants
+   mutation. Say which roles get it to the user.
 2. **Model** (if new data): new file in `src/models/`, export it from
    `src/models/__init__.py` (that import is what registers the table).
    Relationships use `lazy="selectin"` - async sessions can't lazy-load.
@@ -72,8 +85,24 @@ in routes), `src/models/` (SQLAlchemy 2 typed models), `src/deps.py`
    it wherever a test rewinds a model-built database (they build from the
    models, so the column already exists).
 3. **Service**: a class with `__init__(self, session: AsyncSession)`.
-   Anything blocking (hashing, SMTP, file I/O) goes through
+   Anything blocking (hashing, file I/O) goes through
    `asyncio.to_thread`. Secrets/codes/tokens are stored hashed, never raw.
+   Mail is not sent from here: it goes through mcp_server's `email` capability
+   (`services/email_service.py`).
+   **Where data lives.** Relational core data (accounts, chats, usage, logs)
+   stays in this database. Per-account data keys on `account.uid`, the immutable
+   uid (migration `0011`), never the username, so a rename keeps it; remove it
+   when the account is deleted. New data that needs no joins or foreign keys
+   (Notes is the example) goes to `db_gateway` through `DbGatewayClient`
+   (`services/db_gateway.py`, the `get_db_gateway` dependency, `Settings.db_gateway`;
+   tests pass `FakeDbGateway` through the `db_gateway` fixture). Answer `503`
+   when it is unreachable: ember_api must start and the rest of the API must keep
+   working without it. Data that mcp_server owns (tickets, memory) is not copied
+   here: the route is a thin authenticated proxy in a gateway service
+   (`services/ticket_gateway.py`, `services/memory.py`) that sends the internal
+   token and the account uid, maps upstream `404` through, other `4xx` to `400`
+   and an unreachable or `5xx` upstream to `502`/`503`, and logs ids and field
+   names only, never user text.
 4. **Route**: gate with `Depends(require_permission(NAME))` (it also
    rejects unverified emails, unless `require_email_verification` is false) or `Depends(current_account)` for any
    logged-in user. Request/response bodies are pydantic models; response
@@ -131,8 +160,14 @@ preference), `src/components/` (reusable pieces only), `src/router/`,
 5. **Styling**: theme tokens from `src/style.css` (`--bg`, `--surface`,
    `--text`, `--muted`, `--border`, `--accent`, `--accent-contrast`,
    `--danger`, `--code-bg`, `--mono`) - never hardcoded colors, so light and
-   dark both work. Page views scroll themselves (`flex: 1; min-height: 0;
-   overflow-y: auto`), content column `max-width: 820px`.
+   dark both work. Corners come from the radius scale (`--radius-sm|md|lg|xl|full`;
+   `src/radiusScale.test.ts` fails on a literal radius). Animations always play:
+   never add a reduced-motion setting or `prefers-reduced-motion` rule. Page views
+   scroll themselves (`flex: 1; min-height: 0;
+   overflow-y: auto`), content column `max-width: 820px`. A destructive action asks
+   in `ConfirmModal` (never a native `confirm()`), and a setting that reaches
+   other accounts saves explicitly while a local one applies instantly. The
+   `ember-design-system` skill has the full visual rules.
 6. **TypeScript gotcha**: `tsconfig.app.json` has `erasableSyntaxOnly`, so
    no constructor parameter properties (`constructor(private x: T)`) and no
    enums - declare fields explicitly.
@@ -153,14 +188,29 @@ configured) itself. ai_agent and mcp_server reject `/mcp` without that
 token once it's configured, so any new ember_api client of theirs must
 send it too (`identity_headers()` in `services/mcp_session.py` does).
 
-- **mcp_server tools and resources**: already allowed for `tools.use`
+- **mcp_server tools and resources**: already allowed for `tools.execute`
   (`SERVER_POLICY`: `tools/list`, any `tools/call`, `resources/*`). Call them
   from ember_web with `McpServerClient` (`api/McpServerClient.ts`).
   mcp_server's plain HTTP routes (`/commands`, `/capabilities`, ...) go
   through `services/mcp_server_info.py` + `routes/server_info.py`.
-- **A page for one mcp_server capability** is declared in that capability's
-  `gui/page.json` (see mcp_server's capabilities README), not added as a new
-  Vue view: `CapabilityPageView` at `/capabilities/<name>` draws it.
+- **A page for one mcp_server capability**: a simple one (forms bound to its own
+  tools, result lists) can be declared in that capability's `gui/page.json`
+  (see mcp_server's capabilities README) and drawn by `CapabilityPageView` at
+  `/capabilities/<name>`; no capability uses that today. A richer page is a real
+  view with its own client and route (`GeneratorView` at `/generator`,
+  `NotesView`, `MemoryView`), and the capability card gets an "Open page" button.
+  Note the split: Notes are text the user writes and may share with agents
+  (`/notes`, stored in db_gateway); Memory is what the assistant saved about
+  them (`/memory`, stored by mcp_server).
+- **A game** is not an Ember page: it is its own app, registered by URL in
+  ember_admin's Games page (ember_api fetches its `/manifest.json`), embedded at
+  `/games` in an iframe and started with a single-use launch ticket. Add the
+  game's origin to `EMBER_GAME_ORIGINS` for the CSP. See root-project-scaffold
+  for a game's shape.
+- **Tickets**: the reporter side is ember_web (`/tickets`, `tickets.create`),
+  the staff board is ember_admin (`/tickets`, `tickets.manage`); ember_api only
+  proxies to mcp_server. A change to the reporter and the staff routes should be
+  checked on both apps.
 - **Chat with ai_agent** runs inside ember_api, never through the proxy:
   `services/turns.py` (TurnRegistry) calls the agent through
   `services/agent_gateway.py` (the `mcp` SDK), saves the answer and records
@@ -200,7 +250,7 @@ send it too (`identity_headers()` in `services/mcp_session.py` does).
 
 ## 5. Before reporting done
 
-- ember_api tests pass; ember_web type-check and build pass.
+- ember_api tests pass; ember_web (and ember_admin, if touched) type-check and build pass.
 - READMEs updated (API table, features, layout) when the surface changed.
 - Summarize for the user what changed, what was verified and how, what
   they should test by hand (they test manually - don't launch browser
