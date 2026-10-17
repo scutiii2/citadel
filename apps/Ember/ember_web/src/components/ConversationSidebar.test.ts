@@ -77,6 +77,17 @@ const menuItem = (label: string) =>
   [...document.body.querySelectorAll<HTMLElement>('[role^="menuitem"]')].find((b) => b.textContent?.includes(label));
 const openMenu = () => document.body.querySelector('[role="menu"]');
 
+it("keeps the token gauges as the last thing in the sidebar, pinned to the bottom", async () => {
+  const window = { used: 1, limit: 10, reset_at: null };
+  mine.mockResolvedValueOnce({ six_hour: window, weekly: window } as never);
+  const wrapper = mountSidebar();
+  await flushPromises();
+
+  const gauges = wrapper.get(".gauges-pinned");
+  expect(gauges.classes()).toContain("gauges");
+  expect(wrapper.get("aside.sidebar").element.lastElementChild).toBe(gauges.element);
+});
+
 describe("the search box", () => {
   it("shows once there are chats, and reports what is typed", async () => {
     const wrapper = mountSidebar();

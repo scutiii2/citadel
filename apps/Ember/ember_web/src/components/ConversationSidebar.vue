@@ -535,7 +535,7 @@ watch(
         Delete all chats
       </button>
     </div>
-    <UsageGauges :busy="busy" />
+    <UsageGauges class="gauges-pinned" :busy="busy" />
     <ConfirmModal
       v-if="pendingDelete"
       open
@@ -565,6 +565,16 @@ watch(
 .top {
   display: flex;
   gap: 6px;
+}
+/* The token gauges stay at the bottom edge: pushed down when the list is short,
+   stuck there while a long list scrolls. The shadow fills the sidebar's bottom padding. */
+.gauges-pinned {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-top: auto;
+  background: var(--surface);
+  box-shadow: 0 12px 0 var(--surface);
 }
 .new-chat,
 .new-folder {
