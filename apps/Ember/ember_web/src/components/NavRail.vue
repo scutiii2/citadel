@@ -60,10 +60,17 @@ const adminUrl = emberAdminUrl();
 const canAdmin = computed(() => ADMIN_ACCESS_PERMISSIONS.some(auth.hasPermission));
 const canBrowse = computed(() => auth.account !== null && !auth.needsVerification);
 const navPrefs = useNavPrefsStore();
+// Usage and Settings sit in the footer, outside the account's pin/reorder/hide
+// arrangement; an administrator's hide list still removes Usage.
+const FOOTER_PAGES = ["/usage", "/settings"];
+const openPages = computed(() =>
+  canBrowse.value && pageVisibility.ready ? visiblePages((p) => auth.hasPermission(p), pageVisibility.hidden) : [],
+);
+const footerPages = computed(() => FOOTER_PAGES.flatMap((to) => openPages.value.filter((p) => p.to === to)));
 // Nothing is drawn until the arrangement has loaded, so the icons don't jump.
 const pages = computed(() =>
-  canBrowse.value && navPrefs.ready && pageVisibility.ready
-    ? railPages(visiblePages((p) => auth.hasPermission(p), pageVisibility.hidden), navPrefs.prefs)
+  navPrefs.ready
+    ? railPages(openPages.value.filter((p) => !FOOTER_PAGES.includes(p.to)), navPrefs.prefs)
     : { pinned: [], rest: [] },
 );
 const hasPages = computed(() => pages.value.pinned.length + pages.value.rest.length > 0);
@@ -203,6 +210,18 @@ async function logout(): Promise<void> {
       <a v-if="canAdmin" :href="adminUrl" target="_blank" rel="noopener noreferrer" class="admin-link" data-label="Ember Admin" aria-label="Open Ember Admin">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3 3 7v5c0 5 5 8 9 10 4-2 9-5 9-10V7zM8 12l3 3 5-6" /></svg>
       </a>
+      <RouterLink
+        v-for="p in footerPages"
+        :key="p.to"
+        :to="p.to"
+        class="footer-page"
+        :data-label="p.label"
+        :aria-label="p.label"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path v-for="d in p.icon" :key="d" :d="d" />
+        </svg>
+      </RouterLink>
       <button
         type="button"
         class="theme"
@@ -295,6 +314,7 @@ nav a,
 .alert,
 .theme,
 .admin-link,
+.footer-page,
 .close-game,
 .account,
 .logout {
@@ -342,6 +362,7 @@ nav a,
 }
 nav a:hover,
 .admin-link:hover,
+.footer-page:hover,
 .theme:hover,
 .close-game:hover,
 .account:hover,
@@ -351,6 +372,7 @@ nav a:hover,
 }
 nav a.router-link-exact-active,
 nav a.current,
+.footer-page.router-link-exact-active,
 .account.router-link-exact-active {
   color: var(--text);
   background: var(--bg);

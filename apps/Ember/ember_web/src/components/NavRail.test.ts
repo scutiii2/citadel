@@ -52,6 +52,8 @@ async function setup(account: Account | null) {
 }
 
 const pageLinks = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) => wrapper.findAll("nav.pages a");
+const footerLabels = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) =>
+  wrapper.findAll(".bottom a.footer-page").map((l) => l.attributes("aria-label"));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -82,8 +84,8 @@ describe("NavRail", () => {
 
     const links = pageLinks(wrapper);
 
-    // chat.use -> Chat, Agents, Usage, Settings; tools.view or chat.use -> Capabilities
-    expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Capabilities", "Agents", "Usage", "Notes", "Memory", "Generator", "Settings"]);
+    // chat.use -> Chat, Agents; tools.view or chat.use -> Capabilities. Usage and Settings sit in the footer.
+    expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Capabilities", "Agents", "Notes", "Memory", "Generator"]);
     for (const link of links) {
       expect(link.text()).toBe("");
       expect(link.find("svg").exists()).toBe(true);
@@ -223,20 +225,28 @@ describe("NavRail", () => {
     const labels = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) => pageLinks(wrapper).map((l) => l.attributes("aria-label"));
 
     it("puts pinned pages first, then a divider, then the rest", async () => {
-      arrangement({ order: ["/usage", "/agents"], pinned: ["/usage"], hidden: [] });
+      arrangement({ order: ["/notes", "/agents"], pinned: ["/notes"], hidden: [] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Usage", "Agents", "Chat", "Capabilities", "Notes", "Memory", "Generator", "Settings"]);
+      expect(labels(wrapper)).toEqual(["Notes", "Agents", "Chat", "Capabilities", "Memory", "Generator"]);
       expect(wrapper.findAll("nav .divider")).toHaveLength(1);
       expect(wrapper.find("nav.pages").element.children[1]!.classList.contains("divider")).toBe(true);
     });
 
     it("leaves hidden pages out", async () => {
-      arrangement({ order: [], pinned: [], hidden: ["/agents", "/usage"] });
+      arrangement({ order: [], pinned: [], hidden: ["/agents", "/notes"] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Chat", "Capabilities", "Notes", "Memory", "Generator", "Settings"]);
+      expect(labels(wrapper)).toEqual(["Chat", "Capabilities", "Memory", "Generator"]);
       expect(wrapper.find("nav .divider").exists()).toBe(false);
+    });
+
+    it("keeps the footer pages out of the arrangement", async () => {
+      arrangement({ order: ["/usage", "/settings"], pinned: ["/usage"], hidden: ["/settings"] });
+      const { wrapper } = await setup(ACCOUNT);
+
+      expect(footerLabels(wrapper)).toEqual(["Usage", "Settings"]);
+      expect(labels(wrapper)).not.toContain("Usage");
     });
 
     it("draws no pages until the arrangement has loaded", async () => {
@@ -248,7 +258,7 @@ describe("NavRail", () => {
       release({ order: [], pinned: [], hidden: [] });
       await flushPromises();
 
-      expect(pageLinks(wrapper)).toHaveLength(8);
+      expect(pageLinks(wrapper)).toHaveLength(6);
     });
   });
 
@@ -286,16 +296,16 @@ describe("pages hidden by the administrator", () => {
     vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/usage"] });
     const { wrapper } = await setup(ACCOUNT);
 
-    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Capabilities", "Agents", "Games", "Notes", "Memory", "Generator", "Settings"]);
+    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Chat", "Capabilities", "Agents", "Games", "Notes", "Memory", "Generator"]);
+    expect(footerLabels(wrapper)).toEqual(["Settings"]);
   });
 
   it("never removes Chat or Settings, even if the list names them", async () => {
     vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/", "/settings", "/games"] });
     const { wrapper } = await setup(ACCOUNT);
 
-    const labels = pageLinks(wrapper).map((l) => l.attributes("aria-label"));
-    expect(labels).toContain("Chat");
-    expect(labels).toContain("Settings");
+    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toContain("Chat");
+    expect(footerLabels(wrapper)).toContain("Settings");
   });
 
   it("draws no pages until the hidden list has loaded", async () => {
@@ -306,6 +316,6 @@ describe("pages hidden by the administrator", () => {
     expect(pageLinks(wrapper)).toHaveLength(0);
     release({ hidden: ["/games"] });
     await flushPromises();
-    expect(pageLinks(wrapper)).toHaveLength(8);
+    expect(pageLinks(wrapper)).toHaveLength(6);
   });
 });
