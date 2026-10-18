@@ -3,13 +3,13 @@
 import asyncio
 from dataclasses import replace
 from types import SimpleNamespace as NS
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import openai
 import pytest
 
 from src.agents import agent_spec
-from src.llm import openai_provider as provider, cooldown, gateway_failover
+from src.llm import openai_provider as provider, cooldown, gateway_failover, token_limits
 from src.llm.base_provider import ChatCancelled
 from tests.test_openai_provider import _fake_stream
 from tests.test_gateway_failover import sdk_error
@@ -127,3 +127,49 @@ def test_clients_cached_per_gateway(monkeypatch):
         assert get_client() is get_client("gpt")
         assert get_client("backup") is get_client("backup")
         assert get_client("backup") is not get_client()
+
+
+def test_backup_context_limit_is_checked_before_retry(monkeypatch):
+    primary, backup = clients(monkeypatch, [sdk_error(openai, 500)], [_fake_stream(["answer"], response())])
+    monkeypatch.setattr(token_limits, "_config", {"default": {
+        "max_output_tokens": 2048, "max_context_tokens": 100000, "max_tool_rounds": 6},
+        "openai": {"gateways": {"backup": {"max_context_tokens": 1}}}})
+    with pytest.raises(token_limits.ContextLimitError):
+        asyncio.run(provider.run_chat("hello", []))
+    assert primary.responses.stream.call_count == 1
+    assert backup.responses.stream.call_count == 0
+    assert not cooldown.is_in_cooldown("openai:backup")
+
+
+@pytest.mark.parametrize("code,reason", [("server_error", "unavailable"), ("rate_limit_exceeded", "rate_limit")])
+def test_terminal_gateway_failure_event_switches(monkeypatch, code, reason):
+    async def events():
+        yield NS(type="response.failed", response=NS(error=NS(code=code, message="gateway failed")))
+    stream = MagicMock()
+    stream.__aiter__ = lambda self: events()
+    stream.get_final_response = AsyncMock(side_effect=RuntimeError("Didn't receive a response.completed event."))
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=stream)
+    cm.__aexit__ = AsyncMock(return_value=False)
+    clients(monkeypatch, [cm], [_fake_stream(["answer"], response())])
+    result = asyncio.run(provider.run_chat("hello", []))
+    assert (result.response, result.gateway) == ("answer", "backup")
+    assert result.gateway_switches[0]["reason"] == reason
+
+
+def test_non_gateway_terminal_failure_is_not_retried(monkeypatch):
+    async def events():
+        yield NS(type="response.failed", response=NS(error=NS(code="invalid_prompt", message="bad prompt")))
+    stream = MagicMock()
+    stream.__aiter__ = lambda self: events()
+    error = RuntimeError("Didn't receive a response.completed event.")
+    stream.get_final_response = AsyncMock(side_effect=error)
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=stream)
+    cm.__aexit__ = AsyncMock(return_value=False)
+    _, backup = clients(monkeypatch, [cm], [])
+    with pytest.raises(RuntimeError) as raised:
+        asyncio.run(provider.run_chat("hello", []))
+    assert raised.value is error
+    assert backup.responses.stream.call_count == 0
+    assert not cooldown.is_in_cooldown("openai:gpt")

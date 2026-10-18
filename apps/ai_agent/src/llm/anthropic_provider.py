@@ -417,7 +417,7 @@ async def run_chat(
     roster = await agent_routing.roster_for()
     system_prompt = system_prompt_for(caveman, roster)
     model_name = _model_for_route(route, model)
-    history = token_limits.trim_history_to_fit(history, PROVIDER_ID)
+    history = token_limits.trim_history_to_fit(history, PROVIDER_ID, route.current)
     messages: list[dict[str, Any]] = [*history, {"role": "user", "content": question}]
     tools_used: list[str] = []
     tool_calls: list[ToolCallRecord] = []
@@ -459,20 +459,20 @@ async def run_chat(
 
     try:
         async with guard.timeout():
-            for _ in range(options.max_tool_rounds(token_limits.max_tool_rounds(PROVIDER_ID))):
+            for _ in range(options.max_tool_rounds(token_limits.max_tool_rounds(PROVIDER_ID, route.current))):
                 if cancellation.is_cancelled(request_id):
                     raise ChatCancelled()
-                token_limits.enforce_context_limit(PROVIDER_ID, [system_prompt, *messages])
                 # Every round is streamed, so text appears as the model writes
                 # it. A round that ends in tool_use may still have streamed some
                 # text first; "token_reset" tells the client to drop it, since
                 # the real answer is the text of the final (non-tool) round.
                 while True:
+                    token_limits.enforce_context_limit(PROVIDER_ID, [system_prompt, *messages], route.current)
                     text_parts: list[str] = []
                     try:
                         async with client.messages.stream(
                             model=model_name,
-                            max_tokens=options.max_tokens(token_limits.max_output_tokens(PROVIDER_ID)),
+                            max_tokens=options.max_tokens(token_limits.max_output_tokens(PROVIDER_ID, route.current)),
                             system=system,
                             messages=_with_history_breakpoint(messages) if use_cache else messages,
                             tools=tools,
@@ -610,14 +610,14 @@ def run_interpret(text: str, model: str | None = None) -> ChatResult:
     coroutine, not a response)."""
     route = _route_for_turn()
     messages = [{"role": "user", "content": text}]
-    token_limits.enforce_context_limit(PROVIDER_ID, [SYSTEM_PROMPT, *messages])
     while True:
+        token_limits.enforce_context_limit(PROVIDER_ID, [SYSTEM_PROMPT, *messages], route.current)
         client = _get_sync_client() if route.current == _Anthropic._gateway_name() else _get_sync_client(route.current)
         model_name = _model_for_route(route, model)
         try:
             response = client.messages.create(
                 model=model_name,
-                max_tokens=token_limits.max_output_tokens(PROVIDER_ID),
+                max_tokens=token_limits.max_output_tokens(PROVIDER_ID, route.current),
                 system=SYSTEM_PROMPT,
                 messages=messages,
             )

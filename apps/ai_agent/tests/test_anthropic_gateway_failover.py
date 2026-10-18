@@ -9,7 +9,7 @@ import anthropic
 import pytest
 
 from src.agents import agent_spec
-from src.llm import anthropic_provider as provider, cooldown, gateway_failover
+from src.llm import anthropic_provider as provider, cooldown, gateway_failover, token_limits
 from src.llm.base_provider import ChatCancelled
 from tests.test_anthropic_provider import _stream_cm, _usage
 from tests.test_gateway_failover import sdk_error
@@ -126,4 +126,41 @@ def test_clients_are_cached_per_gateway(monkeypatch):
         assert get_client() is get_client("claude")
         assert get_client("backup") is get_client("backup")
         assert get_client("backup") is not get_client()
+
+
+def test_backup_context_limit_is_checked_before_retry(monkeypatch):
+    primary, backup = clients(monkeypatch, [sdk_error(anthropic, 500)], [_stream_cm(["answer"])])
+    monkeypatch.setattr(token_limits, "_config", {"default": {
+        "max_output_tokens": 2048, "max_context_tokens": 100000, "max_tool_rounds": 6},
+        "anthropic": {"gateways": {"backup": {"max_context_tokens": 1}}}})
+    with pytest.raises(token_limits.ContextLimitError):
+        asyncio.run(provider.run_chat("hello", []))
+    assert primary.messages.stream.call_count == 1
+    assert backup.messages.stream.call_count == 0
+    assert not cooldown.is_in_cooldown("anthropic:backup")
+
+
+def test_backup_output_limit_applies_to_chat_and_interpret(monkeypatch):
+    _, backup = clients(monkeypatch, [sdk_error(anthropic, 500)], [_stream_cm(["answer"])])
+    monkeypatch.setattr(token_limits, "_config", {"default": {
+        "max_output_tokens": 2048, "max_context_tokens": 100000, "max_tool_rounds": 6},
+        "anthropic": {"gateways": {"backup": {"max_output_tokens": 7}}}})
+    asyncio.run(provider.run_chat("hello", []))
+    assert backup.messages.stream.call_args.kwargs["max_tokens"] == 7
+    sync = NS(messages=NS(create=Mock(return_value=NS(content=[], usage=_usage()))))
+    monkeypatch.setattr(provider, "_get_sync_client", lambda gateway=None: sync)
+    provider.run_interpret("hello")
+    assert sync.messages.create.call_args.kwargs["max_tokens"] == 7
+
+
+def test_interpret_honors_backup_context_limit(monkeypatch):
+    cooldown.start_cooldown("anthropic:claude", 30)
+    sync = NS(messages=NS(create=Mock(return_value=NS(content=[], usage=_usage()))))
+    monkeypatch.setattr(provider, "_get_sync_client", lambda gateway=None: sync)
+    monkeypatch.setattr(token_limits, "_config", {"default": {
+        "max_output_tokens": 2048, "max_context_tokens": 100000, "max_tool_rounds": 6},
+        "anthropic": {"gateways": {"backup": {"max_context_tokens": 1}}}})
+    with pytest.raises(token_limits.ContextLimitError):
+        provider.run_interpret("hello")
+    assert sync.messages.create.call_count == 0
 

@@ -37,7 +37,8 @@ import json
 import os
 from typing import Any, Sequence
 
-from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, BadRequestError, OpenAI
+import httpx
+from openai import APIStatusError, AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, BadRequestError, OpenAI
 
 from src.llm.turn_guard import TurnStopped
 from src.agents import agent_routing, agent_spec, ask_user, delegation, plan
@@ -389,12 +390,12 @@ async def run_chat(
             for _ in range(options.max_tool_rounds(token_limits.max_tool_rounds(PROVIDER_ID, route.current))):
                 if cancellation.is_cancelled(request_id):
                     raise ChatCancelled()
-                token_limits.enforce_context_limit(PROVIDER_ID, messages, route.current)
                 # Every round is streamed, so text appears as the model writes
                 # it. A round that ends in function calls may still have streamed
                 # some text first; "token_reset" tells the client to drop it,
                 # since the real answer is the text of the final (no-tool) round.
                 while True:
+                    token_limits.enforce_context_limit(PROVIDER_ID, messages, route.current)
                     text_parts: list[str] = []
                     try:
                         async with client.responses.stream(
@@ -414,6 +415,18 @@ async def run_chat(
                                     # Not shown as the answer, but the model is
                                     # spending tokens: keep the live meter moving.
                                     await meter.chars(len(event.delta))
+                                elif event.type == "response.failed":
+                                    failure = getattr(event.response, "error", None)
+                                    status = {"server_error": 503, "rate_limit_exceeded": 429}.get(
+                                        getattr(failure, "code", None))
+                                    if status is not None:
+                                        # Responses can fail after HTTP 200. Adapt known SDK
+                                        # failure codes to the shared HTTP classifier before
+                                        # get_final_response loses them behind a RuntimeError.
+                                        # These transport objects perform no network I/O.
+                                        response_error = httpx.Response(status, request=httpx.Request(
+                                            "POST", "https://gateway.invalid"))
+                                        raise APIStatusError(failure.message, response=response_error, body=None)
                             response = await stream.get_final_response()
                         break
                     except Exception as error:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from functools import lru_cache
 from typing import Callable, Iterable
 
 import anthropic
@@ -13,7 +14,6 @@ from src.core.catalog import catalog
 from src.core.config_files import TUNING_PATH, read_section
 from src.llm import cooldown
 
-QUOTA_WORDS = ("credit", "quota", "billing", "insufficient", "balance", "exceeded your current")
 _SDK_ERRORS = (anthropic.APIError, openai.APIError)
 _TRANSPORT_ERRORS = (anthropic.APIConnectionError, openai.APIConnectionError)
 
@@ -23,6 +23,12 @@ class FailureKind(StrEnum):
     quota = "quota"
     auth = "auth"
     unavailable = "unavailable"
+
+
+_FAILURE_WORDS = {
+    FailureKind.quota: ("credit", "quota", "billing", "insufficient", "balance", "exceeded your current"),
+    FailureKind.unavailable: ("overloaded",),
+}
 
 
 @catalog
@@ -35,7 +41,7 @@ def classify(error: Exception) -> FailureKind | None:
         return FailureKind.quota
     if status in (401, 403):
         return FailureKind.auth
-    if status in (400, 429) and any(word in str(error).lower() for word in QUOTA_WORDS):
+    if status in (400, 429) and any(word in str(error).lower() for word in _FAILURE_WORDS[FailureKind.quota]):
         return FailureKind.quota
     if status == 429 or isinstance(error, (anthropic.RateLimitError, openai.RateLimitError)):
         return FailureKind.rate_limit
@@ -46,7 +52,24 @@ def classify(error: Exception) -> FailureKind | None:
         return FailureKind.auth
     if isinstance(error, (anthropic.InternalServerError, openai.InternalServerError)):
         return FailureKind.unavailable
+    # SDK stream errors may retain the successful HTTP 200 status of the
+    # connection. A plain bad request remains non-retryable unless quota-related.
+    if status != 400 and any(word in str(error).lower() for word in _FAILURE_WORDS[FailureKind.unavailable]):
+        return FailureKind.unavailable
     return None
+
+
+@catalog
+@lru_cache(maxsize=1)
+def _cooldown_settings() -> tuple[float, float, float]:
+    """Load once during provider startup so routing never reads disk on a failure."""
+    section = read_section(TUNING_PATH, "gateway_failover", default={})
+    return tuple(float(section.get(f"{kind}_cooldown_seconds", default)) for kind, default in (
+        ("quota", 3600.0), ("auth", 3600.0), ("unavailable", 30.0)))
+
+
+# Providers import this module before serving requests, outside the event loop.
+_cooldown_settings()
 
 
 @catalog
@@ -55,9 +78,8 @@ def cooldown_seconds(kind: FailureKind, error: Exception) -> float:
     if kind == FailureKind.rate_limit:
         delay = cooldown.extract_retry_after_seconds(error)
         return delay if delay is not None else cooldown.DEFAULT_COOLDOWN_SECONDS
-    defaults = {FailureKind.quota: 3600.0, FailureKind.auth: 3600.0, FailureKind.unavailable: 30.0}
-    section = read_section(TUNING_PATH, "gateway_failover", default={})
-    return float(section.get(f"{kind.value}_cooldown_seconds", defaults[kind]))
+    index = {FailureKind.quota: 0, FailureKind.auth: 1, FailureKind.unavailable: 2}[kind]
+    return _cooldown_settings()[index]
 
 
 @dataclass(frozen=True)

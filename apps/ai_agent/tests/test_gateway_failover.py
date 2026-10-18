@@ -21,8 +21,13 @@ def sdk_error(sdk, status, message="failure", headers=None):
 def isolated(monkeypatch):
     cooldown.reset()
     monkeypatch.setattr(failover, "read_section", lambda *args, **kwargs: {})
+    failover._cooldown_settings.cache_clear()
+    failover._cooldown_settings()
     yield
     cooldown.reset()
+    monkeypatch.setattr(failover, "read_section", lambda *args, **kwargs: {})
+    failover._cooldown_settings.cache_clear()
+    failover._cooldown_settings()
 
 
 @pytest.mark.parametrize("sdk", [anthropic, openai])
@@ -93,4 +98,19 @@ def test_default_cooldowns(kind, seconds):
 
 def test_configured_cooldown(monkeypatch):
     monkeypatch.setattr(failover, "read_section", lambda *args, **kwargs: {"quota_cooldown_seconds": 42})
+    failover._cooldown_settings.cache_clear()
     assert failover.cooldown_seconds(failover.FailureKind.quota, sdk_error(openai, 402)) == 42
+
+
+@pytest.mark.parametrize("sdk", [anthropic, openai])
+def test_overloaded_sse_error_with_http_200_fails_over(sdk):
+    error = sdk_error(sdk, 200, "OverLoAdEd")
+    assert failover.classify(error) == failover.FailureKind.unavailable
+
+
+def test_advance_does_not_read_config_files_on_failure(monkeypatch):
+    def forbidden_read(*args, **kwargs):
+        raise AssertionError("failure handling must use startup-loaded settings")
+    monkeypatch.setattr(failover, "read_section", forbidden_read)
+    route = failover.GatewayRoute.for_turn("anthropic", "primary", ["backup"], lambda _: True)
+    assert route.advance(sdk_error(anthropic, 500)).to_gateway == "backup"
