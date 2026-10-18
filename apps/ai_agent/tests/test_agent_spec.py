@@ -36,6 +36,36 @@ def test_load_file_applies_defaults(tmp_path):
     assert spec.llm.provider == "anthropic"
     assert spec.llm.reasoning_effort == "off"
     assert spec.source == tmp_path / "calc.json"
+    assert spec.llm.fallback_gateways == ()
+
+
+def test_fallback_gateways_preserve_order_and_primary_environ(tmp_path, monkeypatch):
+    spec = agent_spec.load_file(_write(tmp_path, "calc", {"port": 9103, "llm": {
+        "provider": "anthropic", "fallback_gateways": [
+            {"gateway": "openrouter", "model": "mapped"}, "bedrock"],
+    }}))
+    assert spec.llm.fallback_gateways == (
+        agent_spec.GatewayChoice("openrouter", "mapped"), agent_spec.GatewayChoice("bedrock"))
+    for key in ("AI_AGENT_PROVIDER", "AI_AGENT_GATEWAY", "AI_AGENT_MODEL", "AI_AGENT_PORT"):
+        monkeypatch.setenv(key, "previous")
+    agent_spec.apply_to_environ(spec)
+    assert os.environ["AI_AGENT_GATEWAY"] == "claude"
+    assert os.environ["AI_AGENT_MODEL"] == ""
+
+
+@pytest.mark.parametrize("provider,value", [
+    ("anthropic", "openrouter"), ("anthropic", None), ("anthropic", [{}]),
+    ("anthropic", [{"gateway": ""}]), ("anthropic", [{"gateway": 3}]),
+    ("anthropic", [{"gateway": "backup", "typo": True}]),
+    ("anthropic", ["backup", "backup"]), ("anthropic", ["claude"]),
+    ("anthropic", [True]), ("anthropic", [{"gateway": "backup", "model": 3}]),
+    ("laya", ["backup"]),
+])
+def test_invalid_fallback_gateways_name_file_and_field(tmp_path, provider, value):
+    path = _write(tmp_path, "calc", {"port": 9103, "llm": {
+        "provider": provider, "fallback_gateways": value}})
+    with pytest.raises(AgentSpecError, match=r"calc.json: llm.fallback_gateways"):
+        agent_spec.load_file(path)
 
 
 def test_laya_specialist_is_local_and_needs_no_generation_settings(tmp_path, monkeypatch):
