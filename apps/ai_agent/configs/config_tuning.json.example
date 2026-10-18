@@ -1,4 +1,9 @@
 {
+  "gateway_failover": {
+    "quota_cooldown_seconds": 3600,
+    "auth_cooldown_seconds": 3600,
+    "unavailable_cooldown_seconds": 30
+  },
   "token_limits": {
     "default": {
       "max_output_tokens": 2048,
