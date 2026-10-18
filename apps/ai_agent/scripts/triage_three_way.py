@@ -1,4 +1,4 @@
-"""`check_triage_cases --three-way`: the Triage Assistant's sequential flow (src/llm/triage_flow.py, where the rules are
+"""`check_triage_cases --three-way`: the Triage Assistant's flow (src/llm/triage_flow.py, where the rules are
 written down) run over loaded checkpoints. The flow itself moved there; this file only loads the two Laya checkpoints
 at the window the script asks for and re-exports what the script and its tests use.
 """

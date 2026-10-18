@@ -191,9 +191,11 @@ question, a JSON string:
 - `text` is at most 4,000 characters; 1 to 8 questions; `min_confidence` is
   optional (default 0.70, `MIN_CONFIDENCE` in `src/llm/laya_provider.py`).
   Text after the JSON object is ignored.
-- `local_only: true` (optional) makes Laya's English checkpoint answer alone: no typed-decisions round and no
-  fallback classifier (Jev), whatever `classifier` says. Unsure answers stay marked `uncertain`, and a text Laya
-  cannot read whole is an error. ember_api's tag suggestions use it, so a note never leaves the machine.
+- `local_only: true` (optional) keeps the request on Laya's own models: the English checkpoint, then the
+  typed-decisions checkpoint when English is unsure, and never the fallback classifier (Jev), whatever `classifier`
+  says. Both models load at start-up in every flow. Unsure answers stay marked `uncertain`, and a text Laya cannot
+  read whole is an error. ember_api's tag suggestions and triage questions and mcp_server's ticket grouping use it,
+  so their text never leaves the machine.
 
 The response is JSON: `{"answers": {id: {...}}, "uncertain": bool}`. Each
 answer has `type`, the result (`choice`/`score`/`noul`), `answer_confidence`
@@ -213,18 +215,34 @@ errors propagate without an LLM fallback (Jev below is a classifier, not an LLM 
 `interpret`/summarization is unsupported. Cancellation is checked before and
 after inference.
 
-### Sequential flow (Laya English, Laya typed-decisions, Jev)
+### Triage flow (Laya English, Laya typed-decisions, Jev)
 
-Set `"classifier": {"triage_flow": "sequential"}` in `configs/config_tuning.json` and restart the Triage Assistant:
-the legacy single-model review below is replaced by `src/llm/triage_flow.py` (the whole flow is written at the top of
-that file). Laya English answers first; the `typed-decisions` checkpoint only if English is not sure; the fallback
-(Jev, still gated by `triage_fallback`, a key and the triage chain) only when those two cannot settle a question. Each
+Every request goes through `src/llm/triage_flow.py` (the whole flow is written at the top of that file). Laya English
+answers first; the `typed-decisions` checkpoint only if English is not sure; the fallback (Jev, gated by
+`triage_fallback`, a key and the triage chain, see below) only when those two cannot settle a question. Each
 model has its own confidence threshold, by number of options left (2 options: English 0.90, typed 0.80, Jev 0.90;
 3 or more: 0.75, 0.55, 0.90), changed with `classifier.triage_thresholds`
 (`{"3+": {"laya-typed": 0.6}}`) or, for one request, by sending `min_confidence`. Between the steps options far
 below the best (`triage_prune_ratio`) are dropped and the models asked again, and when nobody is ever sure the
-models' confidence-weighted values are compared pairwise: the answer then carries `also_check`, or `"unknown": true`
-with `candidates`. Score and noul questions take the first model that meets its 3+ threshold.
+models' confidence-weighted values are compared pairwise (`triage_pair_ratio`): the answer then carries `also_check`,
+or `"unknown": true` with `candidates`. Score questions take the first model that meets its 3+ threshold. A noul question uses the 2-option thresholds, and Jev
+decides it only when typed is unsure and the fallback is on. A `local_only` request never reaches Jev.
+
+Which models answer which question type, and in what order, is set per type in `configs/config_tuning.json`
+(`classifier`; the `.example` shows the defaults):
+
+```json
+"triage_enabled": {"laya-english": {"noul": false}, "jev": {"score": false}},
+"triage_order": {"noul": ["laya-typed", "jev"], "choice": ["laya-typed", "laya-english", "jev"]}
+```
+
+`triage_enabled` is voter -> type -> true/false (everything on by default). `triage_order` is type -> the voters asked,
+first to last; a voter left out is never asked. English is left out of `noul` by default, because its true/false
+labels can override the text (a confident "no" on clearly positive input). For a `choice` question the order is that of
+the Laya models, and `jev` must be listed last: it is asked after the Laya models are done, including their narrowed
+rounds. For `score` and `noul` the order is followed exactly. A type needs at least one voter that is both listed and
+enabled, or the config is refused at start-up. Jev is still asked only when `triage_fallback`, a key and the triage
+chain allow it.
 
 The answer is compact by default, because the orchestrator reads it on every turn: `type`, the pick (`choice`, `score`
 or `noul`), `answer_confidence`, `uncertain`, `answered_by`, `probabilities` (2 decimals) and, when they apply,
@@ -236,47 +254,25 @@ or set `classifier.triage_trace`, for the full answer: also `resolved_by`, `elim
   the second one downloads on first start (about 2 minutes) and the two models need roughly 1.6-3.4 GB of RAM.
 - The checks measured so far: English 20/23 and typed 21/23 on the 47 cases in `scripts/check_triage_cases.py` with
   Laya alone; both are confidently wrong on sarcasm and "the server room is on fire", where nothing asks Jev.
-- `legacy` (the default) keeps one Laya model and the review below.
+- An old `config_tuning.json` may still hold `triage_flow` or `triage_confidence_gap` (settings of the removed
+  single-model flow); they are read and ignored.
 
 ### Optional remote fallback (decision layer)
 
 With a `"classifier": {"triage_fallback": true}` section added to `configs/config_tuning.json` (it is not in the `.example` seed) and
 a key for a backend of the `triage` chain in `.env`, the remote classifier (`src/llm/decision.py`, see
-[Decision layer](#decision-layer-optional)) answers what Laya cannot:
+[Decision layer](#decision-layer-optional)) is the third voter of the flow above, asked about what both Laya models
+cannot settle:
 
-- each question Laya marks `uncertain` is asked again. For a `choice` question the two confidences are compared
-  first: if they differ by at least `classifier.triage_confidence_gap` (default 0.3), the more confident
-  model's answer stands as it is (`"deferred_to"` names it) and nothing is averaged. Otherwise Laya's answer is
-  weighed with the classifier's instead of being thrown away: the two probability sets are averaged and
-  options far below the rest (under `classifier.triage_prune_ratio`, default 0.25, of the leader's
-  average; 0 turns it off; at least two always stay) are dropped. The question is then asked again over
-  the options left, Laya first and the classifier only if Laya is still unsure. The answer lists what
-  was dropped in `"eliminated"` (those options read 0) and `"answered_by"` says who decided (`laya`,
-  `jev`...). If nothing is far enough below, the two answers are blended instead
-  (`"answered_by": "laya+jev"`): the higher confidence when both pick the same option, the lower one and
-  an `"uncertain": true` plus a `"disagreement"` object (who picked what) when they differ.
-  With exactly two options left (a two-option question, or after dropping) and the two models still picking
-  differently, each model's probabilities are multiplied by its own confidence, the two results are
-  subtracted per option and the absolute differences compared: when the smaller one is under
-  `classifier.triage_pair_ratio` (default 0.5) of the larger, the option with the bigger difference is the answer
-  (`"resolved_by": "pair"`, `"probabilities"` are the shares of the two differences); otherwise the answer is
-  unsure and lists both options in `"candidates"`. Both carry a `"disagreement"` object, `"also_check"` (the
-  option the reader should still look at, the loser) and a one-line `"note"` saying so.
-  Such an answer carries a `"rounds"` trace, one entry per model call in order (`laya`, the classifier,
-  `average` with what it dropped, then the narrowed `laya` and, if needed, classifier calls with their
-  `options`): each shows its pick, probabilities and confidence, and a Laya that could not take the
-  narrowed question is recorded as `failed`. It costs a few hundred characters of the answer.
-  `score` and `noul` questions take the classifier's answer as it is;
-- a text Laya cannot read in full (over its 4000 characters, or reported truncated)
-  goes to the classifier for every question. `classifier.max_input_chars` (default 16000) caps
-  what is sent, since a remote window is larger than Laya's.
+- a text Laya cannot read in full (over its window, or reported truncated) goes to the classifier for every
+  question. `classifier.max_input_chars` (default 16000) caps what is sent, since a remote window is larger than Laya's.
 
 The classifier only picks one option and reports a 0-100 confidence, which is no more calibrated
 than Laya's. Score questions are sent as levels `0`, `1`, ... (lowest first), and a
 noul question as `false` / `true`. If it fails, times out or has no key, Laya's
 answer is returned as it was (or, for unreadable input, the usual "could not read"
 error). Its prompt tokens are added to the turn's input tokens and the result's
-`model_note` says how many answers came from it. It is **off by default**: the text
+`model_note` says which models helped. It is **off by default**: the text
 sent to it leaves this machine and each call is billed by the backend. Laya is skipped in the
 triage chain here, since it is the provider asking.
 
@@ -287,18 +283,13 @@ experimental review gate, **not a calibrated accuracy claim**. Run
 a triage question set, then evaluate representative local inputs before
 relying on the answers.
 
-To exercise the whole triage setup (Laya, the fallback, narrowing, the `rounds` trace) without the
+To exercise the whole triage setup (both Laya models, the fallback, narrowing, the `rounds` trace) without the
 orchestrator, run `python -m scripts.check_triage_cases`: 47 cases that call the Triage Assistant's own
 code, with `--list`, `--case NAME` (or a pattern such as `"escalate-*"`), `--rounds`, `--baseline` (Laya alone, for comparison), `--prune-ratio R` and
 `--json` (full answers with their traces). It uses your `config_tuning.json` and `.env` and sends the
 cases' texts to the fallback backend when that is on.
-`--three-way` runs the Triage Assistant's sequential flow (below) over both checkpoints: Laya English answers first, the
-`typed-decisions` checkpoint only if English is not sure, and the fallback only when those two cannot settle it, each
-against its own confidence threshold (2 options: English 0.90, typed 0.80, Jev 0.90; 3 or more: 0.75, 0.55, 0.90;
-`--threshold laya-typed:3+=0.6` changes one). Between the steps, options far below the best are dropped and the
-question is asked again, and if nobody is ever sure the models' values are compared pairwise (answer, with
-`also_check`, or `unknown`). The exact flow is in `scripts/triage_three_way.py`; `--max-len` sets the Laya window
-(default 4096) and `--baseline` leaves Jev out.
+`--three-way` runs the flow over both checkpoints with `--threshold laya-typed:3+=0.6` to change one threshold; the exact flow is in `scripts/triage_three_way.py`;
+`--max-len` sets the Laya window (default 4096) and `--baseline` leaves Jev out.
 
 Usage reports the model's actual input-token work and zero generated output
 tokens. Laya is restricted to a specialist with the pinned checkpoint and

@@ -1,4 +1,4 @@
-"""The Triage Assistant (llm/laya_provider.py) with classifier.triage_flow set to "sequential": the settings, the
+"""The Triage Assistant (llm/laya_provider.py) through its flow: the settings, the
 hand-off to llm/triage_flow.py, the second checkpoint and the window it reads."""
 
 from __future__ import annotations
@@ -35,8 +35,8 @@ class Engine:
         return copy.deepcopy(self.results.pop(0))
 
 
-def sequential(monkeypatch, **changes):
-    config = decision.ClassifierSettings(triage_flow="sequential", **changes)
+def configure(monkeypatch, **changes):
+    config = decision.ClassifierSettings(**changes)
     monkeypatch.setattr(decision, "settings", lambda: config)
     return config
 
@@ -52,25 +52,25 @@ def use_section(monkeypatch, section):
     monkeypatch.setattr(decision, "read_section", lambda path, name, default=None: section)
 
 
-def test_the_legacy_flow_is_the_default(monkeypatch):
+def test_the_flow_defaults(monkeypatch):
     use_section(monkeypatch, {})
     config = decision.settings()
-    assert (config.triage_flow, config.triage_window, config.triage_thresholds) == ("legacy", 4096, {})
+    assert (config.triage_window, config.triage_thresholds) == (4096, {})
     assert config.triage_trace is False
 
 
 def test_the_flow_window_and_thresholds_are_read(monkeypatch):
     use_section(monkeypatch, {
-        "triage_flow": "sequential", "triage_window": 2048, "triage_trace": True,
+        "triage_window": 2048, "triage_trace": True,
         "triage_thresholds": {"2": {"laya-typed": 0.85}, "3+": {"jev": 0.8, "laya-english": 0.7}},
     })
     config = decision.settings()
-    assert config.triage_flow == "sequential" and config.triage_window == 2048 and config.triage_trace is True
+    assert config.triage_window == 2048 and config.triage_trace is True
     assert config.triage_thresholds == {"2": {"laya-typed": 0.85}, "3+": {"jev": 0.8, "laya-english": 0.7}}
 
 
 @pytest.mark.parametrize("section", [
-    {"triage_flow": "parallel"}, {"triage_flow": 1}, {"triage_window": 100}, {"triage_window": 99999}, {"triage_window": True},
+    {"triage_window": 100}, {"triage_window": 99999}, {"triage_window": True},
     {"triage_window": "big"}, {"triage_thresholds": []}, {"triage_thresholds": {"4": {"jev": 0.9}}},
     {"triage_thresholds": {"2": []}}, {"triage_thresholds": {"2": {"gpt": 0.9}}}, {"triage_thresholds": {"2": {"jev": 0}}},
     {"triage_thresholds": {"2": {"jev": 1.5}}}, {"triage_thresholds": {"2": {"jev": True}}},
@@ -85,7 +85,7 @@ def test_a_bad_flow_setting_is_refused(monkeypatch, section):
 # --- the hand-off ---------------------------------------------------------------------------------------------
 
 def test_a_sure_english_answer_is_returned_as_a_chat_result_and_typed_is_never_loaded(monkeypatch):
-    sequential(monkeypatch)
+    configure(monkeypatch)
     english = Engine(prediction({"a": 0.9, "b": 0.05, "c": 0.05}, 0.8))
     typed = Engine()
     provider = questions(english, typed)
@@ -100,7 +100,7 @@ def test_a_sure_english_answer_is_returned_as_a_chat_result_and_typed_is_never_l
 
 
 def test_both_checkpoints_read_the_configured_window(monkeypatch):
-    sequential(monkeypatch, triage_window=3000)
+    configure(monkeypatch, triage_window=3000)
     english = Engine(prediction({"a": 0.4, "b": 0.35, "c": 0.25}, 0.5))
     typed = Engine(prediction({"a": 0.4, "b": 0.3, "c": 0.3}, 0.5))
 
@@ -109,18 +109,8 @@ def test_both_checkpoints_read_the_configured_window(monkeypatch):
     assert english.calls[0]["max_len"] == 3000 and typed.calls[0]["max_len"] == 3000
 
 
-def test_the_legacy_flow_still_reads_the_old_window_and_never_touches_typed(monkeypatch):
-    monkeypatch.setattr(decision, "settings", decision.ClassifierSettings)
-    english = Engine(prediction({"a": 0.9, "b": 0.05, "c": 0.05}, 0.8))
-    typed = Engine()
-
-    questions(english, typed).answer(request_json())
-
-    assert english.calls[0]["max_len"] == laya_provider.CONTEXT_WINDOW and typed.calls == []
-
-
 def test_help_from_the_other_models_is_noted_and_an_unsure_answer_flags_the_result(monkeypatch):
-    sequential(monkeypatch, triage_trace=True)  # the fallback stays off: only the two Laya models vote
+    configure(monkeypatch, triage_trace=True)  # the fallback stays off: only the two Laya models vote
     english = Engine(prediction({"a": 0.4, "b": 0.35, "c": 0.25}, 0.5))
     typed = Engine(prediction({"a": 0.3, "b": 0.4, "c": 0.3}, 0.5))
 
@@ -133,7 +123,7 @@ def test_help_from_the_other_models_is_noted_and_an_unsure_answer_flags_the_resu
 
 
 def test_the_configured_thresholds_reach_the_flow(monkeypatch):
-    sequential(monkeypatch, triage_thresholds={"3+": {"laya-english": 0.95}})
+    configure(monkeypatch, triage_thresholds={"3+": {"laya-english": 0.95}})
     english = Engine(prediction({"a": 0.9, "b": 0.05, "c": 0.05}, 0.8))
     typed = Engine(prediction({"a": 0.9, "b": 0.05, "c": 0.05}, 0.8))
 
@@ -155,11 +145,11 @@ def test_the_fallback_is_asked_only_when_the_flow_switches_it_on(monkeypatch):
     monkeypatch.setattr(laya_provider, "_ask_fallback", ask)
     unsure = lambda: (Engine(prediction({"a": 0.4, "b": 0.35, "c": 0.25}, 0.5)), Engine(prediction({"a": 0.3, "b": 0.4, "c": 0.3}, 0.5)))
 
-    sequential(monkeypatch)
+    configure(monkeypatch)
     questions(*unsure()).answer(request_json())
     assert asked == []
 
-    sequential(monkeypatch, triage_fallback=True, triage_trace=True)
+    configure(monkeypatch, triage_fallback=True, triage_trace=True)
     result = questions(*unsure()).answer(request_json())
     body = json.loads(result.response)["answers"]["area"]
     assert asked == [["area"]] and body["answered_by"] == "jev" and body["resolved_by"] == "jev"
@@ -167,7 +157,7 @@ def test_the_fallback_is_asked_only_when_the_flow_switches_it_on(monkeypatch):
 
 
 def test_run_chat_goes_through_the_flow(monkeypatch):
-    sequential(monkeypatch)
+    configure(monkeypatch)
     english = Engine(prediction({"a": 0.9, "b": 0.05, "c": 0.05}, 0.8))
     monkeypatch.setattr(laya_provider, "_questions", questions(english, Engine()))
 
@@ -178,7 +168,7 @@ def test_run_chat_goes_through_the_flow(monkeypatch):
 
 # --- preparing the agent -----------------------------------------------------------------------------------------
 
-def test_prepare_loads_the_typed_checkpoint_only_for_the_sequential_flow(monkeypatch):
+def test_prepare_loads_the_typed_checkpoint_in_every_flow(monkeypatch):
     loaded = []
 
     class Loading(LayaQuestions):
@@ -187,11 +177,13 @@ def test_prepare_loads_the_typed_checkpoint_only_for_the_sequential_flow(monkeyp
             return self._engine or object()
 
     monkeypatch.setattr(decision, "settings", decision.ClassifierSettings)
-    Loading().prepare()
-    assert loaded == ["convaiinnovations/laya"]
+    provider = Loading()
+    provider._typed = Loading(checkpoint="typed-decisions")
+    provider.prepare()
+    assert loaded == ["convaiinnovations/laya", "typed-decisions"]  # `local_only` requests use it too
 
     loaded.clear()
-    sequential(monkeypatch)
+    configure(monkeypatch)
     provider = Loading()
     provider._typed = Loading(checkpoint="typed-decisions")
     provider.prepare()
@@ -200,7 +192,7 @@ def test_prepare_loads_the_typed_checkpoint_only_for_the_sequential_flow(monkeyp
 
 
 def test_the_typed_model_is_the_typed_decisions_checkpoint_on_the_flow_window(monkeypatch):
-    sequential(monkeypatch, triage_window=2048)
+    configure(monkeypatch, triage_window=2048)
     provider = LayaQuestions(Engine())
 
     models = provider._flow_models()
@@ -214,7 +206,7 @@ def test_the_typed_model_is_the_typed_decisions_checkpoint_on_the_flow_window(mo
 
 def reviewed(monkeypatch, request=None, **changes):
     """A question the two Laya models cannot settle, so its full answer is long."""
-    sequential(monkeypatch, **changes)
+    configure(monkeypatch, **changes)
     english = Engine(prediction({"a": 0.4, "b": 0.35, "c": 0.25}, 0.5))
     typed = Engine(prediction({"a": 0.3, "b": 0.4, "c": 0.3}, 0.5))
     return questions(english, typed).answer(request or request_json())
@@ -257,15 +249,6 @@ def test_trace_must_be_true_or_false():
         laya_provider.parse_request(raw)
     assert laya_provider.parse_request(request_json()).trace is False
     assert laya_provider.parse_request(json.dumps({**json.loads(request_json()), "trace": True})).trace is True
-
-
-def test_the_legacy_flow_ignores_trace_and_keeps_its_answer(monkeypatch):
-    monkeypatch.setattr(decision, "settings", decision.ClassifierSettings)
-    raw = json.dumps({**json.loads(request_json()), "trace": True})
-
-    result = questions(Engine(prediction({"a": 0.9, "b": 0.05, "c": 0.05}, 0.8)), Engine()).answer(raw)
-
-    assert json.loads(result.response)["answers"]["area"]["uncertain"] is False
 
 
 def test_compact_keeps_what_the_caller_acts_on_for_every_question_type():

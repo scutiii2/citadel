@@ -15,7 +15,6 @@
     }
   },
   "classifier": {
-    "triage_flow": "legacy",
     "triage_fallback": false,
     "triage_trace": false,
     "triage_window": 4096,
@@ -23,8 +22,17 @@
       "2": { "laya-english": 0.90, "laya-typed": 0.80, "jev": 0.90 },
       "3+": { "laya-english": 0.75, "laya-typed": 0.55, "jev": 0.90 }
     },
+    "triage_enabled": {
+      "laya-english": { "choice": true, "noul": true, "score": true },
+      "laya-typed": { "choice": true, "noul": true, "score": true },
+      "jev": { "choice": true, "noul": true, "score": true }
+    },
+    "triage_order": {
+      "choice": ["laya-english", "laya-typed", "jev"],
+      "noul": ["laya-typed", "jev"],
+      "score": ["laya-english", "laya-typed", "jev"]
+    },
     "triage_prune_ratio": 0.25,
-    "triage_confidence_gap": 0.3,
     "triage_pair_ratio": 0.5,
     "timeout_seconds": 3.0,
     "max_input_chars": 16000,

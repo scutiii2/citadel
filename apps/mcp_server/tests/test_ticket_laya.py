@@ -44,6 +44,7 @@ def test_same_issue_payload_is_a_clipped_noul_question():
 
     payload = transport.payloads[0]
     assert payload["min_confidence"] == 0.7
+    assert payload["local_only"] is True  # Laya answers alone: no fallback to Jev
     assert payload["questions"]["same"]["type"] == "noul"
     assert "Email fails" in payload["text"] and "Cannot send mail" in payload["text"]
     assert len(payload["text"]) < 1500  # 2000-char description was clipped

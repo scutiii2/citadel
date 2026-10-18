@@ -39,18 +39,26 @@ _log = logging.getLogger(__name__)
 
 _SECTION = "classifier"
 FEATURES = ("triage", "auto_tier", "auto_route")
-# The voters of the sequential triage flow (llm/triage_flow.py) and the option counts their thresholds are set for.
-TRIAGE_FLOWS = ("legacy", "sequential")
+# The voters of the triage flow (llm/triage_flow.py) and the option counts their thresholds are set for.
 TRIAGE_VOTERS = ("laya-english", "laya-typed", "jev")
 TRIAGE_COUNTS = ("2", "3+")
+# The question types a Laya request can hold, the voters tried for each in order, and which voters may answer which.
+TRIAGE_TYPES = ("choice", "noul", "score")
+# A noul question skips English: its true/false labels can override the text (a confident "no" on clearly positive input).
+DEFAULT_TRIAGE_ORDER = {
+    "choice": TRIAGE_VOTERS, "noul": ("laya-typed", "jev"), "score": TRIAGE_VOTERS,
+}
+DEFAULT_TRIAGE_ENABLED = {voter: {kind: True for kind in TRIAGE_TYPES} for voter in TRIAGE_VOTERS}
 DEFAULT_CHAIN = ("jev", "jev_vercel")
 _BACKENDS = {
     "jev": "src.llm.typesafe_classifier",
     "jev_vercel": "src.llm.jev_classifier",
     "laya": "src.llm.laya_classifier",
 }
-_KNOWN = {"typesafe", "vercel", "chains", "timeout_seconds", "max_input_chars", "triage_fallback", "triage_flow", "triage_trace", "triage_window", "triage_thresholds", "triage_prune_ratio", "triage_confidence_gap",
+_KNOWN = {"typesafe", "vercel", "chains", "timeout_seconds", "max_input_chars", "triage_fallback", "triage_trace", "triage_window", "triage_thresholds", "triage_enabled", "triage_order", "triage_prune_ratio",
           "triage_pair_ratio", "auto_tier", "auto_route"}
+# Settings of the removed legacy triage flow: still read from an old config_tuning.json, and ignored.
+_RETIRED = {"triage_flow", "triage_confidence_gap"}
 _BACKEND_KNOWN = {"url", "model"}
 _AUTO_TIER_KNOWN = {"enabled", "min_confidence", "tiers"}
 _AUTO_ROUTE_KNOWN = {"enabled", "min_confidence"}
@@ -120,30 +128,31 @@ class ClassifierSettings:
     max_input_chars: int = 16_000
     # Re-ask a remote backend about the answers Laya is unsure of, and about texts Laya cannot read.
     triage_fallback: bool = False
-    # After Laya and the fallback both answered a choice, options whose averaged probability is below
-    # this share of the leading option's are dropped and the question is asked again (0 = never drop).
-    # How Laya's triage settles a question. "legacy": one Laya model, the fallback for what it is unsure of.
-    # "sequential": Laya English, then Laya typed-decisions, then the fallback, each against its own threshold
-    # (llm/triage_flow.py). The sequential flow loads a second checkpoint when the agent starts.
-    triage_flow: str = "legacy"
-    # The sequential flow returns the full answer, with its rounds trace, instead of the compact one
+    # The triage flow returns the full answer, with its rounds trace, instead of the compact one
     # (a request can ask for it with "trace": true).
     triage_trace: bool = False
-    # Token window both Laya checkpoints read in the sequential flow (the English one alone reads 512 in the legacy flow).
+    # Token window both Laya checkpoints read (llm/triage_flow.py).
     triage_window: int = 4096
     # count ("2" or "3+") -> voter -> the confidence (0-1) at which that voter's answer is taken, over the defaults in
     # llm/triage_flow.py. Only the entries given are changed.
     triage_thresholds: dict[str, dict[str, float]] = field(default_factory=dict)
+    # voter -> question type -> whether that voter may answer that type. Only the entries given are changed.
+    triage_enabled: dict[str, dict[str, bool]] = field(default_factory=lambda: {v: dict(t) for v, t in DEFAULT_TRIAGE_ENABLED.items()})
+    # question type -> the voters asked, first to last (llm/triage_flow.py). A voter left out is never asked.
+    triage_order: dict[str, tuple[str, ...]] = field(default_factory=lambda: dict(DEFAULT_TRIAGE_ORDER))
+    # After the models answered a choice, options whose averaged probability is below
+    # this share of the leading option's are dropped and the question is asked again (0 = never drop).
     triage_prune_ratio: float = 0.25
-    # When Laya's and the fallback's confidence differ by at least this much, the more confident one's
-    # answer is used as it is, without averaging or dropping (1 = practically never).
-    triage_confidence_gap: float = 0.3
     # With two options left and Laya and the fallback still disagreeing, each option's confidence-weighted
     # probabilities are compared. The pick stands when the smaller of the two differences is below this
     # share of the larger one; otherwise the answer is unsure between both options.
     triage_pair_ratio: float = 0.5
     auto_tier: AutoTierSettings = AutoTierSettings()
     auto_route: AutoRouteSettings = AutoRouteSettings()
+
+    def voters(self, kind: str) -> tuple[str, ...]:
+        """The voters that may answer a question of this type, in the order they are asked."""
+        return tuple(v for v in self.triage_order[kind] if self.triage_enabled[v][kind])
 
     def chain(self, feature: str) -> tuple[str, ...]:
         return self.chains.get(feature, DEFAULT_CHAIN)
@@ -160,7 +169,7 @@ def _load_settings() -> ClassifierSettings:
     raw = read_section(TUNING_PATH, _SECTION, {})
     if not isinstance(raw, dict):
         raise ValueError(f"config_tuning.json {_SECTION} must be an object")
-    unknown = set(raw) - _KNOWN
+    unknown = set(raw) - _KNOWN - _RETIRED
     if unknown:
         raise ValueError(f"config_tuning.json {_SECTION} has unknown field(s): {', '.join(sorted(unknown))}")
     base = ClassifierSettings()
@@ -175,26 +184,21 @@ def _load_settings() -> ClassifierSettings:
     ratio = raw.get("triage_prune_ratio", base.triage_prune_ratio)
     if isinstance(ratio, bool) or not isinstance(ratio, (int, float)) or not 0 <= ratio < 1:
         raise ValueError(f"config_tuning.json {_SECTION}.triage_prune_ratio must be a number from 0 up to (not including) 1")
-    flow = raw.get("triage_flow", base.triage_flow)
-    if flow not in TRIAGE_FLOWS:
-        raise ValueError(f"config_tuning.json {_SECTION}.triage_flow must be one of: {', '.join(TRIAGE_FLOWS)}")
     trace = raw.get("triage_trace", base.triage_trace)
     if not isinstance(trace, bool):
         raise ValueError(f"config_tuning.json {_SECTION}.triage_trace must be true or false")
     window = raw.get("triage_window", base.triage_window)
     if isinstance(window, bool) or not isinstance(window, int) or not 512 <= window <= 32_768:
         raise ValueError(f"config_tuning.json {_SECTION}.triage_window must be an integer from 512 to 32768")
-    gap = raw.get("triage_confidence_gap", base.triage_confidence_gap)
-    if isinstance(gap, bool) or not isinstance(gap, (int, float)) or not 0 < gap <= 1:
-        raise ValueError(f"config_tuning.json {_SECTION}.triage_confidence_gap must be a number above 0 and at most 1")
     pair = raw.get("triage_pair_ratio", base.triage_pair_ratio)
     if isinstance(pair, bool) or not isinstance(pair, (int, float)) or not 0 < pair <= 1:
         raise ValueError(f"config_tuning.json {_SECTION}.triage_pair_ratio must be a number above 0 and at most 1")
+    enabled = _triage_enabled(raw.get("triage_enabled", {}))
     return ClassifierSettings(
-        triage_flow=flow, triage_trace=trace, triage_window=window, triage_thresholds=_triage_thresholds(raw.get("triage_thresholds", {})),
+        triage_enabled=enabled, triage_order=_triage_order(raw.get("triage_order", {}), enabled),
+        triage_trace=trace, triage_window=window, triage_thresholds=_triage_thresholds(raw.get("triage_thresholds", {})),
         triage_pair_ratio=float(pair),
         triage_prune_ratio=float(ratio),
-        triage_confidence_gap=float(gap),
         typesafe=_backend_settings("typesafe", raw.get("typesafe", {}), base.typesafe),
         vercel=_backend_settings("vercel", raw.get("vercel", {}), base.vercel),
         chains=_chains(raw.get("chains", {})),
@@ -234,6 +238,43 @@ def _triage_thresholds(raw: Any) -> dict[str, dict[str, float]]:
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < value <= 1:
                 raise ValueError(f"{where}.{count}.{voter} must be a number above 0 and at most 1")
         out[count] = {voter: float(value) for voter, value in row.items()}
+    return out
+
+
+def _triage_enabled(raw: Any) -> dict[str, dict[str, bool]]:
+    where = f"config_tuning.json {_SECTION}.triage_enabled"
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} must be an object of voter: {{type: true or false}}")
+    out = {voter: dict(kinds) for voter, kinds in DEFAULT_TRIAGE_ENABLED.items()}
+    for voter, kinds in raw.items():
+        if voter not in TRIAGE_VOTERS or not isinstance(kinds, dict):
+            raise ValueError(f"{where} has an entry {voter!r}; the voters are {', '.join(TRIAGE_VOTERS)}, each an object")
+        for kind, value in kinds.items():
+            if kind not in TRIAGE_TYPES:
+                raise ValueError(f"{where}.{voter} names an unknown question type {kind!r} (use {', '.join(TRIAGE_TYPES)})")
+            if not isinstance(value, bool):
+                raise ValueError(f"{where}.{voter}.{kind} must be true or false")
+            out[voter][kind] = value
+    return out
+
+
+def _triage_order(raw: Any, enabled: dict[str, dict[str, bool]]) -> dict[str, tuple[str, ...]]:
+    where = f"config_tuning.json {_SECTION}.triage_order"
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} must be an object of question type: [voter, ...]")
+    out = dict(DEFAULT_TRIAGE_ORDER)
+    for kind, voters in raw.items():
+        if kind not in TRIAGE_TYPES:
+            raise ValueError(f"{where} names an unknown question type {kind!r} (use {', '.join(TRIAGE_TYPES)})")
+        if not isinstance(voters, list) or not voters or any(v not in TRIAGE_VOTERS for v in voters) or len(set(voters)) != len(voters):
+            raise ValueError(f"{where}.{kind} must be a list of distinct voters from: {', '.join(TRIAGE_VOTERS)}")
+        out[kind] = tuple(voters)
+    # The fallback is the last resort of a choice question: it is asked once the local models are done.
+    if "jev" in out["choice"] and out["choice"][-1] != "jev":
+        raise ValueError(f"{where}.choice must list jev last: it is asked after the Laya models")
+    for kind, voters in out.items():
+        if not any(enabled[v][kind] for v in voters):
+            raise ValueError(f"{where}.{kind} lists no voter that triage_enabled allows to answer {kind} questions")
     return out
 
 

@@ -49,10 +49,10 @@ def remote(probabilities, confidence):
     }
 
 
-def make(monkeypatch, english, typed, *fallback, use_fallback=True, thresholds=None):
+def make(monkeypatch, english, typed, *fallback, use_fallback=True, thresholds=None, **settings):
     """A ThreeWayTriage over scripted engines; `fallback` are Jev's answers in order. Returns it and the options
     Jev was asked about, one list per call."""
-    config = decision.ClassifierSettings(triage_fallback=True)
+    config = decision.ClassifierSettings(triage_fallback=True, **settings)
     monkeypatch.setattr(decision, "settings", lambda: config)
     monkeypatch.setattr(decision, "available", lambda *a, **k: True)
     queue, asked = list(fallback), []
@@ -304,6 +304,13 @@ def noul(value, confidence):
     }
 
 
+def score(value, confidence):
+    return {
+        "answers": {"area": {"score": value, "answer_confidence": confidence}},
+        "usage": {"input_tokens": 7, "output_tokens": 0, "state_tokens": 1, "truncated": False},
+    }
+
+
 class NoulEngine(Engine):
     def predict(self, state, questions, **kwargs):
         self.calls.append([])
@@ -313,24 +320,127 @@ class NoulEngine(Engine):
 NOUL_REQUEST = json.dumps({"text": "t", "questions": {"area": {"type": "noul", "instructions": "Is it?"}}})
 
 
-def test_a_noul_question_takes_the_first_model_that_meets_its_threshold(monkeypatch):
-    english, typed = NoulEngine(noul(0.9, 0.9)), NoulEngine()
-    triage, asked = make(monkeypatch, english, typed)
-    answer, tokens = run(triage, NOUL_REQUEST)
-    assert answer["noul"] == 0.9 and answer["answered_by"] == "laya-english" and typed.calls == [] and tokens == 7
+def test_a_score_question_takes_the_first_model_that_meets_its_threshold(monkeypatch):
+    request = json.dumps({"text": "t", "questions": {"area": {"type": "score", "instructions": "How much?", "criteria": ["a", "b", "c"]}}})
+    english, typed = NoulEngine(score(1.0, 0.9)), NoulEngine()
+    triage, _ = make(monkeypatch, english, typed)
+    answer, _ = run(triage, request)
+    assert answer["answered_by"] == "laya-english" and typed.calls == []
 
-    triage, asked = make(monkeypatch, NoulEngine(noul(0.6, 0.5)), NoulEngine(noul(0.7, 0.6)))
+
+def test_a_noul_question_never_asks_english(monkeypatch):
+    english, typed = NoulEngine(), NoulEngine(noul(0.9, 0.9))
+    triage, asked = make(monkeypatch, english, typed)
+
+    answer, tokens = run(triage, NOUL_REQUEST)
+
+    assert answer["noul"] == 0.9 and answer["answered_by"] == "laya-typed" and english.calls == [] and asked == [] and tokens == 7
+
+
+def test_a_noul_question_needs_typeds_two_option_threshold(monkeypatch):
+    triage, _ = make(monkeypatch, NoulEngine(), NoulEngine(noul(0.9, 0.7)), use_fallback=False)  # 0.7 passes 0.55, not 0.80
+
     answer, _ = run(triage, NOUL_REQUEST)
-    assert answer["noul"] == 0.7 and answer["answered_by"] == "laya-typed" and asked == []
+
+    assert answer["uncertain"] is True
+
+
+def test_an_unsure_noul_question_without_the_fallback_is_typeds_answer_flagged_uncertain(monkeypatch):
+    english, typed = NoulEngine(), NoulEngine(noul(0.7, 0.4))
+    triage, asked = make(monkeypatch, english, typed, use_fallback=False)
+
+    answer, _ = run(triage, NOUL_REQUEST)
+
+    assert answer["noul"] == 0.7 and answer["answered_by"] == "laya-typed" and answer["uncertain"] is True
+    assert english.calls == [] and asked == []
 
 
 def test_an_unsure_noul_question_goes_to_jev_and_is_flagged_by_its_threshold(monkeypatch):
     jev = {"type": "noul", "noul": 0.95, "answer_confidence": 0.8, "uncertain": False, "answered_by": "jev"}
-    triage, asked = make(monkeypatch, NoulEngine(noul(0.6, 0.5)), NoulEngine(noul(0.7, 0.4)), jev)
+    triage, asked = make(monkeypatch, NoulEngine(), NoulEngine(noul(0.7, 0.4)), jev)
 
     answer, _ = run(triage, NOUL_REQUEST)
 
     assert answer["answered_by"] == "jev" and answer["uncertain"] is True and len(asked) == 1  # 0.8 is under Jev's 0.9
+
+
+# --- which models answer which question type, and in what order (classifier.triage_enabled / triage_order) ---------
+
+def only(voter_kinds):
+    """A triage_enabled setting with everything on except the listed `voter: [types]` pairs."""
+    enabled = {v: dict(t) for v, t in decision.DEFAULT_TRIAGE_ENABLED.items()}
+    for voter, kinds in voter_kinds.items():
+        for kind in kinds:
+            enabled[voter][kind] = False
+    return enabled
+
+
+def test_a_choice_question_skips_a_model_switched_off_for_choice(monkeypatch):
+    english, typed = Engine(), Engine(prediction({"a": 0.9, "b": 0.05, "c": 0.05}, 0.8))
+    triage, _ = make(monkeypatch, english, typed, triage_enabled=only({"laya-english": ["choice"]}))
+
+    answer, _ = run(triage)
+
+    assert answer["answered_by"] == "laya-typed" and english.calls == []
+
+
+def test_a_choice_question_asks_the_local_models_in_the_configured_order(monkeypatch):
+    english = Engine()
+    typed = Engine(prediction({"a": 0.9, "b": 0.05, "c": 0.05}, 0.8))
+    order = {"choice": ("laya-typed", "laya-english", "jev")}
+    triage, _ = make(monkeypatch, english, typed, triage_order={**decision.DEFAULT_TRIAGE_ORDER, **order})
+
+    answer, _ = run(triage)
+
+    assert answer["answered_by"] == "laya-typed" and english.calls == []
+
+
+def test_a_choice_question_never_asks_jev_when_jev_is_switched_off_for_choice(monkeypatch):
+    english = Engine(prediction({"a": 0.4, "b": 0.35, "c": 0.25}, 0.4))
+    typed = Engine(prediction({"a": 0.4, "b": 0.35, "c": 0.25}, 0.4))
+    triage, asked = make(monkeypatch, english, typed, triage_enabled=only({"jev": ["choice"]}))
+
+    answer, _ = run(triage, request_json(OPTIONS))
+
+    assert asked == [] and answer["uncertain"] is True
+
+
+def test_a_noul_question_follows_the_configured_order(monkeypatch):
+    typed = Engine()
+    jev = {"type": "noul", "noul": 0.95, "answer_confidence": 0.95, "uncertain": False, "answered_by": "jev"}
+    triage, asked = make(monkeypatch, Engine(), typed, jev, triage_order={**decision.DEFAULT_TRIAGE_ORDER, "noul": ("jev", "laya-typed")})
+
+    answer, _ = run(triage, NOUL_REQUEST)
+
+    assert answer["answered_by"] == "jev" and answer["uncertain"] is False and typed.calls == []
+
+
+def test_english_can_be_switched_on_for_noul(monkeypatch):
+    english = NoulEngine(noul(0.9, 0.95))
+    order = {**decision.DEFAULT_TRIAGE_ORDER, "noul": ("laya-english", "laya-typed")}
+    triage, _ = make(monkeypatch, english, NoulEngine(), triage_order=order)
+
+    answer, _ = run(triage, NOUL_REQUEST)
+
+    assert answer["answered_by"] == "laya-english"
+
+
+def test_a_noul_question_with_jev_switched_off_never_asks_jev(monkeypatch):
+    triage, asked = make(monkeypatch, Engine(), NoulEngine(noul(0.7, 0.4)), triage_enabled=only({"jev": ["noul"]}))
+
+    answer, _ = run(triage, NOUL_REQUEST)
+
+    assert asked == [] and answer["answered_by"] == "laya-typed" and answer["uncertain"] is True
+
+
+def test_a_score_question_skips_a_model_switched_off_for_score(monkeypatch):
+    request = json.dumps({"text": "t", "questions": {"area": {"type": "score", "instructions": "How much?", "criteria": ["a", "b", "c"]}}})
+    english, typed = NoulEngine(), NoulEngine(score(1.0, 0.9))
+    triage, _ = make(monkeypatch, english, typed, triage_enabled=only({"laya-english": ["score"]}))
+
+    answer, _ = run(triage, request)
+
+    assert answer["answered_by"] == "laya-typed" and english.calls == []
 
 
 # --- the script's wiring ---------------------------------------------------------------------------------------

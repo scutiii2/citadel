@@ -1,8 +1,8 @@
-"""The Triage Assistant's sequential flow: Laya English, Laya typed-decisions and the fallback classifier (Jev)
+"""The Triage Assistant's flow: Laya English, Laya typed-decisions and the fallback classifier (Jev)
 as separate voters, each against its own confidence threshold.
 
-It runs when config_tuning.json's `classifier.triage_flow` is "sequential" (llm/laya_provider.py hands the
-request here); `scripts/check_triage_cases.py --three-way` exercises the same code. Per `choice` question:
+Every request runs here (llm/laya_provider.py hands it over); `scripts/check_triage_cases.py --three-way` exercises the same code. Per `choice` question (the Laya models below are those `classifier.triage_order` / `triage_enabled` allow for choice,
+in that order; English then typed is the default):
 
   1. Laya English answers. If its confidence meets its threshold, that is the answer.
   2. Otherwise Laya typed answers. If it picks the same option as English and meets its own threshold, that
@@ -26,8 +26,10 @@ Default thresholds (confidence 0-1, "at or above"; `classifier.triage_thresholds
     2 options:   laya-english 0.90, laya-typed 0.80, jev 0.90
     3+ options:  laya-english 0.75, laya-typed 0.55, jev 0.90
 A `min_confidence` in a request replaces all of them for that request. Score and noul questions are not
-averaged: the first of English, typed, Jev that meets its 3+ threshold answers, else the most confident local
-one. Nothing leaves the machine unless Jev is asked.
+averaged: the first voter, in the configured order for that type (`classifier.triage_order`, `triage_enabled`), that meets
+its threshold (3+ for score, 2 for noul) answers, else Jev's answer if it was asked, else the most confident local one.
+By default a noul question skips English (its yes/no label bug), so typed, then Jev, answers it. Nothing leaves the
+machine unless Jev is asked.
 
 What is returned is compact by default, since the orchestrator reads it on every turn (a reviewed answer was
 about 560 tokens with its trace, about 65 without): `type`, the pick (`choice`, `score` or `noul`), `answer_confidence`,
@@ -143,7 +145,7 @@ def final_answer(voters: dict[str, dict[str, Any]], rounds: list[dict[str, Any]]
 
 
 class TriageFlow:
-    """One request's worth of the sequential flow. `locals_` maps "laya-english" and "laya-typed" to a
+    """One request's worth of the flow. `locals_` maps "laya-english" and "laya-typed" to a
     LayaQuestions each; build a new one per request (it holds that request's state). `trace` True always returns the
     full answer, False the compact one; None follows the request and `classifier.triage_trace`."""
 
@@ -198,7 +200,9 @@ class TriageFlow:
 
     # -- settling ----------------------------------------------------------------------------------
     def answer(self, raw: str) -> ChatResult:
-        request = laya_provider.parse_request(raw, decision.settings().max_input_chars)
+        # A longer text is refused outright unless Jev, with its larger window, may take it.
+        limit = decision.settings().max_input_chars if self._fallback_ready() else laya_provider.MAX_INPUT_CHARS
+        request = laya_provider.parse_request(raw, limit)
         data, _ = json.JSONDecoder().raw_decode(raw.lstrip())
         self._override = float(data["min_confidence"]) if "min_confidence" in data else None
         self._request, self._cache, self.tokens = request, {}, 0
@@ -265,29 +269,33 @@ class TriageFlow:
             )
             return True
 
-        # 1 and 2: the two local models, English first
-        english = ask(ENGLISH)
-        if sure(ENGLISH, english):
-            return decided(english, ENGLISH, "local")
-        typed = ask(TYPED)
-        if sure(TYPED, typed) and (english is None or typed["choice"] == english["choice"]):
-            return decided(typed, f"{ENGLISH}+{TYPED}" if english else TYPED, "local")
+        # 1 and 2: the local models in their configured order. The first sure one decides; a later one decides only
+        # if it picks what the one before it did (or the one before could not answer).
+        locals_here = [name for name in decision.settings().voters("choice") if name != JEV]
+        before: tuple[str, dict[str, Any]] | None = None
+        for name in locals_here:
+            answer = ask(name)
+            if sure(name, answer):
+                if before is None:
+                    return decided(answer, name, "local")
+                if answer["choice"] == before[1]["choice"]:
+                    return decided(answer, f"{before[0]}+{name}", "local")
+            if answer is not None:
+                before = (name, answer)
 
         # 3: with 3 or more options, drop the clearly worse ones and ask the local models again
         for _ in range(MAX_NARROWING):
-            voters = {n: a for n, a in latest.items() if n in (ENGLISH, TYPED)}
+            voters = {n: a for n, a in latest.items() if n in locals_here}
             if len(options) <= 2 or not voters or not narrow(_mean(voters)):
                 break
             latest = {}
-            english = ask(ENGLISH)
-            if sure(ENGLISH, english):
-                return decided(english, ENGLISH, "narrowed")
-            typed = ask(TYPED)
-            if sure(TYPED, typed):
-                return decided(typed, TYPED, "narrowed")
+            for name in locals_here:
+                answer = ask(name)
+                if sure(name, answer):
+                    return decided(answer, name, "narrowed")
 
         # 4: Jev, then Jev again over a narrower set
-        if self._fallback_ready():
+        if JEV in decision.settings().voters("choice") and self._fallback_ready():
             jev = ask(JEV)
             if sure(JEV, jev):
                 return decided(jev, JEV, "narrowed" if eliminated else "jev")
@@ -309,21 +317,28 @@ class TriageFlow:
         return laya_provider._with_eliminated(spec, final, eliminated) if eliminated else final
 
     def _settle_other(self, request: Request, qid: str, spec: dict[str, Any]) -> dict[str, Any]:
-        """Score and noul questions: the first model that meets its 3+ threshold answers."""
+        """Score and noul questions: the voters of that type in their configured order (`classifier.triage_order`);
+        the first one that meets its threshold answers (3+ for a score question, the 2-option one for a noul question,
+        which has two answers). Jev, when asked and unsure, still gives the answer, flagged by its own threshold."""
+        count = 2 if spec["type"] == "noul" else 3
         best: tuple[str, dict[str, Any]] | None = None
-        for name in (ENGLISH, TYPED):
+        jev: dict[str, Any] | None = None
+        for name in decision.settings().voters(spec["type"]):
+            if name == JEV and not self._fallback_ready():
+                continue
             answer = self._ask_voter(name, request, qid)
             if answer is None:
                 continue
-            if answer["answer_confidence"] >= self.threshold(name, 3) - 1e-9:
+            if answer["answer_confidence"] >= self.threshold(name, count) - 1e-9:
+                if name == JEV:
+                    return {**answer, "uncertain": False}
                 return {**answer, "answered_by": name, "resolved_by": "local", "uncertain": False}
-            if best is None or answer["answer_confidence"] > best[1]["answer_confidence"]:
+            if name == JEV:
+                jev = {**answer, "uncertain": True}
+            elif best is None or answer["answer_confidence"] > best[1]["answer_confidence"]:
                 best = (name, answer)
-        if self._fallback_ready():
-            answer = self._ask_voter(JEV, request, qid)
-            if answer is not None:
-                answer["uncertain"] = answer["answer_confidence"] < self.threshold(JEV, 3)
-                return answer
+        if jev is not None:
+            return jev
         if best is None:
             raise ValueError(f"no model could answer {qid!r}")
         return {**best[1], "answered_by": best[0], "uncertain": True}
