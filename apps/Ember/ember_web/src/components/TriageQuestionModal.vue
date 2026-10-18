@@ -32,21 +32,28 @@ const TITLE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const KINDS: readonly { value: TriageKind; label: string }[] = [
   { value: "choice", label: "Multiple choice" },
   { value: "yes_no", label: "Yes or no" },
+  { value: "score", label: "Score" },
 ];
+const DEFAULT_LEVELS = 3;
 
 let nextKey = 1;
 const blankRow = (): OptionRow => ({ key: nextKey++, description: "", title: "" });
+const blankLevels = (): OptionRow[] => Array.from({ length: DEFAULT_LEVELS }, blankRow);
 
 const kind = ref<TriageKind>("choice");
 const text = ref("");
 const question = ref("");
 const rows = ref<OptionRow[]>([blankRow(), blankRow()]);
+// A score question's levels, lowest first. Only the description is used.
+const levelRows = ref<OptionRow[]>(blankLevels());
 const titling = ref(false);
 const asking = ref(false);
 const error = ref("");
 
 const isChoice = computed(() => kind.value === "choice");
+const isScore = computed(() => kind.value === "score");
 const busy = computed(() => titling.value || asking.value);
+const levelsFilled = computed(() => levelRows.value.every((r) => r.description.trim() !== ""));
 const descriptionsFilled = computed(() => rows.value.every((r) => r.description.trim() !== ""));
 const titles = computed(() => rows.value.map((r) => r.title.trim()));
 const titlesValid = computed(
@@ -59,8 +66,12 @@ const canAsk = computed(
     !busy.value &&
     text.value.trim() !== "" &&
     question.value.trim() !== "" &&
-    (!isChoice.value || (descriptionsFilled.value && titlesValid.value)),
+    (!isChoice.value || (descriptionsFilled.value && titlesValid.value)) &&
+    (!isScore.value || levelsFilled.value),
 );
+
+const levelLabel = (i: number): string =>
+  i === 0 ? "Level 1 (lowest)" : i === levelRows.value.length - 1 ? `Level ${i + 1} (highest)` : `Level ${i + 1}`;
 const titleHint = computed(() => {
   if (!isChoice.value || !descriptionsFilled.value || titlesValid.value) return "";
   return titles.value.some((t) => t === "") ? "Generate titles, or type one word for each option." : "Each option needs its own one-word title.";
@@ -72,6 +83,14 @@ function addRow(): void {
 
 function removeRow(key: number): void {
   if (rows.value.length > TRIAGE_MIN_OPTIONS) rows.value = rows.value.filter((r) => r.key !== key);
+}
+
+function addLevel(): void {
+  if (levelRows.value.length < TRIAGE_MAX_OPTIONS) levelRows.value.push(blankRow());
+}
+
+function removeLevel(key: number): void {
+  if (levelRows.value.length > TRIAGE_MIN_OPTIONS) levelRows.value = levelRows.value.filter((r) => r.key !== key);
 }
 
 async function generateTitles(): Promise<void> {
@@ -92,6 +111,7 @@ function reset(): void {
   text.value = "";
   question.value = "";
   rows.value = [blankRow(), blankRow()];
+  levelRows.value = blankLevels();
   error.value = "";
 }
 
@@ -105,6 +125,7 @@ async function ask(): Promise<void> {
       text: text.value.trim(),
       question: question.value.trim(),
       options: isChoice.value ? rows.value.map((r) => ({ title: r.title.trim().toLowerCase(), description: r.description.trim() })) : [],
+      ...(isScore.value ? { levels: levelRows.value.map((r) => r.description.trim()) } : {}),
     });
     reset();
     emit("close");
@@ -136,7 +157,7 @@ function close(): void {
           type="text"
           :maxlength="TRIAGE_QUESTION_MAX"
           autocomplete="off"
-          :placeholder="isChoice ? 'Which area does this belong to?' : 'Is this a problem?'"
+          :placeholder="isChoice ? 'Which area does this belong to?' : isScore ? 'How urgent is this?' : 'Is this a problem?'"
         />
       </label>
 
@@ -177,6 +198,32 @@ function close(): void {
           </button>
         </div>
         <small v-if="titleHint" class="hint">{{ titleHint }}</small>
+      </fieldset>
+
+      <fieldset v-if="isScore" class="options levels">
+        <legend>Levels, lowest first</legend>
+        <div v-for="(row, i) in levelRows" :key="row.key" class="option">
+          <input
+            v-model="row.description"
+            type="text"
+            :maxlength="TRIAGE_DESCRIPTION_MAX"
+            autocomplete="off"
+            :aria-label="levelLabel(i)"
+            :placeholder="`What ${levelLabel(i).toLowerCase()} means`"
+          />
+          <button
+            type="button"
+            class="link"
+            :disabled="levelRows.length <= TRIAGE_MIN_OPTIONS"
+            :aria-label="`Remove level ${i + 1}`"
+            @click="removeLevel(row.key)"
+          >
+            ×
+          </button>
+        </div>
+        <div class="option-actions">
+          <button type="button" class="ghost" :disabled="levelRows.length >= TRIAGE_MAX_OPTIONS" @click="addLevel">Add level</button>
+        </div>
       </fieldset>
 
       <p v-if="error" class="error" role="alert">{{ error }}</p>

@@ -7,6 +7,9 @@ export function triageQuestionText(form: TriageForm): string {
   const lines = [`Triage question: ${form.question}`, "", form.text];
   if (form.kind === "choice") {
     lines.push("", "Options:", ...form.options.map((o) => `- ${o.title}: ${o.description}`));
+  } else if (form.kind === "score") {
+    const levels = form.levels ?? [];
+    lines.push("", `Rate from 1 to ${levels.length}:`, ...levels.map((d, i) => `- ${i + 1}: ${d}`));
   } else {
     lines.push("", "Answer yes or no.");
   }
@@ -18,6 +21,11 @@ export function triageAnswerText(answer: TriageAnswer): string {
   const sure = `${percent(answer.confidence)} sure${answer.uncertain ? " (uncertain: treat it as provisional)" : ""}`;
   if (answer.kind === "yes_no") {
     return `**${answer.answer === "yes" ? "Yes" : "No"}**, ${sure}.\n\nProbability of yes: ${percent(answer.yes)}.`;
+  }
+  if (answer.kind === "score") {
+    const top = answer.levels.length - 1;
+    const nearest = Math.min(top, Math.max(0, Math.round(answer.score)));
+    return `**${answer.levels[nearest]}**, ${sure}.\n\nScore: ${(answer.score + 1).toFixed(1)} of ${answer.levels.length} (1 = ${answer.levels[0]}, ${answer.levels.length} = ${answer.levels[top]}).`;
   }
   const ranked = Object.entries(answer.probabilities).sort((a, b) => b[1] - a[1]);
   const table = ["| Option | Probability |", "| --- | --- |", ...ranked.map(([name, p]) => `| ${name} | ${percent(p)} |`)];
