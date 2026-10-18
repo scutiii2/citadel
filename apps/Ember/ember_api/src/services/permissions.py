@@ -31,6 +31,7 @@ TRAFFIC_VIEW = "traffic.view"
 AGENTS_MANAGE = "agents.manage"
 TICKETS_CREATE = "tickets.create"
 TICKETS_MANAGE = "tickets.manage"
+FORGE_USE = "forge.use"
 GAMES_MANAGE = "games.manage"
 
 ALL_PERMISSIONS = MappingProxyType({
@@ -61,6 +62,7 @@ ALL_PERMISSIONS = MappingProxyType({
     AGENTS_MANAGE: "Create, edit and remove ai_agent agents (provider, gateway, persona, tools)",
     TICKETS_CREATE: "Report bugs, suggest features and follow your own tickets",
     TICKETS_MANAGE: "See every ticket, triage them and set status, priority and assignee",
+    FORGE_USE: "Use Forge: pair your own Claude and Codex workers and chat with them",
     GAMES_MANAGE: "Register, refresh and remove games",
 })
 
