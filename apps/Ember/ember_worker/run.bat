@@ -4,10 +4,10 @@ REM this project into it in editable mode. Arguments are passed through:
 REM   run.bat pair <ember_url> <token> --provider claude
 REM   run.bat status
 REM   run.bat                      (connects every paired worker)
+REM It listens on no port: it connects out to ember_api.
 REM
 REM LABEL: Ember Worker
-REM DESCRIPTION: Connects your own Claude Code and Codex CLIs to Ember's Forge page.
-REM LAUNCHER: skip
+REM DESCRIPTION: Connects your own Claude Code and Codex CLIs to Ember's Forge page (no port).
 cd /d "%~dp0"
 
 if not exist ".venv_ember_worker\Scripts\python.exe" (
@@ -20,4 +20,4 @@ if not exist ".venv_ember_worker\Scripts\python.exe" (
     call .venv_ember_worker\Scripts\activate
 )
 
-python -m src.run %*
+py -m src.run %*
