@@ -220,7 +220,7 @@ URL, token or key.
   agent gets no `update_plan` tool, or is told to change the checklist only when an item starts or
   finishes. An agent can also turn the tool off for itself (`plan_tool`, in ember_admin's agent form). Every chat setting shows a short token-cost note (Settings rows, menu tooltips); the figures are rough and live in `src/utils/tokenCosts.ts`, so re-check them when ai_agent's prompts change.
 - Settings page (`/settings`, `chat.use`): your preferences in one place, grouped by task: Chat (terse
-  replies, task checklist, ask before tools, chime, desktop notifications), Appearance (theme), Sidebar (see below). Workspace tool approval and the pages hidden from every sidebar (Games, Usage and others; `GET /api/settings/pages`) are configured in ember_admin. Games shows for every verified account.
+  replies, task checklist, ask before tools, chime, desktop notifications), Appearance (theme), Sidebar (see below). Workspace tool approval and the pages hidden from every sidebar (Usage and others; `GET /api/settings/pages`) are configured in ember_admin.
   A search box filters them as you type (label, description and extra keywords; Enter focuses the first
   match, Esc clears it). A setting that differs from its default shows an accent dot and a reset
   button ("Back to default"), and the header counts how many are changed. Chat and theme apply instantly and
@@ -267,13 +267,6 @@ URL, token or key.
   (a value the agent file does not set is left out), and a status (running,
   offline, disabled; an icon and a word). Read-only, refreshed every 15 s: new chats
   always go to the entry agent, there is no per-agent chat.
-- Games page (`/games`; `/ascension` redirects): lists games permitted by ember_api. Play
-  requests a short-lived launch ticket and opens the registered origin in an iframe
-  with `allow-scripts allow-same-origin allow-forms` (without `allow-forms` a sandbox silently
-  blocks the game's form submits, such as Begin battle). Messages require the game's origin and iframe
-  window; while a game runs it fills the whole page (the game scrolls inside its frame and
-  its resize messages are ignored), and close clears the in-memory launch URL. The games
-  list stays cached; leaving the page closes the frame so a spent ticket is never reused. Ascension's UI, art and tests live in `apps/ascension/web`.
 - Config issues page (`config.issues.view`): problems in ember_api's config and
   secret files, as errors (broken) or warnings (risky or incomplete), grouped by
   file. Not a nav tab: a red (errors) or amber (warnings only) alert with a count
@@ -345,6 +338,24 @@ All calls use the same-origin session and require `tickets.create`:
 | POST | `/api/tickets/{id}/comments` | Add a reply. |
 | POST | `/api/tickets/{id}/close` | Close the ticket. |
 
+## Forge
+
+Forge (`/forge`, `forge.use`) is a page in the account menu for group chats with
+your own Claude and Codex workers. A worker is the official CLI running on your
+own computer, driven by `apps/Ember/ember_worker`, which connects out to
+ember_api. Make a worker in the Workers dialog, copy the pairing command it
+shows once and run it from the `ember_worker` folder. Then make a group, invite
+a worker with the folder it should work in, and write `@name` to address one.
+Workers see only the group's messages.
+
+The group's mode sets what a worker may do: Ask, Accept edits, Plan or Full auto.
+Claude asks for anything the mode does not allow, on an Allow/Deny card in the
+chat. Codex cannot ask: Ask and Plan run in its read-only sandbox, Accept edits
+in `workspace-write` and Full auto in `danger-full-access`. Full auto needs the
+phrase `full auto` typed to confirm. An account with `settings.manage` lists the
+eligible plan names in the Workers dialog; a worker whose plan is not listed
+cannot be invited.
+
 ## Requirements
 
 - Node.js 24 (npm on `PATH`)
@@ -398,9 +409,6 @@ token (five 2 px chart marks are allow-listed).
 
 `turnStream` (the event stream: pieces of events, ping, reconnect with backoff, resume, give up, abort) is covered too.
 
-Games tests cover the client, account-scoped store, stale launch replies, iframe
-origin/source checks, ready/resize/close messages, empty accounts and navigation.
-
 ### End-to-end test
 
 ```bash
@@ -445,21 +453,20 @@ routes - `/api/mcp/agents/{id}` (agent status only) and `/api/mcp/server`
 src/
   api/          http + AuthClient / ChatsClient / UsageClient / CommandsClient /
                 ExtensionsClient / AgentsClient / AttachmentsClient /
-                ConfigIssuesClient / TemplatesClient / NavPreferencesClient / SharesClient / SettingsClient / GamesClient (ember_api REST),
+                ConfigIssuesClient / TemplatesClient / NavPreferencesClient / SharesClient / SettingsClient (ember_api REST),
                 McpClientBase / AiAgentClient / McpServerClient (MCP via ember_api), types
   services/     ConversationStorage (chat history; one-time import of old local chats),
                 turnStream (watching a running answer), slashCommands
-  stores/       Pinia: auth, entryAgent, chat, templates, navPrefs, accountCapabilities, configIssues, games
+  stores/       Pinia: auth, entryAgent, chat, templates, navPrefs, accountCapabilities, configIssues
   composables/  useChatShortcuts (window-level chat keys), useChatRoute (address bar <-> open chat),
                 useElapsed (running clock), useNotify (chime), useCompletionNotify (completion alerts), useSidebarCollapse (chat list),
                 useTheme (system / light / dark)
-  views/        pages: Overview, Chat, Capabilities, Agents, Games, Usage, Tickets, Settings, ConfigIssues,
+  views/        pages: Overview, Chat, Capabilities, Agents, Usage, Tickets, Settings, ConfigIssues,
                 Account, Login, Register, VerifyEmail, NoAccess, SharedChat (public)
   components/   reusable pieces: MessageList, ToolSteps, AgentActivity, ChatInput, CommandFormModal, MarkdownContent,
                 CopyButton, UsageChip, UsageGauges, UsageHeatmap, ElapsedTime, WelcomeCard, DownloadCards, TemplatePicker, TemplatesModal, ShareDialog, ConversationSidebar, EntryAgentTag, ToolRunForm, ToolResultPanel, ToolCard, CapabilitySection, ConfirmModal, NavRail, SidebarEditor, ChatSettingsMenu, SettingRow, AuthCard
     analytics/  shared LineChart, hover/keyboard state in useBucketCursor and chart.css, used by Usage
     infoPage.css  shared look of the Agents / Config pages
-    games/      GameStage and origin/source-checked game messages
   router/       routes + access guard, safe post-login redirect, pages (nav + Overview list)
   utils/        markdown rendering, download markers, tool-schema forms, error/time formatting, chat export,
                 tool titles, tool-result formatting, attachment blocks in questions, clipboard, usage formatting, log-analytics helpers, saved-prompt helpers
@@ -548,13 +555,3 @@ Production browser tests cover phone layouts, installation metadata, offline she
 loading, API cache exclusion and reconnection.
 
 Usage shows only the logged-in account, including for administrators. Workspace and per-user usage inspection lives in ember_admin.
-
-## Game hosts
-
-Set `EMBER_GAME_ORIGINS` before starting or building Vite to a space-separated list
-of permitted game origins. It supplies CSP `frame-src` in development and preview;
-production hosting must send the same policy. Local defaults allow localhost and
-127.0.0.1 on any port. `frame-ancestors 'none'` keeps Ember itself out of frames.
-Game permissions are granted through roles. The Games navigation entry shows for
-every verified account (an empty list says no games are available); an administrator
-can hide it for everyone in ember_admin, Workspace settings, Sidebar pages.
