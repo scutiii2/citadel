@@ -135,3 +135,12 @@ See `docs/superpowers/plans/2026-10-11-game-host.md` for deployment setup.
 
 **Revisit when**: user wants Stop to feel instant. Read the provider streaming code and `dispatch_with_progress` first, then propose the exact change for step 1.
 
+
+## Frontend for db_gateway (added 2026-10-18)
+
+**Context**: `apps/db_gateway` is backend only (`auth.py`, `config.py`, `registry.py`, `run.py`, `seed.py`, `backends/`); no UI exists. Only `ember_web` (`NotesView.vue`, `NotesClient.ts`) touches it, as a notes feature. Build a gateway frontend that uses the ember_web and ember_admin designs (shared tokens, components, radius scale, in-app confirms).
+
+- Decide first which app hosts it (likely `ember_admin`, since it is an admin tool) and which gateway routes it needs; check `registry.py` and `run.py` for the API.
+- Follow the `ember-frontend-design` and `ember-feature-scaffold` skills; any new `ember_api` route proxies to the gateway behind a permission.
+
+**Revisit when**: user wants it built. Brainstorm the design first.

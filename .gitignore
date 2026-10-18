@@ -110,3 +110,5 @@ node_modules/
 /apps/db_gateway/.env
 /apps/db_gateway/data/
 /apps/db_gateway/firestore-debug.log
+
+scuti_server_launcher.exe
