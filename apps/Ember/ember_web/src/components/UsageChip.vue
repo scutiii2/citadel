@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { ChatMessage } from "../api/types";
-import { agentDuration, agentStartTime, agentUsageText, formatDuration, usageSummary } from "../utils/usageFormat";
+import { agentDuration, agentStartTime, agentUsageText, formatCost, formatDuration, usageSummary } from "../utils/usageFormat";
 
 // agentLabel: the name of the agent that wrote the answer, when the page knows it.
 const props = defineProps<{ message: ChatMessage; agentLabel?: string }>();
@@ -26,6 +26,7 @@ const rows = computed<Row[]>(() => {
   if (m.input_tokens !== undefined) list.push({ label: "Input tokens", value: m.input_tokens.toLocaleString() });
   if (m.output_tokens !== undefined) list.push({ label: "Output tokens", value: m.output_tokens.toLocaleString() });
   if (m.total_tokens !== undefined) list.push({ label: "Total tokens", value: m.total_tokens.toLocaleString() });
+  if (m.cost !== undefined) list.push({ label: "Cost", value: formatCost(m.cost) });
   if (m.duration_s !== undefined) list.push({ label: "Time", value: formatDuration(m.duration_s) });
   if (m.steps?.length) {
     const failed = m.steps.filter((s) => s.ok === false).length;

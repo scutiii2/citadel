@@ -168,20 +168,30 @@ export interface FakeApi {
   folders: Map<number, StoredFolder>;
 }
 
-const NO_USAGE = {
+const USAGE = {
   six_hour: { used: 0, limit: 0, reset_at: null },
   weekly: { used: 0, limit: 0, reset_at: null },
   report: {
     days: 30,
     since: "2026-09-03",
-    total_tokens: 0,
-    input_tokens: 0,
-    output_tokens: 0,
+    total_tokens: 1500,
+    input_tokens: 1200,
+    output_tokens: 300,
+    total_cost: 0.042,
+    currency: "USD",
+    unpriced_tokens: 500,
     summary_tokens: 0,
-    turns: 0,
-    chats: 0,
-    by_agent: [],
-    groups: [],
+    turns: 1,
+    chats: 1,
+    group_by: "agent",
+    by_agent: [
+      { agent: "main", model: "priced-model", tokens: 1000, cost: 0.042 },
+      { agent: "helper", model: "unknown-model", tokens: 500, cost: null },
+    ],
+    groups: [
+      { key: "main", tokens: 1000, input_tokens: 800, output_tokens: 200, turns: 1, cost: 0.042 },
+      { key: "helper", tokens: 500, input_tokens: 400, output_tokens: 100, turns: 1, cost: null },
+    ],
     daily: [],
     hourly: Array.from({ length: 24 }, () => 0),
   },
@@ -573,8 +583,19 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     }
 
     // No limits are set, so the sidebar shows no usage gauge.
-    if (method === "GET" && path === "/api/usage") return json(route, NO_USAGE);
-    if (method === "GET" && path === "/api/usage/records") return json(route, []);
+    if (method === "GET" && path === "/api/usage") {
+      const groupBy = url.searchParams.get("group_by") ?? "agent";
+      const keys = groupBy === "model" ? ["priced-model", "unknown-model"] : groupBy === "provider" ? ["example", "unknown"] : groupBy === "gateway" ? ["direct", "unknown"] : ["main", "helper"];
+      return json(route, { ...USAGE, report: { ...USAGE.report, group_by: groupBy,
+        groups: USAGE.report.groups.map((g, i) => ({ ...g, key: keys[i] })) } });
+    }
+    if (method === "GET" && path === "/api/usage/records") return json(route, USAGE.report.by_agent.map((a, i) => ({
+      id: i + 1, turn_id: "example-turn", kind: "chat", chat_id: null,
+      agent: a.agent, agent_id: a.agent, provider_id: i ? "unknown" : "example", gateway: null,
+      model: a.model, input_tokens: i ? 400 : 800, output_tokens: i ? 100 : 200,
+      total_tokens: a.tokens, cost: a.cost, delegated_by: i ? "main" : null,
+      started_at: "2026-10-18T09:00:00", finished_at: "2026-10-18T09:00:01", created_at: "2026-10-18T09:00:01",
+    })));
 
     // The agent's MCP endpoint: only its `status` tool is called by the page.
     if (method === "POST" && path === "/api/mcp/agents/agent-1") return mcpAgent(route);

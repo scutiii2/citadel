@@ -723,7 +723,7 @@ def test_usage_is_recorded_and_reported(client: TestClient, agent: FakeAgent) ->
     assert usage["weekly"]["limit"] == 5_000_000
     report = usage["report"]
     assert (report["total_tokens"], report["turns"], report["chats"]) == (100, 1, 1)
-    assert report["by_agent"] == [{"agent": "claude", "model": "claude-test", "tokens": 100}]
+    assert report["by_agent"] == [{"agent": "claude", "model": "claude-test", "tokens": 100, "cost": None}]
     assert len(report["daily"]) == 1
     admin_view = client.get("/api/admin/usage").json()
     assert [(r["username"], r["tokens"], r["turns"]) for r in admin_view] == [("root", 100, 1)]

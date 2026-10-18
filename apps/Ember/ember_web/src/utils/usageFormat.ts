@@ -1,6 +1,16 @@
 import type { AgentUsage, ChatMessage } from "../api/types";
 import type { UsageWindow } from "../api/UsageClient";
 
+/** Estimated money cost; keep small charges visible instead of rounding to zero. */
+export function formatCost(cost: number, currency = "USD"): string {
+  const tiny = cost > 0 && cost < 0.0001;
+  const decimals = cost < 0.01 ? 4 : cost < 1 ? 3 : 2;
+  const formatted = new Intl.NumberFormat("en-US", {
+    style: "currency", currency, minimumFractionDigits: decimals, maximumFractionDigits: decimals,
+  }).format(tiny ? 0.0001 : cost);
+  return tiny ? `<${formatted}` : formatted;
+}
+
 /** 950 -> "950", 12,400 -> "12.4k", 1,250,000 -> "1.3M": the short form for
  * the chip; the detail panel shows the full number. */
 export function compactNumber(n: number): string {
@@ -33,6 +43,7 @@ export function agentUsageText(a: AgentUsage): string {
     a.input_tokens !== undefined ? `${a.input_tokens.toLocaleString()} in` : "",
     a.output_tokens !== undefined ? `${a.output_tokens.toLocaleString()} out` : "",
     `${a.total_tokens.toLocaleString()} total`,
+    a.cost !== undefined ? formatCost(a.cost) : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -86,6 +97,7 @@ export function usageSummary(m: ChatMessage, agentLabel?: string): string {
     agentLabel ?? m.agent,
     m.model,
     m.total_tokens ? `${compactNumber(m.total_tokens)} tokens` : "",
+    m.cost !== undefined ? formatCost(m.cost) : "",
     m.duration_s !== undefined ? formatDuration(m.duration_s) : "",
     m.steps?.length ? `${m.steps.length} ${m.steps.length === 1 ? "tool" : "tools"}` : "",
   ]

@@ -21,6 +21,7 @@ from src.deps import (
     get_db_gateway,
     get_db_session,
     get_log_writer,
+    get_pricing,
     get_secret_box,
     get_settings,
     get_settings_service,
@@ -64,6 +65,7 @@ from src.services.turns import (
 from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.user_extension_service import TurnExtensions, UserExtensionService
 from src.services.usage_service import LimitBlock, UsageService
+from src.services.pricing import Pricing, with_cost
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
@@ -353,8 +355,9 @@ class ChatOut(ChatSummaryOut):
     messages: list[dict[str, Any]]
 
     @classmethod
-    def of(cls, chat: Chat, running: bool = False) -> ChatOut:  # type: ignore[override]
-        return cls(**ChatSummaryOut.of(chat, running).model_dump(), messages=decode_messages(chat))
+    def of(cls, chat: Chat, pricing: Pricing, running: bool = False) -> ChatOut:  # type: ignore[override]
+        return cls(**ChatSummaryOut.of(chat, running).model_dump(),
+                   messages=[with_cost(message, pricing) for message in decode_messages(chat)])
 
 
 class SpanOut(BaseModel):
@@ -522,9 +525,10 @@ async def get_chat(
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
     turns: TurnRegistry = Depends(get_turns),
+    pricing: Pricing = Depends(get_pricing),
 ) -> ChatOut:
     try:
-        return ChatOut.of(await chats.get(chat_id), turns.is_running(account.id, chat_id))
+        return ChatOut.of(await chats.get(chat_id), pricing, turns.is_running(account.id, chat_id))
     except ChatNotFound as error:
         raise _not_found() from error
 
@@ -637,13 +641,14 @@ async def branch_chat(
     body: BranchRequest,
     chat_id: str = ChatId,
     chats: ChatService = Depends(get_chat_service),
+    pricing: Pricing = Depends(get_pricing),
 ) -> ChatOut:
     """Copies the chat up to and including the answer at `upto` into a new
     chat (new id, "Branch of <title>", same agent) and returns it. The
     original is unchanged, and may even be answering meanwhile: only saved
     messages are copied."""
     try:
-        return ChatOut.of(await chats.branch(chat_id, body.upto))
+        return ChatOut.of(await chats.branch(chat_id, body.upto), pricing)
     except ChatNotFound as error:
         raise _not_found() from error
     except NotABranchPoint as error:
@@ -876,6 +881,7 @@ async def summarize_chat(
     directory: AgentDirectory = Depends(get_agent_directory),
     gateway: AgentGateway = Depends(get_agent_gateway),
     settings: Settings = Depends(get_settings),
+    pricing: Pricing = Depends(get_pricing),
 ) -> ChatOut:
     """Replaces the history with one summary (what the agent sees from now
     on) plus the raw log it replaced. Nothing changes if it fails. Counts
@@ -899,7 +905,7 @@ async def summarize_chat(
     except summarization.SummarizeError as error:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Couldn't summarize: {error}") from error
     if outcome is None:
-        return ChatOut.of(chat)  # nothing new since the last summary
+        return ChatOut.of(chat, pricing)  # nothing new since the last summary
     turn_id = uuid.uuid4().hex
     for result in outcome.results:
         await usage.record(account.id, turn_id, "summary", chat_id, result)
@@ -907,7 +913,7 @@ async def summarize_chat(
         chat = await chats.replace_messages(chat_id, outcome.messages)
     except ChatNotFound as error:
         raise _not_found() from error
-    return ChatOut.of(chat)
+    return ChatOut.of(chat, pricing)
 
 
 @router.post("/{chat_id}/clear")
@@ -916,6 +922,7 @@ async def clear_chat(
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
     turns: TurnRegistry = Depends(get_turns),
+    pricing: Pricing = Depends(get_pricing),
 ) -> ChatOut:
     """Starts the conversation afresh without asking an agent: the old
     messages are kept as one raw log the agent never sees again."""
@@ -930,4 +937,4 @@ async def clear_chat(
         raise _not_found() from error
     except ChatLimitError as error:
         raise _too_large(error) from error
-    return ChatOut.of(chat)
+    return ChatOut.of(chat, pricing)

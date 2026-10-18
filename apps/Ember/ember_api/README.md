@@ -1,5 +1,25 @@
 # ember_api
 
+## Usage cost estimates
+
+Configure `configs/config_pricing.json` with your model names and separate
+`input` / `output` prices in **USD per 1,000,000 tokens** (`currency: "USD"`).
+The file is created from its `.example` on first startup; the shipped
+`example-model` entry is a placeholder. Fill in real names and prices yourself,
+then restart ember_api. Unknown models and calls missing both token counts show
+no cost; a single missing side counts as zero when the other is known.
+
+Chat GET, branch, summarize/clear responses and live `final` events include
+optional `cost` on messages and each `agent_usage` row. `GET /api/usage` returns
+`report.total_cost`, `currency`, `unpriced_tokens` and nullable group/agent costs;
+`GET /api/usage/records` includes nullable per-call `cost`. The corresponding
+admin detail endpoints receive the same fields. Aggregate costs sum priced
+calls, with null when none can be priced. All-account totals remain tokens-only.
+Costs are computed on read without storing them or migrating the database, so
+new prices also apply to old answers. Ember Web shows costs in answer chips,
+usage details, the Usage page and its Markdown export, with a note for partial
+totals. Public share links still expose only plain questions and answers.
+
 ## Ticket read receipts
 
 Reporter routes require `tickets.create` and return only reporter-safe fields.

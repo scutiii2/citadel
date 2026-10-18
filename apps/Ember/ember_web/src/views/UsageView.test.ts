@@ -31,12 +31,15 @@ function usage(extra: Partial<MyUsage["report"]> = {}): MyUsage {
       days: 30,
       since: "2026-09-15T00:00:00",
       total_tokens: 1500,
+      total_cost: null,
+      currency: "USD",
+      unpriced_tokens: 0,
       input_tokens: 1000,
       output_tokens: 500,
       summary_tokens: 0,
       turns: 4,
       chats: 2,
-      by_agent: [{ agent: "claude", model: "opus", tokens: 1500 }],
+      by_agent: [{ agent: "claude", model: "opus", tokens: 1500, cost: null }],
       daily: [{ date: "2026-10-01", tokens: 1500 }],
       hourly: hourly(14, 1500),
       group_by: "agent",
@@ -227,6 +230,7 @@ function row(extra: Partial<UsageRecordRow> = {}): UsageRecordRow {
     input_tokens: 20,
     output_tokens: 5,
     total_tokens: 25,
+    cost: null,
     started_at: "2026-10-04T09:12:04",
     finished_at: "2026-10-04T09:12:05",
     delegated_by: "main",
@@ -236,9 +240,42 @@ function row(extra: Partial<UsageRecordRow> = {}): UsageRecordRow {
 }
 
 describe("group by", () => {
+  it("shows priced totals and groups, and marks unpriced tokens", async () => {
+    mine.mockResolvedValue(usage({ total_cost: 0.042, currency: "USD", unpriced_tokens: 500,
+      groups: [
+        { key: "priced", tokens: 1000, input_tokens: 800, output_tokens: 200, turns: 1, cost: 0.042 },
+        { key: "unknown", tokens: 500, input_tokens: 400, output_tokens: 100, turns: 1, cost: null },
+      ] }));
+    const wrapper = await mountView();
+    expect(wrapper.find(".stats").text()).toContain("$0.042cost");
+    expect(wrapper.text()).toContain("Excludes 500 tokens from models with no price.");
+    expect(wrapper.findAll("table.groups th").map((th) => th.text())).toContain("Cost");
+    const groups = wrapper.findAll("table.groups tbody tr");
+    expect(groups[0]!.text()).toContain("$0.042");
+    expect(groups[1]!.text()).toContain("—");
+  });
+
+  it("omits the cost stat for an entirely unpriced report", async () => {
+    mine.mockResolvedValue(usage({ total_cost: null, unpriced_tokens: 1500 }));
+    const wrapper = await mountView();
+    expect(wrapper.find(".stats").text()).not.toContain("$");
+    expect(wrapper.text()).toContain("Excludes 1,500 tokens");
+  });
+
+  it("shows a cost beside single calls and sums priced rows of a turn", async () => {
+    records.mockResolvedValue([
+      row({ id: 1, turn_id: "t1", cost: 0.01 }),
+      row({ id: 2, turn_id: "t1", cost: 0.02 }),
+      row({ id: 3, turn_id: "t1", cost: null }),
+      row({ id: 4, turn_id: "t2", cost: 0 }),
+    ]);
+    const wrapper = await mountView();
+    expect(wrapper.get(".turn-total").text()).toContain("$0.030");
+    expect(wrapper.get(".call-tokens").text()).toContain("$0.0000");
+  });
   it("groups the report by the chosen field", async () => {
     mine.mockResolvedValue(
-      usage({ group_by: "agent", groups: [{ key: "calc", tokens: 30, input_tokens: 20, output_tokens: 10, turns: 1 }] }),
+      usage({ group_by: "agent", groups: [{ key: "calc", tokens: 30, input_tokens: 20, output_tokens: 10, turns: 1, cost: null }] }),
     );
     const wrapper = await mountView();
 
@@ -250,14 +287,14 @@ describe("group by", () => {
 
   it("lists the groups under a heading for the field", async () => {
     mine.mockResolvedValue(
-      usage({ group_by: "agent", groups: [{ key: "calc", tokens: 30, input_tokens: 20, output_tokens: 10, turns: 1 }] }),
+      usage({ group_by: "agent", groups: [{ key: "calc", tokens: 30, input_tokens: 20, output_tokens: 10, turns: 1, cost: null }] }),
     );
     const wrapper = await mountView();
 
     expect(wrapper.find("table.groups th").text()).toBe("Agent");
     expect(wrapper.find("table.groups tbody tr").text()).toContain("calc");
     mine.mockResolvedValue(
-      usage({ group_by: "gateway", groups: [{ key: "azure", tokens: 30, input_tokens: 20, output_tokens: 10, turns: 1 }] }),
+      usage({ group_by: "gateway", groups: [{ key: "azure", tokens: 30, input_tokens: 20, output_tokens: 10, turns: 1, cost: null }] }),
     );
     await groupButton(wrapper, "Gateway").trigger("click");
     await flushPromises();
@@ -272,7 +309,7 @@ describe("group by", () => {
   });
 
   it("keeps the heading of the loaded report while the next grouping loads", async () => {
-    const group = { key: "calc", tokens: 30, input_tokens: 20, output_tokens: 10, turns: 1 };
+    const group = { key: "calc", tokens: 30, input_tokens: 20, output_tokens: 10, turns: 1, cost: null };
     mine.mockResolvedValue(usage({ group_by: "agent", groups: [group] }));
     const wrapper = await mountView();
     mine.mockReturnValue(new Promise(() => {})); // the provider report is still loading

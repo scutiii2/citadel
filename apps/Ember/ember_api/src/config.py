@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -106,6 +107,41 @@ class UsageSettings:
 
 
 @dataclass(frozen=True)
+class ModelPrice:
+    input: float
+    output: float
+
+
+@dataclass(frozen=True)
+class PricingSettings:
+    """Model prices per million tokens. Unknown models have no estimate."""
+
+    currency: str = "USD"
+    models: dict[str, ModelPrice] = field(default_factory=dict)
+
+    @classmethod
+    def from_config(cls, raw: dict) -> PricingSettings:
+        currency = raw.get("currency", "USD")
+        if currency != "USD":
+            raise ValueError("pricing.currency must be USD")
+        models = raw.get("models", {})
+        if not isinstance(models, dict):
+            raise ValueError("pricing.models must be an object")
+        prices = {}
+        for model, price in models.items():
+            if not isinstance(model, str) or not model.strip():
+                raise ValueError(f"pricing.models key must be a non-empty string: {model!r}")
+            if not isinstance(price, dict):
+                raise ValueError(f"pricing.models.{model} must be an object")
+            for side in ("input", "output"):
+                value = price.get(side)
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                    raise ValueError(f"pricing.models.{model}.{side} must be a finite number >= 0")
+            prices[model] = ModelPrice(input=float(price["input"]), output=float(price["output"]))
+        return cls(currency=currency, models=prices)
+
+
+@dataclass(frozen=True)
 class BackupSettings:
     """config_app.json's "backup" block: a copy of the database every
     `every_hours` hours, the newest `keep` of them kept (in `data/backups`)."""
@@ -162,6 +198,7 @@ class Settings:
     mcp_server_url: str = "http://127.0.0.1:8010/mcp"
     security: SecuritySettings = field(default_factory=SecuritySettings)
     usage: UsageSettings = field(default_factory=UsageSettings)
+    pricing: PricingSettings = field(default_factory=PricingSettings)
     backup: BackupSettings = field(default_factory=BackupSettings)
     db_gateway: DbGatewaySettings = field(default_factory=DbGatewaySettings)
     # Where these settings came from (the Config issues page re-reads it).
@@ -203,6 +240,7 @@ def load_settings() -> Settings:
         mcp_server_url=raw.get("mcp_server_url") or "http://127.0.0.1:8010/mcp",
         security=SecuritySettings.from_config(raw.get("security", {})),
         usage=UsageSettings.from_config(raw.get("usage", {})),
+        pricing=PricingSettings.from_config(load_json_config(CONFIGS_DIR / "config_pricing.json")),
         backup=BackupSettings.from_config(raw.get("backup", {})),
         db_gateway=DbGatewaySettings.from_config(raw.get("db_gateway", {})),
         config_path=CONFIGS_DIR / "config_app.json",

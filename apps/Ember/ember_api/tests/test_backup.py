@@ -475,6 +475,7 @@ class TestSettings:
         import src.config as config
 
         (tmp_path / "config_app.json").write_text(json.dumps({"backup": {"keep": 3, "every_hours": 12}}), encoding="utf-8")
+        (tmp_path / "config_pricing.json.example").write_text("{}", encoding="utf-8")
         monkeypatch.setattr(config, "CONFIGS_DIR", tmp_path)
 
         loaded = config.load_settings()

@@ -1,5 +1,18 @@
 # configs
 
+`config_pricing.json` is the editable model price table, created from
+`config_pricing.json.example` when missing. Replace `example-model` with your
+actual model names and prices: `input` and `output` are **USD per 1,000,000
+tokens**, with `currency` set to `USD`. The placeholder is not a real price.
+Prices must be finite, non-negative numbers. Exact model names win, with a
+case-insensitive fallback. Unknown models or missing input/output splits have
+no cost estimate; one missing side counts as zero when the other is known.
+
+Restart ember_api after editing prices. Costs are computed on output and never
+stored, so the updated table also re-prices old answers. Usage totals sum only
+priced calls and report excluded tokens separately; an entirely unpriced total
+is null, never a made-up zero. These are token-based estimates, not invoices.
+
 `config_app.json` - server and session settings. Created from
 `config_app.json.example` on first run if missing; the real file is
 gitignored.

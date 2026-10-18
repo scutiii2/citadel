@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { UsageRecordRow } from "../api/UsageClient";
-import { parseServerTime } from "../utils/usageFormat";
+import { formatCost, parseServerTime } from "../utils/usageFormat";
 
 /** One model call in the Usage page's Recent calls list: the agent (and who handed it
  * the question), provider and gateway chips, when and with which model, and its tokens. */
-defineProps<{ record: UsageRecordRow }>();
+defineProps<{ record: UsageRecordRow; currency?: string }>();
 
 /** A naive-UTC API time as the viewer's local date and time. */
 const localTime = (value: string): string => new Date(parseServerTime(value)).toLocaleString();
@@ -24,7 +24,7 @@ const tokens = (n: number): string => n.toLocaleString();
       <div class="muted small">{{ localTime(record.started_at ?? record.created_at) }}<template v-if="record.model"> · {{ record.model }}</template></div>
     </div>
     <div class="call-tokens">
-      <strong>{{ tokens(record.total_tokens) }}</strong>
+      <strong>{{ tokens(record.total_tokens) }}<template v-if="record.cost != null"> · {{ formatCost(record.cost, currency) }}</template></strong>
       <span v-if="record.input_tokens !== null && record.output_tokens !== null" class="muted small">
         {{ tokens(record.input_tokens) }} in / {{ tokens(record.output_tokens) }} out
       </span>

@@ -27,6 +27,7 @@ export interface ActiveAgent {
 
 /** One message of a chat, as ember_api stores it. */
 export interface ChatMessage {
+  cost?: number;
   role: "user" | "assistant";
   content: string;
   /** summary: what the agent remembers of earlier messages; log_attachment:
@@ -68,6 +69,7 @@ export interface ContextPart {
 
 /** One agent's share of an answer that ran several. */
 export interface AgentUsage {
+  cost?: number;
   /** This call's prompt parts, separate from the answering agent's context window. */
   context_breakdown?: ContextPart[];
   context_breakdown_exact?: boolean;

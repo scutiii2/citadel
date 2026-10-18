@@ -25,6 +25,16 @@ function rows(wrapper: ReturnType<typeof mount>): Record<string, string> {
 }
 
 describe("UsageChip", () => {
+  it("shows cost in the summary, after total tokens, and in agent rows", async () => {
+    const wrapper = mount(UsageChip, { props: { message: { ...FULL, cost: 0.042,
+      agent_usage: [{ agent: "a", total_tokens: 100, cost: 0.01 }] } } });
+    expect(wrapper.find("button").text()).toContain("12.4k tokens · $0.042");
+    await wrapper.find("button").trigger("click");
+    expect(rows(wrapper).Cost).toBe("$0.042");
+    expect(rows(wrapper).a).toContain("100 total · $0.010");
+    const labels = wrapper.findAll("dt").map((d) => d.text());
+    expect(labels.indexOf("Cost")).toBe(labels.indexOf("Total tokens") + 1);
+  });
   it("shows the one-line summary", () => {
     const wrapper = mount(UsageChip, { props: { message: FULL } });
 

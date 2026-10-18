@@ -1,6 +1,25 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../api/types";
-import { agentDuration, agentStartTime, agentUsageText, compactNumber, formatClock, formatDuration, usagePercent, usageSummary } from "./usageFormat";
+import { agentDuration, agentStartTime, agentUsageText, compactNumber, formatClock, formatCost, formatDuration, usagePercent, usageSummary } from "./usageFormat";
+
+describe("formatCost", () => {
+  it.each([
+    [0, "$0.0000"], [0.000001, "<$0.0001"], [0.0001, "$0.0001"],
+    [0.009, "$0.0090"], [0.01, "$0.010"], [0.042, "$0.042"],
+    [0.999, "$0.999"], [1, "$1.00"], [12.345, "$12.35"],
+  ])("formats %d without hiding tiny charges", (cost, expected) => {
+    expect(formatCost(cost)).toBe(expected);
+  });
+  it("uses the requested currency", () => {
+    expect(formatCost(2, "EUR")).toBe("€2.00");
+    expect(formatCost(0.000001, "EUR")).toBe("<€0.0001");
+  });
+  it("includes a known cost in summaries and agent lines, including zero", () => {
+    expect(usageSummary({ role: "assistant", content: "x", total_tokens: 100, cost: 0.042 })).toBe("100 tokens · $0.042");
+    expect(usageSummary({ role: "assistant", content: "x", total_tokens: 100, cost: 0 })).toBe("100 tokens · $0.0000");
+    expect(agentUsageText({ agent: "a", total_tokens: 100, cost: 0.042 })).toBe("100 total · $0.042");
+  });
+});
 
 describe("compactNumber", () => {
   it.each([

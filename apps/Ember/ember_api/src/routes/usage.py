@@ -11,11 +11,12 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import Settings
-from src.deps import get_db_session, get_settings, require_permission
+from src.deps import get_db_session, get_pricing, get_settings, require_permission
 from src.models import Account, UsageRecord
 from src.services.permissions import USAGE_ALL_VIEW, CHAT_USE
 from src.db import utcnow
 from src.services.usage_service import MAX_REPORT_DAYS, UsageService, Window
+from src.services.pricing import Pricing
 
 router = APIRouter(tags=["usage"])
 
@@ -24,9 +25,10 @@ require_admin = require_permission(USAGE_ALL_VIEW)
 
 
 def get_usage_service(
-    session: AsyncSession = Depends(get_db_session), settings: Settings = Depends(get_settings)
+    session: AsyncSession = Depends(get_db_session), settings: Settings = Depends(get_settings),
+    pricing: Pricing = Depends(get_pricing),
 ) -> UsageService:
-    return UsageService(session, settings.usage)
+    return UsageService(session, settings.usage, pricing)
 
 
 def check_since(since: date | None) -> date | None:
@@ -68,6 +70,7 @@ class AccountUsageOut(BaseModel):
 
 
 class UsageRecordOut(BaseModel):
+    cost: float | None
     id: int
     turn_id: str
     kind: str
@@ -86,8 +89,9 @@ class UsageRecordOut(BaseModel):
     created_at: datetime
 
     @classmethod
-    def of(cls, row: UsageRecord) -> UsageRecordOut:
-        return cls(**{name: getattr(row, name) for name in cls.model_fields})
+    def of(cls, row: UsageRecord, pricing: Pricing) -> UsageRecordOut:
+        return cls(cost=pricing.cost(row.model, row.input_tokens, row.output_tokens),
+                   **{name: getattr(row, name) for name in cls.model_fields if name != "cost"})
 
 
 @router.get("/api/usage")
@@ -119,9 +123,10 @@ async def my_usage_records(
     limit: int = Query(default=100, ge=1, le=500),
     account: Account = Depends(require_chat),
     usage: UsageService = Depends(get_usage_service),
+    pricing: Pricing = Depends(get_pricing),
 ) -> list[UsageRecordOut]:
     rows = await usage.records(account.id, days, check_since(since), agent=agent, provider=provider, limit=limit)
-    return [UsageRecordOut.of(row) for row in rows]
+    return [UsageRecordOut.of(row, pricing) for row in rows]
 
 
 @router.get("/api/admin/usage")
@@ -168,5 +173,6 @@ async def account_usage_records(
     limit: int = Query(default=100, ge=1, le=500),
     account: Account = Depends(get_usage_account),
     usage: UsageService = Depends(get_usage_service),
+    pricing: Pricing = Depends(get_pricing),
 ) -> list[UsageRecordOut]:
-    return await my_usage_records(days, since, agent, provider, limit, account, usage)
+    return await my_usage_records(days, since, agent, provider, limit, account, usage, pricing)

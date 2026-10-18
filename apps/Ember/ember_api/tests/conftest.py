@@ -13,7 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.app import create_app
-from src.config import BackupSettings, SecuritySettings, Settings, UsageSettings
+from src.config import BackupSettings, PricingSettings, SecuritySettings, Settings, UsageSettings
 from src.services import otp_service
 from src.services.agent_gateway import AgentCallError, Caller
 from src.services.email_service import EmailDeliveryError
@@ -329,6 +329,7 @@ def make_settings(
     internal_token: str = "",
     security: SecuritySettings | None = None,
     usage: UsageSettings | None = None,
+    pricing: PricingSettings | None = None,
     backup: BackupSettings | None = None,
     require_email_verification: bool = True,
 ) -> Settings:
@@ -355,6 +356,7 @@ def make_settings(
         mcp_server_url=MCP_SERVER_URL,
         security=security or SecuritySettings(),
         usage=usage or UsageSettings(),
+        pricing=pricing or PricingSettings(),
         # Off unless a test asks: a background copy of every test's database is noise.
         backup=backup or BackupSettings(enabled=False),
         config_path=tmp_path / "config_app.json",

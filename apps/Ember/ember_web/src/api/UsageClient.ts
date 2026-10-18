@@ -10,6 +10,7 @@ export interface UsageWindow {
 export type UsageGroupBy = "agent" | "provider" | "gateway" | "model";
 
 export interface UsageGroup {
+  cost: number | null;
   key: string;
   tokens: number;
   input_tokens: number;
@@ -19,6 +20,7 @@ export interface UsageGroup {
 
 /** One stored usage row: an agent's call in a turn. Times are naive UTC. */
 export interface UsageRecordRow {
+  cost: number | null;
   id: number;
   turn_id: string;
   kind: string;
@@ -43,6 +45,9 @@ export interface UsageFilters {
 }
 
 export interface UsageReport {
+  total_cost: number | null;
+  currency: string;
+  unpriced_tokens: number;
   days: number;
   since: string;
   total_tokens: number;
@@ -51,7 +56,7 @@ export interface UsageReport {
   summary_tokens: number;
   turns: number;
   chats: number;
-  by_agent: { agent: string; model: string; tokens: number }[];
+  by_agent: { agent: string; model: string; tokens: number; cost: number | null }[];
   /** UTC days with usage, oldest first. */
   daily: { date: string; tokens: number }[];
   /** Tokens by UTC hour of day: 24 numbers, hour 0 first. */

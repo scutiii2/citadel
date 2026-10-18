@@ -1,0 +1,6 @@
+{
+  "currency": "USD",
+  "models": {
+    "example-model": { "input": 0.0, "output": 0.0 }
+  }
+}

@@ -1,5 +1,6 @@
 import type { UsageReport } from "../api/UsageClient";
 import { favoriteAgent, hourLabel, peakHour } from "./usageStats";
+import { formatCost } from "./usageFormat";
 
 export interface UsageExportOptions {
   username: string;
@@ -27,6 +28,7 @@ function local(date: Date): string {
  * table, then tokens by agent, by the chosen grouping and by day. Built in the browser. */
 export function usageToMarkdown(report: UsageReport, options: UsageExportOptions): string {
   const n = (value: number) => value.toLocaleString("en-US");
+  const cost = (value: number | null) => value == null ? "" : formatCost(value, report.currency);
   const peak = peakHour(report.hourly, options.utcOffsetMinutes);
   const favorite = favoriteAgent(report.by_agent);
 
@@ -40,6 +42,7 @@ export function usageToMarkdown(report: UsageReport, options: UsageExportOptions
     "| Metric | Value |",
     "|---|---|",
     `| Total tokens | ${n(report.total_tokens)} |`,
+    `| Total cost (${cell(report.currency)}) | ${cost(report.total_cost)} |`,
     `| Input tokens | ${n(report.input_tokens)} |`,
     `| Output tokens | ${n(report.output_tokens)} |`,
     `| Tokens on summaries | ${n(report.summary_tokens)} |`,
@@ -54,8 +57,8 @@ export function usageToMarkdown(report: UsageReport, options: UsageExportOptions
   if (report.by_agent.length === 0) {
     lines.push("None.");
   } else {
-    lines.push("| Agent | Model | Tokens |", "|---|---|---|");
-    for (const row of report.by_agent) lines.push(`| ${cell(row.agent)} | ${cell(row.model || "-")} | ${n(row.tokens)} |`);
+    lines.push("| Agent | Model | Tokens | Cost |", "|---|---|---|---|");
+    for (const row of report.by_agent) lines.push(`| ${cell(row.agent)} | ${cell(row.model || "-")} | ${n(row.tokens)} | ${cost(row.cost)} |`);
   }
   if (report.group_by !== "agent") {
     const heading = report.group_by[0]!.toUpperCase() + report.group_by.slice(1);
@@ -63,8 +66,8 @@ export function usageToMarkdown(report: UsageReport, options: UsageExportOptions
     if (report.groups.length === 0) {
       lines.push("None.");
     } else {
-      lines.push(`| ${heading} | Tokens | Turns |`, "|---|---|---|");
-      for (const g of report.groups) lines.push(`| ${cell(g.key)} | ${n(g.tokens)} | ${n(g.turns)} |`);
+      lines.push(`| ${heading} | Tokens | Turns | Cost |`, "|---|---|---|---|");
+      for (const g of report.groups) lines.push(`| ${cell(g.key)} | ${n(g.tokens)} | ${n(g.turns)} | ${cost(g.cost)} |`);
     }
   }
   lines.push("", "## Per day (UTC)", "");
@@ -75,5 +78,6 @@ export function usageToMarkdown(report: UsageReport, options: UsageExportOptions
     for (const day of report.daily) lines.push(`| ${day.date} | ${n(day.tokens)} |`);
   }
   lines.push("");
+  if (report.unpriced_tokens > 0) lines.push(`Excludes ${n(report.unpriced_tokens)} tokens from models with no price.`, "");
   return lines.join("\n");
 }

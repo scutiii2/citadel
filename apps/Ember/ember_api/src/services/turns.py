@@ -27,7 +27,8 @@ from itertools import count
 from time import monotonic
 from typing import Any
 
-from src.config import UsageSettings
+from src.config import PricingSettings, UsageSettings
+from src.services.pricing import Pricing, with_cost
 from src.db import Database
 from src.services import question_answers, summarization
 from src.services.agent_directory import AgentEntry
@@ -297,6 +298,7 @@ class TurnRegistry:
         usage: UsageSettings,
         logs: LogWriter,
         *,
+        pricing: Pricing | None = None,
         max_running_per_account: int = 3,
         retention_seconds: float = 120.0,
     ) -> None:
@@ -304,6 +306,7 @@ class TurnRegistry:
         self._gateway = gateway
         self._usage = usage
         self._logs = logs
+        self._pricing = pricing or Pricing(PricingSettings())
         self._max_running = max_running_per_account
         self._retention = retention_seconds
         self._turns: dict[tuple[int, str], Turn] = {}
@@ -677,7 +680,7 @@ class TurnRegistry:
         terminal: dict[str, Any] = (
             {"type": "error", "message": error}
             if error is not None
-            else {"type": "final", "message": message, "cancelled": cancelled}
+            else {"type": "final", "message": with_cost(message, self._pricing), "cancelled": cancelled}
         )
         await self._publish(turn, terminal, status)
         if turn.question:

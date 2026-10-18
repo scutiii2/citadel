@@ -18,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import UsageSettings
 from src.db import utcnow
 from src.models import Account, UsageRecord
+from src.config import PricingSettings
+from src.services.pricing import Pricing
 
 SIX_HOURS = timedelta(hours=6)
 WEEK = timedelta(days=7)
@@ -117,9 +119,10 @@ def usage_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 class UsageService:
-    def __init__(self, session: AsyncSession, settings: UsageSettings) -> None:
+    def __init__(self, session: AsyncSession, settings: UsageSettings, pricing: Pricing | None = None) -> None:
         self._session = session
         self._settings = settings
+        self._pricing = pricing or Pricing(PricingSettings())
 
     async def record(
         self, account_id: int, turn_id: str, kind: str, chat_id: str | None, result: dict[str, Any]
@@ -201,6 +204,9 @@ class UsageService:
         # Tokens by UTC hour of day, for the busiest hour.
         hourly = [0] * 24
         agents: dict[tuple[str, str], int] = {}
+        agent_costs: dict[tuple[str, str], float] = {}
+        total_cost: float | None = None
+        unpriced_tokens = 0
         groups: dict[str, dict[str, Any]] = {}
         turns: set[str] = set()
         chats: set[str] = set()
@@ -211,6 +217,12 @@ class UsageService:
             hourly[created_at.hour] += tokens
             key = (agent_name or "unknown", model or "")
             agents[key] = agents.get(key, 0) + tokens
+            cost = self._pricing.cost(model, input_tokens, output_tokens)
+            if cost is None:
+                unpriced_tokens += tokens
+            else:
+                total_cost = (total_cost or 0) + cost
+                agent_costs[key] = agent_costs.get(key, 0) + cost
             group_key = {
                 "agent": agent_name,
                 "provider": provider_id,
@@ -218,8 +230,10 @@ class UsageService:
                 "model": model,
             }[group_by] or "unknown"
             group = groups.setdefault(
-                group_key, {"key": group_key, "tokens": 0, "input_tokens": 0, "output_tokens": 0, "turns": set()}
+                group_key, {"key": group_key, "tokens": 0, "input_tokens": 0, "output_tokens": 0, "turns": set(), "cost": None}
             )
+            if cost is not None:
+                group["cost"] = (group["cost"] or 0) + cost
             group["tokens"] += tokens
             group["input_tokens"] += input_tokens or 0
             group["output_tokens"] += output_tokens or 0
@@ -238,13 +252,16 @@ class UsageService:
             "days": days,
             "since": since,
             "total_tokens": total,
+            "total_cost": total_cost,
+            "currency": self._pricing.currency,
+            "unpriced_tokens": unpriced_tokens,
             "input_tokens": input_total,
             "output_tokens": output_total,
             "summary_tokens": summary_total,
             "turns": len(turns),
             "chats": len(chats),
             "by_agent": [
-                {"agent": agent, "model": model, "tokens": tokens}
+                {"agent": agent, "model": model, "tokens": tokens, "cost": agent_costs.get((agent, model))}
                 for (agent, model), tokens in sorted(agents.items(), key=lambda item: -item[1])
             ],
             "group_by": group_by,

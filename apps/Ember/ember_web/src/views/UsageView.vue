@@ -11,7 +11,7 @@ import { useAuthStore } from "../stores/auth";
 import { downloadText, exportFileName } from "../utils/chatExport";
 import { errorMessage, formatUtc } from "../utils/errors";
 import { usageToMarkdown } from "../utils/usageExport";
-import { parseServerTime, usagePercent as percent } from "../utils/usageFormat";
+import { formatCost, parseServerTime, usagePercent as percent } from "../utils/usageFormat";
 import { favoriteAgent, hourLabel, monthStart, peakHour, utcDay } from "../utils/usageStats";
 
 const auth = useAuthStore();
@@ -102,6 +102,7 @@ interface Turn {
   lead: string;
   rows: UsageRecordRow[];
   total: number;
+  cost: number | null;
   /** When the response's first call began. */
   at: string;
 }
@@ -126,6 +127,7 @@ const turns = computed<Turn[]>(() => {
       lead: agentName(ordered[0]!),
       rows: ordered,
       total: ordered.reduce((sum, r) => sum + r.total_tokens, 0),
+      cost: ordered.some((r) => r.cost != null) ? ordered.reduce((sum, r) => sum + (r.cost ?? 0), 0) : null,
       at: ordered.map(startOf).sort()[0]!,
     };
   });
@@ -226,9 +228,12 @@ onMounted(() => {
 
         <div class="stats">
           <div class="stat"><strong>{{ tokens(usage.report.total_tokens) }}</strong><span>tokens</span></div>
+          <div v-if="usage.report.total_cost != null" class="stat"><strong>{{ formatCost(usage.report.total_cost, usage.report.currency) }}</strong><span>cost</span></div>
           <div class="stat"><strong>{{ tokens(usage.report.turns) }}</strong><span>answers</span></div>
           <div class="stat"><strong>{{ tokens(usage.report.chats) }}</strong><span>chats</span></div>
         </div>
+
+        <p v-if="usage.report.unpriced_tokens > 0" class="muted small">Excludes {{ tokens(usage.report.unpriced_tokens) }} tokens from models with no price.</p>
 
         <div class="panel activity">
           <div class="panel-head"><h3>Activity</h3><span class="muted small">Per day, UTC</span></div>
@@ -257,7 +262,7 @@ onMounted(() => {
           <p v-if="usage.report.groups.length === 0" class="muted">None.</p>
           <table v-else class="groups">
             <thead>
-              <tr><th>{{ groupHeading }}</th><th>Share</th><th class="num">Tokens</th><th class="num">Turns</th></tr>
+              <tr><th>{{ groupHeading }}</th><th>Share</th><th class="num">Tokens</th><th class="num">Turns</th><th class="num">Cost</th></tr>
             </thead>
             <tbody>
               <tr v-for="g in usage.report.groups" :key="g.key">
@@ -268,6 +273,7 @@ onMounted(() => {
                 </td>
                 <td class="num">{{ tokens(g.tokens) }}</td>
                 <td class="num">{{ g.turns }}</td>
+                <td class="num">{{ g.cost == null ? "—" : formatCost(g.cost, usage.report.currency) }}</td>
               </tr>
             </tbody>
           </table>
@@ -279,7 +285,7 @@ onMounted(() => {
           <p v-else-if="records.length === 0" class="muted">None.</p>
           <ul v-else class="calls">
             <template v-for="t in turns" :key="t.id">
-              <UsageCall v-if="t.rows.length === 1" :record="t.rows[0]!" />
+              <UsageCall v-if="t.rows.length === 1" :record="t.rows[0]!" :currency="usage.report.currency" />
               <li v-else class="turn">
                 <button
                   type="button"
@@ -294,10 +300,10 @@ onMounted(() => {
                     <span class="chip">{{ t.rows.length }} calls</span>
                     <span class="muted small turn-time">{{ localTime(t.at) }}</span>
                   </span>
-                  <strong class="turn-total">{{ tokens(t.total) }}</strong>
+                  <strong class="turn-total">{{ tokens(t.total) }}<template v-if="t.cost !== null"> · {{ formatCost(t.cost, usage.report.currency) }}</template></strong>
                 </button>
                 <ul v-if="openTurns.has(t.id)" class="turn-calls">
-                  <UsageCall v-for="r in t.rows" :key="r.id" :record="r" />
+                  <UsageCall v-for="r in t.rows" :key="r.id" :record="r" :currency="usage.report.currency" />
                 </ul>
               </li>
             </template>

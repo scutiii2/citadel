@@ -12,14 +12,17 @@ const REPORT: UsageReport = {
   days: 30,
   since: "2026-09-15T08:00:00.123456",
   total_tokens: 1_234_567,
+  total_cost: null,
+  currency: "USD",
+  unpriced_tokens: 0,
   input_tokens: 1_000_000,
   output_tokens: 234_567,
   summary_tokens: 4200,
   turns: 12,
   chats: 3,
   by_agent: [
-    { agent: "claude", model: "opus", tokens: 1_000_000 },
-    { agent: "openai", model: "", tokens: 234_567 },
+    { agent: "claude", model: "opus", tokens: 1_000_000, cost: null },
+    { agent: "openai", model: "", tokens: 234_567, cost: null },
   ],
   daily: [
     { date: "2026-09-20", tokens: 1000 },
@@ -35,6 +38,20 @@ const OPTIONS = { username: "root", rangeLabel: "30 days", generatedAt: new Date
 const lines = (text: string) => text.split("\n");
 
 describe("usageToMarkdown", () => {
+  it("exports total and row costs with blanks for unpriced rows and a partial-total note", () => {
+    const text = usageToMarkdown({ ...REPORT, total_cost: 0.042, currency: "USD", unpriced_tokens: 234567,
+      by_agent: [
+        { agent: "a", model: "m", tokens: 1000000, cost: 0.042 },
+        { agent: "b", model: "?", tokens: 234567, cost: null },
+      ], group_by: "model",
+      groups: [{ key: "m", tokens: 1000000, input_tokens: 1000000, output_tokens: 0, turns: 1, cost: 0.042 }],
+    }, OPTIONS);
+    expect(text).toContain("| Total cost (USD) | $0.042 |");
+    expect(text).toContain("| a | m | 1,000,000 | $0.042 |");
+    expect(text).toContain("| b | ? | 234,567 |  |");
+    expect(text).toContain("| m | 1,000,000 | 1 | $0.042 |");
+    expect(text).toContain("Excludes 234,567 tokens from models with no price.");
+  });
   const text = usageToMarkdown(REPORT, OPTIONS);
 
   it("starts with the account, the range, where it begins and when it was made", () => {
@@ -61,9 +78,9 @@ describe("usageToMarkdown", () => {
   });
 
   it("lists the agents, with a dash for a missing model", () => {
-    expect(text).toContain("| Agent | Model | Tokens |");
-    expect(text).toContain("| claude | opus | 1,000,000 |");
-    expect(text).toContain("| openai | - | 234,567 |");
+    expect(text).toContain("| Agent | Model | Tokens | Cost |");
+    expect(text).toContain("| claude | opus | 1,000,000 |  |");
+    expect(text).toContain("| openai | - | 234,567 |  |");
   });
 
   it("lists the days, marked as UTC", () => {
@@ -82,14 +99,14 @@ describe("usageToMarkdown", () => {
       {
         ...REPORT,
         group_by: "provider",
-        groups: [{ key: "open|ai", tokens: 1_000_000, input_tokens: 900_000, output_tokens: 100_000, turns: 7 }],
+        groups: [{ key: "open|ai", tokens: 1_000_000, input_tokens: 900_000, output_tokens: 100_000, turns: 7, cost: null }],
       },
       OPTIONS,
     );
 
     expect(grouped).toContain("## By provider");
-    expect(grouped).toContain("| Provider | Tokens | Turns |");
-    expect(grouped).toContain("| open\\|ai | 1,000,000 | 7 |");
+    expect(grouped).toContain("| Provider | Tokens | Turns | Cost |");
+    expect(grouped).toContain("| open\\|ai | 1,000,000 | 7 |  |");
     expect(grouped).toContain("## By agent");
   });
 
@@ -105,15 +122,15 @@ describe("usageToMarkdown", () => {
 
     expect(empty).toContain("## By agent\n\nNone.");
     expect(empty).toContain("## Per day (UTC)\n\nNone.");
-    expect(empty).not.toContain("| Agent | Model | Tokens |");
+    expect(empty).not.toContain("| Agent | Model | Tokens | Cost |");
     expect(empty).toContain("| Peak hour | - |");
     expect(empty).toContain("| Favorite agent | - |");
   });
 
   it("does not let an agent name break the table", () => {
-    const odd = usageToMarkdown({ ...REPORT, by_agent: [{ agent: "a|b", model: "m\nn", tokens: 5 }] }, OPTIONS);
+    const odd = usageToMarkdown({ ...REPORT, by_agent: [{ agent: "a|b", model: "m\nn", tokens: 5, cost: null }] }, OPTIONS);
 
-    expect(odd).toContain("| a\\|b | m n | 5 |");
+    expect(odd).toContain("| a\\|b | m n | 5 |  |");
     expect(odd).toContain("| Favorite agent | a\\|b m n |");
   });
 

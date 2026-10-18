@@ -151,7 +151,10 @@ def create_app(
         app.state.traffic = recorder
         recorder.start()
         app.state.share_limiter = PublicReadLimiter()
-        app.state.turns = TurnRegistry(database, app.state.agent_gateway, settings.usage, log_writer)
+        from src.services.pricing import Pricing
+
+        app.state.pricing = Pricing(settings.pricing)
+        app.state.turns = TurnRegistry(database, app.state.agent_gateway, settings.usage, log_writer, pricing=app.state.pricing)
         backups: BackupScheduler | None = None
         app.state.backups = None
         if settings.backup.enabled:

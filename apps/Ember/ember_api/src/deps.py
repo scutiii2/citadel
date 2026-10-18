@@ -24,10 +24,15 @@ from src.services.traffic import TrafficRecorder
 from src.services.turns import TurnRegistry
 from src.services.extension_probe import ExtensionProbe
 from src.services.secret_box import SecretBox
+from src.services.pricing import Pricing
 
 
 def get_settings(request: Request) -> Settings:
     return request.app.state.settings
+
+
+def get_pricing(request: Request) -> Pricing:
+    return request.app.state.pricing
 
 
 async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:
