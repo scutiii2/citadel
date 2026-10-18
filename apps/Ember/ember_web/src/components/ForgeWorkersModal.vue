@@ -9,6 +9,7 @@ import {
 } from "../api/ForgeClient";
 import BaseModal from "./BaseModal.vue";
 import CopyButton from "./CopyButton.vue";
+import { pairCommand, readShell, SHELL_OPTIONS, writeShell, type ForgeShell } from "../utils/forgeShells";
 import SegmentedControl from "./SegmentedControl.vue";
 
 const props = defineProps<{
@@ -41,8 +42,10 @@ let labelEdited = false;
 const planText = ref<Record<ForgeProvider, string>>({ claude: "", codex: "" });
 
 const labelOk = computed(() => LABEL.test(label.value.trim()));
+const shell = ref<ForgeShell>(readShell());
+watch(shell, writeShell);
 const command = computed(() =>
-  props.created ? `run.bat pair ${window.location.origin} ${props.created.token} --provider ${props.created.provider}` : "",
+  props.created ? pairCommand(shell.value, window.location.origin, props.created.token, props.created.provider) : "",
 );
 const reported = computed(() => {
   const found: Record<ForgeProvider, string[]> = { claude: [], codex: [] };
@@ -87,6 +90,7 @@ function savePlans(which: ForgeProvider): void {
         Run this on the computer where {{ created.provider === "claude" ? "Claude Code" : "Codex" }} is logged in, from the
         <code>ember_worker</code> folder. The token is shown once; make a new worker if you lose it.
       </p>
+      <SegmentedControl v-model="shell" :options="SHELL_OPTIONS" aria-label="Shell" />
       <div class="command-row">
         <code class="command">{{ command }}</code>
         <CopyButton :text="command" label="Copy the command" />

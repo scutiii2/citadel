@@ -10,6 +10,7 @@ const worker = (id: number, label: string, extra: Partial<ForgeWorker> = {}): Fo
 const realShow = HTMLDialogElement.prototype.showModal;
 const realClose = HTMLDialogElement.prototype.close;
 beforeEach(() => {
+  localStorage.clear();
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
 });
@@ -82,7 +83,14 @@ describe("ForgeWorkersModal", () => {
     const wrapper = setup({ created });
 
     expect(wrapper.text()).toContain("shown once");
+    expect(wrapper.get("code.command").text()).toBe(`.\run.bat pair ${window.location.origin} ft_abc123 --provider claude`);
+
+    const pick = (name: string) => wrapper.findAll("button").find((b) => b.text() === name)!.trigger("click");
+    await pick("Command Prompt");
     expect(wrapper.get("code.command").text()).toBe(`run.bat pair ${window.location.origin} ft_abc123 --provider claude`);
+    await pick("Git Bash");
+    expect(wrapper.get("code.command").text()).toBe(`./run.bat pair ${window.location.origin} ft_abc123 --provider claude`);
+    expect(localStorage.getItem("ember_web.forgeShell")).toBe("gitbash");
 
     await wrapper.findAll("button").find((b) => b.text() === "Done")!.trigger("click");
     expect(wrapper.emitted("dismissToken")).toHaveLength(1);
