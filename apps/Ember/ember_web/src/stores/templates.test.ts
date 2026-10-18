@@ -16,7 +16,7 @@ const client = vi.mocked(templatesClient);
 const ACCOUNT = { id: 1, username: "u", email: "u@example.com", email_verified: true, roles: [], permissions: ["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] };
 
 const tpl = (id: number, name = `T${id}`, body = "body"): PromptTemplate => ({
-  id,
+  id: String(id),
   name,
   body,
   created_at: "2026-01-01T00:00:00",
@@ -50,7 +50,7 @@ describe("loading", () => {
     await store.ensureLoaded();
 
     expect(client.list).toHaveBeenCalledOnce();
-    expect(store.templates.map((t) => t.id)).toEqual([1, 2]);
+    expect(store.templates.map((t) => t.id)).toEqual(["1", "2"]);
     expect(store.loading).toBe(false);
   });
 
@@ -91,7 +91,7 @@ describe("loading", () => {
     // The new account loads for itself.
     await store.ensureLoaded();
     expect(client.list).toHaveBeenCalledTimes(2);
-    expect(store.templates.map((t) => t.id)).toEqual([1, 2]);
+    expect(store.templates.map((t) => t.id)).toEqual(["1", "2"]);
   });
 
   it("empties on logout", async () => {
@@ -114,8 +114,8 @@ describe("changing templates", () => {
     const created = await store.create("New", "text");
 
     expect(client.create).toHaveBeenCalledWith("New", "text");
-    expect(created.id).toBe(3);
-    expect(store.templates.map((t) => t.id)).toEqual([3, 1, 2]);
+    expect(created.id).toBe("3");
+    expect(store.templates.map((t) => t.id)).toEqual(["3", "1", "2"]);
   });
 
   it("an edited template moves to the front, once", async () => {
@@ -123,12 +123,12 @@ describe("changing templates", () => {
     const { store } = setup();
     await store.ensureLoaded();
 
-    await store.update(2, "Renamed", "changed");
+    await store.update("2", "Renamed", "changed");
 
-    expect(client.update).toHaveBeenCalledWith(2, "Renamed", "changed");
+    expect(client.update).toHaveBeenCalledWith("2", "Renamed", "changed");
     expect(store.templates.map((t) => [t.id, t.name])).toEqual([
-      [2, "Renamed"],
-      [1, "T1"],
+      ["2", "Renamed"],
+      ["1", "T1"],
     ]);
   });
 
@@ -139,7 +139,7 @@ describe("changing templates", () => {
 
     await expect(store.create("T1", "x")).rejects.toThrow('You already have a template named "T1"');
 
-    expect(store.templates.map((t) => t.id)).toEqual([1, 2]);
+    expect(store.templates.map((t) => t.id)).toEqual(["1", "2"]);
   });
 
   it("removes a template", async () => {
@@ -147,10 +147,10 @@ describe("changing templates", () => {
     const { store } = setup();
     await store.ensureLoaded();
 
-    await store.remove(1);
+    await store.remove("1");
 
-    expect(client.remove).toHaveBeenCalledWith(1);
-    expect(store.templates.map((t) => t.id)).toEqual([2]);
+    expect(client.remove).toHaveBeenCalledWith("1");
+    expect(store.templates.map((t) => t.id)).toEqual(["2"]);
   });
 
   it("treats one that is already gone (another tab) as removed", async () => {
@@ -158,9 +158,9 @@ describe("changing templates", () => {
     const { store } = setup();
     await store.ensureLoaded();
 
-    await store.remove(1);
+    await store.remove("1");
 
-    expect(store.templates.map((t) => t.id)).toEqual([2]);
+    expect(store.templates.map((t) => t.id)).toEqual(["2"]);
   });
 
   it("keeps the template and rethrows other failures", async () => {
@@ -168,8 +168,8 @@ describe("changing templates", () => {
     const { store } = setup();
     await store.ensureLoaded();
 
-    await expect(store.remove(1)).rejects.toThrow("boom");
+    await expect(store.remove("1")).rejects.toThrow("boom");
 
-    expect(store.templates.map((t) => t.id)).toEqual([1, 2]);
+    expect(store.templates.map((t) => t.id)).toEqual(["1", "2"]);
   });
 });

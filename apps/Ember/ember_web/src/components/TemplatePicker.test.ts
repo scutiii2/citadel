@@ -4,7 +4,7 @@ import type { PromptTemplate } from "../api/TemplatesClient";
 import TemplatePicker from "./TemplatePicker.vue";
 
 const tpl = (id: number, name: string, body = `${name} body`): PromptTemplate => ({
-  id,
+  id: String(id),
   name,
   body,
   created_at: "2026-01-01T00:00:00",

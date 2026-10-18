@@ -424,7 +424,7 @@ describe("the rest of the composer", () => {
 
 describe("saved prompts", () => {
   const tpl = (id: number, name: string, body: string): PromptTemplate => ({
-    id,
+    id: String(id),
     name,
     body,
     created_at: "2026-01-01T00:00:00",

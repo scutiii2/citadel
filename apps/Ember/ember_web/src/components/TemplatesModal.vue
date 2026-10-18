@@ -19,7 +19,7 @@ const dialog = ref<HTMLDialogElement | null>(null);
 const nameInput = ref<HTMLInputElement | null>(null);
 
 // null: the list; otherwise the form, for a new template (id null) or an existing one.
-const editing = ref<{ id: number | null } | null>(null);
+const editing = ref<{ id: string | null } | null>(null);
 const name = ref("");
 const body = ref("");
 const error = ref("");

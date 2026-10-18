@@ -15,7 +15,7 @@ vi.mock("../api/TemplatesClient", async (importOriginal) => ({
 const client = vi.mocked(templatesClient);
 
 const tpl = (id: number, name: string, body = `${name} body`): PromptTemplate => ({
-  id,
+  id: String(id),
   name,
   body,
   created_at: "2026-01-01T00:00:00",
@@ -168,7 +168,7 @@ describe("editing and deleting", () => {
     await wrapper.find("form").trigger("submit");
     await flushPromises();
 
-    expect(client.update).toHaveBeenCalledWith(2, "Code review", "new text");
+    expect(client.update).toHaveBeenCalledWith("2", "Code review", "new text");
     expect(wrapper.findAll(".list li strong").map((s) => s.text())).toEqual(["Code review", "Summarize"]);
   });
 
@@ -198,7 +198,7 @@ describe("editing and deleting", () => {
     await deleteFirst().trigger("click");
     await wrapper.getComponent(ConfirmModal).get(".confirm").trigger("click");
     await flushPromises();
-    expect(client.remove).toHaveBeenCalledWith(1);
+    expect(client.remove).toHaveBeenCalledWith("1");
     expect(wrapper.findAll(".list li strong").map((s) => s.text())).toEqual(["Review"]);
   });
 

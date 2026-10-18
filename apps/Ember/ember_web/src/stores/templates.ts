@@ -65,14 +65,14 @@ export const useTemplatesStore = defineStore("templates", () => {
     return template;
   }
 
-  async function update(id: number, name: string, body: string): Promise<PromptTemplate> {
+  async function update(id: string, name: string, body: string): Promise<PromptTemplate> {
     const started = generation;
     const template = await templatesClient.update(id, name, body);
     if (started === generation) upsert(template);
     return template;
   }
 
-  async function remove(id: number): Promise<void> {
+  async function remove(id: string): Promise<void> {
     const started = generation;
     try {
       await templatesClient.remove(id);

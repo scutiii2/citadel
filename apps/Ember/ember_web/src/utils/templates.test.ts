@@ -3,7 +3,7 @@ import type { PromptTemplate } from "../api/TemplatesClient";
 import { appendToDraft, filterTemplates, preview, templateQuery } from "./templates";
 
 const tpl = (id: number, name: string, body = "text"): PromptTemplate => ({
-  id,
+  id: String(id),
   name,
   body,
   created_at: "2026-01-01T00:00:00",
@@ -19,14 +19,14 @@ describe("filterTemplates", () => {
   });
 
   it("matches names anywhere, ignoring case, names that start with the query first", () => {
-    expect(filterTemplates(LIST, "review").map((t) => t.id)).toEqual([3, 2]);
-    expect(filterTemplates(LIST, "REV").map((t) => t.id)).toEqual([3, 2]);
+    expect(filterTemplates(LIST, "review").map((t) => t.id)).toEqual(["3", "2"]);
+    expect(filterTemplates(LIST, "REV").map((t) => t.id)).toEqual(["3", "2"]);
   });
 
   it("keeps the given order inside each group", () => {
     const list = [tpl(1, "b review"), tpl(2, "a review"), tpl(3, "review b"), tpl(4, "review a")];
 
-    expect(filterTemplates(list, "review").map((t) => t.id)).toEqual([3, 4, 1, 2]);
+    expect(filterTemplates(list, "review").map((t) => t.id)).toEqual(["3", "4", "1", "2"]);
   });
 
   it("looks at the name, not the body", () => {
