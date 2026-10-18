@@ -17,13 +17,15 @@ from .discovery import refreshed_spec, templates_from_specs
 from .group_editor import GroupEditor
 from .instance import Instance
 from .models import GroupMember, LaunchSpec, Preset, ServerGroup, ServerTemplate
+from .port_plan import PortPlanError, assign_ports
+from .ports_tab import RangeDetail
 from .processes import (
-    _find_free_port, _find_pid_on_port, _kill_pid_tree, _port_in_use, _spawn_detached, _topmost_python_ancestor,
+    _find_pid_on_port, _kill_pid_tree, _port_in_use, _spawn_detached, _topmost_python_ancestor,
 )
 from .runtimes import runtime_warning
 from .storage import (
-    _load_and_clear_kept_running, _delete_saved_spec, _load_groups, _load_presets, _load_saved_specs, _save_groups,
-    _save_kept_running, _save_presets, _save_spec,
+    _load_and_clear_kept_running, _delete_saved_spec, _load_groups, _load_port_plan, _load_presets, _load_saved_specs,
+    _save_groups, _save_kept_running, _save_port_plan, _save_presets, _save_spec,
 )
 from .theme import (
     _ACCENT, _ACCENT_CONTRAST, _BG, _BORDER, _DANGER, _DANGER_BORDER, _DIM_FG, _ERROR_FG, _FG, _FIELD_BG, _RADIUS_SM, _ROW_BG,
@@ -48,6 +50,7 @@ class LauncherWindow:
         # root.after loop, ever reads it or touches a widget.
         self._status_queue: queue.Queue[tuple[str, str]] = queue.Queue()
 
+        self.plan = _load_port_plan()
         self.templates = self._discover()
         self.instances: dict[str, Instance] = {}
         self._adopt_running_instances()
@@ -59,6 +62,7 @@ class LauncherWindow:
         self.selected_template: ServerTemplate | None = None
         self.selected_instance_id: str | None = None
         self.selected_group_name: str | None = None
+        self.selected_range_name: str | None = None
         self._editing_group = False
         self.instance_dots: dict[str, RoundedCard] = {}
 
@@ -82,7 +86,9 @@ class LauncherWindow:
         self.instances_tab_btn = self._make_tab(tabbar_inner, "Instances", "instances")
         self.instances_tab_btn.pack(side="left", padx=(0, 4))
         self.groups_tab_btn = self._make_tab(tabbar_inner, "Groups", "groups")
-        self.groups_tab_btn.pack(side="left")
+        self.groups_tab_btn.pack(side="left", padx=(0, 4))
+        self.ports_tab_btn = self._make_tab(tabbar_inner, "Ports", "ports")
+        self.ports_tab_btn.pack(side="left")
         RoundedButton(
             tabbar_inner, "Data folder", command=lambda: DataFolderDialog(self.root),
             bg=_TABBAR_BG, fill=_ROW_BG, outline=_BORDER, fg=_FG,
@@ -125,6 +131,14 @@ class LauncherWindow:
         )
         self._remove_server_button = RoundedButton(
             bottom_row, "Remove", command=self._remove_server,
+            bg=_SIDEBAR_BG, fill=_ROW_BG, outline=_DANGER_BORDER, fg=_DANGER,
+        )
+        self._add_range_button = RoundedButton(
+            bottom_row, "Add range", command=self._add_range,
+            bg=_SIDEBAR_BG, fill=_ROW_BG, outline=_BORDER, fg=_FG,
+        )
+        self._remove_range_button = RoundedButton(
+            bottom_row, "Remove", command=self._remove_range,
             bg=_SIDEBAR_BG, fill=_ROW_BG, outline=_DANGER_BORDER, fg=_DANGER,
         )
         self._clear_closed_button = RoundedButton(
@@ -170,6 +184,7 @@ class LauncherWindow:
         self.servers_tab_btn.set_selected(tab == "servers", _BG if tab == "servers" else _TABBAR_BG)
         self.instances_tab_btn.set_selected(tab == "instances", _BG if tab == "instances" else _TABBAR_BG)
         self.groups_tab_btn.set_selected(tab == "groups", _BG if tab == "groups" else _TABBAR_BG)
+        self.ports_tab_btn.set_selected(tab == "ports", _BG if tab == "ports" else _TABBAR_BG)
         if tab == "instances":
             self._instance_actions.pack(side="bottom", fill="x", padx=10, pady=10, before=self._sidebar_scroll)
             self._pack_action_row(self._kill_instances_button, self._refresh_button)
@@ -189,6 +204,9 @@ class LauncherWindow:
             if tab == "servers":
                 self._instance_actions.pack(side="bottom", fill="x", padx=10, pady=10, before=self._sidebar_scroll)
                 self._pack_action_row(self._add_server_button, self._remove_server_button, self._refresh_button)
+            elif tab == "ports":
+                self._instance_actions.pack(side="bottom", fill="x", padx=10, pady=10, before=self._sidebar_scroll)
+                self._pack_action_row(self._add_range_button, self._remove_range_button)
             else:
                 self._instance_actions.pack_forget()
         self._render_sidebar()
@@ -196,6 +214,8 @@ class LauncherWindow:
             self._render_server_detail(self.selected_template)
         elif tab == "instances":
             self._render_instance_detail(self.selected_instance_id)
+        elif tab == "ports":
+            self._render_ports_detail()
         else:
             self._render_group_detail(self.selected_group_name)
 
@@ -204,6 +224,7 @@ class LauncherWindow:
         last stays its natural width, the others share the rest."""
         for button in (
             self._kill_instances_button, self._add_server_button, self._remove_server_button, self._refresh_button,
+            self._add_range_button, self._remove_range_button,
         ):
             button.pack_forget()
         for button in buttons[:-1]:
@@ -243,6 +264,17 @@ class LauncherWindow:
                 )
                 card.pack(fill="x", pady=3)
                 self.instance_dots[instance.id] = card
+        elif self.active_tab == "ports":
+            for port_range in self.plan.ranges:
+                selected = port_range.name == self.selected_range_name
+                card = RoundedCard(
+                    self.sidebar_list,
+                    bg=_SIDEBAR_BG, fill=_ROW_SELECTED if selected else _ROW_BG, outline=_BORDER,
+                    fg=_FG, fg_dim=_DIM_FG, icon="☷", name=port_range.name,
+                    secondary=f"{port_range.start}-{port_range.end}", selected=selected,
+                    command=lambda name=port_range.name: self._select_range(name),
+                )
+                card.pack(fill="x", pady=3)
         else:
             if not self.groups:
                 tk.Label(self.sidebar_list, text="No groups saved yet.", bg=_SIDEBAR_BG, fg=_DIM_FG).pack(pady=8)
@@ -267,7 +299,17 @@ class LauncherWindow:
             if spec != saved:
                 _save_spec(spec)
             specs.append(spec)
-        return templates_from_specs(specs)
+        templates = templates_from_specs(specs)
+        self._assign_ports(templates)
+        return templates
+
+    def _assign_ports(self, templates: list[ServerTemplate]) -> None:
+        """Gives every listed server a reserved port (see port_plan.py); a new one is saved."""
+        try:
+            if assign_ports(self.plan, templates, _port_in_use, lambda t: launch_port(t, t.default_port)):
+                _save_port_plan(self.plan)
+        except PortPlanError as error:
+            messagebox.showerror("Ports", str(error))
 
     def _add_server(self) -> None:
         """Add button: collect projects in a dialog, then list them all."""
@@ -308,6 +350,65 @@ class LauncherWindow:
         self.selected_template = template
         self._render_sidebar()
         self._render_server_detail(template)
+
+    # ---- ports tab -------------------------------------------------------
+
+    def _select_range(self, name: str) -> None:
+        self.selected_range_name = name
+        self._render_sidebar()
+        self._render_ports_detail()
+
+    def _render_ports_detail(self) -> None:
+        self._clear_main()
+        port_range = self.plan.range_named(self.selected_range_name or "")
+        if port_range is None:
+            self._render_empty_state("Ports", "Select a range, or add one.")
+            return
+        RangeDetail(
+            self.main, self.plan, port_range, self.templates, _port_in_use, self._ports_changed,
+            lambda text: self.status.config(text=text),
+        )
+
+    def _ports_changed(self, selected: str | None) -> None:
+        """An edit was accepted: save the plan, give any released server a port and redraw."""
+        _save_port_plan(self.plan)
+        self._assign_ports(self.templates)
+        self.selected_range_name = selected
+        self._render_sidebar()
+        self._render_ports_detail()
+
+    def _add_range(self) -> None:
+        name = simpledialog.askstring("Add range", "Name of the range:", parent=self.root)
+        if not name or not name.strip():
+            return
+        start = simpledialog.askinteger("Add range", "First port:", parent=self.root, minvalue=1, maxvalue=65535)
+        if start is None:
+            return
+        end = simpledialog.askinteger("Add range", "Last port:", parent=self.root, minvalue=1, maxvalue=65535)
+        if end is None:
+            return
+        try:
+            added = self.plan.add_range(name, start, end)
+        except PortPlanError as error:
+            messagebox.showerror("Add range", str(error), parent=self.root)
+            return
+        self.status.config(text=f"Added range {added.name}.")
+        self._ports_changed(added.name)
+
+    def _remove_range(self) -> None:
+        name = self.selected_range_name
+        if not name or self.plan.range_named(name) is None:
+            self.status.config(text="Select a range to remove.")
+            return
+        if not messagebox.askyesno("Remove range", f"Remove the range {name}?", parent=self.root):
+            return
+        try:
+            self.plan.remove_range(name)
+        except PortPlanError as error:
+            messagebox.showerror("Remove range", str(error), parent=self.root)
+            return
+        self.status.config(text=f"Removed range {name}.")
+        self._ports_changed(None)
 
     def _select_group(self, group_name: str) -> None:
         self.selected_group_name = group_name
@@ -458,6 +559,8 @@ class LauncherWindow:
                 issues.append(f"Missing server template: {member.template_key}.")
             elif warning := runtime_warning(template):
                 issues.append(f"{template.display_name}: {warning}")
+            elif clash := self.plan.conflict(template.key, member.port):
+                issues.append(f"{template.display_name}: {clash}")
             elif _port_in_use(port := launch_port(template, member.port)):
                 issues.append(
                     f"Port {port} is already in use for {template.display_name}."
@@ -605,7 +708,15 @@ class LauncherWindow:
             desired = int(port_var.get()) if port_var.get().isdigit() else template.default_port
             # An agent project never moves to a free port: its agents' ports
             # come from their files, so a second supervisor would collide.
-            actual = launch_port(template, desired) if template.agents else _find_free_port(desired)
+            try:
+                actual = (
+                    launch_port(template, desired) if template.agents
+                    else self.plan.free_port(template.key, desired, _port_in_use)
+                )
+            except PortPlanError as error:
+                self.status.config(text=str(error))
+                messagebox.showerror("Start", str(error), parent=self.root)
+                return
             extra_env = {name: var.get() for name, var in field_vars.items()}
             extra_args = args_var.get() if template.supports_args else ""
             instance = Instance(

@@ -7,10 +7,11 @@ import shutil
 from pathlib import Path
 
 from .config import (
-    _GROUPS_PATH, _KEPT_RUNNING_PATH, _PRESETS_PATH, _PROJECTS_DIR, DATA_DIR, DEFAULT_DATA_DIR, LEGACY_DATA_DIR,
+    _GROUPS_PATH, _KEPT_RUNNING_PATH, _PORT_PLAN_PATH, _PRESETS_PATH, _PROJECTS_DIR, DATA_DIR, DEFAULT_DATA_DIR, LEGACY_DATA_DIR,
     LOCATION_FILE_NAME,
 )
 from .models import GroupMember, LaunchSpec, Preset, ServerGroup
+from .port_plan import PortPlan, load_plan, save_plan
 from .specs import SPEC_FILE_NAME, read_saved_spec, spec_to_dict
 
 
@@ -28,7 +29,7 @@ def _migrate_legacy_data(legacy_dir: Path = LEGACY_DATA_DIR) -> None:
                 pass  # the launcher still starts; the groups/presets just begin empty
 
 
-_MOVED_FILES = ("groups.json", "presets.json")
+_MOVED_FILES = ("groups.json", "presets.json", "port_plan.json")
 
 
 def _data_folder_has_data(folder: Path) -> bool:
@@ -143,6 +144,15 @@ def _save_presets(presets: dict[str, list[Preset]]) -> None:
         for template_key, entries in presets.items()
     }
     _PRESETS_PATH.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+
+
+def _load_port_plan() -> PortPlan:
+    """The saved port plan, or the default one while none has been saved."""
+    return load_plan(_PORT_PLAN_PATH)
+
+
+def _save_port_plan(plan: PortPlan) -> None:
+    save_plan(plan, _PORT_PLAN_PATH)
 
 
 def _load_saved_specs() -> list[LaunchSpec]:

@@ -61,6 +61,8 @@ DEFAULT_DATA_DIR = default_data_dir(os.environ)
 DATA_DIR, DATA_DIR_SOURCE = resolve_data_dir_and_source(sys.argv[1:], os.environ)
 _PRESETS_PATH = DATA_DIR / "presets.json"
 _GROUPS_PATH = DATA_DIR / "groups.json"
+# Named port ranges and which server reserves which port (see port_plan.py).
+_PORT_PLAN_PATH = DATA_DIR / "port_plan.json"
 # One folder per listed server, each holding the launcher's own saved copy of its
 # run.srvlnchr (see specs.py). Per machine (absolute paths), so gitignored.
 _PROJECTS_DIR = DATA_DIR / "projects"
