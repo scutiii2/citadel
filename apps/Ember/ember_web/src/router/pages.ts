@@ -69,6 +69,13 @@ export const NAV_PAGES: NavPage[] = [
     permission: "tools.execute",
   },
   {
+    to: "/forge",
+    label: "Forge",
+    icon: ["M4 6h12a4 4 0 0 1-4 4h-2l1 4H8l1-4H7a3 3 0 0 1-3-3z", "M6 20h8", "M16 6h4"],
+    description: "Talk to your own Claude and Codex workers and let them work on your computer.",
+    permission: "forge.use",
+  },
+  {
     to: "/tickets",
     label: "Tickets",
     icon: ["M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z", "M13 5v2", "M13 17v2", "M13 11v2"],

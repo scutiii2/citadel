@@ -98,6 +98,12 @@ export const router = createRouter({
       meta: { permission: "tools.execute" },
     },
     {
+      path: "/forge",
+      name: "forge",
+      component: () => import("../views/ForgeView.vue"),
+      meta: { permission: "forge.use" },
+    },
+    {
       path: "/tickets/:id?",
       name: "tickets",
       component: () => import("../views/TicketsView.vue"),
