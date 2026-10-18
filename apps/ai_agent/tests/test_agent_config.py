@@ -15,6 +15,8 @@ have) would otherwise leak its AI_AGENT_PROVIDER/model/keys into these
 from __future__ import annotations
 
 import importlib
+from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -109,6 +111,65 @@ def test_valid_anthropic_config_resolves(monkeypatch):
     assert status["provider_id"] == "anthropic"
     assert status["available"] is True
     assert status["reason"] is None
+
+
+def test_status_reports_every_gateway_and_backup_availability(monkeypatch):
+    from src.agents import agent_config, agent_spec
+    from src.llm import cooldown
+
+    cooldown.reset()
+    try:
+        monkeypatch.setenv("AI_AGENT_GATEWAY", "claude")
+        spec = agent_spec.current()
+        monkeypatch.setattr(agent_spec, "_current", replace(spec, llm=replace(spec.llm,
+                            fallback_gateways=(agent_spec.GatewayChoice("backup"),))))
+        monkeypatch.setattr(agent_config._PROVIDER_MODULE._Anthropic, "has_api_key", classmethod(lambda cls, gateway=None: True))
+        monkeypatch.setattr(agent_config._PROVIDER_MODULE, "has_api_key", lambda gateway=None: True)
+        cooldown.start_cooldown("anthropic:claude", 40)
+        status = agent_config.status()
+        assert status["available"] is True
+        assert status["reason"] is None
+        primary, backup = status["gateways"]
+        assert primary["gateway"] == "claude" and primary["available"] is False
+        assert 38 <= primary["cooldown_seconds_remaining"] <= 40
+        assert backup == {"gateway": "backup", "available": True, "cooldown_seconds_remaining": 0}
+    finally:
+        cooldown.reset()
+
+
+def test_missing_fallback_file_is_startup_error(monkeypatch):
+    from src.agents import agent_config, agent_spec
+    from src.llm import llm_config
+
+    monkeypatch.setenv("AI_AGENT_PROVIDER", "anthropic")
+    spec = agent_spec.current()
+    monkeypatch.setattr(agent_spec, "_current", replace(spec, source=Path("calc.json"), llm=replace(spec.llm,
+                        fallback_gateways=(agent_spec.GatewayChoice("typo"),))))
+    monkeypatch.setattr(agent_config._PROVIDER_MODULE, "has_api_key", lambda gateway=None: True)
+    monkeypatch.setattr(llm_config, "_config", {"anthropic": {"claude": {}}})
+    with pytest.raises(agent_config.AgentConfigError, match=r"calc.json.*llm.fallback_gateways\[0\].gateway"):
+        agent_config._resolve()
+
+
+def test_missing_fallback_credentials_warn_and_route_skips_it(monkeypatch, caplog):
+    from src.agents import agent_config, agent_spec
+    from src.llm import anthropic_provider, cooldown, llm_config
+
+    cooldown.reset()
+    try:
+        monkeypatch.setenv("AI_AGENT_PROVIDER", "anthropic")
+        monkeypatch.setenv("AI_AGENT_GATEWAY", "claude")
+        spec = agent_spec.current()
+        monkeypatch.setattr(agent_spec, "_current", replace(spec, source=Path("calc.json"), llm=replace(spec.llm,
+                            fallback_gateways=(agent_spec.GatewayChoice("unkeyed"), agent_spec.GatewayChoice("backup")))))
+        monkeypatch.setattr(llm_config, "_config", {"anthropic": {
+            "claude": {"api_key": "fake"}, "unkeyed": {}, "backup": {"api_key": "fake"}}})
+        agent_config._resolve()
+        assert len([r for r in caplog.records if "unkeyed" in r.message]) == 1
+        cooldown.start_cooldown("anthropic:claude", 30)
+        assert anthropic_provider._route_for_turn().current == "backup"
+    finally:
+        cooldown.reset()
 
 
 def test_blank_model_env_var_counts_as_unset(monkeypatch):

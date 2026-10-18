@@ -9,6 +9,7 @@ from __future__ import annotations
 import dataclasses
 import inspect
 import importlib
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -21,12 +22,13 @@ from src.agents import plan as plan_policy
 
 from src.core import approvals, internal_auth, questions, tool_filter
 from src.private_extensions import turn as private_turn
-from src.llm import auto_tier, context_breakdown, llm_options, model_tiers
+from src.llm import auto_tier, context_breakdown, llm_config, llm_options, model_tiers
 from src.llm import reasoning_effort as effort_limits
 from src.core.seed import seed_from_example
 from src.core.chat_history import validate_history
 
 _SECRETS_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
+_log = logging.getLogger(__name__)
 
 
 def _load_secrets_into_environ() -> None:
@@ -78,6 +80,15 @@ def _resolve() -> tuple[str, Any]:
         raise AgentConfigError(
             f"AI_AGENT_PROVIDER is {provider_id!r} but its API key is not configured in {_SECRETS_PATH}"
         )
+    spec = agent_spec.current()
+    for index, choice in enumerate(spec.llm.fallback_gateways):
+        where = f"{spec.source or spec.id}: llm.fallback_gateways[{index}].gateway"
+        try:
+            llm_config.gateway(provider_id, choice.gateway)
+        except KeyError:
+            raise AgentConfigError(f"{where}: gateway {choice.gateway!r} has no file") from None
+        if not module.has_api_key(choice.gateway):
+            _log.warning("%s: gateway %s has no credentials; skipping fallback", where, choice.gateway)
     return provider_id, module
 
 
@@ -269,20 +280,31 @@ def cancel(request_id: str) -> bool:
 
 
 def status() -> dict[str, Any]:
+    spec = agent_spec.current()
+    primary = spec.llm.gateway or agent_spec.default_gateway(PROVIDER_ID)
+    gateways = []
+    for name in (primary, *(choice.gateway for choice in spec.llm.fallback_gateways)):
+        key = cooldown.gateway_key(PROVIDER_ID, name)
+        remaining = cooldown.seconds_remaining(key)
+        credentials = _PROVIDER_MODULE.has_api_key() if name == primary else _PROVIDER_MODULE.has_api_key(name)
+        gateways.append({"gateway": name, "available": credentials and remaining <= 0,
+                         "cooldown_seconds_remaining": int(remaining)})
+    available = _PROVIDER_MODULE.is_available()
     reason = None
-    if not _PROVIDER_MODULE.has_api_key():
+    if not available and not _PROVIDER_MODULE.has_api_key():
         reason = "missing_key"
-    elif cooldown.is_in_cooldown(PROVIDER_ID):
+    elif not available and any(gateway["cooldown_seconds_remaining"] for gateway in gateways):
         reason = "rate_limited"
-    elif not _PROVIDER_MODULE.is_available():
+    elif not available:
         reason = "unavailable"
     model = MODEL or _PROVIDER_MODULE.DEFAULT_MODEL
     return {
         "provider_id": PROVIDER_ID,
         "vendor_label": _PROVIDER_MODULE.VENDOR_LABEL,
         "model": model,
-        "available": _PROVIDER_MODULE.is_available(),
+        "available": available,
         "reason": reason,
-        "cooldown_seconds_remaining": int(cooldown.seconds_remaining(PROVIDER_ID)),
+        "cooldown_seconds_remaining": gateways[0]["cooldown_seconds_remaining"],
+        "gateways": gateways,
         "context_window": context_window_for(model),
     }
