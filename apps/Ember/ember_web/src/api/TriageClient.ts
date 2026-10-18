@@ -25,6 +25,22 @@ export interface TriageForm {
   options: TriageOption[];
   /** Score only: what each level means, lowest first. */
   levels?: string[];
+  /** Ask for every model call of the triage flow, so the answer can show how it was reached. */
+  trace?: boolean;
+}
+
+/** One model call of the triage flow (only with `trace`). */
+export interface TriageRound {
+  step: string;
+  choice?: string;
+  probabilities?: Record<string, number>;
+  confidence?: number;
+  /** How sure this model had to be for its answer to stand. */
+  threshold?: number;
+  /** The options still in play when it was asked, when some had been dropped. */
+  options?: string[];
+  eliminated?: string[];
+  failed?: string;
 }
 
 interface Common {
@@ -32,6 +48,11 @@ interface Common {
   confidence: number;
   /** Provisional: the model was not sure enough to stand behind it. */
   uncertain: boolean;
+  /** Who settled it, for example "laya-english" or "laya-english+laya-typed". */
+  answered_by?: string;
+  resolved_by?: string;
+  /** Every model call, in order; only when the question asked for a trace. */
+  rounds?: TriageRound[];
 }
 
 export interface YesNoAnswer extends Common {
@@ -49,7 +70,6 @@ export interface ChoiceAnswer extends Common {
   /** Set with `unknown`: the options it could not tell apart. */
   candidates?: string[];
   unknown?: true;
-  answered_by?: string;
 }
 
 export interface ScoreAnswer extends Common {
@@ -75,5 +95,6 @@ export const triageClient = {
       question: form.question,
       options: form.kind === "choice" ? form.options : [],
       levels: form.kind === "score" ? (form.levels ?? []) : [],
+      trace: form.trace === true,
     }),
 };

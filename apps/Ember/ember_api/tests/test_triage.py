@@ -217,6 +217,23 @@ def test_an_unknown_choice_keeps_its_candidates(client: TestClient, agent: FakeA
     assert found["also_check"] == ["network"] and found["answered_by"] == "laya-english+jev"
 
 
+def test_a_traced_answer_keeps_who_answered_and_every_round(
+    client: TestClient, agent: FakeAgent, tmp_path: Path, monkeypatch
+) -> None:
+    as_admin(client)
+    run_agents(tmp_path)
+    rounds = [{"step": "laya-english", "choice": "database", "probabilities": {"database": 0.6, "network": 0.4},
+               "confidence": 0.6, "threshold": 0.9}]
+    laya_answers(agent, monkeypatch, {
+        "type": "choice", "choice": "database", "probabilities": {"database": 0.6, "network": 0.4},
+        "answer_confidence": 0.6, "uncertain": True, "answered_by": "laya-english", "resolved_by": "final", "rounds": rounds,
+    })
+
+    found = client.post(ASK, json={**CHOICE, "trace": True}).json()
+
+    assert found["rounds"] == rounds and found["answered_by"] == "laya-english" and found["resolved_by"] == "final"
+
+
 def test_ask_is_unavailable_without_laya(client: TestClient, tmp_path: Path) -> None:
     as_admin(client)
     run_agents(tmp_path, laya=False)

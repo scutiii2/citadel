@@ -123,6 +123,17 @@ def build_request(
     return json.dumps(request)
 
 
+def _with_trace(out: dict[str, Any], answer: dict[str, Any]) -> dict[str, Any]:
+    """Adds what the page's "show details" needs: who answered and, when asked for, every model call."""
+    if answer.get("answered_by"):
+        out["answered_by"] = str(answer["answered_by"])
+    if answer.get("resolved_by"):
+        out["resolved_by"] = str(answer["resolved_by"])
+    if "rounds" in answer:
+        out["rounds"] = answer["rounds"]
+    return out
+
+
 def read_answer(kind: Kind, response: str) -> dict[str, Any]:
     """The part of Laya's answer the page shows. Raises TriageUnavailable for anything that is not the expected JSON."""
     try:
@@ -132,17 +143,17 @@ def read_answer(kind: Kind, response: str) -> dict[str, Any]:
         uncertain = bool(answer["uncertain"])
         if kind == "yes_no":
             yes = float(answer["noul"])
-            return {
+            return _with_trace({
                 "kind": "yes_no", "answer": "yes" if yes >= 0.5 else "no", "yes": round(yes, 4),
                 "confidence": round(confidence, 4), "uncertain": uncertain,
-            }
+            }, answer)
         if kind == "score":
             legend = answer["legend"]
-            return {
+            return _with_trace({
                 "kind": "score", "score": round(float(answer["score"]), 4),
                 "levels": [str(legend[str(i)]) for i in range(len(legend))],
                 "confidence": round(confidence, 4), "uncertain": uncertain,
-            }
+            }, answer)
         probabilities = {str(k): round(float(v), 4) for k, v in answer["probabilities"].items()}
         out: dict[str, Any] = {
             "kind": "choice", "choice": str(answer["choice"]), "probabilities": probabilities,
@@ -153,11 +164,7 @@ def read_answer(kind: Kind, response: str) -> dict[str, Any]:
                 out[key] = [str(x) for x in answer[key]]
         if answer.get("unknown"):
             out["unknown"] = True
-        if answer.get("answered_by"):
-            out["answered_by"] = str(answer["answered_by"])
-        if "rounds" in answer:
-            out["rounds"] = answer["rounds"]
-        return out
+        return _with_trace(out, answer)
     except (ValueError, KeyError, TypeError, AttributeError) as error:
         raise TriageUnavailable("The Triage Assistant gave an answer that could not be read") from error
 

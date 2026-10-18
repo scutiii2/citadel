@@ -48,6 +48,8 @@ const rows = ref<OptionRow[]>([blankRow(), blankRow()]);
 const levelRows = ref<OptionRow[]>(blankLevels());
 const titling = ref(false);
 const asking = ref(false);
+// Ask for every model call, so the answer shows how it was reached. Kept between questions.
+const details = ref(false);
 const error = ref("");
 
 const isChoice = computed(() => kind.value === "choice");
@@ -126,6 +128,7 @@ async function ask(): Promise<void> {
       question: question.value.trim(),
       options: isChoice.value ? rows.value.map((r) => ({ title: r.title.trim().toLowerCase(), description: r.description.trim() })) : [],
       ...(isScore.value ? { levels: levelRows.value.map((r) => r.description.trim()) } : {}),
+      ...(details.value ? { trace: true } : {}),
     });
     reset();
     emit("close");
@@ -226,6 +229,11 @@ function close(): void {
         </div>
       </fieldset>
 
+      <label class="check">
+        <input v-model="details" type="checkbox" />
+        Show details
+      </label>
+
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
         <button type="button" class="ghost" :disabled="asking" @click="close">Cancel</button>
@@ -265,6 +273,16 @@ function close(): void {
 }
 .count {
   align-self: flex-end;
+}
+.form label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.form label.check input {
+  padding: 0;
+  accent-color: var(--accent);
 }
 .options {
   display: flex;

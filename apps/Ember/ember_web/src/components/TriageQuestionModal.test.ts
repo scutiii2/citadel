@@ -174,6 +174,28 @@ describe("a score question", () => {
   });
 });
 
+describe("show details", () => {
+  it("is off by default and asks for a trace once ticked, staying ticked for the next question", async () => {
+    const submit = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountModal(submit);
+    await button(wrapper, "Yes or no").trigger("click");
+    await wrapper.get("textarea").setValue("It is down");
+    await wrapper.get('input[type="text"]').setValue("Is there a problem?");
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+    expect(submit.mock.calls[0]![0]).not.toHaveProperty("trace");
+
+    await wrapper.get('input[type="checkbox"]').setValue(true);
+    await wrapper.get("textarea").setValue("It is down again");
+    await wrapper.get('input[type="text"]').setValue("Is there a problem?");
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(submit.mock.calls[1]![0]).toMatchObject({ kind: "yes_no", trace: true });
+    expect((wrapper.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true);
+  });
+});
+
 describe("when the question fails", () => {
   it("stays open with the message and keeps what was typed", async () => {
     const submit = vi.fn().mockRejectedValue(new ApiError(503, "The Triage Assistant is unavailable: the Triage Assistant is not running"));
