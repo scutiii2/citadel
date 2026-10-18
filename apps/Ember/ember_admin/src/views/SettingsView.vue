@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
 import ConfirmModal from "../components/admin/ConfirmModal.vue";
@@ -67,15 +68,17 @@ const showSidebar = computed(() => matches("sidebar pages order pin hide navigat
 </script>
 
 <template>
-  <section class="settings-view" :class="{ dirty }">
-    <div class="column page-column">
-      <header><h2 class="page-title">Settings</h2><p class="page-description">Adjust appearance and navigation preferences for Ember Admin.</p></header>
-      <p class="scope">Applied when you save. Stored on this device. Sidebar preferences are separate for each account and from Ember Web.</p>
-      <p v-if="navPrefs.error" class="save-error" role="alert">{{ navPrefs.error }}</p>
-      <div class="search-bar">
+  <PageLayout class="settings-view" title="Settings" description="Adjust appearance and navigation preferences for Ember Admin." :class="{ dirty }">
+    <template #toolbar><div class="search-bar">
         <input v-model="query" type="search" aria-label="Search settings" placeholder="Search settings" @keydown.esc="query = ''" />
         <button v-if="count || onlyModified" type="button" :aria-pressed="onlyModified" @click="onlyModified = !onlyModified">{{ count }} modified</button>
-      </div>
+      </div></template>
+    <div class="column">
+
+
+      <p class="scope">Applied when you save. Stored on this device. Sidebar preferences are separate for each account and from Ember Web.</p>
+      <p v-if="navPrefs.error" class="save-error" role="alert">{{ navPrefs.error }}</p>
+
       <section v-if="showTheme" aria-label="Appearance">
         <h3>Appearance</h3>
         <div class="card"><SettingRow setting-id="appearance-theme" label="Theme" description="Light, dark, or follow your system." :modified="themeModified" @reset="draft.theme = DEFAULT_THEME">
@@ -84,14 +87,17 @@ const showSidebar = computed(() => matches("sidebar pages order pin hide navigat
       </section>
       <section v-if="showSidebar" aria-label="Sidebar"><h3>Sidebar</h3><div class="card"><SidebarEditor v-model="draft.sidebar" /></div></section>
       <p v-if="!showTheme && !showSidebar" class="scope">No settings match your filters. <button type="button" @click="query = ''; onlyModified = false">Clear filters</button></p>
-    </div>
+
     <div v-if="dirty" class="settings-save-bar" role="group" aria-label="Unsaved settings">
       <span>Unsaved changes</span>
       <button type="button" class="revert" @click="revert">Revert</button>
       <button type="button" class="save" @click="save">Save</button>
     </div>
     <ConfirmModal v-if="discardOpen" :open="discardOpen" title="Discard unsaved settings?" message="Your settings changes have not been saved." confirm-label="Discard changes" @confirm="answerDiscard(true)" @close="answerDiscard(false)" />
-  </section>
+
+    </div>
+
+  </PageLayout>
 </template>
 
 <style scoped>

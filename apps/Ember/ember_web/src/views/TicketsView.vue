@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ticketsClient, type NewTicket, type Ticket, type TicketStatus } from "../api/TicketsClient";
@@ -261,16 +262,11 @@ async function reopenTicket(): Promise<void> {
 </script>
 
 <template>
-  <section class="info-page tickets">
-    <div class="column page-column">
-      <div class="top">
-        <div>
-          <h2 class="page-title">Tickets</h2>
-          <p class="muted intro page-description">Report a bug, suggest a feature, or ask for help. Support answers here.</p>
-        </div>
-        <button type="button" class="primary" @click="startNew">New ticket</button>
-      </div>
-
+  <PageLayout title="Tickets" description="Report a bug, suggest a feature, or ask for help. Support answers here." class="tickets info-content">
+    <template #actions>
+      <button type="button" class="primary" @click="startNew">New ticket</button>
+    </template>
+    <div class="column">
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       <SegmentedControl v-model="filter" :options="filterOptions" label="Status" aria-label="Ticket status" />
       <div class="list-controls">
@@ -367,7 +363,7 @@ async function reopenTicket(): Promise<void> {
       @confirm="closeTicket"
       @close="confirmOpen = false"
     />
-  </section>
+  </PageLayout>
 </template>
 
 <style scoped>
@@ -385,12 +381,6 @@ async function reopenTicket(): Promise<void> {
 .thread li.own { margin-left: 24px; margin-right: 0; }
 .thread li.system { margin: 0; }
 .reply .actions { justify-content: space-between; }
-.top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
 .list {
   display: flex;
   flex-direction: column;

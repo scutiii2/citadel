@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import {
   agentsAdminClient,
@@ -165,18 +166,13 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
 </script>
 
 <template>
-  <section class="info-page agents-admin">
-    <div class="column page-column">
-      <div class="head">
-        <div>
-          <h2 class="page-title">Agents</h2>
-          <p class="intro page-description">Each agent is a file ai_agent runs as its own process. Changes apply within a few seconds, no restart.</p>
-        </div>
-        <div class="head-actions">
+  <PageLayout class="info-content agents-admin" title="Agents" description="Each agent is a file ai_agent runs as its own process. Changes apply within a few seconds, no restart.">
+    <template #actions><div class="head-actions">
           <button type="button" class="chip" data-test="shared-prompts" @click="promptsOpen = true">Shared prompts</button>
           <button type="button" class="primary" data-test="new" @click="openCreate">＋ New agent</button>
-        </div>
-      </div>
+        </div></template>
+
+
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-if="notice" class="notice" role="status" data-test="notice">{{ notice }}</p>
       <p v-if="loading" class="muted">Loading…</p>
@@ -193,7 +189,7 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
           @reset="resetting = a; resetError = ''"
         />
       </div>
-    </div>
+
 
     <AgentForm
       :open="formOpen"
@@ -230,11 +226,12 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
       @confirm="confirmRemove"
       @close="removing = null"
     />
-  </section>
+
+  </PageLayout>
 </template>
 
 <style scoped>
-.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

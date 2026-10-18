@@ -50,6 +50,10 @@ CHOICE = {
     "options": [{"title": "database", "description": "SQL and storage"}, {"title": "network", "description": "Connections"}],
 }
 YES_NO = {"kind": "yes_no", "text": "SQLite database is locked", "question": "Is there a problem?"}
+SCORE = {
+    "kind": "score", "text": "SQLite database is locked", "question": "How urgent is this?",
+    "levels": ["Can wait", "Soon", "Right now"],
+}
 
 
 # -- parsing ---------------------------------------------------------------------------------------------
@@ -157,6 +161,7 @@ def test_a_choice_question_is_sent_to_laya_and_the_answer_comes_back(
         "text": "SQLite database is locked",
         "questions": {"q": {"type": "choice", "instructions": "Which area?",
                             "criteria": {"database": "SQL and storage", "network": "Connections"}}},
+        "local_only": True,  # Laya answers alone: no fallback to Jev
     }
     assert call["history"] == [] and call["enabled_extensions"] == []
 
@@ -173,6 +178,28 @@ def test_a_yes_no_question_is_a_noul_question(client: TestClient, agent: FakeAge
     spec = calls[0]["request"]["questions"]["q"]
     assert spec["type"] == "noul" and spec["instructions"] == "Is there a problem?"
     assert calls[0]["request"]["trace"] is True
+
+
+def test_a_score_question_sends_its_levels_lowest_first_and_returns_the_score(
+    client: TestClient, agent: FakeAgent, tmp_path: Path, monkeypatch
+) -> None:
+    as_admin(client)
+    run_agents(tmp_path)
+    calls: list = []
+    laya_answers(agent, monkeypatch, {
+        "type": "score", "score": 1.23456, "legend": {"0": "Can wait", "1": "Soon", "2": "Right now"},
+        "answer_confidence": 0.7, "uncertain": False,
+    }, calls)
+
+    found = client.post(ASK, json=SCORE).json()
+
+    assert found == {
+        "kind": "score", "score": 1.2346, "levels": ["Can wait", "Soon", "Right now"],
+        "confidence": 0.7, "uncertain": False,
+    }
+    assert calls[0]["request"]["questions"]["q"] == {
+        "type": "score", "instructions": "How urgent is this?", "criteria": ["Can wait", "Soon", "Right now"],
+    }
 
 
 def test_an_unknown_choice_keeps_its_candidates(client: TestClient, agent: FakeAgent, tmp_path: Path, monkeypatch) -> None:
@@ -233,7 +260,9 @@ def test_the_form_is_validated(client: TestClient, tmp_path: Path) -> None:
     bad_title = {**CHOICE, "options": [{"title": "two words", "description": "x"}, CHOICE["options"][1]]}
     yes_no_with_options = {**YES_NO, "options": CHOICE["options"]}
     for body in (one_option, repeated, bad_title, yes_no_with_options, {**YES_NO, "text": "  "}, {**YES_NO, "text": "x" * 4001},
-                 {**YES_NO, "kind": "score"}, {**YES_NO, "question": ""}):
+                 {**YES_NO, "kind": "rank"}, {**YES_NO, "question": ""},
+                 {**YES_NO, "kind": "score"}, {**SCORE, "levels": ["Only one"]}, {**SCORE, "levels": ["x"] * 11},
+                 {**SCORE, "options": CHOICE["options"]}, {**YES_NO, "levels": SCORE["levels"]}, {**CHOICE, "levels": SCORE["levels"]}):
         assert client.post(ASK, json=body).status_code == 422, body
 
 

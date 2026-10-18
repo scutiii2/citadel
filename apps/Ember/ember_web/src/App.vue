@@ -4,14 +4,11 @@ import { watch } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
 import NavRail from "./components/NavRail.vue";
 import PwaStatus from "./components/PwaStatus.vue";
-import { useGamesStore } from "./stores/games";
 import { usePageVisibilityStore } from "./stores/pageVisibility";
 import { useAuthStore } from "./stores/auth";
 
 const auth = useAuthStore();
-const games = useGamesStore();
 usePageVisibilityStore();
-watch(() => [auth.account?.id, auth.needsVerification], () => { if (auth.account && !auth.needsVerification) void games.load(); }, { immediate: true });
 const { account } = storeToRefs(auth);
 const route = useRoute();
 const router = useRouter();
@@ -29,11 +26,11 @@ watch(account, (now) => {
     <NavRail />
     <main class="page" :class="{ 'has-tabs': account && !auth.needsVerification }">
       <!-- KeepAlive: switching to Tools and back keeps the chat (and a turn in
-           flight) and the games list intact. Leaving Games closes its iframe.
+           flight) intact.
            Keyed by account so a
            different user never gets the previous user's cached pages. -->
       <RouterView v-slot="{ Component }">
-        <KeepAlive :key="account?.id ?? 'guest'" include="ChatView,CapabilitiesView,GamesView">
+        <KeepAlive :key="account?.id ?? 'guest'" include="ChatView,CapabilitiesView">
           <component :is="Component" />
         </KeepAlive>
       </RouterView>

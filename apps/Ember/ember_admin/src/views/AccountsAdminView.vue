@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import type { AccountStatus } from "../api/AdminClient";
@@ -17,5 +18,7 @@ function updateFilters(next: { q: string; status: AccountStatus }): void {
 }
 </script>
 <template>
-  <div class="admin-panel"><header class="admin-page-head"><div><h2 class="page-title">Accounts</h2><p class="page-description">Manage people and their workspace access.</p></div><RouterLink v-if="auth.hasPermission('invites.manage')" class="primary" to="/admin/invites?create=1">＋ Create invite</RouterLink></header><AccountsPanel :show-heading="false" :filters="filters" @filter="updateFilters" /></div>
+  <PageLayout class="admin-panel" title="Accounts" description="Manage people and their workspace access.">
+    <template #actions><RouterLink v-if="auth.hasPermission('invites.manage')" class="primary" to="/admin/invites?create=1">＋ Create invite</RouterLink></template><AccountsPanel :show-heading="false" :filters="filters" @filter="updateFilters" />
+  </PageLayout>
 </template>

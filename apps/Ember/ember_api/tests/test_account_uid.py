@@ -36,7 +36,7 @@ def test_the_uid_survives_a_rename_and_a_role_change(client: TestClient, email: 
     before = uids(client)["alice"]
 
     assert client.patch(f"/api/admin/accounts/{alice}", json={"username": "alicia"}).status_code == 200
-    viewer = client.post("/api/admin/roles", json={"name": "Viewer"}).json()
+    viewer = client.post("/api/admin/roles", json={"name": "Watcher"}).json()
     assert client.put(f"/api/admin/accounts/{alice}/roles/{viewer['id']}").status_code == 200
 
     assert uids(client)["alicia"] == before

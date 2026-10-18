@@ -1,7 +1,7 @@
 """Typed questions for the Triage Assistant, asked straight from the chat page.
 
-The user fills in a form (a yes/no question, or a multiple choice question whose
-options have descriptions). This module turns that into the JSON question Laya
+The user fills in a form (a yes/no question, a multiple choice question whose
+options have descriptions, or a score question whose levels have descriptions). This module turns that into the JSON question Laya
 reads (ai_agent/src/llm/laya_provider.py) and sends it to the Triage Assistant
 without the orchestrator. Option titles are written by the `title-writer` agent:
 one plain model call that sees only the descriptions.
@@ -33,7 +33,7 @@ TITLE_MAX = 30
 _TOO_LONG = "complete input"  # part of ai_agent's "Laya could not read the complete input" error
 _INVALID = "Invalid Laya request"
 
-Kind = Literal["choice", "yes_no"]
+Kind = Literal["choice", "yes_no", "score"]
 
 
 class TriageUnavailable(Exception):
@@ -102,16 +102,22 @@ def parse_titles(response: str, count: int) -> list[str]:
     return unique_titles((items + [""] * count)[:count])
 
 
-def build_request(kind: Kind, text: str, question: str, options: list[Option], trace: bool = False) -> str:
-    """ai_agent's Laya question format: one question, id `q`."""
+def build_request(
+    kind: Kind, text: str, question: str, options: list[Option], trace: bool = False, levels: list[str] | None = None
+) -> str:
+    """ai_agent's Laya question format: one question, id `q`. `levels` (score only) are the level
+    descriptions, lowest first."""
     if kind == "yes_no":
         spec: dict[str, Any] = {
             "type": "noul", "instructions": question,
             "criteria": {"false": "No.", "true": "Yes."},
         }
+    elif kind == "score":
+        spec = {"type": "score", "instructions": question, "criteria": list(levels or [])}
     else:
         spec = {"type": "choice", "instructions": question, "criteria": {o.title: o.description for o in options}}
-    request: dict[str, Any] = {"text": text, "questions": {QID: spec}}
+    # local_only: Laya's own English model answers alone; the text never goes on to the fallback classifier (Jev).
+    request: dict[str, Any] = {"text": text, "questions": {QID: spec}, "local_only": True}
     if trace:
         request["trace"] = True
     return json.dumps(request)
@@ -128,6 +134,13 @@ def read_answer(kind: Kind, response: str) -> dict[str, Any]:
             yes = float(answer["noul"])
             return {
                 "kind": "yes_no", "answer": "yes" if yes >= 0.5 else "no", "yes": round(yes, 4),
+                "confidence": round(confidence, 4), "uncertain": uncertain,
+            }
+        if kind == "score":
+            legend = answer["legend"]
+            return {
+                "kind": "score", "score": round(float(answer["score"]), 4),
+                "levels": [str(legend[str(i)]) for i in range(len(legend))],
                 "confidence": round(confidence, 4), "uncertain": uncertain,
             }
         probabilities = {str(k): round(float(v), 4) for k, v in answer["probabilities"].items()}
@@ -167,7 +180,8 @@ class TriageQuestions:
         return TitlesOutcome(parse_titles(str(result.get("response") or ""), len(descriptions)), result)
 
     async def ask(
-        self, caller: Caller, kind: Kind, text: str, question: str, options: list[Option], trace: bool = False
+        self, caller: Caller, kind: Kind, text: str, question: str, options: list[Option], trace: bool = False,
+        levels: list[str] | None = None,
     ) -> AskOutcome:
         """Asks the Triage Assistant directly (no orchestrator) and returns the readable answer."""
         agent = await self._directory.find_by_provider(LAYA_PROVIDER)
@@ -175,7 +189,7 @@ class TriageQuestions:
             raise TriageUnavailable("the Triage Assistant is not running")
         try:
             result = await self._gateway.ask(
-                agent.url, caller, question=build_request(kind, text, question, options, trace), history=[],
+                agent.url, caller, question=build_request(kind, text, question, options, trace, levels), history=[],
                 request_id=uuid.uuid4().hex, caveman=False, enabled_extensions=[], on_event=_ignore_event,
             )
         except AgentCallError as error:

@@ -8,7 +8,7 @@ export const TRIAGE_TITLE_MAX = 30;
 export const TRIAGE_MIN_OPTIONS = 2;
 export const TRIAGE_MAX_OPTIONS = 10;
 
-export type TriageKind = "choice" | "yes_no";
+export type TriageKind = "choice" | "yes_no" | "score";
 
 export interface TriageOption {
   /** One word; the answer names it. */
@@ -23,6 +23,8 @@ export interface TriageForm {
   question: string;
   /** Multiple choice only. */
   options: TriageOption[];
+  /** Score only: what each level means, lowest first. */
+  levels?: string[];
 }
 
 interface Common {
@@ -50,7 +52,15 @@ export interface ChoiceAnswer extends Common {
   answered_by?: string;
 }
 
-export type TriageAnswer = YesNoAnswer | ChoiceAnswer;
+export interface ScoreAnswer extends Common {
+  kind: "score";
+  /** 0 is the lowest level, `levels.length - 1` the highest; anything in between is a blend. */
+  score: number;
+  /** What each level means, lowest first. */
+  levels: string[];
+}
+
+export type TriageAnswer = YesNoAnswer | ChoiceAnswer | ScoreAnswer;
 
 /** ember_api's /api/triage routes (chat.use). */
 export const triageClient = {
@@ -64,5 +74,6 @@ export const triageClient = {
       text: form.text,
       question: form.question,
       options: form.kind === "choice" ? form.options : [],
+      levels: form.kind === "score" ? (form.levels ?? []) : [],
     }),
 };

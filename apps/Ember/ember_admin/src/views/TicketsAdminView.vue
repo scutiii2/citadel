@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import TicketsPanel from "../components/admin/TicketsPanel.vue";
@@ -36,35 +37,7 @@ function updateFilters(next: TicketFilterState): void {
 </script>
 
 <template>
-  <section class="info-page tickets-admin">
-    <div class="ticket-page-column">
-      <h2 class="page-title">Tickets</h2>
-      <p class="intro page-description">
-        A clear view of what needs attention and what’s moving forward.
-      </p>
-      <TicketsPanel :filters="filters" @filter="updateFilters" />
-    </div>
-  </section>
+  <PageLayout class="info-content tickets-admin" title="Tickets" description="A clear view of what needs attention and what’s moving forward." wide fill>
+    <TicketsPanel :filters="filters" @filter="updateFilters" />
+  </PageLayout>
 </template>
-
-<style scoped>
-.tickets-admin {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.ticket-page-column {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  padding: 28px 30px 16px;
-}
-.page-title { font-size: 1.5rem; }
-.page-description { margin-bottom: 24px; }
-@media (max-width: 767px) {
-  .ticket-page-column { padding: 20px 16px 12px; }
-  .page-title { font-size: 1.3rem; }
-  .page-description { margin-bottom: 18px; font-size: 0.8rem; }
-}
-</style>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, getCurrentInstance, onMounted, onUnmounted, reactive, ref } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
 import {
@@ -303,15 +304,11 @@ function preview(note: Note): string {
 </script>
 
 <template>
-  <section class="info-page notes">
-    <div class="column page-column">
-      <div class="top">
-        <div>
-          <h2 class="page-title">Notes</h2>
-          <p class="muted intro page-description">Private notes, just for your account.</p>
-        </div>
-        <button type="button" class="primary new-note" @click="startNew">New note</button>
-      </div>
+  <PageLayout class="notes info-content" title="Notes" description="Private notes, just for your account.">
+    <template #actions>
+      <button type="button" class="primary new-note" @click="startNew">New note</button>
+    </template>
+    <div class="column">
 
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       <p v-if="loadError" class="error" role="alert">Could not load your notes: {{ loadError }}</p>
@@ -495,16 +492,10 @@ function preview(note: Note): string {
       @confirm="discard"
       @close="discardTarget = undefined"
     />
-  </section>
+  </PageLayout>
 </template>
 
 <style scoped>
-.top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
 .notice {
   margin: 8px 0;
   color: var(--muted);

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { authClient, type KnownDevice } from "../api/AuthClient";
@@ -120,14 +121,11 @@ async function changePassword(): Promise<void> {
 
 <template>
   <!-- Logging out clears the account a moment before the router leaves this page. -->
-  <section v-if="auth.account" class="account-view">
-    <div class="column page-column">
-      <header class="page-head">
-        <p class="eyebrow">Your workspace, your account</p>
-        <h2 class="page-title">Account</h2>
-        <p class="subtitle page-description">Manage your identity, security, and devices.</p>
-      </header>
-
+  <PageLayout v-if="auth.account" title="Account" description="Manage your identity, security, and devices." class="account-view">
+    <template #actions>
+      <p class="eyebrow">Your workspace, your account</p>
+    </template>
+    <div class="column">
       <div v-if="!account.email_verified" class="banner" role="status">
         <span>{{ auth.needsVerification
           ? "Your email isn't verified. Permissions are paused until you enter the code."
@@ -276,15 +274,10 @@ async function changePassword(): Promise<void> {
       <footer class="page-footer">Ember · Account settings</footer>
     </div>
     <ConfirmModal v-if="pendingForget" open title="Forget device" :message="`Forget ${pendingForget.label}? Its next login is noted in the activity log as a new device.`" confirm-label="Forget" @confirm="forgetDevice(pendingForget)" @close="pendingForget = null" />
-  </section>
+  </PageLayout>
 </template>
 
 <style scoped>
-.account-view  {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
 
 .column  {
   display: flex;
@@ -314,10 +307,6 @@ h3  {
   font-weight: 600;
 }
 
-.subtitle  {
-
-  color: var(--muted);
-}
 
 .card  {
   background: var(--surface);
@@ -869,9 +858,6 @@ button.forget  {
   .column  {
 
     gap: 16px;
-  }
-  .page-head  {
-    margin-bottom: 4px;
   }
   .account-grid  {
     grid-template-columns: 1fr;

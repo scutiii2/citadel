@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { capabilityPagesClient, type GuiPageSpec } from "../api/CapabilityPagesClient";
@@ -66,14 +67,12 @@ watch(name, load);
 </script>
 
 <template>
-  <div class="scroll">
-    <div class="page page-column">
+  <PageLayout :title="page?.title ?? 'Capability'" :description="page?.description">
+    <div class="capability-body">
       <p><RouterLink to="/capabilities">← Capabilities</RouterLink></p>
       <p v-if="loading" class="muted">Loading…</p>
       <p v-else-if="problem" class="error" role="alert">{{ problem }}</p>
       <template v-else-if="page">
-        <h2 class="page-title">{{ page.title }}</h2>
-        <p v-if="page.description" class="muted page-description">{{ page.description }}</p>
         <template v-for="s in page.sections" :key="s.id">
           <section v-if="s.type === 'text'" class="note">
             <h3 v-if="s.title">{{ s.title }}</h3>
@@ -85,16 +84,10 @@ watch(name, load);
         </template>
       </template>
     </div>
-  </div>
+  </PageLayout>
 </template>
 
 <style scoped>
-/* The shell gives views no scroll of their own; this one scrolls itself. */
-.scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
 
 .muted {
   color: var(--muted);

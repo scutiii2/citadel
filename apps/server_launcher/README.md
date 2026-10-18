@@ -92,14 +92,14 @@ group names it. Each candidate (`py -3`, `python`, `python3`) is run to check
 its version, so the Microsoft Store's stub `python.exe` is not taken for Python.
 Found once per run: install, then close and reopen the launcher.
 
-Every file the launcher creates at run time (groups, presets, the saved server
-specs, the kept-running handoff) lives in one data folder, by default
+Every file the launcher creates at run time (groups, presets, the port plan, the saved
+server specs, the kept-running handoff) lives in one data folder, by default
 `%APPDATA%\scuti_server_launcher`. To use another folder, set the first of
 these that applies: `--data-dir <path>` on the command line, the
 `SCUTI_SERVER_LAUNCHER_DATA` environment variable, or a `data_location.txt`
 whose first line is the path, kept in the default folder. The **Data folder**
 button (top right) shows the folder in use and changes it: `Change…` picks a
-folder (and offers to copy your groups, presets and saved servers into it, never
+folder (and offers to copy your groups, presets, port plan and saved servers into it, never
 overwriting what is already there), `Use default` goes back. It saves the choice
 in `data_location.txt` and takes effect after a restart; a `--data-dir` or
 environment-variable override still wins, and the dialog says so. On first start,
@@ -108,8 +108,9 @@ if the new folder does not have them (the old folder is left alone).
 
 Sidebar tabs:
 - **Servers**: every added project; flags (port, `set NAME=value` env
-  lines, Extra args when the bat forwards `%*`), saved Presets, Start. A taken
-  port auto-bumps to the next free one.
+  lines, Extra args when the bat forwards `%*`), saved Presets, Start. Its port
+  is the one it reserves in the **Ports** tab; a taken port moves to the next free
+  one inside the same range, never onto a port another server reserves.
   **Add** opens a dialog where you list any number of projects: `Add folder…`
   per project (checked as you go), `Manual setup…` for one without a run file,
   then `Add all`. **Remove** forgets the selected one (deletes the launcher's
@@ -130,6 +131,20 @@ Sidebar tabs:
   Save is refused for a bad port, a port used twice, or an empty group; Cancel
   discards the changes. Agent projects keep their entry-agent port, and a
   member whose server is no longer in the list can only be removed.
+
+- **Ports**: the port plan, saved as `port_plan.json` in the data folder. It is a
+  set of named ranges (like subnets: Tools, Ember, Apps, Web, Agents, Unassigned)
+  and one reservation per server. Pick a range to rename or resize it, to move a
+  server's port inside it, to release a server, or to reserve a port for a server
+  of your choice. **Add range** and **Remove** change the list. A range may not
+  overlap another, a port belongs to one server, a reserved port must sit inside a
+  range, and a range that still holds a reservation (or the fallback range
+  `Unassigned`) cannot be removed. A new server keeps the port its `run.bat`
+  names when that is free inside a range, otherwise it gets the next free port of
+  `Unassigned`; no server falls back to 8000. A saved group is refused when a
+  member's port is reserved for another server. The first plan keeps today's
+  ports. A server that listens on no port still holds one, which
+  it does not use.
 
 The sidebar list and the group member list scroll when they overflow; the
 scrollbar appears only then.

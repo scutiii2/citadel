@@ -5,7 +5,6 @@
 export const EMBER_WEB_PAGES = [
   { id: "/capabilities", label: "Capabilities" },
   { id: "/agents", label: "Agents" },
-  { id: "/games", label: "Games" },
   { id: "/usage", label: "Usage" },
   { id: "/tickets", label: "Tickets" },
 ] as const;

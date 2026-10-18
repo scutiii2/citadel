@@ -16,7 +16,7 @@ import AccountDrawer from "./AccountDrawer.vue";
 import ConfirmModal from "./ConfirmModal.vue";
 import "./admin.css";
 
-/** The overview counts (AdminView) change whenever an account does. */
+/** The overview counts (OverviewView) change whenever an account does. */
 const props = withDefaults(defineProps<{ showHeading?: boolean; filters?: { q: string; status: AccountStatus } }>(), { showHeading: true });
 const emit = defineEmits<{ changed: []; filter: [value: { q: string; status: AccountStatus }] }>();
 

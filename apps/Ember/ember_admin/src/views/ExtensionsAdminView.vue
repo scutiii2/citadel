@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, ref } from "vue";
 import { extensionsClient, type ExtensionInfo } from "../api/ExtensionsClient";
 import IntegrationToolsModal from "../components/IntegrationToolsModal.vue";
@@ -72,15 +73,15 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="info-page extensions-admin">
-    <div class="column page-column">
-      <h2 class="page-title">Extensions</h2>
-      <p class="intro page-description">Other MCP servers mcp_server re-exposes. An extension that is unreachable is still added; it shows its error here.</p>
+  <PageLayout class="info-content extensions-admin" title="Extensions" description="Other MCP servers mcp_server re-exposes. An extension that is unreachable is still added; it shows its error here.">
+    <template v-if="!loading" #toolbar><label class="page-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg><input v-model="query" type="search" aria-label="Search extensions" placeholder="Search extensions or tools" /></label>
+      <p class="search-count" role="status">{{ filteredExtensions.length }} of {{ extensions.length }} extensions</p></template>
+
+
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-if="loading" class="muted">Loading…</p>
       <template v-else>
-      <label class="page-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg><input v-model="query" type="search" aria-label="Search extensions" placeholder="Search extensions or tools" /></label>
-      <p class="search-count" role="status">{{ filteredExtensions.length }} of {{ extensions.length }} extensions</p>
+
       <p v-if="!filteredExtensions.length" class="muted">{{ extensions.length ? 'No extensions match your search.' : 'No extensions are available.' }}</p>
       <ul class="list">
         <li v-for="e in filteredExtensions" :key="e.id" class="card ext" data-test="extension" :data-id="e.id">
@@ -107,7 +108,7 @@ onMounted(load);
         <button type="submit" class="primary" :disabled="adding">{{ adding ? "Adding…" : "Add" }}</button>
       </form>
       <p v-if="addError" class="error" role="alert" data-test="add-error">{{ addError }}</p>
-    </div>
+
 
     <IntegrationToolsModal kind="extension" :status="selected?.status === 'connected' ? 'Connected' : 'Disconnected'" :open="selected !== null" :title="selected?.label ?? ''" :identity="selected?.id ?? ''" :names="selected?.tools ?? []" :available="selected?.status === 'connected'" @close="selectedId = null">
       <template v-if="selected"><p v-if="selected.description">{{ selected.description }}</p><p v-if="selected.error" class="error" role="alert">{{ selected.error }}</p></template>
@@ -122,7 +123,8 @@ onMounted(load);
       @confirm="confirmRemove"
       @close="removing = null"
     />
-  </section>
+
+  </PageLayout>
 </template>
 
 <style scoped>

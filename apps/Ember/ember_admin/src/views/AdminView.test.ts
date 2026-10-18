@@ -6,7 +6,7 @@ import { adminClient } from "../api/AdminClient";
 import { ticketsAdminClient } from "../api/TicketsAdminClient";
 import { useAuthStore } from "../stores/auth";
 import AdminView from "./AdminView.vue";
-import AdminOverviewView from "./AdminOverviewView.vue";
+import OverviewView from "./OverviewView.vue";
 import AdminNav from "../components/AdminNav.vue";
 
 vi.mock("../api/AdminClient", () => ({ adminClient: { summary: vi.fn() } }));
@@ -21,9 +21,9 @@ beforeEach(() => {
   vi.mocked(ticketsAdminClient.stats).mockReset();
   client.summary.mockResolvedValue({ accounts: 24, unverified: 3, disabled: 1, open_invites: 5, roles: 2 });
 });
-async function view(path = '/admin') {
-  const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', redirect: '/admin' }, { path: "/admin", component: AdminView, children: [
-    { path: '', component: AdminOverviewView },
+async function view(path = '/overview') {
+  const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/overview', component: OverviewView }, { path: '/', redirect: '/overview' }, { path: "/admin", component: AdminView, children: [
+    { path: '', redirect: '/overview' },
     { path: 'roles', component: { template: '<div>roles page</div>' } },
     { path: 'accounts', component: { template: '<div>accounts page</div>' } },
     { path: 'invites', component: { template: '<div>invites page</div>' } },
@@ -66,11 +66,11 @@ it('offers only overview and roles to a role viewer and hides unrelated counts',
   expect(wrapper.findAll('nav[aria-label="Admin sections"] a').map(a => a.attributes('aria-label'))).toEqual(['Roles & permissions']);
   expect(wrapper.findAll('.destination')).toHaveLength(1);
   expect(wrapper.find('.stats').exists()).toBe(false);
-  expect(wrapper.find('.admin-page-head .primary').exists()).toBe(false);
+  expect(wrapper.find('.page-head .primary').exists()).toBe(false);
 });
 it('opens invite creation from the overview header', async () => {
   const { wrapper } = await view();
-  expect(wrapper.get('.admin-page-head a').attributes('href')).toBe('/admin/invites?create=1');
+  expect(wrapper.get('.page-head a').attributes('href')).toBe('/admin/invites?create=1');
 });
 
 it('keeps overview destinations in sync with available sidebar pages', async () => {

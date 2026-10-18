@@ -18,7 +18,8 @@ function allowed(needed: string | string[], has: (p: string) => boolean): boolea
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: "/", redirect: "/admin" },
+    { path: "/", redirect: "/overview" },
+    { path: "/overview", name: "overview", component: () => import("../views/OverviewView.vue"), meta: { permission: ADMIN_PERMISSIONS } },
     { path: "/profile", name: "profile", component: () => import("../views/ProfileView.vue") },
     { path: "/account", redirect: "/profile" },
     { path: "/settings", name: "settings", component: () => import("../views/SettingsView.vue") },
@@ -26,14 +27,13 @@ export const router = createRouter({
     { path: "/capabilities", name: "capabilities", component: () => import("../views/CapabilitiesAdminView.vue"), meta: { permission: "capabilities.manage" } },
     { path: "/extensions", name: "extensions", component: () => import("../views/ExtensionsAdminView.vue"), meta: { permission: "extensions.manage" } },
     { path: "/agents", name: "agents", component: () => import("../views/AgentsAdminView.vue"), meta: { permission: "agents.manage" } },
-    { path: "/games", name: "games", component: () => import("../views/GamesAdminView.vue"), meta: { permission: "games.manage" } },
     { path: "/tickets", name: "tickets", component: () => import("../views/TicketsAdminView.vue"), meta: { permission: "tickets.manage" } },
     { path: "/analytics", name: "analytics", component: () => import("../views/AnalyticsView.vue"), meta: { permission: ANALYTICS_PERMISSIONS } },
     { path: "/usage", name: "usage", component: () => import("../views/UsageView.vue"), meta: { permission: "usage.all.view" } },
     {
       path: "/admin", component: () => import("../views/AdminView.vue"), meta: { permission: ADMIN_PERMISSIONS },
       children: [
-        { path: "", name: "admin", component: () => import("../views/AdminOverviewView.vue") },
+        { path: "", redirect: "/overview" },
         { path: "accounts", name: "admin-accounts", component: () => import("../views/AccountsAdminView.vue"), meta: { permission: ADMIN_SECTIONS[1]!.permission } },
         { path: "roles", name: "admin-roles", component: () => import("../views/RolesAdminView.vue"), meta: { permission: ADMIN_SECTIONS[2]!.permission } },
         { path: "invites", name: "admin-invites", component: () => import("../views/InvitesAdminView.vue"), meta: { permission: "invites.manage" } },
@@ -57,7 +57,7 @@ router.beforeEach(async (to): Promise<true | RouteLocationRaw> => {
   if (auth.needsVerification && !["profile", "verify-email", "settings"].includes(String(to.name))) {
     return { name: "verify-email" };
   }
-  if (to.name === "admin") {
+  if (to.name === "overview") {
     const section = ADMIN_SECTIONS.find((s) => s.to === `/admin/${String(to.query.tab)}`);
     if (section) {
       const { tab: _tab, ...query } = to.query;

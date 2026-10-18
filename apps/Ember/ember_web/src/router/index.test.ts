@@ -1,4 +1,3 @@
-import { GamesClient } from "../api/GamesClient";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authClient, type Account } from "../api/AuthClient";
@@ -28,7 +27,6 @@ beforeEach(async () => {
   await router.replace("/login");
   setActivePinia(createPinia());
   vi.clearAllMocks();
-  vi.spyOn(GamesClient.prototype, "list").mockResolvedValue([]);
 });
 
 describe("shared chat route", () => {
@@ -230,25 +228,13 @@ it("does not expose personal Usage to a usage observer without chat permission",
   expect(router.currentRoute.value.name).toBe("no-access");
 });
 
-describe("Games page", () => {
-  it("opens for a signed-in account and redirects old Ascension links", async () => {
-    me.mockResolvedValue(ACCOUNT);
-    await router.push("/games"); expect(router.currentRoute.value.name).toBe("games");
-    await router.push("/ascension"); expect(router.currentRoute.value.name).toBe("games");
-  });
-  it("shows the nav button to every verified account, even one with no permissions", () => {
-    const page = NAV_PAGES.find(p => p.to === "/games"); expect(page?.label).toBe("Games");
-    expect(visiblePages((p) => p === "").some(p => p.to === "/games")).toBe(true);
-  });
-});
-
 describe("pages hidden by the administrator", () => {
   const has = () => true;
   const ids = (hidden: string[]) => visiblePages(has, hidden).map((p) => p.to);
 
   it("drops the pages in the list and keeps the rest", () => {
-    expect(ids(["/usage", "/games"])).not.toContain("/usage");
-    expect(ids(["/usage", "/games"])).not.toContain("/games");
+    expect(ids(["/usage", "/agents"])).not.toContain("/usage");
+    expect(ids(["/usage", "/agents"])).not.toContain("/agents");
     expect(ids(["/usage"])).toContain("/agents");
   });
 
@@ -261,12 +247,6 @@ describe("pages hidden by the administrator", () => {
   });
 
   it("still applies the account's permissions to the pages left", () => {
-    expect(visiblePages((p) => p === "", ["/usage"]).map((p) => p.to)).toEqual(["/games"]);
+    expect(visiblePages((p) => p === "", ["/usage"]).map((p) => p.to)).toEqual([]);
   });
-});
-
-it("lands game-only accounts on Games when the filtered catalog is nonempty", async () => {
-  me.mockResolvedValue({ ...ACCOUNT, permissions: ["games.ascension.play"] });
-  vi.spyOn(GamesClient.prototype, "list").mockResolvedValue([{ id: "ascension", name: "Ascension", url: "http://localhost:8060", description: "", icon: "", wallpaper: "", symbols: [], version: "1" }]);
-  await router.push("/"); expect(router.currentRoute.value.name).toBe("games");
 });

@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from src import add_dialog, agent_files, config, discovery, instance as instance_module, models, runtimes, specs, storage, window
+from src import add_dialog, agent_files, config, discovery, instance as instance_module, models, port_plan, runtimes, specs, storage, window
 
 
 _PY_RUN_BAT = (
@@ -185,6 +185,7 @@ class AddDialogTests(unittest.TestCase):
         a = SimpleNamespace(key="a", working_dir=Path("/p/a").resolve())
         b = SimpleNamespace(key="b", working_dir=Path("/p/b").resolve())
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         launcher.status, launcher.templates = Mock(), []
         launcher._render_sidebar = launcher._render_server_detail = Mock()
         launcher._discover = lambda: [a, b]
@@ -463,6 +464,7 @@ class AgentFileTests(unittest.TestCase):
 
     def test_group_start_uses_the_entry_port_not_the_saved_one(self) -> None:
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         template = SimpleNamespace(key="ai_agent", display_name="AI Agent",
                                    agents=[models.AgentInfo("ember", "Ember", 9100, "", "", True, True)])
         launcher.templates = [template]
@@ -541,8 +543,10 @@ class GroupPersistenceTests(unittest.TestCase):
 class GroupTabTests(unittest.TestCase):
     def test_tab_switch_keeps_actions_before_list_and_refresh_on_servers(self) -> None:
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         for attribute in (
-            "servers_tab_btn", "instances_tab_btn", "groups_tab_btn", "_instance_actions",
+            "servers_tab_btn", "instances_tab_btn", "groups_tab_btn", "ports_tab_btn", "_instance_actions",
+            "_add_range_button", "_remove_range_button", "_render_ports_detail",
             "_instance_actions_row", "_kill_instances_button", "_refresh_button",
             "_add_server_button", "_remove_server_button", "_clear_closed_button", "_restart_all_button", "_create_group_button", "sidebar_list", "_sidebar_scroll",
             "_render_sidebar", "_render_server_detail", "_render_instance_detail",
@@ -551,7 +555,7 @@ class GroupTabTests(unittest.TestCase):
             setattr(launcher, attribute, Mock())
         launcher.selected_template = launcher.selected_instance_id = launcher.selected_group_name = None
 
-        for tab in ("groups", "instances", "servers", "instances"):
+        for tab in ("groups", "instances", "servers", "instances", "ports"):
             launcher._instance_actions.reset_mock()
             launcher._kill_instances_button.reset_mock()
             launcher._add_server_button.reset_mock()
@@ -560,6 +564,12 @@ class GroupTabTests(unittest.TestCase):
             launcher._set_tab(tab)
             if tab == "groups":
                 launcher._instance_actions.pack_forget.assert_called_once()
+            elif tab == "ports":
+                launcher._add_range_button.pack.assert_called_once()
+                launcher._remove_range_button.pack.assert_called_once()
+                launcher._render_ports_detail.assert_called_once()
+                launcher._kill_instances_button.pack.assert_not_called()
+                continue
             else:
                 self.assertIs(
                     launcher._instance_actions.pack.call_args.kwargs["before"], launcher._sidebar_scroll,
@@ -580,6 +590,7 @@ class GroupTabTests(unittest.TestCase):
     def test_remove_forgets_the_saved_copy_and_does_nothing_when_declined_or_unselected(self) -> None:
         added = SimpleNamespace(key="tool", display_name="Tool", working_dir=Path("/elsewhere/tool").resolve())
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         launcher.templates, launcher.status = [added], Mock()
         launcher.root = launcher._render_sidebar = launcher._render_server_detail = Mock()
         launcher._discover = lambda: []
@@ -600,6 +611,7 @@ class GroupTabTests(unittest.TestCase):
     def test_select_group_sets_selection_and_renders_detail(self) -> None:
         """Catches a group click that leaves detail state out of sync."""
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         launcher._render_sidebar = Mock()
         launcher._render_group_detail = Mock()
 
@@ -615,6 +627,7 @@ class GroupManagementTests(unittest.TestCase):
         for change in ("stopped", "removed", "replaced", "unchanged"):
             with self.subTest(change=change):
                 launcher = object.__new__(window.LauncherWindow)
+                launcher.plan = port_plan.default_plan()
                 launcher.root = Mock()
                 live = SimpleNamespace(
                     template=SimpleNamespace(key="ai_agent"), port=9100, extra_env={},
@@ -652,6 +665,7 @@ class GroupManagementTests(unittest.TestCase):
     def test_live_group_members_snapshot_only_running_instances(self) -> None:
         """Catches stopped instances or mutable env state leaking into a saved group."""
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         env = {"AI_AGENT_PROVIDER": "anthropic"}
         live = SimpleNamespace(
             template=SimpleNamespace(key="ai_agent"), port=9100, extra_env=env,
@@ -677,6 +691,7 @@ class GroupManagementTests(unittest.TestCase):
     def test_save_group_replaces_existing_recipe_after_confirmation(self) -> None:
         """Catches replacement that mutates memory without saving the new recipe."""
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         launcher.root = Mock()
         launcher.groups = {"Local stack": models.ServerGroup("Local stack", [])}
         members = [models.GroupMember("ai_agent", 9100)]
@@ -693,6 +708,7 @@ class GroupManagementTests(unittest.TestCase):
     def test_save_group_keeps_existing_recipe_when_replacement_declined(self) -> None:
         """Catches a declined replacement overwriting a saved recipe anyway."""
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         launcher.root = Mock()
         original = models.ServerGroup("Local stack", [models.GroupMember("old", 1)])
         launcher.groups = {"Local stack": original}
@@ -708,6 +724,7 @@ class GroupManagementTests(unittest.TestCase):
     def test_delete_group_removes_recipe_without_stopping_live_instances(self) -> None:
         """Catches group deletion affecting the instances from which it was saved."""
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         launcher.root = Mock()
         launcher.active_tab = "groups"
         launcher.selected_group_name = "Local stack"
@@ -746,6 +763,7 @@ class GroupStartTests(unittest.TestCase):
         ):
             with self.subTest(second_member=second_member):
                 launcher = object.__new__(window.LauncherWindow)
+                launcher.plan = port_plan.default_plan()
                 launcher.root = Mock()
                 launcher.templates = [SimpleNamespace(key="ai_agent", display_name="AI Agent")]
                 launcher.groups = {"Stack": models.ServerGroup("Stack", [
@@ -764,6 +782,7 @@ class GroupStartTests(unittest.TestCase):
 
     def test_preflight_reports_duplicate_ports_even_when_they_are_free(self) -> None:
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         launcher.templates = [SimpleNamespace(key="ai_agent", display_name="AI Agent")]
         group = models.ServerGroup("Stack", [
             models.GroupMember("ai_agent", 9100),
@@ -777,6 +796,7 @@ class GroupStartTests(unittest.TestCase):
     def test_group_preflight_lists_missing_templates_and_occupied_ports(self) -> None:
         """Catches a group launch proceeding despite every validation blocker."""
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         launcher.templates = [SimpleNamespace(key="ai_agent", display_name="AI Agent")]
         group = models.ServerGroup("Stack", [
             models.GroupMember("missing", 8000),
@@ -794,6 +814,7 @@ class GroupStartTests(unittest.TestCase):
     def test_start_group_does_not_launch_when_preflight_fails(self) -> None:
         """Catches an invalid group partially launching before reporting its errors."""
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         launcher.root = Mock()
         launcher.groups = {"Stack": models.ServerGroup("Stack", [])}
         launcher._group_start_issues = Mock(return_value=["Port 9100 is already in use."])
@@ -807,6 +828,7 @@ class GroupStartTests(unittest.TestCase):
     def test_start_group_uses_each_saved_member_configuration_exactly(self) -> None:
         """Catches group starts changing a saved port or launch option."""
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         template = SimpleNamespace(key="ai_agent", display_name="AI Agent")
         member = models.GroupMember(
             "ai_agent", 9100, {"AI_AGENT_PROVIDER": "anthropic"},
@@ -849,6 +871,7 @@ class InstanceTests(unittest.TestCase):
 class ClearClosedInstancesTests(unittest.TestCase):
     def test_clear_closed_instances_removes_only_closed_entries_and_selection(self) -> None:
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         open_instance = SimpleNamespace(is_alive=lambda: True)
         closed_instance = SimpleNamespace(is_alive=lambda: False)
         launcher.instances = {"open": open_instance, "closed": closed_instance}
@@ -869,6 +892,7 @@ class ClearClosedInstancesTests(unittest.TestCase):
 class InstanceSidebarTests(unittest.TestCase):
     def test_sidebar_shows_only_the_port_when_instance_has_a_preset(self) -> None:
         launcher = object.__new__(window.LauncherWindow)
+        launcher.plan = port_plan.default_plan()
         instance = SimpleNamespace(
             id="demo:8123:1",
             template=SimpleNamespace(display_name="Demo"),

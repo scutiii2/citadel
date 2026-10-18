@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import { getCurrentInstance } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
@@ -336,12 +337,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="settings-view" :class="{ dirty }">
-    <div ref="root" class="column page-column">
-      <header class="head">
-        <div><h2 class="page-title">Settings</h2><p class="page-description">Adjust chat, appearance, and navigation preferences.</p></div>
-      </header>
-
+  <PageLayout title="Settings" description="Adjust chat, appearance, and navigation preferences." class="settings-view" :class="{ dirty }">
+    <template #toolbar>
       <div class="top">
         <label class="search-box">
           <svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true"><path :d="SEARCH_ICON" /></svg>
@@ -367,7 +364,8 @@ onMounted(() => {
           {{ modifiedCount }} modified
         </button>
       </div>
-
+    </template>
+    <div ref="root" class="column">
       <p v-if="noMatches" class="muted empty">
         No settings match "{{ query }}".
         <button type="button" class="link" @click="query = ''">Clear search</button>
@@ -549,7 +547,7 @@ onMounted(() => {
       @close="allowAllOpen = false"
     />
     <ConfirmModal v-if="discardOpen" :open="discardOpen" title="Discard unsaved settings?" message="Your settings changes have not been saved." confirm-label="Discard changes" @confirm="answerDiscard(true)" @close="answerDiscard(false)" />
-  </section>
+  </PageLayout>
 </template>
 
 <style scoped>
@@ -563,11 +561,6 @@ onMounted(() => {
 .save-error { margin: 4px 0 0; color: var(--danger); }
 @media (max-width: 767px) { .settings-save-bar { left: 0; bottom: var(--rail-height); padding: 12px 16px; gap: 8px; } }
 
-.settings-view {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
 .column {
   display: flex;
   flex-direction: column;
@@ -575,11 +568,6 @@ onMounted(() => {
 
 
 
-}
-.head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .top {

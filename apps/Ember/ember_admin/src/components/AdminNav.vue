@@ -18,7 +18,7 @@ const navPrefs = useNavPrefsStore();
 const canOpenOverview = computed(() => ADMIN_PERMISSIONS.some(auth.hasPermission));
 const pages = computed(() => {
   const available = ADMIN_NAV_PAGES.filter((p) =>
-  p.to !== "/admin" && (Array.isArray(p.permission) ? p.permission.some(auth.hasPermission) : auth.hasPermission(p.permission)),
+  p.to !== "/overview" && (Array.isArray(p.permission) ? p.permission.some(auth.hasPermission) : auth.hasPermission(p.permission)),
   );
   const groups = railPages(available, navPrefs.prefs);
   return [...groups.pinned, ...groups.rest];
@@ -31,7 +31,7 @@ watch([() => route.path, pages], async () => {
 
 <template>
   <aside class="rail" aria-label="Ember Admin">
-    <RouterLink v-if="canOpenOverview" to="/" class="wordmark" data-label="Overview" aria-label="Overview" :aria-current="route.path === '/admin' ? 'page' : undefined"><EmberLogo /></RouterLink>
+    <RouterLink v-if="canOpenOverview" to="/overview" class="wordmark" data-label="Overview" aria-label="Overview" :aria-current="route.path === '/overview' ? 'page' : undefined"><EmberLogo /></RouterLink>
     <span v-else class="wordmark" role="img" aria-label="Ember Admin"><EmberLogo /></span>
     <nav v-if="pages.length" ref="navigation" class="pages" aria-label="Admin sections">
       <RouterLink v-for="page in pages" :key="page.to" :to="page.to" :data-label="page.label" :aria-label="page.label" :aria-current="route.path === page.to ? 'page' : undefined">

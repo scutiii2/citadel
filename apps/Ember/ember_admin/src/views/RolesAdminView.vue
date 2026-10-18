@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { onBeforeRouteLeave } from "vue-router";
 import { ref } from "vue";
 import RolesPanel from "../components/admin/RolesPanel.vue";
@@ -8,10 +9,11 @@ const panel = ref<InstanceType<typeof RolesPanel> | null>(null);
 onBeforeRouteLeave(() => panel.value?.confirmDiscard() ?? true);
 </script>
 <template>
-  <div class="admin-panel roles-page"><header class="admin-page-head"><div><h2 class="page-title">Roles &amp; permissions</h2><p class="page-description">Make access easy to understand and maintain.</p></div><button v-if="auth.hasPermission('roles.manage')" type="button" class="primary" @click="panel?.openCreate()">＋ New role</button></header><RolesPanel ref="panel" :show-heading="false" /></div>
+  <PageLayout class="admin-panel roles-page" title="Roles &amp; permissions" description="Make access easy to understand and maintain." fill>
+    <template #actions><button v-if="auth.hasPermission('roles.manage')" type="button" class="primary" @click="panel?.openCreate()">＋ New role</button></template><RolesPanel ref="panel" :show-heading="false" />
+  </PageLayout>
 </template>
 
 <style scoped>
 .roles-page { display: flex; flex: 1; flex-direction: column; min-height: 0; }
-.roles-page > header { flex-shrink: 0; }
 </style>

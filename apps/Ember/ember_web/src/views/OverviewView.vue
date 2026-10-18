@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import { ADMIN_ACCESS_PERMISSIONS, emberAdminUrl } from "../utils/adminLink";
@@ -46,14 +47,13 @@ const groups = computed(() => {
 </script>
 
 <template>
-  <section class="overview">
-    <div class="column page-column">
-      <div class="heading">
-        <div><h2 class="page-title">Overview</h2><p class="page-description">A place to start. Everything you need, close by.</p></div>
-        <RouterLink v-if="auth.account" to="/account" class="identity">
+  <PageLayout title="Overview" description="A place to start. Everything you need, close by." class="overview">
+    <template #actions>
+      <RouterLink v-if="auth.account" to="/account" class="identity">
           <span class="user" aria-hidden="true">{{ initial }}</span><span>Signed in as <b>{{ auth.account.username }}</b></span>
         </RouterLink>
-      </div>
+    </template>
+    <div class="column">
       <section v-if="chat" class="hero" aria-labelledby="chat-heading">
         <div class="hero-copy">
           <div class="eyebrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z" /></svg>Your AI workspace</div>
@@ -84,19 +84,16 @@ const groups = computed(() => {
       </a>
       <footer class="footer"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z" /><path d="m8 12 3 3 5-6" /></svg>Your access determines what appears here.</span><span>ember · Your AI workspace</span></footer>
     </div>
-  </section>
+  </PageLayout>
 </template>
 
 <style scoped>
-.overview { flex: 1; min-height: 0; overflow-y: auto; }
 a { color: inherit; text-decoration: none; }
 svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
-.heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
 
-.heading p { color: var(--muted);   }
-.identity { display: flex; gap: 9px; align-items: center; font-size: 0.85em; color: var(--muted); min-width: 0; max-width: 40%; overflow-wrap: anywhere; }
+.identity { display: flex; gap: 9px; align-items: center; font-size: 0.85em; color: var(--muted); min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .identity b { color: var(--text); font-weight: 500; }
 .user { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--surface); }
 .hero { display: flex; justify-content: space-between; position: relative; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); border-radius: var(--radius-lg); background: linear-gradient(110deg, color-mix(in srgb, var(--accent) 8%, var(--surface)), var(--surface)); padding: 27px 28px; margin-bottom: 30px; }

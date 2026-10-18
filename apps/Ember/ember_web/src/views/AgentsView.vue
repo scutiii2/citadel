@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { agentsClient, type AgentListing } from "../api/AgentsClient";
 import AgentCard from "../components/AgentCard.vue";
@@ -48,18 +49,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="info-page">
-    <div class="column page-column">
-      <div class="top">
-        <div>
-          <h2 class="page-title">Agents</h2>
-          <p class="muted intro page-description">The AI agents behind ember. New chats go to the entry agent, which hands work to the others.</p>
-        </div>
-        <div class="actions">
-          <button type="button" class="chip" :disabled="refreshing" @click="refresh">Refresh</button>
-        </div>
-      </div>
-
+  <PageLayout class="info-content" title="Agents" description="The AI agents behind ember. New chats go to the entry agent, which hands work to the others.">
+    <template #actions>
+      <button type="button" class="chip" :disabled="refreshing" @click="refresh">Refresh</button>
+    </template>
+    <div class="column">
       <p v-if="error" class="error">Could not load the agents: {{ error }}</p>
       <p v-if="loading" class="muted">Loading …</p>
       <p v-else-if="agents.length === 0 && !error" class="muted">No agents are running or defined.</p>
@@ -70,20 +64,10 @@ onUnmounted(() => {
         </div>
       </template>
     </div>
-  </section>
+  </PageLayout>
 </template>
 
 <style scoped>
-.top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.actions {
-  display: flex;
-  gap: 8px;
-}
 .summary {
   margin: 0 0 10px;
   font-size: 0.9em;

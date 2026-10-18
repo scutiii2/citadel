@@ -1,6 +1,9 @@
 /* Shared look of the single-column information pages (Extensions,
-   Logs, Config issues). Plain CSS scoped by the .info-page class,
+   Logs, Config issues). Plain CSS scoped to existing information-page content,
    like admin/admin.css, since each view's <style scoped> can't share. */
+
+/* Existing pages opt into body decorations with .info-content.
+   PageLayout supplies .info-page geometry to every view. */
 
 .info-page {
   flex: 1;
@@ -9,33 +12,33 @@
 }
 
 
-.info-page h3 {
+.info-page:where(:not(.page), .info-content) h3 {
   margin: 0;
   font-size: 1em;
 }
 
-.info-page .card {
+.info-page:where(:not(.page), .info-content) .card {
   margin-bottom: 12px;
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
 }
-.info-page .card-head {
+.info-page:where(:not(.page), .info-content) .card-head {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px 12px;
 }
-.info-page .name {
+.info-page:where(:not(.page), .info-content) .name {
   font-family: var(--mono);
   font-size: 0.8em;
   color: var(--muted);
   overflow-wrap: anywhere;
 }
-.info-page input:not([type="checkbox"]),
-.info-page select {
+.info-page:where(:not(.page), .info-content) input:not([type="checkbox"]),
+.info-page:where(:not(.page), .info-content) select {
   padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -43,7 +46,7 @@
   background: var(--bg);
   font: inherit;
 }
-.info-page .primary {
+.info-page:where(:not(.page), .info-content) .primary {
   padding: 6px 16px;
   border: none;
   border-radius: var(--radius-full);
@@ -52,8 +55,8 @@
   color: var(--accent-contrast);
   background: var(--accent);
 }
-.info-page .danger,
-.info-page .chip {
+.info-page:where(:not(.page), .info-content) .danger,
+.info-page:where(:not(.page), .info-content) .chip {
   padding: 3px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
@@ -62,42 +65,42 @@
   color: var(--muted);
   background: transparent;
 }
-.info-page .danger {
+.info-page:where(:not(.page), .info-content) .danger {
   border-color: var(--danger);
   color: var(--danger);
 }
-.info-page .chip.active {
+.info-page:where(:not(.page), .info-content) .chip.active {
   border-color: var(--accent);
   color: var(--text);
   background: var(--bg);
 }
-.info-page button:disabled {
+.info-page:where(:not(.page), .info-content) button:disabled {
   cursor: default;
   opacity: 0.5;
 }
-.info-page .muted {
+.info-page:where(:not(.page), .info-content) .muted {
   color: var(--muted);
 }
-.info-page .error {
+.info-page:where(:not(.page), .info-content) .error {
   color: var(--danger);
 }
-.info-page table {
+.info-page:where(:not(.page), .info-content) table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9em;
 }
-.info-page th,
-.info-page td {
+.info-page:where(:not(.page), .info-content) th,
+.info-page:where(:not(.page), .info-content) td {
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   text-align: left;
   vertical-align: top;
 }
-.info-page th {
+.info-page:where(:not(.page), .info-content) th {
   font-weight: 600;
   color: var(--muted);
 }
-.info-page pre {
+.info-page:where(:not(.page), .info-content) pre {
   max-height: 320px;
   margin: 6px 0 0;
   padding: 8px;
@@ -110,6 +113,6 @@
   background: var(--bg);
 }
 /* Wide tables scroll sideways instead of widening the page. */
-.info-page .table-wrap {
+.info-page:where(:not(.page), .info-content) .table-wrap {
   overflow-x: auto;
 }

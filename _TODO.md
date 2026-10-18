@@ -134,3 +134,4 @@ See `docs/superpowers/plans/2026-10-11-game-host.md` for deployment setup.
 **Also check**: a failed gateway cancel is only logged (`turns.py` `cancel`), so the user sees "stopping ..." while the turn keeps running; and cancel arriving between `turn.asking = True` and the request being sent may be missed.
 
 **Revisit when**: user wants Stop to feel instant. Read the provider streaming code and `dispatch_with_progress` first, then propose the exact change for step 1.
+

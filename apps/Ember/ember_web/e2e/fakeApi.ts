@@ -410,7 +410,6 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     if (method === "GET" && path === "/api/extensions") return json(route, []);
 
     // The account's private extensions: a saved one is reported connected with one tool.
-    if (method === "GET" && path === "/api/games") return json(route, { games: [] });
     if (method === "GET" && path === "/api/user-extensions") return json(route, [...api.userExtensions.values()]);
     if (method === "POST" && path === "/api/user-extensions") {
       const body = request.postDataJSON() as { label: string; url: string; description?: string; headers?: Record<string, string> };

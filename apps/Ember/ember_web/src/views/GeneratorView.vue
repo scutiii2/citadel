@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { McpServerClient } from "../api/McpServerClient";
 import { onBeforeRouteLeave } from "vue-router";
@@ -177,15 +178,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="info-page generator">
-    <div class="page-column">
-      <header class="top">
-        <div>
-          <h2 class="page-title">Generator</h2>
-          <p class="page-description">Random passwords, passphrases, PINs and TOTP codes. Nothing is stored; a value is shown once.</p>
-        </div>
-      </header>
-
+  <PageLayout title="Generator" description="Random passwords, passphrases, PINs and TOTP codes. Nothing is stored; a value is shown once." class="generator info-content">
+    <div class="column">
       <SegmentedControl :model-value="tab" aria-label="Generator type" :options="TABS" @update:model-value="requestTab" />
       <ConfirmModal
         :open="leaving !== null"
@@ -276,7 +270,7 @@ onBeforeUnmount(() => {
 
       <p class="muted note">Nothing here is stored. A generated value travels through the chat like any tool result.</p>
     </div>
-  </section>
+  </PageLayout>
 </template>
 
 <style scoped>

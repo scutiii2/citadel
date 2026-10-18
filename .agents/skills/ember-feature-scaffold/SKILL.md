@@ -8,7 +8,7 @@ description: Add a feature to ember_web (the Vue 3 + TypeScript browser app) and
 Two projects that ship together (plus **ember_admin/**, a second Vue app in
 `apps/Ember/` for administrators on port 5176: same stack and shared control
 files as ember_web, talks only to ember_api; staff-only pages such as Tickets,
-Games, Capabilities, Agents and Analytics go there, not in ember_web):
+Capabilities, Agents and Analytics go there, not in ember_web):
 
 - **ember_web/** - Vue 3 + TS (Vite, Pinia, vue-router). Talks **only** to
   ember_api, same-origin: Vite forwards `/api` to ember_api (`vite.config.ts`),
@@ -63,8 +63,7 @@ in routes), `src/models/` (SQLAlchemy 2 typed models), `src/deps.py`
    `tools.view`, `tools.execute`, `accounts.*`, `roles.*`, `invites.manage`,
    `settings.manage`, `capabilities.manage`, `extensions.manage`,
    `agents.manage`, `usage.all.view`, `logs.*`, `traffic.view`,
-   `tickets.create`, `tickets.manage`, `games.manage` and one
-   `games.<id>.play` per registered game. A new one goes in `ALL_PERMISSIONS`
+   `tickets.create` and `tickets.manage`. A new one goes in `ALL_PERMISSIONS`
    (name -> description); the Administrator role picks it up automatically on
    next start. It is *not* added to existing roles such as `Member`
    (`ensure_default_role` only seeds a role when creating it): if members need
@@ -202,11 +201,6 @@ send it too (`identity_headers()` in `services/mcp_session.py` does).
   Note the split: Notes are text the user writes and may share with agents
   (`/notes`, stored in db_gateway); Memory is what the assistant saved about
   them (`/memory`, stored by mcp_server).
-- **A game** is not an Ember page: it is its own app, registered by URL in
-  ember_admin's Games page (ember_api fetches its `/manifest.json`), embedded at
-  `/games` in an iframe and started with a single-use launch ticket. Add the
-  game's origin to `EMBER_GAME_ORIGINS` for the CSP. See root-project-scaffold
-  for a game's shape.
 - **Tickets**: the reporter side is ember_web (`/tickets`, `tickets.create`),
   the staff board is ember_admin (`/tickets`, `tickets.manage`); ember_api only
   proxies to mcp_server. A change to the reporter and the staff routes should be

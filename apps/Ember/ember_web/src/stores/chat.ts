@@ -763,33 +763,45 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
-  /** Puts a typed question to the Triage Assistant (Laya) directly, without the orchestrator, and
-   * adds the question and its answer to the chat like a command's result. Throws what went wrong
-   * (the form shows it); nothing is added then. */
+  /** Puts a typed question to the Triage Assistant (Laya) directly, without the orchestrator. The
+   * question shows in the chat at once and the answer follows it, like a command's result. Resolves
+   * as soon as the question is in the chat (the form can close); it throws only when the question
+   * cannot be taken. If the Assistant fails, the question is taken back out and `sendError` says why. */
   async function askTriage(form: TriageForm): Promise<void> {
     if (busy.value || chatLoading.value || working.value) throw new Error("Wait for the current answer to finish.");
     if (active.value?.messagesLoaded === false) throw new Error("This chat did not load, so nothing can be added to it.");
+    sendError.value = "";
     working.value = "Asking the Triage Assistant ...";
     const began = Date.now();
     clockStart.value = began;
     const started = generation;
-    try {
-      const answer = await triageClient.ask(form);
-      if (started !== generation) return;
-      const seconds = Number(((Date.now() - began) / 1000).toFixed(1));
-      await appendMessages(
-        [
-          { role: "user", kind: "triage", content: triageQuestionText(form), at: new Date(began).toISOString() },
-          { role: "assistant", kind: "triage", content: triageAnswerText(answer), duration_s: seconds, at: new Date().toISOString() },
-        ],
-        form.question,
-      );
-    } finally {
-      if (started === generation) {
-        working.value = "";
-        clockStart.value = null;
+    const conversation = conversationFor(form.question);
+    const asked: ChatMessage = { role: "user", kind: "triage", content: triageQuestionText(form), at: new Date(began).toISOString() };
+    conversation.messages.push(asked);
+    void (async () => {
+      try {
+        const answer = await triageClient.ask(form);
+        const seconds = Number(((Date.now() - began) / 1000).toFixed(1));
+        const answered: ChatMessage = {
+          role: "assistant", kind: "triage", content: triageAnswerText(answer), duration_s: seconds, at: new Date().toISOString(),
+        };
+        conversation.messages.push(answered);
+        conversation.updatedAt = Date.now();
+        const { id, title } = conversation;
+        enqueue(async () => {
+          await chatsClient.append(id, title, [asked, answered]);
+        });
+      } catch (err) {
+        const at = conversation.messages.indexOf(asked); // Vue's array methods find the raw object too
+        if (at !== -1) conversation.messages.splice(at, 1);
+        sendError.value = errorMessage(err);
+      } finally {
+        if (started === generation) {
+          working.value = "";
+          clockStart.value = null;
+        }
       }
-    }
+    })();
   }
 
   /** Asks the main agent. ember_api saves the question and runs the
@@ -1317,7 +1329,8 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   /** Adds messages ember_api didn't produce itself (slash commands). */
-  async function appendMessages(extra: ChatMessage[], titleSeed: string): Promise<void> {
+  /** The open chat, or a new one titled after `titleSeed` when none is open. */
+  function conversationFor(titleSeed: string): Conversation {
     let conversation = active.value;
     if (!conversation) {
       const now = Date.now();
@@ -1332,6 +1345,11 @@ export const useChatStore = defineStore("chat", () => {
       conversation = conversations.value[conversations.value.length - 1]!;
       activeId.value = conversation.id;
     }
+    return conversation;
+  }
+
+  async function appendMessages(extra: ChatMessage[], titleSeed: string): Promise<void> {
+    const conversation = conversationFor(titleSeed);
     conversation.messages.push(...extra);
     conversation.updatedAt = Date.now();
     const { id, title } = conversation;

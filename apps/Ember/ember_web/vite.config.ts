@@ -1,4 +1,3 @@
-import { GameOrigins } from "./src/services/GameOrigins.ts"
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vitest/config'
@@ -15,20 +14,16 @@ const apiProxy = {
 // For the built app (`vite preview`). Not on the dev server: HMR needs
 // inline scripts and its own websocket. 'unsafe-inline' styles only: Vue
 // sets style attributes at runtime.
-// The same origins also serve game wallpapers (img-src).
-const frameSource = new GameOrigins(process.env.EMBER_GAME_ORIGINS).frameSource()
-const gameOrigins = frameSource === "'none'" ? '' : frameSource
 const contentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: ${gameOrigins}`,
+  "img-src 'self' data: blob:",
   "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  `frame-src ${frameSource}`,
 ].join('; ')
 
 // https://vite.dev/config/
@@ -84,7 +79,7 @@ export default defineConfig({
     // launcher's 127.0.0.1 port check would miss.
     host: '127.0.0.1',
     proxy: apiProxy,
-    headers: { 'Content-Security-Policy': `frame-src ${frameSource}; img-src 'self' data: blob: ${gameOrigins}; frame-ancestors 'none'` },
+    headers: { 'Content-Security-Policy': "img-src 'self' data: blob:; frame-ancestors 'none'" },
   },
   // `vite preview` (the production build) talks to ember_api the same way.
   preview: {

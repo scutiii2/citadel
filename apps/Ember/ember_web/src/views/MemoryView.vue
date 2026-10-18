@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
 import { MEMORY_MAX, MEMORY_TEXT_MAX, memoryClient, type MemoryNote } from "../api/MemoryClient";
@@ -108,15 +109,11 @@ async function remove(): Promise<void> {
 </script>
 
 <template>
-  <section class="info-page memory">
-    <div class="page-column">
-      <header class="top">
-        <div>
-          <h2 class="page-title">Memory</h2>
-          <p class="page-description">Review the context Ember remembers about you.</p>
-        </div>
-        <button type="button" class="primary" :disabled="loading || !!loadError || memories.length >= MEMORY_MAX" @click="openEditor()">Add memory</button>
-      </header>
+  <PageLayout title="Memory" description="Review the context Ember remembers about you." class="memory info-content">
+    <template #actions>
+      <button type="button" class="primary" :disabled="loading || !!loadError || memories.length >= MEMORY_MAX" @click="openEditor()">Add memory</button>
+    </template>
+    <div class="column">
       <p v-if="notice" class="muted" role="status">{{ notice }}</p>
       <p v-if="loading" class="muted" role="status">Loading memories…</p>
       <div v-else-if="loadError" class="load-error" role="alert">
@@ -168,12 +165,10 @@ async function remove(): Promise<void> {
       confirm-label="Delete memory" danger :busy="removing" @confirm="remove" @close="!removing && (deleting = null)" />
     <ConfirmModal :open="discardOpen" title="Discard your changes?" message="This memory has changes you have not saved."
       confirm-label="Discard" danger @confirm="answerDiscard(true)" @close="answerDiscard(false)" />
-  </section>
+  </PageLayout>
 </template>
 
 <style scoped>
-.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.top > .primary { flex-shrink: 0; }
 .memory-list { display: flex; flex-direction: column; gap: 12px; }
 .memory-list .card { margin: 0; }
 .memory-text { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
@@ -190,6 +185,5 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 @media (max-width: 767px) {
   .memory .card-head { flex-direction: column; }
   .row-actions { align-self: flex-end; }
-  .top { flex-wrap: wrap; }
 }
 </style>

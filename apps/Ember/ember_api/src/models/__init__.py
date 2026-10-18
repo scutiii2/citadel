@@ -1,7 +1,6 @@
 """ORM models. Same table shapes as chat_app's accounts/roles/permissions,
 in ember_api's own database."""
 
-from src.models.game import Game, GameTicket
 from src.models.account import Account
 from src.models.account_capability import AccountCapability
 from src.models.app_setting import AppSetting
@@ -22,8 +21,6 @@ from src.models.usage import UsageRecord
 from src.models.user_extension import UserExtension
 
 __all__ = [
-    "Game",
-    "GameTicket",
     "Account",
     "AccountCapability",
     "AccountTicketSeen",

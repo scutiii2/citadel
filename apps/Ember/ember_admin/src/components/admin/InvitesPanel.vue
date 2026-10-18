@@ -8,7 +8,7 @@ import BaseModal from "../BaseModal.vue";
 import ConfirmModal from "./ConfirmModal.vue";
 import "./admin.css";
 
-/** The overview counts (AdminView) change whenever an invite does. */
+/** The overview counts (OverviewView) change whenever an invite does. */
 const emit = defineEmits<{ changed: [] }>();
 withDefaults(defineProps<{ showHeading?: boolean; drawer?: boolean }>(), { showHeading: true, drawer: false });
 const createOpen = ref(false);

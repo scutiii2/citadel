@@ -349,9 +349,9 @@ it("loads only the affected accounts on demand", async () => {
   expect(wrapper.find(".affected-accounts").text()).not.toContain("o@example.com");
 });
 
-it("shows registry-created game permissions in the role editor", async () => {
-  client.listPermissions.mockResolvedValue([...PERMISSIONS, { name: "games.ascension.play", description: "Play Ascension" }]);
+it("shows custom permissions in the role editor", async () => {
+  client.listPermissions.mockResolvedValue([...PERMISSIONS, { name: "custom.action", description: "Run a custom action" }]);
   const wrapper = await panel(); await listItem(wrapper, "Member").trigger("click");
-  expect(editor(wrapper).text()).toContain("games.ascension.play");
-  expect(editor(wrapper).text()).toContain("Play Ascension"); wrapper.unmount();
+  expect(editor(wrapper).text()).toContain("custom.action");
+  expect(editor(wrapper).text()).toContain("Run a custom action"); wrapper.unmount();
 });

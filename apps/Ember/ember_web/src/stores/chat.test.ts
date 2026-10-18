@@ -759,22 +759,30 @@ describe("send without an agent", () => {
 describe("askTriage (a typed question to the Triage Assistant)", () => {
   const FORM: TriageForm = { kind: "yes_no", text: "It is down", question: "Is there a problem?", options: [] };
 
-  it("adds the question and its answer to the open chat and saves them, without a turn", async () => {
+  it("shows the question at once, then adds the answer and saves both, without a turn", async () => {
     const chat = await openChat(FOUR);
-    vi.mocked(triageClient.ask).mockResolvedValue({ kind: "yes_no", answer: "yes", yes: 0.9, confidence: 0.9, uncertain: false });
+    let answerIt!: (value: Awaited<ReturnType<typeof triageClient.ask>>) => void;
+    vi.mocked(triageClient.ask).mockReturnValue(new Promise((resolve) => (answerIt = resolve)));
     client.append.mockResolvedValue(undefined as never);
 
     await chat.askTriage(FORM);
 
     expect(triageClient.ask).toHaveBeenCalledWith(FORM);
-    expect(client.startTurn).not.toHaveBeenCalled();
-    const [asked, answered] = chat.messages.slice(-2);
+    const asked = chat.messages[chat.messages.length - 1]!;
     expect(asked).toMatchObject({ role: "user", kind: "triage" });
-    expect(asked!.content).toContain("Triage question: Is there a problem?");
-    expect(answered).toMatchObject({ role: "assistant", kind: "triage" });
-    expect(answered!.content).toContain("**Yes**, 90% sure.");
-    expect(chat.working).toBe("");
+    expect(asked.content).toContain("Triage question: Is there a problem?");
+    expect(chat.messages).toHaveLength(5);
+    expect(chat.working).toBe("Asking the Triage Assistant ...");
+    expect(client.append).not.toHaveBeenCalled();
+
+    answerIt({ kind: "yes_no", answer: "yes", yes: 0.9, confidence: 0.9, uncertain: false });
     await flushPromises();
+
+    const answered = chat.messages[chat.messages.length - 1]!;
+    expect(answered).toMatchObject({ role: "assistant", kind: "triage" });
+    expect(answered.content).toContain("**Yes**, 90% sure.");
+    expect(chat.working).toBe("");
+    expect(client.startTurn).not.toHaveBeenCalled();
     expect(client.append).toHaveBeenCalledWith("c1", expect.any(String), [asked, answered]);
   });
 
@@ -784,19 +792,30 @@ describe("askTriage (a typed question to the Triage Assistant)", () => {
     client.append.mockResolvedValue(undefined as never);
 
     await chat.askTriage(FORM);
+    await flushPromises();
 
     expect(chat.active?.title).toBe("Is there a problem?");
     expect(chat.messages).toHaveLength(2);
   });
 
-  it("adds nothing and passes the error on when the question fails", async () => {
+  it("takes the question back out and reports the error when the Assistant fails", async () => {
     const chat = await openChat(FOUR);
     vi.mocked(triageClient.ask).mockRejectedValue(new ApiError(503, "The Triage Assistant is unavailable: not running"));
 
-    await expect(chat.askTriage(FORM)).rejects.toThrow("not running");
+    await chat.askTriage(FORM);
+    await flushPromises();
 
     expect(chat.messages).toHaveLength(4);
+    expect(chat.sendError).toContain("not running");
     expect(chat.working).toBe("");
     expect(client.append).not.toHaveBeenCalled();
+  });
+
+  it("refuses a question while an answer is still coming", async () => {
+    const chat = await openChat(FOUR);
+    vi.mocked(triageClient.ask).mockReturnValue(new Promise(() => {}));
+    await chat.askTriage(FORM);
+
+    await expect(chat.askTriage(FORM)).rejects.toThrow("Wait for the current answer");
   });
 });

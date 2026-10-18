@@ -18,8 +18,8 @@ from src.db import Base, Database
 from src.services.migrations import BASELINE, MIGRATIONS_DIR, MigrationRunner
 
 # The newest real migration; the tests' throwaway one comes after it.
-HEAD = "0018"
-NEXT = "0019"
+HEAD = "0022"
+NEXT = "0023"
 
 
 def drop_account_uid(conn: sqlite3.Connection) -> None:
@@ -33,6 +33,12 @@ def drop_log_prompts(conn: sqlite3.Connection) -> None:
     conn.execute("ALTER TABLE log_entries DROP COLUMN prompts")
     conn.execute("DROP TABLE account_ticket_seen")
     conn.execute("DROP TABLE ticket_staff_activity")
+
+
+def clear_access(conn: sqlite3.Connection) -> None:
+    """Drop the roles and permissions a fresh database starts with (migration 0019)."""
+    for table in ("account_role", "role_permission", "roles", "permissions"):
+        conn.execute(f"DELETE FROM {table}")
 
 
 def test_ticket_unread_migration_reverses_and_upgrades_existing_database(tmp_path: Path) -> None:
@@ -60,8 +66,9 @@ def test_permission_split_preserves_access_once_and_keeps_revocations(tmp_path: 
     run_with(make_database(tmp_path))
     path = tmp_path / "ember.db"
     with closing(sqlite3.connect(path)) as conn:
-        conn.execute("DROP TABLE game_tickets")
-        conn.execute("DROP TABLE games")
+        clear_access(conn)
+        conn.execute("DROP TABLE IF EXISTS game_tickets")
+        conn.execute("DROP TABLE IF EXISTS games")
         conn.execute("UPDATE alembic_version SET version_num = '0009'")
         drop_account_uid(conn)
         drop_log_prompts(conn)
@@ -101,8 +108,9 @@ def test_ticket_permission_is_granted_to_chat_roles_once(tmp_path: Path) -> None
     run_with(make_database(tmp_path))
     path = tmp_path / "ember.db"
     with closing(sqlite3.connect(path)) as conn:
-        conn.execute("DROP TABLE game_tickets")
-        conn.execute("DROP TABLE games")
+        clear_access(conn)
+        conn.execute("DROP TABLE IF EXISTS game_tickets")
+        conn.execute("DROP TABLE IF EXISTS games")
         conn.execute("UPDATE alembic_version SET version_num = '0011'")
         drop_log_prompts(conn)
         for name in ("chatters", "readers"):
@@ -136,11 +144,11 @@ def test_ticket_permission_is_granted_to_chat_roles_once(tmp_path: Path) -> None
 
 
 def test_the_game_permission_is_renamed_with_its_grants_kept(tmp_path: Path) -> None:
-    run_with(make_database(tmp_path))
+    migrate_revision(tmp_path, "0019")
     path = tmp_path / "ember.db"
     with closing(sqlite3.connect(path)) as conn:
-        conn.execute("DROP TABLE game_tickets")
-        conn.execute("DROP TABLE games")
+        conn.execute("DROP TABLE IF EXISTS game_tickets")
+        conn.execute("DROP TABLE IF EXISTS games")
         conn.execute("UPDATE alembic_version SET version_num = '0012'")
         drop_log_prompts(conn)
         conn.execute("DELETE FROM permissions WHERE name = 'ascension.play'")
@@ -152,7 +160,7 @@ def test_the_game_permission_is_renamed_with_its_grants_kept(tmp_path: Path) -> 
         )
         conn.commit()
 
-    assert run_with(make_database(tmp_path)) == "upgraded"
+    migrate_revision(tmp_path, "0016")
 
     with closing(sqlite3.connect(path)) as conn:
         names = {row[0] for row in conn.execute("SELECT name FROM permissions")}
@@ -228,8 +236,8 @@ def test_account_uid_is_backfilled_unique_and_removed_by_the_downgrade(tmp_path:
     with closing(sqlite3.connect(path)) as conn:
         drop_account_uid(conn)
         drop_log_prompts(conn)
-        conn.execute("DROP TABLE game_tickets")
-        conn.execute("DROP TABLE games")
+        conn.execute("DROP TABLE IF EXISTS game_tickets")
+        conn.execute("DROP TABLE IF EXISTS games")
         conn.execute("UPDATE alembic_version SET version_num = '0010'")
         for name in ("lex", "sam"):
             conn.execute(
@@ -273,6 +281,12 @@ def test_account_uid_is_backfilled_unique_and_removed_by_the_downgrade(tmp_path:
         finally:
             await database.dispose()
 
+    # Recreate the historical schema before exercising its historical downgrade.
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("UPDATE alembic_version SET version_num = '0013'")
+        drop_log_prompts(conn)
+        conn.commit()
+    migrate_revision(tmp_path, "0019")
     asyncio.run(downgrade())
 
     assert revision_of(path) == "0010"
@@ -327,7 +341,7 @@ class TestFreshDatabase:
 
         added = {"agent_id", "provider_id", "gateway", "started_at", "finished_at", "delegated_by"}
         path = tmp_path / "ember.db"
-        run_with(make_database(path.parent))
+        migrate_revision(tmp_path, "0019")
 
         def columns() -> set[str]:
             with closing(sqlite3.connect(path)) as conn:
@@ -363,8 +377,8 @@ class TestDatabaseFromBeforeMigrations:
             conn.execute("DROP TABLE traffic_buckets")  # likewise
             conn.execute("DROP TABLE nav_preferences")  # likewise
             conn.execute("DROP TABLE account_capabilities")  # likewise
-            conn.execute("DROP TABLE game_tickets")
-            conn.execute("DROP TABLE games")
+            conn.execute("DROP TABLE IF EXISTS game_tickets")
+            conn.execute("DROP TABLE IF EXISTS games")
             conn.execute("DROP TABLE user_extensions")  # likewise
             drop_chat_folders(conn)
             conn.execute("ALTER TABLE accounts DROP COLUMN prompt_suggestions")  # added after the baseline too
@@ -404,7 +418,7 @@ class TestDatabaseFromBeforeMigrations:
     def test_it_is_only_stamped_when_the_baseline_is_the_newest_revision(self, tmp_path: Path) -> None:
         path = self.build_legacy(tmp_path)
         scripts = tmp_path / "baseline_only"
-        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*"))
+        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*"))
         calls: list[int] = []
 
         async def backup() -> None:
@@ -500,8 +514,8 @@ class TestLaterMigration:
             conn.execute("DROP TABLE traffic_buckets")
             conn.execute("DROP TABLE nav_preferences")  # likewise
             conn.execute("DROP TABLE account_capabilities")  # likewise
-            conn.execute("DROP TABLE game_tickets")
-            conn.execute("DROP TABLE games")
+            conn.execute("DROP TABLE IF EXISTS game_tickets")
+            conn.execute("DROP TABLE IF EXISTS games")
             conn.execute("DROP TABLE user_extensions")  # likewise
             for column in ("agent_id", "provider_id", "gateway", "started_at", "finished_at", "delegated_by"):
                 conn.execute(f"ALTER TABLE usage_records DROP COLUMN {column}")
@@ -588,7 +602,7 @@ def test_stamping_and_upgrading_are_not_confused_by_a_foreign_table(tmp_path: Pa
 @pytest.mark.parametrize("collision", [False, True])
 def test_games_migration_preserves_grants_and_reverses(tmp_path: Path, collision: bool):
     from alembic import command
-    run_with(make_database(tmp_path))
+    migrate_revision(tmp_path, "0019")
 
     def migrate(target):
         async def go():
@@ -604,6 +618,7 @@ def test_games_migration_preserves_grants_and_reverses(tmp_path: Path, collision
     migrate("0013")
     path = tmp_path / "ember.db"
     with closing(sqlite3.connect(path)) as conn:
+        clear_access(conn)
         conn.execute("INSERT INTO roles (name) VALUES ('game players')")
         conn.execute("INSERT INTO permissions (name) VALUES ('ascension.play')")
         conn.execute("INSERT INTO role_permission SELECT r.id, p.id FROM roles r, permissions p WHERE r.name='game players' AND p.name='ascension.play'")
@@ -611,11 +626,106 @@ def test_games_migration_preserves_grants_and_reverses(tmp_path: Path, collision
             conn.execute("INSERT INTO permissions (name) VALUES ('games.ascension.play')")
             conn.execute("INSERT INTO role_permission SELECT r.id, p.id FROM roles r, permissions p WHERE r.name='game players' AND p.name='games.ascension.play'")
         conn.commit()
-    run_with(make_database(tmp_path))
+    migrate_revision(tmp_path, "0016")
     assert {"games", "game_tickets"} <= tables_of(path)
     with closing(sqlite3.connect(path)) as conn:
-        assert conn.execute("SELECT p.name FROM role_permission rp JOIN permissions p ON p.id=rp.permission_id").fetchall() == [("games.ascension.play",)]
+        assert conn.execute("SELECT p.name FROM role_permission rp JOIN permissions p ON p.id=rp.permission_id JOIN roles r ON r.id=rp.role_id WHERE r.name='game players'").fetchall() == [("games.ascension.play",)]
     migrate("0013")
     assert not {"games", "game_tickets"} & tables_of(path)
     with closing(sqlite3.connect(path)) as conn:
-        assert conn.execute("SELECT p.name FROM role_permission rp JOIN permissions p ON p.id=rp.permission_id").fetchall() == [("ascension.play",)]
+        assert conn.execute("SELECT p.name FROM role_permission rp JOIN permissions p ON p.id=rp.permission_id JOIN roles r ON r.id=rp.role_id WHERE r.name='game players'").fetchall() == [("ascension.play",)]
+
+
+def test_starter_roles_are_seeded_once_and_edits_stick(tmp_path: Path) -> None:
+    run_with(make_database(tmp_path))
+    path = tmp_path / "ember.db"
+
+    def roles() -> dict[str, set[str]]:
+        with closing(sqlite3.connect(path)) as conn:
+            found: dict[str, set[str]] = {name: set() for (name,) in conn.execute("SELECT name FROM roles")}
+            for role, permission in conn.execute(
+                "SELECT r.name, p.name FROM role_permission rp JOIN roles r ON r.id = rp.role_id "
+                "JOIN permissions p ON p.id = rp.permission_id"
+            ):
+                found[role].add(permission)
+            return found
+
+    seeded = roles()
+    for name in ("Viewer", "Support", "Moderator", "Auditor", "Power User", "Operator"):
+        assert name in seeded
+    assert seeded["Viewer"] == {"chat.use", "tools.view"}
+    assert "extensions.manage" in seeded["Power User"] and "tickets.create" in seeded["Power User"]
+    for name in ("Viewer", "Support", "Moderator", "Auditor", "Power User", "Operator"):
+        assert not {p for p in seeded[name] if p.startswith("logs.chat") or p.startswith("roles.")} - {"roles.view"}
+
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("DELETE FROM role_permission WHERE role_id = (SELECT id FROM roles WHERE name = 'Viewer')")
+        conn.execute("DELETE FROM roles WHERE name = 'Viewer'")
+        conn.execute("UPDATE alembic_version SET version_num = '0018'")
+        conn.commit()
+    assert run_with(make_database(tmp_path)) == "upgraded"
+    assert "Viewer" in roles()  # a removed role is only recreated when the migration runs again
+
+
+
+def migrate_revision(tmp_path: Path, target: str) -> None:
+    """Build historical schemas without crossing the irreversible removal."""
+    from alembic import command
+
+    async def go():
+        database = make_database(tmp_path)
+        runner = MigrationRunner(database.engine)
+        try:
+            async with database.engine.connect() as conn:
+                await conn.run_sync(lambda sync: command.upgrade(runner._config(sync), target))
+        finally:
+            await database.dispose()
+    asyncio.run(go())
+
+
+@pytest.mark.parametrize("missing_tables", [False, True])
+def test_games_removal_deletes_only_retired_data_and_is_idempotent(tmp_path: Path, missing_tables: bool):
+    migrate_revision(tmp_path, "0019")
+    path = tmp_path / "ember.db"
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("INSERT INTO roles (name) VALUES ('Retired players')")
+        for permission in ("games.manage", "games.puzzle.play", "games.chess.play", "tickets.create", "games.other.manage"):
+            conn.execute("INSERT OR IGNORE INTO permissions (name) VALUES (?)", (permission,))
+            conn.execute(
+                "INSERT INTO role_permission SELECT r.id, p.id FROM roles r, permissions p "
+                "WHERE r.name = 'Retired players' AND p.name = ?", (permission,)
+            )
+        conn.execute(
+            "INSERT INTO accounts (uid, username, email, password_hash, is_protected, is_active, email_verified, created_at) "
+            "VALUES ('0123456789abcdef0123456789abcdef', 'player', 'player@example.com', 'x', 0, 1, 1, '2026-01-01')"
+        )
+        conn.execute(
+            "INSERT INTO games (id, url, name, description, icon, version, enabled, manifest, created_at, updated_at, wallpaper, symbols) "
+            "VALUES ('puzzle', 'http://localhost:8060', 'Puzzle', '', '', '1', 1, '{}', '2026-01-01', '2026-01-01', '', '[]')"
+        )
+        conn.execute(
+            "INSERT INTO game_tickets (token_hash, game_id, account_id, expires_at) "
+            "SELECT 'hash', 'puzzle', id, '2026-01-02' FROM accounts WHERE username = 'player'"
+        )
+        if missing_tables:
+            conn.execute("DROP TABLE game_tickets")
+            conn.execute("DROP TABLE games")
+        conn.commit()
+
+    assert run_with(make_database(tmp_path)) == "upgraded"
+    assert not {"games", "game_tickets"} & tables_of(path)
+    with closing(sqlite3.connect(path)) as conn:
+        assert conn.execute(
+            "SELECT p.name FROM role_permission rp JOIN permissions p ON p.id = rp.permission_id "
+            "JOIN roles r ON r.id = rp.role_id WHERE r.name = 'Retired players' ORDER BY p.name"
+        ).fetchall() == [("games.other.manage",), ("tickets.create",)]
+        assert conn.execute("SELECT COUNT(*) FROM permissions WHERE name = 'games.manage' OR name LIKE 'games.%.play'").fetchone() == (0,)
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+        assert conn.execute("SELECT username FROM accounts").fetchall() == [("player",)]
+        conn.execute("UPDATE alembic_version SET version_num = '0019'")
+        conn.commit()
+
+    assert run_with(make_database(tmp_path)) == "upgraded"
+    assert run_with(make_database(tmp_path)) == "current"
+    assert revision_of(path) == HEAD

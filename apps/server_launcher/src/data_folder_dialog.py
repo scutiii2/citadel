@@ -32,7 +32,7 @@ class DataFolderDialog:
         self.dialog.title("Data folder")
         self.dialog.configure(bg=_BG)
         self.dialog.transient(root)
-        tk.Label(self.dialog, text="Groups, presets and saved servers are kept in:", bg=_BG, fg=_DIM_FG).pack(
+        tk.Label(self.dialog, text="Groups, presets, the port plan and saved servers are kept in:", bg=_BG, fg=_DIM_FG).pack(
             anchor="w", padx=16, pady=(16, 4)
         )
         tk.Label(self.dialog, text=str(current), bg=_BG, fg=_FG, wraplength=480, justify="left").pack(anchor="w", padx=16)
@@ -64,7 +64,7 @@ class DataFolderDialog:
         copy = False
         if not _data_folder_has_data(target):
             copy = messagebox.askyesno(
-                "Data folder", f"Copy your groups, presets and saved servers into\n{target}?", parent=self.dialog,
+                "Data folder", f"Copy your groups, presets, port plan and saved servers into\n{target}?", parent=self.dialog,
             )
         try:
             _set_data_location(new_dir, copy=copy, current_dir=self._current)

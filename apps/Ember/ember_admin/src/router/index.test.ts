@@ -12,19 +12,19 @@ beforeEach(() => {
 
 it("allows a role viewer directly into the roles page, but redirects accounts and settings", async () => {
   await router.push("/");
-  expect(router.currentRoute.value.name).toBe("admin");
+  expect(router.currentRoute.value.name).toBe("overview");
   await router.push("/admin/roles");
   expect(router.currentRoute.value.name).toBe("admin-roles");
   await router.push("/admin/accounts");
-  expect(router.currentRoute.value.name).toBe("admin");
+  expect(router.currentRoute.value.name).toBe("overview");
   await router.push("/admin/settings");
-  expect(router.currentRoute.value.name).toBe("admin");
+  expect(router.currentRoute.value.name).toBe("overview");
 });
 
 it("opens the overview for an extension-only account", async () => {
   vi.mocked(authClient.me).mockResolvedValue({ id: 3, username: "extensions", email: "e@example.com", email_verified: true, roles: [], permissions: ["extensions.manage"] });
   await router.replace({ path: "/", force: true });
-  expect(router.currentRoute.value.name).toBe("admin");
+  expect(router.currentRoute.value.name).toBe("overview");
 });
 
 it("preserves query options while redirecting old tab links", async () => {
@@ -34,7 +34,7 @@ it("preserves query options while redirecting old tab links", async () => {
 
 it("checks permissions after redirecting an old settings tab", async () => {
   await router.push("/admin?tab=settings&source=bookmark");
-  expect(router.currentRoute.value.name).toBe("admin");
+  expect(router.currentRoute.value.name).toBe("overview");
   expect(router.currentRoute.value.query.tab).toBeUndefined();
 });
 
@@ -43,7 +43,7 @@ it("allows an invitation manager without account or role grants", async () => {
   await router.push("/admin/invites");
   expect(router.currentRoute.value.name).toBe("admin-invites");
   await router.push("/admin/roles");
-  expect(router.currentRoute.value.name).toBe("admin");
+  expect(router.currentRoute.value.name).toBe("overview");
 });
 
 it("preserves a direct child URL through login", async () => {
@@ -76,11 +76,24 @@ it("lets an unverified account recover through Profile and verification", async 
 it("opens Usage and its overview for a usage-only observer", async () => {
   vi.mocked(authClient.me).mockResolvedValue({ id: 4, username: "observer", email: "o@example.com", email_verified: true, roles: [], permissions: ["usage.all.view"] });
   await router.push("/");
-  expect(router.currentRoute.value.name).toBe("admin");
+  expect(router.currentRoute.value.name).toBe("overview");
   await router.push("/usage");
   expect(router.currentRoute.value.name).toBe("usage");
 });
 it("denies Usage without the usage permission", async () => {
   await router.replace({ path: "/usage", force: true });
-  expect(router.currentRoute.value.name).toBe("admin");
+  expect(router.currentRoute.value.name).toBe("overview");
+});
+
+it("opens the canonical overview and preserves redirect query and hash", async () => {
+  await router.push("/overview");
+  expect(router.currentRoute.value.name).toBe("overview");
+  await router.push("/admin?source=bookmark#summary");
+  expect(router.currentRoute.value.fullPath).toBe("/overview?source=bookmark#summary");
+});
+
+it("denies the overview to an account without workspace permissions", async () => {
+  vi.mocked(authClient.me).mockResolvedValue({ id: 6, username: "member", email: "member@example.com", email_verified: true, roles: [], permissions: [] });
+  await router.replace({ path: "/overview", force: true });
+  expect(router.currentRoute.value.name).toBe("no-access");
 });

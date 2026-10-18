@@ -29,3 +29,19 @@
 
 .page-search:focus-within { border-color: var(--accent); }
 .info-page .page-search input[type="search"]:focus-visible { outline: none; }
+
+/* PageLayout owns the view scroll area and the header in both apps. */
+.page.info-page { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; }
+.page-column-wide { max-width: none; }
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.page-head-copy { min-width: 0; overflow-wrap: anywhere; }
+.page-head .page-description { margin-bottom: 0; }
+.page-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0; max-width: 100%; }
+.page-toolbar { margin-bottom: 16px; }
+.page.info-page.page-layout-fill { display: flex; flex-direction: column; overflow: hidden; }
+.page-layout-fill > .page-column { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.page-layout-fill .page-head, .page-layout-fill .page-toolbar { flex-shrink: 0; }
+@media (max-width: 767px) {
+  .page-head { flex-direction: column; align-items: stretch; gap: 12px; }
+  .page-actions { flex-shrink: 1; }
+}

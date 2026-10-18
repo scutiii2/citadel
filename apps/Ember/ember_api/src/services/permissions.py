@@ -1,7 +1,6 @@
 """Every permission ember_api knows about. The Administrator role always
 holds all of them (see AuthService.ensure_bootstrap_admin)."""
 
-import re
 from types import MappingProxyType
 
 CHAT_USE = "chat.use"
@@ -31,7 +30,6 @@ TRAFFIC_VIEW = "traffic.view"
 AGENTS_MANAGE = "agents.manage"
 TICKETS_CREATE = "tickets.create"
 TICKETS_MANAGE = "tickets.manage"
-GAMES_MANAGE = "games.manage"
 
 ALL_PERMISSIONS = MappingProxyType({
     CHAT_USE: "Chat with ai_agent instances",
@@ -61,7 +59,6 @@ ALL_PERMISSIONS = MappingProxyType({
     AGENTS_MANAGE: "Create, edit and remove ai_agent agents (provider, gateway, persona, tools)",
     TICKETS_CREATE: "Report bugs, suggest features and follow your own tickets",
     TICKETS_MANAGE: "See every ticket, triage them and set status, priority and assignee",
-    GAMES_MANAGE: "Register, refresh and remove games",
 })
 
 ADMIN_ROLE = "Administrator"
@@ -78,32 +75,9 @@ ADMIN_PERMISSIONS = (
     ROLES_MANAGE, ROLES_ASSIGN, INVITES_MANAGE, SETTINGS_MANAGE,
 )
 
-
-GAME_ID_PATTERN = r"^[a-z0-9][a-z0-9-]{0,62}$"
-
-
-class PermissionCatalog:
-    """Recognises static permissions and the play permission of a valid game id."""
-
-    @staticmethod
-    def game_play(game_id: str) -> str:
-        return f"games.{game_id}.play"
-
-    @staticmethod
-    def description(name: str) -> str | None:
-        if name in ALL_PERMISSIONS:
-            return ALL_PERMISSIONS[name]
-        match = re.fullmatch(r"games\.([a-z0-9][a-z0-9-]{0,62})\.play", name)
-        return f"Play {match.group(1)}" if match else None
-
-
-def game_play_permission(game_id: str) -> str:
-    return PermissionCatalog.game_play(game_id)
-
-
 def is_known_permission(name: str) -> bool:
-    return PermissionCatalog.description(name) is not None
+    return name in ALL_PERMISSIONS
 
 
 def permission_description(name: str) -> str | None:
-    return PermissionCatalog.description(name)
+    return ALL_PERMISSIONS.get(name)

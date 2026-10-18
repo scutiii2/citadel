@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import SettingsPanel from "../components/admin/SettingsPanel.vue";
 import SidebarPagesPanel from "../components/admin/SidebarPagesPanel.vue";
 </script>
 <template>
-  <div class="admin-panel"><header class="admin-page-head"><div><h2 class="page-title">Workspace settings</h2><p class="page-description">Changes here apply to every account.</p></div></header><SettingsPanel /><SidebarPagesPanel /></div>
+  <PageLayout class="admin-panel" title="Workspace settings" description="Changes here apply to every account."><SettingsPanel /><SidebarPagesPanel />
+  </PageLayout>
 </template>

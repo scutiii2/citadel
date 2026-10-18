@@ -132,6 +132,48 @@ describe("a yes or no question", () => {
   });
 });
 
+describe("a score question", () => {
+  async function fillScore(wrapper: VueWrapper): Promise<void> {
+    await button(wrapper, "Score").trigger("click");
+    await wrapper.get("textarea").setValue("It is down");
+    await wrapper.get('input[type="text"]').setValue("How urgent?");
+  }
+
+  it("starts with three levels, needs every one described, and sends them lowest first", async () => {
+    const submit = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mountModal(submit);
+    await fillScore(wrapper);
+
+    expect(wrapper.find('[aria-label="Option 1 title"]').exists()).toBe(false);
+    expect(wrapper.findAll(".option")).toHaveLength(3);
+    expect(wrapper.find('[aria-label="Level 1 (lowest)"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Level 3 (highest)"]').exists()).toBe(true);
+    expect(askButton(wrapper).attributes("disabled")).toBeDefined();
+
+    await input(wrapper, "Level 1 (lowest)").setValue("Can wait");
+    await input(wrapper, "Level 2").setValue("Soon");
+    await input(wrapper, "Level 3 (highest)").setValue("Right now");
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(submit).toHaveBeenCalledExactlyOnceWith({
+      kind: "score", text: "It is down", question: "How urgent?", options: [], levels: ["Can wait", "Soon", "Right now"],
+    });
+  });
+
+  it("keeps between two and ten levels", async () => {
+    const wrapper = mountModal();
+    await button(wrapper, "Score").trigger("click");
+
+    for (let i = 0; i < 12; i++) await button(wrapper, "Add level").trigger("click");
+    expect(wrapper.findAll(".option")).toHaveLength(10);
+    expect(button(wrapper, "Add level").attributes("disabled")).toBeDefined();
+
+    for (let i = 0; i < 12; i++) await wrapper.get('[aria-label="Remove level 1"]').trigger("click");
+    expect(wrapper.findAll(".option")).toHaveLength(2);
+  });
+});
+
 describe("when the question fails", () => {
   it("stays open with the message and keeps what was typed", async () => {
     const submit = vi.fn().mockRejectedValue(new ApiError(503, "The Triage Assistant is unavailable: the Triage Assistant is not running"));

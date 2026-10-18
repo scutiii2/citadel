@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { commandsClient, type CapabilityInfo } from "../api/CommandsClient";
@@ -121,12 +122,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="shop-view">
-    <div class="column page-column">
-      <RouterLink to="/capabilities" class="back">&larr; Back to capabilities</RouterLink>
-      <div class="head">
-        <h2 class="page-title">Supermarket</h2>
-        <div class="chips" role="group" aria-label="Filter by state">
+  <PageLayout title="Supermarket" description="Add the capabilities and extensions you want. They appear on your Capabilities page and become available to the agent in your chats." class="shop-view">
+    <template #actions>
+      <div class="chips" role="group" aria-label="Filter by state">
           <button
             type="button"
             :class="['chip', { on: stateFilter === 'enabled' }]"
@@ -144,9 +142,9 @@ onMounted(() => {
             Disabled
           </button>
         </div>
-      </div>
-      <p class="muted intro page-description">Add the capabilities and extensions you want. They appear on your Capabilities page and become available to the agent in your chats.</p>
-
+    </template>
+    <template #toolbar><RouterLink to="/capabilities" class="back">&larr; Back to capabilities</RouterLink></template>
+    <div class="column">
       <p v-if="loading || accountLoading" class="muted">loading ...</p>
       <p v-else-if="loadError" class="error">error: {{ loadError }}</p>
       <p v-else-if="!account.ready" class="error">error: {{ account.error }}</p>
@@ -247,15 +245,10 @@ onMounted(() => {
       @confirm="confirmRemovePrivate"
       @close="pendingRemovePrivate = null"
     />
-  </section>
+  </PageLayout>
 </template>
 
 <style scoped>
-.shop-view {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
 
 .back {
   display: inline-block;
@@ -267,14 +260,6 @@ onMounted(() => {
 .back:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-.head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 6px;
 }
 
 .chips {

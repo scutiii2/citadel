@@ -27,7 +27,6 @@ from src.routes import (
     chat_folders,
     chats,
     config_issues,
-    games as games_routes,
     tickets as tickets_routes,
     logs,
     mcp,
@@ -51,8 +50,6 @@ from src.services.migrations import MigrationRunner
 from src.services.chat_service import MAX_CHAT_BYTES
 from src.services.db_gateway import DbGatewayClient, DocumentStore
 from src.services.email_service import EmailSender, McpEmailSender
-from src.services.game_manifest import ManifestFetcher
-from src.services.game_sync import GameSyncScheduler
 from src.services.extension_probe import ExtensionProbe
 from src.services.log_service import LogWriter
 from src.services.mcp_proxy import McpProxy
@@ -76,8 +73,6 @@ DEFAULT_REQUEST_BYTES = 1024 * 1024
 # The routes that take big bodies: chats (history imports, questions with
 # attached text), attachment files and command-form uploads.
 LARGE_BODY_PREFIXES = ("/api/chats", "/api/attachments", "/api/uploads")
-# How often registered games are re-read for manifest changes (a game may start after ember_api).
-GAME_SYNC_EVERY = timedelta(minutes=10)
 
 # No read timeout: an MCP event stream stays open for as long as a chat turn
 # (or the session) lasts. Connect/write/pool still fail fast.
@@ -94,7 +89,6 @@ def create_app(
     server_tools: ServerTools | None = None,
     traffic: TrafficRecorder | None = None,
     *,
-    game_fetcher: ManifestFetcher | None = None,
     db_gateway: DocumentStore | None = None,
 ) -> FastAPI:
     """email_sender defaults to the MCP Email capability,
@@ -130,11 +124,6 @@ def create_app(
         # Raises SecretBoxError (a clear one-line message) when .env holds a key that is not valid.
         secret_box = SecretBox(ensure_secrets_key(settings.env_path))
         upstream = httpx.AsyncClient(transport=upstream_transport, timeout=_UPSTREAM_TIMEOUT)
-
-        manifest_client = httpx.AsyncClient(follow_redirects=False)
-        app.state.game_fetcher = game_fetcher or ManifestFetcher(
-            manifest_client, allow_private=settings.games_allow_private_urls
-        )
 
         gateway_client = httpx.AsyncClient(base_url=settings.db_gateway.url, timeout=_DB_GATEWAY_TIMEOUT)
         app.state.db_gateway = db_gateway or DbGatewayClient(
@@ -173,14 +162,9 @@ def create_app(
             )
             backups.start()
             app.state.backups = backups
-        game_sync = GameSyncScheduler(
-            database, app.state.game_fetcher, settings.games_allow_private_urls, GAME_SYNC_EVERY
-        )
-        game_sync.start()
         try:
             yield
         finally:
-            await game_sync.stop()
             if backups is not None:
                 await backups.stop()
             # Before the database closes: running turns save what they have.
@@ -188,7 +172,6 @@ def create_app(
             # Saves the counters (turns just ended may have added some).
             await recorder.stop()
             await upstream.aclose()
-            await manifest_client.aclose()
             await gateway_client.aclose()
             await database.dispose()
 
@@ -229,8 +212,6 @@ def create_app(
     app.include_router(traffic_routes.router)
     app.include_router(attachments.router)
     app.include_router(config_issues.router)
-    app.include_router(games_routes.router)
-    app.include_router(games_routes.internal_router)
     app.include_router(tickets_routes.router)
     app.include_router(tickets_routes.admin_router)
 
