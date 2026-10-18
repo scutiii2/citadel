@@ -27,6 +27,7 @@ from src.routes import (
     chat_folders,
     chats,
     config_issues,
+    forge,
     games as games_routes,
     tickets as tickets_routes,
     logs,
@@ -54,6 +55,7 @@ from src.services.email_service import EmailSender, McpEmailSender
 from src.services.game_manifest import ManifestFetcher
 from src.services.game_sync import GameSyncScheduler
 from src.services.extension_probe import ExtensionProbe
+from src.services.forge.runtime import ForgeRuntime
 from src.services.log_service import LogWriter
 from src.services.mcp_proxy import McpProxy
 from src.services.memory_purger import MemoryPurger
@@ -163,6 +165,7 @@ def create_app(
         recorder.start()
         app.state.share_limiter = PublicReadLimiter()
         app.state.turns = TurnRegistry(database, app.state.agent_gateway, settings.usage, log_writer)
+        app.state.forge = ForgeRuntime(database)
         backups: BackupScheduler | None = None
         app.state.backups = None
         if settings.backup.enabled:
@@ -185,6 +188,7 @@ def create_app(
                 await backups.stop()
             # Before the database closes: running turns save what they have.
             await app.state.turns.shutdown()
+            await app.state.forge.shutdown()
             # Saves the counters (turns just ended may have added some).
             await recorder.stop()
             await upstream.aclose()
@@ -233,6 +237,7 @@ def create_app(
     app.include_router(games_routes.internal_router)
     app.include_router(tickets_routes.router)
     app.include_router(tickets_routes.admin_router)
+    app.include_router(forge.router)
 
     @app.exception_handler(Exception)
     async def unexpected_error(request: Request, error: Exception) -> JSONResponse:

@@ -24,6 +24,7 @@ from src.services.settings_service import SettingsService
 from src.services.traffic import TrafficRecorder
 from src.services.turns import TurnRegistry
 from src.services.extension_probe import ExtensionProbe
+from src.services.forge.runtime import ForgeRuntime
 from src.services.secret_box import SecretBox
 from src.services.game_registry import GameRegistry
 from src.services.game_tickets import TicketService
@@ -80,6 +81,10 @@ def get_server_tools(request: Request) -> ServerTools:
 
 def get_memory_purger(request: Request) -> MemoryPurger:
     return request.app.state.memory_purger
+
+
+def get_forge(request: Request) -> ForgeRuntime:
+    return request.app.state.forge
 
 
 def get_log_writer(request: Request) -> LogWriter:

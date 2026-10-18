@@ -28,6 +28,8 @@ dependencies = [
     "alembic>=1.13,<2.0",
     # Encrypts the header values of users' private extensions at rest.
     "cryptography>=42",
+    # The Forge worker WebSocket (uvicorn serves WebSockets through it).
+    "websockets>=13,<17",
 ]
 
 [project.optional-dependencies]
