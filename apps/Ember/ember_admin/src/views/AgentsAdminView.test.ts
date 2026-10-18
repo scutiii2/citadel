@@ -41,6 +41,115 @@ async function mounted() {
   return wrapper;
 }
 
+describe("per-agent gateway order", () => {
+  function configuredAgent() {
+    const agent: AgentFile = { ...CALC, llm: { ...CALC.llm!, model: "claude-custom",
+      fallback_gateways: [{ gateway: "openrouter", model: "router-custom" }, "bedrock"] } };
+    vi.spyOn(agentsAdminClient, "list").mockResolvedValue([EMBER, agent]);
+    vi.spyOn(agentsAdminClient, "gateways").mockResolvedValue({ ...PROVIDERS, anthropic: [
+      ...PROVIDERS.anthropic, { id: "bedrock", label: "Bedrock", model: "bedrock-default", tiers: [] },
+    ] });
+    return agent;
+  }
+
+  it("shows an agent's configured primary and backups on its card", async () => {
+    configuredAgent();
+    const wrapper = await mounted();
+    expect(wrapper.find("[data-id=calc]").text()).toContain("claude → openrouter → bedrock");
+    expect(wrapper.find("[data-id=ember]").text()).not.toContain("bedrock");
+    wrapper.unmount();
+  });
+
+  it("promotes a backup and keeps each model override with its gateway", async () => {
+    const agent = configuredAgent();
+    const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(agent);
+    const wrapper = await mounted();
+    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    const rows = wrapper.findAll("[data-test=gateway-row]");
+    expect(rows).toHaveLength(3);
+    await rows[1]!.find("[data-test=move-up]").trigger("click");
+    expect(wrapper.find("[data-test=gateway-row]").text()).toContain("Primary");
+    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("openrouter");
+    expect(wrapper.find<HTMLInputElement>("[data-test=model]").element.value).toBe("router-custom");
+    expect(update).not.toHaveBeenCalled();
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(update).toHaveBeenCalledWith("calc", expect.objectContaining({ llm: expect.objectContaining({
+      gateway: "openrouter", model: "router-custom", fallback_gateways: [
+        { gateway: "claude", model: "claude-custom" }, { gateway: "bedrock" },
+      ],
+    }) }));
+    expect(agent.llm?.gateway).toBe("claude");
+    wrapper.unmount();
+  });
+
+  it("adds and removes backup rows, excludes used gateways, and keeps a primary", async () => {
+    const wrapper = await mounted();
+    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    expect(wrapper.find<HTMLButtonElement>("[data-test=remove-gateway]").element.disabled).toBe(true);
+    await wrapper.find("[data-test=add-gateway]").trigger("click");
+    expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(2);
+    const backup = wrapper.find<HTMLSelectElement>("[data-test=backup-gateway]");
+    expect(backup.element.value).toBe("openrouter");
+    expect(backup.find<HTMLOptionElement>('option[value="claude"]').element.disabled).toBe(true);
+    expect(wrapper.find<HTMLButtonElement>("[data-test=add-gateway]").element.disabled).toBe(true);
+    await wrapper.findAll("[data-test=gateway-row]")[1]!.find("[data-test=remove-gateway]").trigger("click");
+    expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("reorders by drag without saving until the agent form is submitted", async () => {
+    configuredAgent();
+    const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
+    const wrapper = await mounted();
+    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    const rows = wrapper.findAll("[data-test=gateway-row]");
+    await rows[2]!.find("[data-test=drag-handle]").trigger("dragstart", { dataTransfer: { setData: vi.fn() } });
+    await rows[0]!.trigger("drop");
+    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("bedrock");
+    expect(update).not.toHaveBeenCalled();
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(update.mock.calls[0]![1].llm).toMatchObject({ gateway: "bedrock", fallback_gateways: [
+      { gateway: "claude", model: "claude-custom" }, { gateway: "openrouter", model: "router-custom" },
+    ] });
+    wrapper.unmount();
+  });
+
+  it("discards canceled gateway edits and isolates each agent's draft", async () => {
+    const wrapper = await mounted();
+    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await wrapper.find("[data-test=add-gateway]").trigger("click");
+    await wrapper.find(".agent-form .actions .cancel").trigger("click");
+    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
+    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("openrouter");
+    await wrapper.find(".agent-form .actions .cancel").trigger("click");
+    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
+    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("claude");
+    wrapper.unmount();
+  });
+
+  it("clears incompatible gateway choices when changing provider and omits fallbacks for Laya", async () => {
+    configuredAgent();
+    const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(CALC);
+    const wrapper = await mounted();
+    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await wrapper.find("[data-test=provider]").setValue("openai");
+    expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
+    expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("");
+    expect(wrapper.find<HTMLInputElement>("[data-test=model]").element.value).toBe("");
+    await wrapper.find("[data-test=provider]").setValue("laya");
+    expect(wrapper.find("[data-test=add-gateway]").exists()).toBe(false);
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(update.mock.calls[0]![1].llm.provider).toBe("laya");
+    expect(update.mock.calls[0]![1].llm).not.toHaveProperty("fallback_gateways");
+    wrapper.unmount();
+  });
+});
+
 describe("AgentsAdminView", () => {
   it("lists agents with model, port and live status", async () => {
     const wrapper = await mounted();

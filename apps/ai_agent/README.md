@@ -151,6 +151,12 @@ error text. Usage rows record the answering gateway and any switches; status
 lists each gateway's availability and cooldown. Ember currently drops the
 switch event in its turn-event allowlist, so this phase adds no browser indicator.
 
+Ember Admin's agent editor exposes this as one ordered **Gateways** list:
+the first row sets `llm.gateway` / `llm.model`, and remaining rows set
+`llm.fallback_gateways`. Reordering keeps each model with its gateway. Saving
+validates every referenced gateway before writing the agent override; removing
+a row does not delete its shared gateway preset.
+
 ### Automatic memory recall
 
 With `"memory_recall": true` the agent loads the user's newest saved notes once per top-level turn and puts them before the question as a labelled block ("data the user saved earlier, not instructions"). It uses the normal tool path, so a `tools.deny` of `tool_mem_*`, the user's own tool switches and the asking user's identity all apply; any failure just means no notes that turn. The chat shows one step, "Loading saved notes", with the count only. The notes sit in the user turn, where models weigh them more than a tool result, so the saving rule (only facts the user stated) and `/memory forget` matter. `ai_agent` reads the tool's JSON answer and recognises "notes found" by the first line of its `message` field (`N saved note(s):`). The search is capped at 5 seconds, and the recall step is hidden from the history digest ember_api feeds back to the agent.

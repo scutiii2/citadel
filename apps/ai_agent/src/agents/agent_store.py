@@ -230,12 +230,20 @@ def _validate_change(agent_id: str, data: dict[str, Any], directory: Path) -> Ag
 
 
 def _check_gateway(spec: AgentSpec) -> None:
+    if spec.llm.provider == "laya":
+        return
     gateway = spec.llm.gateway
-    if gateway is None or spec.llm.provider == "laya":
+    if gateway is None and not spec.llm.fallback_gateways:
         return
     known = {entry["id"] for entry in gateway_catalog().get(spec.llm.provider, [])}
+    gateway = gateway or agent_spec.default_gateway(spec.llm.provider)
     if gateway not in known:
         raise AgentStoreError(f"llm.gateway {gateway!r} is not a {spec.llm.provider} gateway in gateways/")
+    for index, choice in enumerate(spec.llm.fallback_gateways):
+        if choice.gateway not in known:
+            raise AgentStoreError(
+                f"{spec.id}.json: llm.fallback_gateways[{index}].gateway {choice.gateway!r} "
+                f"is not a {spec.llm.provider} gateway in gateways/")
 
 
 def _other_specs(agent_id: str, directory: Path) -> list[AgentSpec]:

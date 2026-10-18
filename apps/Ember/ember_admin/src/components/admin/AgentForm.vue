@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import type { AgentConfig, AgentFile, ProviderCatalog } from "../../api/AgentsAdminClient";
 import BaseModal from "../BaseModal.vue";
 import ToggleSwitch from "../ToggleSwitch.vue";
+import AgentGatewayList, { type GatewayRow } from "./AgentGatewayList.vue";
 
 /** Create or edit one agent file. The parent keeps `open`, saves on `save`
  * and closes on `close`; `preview` asks the parent for the assembled system
@@ -34,8 +35,15 @@ const entry = ref(false);
 const orchestrator = ref(false);
 const planTool = ref(true);
 const provider = ref("anthropic");
-const gateway = ref("");
-const model = ref("");
+const gatewayRows = ref<GatewayRow[]>([{ key: 0, gateway: "", model: "" }]);
+const gateway = computed({
+  get: () => gatewayRows.value[0]?.gateway ?? "",
+  set: (value: string) => { if (gatewayRows.value[0]) gatewayRows.value[0].gateway = value; },
+});
+const model = computed({
+  get: () => gatewayRows.value[0]?.model ?? "",
+  set: (value: string) => { if (gatewayRows.value[0]) gatewayRows.value[0].model = value; },
+});
 const effort = ref("off");
 const minTier = ref("");
 const maxTier = ref("");
@@ -55,7 +63,7 @@ const localError = ref("");
 const isLaya = computed(() => provider.value === "laya");
 const gateways = computed(() => props.providers[provider.value] ?? []);
 // What a provider uses when the agent names no gateway (ai_agent: agent_spec._DEFAULT_GATEWAY).
-const DEFAULT_GATEWAY: Record<string, string> = { anthropic: "claude", openai: "gpt" };
+const DEFAULT_GATEWAY: Record<string, string> = { anthropic: "claude", openai: "gpt", laya: "local" };
 /** The model each tier resolves to on the chosen gateway, and whether the range allows it. */
 const tierPreview = computed(() => {
   const gatewayId = gateway.value || DEFAULT_GATEWAY[provider.value];
@@ -74,6 +82,19 @@ function joined(globs: string[] | undefined): string {
   return (globs ?? []).join(", ");
 }
 
+const initialDraft = ref("");
+function draftSignature(): string {
+  return JSON.stringify([
+    id.value, label.value, port.value, url.value, enabled.value, entry.value,
+    orchestrator.value, planTool.value, provider.value,
+    gatewayRows.value.map(({ gateway, model }) => [gateway, model]),
+    effort.value, minTier.value, maxTier.value, identity.value, temperature.value,
+    maxTokens.value, maxToolRounds.value, maxEffort.value, persona.value,
+    instructions.value, focus.value, allow.value, deny.value,
+  ]);
+}
+const modified = computed(() => initialDraft.value !== draftSignature());
+
 watch(
   () => props.open,
   (isOpen) => {
@@ -89,8 +110,14 @@ watch(
     orchestrator.value = a?.orchestrator ?? false;
     planTool.value = a?.plan_tool !== false;
     provider.value = a?.llm?.provider ?? providerIds.value[0] ?? "anthropic";
-    gateway.value = a?.llm?.gateway ?? "";
-    model.value = a?.llm?.model ?? "";
+    gatewayRows.value = [
+      { key: 0, gateway: a?.llm?.gateway ?? "", model: a?.llm?.model ?? "" },
+      ...(a?.llm?.fallback_gateways ?? []).map((choice, index) => ({
+        key: index + 1,
+        gateway: typeof choice === "string" ? choice : choice.gateway,
+        model: typeof choice === "string" ? "" : choice.model ?? "",
+      })),
+    ];
     effort.value = a?.llm?.reasoning_effort ?? "off";
     minTier.value = a?.llm?.min_tier ?? "";
     maxTier.value = a?.llm?.max_tier ?? "";
@@ -105,18 +132,20 @@ watch(
     focus.value = a?.focus ?? "";
     allow.value = joined(a?.tools?.allow);
     deny.value = joined(a?.tools?.deny);
+    initialDraft.value = draftSignature();
   },
   { immediate: true },
 );
 
-// A gateway belongs to one provider: changing the provider clears a gateway it does not offer.
+// Synchronous so loading another agent can set its provider before hydrating
+// that agent's own rows, without a queued watcher clearing the new draft.
 watch(provider, () => {
-  if (gateway.value && !gateways.value.some((g) => g.id === gateway.value)) gateway.value = "";
+  gatewayRows.value = [{ key: 0, gateway: "", model: "" }];
   if (isLaya.value) {
     entry.value = false;
     orchestrator.value = false;
   }
-});
+}, { flush: "sync" });
 
 function globs(text: string): string[] {
   return text.split(/[,\n]/).map((g) => g.trim()).filter(Boolean);
@@ -145,6 +174,17 @@ function buildConfig(): AgentConfig | null {
     localError.value = "The weakest tier cannot be stronger than the strongest tier.";
     return null;
   }
+  if (!isLaya.value) {
+    const names = gatewayRows.value.map((row) => row.gateway || DEFAULT_GATEWAY[provider.value]);
+    if (!names.length || names.some((name) => !gateways.value.some((g) => g.id === name))) {
+      localError.value = "Choose at least one available gateway for this provider.";
+      return null;
+    }
+    if (new Set(names).size !== names.length) {
+      localError.value = "Each gateway can appear only once.";
+      return null;
+    }
+  }
   const { id: _id, error: _error, overridden: _overridden, ...kept } = props.initial ?? { id: "" };
   const llm: AgentConfig["llm"] = { ...(kept.llm ?? {}), provider: provider.value };
   const setOrDrop = (key: string, value: string): void => {
@@ -153,6 +193,12 @@ function buildConfig(): AgentConfig | null {
   };
   setOrDrop("gateway", gateway.value);
   setOrDrop("model", model.value.trim());
+  const backups = gatewayRows.value.slice(1).map((row) => ({
+    gateway: row.gateway || DEFAULT_GATEWAY[provider.value]!,
+    ...(row.model.trim() ? { model: row.model.trim() } : {}),
+  }));
+  if (!isLaya.value && backups.length) llm.fallback_gateways = backups;
+  else delete llm.fallback_gateways;
   const numbers = {
     temperature: optionalNumber(temperature.value, "Temperature", 0, 2, false),
     max_tokens: optionalNumber(maxTokens.value, "Max tokens", 1, 1_000_000, true),
@@ -196,6 +242,7 @@ function buildConfig(): AgentConfig | null {
 }
 
 function submit(): void {
+  if (props.busy) return;
   const config = buildConfig();
   if (config) emit("save", id.value.trim(), config);
 }
@@ -231,14 +278,12 @@ function previewPrompt(): void {
           <label class="field grow"><span>Provider</span>
             <select v-model="provider" data-test="provider"><option v-for="p in providerIds" :key="p" :value="p">{{ p }}</option></select>
           </label>
-          <label class="field grow"><span>Gateway</span>
-            <select v-model="gateway" data-test="gateway" :disabled="isLaya">
-              <option value="">Provider default</option>
-              <option v-for="g in gateways" :key="g.id" :value="g.id">{{ g.label }}</option>
-            </select>
-          </label>
         </div>
-        <label class="field"><span>Model</span><input v-model="model" data-test="model" type="text" autocomplete="off" :disabled="isLaya" placeholder="Gateway default" /></label>
+        <AgentGatewayList v-if="!isLaya" v-model="gatewayRows" :gateways="gateways" :default-gateway="DEFAULT_GATEWAY[provider] ?? ''" :busy="busy" />
+        <template v-else>
+          <label class="field"><span>Gateway</span><select v-model="gateway" data-test="gateway" disabled><option value="">Local</option><option value="local">Local</option></select></label>
+          <label class="field"><span>Model</span><input v-model="model" data-test="model" type="text" disabled placeholder="convaiinnovations/laya" /></label>
+        </template>
         <div v-if="!isLaya" class="row">
           <label class="field grow"><span>Reasoning effort</span>
             <select v-model="effort" data-test="effort"><option v-for="e in EFFORTS" :key="e" :value="e">{{ e }}</option></select>
@@ -300,6 +345,7 @@ function previewPrompt(): void {
 
       <p v-if="localError || error" class="error" role="alert" data-test="form-error">{{ localError || error }}</p>
       <div class="actions">
+        <span v-if="modified" class="unsaved" role="status" data-test="unsaved">● Unsaved changes</span>
         <button type="button" class="cancel" :disabled="busy" @click="emit('close')">Cancel</button>
         <button type="submit" class="primary" :disabled="busy" data-test="save">{{ busy ? "Saving…" : editing ? "Save" : "Create" }}</button>
       </div>
@@ -338,7 +384,9 @@ legend { padding: 0 6px; color: var(--muted); font-size: 0.85em; }
 .switches { display: grid; gap: 8px; }
 .preview-bar { align-items: center; justify-content: space-between; }
 .prompt-text { max-height: 280px; margin: 0; padding: 10px 12px; overflow: auto; border-radius: var(--radius-md); background: var(--code-bg); color: var(--text); font-family: var(--mono); font-size: 0.8em; white-space: pre-wrap; overflow-wrap: anywhere; }
-.actions { display: flex; justify-content: flex-end; gap: 8px; }
+.actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.unsaved { margin-right: auto; color: var(--muted); font-size: 0.8em; }
+.unsaved::first-letter { color: var(--accent); }
 .cancel { padding: 6px 16px; border: 1px solid var(--border); border-radius: var(--radius-full); background: transparent; color: var(--text); font: inherit; cursor: pointer; }
 .primary { padding: 6px 16px; border: none; border-radius: var(--radius-full); cursor: pointer; font: inherit; font-weight: 600; color: var(--accent-contrast); background: var(--accent); }
 .primary:disabled, .cancel:disabled { opacity: 0.6; cursor: default; }
