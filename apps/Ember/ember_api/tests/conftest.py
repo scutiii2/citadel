@@ -306,13 +306,19 @@ class FakeDbGateway:
     async def put(self, collection, key, doc):
         self.records[(collection, key)] = json.loads(json.dumps(doc))
 
+    async def create(self, collection, key, doc):
+        if (collection, key) in self.records:
+            return False
+        self.records[(collection, key)] = json.loads(json.dumps(doc))
+        return True
+
     async def delete(self, collection, key):
         return self.records.pop((collection, key), None) is not None
 
     async def query(self, collection, filters=None, limit=100, offset=0):
         rows = sorted((k, d) for (c, k), d in self.records.items() if c == collection)
         matching = [d for _, d in rows if all(d.get(f) == v for f, v in (filters or {}).items())]
-        return matching[offset : offset + limit]
+        return json.loads(json.dumps(matching[offset : offset + limit]))  # copies, like a real HTTP answer
 
 
 def make_settings(

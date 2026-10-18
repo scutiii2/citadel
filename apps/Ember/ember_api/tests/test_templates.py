@@ -87,8 +87,8 @@ def test_unknown_or_out_of_range_ids(client: TestClient) -> None:
     as_admin(client)
     body = {"name": "x", "body": "y"}
 
-    assert client.put("/api/templates/999", json=body).status_code == 404
-    assert client.delete("/api/templates/999").status_code == 404
+    assert client.put(f"/api/templates/{'0' * 32}", json=body).status_code == 404
+    assert client.delete(f"/api/templates/{'0' * 32}").status_code == 404
     assert client.put("/api/templates/0", json=body).status_code == 422
     assert client.delete("/api/templates/not-a-number").status_code == 422
 
@@ -194,7 +194,7 @@ def test_posts_must_be_json(client: TestClient) -> None:
 # --- account deletion -----------------------------------------------------------
 
 
-def test_templates_go_with_their_account(client: TestClient, email: FakeEmailSender) -> None:
+def test_templates_go_with_their_account(client: TestClient, email: FakeEmailSender, db_gateway) -> None:
     alice_id = make_member(client, email)
     login(client, "alice")
     create(client)
@@ -203,12 +203,20 @@ def test_templates_go_with_their_account(client: TestClient, email: FakeEmailSen
     as_admin(client)
     client.delete(f"/api/admin/accounts/{alice_id}")
 
-    async def remaining() -> int:
-        from sqlalchemy import func, select
+    assert db_gateway.records == {}
 
-        from src.models import PromptTemplate
 
-        async with client.app.state.database.sessions() as session:
-            return await session.scalar(select(func.count()).select_from(PromptTemplate))
+def test_gateway_down_gives_503_and_core_still_works(client: TestClient, db_gateway, monkeypatch) -> None:
+    from src.services.db_gateway import DbGatewayUnavailable
 
-    assert client.portal.call(remaining) == 0
+    as_admin(client)
+
+    async def down(*args, **kwargs):
+        raise DbGatewayUnavailable("db_gateway is not reachable")
+
+    for method in ("get", "put", "create", "delete", "query"):
+        monkeypatch.setattr(db_gateway, method, down)
+
+    assert client.get("/api/templates").status_code == 503
+    assert create(client).status_code == 503
+    assert client.get("/api/auth/me").status_code == 200

@@ -1,18 +1,18 @@
 """Per-account nav rail arrangement: page order, pinned pages, hidden pages.
 
-Every lookup filters by account. The service holds only ids and does not know
-which pages exist; it keeps the lists small and consistent.
+Stored as one document per account in db_gateway (collection "nav_preferences", key the
+account uid). The service holds only ids and does not know which pages exist; it keeps the
+lists small and consistent.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.db import utcnow
-from src.models import NavPreference
+from src.services.db_gateway import DocumentStore
 
+COLLECTION = "nav_preferences"
 MAX_PAGES = 50
 PAGE_ID_MAX = 64
 
@@ -39,31 +39,29 @@ def normalize(layout: NavLayout) -> NavLayout:
 
 
 class NavPreferenceService:
-    def __init__(self, session: AsyncSession, account_id: int) -> None:
-        self._session = session
-        self._account_id = account_id
+    def __init__(self, store: DocumentStore, owner_uid: str) -> None:
+        self._store = store
+        self._owner = owner_uid
 
     async def get(self) -> NavLayout:
-        row = await self._session.get(NavPreference, self._account_id)
-        if row is None:
+        doc = await self._store.get(COLLECTION, self._owner)
+        if doc is None:
             return NavLayout()
-        return NavLayout(order=list(row.page_order), pinned=list(row.pinned), hidden=list(row.hidden))
+        return NavLayout(order=list(doc["order"]), pinned=list(doc["pinned"]), hidden=list(doc["hidden"]))
 
     async def replace(self, layout: NavLayout) -> NavLayout:
         layout = normalize(layout)
-        row = await self._session.get(NavPreference, self._account_id)
-        if row is None:
-            row = NavPreference(account_id=self._account_id)
-            self._session.add(row)
-        row.page_order = layout.order
-        row.pinned = layout.pinned
-        row.hidden = layout.hidden
-        row.updated_at = utcnow()
-        await self._session.commit()
+        doc = {
+            "owner": self._owner, "order": layout.order, "pinned": layout.pinned, "hidden": layout.hidden,
+            "updated_at": utcnow().isoformat(timespec="seconds"),
+        }
+        await self._store.put(COLLECTION, self._owner, doc)
         return layout
 
     async def reset(self) -> None:
-        row = await self._session.get(NavPreference, self._account_id)
-        if row is not None:
-            await self._session.delete(row)
-            await self._session.commit()
+        await self._store.delete(COLLECTION, self._owner)
+
+
+async def purge_owner(store: DocumentStore, owner_uid: str) -> None:
+    """Forget one account's arrangement (used when the account is deleted)."""
+    await store.delete(COLLECTION, owner_uid)

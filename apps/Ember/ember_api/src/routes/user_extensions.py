@@ -10,10 +10,9 @@ from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.deps import (
-    get_db_session,
+    get_db_gateway,
     get_extension_probe,
     get_log_writer,
     get_secret_box,
@@ -23,6 +22,7 @@ from src.models import Account
 from src.routes.mcp import get_agent_directory
 from src.services.agent_directory import AgentDirectory
 from src.services.agent_gateway import Caller
+from src.services.db_gateway import DocumentStore
 from src.services.extension_probe import ExtensionProbe, ProbeResult
 from src.services.log_service import LogWriter
 from src.services.permissions import CHAT_USE, EXTENSIONS_PERSONAL_MANAGE
@@ -47,10 +47,10 @@ NOT_PROBED = ProbeResult("unknown", None, ())
 
 def get_service(
     account: Account = Depends(require_chat),
-    session: AsyncSession = Depends(get_db_session),
+    store: DocumentStore = Depends(get_db_gateway),
     box: SecretBox = Depends(get_secret_box),
 ) -> UserExtensionService:
-    return UserExtensionService(session, account.id, box)
+    return UserExtensionService(store, account.uid, box)
 
 
 class ExtensionCreate(BaseModel):

@@ -3,7 +3,6 @@ the browser cannot name one, notices reach the watcher, and a private tool asks.
 
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -93,13 +92,14 @@ def test_no_notice_when_everything_connected(client: TestClient, agent: FakeAgen
 
 
 def test_an_extension_whose_headers_cannot_be_read_is_left_out_with_a_notice(
-    client: TestClient, agent: FakeAgent, tmp_path: Path
+    client: TestClient, agent: FakeAgent, db_gateway
 ) -> None:
     as_admin(client)
     add(client, "Notes", "https://notes.example.com/mcp", headers={"X-Key": "one"})
     add(client, "Wiki", "https://wiki.example.com/mcp")
-    with sqlite3.connect(tmp_path / "data" / "test.db") as conn:
-        conn.execute("UPDATE user_extensions SET headers_encrypted = 'garbage' WHERE slug = 'notes'")
+    for (collection, _), doc in db_gateway.records.items():
+        if collection == "user_extensions" and doc["slug"] == "notes":
+            doc["headers_encrypted"] = "garbage"
     chat_id = new_id()
 
     start(client, chat_id)
@@ -132,3 +132,24 @@ def test_turn_options_never_show_header_values_in_repr() -> None:
     options = TurnOptions(private_extensions=({"id": "notes", "label": "N", "url": "u", "headers": {"X-Key": "s3cret"}},))
 
     assert "s3cret" not in repr(options)
+
+
+def test_gateway_down_still_answers_without_private_extensions(
+    client: TestClient, agent: FakeAgent, db_gateway, monkeypatch
+) -> None:
+    from src.services.db_gateway import DbGatewayUnavailable
+
+    as_admin(client)
+    add(client, "Notes", "https://notes.example.com/mcp")
+    chat_id = new_id()
+
+    async def down(*args, **kwargs):
+        raise DbGatewayUnavailable("db_gateway is not reachable")
+
+    monkeypatch.setattr(db_gateway, "query", down)
+    start(client, chat_id)
+    stream = finished(client, chat_id)
+
+    assert not agent.asks[-1]["private_extensions"]
+    notice = next(e for e in stream if e["type"] == "notice")
+    assert "unavailable" in notice["notices"][0]["error"]

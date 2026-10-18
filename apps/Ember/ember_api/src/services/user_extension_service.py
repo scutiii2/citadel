@@ -1,8 +1,9 @@
 """Private extensions: the MCP servers an account added for itself.
 
-Every query filters by account. Header values are secrets: they are validated
-here, encrypted with the SecretBox before they reach the database, and only
-this service decrypts them. `ai_agent` validates again (it is the one that
+Stored as documents in db_gateway (collection "user_extensions", key "<owner uid>:<slug>", so
+create-if-absent keeps an account's slugs unique). Header values are secrets: they are validated
+here, encrypted with the SecretBox before they reach the gateway, and only this service decrypts
+them. `ai_agent` validates again (it is the one that
 connects), so the limits below are duplicated there on purpose.
 """
 
@@ -10,17 +11,15 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 from urllib.parse import urlsplit
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.db import utcnow
-from src.models import UserExtension
+from src.services.db_gateway import DocumentStore
 from src.services.secret_box import SecretBox, SecretBoxError
 
+COLLECTION = "user_extensions"
 MAX_EXTENSIONS = 20
 MAX_HEADERS = 20
 MAX_VALUE = 2000
@@ -101,8 +100,32 @@ def clean_headers(headers: Mapping[str, str] | None) -> dict[str, str]:
 
 
 @dataclass(frozen=True)
+class ExtensionRecord:
+    """One saved extension as the gateway holds it."""
+
+    slug: str
+    label: str
+    description: str
+    url: str
+    headers_encrypted: str | None
+    enabled: bool
+    created_at: str
+    updated_at: str
+
+    @classmethod
+    def from_doc(cls, doc: dict[str, Any]) -> ExtensionRecord:
+        return cls(
+            doc["slug"], doc["label"], doc.get("description", ""), doc["url"], doc.get("headers_encrypted"),
+            doc.get("enabled") is not False, doc["created_at"], doc["updated_at"],
+        )
+
+    def to_doc(self, owner_uid: str) -> dict[str, Any]:
+        return {"owner": owner_uid, **asdict(self)}
+
+
+@dataclass(frozen=True)
 class StoredExtension:
-    row: UserExtension
+    row: ExtensionRecord
     # None: the stored headers could not be decrypted (the key changed).
     headers: dict[str, str] | None
 
@@ -127,12 +150,15 @@ class TurnExtensions:
 
 
 class UserExtensionService:
-    def __init__(self, session: AsyncSession, account_id: int, box: SecretBox) -> None:
-        self._session = session
-        self._account_id = account_id
+    def __init__(self, store: DocumentStore, owner_uid: str, box: SecretBox) -> None:
+        self._store = store
+        self._owner = owner_uid
         self._box = box
 
-    def _stored(self, row: UserExtension) -> StoredExtension:
+    def _key(self, slug: str) -> str:
+        return f"{self._owner}:{slug}"
+
+    def _stored(self, row: ExtensionRecord) -> StoredExtension:
         if row.headers_encrypted is None:
             return StoredExtension(row, {})
         try:
@@ -140,21 +166,15 @@ class UserExtensionService:
         except SecretBoxError:
             return StoredExtension(row, None)
 
-    async def _rows(self) -> list[UserExtension]:
-        result = await self._session.scalars(
-            select(UserExtension)
-            .where(UserExtension.account_id == self._account_id)
-            .order_by(UserExtension.created_at, UserExtension.id)
-        )
-        return list(result)
+    async def _rows(self) -> list[ExtensionRecord]:
+        docs = await self._store.query(COLLECTION, {"owner": self._owner}, limit=MAX_EXTENSIONS + 1)
+        return sorted((ExtensionRecord.from_doc(d) for d in docs), key=lambda r: (r.created_at, r.slug))
 
-    async def _row(self, slug: str) -> UserExtension:
-        row = await self._session.scalar(
-            select(UserExtension).where(UserExtension.account_id == self._account_id, UserExtension.slug == slug)
-        )
-        if row is None:
+    async def _row(self, slug: str) -> ExtensionRecord:
+        doc = await self._store.get(COLLECTION, self._key(slug))
+        if doc is None or doc.get("owner") != self._owner:
             raise ExtensionNotFound(slug)
-        return row
+        return ExtensionRecord.from_doc(doc)
 
     async def list(self) -> list[StoredExtension]:
         return [self._stored(row) for row in await self._rows()]
@@ -175,22 +195,19 @@ class UserExtensionService:
         taken = {row.slug for row in rows}
         base = slugify(label)
         slug, number = base, 2
-        while slug in taken:
-            suffix = f"_{number}"
-            slug = f"{base[: MAX_SLUG - len(suffix)].rstrip('_')}{suffix}"
-            number += 1
-        row = UserExtension(
-            account_id=self._account_id,
-            slug=slug,
-            label=label,
-            description=description,
-            url=url,
-            headers_encrypted=self._box.encrypt_map(values) if values else None,
-            enabled=True,
-        )
-        self._session.add(row)
-        await self._session.commit()
-        return StoredExtension(row, values)
+        now = utcnow().isoformat()
+        while True:
+            while slug in taken:
+                suffix = f"_{number}"
+                slug = f"{base[: MAX_SLUG - len(suffix)].rstrip('_')}{suffix}"
+                number += 1
+            row = ExtensionRecord(
+                slug, label, description, url, self._box.encrypt_map(values) if values else None, True, now, now
+            )
+            # Create-if-absent: a slug taken by a racing request is skipped, not overwritten.
+            if await self._store.create(COLLECTION, self._key(slug), row.to_doc(self._owner)):
+                return StoredExtension(row, values)
+            taken.add(slug)
 
     async def update(
         self,
@@ -206,29 +223,30 @@ class UserExtensionService:
         without new headers clears the saved ones: a token is never silently
         sent to another host."""
         row = await self._row(slug)
+        changes: dict[str, Any] = {}
         if label is not None:
-            row.label = clean_label(label)
+            changes["label"] = clean_label(label)
         if description is not None:
-            row.description = clean_description(description)
+            changes["description"] = clean_description(description)
         host_changed = False
         if url is not None:
             new_url = clean_url(url)
             host_changed = urlsplit(new_url).hostname != urlsplit(row.url).hostname
-            row.url = new_url
+            changes["url"] = new_url
         if headers is not None:
             values = clean_headers(headers)
-            row.headers_encrypted = self._box.encrypt_map(values) if values else None
+            changes["headers_encrypted"] = self._box.encrypt_map(values) if values else None
         elif host_changed:
-            row.headers_encrypted = None
+            changes["headers_encrypted"] = None
         if enabled is not None:
-            row.enabled = enabled
-        row.updated_at = utcnow()
-        await self._session.commit()
+            changes["enabled"] = enabled
+        row = replace(row, updated_at=utcnow().isoformat(), **changes)
+        await self._store.put(COLLECTION, self._key(slug), row.to_doc(self._owner))
         return self._stored(row)
 
     async def delete(self, slug: str) -> None:
-        await self._session.delete(await self._row(slug))
-        await self._session.commit()
+        await self._row(slug)
+        await self._store.delete(COLLECTION, self._key(slug))
 
     async def enabled_for_turn(self) -> TurnExtensions:
         items: list[dict[str, Any]] = []
@@ -242,3 +260,15 @@ class UserExtensionService:
             else:
                 items.append({"id": row.slug, "label": row.label, "url": row.url, "headers": dict(stored.headers)})
         return TurnExtensions(tuple(items), tuple(skipped))
+
+
+async def purge_owner(store: DocumentStore, owner_uid: str) -> int:
+    """Delete every extension of one account (used when the account is deleted). Returns the count."""
+    removed = 0
+    for _ in range(20):
+        docs = await store.query(COLLECTION, {"owner": owner_uid}, limit=MAX_EXTENSIONS + 1)
+        if not docs:
+            break
+        for doc in docs:
+            removed += await store.delete(COLLECTION, f"{owner_uid}:{doc['slug']}")
+    return removed

@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import Settings
 from src.deps import (
     get_agent_gateway,
+    get_db_gateway,
     get_db_session,
     get_log_writer,
     get_secret_box,
@@ -60,7 +61,8 @@ from src.services.turns import (
     TurnOptions,
     TurnRegistry,
 )
-from src.services.user_extension_service import UserExtensionService
+from src.services.db_gateway import DbGatewayError, DocumentStore
+from src.services.user_extension_service import TurnExtensions, UserExtensionService
 from src.services.usage_service import LimitBlock, UsageService
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
@@ -691,6 +693,7 @@ async def start_turn(
     settings: Settings = Depends(get_settings),
     app_settings: SettingsService = Depends(get_settings_service),
     box: SecretBox = Depends(get_secret_box),
+    db_gateway: DocumentStore = Depends(get_db_gateway),
 ) -> TurnOut:
     """Saves the question and starts answering it in ember_api. The answer
     keeps going (and is saved) even if the browser leaves; watch it via
@@ -722,8 +725,14 @@ async def start_turn(
     # When the administrator requires it, the browser's choice does not matter:
     # every tool asks, and no tool is pre-allowed.
     forced = await app_settings.get_bool(FORCE_TOOL_APPROVAL)
-    # The caller's own private extensions, read here from the database: the browser cannot name one.
-    private = await UserExtensionService(session, account.id, box).enabled_for_turn()
+    # The caller's own private extensions, read here from db_gateway: the browser cannot name one.
+    # If the gateway is down the answer still runs, without them, and says so.
+    try:
+        private = await UserExtensionService(db_gateway, account.uid, box).enabled_for_turn()
+    except DbGatewayError:
+        private = TurnExtensions(
+            (), ({"id": "private", "label": "Private extensions", "error": "Private extensions storage is unavailable"},)
+        )
     try:
         options = TurnOptions(
             caveman=body.caveman,

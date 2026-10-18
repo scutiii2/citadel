@@ -227,13 +227,13 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `POST` | `/api/chat-folders` | `chat.use` | `{name}` (1 to 60 characters, trimmed) -> `201` folder. `409` duplicate name (ignoring case) or 30 folders already. Logged as `chat_folder.create`. |
 | `PATCH` | `/api/chat-folders/{id}` | `chat.use` | `{name?, position?}` (at least one), or `{direction: "up"|"down"}` on its own. Direction moves one place and saves all affected positions in one transaction; moving past an end is a no-op. `404` unknown, `409` duplicate name. Logged as `chat_folder.rename` for renames and `chat_folder.move` for moves. |
 | `DELETE` | `/api/chat-folders/{id}` | `chat.use` | Deletes the folder **and every chat in it**, with their share links. `404` unknown, `409` while a chat in it is writing an answer. Logged as `chat_folder.delete`. |
-| `GET` | `/api/templates` | `chat.use` | This account's saved prompts, most recently edited first: `[{id, name, body, created_at, updated_at}]`. |
+| `GET` | `/api/templates` | `chat.use` | This account's saved prompts, most recently edited first: `[{id, name, body, created_at, updated_at}]`; `id` is a 32-character hex string. Kept in db_gateway (`503` while it is down). |
 | `POST` | `/api/templates` | `chat.use` | `{name, body}` -> `201` the template. Name up to 60 characters (trimmed), body up to 10,000, at most 100 per account. `409` for a name the account already has (ignoring case) or the limit, `422` for a blank or too-long field. |
-| `PUT` | `/api/templates/{id}` | `chat.use` | `{name, body}` replaces one. `404` if missing or another account's, `409` name taken. |
+| `PUT` | `/api/templates/{id}` | `chat.use` | `{name, body}` replaces one. `404` if missing or another account's, `409` name taken, `422` for an id that is not 32 hex characters. |
 | `DELETE` | `/api/templates/{id}` | `chat.use` | `204`; `404` if missing or another account's. |
 | `GET` | `/api/nav-preferences` | any logged-in account | How this account arranges its nav rail: `{order, pinned, hidden}`, lists of page ids (route paths such as `/agents`). All empty means the default arrangement. |
 | `PUT` | `/api/nav-preferences` | any logged-in account | Replaces it with the same shape. At most 50 ids per list, each 1-64 characters (`422` otherwise). Repeats are dropped; `pinned` and `hidden` keep only ids in `order`, and a hidden page is never pinned. ember_api does not know the page list, so unknown ids are kept. Returns what was stored. |
-| `DELETE` | `/api/nav-preferences` | any logged-in account | Back to the default arrangement. `204`, also when nothing was saved. |
+| `DELETE` | `/api/nav-preferences` | any logged-in account | Back to the default arrangement. `204`, also when nothing was saved. | Nav preferences and account capabilities are kept in db_gateway (one document per account, keyed by uid). While it is down, `GET` answers the default arrangement and saving gives `503`; account capabilities answer `503` for every call (an empty set would disable all tools). Run `python -m scripts.move_to_gateway` once to copy rows saved before the move (`--dry-run` first); the old tables stay until a later migration drops them. |
 | `GET` | `/api/notes` | `chat.use` | This account's private notes, newest edit first: `[{id, title, body, tags, agent_readable, last_editor, created_at, updated_at}]`. Kept in db_gateway, not in this database. |
 | `GET` | `/api/notes/tags` | `chat.use` | The tags this account already uses, most used first: `[{tag, count}]`. |
 | `POST` | `/api/notes/suggest-tags` | `chat.use` | `{title?, body?, tags?}` (the note as the editor holds it): which of this account's existing tags, not already in `tags`, Laya thinks fit. `{suggested, checked, skipped}`. Needs a running agent whose file uses the `laya` provider, else `503`. Laya answers alone (`local_only`: English, then typed-decisions; no fallback to Jev). |
@@ -295,7 +295,7 @@ Every notes route answers `503` `Notes storage is unavailable` when db_gateway c
 
 ## Private extensions
 
-A user can add an MCP server of their own (`/api/user-extensions`). Only that
+A user can add an MCP server of their own (`/api/user-extensions`; kept in db_gateway, so a chat answer still runs without them while it is down, with a notice). Only that
 account sees it and only its chats use it. `ember_api` stores it; `ai_agent`
 makes every connection (it holds the address guard: public and private-LAN
 addresses only, never loopback, link-local or cloud-metadata ones).

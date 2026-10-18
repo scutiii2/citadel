@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-import sqlite3
 from pathlib import Path
 
 import pytest
 from cryptography.fernet import Fernet
 
-from src.db import Database
-from src.models import Account
 from src.services import user_extension_service as svc
 from src.services.secret_box import SecretBox
+from tests.conftest import FakeDbGateway
 from src.services.user_extension_service import (
     ExtensionLimit,
     ExtensionNotFound,
@@ -31,34 +29,21 @@ def new_box() -> SecretBox:
 
 
 class Env:
-    """A real SQLite database with two accounts, and a service per account."""
+    """An in-memory db_gateway and a service per account (1 is uid "u1", 2 is "u2")."""
 
-    def __init__(self, tmp_path: Path, box: SecretBox | None = None):
-        self.path = tmp_path / "ext.db"
-        self.database = Database(f"sqlite+aiosqlite:///{self.path.as_posix()}")
+    def __init__(self, box: SecretBox | None = None):
+        self.store = FakeDbGateway()
         self.box = box or new_box()
 
-    async def setup(self) -> None:
-        await self.database.create_tables()
-        async with self.database.sessions() as session:
-            for name in ("alice", "bob"):
-                session.add(Account(username=name, email=f"{name}@example.com", password_hash="x"))
-            await session.commit()
-
     def service(self, session, account_id: int = 1) -> UserExtensionService:
-        return UserExtensionService(session, account_id, self.box)
+        return UserExtensionService(self.store, f"u{account_id}", self.box)
 
 
 def run(tmp_path: Path, scenario, box: SecretBox | None = None):
-    env = Env(tmp_path, box)
+    env = Env(box)
 
     async def go():
-        await env.setup()
-        try:
-            async with env.database.sessions() as session:
-                return await scenario(env, session)
-        finally:
-            await env.database.dispose()
+        return await scenario(env, None)
 
     return asyncio.run(go())
 
@@ -103,21 +88,19 @@ def test_no_headers_is_an_empty_map():
 def test_create_stores_the_headers_encrypted(tmp_path):
     async def scenario(env, session):
         stored = await env.service(session).create(label="Notes", url=URL, headers={"X-Key": "s3cret-value"})
+        token = env.store.records[("user_extensions", "u1:notes")]["headers_encrypted"]
+        assert token and "s3cret-value" not in token
         return stored.row.slug, stored.headers, stored.header_names
 
     assert run(tmp_path, scenario) == ("notes", {"X-Key": "s3cret-value"}, ["X-Key"])
-    with sqlite3.connect(tmp_path / "ext.db") as conn:
-        (token,) = conn.execute("SELECT headers_encrypted FROM user_extensions").fetchone()
-    assert token and "s3cret-value" not in token
 
 
 def test_no_headers_is_stored_as_null(tmp_path):
     async def scenario(env, session):
         await env.service(session).create(label="Notes", url=URL)
+        return env.store.records[("user_extensions", "u1:notes")]["headers_encrypted"]
 
-    run(tmp_path, scenario)
-    with sqlite3.connect(tmp_path / "ext.db") as conn:
-        assert conn.execute("SELECT headers_encrypted FROM user_extensions").fetchone() == (None,)
+    assert run(tmp_path, scenario) is None
 
 
 def test_slugs_stay_unique_per_account(tmp_path):
@@ -219,7 +202,7 @@ def test_headers_that_cannot_be_decrypted_are_reported_not_fatal(tmp_path):
         await env.service(session).create(label="Notes", url=URL, headers={"X-Key": "one"})
         await env.service(session).create(label="Wiki", url="https://wiki.example.com/mcp")
         # A different key now: the first extension's headers are unreadable.
-        other = UserExtensionService(session, 1, new_box())
+        other = UserExtensionService(env.store, "u1", new_box())
         listed = await other.list()
         return [(s.row.slug, s.readable, s.header_names) for s in listed]
 
@@ -231,7 +214,7 @@ def test_an_unreadable_row_can_be_repaired_by_sending_headers(tmp_path):
 
     async def scenario(env, session):
         await env.service(session).create(label="Notes", url=URL, headers={"X-Key": "one"})
-        other = UserExtensionService(session, 1, new_box())
+        other = UserExtensionService(env.store, "u1", new_box())
         repaired = await other.update("notes", headers={"X-Key": "two"})
         return repaired.readable, repaired.headers
 
@@ -262,7 +245,7 @@ def test_enabled_for_turn_skips_and_reports_an_unreadable_row(tmp_path):
 
     async def scenario(env, session):
         await env.service(session).create(label="Notes", url=URL, headers={"X-Key": "one"})
-        turn = await UserExtensionService(session, 1, new_box()).enabled_for_turn()
+        turn = await UserExtensionService(env.store, "u1", new_box()).enabled_for_turn()
         return list(turn.items), list(turn.skipped)
 
     items, skipped = run(tmp_path, scenario, first_box)

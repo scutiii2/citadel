@@ -48,7 +48,7 @@ from src.services.auth_service import AuthService
 from src.services.backup_service import BackupScheduler, DatabaseBackup
 from src.services.migrations import MigrationRunner
 from src.services.chat_service import MAX_CHAT_BYTES
-from src.services.db_gateway import DbGatewayClient, DocumentStore
+from src.services.db_gateway import DbGatewayClient, DbGatewayError, DocumentStore
 from src.services.email_service import EmailSender, McpEmailSender
 from src.services.extension_probe import ExtensionProbe
 from src.services.log_service import LogWriter
@@ -214,6 +214,11 @@ def create_app(
     app.include_router(config_issues.router)
     app.include_router(tickets_routes.router)
     app.include_router(tickets_routes.admin_router)
+
+    @app.exception_handler(DbGatewayError)
+    async def storage_unavailable(request: Request, error: DbGatewayError) -> JSONResponse:
+        """A route that keeps its data in db_gateway and did not handle the outage itself."""
+        return JSONResponse({"detail": "Storage is unavailable"}, status_code=503)
 
     @app.exception_handler(Exception)
     async def unexpected_error(request: Request, error: Exception) -> JSONResponse:

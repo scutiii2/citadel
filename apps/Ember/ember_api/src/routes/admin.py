@@ -29,6 +29,10 @@ from src.services.email_service import EmailDeliveryError, EmailSender
 from src.services.log_service import LogWriter
 from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.memory_purger import MemoryPurger
+from src.services.account_capability_service import purge_owner as purge_account_capabilities
+from src.services.nav_preference_service import purge_owner as purge_nav_preferences
+from src.services.template_service import purge_owner as purge_templates
+from src.services.user_extension_service import purge_owner as purge_user_extensions
 from src.services.notes import purge_owner as purge_notes
 from src.services.otp_service import OtpService
 from src.services.permissions import (
@@ -314,6 +318,15 @@ async def delete_account(
         await purge_notes(store, uid)
     except DbGatewayError as error:
         await logs.error(admin.id, "admin.notes_purge", f"Notes of deleted account '{username}' were not purged ({error})")
+    try:
+        await purge_nav_preferences(store, uid)
+        await purge_account_capabilities(store, uid)
+        await purge_templates(store, uid)
+        await purge_user_extensions(store, uid)
+    except DbGatewayError as error:
+        await logs.error(
+            admin.id, "admin.settings_purge", f"Saved settings of deleted account '{username}' were not purged ({error})"
+        )
     await logs.action(admin, "admin.delete_account", f"Deleted account '{username}'")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

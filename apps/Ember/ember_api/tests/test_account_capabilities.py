@@ -187,3 +187,32 @@ def test_removing_an_extension_clears_it_for_every_account(
 
     assert alice.get(URL).json()["extensions"] == ["wiki"]
     assert admin.get(URL).json()["extensions"] == []
+
+
+def test_gateway_down_gives_503_not_an_empty_set(client: TestClient, db_gateway, monkeypatch) -> None:
+    from src.services.db_gateway import DbGatewayUnavailable
+
+    as_admin(client)
+    put(client, "capability", "pdf")
+
+    async def down(*args, **kwargs):
+        raise DbGatewayUnavailable("db_gateway is not reachable")
+
+    for method in ("get", "put"):
+        monkeypatch.setattr(db_gateway, method, down)
+
+    assert client.get(URL).status_code == 503  # an empty set would disable every tool
+    assert put(client, "capability", "calc").status_code == 503
+
+
+def test_deleting_an_account_removes_its_items(client: TestClient, email: FakeEmailSender, db_gateway) -> None:
+    alice = make_member(client, email, "alice")
+    login(client, "alice")
+    put(client, "capability", "pdf")
+    client.post("/api/auth/logout", json={})
+    assert len(db_gateway.records) == 1
+
+    as_admin(client)
+    assert client.delete(f"/api/admin/accounts/{alice}").status_code == 204
+
+    assert db_gateway.records == {}

@@ -9,9 +9,8 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.deps import current_account, get_db_session, get_log_writer
+from src.deps import current_account, get_db_gateway, get_log_writer
 from src.models import Account
 from src.routes.server_info import _call, get_server_info
 from src.services.account_capability_service import (
@@ -21,6 +20,7 @@ from src.services.account_capability_service import (
     TooManyItems,
     tools_to_disable,
 )
+from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import McpServerInfo
 
@@ -30,10 +30,14 @@ KEY_PATTERN = r"^[A-Za-z0-9_.-]{1,64}$"
 
 
 def get_service(
-    account: Account = Depends(current_account),
-    session: AsyncSession = Depends(get_db_session),
+    account: Account = Depends(current_account), store: DocumentStore = Depends(get_db_gateway)
 ) -> AccountCapabilityService:
-    return AccountCapabilityService(session, account.id)
+    return AccountCapabilityService(store, account.uid)
+
+
+def _unavailable(error: DbGatewayError) -> HTTPException:
+    # No fallback to an empty set: that would disable every tool for the account.
+    return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Account capabilities storage is unavailable")
 
 
 class EnabledBody(BaseModel):
@@ -60,7 +64,10 @@ async def read_account_capabilities(
     service: AccountCapabilityService = Depends(get_service),
     info: McpServerInfo = Depends(get_server_info),
 ) -> AccountCapabilitiesOut:
-    state = await service.get()
+    try:
+        state = await service.get()
+    except DbGatewayError as error:
+        raise _unavailable(error) from error
     return AccountCapabilitiesOut.of(state, await _call(info.capabilities(account)))
 
 
@@ -82,6 +89,8 @@ async def set_account_capability(
         state = await service.set_enabled(kind_name, key, body.enabled)
     except TooManyItems as error:
         raise HTTPException(status.HTTP_409_CONFLICT, "Too many items added to this account") from error
+    except DbGatewayError as error:
+        raise _unavailable(error) from error
     verb = "Added" if body.enabled else "Disabled"
     await logs.action(account, f"account.{kind}_{'enable' if body.enabled else 'disable'}", f"{verb} {kind} '{key}'")
     return AccountCapabilitiesOut.of(state, listed)

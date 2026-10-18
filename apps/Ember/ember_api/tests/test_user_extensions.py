@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 
 import pytest
@@ -191,22 +190,23 @@ def test_a_disabled_extension_is_not_probed(client: TestClient, agent: FakeAgent
     assert (listed["enabled"], listed["status"], listed["tools"]) == (False, "unknown", [])
 
 
-def test_the_headers_are_encrypted_in_the_database(client: TestClient, tmp_path: Path) -> None:
+def test_the_headers_are_encrypted_in_the_gateway(client: TestClient, db_gateway) -> None:
     as_admin(client)
     add(client, headers={"X-Key": "s3cret-value"})
 
-    with sqlite3.connect(tmp_path / "data" / "test.db") as conn:
-        (token,) = conn.execute("SELECT headers_encrypted FROM user_extensions").fetchone()
+    (doc,) = [d for (collection, _), d in db_gateway.records.items() if collection == "user_extensions"]
+    token = doc["headers_encrypted"]
 
     assert token and "s3cret-value" not in token
 
 
-def test_unreadable_headers_show_an_error_and_can_be_repaired(client: TestClient, tmp_path: Path) -> None:
+def test_unreadable_headers_show_an_error_and_can_be_repaired(client: TestClient, db_gateway) -> None:
     as_admin(client)
     add(client, headers={"X-Key": "one"})
     add(client, label="Wiki", url="https://wiki.example.com/mcp")
-    with sqlite3.connect(tmp_path / "data" / "test.db") as conn:
-        conn.execute("UPDATE user_extensions SET headers_encrypted = 'garbage' WHERE slug = 'notes'")
+    for (collection, _), doc in db_gateway.records.items():
+        if collection == "user_extensions" and doc["slug"] == "notes":
+            doc["headers_encrypted"] = "garbage"
 
     broken = next(e for e in client.get(URL).json() if e["id"] == "notes")
     wiki = next(e for e in client.get(URL).json() if e["id"] == "wiki")
@@ -237,3 +237,19 @@ def test_changes_are_logged_without_secrets_or_the_query_string(client: TestClie
         "Added private extension 'Notes' (notes.example.com)",
     ]
     assert not any("abc123" in m or "s3cret-value" in m for m in logged)
+
+
+def test_gateway_down_gives_503(client: TestClient, db_gateway, monkeypatch) -> None:
+    from src.services.db_gateway import DbGatewayUnavailable
+
+    as_admin(client)
+
+    async def down(*args, **kwargs):
+        raise DbGatewayUnavailable("db_gateway is not reachable")
+
+    for method in ("get", "put", "create", "delete", "query"):
+        monkeypatch.setattr(db_gateway, method, down)
+
+    assert client.get(URL).status_code == 503
+    assert client.post(URL, json={"label": "Notes", "url": "https://notes.example.com/mcp"}).status_code == 503
+    assert client.get("/api/auth/me").status_code == 200

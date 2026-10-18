@@ -6,14 +6,16 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.deps import get_db_session, require_permission
-from src.models import Account, PromptTemplate
+from src.deps import get_db_gateway, require_permission
+from src.models import Account
+from src.services.db_gateway import DocumentStore
 from src.services.permissions import CHAT_USE
 from src.services.template_service import (
     BODY_MAX,
     NAME_MAX,
+    TEMPLATE_ID_PATTERN,
+    Template,
     TemplateLimitError,
     TemplateNameTaken,
     TemplateNotFound,
@@ -24,14 +26,13 @@ router = APIRouter(prefix="/api/templates", tags=["templates"])
 
 require_chat = require_permission(CHAT_USE)
 
-TemplateId = Path(ge=1, le=2**31 - 1)
+TemplateId = Path(pattern=TEMPLATE_ID_PATTERN)
 
 
 def get_template_service(
-    account: Account = Depends(require_chat),
-    session: AsyncSession = Depends(get_db_session),
+    account: Account = Depends(require_chat), store: DocumentStore = Depends(get_db_gateway)
 ) -> TemplateService:
-    return TemplateService(session, account.id)
+    return TemplateService(store, account.uid)
 
 
 class TemplateIn(BaseModel):
@@ -57,14 +58,14 @@ class TemplateIn(BaseModel):
 
 
 class TemplateOut(BaseModel):
-    id: int
+    id: str
     name: str
     body: str
     created_at: datetime
     updated_at: datetime
 
     @classmethod
-    def of(cls, template: PromptTemplate) -> TemplateOut:
+    def of(cls, template: Template) -> TemplateOut:
         return cls(
             id=template.id,
             name=template.name,
@@ -103,7 +104,7 @@ async def create_template(
 @router.put("/{template_id}")
 async def update_template(
     body: TemplateIn,
-    template_id: int = TemplateId,
+    template_id: str = TemplateId,
     templates: TemplateService = Depends(get_template_service),
 ) -> TemplateOut:
     try:
@@ -116,7 +117,7 @@ async def update_template(
 
 @router.delete("/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_template(
-    template_id: int = TemplateId, templates: TemplateService = Depends(get_template_service)
+    template_id: str = TemplateId, templates: TemplateService = Depends(get_template_service)
 ) -> Response:
     try:
         await templates.delete(template_id)

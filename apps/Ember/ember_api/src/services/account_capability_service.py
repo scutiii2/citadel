@@ -1,6 +1,7 @@
 """Per-account choice of which built-in capabilities and server-listed
-extensions the account has added. Every lookup filters by account. A row means
-enabled; the service never stores a "disabled" row.
+extensions the account has added. Stored as one document per account in db_gateway
+(collection "account_capabilities", key the account uid). An id in the lists means enabled;
+the service never stores a "disabled" entry.
 
 It holds only ids and does not know which ones exist: the browser and mcp_server
 own that. `tools_to_disable` is the one place that looks at mcp_server's list.
@@ -8,16 +9,17 @@ own that. `tools_to_disable` is the one place that looks at mcp_server's list.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
-from sqlalchemy import delete, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models import AccountCapability
+from src.db import utcnow
+from src.services.db_gateway import DocumentStore
 
 Kind = Literal["capability", "extension"]
+COLLECTION = "account_capabilities"
 MAX_ITEMS = 200
+_SCAN_PAGE = 500
+_SCAN_MAX_PAGES = 20
 
 
 class TooManyItems(Exception):
@@ -31,47 +33,57 @@ class AccountCapabilities:
 
 
 class AccountCapabilityService:
-    def __init__(self, session: AsyncSession, account_id: int) -> None:
-        self._session = session
-        self._account_id = account_id
+    def __init__(self, store: DocumentStore, owner_uid: str) -> None:
+        self._store = store
+        self._owner = owner_uid
 
     async def get(self) -> AccountCapabilities:
-        rows = (
-            await self._session.execute(
-                select(AccountCapability.kind, AccountCapability.item_id).where(
-                    AccountCapability.account_id == self._account_id
-                )
-            )
-        ).all()
+        doc = await self._store.get(COLLECTION, self._owner) or {}
         return AccountCapabilities(
-            capabilities=sorted(item for kind, item in rows if kind == "capability"),
-            extensions=sorted(item for kind, item in rows if kind == "extension"),
+            capabilities=sorted(set(doc.get("capabilities", []))), extensions=sorted(set(doc.get("extensions", [])))
         )
 
     async def set_enabled(self, kind: Kind, item_id: str, enabled: bool) -> AccountCapabilities:
-        """Adds or removes one row and returns the whole set. Asking for the
-        state it already has changes nothing."""
-        existing = await self._session.get(AccountCapability, (self._account_id, kind, item_id))
-        if enabled and existing is None:
-            count = await self._session.scalar(
-                select(func.count()).select_from(AccountCapability).where(AccountCapability.account_id == self._account_id)
-            )
-            if (count or 0) >= MAX_ITEMS:
+        """Adds or removes one id and returns the whole set. Asking for the state it already
+        has changes nothing. Read then write, not atomic: one account toggling from two tabs
+        at the same instant can lose a change."""
+        state = await self.get()
+        side = "capabilities" if kind == "capability" else "extensions"
+        ids = set(getattr(state, side))
+        if enabled and item_id not in ids:
+            if len(state.capabilities) + len(state.extensions) >= MAX_ITEMS:
                 raise TooManyItems
-            self._session.add(AccountCapability(account_id=self._account_id, kind=kind, item_id=item_id))
-            await self._session.commit()
-        elif not enabled and existing is not None:
-            await self._session.delete(existing)
-            await self._session.commit()
-        return await self.get()
+            ids.add(item_id)
+        elif not enabled and item_id in ids:
+            ids.remove(item_id)
+        else:
+            return state
+        changed = replace(state, **{side: sorted(ids)})
+        doc = {
+            "owner": self._owner, "capabilities": changed.capabilities, "extensions": changed.extensions,
+            "updated_at": utcnow().isoformat(timespec="seconds"),
+        }
+        await self._store.put(COLLECTION, self._owner, doc)
+        return changed
 
 
-async def forget_extension(session: AsyncSession, extension_id: str) -> None:
+async def forget_extension(store: DocumentStore, extension_id: str) -> None:
     """Drops an extension from every account (it was removed from mcp_server)."""
-    await session.execute(
-        delete(AccountCapability).where(AccountCapability.kind == "extension", AccountCapability.item_id == extension_id)
-    )
-    await session.commit()
+    offset = 0
+    for _ in range(_SCAN_MAX_PAGES):
+        docs = await store.query(COLLECTION, {}, limit=_SCAN_PAGE, offset=offset)
+        for doc in docs:
+            if extension_id in doc.get("extensions", []):
+                doc["extensions"] = [e for e in doc["extensions"] if e != extension_id]
+                await store.put(COLLECTION, doc["owner"], doc)
+        if len(docs) < _SCAN_PAGE:
+            break
+        offset += _SCAN_PAGE
+
+
+async def purge_owner(store: DocumentStore, owner_uid: str) -> None:
+    """Forget one account's added items (used when the account is deleted)."""
+    await store.delete(COLLECTION, owner_uid)
 
 
 def tools_to_disable(capabilities: list[dict[str, Any]], enabled: list[str]) -> list[str]:

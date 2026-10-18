@@ -32,6 +32,8 @@ class DocumentStore(Protocol):
 
     async def put(self, collection: str, key: str, doc: Document) -> None: ...
 
+    async def create(self, collection: str, key: str, doc: Document) -> bool: ...
+
     async def delete(self, collection: str, key: str) -> bool: ...
 
     async def query(
@@ -76,6 +78,14 @@ class DbGatewayClient:
 
     async def put(self, collection: str, key: str, doc: Document) -> None:
         self._check(await self._send("PUT", self._record(collection, key), {"doc": doc}))
+
+    async def create(self, collection: str, key: str, doc: Document) -> bool:
+        """Stores `doc` only when the key is free. False when a record already has this key."""
+        response = await self._send("PUT", self._record(collection, key) + "?if_absent=true", {"doc": doc})
+        if response.status_code == 409:
+            return False
+        self._check(response)
+        return True
 
     async def delete(self, collection: str, key: str) -> bool:
         response = await self._send("DELETE", self._record(collection, key))

@@ -134,3 +134,17 @@ def test_settings_defaults_and_validation():
         ("db_gateway.instance", "must be a non-empty string"),
     ]
     assert _check_app({"db_gateway": {"url": "http://h:1", "instance": "i", "connection": "c"}}) == []
+
+
+@sync
+async def test_create_sends_if_absent_and_reads_409_as_taken():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, request.url.path, request.url.query, json.loads(request.content)))
+        return httpx.Response(409 if len(seen) == 2 else 200, json={"ok": True})
+
+    client = make_client(handler)
+    assert await client.create("notes", "k", {"a": 1}) is True
+    assert await client.create("notes", "k", {"a": 2}) is False
+    assert seen[0] == ("PUT", f"{BASE}/collections/notes/records/k", b"if_absent=true", {"doc": {"a": 1}})

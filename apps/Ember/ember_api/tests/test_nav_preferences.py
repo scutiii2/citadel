@@ -86,3 +86,33 @@ def test_private_per_account(client_factory, email: FakeEmailSender) -> None:
     save(bob, ["/c"])
     bob.delete(URL)
     assert alice.get(URL).json()["order"] == ["/a", "/b"]
+
+
+def test_gateway_down_reads_default_but_refuses_saves(client: TestClient, db_gateway, monkeypatch) -> None:
+    from src.services.db_gateway import DbGatewayUnavailable
+
+    as_admin(client)
+    save(client, ["/", "/agents"])
+
+    async def down(*args, **kwargs):
+        raise DbGatewayUnavailable("db_gateway is not reachable")
+
+    for method in ("get", "put", "delete"):
+        monkeypatch.setattr(db_gateway, method, down)
+
+    assert client.get(URL).json() == {"order": [], "pinned": [], "hidden": []}  # the rail still renders
+    assert save(client, ["/"]).status_code == 503
+    assert client.delete(URL).status_code == 503
+
+
+def test_deleting_an_account_removes_its_arrangement(client: TestClient, email: FakeEmailSender, db_gateway) -> None:
+    alice = make_member(client, email, "alice")
+    login(client, "alice")
+    save(client, ["/"])
+    client.post("/api/auth/logout", json={})
+    assert len(db_gateway.records) == 1
+
+    as_admin(client)
+    assert client.delete(f"/api/admin/accounts/{alice}").status_code == 204
+
+    assert db_gateway.records == {}
