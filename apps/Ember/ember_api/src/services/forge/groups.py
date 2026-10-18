@@ -171,6 +171,18 @@ class GroupService:
         await self._session.commit()
         return MemberRow(worker, folder, 0)
 
+    async def set_folder(self, group_id: int, worker_id: int, folder: str) -> MemberRow:
+        """Moves a member to another folder. Its next turn runs there."""
+        row = await self.member(group_id, worker_id)
+        folder = _clean_folder(folder)
+        await self._session.execute(
+            update(ForgeGroupWorker)
+            .where(ForgeGroupWorker.group_id == group_id, ForgeGroupWorker.worker_id == worker_id)
+            .values(folder=folder)
+        )
+        await self._session.commit()
+        return MemberRow(row.worker, folder, row.last_seq)
+
     async def remove_member(self, group_id: int, worker_id: int) -> None:
         await self.member(group_id, worker_id)
         await self._session.execute(

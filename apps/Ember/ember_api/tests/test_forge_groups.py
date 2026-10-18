@@ -155,3 +155,22 @@ def test_mark_seen_moves_the_workers_cursor_and_the_last_addressed(tmp_path: Pat
             assert (await groups.get(group.id)).last_worker_id == worker.id
 
     run(tmp_path, scenario)
+
+
+def test_a_member_can_be_moved_to_another_folder(tmp_path: Path) -> None:
+    async def scenario(env):
+        worker = await env.add_worker()
+        group = await env.add_group(workers=[worker])
+        async with env.database.sessions() as session:
+            groups = service(session)
+            moved = await groups.set_folder(group.id, worker.id, "  D:/other  ")
+            assert moved.folder == "D:/other"
+            assert (await groups.member(group.id, worker.id)).folder == "D:/other"
+            with pytest.raises(InvalidGroup):
+                await groups.set_folder(group.id, worker.id, "   ")
+            with pytest.raises(NotAMember):
+                await groups.set_folder(group.id, 999, "D:/x")
+            with pytest.raises(GroupNotFound):
+                await service(session, account_id=2).set_folder(group.id, worker.id, "D:/x")
+
+    run(tmp_path, scenario)

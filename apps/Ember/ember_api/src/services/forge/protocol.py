@@ -61,7 +61,15 @@ class TurnError(BaseModel):
     message: str = Field(max_length=2_000)
 
 
-WorkerFrame = Union[Hello, Heartbeat, Delta, ToolUsed, PermissionRequested, Usage, TurnDone, TurnError]
+class BrowseResult(BaseModel):
+    """The folder the user picked in the dialog the worker opened, or None when it was cancelled."""
+
+    type: Literal["browse_result"] = "browse_result"
+    request_id: str = Field(max_length=64)
+    path: str | None = Field(default=None, max_length=500)
+
+
+WorkerFrame = Union[Hello, Heartbeat, Delta, ToolUsed, PermissionRequested, Usage, TurnDone, TurnError, BrowseResult]
 _FRAMES: TypeAdapter[WorkerFrame] = TypeAdapter(Annotated[WorkerFrame, Field(discriminator="type")])
 
 
@@ -91,6 +99,11 @@ def turn_frame(*, turn_id: str, group_id: int, folder: str, mode: str, prompt: s
 
 def permission_reply_frame(request_id: str, allow: bool) -> dict:
     return {"type": "permission_reply", "request_id": request_id, "allow": allow}
+
+
+def browse_frame(request_id: str, start: str | None) -> dict:
+    """Asks the worker to open a folder dialog on its computer, starting at `start`."""
+    return {"type": "browse", "request_id": request_id, "start": start}
 
 
 def cancel_frame(turn_id: str) -> dict:

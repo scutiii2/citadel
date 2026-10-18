@@ -231,3 +231,61 @@ def test_message_text_is_validated(client: TestClient) -> None:
 
     assert client.post(f"/api/forge/groups/{gid}/messages", json={"text": "   "}).status_code == 422
     assert client.post(f"/api/forge/groups/{gid}/messages", json={"text": "x" * 8001}).status_code == 422
+
+
+def test_the_folder_dialog_runs_on_the_worker_and_the_pick_comes_back(client: TestClient) -> None:
+    import threading
+
+    as_admin(client)
+    worker = new_worker(client)
+    ws, session, _ready = connect(client, worker["token"])
+    try:
+        answer: dict = {}
+        asker = threading.Thread(
+            target=lambda: answer.update(
+                response=client.post(f"/api/forge/workers/{worker['id']}/browse", json={"start": "C:/start"})
+            )
+        )
+        asker.start()
+        frame = session.receive_json()
+        assert (frame["type"], frame["start"]) == ("browse", "C:/start")
+
+        session.send_json({"type": "browse_result", "request_id": frame["request_id"], "path": "C:/work/site"})
+        asker.join(5)
+
+        assert answer["response"].status_code == 200 and answer["response"].json() == {"path": "C:/work/site"}
+    finally:
+        ws.__exit__(None, None, None)
+
+
+def test_browse_needs_an_online_worker_of_your_own(client: TestClient, email: FakeEmailSender) -> None:
+    make_forger(client, email, "alice")
+    as_admin(client)
+    theirs = new_worker(client)
+    assert client.post(f"/api/forge/workers/{theirs['id']}/browse", json={}).status_code == 409  # offline
+    client.post("/api/auth/logout", json={})
+    login(client, "alice")
+
+    assert client.post(f"/api/forge/workers/{theirs['id']}/browse", json={}).status_code == 404
+
+
+def test_a_member_folder_can_be_changed_but_not_mid_answer(client: TestClient) -> None:
+    as_admin(client)
+    client.put("/api/forge/plans/claude", json={"plans": ["max"]})
+    worker, group = new_worker(client), new_group(client)
+    ws, session, _ready = connect(client, worker["token"])
+    try:
+        invite(client, group["id"], worker["id"])
+        url = f"/api/forge/groups/{group['id']}/workers/{worker['id']}"
+
+        moved = client.patch(url, json={"folder": "D:/other"})
+        assert moved.status_code == 200 and moved.json()["members"][0]["folder"] == "D:/other"
+        assert client.patch(url, json={"folder": "  "}).status_code == 422
+        assert client.patch(f"/api/forge/groups/{group['id']}/workers/9999", json={"folder": "D:/x"}).status_code == 404
+
+        client.post(f"/api/forge/groups/{group['id']}/messages", json={"text": "@claude go"})
+        turn = session.receive_json()
+        assert turn["folder"] == "D:/other"
+        assert client.patch(url, json={"folder": "D:/again"}).status_code == 409
+    finally:
+        ws.__exit__(None, None, None)

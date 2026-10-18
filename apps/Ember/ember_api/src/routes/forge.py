@@ -16,6 +16,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from src.deps import get_db_session, get_forge, get_log_writer, require_permission
 from src.models import Account, ForgeGroup, ForgeWorker
+from src.services.forge.browse import BrowseInProgress, BrowseTimeout, WorkerOffline
 from src.services.forge.connections import WorkerConnection
 from src.services.forge.coordinator import GroupBusy
 from src.services.forge.events import sse_frame
@@ -33,7 +34,7 @@ from src.services.forge.groups import (
 )
 from src.services.forge.messages import message_event
 from src.services.forge.plans import InvalidPlanList, PlanPolicyRegistry
-from src.services.forge.protocol import PROVIDERS, Heartbeat, Hello, parse_worker_frame, ready_frame
+from src.services.forge.protocol import PROVIDERS, BrowseResult, Heartbeat, Hello, parse_worker_frame, ready_frame
 from src.services.forge.runtime import ForgeRuntime
 from src.services.forge.workers import (
     WorkerAuthenticator,
@@ -146,6 +147,14 @@ class UpdateGroupRequest(BaseModel):
 class InviteRequest(BaseModel):
     worker_id: int
     folder: str = Field(max_length=500)
+
+
+class FolderRequest(BaseModel):
+    folder: str = Field(max_length=500)
+
+
+class BrowseRequest(BaseModel):
+    start: str | None = Field(default=None, max_length=500)
 
 
 def _worker_out(worker: ForgeWorker, problem: str | None, forge: ForgeRuntime) -> WorkerOut:
@@ -272,6 +281,28 @@ async def delete_worker(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.post("/workers/{worker_id}/browse")
+async def browse_folder(
+    worker_id: int,
+    body: BrowseRequest,
+    pairing: WorkerPairingService = Depends(get_pairing),
+    forge: ForgeRuntime = Depends(get_forge),
+) -> dict[str, str | None]:
+    """Opens a folder dialog on the worker's computer and returns the folder the user picks
+    (`path` is null when they cancel). The worker has to be online."""
+    try:
+        await pairing.get(worker_id)
+        return {"path": await forge.browser.pick(worker_id, body.start)}
+    except WorkerNotFound as error:
+        raise _not_found("Worker") from error
+    except WorkerOffline as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, "That worker is offline") from error
+    except BrowseInProgress as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A folder dialog is already open on that worker") from error
+    except BrowseTimeout as error:
+        raise HTTPException(status.HTTP_408_REQUEST_TIMEOUT, "No folder was chosen in time") from error
+
+
 # --- groups -----------------------------------------------------------------------------
 
 
@@ -372,6 +403,29 @@ async def invite_worker(
         raise HTTPException(status.HTTP_409_CONFLICT, "That worker is already in this group") from error
     except MemberLimitError as error:
         raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+    except InvalidGroup as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(error)) from error
+
+
+@router.patch("/groups/{group_id}/workers/{worker_id}")
+async def set_member_folder(
+    group_id: int,
+    worker_id: int,
+    body: FolderRequest,
+    groups: GroupService = Depends(get_groups),
+    forge: ForgeRuntime = Depends(get_forge),
+) -> GroupOut:
+    """Moves a member to another folder; its next turn runs there."""
+    try:
+        await groups.get(group_id)
+        if forge.coordinator.is_running(group_id):
+            raise HTTPException(status.HTTP_409_CONFLICT, "A worker is still answering. Stop it first.")
+        await groups.set_folder(group_id, worker_id, body.folder)
+        return await _full_group(groups, group_id, forge)
+    except GroupNotFound as error:
+        raise _not_found("Group") from error
+    except NotAMember as error:
+        raise _not_found("Worker") from error
     except InvalidGroup as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(error)) from error
 
@@ -549,9 +603,13 @@ async def worker_socket(websocket: WebSocket) -> None:
                 async with database.sessions() as session:
                     await WorkerAuthenticator(session).touch(worker.id)
                 continue
+            if isinstance(frame, BrowseResult):
+                forge.browser.on_result(worker.id, frame)
+                continue
             await forge.coordinator.on_worker_frame(worker.id, frame)
     except (WebSocketDisconnect, RuntimeError, KeyError):
         pass
     finally:
         forge.registry.drop(worker.id, connection)
+        forge.browser.on_disconnected(worker.id)
         await forge.coordinator.on_worker_disconnected(worker.id)

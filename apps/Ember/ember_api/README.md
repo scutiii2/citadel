@@ -650,7 +650,8 @@ Routes under `/api/forge`:
 - `GET /plans`, `PUT /plans/{provider}` (the eligible plan strings; changing needs `settings.manage`)
 - `GET/POST /workers`, `DELETE /workers/{id}` (the pairing token is returned once, on create)
 - `GET/POST /groups`, `GET/PATCH/DELETE /groups/{id}` (`full_auto` needs `confirm_full_auto: true`)
-- `POST /groups/{id}/workers`, `DELETE /groups/{id}/workers/{worker_id}`
+- `POST /groups/{id}/workers`, `PATCH /groups/{id}/workers/{worker_id}` (new folder; refused while a worker is answering), `DELETE /groups/{id}/workers/{worker_id}`
+- `POST /workers/{id}/browse`: opens a folder dialog on that worker's computer and returns the chosen `path` (null when cancelled); 409 when offline
 - `GET/POST /groups/{id}/messages`, `GET /groups/{id}/events` (server-sent events, resumable)
 - `POST /groups/{id}/permissions/{request_id}`, `POST /groups/{id}/cancel`
 - `WS /worker`: the worker socket. Bearer pairing token, then a `hello` frame, then frames

@@ -60,3 +60,14 @@ def test_frames_for_the_worker_match_the_spec() -> None:
 
 def test_delta_default_type_lets_code_build_frames_directly() -> None:
     assert Delta(turn_id="t", text="x").type == "delta"
+
+
+def test_browse_frames() -> None:
+    from src.services.forge.protocol import BrowseResult, browse_frame
+
+    assert browse_frame("r1", "C:/s") == {"type": "browse", "request_id": "r1", "start": "C:/s"}
+    picked = parse_worker_frame('{"type": "browse_result", "request_id": "r1", "path": "C:/x"}')
+    assert isinstance(picked, BrowseResult) and picked.path == "C:/x"
+    cancelled = parse_worker_frame('{"type": "browse_result", "request_id": "r1"}')
+    assert isinstance(cancelled, BrowseResult) and cancelled.path is None
+    assert parse_worker_frame('{"type": "browse_result", "path": "C:/x"}') is None  # no request id
