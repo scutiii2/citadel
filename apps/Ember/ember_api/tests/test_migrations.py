@@ -18,8 +18,8 @@ from src.db import Base, Database
 from src.services.migrations import BASELINE, MIGRATIONS_DIR, MigrationRunner
 
 # The newest real migration; the tests' throwaway one comes after it.
-HEAD = "0022"
-NEXT = "0023"
+HEAD = "0023"
+NEXT = "0024"
 
 
 def drop_account_uid(conn: sqlite3.Connection) -> None:
@@ -375,11 +375,11 @@ class TestDatabaseFromBeforeMigrations:
         with closing(sqlite3.connect(path)) as conn:
             conn.execute("DROP TABLE app_settings")  # made after the baseline, so a legacy database lacks it
             conn.execute("DROP TABLE traffic_buckets")  # likewise
-            conn.execute("DROP TABLE nav_preferences")  # likewise
-            conn.execute("DROP TABLE account_capabilities")  # likewise
+            conn.execute("DROP TABLE IF EXISTS nav_preferences")  # likewise
+            conn.execute("DROP TABLE IF EXISTS account_capabilities")  # likewise
             conn.execute("DROP TABLE IF EXISTS game_tickets")
             conn.execute("DROP TABLE IF EXISTS games")
-            conn.execute("DROP TABLE user_extensions")  # likewise
+            conn.execute("DROP TABLE IF EXISTS user_extensions")  # likewise
             drop_chat_folders(conn)
             conn.execute("ALTER TABLE accounts DROP COLUMN prompt_suggestions")  # added after the baseline too
             drop_account_uid(conn)  # likewise
@@ -418,7 +418,7 @@ class TestDatabaseFromBeforeMigrations:
     def test_it_is_only_stamped_when_the_baseline_is_the_newest_revision(self, tmp_path: Path) -> None:
         path = self.build_legacy(tmp_path)
         scripts = tmp_path / "baseline_only"
-        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*"))
+        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*"))
         calls: list[int] = []
 
         async def backup() -> None:
@@ -512,11 +512,11 @@ class TestLaterMigration:
         with closing(sqlite3.connect(tmp_path / "ember.db")) as conn:
             conn.execute("DROP TABLE app_settings")  # a legacy database predates it
             conn.execute("DROP TABLE traffic_buckets")
-            conn.execute("DROP TABLE nav_preferences")  # likewise
-            conn.execute("DROP TABLE account_capabilities")  # likewise
+            conn.execute("DROP TABLE IF EXISTS nav_preferences")  # likewise
+            conn.execute("DROP TABLE IF EXISTS account_capabilities")  # likewise
             conn.execute("DROP TABLE IF EXISTS game_tickets")
             conn.execute("DROP TABLE IF EXISTS games")
-            conn.execute("DROP TABLE user_extensions")  # likewise
+            conn.execute("DROP TABLE IF EXISTS user_extensions")  # likewise
             for column in ("agent_id", "provider_id", "gateway", "started_at", "finished_at", "delegated_by"):
                 conn.execute(f"ALTER TABLE usage_records DROP COLUMN {column}")
             drop_chat_folders(conn)
