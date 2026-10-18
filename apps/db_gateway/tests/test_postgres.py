@@ -58,6 +58,15 @@ async def test_put_sends_json_text(pg):
     assert "ON CONFLICT" in sql and args[:2] == ("c", "k") and json.loads(args[2]) == {"a": 1}
 
 
+async def test_create_does_nothing_on_conflict(pg):
+    backend, pool = pg
+    pool.status = "INSERT 0 1"
+    assert await backend.create("c", "k", {"a": 1}) is True
+    assert "DO NOTHING" in pool.calls[0][1] and json.loads(pool.calls[0][2][2]) == {"a": 1}
+    pool.status = "INSERT 0 0"
+    assert await backend.create("c", "k", {"a": 1}) is False
+
+
 async def test_delete_reads_status(pg):
     backend, pool = pg
     assert await backend.delete("c", "k") is True

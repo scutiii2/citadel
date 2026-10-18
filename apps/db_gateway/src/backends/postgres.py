@@ -61,6 +61,14 @@ class PostgresBackend(DatabaseBackend):
             collection, key, json.dumps(doc),
         )
 
+    async def create(self, collection: str, key: str, doc: Document) -> bool:
+        status = await self._db().execute(
+            "INSERT INTO documents (collection, key, body) VALUES ($1, $2, $3::jsonb) "
+            "ON CONFLICT (collection, key) DO NOTHING",
+            collection, key, json.dumps(doc),
+        )
+        return status.endswith(" 1")  # asyncpg returns e.g. "INSERT 0 1"
+
     async def delete(self, collection: str, key: str) -> bool:
         status = await self._db().execute("DELETE FROM documents WHERE collection = $1 AND key = $2", collection, key)
         return status.endswith(" 1")  # asyncpg returns e.g. "DELETE 1"

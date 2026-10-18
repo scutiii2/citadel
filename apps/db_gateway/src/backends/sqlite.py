@@ -69,6 +69,15 @@ class SqliteBackend(DatabaseBackend):
         )
         await db.commit()
 
+    async def create(self, collection: str, key: str, doc: Document) -> bool:
+        db = self._conn()
+        cursor = await db.execute(
+            "INSERT INTO documents (collection, key, body) VALUES (?, ?, ?) ON CONFLICT(collection, key) DO NOTHING",
+            (collection, key, json.dumps(doc)),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+
     async def delete(self, collection: str, key: str) -> bool:
         db = self._conn()
         cursor = await db.execute("DELETE FROM documents WHERE collection = ? AND key = ?", (collection, key))

@@ -32,6 +32,10 @@ class CountingBackend(DatabaseBackend):
         self._count("put")
         await self.inner.put(collection, key, doc)
 
+    async def create(self, collection, key, doc):
+        self._count("create")
+        return await self.inner.create(collection, key, doc)
+
     async def delete(self, collection, key):
         self._count("delete")
         return await self.inner.delete(collection, key)

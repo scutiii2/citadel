@@ -76,6 +76,12 @@ async def test_put_get_replace_delete(backend, col):
     assert await backend.get(col, "a") is None
 
 
+async def test_create_only_when_absent(backend, col):
+    assert await backend.create(col, "a", record("a", n=1)) is True
+    assert await backend.create(col, "a", record("a", n=2)) is False  # taken: left unchanged
+    assert await backend.get(col, "a") == record("a", n=1)
+
+
 async def test_query_filters_order_limit_offset(backend, col):
     for key, role in (("1", "admin"), ("2", "user"), ("3", "user"), ("4", "user")):
         await backend.put(col, key, record(key, role=role))

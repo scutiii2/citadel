@@ -56,6 +56,15 @@ class FirestoreBackend(DatabaseBackend):
     async def put(self, collection: str, key: str, doc: Document) -> None:
         await self._db().collection(collection).document(_check_key(key)).set(doc)
 
+    async def create(self, collection: str, key: str, doc: Document) -> bool:
+        from google.api_core.exceptions import AlreadyExists
+
+        try:  # create() fails atomically when the document exists
+            await self._db().collection(collection).document(_check_key(key)).create(doc)
+        except AlreadyExists:
+            return False
+        return True
+
     async def delete(self, collection: str, key: str) -> bool:
         from google.api_core.exceptions import NotFound
 

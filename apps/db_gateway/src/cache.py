@@ -126,6 +126,12 @@ class CachedBackend(DatabaseBackend):
         await self._inner.put(collection, key, doc)
         self._invalidate(collection, key)
 
+    async def create(self, collection: str, key: str, doc: Document) -> bool:
+        created = await self._inner.create(collection, key, doc)
+        # Also on False: a cached "not found" for this key is stale if another writer won.
+        self._invalidate(collection, key)
+        return created
+
     async def delete(self, collection: str, key: str) -> bool:
         removed = await self._inner.delete(collection, key)
         self._invalidate(collection, key)

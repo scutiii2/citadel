@@ -165,3 +165,16 @@ async def test_write_during_an_inflight_query_is_not_overwritten_by_it():
         assert await cached.query("c", {}) == [{"v": 2}]
     finally:
         await cached.close()
+
+
+async def test_create_drops_cached_not_found():
+    from src.backends.sqlite import SqliteBackend
+
+    inner = SqliteBackend(":memory:")
+    cached = CachedBackend(inner, CacheSettings(ttl_seconds=30))
+    await cached.connect()
+    assert await cached.get("c", "k") is None  # caches "not found"
+    assert await cached.create("c", "k", {"a": 1}) is True
+    assert await cached.get("c", "k") == {"a": 1}
+    assert await cached.create("c", "k", {"a": 2}) is False
+    await cached.close()

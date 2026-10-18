@@ -4,7 +4,7 @@ Needs the google-cloud-firestore package (for FieldFilter and NotFound)."""
 import pytest
 
 pytest.importorskip("google.cloud.firestore")
-from google.api_core.exceptions import NotFound  # noqa: E402
+from google.api_core.exceptions import AlreadyExists, NotFound  # noqa: E402
 
 from src.backends.factory import BACKEND_TYPES  # noqa: E402
 from src.backends.firestore import FirestoreBackend  # noqa: E402
@@ -28,6 +28,11 @@ class FakeRef:
         return Snapshot(self.store.get((self.name, self.key)))
 
     async def set(self, doc):
+        self.store[(self.name, self.key)] = doc
+
+    async def create(self, doc):
+        if (self.name, self.key) in self.store:
+            raise AlreadyExists("taken")
         self.store[(self.name, self.key)] = doc
 
     async def delete(self, option=None):
@@ -102,6 +107,13 @@ def fs():
     backend = FirestoreBackend()
     backend._client = FakeClient()
     return backend, backend._client
+
+
+async def test_create_only_when_absent(fs):
+    backend, _ = fs
+    assert await backend.create("users", "a", {"n": 1}) is True
+    assert await backend.create("users", "a", {"n": 2}) is False
+    assert await backend.get("users", "a") == {"n": 1}
 
 
 async def test_put_get_delete(fs):

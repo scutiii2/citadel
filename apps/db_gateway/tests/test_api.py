@@ -32,6 +32,14 @@ async def test_record_crud(client):
     assert (await client.delete(f"{REC}/u1")).status_code == 404
 
 
+async def test_put_if_absent_conflicts_when_key_taken(client):
+    assert (await client.put(f"{REC}/u1?if_absent=true", json={"doc": {"n": 1}})).status_code == 200
+    taken = await client.put(f"{REC}/u1?if_absent=true", json={"doc": {"n": 2}})
+    assert taken.status_code == 409 and "already exists" in taken.json()["error"]
+    assert (await client.get(f"{REC}/u1")).json() == {"doc": {"n": 1}}
+    assert (await client.put(f"{REC}/u1", json={"doc": {"n": 3}})).status_code == 200  # plain put still replaces
+
+
 async def test_query(client):
     for key, role in (("1", "x"), ("2", "y")):
         await client.put(f"{REC}/{key}", json={"doc": {"role": role}})

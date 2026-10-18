@@ -86,9 +86,15 @@ def create_app(manager: InstanceManager, token: str = "") -> FastAPI:
         return {"doc": doc}
 
     @app.put(BASE + "/collections/{collection}/records/{key}")
-    async def put_record(instance: str, connection: str, collection: str, key: str, body: PutBody) -> dict[str, Any]:
+    async def put_record(
+        instance: str, connection: str, collection: str, key: str, body: PutBody, if_absent: bool = False
+    ) -> dict[str, Any]:
         backend = await manager.get(instance).backend(connection)
-        await backend.put(collection, key, body.doc)
+        if if_absent:
+            if not await backend.create(collection, key, body.doc):
+                raise HTTPException(409, f"record {key!r} already exists in {collection!r}")
+        else:
+            await backend.put(collection, key, body.doc)
         return {"ok": True}
 
     @app.delete(BASE + "/collections/{collection}/records/{key}")

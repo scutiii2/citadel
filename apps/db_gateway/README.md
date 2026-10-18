@@ -43,9 +43,11 @@ Records are JSON objects addressed by `(collection, key)`.
 | GET | `/health` | |
 | GET | `/instances` | |
 | GET / PUT / DELETE | `/instances/{i}/connections/{c}/collections/{col}/records/{key}` | PUT: `{"doc": {...}}` |
+| PUT | `.../records/{key}?if_absent=true` | `{"doc": {...}}`: stores only when the key is free, else `409` |
 | POST | `/instances/{i}/connections/{c}/collections/{col}/query` | `{"filters": {"field": value}, "limit": 100, "offset": 0}` |
 | POST | `/instances/{i}/connections/{c}/sql` | `{"sql": "...", "params": []}` |
 
+`if_absent` is atomic on every backend, so of two racing creates exactly one wins; use it for unique names.
 A connection is reachable only through an instance that lists it. Filters match top-level fields
 by equality. Raw SQL works only on SQL backends and only when the connection sets
 `"allow_raw_sql": true`.

@@ -31,6 +31,11 @@ class DatabaseBackend(ABC):
     async def put(self, collection: str, key: str, doc: Document) -> None: ...
 
     @abstractmethod
+    async def create(self, collection: str, key: str, doc: Document) -> bool:
+        """Store `doc` only when no record has this key. True when it was stored, False when
+        the key was taken. Atomic: of two racing creates, exactly one wins."""
+
+    @abstractmethod
     async def delete(self, collection: str, key: str) -> bool:
         """True when a record existed and was removed."""
 
