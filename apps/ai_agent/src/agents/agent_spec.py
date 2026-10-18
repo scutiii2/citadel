@@ -22,6 +22,8 @@ from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import urlsplit, urlunsplit
 
+from src.core.catalog import catalog
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 AGENTS_DIR = PROJECT_ROOT / "agents"
 
@@ -36,7 +38,7 @@ _DEFAULT_GATEWAY = {"anthropic": "claude", "openai": "gpt", "laya": "local"}
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 _TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "orchestrator", "memory_recall", "plan_tool", "delegable"}
-_LLM_KEYS = {"provider", "gateway", "model", "temperature", "reasoning_effort", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort"}
+_LLM_KEYS = {"provider", "gateway", "model", "temperature", "reasoning_effort", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort", "fallback_gateways"}
 _TOOLS_KEYS = {"allow", "deny"}
 
 
@@ -48,6 +50,15 @@ def default_gateway(provider: str) -> str | None:
 class AgentSpecError(Exception):
     """An agent file is missing, unreadable, or invalid - the message names
     the file and the field."""
+
+
+@dataclass(frozen=True)
+@catalog
+class GatewayChoice:
+    """A same-provider backup and its optional model override."""
+
+    gateway: str
+    model: str | None = None
 
 
 @dataclass(frozen=True)
@@ -66,6 +77,7 @@ class LlmSpec:
     # Highest reasoning effort a delegating orchestrator may request of this
     # agent; None = no cap. Its own reasoning_effort is never above it.
     max_effort: str | None = None
+    fallback_gateways: tuple[GatewayChoice, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -299,6 +311,28 @@ def load_file(path: Path) -> AgentSpec:
     max_tier = check.tier(llm_data, "max_tier", "llm.")
     if min_tier and max_tier and TIERS.index(min_tier) > TIERS.index(max_tier):
         raise check.fail("llm.min_tier", f"{min_tier!r} is stronger than llm.max_tier {max_tier!r}")
+    fallback_data = llm_data.get("fallback_gateways", [])
+    if not isinstance(fallback_data, list):
+        raise check.fail("llm.fallback_gateways", "must be a list")
+    if provider == "laya" and fallback_data:
+        raise check.fail("llm.fallback_gateways", "Laya does not support gateway failover")
+    primary = check.text(llm_data, "gateway", None, "llm.") or _DEFAULT_GATEWAY[provider]
+    choices: list[GatewayChoice] = []
+    seen = {primary}
+    for index, entry in enumerate(fallback_data):
+        prefix = f"llm.fallback_gateways[{index}]."
+        if isinstance(entry, str):
+            entry = {"gateway": entry}
+        if not isinstance(entry, dict):
+            raise check.fail(prefix[:-1], "must be a gateway name or object")
+        check.keys(entry, {"gateway", "model"}, prefix)
+        name = check.text(entry, "gateway", None, prefix)
+        if not name or not name.strip():
+            raise check.fail(prefix + "gateway", "must be a non-empty string")
+        if name in seen:
+            raise check.fail(prefix + "gateway", "duplicates the primary or another fallback")
+        seen.add(name)
+        choices.append(GatewayChoice(name, check.text(entry, "model", None, prefix) or None))
     llm = LlmSpec(
         provider=provider,
         gateway=check.text(llm_data, "gateway", None, "llm.") or None,
@@ -312,6 +346,7 @@ def load_file(path: Path) -> AgentSpec:
         min_tier=min_tier,
         max_tier=max_tier,
         max_effort=max_effort,
+        fallback_gateways=tuple(choices),
     )
 
     tools_data = check.section(data, "tools")

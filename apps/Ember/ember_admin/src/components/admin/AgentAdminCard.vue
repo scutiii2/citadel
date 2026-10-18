@@ -15,10 +15,18 @@ const STATUS_TEXT: Record<AgentStatus, string> = { running: "Running", offline: 
 const STATUS_ICON: Record<AgentStatus, string> = { running: "●", offline: "○", disabled: "–" };
 
 const shownStatus = computed<AgentStatus | undefined>(() => props.status ?? (props.agent.enabled === false ? "disabled" : undefined));
+const gatewayOrder = computed(() => {
+  const llm = props.agent.llm;
+  if (!llm) return "";
+  const defaults: Record<string, string> = { anthropic: "claude", openai: "gpt", laya: "local" };
+  const primary = llm.gateway || defaults[llm.provider];
+  return [primary, ...(llm.fallback_gateways ?? []).map((choice) =>
+    typeof choice === "string" ? choice : choice.gateway)].filter(Boolean).join(" → ");
+});
 const rows = computed(() =>
   [
     { label: "Provider", value: props.agent.llm?.provider },
-    { label: "Gateway", value: props.agent.llm?.gateway },
+    { label: props.agent.llm?.fallback_gateways?.length ? "Gateway order" : "Gateway", value: gatewayOrder.value },
     { label: "Model", value: props.agent.llm?.model },
     { label: "Port", value: props.agent.port === undefined ? "" : String(props.agent.port) },
     { label: "URL", value: props.agent.url },

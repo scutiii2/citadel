@@ -22,7 +22,7 @@ def tuning_path(tmp_path):
 def test_fresh_install_seeds_token_limits(tuning_path):
     limits = config_files.read_section(tuning_path, "token_limits")
     assert limits["default"]["max_tool_rounds"] == 15
-    assert json.loads(tuning_path.read_text(encoding="utf-8")).keys() == {"token_limits", "classifier"}
+    assert json.loads(tuning_path.read_text(encoding="utf-8")).keys() == {"token_limits", "classifier", "gateway_failover"}
 
 
 def test_migration_preserves_legacy_limits_and_file(tuning_path):

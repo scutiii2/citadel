@@ -145,7 +145,7 @@ def test_is_available_false_during_cooldown_even_with_key(monkeypatch):
     monkeypatch.setenv("CLAUDE_API_KEY", "sk-ant-test")
     assert anthropic_provider.is_available() is True
 
-    cooldown.start_cooldown("anthropic", seconds=30)
+    cooldown.start_cooldown("anthropic:claude", seconds=30)
     assert anthropic_provider.is_available() is False
 
 
@@ -167,8 +167,8 @@ def test_rate_limit_error_starts_a_cooldown(monkeypatch):
         with pytest.raises(RateLimitError):
             asyncio.run(anthropic_provider.run_chat("hello", []))
 
-    assert cooldown.is_in_cooldown("anthropic") is True
-    assert cooldown.seconds_remaining("anthropic") <= 5
+    assert cooldown.is_in_cooldown("anthropic:claude") is True
+    assert cooldown.seconds_remaining("anthropic:claude") <= 5
 
 
 def _usage(input_tokens=10, output_tokens=5):

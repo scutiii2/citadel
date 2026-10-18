@@ -47,6 +47,32 @@ def test_create_refuses_duplicate_bad_id_port_clash_and_unknown_gateway(folder):
     assert not (folder / ".overrides").exists()
 
 
+@pytest.mark.parametrize("primary", [None, "claude"])
+def test_unknown_fallback_is_rejected_before_writing_an_agent(folder, monkeypatch, primary):
+    monkeypatch.setattr(agent_store, "gateway_catalog", lambda: {"anthropic": [{"id": "claude"}]})
+    llm = {"provider": "anthropic", "fallback_gateways": ["missing"]}
+    if primary is not None:
+        llm["gateway"] = primary
+    with pytest.raises(AgentStoreError, match=r"calc.json.*llm.fallback_gateways\[0\].gateway"):
+        agent_store.create_agent("calc", _cfg(9103, llm=llm), folder)
+    assert not (folder / ".overrides").exists()
+
+
+def test_gateway_update_is_isolated_and_invalid_save_preserves_previous_values(folder, monkeypatch):
+    monkeypatch.setattr(agent_store, "gateway_catalog", lambda: {"anthropic": [
+        {"id": "claude"}, {"id": "openrouter"}, {"id": "bedrock"}]})
+    tracked = (folder / "ember.json").read_bytes()
+    llm = {"provider": "anthropic", "gateway": "openrouter", "model": "router-custom",
+           "fallback_gateways": [{"gateway": "claude", "model": "claude-custom"}, "bedrock"]}
+    agent_store.create_agent("calc", _cfg(9103, llm=llm), folder)
+    saved = _overrides(folder)
+    assert saved["calc"]["llm"] == llm
+    with pytest.raises(AgentStoreError, match="fallback_gateways"):
+        agent_store.update_agent("calc", _cfg(9103, llm={**llm, "fallback_gateways": ["missing"]}), folder)
+    assert _overrides(folder) == saved
+    assert (folder / "ember.json").read_bytes() == tracked
+
+
 def test_second_entry_agent_is_refused(folder):
     with pytest.raises(AgentStoreError, match="already the entry"):
         agent_store.create_agent("calc", _cfg(9103, entry=True), folder)

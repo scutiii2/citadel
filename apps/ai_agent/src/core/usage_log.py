@@ -49,7 +49,7 @@ def own_row(
         "agent_id": agent_id,
         "agent_label": agent_label,
         "provider_id": result.provider_id,
-        "gateway": gateway,
+        "gateway": result.gateway or gateway,
         "model": result.model,
         "input_tokens": result.input_tokens,
         "output_tokens": result.output_tokens,
@@ -60,6 +60,8 @@ def own_row(
         "context_breakdown": result.context_breakdown,
         "context_breakdown_exact": result.context_breakdown_exact,
     }
+    if result.gateway_switches:
+        row["gateway_switches"] = result.gateway_switches
     if result.cached_input_tokens:
         row["cached_input_tokens"] = result.cached_input_tokens
     if model_tier:

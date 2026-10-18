@@ -10,6 +10,21 @@ import pytest
 from src.llm import llm_config
 
 
+@pytest.mark.parametrize("requested,explicit,backup,want", [
+    ("sonnet", "override", {"model": "default"}, "override"),
+    ("sonnet", None, {"models": {"standard": {"id": "mapped", "use_for": "work"}}}, "mapped"),
+    ("custom", None, {"model": "default"}, "default"),
+    ("sonnet", None, {"model": "default", "models": {"light": {"id": "small", "use_for": "quick"}}}, "default"),
+    ("custom", None, {}, "claude-sonnet-5"),
+])
+def test_model_for_gateway_resolution(monkeypatch, requested, explicit, backup, want):
+    monkeypatch.setattr(llm_config, "_config", {"anthropic": {
+        "claude": {"models": {"standard": {"id": "sonnet", "use_for": "work"}}},
+        "backup": backup,
+    }})
+    assert llm_config.model_for_gateway("anthropic", "claude", "backup", requested, explicit) == want
+
+
 def _use(monkeypatch, block):
     monkeypatch.setattr(llm_config, "_config", {"anthropic": {"claude": block}})
 

@@ -30,6 +30,16 @@ def test_own_row_shape():
     }
 
 
+def test_own_row_records_answer_gateway_and_switches():
+    switches = [{"from": "claude", "to": "backup", "reason": "quota"}]
+    result = ChatResult(response="done", gateway="backup", gateway_switches=switches)
+    row = usage_log.own_row(result, agent_id="calc", agent_label="Calculator", gateway="claude",
+                            started_at="start", finished_at="end", delegated_by=None)
+    assert row["gateway"] == "backup"
+    assert row["gateway_switches"] == switches
+    assert "gateway_switches" not in _row()
+
+
 def test_append_writes_one_line_per_turn_to_a_per_agent_daily_file(tmp_path):
     asyncio.run(usage_log.append({**_row(), "request_id": "r1"}, tmp_path))
     asyncio.run(usage_log.append({**_row(), "request_id": "r2"}, tmp_path))

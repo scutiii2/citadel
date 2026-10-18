@@ -10,10 +10,16 @@ export interface GatewayInfo {
 /** Provider id -> the gateways it can run through (from ai_agent's gateways/<provider>/<gateway>.json files). */
 export type ProviderCatalog = Record<string, GatewayInfo[]>;
 
+export interface AgentGatewayChoice {
+  gateway: string;
+  model?: string;
+}
+
 export interface AgentLlm {
   provider: string;
   gateway?: string;
   model?: string;
+  fallback_gateways?: (string | AgentGatewayChoice)[];
   reasoning_effort?: string;
   temperature?: number;
   max_tokens?: number;

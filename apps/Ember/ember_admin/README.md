@@ -87,7 +87,20 @@ folder with no entry starts offline. See
 
 ## Agents
 
-Lists ai_agent's agent files as cards like ember_web's (plus port, URL and the Edit and Remove buttons) with their live status (running, offline, disabled; the status needs `chat.use`, otherwise it is left out). **New agent** and **Edit** open a form: id (fixed once created), name, port, URL (where ember and the other agents reach it; empty = this machine and the port), provider, gateway (filtered by the provider), model, reasoning effort, strongest tier, persona, instructions, focus, allowed/denied tool globs, and the enabled, orchestrator and entry switches. Fields the form does not show are kept when saving. The form also edits the identity override, temperature, max tokens, max tool rounds, the highest effort a delegator may request, the weakest and strongest tier (with a preview of the model each tier resolves to). **Show prompt** builds the full system prompt the model receives from the draft and the shared prompts. **Shared prompts** (button in the page header) edits the text every agent shares: assistant name and description, the identity line template, the default instructions, the specialist list intro and the caveman rule; each has a reset to its default, and saving asks first because it restarts every agent. Remove asks for the agent id; the entry agent cannot be removed. ai_agent validates every change (refusals such as a port clash show in the form) and its supervisor starts, restarts or stops the agent within a few seconds. Needs a running agent to reach ai_agent.
+Lists ai_agent's agent files as cards like ember_web's (plus port, URL and the Edit and Remove buttons) with their live status (running, offline, disabled; the status needs `chat.use`, otherwise it is left out). **New agent** and **Edit** open a form: id (fixed once created), name, port, URL (where ember and the other agents reach it; empty = this machine and the port), provider, an ordered gateway list (filtered by provider) with a model override per row, reasoning effort, strongest tier, persona, instructions, focus, allowed/denied tool globs, and the enabled, orchestrator and entry switches. Fields the form does not show are kept when saving. The form also edits the identity override, temperature, max tokens, max tool rounds, the highest effort a delegator may request, the weakest and strongest tier (with a preview of the model each tier resolves to). **Show prompt** builds the full system prompt the model receives from the draft and the shared prompts. **Shared prompts** (button in the page header) edits the text every agent shares: assistant name and description, the identity line template, the default instructions, the specialist list intro and the caveman rule; each has a reset to its default, and saving asks first because it restarts every agent. Remove asks for the agent id; the entry agent cannot be removed. ai_agent validates every change (refusals such as a port clash show in the form) and its supervisor starts, restarts or stops the agent within a few seconds. Needs a running agent to reach ai_agent.
+
+
+The **Gateways** list in each agent's Model section is a draft: its first row is
+primary and later rows are backups. Drag a row by its grip or use its up/down
+buttons; the model override moves with it. Add picks an unused gateway of the
+same provider. Remove drops only that agent's assignment, and the last row
+cannot be removed. Duplicate/default-equivalent gateways are blocked. Changing
+provider resets the list to the new provider default and clears the previous
+model overrides; Laya stays local and has no fallback controls. Blank model
+boxes use automatic tier/default mapping. Save writes only the edited agent's
+override through the existing API; Cancel discards the draft, and a refused
+save keeps it open. Cards show the configured gateway order. This form manages
+assignments; shared gateway presets and credentials remain configured in ai_agent.
 
 ## Extensions
 

@@ -17,6 +17,18 @@ from src import server
 from src.llm.base_provider import ChatCancelled, ChatResult, ToolCallRecord
 
 
+def test_ask_and_interpret_usage_record_actual_gateway(monkeypatch):
+    result = ChatResult(response="done", gateway="backup", gateway_switches=[
+        {"from": "claude", "to": "backup", "reason": "quota"}])
+    monkeypatch.setattr(server.agent_config, "run_chat", AsyncMock(return_value=result))
+    monkeypatch.setattr(server.agent_config, "run_interpret", lambda *args: result)
+    monkeypatch.setattr(server.agent_config, "status", lambda: {"context_window": 100, "model": "default"})
+    for reply in (asyncio.run(server.ask("hello")), server.interpret("hello")):
+        own = reply["agent_usage"][0]
+        assert own["gateway"] == "backup"
+        assert own["gateway_switches"] == result.gateway_switches
+
+
 def test_ask_returns_the_result_shape_chat_app_expects():
     """ask is now async and forwards the ChatResult from run_chat."""
     async def _run():
@@ -359,3 +371,4 @@ def test_ask_reports_the_tier_models_context_window_only_when_tiered():
         assert without["context_window"] == 1
 
     asyncio.run(_run())
+

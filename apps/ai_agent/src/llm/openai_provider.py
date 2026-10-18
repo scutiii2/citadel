@@ -37,10 +37,13 @@ import json
 import os
 from typing import Any, Sequence
 
-from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, BadRequestError, OpenAI, RateLimitError
+import httpx
+from openai import APIStatusError, AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, BadRequestError, OpenAI
 
 from src.llm.turn_guard import TurnStopped
-from src.agents import agent_routing, ask_user, delegation, plan
+from src.agents import agent_routing, agent_spec, ask_user, delegation, plan
+from src.core.catalog import catalog
+from src.llm.gateway_failover import GatewayRoute, classify
 
 from src.core import approvals, questions
 
@@ -70,37 +73,35 @@ class _OpenAI(BaseProvider):
     GATEWAY_ENV = "AI_AGENT_GATEWAY"
     DEFAULT_MODEL_FALLBACK = "gpt-5.6-sol"
 
-    _client: AsyncOpenAI | AsyncAzureOpenAI | None = None
-    # Separate cache from _client above - run_interpret() need
-    # plain synchronous clients (their own client.responses.create(...) calls
-    # are not awaited), while run_chat() needs the async ones. Same gateway
-    # resolution/config either way, just a different SDK class built from
-    # it - mirrors anthropic_provider._Anthropic's get_client/get_sync_client
-    # split, same reasoning.
-    _sync_client: OpenAI | AzureOpenAI | None = None
+    _clients: dict[str, Any] = {}
+    _sync_clients: dict[str, Any] = {}
 
     @classmethod
     def _gateway_name(cls) -> str:
         return os.getenv(cls.GATEWAY_ENV) or "gpt"
 
     @classmethod
-    def has_api_key(cls) -> bool:
-        gateway_name = cls._gateway_name()
-        if gateway_name == "azure":
-            cfg = llm_config.gateway(PROVIDER_NAME, "azure")
-            return bool(cfg.get("azure_endpoint") and cfg.get("api_key"))
+    def has_api_key(cls, gateway: str | None = None) -> bool:
+        gateway_name = gateway or cls._gateway_name()
         try:
             cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
         except KeyError:
             return False
+        if gateway_name == "azure":
+            return bool(cfg.get("azure_endpoint") and cfg.get("api_key"))
         return bool(cfg.get("api_key") or cfg.get("auth_token"))
 
     @classmethod
-    def get_client(cls) -> AsyncOpenAI | AsyncAzureOpenAI:
-        if cls._client is not None:
-            return cls._client
+    def is_available(cls) -> bool:
+        names = (cls._gateway_name(), *(choice.gateway for choice in agent_spec.current().llm.fallback_gateways))
+        return any(cls.has_api_key(name) and not cooldown.is_in_cooldown(cooldown.gateway_key(cls.PROVIDER_ID, name))
+                   for name in names)
 
-        gateway_name = cls._gateway_name()
+    @classmethod
+    def get_client(cls, gateway: str | None = None) -> AsyncOpenAI | AsyncAzureOpenAI:
+        gateway_name = gateway or cls._gateway_name()
+        if gateway_name in cls._clients:
+            return cls._clients[gateway_name]
 
         if gateway_name == "azure":
             cfg = llm_config.gateway(PROVIDER_NAME, "azure")
@@ -109,12 +110,12 @@ class _OpenAI(BaseProvider):
                     "gateways/openai/azure.json: AZURE_OPENAI_ENDPOINT / "
                     "AZURE_OPENAI_API_KEY not set in .env"
                 )
-            cls._client = AsyncAzureOpenAI(
+            cls._clients[gateway_name] = AsyncAzureOpenAI(
                 azure_endpoint=cfg["azure_endpoint"],
                 api_version=cfg.get("api_version"),
                 api_key=cfg["api_key"],
             )
-            return cls._client
+            return cls._clients[gateway_name]
 
         # Every other block ("gpt" itself, "together", "groq", "ollama",
         # ...) is a plain AsyncOpenAI() build - the gateway file supplies
@@ -127,21 +128,20 @@ class _OpenAI(BaseProvider):
                 f"gateways/openai/{gateway_name}.json: its api_key env var is not "
                 "set in .env"
             )
-        cls._client = AsyncOpenAI(api_key=secret, base_url=cfg.get("base_url"))
-        return cls._client
+        cls._clients[gateway_name] = AsyncOpenAI(api_key=secret, base_url=cfg.get("base_url"))
+        return cls._clients[gateway_name]
 
     @classmethod
-    def get_sync_client(cls) -> OpenAI | AzureOpenAI:
+    def get_sync_client(cls, gateway: str | None = None) -> OpenAI | AzureOpenAI:
         """Same gateway resolution as get_client() above, but builds the
         plain synchronous SDK classes (OpenAI/AzureOpenAI) instead of their
         Async* counterparts - used by run_interpret(), whose
         client.responses.create(...) calls are never awaited. Cached
         separately in `_sync_client` so this never collides with
         get_client()'s `_client`."""
-        if cls._sync_client is not None:
-            return cls._sync_client
-
-        gateway_name = cls._gateway_name()
+        gateway_name = gateway or cls._gateway_name()
+        if gateway_name in cls._sync_clients:
+            return cls._sync_clients[gateway_name]
 
         if gateway_name == "azure":
             cfg = llm_config.gateway(PROVIDER_NAME, "azure")
@@ -150,12 +150,12 @@ class _OpenAI(BaseProvider):
                     "gateways/openai/azure.json: AZURE_OPENAI_ENDPOINT / "
                     "AZURE_OPENAI_API_KEY not set in .env"
                 )
-            cls._sync_client = AzureOpenAI(
+            cls._sync_clients[gateway_name] = AzureOpenAI(
                 azure_endpoint=cfg["azure_endpoint"],
                 api_version=cfg.get("api_version"),
                 api_key=cfg["api_key"],
             )
-            return cls._sync_client
+            return cls._sync_clients[gateway_name]
 
         cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
         secret = cfg.get("api_key") or cfg.get("auth_token")
@@ -164,8 +164,8 @@ class _OpenAI(BaseProvider):
                 f"gateways/openai/{gateway_name}.json: its api_key env var is not "
                 "set in .env"
             )
-        cls._sync_client = OpenAI(api_key=secret, base_url=cfg.get("base_url"))
-        return cls._sync_client
+        cls._sync_clients[gateway_name] = OpenAI(api_key=secret, base_url=cfg.get("base_url"))
+        return cls._sync_clients[gateway_name]
 
     @classmethod
     def resolve_default_model(cls) -> str:
@@ -311,6 +311,30 @@ def _dispatch(name: str, arguments: dict[str, Any], depth: int) -> str:
     return call_tool(name, arguments)
 
 
+@catalog
+def _route_for_turn() -> GatewayRoute:
+    return GatewayRoute.for_turn(PROVIDER_ID, _OpenAI._gateway_name(),
+                                 (choice.gateway for choice in agent_spec.current().llm.fallback_gateways),
+                                 lambda gateway: has_api_key(gateway))
+
+
+@catalog
+def _model_for_route(route: GatewayRoute, requested: str | None) -> str:
+    primary = _OpenAI._gateway_name()
+    if route.current == primary:
+        return requested or DEFAULT_MODEL
+    explicit = next((choice.model for choice in agent_spec.current().llm.fallback_gateways
+                     if choice.gateway == route.current), None)
+    return llm_config.model_for_gateway(PROVIDER_ID, primary, route.current, requested or DEFAULT_MODEL, explicit)
+
+
+@catalog
+def _strip_reasoning(messages: list[Any]) -> list[Any]:
+    """Reasoning item ids and encrypted payloads cannot cross gateway boundaries."""
+    return [message for message in messages
+            if (message.get("type") if isinstance(message, dict) else getattr(message, "type", None)) != "reasoning"]
+
+
 async def run_chat(
     question: str,
     history: list[dict[str, Any]],
@@ -322,9 +346,10 @@ async def run_chat(
     caveman: bool = False,
 ) -> ChatResult:
     history = validate_history(history)
-    client = _get_client()
-    model_name = model or DEFAULT_MODEL
-    history = token_limits.trim_history_to_fit(history, PROVIDER_ID, _limit_gateway())
+    route = _route_for_turn()
+    client = _get_client() if route.current == _OpenAI._gateway_name() else _get_client(route.current)
+    model_name = _model_for_route(route, model)
+    history = token_limits.trim_history_to_fit(history, PROVIDER_ID, route.current)
     roster = await agent_routing.roster_for()
     system_prompt = system_prompt_for(caveman, roster)
     messages: list[Any] = [{"role": "system", "content": system_prompt}, *history]
@@ -362,22 +387,22 @@ async def run_chat(
 
     try:
         async with guard.timeout():
-            for _ in range(options.max_tool_rounds(token_limits.max_tool_rounds(PROVIDER_ID, _limit_gateway()))):
+            for _ in range(options.max_tool_rounds(token_limits.max_tool_rounds(PROVIDER_ID, route.current))):
                 if cancellation.is_cancelled(request_id):
                     raise ChatCancelled()
-                token_limits.enforce_context_limit(PROVIDER_ID, messages, _limit_gateway())
                 # Every round is streamed, so text appears as the model writes
                 # it. A round that ends in function calls may still have streamed
                 # some text first; "token_reset" tells the client to drop it,
                 # since the real answer is the text of the final (no-tool) round.
                 while True:
+                    token_limits.enforce_context_limit(PROVIDER_ID, messages, route.current)
                     text_parts: list[str] = []
                     try:
                         async with client.responses.stream(
                             model=model_name,
                             input=messages,
                             tools=schemas if schemas else None,
-                            max_output_tokens=options.max_tokens(token_limits.max_output_tokens(PROVIDER_ID, _limit_gateway())),
+                            max_output_tokens=options.max_tokens(token_limits.max_output_tokens(PROVIDER_ID, route.current)),
                             **options.extra_kwargs(model_name),
                         ) as stream:
                             async for event in stream:
@@ -390,13 +415,34 @@ async def run_chat(
                                     # Not shown as the answer, but the model is
                                     # spending tokens: keep the live meter moving.
                                     await meter.chars(len(event.delta))
+                                elif event.type == "response.failed":
+                                    failure = getattr(event.response, "error", None)
+                                    status = {"server_error": 503, "rate_limit_exceeded": 429}.get(
+                                        getattr(failure, "code", None))
+                                    if status is not None:
+                                        # Responses can fail after HTTP 200. Adapt known SDK
+                                        # failure codes to the shared HTTP classifier before
+                                        # get_final_response loses them behind a RuntimeError.
+                                        # These transport objects perform no network I/O.
+                                        response_error = httpx.Response(status, request=httpx.Request(
+                                            "POST", "https://gateway.invalid"))
+                                        raise APIStatusError(failure.message, response=response_error, body=None)
                             response = await stream.get_final_response()
                         break
-                    except BadRequestError as error:
-                        # A rejected per-agent option fails before any text
-                        # streams; drop it and retry this round once without it.
-                        if text_parts or not options.drop_rejected(str(error), model_name):
+                    except Exception as error:
+                        if isinstance(error, BadRequestError) and classify(error) is None:
+                            if not text_parts and options.drop_rejected(str(error), model_name):
+                                continue
+                        switch = route.advance(error)
+                        if switch is None:
                             raise
+                        if on_event:
+                            if text_parts:
+                                await on_event(step_event("token_reset"))
+                            await on_event(step_event("gateway_switch", **switch.as_dict()))
+                        messages = _strip_reasoning(messages)
+                        client = _get_client(route.current)
+                        model_name = _model_for_route(route, model)
                 usage = getattr(response, "usage", None)
                 round_tokens = getattr(usage, "total_tokens", None) if usage is not None else None
                 if round_tokens is not None:
@@ -418,6 +464,8 @@ async def run_chat(
                         tools_used=tools_used,
                         tool_calls=tool_calls,
                         provider_id=PROVIDER_ID,
+                        gateway=route.current,
+                        gateway_switches=[switch.as_dict() for switch in route.switches],
                         model=model_name,
                         total_tokens=total_tokens,
                         context_tokens=context_tokens,
@@ -472,10 +520,6 @@ async def run_chat(
     except TimeoutError:
         cancellation.cancel(request_id)
         stop_message = guard.time_message()
-    except RateLimitError as error:
-        seconds = cooldown.extract_retry_after_seconds(error) or cooldown.DEFAULT_COOLDOWN_SECONDS
-        cooldown.start_cooldown(PROVIDER_ID, seconds)
-        raise
 
     if on_event:
         await on_event(step_event("token_reset"))
@@ -485,6 +529,8 @@ async def run_chat(
         tools_used=tools_used,
         tool_calls=tool_calls,
         provider_id=PROVIDER_ID,
+        gateway=route.current,
+        gateway_switches=[switch.as_dict() for switch in route.switches],
         model=model_name,
         total_tokens=total_tokens,
         context_tokens=context_tokens,
@@ -500,32 +546,32 @@ def run_interpret(text: str, model: str | None = None) -> ChatResult:
     _get_sync_client(), not _get_client() - this call is a plain,
     non-`await`ed client.responses.create(...), same reasoning as
     anthropic_provider.run_interpret."""
-    client = _get_sync_client()
-    model_name = model or DEFAULT_MODEL
-    try:
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": text},
-        ]
-        token_limits.enforce_context_limit(PROVIDER_ID, messages, _limit_gateway())
-        response = client.responses.create(
-            model=model_name,
-            input=messages,
-            max_output_tokens=token_limits.max_output_tokens(PROVIDER_ID, _limit_gateway()),
-        )
+    route = _route_for_turn()
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": text},
+    ]
+    while True:
+        client = _get_sync_client() if route.current == _OpenAI._gateway_name() else _get_sync_client(route.current)
+        model_name = _model_for_route(route, model)
+        token_limits.enforce_context_limit(PROVIDER_ID, messages, route.current)
+        try:
+            response = client.responses.create(
+                model=model_name,
+                input=messages,
+                max_output_tokens=token_limits.max_output_tokens(PROVIDER_ID, route.current),
+            )
+        except Exception as error:
+            if route.advance(error) is None:
+                raise
+            continue
         usage = getattr(response, "usage", None)
         total_tokens = getattr(usage, "total_tokens", None) if usage is not None else None
         context_tokens = getattr(usage, "input_tokens", None) if usage is not None else None
         return ChatResult(
-            response=response.output_text,
-            provider_id=PROVIDER_ID,
-            model=model_name,
-            total_tokens=total_tokens,
-            context_tokens=context_tokens,
+            response=response.output_text, provider_id=PROVIDER_ID, model=model_name,
+            gateway=route.current, gateway_switches=[switch.as_dict() for switch in route.switches],
+            total_tokens=total_tokens, context_tokens=context_tokens,
             input_tokens=context_tokens,
             output_tokens=getattr(usage, "output_tokens", None) if usage is not None else None,
         )
-    except RateLimitError as error:
-        seconds = cooldown.extract_retry_after_seconds(error) or cooldown.DEFAULT_COOLDOWN_SECONDS
-        cooldown.start_cooldown(PROVIDER_ID, seconds)
-        raise

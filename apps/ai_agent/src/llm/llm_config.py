@@ -165,3 +165,26 @@ def tiers(provider: str, gateway_name: str) -> dict[str, TierModel]:
         if model_id:
             found[name] = TierModel(model_id, use_for)
     return found
+
+
+@catalog
+def model_for_gateway(provider: str, primary_gateway: str, gateway_name: str,
+                      requested_model: str | None, explicit_model: str | None) -> str:
+    """Translate primary tier ids while honoring an explicit backup model first."""
+    if explicit_model:
+        return explicit_model
+    primary_tiers = tiers(provider, primary_gateway)
+    backup_tiers = tiers(provider, gateway_name)
+    for tier, model in primary_tiers.items():
+        if model.id == requested_model and tier in backup_tiers:
+            return backup_tiers[tier].id
+    configured = gateway(provider, gateway_name).get("model")
+    if configured:
+        return configured
+    # Deferred imports avoid a provider/config cycle; defaults stay owned by
+    # the provider classes rather than duplicating their model constants here.
+    if provider == "anthropic":
+        from src.llm.anthropic_provider import _Anthropic
+        return _Anthropic.DEFAULT_MODEL_FALLBACK
+    from src.llm.openai_provider import _OpenAI
+    return _OpenAI.DEFAULT_MODEL_FALLBACK

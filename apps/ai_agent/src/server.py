@@ -240,7 +240,7 @@ async def ask(
     finally:
         internal_auth.reset_requester(requester_token)
     own_usage = usage_log.own_row(
-        result, agent_id=_AGENT_ID, agent_label=_AGENT_LABEL, gateway=SPEC.effective_gateway(),
+        result, agent_id=_AGENT_ID, agent_label=_AGENT_LABEL, gateway=result.gateway or SPEC.effective_gateway(),
         started_at=started_at, finished_at=agent_events.now_iso(), delegated_by=delegated_by,
         model_tier=result.model_tier, reasoning_effort=result.reasoning_effort,
     )
@@ -416,7 +416,7 @@ def interpret(text: str) -> dict[str, Any]:
     started_at = agent_events.now_iso()
     result = agent_config.run_interpret(text)
     own_usage = usage_log.own_row(
-        result, agent_id=_AGENT_ID, agent_label=_AGENT_LABEL, gateway=SPEC.effective_gateway(),
+        result, agent_id=_AGENT_ID, agent_label=_AGENT_LABEL, gateway=result.gateway or SPEC.effective_gateway(),
         started_at=started_at, finished_at=agent_events.now_iso(), delegated_by=None,
     )
     return {

@@ -6,6 +6,14 @@ on first read. Never credentials
 (those go in `../.env`). Anything the program itself writes while running
 lives under `../.data/` instead (see the end of this file).
 
+`config_tuning.json` also accepts `gateway_failover`: `quota_cooldown_seconds`
+and `auth_cooldown_seconds` default to 3600; `unavailable_cooldown_seconds`
+defaults to 30. Rate limits use Retry-After or 60 seconds. Cooldowns are
+per provider and gateway, in memory, and reset on process restart.
+Choose backups with each agent's `llm.fallback_gateways` list, documented in
+[`../README.md`](../README.md#gateway-failover); this tuning section only controls
+the cooldown durations, and enables no backups by itself.
+
 - **`config_tuning.json`** - `token_limits`: output/context/tool-round
   caps, per provider and gateway (`src/llm/token_limits.py`). `classifier`
   (the `.example` seeds every key at its default, so every feature is off until you switch it on; a key
