@@ -236,7 +236,7 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `DELETE` | `/api/nav-preferences` | any logged-in account | Back to the default arrangement. `204`, also when nothing was saved. |
 | `GET` | `/api/notes` | `chat.use` | This account's private notes, newest edit first: `[{id, title, body, tags, agent_readable, last_editor, created_at, updated_at}]`. Kept in db_gateway, not in this database. |
 | `GET` | `/api/notes/tags` | `chat.use` | The tags this account already uses, most used first: `[{tag, count}]`. |
-| `POST` | `/api/notes/suggest-tags` | `chat.use` | `{title?, body?, tags?}` (the note as the editor holds it): which of this account's existing tags, not already in `tags`, Laya thinks fit. `{suggested, checked, skipped}`. Needs a running agent whose file uses the `laya` provider, else `503`. Laya answers alone (`local_only`): no fallback to Jev. |
+| `POST` | `/api/notes/suggest-tags` | `chat.use` | `{title?, body?, tags?}` (the note as the editor holds it): which of this account's existing tags, not already in `tags`, Laya thinks fit. `{suggested, checked, skipped}`. Needs a running agent whose file uses the `laya` provider, else `503`. Laya answers alone (`local_only`: English, then typed-decisions; no fallback to Jev). |
 | `POST` | `/api/notes/generate-tag` | `chat.use` | `{title?, body?, tags?}` (the note as the editor holds it): `{tags}`, up to 3 new lowercase tags (not already on the note or used by the account) written by the `tag-writer` agent, a light-tier model that sees about 1,500 characters of the note and the account's tag names. An unusable reply gives `[]`. Nothing is saved. `503` when `tag-writer` is not running or does not answer. |
 | `POST` | `/api/triage/titles` | `chat.use` | `{descriptions}` (2-10 strings, 1-300 characters each): a one-word lowercase title for each, in order, written by the `title-writer` agent (one plain model call that sees only the descriptions). An unusable reply falls back to `option1`, `option2`...; a repeat gets a number. `503` when `title-writer` is not running or does not answer, `429` at the usage limit. Counted in usage as kind `triage_titles`; logged as the action `triage.titles` (the count of options only) and, on a `503`, as an error. |
 | `POST` | `/api/triage/ask` | `chat.use` | `{kind: "choice"\|"yes_no", text, question, options?, trace?}`: asks the Triage Assistant one typed question about `text` (1-4000 characters) directly, without the orchestrator. `choice` needs 2-10 `options` `{title, description}` (title: one word, unique ignoring case); `yes_no` takes none. Answer: `{kind: "yes_no", answer, yes, confidence, uncertain}` or `{kind: "choice", choice, probabilities, confidence, uncertain, also_check?, candidates?, unknown?, answered_by?, rounds?}` (`rounds` only with `trace: true`). `422` when Laya refuses the question (for example the text is too long), `503` when the Triage Assistant is not running or gives no usable answer, `429` at the usage limit. Counted in usage as kind `triage`; logged as the action `triage.ask` (the kind, the number of options and the pick, never the text or the question) and, on a `503`, as an error. |
@@ -362,6 +362,9 @@ automatic reports. Add manual limits later if abuse appears.
   `extensions.personal.manage`, `files.upload`, `files.download`, `tickets.create`) - unlike chat_app, where new accounts get no
   role. An account with an unverified email holds no permissions at all, unless
   `require_email_verification` is `false` in config.
+- **Starter roles:** migration `0019` creates `Viewer`, `Support`, `Moderator`, `Auditor`, `Power User` and `Operator` once,
+  with preset permissions (none holds `roles.manage`, `roles.assign`, `accounts.delete` or any `logs.chat.*`). An existing
+  role of the same name is left alone, and edits or deletions later stick.
 - **Ticket permissions:** `tickets.create`: "Report bugs, suggest features and follow your own tickets";
   `tickets.manage`: "See every ticket, triage them and set status, priority and assignee".
   Migration `0012` grants `tickets.create` once to existing roles holding `chat.use`;
@@ -617,54 +620,6 @@ rows, but does not undo role edits made after upgrading.
 Admin usage includes every existing account, including disabled accounts and accounts with no usage in the selected period. Tokens include summaries; answers count distinct chat turns (delegated agents count once, summaries count zero). Personal usage remains scoped to the session account. Admin detail routes require usage.all.view, independently of chat.use and accounts.view.
 
 
-## Game registry and launch tickets
-
-Authenticated accounts use `GET /api/games` to list enabled games for which
-an account has `games.<id>.play`. `POST /api/games/{id}/launch` returns the
-registered base URL with a single-use ticket in `/#ticket=...`. Tickets expire
-in 60 seconds. Only their SHA-256 hashes are stored; launch prunes tickets
-that expired more than one minute ago. Tickets are never written to audit logs.
-
-`games.manage` authorizes `GET /api/games/registry`, registration through
-`POST /api/games` with `{ "url": "http://127.0.0.1:8060" }`, refresh through
-`POST /api/games/{id}/refresh` and `DELETE /api/games/{id}`. The registry list
-includes disabled games. Registration fetches `<base>/manifest.json`, creates
-`games.<id>.play`, and grants it to Administrator. Deregistration removes the
-game and its tickets, but retains the permission and role grants for later
-registration. Audit actions are `games.register`, `games.refresh`,
-`games.deregister`, and `games.launch`.
-
-Manifests are JSON objects with `id`, `name`, `description`, `icon`, and
-`version`. IDs match `^[a-z0-9][a-z0-9-]{0,62}$`; name is nonempty and at most
-80 characters, description and icon at most 300, version at most 40. Optional
-text fields default to empty strings. `wallpaper` (at most 300 characters) is the
-card image: a path relative to the game's URL or an absolute http(s) URL, stored
-resolved (migration 0015) and returned by `GET /api/games`; ember_web loads it
-directly, so its origin must be in `EMBER_GAME_ORIGINS` (CSP `img-src`). `symbols` is an optional list of at most eight badge images (same rules,
-stored as JSON text by migration 0016) shown as a row on the card. Fetches have a five-second timeout,
-a 64 KiB decoded body cap, and refuse redirects. URLs allow http/https,
-without credentials; subpath bases are preserved, queries and fragments removed.
-
-`games_allow_private_urls` defaults to true for local development. Set it to
-false for production to refuse localhost names and literal non-public IP
-addresses. As specified by the implementation plan, DNS hostnames are allowed
-without resolution: this validation does not prevent private DNS targets or
-DNS rebinding. Restrict production egress to trusted game hosts as well.
-
-Game servers call `POST /internal/games/tickets/redeem` with `{ "ticket": "...",
-"game_id": "ascension" }` and `X-Internal-Token`. This endpoint checks the
-configured internal token with a constant-time comparison, never authenticates
-from cookies, and returns `{ "account_id": "...", "display_name": "..." }`.
-Invalid authentication, unknown, expired, replayed or wrong-game tickets return
-one generic 401. A missing server token configuration returns 503. Redemption
-atomically consumes a ticket; a wrong-game attempt does not consume it.
-
-Migration 0014 creates the registry and ticket tables and renames
-`ascension.play` to `games.ascension.play`, preserving role grants and merging
-both permission rows if necessary. Downgrade reverses the rename and removes
-the new tables. The old proxy has been removed. Ember launches games through
-`/api/games/{id}/launch`; game servers redeem tickets and issue their own bearer
-sessions. The browser never receives the shared internal token.
 
 ## Document storage (db_gateway)
 
@@ -682,3 +637,30 @@ db_gateway's `configs/config_connections.json` (see its `.example`). Calls send 
 `DbGatewayUnavailable`, so only a feature that uses it fails; ember_api starts without the
 gateway. Routes get it from `get_db_gateway` in `src/deps.py`; tests use `FakeDbGateway`
 (the `db_gateway` fixture). The notes routes are the first user.
+
+## Forge
+
+Forge lets a user chat in groups with their own Claude and Codex workers. A worker is the
+official CLI running on the user's own computer, driven by the `ember_worker` daemon, which
+connects out to ember_api. Ember never sees a provider login. Needs the permission `forge.use`.
+Design: `docs/superpowers/specs/2026-10-18-forge-design.md`.
+
+Routes under `/api/forge`:
+
+- `GET /plans`, `PUT /plans/{provider}` (the eligible plan strings; changing needs `settings.manage`)
+- `GET/POST /workers`, `DELETE /workers/{id}` (the pairing token is returned once, on create)
+- `GET/POST /groups`, `GET/PATCH/DELETE /groups/{id}` (`full_auto` needs `confirm_full_auto: true`)
+- `POST /groups/{id}/workers`, `DELETE /groups/{id}/workers/{worker_id}`
+- `GET/POST /groups/{id}/messages`, `GET /groups/{id}/events` (server-sent events, resumable)
+- `POST /groups/{id}/permissions/{request_id}`, `POST /groups/{id}/cancel`
+- `WS /worker`: the worker socket. Bearer pairing token, then a `hello` frame, then frames
+  (see the spec's wire protocol).
+
+The plan allowlists (`forge_plans_claude`, `forge_plans_codex` in `app_settings`) start empty,
+so no worker is eligible until an account with `settings.manage` sets them from the plan
+strings the Forge page shows for a connected worker. This is a guard in Ember only: workers
+report their own plan.
+
+Forge uses the `websockets` package for the worker socket and keeps its hub (connected
+workers, event bus) in memory, so it assumes a single ember_api process. Each stored worker
+message keeps the worker's label, so deleting a worker leaves the history readable.
