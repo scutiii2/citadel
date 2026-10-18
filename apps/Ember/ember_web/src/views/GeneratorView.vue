@@ -81,6 +81,11 @@ const shown = computed(() => {
   return tab.value === "totp" ? r.value.replace(/(\d{3})(?=\d)/g, "$1 ") : r.value;
 });
 
+/** Filled-track percentage for a range input, set as the `--fill` custom property. */
+function fill(value: number, min: number, max: number): Record<string, string> {
+  return { "--fill": `${((value - min) / (max - min)) * 100}%` };
+}
+
 /** The form button: a fresh value starts hidden again. */
 function generate(): void {
   revealed.value = false;
@@ -194,7 +199,7 @@ onBeforeUnmount(() => {
         <form class="options" @submit.prevent="canRun && generate()">
           <template v-if="tab === 'password'">
             <label class="field">Length: {{ options.password.length }}
-              <input v-model.number="options.password.length" type="range" min="8" max="128" />
+              <input v-model.number="options.password.length" type="range" min="8" max="128" :style="fill(options.password.length, 8, 128)" />
             </label>
             <ToggleSwitch small :checked="options.password.use_upper" @change="options.password.use_upper = checked($event)">Uppercase A-Z</ToggleSwitch>
             <ToggleSwitch small :checked="options.password.use_lower" @change="options.password.use_lower = checked($event)">Lowercase a-z</ToggleSwitch>
@@ -205,7 +210,7 @@ onBeforeUnmount(() => {
           </template>
           <template v-else-if="tab === 'passphrase'">
             <label class="field">Words: {{ options.passphrase.words }}
-              <input v-model.number="options.passphrase.words" type="range" min="3" max="12" />
+              <input v-model.number="options.passphrase.words" type="range" min="3" max="12" :style="fill(options.passphrase.words, 3, 12)" />
             </label>
             <label class="field">Separator
               <input v-model="options.passphrase.separator" type="text" maxlength="3" aria-label="Separator" />
@@ -215,7 +220,7 @@ onBeforeUnmount(() => {
           </template>
           <template v-else-if="tab === 'pin'">
             <label class="field">Digits: {{ options.pin.length }}
-              <input v-model.number="options.pin.length" type="range" min="4" max="12" />
+              <input v-model.number="options.pin.length" type="range" min="4" max="12" :style="fill(options.pin.length, 4, 12)" />
             </label>
           </template>
           <template v-else-if="tab === 'totp-secret'">
@@ -294,6 +299,45 @@ onBeforeUnmount(() => {
 .strength { display: flex; align-items: center; gap: 10px; }
 .bar { flex: 1; height: 6px; border-radius: var(--radius-full); background: var(--border); overflow: hidden; }
 .fill { display: block; height: 100%; background: var(--accent); transition: width 0.2s; }
+.field input[type="range"] {
+  --fill: 0%;
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+.field input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(to right, var(--accent) var(--fill), var(--border) var(--fill));
+}
+.field input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(to right, var(--accent) var(--fill), var(--border) var(--fill));
+}
+.field input[type="range"]::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+  appearance: none;
+}
+.field input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface);
+}
+.field input[type="range"]:focus-visible { outline: none; }
+.field input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
 .note { margin-top: 12px; font-size: 0.85em; }
 .muted { color: var(--muted); }
 .error { color: var(--danger); }
