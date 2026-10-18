@@ -74,3 +74,18 @@ describe("forgeClient", () => {
     expect(forgeClient.eventsUrl(3, 12)).toBe("/api/forge/groups/3/events?after=12");
   });
 });
+
+
+describe("forgeClient folders", () => {
+  it("moves a member and opens the folder dialog on a worker", async () => {
+    await forgeClient.setFolder(3, 5, "D:/other");
+    await forgeClient.browseFolder(5, "C:/site");
+    await forgeClient.browseFolder(5, "");
+
+    expect(request.mock.calls).toEqual([
+      ["PATCH", "/api/forge/groups/3/workers/5", { folder: "D:/other" }],
+      ["POST", "/api/forge/workers/5/browse", { start: "C:/site" }],
+      ["POST", "/api/forge/workers/5/browse", { start: null }],
+    ]);
+  });
+});

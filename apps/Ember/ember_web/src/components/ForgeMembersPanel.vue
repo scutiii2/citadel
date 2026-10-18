@@ -1,18 +1,40 @@
 <script setup lang="ts">
 import type { ForgeGroup, ForgeMode } from "../api/ForgeClient";
+import { ref } from "vue";
 import { MODE_HELP, MODE_OPTIONS } from "../utils/forgeModes";
+import ForgeFolderField from "./ForgeFolderField.vue";
 import SegmentedControl from "./SegmentedControl.vue";
 import ToggleSwitch from "./ToggleSwitch.vue";
 
-defineProps<{ group: ForgeGroup; busy: boolean }>();
+defineProps<{
+  group: ForgeGroup;
+  busy: boolean;
+  /** Opens a folder dialog on that worker's computer. */
+  browse?: (workerId: number, start: string) => Promise<string | null>;
+}>();
 const emit = defineEmits<{
   mode: [mode: ForgeMode];
   "full-auto": [];
   relay: [on: boolean];
   invite: [];
   remove: [workerId: number];
+  folder: [workerId: number, folder: string];
   delete: [];
 }>();
+
+const editing = ref<number | null>(null);
+const draft = ref("");
+
+function startEditing(workerId: number, folder: string): void {
+  editing.value = workerId;
+  draft.value = folder;
+}
+
+function saveFolder(workerId: number): void {
+  const next = draft.value.trim();
+  if (next) emit("folder", workerId, next);
+  editing.value = null;
+}
 
 function chooseMode(next: ForgeMode, current: ForgeMode): void {
   if (next === current) return;
@@ -32,7 +54,31 @@ function chooseMode(next: ForgeMode, current: ForgeMode): void {
             <span class="provider">{{ m.provider }}</span>
             <button type="button" class="remove" :aria-label="`Remove @${m.label} from this group`" :disabled="busy" @click="emit('remove', m.worker_id)">Remove</button>
           </div>
-          <code class="folder">{{ m.folder }}</code>
+          <template v-if="editing === m.worker_id">
+            <ForgeFolderField
+              v-model="draft"
+              label="Folder"
+              :browse="browse && m.online ? (start: string) => browse!(m.worker_id, start) : null"
+              :unavailable="m.online ? '' : 'That worker is offline. Type the path instead.'"
+            />
+            <div class="edit-actions">
+              <button type="button" class="save" :disabled="busy || !draft.trim()" @click="saveFolder(m.worker_id)">Save folder</button>
+              <button type="button" class="cancel" @click="editing = null">Cancel</button>
+            </div>
+          </template>
+          <template v-else>
+            <code class="folder">{{ m.folder }}</code>
+            <button
+              type="button"
+              class="change"
+              :aria-label="`Change the folder of @${m.label}`"
+              :disabled="busy || group.running"
+              :title="group.running ? 'Wait for the answer to finish' : undefined"
+              @click="startEditing(m.worker_id, m.folder)"
+            >
+              Change folder
+            </button>
+          </template>
           <span class="status" :class="{ online: m.online }">
             <svg v-if="m.online" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" /></svg>
             <svg v-else viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="8" /></svg>
@@ -136,6 +182,32 @@ h3 {
 }
 .help {
   margin: 6px 0 0;
+}
+.edit-actions {
+  display: flex;
+  gap: 8px;
+}
+button.change,
+.edit-actions button {
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text);
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+.edit-actions .save {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+button.change:disabled,
+.edit-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 button.remove {
   margin-left: auto;

@@ -11,7 +11,7 @@ vi.mock("../api/ForgeClient", async (importOriginal) => ({
   forgeClient: {
     plans: vi.fn(), setPlans: vi.fn(), workers: vi.fn(), createWorker: vi.fn(), removeWorker: vi.fn(),
     groups: vi.fn(), createGroup: vi.fn(), updateGroup: vi.fn(), removeGroup: vi.fn(),
-    invite: vi.fn(), removeMember: vi.fn(), send: vi.fn(), answerPermission: vi.fn(), stop: vi.fn(),
+    invite: vi.fn(), setFolder: vi.fn(), browseFolder: vi.fn(), removeMember: vi.fn(), send: vi.fn(), answerPermission: vi.fn(), stop: vi.fn(),
   },
 }));
 vi.mock("../services/forgeStream", () => ({ watchGroup: vi.fn() }));
@@ -191,6 +191,39 @@ describe("ForgeView", () => {
 
     expect(client.invite).toHaveBeenCalledWith(1, 1, "C:/site");
     expect(dialog.get("[role=alert]").text()).toContain("Plan not eligible: Pro");
+  });
+
+  it("changes a member's folder from the side panel and shows a refusal", async () => {
+    await setup();
+    await groupButton("Group 1").trigger("click");
+    client.setFolder.mockRejectedValueOnce(new Error("A worker is still answering. Stop it first."));
+
+    await wrapper.get("button.change").trigger("click");
+    await wrapper.get(".members input[type=text]").setValue("D:/other");
+    await wrapper.get("button.save").trigger("click");
+    await flushPromises();
+    expect(client.setFolder).toHaveBeenCalledWith(1, 1, "D:/other");
+    expect(wrapper.text()).toContain("still answering");
+
+    client.setFolder.mockResolvedValue(group(1, { members: [{ ...member, folder: "D:/other" }] }));
+    await wrapper.get("button.change").trigger("click");
+    await wrapper.get(".members input[type=text]").setValue("D:/other");
+    await wrapper.get("button.save").trigger("click");
+    await flushPromises();
+    expect(wrapper.get("code.folder").text()).toBe("D:/other");
+  });
+
+  it("browses for a folder on the worker's computer", async () => {
+    await setup();
+    await groupButton("Group 1").trigger("click");
+    client.browseFolder.mockResolvedValue({ path: "D:/picked" });
+
+    await wrapper.get("button.change").trigger("click");
+    await wrapper.get(".members button.browse").trigger("click");
+    await flushPromises();
+
+    expect(client.browseFolder).toHaveBeenCalledWith(1, "C:/site");
+    expect((wrapper.get(".members input[type=text]").element as HTMLInputElement).value).toBe("D:/picked");
   });
 
   it("deletes a group only after confirmation", async () => {

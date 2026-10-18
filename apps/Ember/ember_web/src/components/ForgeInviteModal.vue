@@ -1,15 +1,34 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { FORGE_FOLDER_MAX, type ForgeGroup, type ForgeWorker } from "../api/ForgeClient";
+import type { ForgeGroup, ForgeWorker } from "../api/ForgeClient";
 import BaseModal from "./BaseModal.vue";
+import ForgeFolderField from "./ForgeFolderField.vue";
 
-const props = defineProps<{ open: boolean; group: ForgeGroup | null; workers: ForgeWorker[]; busy: boolean; error: string }>();
+const props = defineProps<{
+  open: boolean;
+  group: ForgeGroup | null;
+  workers: ForgeWorker[];
+  busy: boolean;
+  error: string;
+  /** Opens a folder dialog on that worker's computer. */
+  browse?: (workerId: number, start: string) => Promise<string | null>;
+}>();
 const emit = defineEmits<{ close: []; invite: [workerId: number, folder: string] }>();
 
 const chosen = ref<number | null>(null);
 const folder = ref("");
 
 const memberIds = computed(() => new Set(props.group?.members.map((m) => m.worker_id) ?? []));
+const chosenWorker = computed(() => props.workers.find((w) => w.id === chosen.value));
+const browseChosen = computed(() => {
+  const worker = chosenWorker.value;
+  if (!props.browse || !worker?.online) return null;
+  return (start: string) => props.browse!(worker.id, start);
+});
+const browseUnavailable = computed(() => {
+  if (!chosenWorker.value) return "Choose a worker to browse its computer.";
+  return chosenWorker.value.online ? "" : "That worker is offline. Type the path instead.";
+});
 const canInvite = computed(() => chosen.value !== null && folder.value.trim() !== "" && !props.busy);
 
 function reason(worker: ForgeWorker): string {
@@ -46,10 +65,14 @@ function submit(): void {
           <span v-if="reason(w)" class="why">{{ reason(w) }}</span>
         </label>
       </fieldset>
-      <label class="folder">
-        <span>Folder on that worker's computer</span>
-        <input v-model="folder" type="text" :maxlength="FORGE_FOLDER_MAX" autocomplete="off" spellcheck="false" placeholder="C:\Users\you\Projects\site" />
-      </label>
+      <ForgeFolderField
+        v-model="folder"
+        label="Folder on that worker's computer"
+        :browse="browseChosen"
+        :unavailable="browseUnavailable"
+        :disabled="busy"
+        placeholder="C:/Users/you/Projects/site"
+      />
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="actions">
         <button type="button" class="cancel" @click="emit('close')">Cancel</button>
@@ -102,23 +125,6 @@ legend {
 }
 .why {
   margin-left: auto;
-}
-.folder {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.folder input {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg);
-  color: var(--text);
-  padding: 8px 10px;
-  font: inherit;
-  font-family: var(--mono);
-}
-.folder input:focus {
-  border-color: var(--accent);
 }
 .error {
   margin: 0;

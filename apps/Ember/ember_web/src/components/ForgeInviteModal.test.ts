@@ -1,5 +1,5 @@
-import { mount } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ForgeGroup, ForgeWorker } from "../api/ForgeClient";
 import ForgeInviteModal from "./ForgeInviteModal.vue";
 
@@ -65,5 +65,33 @@ describe("ForgeInviteModal", () => {
 
   it("points to pairing when there is no worker at all", () => {
     expect(setup({ workers: [] }).text()).toContain("Add a worker first");
+  });
+});
+
+
+describe("ForgeInviteModal folder browsing", () => {
+  it("browses on the chosen worker, starting from the typed folder", async () => {
+    const browse = vi.fn().mockResolvedValue("D:/picked");
+    const wrapper = setup({ browse });
+    expect(wrapper.get("button.browse").attributes("disabled")).toBeDefined(); // no worker chosen yet
+
+    await wrapper.findAll("input[type=radio]")[1].setValue(true);
+    await wrapper.get("button.browse").trigger("click");
+    await flushPromises();
+
+    expect(browse).toHaveBeenCalledWith(2, "C:/site");
+    expect((wrapper.get("input[type=text]").element as HTMLInputElement).value).toBe("D:/picked");
+  });
+
+  it("cannot browse an offline worker", async () => {
+    const wrapper = mount(ForgeInviteModal, {
+      props: { open: true, group, workers: [worker(5, "away", { online: false })], busy: false, error: "", browse: vi.fn() },
+      attachTo: document.body,
+    });
+
+    await wrapper.get("input[type=radio]").setValue(true);
+
+    expect(wrapper.get("button.browse").attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).toContain("That worker is offline");
   });
 });

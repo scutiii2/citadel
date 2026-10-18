@@ -11,7 +11,7 @@ vi.mock("../api/ForgeClient", async (importOriginal) => ({
   forgeClient: {
     plans: vi.fn(), setPlans: vi.fn(), workers: vi.fn(), createWorker: vi.fn(), removeWorker: vi.fn(),
     groups: vi.fn(), createGroup: vi.fn(), updateGroup: vi.fn(), removeGroup: vi.fn(),
-    invite: vi.fn(), removeMember: vi.fn(), send: vi.fn(), answerPermission: vi.fn(), stop: vi.fn(),
+    invite: vi.fn(), setFolder: vi.fn(), browseFolder: vi.fn(), removeMember: vi.fn(), send: vi.fn(), answerPermission: vi.fn(), stop: vi.fn(),
   },
 }));
 vi.mock("../services/forgeStream", () => ({ watchGroup: vi.fn() }));
@@ -221,6 +221,22 @@ describe("groups", () => {
 
     await store.removeMember(2, 1);
     expect(store.groups.find((g) => g.id === 2)!.members).toEqual([]);
+  });
+
+  it("moves a member to another folder and browses the worker's computer", async () => {
+    const { store } = setup();
+    await store.ensureLoaded();
+    const member = { worker_id: 1, label: "claude", provider: "claude" as const, folder: "D:/other", online: true };
+    client.setFolder.mockResolvedValue(group(2, { members: [member] }));
+    client.browseFolder.mockResolvedValue({ path: "D:/picked" });
+
+    await store.setFolder(2, 1, "D:/other");
+    expect(store.groups.find((g) => g.id === 2)!.members[0].folder).toBe("D:/other");
+
+    expect(await store.browseFolder(1, "C:/x")).toBe("D:/picked");
+    expect(client.browseFolder).toHaveBeenCalledWith(1, "C:/x");
+    client.browseFolder.mockResolvedValue({ path: null });
+    expect(await store.browseFolder(1, "")).toBeNull();
   });
 
   it("passes server errors up to the dialog", async () => {

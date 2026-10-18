@@ -70,3 +70,33 @@ describe("ForgeMembersPanel", () => {
     expect(setup({ members: [] }).text()).toContain("No workers yet");
   });
 });
+
+
+describe("ForgeMembersPanel folders", () => {
+  it("changes a member's folder", async () => {
+    const wrapper = setup();
+
+    await wrapper.get("button.change").trigger("click");
+    await wrapper.get("input[type=text]").setValue("  D:/other  ");
+    await wrapper.get("button.save").trigger("click");
+
+    expect(wrapper.emitted("folder")).toEqual([[1, "D:/other"]]);
+    expect(wrapper.find("input[type=text]").exists()).toBe(false);
+  });
+
+  it("can be cancelled without changing anything", async () => {
+    const wrapper = setup();
+
+    await wrapper.get("button.change").trigger("click");
+    await wrapper.get(".edit-actions .cancel").trigger("click");
+
+    expect(wrapper.emitted("folder")).toBeUndefined();
+    expect(wrapper.find("code.folder").exists()).toBe(true);
+  });
+
+  it("will not change the folder while a worker is answering", () => {
+    const wrapper = setup({ running: true });
+
+    expect(wrapper.get("button.change").attributes("disabled")).toBeDefined();
+  });
+});

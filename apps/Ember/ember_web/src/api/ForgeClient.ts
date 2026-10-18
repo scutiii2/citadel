@@ -105,6 +105,11 @@ export const forgeClient = {
 
   invite: (groupId: number, workerId: number, folder: string) =>
     apiRequest<ForgeGroup>("POST", `${group(groupId)}/workers`, { worker_id: workerId, folder }),
+  setFolder: (groupId: number, workerId: number, folder: string) =>
+    apiRequest<ForgeGroup>("PATCH", `${group(groupId)}/workers/${workerId}`, { folder }),
+  /** Opens a folder dialog on the worker's own computer; resolves with the chosen path (null when cancelled). */
+  browseFolder: (workerId: number, start: string | null) =>
+    apiRequest<{ path: string | null }>("POST", `/api/forge/workers/${workerId}/browse`, { start: start || null }),
   removeMember: (groupId: number, workerId: number) =>
     apiRequest<ForgeGroup>("DELETE", `${group(groupId)}/workers/${workerId}`),
 

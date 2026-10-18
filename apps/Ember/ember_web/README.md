@@ -345,7 +345,8 @@ your own Claude and Codex workers. A worker is the official CLI running on your
 own computer, driven by `apps/Ember/ember_worker`, which connects out to
 ember_api. Make a worker in the Workers dialog, copy the pairing command it
 shows once and run it from the `ember_worker` folder. Then make a group, invite
-a worker with the folder it should work in, and write `@name` to address one.
+a worker with the folder it should work in (type the path, or press Browse… to pick it in a dialog
+that opens on that worker's computer; Change folder moves a member later), and write `@name` to address one.
 Workers see only the group's messages.
 
 The group's mode sets what a worker may do: Ask, Accept edits, Plan or Full auto.

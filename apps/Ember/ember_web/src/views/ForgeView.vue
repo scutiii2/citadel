@@ -128,6 +128,8 @@ async function answer(requestId: string, allow: boolean): Promise<void> {
 
 const setMode = (mode: ForgeMode) => runInPanel(() => forge.updateGroup(group.value!.id, { mode }));
 const setRelay = (relay: boolean) => runInPanel(() => forge.updateGroup(group.value!.id, { relay }));
+const setFolder = (workerId: number, folder: string) => runInPanel(() => forge.setFolder(group.value!.id, workerId, folder));
+const browseFolder = (workerId: number, start: string) => forge.browseFolder(workerId, start);
 const removeMember = (workerId: number) => runInPanel(() => forge.removeMember(group.value!.id, workerId));
 
 const createGroup = (title: string, mode: Exclude<ForgeMode, "full_auto">) => runInDialog(() => forge.createGroup(title, mode).then(() => undefined));
@@ -228,6 +230,8 @@ function dismissToken(): void {
           @full-auto="open('full-auto')"
           @relay="setRelay"
           @invite="open('invite')"
+          :browse="browseFolder"
+          @folder="setFolder"
           @remove="removeMember"
           @delete="open('delete-group')"
         />
@@ -236,7 +240,7 @@ function dismissToken(): void {
     </div>
 
     <ForgeNewGroupModal :open="dialog === 'new'" :busy="dialogBusy" :error="dialogError" @close="close" @create="createGroup" />
-    <ForgeInviteModal :open="dialog === 'invite'" :group="group" :workers="forge.workers" :busy="dialogBusy" :error="dialogError" @close="close" @invite="invite" />
+    <ForgeInviteModal :open="dialog === 'invite'" :group="group" :workers="forge.workers" :busy="dialogBusy" :error="dialogError" :browse="browseFolder" @close="close" @invite="invite" />
     <ForgeWorkersModal
       :open="dialog === 'workers'"
       :workers="forge.workers"

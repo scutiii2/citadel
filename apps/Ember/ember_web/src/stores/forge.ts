@@ -158,6 +158,15 @@ export const useForgeStore = defineStore("forge", () => {
     upsert(await forgeClient.invite(groupId, workerId, folder));
   }
 
+  async function setFolder(groupId: number, workerId: number, folder: string): Promise<void> {
+    upsert(await forgeClient.setFolder(groupId, workerId, folder));
+  }
+
+  /** The folder chosen in a dialog on the worker's computer, or null when cancelled. */
+  async function browseFolder(workerId: number, start: string): Promise<string | null> {
+    return (await forgeClient.browseFolder(workerId, start)).path;
+  }
+
   async function removeMember(groupId: number, workerId: number): Promise<void> {
     upsert(await forgeClient.removeMember(groupId, workerId));
   }
@@ -195,7 +204,7 @@ export const useForgeStore = defineStore("forge", () => {
   return {
     workers, plans, groups, selectedId, selected, transcript, connection, loading, loadError,
     ensureLoaded, refresh, select, reconnect, leave,
-    createGroup, updateGroup, removeGroup, invite, removeMember,
+    createGroup, updateGroup, removeGroup, invite, setFolder, browseFolder, removeMember,
     createWorker, removeWorker, savePlans, send, stop, answer,
   };
 });
