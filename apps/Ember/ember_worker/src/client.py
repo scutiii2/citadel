@@ -14,10 +14,13 @@ from websockets.exceptions import ConnectionClosed, InvalidStatus
 from src import __version__
 from src.config import WorkerConfig
 from src.events import TurnRequest
+from src.folder_picker import FolderPicker, SubprocessFolderPicker
 from src.protocol import (
+    BrowseRequest,
     CancelFrame,
     PermissionReply,
     ReadyFrame,
+    browse_result_frame,
     heartbeat_frame,
     hello_frame,
     parse_server_frame,
@@ -45,6 +48,7 @@ class WorkerClient:
         connect=ws_connect,
         backoff_start: float = 1.0,
         backoff_max: float = 30.0,
+        folder_picker: FolderPicker | None = None,
     ) -> None:
         self._provider = provider
         self._config = config
@@ -53,6 +57,7 @@ class WorkerClient:
         self._backoff_start = backoff_start
         self._backoff_max = backoff_max
         self._cancel_grace = CANCEL_GRACE_SECONDS
+        self._folder_picker = folder_picker or SubprocessFolderPicker()
 
     async def run(self) -> None:
         """Runs until cancelled, or until Ember rejects the token."""
@@ -106,6 +111,7 @@ class WorkerClient:
 
         runner = TurnRunner(self._provider, send, self._cancel_grace)
         beat = asyncio.create_task(self._heartbeat(send))
+        dialogs: set[asyncio.Task] = set()
         try:
             async for raw in ws:
                 frame = parse_server_frame(raw)
@@ -115,10 +121,32 @@ class WorkerClient:
                     runner.permission_reply(frame.request_id, frame.allow)
                 elif isinstance(frame, CancelFrame):
                     await runner.cancel(frame.turn_id)
+                elif isinstance(frame, BrowseRequest):
+                    dialog = asyncio.create_task(self._browse(send, frame))
+                    dialogs.add(dialog)
+                    dialog.add_done_callback(dialogs.discard)
         finally:
+            for dialog in dialogs:
+                dialog.cancel()
             beat.cancel()
-            await asyncio.gather(beat, return_exceptions=True)
+            await asyncio.gather(beat, *dialogs, return_exceptions=True)
             await runner.shutdown()
+
+    async def _browse(self, send, request: BrowseRequest) -> None:
+        """Opens the folder dialog (in its own process) and reports what the user chose."""
+        try:
+            path = await self._folder_picker.pick(request.start)
+        except asyncio.TimeoutError:
+            path = None
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            logger.warning("The folder dialog failed: %s", error)
+            path = None
+        try:
+            await send(browse_result_frame(request.request_id, path))
+        except Exception as error:
+            logger.warning("Could not report the chosen folder: %s", error)
 
     async def _heartbeat(self, send) -> None:
         while True:

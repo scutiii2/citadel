@@ -18,6 +18,10 @@ Design: `docs/superpowers/specs/2026-10-18-forge-design.md`.
 4. Run `run.bat` to connect every paired worker. Keep it running while you chat.
 5. `run.bat status` shows the Ember address, whether each CLI is logged in, its plan and whether it is paired. It never prints a token.
 
+## Choosing a folder
+
+On the Forge page, Browse... asks this worker to open a folder dialog on this computer, because a web page cannot see your disk. The dialog runs in its own short-lived process (it needs Python's `tkinter`, which a normal Python install includes), so a stuck dialog never stops the worker. If no dialog can open, the page keeps the path you typed.
+
 ## Modes
 
 The group's mode on the Forge page decides what a worker may do.

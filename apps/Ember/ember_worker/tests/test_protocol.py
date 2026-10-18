@@ -81,3 +81,14 @@ def test_events_are_plain_values() -> None:
     assert TextDelta("a") == TextDelta("a")
     assert Finished("x") != Failed("x")
     assert ToolCall("Bash", "ls").name == "Bash" and UsageReport(1, 2).output_tokens == 2
+
+
+def test_a_browse_request_and_its_result() -> None:
+    from src.protocol import BrowseRequest, browse_result_frame, parse_server_frame
+
+    assert parse_server_frame('{"type": "browse", "request_id": "r", "start": "C:/s"}') == BrowseRequest("r", "C:/s")
+    assert parse_server_frame('{"type": "browse", "request_id": "r", "start": null}') == BrowseRequest("r", None)
+    assert parse_server_frame('{"type": "browse"}') is None
+    assert browse_result_frame("r", "C:/x") == {"type": "browse_result", "request_id": "r", "path": "C:/x"}
+    assert browse_result_frame("r", None)["path"] is None
+    assert len(browse_result_frame("r", "p" * 900)["path"]) == 500

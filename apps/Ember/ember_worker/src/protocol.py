@@ -15,6 +15,7 @@ PLAN_MAX = 80
 VERSION_MAX = 40
 DONE_MAX = 200_000
 ERROR_MAX = 2_000
+PATH_MAX = 500
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,15 @@ class CancelFrame:
     turn_id: str
 
 
-ServerFrame = TurnRequest | ReadyFrame | PermissionReply | CancelFrame
+@dataclass(frozen=True)
+class BrowseRequest:
+    """Ember asks the user to pick a folder on this computer, starting at `start`."""
+
+    request_id: str
+    start: str | None
+
+
+ServerFrame = TurnRequest | ReadyFrame | PermissionReply | CancelFrame | BrowseRequest
 
 
 def parse_server_frame(raw: str) -> ServerFrame | None:
@@ -64,6 +73,9 @@ def parse_server_frame(raw: str) -> ServerFrame | None:
             return PermissionReply(request_id=str(data["request_id"]), allow=data["allow"])
         if kind == "cancel":
             return CancelFrame(turn_id=str(data["turn_id"]))
+        if kind == "browse":
+            start = data.get("start")
+            return BrowseRequest(request_id=str(data["request_id"]), start=start if isinstance(start, str) and start else None)
     except (KeyError, TypeError, ValueError):
         return None
     return None
@@ -71,6 +83,10 @@ def parse_server_frame(raw: str) -> ServerFrame | None:
 
 def hello_frame(plan: str | None, version: str) -> dict:
     return {"type": "hello", "plan": plan[:PLAN_MAX] if plan else None, "version": version[:VERSION_MAX]}
+
+
+def browse_result_frame(request_id: str, path: str | None) -> dict:
+    return {"type": "browse_result", "request_id": request_id, "path": path[:PATH_MAX] if path else None}
 
 
 def heartbeat_frame() -> dict:

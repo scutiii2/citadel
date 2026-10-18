@@ -279,3 +279,51 @@ def test_it_keeps_retrying_while_the_server_is_unreachable() -> None:
         return alive
 
     assert asyncio.run(go()) is True
+
+
+class FixedPicker:
+    def __init__(self, path):
+        self.path, self.starts = path, []
+
+    async def pick(self, start):
+        self.starts.append(start)
+        return self.path
+
+
+class BrokenPicker:
+    async def pick(self, start):
+        raise RuntimeError("no display")
+
+
+def browse_scenario(picker, start):
+    seen, done = [], asyncio.Event()
+
+    async def handler(ws):
+        await ws.recv()
+        await ws.send(json.dumps({"type": "ready", "worker_id": 1}))
+        await ws.send(json.dumps({"type": "browse", "request_id": "r1", "start": start}))
+        async for raw in ws:
+            frame = json.loads(raw)
+            if frame["type"] == "browse_result":
+                seen.append(frame)
+                done.set()
+
+    async def scenario(port):
+        client = WorkerClient(ScriptedProvider([]), make_config(port), "ft_test", folder_picker=picker)
+        await run_client_until(client, done)
+
+    asyncio.run(with_server(handler, scenario))
+    return seen
+
+
+def test_a_browse_request_opens_the_dialog_and_reports_the_pick() -> None:
+    picker = FixedPicker("C:/work/site")
+
+    seen = browse_scenario(picker, "C:/start")
+
+    assert seen == [{"type": "browse_result", "request_id": "r1", "path": "C:/work/site"}]
+    assert picker.starts == ["C:/start"]
+
+
+def test_a_broken_dialog_reports_no_folder_and_keeps_the_worker_alive() -> None:
+    assert browse_scenario(BrokenPicker(), None) == [{"type": "browse_result", "request_id": "r1", "path": None}]
