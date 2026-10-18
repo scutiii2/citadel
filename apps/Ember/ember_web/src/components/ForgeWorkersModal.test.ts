@@ -83,7 +83,7 @@ describe("ForgeWorkersModal", () => {
     const wrapper = setup({ created });
 
     expect(wrapper.text()).toContain("shown once");
-    expect(wrapper.get("code.command").text()).toBe(`.\run.bat pair ${window.location.origin} ft_abc123 --provider claude`);
+    expect(wrapper.get("code.command").text()).toBe(`.\\run.bat pair ${window.location.origin} ft_abc123 --provider claude`);
 
     const pick = (name: string) => wrapper.findAll("button").find((b) => b.text() === name)!.trigger("click");
     await pick("Command Prompt");

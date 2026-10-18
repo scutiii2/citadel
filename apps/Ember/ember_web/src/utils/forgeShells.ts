@@ -13,7 +13,7 @@ const STORAGE_KEY = "ember_web.forgeShell";
 
 /** The command that pairs a worker. PowerShell does not run a script from the current folder by bare name. */
 export function pairCommand(shell: ForgeShell, origin: string, token: string, provider: ForgeProvider): string {
-  const launcher = shell === "powershell" ? ".\run.bat" : shell === "gitbash" ? "./run.bat" : "run.bat";
+  const launcher = shell === "powershell" ? ".\\run.bat" : shell === "gitbash" ? "./run.bat" : "run.bat";
   return `${launcher} pair ${origin} ${token} --provider ${provider}`;
 }
 
