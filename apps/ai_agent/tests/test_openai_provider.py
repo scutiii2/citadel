@@ -171,7 +171,7 @@ def test_is_available_false_during_cooldown_even_with_key(monkeypatch):
     monkeypatch.setenv("GPT_API_KEY", "sk-test")
     assert openai_provider.is_available() is True
 
-    cooldown.start_cooldown("openai", seconds=30)
+    cooldown.start_cooldown("openai:gpt", seconds=30)
     assert openai_provider.is_available() is False
 
 
@@ -198,8 +198,8 @@ def test_rate_limit_error_starts_a_cooldown(monkeypatch):
         with pytest.raises(RateLimitError):
             asyncio.run(openai_provider.run_chat("hello", []))
 
-    assert cooldown.is_in_cooldown("openai") is True
-    assert cooldown.seconds_remaining("openai") <= 5
+    assert cooldown.is_in_cooldown("openai:gpt") is True
+    assert cooldown.seconds_remaining("openai:gpt") <= 5
 
 
 def test_run_chat_dispatches_a_delegate_function_call_through_delegation(monkeypatch):
