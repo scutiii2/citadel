@@ -145,6 +145,8 @@ class ChatResult:
     tool_calls: list[ToolCallRecord] = field(default_factory=list)
     provider_id: str = ""
     model: str = ""
+    gateway: str | None = None
+    gateway_switches: list[dict[str, str]] = field(default_factory=list)
     total_tokens: int | None = None
     context_tokens: int | None = None
     # What fills context_tokens, as [{"id", "label", "tokens"}] (see
