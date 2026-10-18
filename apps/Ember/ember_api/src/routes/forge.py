@@ -3,15 +3,22 @@ allowlists (settings.manage to change), and the worker WebSocket."""
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.websockets import WebSocketDisconnect
 
 from src.deps import get_db_session, get_forge, get_log_writer, require_permission
 from src.models import Account, ForgeGroup, ForgeWorker
+from src.services.forge.connections import WorkerConnection
+from src.services.forge.coordinator import GroupBusy
+from src.services.forge.events import sse_frame
 from src.services.forge.groups import (
     TITLE_MAX,
     AlreadyMember,
@@ -24,10 +31,12 @@ from src.services.forge.groups import (
     NotAMember,
     WorkerNotEligible,
 )
+from src.services.forge.messages import message_event
 from src.services.forge.plans import InvalidPlanList, PlanPolicyRegistry
-from src.services.forge.protocol import PROVIDERS
+from src.services.forge.protocol import PROVIDERS, Heartbeat, Hello, parse_worker_frame, ready_frame
 from src.services.forge.runtime import ForgeRuntime
 from src.services.forge.workers import (
+    WorkerAuthenticator,
     InvalidWorkerLabel,
     WorkerLabelTaken,
     WorkerLimitError,
@@ -381,3 +390,168 @@ async def remove_worker(
         raise _not_found("Group") from error
     except NotAMember as error:
         raise _not_found("Worker") from error
+
+
+# --- chat -------------------------------------------------------------------------------
+
+MESSAGE_MAX = 8000
+HELLO_TIMEOUT_SECONDS = 10.0
+
+
+class MessageRequest(BaseModel):
+    text: str = Field(max_length=MESSAGE_MAX)
+
+    @field_validator("text")
+    @classmethod
+    def not_blank(cls, text: str) -> str:
+        if not text.strip():
+            raise ValueError("text must not be blank")
+        return text
+
+
+class PermissionAnswer(BaseModel):
+    allow: bool
+
+
+@router.get("/groups/{group_id}/messages")
+async def list_messages(
+    group_id: int,
+    after: int = Query(default=0, ge=0),
+    groups: GroupService = Depends(get_groups),
+    forge: ForgeRuntime = Depends(get_forge),
+) -> list[dict]:
+    try:
+        await groups.get(group_id)
+    except GroupNotFound as error:
+        raise _not_found("Group") from error
+    return [message_event(message) for message in await forge.store.list_after(group_id, after)]
+
+
+@router.post("/groups/{group_id}/messages", status_code=status.HTTP_201_CREATED)
+async def post_message(
+    group_id: int,
+    body: MessageRequest,
+    account: Account = Depends(require_forge),
+    forge: ForgeRuntime = Depends(get_forge),
+) -> dict:
+    """Stores the message and starts a turn for the worker it addresses (one turn per group at a time)."""
+    try:
+        message = await forge.coordinator.post_user_message(account.id, group_id, body.text)
+    except GroupNotFound as error:
+        raise _not_found("Group") from error
+    except GroupBusy as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A worker is still answering. Wait for it or stop it.") from error
+    return message_event(message)
+
+
+@router.get("/groups/{group_id}/events")
+async def group_events(
+    request: Request,
+    group_id: int,
+    after: int = Query(default=0, ge=0),
+    groups: GroupService = Depends(get_groups),
+    forge: ForgeRuntime = Depends(get_forge),
+) -> StreamingResponse:
+    """Server-Sent Events: stored messages after `after`, the turn state, then live events
+    (message / delta / turn). A message event carries `id: <seq>` so the browser can resume."""
+    last_event_id = request.headers.get("last-event-id", "")
+    if last_event_id.isdigit():
+        after = max(after, int(last_event_id))
+    try:
+        await groups.get(group_id)
+    except GroupNotFound as error:
+        raise _not_found("Group") from error
+
+    async def stream() -> AsyncIterator[bytes]:
+        async for event in forge.streamer.stream(group_id, after):
+            yield sse_frame(event)
+
+    return StreamingResponse(
+        stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    )
+
+
+@router.post("/groups/{group_id}/permissions/{request_id}")
+async def answer_permission(
+    group_id: int,
+    request_id: str,
+    body: PermissionAnswer,
+    account: Account = Depends(require_forge),
+    forge: ForgeRuntime = Depends(get_forge),
+) -> dict[str, bool]:
+    try:
+        answered = await forge.coordinator.resolve_permission(account.id, group_id, request_id, body.allow)
+    except GroupNotFound as error:
+        raise _not_found("Group") from error
+    if not answered:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nothing is waiting for that answer")
+    return {"answered": True}
+
+
+@router.post("/groups/{group_id}/cancel")
+async def cancel_turn(
+    group_id: int,
+    account: Account = Depends(require_forge),
+    forge: ForgeRuntime = Depends(get_forge),
+) -> dict[str, bool]:
+    try:
+        return {"stopping": await forge.coordinator.cancel(account.id, group_id)}
+    except GroupNotFound as error:
+        raise _not_found("Group") from error
+
+
+# --- the worker socket ------------------------------------------------------------------
+
+
+def _bearer(header: str | None) -> str | None:
+    if header and header[:7].lower() == "bearer ":
+        return header[7:].strip() or None
+    return None
+
+
+@router.websocket("/worker")
+async def worker_socket(websocket: WebSocket) -> None:
+    """A worker connects out with its pairing token, says hello (with its plan), then trades
+    frames with the coordinator until it disconnects."""
+    forge: ForgeRuntime = websocket.app.state.forge
+    database = websocket.app.state.database
+    token = _bearer(websocket.headers.get("authorization"))
+    worker = None
+    if token:
+        async with database.sessions() as session:
+            worker = await WorkerAuthenticator(session).authenticate(token)
+    if worker is None:
+        await websocket.close(code=4401)
+        return
+    await websocket.accept()
+    try:
+        hello = parse_worker_frame(await asyncio.wait_for(websocket.receive_text(), HELLO_TIMEOUT_SECONDS))
+    except (asyncio.TimeoutError, WebSocketDisconnect):
+        await websocket.close(code=4400)
+        return
+    if not isinstance(hello, Hello):
+        await websocket.close(code=4400)
+        return
+
+    connection = WorkerConnection(worker.id, websocket)
+    replaced = forge.registry.register(connection)
+    if replaced is not None:
+        await replaced.close(4000)
+    try:
+        async with database.sessions() as session:
+            await WorkerAuthenticator(session).record_hello(worker.id, hello.plan)
+        await connection.send(ready_frame(worker.id))
+        while True:
+            frame = parse_worker_frame(await websocket.receive_text())
+            if frame is None:
+                continue
+            if isinstance(frame, Heartbeat):
+                async with database.sessions() as session:
+                    await WorkerAuthenticator(session).touch(worker.id)
+                continue
+            await forge.coordinator.on_worker_frame(worker.id, frame)
+    except (WebSocketDisconnect, RuntimeError, KeyError):
+        pass
+    finally:
+        forge.registry.drop(worker.id, connection)
+        await forge.coordinator.on_worker_disconnected(worker.id)
