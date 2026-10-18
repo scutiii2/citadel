@@ -82,6 +82,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `entry` | no | `false` | The agent ember sends new turns to (Phase 2). Exactly one enabled file must set it. |
 | `llm.provider` | yes | none | `anthropic`, `openai`, or `laya` (local typed questions only). |
 | `llm.gateway` | no | provider default | A filename stem from `gateways/<provider>/<gateway>.json`. |
+| `llm.fallback_gateways` | no | `[]` | Ordered same-provider backup gateways, as names or `{gateway, model?}` objects. See Gateway failover below. |
 | `llm.model` | no | gateway's `model` | Model id. |
 | `llm.temperature` | no | unset (provider default) | Float 0-2. |
 | `llm.reasoning_effort` | no | `off` | `off`, `low`, `medium`, `high`. Maps to the Anthropic thinking budget or OpenAI `reasoning_effort`. |
@@ -102,6 +103,53 @@ An orchestrator file:
 ```json
 { "port": 9100, "entry": true, "llm": { "provider": "anthropic" }, "orchestrator": true }
 ```
+
+### Gateway failover
+
+An agent can try backup gateways when its current gateway runs out of credit,
+is rate limited, rejects its credentials, or is unavailable. Configure the
+ordered list in that agent's `llm` block; this example enables nothing by itself:
+
+```jsonc
+{
+  "provider": "anthropic",
+  "gateway": "claude",
+  "model": "claude-sonnet-5-5",
+  "fallback_gateways": [
+    // Optional explicit model id on the backup gateway.
+    { "gateway": "openrouter", "model": "anthropic/claude-sonnet-5.5" },
+    // A name is shorthand for {"gateway": "bedrock"}.
+    "bedrock"
+  ]
+}
+```
+
+Every name must have a gateway file under the same provider. Duplicate names,
+the primary itself, malformed entries, unknown entry keys, and fallbacks on
+Laya are rejected. A missing primary key still prevents startup; an unkeyed
+backup is warned about at startup and skipped. Admin overrides accept the
+same whole-agent-file shape.
+
+Each turn starts with the first credentialed gateway outside cooldown and
+stays on it until it fails. A switch retries only the failed model round;
+completed tools and their results are retained. Signed thinking/reasoning
+from earlier rounds is removed before sending to another gateway. Partial
+answer text is reset before retrying. Ordinary bad requests and cancellation
+do not trigger failover. If every candidate fails, the last error is raised;
+if all are cooling down at turn start, the primary is attempted once.
+
+Backups use their explicit `model` first, otherwise the matching primary tier,
+then their gateway's default model, then the provider default. The advertised
+tiers remain those of the primary. Cooldowns are scoped to provider and gateway:
+Retry-After or 60 seconds for rate limits, 3600 for quota/auth, 30 for outages.
+The last three are configurable under `gateway_failover` in
+[`configs/config_tuning.json`](configs/README.md). Later turns return to the
+primary after its cooldown expires; restart clears cooldowns.
+
+The stream emits `gateway_switch` with `from`, `to`, and `reason`, without
+error text. Usage rows record the answering gateway and any switches; status
+lists each gateway's availability and cooldown. Ember currently drops the
+switch event in its turn-event allowlist, so this phase adds no browser indicator.
 
 ### Automatic memory recall
 

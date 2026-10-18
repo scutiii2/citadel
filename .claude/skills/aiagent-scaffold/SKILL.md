@@ -55,7 +55,7 @@ block before designing the interface from scratch.
 
    Fields (full table in the README): `label`, `port` (required, unique across
    enabled files), `enabled`,
-   `entry`, `llm.{provider,gateway,model,temperature,reasoning_effort,max_effort,min_tier,max_tier,max_tokens,max_tool_rounds,max_turn_tokens,max_turn_seconds}`,
+   `entry`, `llm.{provider,gateway,model,fallback_gateways,temperature,reasoning_effort,max_effort,min_tier,max_tier,max_tokens,max_tool_rounds,max_turn_tokens,max_turn_seconds}`,
    `persona`, `instructions`, `focus`, `tools.{allow,deny}` (fnmatch on tool names without the
    `main__` prefix; empty allow = all; deny wins), `orchestrator`,
    `memory_recall` (entry agent only: loads the user's newest saved notes before
@@ -63,6 +63,18 @@ block before designing the interface from scratch.
    called directly, like `title-writer` and `tag-writer`) and `plan_tool`
    (`false` stops it offering `update_plan`; set it `false` on every specialist,
    the checklist is the orchestrator's). There is no `routing` block any more.
+   For automatic gateway failover, set `llm.fallback_gateways` to an ordered
+   list of same-provider names or `{ "gateway": "openrouter", "model": "..." }`
+   objects (`model` optional; default `[]`). Keep the primary in `llm.gateway`.
+   Each fallback needs a gateway file; missing files, duplicates, the primary
+   name, unknown entry keys, missing/empty names, and non-list values are errors.
+   Laya accepts no fallback entries. A missing primary key remains fatal;
+   unkeyed fallbacks warn at startup and are skipped. Failover retries only the
+   failed model round, retaining completed tools/results and stripping prior
+   gateway-bound thinking/reasoning. Later turns prefer the primary again when
+   its cooldown ends. See README's **Gateway failover** for model mapping,
+   error kinds, cooldown tuning and stream/usage/status visibility. This needs
+   no Ember changes; enable fallbacks on agent files only when asked.
 2. Write `focus` as one concrete line (what it is good at, with the nouns a
    question would use). The orchestrator's roster and the optional `auto_route`
    classifier use it; a specialist without one is hard to pick. A specialist
