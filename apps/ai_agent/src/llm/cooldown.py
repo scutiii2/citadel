@@ -26,6 +26,12 @@ _cooldown_until: dict[str, float] = {}
 
 
 @catalog
+def gateway_key(provider_id: str, gateway: str) -> str:
+    """Scope a gateway failure without blocking its provider's other gateways."""
+    return f"{provider_id}:{gateway}"
+
+
+@catalog
 def start_cooldown(provider_id: str, seconds: float = DEFAULT_COOLDOWN_SECONDS) -> None:
     _cooldown_until[provider_id] = time.monotonic() + max(seconds, 1.0)
 
