@@ -9,7 +9,7 @@ import { defineConfig } from 'vitest/config'
 // xfwd: adds X-Forwarded-For, so ember_api (which trusts it only from
 // loopback) rate-limits logins per real client, not per proxy.
 const apiProxy = {
-  '/api': { target: `http://127.0.0.1:${process.env.EMBER_API_PORT ?? 8030}`, xfwd: true, ws: true },
+  '/api': { target: `http://127.0.0.1:${process.env.EMBER_API_PORT ?? 8030}`, xfwd: true },
 }
 
 // For the built app (`vite preview`). Not on the dev server: HMR needs

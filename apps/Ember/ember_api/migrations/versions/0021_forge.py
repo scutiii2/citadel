@@ -63,10 +63,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_forge_messages_group_id", table_name="forge_messages")
-    op.drop_table("forge_messages")
-    op.drop_table("forge_group_workers")
-    op.drop_index("ix_forge_groups_account_id", table_name="forge_groups")
-    op.drop_table("forge_groups")
-    op.drop_index("ix_forge_workers_account_id", table_name="forge_workers")
-    op.drop_table("forge_workers")
+    # 0022 drops these tables, so they may already be gone; SQLite removes their indexes with them.
+    for table in ("forge_messages", "forge_group_workers", "forge_groups", "forge_workers"):
+        op.execute(f"DROP TABLE IF EXISTS {table}")

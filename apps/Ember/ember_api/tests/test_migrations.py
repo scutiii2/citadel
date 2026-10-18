@@ -18,8 +18,8 @@ from src.db import Base, Database
 from src.services.migrations import BASELINE, MIGRATIONS_DIR, MigrationRunner
 
 # The newest real migration; the tests' throwaway one comes after it.
-HEAD = "0021"
-NEXT = "0022"
+HEAD = "0022"
+NEXT = "0023"
 
 
 def drop_account_uid(conn: sqlite3.Connection) -> None:
@@ -33,16 +33,6 @@ def drop_log_prompts(conn: sqlite3.Connection) -> None:
     conn.execute("ALTER TABLE log_entries DROP COLUMN prompts")
     conn.execute("DROP TABLE account_ticket_seen")
     conn.execute("DROP TABLE ticket_staff_activity")
-    conn.execute("DROP TABLE IF EXISTS forge_messages")
-    conn.execute("DROP TABLE IF EXISTS forge_group_workers")
-    conn.execute("DROP TABLE IF EXISTS forge_groups")
-    conn.execute("DROP TABLE IF EXISTS forge_workers")
-
-
-def drop_forge(conn: sqlite3.Connection) -> None:
-    """Undo migration 0021 on a database that has been migrated to the newest revision."""
-    for table in ("forge_messages", "forge_group_workers", "forge_groups", "forge_workers"):
-        conn.execute(f"DROP TABLE IF EXISTS {table}")
 
 
 def clear_access(conn: sqlite3.Connection) -> None:
@@ -428,7 +418,7 @@ class TestDatabaseFromBeforeMigrations:
     def test_it_is_only_stamped_when_the_baseline_is_the_newest_revision(self, tmp_path: Path) -> None:
         path = self.build_legacy(tmp_path)
         scripts = tmp_path / "baseline_only"
-        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*"))
+        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*"))
         calls: list[int] = []
 
         async def backup() -> None:
@@ -672,7 +662,6 @@ def test_starter_roles_are_seeded_once_and_edits_stick(tmp_path: Path) -> None:
         conn.execute("DELETE FROM role_permission WHERE role_id = (SELECT id FROM roles WHERE name = 'Viewer')")
         conn.execute("DELETE FROM roles WHERE name = 'Viewer'")
         conn.execute("UPDATE alembic_version SET version_num = '0018'")
-        drop_forge(conn)
         conn.commit()
     assert run_with(make_database(tmp_path)) == "upgraded"
     assert "Viewer" in roles()  # a removed role is only recreated when the migration runs again
@@ -735,7 +724,6 @@ def test_games_removal_deletes_only_retired_data_and_is_idempotent(tmp_path: Pat
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
         assert conn.execute("SELECT username FROM accounts").fetchall() == [("player",)]
         conn.execute("UPDATE alembic_version SET version_num = '0019'")
-        drop_forge(conn)
         conn.commit()
 
     assert run_with(make_database(tmp_path)) == "upgraded"

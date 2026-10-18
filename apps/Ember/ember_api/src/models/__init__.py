@@ -8,7 +8,6 @@ from src.models.app_setting import AppSetting
 from src.models.auth_session import AuthSession
 from src.models.chat import Chat
 from src.models.chat_folder import ChatFolder
-from src.models.forge import ForgeGroup, ForgeGroupWorker, ForgeMessage, ForgeWorker
 from src.models.known_device import KnownDevice
 from src.models.log_entry import LogEntry
 from src.models.login_attempt import LoginAttempt
@@ -33,10 +32,6 @@ __all__ = [
     "Chat",
     "ChatFolder",
     "EmailVerificationCode",
-    "ForgeGroup",
-    "ForgeGroupWorker",
-    "ForgeMessage",
-    "ForgeWorker",
     "InviteCode",
     "KnownDevice",
     "LogEntry",

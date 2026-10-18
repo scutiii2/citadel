@@ -63,7 +63,7 @@ const canBrowse = computed(() => auth.account !== null && !auth.needsVerificatio
 const navPrefs = useNavPrefsStore();
 // These pages live in the account menu, in two groups, outside the account's
 // pin/reorder/hide arrangement; an administrator's hide list still removes them.
-const MENU_GROUPS = [["/capabilities", "/agents", "/games", "/forge"], ["/usage", "/settings"]];
+const MENU_GROUPS = [["/capabilities", "/agents", "/games"], ["/usage", "/settings"]];
 // Chat sits in the header under the wordmark, not in the arrangement either.
 const HEADER_PAGE = "/";
 const MENU_PAGES = [...MENU_GROUPS.flat(), HEADER_PAGE];

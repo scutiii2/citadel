@@ -338,25 +338,6 @@ All calls use the same-origin session and require `tickets.create`:
 | POST | `/api/tickets/{id}/comments` | Add a reply. |
 | POST | `/api/tickets/{id}/close` | Close the ticket. |
 
-## Forge
-
-Forge (`/forge`, `forge.use`) is a page in the account menu for group chats with
-your own Claude and Codex workers. A worker is the official CLI running on your
-own computer, driven by `apps/Ember/ember_worker`, which connects out to
-ember_api. Make a worker in the Workers dialog, copy the pairing command it
-shows once and run it from the `ember_worker` folder. Then make a group, invite
-a worker with the folder it should work in (type the path, or press Browse… to pick it in a dialog
-that opens on that worker's computer; Change folder moves a member later), and write `@name` to address one.
-Workers see only the group's messages.
-
-The group's mode sets what a worker may do: Ask, Accept edits, Plan or Full auto.
-Claude asks for anything the mode does not allow, on an Allow/Deny card in the
-chat. Codex cannot ask: Ask and Plan run in its read-only sandbox, Accept edits
-in `workspace-write` and Full auto in `danger-full-access`. Full auto needs the
-phrase `full auto` typed to confirm. An account with `settings.manage` lists the
-eligible plan names in the Workers dialog; a worker whose plan is not listed
-cannot be invited.
-
 ## Requirements
 
 - Node.js 24 (npm on `PATH`)

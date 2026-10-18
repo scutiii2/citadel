@@ -638,30 +638,3 @@ db_gateway's `configs/config_connections.json` (see its `.example`). Calls send 
 gateway. Routes get it from `get_db_gateway` in `src/deps.py`; tests use `FakeDbGateway`
 (the `db_gateway` fixture). The notes routes are the first user.
 
-## Forge
-
-Forge lets a user chat in groups with their own Claude and Codex workers. A worker is the
-official CLI running on the user's own computer, driven by the `ember_worker` daemon, which
-connects out to ember_api. Ember never sees a provider login. Needs the permission `forge.use`.
-Design: `docs/superpowers/specs/2026-10-18-forge-design.md`.
-
-Routes under `/api/forge`:
-
-- `GET /plans`, `PUT /plans/{provider}` (the eligible plan strings; changing needs `settings.manage`)
-- `GET/POST /workers`, `DELETE /workers/{id}` (the pairing token is returned once, on create)
-- `GET/POST /groups`, `GET/PATCH/DELETE /groups/{id}` (`full_auto` needs `confirm_full_auto: true`)
-- `POST /groups/{id}/workers`, `PATCH /groups/{id}/workers/{worker_id}` (new folder; refused while a worker is answering), `DELETE /groups/{id}/workers/{worker_id}`
-- `POST /workers/{id}/browse`: opens a folder dialog on that worker's computer and returns the chosen `path` (null when cancelled); 409 when offline
-- `GET/POST /groups/{id}/messages`, `GET /groups/{id}/events` (server-sent events, resumable)
-- `POST /groups/{id}/permissions/{request_id}`, `POST /groups/{id}/cancel`
-- `WS /worker`: the worker socket. Bearer pairing token, then a `hello` frame, then frames
-  (see the spec's wire protocol).
-
-The plan allowlists (`forge_plans_claude`, `forge_plans_codex` in `app_settings`) start empty,
-so no worker is eligible until an account with `settings.manage` sets them from the plan
-strings the Forge page shows for a connected worker. This is a guard in Ember only: workers
-report their own plan.
-
-Forge uses the `websockets` package for the worker socket and keeps its hub (connected
-workers, event bus) in memory, so it assumes a single ember_api process. Each stored worker
-message keeps the worker's label, so deleting a worker leaves the history readable.

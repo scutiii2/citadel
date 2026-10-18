@@ -135,14 +135,3 @@ See `docs/superpowers/plans/2026-10-11-game-host.md` for deployment setup.
 
 **Revisit when**: user wants Stop to feel instant. Read the provider streaming code and `dispatch_with_progress` first, then propose the exact change for step 1.
 
-## Forge: deferred features (added 2026-10-18)
-
-**Context**: Forge is the planned Ember page where one user talks to their own Claude and Codex workers in group chats (workers are `ember-worker` daemons on the user's own PC, linked to ember_api over WebSocket). Version 1 is deliberately small: one human per group, one shared folder per member, no file browser. These were left out on purpose:
-
-- **More than one human per group**: invite other Ember users, with per-member permissions and shared transcripts.
-- **Git worktree per worker**: each worker edits its own branch and worktree, and the user merges. Safer for parallel edits; needs a git repo and more UI.
-- **File browser**: browse and open the group's folder from the Forge page.
-- **Sharing groups**: read-only share links for a group transcript (the chat share feature is the model).
-- **Usage charts**: tokens and cost per worker and per group, from the `usage` frames the workers report.
-
-**Revisit when**: Forge version 1 is built and in use; pick one item and brainstorm it first.

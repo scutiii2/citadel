@@ -143,7 +143,7 @@ Sidebar tabs:
   names when that is free inside a range, otherwise it gets the next free port of
   `Unassigned`; no server falls back to 8000. A saved group is refused when a
   member's port is reserved for another server. The first plan keeps today's
-  ports. A server that listens on no port (ember_worker) still holds one, which
+  ports. A server that listens on no port still holds one, which
   it does not use.
 
 The sidebar list and the group member list scroll when they overflow; the
