@@ -212,12 +212,12 @@ def test_delete_account(client: TestClient, email: FakeEmailSender) -> None:
 def test_assign_and_remove_role_changes_permissions(client: TestClient, email: FakeEmailSender) -> None:
     alice = make_member(client, email)
     as_admin(client)
-    viewer = client.post("/api/admin/roles", json={"name": "Viewer"}).json()
+    viewer = client.post("/api/admin/roles", json={"name": "Watcher"}).json()
     member = role_by_name(client, "Member")
 
     assert client.put(f"/api/admin/accounts/{alice}/roles/{viewer['id']}").status_code == 200
     response = client.delete(f"/api/admin/accounts/{alice}/roles/{member['id']}")
-    assert [r["name"] for r in response.json()["roles"]] == ["Viewer"]
+    assert [r["name"] for r in response.json()["roles"]] == ["Watcher"]
 
     client.post("/api/auth/logout", json={})
     login(client, "alice")
@@ -255,12 +255,12 @@ def test_send_verification(client: TestClient, email: FakeEmailSender) -> None:
 def test_create_update_delete_role(client: TestClient) -> None:
     as_admin(client)
 
-    created = client.post("/api/admin/roles", json={"name": " Support ", "description": "Helpdesk"})
+    created = client.post("/api/admin/roles", json={"name": " Helpers ", "description": "Helpdesk"})
     assert created.status_code == 201
     role = created.json()
-    assert (role["name"], role["description"], role["permissions"]) == ("Support", "Helpdesk", [])
+    assert (role["name"], role["description"], role["permissions"]) == ("Helpers", "Helpdesk", [])
 
-    assert client.post("/api/admin/roles", json={"name": "support"}).status_code == 409
+    assert client.post("/api/admin/roles", json={"name": "helpers"}).status_code == 409
     assert client.post("/api/admin/roles", json={"name": "   "}).status_code == 422
 
     updated = client.patch(f"/api/admin/roles/{role['id']}", json={"name": "Help", "description": ""})
@@ -379,20 +379,3 @@ def test_bulk_permission_save_keeps_protected_and_delegation_rules(client: TestC
     saved = role_by_name(client, "Ops")
     assert saved["description"] is None
     assert saved["permissions"] == ["roles.manage"]
-
-
-def test_game_permissions_and_role_grants_survive_deregistration(client_factory):
-    from tests.test_games_registry import FakeFetcher
-    fetcher = FakeFetcher()
-    fetcher.raw.update(id="puzzle", name="Puzzle")
-    client = client_factory(game_fetcher=fetcher)
-    as_admin(client)
-    assert client.post("/api/games", json={"url": "http://localhost:8060"}).status_code == 201
-    permission = {"name": "games.puzzle.play", "description": "Play puzzle"}
-    assert permission in client.get("/api/admin/permissions").json()
-    role = client.post("/api/admin/roles", json={"name": "Players"}).json()
-    assert client.put(f"/api/admin/roles/{role['id']}/permissions/games.puzzle.play").status_code == 200
-    assert "games.puzzle.play" in role_by_name(client, "Players")["permissions"]
-    assert client.delete("/api/games/puzzle").status_code == 204
-    assert permission in client.get("/api/admin/permissions").json()
-    assert "games.puzzle.play" in role_by_name(client, "Players")["permissions"]

@@ -37,7 +37,7 @@ export default defineConfig({
       name: 'Ember Admin',
       short_name: 'Ember Admin',
       description: 'Manage your Ember workspace.',
-      start_url: '/admin',
+      start_url: '/overview',
       scope: '/',
       display: 'standalone',
       background_color: '#17171a',

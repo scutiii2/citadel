@@ -9,7 +9,7 @@ test("production manifest, offline shell, network-only API, and reconnect", asyn
   const manifest = await (await page.request.get(manifestHref!)).json();
   expect(manifest.name).toBe("Ember Admin");
   expect(manifest.display).toBe("standalone");
-  expect(manifest.start_url).toBe("/admin");
+  expect(manifest.start_url).toBe("/overview");
   for (const size of ["192x192", "512x512"]) expect(manifest.icons.some((icon: { sizes: string }) => icon.sizes === size)).toBe(true);
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();

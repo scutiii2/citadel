@@ -566,7 +566,7 @@ describe("the page layout", () => {
     const w = await show();
 
     expect(w.get("details.how summary").text()).toBe("How switches work");
-    expect(w.get(".intro").text()).not.toContain("slash");
+    expect(w.get(".page-description").text()).not.toContain("slash");
     expect(w.get("details.how p").text()).toContain("follows your account");
   });
 

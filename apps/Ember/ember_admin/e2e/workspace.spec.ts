@@ -7,7 +7,7 @@ async function flipSwitch(page: Page, name: string): Promise<void> {
 
 // Log in directly to the moved workspace page.
 async function logInAdmin(page: Page): Promise<void> {
-  await page.goto("/admin");
+  await page.goto("/overview");
   await expect(page).toHaveURL(/\/login/);
   await page.getByLabel("Username").fill(ACCOUNT.username);
   await page.getByLabel("Password").fill(PASSWORD);
@@ -19,7 +19,7 @@ test("an administrator deletes an account from the Danger zone by typing its nam
   const api = await installFakeApi(page);
   await logInAdmin(page);
   await page.getByRole("link", { name: "Overview", exact: true }).click();
-  await expect(page).toHaveURL(/\/admin/);
+  await expect(page).toHaveURL(/\/overview/);
   await page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Accounts', exact: true }).click();
 
   // Open maria's drawer: Delete account is in its own Danger zone, not among the edit buttons.
@@ -168,7 +168,7 @@ test('a role viewer sees only the permitted pages and cannot change permissions'
   await page.locator('button.role').filter({ hasText: 'Member' }).click();
   for (const control of await page.getByRole('switch').all()) await expect(control).toBeDisabled();
   await page.goto('/admin/settings');
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/overview$/);
   await expect(page.getByRole('heading', { name: 'Workspace overview' })).toBeVisible();
   expect(api.unexpected).toEqual([]);
 });
@@ -195,7 +195,7 @@ test('admin pages fit desktop, tablet, and mobile in both themes', async ({ page
     await page.evaluate((scheme) => { localStorage.setItem('ember_admin.theme', scheme); }, color);
     for (const width of [1280, 768, 375]) {
       await page.setViewportSize({ width, height: 812 });
-      for (const route of ['/admin', '/admin/accounts', '/admin/roles', '/admin/invites', '/admin/settings']) {
+      for (const route of ['/overview', '/admin/accounts', '/admin/roles', '/admin/invites', '/admin/settings']) {
         await page.goto(route);
         await expect(page.getByRole('navigation', { name: 'Admin sections' })).toBeVisible();
         await expect(page.locator('.admin-sidebar')).toHaveCount(0);
@@ -278,11 +278,11 @@ test('role list and permission options scroll independently', async ({ page }) =
     const overflow = await page.evaluate(`(() => {
       const list = document.querySelector('.roles-panel .list');
       const options = document.querySelector('.role-options');
-      return { list: getComputedStyle(list).overflowY, options: getComputedStyle(options).overflowY, outer: getComputedStyle(document.querySelector('.admin-content')).overflowY, scrollable: options.scrollHeight > options.clientHeight };
+      return { list: getComputedStyle(list).overflowY, options: getComputedStyle(options).overflowY, outer: getComputedStyle(document.querySelector('.roles-page')).overflowY, scrollable: options.scrollHeight > options.clientHeight };
     })()`);
     expect(overflow).toEqual({ list: width < 768 ? 'hidden' : 'auto', options: 'auto', outer: 'hidden', scrollable: true });
     await page.evaluate(`(() => { document.querySelector('.role-options').scrollTop = 150; })()`);
-    const position = await page.evaluate<{ options: number; outer: number; list: number }>(`({ options: document.querySelector('.role-options').scrollTop, outer: document.querySelector('.admin-content').scrollTop, list: document.querySelector('.roles-panel .list').scrollTop })`);
+    const position = await page.evaluate<{ options: number; outer: number; list: number }>(`({ options: document.querySelector('.role-options').scrollTop, outer: document.querySelector('.roles-page').scrollTop, list: document.querySelector('.roles-panel .list').scrollTop })`);
     expect(position.options).toBeGreaterThan(0);
     expect(position.outer).toBe(0);
     expect(position.list).toBe(0);

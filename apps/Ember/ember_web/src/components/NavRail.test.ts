@@ -66,8 +66,7 @@ async function footerLabels(wrapper: Wrapper): Promise<string[]> {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Games is open to every account; these tests are about the other pages, so the admin hides it.
-  vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/games"] });
+  vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: [] });
 });
 
 describe("NavRail", () => {
@@ -93,7 +92,7 @@ describe("NavRail", () => {
 
     const links = pageLinks(wrapper);
 
-    // Capabilities, Agents, Games, Usage and Settings sit in the account menu.
+    // Capabilities, Agents, Usage and Settings sit in the account menu.
     expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Memory", "Generator"]);
     for (const link of [...links, ...wrapper.findAll("nav.header a")]) {
       expect(link.text()).toBe("");
@@ -332,7 +331,7 @@ it("offers Ember Admin to delegated admins and hides it for members and unverifi
   auth.account = { ...ACCOUNT, permissions: ["roles.view"] };
   await flushPromises();
   await openMenu(wrapper);
-  expect(wrapper.get(".admin-link").attributes("href")).toBe("http://localhost:5176/");
+  expect(wrapper.get(".admin-link").attributes("href")).toBe("http://localhost:5176/overview");
   expect(wrapper.get(".admin-link").attributes("target")).toBe("_blank");
   expect(wrapper.get(".admin-link").attributes("rel")).toBe("noopener noreferrer");
   auth.account = { ...auth.account, email_verified: false };
@@ -342,16 +341,16 @@ it("offers Ember Admin to delegated admins and hides it for members and unverifi
 });
 
 describe("pages hidden by the administrator", () => {
-  it("leaves them out of the rail, and shows Games when it is not hidden", async () => {
+  it("leaves them out of the rail, keeps the visible menu pages", async () => {
     vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/usage"] });
     const { wrapper } = await setup(ACCOUNT);
 
     expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Memory", "Generator"]);
-    expect(await footerLabels(wrapper)).toEqual(["Capabilities", "Agents", "Games", "Settings", "Profile"]);
+    expect(await footerLabels(wrapper)).toEqual(["Capabilities", "Agents", "Settings", "Profile"]);
   });
 
   it("never removes Chat or Settings, even if the list names them", async () => {
-    vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/", "/settings", "/games"] });
+    vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/", "/settings"] });
     const { wrapper } = await setup(ACCOUNT);
 
     expect(wrapper.get("nav.header a").attributes("aria-label")).toBe("Chat");
@@ -364,7 +363,7 @@ describe("pages hidden by the administrator", () => {
     const { wrapper } = await setup(ACCOUNT);
 
     expect(pageLinks(wrapper)).toHaveLength(0);
-    release({ hidden: ["/games"] });
+    release({ hidden: [] });
     await flushPromises();
     expect(pageLinks(wrapper)).toHaveLength(3);
   });

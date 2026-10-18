@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { usageClient, type AccountUsage, type MyUsage, type UsageGroupBy, type UsageRecordRow } from "../api/UsageClient";
 import { ApiError } from "../api/http";
@@ -153,15 +154,13 @@ onMounted(() => { if (auth.hasPermission("usage.all.view")) void loadSummary(); 
 </script>
 
 <template>
-  <section class="usage-view">
-    <div class="column page-column">
-      <header class="head">
-        <div><h2 class="page-title">Usage</h2><p class="page-description">Review each user's token usage and account limits.</p></div>
-        <div class="ranges">
+  <PageLayout class="usage-view" title="Usage" description="Review each user's token usage and account limits.">
+    <template #actions><div class="ranges">
           <SegmentedControl v-model="range" :options="RANGES" label="Period" aria-label="Period" />
           <ActionButton icon="export" class="export" :disabled="!loaded" title="Download the selected user's usage as Markdown" @click="exportReport">Export .md</ActionButton>
-        </div>
-      </header>
+        </div></template>
+
+
       <section class="panel accounts" aria-label="User usage summary" :aria-busy="summaryLoading">
         <h3>All users</h3>
         <p v-if="summaryError" class="error" role="alert">Could not load user usage: {{ summaryError }} <button class="summary-retry" @click="loadSummary">Retry</button></p>
@@ -180,16 +179,17 @@ onMounted(() => { if (auth.hasPermission("usage.all.view")) void loadSummary(); 
       <p v-else-if="detailLoading" class="muted" role="status">Loading usage for {{ selected.username }}…</p>
       <p v-else-if="detailError" class="error" role="alert">Could not load usage for {{ selected.username }}: {{ detailError }} <button class="detail-retry" @click="loadDetails">Retry</button></p>
       <UsageDetails v-if="loaded" :username="loaded.username" :usage="loaded.usage" :year="year" :records="records" :records-failed="recordsFailed" :year-failed="yearFailed" :loading="detailLoading" :group-by="groupBy" @group="groupBy = $event" />
-    </div>
-  </section>
+
+
+  </PageLayout>
 </template>
 
 <style scoped>
 .usage-view { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; }
-.head, .ranges { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.ranges { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .ranges { min-width: 0; max-width: 100%; }
 .ranges > .segmented-control { flex: 1 1 auto; }
-.head { justify-content: space-between; margin-bottom: 16px; }
+
 .panel { padding: 14px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
 h3 { margin: 0 0 12px; font-size: 1em; }
 table { width: 100%; border-collapse: collapse; font-size: 0.9em; }

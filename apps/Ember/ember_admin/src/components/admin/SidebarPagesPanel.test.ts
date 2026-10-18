@@ -29,15 +29,15 @@ beforeEach(() => {
 
 describe("SidebarPagesPanel", () => {
   it("lists the pages an admin may hide, not Chat or Settings", async () => {
-    expect(labels(await panel())).toEqual(["Capabilities", "Agents", "Games", "Usage", "Tickets"]);
+    expect(labels(await panel())).toEqual(["Capabilities", "Agents", "Usage", "Tickets"]);
   });
 
   it("shows every page on by default and the stored hidden ones off", async () => {
-    const wrapper = await panel(["/usage", "/games"]);
+    const wrapper = await panel(["/usage", "/agents"]);
 
-    expect(checked(wrapper, "Agents")).toBe(true);
+    expect(checked(wrapper, "Capabilities")).toBe(true);
     expect(checked(wrapper, "Usage")).toBe(false);
-    expect(checked(wrapper, "Games")).toBe(false);
+    expect(checked(wrapper, "Agents")).toBe(false);
   });
 
   it("says the setting hides the page from the sidebar for every account", async () => {
@@ -62,12 +62,12 @@ describe("SidebarPagesPanel", () => {
   it("saves the hidden ids on Save, then shows Saved", async () => {
     const wrapper = await panel();
     await box(wrapper, "Usage").setValue(false);
-    await box(wrapper, "Games").setValue(false);
+    await box(wrapper, "Agents").setValue(false);
 
     await wrapper.get(".save-bar .primary").trigger("click");
     await flushPromises();
 
-    expect(client.setPages).toHaveBeenCalledWith(["/games", "/usage"]);
+    expect(client.setPages).toHaveBeenCalledWith(["/agents", "/usage"]);
     expect(wrapper.find(".save-bar").exists()).toBe(false);
     expect(wrapper.get(".chip.saved").text()).toBe("Saved");
   });

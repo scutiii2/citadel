@@ -34,8 +34,7 @@ const lastSaved = () => vi.mocked(navPreferencesClient.save).mock.lastCall![0];
 
 beforeEach(() => {
   vi.resetAllMocks();
-  // Games is open to every account; these tests are about the other pages, so the admin hides it.
-  vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/games"] });
+  vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: [] });
   vi.mocked(navPreferencesClient.save).mockImplementation(async (p) => p);
   vi.mocked(navPreferencesClient.reset).mockResolvedValue(undefined);
 });
@@ -164,9 +163,9 @@ describe("SidebarEditor", () => {
 });
 
 describe("pages hidden by the administrator", () => {
-  it("are not offered to the account, and Games is when not hidden", async () => {
+  it("are not offered to the account, and visible pages remain available", async () => {
     vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/usage", "/agents"] });
 
-    expect(names(await setup())).toEqual(["Chat", "Capabilities", "Games", "Notes", "Memory", "Generator", "Settings"]);
+    expect(names(await setup())).toEqual(["Chat", "Capabilities", "Notes", "Memory", "Generator", "Settings"]);
   });
 });

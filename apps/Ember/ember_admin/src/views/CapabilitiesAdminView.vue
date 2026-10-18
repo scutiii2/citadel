@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { capabilitiesAdminClient, type CapabilityStatus } from "../api/CapabilitiesAdminClient";
 import { commandsClient } from "../api/CommandsClient";
@@ -108,25 +109,18 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="info-page capabilities-admin">
-    <div class="column page-column">
-      <header class="head">
-        <div>
-          <h2 class="page-title">Capabilities</h2>
-          <p class="intro page-description">
-            Offline hides a capability's tools from every client. Going online loads its code from disk again, so edit
-            while it is offline. Refresh finds capability folders added while mcp_server runs; they start offline.
-          </p>
-        </div>
-        <button type="button" class="refresh" data-test="refresh" :disabled="refreshing" @click="refresh">
+  <PageLayout class="info-content capabilities-admin" title="Capabilities" description="Offline hides a capability's tools from every client. Going online loads its code from disk again, so edit while it is offline. Refresh finds capability folders added while mcp_server runs; they start offline.">
+    <template v-if="!loading" #toolbar><label class="page-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg><input v-model="query" type="search" aria-label="Search capabilities" placeholder="Search capabilities or tools" /></label>
+      <p class="search-count" role="status">{{ rows.length }} of {{ capabilities.length }} capabilities</p></template>
+    <template #actions><button type="button" class="refresh" data-test="refresh" :disabled="refreshing" @click="refresh">
           {{ refreshing ? "Refreshing…" : "Refresh" }}
-        </button>
-      </header>
+        </button></template>
+
+
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <p v-if="loading" class="muted">Loading…</p>
       <template v-else>
-      <label class="page-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg><input v-model="query" type="search" aria-label="Search capabilities" placeholder="Search capabilities or tools" /></label>
-      <p class="search-count" role="status">{{ rows.length }} of {{ capabilities.length }} capabilities</p>
+
       <p v-if="!rows.length" class="muted">{{ capabilities.length ? 'No capabilities match your search.' : 'No capabilities are available.' }}</p>
       <ul class="list">
         <li v-for="{ c, state } in rows" :key="c.name" class="card cap" data-test="capability" :data-name="c.name" :data-state="state">
@@ -149,20 +143,16 @@ onMounted(load);
         </li>
       </ul>
       </template>
-    </div>
+
     <IntegrationToolsModal kind="capability" :status="selected ? STATE_LABELS[stateOf(selected)] : ''" :open="selected !== null" :title="selected?.label ?? selected?.name ?? ''" :identity="selected?.name ?? ''" :names="selected?.tools ?? []" :available="selected?.enabled ?? false" @close="selectedName = null">
       <template v-if="selected"><p>{{ summaries[selected.name] ?? `Workspace tools provided by ${selected.label ?? selected.name}. Select a tool below to explore what it does.` }}</p><pre v-if="selected.load_error" class="load-error">{{ selected.load_error }}</pre></template>
     </IntegrationToolsModal>
-  </section>
+
+  </PageLayout>
 </template>
 
 <style scoped>
-.head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-}
+
 .refresh {
   padding: 6px 16px;
   border: none;

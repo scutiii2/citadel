@@ -5,7 +5,7 @@ test("a usage-only observer selects users and exports the loaded user's report",
   const state = newState(); state.permissions = ["usage.all.view"];
   await installFakeApi(page, state);
   const calls: string[] = []; page.on("request", r => { if (r.url().includes("/api/")) calls.push(r.url()); });
-  await page.goto("/admin");
+  await page.goto("/overview");
   await expect(page.getByRole("link", { name: "Usage", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Usage", exact: true }).click();
   await expect(page.getByText("Select a user to view their usage.")).toBeVisible();
@@ -53,7 +53,7 @@ test("report errors can be retried and do not allow stale exports", async ({ pag
 test("Usage is denied without usage.all.view", async ({ page }) => {
   const state = newState(); state.permissions = ["extensions.manage"];
   await installFakeApi(page, state); await page.goto("/usage");
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/overview$/);
   await expect(page.getByRole("link", { name: "Usage", exact: true })).toHaveCount(0);
   expect(state.unexpected).toEqual([]);
 });

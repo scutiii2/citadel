@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { usageClient, type MyUsage, type UsageGroupBy, type UsageRecordRow } from "../api/UsageClient";
 import ActionButton from "../components/ActionButton.vue";
@@ -188,18 +189,16 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="usage-view">
-    <div class="column page-column">
-      <div class="head">
-        <div><h2 class="page-title">Usage</h2><p class="page-description">Review your token usage and account limits.</p></div>
-        <div class="ranges" role="group" aria-label="Period">
+  <PageLayout title="Usage" description="Review your token usage and account limits." class="usage-view">
+    <template #actions>
+      <div class="ranges" role="group" aria-label="Period">
           <SegmentedControl v-model="range" :options="RANGE_OPTIONS" label="Period" aria-label="Period" />
           <ActionButton icon="export" class="export" :disabled="!usage" title="Download this period as a Markdown file" @click="exportReport">
             Export .md
           </ActionButton>
         </div>
-      </div>
-
+    </template>
+    <div class="column">
       <p v-if="error" class="error">error: {{ error }}</p>
       <p v-else-if="!usage && loading" class="muted">loading ...</p>
 
@@ -308,24 +307,11 @@ onMounted(() => {
       </template>
 
     </div>
-  </section>
+  </PageLayout>
 </template>
 
 <style scoped>
-.usage-view {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
 
-.head {
-  align-items: last baseline;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
 
 h3 {
   margin: 0;

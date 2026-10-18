@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { commandsClient, type CapabilityInfo } from "../api/CommandsClient";
@@ -198,17 +199,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="caps-view">
-    <div class="column page-column">
-      <div class="head">
-        <h2 class="page-title">
-          Capabilities <span v-if="added.tools.length" class="count">{{ added.tools.length }} tools</span>
-        </h2>
-        <div class="head-actions">
-          <RouterLink to="/capabilities/supermarket" class="shop">Supermarket</RouterLink>
-        </div>
-      </div>
-      <p class="muted intro page-description">What you've added: built-in capabilities and extensions. Open one to run its tools, or add more in the Supermarket.</p>
+  <PageLayout title="Capabilities" description="What you've added: built-in capabilities and extensions. Open one to run its tools, or add more in the Supermarket." class="caps-view">
+    <template #actions>
+      <span v-if="added.tools.length" class="count">{{ added.tools.length }} tools</span>
+      <RouterLink to="/capabilities/supermarket" class="shop">Supermarket</RouterLink>
+    </template>
+    <div class="column">
       <details class="how muted">
         <summary>How switches work</summary>
         <p>
@@ -390,32 +386,12 @@ onMounted(() => {
         </div>
       </div>
     </div>
-  </section>
+  </PageLayout>
 </template>
 
 <style scoped>
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); grid-auto-rows: 1fr; gap: 14px; }
-.caps-view {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
 
-.head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 6px;
-}
-h2 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-
-}
 h3 {
   margin: 0;
   font-size: 1em;
@@ -427,12 +403,6 @@ h3 {
   font-weight: 400;
   color: var(--muted);
   background: var(--surface);
-}
-.head-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
 }
 .shop {
   padding: 6px 16px;

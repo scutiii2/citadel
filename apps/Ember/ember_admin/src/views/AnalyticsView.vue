@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { logsClient, type AnalyticsRange, type AnalyticsReport, type LogActor, type LogKind } from "../api/LogsClient";
 import ActivityChart from "../components/analytics/ActivityChart.vue";
@@ -101,17 +102,18 @@ watch(range, load);
 </script>
 
 <template>
-  <section class="info-page">
-    <div class="column page-column">
-      <h2 class="page-title">Analytics</h2><p class="page-description">Review workspace activity, errors, and network traffic.</p>
-      <div class="toolbar">
+  <PageLayout class="info-content" title="Analytics" description="Review workspace activity, errors, and network traffic.">
+    <template #toolbar><div class="toolbar">
         <SegmentedControl :model-value="tab" :options="TAB_OPTIONS" label="View" aria-label="View" @update:model-value="showTab" />
         <template v-if="tab !== 'entries'">
           <SegmentedControl v-model="range" :options="RANGE_OPTIONS" label="Period" aria-label="Range" />
           <button type="button" class="chip" :disabled="busy" @click="refresh">Refresh</button>
           <span class="note">Times in UTC</span>
         </template>
-      </div>
+      </div></template>
+
+
+
 
       <template v-if="tab === 'overview'">
         <p v-if="error" class="error">{{ error }}</p>
@@ -165,8 +167,9 @@ watch(range, load);
       <TrafficPanel v-else-if="tab === 'traffic'" v-model:loading="trafficLoading" :range="range" :refresh="trafficRefresh" />
 
       <LogEntries v-else :kind="jump?.kind" :actor="jump?.actor" />
-    </div>
-  </section>
+
+
+  </PageLayout>
 </template>
 
 <style scoped src="../components/analytics/overview.css"></style>

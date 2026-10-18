@@ -11,12 +11,12 @@ beforeEach(() => {
   document.documentElement.style.colorScheme = "";
 });
 
-async function show(permissions: string[] | null, path = "/admin") {
+async function show(permissions: string[] | null, path = "/overview") {
   const pinia = createPinia();
   setActivePinia(pinia);
   const auth = useAuthStore();
   if (permissions) auth.account = { id: 1, username: "ada", email: "ada@example.com", email_verified: true, roles: [], permissions };
-  const router = createRouter({ history: createMemoryHistory(), routes: ["/", "/profile", "/settings", "/capabilities", "/extensions", "/agents", "/analytics", "/usage", "/admin", "/admin/accounts", "/admin/roles", "/admin/invites", "/admin/settings"].map(path => ({ path, component: { template: "<div />" } })) });
+  const router = createRouter({ history: createMemoryHistory(), routes: ["/", "/profile", "/settings", "/capabilities", "/extensions", "/agents", "/analytics", "/usage", "/overview", "/admin/accounts", "/admin/roles", "/admin/invites", "/admin/settings"].map(path => ({ path, component: { template: "<div />" } })) });
   await router.push(path);
   const w = mount(AdminNav, { global: { plugins: [pinia, router] } });
   await flushPromises();
@@ -40,9 +40,9 @@ it("marks only the current administration page in the main rail", async () => {
 });
 
 it("lists the pages in the default arrangement", async () => {
-  const w = await show(["accounts.manage", "roles.manage", "invites.manage", "settings.manage", "capabilities.manage", "extensions.manage", "agents.manage", "games.manage", "tickets.manage", "usage.all.view", "traffic.view"]);
+  const w = await show(["accounts.manage", "roles.manage", "invites.manage", "settings.manage", "capabilities.manage", "extensions.manage", "agents.manage", "tickets.manage", "usage.all.view", "traffic.view"]);
   expect(w.findAll("nav[aria-label='Admin sections'] a").map(a => a.attributes("aria-label"))).toEqual([
-    "Roles & permissions", "Accounts", "Capabilities", "Extensions", "Agents", "Analytics", "Usage", "Workspace settings", "Invites", "Games", "Tickets",
+    "Roles & permissions", "Accounts", "Capabilities", "Extensions", "Agents", "Analytics", "Usage", "Workspace settings", "Invites", "Tickets",
   ]);
 });
 
@@ -99,13 +99,19 @@ it("keeps Overview reachable when every administration page is hidden", async ()
   useNavPrefsStore().update({ order: ["/extensions"], pinned: [], hidden: ["/extensions"] });
   await flushPromises();
   expect(w.find("nav").exists()).toBe(false);
-  expect(w.get("a[aria-label='Overview']").attributes("href")).toBe("/");
+  expect(w.get("a[aria-label='Overview']").attributes("href")).toBe("/overview");
   expect(w.find("button.account").exists()).toBe(true);
 });
 
 it("exposes Usage and Overview to a usage-only observer", async () => {
   const w = await show(["usage.all.view"], "/usage");
   expect(w.get("a[aria-label='Usage']").attributes("aria-current")).toBe("page");
-  expect(w.get("a[aria-label='Overview']").attributes("href")).toBe("/");
+  expect(w.get("a[aria-label='Overview']").attributes("href")).toBe("/overview");
   expect(w.find("a[aria-label='Accounts']").exists()).toBe(false);
+});
+
+it("links the wordmark to the canonical overview and marks it current", async () => {
+  const wrapper = await show(["roles.view"], "/overview");
+  expect(wrapper.get("a.wordmark").attributes("href")).toBe("/overview");
+  expect(wrapper.get("a.wordmark").attributes("aria-current")).toBe("page");
 });

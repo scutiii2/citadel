@@ -33,7 +33,7 @@ scoped by port, so the same ember_api session cookie is sent.
 | Agents (`/agents`) | `agents.manage` |
 | Tickets (`/tickets`) | `tickets.manage` |
 | Analytics (`/analytics`) | any of `logs.view`, `logs.errors.view`, `logs.chat.view`, `traffic.view`. Entries → Chat turns lists each agent used; with `logs.chat.prompts.view` an Advanced view adds each agent's run and the prompt it received (never the system prompt). |
-| Workspace overview (`/admin`) | any account, role, invitation, or workspace settings permission |
+| Workspace overview (`/overview`) | any account, role, invitation, or workspace settings permission |
 | Accounts (`/admin/accounts`) | any of `accounts.view`, `accounts.manage`, `accounts.delete`, `roles.assign` |
 | Roles & permissions (`/admin/roles`) | any of `roles.view`, `roles.manage`, `roles.assign` |
 | Invites (`/admin/invites`) | `invites.manage` |
@@ -251,13 +251,4 @@ loading, API cache exclusion and reconnection.
 
 Usage (/usage, usage.all.view) lists every account for a selected period, including zero-usage accounts. Select a user for rolling limits, totals, activity, annual heatmap, breakdown, recent calls and a Markdown export. It does not require chat.use or accounts.view.
 
-## Games registry
-
-The Games page (`/games`, `games.manage`) registers a game by its base URL,
-refreshes its manifest and deregisters it after an exact game-id confirmation.
-Failures appear inline. Registration creates `games.<id>.play`; assign it through
-the Roles page. Deregistration retains permissions and role grants.
-
-For local Ascension, register `http://127.0.0.1:8060` after building its UI and
-configuring server-side redemption against Ember API on port 8030. Configure
-Ember web's `EMBER_GAME_ORIGINS` for production game origins.
+Every page view uses PageLayout; the AdminView routing shell and chat/auth screens are exempt. Overview lives at `/overview`; `/` and `/admin` redirect there. Shared PageLayout fixes must be applied in both apps.

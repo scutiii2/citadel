@@ -31,7 +31,7 @@ function reset(): void {
   if (props.modelValue) emit('update:modelValue', { order: [], pinned: [], hidden: [] });
   else void navPrefs.reset();
 }
-const pages = computed(() => ADMIN_NAV_PAGES.filter(p => p.to !== "/admin" && (Array.isArray(p.permission) ? p.permission.some(auth.hasPermission) : auth.hasPermission(p.permission))));
+const pages = computed(() => ADMIN_NAV_PAGES.filter(p => p.to !== "/overview" && (Array.isArray(p.permission) ? p.permission.some(auth.hasPermission) : auth.hasPermission(p.permission))));
 const groups = computed(() => arrange(pages.value, prefs.value));
 const rows = computed(() => [
   ...groups.value.pinned.map((page) => ({ page, pinned: true })),

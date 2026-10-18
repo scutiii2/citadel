@@ -1,6 +1,6 @@
 import { onBeforeUnmount, onMounted, ref, type Ref } from "vue";
 
-/** Wall-clock epoch seconds (the unit of Ascension's timestamps), updated
+/** Wall-clock epoch seconds, updated
  * every second while the component is mounted. */
 export function useNowSeconds(): Ref<number> {
   const now = ref(Date.now() / 1000);

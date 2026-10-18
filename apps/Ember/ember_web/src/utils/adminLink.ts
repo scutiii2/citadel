@@ -1,7 +1,7 @@
 /** Permissions that open a page in Ember Admin, including delegated administrators. */
 export const ADMIN_ACCESS_PERMISSIONS = [
   "accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign",
-  "invites.manage", "settings.manage", "games.manage", "capabilities.manage", "extensions.manage",
+  "invites.manage", "settings.manage", "capabilities.manage", "extensions.manage",
   "logs.view", "logs.errors.view", "logs.chat.view", "traffic.view",
 ];
 
@@ -15,7 +15,7 @@ export function emberAdminUrl(current = window.location.href, configured = impor
   }
   const url = new URL(current);
   url.port = "5176";
-  url.pathname = "/";
+  url.pathname = "/overview";
   url.search = url.hash = "";
   return url.href;
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { authClient, type KnownDevice } from "../api/AuthClient";
@@ -108,14 +109,11 @@ async function changePassword(): Promise<void> {
 </script>
 
 <template>
-  <!-- Logging out clears the account a moment before the router leaves this page. -->
-  <section v-if="auth.account" class="account-view">
-    <div class="column page-column">
-      <header class="page-head">
-        <p class="eyebrow">Your workspace, your account</p>
-        <h2 class="page-title">Profile</h2>
-        <p class="subtitle page-description">Manage your identity, security, and devices.</p>
-      </header>
+  <PageLayout class="account-view" title="Profile" description="Manage your identity, security, and devices." v-if="auth.account">
+    <div class="column">
+      <p class="eyebrow">Your workspace, your account</p>
+
+
 
       <div v-if="!account.email_verified" class="banner" role="status">
         <span>{{ auth.needsVerification
@@ -241,9 +239,12 @@ async function changePassword(): Promise<void> {
         <p class="device-footer">Forgetting a device makes its next sign-in appear as a new device in your activity log.</p>
       </section>
       <footer class="page-footer">Ember Admin · Profile</footer>
-    </div>
+
     <ConfirmModal v-if="pendingForget" open title="Forget device" :message="`Forget ${pendingForget.label}? Its next login is noted in the activity log as a new device.`" confirm-label="Forget" @confirm="forgetDevice(pendingForget)" @close="pendingForget = null" />
-  </section>
+
+    </div>
+
+  </PageLayout>
 </template>
 
 <style scoped>
@@ -792,9 +793,7 @@ button.forget  {
 
     gap: 16px;
   }
-  .page-head  {
-    margin-bottom: 4px;
-  }
+
   .account-grid  {
     grid-template-columns: 1fr;
     gap: 16px;

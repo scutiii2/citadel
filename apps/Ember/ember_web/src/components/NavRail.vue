@@ -13,7 +13,6 @@ import { CONFIG_ISSUES_ICON, OVERVIEW_ICON, PROFILE_ICON, visiblePages } from ".
 import { usePageVisibilityStore } from "../stores/pageVisibility";
 import { useAuthStore } from "../stores/auth";
 import { useConfigIssuesStore } from "../stores/configIssues";
-import { useGamesStore } from "../stores/games";
 import { useNavPrefsStore } from "../stores/navPrefs";
 import { ADMIN_ACCESS_PERMISSIONS, emberAdminUrl } from "../utils/adminLink";
 import { railPages } from "../utils/navArrangement";
@@ -63,7 +62,7 @@ const canBrowse = computed(() => auth.account !== null && !auth.needsVerificatio
 const navPrefs = useNavPrefsStore();
 // These pages live in the account menu, in two groups, outside the account's
 // pin/reorder/hide arrangement; an administrator's hide list still removes them.
-const MENU_GROUPS = [["/capabilities", "/agents", "/games"], ["/usage", "/settings"]];
+const MENU_GROUPS = [["/capabilities", "/agents"], ["/usage", "/settings"]];
 // Chat sits in the header under the wordmark, not in the arrangement either.
 const HEADER_PAGE = "/";
 const MENU_PAGES = [...MENU_GROUPS.flat(), HEADER_PAGE];
@@ -110,10 +109,6 @@ const tabs = computed(() => {
   right[0]!.near = "r";
   return { left, right, chat: page("/") };
 });
-
-// While a game runs, the rail carries its Close button (narrow screens use a button over the game).
-const games = useGamesStore();
-const gamePlaying = computed(() => Boolean(games.activeId && games.launchUrl));
 
 const configIssues = useConfigIssuesStore();
 const showConfigAlert = computed(() => canBrowse.value && configIssues.issues.length > 0);
@@ -220,9 +215,6 @@ async function logout(): Promise<void> {
     </RouterLink>
 
     <div class="bottom">
-      <button v-if="gamePlaying" type="button" class="close-game" data-label="Close game" aria-label="Close game" @click="games.close()">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
-      </button>
       <AccountMenu
         v-if="auth.account"
         :username="auth.account.username"
@@ -307,8 +299,7 @@ nav {
 /* One shape for every control in the rail. */
 nav a,
 .alert,
-.theme,
-.close-game {
+.theme {
   position: relative;
   display: grid;
   place-items: center;
@@ -352,8 +343,7 @@ nav a,
   background: var(--tone);
 }
 nav a:hover,
-.theme:hover,
-.close-game:hover {
+.theme:hover {
   color: var(--text);
   background: var(--bg);
 }

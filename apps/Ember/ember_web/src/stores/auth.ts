@@ -33,7 +33,7 @@ export const useAuthStore = defineStore("auth", () => {
   function hasPermission(name: string): boolean {
     // Mirrors ember_api: an unverified email holds no permissions, unless
     // verification is switched off there. An empty name asks for no permission
-    // at all: any verified, signed-in account passes (the Games page).
+    // at all: any verified, signed-in account passes.
     if (name === "") return account.value !== null && !needsVerification.value;
     return account.value !== null && !needsVerification.value && permissions.value.has(name);
   }

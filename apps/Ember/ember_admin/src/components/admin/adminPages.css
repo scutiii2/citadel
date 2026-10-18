@@ -1,18 +1,13 @@
 /* Page hierarchy for the administration workspace; controls share admin.css. */
-.admin-workspace .admin-page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
 
 
-.admin-workspace .admin-page-head .primary { flex-shrink: 0; padding: 8px 16px; text-decoration: none; white-space: nowrap; }
-.admin-workspace .admin-page-head button:disabled { opacity: 0.5; cursor: default; }
-.admin-workspace .admin-info { display: flex; gap: 12px; align-items: center; padding: 15px 18px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
-.admin-workspace .admin-info h3 { margin: 0; font-size: 0.95em; }
-.admin-workspace .admin-info p { margin: 4px 0 0; color: var(--muted); font-size: 0.85em; }
-.admin-workspace .admin-info > svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--warning); }
-.admin-workspace .admin-info > a { margin-left: auto; white-space: nowrap; text-decoration: none; }
+.page .admin-info { display: flex; gap: 12px; align-items: center; padding: 15px 18px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.page .admin-info h3 { margin: 0; font-size: 0.95em; }
+.page .admin-info p { margin: 4px 0 0; color: var(--muted); font-size: 0.85em; }
+.page .admin-info > svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--warning); }
+.page .admin-info > a { margin-left: auto; white-space: nowrap; text-decoration: none; }
 @media (max-width: 767px) {
-  .admin-workspace .admin-page-head { align-items: flex-start; gap: 10px; margin-bottom: 20px; }
 
-  .admin-workspace .admin-page-head .primary { font-size: 0.8em; padding: 7px 11px; }
-  .admin-workspace .admin-info { flex-wrap: wrap; }
-  .admin-workspace .admin-info > a { margin-left: 32px; }
+  .page .admin-info { flex-wrap: wrap; }
+  .page .admin-info > a { margin-left: 32px; }
 }

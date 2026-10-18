@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { adminClient, type AdminSummary } from "../api/AdminClient";
@@ -8,12 +9,13 @@ import { useAuthStore } from "../stores/auth";
 import { errorMessage } from "../utils/errors";
 import StatTile from "../components/admin/StatTile.vue";
 import "../components/admin/admin.css";
+import "../components/admin/adminPages.css";
 
 const auth = useAuthStore();
 const summary = ref<AdminSummary | null>(null);
 const ticketStats = ref<TicketStats | null>(null);
 const error = ref("");
-const destinations = computed(() => ADMIN_NAV_PAGES.filter(s => s.to !== "/admin").filter((s) => Array.isArray(s.permission) ? s.permission.some(auth.hasPermission) : auth.hasPermission(s.permission)));
+const destinations = computed(() => ADMIN_NAV_PAGES.filter(s => s.to !== "/overview").filter((s) => Array.isArray(s.permission) ? s.permission.some(auth.hasPermission) : auth.hasPermission(s.permission)));
 const descriptions: Record<string, string> = {
   "/admin/accounts": "Manage profiles, account status, and assigned roles.",
   "/admin/roles": "Define exactly what each role can view and change.",
@@ -37,8 +39,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="admin-overview admin-panel">
-    <header class="admin-page-head"><div><h2 class="page-title">Workspace overview</h2><p class="page-description">Manage people, access, integrations, and activity.</p></div><RouterLink v-if="auth.hasPermission('invites.manage')" class="primary" to="/admin/invites?create=1">＋ Create invite</RouterLink></header>
+  <PageLayout class="admin-overview admin-panel" title="Workspace overview" description="Manage people, access, integrations, and activity.">
+    <template #actions><RouterLink v-if="auth.hasPermission('invites.manage')" class="primary" to="/admin/invites?create=1">＋ Create invite</RouterLink></template>
+
     <p v-if="error" class="error" role="alert">Couldn't load the overview: {{ error }}</p>
     <div v-if="auth.hasPermission('accounts.view') || auth.hasPermission('invites.manage')" class="stats">
       <RouterLink v-if="auth.hasPermission('accounts.view')" to="/admin/accounts"><StatTile label="Accounts" :value="summary?.accounts ?? null" /><span class="stat-link">Browse accounts →</span></RouterLink>
@@ -62,7 +65,8 @@ onMounted(async () => {
         <div><h3>{{ section.label }}</h3><p>{{ descriptions[section.to] }}</p></div><span class="arrow" aria-hidden="true">→</span>
       </RouterLink>
     </div>
-  </div>
+
+  </PageLayout>
 </template>
 
 <style scoped>
