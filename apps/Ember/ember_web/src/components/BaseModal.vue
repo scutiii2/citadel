@@ -19,6 +19,13 @@ watch(
   { immediate: true },
 );
 
+/** The browser fires `close` for a close made from code too. When the parent
+ * already set `open` to false it asked for that, so it must not hear it back:
+ * it may be switching to another dialog, and the echo would shut that one. */
+function onNativeClose(): void {
+  if (props.open) emit("close");
+}
+
 /** A click on the backdrop lands on the <dialog> itself, not on its content. */
 function onClick(event: MouseEvent): void {
   if (event.target === dialog.value) emit("close");
@@ -26,7 +33,7 @@ function onClick(event: MouseEvent): void {
 </script>
 
 <template>
-  <dialog ref="dialog" class="modal" :class="{ wide }" :aria-label="title" @close="emit('close')" @cancel.prevent="emit('close')" @click="onClick">
+  <dialog ref="dialog" class="modal" :class="{ wide }" :aria-label="title" @close="onNativeClose" @cancel.prevent="emit('close')" @click="onClick">
     <header>
       <h3>{{ title }}</h3>
       <button type="button" class="close" aria-label="Close" @click="emit('close')">×</button>
