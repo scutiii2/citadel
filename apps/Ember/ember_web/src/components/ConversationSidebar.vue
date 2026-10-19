@@ -576,6 +576,11 @@ watch(
   background: var(--surface);
   box-shadow: 0 12px 0 var(--surface);
 }
+/* The footer already takes the free space; two auto margins would split it and strand the footer mid-sidebar. */
+.footer + .gauges-pinned,
+.select-bar + .gauges-pinned {
+  margin-top: 0;
+}
 .new-chat,
 .new-folder {
   display: flex;
