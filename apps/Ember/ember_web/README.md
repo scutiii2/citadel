@@ -12,7 +12,8 @@ URL, token or key.
   (`/capabilities/video_downloader`) port the standalone workspaces into Ember.
   Add Armory's `pdf` or `video` capability in the Supermarket, then use its card's
   Open page button. Both need `tools.execute`; uploads also need `files.upload`,
-  and content previews/downloads need `files.download`. They add no rail entries.
+  and content previews/downloads need `files.download`. Both also have sidebar entries
+  (`NAV_PAGES` in `src/router/pages.ts`), which an admin can hide like any other page.
   `src/router/capabilityPages.ts` owns the shared page map and lazy native routes;
   generic GUI pages and other extensions' external Open app links still work.
 - PDF keeps drag/keyboard source and page ordering, page ranges, rotation,

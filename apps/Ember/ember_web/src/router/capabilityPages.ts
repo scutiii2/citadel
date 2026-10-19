@@ -1,5 +1,5 @@
 /** Capability IDs, including legacy extension IDs, with native workspaces.
- * Keep these out of NAV_PAGES: their entry point is the Capabilities card. */
+ * Each also has a NAV_PAGES entry (router/pages.ts) with the same `to`. */
 import type { RouteRecordRaw } from "vue-router";
 
 interface CapabilityPage {

@@ -56,6 +56,20 @@ export const NAV_PAGES: NavPage[] = [
     permission: "tools.execute",
   },
   {
+    to: "/capabilities/pdf_merger",
+    label: "PDF merger",
+    icon: ["m8 6 4-4 4 4", "M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22", "m20 22-5-5"],
+    description: "Combine PDFs and images into one file; reorder, rotate and pick pages.",
+    permission: "tools.execute",
+  },
+  {
+    to: "/capabilities/video_downloader",
+    label: "Video downloader",
+    icon: ["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", "M7 10l5 5 5-5", "M12 15V3"],
+    description: "Download a video or its audio from a link.",
+    permission: "tools.execute",
+  },
+  {
     to: "/tickets",
     label: "Tickets",
     icon: ["M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z", "M13 5v2", "M13 17v2", "M13 11v2"],

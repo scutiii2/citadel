@@ -166,7 +166,7 @@ describe("native capability pages", () => {
     await router.push(`/capabilities/${path}`);
     expect(router.currentRoute.value.name).toBe(name);
     expect(router.currentRoute.value.meta.permission).toBe("tools.execute");
-    expect(NAV_PAGES.some((p) => p.to === `/capabilities/${path}`)).toBe(false);
+    expect(NAV_PAGES.some((p) => p.to === `/capabilities/${path}`)).toBe(true);
   });
   it("keeps unknown capability pages generic", () => {
     expect(router.resolve("/capabilities/other").name).toBe("capability-page");
