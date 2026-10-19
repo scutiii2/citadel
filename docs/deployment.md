@@ -54,28 +54,108 @@ publishes the two web ports on all interfaces so the LAN can reach them.
    docker compose version
    ```
 
-2. Clone the repo onto the data disk, not the system partition. Later updates are a `git pull`, with no manual copying.
+2. Publish the `live` branch from your PC (see "The live branch" below), then clone it onto the data disk, not the
+   system partition. Later updates are a `git pull`, with no manual copying.
 
    ```bash
    mkdir -p /media/ZimaOS-HD/Apps
-   git clone <your-repo-url> /media/ZimaOS-HD/Apps/Citadel
+   git clone -b live <your-repo-url> /media/ZimaOS-HD/Apps/Citadel
    cd /media/ZimaOS-HD/Apps/Citadel
    ```
 
+   Already cloned `main`? Switch that clone in place. The containers keep running:
+
+   ```bash
+   git fetch origin live
+   git switch -c live --track origin/live
+   ```
+
    A private repo needs a deploy key or token. Run every later command from this folder.
-3. Create the files that git does not hold. ZimaOS has no `openssl`, so build the token from `/dev/urandom`:
+3. Create the `.env` files. They are gitignored, so `live` does not hold them, and a `git pull` never touches them.
+   Names that start with a dot are hidden: use `ls -la` to see them.
+
+   Root `.env` (required, Compose refuses to start without it). ZimaOS has no `openssl`, so build the token from
+   `/dev/urandom`:
 
    ```bash
    echo "INTERNAL_API_TOKEN=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" > .env
    cat .env                      # INTERNAL_API_TOKEN= then 64 hex characters
-   touch apps/Ember/ember_api/.env
    ```
 
-   Create `apps/Ember/ember_api/.env` before the first start. Compose bind-mounts it, and if it does not exist
-   Docker creates a directory in its place and ember_api fails. ember_api writes its own secrets into this file.
+   The root token reaches every service and overrides any `INTERNAL_API_TOKEN` in a per-app file, so leave that line
+   out of those.
 
-   Copy the API keys that armory and garrison need (for example Tavily or LLM keys) into `apps/armory/.env` and
-   `apps/garrison/.env` by hand. They are secrets and are not in git.
+   Per-app `.env` files. Each app has a committed `.env.example`; copy it and fill in the values:
+
+   ```bash
+   cp apps/armory/.env.example apps/armory/.env
+   cp apps/garrison/.env.example apps/garrison/.env
+   cp apps/treasury/.env.example apps/treasury/.env
+   cp apps/Ember/ember_api/.env.example apps/Ember/ember_api/.env
+   ```
+
+   | File | Keys to fill in |
+   |---|---|
+   | `apps/armory/.env` | Only the capability keys you use: `SMTP_PASSWORD`, `TEAMS_WEBHOOK_URL`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` |
+   | `apps/garrison/.env` | `CLAUDE_API_KEY`, or the keys of the gateway your agents use; `HF_TOKEN` if used |
+   | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
+   | `apps/Ember/ember_api/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
+
+   Skip `MCP_HOST`, `MCP_PORT` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. Do not use `localhost`
+   for another service.
+
+   `apps/Ember/ember_api/.env` must exist before the first start. Compose bind-mounts it, and if it is missing Docker
+   creates a directory in its place and ember_api fails. ember_api writes `EMBER_SECRETS_KEY` into this file, so keep
+   it when you rebuild.
+
+   Lock the files down:
+
+   ```bash
+   chmod 600 .env apps/armory/.env apps/garrison/.env apps/treasury/.env apps/Ember/ember_api/.env
+   ```
+
+   **Or copy them from your PC.** This keeps your existing values, including `EMBER_SECRETS_KEY`, and replaces the
+   root token with the PC's, so use the same token on both machines if they talk to each other. From the repo root on
+   the PC (PowerShell):
+
+   ```bash
+   tar -cf $env:TEMP\envs.tar .env apps/armory/.env apps/garrison/.env apps/treasury/.env apps/Ember/ember_api/.env
+   scp $env:TEMP\envs.tar myuser@<zima-ip>:/tmp/envs.tar
+   del $env:TEMP\envs.tar
+   ```
+
+   Then on the box as `root`:
+
+   ```bash
+   tar -xf /tmp/envs.tar -C /media/ZimaOS-HD/Apps/Citadel
+   rm /tmp/envs.tar
+   ```
+
+   Use a real username and IP, not the placeholders. If `root` cannot log in over SSH, send to the other account's
+   `/tmp` and unpack as `root`, as above. The archive holds secrets, so delete it afterwards. The result overwrites
+   any `.env` already on the box.
+4. Create the config files that git does not hold. `config_*.json` is gitignored. Compose mounts the files under
+   `docker/configs/` (tracked) over `config_extensions.json`, `config_servers.json`, `config_app.json` and
+   `config_connections.json`. These stay inside the containers:
+
+   | File | On a fresh clone |
+   |---|---|
+   | `apps/garrison/configs/config_tuning.json` | Created from its `.example` automatically |
+   | `apps/Ember/ember_api/configs/config_pricing.json` | Created from its `.example` automatically |
+   | `apps/armory/configs/config_capabilities.json` | Not confirmed; copy the `.example` to be safe |
+   | `apps/armory/configs/config_email.json` | May fail without it; copy the `.example` and fill it in |
+   | `apps/armory/configs/config_tickets.json` | May fail without it; copy the `.example` |
+
+   ```bash
+   cd apps/armory/configs
+   cp config_capabilities.json.example config_capabilities.json
+   cp config_email.json.example config_email.json
+   cp config_tickets.json.example config_tickets.json
+   cd ../../..
+   ```
+
+   These files are baked into the image at build time, so a change made in the Capabilities page of ember_admin is
+   lost when armory is rebuilt.
 4. Start with the overlay:
 
    ```bash
@@ -106,7 +186,7 @@ compose containers, and it cannot build our images. Add external links instead. 
 Give the box a fixed IP (a DHCP reservation in the router) so the links keep working. If your version has no external
 link option, use a browser bookmark.
 
-To update later:
+To update later, publish from the PC, then on the box:
 
 ```bash
 cd /media/ZimaOS-HD/Apps/Citadel
@@ -114,8 +194,34 @@ git pull
 docker compose -f docker-compose.yml -f docker-compose.zima.yml up -d --build
 ```
 
+Use `up -d`, not `docker restart`, after any `.env` edit: `restart` does not reload `env_file`.
+
 `config_*.json` files are gitignored, so a capability toggle such as `server` in
 `apps/armory/configs/config_capabilities.json` does not arrive with `git pull`. Set it on the box.
+
+### The live branch
+
+The box needs only what the stack builds from, not the whole repo. `tools/publish_live.py` builds a `live` branch
+from `main` with just those paths:
+
+- `docker-compose.yml`, `docker-compose.zima.yml`, `.env.example`, `docker/`
+- `apps/armory`, `apps/garrison`, `apps/treasury`, `apps/Ember`
+- `docs/deployment.md`
+
+It leaves out other docs, skills, `tools/`, `apps/archive`, the Python `tests/` folders and `apps/Ember/ember_cli`.
+`e2e/` and the `src/*.test.ts` files stay because the web apps' tsconfig includes them. The path lists are at the top
+of the script; add a path there when you add a compose service.
+
+From the repo root on the PC:
+
+```bash
+py tools\publish_live.py --dry-run     # show what would be published
+py tools\publish_live.py               # create or update origin/live
+```
+
+or double-click `tools\publish_live.bat`. The script reads committed `main` without touching your working tree,
+index or branch, so commit `main` first. The `live` commit is built on top of the remote tip, so pushes are normal
+fast-forwards with no force-push. A run with no changes prints "already up to date".
 
 The old `apps/armory/zima_host.yaml` is from before the stack was split into containers. Do not use it.
 
@@ -164,6 +270,8 @@ docker compose up -d armory
 | Symptom | Cause and fix |
 |---|---|
 | `set INTERNAL_API_TOKEN in .env` | The root `.env` is missing or empty. |
+| `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
+| `scp` will not log in | Use a real user and IP, not `user@<zima-ip>`. If `root` is not allowed, send to the other account's `/tmp` and unpack as `root`. |
 | `openssl: command not found` | Use the `/dev/urandom` command in section 2, step 3. A failed `echo` leaves an empty `.env`, so run it again. |
 | ember_api fails and `apps/Ember/ember_api/.env` is a directory | Compose created it because the file was missing. Run `rmdir apps/Ember/ember_api/.env`, then `touch apps/Ember/ember_api/.env`, then start again. |
 | UI loads on the PC but not on another device | Overlay not used. Add `-f docker-compose.zima.yml`. |
