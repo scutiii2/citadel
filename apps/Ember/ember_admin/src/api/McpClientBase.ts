@@ -33,11 +33,13 @@ export abstract class McpClientBase {
   }
 
   private async open(): Promise<Client> {
-    const [{ Client }, { StreamableHTTPClientTransport }] = await Promise.all([
+    const [{ Client }, { StreamableHTTPClientTransport }, { CfWorkerJsonSchemaValidator }] = await Promise.all([
       import("@modelcontextprotocol/sdk/client/index.js"),
       import("@modelcontextprotocol/sdk/client/streamableHttp.js"),
+      import("@modelcontextprotocol/sdk/validation/cfworker"),
     ]);
-    const client = new Client({ name: "ember_admin", version: "0.1.0" });
+    // The default ajv validator compiles schemas with new Function, which the CSP blocks.
+    const client = new Client({ name: "ember_admin", version: "0.1.0" }, { jsonSchemaValidator: new CfWorkerJsonSchemaValidator() });
     await client.connect(new StreamableHTTPClientTransport(new URL(this.path, window.location.origin)));
     return client;
   }
