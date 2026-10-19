@@ -9,33 +9,28 @@ __pycache__/
 .secret
 .vscode
 
-# server_launcher's local settings and runtime state - per-machine, not source.
-/apps/server_launcher/.data/
-/apps/server_launcher/build/
-/apps/server_launcher/dist/
-
 # mcp_server's real config/secrets/runtime-state. config_*.json holds
 # structure (committed) with ${VAR} placeholders for anything sensitive;
 # .env holds the real values (gitignored) those placeholders resolve to.
 # Both keep an .example twin, which IS committed. .secrets/ is the legacy
 # folder run.py migrates into .env on first start.
-/apps/mcp_server/.env
-/apps/mcp_server/.secrets/*
-!/apps/mcp_server/.secrets/*.example
+/apps/armory/.env
+/apps/armory/.secrets/*
+!/apps/armory/.secrets/*.example
 
 # ai_agent's real API keys / pinned-provider selection, same treatment
 # as mcp_server's secret_*.env above - only .env.example is committed.
-/apps/ai_agent/.env
-/apps/ai_agent/configs/*
-!/apps/ai_agent/configs/*.example
-!/apps/ai_agent/configs/README.md
+/apps/garrison/.env
+/apps/garrison/configs/*
+!/apps/garrison/configs/*.example
+!/apps/garrison/configs/README.md
 # Agent definitions and gateway presets are tracked; runtime state is not.
-/apps/ai_agent/.data/
+/apps/garrison/.data/
 # Temporary agent writes and gateway migration state remain local.
-/apps/ai_agent/agents/*.tmp
-/apps/ai_agent/gateways/.initialized
-/apps/ai_agent/gateways/*/*.tmp
-/apps/ai_agent/gateways/*.tmp
+/apps/garrison/agents/*.tmp
+/apps/garrison/gateways/.initialized
+/apps/garrison/gateways/*/*.tmp
+/apps/garrison/gateways/*.tmp
 
 # mcp_server's real SMTP-account addresses. The equivalent data lived in the old root-level config.json,
 # which was gitignored outright - these carry the same real deployment
@@ -43,23 +38,23 @@ __pycache__/
 # treatment. config_extensions.json and config_capabilities.json are NOT
 # listed here - low-sensitivity structure, tracked normally like their
 # .example twins.
-/apps/mcp_server/configs/config_email.json
+/apps/armory/configs/config_email.json
 
 # Runtime state, not source: one-time-code
 # records, and any capability's own data/ (e.g. capabilities/otp/data/).
 # All hold security-relevant material or are regenerated on every run.
-/apps/mcp_server/.data/
-/apps/mcp_server/.logs/
-/apps/mcp_server/.cache/
+/apps/armory/.data/
+/apps/armory/.logs/
+/apps/armory/.cache/
 
 # Per-capability state/config under mcp_server/specifics/<capability_name>/:
 # dot-prefixed folders are untracked runtime state and secrets; the plain
 # configs/ folder next to them is tracked. Includes audit DBs and
 # JobWatcher persisted state ({state_dir}/{WatcherClass}/{key}.json).
-/apps/mcp_server/specifics/*/.data/
-/apps/mcp_server/specifics/*/.logs/
-/apps/mcp_server/specifics/*/.cache/
-/apps/mcp_server/specifics/*/.secrets/
+/apps/armory/specifics/*/.data/
+/apps/armory/specifics/*/.logs/
+/apps/armory/specifics/*/.cache/
+/apps/armory/specifics/*/.secrets/
 *.db
 
 
@@ -92,26 +87,13 @@ dev_rfc.log
 # Archive snapshots are never tracked
 *.zip
 
-# ascension: real config, secrets and game data stay local; the .example twins and the game catalog are tracked.
-# ascended/ (one folder per Ascended) is versioned game data: it ships with every deployment, so it has no dot prefix and no ignore rule.
-/apps/ascension/configs/*
-!/apps/ascension/configs/*.example
-!/apps/ascension/configs/ascension_catalog.json
-/apps/ascension/.env
-/apps/ascension/.data/
-
 # Dependencies, never tracked.
 node_modules/
 
-# chess real credentials - only .env.example is committed (config_*.json is ignored above).
-/apps/chess/.env
-
 # db_gateway: real credentials and the SQLite files it creates stay local.
-/apps/db_gateway/.env
-/apps/db_gateway/data/
-/apps/db_gateway/firestore-debug.log
-
-scuti_server_launcher.exe
+/apps/treasury/.env
+/apps/treasury/data/
+/apps/treasury/firestore-debug.log
 
 # docker compose secrets (INTERNAL_API_TOKEN)
 /.env

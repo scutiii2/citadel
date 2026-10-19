@@ -221,10 +221,10 @@ def load_settings() -> Settings:
     raw = load_json_config(CONFIGS_DIR / "config_app.json")
     ensure_env_file(ENV_PATH, ENV_PATH.with_name(".env.example"), LEGACY_SECRETS_DIR)
     database_path = _project_path(raw.get("database_path", "data/ember_api.db"))
-    registry_path = raw.get("agents_registry_path", "../../ai_agent/.data/agent_registry.json")
+    registry_path = raw.get("agents_registry_path", "../../garrison/.data/agent_registry.json")
     # Preserve the standard registry location in configs predating the data-folder rename.
-    if registry_path == "../../ai_agent/data/agent_registry.json":
-        registry_path = "../../ai_agent/.data/agent_registry.json"
+    if registry_path == "../../garrison/data/agent_registry.json":
+        registry_path = "../../garrison/.data/agent_registry.json"
     return Settings(
         host=os.getenv("EMBER_API_HOST") or raw.get("host", "127.0.0.1"),
         port=int(os.getenv("EMBER_API_PORT") or raw.get("port", 8030)),

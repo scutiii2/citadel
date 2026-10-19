@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "main": {
+      "label": "armory",
+      "description": "This repo's own MCP tool server.",
+      "transport": "http",
+      "url": "http://armory:8010/mcp"
+    }
+  }
+}

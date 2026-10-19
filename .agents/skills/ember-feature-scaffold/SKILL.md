@@ -23,7 +23,7 @@ Capabilities, Agents and Analytics go there, not in ember_web):
 A third client uses the same REST API: **chat_cli/** (terminal chat, logs in
 with the account, same cookie session, same SSE events). A change to an
 existing route's shape or to the turn/events contract must keep it working -
-check `apps/chat_cli/src/api.py` and `events.py` - and a new route the web app
+check `apps/Ember/ember_cli/src/api.py` and `events.py` - and a new route the web app
 needs is not automatically wanted there.
 
 Read both READMEs (`apps/Ember/ember_web/README.md`, `apps/Ember/ember_api/README.md`) before
