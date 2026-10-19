@@ -1,0 +1,27 @@
+{
+  "host": "0.0.0.0",
+  "port": 8030,
+  "database_path": "data/ember_api.db",
+  "session_cookie_name": "ember_session",
+  "session_hours": 12,
+  "cookie_secure": false,
+  "default_role": "Member",
+  "require_email_verification": false,
+  "agents_registry_path": "/agent_data/agent_registry.json",
+  "mcp_server_url": "http://armory:8010/mcp",
+  "db_gateway": {
+    "url": "http://treasury:8071",
+    "instance": "ember",
+    "connection": "data"
+  },
+  "security": {
+    "trusted_proxies": ["127.0.0.1", "::1", "172.28.0.0/16"]
+  },
+  "usage": {
+    "six_hour_token_limit": 1000000,
+    "weekly_token_limit": 5000000,
+    "max_context_tokens_per_chat": 150000,
+    "auto_summarize_ratio": 0.6
+  },
+  "backup": {"enabled": true, "keep": 14, "every_hours": 24}
+}

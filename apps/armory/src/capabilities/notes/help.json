@@ -1,0 +1,195 @@
+{
+  "summary": "Use the notes you chose to share with agents: list, search, read, create, update and append. Only notes with the agent switch turned on can be read or changed. Nothing is deleted.",
+  "tools": [
+    {
+      "name": "tool_notes_listNotes",
+      "purpose": "List the shared notes, optionally one tag.",
+      "connection": "db_gateway (HTTP)",
+      "commands": [
+        "list"
+      ]
+    },
+    {
+      "name": "tool_notes_searchNotes",
+      "purpose": "Search the titles and text of the shared notes.",
+      "connection": "db_gateway (HTTP)",
+      "commands": [
+        "search"
+      ]
+    },
+    {
+      "name": "tool_notes_readNote",
+      "purpose": "Read one shared note in full.",
+      "connection": "db_gateway (HTTP)",
+      "commands": [
+        "read"
+      ]
+    },
+    {
+      "name": "tool_notes_createNote",
+      "purpose": "Create a note (shared with agents, marked as written by an agent).",
+      "connection": "db_gateway (HTTP)",
+      "commands": [
+        "create"
+      ]
+    },
+    {
+      "name": "tool_notes_updateNote",
+      "purpose": "Replace the title, text or tags of a shared note.",
+      "connection": "db_gateway (HTTP)",
+      "commands": [
+        "update"
+      ]
+    },
+    {
+      "name": "tool_notes_appendToNote",
+      "purpose": "Add text to the end of a shared note; list items it already has are left out and counted.",
+      "connection": "db_gateway (HTTP)",
+      "commands": [
+        "append"
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "name": "list",
+      "tool": "tool_notes_listNotes",
+      "params": [
+        {
+          "name": "tag",
+          "required": false,
+          "default": "",
+          "description": "Only notes with this tag."
+        }
+      ]
+    },
+    {
+      "name": "search",
+      "tool": "tool_notes_searchNotes",
+      "params": [
+        {
+          "name": "query",
+          "required": true,
+          "default": null,
+          "description": "Text to look for, case-insensitive."
+        }
+      ]
+    },
+    {
+      "name": "read",
+      "tool": "tool_notes_readNote",
+      "params": [
+        {
+          "name": "note_id",
+          "required": true,
+          "default": null,
+          "description": "The note's id, from the list or a search."
+        }
+      ]
+    },
+    {
+      "name": "create",
+      "tool": "tool_notes_createNote",
+      "params": [
+        {
+          "name": "title",
+          "required": true,
+          "default": null,
+          "description": "The note's title (at most 200 characters)."
+        },
+        {
+          "name": "body",
+          "required": true,
+          "default": null,
+          "description": "The note's text (at most 20,000 characters)."
+        },
+        {
+          "name": "tags",
+          "required": false,
+          "default": "",
+          "description": "Comma-separated tags, at most 10."
+        }
+      ]
+    },
+    {
+      "name": "update",
+      "tool": "tool_notes_updateNote",
+      "params": [
+        {
+          "name": "note_id",
+          "required": true,
+          "default": null,
+          "description": "The note's id."
+        },
+        {
+          "name": "title",
+          "required": false,
+          "default": "",
+          "description": "A new title; empty keeps the current one."
+        },
+        {
+          "name": "body",
+          "required": false,
+          "default": "",
+          "description": "The new full text; empty keeps the current text."
+        },
+        {
+          "name": "tags",
+          "required": false,
+          "default": "",
+          "description": "The new full tag list; empty keeps the current tags."
+        }
+      ]
+    },
+    {
+      "name": "append",
+      "tool": "tool_notes_appendToNote",
+      "params": [
+        {
+          "name": "note_id",
+          "required": true,
+          "default": null,
+          "description": "The note's id."
+        },
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "description": "Text to add after the current text. List items already in the note are left out; other lines are always kept."
+        }
+      ]
+    }
+  ],
+  "workflow": [
+    {
+      "sequence": "1",
+      "tool": "tool_notes_listNotes",
+      "ai_only_step": false,
+      "explanation": "See which notes are shared, or filter by tag."
+    },
+    {
+      "sequence": "2",
+      "tool": "tool_notes_searchNotes",
+      "ai_only_step": false,
+      "explanation": "Or search for a word."
+    },
+    {
+      "sequence": "3",
+      "tool": "tool_notes_readNote",
+      "ai_only_step": false,
+      "explanation": "Read the notes that matter, by id."
+    },
+    {
+      "sequence": "4",
+      "tool": "tool_notes_createNote",
+      "ai_only_step": false,
+      "explanation": "Save something as a new note."
+    },
+    {
+      "sequence": "5",
+      "tool": "tool_notes_appendToNote",
+      "ai_only_step": false,
+      "explanation": "Add to a shared note without losing its text (or update it to rewrite it)."
+    }
+  ]
+}

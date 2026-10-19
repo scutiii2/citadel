@@ -1,0 +1,228 @@
+from __future__ import annotations
+
+import time
+import threading
+
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from src.services.watcher import JobWatcher, WatcherPhase, WatcherRecord
+
+
+class _FakeWatcher(JobWatcher):
+    """Test double: poll() returns whatever the test queues up next."""
+
+    backoff_schedule = [(0.3, 0.05), (0.6, 0.1)]  # short schedule for fast tests
+
+    def __init__(self, key: str, state_dir: Path, results: list[tuple[WatcherPhase, dict]], started_at: str | None = None):
+        super().__init__(key=key, state_dir=state_dir, started_at=started_at)
+        self._results = list(results)
+        self.completed_detail: dict | None = None
+        self.state_changes: list[tuple[WatcherPhase | None, WatcherPhase]] = []
+
+    def poll(self):
+        if not self._results:
+            return WatcherPhase.RUNNING, {}
+        return self._results.pop(0)
+
+    def on_completed(self, detail):
+        self.completed_detail = detail
+
+    def on_state_change(self, old, new, detail):
+        self.state_changes.append((old, new))
+
+    @classmethod
+    def from_record(cls, record: WatcherRecord) -> "_FakeWatcher":
+        return cls(key=record.key, state_dir=Path("unused"), results=[], started_at=record.started_at)
+
+
+def test_interval_for_elapsed_follows_schedule(tmp_path):
+    watcher = _FakeWatcher("k", tmp_path, [])
+    assert watcher._interval_for_elapsed(0.0) == 0.05
+    assert watcher._interval_for_elapsed(0.3) == 0.1
+    assert watcher._interval_for_elapsed(0.59) == 0.1
+    assert watcher._interval_for_elapsed(0.6) is None  # past last cutoff -> timed out
+
+
+def test_run_stops_on_completed_and_calls_on_completed(tmp_path):
+    watcher = _FakeWatcher(
+        "job1", tmp_path,
+        results=[(WatcherPhase.RUNNING, {"n": 1}), (WatcherPhase.COMPLETED, {"n": 2})],
+    )
+    watcher.run()  # runs synchronously to completion since results is finite and terminal
+
+    assert watcher.completed_detail == {"n": 2}
+    assert (WatcherPhase.RUNNING, WatcherPhase.COMPLETED) in watcher.state_changes
+
+    record = WatcherRecord.model_validate_json(
+        (tmp_path / "_FakeWatcher" / "instances" / "job1.json").read_text(encoding="utf-8")
+    )
+    assert record.phase == WatcherPhase.COMPLETED
+    assert record.detail == {"n": 2}
+
+
+def test_run_times_out_when_never_terminal(tmp_path):
+    watcher = _FakeWatcher("job2", tmp_path, results=[])  # poll() always returns RUNNING
+    watcher.run()
+
+    record = WatcherRecord.model_validate_json(
+        (tmp_path / "_FakeWatcher" / "instances" / "job2.json").read_text(encoding="utf-8")
+    )
+    assert record.phase == WatcherPhase.TIMED_OUT
+
+
+def test_poll_error_is_swallowed_and_retried(tmp_path):
+    calls = {"n": 0}
+
+    class _FlakyWatcher(_FakeWatcher):
+        def poll(self):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("transient RFC error")
+            return WatcherPhase.COMPLETED, {"ok": True}
+
+    watcher = _FlakyWatcher("job3", tmp_path, results=[])
+    watcher.run()
+
+    assert calls["n"] == 2
+    assert watcher.completed_detail == {"ok": True}
+
+
+def test_resumed_watcher_continues_elapsed_time_from_record(tmp_path):
+    """Verify that resumed watchers preserve elapsed time from their original
+    start, so backoff/timeout clock continues counting instead of resetting."""
+    # Create a record with started_at far enough in the past to exceed the schedule's last cutoff (0.6 seconds)
+    now = datetime.now(timezone.utc)
+    old_start = (now - timedelta(seconds=1.0)).isoformat()
+
+    record = WatcherRecord(
+        key="old_job",
+        phase=WatcherPhase.RUNNING,
+        started_at=old_start,
+        last_polled_at=now.isoformat(),
+        detail={},
+    )
+
+    # Reconstruct the watcher from the record
+    watcher = _FakeWatcher.from_record(record)
+    watcher.state_dir = tmp_path
+
+    # Run it - it should immediately timeout because elapsed time (>1s) is past the schedule cutoff (0.6s)
+    watcher.run()
+
+    # Verify it timed out instead of running polls
+    persisted = WatcherRecord.model_validate_json(
+        (tmp_path / "_FakeWatcher" / "instances" / "old_job.json").read_text(encoding="utf-8")
+    )
+    assert persisted.phase == WatcherPhase.TIMED_OUT
+    # started_at should be preserved from the record, not reset to "now"
+    assert persisted.started_at == old_start
+
+
+def test_state_path_sanitizes_colons_in_key(tmp_path):
+    watcher = _FakeWatcher("sid:job:count", tmp_path, results=[(WatcherPhase.COMPLETED, {"x": 1})])
+    watcher.run()
+    saved_files = list((tmp_path / "_FakeWatcher" / "instances").glob("*.json"))
+    assert len(saved_files) == 1
+    assert ":" not in saved_files[0].name
+    # resume_all must be able to find and reload it despite the sanitized filename
+    resumed = _FakeWatcher.resume_all(tmp_path)
+    # this key's phase is COMPLETED (terminal), so resume_all should NOT restart it
+    assert resumed == []
+
+
+def test_is_active_follows_start_and_cancel(tmp_path):
+    watcher = _FakeWatcher("job-a", tmp_path, [])
+    assert not _FakeWatcher.is_active("job-a")
+
+    watcher.start()
+    assert _FakeWatcher.is_active("job-a")
+
+    _FakeWatcher.cancel(tmp_path, "job-a")
+    assert not _FakeWatcher.is_active("job-a")
+
+
+def test_cancel_deletes_the_record_and_it_does_not_come_back(tmp_path):
+    watcher = _FakeWatcher("job-b", tmp_path, [])
+    watcher.start()
+    path = tmp_path / "_FakeWatcher" / "instances" / "job-b.json"
+    deadline = time.time() + 2
+    while not path.exists() and time.time() < deadline:
+        time.sleep(0.01)
+    assert path.exists()
+
+    _FakeWatcher.cancel(tmp_path, "job-b")
+    time.sleep(0.2)
+
+    assert not path.exists()
+
+
+def test_a_stopped_watcher_does_not_write_its_record(tmp_path):
+    watcher = _FakeWatcher("job-c", tmp_path, [])
+    watcher.stop()
+
+    watcher._save_record(WatcherPhase.RUNNING, {})
+
+    assert not watcher._state_path().exists()
+
+
+def test_resume_all_points_rebuilt_watchers_at_the_real_state_directory(tmp_path):
+    _FakeWatcher("job-d", tmp_path, [])._save_record(WatcherPhase.RUNNING, {})
+
+    started = _FakeWatcher.resume_all(tmp_path)
+    try:
+        assert [watcher.state_dir for watcher in started] == [tmp_path]
+    finally:
+        for watcher in started:
+            watcher.stop()
+
+
+def test_cancel_waits_for_an_in_flight_save_then_deletes_it(tmp_path, monkeypatch):
+    writing, release, cancelled = threading.Event(), threading.Event(), threading.Event()
+    original_write = Path.write_text
+    monkeypatch.setattr(_FakeWatcher, "run", lambda self: self._stop_event.wait(5))
+    watcher = _FakeWatcher("saving", tmp_path, [])
+    watcher.start()
+
+    def blocked_write(path, *args, **kwargs):
+        writing.set()
+        assert release.wait(5)
+        return original_write(path, *args, **kwargs)
+
+    def cancel():
+        _FakeWatcher.cancel(tmp_path, watcher.key)
+        cancelled.set()
+
+    monkeypatch.setattr(Path, "write_text", blocked_write)
+    writer = threading.Thread(target=watcher._save_record, args=(WatcherPhase.RUNNING, {}))
+    canceller = threading.Thread(target=cancel)
+    writer.start()
+    try:
+        assert writing.wait(2)
+        canceller.start()
+        cancelled.wait(0.2)
+    finally:
+        release.set()
+        writer.join(2)
+        if canceller.ident is not None:
+            canceller.join(2)
+        watcher.stop()
+
+    assert not writer.is_alive() and not canceller.is_alive()
+    assert cancelled.is_set()
+    assert not watcher._state_path().exists()
+
+
+def test_old_watcher_cleanup_leaves_its_replacement_active(tmp_path, monkeypatch):
+    monkeypatch.setattr(_FakeWatcher, "run", lambda self: self._stop_event.wait(5))
+    old = _FakeWatcher("replaced", tmp_path, [])
+    replacement = _FakeWatcher("replaced", tmp_path, [])
+    old.start()
+    replacement.start()
+    try:
+        old.stop()
+        assert _FakeWatcher.is_active("replaced")
+        _FakeWatcher.cancel(tmp_path, "replaced")
+        assert replacement._stop_event.is_set()
+    finally:
+        replacement.stop()

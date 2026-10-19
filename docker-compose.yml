@@ -1,0 +1,111 @@
+# Stack: ember_web / ember_admin -> ember_api -> armory / garrison / treasury.
+# Start:  docker compose up -d --build
+# Needs a root .env with INTERNAL_API_TOKEN (see .env.example). Per-app
+# secrets stay in apps/<app>/.env and are loaded when the file exists.
+# Container-only configs live in docker/configs and are mounted over each
+# app's configs/ file; the apps' own configs stay untouched.
+
+name: citadel
+
+x-internal-token: &internal_token
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?set INTERNAL_API_TOKEN in .env}
+
+services:
+  armory:
+    build: ./apps/armory
+    restart: unless-stopped
+    env_file:
+      - path: ./apps/armory/.env
+        required: false
+    environment:
+      <<: *internal_token
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8010"
+      DB_GATEWAY_URL: http://treasury:8071
+    volumes:
+      - ./docker/configs/armory/extensions.json:/app/configs/config_extensions.json:ro
+      - armory_data:/app/.data
+      # server_manager (Docker apps list/start/stop/logs) talks to the host daemon.
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on: [treasury]
+    networks: [core]
+
+  garrison:
+    build: ./apps/garrison
+    restart: unless-stopped
+    env_file:
+      - path: ./apps/garrison/.env
+        required: false
+    environment:
+      <<: *internal_token
+      AI_AGENT_HOST: 0.0.0.0
+      AI_AGENT_ADVERTISE_URL: http://garrison
+      MCP_SERVER_URL: http://armory:8010/mcp
+    volumes:
+      - ./docker/configs/garrison/servers.json:/app/configs/config_servers.json:ro
+      - agent_data:/app/.data
+    depends_on: [armory]
+    networks: [core]
+
+  treasury:
+    build: ./apps/treasury
+    restart: unless-stopped
+    env_file:
+      - path: ./apps/treasury/.env
+        required: false
+    environment:
+      <<: *internal_token
+      DB_GATEWAY_PORT: "8071"
+    volumes:
+      - ./docker/configs/treasury/app.json:/app/configs/config_app.json:ro
+      - ./docker/configs/treasury/connections.json:/app/configs/config_connections.json:ro
+      - treasury_data:/app/data
+    networks: [core]
+
+  ember_api:
+    build: ./apps/Ember/ember_api
+    restart: unless-stopped
+    env_file:
+      - path: ./apps/Ember/ember_api/.env
+        required: false
+    environment:
+      <<: *internal_token
+      EMBER_API_HOST: 0.0.0.0
+    volumes:
+      - ./docker/configs/ember_api/app.json:/app/configs/config_app.json:ro
+      # ember_api reads and writes its secrets (EMBER_SECRETS_KEY) in its own .env file.
+      - ./apps/Ember/ember_api/.env:/app/.env
+      - ember_api_data:/app/data
+      - agent_data:/agent_data:ro
+    depends_on: [armory, garrison, treasury]
+    networks: [core]
+
+  ember_web:
+    build: ./apps/Ember/ember_web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on: [ember_api]
+    networks: [core]
+
+  ember_admin:
+    build:
+      context: ./apps/Ember
+      dockerfile: ember_admin/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5176:80"
+    depends_on: [ember_api]
+    networks: [core]
+
+networks:
+  core:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  armory_data:
+  agent_data:
+  treasury_data:
+  ember_api_data:

@@ -1,0 +1,35 @@
+{
+  "server": {
+    "enabled": true
+  },
+  "gen": {
+    "enabled": true
+  },
+  "web": {
+    "enabled": true
+  },
+  "scrape": {
+    "enabled": true
+  },
+  "usage": {
+    "enabled": true
+  },
+  "vault": {
+    "enabled": true
+  },
+  "repo": {
+    "enabled": true
+  },
+  "data": {
+    "enabled": true
+  },
+  "email": {
+    "enabled": true
+  },
+  "memory": {
+    "enabled": true
+  },
+  "ticket": {
+    "enabled": true
+  }
+}

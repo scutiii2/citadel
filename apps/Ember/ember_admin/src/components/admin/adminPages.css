@@ -1,0 +1,13 @@
+/* Page hierarchy for the administration workspace; controls share admin.css. */
+
+
+.page .admin-info { display: flex; gap: 12px; align-items: center; padding: 15px 18px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.page .admin-info h3 { margin: 0; font-size: 0.95em; }
+.page .admin-info p { margin: 4px 0 0; color: var(--muted); font-size: 0.85em; }
+.page .admin-info > svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--warning); }
+.page .admin-info > a { margin-left: auto; white-space: nowrap; text-decoration: none; }
+@media (max-width: 767px) {
+
+  .page .admin-info { flex-wrap: wrap; }
+  .page .admin-info > a { margin-left: 32px; }
+}

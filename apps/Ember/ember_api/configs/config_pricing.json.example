@@ -1,0 +1,8 @@
+{
+  "currency": "USD",
+  "models": {
+    "claude-haiku-5-5": { "input": 0.0, "output": 0.0 },
+    "claude-sonnet-5-5": { "input": 0.0, "output": 0.0 },
+    "claude-opus-5-5": { "input": 0.0, "output": 0.0 }
+  }
+}

@@ -1,0 +1,24 @@
+<script setup lang="ts">
+import { computed, watch } from "vue";
+import { RouterView, useRoute, useRouter } from "vue-router";
+import { ADMIN_SECTIONS } from "../router/pages";
+import { useAuthStore } from "../stores/auth";
+import "../components/admin/adminPages.css";
+
+const auth = useAuthStore();
+const route = useRoute();
+const router = useRouter();
+const sections = computed(() => ADMIN_SECTIONS.filter((s) => Array.isArray(s.permission) ? s.permission.some(auth.hasPermission) : auth.hasPermission(s.permission)));
+// Editing a held role may remove access to the page currently open.
+watch(sections, (now) => {
+  if (!now.some((s) => s.to === route.path)) void router.replace(now.length ? '/overview' : '/');
+});
+</script>
+
+<template>
+  <section class="admin-workspace"><RouterView /></section>
+</template>
+
+<style scoped>
+.admin-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; }
+</style>

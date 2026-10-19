@@ -1,0 +1,21 @@
+{
+  "label": "Triage Assistant",
+  "port": 9111,
+  "plan_tool": false,
+  "enabled": true,
+  "entry": false,
+  "llm": {
+    "provider": "laya",
+    "gateway": "local",
+    "model": "convaiinnovations/laya"
+  },
+  "persona": "",
+  "focus": "Answers typed questions about a short text (at most 4000 characters) with a local model. Send the question as JSON: {\"text\": \"...\", \"questions\": {\"id\": {\"type\": \"choice|score|noul\", \"instructions\": \"...\", \"criteria\": ...}}}. choice criteria = {option: description}; score criteria = ordered list of level descriptions, lowest first; noul (yes/no) criteria optional {\"false\": \"...\", \"true\": \"...\"}. Returns JSON with an answer, answer_confidence and an uncertain flag per question; treat uncertain answers as provisional. Does not generate text, fetch data or call tools.",
+  "tools": {
+    "allow": [],
+    "deny": [
+      "*"
+    ]
+  },
+  "orchestrator": false
+}

@@ -1,0 +1,47 @@
+/* Shared page geometry and typography for Ember Web and Ember Admin. */
+.page-column {
+  width: 100%;
+  max-width: 1060px;
+  margin-inline: auto;
+  padding: 24px 32px 40px;
+}
+.page-title {
+  margin: 0 0 6px;
+  font: 600 1.2rem/1.35 var(--sans);
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+.page-description {
+  margin: 0 0 16px;
+  font: 400 0.9rem/1.55 var(--sans);
+  letter-spacing: normal;
+  color: var(--muted);
+}
+.page-search {
+  display: flex; align-items: center; gap: 10px;
+  margin: 16px 0; padding: 9px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg);
+}
+.page-search svg { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
+.info-page .page-search input[type="search"] { width: 100%; min-width: 0; padding: 0; border: none; border-radius: 0; background: transparent; font: 400 0.9rem/1.55 var(--sans); }
+.search-count { color: var(--muted); font-size: 0.85em; margin: 0 0 12px; }
+@media (max-width: 767px) { .page-column { padding: 24px 16px 32px; } }
+
+.page-search:focus-within { border-color: var(--accent); }
+.info-page .page-search input[type="search"]:focus-visible { outline: none; }
+
+/* PageLayout owns the view scroll area and the header in both apps. */
+.page.info-page { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; }
+.page-column-wide { max-width: none; }
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.page-head-copy { min-width: 0; overflow-wrap: anywhere; }
+.page-head .page-description { margin-bottom: 0; }
+.page-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0; max-width: 100%; }
+.page-toolbar { margin-bottom: 16px; }
+.page.info-page.page-layout-fill { display: flex; flex-direction: column; overflow: hidden; }
+.page-layout-fill > .page-column { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.page-layout-fill .page-head, .page-layout-fill .page-toolbar { flex-shrink: 0; }
+@media (max-width: 767px) {
+  .page-head { flex-direction: column; align-items: stretch; gap: 12px; }
+  .page-actions { flex-shrink: 1; }
+}

@@ -1,0 +1,281 @@
+from __future__ import annotations
+
+import json
+import re
+
+import httpx
+from fastapi.testclient import TestClient
+
+from tests.conftest import AGENTS, MCP_SERVER_URL, FakeUpstream
+from tests.test_registration import as_admin, new_invite, register
+
+AGENT_PATH = "/api/mcp/agents/claude-agent"
+SERVER_PATH = "/api/mcp/server"
+MCP_HEADERS = {"accept": "application/json, text/event-stream"}
+
+
+def rpc(method: str, params: dict | None = None, request_id: int = 1) -> dict:
+    message: dict = {"jsonrpc": "2.0", "id": request_id, "method": method}
+    if params is not None:
+        message["params"] = params
+    return message
+
+
+def call_tool(name: str, arguments: dict | None = None) -> dict:
+    return rpc("tools/call", {"name": name, "arguments": arguments or {}})
+
+
+def post(client: TestClient, path: str, payload, **headers) -> httpx.Response:
+    return client.post(path, json=payload, headers={**MCP_HEADERS, **headers})
+
+
+# --- entry agent -------------------------------------------------------------------
+
+
+def test_entry_agent_is_returned_without_a_url(client: TestClient) -> None:
+    as_admin(client)
+
+    # conftest's registry marks no entry agent, so the legacy fallback applies.
+    assert client.get("/api/agent").json() == {"id": AGENTS[0]["id"], "label": AGENTS[0]["label"]}
+
+
+def test_entry_agent_requires_login(client: TestClient) -> None:
+    assert client.get("/api/agent").status_code == 401
+
+
+def test_no_entry_agent_is_a_503(client: TestClient, tmp_path) -> None:
+    as_admin(client)
+    (tmp_path / "config_agents.json").write_text('{"agents": []}', encoding="utf-8")
+
+    response = client.get("/api/agent")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "No agent is running"
+
+
+def test_agent_list_has_no_urls_and_flags_the_entry_agent(client: TestClient) -> None:
+    as_admin(client)
+
+    agents = client.get("/api/agents").json()
+
+    assert [a["id"] for a in agents] == [a["id"] for a in AGENTS]
+    assert all(
+        set(a) == {"id", "label", "entry", "orchestrator", "focus", "status", "provider", "gateway", "model", "tiers"}
+        for a in agents
+    )
+    assert {a["status"] for a in agents} == {"running"}
+    assert [a["id"] for a in agents if a["entry"]] == [AGENTS[0]["id"]]
+
+
+def test_agent_list_adds_defined_agents_that_are_not_running(client: TestClient, tmp_path) -> None:
+    as_admin(client)
+    defined = [
+        {"id": AGENTS[0]["id"], "label": AGENTS[0]["label"], "enabled": True},
+        {
+            "id": "stopped", "label": "Stopped", "focus": "Idle.", "enabled": True,
+            "llm": {"tiers": [{"tier": "light", "id": "haiku", "use_for": "quick"}]},
+        },
+        {"id": "switched-off", "label": "Switched off", "enabled": False},
+    ]
+    (tmp_path / "agent_definitions.json").write_text(json.dumps({"defined": defined}), encoding="utf-8")
+
+    agents = client.get("/api/agents").json()
+
+    assert [(a["id"], a["status"]) for a in agents][-2:] == [("stopped", "offline"), ("switched-off", "disabled")]
+    stopped = next(a for a in agents if a["id"] == "stopped")
+    assert stopped["focus"] == "Idle."
+    assert stopped["tiers"] == [{"tier": "light", "id": "haiku", "use_for": "quick"}]
+    assert next(a for a in agents if a["id"] == "switched-off")["tiers"] == []
+
+
+def test_agent_list_requires_login(client: TestClient) -> None:
+    assert client.get("/api/agents").status_code == 401
+
+
+def test_agent_list_is_empty_when_none_is_running(client: TestClient, tmp_path) -> None:
+    as_admin(client)
+    (tmp_path / "config_agents.json").write_text('{"agents": []}', encoding="utf-8")
+
+    assert client.get("/api/agents").json() == []
+
+
+# --- forwarding -------------------------------------------------------------------
+
+
+def test_initialize_is_forwarded_with_identity_and_session_id(client: TestClient, upstream: FakeUpstream) -> None:
+    as_admin(client)
+
+    response = post(client, AGENT_PATH, rpc("initialize", {}))
+
+    assert response.status_code == 200
+    assert response.headers["mcp-session-id"] == "sess-1"
+    sent = upstream.requests[-1]
+    assert str(sent.url) == AGENTS[0]["url"]
+    assert sent.headers["x-requester-username"] == "root"
+    assert sent.headers["x-requester-email"] == "root@example.com"
+    assert re.fullmatch(r"[0-9a-f]{32}", sent.headers["x-requester-uid"])
+    assert "x-internal-token" not in sent.headers  # none configured
+
+
+def test_browser_cannot_forge_identity_or_leak_its_cookie(client: TestClient, upstream: FakeUpstream) -> None:
+    as_admin(client)
+
+    post(
+        client,
+        AGENT_PATH,
+        rpc("initialize", {}),
+        **{"X-Requester-Username": "someone-else", "X-Requester-Uid": "forged", "X-Internal-Token": "guess", "mcp-session-id": "sess-9"},
+    )
+
+    sent = upstream.requests[-1]
+    assert sent.headers["x-requester-username"] == "root"
+    assert sent.headers["x-requester-uid"] != "forged"
+    assert "x-internal-token" not in sent.headers
+    assert "cookie" not in sent.headers
+    assert sent.headers["mcp-session-id"] == "sess-9"  # MCP headers do pass through
+
+
+def test_internal_token_is_sent_when_configured(client_factory, upstream: FakeUpstream) -> None:
+    client = as_admin(client_factory(internal_token="s3cret-token"))
+
+    post(client, AGENT_PATH, rpc("initialize", {}))
+
+    assert upstream.requests[-1].headers["x-internal-token"] == "s3cret-token"
+
+
+def test_event_stream_response_is_relayed(client: TestClient, upstream: FakeUpstream) -> None:
+    events = [
+        b'event: message\ndata: {"jsonrpc":"2.0","method":"notifications/progress","params":{"message":"tok"}}\n\n',
+        b'event: message\ndata: {"jsonrpc":"2.0","id":1,"result":{"structuredContent":{"response":"hi"}}}\n\n',
+    ]
+
+    async def stream():
+        for event in events:
+            yield event
+
+    upstream.handler = lambda _request: httpx.Response(
+        200, headers={"content-type": "text/event-stream"}, content=stream()
+    )
+    as_admin(client)
+
+    with client.stream(
+        "POST", AGENT_PATH, json=call_tool("status", {}), headers=MCP_HEADERS
+    ) as response:
+        body = b"".join(response.iter_bytes())
+
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert body == b"".join(events)
+    assert json.loads(upstream.requests[-1].content)["params"]["name"] == "status"
+
+
+def test_session_delete_without_content_type_is_forwarded(client: TestClient, upstream: FakeUpstream) -> None:
+    as_admin(client)
+
+    response = client.delete(AGENT_PATH, headers={"mcp-session-id": "sess-1"})
+
+    assert response.status_code == 200
+    assert upstream.requests[-1].method == "DELETE"
+
+
+def test_unreachable_upstream_is_502(client: TestClient, upstream: FakeUpstream) -> None:
+    upstream.unreachable = True
+    as_admin(client)
+
+    assert post(client, AGENT_PATH, rpc("initialize", {})).status_code == 502
+
+
+# --- what's allowed ---------------------------------------------------------------
+
+
+def test_unknown_agent_is_404_and_never_contacted(client: TestClient, upstream: FakeUpstream) -> None:
+    as_admin(client)
+
+    assert post(client, "/api/mcp/agents/not-registered", rpc("initialize", {})).status_code == 404
+    assert upstream.requests == []
+
+
+def test_agent_tool_outside_the_allow_list_is_refused(client: TestClient, upstream: FakeUpstream) -> None:
+    as_admin(client)
+
+    response = post(client, AGENT_PATH, call_tool("interpret", {"text": "x"}))
+
+    assert response.status_code == 403
+    assert response.json()["error"]["message"] == "Tool not allowed: interpret"
+    assert upstream.requests == []
+
+
+def test_ask_and_cancel_are_refused_turns_run_server_side(client: TestClient, upstream: FakeUpstream) -> None:
+    as_admin(client)
+
+    for tool, arguments in (("ask", {"question": "hi"}), ("cancel", {"request_id": "x"})):
+        response = post(client, AGENT_PATH, call_tool(tool, arguments))
+        assert response.status_code == 403
+        assert response.json()["error"]["message"] == f"Tool not allowed: {tool}"
+    assert upstream.requests == []
+
+
+def test_status_is_forwarded(client: TestClient, upstream: FakeUpstream) -> None:
+    as_admin(client)
+
+    assert post(client, AGENT_PATH, call_tool("status", {})).status_code == 200
+    assert len(upstream.requests) == 1
+
+
+def test_batch_with_one_bad_message_is_refused_whole(client: TestClient, upstream: FakeUpstream) -> None:
+    as_admin(client)
+
+    response = post(client, AGENT_PATH, [rpc("ping"), rpc("resources/list", request_id=2)])
+
+    assert response.status_code == 403
+    assert upstream.requests == []
+
+
+def test_server_allows_tools_and_resources_but_not_prompts(client: TestClient, upstream: FakeUpstream) -> None:
+    as_admin(client)
+
+    assert post(client, SERVER_PATH, rpc("tools/list")).status_code == 200
+    assert post(client, SERVER_PATH, call_tool("disk_usage", {"path": "/"})).status_code == 200
+    assert post(client, SERVER_PATH, rpc("resources/list")).status_code == 200
+    assert post(client, SERVER_PATH, rpc("resources/read", {"uri": "x"})).status_code == 200
+    assert post(client, SERVER_PATH, rpc("prompts/list")).status_code == 403
+    assert {str(r.url) for r in upstream.requests} == {MCP_SERVER_URL}
+    assert len(upstream.requests) == 4
+
+
+def test_malformed_json_is_a_parse_error(client: TestClient) -> None:
+    as_admin(client)
+
+    response = client.post(
+        AGENT_PATH, content=b"{not json", headers={**MCP_HEADERS, "content-type": "application/json"}
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == -32700
+
+
+def test_oversized_body_is_413(client: TestClient, upstream: FakeUpstream) -> None:
+    as_admin(client)
+
+    response = post(client, AGENT_PATH, call_tool("status", {"pad": "x" * 1_100_000}))
+
+    assert response.status_code == 413
+    assert upstream.requests == []
+
+
+# --- who may use it ---------------------------------------------------------------
+
+
+def test_proxy_requires_login(client: TestClient, upstream: FakeUpstream) -> None:
+    assert post(client, AGENT_PATH, rpc("initialize", {})).status_code == 401
+    assert client.get(SERVER_PATH).status_code == 401
+    assert upstream.requests == []
+
+
+def test_unverified_account_cannot_use_the_proxy(client: TestClient, upstream: FakeUpstream) -> None:
+    register(client, new_invite(client))  # logged in, email not verified
+
+    response = post(client, AGENT_PATH, rpc("initialize", {}))
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Email not verified"
+    assert upstream.requests == []

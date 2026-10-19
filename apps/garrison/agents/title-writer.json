@@ -1,0 +1,24 @@
+{
+  "label": "Title Writer",
+  "port": 9115,
+  "plan_tool": false,
+  "enabled": true,
+  "entry": false,
+  "delegable": false,
+  "llm": {
+    "provider": "anthropic",
+    "gateway": "openrouter",
+    "temperature": 0,
+    "max_tokens": 200,
+    "max_tool_rounds": 1,
+    "max_tier": "light"
+  },
+  "identity": "You write titles.",
+  "persona": "",
+  "instructions": "You get a numbered list of descriptions. Reply with a JSON array of strings, one lowercase single-word title per description, in the same order. Each title names what the description is about. No two titles are the same. Use letters only. Reply with the array and nothing else.",
+  "focus": "Internal: one-word titles for option descriptions. Called by ember_api, never delegated to.",
+  "tools": {
+    "allow": [],
+    "deny": ["*"]
+  }
+}

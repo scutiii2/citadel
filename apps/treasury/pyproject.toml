@@ -1,0 +1,31 @@
+[project]
+name = "db-gateway"
+description = "Database gateway: named instances that share cached connections to SQLite, SQL and Firestore behind an HTTP API"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "aiosqlite>=0.20",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+postgres = ["asyncpg>=0.29"]
+firestore = ["google-cloud-firestore>=2.16"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "httpx>=0.27"]
+
+[project.scripts]
+db-gateway = "src.run:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
