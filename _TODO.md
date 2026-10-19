@@ -144,3 +144,20 @@ See `docs/superpowers/plans/2026-10-11-game-host.md` for deployment setup.
 - Follow the `ember-frontend-design` and `ember-feature-scaffold` skills; any new `ember_api` route proxies to the gateway behind a permission.
 
 **Revisit when**: user wants it built. Brainstorm the design first.
+
+
+## Full cross-provider gateway fallback (added 2026-10-19)
+
+**Context**: An agent's gateway list (primary plus `llm.fallback_gateways`) is limited to one provider. `AgentForm.vue` shows only the selected provider's gateways and resets the list when the provider changes. In garrison, `fallback_gateways` entries accept only `gateway` and `model` (`apps/garrison/src/agents/agent_spec.py`), and failover lives inside each provider module (`openai_provider.py`, `anthropic_provider.py`), which each read only their own gateway files. Anthropic and OpenAI use different message and tool-call formats, so a mid-turn switch needs the history converted.
+
+**Plan**:
+- **Spec**: add an optional `provider` to each fallback entry (default: the agent's provider). Validate it in `agent_spec.py`, `agent_config.py` and `agent_store.py`.
+- **Failover above the providers**: move the retry loop out of the provider modules so a failed round can be retried on another provider. Keep completed tool results; strip gateway-bound thinking/reasoning.
+- **History converter**: convert Anthropic and OpenAI message and tool-call history both ways, including tool results already collected in the turn.
+- **ember_api**: pass the new field through the agent admin routes and validation.
+- **ember_admin**: one gateway list across providers, each row labelled with its provider (`AgentForm.vue`, `AgentGatewayList.vue`); stop resetting rows on provider change.
+- **Docs and tests**: README "Gateway failover" and the `aiagent-scaffold` skill; unit tests for the converter and failover order.
+
+**Cheaper first step**: fail over to the other provider between turns only (the next turn starts fresh on the backup), which skips the converter.
+
+**Revisit when**: user wants it built. Brainstorm the failover design first.
