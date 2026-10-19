@@ -5,16 +5,20 @@
   "model": "gpt-6.1-sol",
   "models": {
     "light": {
-      "id": "gpt-6-luna",
+      "id": "longcat-2.5-preview-free",
       "use_for": "lookups, extraction, short rewrites, simple formatting"
     },
     "standard": {
-      "id": "gpt-6.1-sol",
+      "id": "glm-5.3-flash-free",
       "use_for": "most tasks"
     },
     "heavy": {
-      "id": "gpt-6-astra",
+      "id": "nemotron-3-ultra-free",
       "use_for": "multi-step reasoning, hard code or data analysis"
+    },
+    "extreme": {
+      "id": "deepseek-v4.1-flash-free",
+      "use_for": "the hardest problems: deep research, large-scale refactors, long-horizon planning"
     }
   }
 }
