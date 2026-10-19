@@ -99,6 +99,13 @@ class Settings:
     firecrawl_api_key: str = _env("FIRECRAWL_API_KEY", "")
     firecrawl_api_url: str = _env("FIRECRAWL_API_URL", "")
 
+    # Video downloads stay on armory's listener; only the public origin is configurable.
+    video_store_dir: Path = Path(_env("MCP_VIDEO_STORE_DIR", "specifics/video_downloader/.data/store"))
+    video_log_dir: Path = Path(_env("MCP_VIDEO_LOG_DIR", "specifics/video_downloader/.logs"))
+    video_config_path: Path = Path(_env("MCP_VIDEO_CONFIG_PATH", "specifics/video_downloader/configs/config_video_downloader.json"))
+    video_public_base_url: str = _env("MCP_VIDEO_PUBLIC_BASE_URL", "")
+    video_signing_key: str = _env("MCP_VIDEO_SIGNING_KEY", "")
+
     # Folders the read-only capabilities look at, relative to apps/armory/.
     # usage_report: ai_agent's usage log. vault: the Obsidian vault.
     # repo_reader: the folder that holds the project repos.

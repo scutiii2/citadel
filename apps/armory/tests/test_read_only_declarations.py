@@ -17,6 +17,7 @@ CAPABILITIES = pathlib.Path(__file__).resolve().parents[1] / "src" / "capabiliti
 
 # capability id -> the tools that declare readOnlyHint
 READ_ONLY = {
+    "video": {"tool_vid_probe", "tool_vid_status", "tool_vid_listFiles"},
     "vault": {"tool_vault_search", "tool_vault_listNotes", "tool_vault_readNote"},
     "usage": {"tool_usage_summary"},
     "repo": {"tool_repo_listRepos", "tool_repo_log", "tool_repo_diff", "tool_repo_grep"},
@@ -74,3 +75,7 @@ def test_capabilities_that_change_things_or_spend_credits_never_declare_it(folde
     # email and tickets mix reads and writes: they may declare a read tool, but only one at a time.
     allowed = {"email": 1, "tickets": 2}.get(folder, 0)
     assert source.count("readOnlyHint=True") == allowed, folder
+
+
+def test_video_download_is_not_read_only(loaded):
+    assert "tool_vid_download" in loaded and not declared(loaded["tool_vid_download"])

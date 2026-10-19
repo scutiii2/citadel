@@ -1,0 +1,112 @@
+{
+  "summary": "Probe and download public video or audio on armory, scoped to your authenticated account. Files expire automatically; tools never wait for a download.",
+  "tools": [
+    {
+      "name": "tool_vid_probe",
+      "purpose": "Inspect a public video and its unblocked quality presets",
+      "connection": "Public HTTP(S)",
+      "commands": [
+        "probe"
+      ]
+    },
+    {
+      "name": "tool_vid_download",
+      "purpose": "Queue a download and return a job id immediately",
+      "connection": "Public HTTP(S), local FFmpeg",
+      "commands": [
+        "download"
+      ]
+    },
+    {
+      "name": "tool_vid_status",
+      "purpose": "Poll your job and get a fresh signed link",
+      "connection": "Local queue",
+      "commands": [
+        "status"
+      ]
+    },
+    {
+      "name": "tool_vid_listFiles",
+      "purpose": "List your unexpired files with fresh signed links",
+      "connection": "Local store",
+      "commands": [
+        "files"
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "name": "probe",
+      "tool": "tool_vid_probe",
+      "params": [
+        {
+          "name": "url",
+          "required": true,
+          "default": null,
+          "description": "Full public http(s) link to a single video."
+        }
+      ]
+    },
+    {
+      "name": "download",
+      "tool": "tool_vid_download",
+      "params": [
+        {
+          "name": "url",
+          "required": true,
+          "default": null,
+          "description": "Full public http(s) link to a single video."
+        },
+        {
+          "name": "preset",
+          "required": false,
+          "default": "best",
+          "description": "Unblocked preset from probe."
+        }
+      ]
+    },
+    {
+      "name": "status",
+      "tool": "tool_vid_status",
+      "params": [
+        {
+          "name": "job_id",
+          "required": true,
+          "default": null,
+          "description": "Job id returned by download."
+        }
+      ]
+    },
+    {
+      "name": "files",
+      "tool": "tool_vid_listFiles",
+      "params": []
+    }
+  ],
+  "workflow": [
+    {
+      "sequence": "1",
+      "tool": "tool_vid_probe",
+      "ai_only_step": false,
+      "explanation": "Inspect the URL and choose an unblocked preset."
+    },
+    {
+      "sequence": "2",
+      "tool": "tool_vid_download",
+      "ai_only_step": false,
+      "explanation": "Start the download; retain its job_id."
+    },
+    {
+      "sequence": "3",
+      "tool": "tool_vid_status",
+      "ai_only_step": false,
+      "explanation": "Poll until done or error, then open the signed download_url."
+    },
+    {
+      "sequence": "4",
+      "tool": "tool_vid_listFiles",
+      "ai_only_step": false,
+      "explanation": "Find earlier unexpired files or renew a download link."
+    }
+  ]
+}

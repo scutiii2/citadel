@@ -6,6 +6,7 @@ what it does:
 - `server_manager/` - start/stop/restart/list Docker containers and app logs, with owner email notifications from ServerWatcher (`/server ...`).
 - `generator/` - passwords, passphrases, PINs, TOTP (`/gen ...`).
 - `web_research/` - web search and page read through Tavily (`/web ...`).
+- `video_downloader/` - public video/audio probes, queued downloads, status and signed file links (`/video ...`).
 - `firecrawl/` - scrape and crawl through Firecrawl (`/scrape ...`).
 - `usage_report/` - token usage per agent, model or day (`/usage ...`).
 - `vault/` - read-only notes vault (`/vault ...`).
@@ -356,3 +357,14 @@ so deleting it leaves the resource untouched. No capability in this
 checkout does this today (see `src/resources/README.md` for why there's
 no worked example to point at right now) - this is the pattern to follow
 the first time one needs to.
+
+
+## Process-lifetime engine modules
+
+A capability whose engine owns process-wide library patches or live background
+work can declare `PROCESS_LIFETIME_MODULES = ("utils",)` in its package. The
+loader preserves these direct child packages and their descendants when it
+reloads wrappers, then attaches them to the fresh parent package. Changes to
+retained modules require a server restart. All other capabilities keep the
+default full purge. VideoDownloader uses this to retain one queue/store and
+coherent socket/curl guard identities while its tools are reloaded.
