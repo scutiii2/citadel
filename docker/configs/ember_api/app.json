@@ -9,7 +9,7 @@
   "require_email_verification": false,
   "agents_registry_path": "/agent_data/agent_registry.json",
   "mcp_server_url": "http://armory:8010/mcp",
-  "treasury": {
+  "db_gateway": {
     "url": "http://treasury:8071",
     "instance": "ember",
     "connection": "data"
