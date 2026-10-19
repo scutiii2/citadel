@@ -14,8 +14,8 @@ const plan = usePlanStore()
       <label>File name<input v-model="plan.output.filename" placeholder="merged.pdf" /></label>
       <label>Title<input v-model="plan.output.title" placeholder="Contract package" /></label>
       <label>Author<input v-model="plan.output.author" placeholder="Jane Cruz" /></label>
-      <SegmentedControl v-model="plan.output.image_page_size" label="Image page size" :options="[{value:'A4',label:'A4'},{value:'Letter',label:'Letter'},{value:'match',label:'Match image'}]" />
-      <SegmentedControl v-model="plan.output.image_fit" label="Image fit" :options="[{value:'fit',label:'Fit page'},{value:'fill',label:'Fill page'},{value:'original',label:'Original size'}]" />
+      <SegmentedControl class="wide" v-model="plan.output.image_page_size" label="Image page size" :options="[{value:'A4',label:'A4'},{value:'Letter',label:'Letter'},{value:'match',label:'Match image'}]" />
+      <SegmentedControl class="wide" v-model="plan.output.image_fit" label="Image fit" :options="[{value:'fit',label:'Fit page'},{value:'fill',label:'Fill page'},{value:'original',label:'Original size'}]" />
       <label
         >Image margin (mm)
         <input v-model.number="plan.output.image_margin_mm" type="number" min="0" max="50" step="1" />
@@ -24,3 +24,7 @@ const plan = usePlanStore()
     </div>
   </section>
 </template>
+<style scoped>
+/* Three-option pills are wider than a grid column; give them the whole row so they never scroll. */
+.wide { grid-column: 1 / -1; }
+</style>
