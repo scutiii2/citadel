@@ -72,6 +72,38 @@ describe("CapabilitiesAdminView", () => {
     expect(wrapper.find("[data-name=fresh] [data-test=row-error]").text()).toContain("boom in tool.py");
   });
 
+  it("offers Restart only on a capability that is online", async () => {
+    const wrapper = await mounted();
+    expect(wrapper.find("[data-name=vault] [data-test=restart]").exists()).toBe(true);
+    for (const name of ["fresh", "broken", "gone"]) {
+      expect(wrapper.find(`[data-name=${name}] [data-test=restart]`).exists()).toBe(false);
+    }
+  });
+
+  it("restarts by loading the capability again and waits for the server", async () => {
+    let answer: (value: CapabilityStatus) => void = () => {};
+    const set = vi.spyOn(capabilitiesAdminClient, "setOnline").mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    const wrapper = await mounted();
+    const restart = wrapper.get("[data-name=vault] [data-test=restart]");
+
+    await restart.trigger("click");
+    expect(set).toHaveBeenCalledWith("vault", true);
+    expect((restart.element as HTMLButtonElement).disabled).toBe(true); // pending
+    answer(cap({}));
+    await flushPromises();
+    expect((restart.element as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows the error when a restart fails to load", async () => {
+    vi.spyOn(capabilitiesAdminClient, "setOnline").mockRejectedValue(new Error("boom in tool.py"));
+    const wrapper = await mounted();
+
+    await wrapper.get("[data-name=vault] [data-test=restart]").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get("[data-name=vault] [data-test=row-error]").text()).toContain("boom in tool.py");
+  });
+
   it("refresh reloads the list", async () => {
     const refresh = vi.spyOn(capabilitiesAdminClient, "refresh").mockResolvedValue([cap({}), cap({ name: "newest", label: "Newest", enabled: false, loaded: false })]);
     const wrapper = await mounted();

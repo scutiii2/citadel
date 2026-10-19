@@ -109,7 +109,7 @@ onMounted(load);
 </script>
 
 <template>
-  <PageLayout class="info-content capabilities-admin" title="Capabilities" description="Offline hides a capability's tools from every client. Going online loads its code from disk again, so edit while it is offline. Refresh finds capability folders added while mcp_server runs; they start offline.">
+  <PageLayout class="info-content capabilities-admin" title="Capabilities" description="Offline hides a capability's tools from every client. Going online, or Restart on an online one, loads its code from disk again. Refresh finds capability folders added while mcp_server runs; they start offline.">
     <template v-if="!loading" #toolbar><label class="page-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg><input v-model="query" type="search" aria-label="Search capabilities" placeholder="Search capabilities or tools" /></label>
       <p class="search-count" role="status">{{ rows.length }} of {{ capabilities.length }} capabilities</p></template>
     <template #actions><button type="button" class="refresh" data-test="refresh" :disabled="refreshing" @click="refresh">
@@ -130,12 +130,26 @@ onMounted(load);
               <code>{{ c.name }}</code>
               <span class="state" :class="state"><span aria-hidden="true">{{ state === 'online' ? '●' : '○' }}</span> {{ STATE_LABELS[state] }}</span>
             </button>
-            <ToggleSwitch
-              :checked="c.enabled"
-              :disabled="pending.has(c.name) || (c.missing && !c.enabled)"
-              :aria-label="`${c.label ?? c.name} online`"
-              @change="onToggle(c, $event)"
-            />
+            <div class="controls">
+              <button
+                v-if="c.enabled && !c.missing"
+                type="button"
+                class="restart"
+                data-test="restart"
+                :disabled="pending.has(c.name)"
+                :aria-label="`Restart ${c.label ?? c.name}`"
+                title="Restart: load its code from disk again"
+                @click="setOnline(c, true)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5" /></svg>
+              </button>
+              <ToggleSwitch
+                :checked="c.enabled"
+                :disabled="pending.has(c.name) || (c.missing && !c.enabled)"
+                :aria-label="`${c.label ?? c.name} online`"
+                @change="onToggle(c, $event)"
+              />
+            </div>
           </div>
           <p class="tools">{{ c.tools.length }} tool{{ c.tools.length === 1 ? "" : "s" }}<template v-if="!c.loaded"> · not loaded yet</template></p>
           <pre v-if="c.load_error" class="load-error" data-test="load-error">{{ c.load_error }}</pre>
@@ -182,6 +196,24 @@ onMounted(load);
 .open-card { border: none; padding: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
 .open-card::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius-lg); }
 .top :deep(.toggle) { position: relative; z-index: 1; flex-shrink: 0; }
+.controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.restart {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.restart svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.restart:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.restart:disabled { opacity: 0.6; cursor: default; }
+.restart:disabled svg { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 button.open-card:focus-visible { outline: none; }
 .open-card:focus-visible::after { box-shadow: inset 0 0 0 2px var(--accent); }
 .who strong { flex-basis: 100%; }
