@@ -114,7 +114,7 @@ onMounted(loadInvites);
       <p v-if="createError" class="error">{{ createError }}</p>
 
       <div v-if="created" class="created">
-        <p>
+        <p v-if="!created.email_sent">
           Invite code (shown only now, valid 7 days, works once):
           <code class="code">{{ created.code }}</code>
           <CopyButton :text="created.code" label="Copy invite code" />

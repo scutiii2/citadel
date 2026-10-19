@@ -99,6 +99,8 @@ describe("InvitesPanel", () => {
     await flushPromises();
 
     expect(client.createInvite).toHaveBeenCalledWith("a@b.co", "email");
+    expect(wrapper.get(".created").text()).toContain("Emailed to");
+    expect(wrapper.get(".created").text()).not.toContain("ABCD-1234");
   });
 
   it("switches emailing off when the address is cleared", async () => {
