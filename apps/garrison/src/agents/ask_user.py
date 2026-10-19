@@ -24,6 +24,7 @@ DESCRIPTION_MAX = 200
 def tool_description() -> str:
     return (
         "Ask the user one to four multiple-choice questions and wait for their answers. "
+        "Never use it to answer questions the user gave you: answer those yourself or delegate them. "
         "Use it sparingly: only when the request is ambiguous or a choice is really the user's to make, "
         "never to confirm routine steps or to ask what you can work out yourself. "
         "Give 2 to 4 distinct options per question, put your recommended option first, and keep labels short. "
