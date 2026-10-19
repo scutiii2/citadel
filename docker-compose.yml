@@ -71,6 +71,8 @@ services:
       EMBER_API_HOST: 0.0.0.0
     volumes:
       - ./docker/configs/ember_api/app.json:/app/configs/config_app.json:ro
+      # ember_api reads and writes its secrets (EMBER_SECRETS_KEY) in its own .env file.
+      - ./apps/Ember/ember_api/.env:/app/.env
       - ember_api_data:/app/data
       - agent_data:/agent_data:ro
     depends_on: [armory, garrison, treasury]
