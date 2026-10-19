@@ -30,6 +30,10 @@ DEPLOY_PATHS = [
     "apps/Ember",
     "docs/deployment.md",
 ]
+# Left out of live. Python tests/ folders are not built into any image; e2e/ and src/*.test.ts stay
+# because the web apps' tsconfig includes them. ember_cli is not a compose service.
+EXCLUDE_DIRS = {"tests"}
+EXCLUDE_PREFIXES = ("apps/Ember/ember_cli/",)
 BRANCH = "live"
 REMOTE = "origin"
 ROOT = Path(__file__).resolve().parent.parent
@@ -57,7 +61,15 @@ def remote_live_tip() -> str | None:
 
 def build_tree(source: str) -> str:
     """Write a tree holding only DEPLOY_PATHS from `source`, using a throwaway index."""
-    listing = git("ls-tree", "-r", source, "--", *DEPLOY_PATHS)
+    kept = [
+        line
+        for line in git("ls-tree", "-r", source, "--", *DEPLOY_PATHS).splitlines()
+        if not (
+            line.split("\t", 1)[1].startswith(EXCLUDE_PREFIXES)
+            or EXCLUDE_DIRS.intersection(line.split("\t", 1)[1].split("/")[:-1])
+        )
+    ]
+    listing = "\n".join(kept)
     if not listing:
         sys.exit(f"None of the deploy paths exist in {source}.")
     present = {line.split("\t", 1)[1] for line in listing.splitlines()}
