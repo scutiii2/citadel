@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.test-tmp/
 .venv_ember_api/
 
 # Real config/secrets/runtime data stay local; only .example twins and

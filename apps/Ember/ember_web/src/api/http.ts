@@ -2,10 +2,12 @@
 
 export class ApiError extends Error {
   readonly status: number;
+  readonly code?: string;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -64,7 +66,8 @@ export async function apiRequest<T>(
       unauthorizedHandler?.();
       throw new UnauthorizedError(401, message);
     }
-    throw new ApiError(response.status, message);
+    const code = (data as { error?: { code?: unknown } } | null)?.error?.code;
+    throw new ApiError(response.status, message, typeof code === "string" ? code : undefined);
   }
   return data as T;
 }

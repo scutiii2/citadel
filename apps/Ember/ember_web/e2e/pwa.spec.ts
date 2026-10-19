@@ -42,8 +42,13 @@ for (const width of [375, 768]) {
     await logIn(page);
     if (width < 768) await page.getByRole('link', { name: 'Overview', exact: true }).click();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await expect(page.getByRole('link', { name: /^Settings\b/ }).last()).toBeVisible();
-    await page.getByRole('link', { name: /^Settings\b/ }).last().click();
+    if (width < 768) {
+      await expect(page.getByRole('link', { name: /^Settings\b/ }).last()).toBeVisible();
+      await page.getByRole('link', { name: /^Settings\b/ }).last().click();
+    } else {
+      await page.getByRole('button', { name: /account menu$/ }).click();
+      await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
+    }
     await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.getByRole('searchbox', { name: 'Search settings' }).fill('theme');

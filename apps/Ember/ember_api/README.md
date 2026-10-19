@@ -1,5 +1,45 @@
 # ember_api
 
+## Native capability workspace API
+
+PDF/video workspaces proxy only fixed Armory routes (`/pdf/ui`, `/video/ui`,
+and the existing `/upload/pdf`). Armory must be restarted after installing
+the HTTP adapters, with the shared internal token configured and `pdf` / `video`
+online. The authenticated account must add the native capability from the
+Supermarket. Legacy standalone extension subscriptions do not grant native access.
+Every route requires `tools.execute`; file uploads additionally require
+`files.upload`, and preview/download routes additionally require `files.download`.
+No new permissions or role grants are introduced.
+
+| Method | Route | Behavior |
+| --- | --- | --- |
+| GET | `/api/pdf-merger/files` | List this account's unexpired source/output files. |
+| POST | `/api/pdf-merger/files` | JSON `{filename, data}` (base64), 15 MiB per file; return original file metadata. |
+| DELETE | `/api/pdf-merger/files/{id}` | Delete an owned file (204). |
+| GET | `/api/pdf-merger/files/{id}/content` | Owned source bytes for PDF/image thumbnails; no-store, sandboxed. |
+| POST | `/api/pdf-merger/merge` | Ordered `{segments, output}` plan; return `{job_id}` immediately. Ranges and individual page ordering are expressed by segments. |
+| GET | `/api/pdf-merger/jobs/{id}` | `{job_id,state,done,total,result,error}`; queued/progress/done/error. |
+| POST | `/api/pdf-merger/jobs/{id}/cancel` | Cooperatively cancel an owned merge. |
+| GET | `/api/pdf-merger/files/{id}/download` | Check ownership, then stream a fresh signed Armory download. |
+| POST | `/api/video-downloader/probe` | `{url}` through Armory UrlPolicy; metadata and presets. |
+| POST | `/api/video-downloader/downloads` | `{url,preset}`; return `{job_id}` immediately. |
+| GET | `/api/video-downloader/jobs/{id}` | Owned JobStatus with progress, file or structured error. |
+| POST | `/api/video-downloader/jobs/{id}/cancel` | Cooperatively cancel an owned download. |
+| GET | `/api/video-downloader/files` | Owned unexpired media files. |
+| DELETE | `/api/video-downloader/files/{id}` | Delete an owned media file (204). |
+| GET | `/api/video-downloader/files/{id}/download` | Check ownership, then stream a fresh signed Armory download (Range supported). |
+
+Identity always comes from the session's stable UID, never browser headers or
+request bodies. Armory enforces file/job ownership, quotas, expiry, merge limits,
+and video URL/extractor policy. Errors retain readable messages and stable codes;
+missing and other-account objects have the same unavailable response.
+Download origins are fixed server-side; redirects and malformed upstream links
+are refused. Upstream signatures/origins are rewritten to local authenticated
+links. Preview/download responses are not cached. Mutations audit IDs only.
+Default file TTL is six hours; expired files must be uploaded/downloaded again.
+Jobs remain owned by Armory after browser polling stops and do not survive its
+process restart. Cancellation is cooperative and may finish after the response.
+
 ## Usage cost estimates
 
 Configure `configs/config_pricing.json` with your model names and separate

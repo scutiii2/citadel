@@ -325,7 +325,7 @@ onBeforeUnmount(() => {
   height: 18px;
   margin-top: -6px;
   border: 2px solid var(--accent);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--surface);
   appearance: none;
 }
@@ -333,7 +333,7 @@ onBeforeUnmount(() => {
   width: 14px;
   height: 14px;
   border: 2px solid var(--accent);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--surface);
 }
 .field input[type="range"]:focus-visible { outline: none; }

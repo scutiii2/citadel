@@ -10,7 +10,7 @@ const item = (page: import("@playwright/test").Page, name: string) =>
 test("a built-in capability turned off moves to the Supermarket and can be added back", async ({ page }) => {
   const api = await installFakeApi(page, { admin: true });
   await logIn(page);
-  await page.getByRole("link", { name: "Capabilities", exact: true }).click();
+  await page.goto("/capabilities");
 
   const pdf = card(page, "PDF files");
   await expect(pdf.getByRole("switch")).toBeChecked();
@@ -94,7 +94,7 @@ test("a private extension turned off on Capabilities stays in the Supermarket an
     tools: ["search"],
   });
   await logIn(page);
-  await page.getByRole("link", { name: "Capabilities", exact: true }).click();
+  await page.goto("/capabilities");
 
   await card(page, "My notes").locator("label.toggle").click();
   await expect(card(page, "My notes")).toHaveCount(0);

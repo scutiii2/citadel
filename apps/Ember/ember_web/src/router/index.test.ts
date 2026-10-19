@@ -4,8 +4,13 @@ import { authClient, type Account } from "../api/AuthClient";
 import { UnauthorizedError } from "../api/http";
 import { router } from "./index";
 import { NAV_PAGES, visiblePages } from "./pages";
+import { accountCapabilitiesClient } from "../api/AccountCapabilitiesClient";
+import { commandsClient } from "../api/CommandsClient";
+import { useAuthStore } from "../stores/auth";
 
 vi.mock("../api/AuthClient", () => ({ authClient: { me: vi.fn() } }));
+vi.mock("../api/AccountCapabilitiesClient", () => ({ accountCapabilitiesClient: { get: vi.fn() } }));
+vi.mock("../api/CommandsClient", () => ({ commandsClient: { capabilities: vi.fn() } }));
 
 const me = vi.mocked(authClient.me);
 
@@ -147,6 +152,62 @@ describe("email verification", () => {
 });
 
 const ACCOUNT_WITH_TOOLS = { ...ACCOUNT, permissions: ["chat.use", "tools.view", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] };
+
+describe("native capability pages", () => {
+  beforeEach(() => {
+    vi.mocked(accountCapabilitiesClient.get).mockResolvedValue({ capabilities: ["pdf", "video"], extensions: [], disabled_tools: [] });
+    vi.mocked(commandsClient.capabilities).mockResolvedValue([
+      { name: "pdf", label: "PDF merger", enabled: true, tools: [], resources: [] },
+      { name: "video", label: "Video downloader", enabled: true, tools: [], resources: [] },
+    ]);
+  });
+  it.each([["pdf_merger", "pdf-merger"], ["video_downloader", "video-downloader"]])("opens %s as a dedicated route", async (path, name) => {
+    me.mockResolvedValue(ACCOUNT_WITH_TOOLS);
+    await router.push(`/capabilities/${path}`);
+    expect(router.currentRoute.value.name).toBe(name);
+    expect(router.currentRoute.value.meta.permission).toBe("tools.execute");
+    expect(NAV_PAGES.some((p) => p.to === `/capabilities/${path}`)).toBe(false);
+  });
+  it("keeps unknown capability pages generic", () => {
+    expect(router.resolve("/capabilities/other").name).toBe("capability-page");
+    expect(router.resolve("/capabilities/supermarket").name).toBe("supermarket");
+  });
+  it("allows execution without requiring the separate discovery permission", async () => {
+    me.mockResolvedValue(ACCOUNT);
+    await router.push("/capabilities/pdf_merger");
+    expect(router.currentRoute.value.name).toBe("pdf-merger");
+    expect(commandsClient.capabilities).not.toHaveBeenCalled();
+  });
+  it("ignores capability answers received after the account changes", async () => {
+    me.mockResolvedValue(ACCOUNT_WITH_TOOLS);
+    let resolve!: (value: Awaited<ReturnType<typeof accountCapabilitiesClient.get>>) => void;
+    vi.mocked(accountCapabilitiesClient.get).mockReturnValue(new Promise((done) => { resolve = done; }));
+    const navigation = router.push("/capabilities/pdf_merger");
+    await vi.waitFor(() => expect(accountCapabilitiesClient.get).toHaveBeenCalled());
+    useAuthStore().account = { ...ACCOUNT_WITH_TOOLS, id: 2 };
+    resolve({ capabilities: ["pdf"], extensions: [], disabled_tools: [] });
+    await navigation;
+    expect(router.currentRoute.value.name).toBe("chat");
+  });
+  it("refuses a capability the account has not added", async () => {
+    me.mockResolvedValue(ACCOUNT_WITH_TOOLS);
+    vi.mocked(accountCapabilitiesClient.get).mockResolvedValue({capabilities: [], extensions: [], disabled_tools: []});
+    await router.push("/capabilities/pdf_merger");
+    expect(router.currentRoute.value.name).toBe("chat");
+  });
+  it("refuses an offline capability", async () => {
+    me.mockResolvedValue(ACCOUNT_WITH_TOOLS);
+    vi.mocked(commandsClient.capabilities).mockResolvedValue([]);
+    await router.push("/capabilities/video_downloader");
+    expect(router.currentRoute.value.name).toBe("chat");
+  });
+  it("uses the existing permission redirect", async () => {
+    me.mockResolvedValue({...ACCOUNT, permissions: ["chat.use"]});
+    await router.push("/capabilities/pdf_merger");
+    expect(router.currentRoute.value.name).toBe("chat");
+    expect(accountCapabilitiesClient.get).not.toHaveBeenCalled();
+  });
+});
 
 describe("the merged Capabilities page", () => {
   it("sends the old Tools address to Capabilities, keeping the filter", async () => {

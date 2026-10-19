@@ -18,6 +18,7 @@ import { matchesUserExtension, userExtensionSummary } from "../utils/userExtensi
 import { errorMessage } from "../utils/errors";
 import { formatToolResult } from "../utils/toolResultFormat";
 import { safeWebUrl } from "../utils/webUrl";
+import { dedicatedCapabilityPage } from "../router/capabilityPages";
 
 /** Account capabilities and extensions, shown as compact cards. Their modals
  * provide a tool browser, execution panel and resource reader. */
@@ -115,27 +116,26 @@ function capabilitySummary(capability: CapabilityInfo, tools: number): string {
   return capability.enabled ? countText(tools, resourcesOf(capability).length) : "off";
 }
 
-/** Capabilities that have a dedicated app page instead of a gui/page.json one. */
-const APP_PAGES: Record<string, { to: string; permission: string }> = {
-  notes: { to: "/notes", permission: "chat.use" },
-  memory: { to: "/memory", permission: "chat.use" },
-  gen: { to: "/generator", permission: "tools.execute" },
-  ticket: { to: "/tickets", permission: "tickets.create" },
-};
-
 /** Where a capability's Open button leads: its own page, while it is on. */
 function capabilityPage(capability: CapabilityInfo): SectionPage | null {
   if (!capability.enabled) return null;
-  const appPage = APP_PAGES[capability.name];
+  const appPage = dedicatedCapabilityPage(capability.name);
   if (appPage) return auth.hasPermission(appPage.permission) ? { to: appPage.to, external: false } : null;
   return capability.has_gui
     ? { to: `/capabilities/${encodeURIComponent(capability.name)}`, external: false }
     : null;
 }
 
-/** Where an extension's Open button leads: its own web UI when it names a
- * usable one (a new tab), else nowhere (its tools are listed in its card). */
+/** Native workspaces replace their old extension UIs; other extensions keep
+ * their validated external web URL. */
 function extensionPage(e: ExtensionInfo): SectionPage | null {
+  const page = dedicatedCapabilityPage(e.id);
+  if (page?.route) {
+    // Native API access follows the built-in capability, including links from old extension cards.
+    const enabled = capabilities.value.some((capability) => capability.enabled &&
+      account.capabilities.includes(capability.name) && dedicatedCapabilityPage(capability.name) === page);
+    return enabled && auth.hasPermission(page.permission) ? { to: page.to, external: false } : null;
+  }
   const web = safeWebUrl(e.web_url);
   return web ? { to: web, external: true, label: "Open app" } : null;
 }

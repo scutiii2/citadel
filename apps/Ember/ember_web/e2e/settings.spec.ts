@@ -9,8 +9,9 @@ test("search, change and reset settings on the Settings page", async ({ page }) 
   const api = await installFakeApi(page);
   await logIn(page);
 
-  // The gear in the nav rail opens the page; a member sees no Administration group.
-  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  // Settings lives in the account menu; a member sees no Administration group.
+  await page.getByRole("button", { name: /account menu$/ }).click();
+  await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByRole("heading", { name: "Settings", level: 2 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Chat", level: 3 })).toBeVisible();

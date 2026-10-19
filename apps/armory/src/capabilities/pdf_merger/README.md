@@ -55,6 +55,26 @@ Default tuning keeps files for 6 hours, sweeps every 10 minutes, and signs downl
 
 ## Runtime, storage and downloads
 
+Ember's PDF screen uses fixed internal HTTP adapters on the existing listener.
+Every `/pdf/ui` request requires `X-Internal-Token` and `X-Requester-Uid`;
+the token never bypasses ownership. Disabled or absent capabilities return 503
+before the engine is initialized. These routes add no MCP schemas.
+
+| Method and path | Request / response |
+| --- | --- |
+| `GET /pdf/ui/files` | Array of native `FileInfo` objects with fresh `download_url` links. |
+| `DELETE /pdf/ui/files/{file_id}` | Delete the account's file; returns `{"ok": true}`. |
+| `GET /pdf/ui/files/{file_id}/content` | Stream owned PDF/image bytes for preview, with sandbox CSP, nosniff and no-store. |
+| `POST /pdf/ui/merge` | Native `MergePlan` body; returns `{"job_id": "..."}` immediately. |
+| `GET /pdf/ui/jobs/{job_id}` | `{job_id,state,done,total,result,error}`; state is `queued`, `progress`, `done` or `error`; result is native `MergeResult` on completion, error is `{code,message}` on failure, otherwise null. |
+| `POST /pdf/ui/jobs/{job_id}/cancel` | Request cooperative cancellation; returns `{"ok": true}`. Native queue cancellation finishes with `merge_timeout`. |
+
+Uploads continue through `POST /upload/pdf`. UI filenames are plain JSON data;
+only MCP results fence filenames for model consumption. Missing and other-owner
+files/jobs share the same unavailable response. Expected service failures retain
+their native HTTP status and `{error:{code,message}}` body; unexpected failures
+return a sanitized 503. Jobs remain in memory and are lost on restart.
+
 `src/services/pdf_runtime.py` owns one process-wide service on a dedicated event loop. This keeps the file index, quota reservations and job queue on one loop and preserves the service and sweeper across capability reloads. Tool wrappers use `@offload`, so the synchronous wait blocks a worker thread while the engine performs asynchronous work. There is no public job or polling tool.
 
 A merge waits up to the configured deadline and requests cooperative cancellation on timeout. Python worker threads cannot be forcibly killed, so cleanup may finish after the timeout response. A concurrency slot remains occupied until the work actually stops. Shutdown cancels outstanding jobs and waits for cleanup.

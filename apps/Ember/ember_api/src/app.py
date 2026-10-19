@@ -23,6 +23,7 @@ from src.routes import (
     admin,
     agent_admin,
     attachments,
+    capability_files,
     auth,
     chat_folders,
     chats,
@@ -45,6 +46,7 @@ from src.routes import (
 from src.services.agent_directory import AgentDirectory, HttpRegistrySource
 from src.services.agent_gateway import AgentGateway, McpAgentGateway
 from src.services.auth_service import AuthService
+from src.services.capability_files import CapabilityFailure
 from src.services.backup_service import BackupScheduler, DatabaseBackup
 from src.services.migrations import MigrationRunner
 from src.services.chat_service import MAX_CHAT_BYTES
@@ -72,7 +74,7 @@ MAX_REQUEST_BYTES = 16 * MAX_CHAT_BYTES
 DEFAULT_REQUEST_BYTES = 1024 * 1024
 # The routes that take big bodies: chats (history imports, questions with
 # attached text), attachment files and command-form uploads.
-LARGE_BODY_PREFIXES = ("/api/chats", "/api/attachments", "/api/uploads")
+LARGE_BODY_PREFIXES = ("/api/chats", "/api/attachments", "/api/uploads", "/api/pdf-merger/files")
 
 # No read timeout: an MCP event stream stays open for as long as a chat turn
 # (or the session) lasts. Connect/write/pool still fail fast.
@@ -214,6 +216,13 @@ def create_app(
     app.include_router(logs.router)
     app.include_router(traffic_routes.router)
     app.include_router(attachments.router)
+    app.include_router(capability_files.router)
+
+    @app.exception_handler(CapabilityFailure)
+    async def capability_failure(_request: Request, error: CapabilityFailure):
+        return JSONResponse(status_code=error.status, content={
+            "detail": str(error), "error": {"code": error.code, "message": str(error)},
+        })
     app.include_router(config_issues.router)
     app.include_router(tickets_routes.router)
     app.include_router(tickets_routes.admin_router)
