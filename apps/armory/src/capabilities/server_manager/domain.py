@@ -22,7 +22,7 @@ daemon until the first real call does.
 from __future__ import annotations
 
 import docker
-from docker.errors import DockerException, NotFound
+from docker.errors import DockerException, ImageNotFound, NotFound
 
 from src.capabilities.server_manager.contract import (
     AppActionResult,
@@ -61,8 +61,12 @@ def _image_label(container) -> str:
     """The image's own tag if it has one, else its short id - a container
     started from a now-untagged (dangling) image otherwise has no name at
     all to show, which reads as a bug rather than a fact about the image."""
-    tags = container.image.tags
-    return tags[0] if tags else container.image.short_id
+    try:
+        image = container.image
+    except ImageNotFound:
+        # The image record is gone (pruned, or the daemon cannot resolve it): use the name the container was created with.
+        return container.attrs["Config"]["Image"]
+    return image.tags[0] if image.tags else image.short_id
 
 
 def _get_container(client: docker.DockerClient, name: str):

@@ -25,6 +25,8 @@ services:
     volumes:
       - ./docker/configs/armory/extensions.json:/app/configs/config_extensions.json:ro
       - armory_data:/app/.data
+      # server_manager (Docker apps list/start/stop/logs) talks to the host daemon.
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on: [treasury]
     networks: [core]
 

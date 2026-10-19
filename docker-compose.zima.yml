@@ -1,0 +1,11 @@
+# ZimaOS overlay for docker-compose.yml. Opens the two web UIs to the LAN.
+# Needs Docker Compose 2.24+ (for !override).
+# Start:  docker compose -f docker-compose.yml -f docker-compose.zima.yml up -d --build
+
+services:
+  ember_web:
+    ports: !override
+      - "5173:80"
+  ember_admin:
+    ports: !override
+      - "5176:80"
