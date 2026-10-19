@@ -74,6 +74,10 @@ class Settings:
     # that expects a real server-side path gets one.
     # Relative to CWD by default, same convention as every path above.
     uploads_dir: Path = Path(_env("MCP_UPLOADS_DIR", ".data/uploads"))
+    pdf_merger_store_dir: Path = Path(_env("MCP_PDF_MERGER_STORE_DIR", "specifics/pdf_merger/.data/store"))
+    pdf_merger_config_path: Path = Path(_env("MCP_PDF_MERGER_CONFIG_PATH", "specifics/pdf_merger/configs/config_pdf_merger.json"))
+    pdf_merger_public_base_url: str = _env("MCP_PDF_MERGER_PUBLIC_BASE_URL", "")
+    pdf_merger_signing_key: str = _env("PDF_MERGER_SIGNING_KEY", "")
     # Where capability-owned job watchers keep their state
     # records. Relative to CWD, like uploads_dir.
     watchers_dir: Path = Path(_env("MCP_WATCHERS_DIR", ".data/watchers"))

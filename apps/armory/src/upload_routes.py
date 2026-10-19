@@ -24,20 +24,18 @@ from __future__ import annotations
 
 import asyncio
 import hmac
-from urllib.parse import quote, urlsplit, urlunsplit
 
 from uuid import uuid4
 
-import httpx
-
 from starlette.applications import Starlette
 from starlette.requests import Request
+from starlette.formparsers import MultiPartException
+from starlette.exceptions import HTTPException
 from starlette.responses import JSONResponse
 
 from src.config import settings
-from src.services import table_loader, tables
-from src.services.app_config import load_extension_config
-from src.services.identity_context import REQUESTER_USERNAME_HEADER
+from src.services import capability_registry, table_loader, tables
+from src.services.identity_context import REQUESTER_UID_HEADER, REQUESTER_USERNAME_HEADER
 
 # Deliberately tight, not a generic upload endpoint: no built-in tool
 # consumes an uploaded file today. Extend this set only when a new file-shaped param actually
@@ -126,53 +124,63 @@ async def upload_table(request: Request) -> JSONResponse:
 
 
 async def upload_pdf(request: Request) -> JSONResponse:
-    """Store originals in the configured PDFMerger, owned by the tool caller."""
+    """Keep an original PDF/image in the native capability's account store."""
     if not _token_valid(request):
         return JSONResponse({"error": "Invalid or missing internal API token"}, status_code=401)
-    username = request.headers.get(REQUESTER_USERNAME_HEADER, "").strip()
-    if not username:
+    if not request.headers.get(REQUESTER_UID_HEADER, "").strip():
         return JSONResponse({"error": "The requesting account is not identified"}, status_code=400)
-    form = await request.form()
-    upload = form.get("file")
-    if upload is None or not hasattr(upload, "filename"):
-        return JSONResponse({"error": "'file' is required"}, status_code=400)
-    filename = (upload.filename or "").replace("\\", "/").rsplit("/", 1)[-1]
-    if not filename.lower().endswith((".pdf", ".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".gif", ".heic")):
-        return JSONResponse({"error": "Upload a PDF or supported image"}, status_code=400)
-    content = await upload.read(15 * 1024 * 1024 + 1)
-    if len(content) > 15 * 1024 * 1024:
-        return JSONResponse({"error": "The file is larger than 15 MB"}, status_code=413)
     try:
-        config = load_extension_config(settings.extensions_config_path, "pdf_merger")
-        if not config or config.transport != "http" or not config.url or not config.forward_requester:
-            return JSONResponse({"error": "Configure the pdf_merger HTTP extension with requester forwarding"}, status_code=503)
-        headers = httpx.Headers(config.headers)
-        if not headers.get("X-Internal-Token"):
-            return JSONResponse({"error": "Configure PDFMerger's internal API token"}, status_code=503)
-        headers[REQUESTER_USERNAME_HEADER] = username
-        headers["X-Filename"] = quote(filename, safe="")
-        headers["Content-Type"] = "application/octet-stream"
-        url = urlsplit(config.url)
-        endpoint = urlunsplit((url.scheme, url.netloc, url.path.rstrip("/").removesuffix("/mcp") + "/api/files", "", ""))
-        async with httpx.AsyncClient(timeout=120, follow_redirects=False) as client:
-            identity = await client.get(endpoint, headers=headers)
-            if not identity.is_success or any(cookie.name == "pm_session" for cookie in identity.cookies.jar):
-                return JSONResponse({"error": "PDFMerger refused the internal API token"}, status_code=502)
-            response = await client.post(endpoint, content=content, headers=headers)
-        # PDFMerger falls back to a browser session when its token is wrong.
-        # Never hand back an ID that the requesting account's tools cannot own.
-        if any(cookie.name == "pm_session" for cookie in response.cookies.jar):
-            return JSONResponse({"error": "PDFMerger refused the internal API token"}, status_code=502)
-        body = response.json()
-        if response.is_success:
-            if not isinstance(body, dict) or not isinstance(body.get("file_id"), str) or not isinstance(body.get("pages"), int):
-                raise ValueError("Invalid upload response")
-            return JSONResponse(body)
-        message = body.get("error", {}) if isinstance(body, dict) else {}
-        message = message.get("message") if isinstance(message, dict) else message
-        return JSONResponse({"error": message or "PDFMerger refused this file"}, status_code=400 if response.status_code < 500 else 502)
-    except (httpx.HTTPError, ValueError, KeyError, OSError):
-        return JSONResponse({"error": "PDFMerger is unavailable; check its extension configuration"}, status_code=502)
+        enabled = capability_registry.is_enabled("pdf")
+    except KeyError:
+        enabled = False
+    if not enabled:
+        return JSONResponse({"error": "PDF capability is unavailable"}, status_code=503)
+
+    # Offline capabilities must not import their optional processing dependencies.
+    try:
+        from src.capabilities.pdf_merger import domain
+        from src.capabilities.pdf_merger.utils.errors import ErrorCode, MergerError
+    except ImportError:
+        return JSONResponse({"error": "PDF capability is unavailable"}, status_code=503)
+
+    # Count the whole multipart stream before Starlette spools file parts.
+    # Allow 64 KiB for the boundary and headers in addition to the file cap.
+    received = 0
+    original_receive = request.receive
+
+    async def bounded_receive():
+        nonlocal received
+        message = await original_receive()
+        received += len(message.get("body", b""))
+        if received > 15 * 1024 * 1024 + 65536:
+            # MultiPartException makes the parser close every spooled temp file.
+            raise MultiPartException("The upload is larger than 15 MB")
+        return message
+
+    bounded_request = Request(request.scope, receive=bounded_receive)
+    try:
+        async with bounded_request.form(max_files=1, max_fields=0) as form:
+            upload = form.get("file")
+            if upload is None or not hasattr(upload, "filename"):
+                return JSONResponse({"error": "'file' is required"}, status_code=400)
+            filename = (upload.filename or "").replace("\\", "/").rsplit("/", 1)[-1]
+            content = await upload.read(15 * 1024 * 1024 + 1)
+        if len(content) > 15 * 1024 * 1024:
+            return JSONResponse({"error": "The file is larger than 15 MB"}, status_code=413)
+        result = await asyncio.to_thread(domain.upload, filename, content)
+        return JSONResponse(result.model_dump(mode="json"))
+    except (HTTPException, MultiPartException):
+        if received > 15 * 1024 * 1024 + 65536:
+            return JSONResponse({"error": "The upload is larger than 15 MB"}, status_code=413)
+        return JSONResponse({"error": "Invalid file upload"}, status_code=400)
+    except domain.PdfError as error:
+        return JSONResponse({"error": str(error)}, status_code=400)
+    except MergerError as error:
+        if error.code == ErrorCode.INTERNAL:
+            return JSONResponse({"error": "PDF capability is unavailable"}, status_code=503)
+        return JSONResponse({"error": error.message}, status_code=400)
+    except Exception:
+        return JSONResponse({"error": "PDF capability is unavailable"}, status_code=503)
 
 
 def install_upload_routes(app: Starlette) -> None:

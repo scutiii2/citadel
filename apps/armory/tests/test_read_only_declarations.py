@@ -18,6 +18,7 @@ CAPABILITIES = pathlib.Path(__file__).resolve().parents[1] / "src" / "capabiliti
 # capability id -> the tools that declare readOnlyHint
 READ_ONLY = {
     "video": {"tool_vid_probe", "tool_vid_status", "tool_vid_listFiles"},
+    "pdf": {"tool_pdf_inspect", "tool_pdf_listFiles"},
     "vault": {"tool_vault_search", "tool_vault_listNotes", "tool_vault_readNote"},
     "usage": {"tool_usage_summary"},
     "repo": {"tool_repo_listRepos", "tool_repo_log", "tool_repo_diff", "tool_repo_grep"},
@@ -64,7 +65,7 @@ def test_every_tool_of_a_read_only_capability_is_loaded_and_declared(loaded, cap
 
 
 def test_the_notes_write_tools_are_not_read_only(loaded):
-    for name in ("tool_notes_createNote", "tool_notes_updateNote", "tool_notes_appendToNote", "tool_mem_save", "tool_mem_forget"):
+    for name in ("tool_pdf_merge", "tool_notes_createNote", "tool_notes_updateNote", "tool_notes_appendToNote", "tool_mem_save", "tool_mem_forget"):
         assert name in loaded and not declared(loaded[name]), name
 
 

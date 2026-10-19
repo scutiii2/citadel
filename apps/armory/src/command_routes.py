@@ -8,9 +8,11 @@ it.
 
 from __future__ import annotations
 
+import asyncio
+
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import FileResponse, JSONResponse
 
 from src import commands
 from src.services import capability_registry
@@ -43,8 +45,50 @@ async def list_commands(request: Request) -> JSONResponse:
     )
 
 
+async def download_pdf(request: Request) -> FileResponse | JSONResponse:
+    """Redeem a signed bearer link without requiring the internal API token."""
+    try:
+        enabled = capability_registry.is_enabled("pdf")
+    except KeyError:
+        enabled = False
+    if not enabled:
+        return JSONResponse({"error": "PDF capability is unavailable"}, status_code=503)
+
+    try:
+        from src.capabilities.pdf_merger import domain
+        from src.capabilities.pdf_merger.utils.errors import ErrorCode, MergerError
+    except ImportError:
+        return JSONResponse({"error": "PDF capability is unavailable"}, status_code=503)
+
+    unavailable = JSONResponse({"error": "File is not available"}, status_code=404)
+    try:
+        exp = int(request.query_params.get("exp", ""))
+    except ValueError:
+        return unavailable
+    sig = request.query_params.get("sig", "")
+    if not sig:
+        return unavailable
+    try:
+        path, filename = await asyncio.to_thread(
+            domain.download, request.path_params["file_id"], exp, sig
+        )
+        return FileResponse(
+            path, filename=filename, media_type="application/octet-stream",
+            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+        )
+    except domain.PdfError:
+        return unavailable
+    except MergerError as error:
+        if error.code != ErrorCode.INTERNAL:
+            return unavailable
+        return JSONResponse({"error": "PDF capability is unavailable"}, status_code=503)
+    except Exception:
+        return JSONResponse({"error": "PDF capability is unavailable"}, status_code=503)
+
+
 def install_command_routes(app: Starlette) -> None:
     app.add_route("/commands", list_commands, methods=["GET"])
+    app.add_route("/pdf/files/{file_id}/download", download_pdf, methods=["GET"])
     from contextlib import asynccontextmanager
     import asyncio
     from src.video_routes import download_video
