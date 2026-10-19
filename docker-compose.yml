@@ -1,4 +1,4 @@
-# Stack: ember_web -> ember_api -> armory / garrison / treasury.
+# Stack: ember_web / ember_admin -> ember_api -> armory / garrison / treasury.
 # Start:  docker compose up -d --build
 # Needs a root .env with INTERNAL_API_TOKEN (see .env.example). Per-app
 # secrets stay in apps/<app>/.env and are loaded when the file exists.
@@ -83,6 +83,16 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:5173:80"
+    depends_on: [ember_api]
+    networks: [core]
+
+  ember_admin:
+    build:
+      context: ./apps/Ember
+      dockerfile: ember_admin/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5176:80"
     depends_on: [ember_api]
     networks: [core]
 

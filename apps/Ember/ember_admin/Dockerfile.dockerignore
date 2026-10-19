@@ -1,0 +1,14 @@
+ember_admin/node_modules
+ember_admin/dist
+ember_admin/e2e
+ember_admin/test-results
+ember_api
+ember_cli
+ember_web/*
+!ember_web/src
+ember_web/src/*
+!ember_web/src/components
+ember_web/src/components/*
+!ember_web/src/components/PwaStatus.vue
+!ember_web/src/components/pageLayout.css
+scripts
