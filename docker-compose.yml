@@ -1,5 +1,5 @@
 # Stack: ember_web -> ember_api -> mcp_server / ai_agent / db_gateway, plus
-# catalog_service, chess, ascension, pdf_merger and video_downloader (+ web UIs).
+# chess, ascension, pdf_merger and video_downloader (+ web UIs).
 # Start:  docker compose up -d --build
 # Needs a root .env with INTERNAL_API_TOKEN (see .env.example). Per-app
 # secrets stay in apps/<app>/.env and are loaded when the file exists.
@@ -83,19 +83,6 @@ services:
     ports:
       - "127.0.0.1:5173:80"
     depends_on: [ember_api]
-    networks: [core]
-
-  catalog_service:
-    build: ./apps/catalog_service
-    restart: unless-stopped
-    environment:
-      CATALOG_HOST: 0.0.0.0
-    volumes:
-      - ./docker/configs/catalog_service/sources.json:/app/configs/config_sources.json:ro
-      - ./apps/mcp_server/src:/mcp_server/src:ro
-      - ./apps/ai_agent/src:/ai_agent/src:ro
-    ports:
-      - "127.0.0.1:8020:8020"
     networks: [core]
 
   chess:
