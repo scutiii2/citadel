@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteLocationRaw } from "vue-router";
 import { useAuthStore } from "../stores/auth";
+import { useConfigIssuesStore } from "../stores/configIssues";
 import { ADMIN_PAGES, ADMIN_PERMISSIONS, ADMIN_SECTIONS, ANALYTICS_PERMISSIONS } from "./pages";
 
 declare module "vue-router" {
@@ -29,6 +30,7 @@ export const router = createRouter({
     { path: "/agents", name: "agents", component: () => import("../views/AgentsAdminView.vue"), meta: { permission: "agents.manage" } },
     { path: "/tickets", name: "tickets", component: () => import("../views/TicketsAdminView.vue"), meta: { permission: "tickets.manage" } },
     { path: "/analytics", name: "analytics", component: () => import("../views/AnalyticsView.vue"), meta: { permission: ANALYTICS_PERMISSIONS } },
+    { path: "/config-issues", name: "config-issues", component: () => import("../views/ConfigIssuesView.vue"), meta: { permission: "config.issues.view" } },
     { path: "/usage", name: "usage", component: () => import("../views/UsageView.vue"), meta: { permission: "usage.all.view" } },
     {
       path: "/admin", component: () => import("../views/AdminView.vue"), meta: { permission: ADMIN_PERMISSIONS },
@@ -68,6 +70,12 @@ router.beforeEach(async (to): Promise<true | RouteLocationRaw> => {
   if (to.meta.guestOnly) return { path: home?.to ?? "/no-access" };
   const needed = to.meta.permission;
   if (needed && !allowed(needed, auth.hasPermission)) return { path: home?.to ?? "/no-access" };
+  // The Config issues page opens only while there are issues to show.
+  if (to.name === "config-issues") {
+    const configIssues = useConfigIssuesStore();
+    await configIssues.ensureLoaded();
+    if (configIssues.issues.length === 0) return { path: home?.to ?? "/no-access" };
+  }
   if (to.name === "no-access" && home) return { path: home.to };
   return true;
 });

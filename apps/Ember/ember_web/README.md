@@ -267,10 +267,6 @@ URL, token or key.
   (a value the agent file does not set is left out), and a status (running,
   offline, disabled; an icon and a word). Read-only, refreshed every 15 s: new chats
   always go to the entry agent, there is no per-agent chat.
-- Config issues page (`config.issues.view`): problems in ember_api's config and
-  secret files, as errors (broken) or warnings (risky or incomplete), grouped by
-  file. Not a nav tab: a red (errors) or amber (warnings only) alert with a count
-  shows in the rail, and the page opens, only while there are issues.
 - Account page (click your username): profile with email verification status,
   separate security and roles/access panels, expandable permissions, and a
   responsive remembered-device list. Change email (re-verify),
@@ -313,7 +309,7 @@ URL, token or key.
   with `refresh_after` shows a countdown ring ("New code in N s") and re-runs
   the tool at zero; it stops when you leave the page and while the tab is hidden.
 - Pages and tabs follow your permissions (`chat.use`, `tools.use`,
-  `admin.manage`, `logs.*`, `traffic.view`, `config.issues.view`);
+  `admin.manage`, `logs.*`, `traffic.view`);
   ember_api enforces the same rules on every call.
 - Light and dark theme: a top-bar button cycles System, Light and Dark
   (remembered per browser, also on the login page). Colors are
@@ -435,15 +431,15 @@ routes - `/api/mcp/agents/{id}` (agent status only) and `/api/mcp/server`
 src/
   api/          http + AuthClient / ChatsClient / UsageClient / CommandsClient /
                 ExtensionsClient / AgentsClient / AttachmentsClient /
-                ConfigIssuesClient / TemplatesClient / NavPreferencesClient / SharesClient / SettingsClient (ember_api REST),
+                TemplatesClient / NavPreferencesClient / SharesClient / SettingsClient (ember_api REST),
                 McpClientBase / AiAgentClient / McpServerClient (MCP via ember_api), types
   services/     ConversationStorage (chat history; one-time import of old local chats),
                 turnStream (watching a running answer), slashCommands
-  stores/       Pinia: auth, entryAgent, chat, templates, navPrefs, accountCapabilities, configIssues
+  stores/       Pinia: auth, entryAgent, chat, templates, navPrefs, accountCapabilities
   composables/  useChatShortcuts (window-level chat keys), useChatRoute (address bar <-> open chat),
                 useElapsed (running clock), useNotify (chime), useCompletionNotify (completion alerts), useSidebarCollapse (chat list),
                 useTheme (system / light / dark)
-  views/        pages: Overview, Chat, Capabilities, Agents, Usage, Tickets, Settings, ConfigIssues,
+  views/        pages: Overview, Chat, Capabilities, Agents, Usage, Tickets, Settings,
                 Account, Login, Register, VerifyEmail, NoAccess, SharedChat (public)
   components/   reusable pieces: MessageList, ToolSteps, AgentActivity, ChatInput, CommandFormModal, MarkdownContent,
                 CopyButton, UsageChip, UsageGauges, UsageHeatmap, ElapsedTime, WelcomeCard, DownloadCards, TemplatePicker, TemplatesModal, ShareDialog, ConversationSidebar, EntryAgentTag, ToolRunForm, ToolResultPanel, ToolCard, CapabilitySection, ConfirmModal, NavRail, SidebarEditor, ChatSettingsMenu, SettingRow, AuthCard

@@ -5,7 +5,8 @@ import AccountMenu from "./AccountMenu.vue";
 import EmberLogo from "./EmberLogo.vue";
 import { useTheme } from "../composables/useTheme";
 import { useAuthStore } from "../stores/auth";
-import { ADMIN_NAV_PAGES, ADMIN_PERMISSIONS } from "../router/pages";
+import { ADMIN_NAV_PAGES, ADMIN_PERMISSIONS, CONFIG_ISSUES_ICON } from "../router/pages";
+import { useConfigIssuesStore } from "../stores/configIssues";
 import { useNavPrefsStore } from "../stores/navPrefs";
 import { railPages } from "../utils/navArrangement";
 
@@ -23,6 +24,14 @@ const pages = computed(() => {
   const groups = railPages(available, navPrefs.prefs);
   return [...groups.pinned, ...groups.rest];
 });
+const configIssues = useConfigIssuesStore();
+const showConfigAlert = computed(() => configIssues.issues.length > 0);
+const alertLabel = computed(() => {
+  const parts = ([[configIssues.errorCount, "error"], [configIssues.warningCount, "warning"]] as const)
+    .filter(([n]) => n)
+    .map(([n, word]) => `${n} ${word}${n === 1 ? "" : "s"}`);
+  return `Config issues: ${parts.join(", ")}`;
+});
 watch([() => route.path, pages], async () => {
   await nextTick();
   navigation.value?.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
@@ -38,6 +47,10 @@ watch([() => route.path, pages], async () => {
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path v-for="d in page.icon" :key="d" :d="d" /></svg>
       </RouterLink>
     </nav>
+    <RouterLink v-if="showConfigAlert" to="/config-issues" class="alert" :class="configIssues.errorCount > 0 ? 'has-errors' : 'has-warnings'" :data-label="alertLabel" :aria-label="alertLabel">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path v-for="d in CONFIG_ISSUES_ICON" :key="d" :d="d" /></svg>
+      <span class="count">{{ configIssues.issues.length }}</span>
+    </RouterLink>
     <div class="bottom">
       <AccountMenu v-if="auth.account" :username="auth.account.username" :email="auth.account.email" @logout="auth.logout()" />
       <button v-else type="button" class="theme" :data-label="'Theme: ' + THEME_LABELS[theme] + '. Switch to ' + THEME_LABELS[next()]" :aria-label="'Theme: ' + THEME_LABELS[theme] + '. Switch to ' + THEME_LABELS[next()]" @click="cycle">
@@ -79,7 +92,7 @@ watch([() => route.path, pages], async () => {
   text-decoration: none;
 }
 .wordmark svg { width: 100%; height: 100%; }
-.pages a, .bottom a, button {
+.pages a, .bottom a, .alert, button {
   position: relative;
   display: grid;
   place-items: center;
@@ -94,7 +107,24 @@ watch([() => route.path, pages], async () => {
   text-decoration: none;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.pages a:hover, .bottom a:hover, button:hover { color: var(--text); background: var(--bg); }
+.pages a:hover, .bottom a:hover, .alert:hover, button:hover { color: var(--text); background: var(--bg); }
+/* Config issues: red while any error exists, amber when only warnings. */
+.alert { --tone: var(--warning); margin-top: 8px; color: var(--tone); }
+.alert.has-errors { --tone: var(--status-failed); }
+.alert .count {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  line-height: 16px;
+  text-align: center;
+  color: var(--bg);
+  background: var(--tone);
+}
 a[aria-current="page"]:not(.wordmark) {
   color: var(--text);
   background: var(--bg);

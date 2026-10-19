@@ -6,10 +6,9 @@ import { authClient, type KnownDevice } from "../api/AuthClient";
 import ActionButton from "../components/ActionButton.vue";
 import ConfirmModal from "../components/ConfirmModal.vue";
 import { useTheme } from "../composables/useTheme";
-import { CONFIG_ISSUES_ICON, visiblePages } from "../router/pages";
+import { visiblePages } from "../router/pages";
 import { usePageVisibilityStore } from "../stores/pageVisibility";
 import { useAuthStore } from "../stores/auth";
-import { useConfigIssuesStore } from "../stores/configIssues";
 import { errorMessage, formatUtc } from "../utils/errors";
 
 const auth = useAuthStore();
@@ -24,8 +23,6 @@ const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" } as const
 // narrow screens only (the wide rail already shows them).
 const IN_TAB_BAR = new Set(["/", "/capabilities", "/usage"]);
 const morePages = computed(() => visiblePages((p) => auth.hasPermission(p), pageVisibility.hidden).filter((p) => !IN_TAB_BAR.has(p.to)));
-const configIssues = useConfigIssuesStore();
-const showConfigIssues = computed(() => auth.hasPermission("config.issues.view") && configIssues.issues.length > 0);
 
 async function logout(): Promise<void> {
   await auth.logout();
@@ -153,7 +150,7 @@ async function changePassword(): Promise<void> {
         </div>
       </div>
 
-      <section v-if="morePages.length || showConfigIssues" class="card more-pages" aria-labelledby="account-more">
+      <section v-if="morePages.length" class="card more-pages" aria-labelledby="account-more">
         <header class="section-header">
           <span class="section-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg></span>
           <div><h3 id="account-more">More pages</h3><p>The rest of Ember.</p></div>
@@ -163,13 +160,6 @@ async function changePassword(): Promise<void> {
             <RouterLink :to="p.to">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path v-for="d in p.icon" :key="d" :d="d" /></svg>
               <span>{{ p.label }}</span>
-            </RouterLink>
-          </li>
-          <li v-if="showConfigIssues">
-            <RouterLink to="/config-issues" class="issues">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path v-for="d in CONFIG_ISSUES_ICON" :key="d" :d="d" /></svg>
-              <span>Config issues</span>
-              <span class="count">{{ configIssues.issues.length }}</span>
             </RouterLink>
           </li>
         </ul>
@@ -733,21 +723,6 @@ button.forget  {
   width: 18px;
   height: 18px;
   color: var(--muted);
-}
-
-.more-list a.issues svg  {
-  color: var(--warning);
-}
-
-.more-list .count  {
-  margin-left: auto;
-  min-width: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-full);
-  text-align: center;
-  font-size: .8em;
-  color: var(--accent-contrast);
-  background: var(--warning);
 }
 
 .page-footer  {

@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory, type RouteLocationRaw } from "vue-router";
 import { useAuthStore } from "../stores/auth";
-import { useConfigIssuesStore } from "../stores/configIssues";
 import ChatView from "../views/ChatView.vue";
 
 declare module "vue-router" {
@@ -63,12 +62,6 @@ export const router = createRouter({
       name: "agents",
       component: () => import("../views/AgentsView.vue"),
       meta: { permission: "chat.use" },
-    },
-    {
-      path: "/config-issues",
-      name: "config-issues",
-      component: () => import("../views/ConfigIssuesView.vue"),
-      meta: { permission: "config.issues.view" },
     },
     {
       path: "/usage",
@@ -157,12 +150,6 @@ router.beforeEach(async (to): Promise<true | RouteLocationRaw> => {
   const needed = to.meta.permission;
   if (needed && !(Array.isArray(needed) ? needed.some((p) => auth.hasPermission(p)) : auth.hasPermission(needed))) {
     return { name: home?.name ?? "no-access" };
-  }
-  // The Config issues page opens only while there are issues to show.
-  if (to.name === "config-issues") {
-    const configIssues = useConfigIssuesStore();
-    await configIssues.ensureLoaded();
-    if (configIssues.issues.length === 0) return { name: home?.name ?? "no-access" };
   }
   if (to.name === "no-access" && home) return { name: home.name };
   return true;

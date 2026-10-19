@@ -9,10 +9,9 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import AccountMenu from "./AccountMenu.vue";
 import EmberLogo from "./EmberLogo.vue";
 import { useTheme } from "../composables/useTheme";
-import { CONFIG_ISSUES_ICON, OVERVIEW_ICON, PROFILE_ICON, visiblePages } from "../router/pages";
+import { OVERVIEW_ICON, PROFILE_ICON, visiblePages } from "../router/pages";
 import { usePageVisibilityStore } from "../stores/pageVisibility";
 import { useAuthStore } from "../stores/auth";
-import { useConfigIssuesStore } from "../stores/configIssues";
 import { useNavPrefsStore } from "../stores/navPrefs";
 import { ADMIN_ACCESS_PERMISSIONS, emberAdminUrl } from "../utils/adminLink";
 import { railPages } from "../utils/navArrangement";
@@ -110,18 +109,6 @@ const tabs = computed(() => {
   return { left, right, chat: page("/") };
 });
 
-const configIssues = useConfigIssuesStore();
-const showConfigAlert = computed(() => canBrowse.value && configIssues.issues.length > 0);
-const alertLabel = computed(() => {
-  const parts = [
-    [configIssues.errorCount, "error"],
-    [configIssues.warningCount, "warning"],
-  ]
-    .filter(([n]) => n)
-    .map(([n, word]) => `${n} ${word}${n === 1 ? "" : "s"}`);
-  return `Config issues: ${parts.join(", ")}`;
-});
-
 // A chat opened by id and a capability's own page have no rail item of
 // their own, so they keep their parent page marked.
 function isOpenedFromHere(to: string): boolean {
@@ -199,20 +186,6 @@ async function logout(): Promise<void> {
         </RouterLink>
       </template>
     </nav>
-
-    <RouterLink
-      v-if="showConfigAlert"
-      to="/config-issues"
-      class="alert"
-      :class="configIssues.errorCount > 0 ? 'has-errors' : 'has-warnings'"
-      :data-label="alertLabel"
-      :aria-label="alertLabel"
-    >
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-        <path v-for="d in CONFIG_ISSUES_ICON" :key="d" :d="d" />
-      </svg>
-      <span class="count">{{ configIssues.issues.length }}</span>
-    </RouterLink>
 
     <div class="bottom">
       <AccountMenu
@@ -298,7 +271,6 @@ nav {
 
 /* One shape for every control in the rail. */
 nav a,
-.alert,
 .theme {
   position: relative;
   display: grid;
@@ -314,33 +286,6 @@ nav a,
   text-decoration: none;
   font-size: 0.85em;
   font-weight: 600;
-}
-/* Config issues: red while any error exists, amber when only warnings. */
-.alert {
-  margin-top: 8px;
-}
-.alert {
-  --tone: var(--warning);
-}
-.alert.has-errors {
-  --tone: var(--status-failed);
-}
-.alert {
-  color: var(--tone);
-}
-.alert .count {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: var(--radius-full);
-  font-size: 0.7rem;
-  line-height: 16px;
-  text-align: center;
-  color: var(--bg);
-  background: var(--tone);
 }
 nav a:hover,
 .theme:hover {
@@ -406,7 +351,6 @@ svg {
   .header,
   .divider,
   .pages,
-  .alert,
   .bottom {
     display: none;
   }

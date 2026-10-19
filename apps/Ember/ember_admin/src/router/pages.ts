@@ -6,6 +6,8 @@ export const LOG_PERMISSIONS = ["logs.view", "logs.errors.view", "logs.chat.view
 // ...and its Traffic tab needs traffic.view; any one of these opens the page.
 export const ANALYTICS_PERMISSIONS = [...LOG_PERMISSIONS, "traffic.view"];
 
+export const CONFIG_ISSUES_ICON = ["M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z", "M12 9v4", "M12 17h.01"];
+
 export interface AdminPage {
   to: string;
   label: string;
@@ -14,7 +16,7 @@ export interface AdminPage {
   permission: string | string[];
 }
 
-export const ADMIN_PERMISSIONS = ["accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage", "settings.manage", "capabilities.manage", "extensions.manage", "agents.manage", "tickets.manage", "usage.all.view", ...ANALYTICS_PERMISSIONS];
+export const ADMIN_PERMISSIONS = ["accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage", "settings.manage", "capabilities.manage", "extensions.manage", "agents.manage", "tickets.manage", "usage.all.view", "config.issues.view", ...ANALYTICS_PERMISSIONS];
 
 /** Administration destinations share their permission rules with nested routes. */
 export const ADMIN_SECTIONS: AdminPage[] = [
