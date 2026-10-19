@@ -1,0 +1,182 @@
+# Stack: ember_web -> ember_api -> mcp_server / ai_agent / db_gateway, plus
+# catalog_service, chess, ascension, pdf_merger and video_downloader (+ web UIs).
+# Start:  docker compose up -d --build
+# Needs a root .env with INTERNAL_API_TOKEN (see .env.example). Per-app
+# secrets stay in apps/<app>/.env and are loaded when the file exists.
+# Container-only configs live in docker/configs and are mounted over each
+# app's configs/ file; the apps' own configs stay untouched.
+
+name: mcpserver
+
+x-internal-token: &internal_token
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?set INTERNAL_API_TOKEN in .env}
+
+services:
+  mcp_server:
+    build: ./apps/mcp_server
+    restart: unless-stopped
+    env_file:
+      - path: ./apps/mcp_server/.env
+        required: false
+    environment:
+      <<: *internal_token
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8010"
+      DB_GATEWAY_URL: http://db_gateway:8071
+    volumes:
+      - ./docker/configs/mcp_server/extensions.json:/app/configs/config_extensions.json:ro
+      - mcp_server_data:/app/.data
+    depends_on: [db_gateway, pdf_merger, video_downloader]
+    networks: [core]
+
+  ai_agent:
+    build: ./apps/ai_agent
+    restart: unless-stopped
+    env_file:
+      - path: ./apps/ai_agent/.env
+        required: false
+    environment:
+      <<: *internal_token
+      AI_AGENT_HOST: 0.0.0.0
+      AI_AGENT_ADVERTISE_URL: http://ai_agent
+      MCP_SERVER_URL: http://mcp_server:8010/mcp
+    volumes:
+      - ./docker/configs/ai_agent/servers.json:/app/configs/config_servers.json:ro
+      - agent_data:/app/.data
+    depends_on: [mcp_server]
+    networks: [core]
+
+  db_gateway:
+    build: ./apps/db_gateway
+    restart: unless-stopped
+    env_file:
+      - path: ./apps/db_gateway/.env
+        required: false
+    environment:
+      <<: *internal_token
+      DB_GATEWAY_PORT: "8071"
+    volumes:
+      - ./docker/configs/db_gateway/app.json:/app/configs/config_app.json:ro
+      - ./docker/configs/db_gateway/connections.json:/app/configs/config_connections.json:ro
+      - db_gateway_data:/app/data
+    networks: [core]
+
+  ember_api:
+    build: ./apps/Ember/ember_api
+    restart: unless-stopped
+    env_file:
+      - path: ./apps/Ember/ember_api/.env
+        required: false
+    environment:
+      <<: *internal_token
+      EMBER_API_HOST: 0.0.0.0
+    volumes:
+      - ./docker/configs/ember_api/app.json:/app/configs/config_app.json:ro
+      - ember_api_data:/app/data
+      - agent_data:/agent_data:ro
+    depends_on: [mcp_server, ai_agent, db_gateway]
+    networks: [core]
+
+  ember_web:
+    build: ./apps/Ember/ember_web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on: [ember_api]
+    networks: [core]
+
+  catalog_service:
+    build: ./apps/catalog_service
+    restart: unless-stopped
+    environment:
+      CATALOG_HOST: 0.0.0.0
+    volumes:
+      - ./docker/configs/catalog_service/sources.json:/app/configs/config_sources.json:ro
+      - ./apps/mcp_server/src:/mcp_server/src:ro
+      - ./apps/ai_agent/src:/ai_agent/src:ro
+    ports:
+      - "127.0.0.1:8020:8020"
+    networks: [core]
+
+  chess:
+    build: ./apps/chess
+    restart: unless-stopped
+    environment:
+      <<: *internal_token
+      CHESS_PORT: "8070"
+    volumes:
+      - ./docker/configs/chess/app.json:/app/configs/config_app.json:ro
+    ports:
+      - "127.0.0.1:8070:8070"
+    networks: [core]
+
+  ascension:
+    build: ./apps/ascension
+    restart: unless-stopped
+    env_file:
+      - path: ./apps/ascension/.env
+        required: false
+    environment:
+      <<: *internal_token
+    volumes:
+      - ./docker/configs/ascension/app.json:/app/configs/config_app.json:ro
+      - ascension_data:/app/.data
+    ports:
+      - "127.0.0.1:8060:8060"
+    depends_on: [ember_api]
+    networks: [core]
+
+  pdf_merger:
+    build: ./apps/PDFMerger/pdf_merger
+    restart: unless-stopped
+    environment:
+      <<: *internal_token
+      PDF_MERGER_HOST: 0.0.0.0
+      PDF_MERGER_PUBLIC_BASE_URL: http://127.0.0.1:8040
+      PDF_MERGER_WEB_ORIGIN: http://127.0.0.1:5174
+      PDF_MERGER_SIGNING_KEY: ${PDF_MERGER_SIGNING_KEY:?set PDF_MERGER_SIGNING_KEY in .env}
+    ports:
+      - "127.0.0.1:8040:8040"
+    networks: [core]
+
+  pdf_merger_web:
+    build: ./apps/PDFMerger/pdf_merger_web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5174:80"
+    depends_on: [pdf_merger]
+    networks: [core]
+
+  video_downloader:
+    build: ./apps/VideoDownloader/video_downloader
+    restart: unless-stopped
+    environment:
+      <<: *internal_token
+      VIDEO_DOWNLOADER_HOST: 0.0.0.0
+      VIDEO_DOWNLOADER_PUBLIC_BASE_URL: http://127.0.0.1:8050
+      VIDEO_DOWNLOADER_WEB_ORIGIN: http://127.0.0.1:5175
+      VIDEO_DOWNLOADER_SIGNING_KEY: ${VIDEO_DOWNLOADER_SIGNING_KEY:?set VIDEO_DOWNLOADER_SIGNING_KEY in .env}
+    ports:
+      - "127.0.0.1:8050:8050"
+    networks: [core]
+
+  video_downloader_web:
+    build: ./apps/VideoDownloader/video_downloader_web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5175:80"
+    depends_on: [video_downloader]
+    networks: [core]
+
+networks:
+  core:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  mcp_server_data:
+  agent_data:
+  db_gateway_data:
+  ember_api_data:
+  ascension_data:

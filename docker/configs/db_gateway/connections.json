@@ -1,0 +1,11 @@
+{
+  "connections": {
+    "main": {"type": "sqlite", "path": "data/main.db", "allow_raw_sql": false},
+    "data": {"type": "sqlite", "path": "data/ember.db"}
+  },
+  "instances": {
+    "default": ["main"],
+    "ember": ["data"],
+    "mcp_server": ["data"]
+  }
+}

@@ -112,3 +112,6 @@ node_modules/
 /apps/db_gateway/firestore-debug.log
 
 scuti_server_launcher.exe
+
+# docker compose secrets (INTERNAL_API_TOKEN)
+/.env

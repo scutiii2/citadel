@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "main": {
+      "label": "mcp_server",
+      "description": "This repo's own MCP tool server.",
+      "transport": "http",
+      "url": "http://mcp_server:8010/mcp"
+    }
+  }
+}
