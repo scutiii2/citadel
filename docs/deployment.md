@@ -86,6 +86,26 @@ publishes the two web ports on all interfaces so the LAN can reach them.
 
 Without the overlay the UIs stay on `127.0.0.1` and are not reachable from the LAN.
 
+### Dashboard tiles
+
+Containers started from the CLI may not show in the ZimaOS dashboard (v1.8.0). The "import Docker CLI" option in
+Custom Install does not fit: it creates a new container from one `docker run` command instead of adopting the
+compose containers, and it cannot build our images. Add external links instead. The containers stay under compose.
+
+1. In the dashboard, click **+** and choose **Add external link**. The label may differ by version.
+2. Add two links, using the box's LAN IP (not `localhost`) so they work from other devices:
+
+   | Name | URL | Icon |
+   |---|---|---|
+   | Ember | `http://<zima-ip>:5173` | `apps/Ember/ember_web/public/icons/icon-512.png` |
+   | Ember Admin | `http://<zima-ip>:5176` | `apps/Ember/ember_admin/public/icons/icon-512.png` |
+
+3. If the dashboard asks for an image URL, use the running app: `http://<zima-ip>:5173/icons/icon-512.png` and
+   `http://<zima-ip>:5176/icons/icon-512.png`. Avoid `icon-maskable-512.png`; its padding makes the tile look small.
+
+Give the box a fixed IP (a DHCP reservation in the router) so the links keep working. If your version has no external
+link option, use a browser bookmark.
+
 To update later:
 
 ```bash
