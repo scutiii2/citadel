@@ -14,7 +14,9 @@ are deleted, and the package is imported again inside
 submodules such as ``domain.py``. The ``__pycache__`` delete matters because
 Python trusts a cached ``.pyc`` when the source has the same mtime (whole
 seconds) and size, so a quick same-size edit would otherwise run old code.
-Only the capability's own folder is purged; a shared ``src.services`` module
+Capabilities may opt a direct child package into PROCESS_LIFETIME_MODULES for
+process-owned engines or global library patches; changes to those require restart.
+Otherwise only the capability's own folder is purged; a shared ``src.services`` module
 edited meanwhile is not reloaded.
 
 Everything runs on the event-loop thread under one lock. The decorators in a
@@ -203,7 +205,14 @@ class CapabilityLoader:
         tool_manager.logger.addHandler(watcher)
         capability_id, label = record.id, record.label  # what this record owned before the attempt
         try:
-            meta = importlib.import_module(f"{self._package}.{record.folder}").META
+            package = importlib.import_module(f"{self._package}.{record.folder}")
+            # Reattach opt-in process-lifetime children to the fresh parent package.
+            # These may own global library patches or a live background engine.
+            for child in getattr(package, "PROCESS_LIFETIME_MODULES", ()):
+                module = sys.modules.get(f"{package.__name__}.{child}")
+                if module is not None:
+                    setattr(package, child, module)
+            meta = package.META
             other = next((r for r in self._records.values() if r.folder != record.folder and r.id == meta.id), None)
             if other is not None:
                 capability_meta.unregister(record.folder)
@@ -234,8 +243,13 @@ class CapabilityLoader:
 
     def _purge(self, folder: str) -> None:
         prefix = f"{self._package}.{folder}"
+        package = sys.modules.get(prefix)
+        # Only a direct child can be retained; all capabilities default to a full purge.
+        retained = tuple(f"{prefix}.{child}" for child in getattr(package, "PROCESS_LIFETIME_MODULES", ())
+                         if isinstance(child, str) and child.isidentifier())
         for name in [name for name in sys.modules if name == prefix or name.startswith(prefix + ".")]:
-            del sys.modules[name]
+            if not any(name == child or name.startswith(child + ".") for child in retained):
+                del sys.modules[name]
         # Stale bytecode: same mtime (whole seconds) and size would be trusted.
         package_dir = Path(importlib.import_module(self._package).__path__[0]) / folder
         for cache in package_dir.rglob("__pycache__"):

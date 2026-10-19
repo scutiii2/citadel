@@ -1,0 +1,78 @@
+{
+  "summary": "Inspect and merge your uploaded PDFs and images with account-owned native storage and signed download links.",
+  "tools": [
+    {
+      "name": "tool_pdf_inspect",
+      "purpose": "Read-only inspection of owned file IDs, with page counts, fresh links and per-ID failures.",
+      "connection": "Local PDF engine and file store",
+      "commands": [
+        "inspect"
+      ]
+    },
+    {
+      "name": "tool_pdf_listFiles",
+      "purpose": "Read-only listing of your unexpired uploads and merged files with fresh download links.",
+      "connection": "Local file store",
+      "commands": [
+        "list_files"
+      ]
+    },
+    {
+      "name": "tool_pdf_merge",
+      "purpose": "Merge an ordered structured plan into a new PDF (MCP-only).",
+      "connection": "Local PDF engine and file store",
+      "commands": []
+    }
+  ],
+  "commands": [
+    {
+      "name": "inspect",
+      "tool": "tool_pdf_inspect",
+      "params": [
+        {
+          "name": "file_ids",
+          "required": true,
+          "default": null,
+          "description": "Comma-separated IDs from your chat uploads or file list; at most 100."
+        }
+      ]
+    },
+    {
+      "name": "list_files",
+      "tool": "tool_pdf_listFiles",
+      "params": []
+    }
+  ],
+  "workflow": [
+    {
+      "sequence": "1",
+      "tool": "(manual - no tool)",
+      "ai_only_step": false,
+      "explanation": "Upload PDFs or supported images through Ember chat."
+    },
+    {
+      "sequence": "2",
+      "tool": "tool_pdf_listFiles",
+      "ai_only_step": false,
+      "explanation": "Find usable file IDs owned by the signed-in account."
+    },
+    {
+      "sequence": "3",
+      "tool": "tool_pdf_inspect",
+      "ai_only_step": false,
+      "explanation": "Check page counts and IDs before selecting pages."
+    },
+    {
+      "sequence": "4",
+      "tool": "tool_pdf_merge",
+      "ai_only_step": true,
+      "explanation": "Submit ordered page segments and output options, then save the returned download link."
+    },
+    {
+      "sequence": "5",
+      "tool": "tool_pdf_listFiles",
+      "ai_only_step": false,
+      "explanation": "Renew an expired download link while the stored file still exists."
+    }
+  ]
+}
