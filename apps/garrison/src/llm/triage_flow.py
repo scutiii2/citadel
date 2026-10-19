@@ -111,7 +111,8 @@ def _restrict(answer: dict[str, Any], options: list[str]) -> dict[str, Any]:
 
 
 def final_answer(voters: dict[str, dict[str, Any]], rounds: list[dict[str, Any]]) -> dict[str, Any]:
-    """Step 5: pairwise differences of the confidence-weighted values, per option."""
+    """Step 5: pairwise differences of the confidence-weighted values, per option. Always `uncertain`: no voter met
+    its threshold, so even a clear leader (`decided`) is a provisional pick and `also_check` stays worth reading."""
     options = list(next(iter(voters.values()))["probabilities"])
     scaled = {name: {o: a["answer_confidence"] * a["probabilities"][o] for o in options} for name, a in voters.items()}
     names = list(scaled)
@@ -132,7 +133,7 @@ def final_answer(voters: dict[str, dict[str, Any]], rounds: list[dict[str, Any]]
     who = " and ".join(names)
     out: dict[str, Any] = {
         "type": "choice", "choice": top, "probabilities": _rounded(share), "answer_confidence": round(share[top], 4),
-        "uncertain": not decided, "answered_by": "+".join(names), "resolved_by": "final",
+        "uncertain": True, "answered_by": "+".join(names), "resolved_by": "final",
         "disagreement": {name: a["choice"] for name, a in voters.items()}, "also_check": ranked[1:3],
     }
     if decided:
@@ -203,6 +204,7 @@ class TriageFlow:
         # A longer text is refused outright unless Jev, with its larger window, may take it.
         limit = decision.settings().max_input_chars if self._fallback_ready() else laya_provider.MAX_INPUT_CHARS
         request = laya_provider.parse_request(raw, limit)
+        self.use_fallback = self.use_fallback and not request.local_only
         data, _ = json.JSONDecoder().raw_decode(raw.lstrip())
         self._override = float(data["min_confidence"]) if "min_confidence" in data else None
         self._request, self._cache, self.tokens = request, {}, 0

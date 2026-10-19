@@ -279,7 +279,7 @@ model has its own confidence threshold, by number of options left (2 options: En
 (`{"3+": {"laya-typed": 0.6}}`) or, for one request, by sending `min_confidence`. Between the steps options far
 below the best (`triage_prune_ratio`) are dropped and the models asked again, and when nobody is ever sure the
 models' confidence-weighted values are compared pairwise (`triage_pair_ratio`): the answer then carries `also_check`,
-or `"unknown": true` with `candidates`. Score questions take the first model that meets its 3+ threshold. A noul question uses the 2-option thresholds, and Jev
+or `"unknown": true` with `candidates`, and is always `uncertain` (no model was sure, so a clear leader is still provisional). Score questions take the first model that meets its 3+ threshold. A noul question uses the 2-option thresholds, and Jev
 decides it only when typed is unsure and the fallback is on. A `local_only` request never reaches Jev.
 
 Which models answer which question type, and in what order, is set per type in `configs/config_tuning.json`

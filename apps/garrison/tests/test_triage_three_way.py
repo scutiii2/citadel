@@ -250,7 +250,7 @@ def test_the_pairwise_comparison_decides_when_one_option_clearly_stands_out(monk
     # Weighted by confidence: English 0.30 / 0.20, typed 0.27 / 0.33, Jev 0.294 / 0.306. Mean of the three pairwise
     # differences: a 0.02, b 0.0867. 0.02 is under half of 0.0867, so b is the answer and a is the one to check.
     assert asked == [["a", "b"]]
-    assert answer["resolved_by"] == "final" and answer["choice"] == "b" and answer["uncertain"] is False
+    assert answer["resolved_by"] == "final" and answer["choice"] == "b" and answer["uncertain"] is True
     assert answer["eliminated"] == ["c"] and answer["also_check"] == ["a"] and "unknown" not in answer
     assert answer["probabilities"] == {"a": 0.1875, "b": 0.8125, "c": 0.0} and answer["answer_confidence"] == 0.8125
     assert steps(answer) == [
@@ -283,7 +283,7 @@ def test_without_jev_the_two_local_models_are_compared_alone(monkeypatch):
     answer, _ = run(triage, request_json(TWO))
 
     # English 0.42 / 0.18, typed 0.135 / 0.165: differences 0.285 and 0.015.
-    assert asked == [] and answer["choice"] == "a" and answer["uncertain"] is False and answer["also_check"] == ["b"]
+    assert asked == [] and answer["choice"] == "a" and answer["uncertain"] is True and answer["also_check"] == ["b"]
     assert answer["answered_by"] == "laya-english+laya-typed" and answer["probabilities"] == {"a": 0.95, "b": 0.05}
 
 
@@ -293,6 +293,27 @@ def test_a_lone_unsure_voter_answers_as_it_is(monkeypatch):
     answer, _ = run(triage)
 
     assert answer["answered_by"] == "laya-english" and answer["uncertain"] is True
+
+
+def test_a_decided_final_answer_is_still_uncertain_and_keeps_also_check(monkeypatch):
+    triage, _ = make(
+        monkeypatch, Engine(prediction({"a": 0.7, "b": 0.3}, 0.6)), Engine(prediction({"a": 0.45, "b": 0.55}, 0.3)), use_fallback=False,
+    )
+
+    result = json.loads(triage.answer(request_json(TWO)).response)
+
+    assert result["uncertain"] is True and result["answers"]["area"]["uncertain"] is True
+    assert result["answers"]["area"]["also_check"] == ["b"] and "unknown" not in result["answers"]["area"]
+
+
+def test_a_local_only_request_never_reaches_jev_even_when_the_flow_allows_it(monkeypatch):
+    english = Engine(prediction({"a": 0.5, "b": 0.3, "c": 0.2}, 0.5), prediction({"a": 0.6, "b": 0.4}, 0.5))
+    typed = Engine(prediction({"a": 0.4, "b": 0.35, "c": 0.25}, 0.5), prediction({"a": 0.55, "b": 0.45}, 0.5))
+    triage, asked = make(monkeypatch, english, typed, use_fallback=True)
+
+    answer, _ = run(triage, request_json(local_only=True))
+
+    assert asked == [] and "jev" not in answer["answered_by"] and answer["uncertain"] is True
 
 
 # --- score and noul questions, odd inputs --------------------------------------------------------------------
