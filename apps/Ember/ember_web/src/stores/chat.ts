@@ -27,6 +27,7 @@ import {
 } from "../services/ConversationStorage";
 import { clearCompletionNotifications, notifyCompletion } from "../composables/useCompletionNotify";
 import { chimeIfAway } from "../composables/useNotify";
+import { newId } from "../utils/uuid";
 import { SlashCommandRunner } from "../services/slashCommands";
 import { watchTurn } from "../services/turnStream";
 import { type ApprovalMode, DEFAULT_APPROVAL_MODE, isApprovalMode } from "../utils/approvalMode";
@@ -841,7 +842,7 @@ export const useChatStore = defineStore("chat", () => {
     if (!conversation) {
       const now = Date.now();
       conversations.value.push({
-        id: crypto.randomUUID(),
+        id: newId(),
         title: titleFrom(question),
         messages: [],
         messagesLoaded: true,
@@ -1335,7 +1336,7 @@ export const useChatStore = defineStore("chat", () => {
     if (!conversation) {
       const now = Date.now();
       conversations.value.push({
-        id: crypto.randomUUID(),
+        id: newId(),
         title: titleFrom(titleSeed),
         messages: [],
         messagesLoaded: true,

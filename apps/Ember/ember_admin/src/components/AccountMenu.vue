@@ -5,12 +5,14 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { useTheme } from "../composables/useTheme";
+import { emberWebUrl } from "../utils/webLink";
 
 defineProps<{ username: string; email: string }>();
 const emit = defineEmits<{ logout: [] }>();
 
 const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" } as const;
 const { theme, cycle } = useTheme();
+const webUrl = emberWebUrl();
 
 const route = useRoute();
 const open = ref(false);
@@ -120,6 +122,11 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onPointerDown)
         <span>Theme</span>
         <span class="value">{{ THEME_LABELS[theme] }}</span>
       </button>
+      <a :href="webUrl" target="_blank" rel="noopener noreferrer" class="row web-link" role="menuitem" @click="close()">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg>
+        <span>Ember</span>
+        <svg class="value" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+      </a>
 
       <hr role="separator" />
       <button type="button" class="row logout" role="menuitem" @click="logout">

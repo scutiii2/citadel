@@ -68,7 +68,8 @@ it("keeps personal pages reachable without admin grants, in the account menu", a
   const w = await show([], "/profile");
   await w.get("button.account").trigger("click");
   expect(w.get(".menu .email").text()).toBe("ada@example.com");
-  expect(w.findAll(".menu a.row").map(a => [a.text(), a.attributes("href")])).toEqual([["Profile", "/profile"], ["Settings", "/settings"]]);
+  expect(w.findAll(".menu a.row").map(a => [a.text(), a.attributes("href")])).toEqual([["Profile", "/profile"], ["Settings", "/settings"], ["Ember", "http://localhost:5173/overview"]]);
+  expect(w.get(".menu a.web-link").attributes("target")).toBe("_blank");
   expect(w.get(".menu a.router-link-exact-active").text()).toBe("Profile");
   expect(w.find("nav a[aria-label='Settings']").exists()).toBe(false);
 });
