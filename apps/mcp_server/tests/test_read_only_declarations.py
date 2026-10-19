@@ -20,16 +20,13 @@ READ_ONLY = {
     "vault": {"tool_vault_search", "tool_vault_listNotes", "tool_vault_readNote"},
     "usage": {"tool_usage_summary"},
     "repo": {"tool_repo_listRepos", "tool_repo_log", "tool_repo_diff", "tool_repo_grep"},
-    "gen": {
-        "tool_gen_generatePassword", "tool_gen_generatePassphrase", "tool_gen_generatePin",
-        "tool_gen_generateTotpSecret", "tool_gen_getTotpCode",
-    },
     "web": {"tool_web_search", "tool_web_readPage"},
     "notes": {"tool_notes_listNotes", "tool_notes_searchNotes", "tool_notes_readNote"},
     "memory": {"tool_mem_search"},
 }
 # Capabilities whose tools change something, spend credits or crawl, or run commands: none may declare it.
-NEVER = ("server_manager", "tables", "firecrawl", "email", "tickets")
+# generator joined it when its tools gained email_to (they can send mail).
+NEVER = ("server_manager", "tables", "firecrawl", "email", "tickets", "generator")
 
 
 @pytest.fixture
