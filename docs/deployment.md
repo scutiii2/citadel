@@ -54,24 +54,48 @@ publishes the two web ports on all interfaces so the LAN can reach them.
    docker compose version
    ```
 
-2. Copy the repo to the box, for example to `/media/ZimaOS-HD/Apps/Citadel`. Over SSH:
+2. Clone the repo onto the data disk, not the system partition. Later updates are a `git pull`, with no manual copying.
 
    ```bash
-   scp -r Citadel user@zimaos:/media/ZimaOS-HD/Apps/
+   mkdir -p /media/ZimaOS-HD/Apps
+   git clone <your-repo-url> /media/ZimaOS-HD/Apps/Citadel
+   cd /media/ZimaOS-HD/Apps/Citadel
    ```
 
-   Skip `node_modules` and `.venv` folders to save time.
-3. On the box, create `.env` as in section 1 (`INTERNAL_API_TOKEN`).
+   A private repo needs a deploy key or token. Run every later command from this folder.
+3. Create the files that git does not hold. ZimaOS has no `openssl`, so build the token from `/dev/urandom`:
+
+   ```bash
+   echo "INTERNAL_API_TOKEN=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" > .env
+   cat .env                      # INTERNAL_API_TOKEN= then 64 hex characters
+   touch apps/Ember/ember_api/.env
+   ```
+
+   Create `apps/Ember/ember_api/.env` before the first start. Compose bind-mounts it, and if it does not exist
+   Docker creates a directory in its place and ember_api fails. ember_api writes its own secrets into this file.
+
+   Copy the API keys that armory and garrison need (for example Tavily or LLM keys) into `apps/armory/.env` and
+   `apps/garrison/.env` by hand. They are secrets and are not in git.
 4. Start with the overlay:
 
    ```bash
-   cd /media/ZimaOS-HD/Apps/Citadel
    docker compose -f docker-compose.yml -f docker-compose.zima.yml up -d --build
    ```
 
 5. Open `http://<zima-ip>:5173` and `http://<zima-ip>:5176` from any device on your network.
 
 Without the overlay the UIs stay on `127.0.0.1` and are not reachable from the LAN.
+
+To update later:
+
+```bash
+cd /media/ZimaOS-HD/Apps/Citadel
+git pull
+docker compose -f docker-compose.yml -f docker-compose.zima.yml up -d --build
+```
+
+`config_*.json` files are gitignored, so a capability toggle such as `server` in
+`apps/armory/configs/config_capabilities.json` does not arrive with `git pull`. Set it on the box.
 
 The old `apps/armory/zima_host.yaml` is from before the stack was split into containers. Do not use it.
 
@@ -120,6 +144,8 @@ docker compose up -d armory
 | Symptom | Cause and fix |
 |---|---|
 | `set INTERNAL_API_TOKEN in .env` | The root `.env` is missing or empty. |
+| `openssl: command not found` | Use the `/dev/urandom` command in section 2, step 3. A failed `echo` leaves an empty `.env`, so run it again. |
+| ember_api fails and `apps/Ember/ember_api/.env` is a directory | Compose created it because the file was missing. Run `rmdir apps/Ember/ember_api/.env`, then `touch apps/Ember/ember_api/.env`, then start again. |
 | UI loads on the PC but not on another device | Overlay not used. Add `-f docker-compose.zima.yml`. |
 | Overlay still binds `127.0.0.1` | Compose older than 2.24 ignores `!override`. Update Compose, or edit the `ports` lines in the main file. |
 | Port already in use | Another app uses 5173 or 5176. Change the left side of the port mapping. |
