@@ -2,7 +2,7 @@
   "label": "OpenCode Zen",
   "base_url": "https://opencode.ai/zen/v1",
   "api_key": "{OPENCODE_API_KEY}",
-  "model": "gpt-6.1-sol",
+  "model": "deepseek-v4.1-flash-free",
   "models": {
     "light": {
       "id": "longcat-2.5-preview-free",
