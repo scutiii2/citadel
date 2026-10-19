@@ -10,7 +10,7 @@ import pytest
 
 from scripts import check_triage_cases as cases
 from scripts import triage_three_way as three
-from src.llm import decision, laya_provider
+from src.llm import decision, laya_provider, triage_flow
 from src.llm.laya_provider import LayaQuestions
 
 OPTIONS = {"a": "A", "b": "B", "c": "C"}
@@ -304,6 +304,24 @@ def test_a_decided_final_answer_is_still_uncertain_and_keeps_also_check(monkeypa
 
     assert result["uncertain"] is True and result["answers"]["area"]["uncertain"] is True
     assert result["answers"]["area"]["also_check"] == ["b"] and "unknown" not in result["answers"]["area"]
+
+
+def test_a_failed_model_s_reason_reaches_the_error_when_nobody_answers(monkeypatch):
+    triage, _ = make(
+        monkeypatch, Engine(error=RuntimeError("Laya is not installed")), Engine(error=ValueError("bad window")), use_fallback=False,
+    )
+
+    with pytest.raises(ValueError, match=r"no model could answer 'area' \(laya-english: Laya is not installed; laya-typed: bad window\)"):
+        run(triage)
+
+
+def test_step_5_choice_is_never_an_eliminated_option():
+    voter = {"type": "choice", "choice": "c", "probabilities": {"a": 0.3, "b": 0.2, "c": 0.5}, "answer_confidence": 0.5}
+
+    restricted = triage_flow._restrict(voter, ["a", "b"])
+
+    assert restricted["choice"] == "a" and restricted["probabilities"] == {"a": 0.6, "b": 0.4}
+    assert triage_flow._restrict(voter, ["b", "c"])["choice"] == "c"
 
 
 def test_a_local_only_request_never_reaches_jev_even_when_the_flow_allows_it(monkeypatch):

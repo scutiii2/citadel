@@ -32,7 +32,7 @@ By default a noul question skips English (its yes/no label bug), so typed, then 
 machine unless Jev is asked.
 
 What is returned is compact by default, since the orchestrator reads it on every turn (a reviewed answer was
-about 560 tokens with its trace, about 65 without): `type`, the pick (`choice`, `score` or `noul`), `answer_confidence`,
+about 560 tokens with its trace, about 75 without): `type`, the pick (`choice`, `score` or `noul`), `answer_confidence`,
 `uncertain`, `answered_by`, `probabilities` (2 decimals) and, when they apply, `also_check`, `unknown` and
 `candidates`. The full answer adds `resolved_by`, `eliminated`, `disagreement`, `note`, a `legend` for score questions and
 a `rounds` trace of every model call. Ask for it with `"trace": true` in a request, or set `classifier.triage_trace`.
@@ -46,7 +46,7 @@ from typing import Any
 
 from src.llm import decision, laya_provider
 from src.llm.base_provider import ChatResult
-from src.llm.decision import TRIAGE_COUNTS, TRIAGE_VOTERS
+from src.llm.decision import TRIAGE_VOTERS
 from src.llm.laya_provider import LayaQuestions, Request
 
 _log = logging.getLogger(__name__)
@@ -76,19 +76,6 @@ def compact(answer: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def parse_threshold(text: str) -> tuple[str, str, float]:
-    """`laya-typed:3+=0.6` -> ("laya-typed", "3+", 0.6)."""
-    try:
-        left, value = text.split("=")
-        name, count = left.split(":")
-        number = float(value)
-    except ValueError as error:
-        raise SystemExit(f"--threshold wants MODEL:COUNT=VALUE, for example laya-typed:3+=0.6 (got {text!r})") from error
-    if name not in TRIAGE_VOTERS or count not in TRIAGE_COUNTS or not 0 < number <= 1:
-        raise SystemExit(f"--threshold {text!r}: MODEL is one of {', '.join(TRIAGE_VOTERS)}; COUNT is 2 or 3+; VALUE is 0-1")
-    return name, count, number
-
-
 def _key(name: str) -> str:
     """The threshold row of a voter: any fallback backend counts as Jev."""
     return name if name in (ENGLISH, TYPED) else JEV
@@ -107,7 +94,8 @@ def _restrict(answer: dict[str, Any], options: list[str]) -> dict[str, Any]:
     """The answer's probabilities over only `options`, renormalised (a model answered before options were dropped)."""
     kept = {o: answer["probabilities"].get(o, 0.0) for o in options}
     total = sum(kept.values())
-    return {**answer, "probabilities": {o: (v / total if total else 1 / len(options)) for o, v in kept.items()}}
+    choice = answer["choice"] if answer["choice"] in kept else max(kept, key=kept.get)
+    return {**answer, "choice": choice, "probabilities": {o: (v / total if total else 1 / len(options)) for o, v in kept.items()}}
 
 
 def final_answer(voters: dict[str, dict[str, Any]], rounds: list[dict[str, Any]]) -> dict[str, Any]:
@@ -163,6 +151,7 @@ class TriageFlow:
             for count, row in DEFAULT_THRESHOLDS.items()
         }
         self.tokens = 0
+        self._failures: list[str] = []
         self._request: Request | None = None
         self._override: float | None = None
         self._cache: dict[str, dict[str, dict[str, Any]] | None] = {}
@@ -181,6 +170,7 @@ class TriageFlow:
             answers, tokens = self.locals[name]._laya_answers(request)
         except (ValueError, RuntimeError) as error:
             _log.warning("%s could not answer: %s", name, error)
+            self._failures.append(f"{name}: {error}")
             return None
         self.tokens += tokens
         return answers
@@ -199,6 +189,10 @@ class TriageFlow:
             answers = self._run_local(name, request)
         return None if answers is None else answers[qid]
 
+    def _no_answer(self, qid: str) -> str:
+        """The error for a question nobody answered, with what each Laya model said when it failed."""
+        return f"no model could answer {qid!r}" + (f" ({'; '.join(self._failures)})" if self._failures else "")
+
     # -- settling ----------------------------------------------------------------------------------
     def answer(self, raw: str) -> ChatResult:
         # A longer text is refused outright unless Jev, with its larger window, may take it.
@@ -207,7 +201,7 @@ class TriageFlow:
         self.use_fallback = self.use_fallback and not request.local_only
         data, _ = json.JSONDecoder().raw_decode(raw.lstrip())
         self._override = float(data["min_confidence"]) if "min_confidence" in data else None
-        self._request, self._cache, self.tokens = request, {}, 0
+        self._request, self._cache, self.tokens, self._failures = request, {}, 0, []
         answers = {}
         for qid, spec in request.questions.items():
             settle = self._settle_choice if spec["type"] == "choice" else self._settle_other
@@ -309,7 +303,7 @@ class TriageFlow:
         # 5: nobody was sure: compare what they said
         voters = {n: _restrict(a, options) for n, a in latest.items()}
         if not voters:
-            raise ValueError(f"no model could answer {qid!r}")
+            raise ValueError(self._no_answer(qid))
         if len(voters) == 1:
             name, answer = next(iter(voters.items()))
             out = {**answer, "answered_by": name, "uncertain": True, "rounds": rounds}
@@ -342,5 +336,5 @@ class TriageFlow:
         if jev is not None:
             return jev
         if best is None:
-            raise ValueError(f"no model could answer {qid!r}")
+            raise ValueError(self._no_answer(qid))
         return {**best[1], "answered_by": best[0], "uncertain": True}
