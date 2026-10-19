@@ -259,7 +259,8 @@ test("notes: leaving the page with unsaved text asks first", async ({ page }) =>
 
   await page.getByRole("button", { name: "New note" }).click();
   await page.getByLabel("Title").fill("Draft");
-  await page.getByRole("link", { name: "Capabilities", exact: true }).click();
+  await page.getByRole("button", { name: /account menu$/ }).click();
+  await page.getByRole("menuitem", { name: "Capabilities", exact: true }).click();
 
   const dialog = page.getByRole("dialog", { name: "Leave without saving?" });
   await expect(dialog).toBeVisible();
@@ -267,7 +268,8 @@ test("notes: leaving the page with unsaved text asks first", async ({ page }) =>
   await expect(page).toHaveURL(/notes$/);
   await expect(page.getByLabel("Title")).toHaveValue("Draft");
 
-  await page.getByRole("link", { name: "Capabilities", exact: true }).click();
+  await page.getByRole("button", { name: /account menu$/ }).click();
+  await page.getByRole("menuitem", { name: "Capabilities", exact: true }).click();
   await dialog.getByRole("button", { name: "Leave page", exact: true }).click();
   await expect(page).toHaveURL(/capabilities$/);
   expect(api.notes.size).toBe(0);

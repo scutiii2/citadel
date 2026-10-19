@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory, type RouteLocationRaw } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import ChatView from "../views/ChatView.vue";
+import { accountCapabilitiesClient } from "../api/AccountCapabilitiesClient";
+import { commandsClient } from "../api/CommandsClient";
+import { NATIVE_CAPABILITY_ROUTES } from "./capabilityPages";
 
 declare module "vue-router" {
   interface RouteMeta {
@@ -13,6 +16,7 @@ declare module "vue-router" {
     /** Open to any logged-in account, verified or not (the Account page,
      * so a mistyped email can be fixed). */
     anyAccount?: boolean;
+    capability?: string;
   }
 }
 
@@ -47,6 +51,7 @@ export const router = createRouter({
       // tools.view for the built-in capabilities, chat.use for the extensions.
       meta: { permission: ["tools.view", "chat.use"] },
     },
+    ...NATIVE_CAPABILITY_ROUTES,
     {
       path: "/capabilities/:name",
       name: "capability-page",
@@ -152,5 +157,22 @@ router.beforeEach(async (to): Promise<true | RouteLocationRaw> => {
     return { name: home?.name ?? "no-access" };
   }
   if (to.name === "no-access" && home) return { name: home.name };
+  if (to.meta.capability) {
+    try {
+      const [added, available] = await Promise.all([
+        accountCapabilitiesClient.get(),
+        // Execution access does not imply permission to browse the global catalog.
+        // Native API routes always enforce the capability's current enabled state.
+        auth.hasPermission("tools.view") ? commandsClient.capabilities() : null,
+      ]);
+      if (auth.account?.id !== account.id ||
+          !added.capabilities.includes(to.meta.capability) ||
+          (available !== null && !available.some((c) => c.name === to.meta.capability && c.enabled))) {
+        return { name: home?.name ?? "no-access" };
+      }
+    } catch {
+      return { name: home?.name ?? "no-access" };
+    }
+  }
   return true;
 });

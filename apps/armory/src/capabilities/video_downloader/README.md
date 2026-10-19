@@ -41,6 +41,27 @@ Install armory's dependencies, including pinned `yt-dlp[default,curl-cffi]==2026
 
 ## File serving decision
 
+Ember's Video Downloader screen uses fixed internal HTTP adapters on this same
+listener. Every `/video/ui` call requires `X-Internal-Token` and
+`X-Requester-Uid`. Only that UID owns the files and jobs; the token does not
+grant cross-account access. Disabled or absent capabilities return 503 before
+initializing the runtime. No extra MCP tool schemas are exposed.
+
+| Method and path | Request / response |
+| --- | --- |
+| `POST /video/ui/probe` | `{url}`; returns native `ProbeResult`, with plain metadata. |
+| `POST /video/ui/downloads` | `{url,preset}`; returns `{"job_id":"..."}` immediately. |
+| `GET /video/ui/jobs/{job_id}` | Native `JobStatus`, including fresh signed file link on completion. |
+| `POST /video/ui/jobs/{job_id}/cancel` | Request cooperative cancellation; returns `{"ok":true}`. Polling eventually reports `error` with code `cancelled`. |
+| `GET /video/ui/files` | Array of native `FileInfo` objects with fresh signed links. |
+| `DELETE /video/ui/files/{file_id}` | Delete an owned file; returns `{"ok":true}`. |
+
+Probe and download retain the service's URL policy and network guards, and both
+require FFmpeg as their MCP equivalents do. Missing and other-owner IDs return
+the same unavailable response. Expected service errors retain their native
+HTTP status and `{error:{code,message}}` body. Unexpected failures return a
+sanitized 503. These adapters share the existing runtime, quotas and queue.
+
 Signed links use `GET /video/files/{file_id}/download?exp=...&sig=...` on armory's existing listener. `command_routes.install_command_routes` installs the route and wraps the existing lifespan for cleanup; no new port or service is started. The route checks the capability toggle and exposure policy before initializing anything, validates the HMAC and expiry, then checks file TTL. Missing, expired and invalid links return the same 404. Starlette FileResponse provides streaming and Range support with attachment disposition, nosniff, no-store and no-referrer headers.
 
 Links are bearer credentials: anyone holding a valid link can download until link/file expiry, without an account header. Do not log or expose their query strings at a proxy. HTTPS is required at the public edge to protect links in transit. The standalone HMAC format is retained; listing or polling a completed job mints fresh links without changing the stored file.

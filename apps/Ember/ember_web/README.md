@@ -8,6 +8,35 @@ URL, token or key.
 
 ## Features
 
+- Native PDF merger (`/capabilities/pdf_merger`) and video downloader
+  (`/capabilities/video_downloader`) port the standalone workspaces into Ember.
+  Add Armory's `pdf` or `video` capability in the Supermarket, then use its card's
+  Open page button. Both need `tools.execute`; uploads also need `files.upload`,
+  and content previews/downloads need `files.download`. They add no rail entries.
+  `src/router/capabilityPages.ts` owns the shared page map and lazy native routes;
+  generic GUI pages and other extensions' external Open app links still work.
+- PDF keeps drag/keyboard source and page ordering, page ranges, rotation,
+  lazy PDF thumbnails, image fit/page size/margins, metadata and bookmarks.
+  JSON/base64 uploads allow 15 MiB per file. Armory's engine also enforces plan,
+  page and account quotas. Files normally expire after six hours; upload again
+  if expired. Merge progress is polled without blocking the page.
+- Video keeps URL probing, readable policy errors, available/blocked presets,
+  progress, cancellation and the expiring file list. Remote thumbnails use a
+  neutral placeholder under Ember's existing same-origin image policy.
+  Polling stops on route leave; stale account/request responses are ignored.
+  File deletion and job cancellation use ConfirmModal. DownloadCards, CopyButton,
+  ActionButton, ElapsedTime, SegmentedControl and ToggleSwitch are reused.
+- These workspaces call only `/api/pdf-merger` and `/api/video-downloader` on
+  ember_api. Armory owns jobs/files and validates video URLs with UrlPolicy.
+  Signed upstream downloads are fetched by ember_api after checking ownership;
+  the browser receives authenticated same-origin download links.
+
+  Verification includes view/client/store Vitest tests and
+  `e2e/capabilityWorkspaces.spec.ts` (mocked API, real production PDF.js worker).
+  Live smoke checks also exercised the real Armory engines through ember_api:
+  reordered PDF merges and a public MDN sample-video download, including browser
+  downloads. Light/dark layouts were checked at 1280, 768 and 375 pixels.
+
 - Tickets highlight unread support activity with an accent dot, border and
   “Support replied” label. The Tickets navigation badge refreshes while visible;
   opening an owned ticket marks it seen.

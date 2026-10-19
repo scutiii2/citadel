@@ -87,6 +87,8 @@ async def download_pdf(request: Request) -> FileResponse | JSONResponse:
 
 
 def install_command_routes(app: Starlette) -> None:
+    from src.media_ui_routes import install_media_ui_routes
+    install_media_ui_routes(app)
     app.add_route("/commands", list_commands, methods=["GET"])
     app.add_route("/pdf/files/{file_id}/download", download_pdf, methods=["GET"])
     from contextlib import asynccontextmanager

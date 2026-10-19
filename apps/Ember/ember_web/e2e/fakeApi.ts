@@ -138,6 +138,8 @@ export interface StoredTicket {
 }
 
 export interface FakeApi {
+  /** Requests captured only by the opt-in native media workspace fake. */
+  media: { uploads: { filename: string; data: string }[]; merges: Record<string, unknown>[]; downloads: { url: string; preset: string }[] };
   tickets: Map<number, StoredTicket>;
   /** What the account has added (GET and PUT /api/account-capabilities). */
   accountCapabilities: { capabilities: Set<string>; extensions: Set<string> };
@@ -240,8 +242,9 @@ const event = (sequence: number, body: Record<string, unknown>) =>
 export const ANSWER_PIECES = ["The capital ", "of France ", "is Paris."];
 export const ANSWER = ANSWER_PIECES.join("");
 
-export async function installFakeApi(page: Page, options: { admin?: boolean; tickets?: boolean } = {}): Promise<FakeApi> {
+export async function installFakeApi(page: Page, options: { admin?: boolean; tickets?: boolean; media?: boolean } = {}): Promise<FakeApi> {
   const api: FakeApi = {
+    media: { uploads: [], merges: [], downloads: [] },
     tickets: new Map(),
     accountCapabilities: { capabilities: new Set(), extensions: new Set() },
     userExtensions: new Map(),
@@ -259,19 +262,86 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     folders: new Map(),
   };
   const baseAccount = options.admin ? ADMIN_ACCOUNT : ACCOUNT;
-  const account = { ...baseAccount, permissions: [...baseAccount.permissions, ...(options.tickets ? ["tickets.create"] : [])] };
+  const account = { ...baseAccount, permissions: [...baseAccount.permissions, ...(options.tickets ? ["tickets.create"] : []), ...(options.media ? ["tools.view", "tools.execute", "files.download"] : [])] };
   if (options.admin) {
     for (const a of ADMIN_ACCOUNTS) api.accounts.set(a.id, { ...a });
     for (const r of ADMIN_ROLES) api.roles.set(r.id, { ...r });
     for (const c of ADMIN_CAPABILITIES) api.capabilities.set(c.name, { ...c });
     for (const c of ADMIN_CAPABILITIES) api.accountCapabilities.capabilities.add(c.name);
   }
+  if (options.media) {
+    for (const name of ['pdf', 'video']) {
+      api.capabilities.set(name, { name, enabled: true, label: name === 'pdf' ? 'PDF merger' : 'Video downloader', tools: [], resources: [] });
+      api.accountCapabilities.capabilities.add(name);
+    }
+  }
+  const pdfs = new Map<string, { info: { file_id: string; name: string; kind: string; pages: number; size: number; expires_at: number }; bytes: Buffer }>();
+  let videoDone = false;
+  let videoPolls = 0;
+  const videoBytes = Buffer.from('Mock video download fixture');
+  const videoFile = { file_id: 'video-file', name: 'Coastal walk.mp4', kind: 'video', mime: 'video/mp4', size: videoBytes.length, duration: 125, expires_at: Date.now() / 1000 + 21600, download_url: '/api/video-downloader/files/video-file/download' };
   let loggedIn = false;
 
-  await page.route("**/api/**", async (route) => {
+  // Opt-in media fixtures share routing across this test's browser context.
+  await (options.media ? page.context() : page).route("**/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
+    if (options.media && path.startsWith('/api/pdf-merger/')) {
+      const method = request.method();
+      if (path === '/api/pdf-merger/files' && method === 'GET') return json(route, [...pdfs.values()].map(f => f.info));
+      if (path === '/api/pdf-merger/files' && method === 'POST') {
+        const body = request.postDataJSON() as { filename: string; data: string };
+        api.media.uploads.push(body);
+        const bytes = Buffer.from(body.data, 'base64');
+        if (!bytes.toString('ascii', 0, 5).startsWith('%PDF-')) return json(route, { detail: 'Invalid PDF' }, 400);
+        const file_id = `pdf-${pdfs.size + 1}`;
+        const info = { file_id, name: body.filename, kind: 'pdf', pages: 1, size: bytes.length, expires_at: Date.now() / 1000 + 21600 };
+        pdfs.set(file_id, { info, bytes });
+        return json(route, info, 201);
+      }
+      const match = path.match(/^\/api\/pdf-merger\/files\/([^/]+)(?:\/(content|download))?$/);
+      if (match) {
+        const found = pdfs.get(match[1]!);
+        if (!found) return json(route, { detail: 'File not found' }, 404);
+        if (method === 'DELETE') { pdfs.delete(match[1]!); return route.fulfill({ status: 204 }); }
+        if (method === 'GET') return route.fulfill({ status: 200, contentType: 'application/pdf', headers: match[2] === 'download' ? { 'Content-Disposition': `attachment; filename="${found.info.name}"` } : {}, body: found.bytes });
+      }
+      if (path === '/api/pdf-merger/merge' && method === 'POST') {
+        api.media.merges.push(request.postDataJSON() as Record<string, unknown>);
+        return json(route, { job_id: 'pdf-job' }, 202);
+      }
+      if (path === '/api/pdf-merger/jobs/pdf-job' && method === 'GET') {
+        const bytes = samplePdf('Merged document', 2);
+        const info = { file_id: 'pdf-output', name: 'merged.pdf', kind: 'pdf', pages: 2, size: bytes.length, expires_at: Date.now() / 1000 + 21600 };
+        pdfs.set(info.file_id, { info, bytes });
+        return json(route, { job_id: 'pdf-job', state: 'done', done: 2, total: 2, result: { ...info, download_url: '/api/pdf-merger/files/pdf-output/download' }, error: null });
+      }
+      if (path.endsWith('/cancel') && method === 'POST') return json(route, {});
+    }
+    if (options.media && path.startsWith('/api/video-downloader/')) {
+      const method = request.method();
+      if (path === '/api/video-downloader/probe' && method === 'POST') return json(route, {
+        url: (request.postDataJSON() as { url: string }).url, title: 'Coastal walk at sunset', duration: 125, thumbnail: 'https://example.com/thumbnail.jpg', uploader: 'Field recordings',
+        options: [
+          { id: 'best', label: 'Best quality', kind: 'video', estimated_bytes: 900000000, blocked: true, code: 'too_large', reason: 'Exceeds the file size limit' },
+          { id: '720p', label: '720p', kind: 'video', estimated_bytes: 24000000, blocked: false, code: null, reason: null },
+          { id: 'audio-mp3', label: 'Audio (MP3)', kind: 'audio', estimated_bytes: 3000000, blocked: false, code: null, reason: null },
+        ],
+      });
+      if (path === '/api/video-downloader/downloads' && method === 'POST') {
+        api.media.downloads.push(request.postDataJSON() as { url: string; preset: string });
+        return json(route, { job_id: 'video-job' }, 202);
+      }
+      if (path === '/api/video-downloader/jobs/video-job' && method === 'GET') {
+        videoDone = ++videoPolls > 1;
+        return json(route, { job_id: 'video-job', state: videoDone ? 'done' : 'downloading', percent: videoDone ? 100 : 42, speed: videoDone ? null : 1200000, eta: videoDone ? null : 12, file: videoDone ? videoFile : null, error: null });
+      }
+      if (path === '/api/video-downloader/files' && method === 'GET') return json(route, videoDone ? [videoFile] : []);
+      if (path === '/api/video-downloader/files/video-file/download' && method === 'GET') return route.fulfill({ status: 200, contentType: 'video/mp4', headers: { 'Content-Disposition': 'attachment; filename="Coastal walk.mp4"' }, body: videoBytes });
+      if (path === '/api/video-downloader/files/video-file' && method === 'DELETE') { videoDone = false; return route.fulfill({ status: 204 }); }
+      if (path.endsWith('/cancel') && method === 'POST') return json(route, {});
+    }
     if (path === "/api/tickets/unread-count" && request.method() === "GET") {
       return json(route, { count: [...api.tickets.values()].filter(ticket => ticket.has_unread).length });
     }
@@ -689,7 +759,7 @@ const DELEGATE_WORKING_MS = 1000;
 
 /** The answer streams in two requests, like a connection that drops and resumes
  * from the last sequence: the first ends with the delegated agent working (so the
- * page shows "Test Agent → Calculator" for a moment), the second finishes it. */
+ * page shows "Test Agent â†’ Calculator" for a moment), the second finishes it. */
 async function streamTurn(route: Route, api: FakeApi, id: string) {
   const chat = api.chats.get(id);
   if (!chat) return json(route, { detail: "No answer is being written for this chat" }, 404);
@@ -777,4 +847,27 @@ async function mcpAgent(route: Route) {
     headers: { "Mcp-Session-Id": "fake-session" },
     body: JSON.stringify({ jsonrpc: "2.0", id: message.id, result }),
   });
+}
+
+/** Small valid PDF with byte-accurate xref offsets, used for real PDF.js worker previews. */
+export function samplePdf(label: string, pageCount = 1): Buffer {
+  const kids = Array.from({ length: pageCount }, (_, i) => `${4 + i * 2} 0 R`).join(' ');
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    `<< /Type /Pages /Kids [${kids}] /Count ${pageCount} >>`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  for (let i = 0; i < pageCount; i++) {
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + i * 2} 0 R >>`);
+    const stream = `BT /F1 18 Tf 35 340 Td (${label} ${i + 1}) Tj ET`;
+    objects.push(`<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`);
+  }
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  objects.forEach((object, i) => { offsets.push(Buffer.byteLength(pdf)); pdf += `${i + 1} 0 obj\n${object}\nendobj\n`; });
+  const xref = Buffer.byteLength(pdf);
+  pdf += `xref\n0 ${offsets.length}\n0000000000 65535 f \n`;
+  pdf += offsets.slice(1).map(offset => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+  pdf += `trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(pdf);
 }

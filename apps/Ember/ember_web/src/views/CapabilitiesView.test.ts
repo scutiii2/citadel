@@ -156,7 +156,7 @@ describe("CapabilitiesView", () => {
     const links = w.findAll("a").filter((a) => a.text() === "Open page");
 
     expect(links).toHaveLength(1);
-    expect(links[0].attributes("href")).toBe("/capabilities/pdf");
+    expect(links[0].attributes("href")).toBe("/capabilities/pdf_merger");
   });
 
   it("links notes, memory, the generator and tickets to their dedicated pages, for accounts allowed to use them", async () => {
@@ -179,6 +179,34 @@ describe("CapabilitiesView", () => {
 
     const without = await show({ permissions: ["tools.view"], added: { capabilities: ["notes", "memory", "gen", "ticket"] } });
     expect(without.findAll("a").filter((a) => a.text() === "Open page")).toHaveLength(0);
+  });
+
+  it("opens native PDF and video workspaces even without a generic GUI declaration", async () => {
+    const caps: CapabilityInfo[] = [
+      {name: "pdf", label: "PDF", enabled: true, tools: [], resources: []},
+      {name: "video", label: "Video", enabled: true, tools: [], resources: []},
+    ];
+    mocks.capabilities.mockResolvedValue(caps);
+    const w = await show({added: {capabilities: ["pdf", "video"]}});
+    expect(w.findAll("a").filter(a => a.text() === "Open page").map(a => a.attributes("href")))
+      .toEqual(["/capabilities/pdf_merger", "/capabilities/video_downloader"]);
+  });
+
+  it("keeps the generic capability page fallback for other GUI capabilities", async () => {
+    mocks.capabilities.mockResolvedValue([{name: "custom", label: "Custom", enabled: true, tools: [], resources: [], has_gui: true}]);
+    const w = await show({added: {capabilities: ["custom"]}});
+    expect(w.get("a[href='/capabilities/custom']").text()).toBe("Open page");
+  });
+
+  it("hides native workspace links without execution permission or when disabled", async () => {
+    mocks.capabilities.mockResolvedValue([
+      {name: "pdf", label: "PDF", enabled: true, tools: [], resources: []},
+      {name: "video", label: "Video", enabled: false, tools: [], resources: []},
+    ]);
+    const readonly = await show({permissions: ["tools.view"], added: {capabilities: ["pdf", "video"]}});
+    expect(readonly.findAll("a").filter(a => a.text() === "Open page")).toHaveLength(0);
+    const writer = await show({added: {capabilities: ["video"]}});
+    expect(writer.findAll("a").filter(a => a.text() === "Open page")).toHaveLength(0);
   });
 
   it("lists compact capability cards with what they bring", async () => {
@@ -470,7 +498,7 @@ describe("CapabilitiesView extension cards", () => {
     w.findAll("article.card a").filter((a) => a.text() === "Open page" || a.text() === "Open app");
 
   it("opens the web UI of an extension that has one, in a new tab", async () => {
-    mocks.extensions.mockResolvedValue([ext("pdf", "http://127.0.0.1:5174")]);
+    mocks.extensions.mockResolvedValue([ext("other_pdf", "http://127.0.0.1:5174")]);
     const w = await show({ permissions: WITH_CHAT });
 
     const link = w.get("a[href='http://127.0.0.1:5174/']");
@@ -479,12 +507,27 @@ describe("CapabilitiesView extension cards", () => {
     expect(link.attributes("rel")).toBe("noopener noreferrer");
   });
 
+  it("opens legacy PDF and video extension cards in the corresponding native workspace", async () => {
+    mocks.capabilities.mockResolvedValue([...CAPS, {name: "video", label: "Video", enabled: true, tools: [], resources: []}]);
+    mocks.extensions.mockResolvedValue([ext("pdf_merger", "https://old-pdf.example"), ext("video_downloader", "https://old-video.example")]);
+    const w = await show({permissions: WITH_CHAT, added: {capabilities: ["pdf", "video"]}});
+    const links = sections(w).filter(card => ["PDF_MERGER", "VIDEO_DOWNLOADER"].includes(card.get("h3").text())).map(card => card.get("a"));
+    expect(links.map(link => link.attributes("href"))).toEqual(["/capabilities/pdf_merger", "/capabilities/video_downloader"]);
+    expect(links.every(link => link.attributes("target") !== "_blank")).toBe(true);
+  });
+
+  it("hides native legacy extension links when its built-in capability is not added", async () => {
+    mocks.extensions.mockResolvedValue([ext("pdf_merger", "https://old-pdf.example")]);
+    const w = await show({permissions: WITH_CHAT, added: {capabilities: []}});
+    expect(openButtons(w)).toHaveLength(0);
+  });
+
   it("gives an extension without a web UI no Open button, and never links a non-http address", async () => {
     mocks.extensions.mockResolvedValue([ext("notes"), ext("odd id/x", null), ext("bad", "javascript:alert(1)")]);
     const w = await show({ permissions: WITH_CHAT });
 
     expect(openButtons(w).map((a) => [a.text(), a.attributes("href")])).toEqual([
-      ["Open page", "/capabilities/pdf"],
+      ["Open page", "/capabilities/pdf_merger"],
     ]);
   });
 
