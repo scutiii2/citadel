@@ -61,6 +61,15 @@ ALL_PERMISSIONS = MappingProxyType({
     TICKETS_MANAGE: "See every ticket, triage them and set status, priority and assignee",
 })
 
+# Staff permissions: an account whose email is not verified does not hold them, even when
+# config_app.json sets require_email_verification to false (see Account.permission_names).
+STAFF_PERMISSIONS = frozenset({
+    ACCOUNTS_VIEW, ACCOUNTS_MANAGE, ACCOUNTS_DELETE, ROLES_VIEW, ROLES_MANAGE, ROLES_ASSIGN,
+    INVITES_MANAGE, SETTINGS_MANAGE, CAPABILITIES_MANAGE, EXTENSIONS_MANAGE, AGENTS_MANAGE,
+    LOGS_VIEW, LOGS_ERRORS_VIEW, LOGS_CHAT_VIEW, LOGS_CHAT_PROMPTS_VIEW, CONFIG_ISSUES_VIEW,
+    TRAFFIC_VIEW, USAGE_ALL_VIEW, TICKETS_MANAGE,
+})
+
 ADMIN_ROLE = "Administrator"
 
 # What the default role (config_app.json's default_role) starts with when it

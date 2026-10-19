@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import utcnow
 from src.models import Account, AuthSession, InviteCode, Permission, Role
-from src.services.permissions import ROLES_MANAGE, ROLES_ASSIGN, ADMIN_ROLE, is_known_permission, permission_description
+from src.services.permissions import ROLES_MANAGE, ROLES_ASSIGN, ADMIN_ROLE, STAFF_PERMISSIONS, is_known_permission, permission_description
 
 
 class AdminError(Exception):
@@ -149,6 +149,8 @@ class AdminService:
 
     async def assign_role(self, account: Account, role: Role, *, actor: Account) -> Account:
         self.ensure_can_delegate(actor, role)
+        if not account.email_verified and any(p.name in STAFF_PERMISSIONS for p in role.permissions):
+            raise AdminError(f"Account '{account.username}' has not verified its email; it cannot hold role '{role.name}'")
         if role not in account.roles:
             account.roles.append(role)
             await self._session.commit()
