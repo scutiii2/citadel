@@ -77,17 +77,17 @@ Items 1 to 6 are complete; item 7 remains open.
 
 **Revisit when**: user wants to tackle a sandboxed workspace; brainstorm that design first.
 
-## Chess and Tetris in Ember: web page and chat tools (added 2026-10-09, backend built 2026-10-16)
+## Chess: standalone project (added 2026-10-09, backend built 2026-10-16, decoupled 2026-10-19)
 
-**Context**: Player fights a bot in chess or Tetris inside Ember, at no billing cost. Designed 2026-10-09 as three specs. Laya reads text only (512-token window), so a conventional engine proposes and scores moves and Laya picks among the top candidates, with the engine's best move as fallback. Standalone project `apps/chess/` (port 8070, renamed from `mini_games` 2026-10-16), no LLM calls. It holds both games.
+**Context**: `Python/chess` is its own project, not part of Citadel or Ember. A conventional engine proposes and scores moves and its own local Laya picks among the top candidates, with the engine's best move as fallback. Laya is required, not optional. Port 8070, renamed from `mini_games` 2026-10-16. Spec 1 (backend, 144 tests, Laya eval in `docs/laya-eval.md`) merged as `8c4dc28e`.
 
-- **Spec 1, backend: done.** Merged to main (`8c4dc28e`). 144 tests; the Laya eval (`apps/chess/docs/laya-eval.md`) made `laya` the default picker for both games (Tetris only just clears the 75% rule). Spec `docs/superpowers/specs/2026-10-09-mini-games-backend-design.md`, plan `docs/superpowers/plans/2026-10-09-mini-games-backend.md` (file names keep the old name). Not yet in the Ember game registry or run beside the other servers.
-- **Spec 2, not written**: `ember_api` proxy routes for the chess backend and an `ember_web` page with the boards. Chess is the smaller board (static grid, click to move); the Tetris gravity loop runs in the browser. Build chess first.
-- **Spec 3, not written**: mcp_server extension entry (`config_extensions.json`) with tools to start and play a game from chat, a chat "Play" card, and a floating modal. Overturns nothing: it reuses the same backend, and `ember` stays the only entry agent. Check first how the game host (`/games`, see below) changes this.
+**Dropped 2026-10-19**: the `ember_api` proxy with an `ember_web` page (old spec 2) and the mcp_server/armory chat tools (old spec 3). Chess does not use garrison; it has its own Laya client.
 
-**Open points**: Tetris garbage lines, session persistence across restarts, and more games are out of scope for v1. The folder name `chess` is narrower than its contents.
+**To do** (tracked in `Brain/Projects/chess.md`; chess has no git repo yet): (run.bat and 103 tests pass 2026-10-19; Tetris removed, chess only) `git init`; own UI; an autonomous brain; decide the auth headers and the folder name; session persistence.
 
-**Revisit when**: user wants the Ember page; write spec 2 first.
+**Optional phase 2**: stronger chess engine, `Python/chess/docs/phase-2-stronger-engine.md`. Stockfish, if added, is a separate picker; Laya stays.
+
+**Revisit when**: user continues chess; start with the to-do list above.
 
 ## Ascension card images in the UI (added 2026-10-10)
 
