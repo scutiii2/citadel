@@ -1,0 +1,20 @@
+{
+  "label": "OpenCode Zen",
+  "base_url": "https://opencode.ai/zen/v1",
+  "api_key": "{OPENCODE_API_KEY}",
+  "model": "gpt-6.1-sol",
+  "models": {
+    "light": {
+      "id": "gpt-6-luna",
+      "use_for": "lookups, extraction, short rewrites, simple formatting"
+    },
+    "standard": {
+      "id": "gpt-6.1-sol",
+      "use_for": "most tasks"
+    },
+    "heavy": {
+      "id": "gpt-6-astra",
+      "use_for": "multi-step reasoning, hard code or data analysis"
+    }
+  }
+}
