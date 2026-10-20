@@ -1,5 +1,21 @@
 # ember_api
 
+
+## Internal Router metadata and access
+
+`GET /api/agents` adds optional `internal_role` and a sanitized `decision` summary
+for Router; ordinary agent response fields remain compatible. Running definitions
+and disabled/offline definitions retain the internal role. Discovery of the Laya
+triage agent explicitly excludes internal roles. Router configuration passes
+through existing `/api/admin/agents` routes and `agents.manage` checks.
+
+The browser agent MCP proxy continues allowing only `status`; internal `route`,
+`ask` and `interpret` calls are refused. Routing backend/model usage uses existing
+usage accounting and permissions. Chat traces retain up to 64 attempt diagnostics
+without increasing the established 20-row chat-message breakdown limit; prompt
+text and credentials are excluded from routing metadata.
+
+
 ## Second brain auto-save
 
 Migration `0024` adds `chats.save_to_second_brain`, default false. It appears in

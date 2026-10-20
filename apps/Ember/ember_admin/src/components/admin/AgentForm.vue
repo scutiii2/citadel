@@ -4,6 +4,8 @@ import type { AgentConfig, AgentFile, ProviderCatalog } from "../../api/AgentsAd
 import BaseModal from "../BaseModal.vue";
 import ToggleSwitch from "../ToggleSwitch.vue";
 import AgentGatewayList, { type GatewayRow } from "./AgentGatewayList.vue";
+import RouterPolicyForm from "./RouterPolicyForm.vue";
+import { routerPolicyDefaults, validateRouterPolicy } from "../../utils/routerPolicy";
 
 /** Create or edit one agent file. The parent keeps `open`, saves on `save`
  * and closes on `close`; `preview` asks the parent for the assembled system
@@ -26,6 +28,8 @@ const EFFORTS = ["off", "low", "medium", "high"];
 const TIERS = ["light", "standard", "heavy", "extreme"];
 
 const editing = computed(() => props.initial !== null);
+const isRouter = computed(() => props.initial?.internal_role === "router");
+const decision = ref(routerPolicyDefaults());
 const id = ref("");
 const label = ref("");
 const port = ref("");
@@ -91,6 +95,7 @@ function draftSignature(): string {
     effort.value, minTier.value, maxTier.value, identity.value, temperature.value,
     maxTokens.value, maxToolRounds.value, maxEffort.value, persona.value,
     instructions.value, focus.value, allow.value, deny.value,
+    decision.value,
   ]);
 }
 const modified = computed(() => initialDraft.value !== draftSignature());
@@ -100,6 +105,7 @@ watch(
   (isOpen) => {
     if (!isOpen) return;
     const a = props.initial;
+    decision.value = routerPolicyDefaults(a?.decision);
     localError.value = "";
     id.value = a?.id ?? "";
     label.value = a?.label ?? "";
@@ -165,6 +171,7 @@ function optionalNumber(text: string, name: string, low: number, high: number, w
 /** The agent file the form describes, or null (with localError set) when a field is invalid. */
 function buildConfig(): AgentConfig | null {
   localError.value = "";
+  if (isRouter.value && (localError.value = validateRouterPolicy(decision.value))) return null;
   const portNumber = Number(port.value);
   if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) {
     localError.value = "Port must be a whole number from 1 to 65535.";
@@ -236,6 +243,17 @@ function buildConfig(): AgentConfig | null {
   // On is the default: leave the key out so existing agent files stay as they are.
   if (planTool.value) delete config.plan_tool;
   else config.plan_tool = false;
+  if (isRouter.value) {
+    config.internal_role = "router";
+    config.decision = decision.value;
+    config.entry = false;
+    config.orchestrator = false;
+    config.delegable = false;
+    config.memory_recall = false;
+    config.plan_tool = false;
+    config.tools = { allow: [], deny: ["*"] };
+    config.llm = { provider: "laya", gateway: "local", model: "convaiinnovations/laya" };
+  }
   delete config.routing; // ai_agent rejects the retired routing option, also in files saved earlier
   for (const key of ["label", "url", "identity", "persona", "instructions", "focus"]) if (!config[key]) delete config[key];
   return config;
@@ -276,7 +294,7 @@ function previewPrompt(): void {
         <legend>Model</legend>
         <div class="row">
           <label class="field grow"><span>Provider</span>
-            <select v-model="provider" data-test="provider"><option v-for="p in providerIds" :key="p" :value="p">{{ p }}</option></select>
+            <select v-model="provider" :disabled="isRouter" data-test="provider"><option v-for="p in providerIds" :key="p" :value="p">{{ p }}</option></select>
           </label>
         </div>
         <AgentGatewayList v-if="!isLaya" v-model="gatewayRows" :gateways="gateways" :default-gateway="DEFAULT_GATEWAY[provider] ?? ''" :busy="busy" />
@@ -311,7 +329,8 @@ function previewPrompt(): void {
         <small v-if="!isLaya">The orchestrator picks the lightest tier in this range that fits each task. Tier models are set per gateway in ai_agent's gateways directory.</small>
       </fieldset>
 
-      <fieldset>
+      <RouterPolicyForm v-if="isRouter" v-model="decision" :busy="busy" />
+      <fieldset v-else>
         <legend>Behaviour</legend>
         <label class="field"><span>Identity (replaces the shared identity line)</span><textarea v-model="identity" data-test="identity" rows="2" placeholder="Empty = the shared identity from Shared prompts" /></label>
         <label class="field"><span>Persona</span><textarea v-model="persona" data-test="persona" rows="3" /></label>
@@ -325,14 +344,14 @@ function previewPrompt(): void {
 
       <div class="switches">
         <ToggleSwitch :checked="enabled" data-test="enabled" @change="enabled = ($event.target as HTMLInputElement).checked">Enabled</ToggleSwitch>
-        <ToggleSwitch :checked="orchestrator" :disabled="isLaya" data-test="orchestrator" @change="orchestrator = ($event.target as HTMLInputElement).checked">Orchestrator (can hand work to other agents)</ToggleSwitch>
-        <ToggleSwitch :checked="planTool" :disabled="isLaya" data-test="plan-tool" @change="planTool = ($event.target as HTMLInputElement).checked">Task checklist (can show a step-by-step plan; chats can also turn it off)</ToggleSwitch>
-        <ToggleSwitch :checked="entry" :disabled="isLaya" data-test="entry" @change="entry = ($event.target as HTMLInputElement).checked">Entry agent (receives every new question)</ToggleSwitch>
+        <ToggleSwitch v-if="!isRouter" :checked="orchestrator" :disabled="isLaya" data-test="orchestrator" @change="orchestrator = ($event.target as HTMLInputElement).checked">Orchestrator (can hand work to other agents)</ToggleSwitch>
+        <ToggleSwitch v-if="!isRouter" :checked="planTool" :disabled="isLaya" data-test="plan-tool" @change="planTool = ($event.target as HTMLInputElement).checked">Task checklist (can show a step-by-step plan; chats can also turn it off)</ToggleSwitch>
+        <ToggleSwitch v-if="!isRouter" :checked="entry" :disabled="isLaya" data-test="entry" @change="entry = ($event.target as HTMLInputElement).checked">Entry agent (receives every new question)</ToggleSwitch>
       </div>
       <p v-if="planTool && !isLaya" class="hint" data-test="plan-tool-cost">Task checklist costs about 200 input tokens on every model call of this agent, plus about 15-25 output tokens per item each time it updates the list. Turn it off for agents that only do short tasks.</p>
       <p v-if="entry" class="hint">Only one enabled agent can be the entry agent. To move it, unset it on the current one first.</p>
 
-      <fieldset class="preview">
+      <fieldset v-if="!isRouter" class="preview">
         <legend>Prompt preview</legend>
         <p class="hint">The system prompt the model receives, built from this form and the shared prompts.</p>
         <div class="row preview-bar">

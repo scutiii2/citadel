@@ -50,6 +50,8 @@ class AgentEntry:
     entry: bool = False
     orchestrator: bool = False
     focus: str = ""
+    internal_role: str | None = None
+    decision: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,8 @@ class AgentDefinition:
     gateway: str | None = None
     model: str | None = None
     tiers: tuple[ModelTier, ...] = ()
+    internal_role: str | None = None
+    decision: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -95,6 +99,21 @@ class AgentListing:
     gateway: str | None = None
     model: str | None = None
     tiers: tuple[ModelTier, ...] = ()
+    internal_role: str | None = None
+    decision: dict[str, Any] | None = None
+
+
+def _decision_summary(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    fields = ("choose_agent", "choose_tier", "english", "typed", "fallback", "fallback_available")
+    safe = {k: raw[k] for k in fields if isinstance(raw.get(k), bool)}
+    seconds = raw.get("deadline_seconds")
+    if isinstance(seconds, (int, float)) and not isinstance(seconds, bool) and 1 <= seconds <= 30:
+        safe["deadline_seconds"] = seconds
+    if raw.get("local_status") in ("not_loaded", "loaded", "unavailable"):
+        safe["local_status"] = raw["local_status"]
+    return safe
 
 
 def _text_or_none(value: Any) -> str | None:
@@ -132,6 +151,8 @@ def parse_definitions(raw: Any) -> list[AgentDefinition]:
                     gateway=_text_or_none(llm.get("gateway")),
                     model=_text_or_none(llm.get("model")),
                     tiers=_parse_tiers(llm.get("tiers")),
+                    internal_role="router" if item.get("internal_role") == "router" else None,
+                    decision=_decision_summary(item.get("decision")) if item.get("internal_role") == "router" else None,
                 )
             )
     return found
@@ -151,6 +172,8 @@ def parse_registry(raw: Any) -> list[AgentEntry]:
                     entry=item.get("entry") is True,
                     orchestrator=item.get("orchestrator") is True,
                     focus=focus if isinstance(focus, str) else "",
+                    internal_role="router" if item.get("internal_role") == "router" else None,
+                    decision=_decision_summary(item.get("decision")) if item.get("internal_role") == "router" else None,
                 )
             )
     return entries
@@ -252,7 +275,7 @@ class AgentDirectory:
     async def find_by_provider(self, provider: str) -> AgentEntry | None:
         """A running agent whose agent file uses this LLM provider (e.g. "laya").
         None when none is running, or when the definitions are not published."""
-        ids = {d.id for d in await self._source.definitions() if d.provider == provider}
+        ids = {d.id for d in await self._source.definitions() if d.provider == provider and not d.internal_role}
         return next((a for a in await self.all() if a.id in ids), None)
 
     async def listing(self) -> list[AgentListing]:
@@ -272,12 +295,15 @@ class AgentDirectory:
                 a.id, a.label, entry is not None and a.id == entry.id, a.orchestrator, a.focus, "running",
                 d.provider if d else None, d.gateway if d else None, d.model if d else None,
                 d.tiers if d else (),
+                a.internal_role or (d.internal_role if d else None),
+                a.decision if a.decision is not None else (d.decision if d else None),
             )
         for d in defined:
             if d.id not in rows:
                 status = "offline" if d.enabled else "disabled"
                 rows[d.id] = AgentListing(
-                    d.id, d.label, d.entry, d.orchestrator, d.focus, status, d.provider, d.gateway, d.model, d.tiers
+                    d.id, d.label, d.entry, d.orchestrator, d.focus, status, d.provider, d.gateway, d.model, d.tiers,
+                    d.internal_role, d.decision,
                 )
         order = {"running": 0, "offline": 1, "disabled": 2}
         return sorted(rows.values(), key=lambda r: (order[r.status], not r.entry))

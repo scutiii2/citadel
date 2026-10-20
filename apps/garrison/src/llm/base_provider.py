@@ -172,6 +172,8 @@ class ChatResult:
     # Private extensions that could not be used this turn (see private_extensions/turn.py):
     # [{"id", "label", "error"}]. The turn went on without their tools.
     private_extension_errors: list[dict[str, str]] = field(default_factory=list)
+    # False for an entry turn answered entirely by a delegated specialist.
+    model_executed: bool = True
 
 
 @catalog

@@ -303,11 +303,13 @@ class LayaQuestions:
     def __init__(
         self, engine: Any = None, checkpoint: str = DEFAULT_MODEL, window: int | None = None,
         typed: "LayaQuestions | None" = None,
+        local_only: bool = False,
     ) -> None:
         self._engine = engine
         self._checkpoint = checkpoint
         self.window = window
         self._typed = typed
+        self._local_only = local_only
         self._lock = threading.Lock()
 
     def _load(self) -> Any:
@@ -317,7 +319,12 @@ class LayaQuestions:
                 import laya
             except ImportError as error:
                 raise RuntimeError('Laya is not installed: pip install -e .') from error
-            self._engine = laya.load(self._checkpoint)
+            checkpoint = self._checkpoint
+            if self._local_only:
+                from src.agents.router_models import cached_checkpoint
+
+                checkpoint = cached_checkpoint(checkpoint)
+            self._engine = laya.load(checkpoint)
         return self._engine
 
     def _flow_models(self) -> dict[str, "LayaQuestions"]:
@@ -358,9 +365,18 @@ class LayaQuestions:
 
         return triage_flow.TriageFlow(self._flow_models()).answer(raw)
 
-    def _laya_answers(self, request: Request) -> tuple[dict[str, dict[str, Any]], int]:
-        with self._lock:
+    def _laya_answers(self, request: Request, check=None) -> tuple[dict[str, dict[str, Any]], int]:
+        if check:
+            while not self._lock.acquire(timeout=min(.05, check())):
+                check()
+        else:
+            self._lock.acquire()
+        try:
+            if check:
+                check()
             prediction = self._load().predict(request.text, request.questions, max_len=self.window or CONTEXT_WINDOW)
+        finally:
+            self._lock.release()
         try:
             usage = prediction.get("usage", {})
             incomplete = usage.get("truncated") or usage.get("state_tokens_dropped", 0)

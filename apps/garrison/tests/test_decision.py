@@ -299,12 +299,15 @@ def test_the_example_config_seeds_every_classifier_key_at_its_default(monkeypatc
     assert seeded.auto_tier.enabled is False and seeded.auto_route.enabled is False
 
 
-def test_the_example_config_names_every_classifier_setting():
+def test_the_example_config_names_active_classifier_settings_only():
     import json
     from pathlib import Path
 
     path = Path(decision.__file__).resolve().parents[2] / "configs" / "config_tuning.json.example"
-    assert set(json.loads(path.read_text(encoding="utf-8"))["classifier"]) == decision._KNOWN
+    legacy_routing = {"auto_route", "auto_tier"}
+    example_keys = set(json.loads(path.read_text(encoding="utf-8"))["classifier"])
+    assert legacy_routing <= decision._KNOWN  # Old deployments remain readable.
+    assert example_keys == decision._KNOWN - legacy_routing
 
 
 def test_the_example_env_lists_the_keys_the_classifier_backends_read():

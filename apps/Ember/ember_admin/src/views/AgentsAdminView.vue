@@ -184,6 +184,7 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
           :agent="a"
           :status="live[a.id]?.status"
           :tiers="live[a.id]?.tiers"
+          :decision="live[a.id]?.decision"
           @edit="openEdit(a)"
           @remove="removing = a; removeError = ''"
           @reset="resetting = a; resetError = ''"

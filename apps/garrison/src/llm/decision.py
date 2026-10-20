@@ -28,6 +28,10 @@ import json
 import logging
 import urllib.error
 import urllib.request
+import time
+from contextlib import contextmanager
+from contextvars import ContextVar
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any, Mapping
@@ -38,6 +42,9 @@ from src.core.config_files import TUNING_PATH, read_section
 _log = logging.getLogger(__name__)
 
 _SECTION = "classifier"
+_snapshot: ContextVar[Any] = ContextVar("decision_snapshot", default=None)
+_attempt_observer: ContextVar[Any] = ContextVar("decision_attempt_observer", default=None)
+_remaining_time: ContextVar[Any] = ContextVar("decision_remaining_time", default=None)
 FEATURES = ("triage", "auto_tier", "auto_route")
 # The voters of the triage flow (llm/triage_flow.py) and the option counts their thresholds are set for.
 TRIAGE_VOTERS = ("laya-english", "laya-typed", "jev")
@@ -161,7 +168,19 @@ class ClassifierSettings:
 @catalog
 def settings() -> ClassifierSettings:
     """The `classifier` section of config_tuning.json over the defaults above (all off)."""
-    return _load_settings()
+    return _snapshot.get() or _load_settings()
+
+
+@contextmanager
+def scoped_settings(config: ClassifierSettings, observer=None, remaining=None):
+    """Request-local policy and attempt accounting, inherited by worker threads."""
+    tokens = (_snapshot.set(config), _attempt_observer.set(observer), _remaining_time.set(remaining))
+    try:
+        yield
+    finally:
+        _remaining_time.reset(tokens[2])
+        _attempt_observer.reset(tokens[1])
+        _snapshot.reset(tokens[0])
 
 
 @lru_cache(maxsize=1)
@@ -387,12 +406,27 @@ def ask_choice(
     answer: Choice | None = None
     failure: ClassifierError | None = None
     for backend_id in chain:
+        remaining = _remaining_time.get()
+        call_limit = min(limit, remaining()) if remaining else limit
+        started = time.monotonic()
+        started_at = datetime.now(timezone.utc).isoformat()
+        picked = None
+        observer = _attempt_observer.get()
         try:
-            answer = _backend(backend_id).ask_choice(subject, criteria, question, limit)
+            picked = _backend(backend_id).ask_choice(subject, criteria, question, call_limit)
+            answer = picked
         except ClassifierError as error:
             _log.warning("classifier backend %s could not answer: %s", backend_id, error)
             failure = error
             continue
+        finally:
+            if observer:
+                configured = settings().typesafe if backend_id == "jev" else settings().vercel
+                observer({"provider_id": backend_id, "model": picked.model if picked else configured.model,
+                          "started_at": started_at, "duration_ms": round((time.monotonic()-started)*1000),
+                          "input_tokens": picked.prompt_tokens if picked else None,
+                          "output_tokens": 0 if picked else None, "ok": picked is not None,
+                          "reason": "" if picked else "backend_failed"})
         if min_confidence is None or answer.confidence >= min_confidence:
             break
     if answer is None:

@@ -1,0 +1,15 @@
+{
+  "label": "Router",
+  "port": 9117,
+  "enabled": true,
+  "internal_role": "router",
+  "entry": false,
+  "orchestrator": false,
+  "delegable": false,
+  "memory_recall": false,
+  "plan_tool": false,
+  "llm": {"provider": "laya", "gateway": "local", "model": "convaiinnovations/laya"},
+  "focus": "Internal: chooses an available specialist and model tier using local triage with optional Jev fallback.",
+  "tools": {"allow": [], "deny": ["*"]},
+  "decision": {}
+}

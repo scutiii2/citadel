@@ -748,7 +748,10 @@ def _trace_parts(result: dict[str, Any], turn: Turn) -> tuple[list[dict[str, Any
     because only some admins may read them."""
     agents: list[dict[str, Any]] = []
     prompts: list[dict[str, Any]] = []
-    for entry in (result.get("agent_usage") or [])[:MAX_AGENT_USAGE_ROWS]:
+    # Router narrowing can produce several voter calls per decision. Billing
+    # already consumes all usage rows; retain their diagnostics beyond the
+    # smaller chat-message display limit as well.
+    for entry in (result.get("agent_usage") or [])[:64]:
         if not isinstance(entry, dict):
             continue
         agent_id = str(entry.get("agent_id") or entry.get("provider_id") or "unknown")[:120]
@@ -775,6 +778,24 @@ def _trace_parts(result: dict[str, Any], turn: Turn) -> tuple[list[dict[str, Any
             "finished_at": entry.get("finished_at"),
             "tools": tools,
         }
+        routing = entry.get("routing")
+        if agent_id == "router" and isinstance(routing, dict):
+            safe = {k: routing[k] for k in ("ok", "agent_uncertain", "size_uncertain")
+                    if isinstance(routing.get(k), bool)}
+            for key in ("reason", "agent_choice", "size_choice", "policy_revision"):
+                if isinstance(routing.get(key), str):
+                    safe[key] = routing[key][:100]
+            if isinstance(routing.get("duration_ms"), int) and routing["duration_ms"] >= 0:
+                safe["duration_ms"] = routing["duration_ms"]
+            trace = routing.get("trace")
+            if isinstance(trace, list):
+                safe["trace"] = [{"question": q.get("question"), "rounds": [
+                    {k: v for k, v in r.items() if k in {
+                        "step", "choice", "probabilities", "confidence", "threshold", "options", "eliminated", "failed"}}
+                    for r in q.get("rounds", [])[:20] if isinstance(r, dict)]}
+                    for q in trace[:2] if isinstance(q, dict) and q.get("question") in ("agent", "size")
+                    and isinstance(q.get("rounds", []), list)]
+            info["routing"] = safe
         agents.append({k: v for k, v in info.items() if v is not None})
         prompts.append(_clip_prompt(entry.get("prompt")))
     if not any(p["messages"] for p in prompts):

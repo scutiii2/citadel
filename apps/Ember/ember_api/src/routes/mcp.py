@@ -69,9 +69,11 @@ class AgentListItem(AgentOut):
     gateway: str | None
     model: str | None
     tiers: list[ModelTierOut]
+    internal_role: Literal["router"] | None = None
+    decision: dict[str, Any] | None = None
 
 
-@router.get("/agents")
+@router.get("/agents", response_model_exclude_unset=True)
 async def list_agents(
     _account: Account = Depends(require_chat),
     directory: AgentDirectory = Depends(get_agent_directory),
@@ -84,6 +86,7 @@ async def list_agents(
             id=a.id, label=a.label, entry=a.entry, orchestrator=a.orchestrator, focus=a.focus, status=a.status,
             provider=a.provider, gateway=a.gateway, model=a.model,
             tiers=[ModelTierOut(tier=t.tier, id=t.id, use_for=t.use_for) for t in a.tiers],
+            **({"internal_role": a.internal_role, "decision": a.decision} if a.internal_role else {}),
         )
         for a in await directory.listing()
     ]

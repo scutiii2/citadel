@@ -151,6 +151,24 @@ describe("per-agent gateway order", () => {
 });
 
 describe("AgentsAdminView", () => {
+  it("edits Router policy while keeping its internal role and denied tools", async () => {
+    const router: AgentFile = { id: "router", label: "Router", port: 9117, internal_role: "router",
+      llm: { provider: "laya", gateway: "local" }, decision: {}, delegable: false,
+      plan_tool: false, tools: { deny: ["*"] } };
+    vi.mocked(agentsAdminClient.list).mockResolvedValue([EMBER, router]);
+    const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(router);
+    const wrapper = await mounted();
+    expect(wrapper.find("[data-id=router]").text()).toContain("Internal / Router");
+    await wrapper.find("[data-id=router] [data-test=edit]").trigger("click");
+    await wrapper.find("[data-test=routing-deadline]").setValue("7");
+    expect(wrapper.find("[data-test=allow]").exists()).toBe(false);
+    expect(wrapper.find("[data-test=preview]").exists()).toBe(false);
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(update.mock.calls[0]![1]).toMatchObject({ internal_role: "router", delegable: false,
+      decision: { deadline_seconds: 7 }, tools: { deny: ["*"] } });
+    wrapper.unmount();
+  });
   it("lists agents with model, port and live status", async () => {
     const wrapper = await mounted();
     expect(wrapper.findAll("[data-test=agent]")).toHaveLength(2);

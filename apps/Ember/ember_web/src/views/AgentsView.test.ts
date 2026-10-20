@@ -51,6 +51,16 @@ afterEach(() => {
 });
 
 describe("AgentsView", () => {
+  it("shows the internal Router even while disabled without offering it as a chat target", async () => {
+    list.mockResolvedValue([agent("router", { internal_role: "router", status: "disabled",
+      decision: { choose_agent: true, choose_tier: true, english: true, typed: true, fallback: true } })]);
+    const wrapper = await mountView();
+    expect(cards(wrapper)[0].text()).toContain("Internal / Router");
+    expect(cards(wrapper)[0].text()).toContain("Jev fallback");
+    expect(cards(wrapper)[0].text()).toContain("Disabled");
+    expect(cards(wrapper)[0].text()).not.toContain("Start chat");
+    wrapper.unmount();
+  });
   it("shows a card per agent with its name, id, focus and a status word", async () => {
     const wrapper = await mountView();
 

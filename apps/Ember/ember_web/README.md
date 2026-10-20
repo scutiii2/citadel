@@ -1,5 +1,15 @@
 # ember_web
 
+
+## Internal Router visibility
+
+The existing Agents page lists Router with an Internal / Router badge, local model
+and Jev fallback information, including disabled/offline and degraded readiness.
+It is informational: chats still enter through Ember and Router is not a selectable
+chat agent or delegable specialist. Routing progress uses ordinary step events;
+the internal decision JSON never appears as answer text.
+
+
 Browser chat frontend for this repo, built with Vue 3, TypeScript and Vite.
 It talks only to [ember_api](../ember_api), its own backend, over the same
 origin: ember_api owns the accounts and login sessions and proxies MCP to

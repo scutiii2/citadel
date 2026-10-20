@@ -145,6 +145,13 @@ def run_turn(monkeypatch, tiers, chosen, *, depth=0, model_tier=None, history=()
     picker = AsyncMock(return_value=chosen)
     monkeypatch.setattr(auto_tier, "pick", picker)
     monkeypatch.setattr(auto_tier, "enabled", lambda: feature_on)
+    async def fake_router(question, history, on_event, request_id, call_depth, explicit_tier):
+        if not call_depth and not explicit_tier and tiers and feature_on:
+            value = await picker(question, bool(history))
+            if value:
+                return None, value.tier, value.note
+        return None, None, ""
+    monkeypatch.setattr(agent_config.router_routing, "route_turn", fake_router)
     result = asyncio.run(agent_config.run_chat(
         "write the report", list(history), [], depth=depth, **({"model_tier": model_tier} if model_tier else {}),
     ))

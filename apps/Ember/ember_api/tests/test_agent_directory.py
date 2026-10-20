@@ -27,6 +27,27 @@ def test_no_agent_running_message_is_the_one_the_routes_use() -> None:
     assert NO_AGENT_RUNNING == "No agent is running"
 
 
+def test_router_metadata_is_sanitized_and_kept_for_disabled_definitions(tmp_path):
+    path = tmp_path / "agents.json"
+    path.write_text('{"agents": []}')
+    definitions = {"defined": [{"id": "router", "label": "Router", "enabled": False,
+        "internal_role": "router", "decision": {"choose_agent": True, "fallback": True,
+            "api_key": "not-public", "trace": ["private"]}, "llm": {"provider": "laya"}}]}
+    path.with_name("agent_definitions.json").write_text(json.dumps(definitions))
+    rows = asyncio.run(AgentDirectory(path).listing())
+    assert rows[0].internal_role == "router" and rows[0].status == "disabled"
+    assert rows[0].decision == {"choose_agent": True, "fallback": True}
+
+
+def test_router_is_not_discovered_as_triage_assistant(tmp_path):
+    path = tmp_path / "agents.json"
+    path.write_text(json.dumps({"agents": [agent("router", internal_role="router"), agent("triage-assistant")]}))
+    path.with_name("agent_definitions.json").write_text(json.dumps({"defined": [
+        {"id": "router", "label": "Router", "internal_role": "router", "llm": {"provider": "laya"}},
+        {"id": "triage-assistant", "label": "Triage", "llm": {"provider": "laya"}}]}))
+    assert asyncio.run(AgentDirectory(path).find_by_provider("laya")).id == "triage-assistant"
+
+
 def test_entries_without_the_new_keys_read_as_plain_agents(tmp_path: Path) -> None:
     found = asyncio.run(directory(tmp_path, [agent("old")]).all())
 

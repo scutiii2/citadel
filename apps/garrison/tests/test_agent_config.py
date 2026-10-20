@@ -551,7 +551,8 @@ def _recall_chat(monkeypatch, recall_calls, cancel_first=False):
     from src.agents import agent_config
 
     reloaded = importlib.reload(agent_config)
-    spec = SimpleNamespace(id="ember", memory_recall=True, plan_tool=True, llm=SimpleNamespace(max_effort=None, min_tier=None, max_tier=None))
+    spec = SimpleNamespace(id="ember", entry=False, orchestrator=False, internal_role=None,
+        memory_recall=True, plan_tool=True, llm=SimpleNamespace(max_effort=None, min_tier=None, max_tier=None))
     monkeypatch.setattr(reloaded.agent_spec, "current", lambda: spec)
 
     async def fake_recall(question, on_event=None):

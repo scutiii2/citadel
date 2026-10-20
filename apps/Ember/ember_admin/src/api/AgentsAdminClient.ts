@@ -32,6 +32,8 @@ export interface AgentLlm {
 
 /** An agent file's content. Fields the form does not edit are kept as they are. */
 export interface AgentConfig {
+  internal_role?: "router";
+  decision?: Partial<RouterPolicy>;
   label?: string;
   port: number;
   /** Address peers and ember_api reach the agent at; unset = http://127.0.0.1:<port>/mcp. */
@@ -51,6 +53,21 @@ export interface AgentConfig {
   [key: string]: unknown;
 }
 
+export interface RouterPolicy {
+  choose_agent: boolean;
+  choose_tier: boolean;
+  english: boolean;
+  typed: boolean;
+  fallback: boolean;
+  trace: boolean;
+  thresholds: Record<"2" | "3+", Record<"laya-english" | "laya-typed" | "jev", number>>;
+  prune_ratio: number;
+  pair_ratio: number;
+  deadline_seconds: number;
+  remote_timeout_seconds: number;
+  size_tiers: Record<"tiny" | "everyday" | "large" | "hardest", string>;
+}
+
 /** A listed agent: its file plus the id; a file ai_agent could not read has only `error`.
  * `overridden`: this machine's edits replace the tracked default file, which can be reset to. */
 export type AgentFile = Partial<AgentConfig> & { id: string; error?: string; overridden?: boolean };
@@ -68,6 +85,7 @@ export interface AgentTier {
 export interface LiveAgent {
   status: AgentStatus;
   tiers: AgentTier[];
+  decision?: Partial<RouterPolicy> & { fallback_available?: boolean; local_status?: string };
 }
 
 /** The prompt texts every agent shares. `overridden` lists the ones that differ from the built-in default. */
@@ -95,6 +113,6 @@ export const agentsAdminClient = {
   /** Status and effective model tiers by agent id (needs chat.use; callers treat a failure as "unknown"). */
   live: async (): Promise<Record<string, LiveAgent>> => {
     const rows = await apiRequest<({ id: string } & LiveAgent)[]>("GET", "/api/agents");
-    return Object.fromEntries(rows.map((r) => [r.id, { status: r.status, tiers: r.tiers ?? [] }]));
+    return Object.fromEntries(rows.map((r) => [r.id, { status: r.status, tiers: r.tiers ?? [], decision: r.decision }]));
   },
 };

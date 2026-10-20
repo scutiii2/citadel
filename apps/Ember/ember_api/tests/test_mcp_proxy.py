@@ -207,7 +207,8 @@ def test_agent_tool_outside_the_allow_list_is_refused(client: TestClient, upstre
 def test_ask_and_cancel_are_refused_turns_run_server_side(client: TestClient, upstream: FakeUpstream) -> None:
     as_admin(client)
 
-    for tool, arguments in (("ask", {"question": "hi"}), ("cancel", {"request_id": "x"})):
+    for tool, arguments in (("ask", {"question": "hi"}), ("cancel", {"request_id": "x"}),
+                            ("route", {"request": {"subject": "hi", "request_id": "r"}})):
         response = post(client, AGENT_PATH, call_tool(tool, arguments))
         assert response.status_code == 403
         assert response.json()["error"]["message"] == f"Tool not allowed: {tool}"

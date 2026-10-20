@@ -216,6 +216,10 @@ def _validate_change(agent_id: str, data: dict[str, Any], directory: Path) -> Ag
             raise AgentStoreError(str(error).replace(str(candidate), f"{agent_id}.json")) from error
     _check_gateway(spec)
     others = _other_specs(agent_id, directory)
+    if spec.enabled and spec.internal_role == "router" and any(
+        o.enabled and o.internal_role == "router" for o in others
+    ):
+        raise AgentStoreError("at most one enabled internal router is allowed", 409)
     if spec.enabled:
         clash = next((o.id for o in others if o.enabled and o.port == spec.port), None)
         if clash:

@@ -37,7 +37,7 @@ TIERS = ("light", "standard", "heavy", "extreme")
 _DEFAULT_GATEWAY = {"anthropic": "claude", "openai": "gpt", "laya": "local"}
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
-_TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "orchestrator", "memory_recall", "plan_tool", "delegable"}
+_TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "orchestrator", "memory_recall", "plan_tool", "delegable", "internal_role", "decision"}
 _LLM_KEYS = {"provider", "gateway", "model", "temperature", "reasoning_effort", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort", "fallback_gateways"}
 _TOOLS_KEYS = {"allow", "deny"}
 
@@ -150,6 +150,8 @@ class AgentSpec:
     # None = derived from the host and port it listens on.
     url: str | None = None
     source: Path | None = None
+    internal_role: str | None = None
+    decision: Any = None
 
     def effective_gateway(self) -> str | None:
         """The gateway to report in usage rows: the file's own gateway (None
@@ -367,6 +369,24 @@ def load_file(path: Path) -> AgentSpec:
         if any(key in llm_data for key in ("temperature", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort")) or effort != "off":
             raise check.fail("llm", "Laya triage does not accept generation or tool-loop settings")
 
+    internal_role = data.get("internal_role")
+    policy = None
+    if internal_role not in (None, "router"):
+        raise check.fail("internal_role", "must be router or null")
+    if internal_role == "router":
+        from src.agents.router_contract import RouterPolicy
+
+        if (provider != "laya" or check.boolean(data, "entry", False) or orchestrator
+                or check.boolean(data, "delegable", True) or memory_recall
+                or check.boolean(data, "plan_tool", True) or "*" not in tools.deny):
+            raise check.fail("internal_role", "router requires local Laya, no chat roles, no tools, memory or plan")
+        try:
+            policy = RouterPolicy.model_validate(data.get("decision", {}))
+        except ValueError as error:
+            raise check.fail("decision", str(error)) from error
+    elif "decision" in data:
+        raise check.fail("decision", "is only supported for internal_role router")
+
     return AgentSpec(
         id=agent_id,
         url=_agent_url(check, data),
@@ -385,6 +405,8 @@ def load_file(path: Path) -> AgentSpec:
         plan_tool=check.boolean(data, "plan_tool", True),
         delegable=check.boolean(data, "delegable", True),
         source=path,
+        internal_role=internal_role,
+        decision=policy,
     )
 
 
@@ -396,6 +418,8 @@ def load_dir(directory: Path) -> list[AgentSpec]:
         raise AgentSpecError(f"{directory}: no agent files found (create <id>.json)")
     specs = [load_file(directory / f"{agent_id}.json") for agent_id in ids]
     enabled = [s for s in specs if s.enabled]
+    if sum(s.internal_role == "router" for s in enabled) > 1:
+        raise AgentSpecError("at most one enabled internal router is allowed")
 
     by_port: dict[int, list[str]] = {}
     for spec in enabled:

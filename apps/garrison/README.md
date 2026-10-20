@@ -370,75 +370,75 @@ Specialist activity streams to the orchestrator's caller as `agent_start`,
 events pass through stamped with its `agent_id`. A specialist's step ids can
 collide with the orchestrator's, so consumers key on `(agent_id, id)`.
 
-## Decision layer (optional)
+## Internal Router agent
 
-`src/llm/decision.py` answers "which option fits, and how sure" for three features: Laya's
-`triage` fallback, `auto_tier` and `auto_route`. A feature names a chain of backends in
-`classifier.chains` of `configs/config_tuning.json`; the default chain is `["jev", "jev_vercel"]`.
-The chain is walked in order, so a backend without a key, one that fails, or (for `auto_tier`
-and `auto_route`) one below the feature's `min_confidence` hands over to the next, and the last
-answer is returned. Every feature is off until its own setting turns it on.
+`agents/router.json` defines the supervised internal Router on port 9117. It is
+visible on both Agents pages, but cannot receive chat questions or appear in a
+delegation roster. Ember Admin's existing Agents editor (`agents.manage`) controls
+its enabled state, task switches, local voters, confidence thresholds, narrowing,
+deadline, remote timeout, tier mapping and optional trace. Saves use the existing
+machine-specific override and supervisor restart; Reset restores tracked defaults.
 
-| Backend id | Module | What it is | Key in `.env` |
-|---|---|---|---|
-| `jev` | `typesafe_classifier.py` | TypeSafe's own Jev API (`/v1/systemone`, `typesafe.model` default `jev-latest`). Confidence is the API's 0-1 `confidence` (how peaked the probabilities are) as a percentage. | `TYPESAFE_API_KEY` |
-| `jev_vercel` | `jev_classifier.py` | `typesafe-ai/jev` through Vercel AI Gateway; the model reports its own 0-100 confidence. | `VERCEL_GATEWAY_API_KEY` |
-| `laya` | `laya_classifier.py` | The local Laya model (512-token window). A text or option list that does not fit hands over to the next backend. Not in the default chains. | none |
+For a top-level entry/orchestrator turn, Garrison sends the user message, up to 600
+characters of the previous assistant message and the authorized specialist roster
+to Router's internal `route` operation. Memory injection and full history are
+excluded. Router runs the same flow as Triage Assistant: Laya English, typed-decisions,
+option narrowing and optional Jev. It returns independent agent and size decisions.
+An uncertain agent choice stays with Ember; uncertain size uses the selected
+agent's default model. Explicit tiers and target limits still apply. Delegation
+requiring approval remains Ember's responsibility.
 
-```json
-"classifier": {
-  "chains": {"triage": ["jev", "jev_vercel"], "auto_tier": ["laya", "jev"], "auto_route": ["jev"]},
-  "typesafe": {"model": "jev-latest"},
-  "vercel": {"url": "https://ai-gateway.vercel.sh/v1/chat/completions", "model": "typesafe-ai/jev"}
-}
-```
+The Router requires a configured shared internal token even for local use. Its
+operation is not available through the browser MCP proxy or the assistant's tool
+catalog. It has no tools, private extensions, memory recall or plan capability.
+Internal role invariants are validated on file/Admin changes and at startup.
 
-A new model is one module with `ID`, `available()` and `ask_choice(subject, criteria, question, timeout)`
-plus a line in `decision._BACKENDS`. Confidence means something different per backend, so tune
-each feature's `min_confidence` against the backend you chain, not against the 60 default.
+Local models must already be cached completely. Router probes Hub snapshots using
+`local_files_only=True`, then loads an absolute local directory. It never fetches
+missing weights. Checkpoint preparation remains an operator action; ordinary chat
+abstains from unavailable local voters and can use the configured Jev fallback.
+Readiness summaries distinguish missing caches, unloaded cached models and missing
+fallback credentials. The normal Triage Assistant retains its existing loader.
 
-## Automatic model tier (optional)
+Defaults: 10-second overall deadline (1-30 configurable), 3-second remote timeout,
+4,000 local subject characters, 16,000 remote subject characters, and at most nine
+specialists plus `none`. Oversized rosters leave agent selection to Ember while
+size selection may continue. Inputs are not silently truncated to fit. Short
+follow-ups with history skip tier selection. Tier mapping is tiny/everyday to
+light, large to standard, hardest to heavy. Thresholds remain the triage defaults,
+not an accuracy guarantee. Missing/offline/disabled/failed Router uses normal
+Ember orchestration and default tiers; legacy direct Jev routing does not restart.
 
-With `"classifier": {"auto_tier": {"enabled": true}}` in `configs/config_tuning.json` and
-a key for a backend of the `auto_tier` chain in `.env`, a top-level turn that asked for no tier gets one from how
-hard its question looks. The classifier (`src/llm/decision.py`) names the
-request `tiny`, `everyday`, `large` or `hardest`, and `src/llm/auto_tier.py` maps that to a
-tier (default `tiny` and `everyday` to `light`, `large` to `standard`, `hardest` to
-`heavy`; change it under `auto_tier.tiers`). `agent_config.run_chat` then resolves it
-like a delegated tier, so the agent's own `min_tier` / `max_tier` still cap it: an agent
-capped at `light` stays on `light`, and raising `max_tier` is what lets a hard question
-use a stronger model.
+Router usage is attributed to `router`, per actual voter/backend/model attempt,
+without an entry-model row when no entry model ran. Optional diagnostics retain
+settled/uncertain outcomes and bounded trace metadata without copying user text.
+Late inference cannot dispatch work; actual late completions remain in Router's
+local usage log. Browser APIs keep their existing usage and log permissions.
 
-It is skipped, and the default model runs, when the feature is off, there is no key, the
-classifier fails, its confidence is below `auto_tier.min_confidence` (default 60), the turn
-is a delegate's or already asked for a tier, the agent has no tiers, or the message is a
-short follow-up (under 20 characters after the chat's first message). A chosen tier shows
-as the turn's tier plus a `model_note` such as `auto tier: hardest (90%) -> heavy`. Only the
-user's question is sent, never tool results, but it does leave this machine and each call
-is billed by the backend.
+### Classifier backend configuration
 
-## Routing straight to a specialist (optional)
+The shared `classifier` section still configures Triage Assistant and the Jev
+backend chain Router uses for remote fallback. Router's own voting policy is the
+`decision` block of its agent definition and Admin override; it does not mutate
+Triage Assistant's cached settings.
 
-With `"classifier": {"auto_route": {"enabled": true}}` in `configs/config_tuning.json` and
-a key for a backend of the `auto_route` chain in `.env`, an orchestrator's top-level turn first asks the
-classifier (`src/llm/decision.py`) which specialist fits the question
-(`src/agents/auto_route.py`). If one is picked with confidence of at least
-`auto_route.min_confidence` (default 60), the question goes to it exactly as a
-`delegate_to_agent` call would (same `step_*` and `agent_*` events, same usage rows) and its
-answer is the turn's answer; the orchestrator's own model never runs. Its usage row then
-holds only the classifier's tokens, and `model_note` reads `routed straight to <label>`.
+| Backend | Transport | Deployment credential |
+| --- | --- | --- |
+| `jev` | TypeSafe Jev API, default model `jev-latest` | `TYPESAFE_API_KEY` |
+| `jev_vercel` | Vercel AI Gateway, default model `typesafe-ai/jev` | `VERCEL_GATEWAY_API_KEY` |
+| `laya` | Existing local classifier helper | none |
 
-- Only specialists with tools of their own are offered, among the ones the roster already
-  shows this turn (capabilities off, or tools the user switched off, hide them). Tool-less
-  helpers such as `planner` stay the orchestrator's to choose.
-- The classifier sees the user's message and the end of the last assistant message; the
-  specialist gets the same context, since it never sees the chat.
-- No routing, and the orchestrator answers as usual, when the feature is off, there is no
-  usable backend, the classifier fails or says `none`, confidence is low, the turn is a delegate's, or
-  the turn would need the user's approval to delegate (the orchestrator then asks as it does today).
-- A specialist that fails is reported to the user and not retried, because it may already
-  have acted. You also lose the orchestrator's synthesis of the answer on routed turns.
-- The text sent to the classifier leaves this machine and each call is billed by the backend.
+`classifier.auto_route`, `classifier.auto_tier` and their feature-specific chains
+are accepted for compatibility but no longer control automatic entry-turn
+routing. Their reusable helper functions remain available for comparison tests.
+Configure Router in Agents instead. Remote fallback sends the routing subject to
+the selected provider and uses that provider's billing.
+
+Run `python -m scripts.check_router_cases --offline` for deterministic contract
+fixtures. It does not measure model accuracy. The explicit `--live` comparison
+uses installed local models and environment credentials, records outcomes,
+abstentions, elapsed time and remote calls, and never executes specialist work.
+See [router-evaluation.md](docs/router-evaluation.md) before deployment activation.
 
 ## Usage log
 

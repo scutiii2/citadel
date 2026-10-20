@@ -224,7 +224,7 @@ def run_chat(monkeypatch, routed):
     monkeypatch.setattr(agent_spec, "_current", spec)
     provider = AsyncMock(return_value=ChatResult(response="from the model"))
     monkeypatch.setattr(agent_config._PROVIDER_MODULE, "run_chat", provider)
-    monkeypatch.setattr(auto_route, "try_route", AsyncMock(return_value=routed))
+    monkeypatch.setattr(agent_config.router_routing, "route_turn", AsyncMock(return_value=(routed, None, "")))
     return asyncio.run(agent_config.run_chat("q", [], [])), provider
 
 
