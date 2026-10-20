@@ -8,6 +8,15 @@ URL, token or key.
 
 ## Features
 
+- Chat settings offers **Save to second brain** only when the account added
+  Obsidian and the backend confirms it is online with its write tool available.
+  It defaults off and persists on each chat in ember_api. Existing-chat changes
+  stay pending until the server confirms; a fresh chat saves its choice with
+  the first question. The agent then summarizes each exchange to the configured
+  shared Obsidian vault under `Conversations/`, through normal tool approval and
+  Armory's write guard. Off leaves automatic saving disabled; explicit requests
+  to save still work. Reloading or switching chats restores that chat's choice.
+
 - Native PDF merger (`/capabilities/pdf_merger`) and video downloader
   (`/capabilities/video_downloader`) port the standalone workspaces into Ember.
   Add Armory's `pdf` or `video` capability in the Supermarket, then use its card's

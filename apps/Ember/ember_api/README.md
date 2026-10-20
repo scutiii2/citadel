@@ -1,5 +1,31 @@
 # ember_api
 
+## Second brain auto-save
+
+Migration `0024` adds `chats.save_to_second_brain`, default false. It appears in
+chat list/detail/turn responses and persists per chat across devices. PATCH
+`/api/chats/{id}` accepts `{save_to_second_brain: bool}`; a turn may set it with
+the same field. Omission uses the saved preference; a new chat defaults off.
+
+GET `/api/chats/second-brain` returns `{available: bool}` for the signed-in
+account. Enabling requires `chat.use`, `tools.execute`, an account subscription
+to `obsidian`, and an online Armory capability exposing `tool_obsidian_write`.
+The server checks these itself; disabling the write tool refuses an explicit
+auto-save request. Unknown/foreign chats remain 404. Capability/storage outages
+fail closed. No new permissions or role grants are introduced.
+
+When enabled, ember_api asks the agent to summarize the current exchange and
+write `Conversations/<UTC date>-<question slug>-<unique suffix>.md` with `date`,
+`chat_id` and `tags` frontmatter, using `overwrite=false`. The stored user
+question stays unchanged. Saving uses the normal agent tool/approval flow and
+Armory's `allow_write` guard. The option requests an agent action; it cannot
+guarantee an external write if the agent does not perform it, approval is denied,
+or Obsidian is unavailable. The agent is instructed to confirm only a successful
+write and explain failures. With the option off, no auto-save instruction is
+added; an explicit user request to save still works. This vault is shared by
+callers of this Armory instance, so do not enable this for private transcripts
+that should stay inside a single account.
+
 ## Native capability workspace API
 
 PDF/video workspaces proxy only fixed Armory routes (`/pdf/ui`, `/video/ui`,

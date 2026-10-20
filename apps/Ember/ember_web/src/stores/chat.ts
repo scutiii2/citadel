@@ -274,6 +274,53 @@ export const useChatStore = defineStore("chat", () => {
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   const active = computed(() => conversations.value.find((c) => c.id === activeId.value) ?? null);
+  const secondBrainOnline = ref(false);
+  const secondBrainPending = ref(false);
+  const draftSecondBrain = ref(false);
+  const secondBrainAvailable = computed(() => accountCaps.ready && accountCaps.capabilities.includes("obsidian")
+    && auth.hasPermission("tools.execute") && secondBrainOnline.value);
+  const saveToSecondBrain = computed(() => active.value ? (active.value.saveToSecondBrain ?? false) : draftSecondBrain.value);
+  let availabilityRequest = 0;
+
+  async function refreshSecondBrainAvailability(): Promise<void> {
+    const mine = ++availabilityRequest;
+    const accountId = auth.account?.id;
+    secondBrainOnline.value = false;
+    if (!accountCaps.ready || !accountCaps.capabilities.includes("obsidian") || !auth.hasPermission("tools.execute")) return;
+    try {
+      const status = await chatsClient.secondBrainAvailability();
+      if (mine === availabilityRequest && auth.account?.id === accountId) secondBrainOnline.value = status.available;
+    } catch {
+      // Hidden on any failed availability check. The backend also enforces it.
+    }
+  }
+
+  watch(() => [auth.account?.id, accountCaps.ready, accountCaps.capabilities.includes("obsidian"), auth.hasPermission("tools.execute")],
+    () => void refreshSecondBrainAvailability(), { immediate: true });
+
+  async function setSaveToSecondBrain(on: boolean): Promise<void> {
+    if (secondBrainPending.value || (on && !secondBrainAvailable.value)) return;
+    const conversation = active.value;
+    if (!conversation) {
+      draftSecondBrain.value = on;
+      return; // A fresh chat is created and its preference saved with the first question.
+    }
+    const started = generation;
+    secondBrainPending.value = true;
+    saveError.value = "";
+    try {
+      const saved = await chatsClient.update(conversation.id, { save_to_second_brain: on });
+      if (started === generation) {
+        const current = find(conversation.id);
+        if (current) current.saveToSecondBrain = saved.save_to_second_brain ?? false;
+        listSeq += 1; // Discard any chat-list response requested before this save.
+      }
+    } catch (error) {
+      if (started === generation) saveError.value = errorMessage(error);
+    } finally {
+      if (started === generation) secondBrainPending.value = false;
+    }
+  }
   const messages = computed<ChatMessage[]>(() => active.value?.messages ?? []);
   /** The open chat is being answered (or its question is on its way). */
   const busy = computed(() => starting.value || active.value?.running === true);
@@ -402,7 +449,8 @@ export const useChatStore = defineStore("chat", () => {
         // While a save is outstanding the local values win: this list may have
         // been requested before the change and would write the old ones back.
         const keepLocal = known !== undefined && (pending.length > 0 || saving);
-        const filing = keepLocal ? { folderId: known.folderId, pinned: known.pinned } : { folderId: c.folderId, pinned: c.pinned };
+        const filing = keepLocal ? { folderId: known.folderId, pinned: known.pinned, saveToSecondBrain: known.saveToSecondBrain }
+          : { folderId: c.folderId, pinned: c.pinned, saveToSecondBrain: c.saveToSecondBrain };
         if (c.id === activeId.value && known) return { ...known, title: c.title, running: known.running, ...filing };
         return unchanged ? { ...known, title: c.title, ...filing } : { ...c, ...filing };
       });
@@ -468,6 +516,7 @@ export const useChatStore = defineStore("chat", () => {
       conversation.messages = detail.messages;
       conversation.messagesLoaded = true;
       conversation.running = detail.running;
+      if (!secondBrainPending.value) conversation.saveToSecondBrain = detail.saveToSecondBrain ?? false;
       if (detail.running && id === activeId.value) follow(id, 0);
     } catch (err) {
       if (started === generation) loadError.value = errorMessage(err);
@@ -485,6 +534,8 @@ export const useChatStore = defineStore("chat", () => {
       clearCompletionNotifications();
       clearSuggestion();
       generation += 1;
+      draftSecondBrain.value = false;
+      secondBrainPending.value = false;
       pending = [];
       saveError.value = "";
       loadError.value = "";
@@ -834,6 +885,8 @@ export const useChatStore = defineStore("chat", () => {
       return false;
     }
     const disabledTools = accountCaps.disabledTools;
+    const autoSave = secondBrainAvailable.value && saveToSecondBrain.value;
+    const sendSecondBrain = secondBrainAvailable.value || active.value?.saveToSecondBrain === true;
     // The administrator may have changed what is required since the page loaded.
     void refreshSettings();
 
@@ -844,6 +897,7 @@ export const useChatStore = defineStore("chat", () => {
       conversations.value.push({
         id: newId(),
         title: titleFrom(question),
+        saveToSecondBrain: autoSave,
         messages: [],
         messagesLoaded: true,
         createdAt: now,
@@ -866,6 +920,7 @@ export const useChatStore = defineStore("chat", () => {
       const turn = await chatsClient.startTurn(id, {
         question,
         caveman: caveman.value,
+        ...(sendSecondBrain ? { save_to_second_brain: autoSave } : {}),
         ...(plan.value ? {} : { plan: false }),
         ...(planLean.value ? {} : { plan_lean: false }),
         ...(contextPanel.value && contextAccuracy.value === "exact" ? { exact_context: true } : {}),
@@ -885,6 +940,7 @@ export const useChatStore = defineStore("chat", () => {
       });
       if (started !== generation) return true;
       conversation.agentId = turn.chat.agent_id ?? undefined;
+      conversation.saveToSecondBrain = turn.chat.save_to_second_brain ?? false;
       conversation.running = true;
       conversation.updatedAt = Date.parse(`${turn.chat.updated_at}Z`);
       if (activeId.value === id) follow(id, turn.sequence, began);
@@ -1041,6 +1097,7 @@ export const useChatStore = defineStore("chat", () => {
   // --- chat list actions ----------------------------------------------------
 
   function newChat(): void {
+    draftSecondBrain.value = false;
     unfollow();
     clearSuggestion();
     sendError.value = "";
@@ -1412,6 +1469,11 @@ export const useChatStore = defineStore("chat", () => {
     setSearch,
     clearSearch,
     caveman,
+    secondBrainAvailable,
+    saveToSecondBrain,
+    secondBrainPending,
+    setSaveToSecondBrain,
+    refreshSecondBrainAvailability,
     setCaveman,
     plan,
     setPlan,

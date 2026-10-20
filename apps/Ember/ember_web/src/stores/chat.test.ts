@@ -26,6 +26,8 @@ vi.mock("../api/ChatsClient", () => ({
     importChats: vi.fn(),
     append: vi.fn(),
     branch: vi.fn(),
+    update: vi.fn(),
+    secondBrainAvailability: vi.fn(),
   },
 }));
 vi.mock("../api/TriageClient", async (importOriginal) => ({
@@ -99,6 +101,48 @@ beforeEach(() => {
   client.remove.mockResolvedValue(undefined);
   client.rename.mockResolvedValue(summary("c1"));
   client.cancel.mockResolvedValue({ cancelled: true });
+  client.secondBrainAvailability.mockResolvedValue({ available: true });
+});
+
+describe("per-chat second brain option", () => {
+  it("waits for server confirmation and sends the saved choice with the turn", async () => {
+    vi.mocked(accountCapabilitiesClient.get).mockResolvedValue({ capabilities: ["obsidian"], extensions: [], disabled_tools: [] });
+    const chat = await openChat([]);
+    await flushPromises();
+    expect(chat.secondBrainAvailable).toBe(true);
+    expect(chat.saveToSecondBrain).toBe(false);
+    let finish!: (value: ChatSummary) => void;
+    client.update.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const saving = chat.setSaveToSecondBrain(true);
+    expect(chat.secondBrainPending).toBe(true);
+    expect(chat.saveToSecondBrain).toBe(false);
+    finish({ ...summary("c1"), save_to_second_brain: true });
+    await saving;
+    expect(chat.saveToSecondBrain).toBe(true);
+    await chat.send("remember this exchange");
+    expect(client.startTurn.mock.calls[0]![1].save_to_second_brain).toBe(true);
+    chat.newChat();
+    expect(chat.saveToSecondBrain).toBe(false);
+  });
+
+  it("keeps the previous choice when saving fails", async () => {
+    vi.mocked(accountCapabilitiesClient.get).mockResolvedValue({ capabilities: ["obsidian"], extensions: [], disabled_tools: [] });
+    const chat = await openChat([]);
+    client.update.mockRejectedValue(new Error("storage unavailable"));
+    await chat.setSaveToSecondBrain(true);
+    expect(chat.saveToSecondBrain).toBe(false);
+    expect(chat.saveError).toContain("storage unavailable");
+    expect(chat.secondBrainPending).toBe(false);
+  });
+
+  it("does not offer saving when the capability is offline", async () => {
+    vi.mocked(accountCapabilitiesClient.get).mockResolvedValue({ capabilities: ["obsidian"], extensions: [], disabled_tools: [] });
+    client.secondBrainAvailability.mockResolvedValue({ available: false });
+    const chat = await openChat([]);
+    await chat.setSaveToSecondBrain(true);
+    expect(chat.secondBrainAvailable).toBe(false);
+    expect(client.update).not.toHaveBeenCalled();
+  });
 });
 
 describe("send with truncateTo (regenerate / edit)", () => {

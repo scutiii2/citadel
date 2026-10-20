@@ -7,10 +7,19 @@ import json
 import re
 import uuid
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,12 +39,16 @@ from src.deps import (
 )
 from src.models import Account, Chat
 from src.routes.mcp import get_agent_directory
-from src.routes.server_info import EXTENSION_ID_PATTERN
-from src.services import question_answers, suggestions, summarization
+from src.routes.server_info import EXTENSION_ID_PATTERN, get_server_info
+from src.services import question_answers, second_brain, suggestions, summarization
 from src.services.agent_directory import NO_AGENT_RUNNING, AgentDirectory
 from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
-from src.services.log_service import LogWriter
-from src.services.chat_search import MAX_QUERY_CHARS, MIN_QUERY_CHARS, ChatSearch, SearchHit
+from src.services.chat_search import (
+    MAX_QUERY_CHARS,
+    MIN_QUERY_CHARS,
+    ChatSearch,
+    SearchHit,
+)
 from src.services.chat_service import (
     MAX_CHATS_PER_ACCOUNT,
     TITLE_MAX,
@@ -48,8 +61,16 @@ from src.services.chat_service import (
     decode_messages,
     message_time,
 )
+from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.folder_service import FolderNotFound
+from src.services.log_service import LogWriter
+from src.services.mcp_server_info import (
+    McpServerInfo,
+    McpServerRefused,
+    McpServerUnavailable,
+)
 from src.services.permissions import CHAT_USE, TOOLS_EXECUTE
+from src.services.pricing import Pricing, with_cost
 from src.services.secret_box import SecretBox
 from src.services.settings_service import FORCE_TOOL_APPROVAL, SettingsService
 from src.services.turns import (
@@ -62,10 +83,8 @@ from src.services.turns import (
     TurnOptions,
     TurnRegistry,
 )
-from src.services.db_gateway import DbGatewayError, DocumentStore
-from src.services.user_extension_service import TurnExtensions, UserExtensionService
 from src.services.usage_service import LimitBlock, UsageService
-from src.services.pricing import Pricing, with_cost
+from src.services.user_extension_service import TurnExtensions, UserExtensionService
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
@@ -200,6 +219,7 @@ class UpdateChatRequest(BaseModel):
     title: str | None = Field(default=None, max_length=TITLE_MAX)
     folder_id: int | None = None
     pinned: bool | None = None
+    save_to_second_brain: bool | None = None
 
     @field_validator("title")
     @classmethod
@@ -208,8 +228,8 @@ class UpdateChatRequest(BaseModel):
 
     @model_validator(mode="after")
     def something_to_change(self) -> UpdateChatRequest:
-        if self.title is None and self.pinned is None and "folder_id" not in self.model_fields_set:
-            raise ValueError("send a title, a folder_id or pinned")
+        if self.title is None and self.pinned is None and self.save_to_second_brain is None and "folder_id" not in self.model_fields_set:
+            raise ValueError("send a title, a folder_id, pinned or save_to_second_brain")
         return self
 
 
@@ -234,6 +254,8 @@ class TurnRequest(BaseModel):
     # Ignored: every question goes to the entry agent. Kept so older browsers still validate.
     agent_id: str | None = Field(default=None, max_length=120)
     caveman: bool = False
+    # None uses the saved preference; older clients never enable it accidentally.
+    save_to_second_brain: bool | None = None
     # The agent may keep a task checklist (update_plan); plan_lean asks it to update the list only on a status change.
     plan: bool = True
     plan_lean: bool = True
@@ -335,6 +357,7 @@ class ChatSummaryOut(BaseModel):
     # The folder this chat is filed in (chat-folders id), and whether it is pinned.
     folder_id: int | None = None
     pinned: bool = False
+    save_to_second_brain: bool = False
 
     @classmethod
     def of(cls, chat: Chat, running: bool = False) -> ChatSummaryOut:
@@ -348,6 +371,7 @@ class ChatSummaryOut(BaseModel):
             running=running,
             folder_id=chat.folder_id,
             pinned=chat.pinned,
+            save_to_second_brain=chat.save_to_second_brain,
         )
 
 
@@ -424,7 +448,7 @@ def _messages(items: list[MessageIn]) -> list[ChatMessage]:
 
 
 def _from_ms(ms: int) -> datetime:
-    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).replace(tzinfo=None)
+    return datetime.fromtimestamp(ms / 1000, tz=UTC).replace(tzinfo=None)
 
 
 def _not_found() -> HTTPException:
@@ -440,7 +464,7 @@ def _busy() -> HTTPException:
 
 
 def limit_reached(block: LimitBlock) -> HTTPException:
-    minutes = max(1, int((block.reset_at - datetime.now(timezone.utc).replace(tzinfo=None)).total_seconds() // 60) + 1)
+    minutes = max(1, int((block.reset_at - datetime.now(UTC).replace(tzinfo=None)).total_seconds() // 60) + 1)
     wait = f"{minutes} min" if minutes < 60 else f"{minutes // 60} h {minutes % 60} min"
     return HTTPException(
         status.HTTP_429_TOO_MANY_REQUESTS,
@@ -517,6 +541,22 @@ async def search_chats(
     newest first, at most 50, each with a snippet around the first message
     match. Declared before /{chat_id}, which would otherwise take "search"."""
     return [SearchHitOut.of(hit) for hit in await search.search(q)]
+
+
+async def _second_brain_available(account: Account, store: DocumentStore, info: McpServerInfo) -> bool:
+    try:
+        return await second_brain.available(account, store, info)
+    except (DbGatewayError, McpServerUnavailable, McpServerRefused):
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Could not check Obsidian capability availability") from None
+
+
+@router.get("/second-brain")
+async def second_brain_status(
+    account: Account = Depends(require_chat),
+    store: DocumentStore = Depends(get_db_gateway),
+    info: McpServerInfo = Depends(get_server_info),
+) -> dict[str, bool]:
+    return {"available": await _second_brain_available(account, store, info)}
 
 
 @router.get("/{chat_id}")
@@ -604,18 +644,26 @@ async def update_chat(
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
     turns: TurnRegistry = Depends(get_turns),
+    store: DocumentStore = Depends(get_db_gateway),
+    info: McpServerInfo = Depends(get_server_info),
+    logs: LogWriter = Depends(get_log_writer),
 ) -> ChatSummaryOut:
     """Renames, files (folder_id; null takes it out of its folder) or pins a
     chat. Allowed while an answer is being written: it changes no messages."""
-    changes: dict[str, Any] = {"title": body.title, "pinned": body.pinned}
+    changes: dict[str, Any] = {"title": body.title, "pinned": body.pinned, "save_to_second_brain": body.save_to_second_brain}
     if "folder_id" in body.model_fields_set:
         changes["folder_id"] = body.folder_id
     try:
+        await chats.get(chat_id)
+        if body.save_to_second_brain is True and not await _second_brain_available(account, store, info):
+            raise HTTPException(status.HTTP_409_CONFLICT, "Add and activate the Obsidian capability before enabling auto-save")
         chat = await chats.update(chat_id, **changes)
     except ChatNotFound as error:
         raise _not_found() from error
     except FolderNotFound as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Folder not found") from error
+    if body.save_to_second_brain is not None:
+        await logs.action(account, "chat.second_brain", f"Chat {chat_id}: auto-save={body.save_to_second_brain}")
     return ChatSummaryOut.of(chat, turns.is_running(account.id, chat_id))
 
 
@@ -699,6 +747,7 @@ async def start_turn(
     app_settings: SettingsService = Depends(get_settings_service),
     box: SecretBox = Depends(get_secret_box),
     db_gateway: DocumentStore = Depends(get_db_gateway),
+    info: McpServerInfo = Depends(get_server_info),
 ) -> TurnOut:
     """Saves the question and starts answering it in ember_api. The answer
     keeps going (and is saved) even if the browser leaves; watch it via
@@ -711,6 +760,18 @@ async def start_turn(
     block = await UsageService(session, settings.usage).check(account.id)
     if block is not None:
         raise limit_reached(block)
+
+    try:
+        saved_preference = (await chats.get(chat_id)).save_to_second_brain
+    except ChatNotFound:
+        saved_preference = False
+    auto_save = saved_preference if body.save_to_second_brain is None else body.save_to_second_brain
+    if auto_save:
+        active = await _second_brain_available(account, db_gateway, info)
+        permitted = active and "tool_obsidian_write" not in body.disabled_tools and "*" not in body.disabled_tools
+        if body.save_to_second_brain is True and not permitted:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Add and activate Obsidian and enable its write tool before auto-saving")
+        auto_save = permitted
 
     question = {"role": "user", "content": body.question, "at": message_time()}
     try:
@@ -727,6 +788,9 @@ async def start_turn(
     except ChatLimitError as error:
         raise _too_large(error) from error
 
+    if body.save_to_second_brain is not None:
+        chat = await chats.update(chat_id, save_to_second_brain=body.save_to_second_brain)
+
     # When the administrator requires it, the browser's choice does not matter:
     # every tool asks, and no tool is pre-allowed.
     forced = await app_settings.get_bool(FORCE_TOOL_APPROVAL)
@@ -741,6 +805,7 @@ async def start_turn(
     try:
         options = TurnOptions(
             caveman=body.caveman,
+            save_to_second_brain=auto_save,
             plan=body.plan,
             plan_lean=body.plan_lean,
             exact_context=body.exact_context,

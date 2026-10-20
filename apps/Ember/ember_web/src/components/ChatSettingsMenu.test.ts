@@ -12,6 +12,9 @@ const BASE = {
   allowedCount: 0,
   enabledExtensions: [] as string[],
   attention: false,
+  secondBrainAvailable: false,
+  saveToSecondBrain: false,
+  secondBrainPending: false,
 };
 
 let wrapper: ReturnType<typeof mount> | null = null;
@@ -34,6 +37,28 @@ const gear = (w: ReturnType<typeof mount>) => w.get("button.gear");
 const panel = (w: ReturnType<typeof mount>) => w.find(".panel");
 
 describe("ChatSettingsMenu", () => {
+  it("hides auto-save unless Obsidian is active", async () => {
+    const w = open();
+    await gear(w).trigger("click");
+    expect(panel(w).text()).not.toContain("Save to second brain");
+  });
+
+  it("offers an off-by-default per-chat auto-save switch and emits changes", async () => {
+    const w = open({ secondBrainAvailable: true });
+    await gear(w).trigger("click");
+    const label = w.findAll("label").find((l) => l.text().includes("Save to second brain"))!;
+    expect((label.get("input").element as HTMLInputElement).checked).toBe(false);
+    await label.get("input").setValue(true);
+    expect(w.emitted("update:saveToSecondBrain")).toEqual([[true]]);
+  });
+
+  it("keeps the server-backed switch disabled while saving", async () => {
+    const w = open({ secondBrainAvailable: true, secondBrainPending: true });
+    await gear(w).trigger("click");
+    const label = w.findAll("label").find((l) => l.text().includes("Save to second brain"))!;
+    expect(label.get("input").attributes("disabled")).toBeDefined();
+    expect(label.get("input").attributes("aria-busy")).toBe("true");
+  });
   it("is closed on load, with only the gear showing", () => {
     const w = open();
 
