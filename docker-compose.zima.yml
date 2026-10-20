@@ -3,6 +3,10 @@
 # Start:  docker compose -f docker-compose.yml -f docker-compose.zima.yml up -d --build
 
 services:
+  armory:
+    # Dedicated Obsidian vault, read-only, for the obsidian capability's semantic index.
+    volumes:
+      - /DATA/AppData/obsidian/config/Desktop/Obsidian-vaults/citadel-brain:/vault:ro
   ember_web:
     ports: !override
       - "5173:80"
