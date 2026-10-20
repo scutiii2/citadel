@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import delete, func, select
@@ -52,7 +52,7 @@ ChatMessage = dict[str, Any]
 def message_time() -> str:
     """Now as the "at" of a message: ISO 8601 UTC with milliseconds, e.g.
     2026-10-06T14:03:09.123Z. Messages saved before this existed have none."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
 @dataclass(frozen=True)
@@ -154,7 +154,8 @@ class ChatService:
         return chat
 
     async def update(
-        self, chat_id: str, *, title: str | None = None, folder_id: int | None = UNSET, pinned: bool | None = None
+        self, chat_id: str, *, title: str | None = None, folder_id: int | None = UNSET,
+        pinned: bool | None = None, save_to_second_brain: bool | None = None,
     ) -> Chat:
         """Changes whichever of title, folder and pin are given. `folder_id`
         None takes the chat out of its folder; a folder of another account is
@@ -173,6 +174,8 @@ class ChatService:
             chat.title = title
         if pinned is not None:
             chat.pinned = pinned
+        if save_to_second_brain is not None:
+            chat.save_to_second_brain = save_to_second_brain
         await self._session.commit()
         return chat
 

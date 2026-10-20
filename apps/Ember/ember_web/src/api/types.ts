@@ -250,6 +250,8 @@ export interface Conversation {
   folderId?: number | null;
   /** Shown in the Pinned section, above the folders. */
   pinned?: boolean;
+  /** Persisted on this chat in ember_api; absent means off. */
+  saveToSecondBrain?: boolean;
   createdAt: number;
   updatedAt: number;
 }

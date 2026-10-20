@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import shutil
 import sqlite3
-from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
 
@@ -18,8 +17,8 @@ from src.db import Base, Database
 from src.services.migrations import BASELINE, MIGRATIONS_DIR, MigrationRunner
 
 # The newest real migration; the tests' throwaway one comes after it.
-HEAD = "0023"
-NEXT = "0024"
+HEAD = "0024"
+NEXT = "0025"
 
 
 def drop_account_uid(conn: sqlite3.Connection) -> None:
@@ -33,6 +32,38 @@ def drop_log_prompts(conn: sqlite3.Connection) -> None:
     conn.execute("ALTER TABLE log_entries DROP COLUMN prompts")
     conn.execute("DROP TABLE account_ticket_seen")
     conn.execute("DROP TABLE ticket_staff_activity")
+    drop_second_brain(conn)
+
+
+def drop_second_brain(conn: sqlite3.Connection) -> None:
+    """Undo the chat option on model-built databases rewound before 0024."""
+    if "save_to_second_brain" in {row[1] for row in conn.execute("PRAGMA table_info(chats)")}:
+        conn.execute("ALTER TABLE chats DROP COLUMN save_to_second_brain")
+
+
+def test_second_brain_column_reverses_and_defaults_off(tmp_path: Path) -> None:
+    from alembic import command
+
+    run_with(make_database(tmp_path))
+    path = tmp_path / "ember.db"
+    with closing(sqlite3.connect(path)) as conn:
+        column = next(row for row in conn.execute("PRAGMA table_info(chats)") if row[1] == "save_to_second_brain")
+        assert column[3] == 1 and column[4] == "0"
+
+    async def downgrade():
+        database = make_database(tmp_path)
+        runner = MigrationRunner(database.engine)
+        try:
+            async with database.engine.connect() as conn:
+                await conn.run_sync(lambda sync: command.downgrade(runner._config(sync), "0023"))
+        finally:
+            await database.dispose()
+
+    asyncio.run(downgrade())
+    with closing(sqlite3.connect(path)) as conn:
+        assert "save_to_second_brain" not in {row[1] for row in conn.execute("PRAGMA table_info(chats)")}
+    assert run_with(make_database(tmp_path)) == "upgraded"
+    assert differences(make_database(tmp_path)) == []
 
 
 def clear_access(conn: sqlite3.Connection) -> None:
@@ -259,7 +290,8 @@ def test_account_uid_is_backfilled_unique_and_removed_by_the_downgrade(tmp_path:
 
     with closing(sqlite3.connect(path)) as conn:
         for table, rows in children.items():
-            assert conn.execute(f"SELECT * FROM {table}").fetchall() == rows
+            expected = [(*row, 0) for row in rows] if table == "chats" else rows
+            assert conn.execute(f"SELECT * FROM {table}").fetchall() == expected
         uids = [row[0] for row in conn.execute("SELECT uid FROM accounts ORDER BY id")]
         assert len(uids) == 2 and len(set(uids)) == 2
         assert all(len(uid) == 32 and int(uid, 16) >= 0 for uid in uids)
@@ -418,7 +450,7 @@ class TestDatabaseFromBeforeMigrations:
     def test_it_is_only_stamped_when_the_baseline_is_the_newest_revision(self, tmp_path: Path) -> None:
         path = self.build_legacy(tmp_path)
         scripts = tmp_path / "baseline_only"
-        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*"))
+        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*", "0024*"))
         calls: list[int] = []
 
         async def backup() -> None:
@@ -656,12 +688,13 @@ def test_starter_roles_are_seeded_once_and_edits_stick(tmp_path: Path) -> None:
     assert seeded["Viewer"] == {"chat.use", "tools.view"}
     assert "extensions.manage" in seeded["Power User"] and "tickets.create" in seeded["Power User"]
     for name in ("Viewer", "Support", "Moderator", "Auditor", "Power User", "Operator"):
-        assert not {p for p in seeded[name] if p.startswith("logs.chat") or p.startswith("roles.")} - {"roles.view"}
+        assert not {p for p in seeded[name] if p.startswith(("logs.chat", "roles."))} - {"roles.view"}
 
     with closing(sqlite3.connect(path)) as conn:
         conn.execute("DELETE FROM role_permission WHERE role_id = (SELECT id FROM roles WHERE name = 'Viewer')")
         conn.execute("DELETE FROM roles WHERE name = 'Viewer'")
         conn.execute("UPDATE alembic_version SET version_num = '0018'")
+        drop_second_brain(conn)
         conn.commit()
     assert run_with(make_database(tmp_path)) == "upgraded"
     assert "Viewer" in roles()  # a removed role is only recreated when the migration runs again
@@ -724,6 +757,7 @@ def test_games_removal_deletes_only_retired_data_and_is_idempotent(tmp_path: Pat
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
         assert conn.execute("SELECT username FROM accounts").fetchall() == [("player",)]
         conn.execute("UPDATE alembic_version SET version_num = '0019'")
+        drop_second_brain(conn)
         conn.commit()
 
     assert run_with(make_database(tmp_path)) == "upgraded"

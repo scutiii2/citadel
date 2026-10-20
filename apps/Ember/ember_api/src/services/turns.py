@@ -28,13 +28,18 @@ from time import monotonic
 from typing import Any
 
 from src.config import PricingSettings, UsageSettings
-from src.services.pricing import Pricing, with_cost
 from src.db import Database
-from src.services import question_answers, summarization
+from src.services import question_answers, second_brain, summarization
 from src.services.agent_directory import AgentEntry
 from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
-from src.services.chat_service import ChatNotFound, ChatService, decode_messages, message_time
+from src.services.chat_service import (
+    ChatNotFound,
+    ChatService,
+    decode_messages,
+    message_time,
+)
 from src.services.log_service import LogWriter
+from src.services.pricing import Pricing, with_cost
 from src.services.usage_service import UsageService, usage_rows
 
 logger = logging.getLogger(__name__)
@@ -85,6 +90,7 @@ class TurnOptions:
     """What the browser chose for this question."""
 
     caveman: bool = False
+    save_to_second_brain: bool = False
     # Task checklist toggles: the agent may use update_plan, and updates it only on a status change.
     plan: bool = True
     plan_lean: bool = True
@@ -512,7 +518,7 @@ class TurnRegistry:
             # ember_api is stopping: keep what streamed, marked as such.
             await asyncio.shield(self._finish(turn, _interrupted(turn.text), status="failed", error=None))
             raise
-        except Exception as error:  # noqa: BLE001 - a bug here must still end the turn for its watchers
+        except Exception as error:  # A bug here must still end the turn for its watchers.
             logger.exception("turn %s crashed", turn.request_id)
             await self._logs.error(
                 turn.account_id, "chat.answer", f"{type(error).__name__}: {error}", traceback.format_exc()
@@ -553,12 +559,17 @@ class TurnRegistry:
 
         if turn.options.private_skipped:
             await self._publish(turn, {"type": "notice", "notices": [dict(n) for n in turn.options.private_skipped]})
+        agent_question = question
+        if turn.options.save_to_second_brain:
+            agent_question = second_brain.save_request(
+                question, turn.chat_id, turn.request_id, str(messages[-1].get("at") or message_time()),
+            )
         turn.asking = True
         try:
             result = await self._gateway.ask(
                 turn.agent.url,
                 turn.caller,
-                question=question,
+                question=agent_question,
                 history=summarization.history_for_agent(earlier),
                 request_id=turn.request_id,
                 caveman=turn.options.caveman,
@@ -649,7 +660,7 @@ class TurnRegistry:
         try:
             async with self._database.sessions() as session:
                 await UsageService(session, self._usage).record(turn.account_id, turn.request_id, kind, turn.chat_id, result)
-        except Exception:  # noqa: BLE001 - accounting must not lose the user's answer
+        except Exception:  # Accounting must not lose the user's answer.
             logger.exception("recording usage of turn %s failed", turn.request_id)
 
     async def _finish(
@@ -675,7 +686,7 @@ class TurnRegistry:
                 await chats.replace_messages(turn.chat_id, [*current, message], agent_id=turn.agent.id)
         except ChatNotFound:
             pass  # deleted while the answer was running
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception("saving the answer of turn %s failed", turn.request_id)
         terminal: dict[str, Any] = (
             {"type": "error", "message": error}

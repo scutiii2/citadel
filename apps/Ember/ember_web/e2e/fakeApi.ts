@@ -38,6 +38,7 @@ export interface StoredChat {
   running: boolean;
   folder_id?: number | null;
   pinned?: boolean;
+  save_to_second_brain?: boolean;
 }
 
 export interface StoredFolder {
@@ -233,6 +234,7 @@ const summary = (chat: StoredChat) => ({
   running: chat.running,
   folder_id: chat.folder_id ?? null,
   pinned: chat.pinned ?? false,
+  save_to_second_brain: chat.save_to_second_brain ?? false,
 });
 
 const event = (sequence: number, body: Record<string, unknown>) =>
@@ -704,13 +706,17 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       }
     }
 
+    if (method === "GET" && path === "/api/chats/second-brain") {
+      return json(route, { available: api.accountCapabilities.capabilities.has("obsidian") && api.capabilities.get("obsidian")?.enabled === true });
+    }
     const chatPath = /^\/api\/chats\/([A-Za-z0-9-]+)(\/[a-z]+)?$/.exec(path);
     if (chatPath) {
       const [, id, tail] = chatPath;
       if (method === "PATCH" && !tail) {
         const chat = api.chats.get(id!);
         if (!chat) return json(route, { detail: "Chat not found" }, 404);
-        const body = request.postDataJSON() as { title?: string; folder_id?: number | null; pinned?: boolean };
+        const body = request.postDataJSON() as { title?: string; folder_id?: number | null; pinned?: boolean; save_to_second_brain?: boolean };
+        if (body.save_to_second_brain !== undefined) chat.save_to_second_brain = body.save_to_second_brain;
         if (body.title !== undefined) chat.title = body.title;
         if ("folder_id" in body) chat.folder_id = body.folder_id ?? null;
         if (body.pinned !== undefined) chat.pinned = body.pinned;
@@ -740,7 +746,7 @@ function chatsIn(api: FakeApi, folderId: number): number {
 }
 
 function startTurn(route: Route, api: FakeApi, id: string) {
-  const body = route.request().postDataJSON() as { question: string; title?: string; truncate_to?: number };
+  const body = route.request().postDataJSON() as { question: string; title?: string; truncate_to?: number; save_to_second_brain?: boolean };
   api.turns.push(body);
   // An edited question cuts the chat back to before it (`truncate_to`), as ember_api does.
   const kept = body.truncate_to === undefined ? [] : (api.chats.get(id)?.messages.slice(0, body.truncate_to) ?? []);
@@ -750,6 +756,7 @@ function startTurn(route: Route, api: FakeApi, id: string) {
     agent_id: ENTRY_AGENT.id, // what ember_api reports: the browser sends no agent
     messages: [...kept, { role: "user", content: body.question }],
     running: true,
+    save_to_second_brain: body.save_to_second_brain ?? api.chats.get(id)?.save_to_second_brain ?? false,
   });
   return json(route, { chat: summary(api.chats.get(id)!), sequence: 0 }, 202);
 }
