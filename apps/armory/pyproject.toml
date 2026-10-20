@@ -28,6 +28,8 @@ dependencies = [
     "img2pdf>=0.5",
     "pillow>=10.0",
     "pillow-heif>=0.18",
+    "sqlite-vec>=0.1.6,<0.2",
+    "PyYAML>=6.0.2,<7",
 ]
 
 [project.optional-dependencies]

@@ -7,7 +7,7 @@ pydantic-settings later if the number of tunables grows.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -95,6 +95,17 @@ class Settings:
     db_gateway_url: str = _env("DB_GATEWAY_URL", "http://127.0.0.1:8071")
     db_gateway_instance: str = _env("DB_GATEWAY_INSTANCE", "mcp_server")
     db_gateway_connection: str = _env("DB_GATEWAY_CONNECTION", "data")
+    # Obsidian Local REST API. Never include the address or credential in settings repr.
+    obsidian_base_url: str = field(default=_env("OBSIDIAN_BASE_URL", "https://127.0.0.1:27124"), repr=False)
+    obsidian_api_key: str = field(default=_env("OBSIDIAN_API_KEY", ""), repr=False)
+    obsidian_timeout: float = float(_env("OBSIDIAN_TIMEOUT", "5"))
+    obsidian_verify_tls: bool = _env("OBSIDIAN_VERIFY_TLS", "true").lower() != "false"
+    obsidian_allow_write: bool = _env("OBSIDIAN_ALLOW_WRITE", "false").lower() == "true"
+    obsidian_vault_path: str = _env("OBSIDIAN_VAULT_PATH", "")
+    obsidian_index_path: Path = Path(_env("OBSIDIAN_INDEX_PATH", "specifics/obsidian/.data/index.db"))
+    obsidian_ollama_url: str = _env("OBSIDIAN_OLLAMA_URL", "http://127.0.0.1:11434")
+    obsidian_embed_model: str = _env("OBSIDIAN_EMBED_MODEL", "nomic-embed-text")
+    obsidian_refresh_seconds: float = float(_env("OBSIDIAN_REFRESH_SECONDS", "60"))
     # Tavily API key for the web_research capability. Blank until set in .env;
     # the tools then fail with a message naming the variable.
     tavily_api_key: str = _env("TAVILY_API_KEY", "")

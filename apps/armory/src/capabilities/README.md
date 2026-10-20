@@ -10,6 +10,7 @@ what it does:
 - `firecrawl/` - scrape and crawl through Firecrawl (`/scrape ...`).
 - `usage_report/` - token usage per agent, model or day (`/usage ...`).
 - `vault/` - read-only notes vault (`/vault ...`).
+- `obsidian/` - Local REST API vault listing, search and note read/write/append, with writes disabled by default (`/obsidian ...`).
 - `repo_reader/` - read-only git history and code (`/repo ...`).
 - `tables/` - questions about an attached CSV or Excel file (`/data ...`).
 - `email/` - shared outgoing email and threaded replies (`/email ...`).
