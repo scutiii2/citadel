@@ -90,7 +90,7 @@ describe("NavRail", () => {
     const links = pageLinks(wrapper);
 
     // Capabilities, Agents, Usage and Settings sit in the account menu.
-    expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Memory", "Generator"]);
+    expect(links.map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Memory", "Generator", "PDF merger", "Video downloader"]);
     for (const link of [...links, ...wrapper.findAll("nav.header a")]) {
       expect(link.text()).toBe("");
       expect(link.find("svg").exists()).toBe(true);
@@ -219,7 +219,7 @@ describe("NavRail", () => {
       arrangement({ order: ["/memory", "/notes"], pinned: ["/memory"], hidden: [] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Memory", "Notes", "Generator"]);
+      expect(labels(wrapper)).toEqual(["Memory", "Notes", "Generator", "PDF merger", "Video downloader"]);
       expect(wrapper.findAll("nav .divider")).toHaveLength(1);
       expect(wrapper.find("nav.pages").element.children[1]!.classList.contains("divider")).toBe(true);
     });
@@ -228,7 +228,7 @@ describe("NavRail", () => {
       arrangement({ order: [], pinned: [], hidden: ["/memory", "/notes"] });
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(labels(wrapper)).toEqual(["Generator"]);
+      expect(labels(wrapper)).toEqual(["Generator", "PDF merger", "Video downloader"]);
       expect(wrapper.find("nav .divider").exists()).toBe(false);
     });
 
@@ -249,7 +249,7 @@ describe("NavRail", () => {
       release({ order: [], pinned: [], hidden: [] });
       await flushPromises();
 
-      expect(pageLinks(wrapper)).toHaveLength(3);
+      expect(pageLinks(wrapper)).toHaveLength(5);
     });
   });
 
@@ -302,7 +302,7 @@ describe("pages hidden by the administrator", () => {
     vi.mocked(settingsClient.pages).mockResolvedValue({ hidden: ["/usage"] });
     const { wrapper } = await setup(ACCOUNT);
 
-    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Memory", "Generator"]);
+    expect(pageLinks(wrapper).map((l) => l.attributes("aria-label"))).toEqual(["Notes", "Memory", "Generator", "PDF merger", "Video downloader"]);
     expect(await footerLabels(wrapper)).toEqual(["Capabilities", "Agents", "Settings", "Profile"]);
   });
 
@@ -322,6 +322,6 @@ describe("pages hidden by the administrator", () => {
     expect(pageLinks(wrapper)).toHaveLength(0);
     release({ hidden: [] });
     await flushPromises();
-    expect(pageLinks(wrapper)).toHaveLength(3);
+    expect(pageLinks(wrapper)).toHaveLength(5);
   });
 });
