@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from "pinia";
-import { computed, onActivated, onDeactivated, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onActivated, onDeactivated, onMounted, ref, watch } from "vue";
+import EmberLogo from "../components/EmberLogo.vue";
 import ConfirmModal from "../components/ConfirmModal.vue";
 import ChatHeader from "../components/ChatHeader.vue";
 import ChatInput from "../components/ChatInput.vue";
@@ -216,6 +217,13 @@ function runCommandForm(text: string): void {
 
 // Narrow screens only: the sidebar is a drawer toggled by the menu button.
 const drawerOpen = ref(false);
+const historyButton = ref<HTMLButtonElement | null>(null);
+const closeHistoryButton = ref<HTMLButtonElement | null>(null);
+watch(drawerOpen, async (open) => {
+  await nextTick();
+  if (open) closeHistoryButton.value?.focus({ preventScroll: true });
+  else if (shown.value) historyButton.value?.focus({ preventScroll: true });
+});
 // Wider screens: the list can be folded away to give the chat the room.
 const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebarCollapse();
 
@@ -241,6 +249,7 @@ onActivated(() => {
 });
 onDeactivated(() => {
   shown.value = false;
+  drawerOpen.value = false;
 });
 
 function onNew(): void {
@@ -331,6 +340,9 @@ useChatShortcuts({
 <template>
   <section class="chat-view">
     <ConversationSidebar
+      id="chat-history"
+      aria-label="Conversations"
+      @keydown.esc.stop="drawerOpen = false"
       :class="['sidebar', { open: drawerOpen, collapsed: sidebarCollapsed }]"
       :conversations="sortedConversations"
       :active-id="activeId"
@@ -363,7 +375,16 @@ useChatShortcuts({
       @retry-folders="folderStore.reload()"
       @rename-folder="(f: ChatFolder) => folderDialogs?.openRename(f)"
       @delete-folder="(f: ChatFolder) => folderDialogs?.openDelete(f, chatsIn(f))"
-    />
+    >
+      <template #header>
+        <div class="sheet-heading">
+          <h2>Conversations</h2>
+          <button ref="closeHistoryButton" type="button" aria-label="Close conversations" @click="drawerOpen = false">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg>
+          </button>
+        </div>
+      </template>
+    </ConversationSidebar>
     <FolderDialogs ref="folderDialogs" />
     <div v-if="drawerOpen" class="backdrop" @click="drawerOpen = false" />
     <button
@@ -380,11 +401,17 @@ useChatShortcuts({
     </button>
 
     <div class="main">
-      <button type="button" class="menu" title="Chats" @click="drawerOpen = true">
+      <div class="mobile-header">
+      <button ref="historyButton" type="button" class="menu" title="Chats" aria-label="Chats" aria-controls="chat-history" :aria-expanded="drawerOpen" @click="drawerOpen = !drawerOpen">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
         </svg>
       </button>
+      <span class="mobile-brand"><EmberLogo /> <strong>ember</strong></span>
+      <button type="button" class="new-mobile-chat" aria-label="New chat" title="New chat" @click="onNew">
+        <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M12 5H5v14h14v-7M14 4l6 6M10 14l2-6 6-6 4 4-6 6z" /></svg>
+      </button>
+      </div>
       <ChatHeader
         :title="active?.title ?? 'New chat'"
         :has-messages="!!active && messages.length > 0"
@@ -571,7 +598,7 @@ useChatShortcuts({
   font-size: 0.8em;
   color: var(--muted);
 }
-.menu {
+.mobile-header, .sheet-heading {
   display: none;
 }
 .backdrop {
@@ -639,13 +666,90 @@ useChatShortcuts({
   }
   .sidebar {
     position: absolute;
-    inset: 0 auto 0 0;
+    inset: auto 0 0;
     z-index: 20;
-    transform: translateX(-100%);
-    transition: transform 0.2s ease;
+    width: 100%;
+    height: min(80%, 640px);
+    padding: 8px 16px 16px;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    background: var(--bg);
+    visibility: hidden;
+    transform: translateY(100%);
+    transition: transform 0.2s ease, visibility 0s 0.2s;
   }
   .sidebar.open {
+    visibility: visible;
     transform: none;
+    transition: transform 0.2s ease;
+  }
+  .sheet-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: -8px;
+    z-index: 2;
+    padding-top: 12px;
+    background: var(--bg);
+  }
+  .sheet-heading::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: calc(50% - 18px);
+    width: 36px;
+    height: 4px;
+    border-radius: var(--radius-full);
+    background: var(--border);
+  }
+  .sheet-heading h2 { margin: 0; font-size: 1.2em; }
+  .sidebar :deep(.new-chat) {
+    justify-content: center;
+    border-radius: var(--radius-full);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+    background: var(--accent);
+  }
+  .sidebar :deep(.new-chat svg) { stroke: currentColor; }
+  .sidebar :deep(.row) { min-height: 52px; }
+  .sidebar :deep(.search input) { min-height: 44px; }
+  .sidebar :deep(.row .title) { min-width: 0; }
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    min-height: 56px;
+    padding: 4px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .mobile-brand { display: flex; align-items: center; gap: 8px; font-size: 1.2em; }
+  .mobile-brand svg { width: 26px; height: 26px; }
+  .mobile-header button, .sheet-heading button {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--muted);
+    background: transparent;
+    cursor: pointer;
+  }
+  .mobile-header button:hover, .sheet-heading button:hover { color: var(--text); background: var(--surface); }
+  .mobile-header button:focus-visible, .sheet-heading button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .new-mobile-chat svg, .sheet-heading svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .backdrop {
     display: block;
@@ -653,20 +757,6 @@ useChatShortcuts({
     inset: 0;
     z-index: 10;
     background: rgba(0, 0, 0, 0.35);
-  }
-  .menu {
-    display: grid;
-    place-items: center;
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    z-index: 5;
-    width: 34px;
-    height: 34px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    background: var(--bg);
   }
 }
 </style>

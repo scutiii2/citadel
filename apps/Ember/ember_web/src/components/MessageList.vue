@@ -517,6 +517,13 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 18px;
 }
+@media (max-width: 767px) {
+  .column { padding: 20px 16px 12px; gap: 24px; }
+  .column .assistant { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .column .assistant::before { grid-column: 1; width: 22px; height: 22px; color: var(--accent); background: transparent; }
+  .column .assistant > * { grid-column: 1; }
+  .column .user-bubble { max-width: 88%; border-radius: var(--radius-lg); }
+}
 .elapsed {
   display: block;
   margin-top: 4px;

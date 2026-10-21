@@ -76,6 +76,8 @@ const more = useTemplateRef<InstanceType<typeof ActionButton>>("more");
 const moreButton = (): HTMLElement | null => (more.value?.$el as HTMLElement | undefined) ?? null;
 
 const items = computed<MenuItem[]>(() => [
+  { id: "export", label: "Export Markdown" },
+  ...(auth.hasPermission("chat.share") ? [{ id: "share", label: "Share chat" }] : []),
   { id: "summarize", label: "Summarize", disabled: props.locked },
   { id: "clear", label: "Clear", disabled: props.locked },
 ]);
@@ -100,7 +102,9 @@ async function closeMenu(): Promise<void> {
 
 function choose(id: string): void {
   menuAt.value = null; // a choice opens a dialog, which takes focus
-  if (id === "summarize") emit("summarize");
+  if (id === "export") emit("export");
+  else if (id === "share" && auth.hasPermission("chat.share")) emit("share");
+  else if (id === "summarize") emit("summarize");
   else if (id === "clear") emit("clear");
 }
 </script>
@@ -142,8 +146,8 @@ function choose(id: string): void {
       />
     </div>
     <template v-if="hasMessages">
-      <ActionButton icon="export" icon-only title="Download this chat as Markdown" @click="emit('export')">Export</ActionButton>
-      <ActionButton v-if="auth.hasPermission('chat.share')" icon="share" icon-only title="Make a read-only link to this chat" @click="emit('share')">Share</ActionButton>
+      <ActionButton class="desktop-action" icon="export" icon-only title="Download this chat as Markdown" @click="emit('export')">Export</ActionButton>
+      <ActionButton v-if="auth.hasPermission('chat.share')" class="desktop-action" icon="share" icon-only title="Make a read-only link to this chat" @click="emit('share')">Share</ActionButton>
       <ActionButton
         ref="more"
         icon="more"
@@ -232,10 +236,16 @@ button.context[aria-expanded="true"] {
 .high .meter i {
   background: var(--danger);
 }
-/* Room for the floating chats button on narrow screens. */
 @media (max-width: 767px) {
   .chat-header {
-    padding-left: 50px;
+    gap: 4px 8px;
+    padding: 6px 16px;
   }
+  .title { flex: 1; max-width: none; }
+  .desktop-action, .spacer { display: none; }
+  .chat-header :deep(.agent-tag) { order: 4; flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; }
+  .context-box { flex-shrink: 0; }
+  .context .meter { display: none; }
+  .more { min-width: 44px; min-height: 44px; }
 }
 </style>

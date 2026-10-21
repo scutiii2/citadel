@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import { useAuthStore } from "../stores/auth";
 import { attachmentsClient } from "../api/AttachmentsClient";
 import type { CommandInfo } from "../api/CommandsClient";
@@ -58,6 +58,18 @@ const emit = defineEmits<{
 }>();
 
 const draft = ref("");
+const extraToolsOpen = ref(false);
+const extraToolsId = useId();
+const toolbox = ref<HTMLElement | null>(null);
+const moreToolsButton = ref<HTMLButtonElement | null>(null);
+function closeExtraTools(event: PointerEvent): void {
+  if (!toolbox.value?.contains(event.target as Node)) extraToolsOpen.value = false;
+}
+watch(extraToolsOpen, (open) => {
+  if (open) document.addEventListener("pointerdown", closeExtraTools);
+  else document.removeEventListener("pointerdown", closeExtraTools);
+});
+onBeforeUnmount(() => document.removeEventListener("pointerdown", closeExtraTools));
 /** Counts sends; non-zero while the paper plane is in the air (also its :key, so each send restarts it). */
 const flights = ref(0);
 // Browsing past questions: which one is shown (null = not browsing). It
@@ -559,7 +571,12 @@ function onKeydown(event: KeyboardEvent): void {
         @paste="onPaste"
       />
       <div class="tools">
-        <button v-if="auth.hasPermission('files.upload')" type="button" class="attach" title="Attach files (text, code, PDF, Word, Excel)" @click="fileInput?.click()">
+        <div ref="toolbox" class="toolbox" @keydown.esc.stop.prevent="extraToolsOpen = false; moreToolsButton?.focus()">
+        <button ref="moreToolsButton" type="button" class="attach more-tools" aria-label="More message tools" :aria-expanded="extraToolsOpen" :aria-controls="extraToolsId" @click="extraToolsOpen = !extraToolsOpen">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+        </button>
+        <div :id="extraToolsId" class="extra-tools" :class="{ open: extraToolsOpen }">
+        <button v-if="auth.hasPermission('files.upload')" type="button" class="attach" title="Attach files (text, code, PDF, Word, Excel)" @click="fileInput?.click(); extraToolsOpen = false">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <path
               d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"
@@ -571,7 +588,7 @@ function onKeydown(event: KeyboardEvent): void {
             />
           </svg>
         </button>
-        <button type="button" class="attach" title="Ask a multiple choice or yes or no question" aria-label="Ask a multiple choice or yes or no question" @click="emit('triage')">
+        <button type="button" class="attach" title="Ask a multiple choice or yes or no question" aria-label="Ask a multiple choice or yes or no question" @click="extraToolsOpen = false; emit('triage')">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <path
               d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1.9-1.1 1.8M12 17h.01"
@@ -589,10 +606,12 @@ function onKeydown(event: KeyboardEvent): void {
           :error="templatesError"
           :can-save="draft.trim() !== ''"
           @open="emit('templatesNeeded')"
-          @pick="(template) => insertText(template.body)"
-          @manage="emit('manageTemplates', '')"
-          @save="emit('manageTemplates', draft.trim())"
+          @pick="(template) => { insertText(template.body); extraToolsOpen = false; }"
+          @manage="extraToolsOpen = false; emit('manageTemplates', '')"
+          @save="extraToolsOpen = false; emit('manageTemplates', draft.trim())"
         />
+        </div>
+        </div>
         <!-- The chat page's own controls (settings, status) sit beside the attach button. -->
         <slot name="tools" />
         <span class="spacer" />
@@ -721,6 +740,8 @@ function onKeydown(event: KeyboardEvent): void {
   gap: 6px;
   margin-left: -6px;
 }
+.toolbox, .extra-tools { display: contents; }
+.attach.more-tools { display: none; }
 .spacer {
   flex: 1;
 }
@@ -838,6 +859,52 @@ textarea {
   pointer-events: none;
   color: var(--accent);
   animation: plane-fly 0.65s cubic-bezier(0.4, 0, 0.8, 0.6) forwards;
+}
+@media (max-width: 767px) {
+  .composer { padding: 8px 12px; }
+  .box { padding: 8px; border-radius: var(--radius-lg); background: var(--bg); }
+  textarea { padding: 6px 4px; }
+  .tools { gap: 2px; margin-left: 0; }
+  .toolbox { position: relative; display: block; }
+  .attach.more-tools { display: grid; width: 44px; }
+  .extra-tools { display: none; }
+  .extra-tools.open {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    z-index: 17;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+  .extra-tools :deep(.picker) { position: static; }
+  .extra-tools :deep(.popover) {
+    left: 0;
+    max-height: min(400px, calc(100dvh - var(--rail-height) - 220px));
+    overflow-y: auto;
+  }
+  .round { width: 44px; height: 44px; }
+  .attach { width: 44px; min-height: 44px; border-radius: var(--radius-md); }
+  .keys, .recall { display: none; }
+  .tools :deep(.trigger), .tools :deep(.gear) { width: 44px; min-height: 44px; }
+  .tools :deep(.mode-chip) { min-height: 44px; }
+  .tools :deep(.mode-chip) { max-width: 140px; }
+  .tools :deep(.settings-menu), .tools :deep(.approval-picker) { position: static; }
+  .tools :deep(.settings-menu .panel), .tools :deep(.approval-picker .menu) {
+    left: 12px;
+    right: 12px;
+    bottom: calc(100% + 4px);
+    width: auto;
+    max-width: none;
+    max-height: min(400px, calc(100dvh - var(--rail-height) - 160px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .attach:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 @keyframes plane-fly {
   0% {
