@@ -303,6 +303,108 @@ def test_run_chat_raises_chat_cancelled_before_any_api_call_when_already_cancell
     cancellation.clear("req-1")
 
 
+def test_run_chat_recovers_text_from_final_message(monkeypatch):
+    final = SimpleNamespace(usage=_usage(), stop_reason="end_turn", content=[
+        SimpleNamespace(type="thinking", thinking="private reasoning"),
+        SimpleNamespace(type="text", text="Recovered answer"),
+    ])
+    client = SimpleNamespace(messages=SimpleNamespace(stream=Mock(return_value=_stream_cm([], final))))
+    events = []
+    async def emit(event):
+        events.append(event)
+    with patch.object(anthropic_provider, "_get_client", return_value=client), \
+         patch.object(anthropic_provider, "list_tools", return_value=[]):
+        result = asyncio.run(anthropic_provider.run_chat("hello", [], on_event=emit))
+
+    assert result.response == "Recovered answer"
+    assert {"type": "token", "text": "Recovered answer"} in events
+    assert client.messages.stream.call_count == 1
+    assert "private reasoning" not in str(events)
+
+
+def test_run_chat_retries_empty_answer_once_preserving_usage(monkeypatch, caplog):
+    empty = SimpleNamespace(usage=_usage(10, 5), stop_reason="end_turn", content=[])
+    client = SimpleNamespace(messages=SimpleNamespace(stream=Mock(side_effect=[
+        _stream_cm(["  "], empty), _stream_cm(["Recovered answer"], input_tokens=3, output_tokens=2),
+    ])))
+    events = []
+    async def emit(event):
+        events.append(event)
+    with patch.object(anthropic_provider, "_get_client", return_value=client), \
+         patch.object(anthropic_provider, "list_tools", return_value=[]):
+        result = asyncio.run(anthropic_provider.run_chat("private question", [], on_event=emit))
+
+    assert result.response == "Recovered answer"
+    assert result.total_tokens == 20
+    assert client.messages.stream.call_count == 2
+    assert {"type": "token_reset"} in events
+    assert "stop_reason=end_turn" in caplog.text
+    assert "private question" not in caplog.text
+
+
+@pytest.mark.parametrize("reason", ["end_turn", "max_tokens", "refusal"])
+def test_run_chat_never_returns_blank_after_empty_recovery(monkeypatch, caplog, reason):
+    final = SimpleNamespace(usage=_usage(), stop_reason=reason, content=[
+        SimpleNamespace(type="thinking", thinking="private reasoning"),
+    ])
+    client = SimpleNamespace(messages=SimpleNamespace(stream=Mock(side_effect=[
+        _stream_cm([], final), _stream_cm([], final),
+    ])))
+    events = []
+    async def emit(event):
+        events.append(event)
+    with patch.object(anthropic_provider, "_get_client", return_value=client), \
+         patch.object(anthropic_provider, "list_tools", return_value=[]):
+        result = asyncio.run(anthropic_provider.run_chat("hello", [], on_event=emit))
+
+    assert result.response.strip()
+    # Refusals must be reported without retrying to get around them.
+    assert client.messages.stream.call_count == (1 if reason == "refusal" else 2)
+    assert events[-1] == {"type": "token", "text": result.response}
+    assert f"stop_reason={reason}" in caplog.text
+    assert "thinking" in caplog.text
+    assert "private reasoning" not in caplog.text
+    if reason == "max_tokens":
+        assert "output limit" in result.response
+
+
+def test_empty_answer_recovery_preserves_completed_tool_work(monkeypatch):
+    tool = SimpleNamespace(type="tool_use", id="saved-call", name="save_file", input={})
+    first = SimpleNamespace(usage=_usage(), stop_reason="tool_use", content=[tool])
+    client = SimpleNamespace(messages=SimpleNamespace(stream=Mock(side_effect=[
+        _stream_cm([], first), _stream_cm([]), _stream_cm(["File saved"]),
+    ])))
+    with patch.object(anthropic_provider, "_get_client", return_value=client), \
+         patch.object(anthropic_provider, "list_tools", return_value=[]), \
+         patch.object(anthropic_provider, "_dispatch", return_value="saved") as dispatch:
+        result = asyncio.run(anthropic_provider.run_chat("save a file", []))
+
+    dispatch.assert_called_once_with("save_file", {}, 0)
+    assert result.response == "File saved"
+    assert result.tools_used == ["save_file"]
+    recovery_messages = client.messages.stream.call_args.kwargs["messages"]
+    assert any(message["role"] == "user" and isinstance(message["content"], list)
+               and message["content"][0]["tool_use_id"] == "saved-call" for message in recovery_messages)
+
+
+@pytest.mark.parametrize("limits", [{"max_tool_rounds": 1}, {"max_turn_tokens": 15}])
+def test_empty_answer_recovery_respects_turn_budgets(monkeypatch, limits):
+    from src.agents.agent_spec import LlmSpec
+    from src.llm.llm_options import LlmOptions
+
+    final = SimpleNamespace(usage=_usage(), stop_reason="end_turn", content=[])
+    client = SimpleNamespace(messages=SimpleNamespace(stream=Mock(return_value=_stream_cm([], final))))
+    options = LlmOptions("anthropic", "test", LlmSpec(provider="anthropic", **limits))
+    with patch.object(anthropic_provider, "_get_client", return_value=client), \
+         patch.object(anthropic_provider, "list_tools", return_value=[]), \
+         patch.object(anthropic_provider.llm_options, "for_provider", return_value=options):
+        result = asyncio.run(anthropic_provider.run_chat("hello", []))
+
+    assert result.response.strip()
+    assert result.total_tokens == 15
+    assert client.messages.stream.call_count == 1
+
+
 def test_run_chat_sends_agent_llm_options_and_retries_without_a_rejected_one(monkeypatch):
     import anthropic
     from src.agents import agent_spec

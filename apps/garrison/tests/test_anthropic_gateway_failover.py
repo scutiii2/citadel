@@ -16,6 +16,19 @@ from tests.test_anthropic_provider import _stream_cm, _usage
 from tests.test_gateway_failover import sdk_error
 
 
+def _malformed_stream(chunks=()):
+    from anthropic._streaming import ServerSentEvent
+
+    cm = _stream_cm([])
+    event = ServerSentEvent(event="message_start", data="private-invalid-event")
+    async def pieces():
+        for chunk in chunks:
+            yield chunk
+        event.json()
+    cm.__aenter__.return_value.text_stream = pieces()
+    return cm
+
+
 @pytest.fixture(autouse=True)
 def setup(monkeypatch):
     cooldown.reset()
@@ -136,6 +149,121 @@ def test_exhaustion_raises_last_error(monkeypatch):
         asyncio.run(provider.run_chat("hello", []))
     assert raised.value is last
     assert cooldown.is_in_cooldown("anthropic:backup")
+
+
+def test_sse_json_failure_retries_once_and_resets_partial_answer(monkeypatch, caplog):
+    primary, backup = clients(monkeypatch, [_malformed_stream(["discard"]), _stream_cm(["answer"])], [])
+    events = []
+    async def emit(event):
+        events.append(event)
+    result = asyncio.run(provider.run_chat("private-question", [], on_event=emit))
+    assert result.response == "answer"
+    assert primary.messages.stream.call_count == 2
+    assert backup.messages.stream.call_count == 0
+    assert not cooldown.is_in_cooldown("anthropic:claude")
+    reset = events.index({"type": "token_reset"})
+    assert reset < next(i for i, event in enumerate(events) if event.get("text") == "answer")
+    assert "private-invalid-event" not in caplog.text
+    assert "private-question" not in caplog.text
+
+
+def test_repeated_sse_json_failure_switches_without_replaying_tools(monkeypatch):
+    tool = NS(type="tool_use", name="save_file", input={}, id="saved-call")
+    first = NS(content=[tool], stop_reason="tool_use", usage=_usage())
+    primary, backup = clients(monkeypatch, [
+        _stream_cm([], first), _malformed_stream(), _malformed_stream(),
+    ], [_stream_cm(["saved"])])
+    dispatch = Mock(return_value="file saved")
+    monkeypatch.setattr(provider, "_dispatch", dispatch)
+    result = asyncio.run(provider.run_chat("save", []))
+    assert result.response == "saved"
+    assert result.gateway == "backup"
+    assert result.gateway_switches == [{"from": "claude", "to": "backup", "reason": "unavailable"}]
+    assert primary.messages.stream.call_count == 3
+    assert backup.messages.stream.call_count == 1
+    dispatch.assert_called_once_with("save_file", {}, 0)
+    assert result.tools_used == ["save_file"]
+    assert backup.messages.stream.call_args.kwargs["messages"][-1]["content"][0]["content"] == "file saved"
+
+
+@pytest.mark.parametrize("with_backup", [True, False])
+def test_sse_json_retry_exhaustion_returns_visible_error(monkeypatch, with_backup):
+    if not with_backup:
+        spec = agent_spec.current()
+        monkeypatch.setattr(agent_spec, "_current", replace(spec, llm=replace(spec.llm, fallback_gateways=())))
+    primary, backup = clients(monkeypatch, [_malformed_stream(), _malformed_stream()],
+                              [_malformed_stream(), _malformed_stream()])
+    events = []
+    async def emit(event):
+        events.append(event)
+    result = asyncio.run(provider.run_chat("hello", [], on_event=emit))
+    assert "invalid response stream" in result.response
+    assert "private-invalid-event" not in result.response
+    assert primary.messages.stream.call_count == 2
+    assert backup.messages.stream.call_count == (2 if with_backup else 0)
+    assert events[-1] == {"type": "token", "text": result.response}
+
+
+def test_sse_retry_obeys_cancellation(monkeypatch):
+    from src.llm import cancellation
+
+    primary, backup = clients(monkeypatch, [_malformed_stream(["discard"]), _stream_cm(["answer"])], [])
+    async def emit(event):
+        if event["type"] == "token_reset":
+            cancellation.cancel("cancel-sse-retry")
+    try:
+        with pytest.raises(ChatCancelled):
+            asyncio.run(provider.run_chat("hello", [], request_id="cancel-sse-retry", on_event=emit))
+        assert primary.messages.stream.call_count == 1
+        assert backup.messages.stream.call_count == 0
+    finally:
+        cancellation.clear("cancel-sse-retry")
+
+
+def test_sse_retry_respects_token_budget(monkeypatch):
+    from src.agents.agent_spec import LlmSpec
+    from src.llm.llm_options import LlmOptions
+
+    primary, backup = clients(monkeypatch, [_malformed_stream(), _stream_cm(["answer"])], [])
+    options = LlmOptions("anthropic", "test", LlmSpec(provider="anthropic", max_turn_tokens=1))
+    monkeypatch.setattr(provider.llm_options, "for_provider", lambda _: options)
+    result = asyncio.run(provider.run_chat("hello", []))
+    assert "token budget" in result.response
+    assert primary.messages.stream.call_count == 1
+    assert backup.messages.stream.call_count == 0
+
+
+def test_sse_retry_respects_time_budget(monkeypatch):
+    from src.agents.agent_spec import LlmSpec
+    from src.llm.llm_options import LlmOptions
+
+    slow = _stream_cm([])
+    async def delayed_pieces():
+        await asyncio.sleep(1)
+        yield "too late"
+    slow.__aenter__.return_value.text_stream = delayed_pieces()
+    primary, backup = clients(monkeypatch, [_malformed_stream(), slow], [])
+    options = LlmOptions("anthropic", "test", LlmSpec(provider="anthropic", max_turn_seconds=0.05))
+    monkeypatch.setattr(provider.llm_options, "for_provider", lambda _: options)
+    result = asyncio.run(provider.run_chat("hello", []))
+    assert "time budget" in result.response
+    assert primary.messages.stream.call_count == 2
+    assert backup.messages.stream.call_count == 0
+
+
+def test_sse_retry_allowance_does_not_reset_after_completed_round(monkeypatch):
+    tool = NS(type="tool_use", name="save_file", input={}, id="saved-call")
+    first = NS(content=[tool], stop_reason="tool_use", usage=_usage())
+    primary, backup = clients(monkeypatch, [
+        _malformed_stream(), _stream_cm([], first), _malformed_stream(),
+    ], [_stream_cm(["saved"])])
+    dispatch = Mock(return_value="file saved")
+    monkeypatch.setattr(provider, "_dispatch", dispatch)
+    result = asyncio.run(provider.run_chat("save", []))
+    assert result.response == "saved"
+    assert primary.messages.stream.call_count == 3
+    assert backup.messages.stream.call_count == 1
+    dispatch.assert_called_once_with("save_file", {}, 0)
 
 
 def test_interpret_switches_and_records_actual_gateway(monkeypatch):

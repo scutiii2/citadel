@@ -1,6 +1,7 @@
 """Route failures using SDK identity/status, without exposing gateway messages."""
 
 import httpx
+import json
 import anthropic
 import openai
 import pytest
@@ -53,6 +54,20 @@ def test_transport_errors(sdk, name):
 @pytest.mark.parametrize("error", [ValueError("quota"), TimeoutError(), RuntimeError("overloaded")])
 def test_non_sdk_errors_are_not_retried(error):
     assert failover.classify(error) is None
+
+
+def test_anthropic_sse_json_failure_is_an_upstream_failure():
+    from anthropic._streaming import ServerSentEvent
+
+    with pytest.raises(json.JSONDecodeError) as raised:
+        ServerSentEvent(event="message_start", data="invalid upstream event").json()
+    assert failover.classify(raised.value) == failover.FailureKind.unavailable
+
+
+def test_application_json_failure_is_not_an_upstream_failure():
+    with pytest.raises(json.JSONDecodeError) as raised:
+        json.loads("invalid tool arguments")
+    assert failover.classify(raised.value) is None
 
 
 def test_route_skips_missing_credentials_and_cooldowns_and_never_flaps():

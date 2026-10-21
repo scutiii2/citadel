@@ -35,7 +35,7 @@ def _round_cm(final_message):
 
 def _run_chat(monkeypatch, *, cache: bool, usage: SimpleNamespace):
     """One answered round; returns (result, the kwargs the SDK was called with)."""
-    response = MagicMock(stop_reason="end_turn", content=[])
+    response = MagicMock(stop_reason="end_turn", content=[SimpleNamespace(type="text", text="answer")])
     response.usage = usage
     client = MagicMock()
     client.messages.stream = MagicMock(return_value=_round_cm(response))
@@ -132,7 +132,7 @@ def test_each_round_of_a_tool_loop_carries_one_history_breakpoint_on_its_last_me
     tool_block.name = "tool_srv_listApps"
     first = MagicMock(stop_reason="tool_use", content=[tool_block])
     first.usage = SimpleNamespace(input_tokens=10, output_tokens=5)
-    second = MagicMock(stop_reason="end_turn", content=[])
+    second = MagicMock(stop_reason="end_turn", content=[SimpleNamespace(type="text", text="answer")])
     second.usage = SimpleNamespace(input_tokens=3, output_tokens=1)
     client = MagicMock()
     client.messages.stream = MagicMock(side_effect=[_round_cm(first), _round_cm(second)])
