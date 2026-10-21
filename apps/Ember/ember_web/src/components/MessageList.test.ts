@@ -23,6 +23,42 @@ const assistant = (content: string, extra: Partial<ChatMessage> = {}): ChatMessa
 const FOUR = [user("q1"), assistant("a1"), user("q2"), assistant("a2")];
 const FILE = { filename: "f.txt", chars: 3, truncated: false, text: "abc" };
 
+describe("image attachments", () => {
+  for (const label of ["PDFMerger", "Image"]) {
+    it(`previews saved ${label} image references and opens the viewer`, async () => {
+      const attachment = { filename: "image.png", chars: 0, truncated: false,
+        text: `[${label} file_id: f_photo | 1 pages | image | expires_at: 2000000000]` };
+      const wrapper = mountList({ messages: [user(withAttachments("Look", [attachment]))] });
+      const image = wrapper.find<HTMLImageElement>(".attachment-image img");
+      expect(image.exists()).toBe(true);
+      expect(image.attributes("src")).toBe("/api/attachments/files/f_photo/content");
+      expect(image.attributes("alt")).toBe("image.png");
+      expect(wrapper.text()).not.toContain("0 characters");
+      await wrapper.find("button.attachment-image").trigger("click");
+      await flushPromises();
+      expect(wrapper.find('dialog[open] img').attributes("src")).toBe(image.attributes("src"));
+      wrapper.unmount();
+    });
+  }
+  it("shows an unavailable message when the image cannot load", async () => {
+    const wrapper = mountList({ messages: [user(withAttachments("Look", [{ ...FILE, filename: "image.png",
+      text: "[Image file_id: f_gone | 1 pages | image | expires_at: 1]" }]))] });
+    await wrapper.find(".attachment-image img").trigger("error");
+    expect(wrapper.text()).toContain("Image expired or unavailable");
+    expect(wrapper.find("button.attachment-image").exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it("does not load images without download permission", async () => {
+    const wrapper = mountList({ messages: [user(withAttachments("Look", [{ ...FILE, filename: "image.png",
+      text: "[Image file_id: f_private | 1 pages | image]" }]))] });
+    useAuthStore().account!.permissions = [];
+    await flushPromises();
+    expect(wrapper.find(".attachment-image img").exists()).toBe(false);
+    expect(wrapper.text()).toContain("Image preview requires file download permission");
+    wrapper.unmount();
+  });
+});
+
 type Props = InstanceType<typeof MessageList>["$props"];
 
 function mountList(props: Partial<Props> = {}) {

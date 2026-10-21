@@ -64,14 +64,14 @@ def record_usage(rows: list[dict[str, Any]]) -> None:
 _attachments: ContextVar[str] = ContextVar("delegation_pdf_attachments", default="")
 
 
-@catalog(description="Preserve uploaded PDF file references across specialist delegations")
+@catalog(description="Preserve uploaded PDF/image file references across specialist delegations")
 def bind_attachments(question: str, history: list[dict[str, Any]]) -> Token:
     # Carry only file metadata, never the extracted document text or unrelated history.
     sources = [str(item.get("content", "")) for item in history if item.get("role") == "user"] + [question]
-    pattern = r'\[\[ATTACHMENT filename="([^"]*)" chars="\d+" truncated="(?:true|false)"\]\]\n(\[PDFMerger file_id:[^\n]*\])'
+    pattern = r'\[\[ATTACHMENT filename="([^"]*)" chars="\d+" truncated="(?:true|false)"\]\]\n(\[(?:PDFMerger|Image) file_id:[^\n]*\])'
     references = list(dict.fromkeys(f"{name}: {header}" for source in sources for name, header in re.findall(pattern, source)))
     # Nested delegates inherit the references appended by the preceding hop.
-    references += [f"{name}: {header}" for source in sources for name, header in re.findall(r'^([^\n]+): (\[PDFMerger file_id:[^\n]*\])$', source, re.MULTILINE)]
+    references += [f"{name}: {header}" for source in sources for name, header in re.findall(r'^([^\n]+): (\[(?:PDFMerger|Image) file_id:[^\n]*\])$', source, re.MULTILINE)]
     return _attachments.set("\n".join(dict.fromkeys(references)))
 
 
@@ -234,7 +234,7 @@ def call(
 
     references = _attachments.get()
     if references and references not in question:
-        question += "\n\nUploaded PDF file references (original attachment order):\n" + references
+        question += "\n\nUploaded file references (original attachment order):\n" + references
 
     # Specialists start and stop on their own - read the current registry.
     agent_registry.reload()

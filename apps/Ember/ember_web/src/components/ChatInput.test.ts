@@ -883,6 +883,9 @@ describe("original PDF attachments", () => {
     const sent = wrapper.emitted("send")![0]![0] as string;
     expect(sent.indexOf("file_id: first")).toBeLessThan(sent.indexOf("file_id: second"));
     expect(sent).toContain("No text preview available");
+    const imageBlock = sent.slice(sent.indexOf('[[ATTACHMENT filename="photo.png"'));
+    expect(imageBlock).toContain("[Image file_id: second");
+    expect(imageBlock).not.toContain("PDF Assistant");
     expect(text).not.toHaveBeenCalled();
   });
   it("shows storage errors instead of sending a misleading text-only PDF", async () => {

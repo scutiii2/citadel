@@ -289,6 +289,12 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
+    const attachmentContent = path.match(/^\/api\/attachments\/files\/([A-Za-z0-9_-]+)\/content$/);
+    if (attachmentContent && request.method() === 'GET') {
+      const found = pdfs.get(attachmentContent[1]!);
+      if (!found) return json(route, { detail: 'Image expired or unavailable' }, 404);
+      return route.fulfill({ status: 200, contentType: found.info.kind === 'image' ? 'image/png' : 'application/pdf', body: found.bytes });
+    }
     if (options.media && path.startsWith('/api/pdf-merger/')) {
       const method = request.method();
       if (path === '/api/pdf-merger/files' && method === 'GET') return json(route, [...pdfs.values()].map(f => f.info));

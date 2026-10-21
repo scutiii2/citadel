@@ -11,7 +11,7 @@ from __future__ import annotations
 import base64
 import binascii
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
 from pydantic import BaseModel, Field
 
 from src.deps import get_log_writer, require_permission
@@ -20,11 +20,24 @@ from src.routes.server_info import get_server_info
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import McpServerInfo, McpServerRefused, McpServerUnavailable
 from src.services.permissions import FILES_UPLOAD
+from src.services.capability_files import CapabilityFilesGateway
 from src.services.text_extraction import MAX_FILE_BYTES, ExtractionError, extract_text_async
 
 router = APIRouter(prefix="/api/attachments", tags=["attachments"])
 
 require_chat = require_permission(FILES_UPLOAD)
+
+
+@router.get("/files/{file_id}/content")
+async def attachment_content(
+    request: Request,
+    file_id: str = Path(pattern=r"^[A-Za-z0-9_-]{1,100}$"),
+    account: Account = Depends(require_permission("files.download")),
+):
+    """Preview an owned chat attachment without a PDF workspace subscription."""
+    client = CapabilityFilesGateway(request.app.state.upstream, request.app.state.settings.mcp_server_url,
+                                    request.app.state.internal_token)
+    return await client.stream("pdf", file_id, account, content=True, range_header=request.headers.get("range"))
 
 # base64 is 4 characters per 3 bytes.
 _MAX_BASE64 = (MAX_FILE_BYTES + 2) // 3 * 4

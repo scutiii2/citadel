@@ -183,7 +183,12 @@ URL, token or key.
 - Attach files to a question (paperclip, paste, or drag and drop anywhere on
   the input area): text and code files, PDF, Word, Excel and supported images.
   Text previews (up to 20,000 characters each) go into the question; the chat
-  shows each file collapsed under what you typed. PDF/image originals are also
+  shows text files collapsed under what you typed. Images show an inline preview
+  with click-to-enlarge and expandable attachment details; older saved image
+  references also work while their originals remain available. Preview access
+  requires `files.download`; expired or unavailable images show a fallback.
+  Image references are labelled Image without directing delegation to PDF Assistant.
+  PDF/image originals are also
   stored in PDFMerger under your account so PDF Assistant can inspect and merge
   them using their uploaded IDs, including scans without readable text. IDs are
   retained when delegating to specialists. Uploads are limited to 15 MB each.

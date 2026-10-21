@@ -329,6 +329,20 @@ def test_attachment_references_survive_rewritten_delegation_and_reset(monkeypatc
     assert delegation._attachments.get() == ""
 
 
+def test_image_references_survive_nested_delegation():
+    question = 'Look\n[[ATTACHMENT filename="image.png" chars="0" truncated="false"]]\n[Image file_id: f_photo | 1 pages | image]\n[[/ATTACHMENT]]'
+    token = delegation.bind_attachments(question, [])
+    try:
+        assert "f_photo" in delegation._attachments.get()
+        nested = delegation.bind_attachments("image.png: [Image file_id: f_photo | 1 pages | image]", [])
+        try:
+            assert "f_photo" in delegation._attachments.get()
+        finally:
+            delegation.reset_attachments(nested)
+    finally:
+        delegation.reset_attachments(token)
+
+
 
 def test_call_forwards_the_chats_plan_toggles_only_when_they_are_off(monkeypatch):
     from src.agents import plan
