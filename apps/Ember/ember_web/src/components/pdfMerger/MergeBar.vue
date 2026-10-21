@@ -49,7 +49,7 @@ const percent = computed(() =>
       <template v-else>Add files to start</template>
     </div>
     <ActionButton icon="verify" class="primary" :disabled="!plan.canMerge" :aria-busy="plan.status === 'running'" @click="plan.merge()">
-      {{ plan.status === 'running' ? 'Merging…' : 'Merge' }}
+      {{ plan.status === 'running' ? 'Merging…' : 'Merge PDF' }}
     </ActionButton>
     <ConfirmModal :open="cancelOpen" title="Cancel merge?" message="Stop the current PDF merge?" confirm-label="Cancel merge" :busy="cancelling" @close="!cancelling && (cancelOpen = false)" @confirm="confirmCancel" />
   </div>

@@ -43,6 +43,10 @@ URL, token or key.
   generic GUI pages and other extensions' external Open app links still work.
 - PDF keeps drag/keyboard source and page ordering, page ranges, rotation,
   lazy PDF thumbnails, image fit/page size/margins, metadata and bookmarks.
+  Page ordering fills the workspace with source files alongside on desktop;
+  mobile uses Pages / Files modes with touch reorder buttons. The output name
+  and Merge PDF action stay visible, with metadata and image defaults in Output
+  options. Changing modes preserves edits and the active merge job.
   JSON/base64 uploads allow 15 MiB per file. Armory's engine also enforces plan,
   page and account quotas. Files normally expire after six hours; upload again
   if expired. Merge progress is polled without blocking the page.

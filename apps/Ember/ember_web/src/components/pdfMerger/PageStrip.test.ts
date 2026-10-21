@@ -10,6 +10,19 @@ vi.mock('../../api/PdfMergerClient')
 vi.mock('../../lib/pdfMerger/pdfThumbs', () => ({ renderPage: vi.fn().mockResolvedValue(undefined), forgetDocument: vi.fn() }))
 
 describe('PageStrip', () => {
+  it('reorders pages with touch controls and disables boundary moves', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const files = useFilesStore()
+    const plan = usePlanStore()
+    files.add({ file_id: 'f_a', name: 'contract.pdf', kind: 'pdf', pages: 2, size: 1, expires_at: 0 })
+    await nextTick()
+    const wrapper = mount(PageStrip, { global: { plugins: [pinia] } })
+    expect(wrapper.get('button[aria-label="Move contract p1 earlier"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('button[aria-label="Move contract p1 later"]').trigger('click')
+    expect(plan.pages.map(p => p.key)).toEqual(['f_a:1', 'f_a:0'])
+    expect(wrapper.get('button[aria-label="Move contract p1 later"]').attributes('disabled')).toBeDefined()
+  })
   it('labels pages and reorders by drag and drop', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
