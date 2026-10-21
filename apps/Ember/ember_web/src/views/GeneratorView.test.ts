@@ -51,6 +51,35 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("GeneratorView", () => {
+  it("keeps the mobile type picker and generated value when a type change is cancelled", async () => {
+    const w = await show();
+    await generate(w);
+    await tabButton(w, "Reveal").trigger("click");
+    await w.get('select[aria-label="Generator type"]').setValue("pin");
+    await flushPromises();
+    expect(w.get('select[aria-label="Generator type"]').element).toHaveProperty("value", "password");
+    await w.get('dialog button.cancel').trigger("click");
+    await flushPromises();
+    expect(w.get('[data-testid=generated-value]').text()).toBe(PASSWORD.password);
+    expect(mocks.runTool).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
+  it("opens and closes mobile options without losing the result or generating again", async () => {
+    const w = await show();
+    await generate(w);
+    const disclosure = w.get('button[aria-controls="generator-options"]');
+    expect(disclosure.attributes('aria-expanded')).toBe('false');
+    await disclosure.trigger('click');
+    await w.get('input[type=range]').setValue('40');
+    await disclosure.trigger('click');
+    expect(disclosure.attributes('aria-expanded')).toBe('false');
+    expect(w.get('[data-testid=generated-value]').text()).toBe('•'.repeat(PASSWORD.password.length));
+    expect(mocks.runTool).toHaveBeenCalledTimes(1);
+    await generate(w);
+    expect(mocks.runTool).toHaveBeenLastCalledWith('tool_gen_generatePassword', expect.objectContaining({ length: 40 }));
+    w.unmount();
+  });
   it("makes nothing on open or when a tab is opened, only a hint", async () => {
     const w = await show();
 
@@ -229,5 +258,18 @@ describe("GeneratorView", () => {
     await generate(w);
 
     expect(w.get("[role=alert]").text()).toBe("Secret is not valid base32.");
+  });
+
+  it("keeps the previous masked result available if regeneration fails", async () => {
+    const w = await show();
+    await generate(w);
+    await tabButton(w, "Reveal").trigger("click");
+    mocks.runTool.mockResolvedValue({ text: "Generator unavailable.", isError: true });
+    await generate(w);
+    expect(w.get('[role=alert]').text()).toBe('Generator unavailable.');
+    expect(w.get('[data-testid=generated-value]').text()).toBe('•'.repeat(PASSWORD.password.length));
+    await tabButton(w, "Reveal").trigger("click");
+    expect(w.get('[data-testid=generated-value]').text()).toBe(PASSWORD.password);
+    w.unmount();
   });
 });
