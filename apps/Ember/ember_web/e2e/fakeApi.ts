@@ -573,6 +573,9 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       return json(route, { kind, choice: options[0]!.title, probabilities, confidence: 0.8, uncertain: false });
     }
 
+    if (method === "POST" && path === "/api/brains/browse") return json(route, {
+      message: "This brain is not configured.", status: "not_configured", index_status: "not_started"
+    });
     if (method === "GET" && path.startsWith("/api/brains/connections/")) return json(route, {
       id: null, scope: path.endsWith("instance") ? "instance" : "personal", label: "Brain", endpoint: "", folder: "Inbox",
       enabled: false, allow_write: false, credential_configured: false, revision: 0, generation: null, status: "not_configured"
