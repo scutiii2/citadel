@@ -9,7 +9,6 @@ import { settingsClient } from "../api/SettingsClient";
 import { useAuthStore } from "../stores/auth";
 import SettingsView from "./SettingsView.vue";
 
-vi.mock("../components/BrainConnectionForm.vue", () => ({ default: { template: "<div />" } }));
 vi.mock("../api/SettingsClient", () => ({ settingsClient: { get: vi.fn(), set: vi.fn() } }));
 vi.mock("../api/NavPreferencesClient", () => ({
   navPreferencesClient: { get: vi.fn(), save: vi.fn(), reset: vi.fn() },

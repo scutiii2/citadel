@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import BrainConnectionForm from "../components/BrainConnectionForm.vue";
 import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import { getCurrentInstance } from "vue";
@@ -367,7 +366,6 @@ onMounted(() => {
       </div>
     </template>
     <div ref="root" class="column">
-      <BrainConnectionForm v-show="!onlyModified && (!query.trim() || /brain|obsidian|vault|connection/i.test(query))" scope="personal" />
       <p v-if="noMatches" class="muted empty">
         No settings match "{{ query }}".
         <button type="button" class="link" @click="query = ''">Clear search</button>

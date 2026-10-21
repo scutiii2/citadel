@@ -10,7 +10,7 @@ it creates a separate Markdown document, without automatic synchronization.
 
 In Ember Admin, open **Workspace settings → Instance Brain**. Managing the shared
 connection requires `settings.manage` and the existing staff verification rules.
-In Ember Web, open **Settings → Personal Brain** to configure your own connection.
+In Ember Web, open **Brains → Personal Brain** to configure your own connection.
 Use the Obsidian Local REST API plugin's HTTPS endpoint and API key. The endpoint
 must be reachable from Armory, not just from the browser or the user's desktop.
 
