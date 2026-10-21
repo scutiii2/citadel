@@ -48,6 +48,7 @@ export const NAV_PAGES: NavPage[] = [
     description: "Review and manage the context Ember remembers about you.",
     permission: "chat.use",
   },
+  { to: "/brains", label: "Brains", icon: ["M4 4h7v16H4z", "M13 4h7v16h-7z"], description: "Browse durable shared and personal knowledge.", permission: "" },
   {
     to: "/generator",
     label: "Generator",

@@ -289,6 +289,12 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
+    const attachmentContent = path.match(/^\/api\/attachments\/files\/([A-Za-z0-9_-]+)\/content$/);
+    if (attachmentContent && request.method() === 'GET') {
+      const found = pdfs.get(attachmentContent[1]!);
+      if (!found) return json(route, { detail: 'Image expired or unavailable' }, 404);
+      return route.fulfill({ status: 200, contentType: found.info.kind === 'image' ? 'image/png' : 'application/pdf', body: found.bytes });
+    }
     if (options.media && path.startsWith('/api/pdf-merger/')) {
       const method = request.method();
       if (path === '/api/pdf-merger/files' && method === 'GET') return json(route, [...pdfs.values()].map(f => f.info));
@@ -566,6 +572,11 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       return json(route, { kind, choice: options[0]!.title, probabilities, confidence: 0.8, uncertain: false });
     }
 
+    if (method === "GET" && path.startsWith("/api/brains/connections/")) return json(route, {
+      id: null, scope: path.endsWith("instance") ? "instance" : "personal", label: "Brain", endpoint: "", folder: "Inbox",
+      enabled: false, allow_write: false, credential_configured: false, revision: 0, generation: null, status: "not_configured"
+    });
+    if (method === "GET" && ["/api/brains/destinations", "/api/brains/suggestions", "/api/brains/promotions"].includes(path)) return json(route, []);
     // Laya's tag suggestions. The fake "reads" the note: it suggests the account's tags that the text mentions.
     if (path === "/api/notes/suggest-tags" && method === "POST") {
       const { title, body, tags } = request.postDataJSON() as NoteBody;

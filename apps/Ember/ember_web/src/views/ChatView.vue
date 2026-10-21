@@ -50,6 +50,7 @@ const {
   busy,
   caveman,
   secondBrainAvailable,
+  secondBrainScope,
   saveToSecondBrain,
   secondBrainPending,
   plan,
@@ -470,6 +471,8 @@ useChatShortcuts({
           <template #tools>
             <ChatSettingsMenu
               :caveman="caveman"
+              :second-brain-scope="secondBrainScope"
+              @update:second-brain-scope="chat.setSecondBrainScope"
               :second-brain-available="secondBrainAvailable"
               :save-to-second-brain="saveToSecondBrain"
               :second-brain-pending="secondBrainPending"

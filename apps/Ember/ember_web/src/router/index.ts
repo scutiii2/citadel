@@ -32,6 +32,7 @@ export const router = createRouter({
     { path: "/", name: "chat", component: ChatView, meta: { permission: "chat.use" } },
     // The same page with one chat open; ChatView keeps the address and the open chat in step.
     { path: "/chat/:id", name: "chat-id", component: ChatView, meta: { permission: "chat.use" } },
+    { path: "/brains", name: "brains", component: () => import("../views/BrainsView.vue") },
     // Lazy: each of these loads its own chunk only when first opened.
     { path: "/overview", name: "overview", component: () => import("../views/OverviewView.vue") },
     // The Tools page was merged into Capabilities; old links and bookmarks still work.

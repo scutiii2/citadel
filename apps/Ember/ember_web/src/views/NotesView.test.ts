@@ -10,6 +10,8 @@ vi.mock("../api/NotesClient", async (importOriginal) => ({
   notesClient: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), suggestTags: vi.fn(), generateTags: vi.fn(), get: vi.fn() },
 }));
 
+vi.mock("../components/NotePromotionPanel.vue", () => ({ default: { template: "<div />" } }));
+
 const client = vi.mocked(notesClient);
 const note = (
   id: string, title: string, body = "", updated = "2026-01-01T00:00:00", tags: string[] = [], agent_readable = false,

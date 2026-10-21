@@ -17,6 +17,7 @@ import { clockTime, dayDividers, fullTime } from "../utils/messageTime";
 import { toolTitle } from "../utils/toolTitles";
 import { compactNumber } from "../utils/usageFormat";
 import ConfirmModal from "./ConfirmModal.vue";
+import ChatAttachment from "./ChatAttachment.vue";
 import AgentActivity from "./AgentActivity.vue";
 import CopyButton from "./CopyButton.vue";
 import DownloadCards from "./DownloadCards.vue";
@@ -314,10 +315,7 @@ onBeforeUnmount(() => {
         <div v-else-if="m.role === 'user'" class="user-row">
           <div class="user-bubble">
             <template v-if="userParts[i]?.text">{{ userParts[i]?.text }}</template>
-            <details v-for="(a, j) in userParts[i]?.attachments ?? []" :key="j" class="attachment">
-              <summary>📎 {{ a.filename }} ({{ a.chars.toLocaleString() }} characters{{ a.truncated ? ", cut short" : "" }})</summary>
-              <pre>{{ a.text }}</pre>
-            </details>
+            <ChatAttachment v-for="(a, j) in userParts[i]?.attachments ?? []" :key="j" :attachment="a" />
           </div>
           <div class="actions user-actions">
             <time v-if="m.at" class="stamp" :datetime="m.at" :title="fullTime(m.at)">{{ clockTime(m.at) }}</time>
@@ -700,24 +698,6 @@ onBeforeUnmount(() => {
 }
 .assistant > * {
   grid-column: 2;
-}
-.attachment {
-  margin-top: 6px;
-  white-space: normal;
-  font-size: 0.85em;
-}
-.attachment summary {
-  cursor: pointer;
-}
-.attachment pre {
-  max-height: 240px;
-  margin: 6px 0 0;
-  padding: 8px;
-  overflow: auto;
-  border-radius: var(--radius-md);
-  white-space: pre-wrap;
-  font-family: var(--mono);
-  background: var(--bg);
 }
 .saved-steps {
   margin-bottom: 6px;

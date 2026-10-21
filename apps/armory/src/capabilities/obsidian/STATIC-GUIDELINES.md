@@ -12,3 +12,13 @@ removed after a complete scan. Failed refreshes retain completed notes and retry
 Stop Armory before manually removing index files; next search rebuilds them.
 For a new embedding model choose a new index path and restart Armory.
 No hand-maintained reference data or `static/` folder is used.
+
+Managed remote brains additionally own `brains/<connection-generation-model hash>/`
+beside the configured index path. Each directory contains `index.db`, its SQLite
+`-wal`/`-shm` files, and `owner.json` (owner UID, connection ID and generation for
+cleanup; no credential). All are private generated, disposable, gitignored state.
+A managed save always creates a fresh generation; changing embedding identity
+selects a new index. Idle/obsolete runtimes retire and removal waits for readers
+and workers, including workers already awaiting retirement. Account deletion also
+removes matching manifests/indexes left by earlier processes. No remote document
+is deleted. Persist/protect the derived root deliberately in containers.

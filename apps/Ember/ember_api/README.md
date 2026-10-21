@@ -381,6 +381,7 @@ Every notes route answers `503` `Notes storage is unavailable` when db_gateway c
 | `GET` | `/api/logs/{kind}?actor=server\|<account id>` | `logs.view` (action), `logs.errors.view` (error), `logs.chat.view` (chat_trace) | The 200 newest entries: `[{id, kind, account_id, source, message, details, prompts, created_at}]`. A chat turn's `details` lists each agent that ran (`agents[]`); `prompts` (JSON, one `{messages, truncated}` per agent, same order, system prompts never stored) is `null` unless the account holds `logs.chat.prompts.view`. |
 | `POST` | `/api/attachments/text` | `files.upload` | `{filename, data}` (base64, up to 15 MB) -> `{filename, text, char_count, truncated}`: text from a text/code, `.pdf`, `.docx` or `.xlsx` file, at most 20,000 characters. The file isn't kept. `400` with a readable reason when it can't be read. |
 | `POST` | `/api/attachments/pdf` | `files.upload` | `{filename, data}` (base64, up to 15 MB) -> `{filename, file_id, pages, kind, expires_at, text, char_count, truncated}`. Stores PDF/image originals via mcp_server in PDFMerger for the signed-in account. Text preview is optional, including for scanned PDFs. Requires the configured `pdf_merger` HTTP extension with requester forwarding and its internal token. |
+| `GET` | `/api/attachments/files/{file_id}/content` | `files.download` | Streams owned chat attachment bytes for inline image previews, with no-store, nosniff and sandbox CSP. Uses Armory ownership checks without requiring a PDF workspace subscription. Expired or foreign files return 404. |
 | `GET` | `/api/traffic/analytics?range=24h\|7d\|30d\|90d` | `traffic.view` | Network traffic for the Analytics Traffic tab (default `7d`): `{period, bucket (hour\|day), latency_cap_ms, totals {requests, error_rate, p95_ms, upstream_failures: {current, previous}}, series [{bucket, requests {2xx,3xx,4xx,5xx}, p50_ms, p95_ms}] (zero-filled), routes {busiest, slowest: [{name, count, error_rate, p95_ms}]}, upstream [{target, calls, failures, failure_rate, p95_ms, tools [{name, calls, failures, p95_ms}]}]}`. Counts come from `traffic_buckets` (written by `TrafficMiddleware` and the upstream timing, flushed every 30 s); names are route templates, never raw paths. Latency is kept as bands (50/100/250/500/1000/2500/5000 ms), so a percentile is its band's upper bound, and one in the slowest band shows as `latency_cap_ms` (meaning "at least"). `error_rate` is 5xx over all requests (`null` with no requests); `slowest` needs 5 requests per route; top lists hold 10. `422` bad range. |
 | `GET` | `/api/config-issues` | `config.issues.view` | `[{file, key, message}]`: problems in `config_app.json`, the agent registry and the secret files. Never includes secret values. |
 | `GET` | `/api/agent` | `chat.use` | The agent every question goes to, as `{id, label}` - no URL. `503` "No agent is running" when none is registered. |
@@ -743,3 +744,29 @@ db_gateway's `configs/config_connections.json` (see its `.example`). Calls send 
 gateway. Routes get it from `get_db_gateway` in `src/deps.py`; tests use `FakeDbGateway`
 (the `db_gateway` fixture). The notes routes are the first user.
 
+
+## Obsidian brains
+
+Authenticated `/api/brains` routes manage scoped vault connections and Notes
+promotion. See [operations and storage](../../../docs/obsidian-brains.md).
+
+| Route | Responsibility |
+| --- | --- |
+| `GET/PUT /api/brains/connections/{instance|personal}` | Safe settings read and revision-checked explicit save; instance management requires `settings.manage`. |
+| `POST /api/brains/connections/{scope}/test` | Bounded read-only candidate test; no activation or publication. |
+| `GET /api/brains/destinations` | Authorized destination labels, revisions and write availability. |
+| `POST /api/brains/browse` | Signed-in browse/read/status/scoped hybrid search, independent of Supermarket opt-in. |
+| `POST /api/brains/internal/resolve` | Internal-token/trusted-UID snapshots for Armory; never a browser credential API. |
+| `GET /api/brains/notes/{id}/review` | Owned Note content/hash/revision for publication review. |
+| `GET /api/brains/promotions` | Owned publication receipts and changed-source state. |
+| `POST /api/brains/notes/{id}/promote` | Recoverable, create-only reviewed publication; preserves the source Note. |
+| `POST /api/brains/promotions/{id}/reconcile` | Confirm a pending write by content hash without another write. |
+| `GET /api/brains/suggestions` | Current, authorized, non-dismissed AI proposals. |
+| `POST /api/brains/suggestions/review` | Explicit AI review, private-note consent, 20 Notes/40,000 characters, usage limits/accounting. |
+| `POST /api/brains/suggestions/{id}/dismiss` | Owned, content/destination-specific dismissal. |
+
+Migration `0025` grants `brain.instance.publish` to Administrator only and preserves
+existing chat auto-save destinations as `instance`. Chat summaries/updates/turns
+carry additive `second_brain_scope` (`instance|personal`); loss of access disables
+auto-save with a visible notice. Keys use existing SecretBox encryption in
+db_gateway, and account deletion purges all personal brain records.

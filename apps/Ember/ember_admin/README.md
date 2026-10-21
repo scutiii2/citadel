@@ -277,3 +277,12 @@ loading, API cache exclusion and reconnection.
 Usage (/usage, usage.all.view) lists every account for a selected period, including zero-usage accounts. Select a user for rolling limits, totals, activity, annual heatmap, breakdown, recent calls and a Markdown export. It does not require chat.use or accounts.view.
 
 Every page view uses PageLayout; the AdminView routing shell and chat/auth screens are exempt. Overview lives at `/overview`; `/` and `/admin` redirect there. Shared PageLayout fixes must be applied in both apps.
+
+## Instance Brain
+
+Workspace settings contains the shared Obsidian connection editor under existing
+`settings.manage` authorization. Saved keys appear only as a configured indicator;
+the password field is write-only and an unchanged value preserves the key. Test
+reads the candidate; Save applies a revision without restart; Disable revokes new
+operations. `brain.instance.publish` separately permits publishing shared knowledge.
+See [brain operations](../../../docs/obsidian-brains.md).

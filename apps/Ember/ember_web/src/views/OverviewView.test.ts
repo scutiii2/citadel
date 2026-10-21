@@ -30,7 +30,7 @@ describe("OverviewView", () => {
     const { wrapper, router } = setup(["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage", "watchers.view"]);
     expect(wrapper.find(".primary").attributes("href")).toBe("/");
     expect(wrapper.findAll(".card").map((link) => link.attributes("href"))).toEqual([
-      "/agents", "/capabilities", "/notes", "/memory", "/generator", "/capabilities/pdf_merger", "/capabilities/video_downloader", "/usage", "/settings", "/account",
+      "/agents", "/capabilities", "/notes", "/memory", "/brains", "/generator", "/capabilities/pdf_merger", "/capabilities/video_downloader", "/usage", "/settings", "/account",
     ]);
     expect(wrapper.text()).toContain("Signed in as ada");
     await wrapper.find('.card[href="/capabilities"]').trigger("click");
@@ -42,11 +42,11 @@ describe("OverviewView", () => {
     const { wrapper, auth } = setup([]);
     expect(wrapper.find(".hero").exists()).toBe(false);
     expect(wrapper.find("#monitor-heading").exists()).toBe(false);
-    expect(wrapper.findAll(".card").map((link) => link.attributes("href"))).toEqual(["/account"]);
+    expect(wrapper.findAll(".card").map((link) => link.attributes("href"))).toEqual(["/brains", "/account"]);
     auth.account = { ...auth.account!, permissions: ["traffic.view", "roles.manage"] };
     await wrapper.vm.$nextTick();
     expect(wrapper.findAll(".card").map((link) => link.attributes("href"))).toEqual([
-      "/account", "http://localhost:5176/overview",
+      "/brains", "/account", "http://localhost:5176/overview",
     ]);
     expect(wrapper.find(".hero").exists()).toBe(false);
     expect(wrapper.get(".admin-shortcut").attributes("target")).toBe("_blank");

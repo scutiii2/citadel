@@ -59,6 +59,11 @@ export async function installFakeApi(page: Page, state: FakeState): Promise<void
     const { pathname } = new URL(request.url());
     const method = request.method();
 
+    if (method === "GET" && pathname.startsWith("/api/brains/connections/")) return json(route, {
+      id: null, scope: pathname.endsWith("instance") ? "instance" : "personal", label: "Brain", endpoint: "", folder: "Inbox",
+      enabled: false, allow_write: false, credential_configured: false, revision: 0, generation: null, status: "not_configured"
+    });
+    if (method === "GET" && ["/api/brains/destinations", "/api/brains/suggestions", "/api/brains/promotions"].includes(pathname)) return json(route, []);
     if (pathname === "/api/commands/help" && method === "GET") return json(route, { capabilities: state.capabilities.map((c) => ({ capability: `/${c.name}`, summary: `Explore the tools provided by ${c.label}.` })) });
     if (pathname === "/api/commands" && method === "GET") return json(route, []);
     if (pathname === "/api/auth/me") return json(route, { ...ADMIN_ACCOUNT, permissions: state.permissions ?? ADMIN_ACCOUNT.permissions });

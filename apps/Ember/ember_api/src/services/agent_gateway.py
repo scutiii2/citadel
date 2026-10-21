@@ -42,6 +42,7 @@ class Caller:
     username: str
     email: str
     uid: str = ""
+    brain_scope: str = ""
 
 
 class AgentGateway(Protocol):
@@ -88,7 +89,10 @@ class McpAgentGateway:
         self._traffic = traffic or TrafficRecorder()
 
     def _headers(self, caller: Caller) -> dict[str, str]:
-        return identity_headers(caller.username, caller.email, self._internal_token, caller.uid)
+        headers = identity_headers(caller.username, caller.email, self._internal_token, caller.uid)
+        if caller.brain_scope in {"instance", "personal"}:
+            headers["X-Brain-Destination"] = caller.brain_scope
+        return headers
 
     async def _call(
         self,

@@ -71,7 +71,7 @@ describe("AccountView", () => {
     const wrapper = await mountView([]);
 
     // chat.use: Agents, Notes, Memory and Settings; Chat, Capabilities and Usage are in the bar.
-    expect(wrapper.findAll(".more-list a").map((a) => a.text())).toEqual(["Agents", "Notes", "Memory", "Settings"]);
+    expect(wrapper.findAll(".more-list a").map((a) => a.text())).toEqual(["Agents", "Notes", "Memory", "Brains", "Settings"]);
   });
 
   it("cycles the theme and logs out to the login page", async () => {

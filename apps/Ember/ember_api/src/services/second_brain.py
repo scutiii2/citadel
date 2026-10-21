@@ -13,11 +13,21 @@ from src.services.account_capability_service import AccountCapabilityService
 from src.services.db_gateway import DocumentStore
 from src.services.mcp_server_info import McpServerInfo
 from src.services.permissions import TOOLS_EXECUTE
+from src.services.brain_connections import PUBLISH, BrainError
 
 
-async def available(account: Account, store: DocumentStore, info: McpServerInfo) -> bool:
+async def available(account: Account, store: DocumentStore, info: McpServerInfo, *, scope="instance", connections=None) -> bool:
+    if scope == "both":
+        return await available(account, store, info, scope="personal", connections=connections) or await available(account, store, info, scope="instance", connections=connections)
+    if scope == "instance" and PUBLISH not in account.permission_names:
+        return False
     if TOOLS_EXECUTE not in account.permission_names:
         return False
+    if connections is not None:
+        try:
+            await connections.resolve(scope, account.uid, write=True, publish=PUBLISH in account.permission_names)
+        except BrainError:
+            return False
     state = await AccountCapabilityService(store, account.uid).get()
     if "obsidian" not in state.capabilities:
         return False
@@ -28,7 +38,7 @@ async def available(account: Account, store: DocumentStore, info: McpServerInfo)
     )
 
 
-def save_request(question: str, chat_id: str, request_id: str, at: str) -> str:
+def save_request(question: str, chat_id: str, request_id: str, at: str, scope: str = "instance") -> str:
     """Keep the stored question unchanged; attach this request only to the agent call."""
     slug = re.sub(r"[^a-z0-9]+", "-", question.lower()).strip("-")[:48] or "exchange"
     date = at[:10]
@@ -37,7 +47,8 @@ def save_request(question: str, chat_id: str, request_id: str, at: str) -> str:
     return (
         question + "\n\n[Ember per-chat preference: Save to second brain is ON]\n"
         "Answer the user's question, then save a concise summary of this exchange (question, answer, decisions and next steps) "
-        f"with tool_obsidian_write at exactly {json.dumps(path)}, overwrite=false. "
+        f"with tool_obsidian_write at exactly {json.dumps(path)}, overwrite=false, scope={json.dumps(scope)}. "
+        "Never switch to another brain if this destination is unavailable or refused. "
         "Begin the Markdown text with this frontmatter:\n" + frontmatter + "\n"
         "Use the ordinary tool approval flow; do not bypass approval or the allow_write guard. "
         "Never copy secrets. Only say the summary was saved when the tool result confirms success=true. "

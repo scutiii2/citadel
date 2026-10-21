@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import ssl
 import urllib.error
 import urllib.request
@@ -65,7 +66,7 @@ class ObsidianGateway:
 
     def __init__(
         self, base_url: str, api_key: str, timeout: float = 5.0,
-        *, verify_tls: bool = True, allow_write: bool = False,
+        *, verify_tls: bool = True, allow_write: bool = False, personal: bool = False,
     ) -> None:
         try:
             url = urlsplit(base_url)
@@ -90,7 +91,9 @@ class ObsidianGateway:
         if verify_tls is False:
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
-        self._opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context), _NoRedirect())
+        from src.capabilities.obsidian.utils.network import PinnedHTTPSHandler
+        self._opener = urllib.request.build_opener(
+            PinnedHTTPSHandler(context=context, personal=personal), urllib.request.ProxyHandler({}), _NoRedirect())
 
     def list(self, folder: str = "") -> list[str]:
         path = vault_path(folder, folder=True)
@@ -125,6 +128,19 @@ class ObsidianGateway:
 
     def write(self, path: str, text: str, *, overwrite: bool = False) -> None:
         self._write("PUT", path, text, overwrite=overwrite)
+
+    def require_create_only(self) -> None:
+        """Promotion requires the plugin's documented conditional-write contract.
+
+        See obsidian-local-rest-api 5.2 OpenAPI, Conditional writes. Older or
+        unrecognized servers are refused rather than relying on a racy GET/PUT.
+        """
+        details = self._json("GET", "/")
+        versions = details.get("versions") if isinstance(details, dict) else None
+        version = versions.get("self", "") if isinstance(versions, dict) else ""
+        match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:\+[^\s]+)?", str(version))
+        if match is None or tuple(map(int, match.groups())) < (5, 2, 0):
+            raise ObsidianGatewayError("Safe promotion requires Obsidian Local REST API 5.2.0 or newer with conditional create support.")
 
     def append(self, path: str, text: str) -> None:
         self._write("POST", path, text)

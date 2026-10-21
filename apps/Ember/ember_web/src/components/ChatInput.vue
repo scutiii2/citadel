@@ -135,10 +135,13 @@ async function addFiles(files: FileList | File[] | null | undefined): Promise<vo
     const live = attachments.value[attachments.value.length - 1]!; // the reactive copy
     if (PDF_FILE.test(file.name)) {
       void attachmentsClient.pdf(file).then((result) => {
+        const image = result.kind === "image";
         Object.assign(live, {
           state: "ready",
-          text: `[PDFMerger file_id: ${result.file_id} | ${result.pages} pages | ${result.kind} | expires_at: ${result.expires_at} | use pdf_merger tools to inspect/merge this original; preserve this file_id when delegating to PDF Assistant]\n` +
-            (result.text || "[No text preview available; the original file is available for inspection and merging.]"),
+          text: image
+            ? `[Image file_id: ${result.file_id} | ${result.pages} pages | image | expires_at: ${result.expires_at} | preserve this file_id when delegating; the original image is stored with the pdf_merger tools]\n[No text preview available; inspect the original image when needed.]`
+            : `[PDFMerger file_id: ${result.file_id} | ${result.pages} pages | ${result.kind} | expires_at: ${result.expires_at} | use pdf_merger tools to inspect/merge this original; preserve this file_id when delegating to PDF Assistant]\n` +
+              (result.text || "[No text preview available; the original file is available for inspection and merging.]"),
           chars: result.char_count, truncated: result.truncated, pages: result.pages,
         });
       }).catch((err: unknown) => Object.assign(live, { state: "error", error: errorMessage(err) }));
