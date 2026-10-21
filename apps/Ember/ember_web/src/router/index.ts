@@ -52,6 +52,7 @@ export const router = createRouter({
       // tools.view for the built-in capabilities, chat.use for the extensions.
       meta: { permission: ["tools.view", "chat.use"] },
     },
+    { path: "/capabilities/video_downloader", redirect: (to) => ({ path: "/capabilities/media_downloader", query: to.query, hash: to.hash }) },
     ...NATIVE_CAPABILITY_ROUTES,
     {
       path: "/capabilities/:name",

@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, watch } from "vue";
 import { settingsClient } from "../api/SettingsClient";
 import { useAuthStore } from "./auth";
+import { canonicalPagePath } from "../utils/pagePaths";
 
 /** Pages the administrator hid from every sidebar, kept in ember_api. Loaded at login and
  * dropped when the account changes. A failed load means "nothing hidden": the sidebar must
@@ -19,7 +20,7 @@ export const usePageVisibilityStore = defineStore("pageVisibility", () => {
     const started = generation;
     try {
       const loaded = await settingsClient.pages();
-      if (started === generation) hidden.value = loaded.hidden;
+      if (started === generation) hidden.value = [...new Set(loaded.hidden.map(canonicalPagePath))];
     } catch {
       if (started === generation) hidden.value = [];
     } finally {

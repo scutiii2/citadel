@@ -28,11 +28,13 @@ URL, token or key.
   to save still work. Reloading or switching chats restores that chat's choice.
 
 - Native PDF merger (`/capabilities/pdf_merger`) and media downloader
-  (`/capabilities/video_downloader`) port the standalone workspaces into Ember.
+  (`/capabilities/media_downloader`) port the standalone workspaces into Ember.
   Media downloader supports video, MP3/M4A music, direct images and public
   TikTok/Instagram/Pinterest photo posts. Carousels download as numbered ZIPs;
   one photo keeps its original format. The existing URL and capability ID stay
-  compatible. Private/login-only posts are unavailable.
+  compatible through a redirect from `/capabilities/video_downloader`. Private/login-only posts are unavailable.
+  Draft, completed, and failed download groups can be removed after confirmation; active groups must finish first.
+  Removing a group keeps its downloaded ZIP available in Downloads until separately deleted or expired.
   Add Armory's `pdf` or `video` capability in the Supermarket, then use its card's
   Open page button. Both need `tools.execute`; uploads also need `files.upload`,
   and content previews/downloads need `files.download`. Both also have sidebar entries

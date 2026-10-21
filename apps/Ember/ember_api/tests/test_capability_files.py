@@ -24,6 +24,20 @@ def test_package_routes_require_access_and_proxy_fixed_paths(client, db_gateway,
     response = client.post('/api/video-downloader/packages/p_one/items', json={'url': 'https://example.com/b'})
     assert response.status_code == 409 and response.json()['error']['code'] == 'package_locked'
 
+
+def test_package_delete_requires_capability_and_proxies_conflicts(client, db_gateway, upstream):
+    path = '/api/video-downloader/packages/p_one'
+    assert client.delete(path).status_code == 401
+    as_admin(client)
+    assert client.delete(path).status_code == 403
+    enable(client, db_gateway, 'video')
+    upstream.handler = lambda r: httpx.Response(409, json={'error': {'code': 'package_locked', 'message': 'Still downloading'}})
+    assert client.delete(path).status_code == 409
+    upstream.handler = lambda r: httpx.Response(200, json={'ok': True})
+    assert client.delete(path).status_code == 204
+    assert upstream.requests[-1].method == 'DELETE'
+    assert upstream.requests[-1].url.path == '/video/ui/packages/p_one'
+
 from tests.test_registration import as_admin
 from tests.test_permission_split import limited_account
 

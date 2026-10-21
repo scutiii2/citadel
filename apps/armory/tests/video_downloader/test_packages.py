@@ -55,6 +55,51 @@ async def test_packages_are_owned_and_drafts_can_remove_items(service):
     assert len(service.packages.get(ALICE, package.package_id).items) == 1
 
 
+async def test_delete_package_checks_owner_and_frees_group_slot(service):
+    package = await draft(service)
+    for package_id in [package.package_id, 'missing']:
+        with pytest.raises(DownloaderError) as error:
+            service.packages.delete(BOB, package_id)
+        assert error.value.code == ErrorCode.PACKAGE_NOT_FOUND
+    for i in range(19):
+        service.packages.create(ALICE, str(i))
+    service.packages.delete(ALICE, package.package_id)
+    assert len(service.packages.list(ALICE)) == 19
+    assert service.packages.create(ALICE, 'Replacement').name == 'Replacement'
+    with pytest.raises(DownloaderError) as error:
+        service.packages.get(ALICE, package.package_id)
+    assert error.value.code == ErrorCode.PACKAGE_NOT_FOUND
+
+
+async def test_delete_refuses_active_job_and_keeps_completed_zip(service, fake_extractor):
+    package = await draft(service, 1)
+    fake_extractor.hold = threading.Event()
+    job = service.packages.start(ALICE, package.package_id)
+    try:
+        with pytest.raises(DownloaderError) as error:
+            service.packages.delete(ALICE, package.package_id)
+        assert error.value.code == ErrorCode.PACKAGE_LOCKED
+    finally:
+        fake_extractor.hold.set()
+        await service.wait(job)
+    files = service.list_files(ALICE)
+    service.packages.delete(ALICE, package.package_id)
+    assert service.packages.list(ALICE) == []
+    assert service.list_files(ALICE) == files
+    assert service.file_path(files[0]).exists()
+
+
+async def test_delete_failed_package(service, fake_extractor):
+    package = await draft(service, 1)
+    def fail(_url):
+        raise DownloaderError(ErrorCode.EXTRACTOR_FAILED, 'Unavailable')
+    fake_extractor.probe = fail
+    job = service.packages.start(ALICE, package.package_id)
+    assert (await service.wait(job))['type'] == 'error'
+    service.packages.delete(ALICE, package.package_id)
+    assert service.packages.list(ALICE) == []
+
+
 async def test_empty_or_full_queue_does_not_lock_draft(service, fake_extractor):
     package = service.packages.create(ALICE, 'Empty')
     with pytest.raises(DownloaderError):

@@ -21,6 +21,54 @@ HEADERS = {"X-Internal-Token": "test", "X-Requester-Uid": "alice"}
 OTHER = {**HEADERS, "X-Requester-Uid": "bob"}
 
 
+def test_delete_package_http_requires_owner_and_rejects_active_jobs(native):
+    client, _, runtime, extractor = native
+    created = client.post('/video/ui/packages', headers=HEADERS, json={'name': 'Disposable'})
+    path = f'/video/ui/packages/{created.json()["package_id"]}'
+    assert client.delete(path, headers=OTHER).status_code == 404
+    assert client.delete(path).status_code == 401
+    assert client.delete(path, headers=HEADERS).status_code == 200
+    assert client.get(path, headers=HEADERS).status_code == 404
+    created = client.post('/video/ui/packages', headers=HEADERS, json={'name': 'Active'})
+    path = f'/video/ui/packages/{created.json()["package_id"]}'
+    client.post(path + '/items', headers=HEADERS, json={'url': 'https://example.com/a', 'preset': 'best'})
+    extractor.hold = threading.Event()
+    started = client.post(path + '/start', headers=HEADERS, json={})
+    try:
+        assert client.delete(path, headers=HEADERS).status_code == 409
+    finally:
+        extractor.hold.set()
+        async def wait(service):
+            from src.capabilities.video_downloader.utils.service import Caller
+            return await service.wait(service.get_job(Caller('uid:alice'), started.json()['job_id']))
+        runtime.call(wait)
+    assert client.delete(path, headers=HEADERS).status_code == 200
+    assert client.get('/video/ui/files', headers=HEADERS).json()
+
+
+def test_package_start_without_ffmpeg_returns_503_and_keeps_draft_editable(native, monkeypatch):
+    from src.capabilities.video_downloader import domain
+    client, _, runtime, _ = native
+    created = client.post('/video/ui/packages', headers=HEADERS, json={'name': 'Collection'})
+    path = f'/video/ui/packages/{created.json()["package_id"]}'
+    client.post(path + '/items', headers=HEADERS, json={'url': 'https://example.com/a', 'preset': 'best'})
+    monkeypatch.setattr(domain.shutil, 'which', lambda _: None)
+    refused = client.post(path + '/start', headers=HEADERS, json={})
+    assert refused.status_code == 503
+    assert refused.json()['error']['code'] == 'ffmpeg_missing'
+    assert 'FFmpeg' in refused.json()['error']['message']
+    draft = client.get(path, headers=HEADERS).json()
+    assert draft['state'] == 'draft' and draft['job_id'] is None
+    assert client.post(path + '/items', headers=HEADERS, json={'url': 'https://example.com/b', 'preset': 'best'}).status_code == 200
+    monkeypatch.setattr(domain.shutil, 'which', lambda _: '/usr/bin/ffmpeg')
+    started = client.post(path + '/start', headers=HEADERS, json={})
+    assert started.status_code == 200
+    async def wait(service):
+        from src.capabilities.video_downloader.utils.service import Caller
+        return await service.wait(service.get_job(Caller('uid:alice'), started.json()['job_id']))
+    runtime.call(wait)
+
+
 def test_video_package_routes_ownership_and_lock(native):
     client, _, runtime, _ = native
     created = client.post('/video/ui/packages', headers=HEADERS, json={'name': 'Mix'})

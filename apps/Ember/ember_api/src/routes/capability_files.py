@@ -153,6 +153,12 @@ def install(area: Area) -> None:
                             client: CapabilityFilesGateway = Depends(gateway)):
             return await client.request('video', 'POST', f'/packages/{package_id}/items', account, json=body.model_dump())
 
+        @routes.delete('/packages/{package_id}', status_code=204)
+        async def delete_package(package_id: str = Path(pattern=ID), account: Account = Depends(access),
+                                 client: CapabilityFilesGateway = Depends(gateway), logs: LogWriter = Depends(get_log_writer)):
+            await client.request('video', 'DELETE', f'/packages/{package_id}', account)
+            await logs.action(account, 'video.package_delete', f'Removed package {package_id}')
+
         @routes.delete('/packages/{package_id}/items/{item_id}')
         async def remove_media(package_id: str = Path(pattern=ID), item_id: str = Path(pattern=ID),
                                account: Account = Depends(access), client: CapabilityFilesGateway = Depends(gateway)):

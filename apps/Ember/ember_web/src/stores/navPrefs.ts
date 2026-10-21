@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 import { navPreferencesClient, type NavPrefs } from "../api/NavPreferencesClient";
 import { errorMessage } from "../utils/errors";
 import { EMPTY_PREFS } from "../utils/navArrangement";
+import { canonicalNavPrefs } from "../utils/pagePaths";
 import { useAuthStore } from "./auth";
 
 /** How the account arranges its nav rail (order, pinned, hidden), kept in
@@ -27,7 +28,7 @@ export const useNavPrefsStore = defineStore("navPrefs", () => {
     const started = generation;
     try {
       const loaded = await navPreferencesClient.get();
-      if (started === generation) prefs.value = loaded;
+      if (started === generation) prefs.value = canonicalNavPrefs(loaded);
     } catch (err) {
       if (started === generation) error.value = errorMessage(err);
     } finally {
@@ -50,6 +51,7 @@ export const useNavPrefsStore = defineStore("navPrefs", () => {
 
   /** Shows `next` now and saves it; resolves when the save has finished. */
   function update(next: NavPrefs): Promise<void> {
+    next = canonicalNavPrefs(next);
     const started = generation;
     const mine = ++latest;
     prefs.value = next;
@@ -57,7 +59,7 @@ export const useNavPrefsStore = defineStore("navPrefs", () => {
     chain = chain.then(async () => {
       try {
         const saved = await navPreferencesClient.save(next);
-        if (started === generation && mine === latest) prefs.value = saved;
+        if (started === generation && mine === latest) prefs.value = canonicalNavPrefs(saved);
       } catch (err) {
         if (started !== generation) return;
         error.value = errorMessage(err);

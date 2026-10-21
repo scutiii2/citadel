@@ -134,6 +134,9 @@ def _video_operation(request, uid, body):
                     _require_ffmpeg()
                 return {'job_id': service.packages.start(caller, package_id).id}
             if package_id:
+                if request.method == 'DELETE':
+                    service.packages.delete(caller, package_id)
+                    return {'ok': True}
                 return service.packages.get(caller, package_id).model_dump(mode='json')
             if request.method == 'POST':
                 return service.packages.create(caller, PackageCreate.model_validate(body).name).model_dump(mode='json')
@@ -175,7 +178,7 @@ def install_media_ui_routes(app):
     app.add_route("/video/ui/probe", media_ui, methods=["POST"])
     app.add_route("/video/ui/downloads", media_ui, methods=["POST"])
     app.add_route('/video/ui/packages', media_ui, methods=['GET', 'POST'])
-    app.add_route('/video/ui/packages/{package_id}', media_ui, methods=['GET'])
+    app.add_route('/video/ui/packages/{package_id}', media_ui, methods=['GET', 'DELETE'])
     app.add_route('/video/ui/packages/{package_id}/items', media_ui, methods=['POST'])
     app.add_route('/video/ui/packages/{package_id}/items/{item_id}', media_ui, methods=['DELETE'])
     app.add_route('/video/ui/packages/{package_id}/start', media_ui, methods=['POST'])

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import ActionButton from '../ActionButton.vue'
 import ConfirmModal from '../ConfirmModal.vue'
@@ -15,7 +15,17 @@ const auth = useAuthStore()
 const name = ref('')
 const drafts = reactive<Record<string, string>>({})
 const presets = reactive<Record<string, string>>({})
-const confirm = ref<{ kind: 'start' | 'remove'; id: string; itemId?: string; name: string } | null>(null)
+const confirm = ref<{ kind: 'start' | 'remove' | 'delete-package'; id: string; itemId?: string; name: string; error?: string } | null>(null)
+const confirmTitle = computed(() => confirm.value?.kind === 'start' ? 'Start package download?' : confirm.value?.kind === 'delete-package' ? 'Remove this package?' : 'Remove media?')
+const confirmLabel = computed(() => confirm.value?.kind === 'start' ? 'Start download' : confirm.value?.kind === 'delete-package' ? 'Remove package' : 'Remove media')
+const confirmMessage = computed(() => {
+  const action = confirm.value
+  if (!action) return ''
+  const message = action.kind === 'start' ? `Start ${action.name}? Its media list will be permanently locked.`
+    : action.kind === 'delete-package' ? `Remove ${action.name} and its media list? Downloaded files will remain available separately.`
+    : `Remove ${action.name} from this group?`
+  return message + (action.error ? ` ${action.error}` : '')
+})
 const choices = [ ['best', 'Best video'], ['1080p', '1080p'], ['720p', '720p'], ['480p', '480p'], ['audio-mp3', 'MP3 music'], ['audio-m4a', 'M4A music'], ['photos', 'Original photos'] ]
 onMounted(store.activate)
 onActivated(store.activate)
@@ -39,8 +49,12 @@ async function add(id: string) {
 async function confirmAction() {
   const action = confirm.value
   if (!action) return
-  const ok = action.kind === 'start' ? await store.start(action.id) : await store.remove(action.id, action.itemId!)
-  if (ok) confirm.value = null
+  const ok = action.kind === 'start' ? await store.start(action.id) : action.kind === 'delete-package' ? await store.deletePackage(action.id) : await store.remove(action.id, action.itemId!)
+  if (ok) {
+    if (action.kind === 'delete-package') { delete drafts[action.id]; delete presets[action.id] }
+    confirm.value = null
+  }
+  else if (confirm.value === action) confirm.value = { ...action, error: store.error ?? 'The operation could not be completed. Try again.' }
 }
 </script>
 
@@ -78,8 +92,12 @@ async function confirmAction() {
         <p v-if="group.state === 'done' && group.items.some(item => item.state === 'error')" class="muted">ZIP ready with the successful files. Failed links are shown above.</p>
         <DownloadCards v-if="group.status?.file" :downloads="[{ filename: group.status.file.name, bytes: group.status.file.size, href: group.status.file.download_url, label: 'ZIP' }]" />
       </div>
+      <div class="danger-zone">
+        <span>{{ store.removable(group.package_id) ? 'Remove this group and its media list.' : 'Wait for the download to finish before removing this package.' }}</span>
+        <ActionButton icon="clear" class="danger" :disabled="store.busy || !store.removable(group.package_id)" @click="confirm = { kind: 'delete-package', id: group.package_id, name: group.name }">Remove package</ActionButton>
+      </div>
     </article>
-    <ConfirmModal v-if="confirm" :open="confirm !== null" :title="confirm?.kind === 'start' ? 'Start package download?' : 'Remove media?'" :message="confirm?.kind === 'start' ? `Start ${confirm.name}? Its media list will be permanently locked.` : `Remove ${confirm?.name} from this group?`" :confirm-label="confirm?.kind === 'start' ? 'Start download' : 'Remove media'" :danger="confirm?.kind === 'remove'" :busy="store.busy" @confirm="confirmAction" @close="!store.busy && (confirm = null)" />
+    <ConfirmModal v-if="confirm" :open="true" :title="confirmTitle" :message="confirmMessage" :confirm-label="confirmLabel" :danger="confirm.kind !== 'start'" :busy="store.busy" @confirm="confirmAction" @close="!store.busy && (confirm = null)" />
   </section>
 </template>
 
@@ -102,6 +120,7 @@ small { display: block; }
 .muted, .state { color: var(--muted); font-size: .85em; }
 .error { color: var(--danger); white-space: pre-line; overflow-wrap: anywhere; }
 .result { display: flex; flex-direction: column; gap: 10px; }
+.danger-zone { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 14px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-lg); font-size: .85em; }
 .packages :deep(button.action) { border-radius: var(--radius-full); }
 .packages :deep(button.action .label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
 progress { width: 100%; accent-color: var(--accent); }

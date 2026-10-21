@@ -6,13 +6,29 @@ import { useAuthStore } from './auth'
 import type { MediaPackage } from '../api/VideoDownloaderTypes'
 
 vi.mock('../api/VideoDownloaderClient', () => ({ videoDownloaderClient: {
-  listPackages: vi.fn(), createPackage: vi.fn(), addPackageItem: vi.fn(), startPackage: vi.fn(), removePackageItem: vi.fn(),
+  listPackages: vi.fn(), createPackage: vi.fn(), addPackageItem: vi.fn(), startPackage: vi.fn(), removePackageItem: vi.fn(), deletePackage: vi.fn(),
 } }))
 const draft: MediaPackage = { package_id: 'p', name: 'Mix', state: 'draft', items: [], job_id: null, status: null }
 
 beforeEach(() => { vi.resetAllMocks(); setActivePinia(createPinia()); vi.mocked(api.listPackages).mockResolvedValue([structuredClone(draft)]) })
 
 describe('media packages', () => {
+  it('removes a package only after the server confirms and retains it on failure', async () => {
+    const store = useMediaPackagesStore()
+    await store.refresh()
+    vi.mocked(api.deletePackage).mockRejectedValueOnce(new Error('Try later')).mockResolvedValueOnce(undefined)
+    expect(await store.deletePackage('p')).toBe(false)
+    expect(store.packages).toHaveLength(1)
+    expect(await store.deletePackage('p')).toBe(true)
+    expect(store.packages).toEqual([])
+  })
+  it('does not remove active packages', async () => {
+    vi.mocked(api.listPackages).mockResolvedValue([{ ...draft, job_id: 'j', state: 'downloading' }])
+    const store = useMediaPackagesStore()
+    await store.refresh()
+    expect(await store.deletePackage('p')).toBe(false)
+    expect(api.deletePackage).not.toHaveBeenCalled()
+  })
   it('locks the group as soon as starting is accepted', async () => {
     const store = useMediaPackagesStore()
     await store.refresh()

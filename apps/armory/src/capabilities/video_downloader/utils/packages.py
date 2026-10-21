@@ -99,6 +99,20 @@ class PackageManager:
         info.state = 'queued'
         return job
 
+    def delete(self, caller: Caller, package_id: str) -> None:
+        """Remove owned metadata after work ends; saved files keep their own lifetime."""
+        info = self._owned(caller, package_id).info
+        if info.job_id:
+            try:
+                job = self._service.get_job(caller, info.job_id)
+            except DownloaderError as error:
+                if error.code != ErrorCode.JOB_NOT_FOUND:
+                    raise
+            else:
+                if not job.finished:
+                    raise DownloaderError(ErrorCode.PACKAGE_LOCKED, 'Wait for this package download to finish before removing it.')
+        del self._packages[package_id]
+
     async def _run(self, session, info, emit, cancel):
         service = self._service
         work = await service.store.make_work_dir()

@@ -12,6 +12,8 @@ describe('video downloader client', () => {
     expect(fetcher).toHaveBeenCalledWith('/api/video-downloader/jobs/a%2Fb/cancel', expect.objectContaining({ method: 'POST', credentials: 'same-origin', body: '{}', headers: { 'Content-Type': 'application/json' } }))
     await api.deleteFile('a/b')
     expect(fetcher).toHaveBeenLastCalledWith('/api/video-downloader/files/a%2Fb', expect.objectContaining({ method: 'DELETE' }))
+    await api.deletePackage('a/b')
+    expect(fetcher).toHaveBeenLastCalledWith('/api/video-downloader/packages/a%2Fb', expect.objectContaining({ method: 'DELETE', credentials: 'same-origin' }))
   })
   it('preserves error codes and invokes the session handler on 401', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'Protected', error: { code: 'drm_protected', message: 'Protected' } }), { status: 422 })).mockResolvedValueOnce(new Response('{}', { status: 401 })))
