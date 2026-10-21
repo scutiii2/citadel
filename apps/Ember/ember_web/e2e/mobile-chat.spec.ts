@@ -2,6 +2,65 @@ import { expect, test } from "@playwright/test";
 import { ACCOUNT, ANSWER, installFakeApi } from "./fakeApi.ts";
 import { logIn } from "./helpers.ts";
 
+test("composer stays above a keyboard that only resizes the visual viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.addInitScript(() => {
+    // Safari can keep the layout viewport full-height while the keyboard
+    // shrinks and pans the visual viewport. Resizing the window misses this.
+    const viewport = new EventTarget();
+    Object.assign(viewport, { height: 812, offsetTop: 0, scale: 1 });
+    Object.defineProperty(window, "visualViewport", { value: viewport });
+  });
+  await installFakeApi(page);
+  await logIn(page);
+  const input = page.getByPlaceholder(/Ask something/);
+  await input.fill("Keep my draft visible");
+
+  for (const [height, offsetTop, event] of [[480, 0, "resize"], [420, 60, "scroll"], [812, 0, "resize"]] as const) {
+    await page.evaluate(({ height, offsetTop, event }) => {
+      Object.assign(window.visualViewport!, { height, offsetTop });
+      window.visualViewport!.dispatchEvent(new Event(event));
+    }, { height, offsetTop, event });
+    await expect.poll(async () => {
+      const box = await input.boundingBox();
+      return box!.y + box!.height;
+    }).toBeLessThanOrEqual(offsetTop + height);
+    await expect.poll(async () => {
+      const box = await page.locator("#app").boundingBox();
+      return Math.abs(box!.height - height);
+    }).toBeLessThanOrEqual(1);
+    await expect.poll(async () => {
+      const box = await page.locator("#app").boundingBox();
+      return Math.abs(box!.y - offsetTop);
+    }).toBeLessThanOrEqual(1);
+    const send = await page.getByRole("button", { name: "Send", exact: true }).boundingBox();
+    expect(send!.y + send!.height).toBeLessThanOrEqual(offsetTop + height);
+    await expect(input).toHaveValue("Keep my draft visible");
+    await expect(input).toBeFocused();
+  }
+
+  // Zooming should magnify the full layout rather than squeeze it into the
+  // smaller visual viewport, so the user can still pan around the page.
+  await page.evaluate(() => {
+    Object.assign(window.visualViewport!, { height: 406, offsetTop: 80, scale: 2 });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  await expect.poll(async () => (await page.locator("#app").boundingBox())!.height).toBe(812);
+});
+
+test("mobile layout still resizes without the Visual Viewport API", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "visualViewport", { value: undefined });
+  });
+  await installFakeApi(page);
+  await logIn(page);
+  await page.setViewportSize({ width: 375, height: 480 });
+  await page.getByPlaceholder(/Ask something/).fill("Keep typing");
+  const input = await page.getByPlaceholder(/Ask something/).boundingBox();
+  expect(input!.y + input!.height).toBeLessThanOrEqual(480);
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`mobile chat and history remain usable in ${theme} mode`, async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });

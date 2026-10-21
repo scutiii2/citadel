@@ -568,7 +568,8 @@ Settings edits are drafts until Save. A fixed bottom Save/Revert bar covers chat
 ## Mobile and installation
 
 Phone layouts use bottom navigation, touch controls, safe-area padding for notches
-and the home indicator, and the dynamic viewport for browser chrome and keyboards.
+and the home indicator. Ember's shell follows the Visual Viewport API for keyboard
+height and focus panning, with a dynamic viewport fallback when the API is unavailable.
 Ember and Ember Admin install separately, each from its own origin.
 
 Build with `npm run build`, then serve `dist/` over HTTPS (localhost also works).
