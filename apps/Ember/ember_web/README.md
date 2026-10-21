@@ -18,6 +18,12 @@ URL, token or key.
 
 ## Features
 
+- Generator presents masked results with Reveal and Copy beside them. Desktop
+  keeps options in a companion pane; mobile uses a type picker and collapsible
+  options with Generate above the navigation. Passwords, passphrases, PINs,
+  TOTP secrets and refreshing codes use the existing MCP tools. Switching types
+  or leaving a generated value still requires discard confirmation.
+
 - Chat settings offers **Save to second brain** only when the account added
   Obsidian and the backend confirms it is online with its write tool available.
   It defaults off and persists on each chat in ember_api. Existing-chat changes
@@ -89,8 +95,11 @@ URL, token or key.
 - Separate Notes (`/notes`) and Memory (`/memory`) pages use Ember's existing
   navigation rail, compact headings, theme tokens and responsive layouts. Notes
   keeps its list/editor, tags, explicit Save and agent-read switch. Memory lists
-  the account's assistant memories, with local text search, 20-item pagination,
-  add/edit dialogs and confirmed deletion. Memory edits refuse stale text and
+  the account's assistant memories in the same list/editor workspace, with local
+  text search, 20-item pagination and confirmed deletion under Manage memory.
+  Mobile shows the list or full-page editor, with Back and a persistent Save
+  action. Changing memories asks before dropping edits, and saved memories stay
+  open. Memory edits refuse stale text and
   preserve creation dates. Categories and provenance are not stored or inferred.
   Both pages need `chat.use`. Memory requires mcp_server's memory capability and
   a shared internal token configured in ember_api and mcp_server; an unavailable
