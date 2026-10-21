@@ -21,6 +21,7 @@ test("Personal Brain tests a draft read-only and saves a private connection expl
   await logIn(page); await page.goto("/settings");
   await expect(page.getByRole("region", { name: "Personal Brain" })).toHaveCount(0);
   await page.goto("/brains");
+  await page.getByRole("button", { name: "Personal connection", exact: true }).click();
   const panel = page.getByRole("region", { name: "Personal Brain" });
   await panel.getByLabel("Label", { exact: true }).fill("My private vault");
   await panel.getByLabel("HTTPS endpoint").fill("https://vault.lan:27124");

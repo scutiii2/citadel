@@ -11,9 +11,16 @@ test('media groups accept multiple links and lock membership after starting a pa
   page.on('pageerror', error => errors.push(error.message))
   let group: Record<string, any> | null = null
   let running = false
+  let finished = false
   await page.route('**/api/video-downloader/packages**', async route => {
     const request = route.request()
     const path = new URL(request.url()).pathname
+    if (request.method() === 'DELETE' && path.endsWith('/p_group')) {
+      if (running && !finished) return route.fulfill({ status: 409, json: { detail: 'Still downloading' } })
+      group = null
+      running = false
+      return route.fulfill({ status: 204 })
+    }
     if (path.endsWith('/packages') && request.method() === 'POST') {
       group = { package_id: 'p_group', name: request.postDataJSON().name, state: 'draft', items: [], job_id: null, status: null }
       return route.fulfill({ json: group })
@@ -29,11 +36,12 @@ test('media groups accept multiple links and lock membership after starting a pa
       group!.state = 'downloading'
       return route.fulfill({ json: { job_id: 'j_group' } })
     }
-    if (running) group!.status = { job_id: 'j_group', state: 'downloading', percent: 40, speed: null, eta: null, file: null, error: null }
+    if (running) group!.status = { job_id: 'j_group', state: finished ? 'done' : 'downloading', percent: finished ? 100 : 40, speed: null, eta: null, file: null, error: null }
     return route.fulfill({ json: group ? [group] : [] })
   })
   await logIn(page)
   await page.goto('/capabilities/video_downloader')
+  await expect(page).toHaveURL(/\/capabilities\/media_downloader$/)
   await page.getByRole('textbox', { name: 'Group name' }).fill('My collection')
   await page.getByRole('button', { name: 'Create group', exact: true }).click()
   const panel = page.getByRole('article', { name: 'My collection' })
@@ -49,7 +57,20 @@ test('media groups accept multiple links and lock membership after starting a pa
   await expect(panel.getByRole('textbox')).toHaveCount(0)
   await expect(panel.getByRole('button', { name: 'Remove', exact: true })).toHaveCount(0)
   await expect(panel.getByRole('progressbar')).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Remove package', exact: true })).toBeDisabled()
   await screenshots(page, info, 'package-locked')
+  finished = true
+  group!.state = 'done'
+  await page.getByRole('button', { name: 'Refresh groups', exact: true }).click()
+  await expect(panel.getByRole('button', { name: 'Remove package', exact: true })).toBeEnabled()
+  await panel.getByRole('button', { name: 'Remove package', exact: true }).click()
+  const remove = page.getByRole('dialog', { name: 'Remove this package?' })
+  await expect(remove).toContainText('Downloaded files will remain')
+  await remove.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(panel).toBeVisible()
+  await panel.getByRole('button', { name: 'Remove package', exact: true }).click()
+  await remove.getByRole('button', { name: 'Remove package', exact: true }).click()
+  await expect(panel).toHaveCount(0)
   expect(errors).toEqual([])
   expect(api.unexpected).toEqual([])
 })
@@ -118,7 +139,7 @@ test('native video workspace probes presets, follows a job and downloads its fil
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
   await logIn(page)
   errors.length = 0
-  await page.goto('/capabilities/video_downloader')
+  await page.goto('/capabilities/media_downloader')
   await page.getByRole('textbox', { name: 'Media link' }).fill('https://www.youtube.com/watch?v=public-example')
   await page.getByRole('button', { name: 'Check', exact: true }).click()
   await expect(page.getByText('Coastal walk at sunset')).toBeVisible()
@@ -167,7 +188,7 @@ test('media workspace downloads a TikTok photo carousel as a ZIP (mock API)', as
     return route.fallback()
   })
   await logIn(page)
-  await page.goto('/capabilities/video_downloader')
+  await page.goto('/capabilities/media_downloader')
   await expect(page.getByRole('heading', { name: 'Media downloader', exact: true })).toBeVisible()
   await page.getByRole('textbox', { name: 'Media link' }).fill(url)
   await page.getByRole('button', { name: 'Check', exact: true }).click()

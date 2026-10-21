@@ -13,6 +13,7 @@ export const videoDownloaderClient = {
   deleteFile: (fileId: string) => apiRequest<void>('DELETE', `${BASE}/files/${id(fileId)}`),
   listPackages: () => apiRequest<MediaPackage[]>('GET', `${BASE}/packages`),
   createPackage: (name: string) => apiRequest<MediaPackage>('POST', `${BASE}/packages`, { name }),
+  deletePackage: (packageId: string) => apiRequest<void>('DELETE', `${BASE}/packages/${id(packageId)}`),
   addPackageItem: (packageId: string, url: string, preset: string) => apiRequest<MediaPackage>('POST', `${BASE}/packages/${id(packageId)}/items`, { url, preset }),
   removePackageItem: (packageId: string, itemId: string) => apiRequest<MediaPackage>('DELETE', `${BASE}/packages/${id(packageId)}/items/${id(itemId)}`),
   startPackage: (packageId: string) => apiRequest<{ job_id: string }>('POST', `${BASE}/packages/${id(packageId)}/start`, {}),

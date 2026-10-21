@@ -17,6 +17,7 @@ export const useMediaPackagesStore = defineStore('mediaPackages', () => {
   let timer: ReturnType<typeof setTimeout> | undefined
 
   const editable = (id: string) => packages.value.some(p => p.package_id === id && p.state === 'draft' && !p.job_id)
+  const removable = (id: string) => packages.value.some(p => p.package_id === id && ['draft', 'done', 'error'].includes(p.state))
   function replace(value: MediaPackage) {
     const index = packages.value.findIndex(p => p.package_id === value.package_id)
     if (index < 0) packages.value.push(value)
@@ -101,6 +102,13 @@ export const useMediaPackagesStore = defineStore('mediaPackages', () => {
       if (current) { current.job_id = result.job_id; current.state = 'queued' }
     })
   }
+  async function deletePackage(id: string) {
+    if (!removable(id)) return false
+    return change(async generation => {
+      await api.deletePackage(id)
+      if (generation === epoch) packages.value = packages.value.filter(p => p.package_id !== id)
+    })
+  }
   function stop() {
     active = false
     epoch++
@@ -120,5 +128,5 @@ export const useMediaPackagesStore = defineStore('mediaPackages', () => {
     error.value = null
     if (resume) activate()
   }, { flush: 'sync' })
-  return { packages, error, busy, loading, editable, create, add, remove, start, refresh, activate, stop }
+  return { packages, error, busy, loading, editable, removable, create, add, remove, start, deletePackage, refresh, activate, stop }
 })

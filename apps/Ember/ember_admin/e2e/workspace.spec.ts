@@ -10,7 +10,7 @@ async function logInAdmin(page: Page): Promise<void> {
   await page.goto("/overview");
   await expect(page).toHaveURL(/\/login/);
   await page.getByLabel("Username").fill(ACCOUNT.username);
-  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(page.getByRole("heading", { name: "Workspace overview", exact: true })).toBeVisible();
 }

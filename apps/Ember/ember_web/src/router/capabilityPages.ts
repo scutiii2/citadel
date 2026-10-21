@@ -19,8 +19,8 @@ export const CAPABILITY_PAGES: Record<string, CapabilityPage> = {
     route: { path: "/capabilities/pdf_merger", name: "pdf-merger", component: () => import("../views/PdfMergerView.vue") },
   },
   video: {
-    to: "/capabilities/video_downloader", permission: "tools.execute", aliases: ["video_downloader"],
-    route: { path: "/capabilities/video_downloader", name: "video-downloader", component: () => import("../views/VideoDownloaderView.vue") },
+    to: "/capabilities/media_downloader", permission: "tools.execute", aliases: ["video_downloader", "media_downloader"],
+    route: { path: "/capabilities/media_downloader", name: "media-downloader", component: () => import("../views/VideoDownloaderView.vue") },
   },
 };
 

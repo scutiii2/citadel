@@ -161,12 +161,19 @@ describe("native capability pages", () => {
       { name: "video", label: "Media downloader", enabled: true, tools: [], resources: [] },
     ]);
   });
-  it.each([["pdf_merger", "pdf-merger"], ["video_downloader", "video-downloader"]])("opens %s as a dedicated route", async (path, name) => {
+  it.each([["pdf_merger", "pdf-merger"], ["media_downloader", "media-downloader"]])("opens %s as a dedicated route", async (path, name) => {
     me.mockResolvedValue(ACCOUNT_WITH_TOOLS);
     await router.push(`/capabilities/${path}`);
     expect(router.currentRoute.value.name).toBe(name);
     expect(router.currentRoute.value.meta.permission).toBe("tools.execute");
     expect(NAV_PAGES.some((p) => p.to === `/capabilities/${path}`)).toBe(true);
+  });
+  it("redirects old downloader bookmarks to the canonical media route", async () => {
+    me.mockResolvedValue(ACCOUNT_WITH_TOOLS);
+    await router.push('/capabilities/video_downloader?tab=groups#packages');
+    expect(router.currentRoute.value.path).toBe('/capabilities/media_downloader');
+    expect(router.currentRoute.value.query.tab).toBe('groups');
+    expect(router.currentRoute.value.hash).toBe('#packages');
   });
   it("keeps unknown capability pages generic", () => {
     expect(router.resolve("/capabilities/other").name).toBe("capability-page");

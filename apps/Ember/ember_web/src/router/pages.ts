@@ -64,7 +64,7 @@ export const NAV_PAGES: NavPage[] = [
     permission: "tools.execute",
   },
   {
-    to: "/capabilities/video_downloader",
+    to: "/capabilities/media_downloader",
     label: "Media downloader",
     icon: ["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", "M7 10l5 5 5-5", "M12 15V3"],
     description: "Download videos, music and photos, including TikTok photo posts.",

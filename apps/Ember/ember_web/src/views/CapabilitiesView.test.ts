@@ -189,7 +189,7 @@ describe("CapabilitiesView", () => {
     mocks.capabilities.mockResolvedValue(caps);
     const w = await show({added: {capabilities: ["pdf", "video"]}});
     expect(w.findAll("a").filter(a => a.text() === "Open page").map(a => a.attributes("href")))
-      .toEqual(["/capabilities/pdf_merger", "/capabilities/video_downloader"]);
+      .toEqual(["/capabilities/pdf_merger", "/capabilities/media_downloader"]);
   });
 
   it("keeps the generic capability page fallback for other GUI capabilities", async () => {
@@ -512,7 +512,7 @@ describe("CapabilitiesView extension cards", () => {
     mocks.extensions.mockResolvedValue([ext("pdf_merger", "https://old-pdf.example"), ext("video_downloader", "https://old-video.example")]);
     const w = await show({permissions: WITH_CHAT, added: {capabilities: ["pdf", "video"]}});
     const links = sections(w).filter(card => ["PDF_MERGER", "VIDEO_DOWNLOADER"].includes(card.get("h3").text())).map(card => card.get("a"));
-    expect(links.map(link => link.attributes("href"))).toEqual(["/capabilities/pdf_merger", "/capabilities/video_downloader"]);
+    expect(links.map(link => link.attributes("href"))).toEqual(["/capabilities/pdf_merger", "/capabilities/media_downloader"]);
     expect(links.every(link => link.attributes("target") !== "_blank")).toBe(true);
   });
 

@@ -12,13 +12,13 @@ test("log in, ask a question and read the streamed answer", async ({ page }) => 
 
   // A wrong password is refused and the page stays on the login form.
   await page.getByLabel("Username").fill(ACCOUNT.username);
-  await page.getByLabel("Password").fill("not the password");
+  await page.getByLabel("Password", { exact: true }).fill("not the password");
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(page.getByText("Wrong username or password")).toBeVisible();
   await expect(page).toHaveURL(/\/login/);
 
   // The right one lands on the chat page.
-  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Log in" }).click();
   const input = page.getByPlaceholder(/Ask something/);
   await expect(input).toBeVisible();
@@ -72,7 +72,7 @@ test("make a folder, file and pin a chat, then delete the folder with it", async
   await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
   await page.getByLabel("Username").fill(ACCOUNT.username);
-  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(page.getByPlaceholder(/Ask something/)).toBeVisible();
 
@@ -143,7 +143,7 @@ test("drag chats onto a folder and onto Pinned", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
   await page.getByLabel("Username").fill(ACCOUNT.username);
-  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(page.getByPlaceholder(/Ask something/)).toBeVisible();
 

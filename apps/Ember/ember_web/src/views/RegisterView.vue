@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PasswordInput from "../components/PasswordInput.vue";
 import { reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import AuthCard from "../components/AuthCard.vue";
@@ -59,10 +60,7 @@ async function submit(): Promise<void> {
         Email
         <input v-model="form.email" type="email" autocomplete="email" required />
       </label>
-      <label>
-        Password
-        <input v-model="form.password" type="password" autocomplete="new-password" minlength="8" required />
-      </label>
+      <PasswordInput label="Password" v-model="form.password" autocomplete="new-password" minlength="8" required />
       <p v-if="error" class="error">{{ error }}</p>
       <button class="primary" :disabled="busy">{{ busy ? "Creating ..." : "Create account" }}</button>
     </form>
