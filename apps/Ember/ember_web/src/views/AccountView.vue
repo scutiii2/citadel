@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PasswordInput from "../components/PasswordInput.vue";
 import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
@@ -197,7 +198,7 @@ async function changePassword(): Promise<void> {
             </div>
             <form v-if="openForm === 'email'" id="account-email-form" class="stack" :aria-busy="emailForm.busy" @submit.prevent="changeEmail">
               <label>New email<input v-model="emailForm.email" type="email" autocomplete="email" required /></label>
-              <label>Current password<input v-model="emailForm.password" type="password" autocomplete="current-password" required /></label>
+              <PasswordInput label="Current password" v-model="emailForm.password" autocomplete="current-password" required />
               <p class="muted small">{{ account.email_verification_required === false
                 ? "You'll get a code at the new address. Verifying it is optional."
                 : "You'll get a code at the new address. Until you enter it, your permissions are paused." }}</p>
@@ -212,9 +213,9 @@ async function changePassword(): Promise<void> {
               </ActionButton>
             </div>
             <form v-if="openForm === 'password'" id="account-password-form" class="stack" :aria-busy="passwordForm.busy" @submit.prevent="changePassword">
-              <label>New password<input v-model="passwordForm.next" type="password" autocomplete="new-password" minlength="8" required /></label>
-              <label>Repeat new password<input v-model="passwordForm.confirm" type="password" autocomplete="new-password" required /></label>
-              <label>Current password<input v-model="passwordForm.current" type="password" autocomplete="current-password" required /></label>
+              <PasswordInput label="New password" v-model="passwordForm.next" autocomplete="new-password" minlength="8" required />
+              <PasswordInput label="Repeat new password" v-model="passwordForm.confirm" autocomplete="new-password" required />
+              <PasswordInput label="Current password" v-model="passwordForm.current" autocomplete="current-password" required />
               <p v-if="passwordMismatch" class="error" role="alert">The new passwords don't match.</p>
               <p v-else-if="passwordForm.error" class="error" role="alert">{{ passwordForm.error }}</p>
               <p v-else-if="passwordForm.done" class="notice" role="status">Password changed.</p>

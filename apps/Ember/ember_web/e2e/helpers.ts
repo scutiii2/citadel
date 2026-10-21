@@ -12,7 +12,7 @@ export async function logIn(page: Page): Promise<void> {
   await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
   await page.getByLabel("Username").fill(ACCOUNT.username);
-  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(page.getByPlaceholder(/Ask something/)).toBeVisible();
 }

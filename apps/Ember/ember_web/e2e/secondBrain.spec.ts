@@ -8,7 +8,7 @@ test("second brain toggle persists per chat and is sent with the next question",
   api.chats.set("second-brain-0001", { id: "second-brain-0001", title: "Second brain", agent_id: "agent-1", messages: [], running: false });
   await page.goto("/");
   await page.getByLabel("Username").fill(ACCOUNT.username);
-  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Log in" }).click();
   await page.goto("/chat/second-brain-0001");
   await page.getByRole("button", { name: "Chat settings" }).click();
