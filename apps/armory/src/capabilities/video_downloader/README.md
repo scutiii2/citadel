@@ -1,6 +1,6 @@
 # Media downloader (`capabilities/video_downloader/`)
 
-Four native armory tools probe public videos, music and photos, queue downloads, poll progress and list unexpired files. The existing `video` capability ID, `/video` commands, `tool_vid_*` names, routes and storage paths remain compatible. See [capability conventions](../README.md).
+Six native armory tools probe public videos, music and photos, build grouped ZIP packages, queue downloads, poll progress and list unexpired files. The existing `video` capability ID, `/video` commands, `tool_vid_*` names, routes and storage paths remain compatible. See [capability conventions](../README.md).
 
 Direct image URLs (including extensionless URLs), single TikTok photo posts,
 Instagram posts and Pinterest pins offer the `photos` preset. One photo stays
@@ -21,6 +21,8 @@ handled by yt-dlp; gallery-dl discovers photo URLs only.
 | `tool_vid_download` | Queue a download and return a job id immediately | Public HTTP(S), local FFmpeg |
 | `tool_vid_status` | Poll your job and get a fresh signed link | Local queue |
 | `tool_vid_listFiles` | List your unexpired files with fresh signed links | Local store |
+| `tool_vid_package` | Create a group, add/remove media, or start its locked ZIP download | Public HTTP(S), local queue/store |
+| `tool_vid_packages` | List groups or inspect package items, failures and fresh ZIP links | Local queue/store |
 
 ## Slash commands
 
@@ -30,6 +32,8 @@ handled by yt-dlp; gallery-dl discovers photo URLs only.
 | `tool_vid_download` | `/video download` | <ul><li>`url` - required. Public media URL.</li><li>`preset` - optional, default `best`. Choose an unblocked preset from probe; use `photos` for images and photo posts.</li></ul> |
 | `tool_vid_status` | `/video status` | <ul><li>`job_id` - required. Job id returned by download.</li></ul> |
 | `tool_vid_listFiles` | `/video files` | No parameters; account comes from authenticated request context. |
+| `tool_vid_package` | `/video package` | <ul><li>`action` - required. `create`, `add`, `remove` or `start`.</li><li>`package_id` - optional, default empty. Required except for create.</li><li>`name` - optional, default empty. Required for create.</li><li>`urls` - optional, default empty. Comma-separated URLs for add; percent-encode commas inside URLs.</li><li>`preset` - optional, default `best`. Shared preset for added links.</li><li>`item_id` - optional, default empty. Required for remove.</li></ul> |
+| `tool_vid_packages` | `/video packages` | <ul><li>`package_id` - optional, default empty. Inspect one group; omit to list your groups.</li></ul> |
 
 ## Typical workflow
 
@@ -39,6 +43,30 @@ handled by yt-dlp; gallery-dl discovers photo URLs only.
 | 2 | `tool_vid_download` | Start the download; retain its job_id. |
 | 3 | `tool_vid_status` | Poll until done or error, then open the signed download_url. |
 | 4 | `tool_vid_listFiles` | Find earlier unexpired files or renew a download link. |
+| 5 | `tool_vid_package` | For packages: create a named draft, add media with chosen presets, then start. |
+| 6 | `tool_vid_packages` | Inspect progress and per-item failures; get the ZIP link when complete. |
+
+## Download groups and packages
+
+Groups are account-owned drafts. Add URLs with a preset and remove individual
+items while in draft. An accepted start atomically locks membership and creates
+one job; queued, downloading, completed, failed and cancelled packages remain
+locked. A full queue leaves the draft editable. URL validation rechecks the lock
+after yielding, so a concurrent start cannot admit a late item.
+
+One package occupies one existing queue slot and downloads items sequentially.
+Successful files become a numbered ZIP (`kind: package`); photo carousels retain
+their inner ZIP. Ordinary site failures are recorded per item and remaining
+links continue. A package with no successful items fails. Cancellation, size and
+storage limit failures stop the job. Member and combined payload sizes, final
+ZIP size and account storage all respect existing limits. Scratch members are
+removed after archiving; only the final ZIP enters the file list.
+
+Each account can hold 20 groups with up to 50 media links each. Drafts and
+finished history expire on the existing file TTL sweep; active packages remain
+until finished. Groups and job history live in process memory and are lost on
+restart. Completed ZIPs persist with existing file sidecars and TTL.
+Restart Armory and ember_api after deploying the new HTTP adapters.
 
 ## Configuration and operation
 
@@ -66,6 +94,12 @@ initializing the runtime. No extra MCP tool schemas are exposed.
 | `POST /video/ui/jobs/{job_id}/cancel` | Request cooperative cancellation; returns `{"ok":true}`. Polling eventually reports `error` with code `cancelled`. |
 | `GET /video/ui/files` | Array of native `FileInfo` objects with fresh signed links. |
 | `DELETE /video/ui/files/{file_id}` | Delete an owned file; returns `{"ok":true}`. |
+| `GET /video/ui/packages` | List owned groups, items and current job snapshots. |
+| `POST /video/ui/packages` | `{name}`; create an editable draft. |
+| `GET /video/ui/packages/{package_id}` | Inspect an owned group and fresh ZIP link. |
+| `POST /video/ui/packages/{package_id}/items` | `{url,preset}`; append to an editable draft. |
+| `DELETE /video/ui/packages/{package_id}/items/{item_id}` | Remove a draft item. |
+| `POST /video/ui/packages/{package_id}/start` | `{}`; atomically lock and queue; returns `{job_id}`. |
 
 Probe and download retain the service's URL policy and network guards. Video
 and music require FFmpeg; photos do not. Missing and other-owner IDs return

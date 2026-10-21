@@ -53,6 +53,10 @@ class DownloadIn(ProbeIn):
     preset: str = Field(default="best", min_length=1, max_length=64)
 
 
+class PackageIn(BaseModel):
+    name: str = Field(min_length=1, max_length=150)
+
+
 def gateway(request: Request) -> CapabilityFilesGateway:
     return CapabilityFilesGateway(request.app.state.upstream, request.app.state.settings.mcp_server_url,
                                   request.app.state.internal_token)
@@ -130,6 +134,37 @@ def install(area: Area) -> None:
             await logs.action(account, "pdf.merge", f"Started merge job {result['job_id']}")
             return result
     else:
+        @routes.get('/packages')
+        async def packages(account: Account = Depends(access), client: CapabilityFilesGateway = Depends(gateway)):
+            return client.local_links('video', await client.request('video', 'GET', '/packages', account))
+
+        @routes.post('/packages')
+        async def create_package(body: PackageIn, account: Account = Depends(access),
+                                 client: CapabilityFilesGateway = Depends(gateway)):
+            return await client.request('video', 'POST', '/packages', account, json=body.model_dump())
+
+        @routes.get('/packages/{package_id}')
+        async def package(package_id: str = Path(pattern=ID), account: Account = Depends(access),
+                          client: CapabilityFilesGateway = Depends(gateway)):
+            return client.local_links('video', await client.request('video', 'GET', f'/packages/{package_id}', account))
+
+        @routes.post('/packages/{package_id}/items')
+        async def add_media(body: DownloadIn, package_id: str = Path(pattern=ID), account: Account = Depends(access),
+                            client: CapabilityFilesGateway = Depends(gateway)):
+            return await client.request('video', 'POST', f'/packages/{package_id}/items', account, json=body.model_dump())
+
+        @routes.delete('/packages/{package_id}/items/{item_id}')
+        async def remove_media(package_id: str = Path(pattern=ID), item_id: str = Path(pattern=ID),
+                               account: Account = Depends(access), client: CapabilityFilesGateway = Depends(gateway)):
+            return await client.request('video', 'DELETE', f'/packages/{package_id}/items/{item_id}', account)
+
+        @routes.post('/packages/{package_id}/start')
+        async def start_package(package_id: str = Path(pattern=ID), account: Account = Depends(access),
+                                client: CapabilityFilesGateway = Depends(gateway), logs: LogWriter = Depends(get_log_writer)):
+            result = await client.request('video', 'POST', f'/packages/{package_id}/start', account, json={})
+            await logs.action(account, 'video.package_start', f'Started package {package_id} as job {result["job_id"]}')
+            return result
+
         @routes.post("/probe")
         async def probe(body: ProbeIn, account: Account = Depends(access),
                         client: CapabilityFilesGateway = Depends(gateway)):

@@ -5,6 +5,55 @@ import { logIn } from './helpers.ts'
 // The API is deliberately mocked; keep requests visible to Playwright routing.
 test.use({ serviceWorkers: 'block' })
 
+test('media groups accept multiple links and lock membership after starting a package (mock API)', async ({ page }, info) => {
+  const api = await installFakeApi(page, { media: true })
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  let group: Record<string, any> | null = null
+  let running = false
+  await page.route('**/api/video-downloader/packages**', async route => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    if (path.endsWith('/packages') && request.method() === 'POST') {
+      group = { package_id: 'p_group', name: request.postDataJSON().name, state: 'draft', items: [], job_id: null, status: null }
+      return route.fulfill({ json: group })
+    }
+    if (path.endsWith('/items') && request.method() === 'POST') {
+      if (running) return route.fulfill({ status: 409, json: { error: { code: 'package_locked', message: 'Locked' } } })
+      group!.items.push({ item_id: `i_${group!.items.length}`, ...request.postDataJSON(), title: null, state: 'pending', error: null })
+      return route.fulfill({ json: group })
+    }
+    if (path.endsWith('/start')) {
+      running = true
+      group!.job_id = 'j_group'
+      group!.state = 'downloading'
+      return route.fulfill({ json: { job_id: 'j_group' } })
+    }
+    if (running) group!.status = { job_id: 'j_group', state: 'downloading', percent: 40, speed: null, eta: null, file: null, error: null }
+    return route.fulfill({ json: group ? [group] : [] })
+  })
+  await logIn(page)
+  await page.goto('/capabilities/video_downloader')
+  await page.getByRole('textbox', { name: 'Group name' }).fill('My collection')
+  await page.getByRole('button', { name: 'Create group', exact: true }).click()
+  const panel = page.getByRole('article', { name: 'My collection' })
+  await panel.getByRole('textbox', { name: 'Media links, one per line' }).fill('https://example.com/one\nhttps://example.com/two')
+  await panel.getByRole('button', { name: 'Add links', exact: true }).click()
+  await expect(panel.locator('.items li')).toHaveCount(2)
+  await screenshots(page, info, 'package-draft')
+  await panel.getByRole('button', { name: 'Download package', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Start package download?' })
+  await expect(dialog).toContainText('permanently locked')
+  await dialog.getByRole('button', { name: 'Start download', exact: true }).click()
+  await expect(panel).toContainText('Locked')
+  await expect(panel.getByRole('textbox')).toHaveCount(0)
+  await expect(panel.getByRole('button', { name: 'Remove', exact: true })).toHaveCount(0)
+  await expect(panel.getByRole('progressbar')).toBeVisible()
+  await screenshots(page, info, 'package-locked')
+  expect(errors).toEqual([])
+  expect(api.unexpected).toEqual([])
+})
+
 async function screenshots(page: Page, info: TestInfo, name: string): Promise<void> {
   for (const [theme, width] of [['light', 1280], ['dark', 1280], ['light', 768], ['dark', 375]] as const) {
     await page.setViewportSize({ width, height: 1200 })

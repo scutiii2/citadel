@@ -51,8 +51,8 @@ async def media_ui(request):
     except (ValidationError, json.JSONDecodeError, UnicodeDecodeError):
         return JSONResponse({"error": {"code": "invalid_request", "message": "Invalid request body"}}, status_code=422)
     except ServiceError as error:
-        if str(error.code) in {"file_not_found", "job_not_found"}:
-            noun = "File" if str(error.code) == "file_not_found" else "Job"
+        if str(error.code) in {"file_not_found", "job_not_found", "package_not_found"}:
+            noun = {"file_not_found": "File", "job_not_found": "Job", "package_not_found": "Package"}[str(error.code)]
             return JSONResponse({"error": {"code": str(error.code), "message": f"{noun} is not available"}}, status_code=404)
         if str(error.code) == "internal_error":
             logger.exception("Native %s UI operation failed", kind)
@@ -110,7 +110,7 @@ def _pdf_operation(request, uid, body):
 
 def _video_operation(request, uid, body):
     from src.capabilities.video_downloader.domain import _require_ffmpeg
-    from src.capabilities.video_downloader.utils.models import DownloadRequest, ProbeRequest
+    from src.capabilities.video_downloader.utils.models import DownloadRequest, ProbeRequest, PackageCreate, PackageAdd
     from src.capabilities.video_downloader.utils.service import Caller
     from src.services.video_downloads import get_runtime
 
@@ -120,6 +120,24 @@ def _video_operation(request, uid, body):
     job_id = request.path_params.get("job_id")
 
     async def operation(service):
+        if '/packages' in path:
+            package_id = request.path_params.get('package_id')
+            item_id = request.path_params.get('item_id')
+            if item_id:
+                return service.packages.remove(caller, package_id, item_id).model_dump(mode='json')
+            if path.endswith('/items'):
+                payload = PackageAdd.model_validate(body)
+                return (await service.packages.add(caller, package_id, payload.url, payload.preset)).model_dump(mode='json')
+            if path.endswith('/start'):
+                package = service.packages.get(caller, package_id)
+                if any(item.preset != 'photos' for item in package.items):
+                    _require_ffmpeg()
+                return {'job_id': service.packages.start(caller, package_id).id}
+            if package_id:
+                return service.packages.get(caller, package_id).model_dump(mode='json')
+            if request.method == 'POST':
+                return service.packages.create(caller, PackageCreate.model_validate(body).name).model_dump(mode='json')
+            return [package.model_dump(mode='json') for package in service.packages.list(caller)]
         if file_id:
             await service.delete_file(caller, file_id)
             return {"ok": True}
@@ -156,3 +174,8 @@ def install_media_ui_routes(app):
     app.add_route("/pdf/ui/merge", media_ui, methods=["POST"])
     app.add_route("/video/ui/probe", media_ui, methods=["POST"])
     app.add_route("/video/ui/downloads", media_ui, methods=["POST"])
+    app.add_route('/video/ui/packages', media_ui, methods=['GET', 'POST'])
+    app.add_route('/video/ui/packages/{package_id}', media_ui, methods=['GET'])
+    app.add_route('/video/ui/packages/{package_id}/items', media_ui, methods=['POST'])
+    app.add_route('/video/ui/packages/{package_id}/items/{item_id}', media_ui, methods=['DELETE'])
+    app.add_route('/video/ui/packages/{package_id}/start', media_ui, methods=['POST'])

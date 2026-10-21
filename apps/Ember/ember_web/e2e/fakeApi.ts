@@ -329,6 +329,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     }
     if (options.media && path.startsWith('/api/video-downloader/')) {
       const method = request.method();
+      if (path === '/api/video-downloader/packages' && method === 'GET') return json(route, []);
       if (path === '/api/video-downloader/probe' && method === 'POST') return json(route, {
         url: (request.postDataJSON() as { url: string }).url, title: 'Coastal walk at sunset', duration: 125, thumbnail: 'https://example.com/thumbnail.jpg', uploader: 'Field recordings',
         options: [

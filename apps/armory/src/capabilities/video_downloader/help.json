@@ -1,5 +1,5 @@
 {
-  "summary": "Probe and download public video, music and photos on armory, scoped to your authenticated account. Files expire automatically; tools never wait for a download.",
+  "summary": "Probe and download public media, or collect links in draft groups and start locked ZIP packages. Account-scoped files expire automatically; tools return immediately.",
   "tools": [
     {
       "name": "tool_vid_probe",
@@ -31,6 +31,22 @@
       "connection": "Local store",
       "commands": [
         "files"
+      ]
+    },
+    {
+      "name": "tool_vid_package",
+      "purpose": "Create a draft group, add/remove media, or start and lock its ZIP download",
+      "connection": "Public HTTP(S), local queue/store",
+      "commands": [
+        "package"
+      ]
+    },
+    {
+      "name": "tool_vid_packages",
+      "purpose": "List your groups or inspect package progress, item failures and fresh ZIP links",
+      "connection": "Local queue/store",
+      "commands": [
+        "packages"
       ]
     }
   ],
@@ -81,6 +97,60 @@
       "name": "files",
       "tool": "tool_vid_listFiles",
       "params": []
+    },
+    {
+      "name": "package",
+      "tool": "tool_vid_package",
+      "params": [
+        {
+          "name": "action",
+          "required": true,
+          "default": null,
+          "description": "create, add, remove or start. Start permanently locks the media list."
+        },
+        {
+          "name": "package_id",
+          "required": false,
+          "default": "",
+          "description": "Required except for create; returned by create or packages."
+        },
+        {
+          "name": "name",
+          "required": false,
+          "default": "",
+          "description": "Required for create; group name of 1 to 150 characters."
+        },
+        {
+          "name": "urls",
+          "required": false,
+          "default": "",
+          "description": "Required for add; comma-separated public URLs. Percent-encode commas inside URLs."
+        },
+        {
+          "name": "preset",
+          "required": false,
+          "default": "best",
+          "description": "Unblocked preset shared by added links; use photos for images."
+        },
+        {
+          "name": "item_id",
+          "required": false,
+          "default": "",
+          "description": "Required for remove; media item id from packages."
+        }
+      ]
+    },
+    {
+      "name": "packages",
+      "tool": "tool_vid_packages",
+      "params": [
+        {
+          "name": "package_id",
+          "required": false,
+          "default": "",
+          "description": "Optional id to inspect one group; omit to list your groups."
+        }
+      ]
     }
   ],
   "workflow": [
@@ -107,6 +177,18 @@
       "tool": "tool_vid_listFiles",
       "ai_only_step": false,
       "explanation": "Find earlier unexpired files or renew a download link."
+    },
+    {
+      "sequence": "5",
+      "tool": "tool_vid_package",
+      "ai_only_step": false,
+      "explanation": "For a package: create a named group, add URLs with chosen presets, then start. The accepted start permanently locks membership."
+    },
+    {
+      "sequence": "6",
+      "tool": "tool_vid_packages",
+      "ai_only_step": false,
+      "explanation": "Inspect group items and failures; completed packages include one ZIP of successful downloads. Status also accepts the package job_id."
     }
   ]
 }

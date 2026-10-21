@@ -1,5 +1,5 @@
 import { apiRequest, ApiError } from './http'
-import type { FileInfo, JobStatus, ProbeResult } from './VideoDownloaderTypes'
+import type { FileInfo, JobStatus, ProbeResult, MediaPackage } from './VideoDownloaderTypes'
 
 const BASE = '/api/video-downloader'
 const id = encodeURIComponent
@@ -11,6 +11,11 @@ export const videoDownloaderClient = {
   cancelJob: (jobId: string) => apiRequest<void>('POST', `${BASE}/jobs/${id(jobId)}/cancel`, {}),
   listFiles: () => apiRequest<FileInfo[]>('GET', `${BASE}/files`),
   deleteFile: (fileId: string) => apiRequest<void>('DELETE', `${BASE}/files/${id(fileId)}`),
+  listPackages: () => apiRequest<MediaPackage[]>('GET', `${BASE}/packages`),
+  createPackage: (name: string) => apiRequest<MediaPackage>('POST', `${BASE}/packages`, { name }),
+  addPackageItem: (packageId: string, url: string, preset: string) => apiRequest<MediaPackage>('POST', `${BASE}/packages/${id(packageId)}/items`, { url, preset }),
+  removePackageItem: (packageId: string, itemId: string) => apiRequest<MediaPackage>('DELETE', `${BASE}/packages/${id(packageId)}/items/${id(itemId)}`),
+  startPackage: (packageId: string) => apiRequest<{ job_id: string }>('POST', `${BASE}/packages/${id(packageId)}/start`, {}),
 }
 
 /** Poll without overlapping requests. Stopping also discards a response already in flight. */

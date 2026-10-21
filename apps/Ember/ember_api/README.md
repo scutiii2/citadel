@@ -61,6 +61,14 @@ that should stay inside a single account.
 
 ## Native capability workspace API
 
+Media groups use fixed `/api/video-downloader/packages` GET/POST routes, GET
+`/packages/{id}`, POST `/packages/{id}/items` (`{url,preset}`), DELETE
+`/packages/{id}/items/{item_id}` and POST `/packages/{id}/start`. The same
+`tools.execute` and added `video` capability checks apply. Armory owns groups,
+validates URLs and permanently locks membership when queue admission succeeds.
+Nested ZIP links are rewritten to authenticated same-origin file downloads.
+Restart Armory and ember_api after deployment; no database migration is needed.
+
 PDF/video workspaces proxy only fixed Armory routes (`/pdf/ui`, `/video/ui`,
 and the existing `/upload/pdf`). Armory must be restarted after installing
 the HTTP adapters, with the shared internal token configured and `pdf` / `video`

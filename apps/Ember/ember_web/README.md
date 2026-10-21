@@ -45,7 +45,14 @@ URL, token or key.
   page and account quotas. Files normally expire after six hours; upload again
   if expired. Merge progress is polled without blocking the page.
 - Video keeps URL probing, readable policy errors, available/blocked presets,
-  progress, cancellation and the expiring file list. Remote thumbnails use a
+  progress, cancellation and the expiring file list. It also supports
+  named download groups. Add checked media or paste links (one per line),
+  choose a format and download the package as a ZIP. Starting locks its media
+  list on the server; failed/cancelled packages stay locked. Partial success
+  keeps successful files in the ZIP and shows failed items. Groups are scoped
+  to the account and expire with job history; restart discards group drafts.
+  The package list resumes polling on return to the page.
+  Remote thumbnails use a
   neutral placeholder under Ember's existing same-origin image policy.
   Polling stops on route leave; stale account/request responses are ignored.
   File deletion and job cancellation use ConfirmModal. DownloadCards, CopyButton,
