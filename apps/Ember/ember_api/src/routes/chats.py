@@ -975,9 +975,9 @@ async def summarize_chat(
         chat = await chats.get(chat_id)
     except ChatNotFound as error:
         raise _not_found() from error
-    agent = await directory.entry()
+    agent = await directory.get(summarization.SUMMARIZER_AGENT_ID)
     if agent is None:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, NO_AGENT_RUNNING)
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Context summarizer is not running")
     usage = UsageService(session, settings.usage)
     block = await usage.check(account.id)
     if block is not None:

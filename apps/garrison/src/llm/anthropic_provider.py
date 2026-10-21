@@ -617,7 +617,8 @@ def run_interpret(text: str, model: str | None = None) -> ChatResult:
         try:
             response = client.messages.create(
                 model=model_name,
-                max_tokens=token_limits.max_output_tokens(PROVIDER_ID, route.current),
+                max_tokens=llm_options.for_provider(PROVIDER_ID).max_tokens(
+                    token_limits.max_output_tokens(PROVIDER_ID, route.current)),
                 system=SYSTEM_PROMPT,
                 messages=messages,
             )

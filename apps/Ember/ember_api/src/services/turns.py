@@ -30,7 +30,7 @@ from typing import Any
 from src.config import PricingSettings, UsageSettings
 from src.db import Database
 from src.services import question_answers, second_brain, summarization
-from src.services.agent_directory import AgentEntry
+from src.services.agent_directory import AgentDirectory, AgentEntry
 from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
 from src.services.chat_service import (
     ChatNotFound,
@@ -307,6 +307,7 @@ class TurnRegistry:
         logs: LogWriter,
         *,
         pricing: Pricing | None = None,
+        directory: AgentDirectory | None = None,
         max_running_per_account: int = 3,
         retention_seconds: float = 120.0,
     ) -> None:
@@ -315,6 +316,7 @@ class TurnRegistry:
         self._usage = usage
         self._logs = logs
         self._pricing = pricing or Pricing(PricingSettings())
+        self._directory = directory
         self._max_running = max_running_per_account
         self._retention = retention_seconds
         self._turns: dict[tuple[int, str], Turn] = {}
@@ -643,7 +645,10 @@ class TurnRegistry:
         A failure never blocks the turn: the history is then sent as is."""
         await self._publish(turn, {"type": "summarizing"})
         try:
-            outcome = await summarization.summarize(self._gateway, turn.agent.url, turn.caller, earlier)
+            agent = await self._directory.get(summarization.SUMMARIZER_AGENT_ID) if self._directory else None
+            if agent is None:
+                raise summarization.SummarizeError("Context summarizer is not running")
+            outcome = await summarization.summarize(self._gateway, agent.url, turn.caller, earlier)
         except summarization.SummarizeError as error:
             logger.info("auto-summarize of chat %s skipped: %s", turn.chat_id, error)
             return earlier

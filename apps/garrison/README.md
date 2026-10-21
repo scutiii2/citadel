@@ -395,10 +395,13 @@ its enabled state, task switches, local voters, confidence thresholds, narrowing
 deadline, remote timeout, tier mapping and optional trace. Saves use the existing
 machine-specific override and supervisor restart; Reset restores tracked defaults.
 
-For a top-level entry/orchestrator turn, Garrison sends the user message, up to 600
-characters of the previous assistant message and the authorized specialist roster
-to Router's internal `route` operation. Memory injection and full history are
-excluded. Router runs the same flow as Triage Assistant: Laya English, typed-decisions,
+For a top-level entry/orchestrator turn with conversation history, Garrison first
+asks the tool-free `context-summarizer` for a short routing brief. Router receives
+that brief, the latest user message verbatim, and the authorized specialist roster.
+If the helper is unavailable, times out, or returns an unusable brief, routing uses
+up to 600 characters of the previous assistant message instead. First messages
+need no summary call. Memory injection and full history are excluded from Router.
+Router runs the same flow as Triage Assistant: Laya English, typed-decisions,
 option narrowing and optional Jev. It returns independent agent and size decisions.
 An uncertain agent choice stays with Ember; uncertain size uses the selected
 agent's default model. Explicit tiers and target limits still apply. Delegation
@@ -420,7 +423,8 @@ Defaults: 10-second overall deadline (1-30 configurable), 3-second remote timeou
 4,000 local subject characters, 16,000 remote subject characters, and at most nine
 specialists plus `none`. Oversized rosters leave agent selection to Ember while
 size selection may continue. Inputs are not silently truncated to fit. Short
-follow-ups with history skip tier selection. Tier mapping is tiny/everyday to
+follow-ups with history skip tier selection unless the summarizer supplies context.
+Tier mapping is tiny/everyday to
 light, large to standard, hardest to heavy. Thresholds remain the triage defaults,
 not an accuracy guarantee. Missing/offline/disabled/failed Router uses normal
 Ember orchestration and default tiers; legacy direct Jev routing does not restart.
@@ -430,6 +434,37 @@ without an entry-model row when no entry model ran. Optional diagnostics retain
 settled/uncertain outcomes and bounded trace metadata without copying user text.
 Late inference cannot dispatch work; actual late completions remain in Router's
 local usage log. Browser APIs keep their existing usage and log permissions.
+
+### Shared context summarizer
+
+`agents/context-summarizer.json` defines the supervised helper on port 9118.
+It uses the existing Anthropic/OpenRouter light tier (currently `openrouter/free`
+in tracked defaults), with no tools, delegation, memory recall or planning. It
+is not an entry agent or a routable specialist. The existing agent editor and
+deployment override mechanism control its model, enabled state and limits.
+
+The `interpret` operation accepts two caller prompt modes: `routing` produces
+a factual brief without selecting an agent or tier; `compact` preserves the
+continuation context, decisions, pending work and exact identifiers. Routing
+waits at most five seconds, accepts at most 1,600 summary characters, and bounds
+history to about 32,000 characters while retaining the start and recent turns.
+The prompt discloses omitted middle history. Existing compacted history is input
+like other messages; no additional per-chat summary store is introduced.
+
+Routing summaries are recorded as `context-summarizer` work in the turn's usage
+breakdown, separately from Router voters and answer generation. Cancellation or
+timeout discards late results; a tool-free `interpret` inference already running
+on the remote service may finish after the caller stops waiting.
+Completed `interpret` calls write the helper's local usage log before returning,
+including late completions after a timeout. Late usage cannot be attached to an
+already completed Ember turn; the helper log retains it with the routing request
+ID for reconciliation. Regular successful calls appear once in account usage.
+
+Ember API also discovers this helper for `/compact` and automatic compaction.
+Those calls keep the existing full compaction prompt, transcript backup,
+recompression and summary usage accounting. They do not use the short routing
+brief as the chat's replacement memory. No helper means manual compaction
+reports unavailability; automatic compaction keeps the history and continues.
 
 ### Classifier backend configuration
 

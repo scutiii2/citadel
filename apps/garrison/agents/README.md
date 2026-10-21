@@ -23,6 +23,10 @@ See `../README.md` for the field descriptions and examples.
 
 The supervisor watches this directory and the overrides file and reconciles
 validated changes.
+
+`context-summarizer.json` is a tool-free, non-delegable light-tier helper for
+Router context briefs and Ember's manual/automatic conversation compaction.
+It is called directly through `interpret`; it does not choose agents or tiers.
 `.data/agent_definitions.json` is its generated summary of all configured
 agents; `.data/agent_registry.json` records registered running instances.
 Both remain ignored runtime state, along with usage logs. Temporary admin

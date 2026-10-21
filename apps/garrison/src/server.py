@@ -14,6 +14,7 @@ import asyncio
 import json
 import os
 import sys
+from uuid import uuid4
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -413,7 +414,7 @@ async def agent_prompt_preview(request: Request) -> JSONResponse:
 
 
 @mcp.tool()
-def interpret(text: str) -> dict[str, Any]:
+def interpret(text: str, request_id: str | None = None, delegated_by: str | None = None) -> dict[str, Any]:
     """One completion over `text` - no tool-calling loop, no tool calls
     offered. Used by chat_app's summarization (see services/summarization.py)
     for a plain prompt-in, text-out step; `ask()` remains what a free-form
@@ -424,8 +425,11 @@ def interpret(text: str) -> dict[str, Any]:
     result = agent_config.run_interpret(text)
     own_usage = usage_log.own_row(
         result, agent_id=_AGENT_ID, agent_label=_AGENT_LABEL, gateway=result.gateway or SPEC.effective_gateway(),
-        started_at=started_at, finished_at=agent_events.now_iso(), delegated_by=None,
+        started_at=started_at, finished_at=agent_events.now_iso(), delegated_by=delegated_by,
     )
+    # This runs in the helper process, before replying: a caller timing out
+    # must not erase the usage of a completion that still finished upstream.
+    usage_log.append_sync({**own_usage, "request_id": request_id or uuid4().hex, "depth": 0})
     return {
         "response": result.response,
         "provider_id": result.provider_id,
