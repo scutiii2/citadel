@@ -161,8 +161,8 @@ def map_error(exc: Exception, *, blocked: bool) -> DownloaderError:
     if "ffmpeg" in lowered or "ffprobe" in lowered:
         return DownloaderError(ErrorCode.FFMPEG_MISSING, "FFmpeg is missing or failed, so the video can't be processed.")
     if _LOGIN.search(text):
-        return DownloaderError(ErrorCode.LOGIN_REQUIRED, "This video needs a login (private, members-only or age-restricted).")
-    return DownloaderError(ErrorCode.EXTRACTOR_FAILED, "The video couldn't be fetched. The site may have changed or the video is unavailable.")
+        return DownloaderError(ErrorCode.LOGIN_REQUIRED, "This media needs a login (private, members-only or age-restricted).")
+    return DownloaderError(ErrorCode.EXTRACTOR_FAILED, "The media couldn't be fetched. The site may have changed or the media is unavailable.")
 
 
 def _final_path(info: dict, work_dir: Path) -> Path:

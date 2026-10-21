@@ -11,7 +11,7 @@ from src.capabilities.video_downloader.utils.errors import DownloaderError, Erro
 class Preset:
     id: str
     label: str
-    kind: str  # "video" or "audio"
+    kind: str  # video, audio or photo
     height: int | None = None  # video: cap on frame height (None = best available)
     audio_kbps: int = 192  # audio: target bitrate of the converted file
     codec: str | None = None  # audio: "mp3" or "m4a"
@@ -24,8 +24,9 @@ PRESETS: dict[str, Preset] = {
         Preset("1080p", "1080p", "video", height=1080),
         Preset("720p", "720p", "video", height=720),
         Preset("480p", "480p", "video", height=480),
-        Preset("audio-mp3", "Audio (MP3)", "audio", codec="mp3"),
-        Preset("audio-m4a", "Audio (M4A)", "audio", codec="m4a"),
+        Preset("audio-mp3", "Music (MP3)", "audio", codec="mp3"),
+        Preset("audio-m4a", "Music (M4A)", "audio", codec="m4a"),
+        Preset("photos", "Original photos", "photo"),
     )
 }
 

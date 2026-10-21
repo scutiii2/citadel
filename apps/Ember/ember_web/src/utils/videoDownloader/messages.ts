@@ -9,7 +9,7 @@ const FRIENDLY: Record<string, string> = {
   connection_lost: 'Lost the connection to the server. Check your downloads list, then try again.',
   http_error: 'The server could not be reached. Try again.',
   drm_protected: 'This video is copy-protected (DRM), so it cannot be downloaded.',
-  login_required: 'This video needs a login (private, members-only or age-restricted), so it cannot be downloaded here.',
+  login_required: 'This media needs a login (private, members-only or age-restricted), so it cannot be downloaded here.',
 }
 
 /** One table of error text: known codes get fixed wording, anything else shows the server's message. */

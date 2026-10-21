@@ -8,6 +8,16 @@ from urllib.parse import quote
 _UNSAFE = re.compile(r"[^\w.\- ()]+")
 _MAX_LENGTH = 150
 _MIME = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".avif": "image/avif",
+    ".heif": "image/heif",
+    ".bmp": "image/bmp",
+    ".tiff": "image/tiff",
+    ".zip": "application/zip",
     ".mp4": "video/mp4",
     ".webm": "video/webm",
     ".mkv": "video/x-matroska",

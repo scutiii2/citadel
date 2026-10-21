@@ -130,11 +130,14 @@ def _video_operation(request, uid, body):
             return service.job_status(caller, job_id).model_dump(mode="json")
         if path.endswith("/probe"):
             payload = ProbeRequest.model_validate(body)
-            _require_ffmpeg()
-            return (await service.probe(payload.url)).model_dump(mode="json")
+            result = await service.probe(payload.url)
+            if not result.photo_count:
+                _require_ffmpeg()
+            return result.model_dump(mode="json")
         if path.endswith("/downloads"):
             payload = DownloadRequest.model_validate(body)
-            _require_ffmpeg()
+            if payload.preset != "photos":
+                _require_ffmpeg()
             job = await service.start_download(caller, payload.url, payload.preset)
             return {"job_id": job.id}
         return [service.file_info(file).model_dump(mode="json") for file in service.list_files(caller)]

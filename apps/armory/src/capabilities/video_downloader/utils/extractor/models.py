@@ -30,6 +30,7 @@ class MediaInfo:
     webpage_url: str | None
     formats: list[FormatInfo] = field(default_factory=list)
     live_status: str | None = None  # yt-dlp's live_status: is_live, is_upcoming, was_live, not_live, post_live
+    photo_count: int = 0
 
     @property
     def is_live(self) -> bool:

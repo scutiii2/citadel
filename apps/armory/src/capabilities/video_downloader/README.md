@@ -1,12 +1,23 @@
-# capabilities/video_downloader/
+# Media downloader (`capabilities/video_downloader/`)
 
-Four native armory tools probe public videos, queue downloads, poll progress and list unexpired files. Standalone service logic is ported with its regression tests. See [capability conventions](../README.md).
+Four native armory tools probe public videos, music and photos, queue downloads, poll progress and list unexpired files. The existing `video` capability ID, `/video` commands, `tool_vid_*` names, routes and storage paths remain compatible. See [capability conventions](../README.md).
+
+Direct image URLs (including extensionless URLs), single TikTok photo posts,
+Instagram posts and Pinterest pins offer the `photos` preset. One photo stays
+in its original raster format; multiple photos become a ZIP with ordered,
+numbered filenames. Probe responses include `photo_count` (zero for video or
+music); photo files have `kind: "photo"` and an image or `application/zip` MIME.
+At most 100 photos are accepted per post. Profiles, boards and playlists are
+refused. Site access still depends on anonymous availability: private posts,
+login requirements, challenges and unavailable content can fail. No cookies
+or account credentials are imported. Video options and MP3/M4A music remain
+handled by yt-dlp; gallery-dl discovers photo URLs only.
 
 ## Tools
 
 | Tool | Purpose | Connection |
 | --- | --- | --- |
-| `tool_vid_probe` | Inspect a public video and its unblocked quality presets | Public HTTP(S) |
+| `tool_vid_probe` | Inspect public media and its unblocked download options | Public HTTP(S) |
 | `tool_vid_download` | Queue a download and return a job id immediately | Public HTTP(S), local FFmpeg |
 | `tool_vid_status` | Poll your job and get a fresh signed link | Local queue |
 | `tool_vid_listFiles` | List your unexpired files with fresh signed links | Local store |
@@ -15,8 +26,8 @@ Four native armory tools probe public videos, queue downloads, poll progress and
 
 | Tool | Slash command | Parameters |
 | --- | --- | --- |
-| `tool_vid_probe` | `/video probe` | <ul><li>`url` - required. Full public http(s) link to a single video.</li></ul> |
-| `tool_vid_download` | `/video download` | <ul><li>`url` - required. Full public http(s) link to a single video.</li><li>`preset` - optional, default `best`. Unblocked preset from probe.</li></ul> |
+| `tool_vid_probe` | `/video probe` | <ul><li>`url` - required. Public video, music, direct image or single photo-post URL.</li></ul> |
+| `tool_vid_download` | `/video download` | <ul><li>`url` - required. Public media URL.</li><li>`preset` - optional, default `best`. Choose an unblocked preset from probe; use `photos` for images and photo posts.</li></ul> |
 | `tool_vid_status` | `/video status` | <ul><li>`job_id` - required. Job id returned by download.</li></ul> |
 | `tool_vid_listFiles` | `/video files` | No parameters; account comes from authenticated request context. |
 
@@ -37,11 +48,11 @@ Caps and TTLs use `specifics/video_downloader/configs/config_video_downloader.js
 
 Settings in `src/config.py` accept `MCP_VIDEO_STORE_DIR` (default `specifics/video_downloader/.data/store`), `MCP_VIDEO_LOG_DIR` (reserved log location), `MCP_VIDEO_CONFIG_PATH`, `MCP_VIDEO_PUBLIC_BASE_URL` and `MCP_VIDEO_SIGNING_KEY`. Paths follow armory's working directory convention. Set the public base URL to the externally reachable armory origin (including any proxy path prefix); the fallback is `http://127.0.0.1:<MCP_PORT>`. A persistent random signing key keeps old links valid across restarts; absent a key, a process-local random key is used and restart invalidates old links. `MCP_HOST`, `MCP_PORT` and `INTERNAL_API_TOKEN` retain their existing armory meaning.
 
-Install armory's dependencies, including pinned `yt-dlp[default,curl-cffi]==2026.8.19`. FFmpeg must be on PATH. Missing FFmpeg refuses probe/download with `ffmpeg_missing`, while server startup and file/status reads remain available. DRM, login-only media, live streams and playlists are refused. The configured download cap is rechecked against extraction and actual bytes; concurrent commits reserve account storage.
+Install armory's dependencies, including pinned `yt-dlp[default,curl-cffi]==2026.8.19` and `gallery-dl==1.32.17`. FFmpeg must be on PATH for video/music; photos work without it. Missing FFmpeg refuses video/music probe/download with `ffmpeg_missing`, while photos, server startup and file/status reads remain available. DRM, login-only media, live streams and playlists are refused. The configured download cap is rechecked against extraction and actual bytes; concurrent commits reserve account storage. For carousels the file cap covers the combined photos and final ZIP; cancellation and account quotas still apply.
 
 ## File serving decision
 
-Ember's Video Downloader screen uses fixed internal HTTP adapters on this same
+Ember's Media Downloader screen uses fixed internal HTTP adapters on this same
 listener. Every `/video/ui` call requires `X-Internal-Token` and
 `X-Requester-Uid`. Only that UID owns the files and jobs; the token does not
 grant cross-account access. Disabled or absent capabilities return 503 before
@@ -56,8 +67,8 @@ initializing the runtime. No extra MCP tool schemas are exposed.
 | `GET /video/ui/files` | Array of native `FileInfo` objects with fresh signed links. |
 | `DELETE /video/ui/files/{file_id}` | Delete an owned file; returns `{"ok":true}`. |
 
-Probe and download retain the service's URL policy and network guards, and both
-require FFmpeg as their MCP equivalents do. Missing and other-owner IDs return
+Probe and download retain the service's URL policy and network guards. Video
+and music require FFmpeg; photos do not. Missing and other-owner IDs return
 the same unavailable response. Expected service errors retain their native
 HTTP status and `{error:{code,message}}` body. Unexpected failures return a
 sanitized 503. These adapters share the existing runtime, quotas and queue.

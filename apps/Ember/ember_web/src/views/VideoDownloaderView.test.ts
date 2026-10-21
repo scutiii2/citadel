@@ -32,6 +32,21 @@ async function start() {
   await flushPromises()
 }
 describe('VideoDownloaderView', () => {
+  it('downloads a TikTok photo carousel and explains the ZIP result', async () => {
+    vi.mocked(api.probe).mockResolvedValue({ url: 'https://www.tiktok.com/@alice/photo/123', title: 'Holiday', duration: null, thumbnail: null, uploader: 'alice', photo_count: 3,
+      options: [{ id: 'photos', label: 'Original photos', kind: 'photo', blocked: false, estimated_bytes: null, code: null, reason: null }] })
+    await setup()
+    expect(wrapper.text()).toContain('Media downloader')
+    expect(wrapper.get('input[type=url]').attributes('aria-label')).toBe('Media link')
+    await wrapper.get('input[type=url]').setValue('https://www.tiktok.com/@alice/photo/123')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.text()).toContain('3 photos')
+    expect(wrapper.text()).toContain('ZIP')
+    await button('Download').trigger('click')
+    await flushPromises()
+    expect(api.startDownload).toHaveBeenCalledWith('https://www.tiktok.com/@alice/photo/123', 'photos')
+  })
   it('ports probe details, blocked presets, queued downloads and watcher cleanup', async () => {
     await setup()
     await wrapper.get('input[type=url]').setValue('https://example.com/cat')
