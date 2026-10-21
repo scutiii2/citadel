@@ -176,17 +176,15 @@ describe("NavRail", () => {
 
       const labels = tabLinks(wrapper).map((l) => l.attributes("aria-label"));
 
-      // Chat is drawn last (it floats over the middle gap); the rest read left to right.
-      expect(labels).toEqual(["Overview", "Capabilities", "Usage", "Profile", "Chat"]);
-      expect(wrapper.find("nav.tabs .gap").exists()).toBe(true);
+      expect(labels).toEqual(["Overview", "Capabilities", "Chat", "Usage", "Profile"]);
+      expect(tabLinks(wrapper).map((l) => l.text())).toEqual(labels);
       expect(wrapper.find("nav.tabs a.chat").attributes("href")).toBe("/");
     });
 
-    it("marks the two tabs beside Chat", async () => {
+    it("keeps keyboard navigation in visual order", async () => {
       const { wrapper } = await setup(ACCOUNT);
 
-      expect(wrapper.find("nav.tabs a.near-l").attributes("aria-label")).toBe("Capabilities");
-      expect(wrapper.find("nav.tabs a.near-r").attributes("aria-label")).toBe("Usage");
+      expect(tabLinks(wrapper).map((l) => l.attributes("href"))).toEqual(["/overview", "/capabilities", "/", "/usage", "/account"]);
     });
 
     it("drops the tabs the account may not open but keeps Overview and Profile", async () => {

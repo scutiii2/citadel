@@ -39,6 +39,30 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
+describe("compact composer tools", () => {
+  it("opens extra tools and closes them after asking a structured question", async () => {
+    const wrapper = mountInput();
+    const trigger = wrapper.get('button[aria-label="More message tools"]');
+    expect(trigger.attributes("aria-expanded")).toBe("false");
+    await trigger.trigger("click");
+    expect(trigger.attributes("aria-expanded")).toBe("true");
+    await wrapper.get('button[aria-label="Ask a multiple choice or yes or no question"]').trigger("click");
+    expect(wrapper.emitted("triage")).toHaveLength(1);
+    expect(trigger.attributes("aria-expanded")).toBe("false");
+    wrapper.unmount();
+  });
+
+  it("dismisses extra tools on an outside press", async () => {
+    const wrapper = mountInput();
+    const trigger = wrapper.get('button[aria-label="More message tools"]');
+    await trigger.trigger("click");
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    await wrapper.vm.$nextTick();
+    expect(trigger.attributes("aria-expanded")).toBe("false");
+    wrapper.unmount();
+  });
+});
+
 describe("giving back a question that was not taken", () => {
   it("puts the typed text and its files back into an empty box", async () => {
     const wrapper = mountInput();

@@ -57,9 +57,5 @@ watch(account, (now) => {
   .shell {
     flex-direction: column-reverse;
   }
-  /* Room for the Chat button, which rises above the bottom bar. */
-  .page.has-tabs {
-    padding-bottom: 34px;
-  }
 }
 </style>

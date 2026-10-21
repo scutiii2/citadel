@@ -88,12 +88,9 @@ interface Tab {
   icon: string[];
   /** Draw the Ember logo instead of the icon. */
   logo?: boolean;
-  /** Beside the Chat button: its highlight runs under it. */
-  near?: "l" | "r";
 }
 const tabs = computed(() => {
   const open = new Map(visiblePages((p) => auth.hasPermission(p), pageVisibility.hidden).map((p) => [p.to, p]));
-  // A copy, so setting `near` below never touches the shared page list.
   const page = (to: string): Tab | undefined => {
     const p = open.get(to);
     return p && { to: p.to, label: p.label, icon: p.icon };
@@ -104,9 +101,8 @@ const tabs = computed(() => {
   const usage = page("/usage");
   if (capabilities) left.push(capabilities);
   if (usage) right.unshift(usage);
-  left[left.length - 1]!.near = "l";
-  right[0]!.near = "r";
-  return { left, right, chat: page("/") };
+  const chat = page("/");
+  return [...left, ...(chat ? [chat] : []), ...right];
 });
 
 // A chat opened by id and a capability's own page have no rail item of
@@ -131,32 +127,19 @@ async function logout(): Promise<void> {
     <span v-else class="wordmark" role="img" aria-label="Ember"><EmberLogo /></span>
 
     <nav v-if="canBrowse" class="tabs" aria-label="Main pages">
-      <template v-for="(side, i) in [tabs.left, tabs.right]" :key="i">
-        <span v-if="i === 1" class="gap" aria-hidden="true" />
         <RouterLink
-          v-for="t in side"
+          v-for="t in tabs"
           :key="t.to"
           :to="t.to"
           :aria-label="t.label"
-          :class="[t.near && `near-${t.near}`, { current: isOpenedFromHere(t.to) }]"
+          :class="{ chat: t.to === '/', current: isOpenedFromHere(t.to) }"
         >
           <EmberLogo v-if="t.logo" class="tab-logo" />
           <svg v-else viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
             <path v-for="d in t.icon" :key="d" :d="d" />
           </svg>
+          <span class="tab-label">{{ t.label }}</span>
         </RouterLink>
-      </template>
-      <RouterLink
-        v-if="tabs.chat"
-        :to="tabs.chat.to"
-        class="chat"
-        :class="{ current: isOpenedFromHere(tabs.chat.to) }"
-        aria-label="Chat"
-      >
-        <svg viewBox="0 0 24 24" width="38" height="38" aria-hidden="true">
-          <path v-for="d in tabs.chat.icon" :key="d" :d="d" />
-        </svg>
-      </RouterLink>
     </nav>
 
     <nav v-if="chatPage" class="header" aria-label="Chat">
@@ -335,106 +318,45 @@ svg {
   display: none;
 }
 
-/* Narrow screens: a bar along the bottom with five fixed tabs and a big Chat
-   button in the middle that rises above it. The selected tab's highlight runs
-   under the Chat button when it is one of the two beside it. */
+/* Labeled tabs stay inside the bar, leaving the composer its full height. */
 @media (max-width: 767px) {
   .rail {
     flex-direction: row;
     width: 100%;
     height: var(--rail-height);
-    padding: 0 6px env(safe-area-inset-bottom, 0px);
+    padding: 4px 8px env(safe-area-inset-bottom, 0px);
     border-right: none;
     border-top: 1px solid var(--border);
+    background: var(--bg);
   }
-  .wordmark,
-  .header,
-  .divider,
-  .pages,
-  .bottom {
-    display: none;
-  }
+  .wordmark, .header, .divider, .pages, .bottom { display: none; }
   .tabs {
-    position: relative;
     display: flex;
     flex: 1;
     flex-direction: row;
     align-items: center;
     height: 100%;
     margin: 0;
-    gap: 0;
-  }
-  .tabs .gap {
-    flex: 0 0 92px;
+    gap: 4px;
   }
   .tabs a {
-    position: relative;
     flex: 1;
-    display: grid;
-    place-items: center;
+    min-width: 0;
     width: auto;
     height: 44px;
-    margin: 0 2px;
-    color: var(--muted);
-    text-decoration: none;
-    transition: color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    font-weight: 400;
+    box-shadow: none;
   }
-  .tabs a svg {
-    position: relative;
-  }
-  .tabs a .tab-logo {
-    width: 28px;
-    height: 28px;
-  }
-  .tabs a::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: var(--radius-md);
-    background: var(--bg);
-    box-shadow: inset 0 -2px 0 var(--accent);
-    opacity: 0;
-    transition: opacity 0.22s ease;
-  }
-  .tabs a.near-l::before {
-    right: -46px;
-    border-radius: var(--radius-md) 0 0 var(--radius-md);
-  }
-  .tabs a.near-r::before {
-    left: -46px;
-    border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  }
-  .tabs a.router-link-exact-active,
-  .tabs a.current {
-    color: var(--text);
-  }
-  .tabs a.router-link-exact-active::before,
-  .tabs a.current::before {
-    opacity: 1;
-  }
-  .tabs a.chat {
-    position: absolute;
-    left: 50%;
-    top: -34px;
-    z-index: 2;
-    width: 84px;
-    height: 84px;
-    margin: 0;
-    transform: translateX(-50%);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-full);
-    color: var(--text);
-    background: var(--bg);
-    /* A ring in the bar's colour cuts the circle out of the bar. */
-    box-shadow: 0 0 0 6px var(--surface);
-    transition: box-shadow 0.25s ease;
-  }
-  .tabs a.chat::before {
-    display: none;
-  }
-  .tabs a.chat.router-link-exact-active,
-  .tabs a.chat.current {
-    box-shadow: 0 0 0 6px var(--surface), inset 0 -4px 0 var(--accent);
+  .tabs a .tab-logo { width: 22px; height: 22px; }
+  .tab-label { font-size: 0.65rem; line-height: 1.2; }
+  .tabs a.router-link-exact-active, .tabs a.current {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+    box-shadow: none;
   }
 }
 </style>

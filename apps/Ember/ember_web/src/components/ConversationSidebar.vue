@@ -396,6 +396,7 @@ watch(
   <!-- The menu is fixed to the page, so it would drift from its row: a scroll
        of the sidebar (the element that scrolls) closes it. -->
   <aside class="sidebar" @scroll="menu = null">
+    <slot name="header" />
     <div class="top">
       <button type="button" class="new-chat" :disabled="locked" @click="emit('new')">
         <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
