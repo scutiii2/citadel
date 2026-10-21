@@ -42,6 +42,7 @@ test('media groups accept multiple links and lock membership after starting a pa
   await logIn(page)
   await page.goto('/capabilities/video_downloader')
   await expect(page).toHaveURL(/\/capabilities\/media_downloader$/)
+  await page.getByRole('button', { name: 'Download groups', exact: true }).click()
   await page.getByRole('textbox', { name: 'Group name' }).fill('My collection')
   await page.getByRole('button', { name: 'Create group', exact: true }).click()
   const panel = page.getByRole('article', { name: 'My collection' })
@@ -84,6 +85,52 @@ async function screenshots(page: Page, info: TestInfo, name: string): Promise<vo
     await page.screenshot({ path: info.outputPath(`${name}-${theme}-${width}.png`), fullPage: true })
   }
 }
+
+test('media modes preserve drafts, checked formats, and file details across mobile and desktop', async ({ page }) => {
+  const api = await installFakeApi(page, { media: true })
+  const expiry = Date.now() / 1000 + 3600
+  let deleted = false
+  await page.route('**/api/video-downloader/files**', route => {
+    if (route.request().method() === 'DELETE') { deleted = true; return route.fulfill({ status: 204 }) }
+    return route.fulfill({ json: deleted ? [] : [{ file_id: 'saved', name: 'A saved video.mp4', kind: 'video', mime: 'video/mp4', size: 1024, duration: 60, expires_at: expiry, download_url: '/api/video-downloader/files/saved/download' }] })
+  })
+  await logIn(page)
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/capabilities/media_downloader')
+  const tabs = page.locator('.mobile-tabs')
+  await tabs.getByRole('button', { name: 'Groups', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Group name' }).fill('Weekend draft')
+  await tabs.getByRole('button', { name: 'Download', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Media link' }).fill('https://example.com/media')
+  await page.getByRole('button', { name: 'Check', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Checked media' })).toBeVisible()
+  await tabs.getByRole('button', { name: 'Groups', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: 'Group name' })).toHaveValue('Weekend draft')
+  await tabs.getByRole('button', { name: /^My files/ }).click()
+  await expect(page.getByRole('link', { name: 'Download A saved video.mp4', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'File options for A saved video.mp4' }).click()
+  const details = page.getByRole('dialog', { name: 'File details' })
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme })
+    for (const width of [1440, 768, 375]) {
+      await page.setViewportSize({ width, height: 812 })
+      await expect(details).toBeVisible()
+      expect(await details.evaluate(e => e.scrollWidth <= e.clientWidth)).toBe(true)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    }
+  }
+  await details.getByRole('button', { name: 'Delete file', exact: true }).click()
+  const confirm = page.getByRole('dialog', { name: 'Delete file?', exact: true })
+  await confirm.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(details).toBeVisible()
+  expect(deleted).toBe(false)
+  await details.getByRole('button', { name: 'Delete file', exact: true }).click()
+  await confirm.getByRole('button', { name: 'Delete file', exact: true }).click()
+  await expect(details).toBeHidden()
+  await expect(page.getByRole('link', { name: 'Download A saved video.mp4', exact: true })).toHaveCount(0)
+  expect(deleted).toBe(true)
+  expect(api.unexpected).toEqual([])
+})
 
 test('native PDF workspace uploads JSON, renders worker previews, reorders pages and downloads a merge (mock API)', async ({ page }, info) => {
   const api = await installFakeApi(page, { media: true })
@@ -146,11 +193,13 @@ test('native video workspace probes presets, follows a job and downloads its fil
   await expect(page.getByRole('button', { name: 'Best quality', exact: true })).toBeDisabled()
   await expect(page.getByText('Preview unavailable')).toBeVisible()
   await screenshots(page, info, 'video-presets')
-  await page.getByRole('button', { name: 'Download', exact: true }).click()
+  await page.getByRole('region', { name: 'Checked media' }).getByRole('button', { name: 'Download', exact: true }).click()
   await expect(page.getByRole('progressbar')).toBeVisible()
   await expect(page.getByRole('status').filter({ hasText: 'Done' })).toBeVisible()
   const links = page.getByRole('link', { name: /Download Coastal walk.mp4/ })
-  await expect(links).toHaveCount(2)
+  await expect(links).toHaveCount(1)
+  await page.locator('.mobile-tabs').getByRole('button', { name: /^My files/ }).click()
+  await expect(links).toHaveCount(1)
   expect(api.media.downloads).toEqual([{ url: 'https://www.youtube.com/watch?v=public-example', preset: '720p' }])
   const downloaded = page.waitForEvent('download')
   await expect(links.last()).toHaveAttribute('download', '')
@@ -193,7 +242,7 @@ test('media workspace downloads a TikTok photo carousel as a ZIP (mock API)', as
   await page.getByRole('textbox', { name: 'Media link' }).fill(url)
   await page.getByRole('button', { name: 'Check', exact: true }).click()
   await expect(page.getByText('3 photos · Downloaded together as a ZIP')).toBeVisible()
-  await page.getByRole('button', { name: 'Download', exact: true }).click()
+  await page.getByRole('region', { name: 'Checked media' }).getByRole('button', { name: 'Download', exact: true }).click()
   await expect(page.getByRole('link', { name: /Download Holiday.zip/ })).toHaveCount(2)
   expect(downloads).toEqual([{ url, preset: 'photos' }])
   await screenshots(page, info, 'media-photos')

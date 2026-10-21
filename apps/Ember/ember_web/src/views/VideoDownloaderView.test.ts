@@ -3,6 +3,8 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { videoDownloaderClient as api, watchVideoJob } from '../api/VideoDownloaderClient'
 import VideoDownloaderView from './VideoDownloaderView.vue'
+import { useVideoDownloaderStore } from '../stores/videoDownloader'
+import { useAuthStore } from '../stores/auth'
 
 vi.mock('../api/VideoDownloaderClient', () => ({ videoDownloaderClient: { probe: vi.fn(), listFiles: vi.fn(), startDownload: vi.fn(), cancelJob: vi.fn(), deleteFile: vi.fn(), listPackages: vi.fn() }, watchVideoJob: vi.fn() }))
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn() }))
@@ -24,7 +26,7 @@ beforeEach(() => {
 })
 afterEach(() => { wrapper?.unmount(); HTMLDialogElement.prototype.showModal = realShow; HTMLDialogElement.prototype.close = realClose })
 async function setup() { wrapper = mount(VideoDownloaderView, { attachTo: document.body, global: { plugins: [createPinia()] } }); await flushPromises() }
-const button = (text: string) => wrapper.findAll('button').find(b => b.text() === text)!
+const button = (text: string) => (text === 'Download' ? wrapper.findAll('.probe button') : wrapper.findAll('button')).find(b => b.text() === text)!
 async function start() {
   await wrapper.get('input[type=url]').setValue('https://example.com/cat')
   await wrapper.get('form').trigger('submit')
@@ -33,6 +35,25 @@ async function start() {
   await flushPromises()
 }
 describe('VideoDownloaderView', () => {
+  it('preserves a group draft and active watchers when switching workspace tabs', async () => {
+    await setup()
+    await start()
+    await button('Download groups').trigger('click')
+    const draft = wrapper.get<HTMLInputElement>('input[placeholder="My collection"]')
+    await draft.setValue('Weekend collection')
+    await button('Single link').trigger('click')
+    await button('Download groups').trigger('click')
+    expect(draft.element.value).toBe('Weekend collection')
+    expect(stop).not.toHaveBeenCalled()
+  })
+  it('shows only the selected estimate while explaining unavailable formats', async () => {
+    await setup()
+    await wrapper.get('input[type=url]').setValue('https://example.com/cat')
+    await wrapper.get('form').trigger('submit'); await flushPromises()
+    expect(wrapper.find('.selected-format').text()).toContain('720p')
+    expect(wrapper.findAll('.blocked-presets li')).toHaveLength(1)
+    expect(wrapper.find('.blocked-presets').text()).toContain('Too large')
+  })
   it('downloads a TikTok photo carousel and explains the ZIP result', async () => {
     vi.mocked(api.probe).mockResolvedValue({ url: 'https://www.tiktok.com/@alice/photo/123', title: 'Holiday', duration: null, thumbnail: null, uploader: 'alice', photo_count: 3,
       options: [{ id: 'photos', label: 'Original photos', kind: 'photo', blocked: false, estimated_bytes: null, code: null, reason: null }] })
@@ -66,12 +87,35 @@ describe('VideoDownloaderView', () => {
   })
   it('deletes only after an Ember confirmation', async () => {
     await setup()
-    await button('Delete').trigger('click')
+    await wrapper.get('button[aria-label="File options for Cat.mp4"]').trigger('click')
+    await button('Delete file').trigger('click')
     expect(api.deleteFile).not.toHaveBeenCalled()
     document.body.querySelector<HTMLButtonElement>('dialog[open] .confirm')!.click()
     await flushPromises()
     expect(api.deleteFile).toHaveBeenCalledWith('f')
     expect(wrapper.text()).toContain('Nothing here yet')
+    expect(document.body.querySelector('dialog[open][aria-label="File details"]')).toBeNull()
+  })
+  it('disables saving expired files', async () => {
+    await setup()
+    const store = useVideoDownloaderStore()
+    store.files[0]!.expires_at = 0
+    await flushPromises()
+    expect(wrapper.find('.save-file').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Expired')
+  })
+  it('offers file downloads only with files.download permission', async () => {
+    await setup()
+    const store = useVideoDownloaderStore()
+    const permission = vi.spyOn(useAuthStore(), 'hasPermission').mockReturnValue(true)
+    store.files = store.files.map(file => ({ ...file }))
+    await flushPromises()
+    expect(wrapper.get('.save-file').attributes('href')).toBe('/api/video-downloader/files/f/download')
+    permission.mockReturnValue(false)
+    store.files = store.files.map(file => ({ ...file }))
+    await flushPromises()
+    expect(wrapper.find('.save-file').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Download unavailable')
   })
   it('cancels only after confirmation', async () => {
     await setup()

@@ -29,6 +29,26 @@ Gate admin pages by permission in `ember_admin/src/router/pages.ts`; the guard i
 
 Before writing a component, grep both `components/` folders for an existing one.
 
+## Task-focused layouts
+
+These are the user's preferred Ember patterns. Choose the shape that fits the task; retain the page's supported actions and data contracts.
+
+- **Hierarchy:** give the active task one clear primary action. Keep metadata quiet and move occasional setup, publishing, and management controls into labeled accordions, dialogs, or secondary modes. Keep progress and results easy to find.
+- **Desktop workspaces:** pair a working area with a useful companion pane, such as a note list, folder browser, or temporary files. Use `PageLayout wide fill` when the panes should own their scrolling; keep `min-width: 0` and `min-height: 0` through the flex/grid chain.
+- **Mobile modes:** below 768px give the active task the full width. Use list-to-editor navigation with a visible Back action, or a small segmented mode selector. Preserve reachable Save/download actions, readable text, and 44px touch controls. Put sheets above `--rail-height`.
+- **Lists:** use readable rows with light separators, short secondary metadata, and one clear contextual action. Use an editor/details dialog for occasional management and place deletion in its final Danger zone with confirmation.
+- **State:** keep draft-bearing panels and job watchers mounted when changing modes. Place dialogs outside hidden tab ancestors. Refreshing status must preserve the current document/result. Clear private content before changing scopes, and open search hits in their originating scope.
+- **Real data:** render the formats, sizes, expiry, scope, and status returned by the API. Clearly label sample data in mockups; keep production previews honest when thumbnails or estimates are unavailable.
+
+Use these existing pages as implementation references:
+
+| Task | Reference under `apps/Ember/ember_web/src/` |
+|---|---|
+| Writing with secondary tools | `views/NotesView.vue`: list/editor, collapsed tools, persistent Save |
+| Reviewing short facts | `views/MemoryView.vue`: searchable rows, editor dialog/mobile sheet |
+| Reading durable documents | `views/BrainsView.vue`: scoped search, browser/reader, secondary connection settings |
+| Downloading and collecting media | `views/VideoDownloaderView.vue`, `components/videoDownloader/`: single-link flow, ZIP groups, temporary files |
+
 ## 3. Navigation placement
 
 - **ember_web rail** (`NavRail.vue`): header = Overview (wordmark) + Chat. Main list = only pages backed by a dedicated mcp_server capability (Notes, Memory, Generator, Tickets). Every other page (Capabilities, Agents, Usage, Settings, Profile) goes in `AccountMenu.vue`.
@@ -47,7 +67,7 @@ Before writing a component, grep both `components/` folders for an existing one.
 
 ## 5. Workflow
 
-1. Propose the step (files, components reused, tokens, any new dependency) and wait for approval. One step at a time.
+1. Use the approved design and scope already in the conversation. Implement an approved mockup when asked to proceed. When the layout is undecided, propose a concrete design with the files, reused components, and any dependencies before implementation.
 2. Implement with existing components; copy shared-component changes to both apps.
 3. Check: `npx vue-tsc -b`, `npm test` (includes `radiusScale.test.ts`), `npm run test:e2e` in the touched app. Web e2e uses `e2e/fakeApi.ts`; click a switch's label, not its hidden checkbox.
 4. Do not spawn browser-verification agents; the user tests manually. If a visual check is needed, use a throwaway Vite config with a fake `/api` and clear `localStorage` first (theme persists per origin).
