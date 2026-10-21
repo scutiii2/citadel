@@ -22,6 +22,7 @@ class ProbeResult(BaseModel):
     thumbnail: str | None = None
     uploader: str | None = None
     options: list[PresetOption]
+    photo_count: int = 0
 
 
 from src.capabilities.video_downloader.utils.store.file_store import StoredFile  # noqa: E402  (kept at the bottom to keep the top of the file model-only)
@@ -30,7 +31,7 @@ from src.capabilities.video_downloader.utils.store.file_store import StoredFile 
 class FileInfo(BaseModel):
     file_id: str
     name: str
-    kind: str  # "video" or "audio"
+    kind: str  # video, audio or photo (image/ZIP)
     mime: str
     size: int
     duration: float | None = None

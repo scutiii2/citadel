@@ -115,6 +115,28 @@ def test_pdf_cancel_preserves_queue_status(native):
     assert status["state"] == "error" and status["error"]["code"] == "merge_timeout"
 
 
+def test_photos_cross_http_boundary_without_ffmpeg(native, monkeypatch):
+    from src.capabilities.video_downloader import domain
+    from src.capabilities.video_downloader.utils.service import Caller
+    client, _, video, extractor = native
+    monkeypatch.setattr(domain.shutil, "which", lambda _: None)
+    extractor.info = replace(extractor.info, photo_count=3, duration=None, formats=[])
+    extractor.suffix = ".zip"
+    probe = client.post("/video/ui/probe", headers=HEADERS, json={"url": "https://example.com/post"})
+    assert probe.status_code == 200
+    assert probe.json()["photo_count"] == 3
+    started = client.post("/video/ui/downloads", headers=HEADERS, json={"url": "https://example.com/post", "preset": "photos"})
+    assert started.status_code == 200
+    job_id = started.json()["job_id"]
+    async def wait(service):
+        return await service.wait(service.get_job(Caller("uid:alice"), job_id))
+    assert video.call(wait)["type"] == "done"
+    status = client.get(f"/video/ui/jobs/{job_id}", headers=HEADERS).json()
+    assert status["file"]["mime"] == "application/zip"
+    assert status["file"]["kind"] == "photo"
+    assert client.get("/video/ui/files", headers=OTHER).json() == []
+
+
 def test_video_policy_download_status_delete_and_cancel(native):
     from src.capabilities.video_downloader.utils.service import Caller
     client, _, video, extractor = native

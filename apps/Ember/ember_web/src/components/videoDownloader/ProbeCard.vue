@@ -23,7 +23,8 @@ const options = computed(() => props.result.options.map(o => ({ value: o.id, lab
         <span v-if="result.uploader && result.duration !== null"> &middot; </span>
         <span v-if="result.duration !== null">{{ formatDuration(result.duration) }}</span>
       </div>
-      <CopyButton :text="result.url" label="Copy video link" />
+      <p v-if="result.photo_count" class="muted small">{{ result.photo_count }} {{ result.photo_count === 1 ? 'photo · Original image file' : 'photos · Downloaded together as a ZIP' }}</p>
+      <CopyButton :text="result.url" label="Copy media link" />
       <SegmentedControl v-model="choice" :options="options" aria-label="Download quality" />
       <ul class="presets">
         <li v-for="option in result.options" :key="option.id">

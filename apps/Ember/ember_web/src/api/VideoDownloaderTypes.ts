@@ -1,6 +1,6 @@
 // Mirrors video_downloader/src/models.py and the job events in src/service.py. Keep both in step.
 
-export type FileKind = 'video' | 'audio'
+export type FileKind = 'video' | 'audio' | 'photo'
 export type JobState = 'queued' | 'downloading' | 'processing' | 'done' | 'error'
 
 export interface FileInfo {
@@ -31,6 +31,7 @@ export interface ProbeResult {
   thumbnail: string | null
   uploader: string | null
   options: PresetOption[]
+  photo_count?: number
 }
 
 export type JobEvent =

@@ -57,7 +57,7 @@ async function confirmAction(): Promise<void> {
 </script>
 
 <template>
-  <PageLayout title="Video downloader" :description="`${plural(store.files.length, 'file')} kept for a few hours`">
+  <PageLayout title="Media downloader" :description="`Video, music and photos · ${plural(store.files.length, 'file')} kept for a few hours`">
     <div class="video-downloader">
       <UrlBar v-model="store.url" :loading="store.checking" :can-check="store.canCheck" @check="store.check()" />
       <p v-if="store.error" class="error" role="alert">{{ store.error }}</p>

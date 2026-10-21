@@ -5,7 +5,7 @@ from src.capabilities.video_downloader.utils.extractor.presets import PRESETS, g
 
 
 def test_preset_ids_and_order():
-    assert list(PRESETS) == ["best", "1080p", "720p", "480p", "audio-mp3", "audio-m4a"]
+    assert list(PRESETS) == ["best", "1080p", "720p", "480p", "audio-mp3", "audio-m4a", "photos"]
 
 
 def test_video_and_audio_presets():

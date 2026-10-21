@@ -70,7 +70,7 @@ test('native video workspace probes presets, follows a job and downloads its fil
   await logIn(page)
   errors.length = 0
   await page.goto('/capabilities/video_downloader')
-  await page.getByRole('textbox', { name: 'Video link' }).fill('https://www.youtube.com/watch?v=public-example')
+  await page.getByRole('textbox', { name: 'Media link' }).fill('https://www.youtube.com/watch?v=public-example')
   await page.getByRole('button', { name: 'Check', exact: true }).click()
   await expect(page.getByText('Coastal walk at sunset')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Best quality', exact: true })).toBeDisabled()
@@ -89,5 +89,43 @@ test('native video workspace probes presets, follows a job and downloads its fil
   expect((await downloaded).suggestedFilename()).toBe('Coastal walk.mp4')
   await screenshots(page, info, 'video-complete')
   expect(errors).toEqual([])
+  expect(api.unexpected).toEqual([])
+})
+
+test('media workspace downloads a TikTok photo carousel as a ZIP (mock API)', async ({ page }, info) => {
+  const api = await installFakeApi(page, { media: true })
+  const url = 'https://www.tiktok.com/@alice/photo/1234567890'
+  const file = { file_id: 'photos', name: 'Holiday.zip', kind: 'photo', mime: 'application/zip', size: 1024, duration: null,
+    expires_at: Date.now() / 1000 + 21600, download_url: '/api/video-downloader/files/photos/download' }
+  let done = false
+  const downloads: unknown[] = []
+  await page.route('**/api/video-downloader/**', async route => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    if (path.endsWith('/probe')) return route.fulfill({ json: { url, title: 'Holiday', duration: null, uploader: 'alice', thumbnail: null, photo_count: 3,
+      options: [{ id: 'photos', label: 'Original photos', kind: 'photo', blocked: false, estimated_bytes: null, code: null, reason: null }] } })
+    if (path.endsWith('/downloads')) {
+      downloads.push(request.postDataJSON())
+      return route.fulfill({ status: 202, json: { job_id: 'photos-job' } })
+    }
+    if (path.endsWith('/jobs/photos-job')) {
+      done = true
+      return route.fulfill({ json: { job_id: 'photos-job', state: 'done', percent: 100, speed: null, eta: null, file, error: null } })
+    }
+    if (path.endsWith('/files')) return route.fulfill({ json: done ? [file] : [] })
+    if (path.endsWith('/files/photos/download')) return route.fulfill({ contentType: 'application/zip',
+      headers: { 'Content-Disposition': 'attachment; filename="Holiday.zip"' }, body: Buffer.from('UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==', 'base64') })
+    return route.fallback()
+  })
+  await logIn(page)
+  await page.goto('/capabilities/video_downloader')
+  await expect(page.getByRole('heading', { name: 'Media downloader', exact: true })).toBeVisible()
+  await page.getByRole('textbox', { name: 'Media link' }).fill(url)
+  await page.getByRole('button', { name: 'Check', exact: true }).click()
+  await expect(page.getByText('3 photos · Downloaded together as a ZIP')).toBeVisible()
+  await page.getByRole('button', { name: 'Download', exact: true }).click()
+  await expect(page.getByRole('link', { name: /Download Holiday.zip/ })).toHaveCount(2)
+  expect(downloads).toEqual([{ url, preset: 'photos' }])
+  await screenshots(page, info, 'media-photos')
   expect(api.unexpected).toEqual([])
 })

@@ -9,8 +9,8 @@ defineEmits<{ 'update:modelValue': [value: string]; check: [] }>()
     <input
       type="url"
       :value="modelValue"
-      placeholder="Paste a video link (YouTube, TikTok, ...)"
-      aria-label="Video link"
+      placeholder="Paste a video, music, photo or post link"
+      aria-label="Media link"
       autofocus
       @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
     />

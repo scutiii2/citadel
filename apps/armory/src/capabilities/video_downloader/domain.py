@@ -37,9 +37,10 @@ def _text(value: str) -> str:
 
 def probe(url: str) -> ProbeToolResult:
     caller()
-    _require_ffmpeg()
     async def operation(service):
         result = await service.probe(url)
+        if not result.photo_count:
+            _require_ffmpeg()
         return ProbeToolResult(**result.model_dump(exclude={"title", "uploader"}),
                                title=_text(result.title), uploader=_text(result.uploader) if result.uploader else None,
                                message="Choose an unblocked preset, then start a download.")
@@ -48,7 +49,8 @@ def probe(url: str) -> ProbeToolResult:
 
 def download(url: str, preset: str = "best") -> DownloadStarted:
     owner = caller()
-    _require_ffmpeg()
+    if preset != "photos":
+        _require_ffmpeg()
     username = current_username()
     async def operation(service):
         job = await service.start_download(owner, url, preset)

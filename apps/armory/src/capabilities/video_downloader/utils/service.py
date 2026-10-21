@@ -80,6 +80,7 @@ class DownloadService:
             thumbnail=info.thumbnail,
             uploader=info.uploader,
             options=build_options(info, self._limits),
+            photo_count=info.photo_count,
         )
 
     # --- downloading -------------------------------------------------------
@@ -146,7 +147,7 @@ class DownloadService:
             stored = await self._store.commit_file(
                 session,
                 downloaded.path,
-                name=safe_filename(info.title, "video") + suffix,
+                name=safe_filename(info.title, "media") + suffix,
                 mime=mime_for(suffix),
                 kind=preset.kind,
                 duration=info.duration,
@@ -224,9 +225,9 @@ class DownloadService:
 def build_service(settings: Settings, *, extractor: Extractor | None = None, policy: UrlPolicy | None = None) -> DownloadService:
     """Wire the real collaborators; tests pass a fake extractor and policy."""
     if extractor is None:
-        from src.capabilities.video_downloader.utils.extractor.ytdlp import YtDlpExtractor
+        from src.capabilities.video_downloader.utils.extractor.media import MediaExtractor
 
-        extractor = YtDlpExtractor()
+        extractor = MediaExtractor()
     limits = settings.limits
     return DownloadService(
         store=FileStore(

@@ -39,7 +39,7 @@ _DATA_NAME_RE = re.compile(r"f_[0-9a-f]{32}")
 
 @dataclass(frozen=True)
 class StoredFile:
-    """One committed file. ``kind`` is "video" or "audio"."""
+    """One committed file. ``kind`` is video, audio or photo (image/ZIP)."""
 
     file_id: str
     session: str

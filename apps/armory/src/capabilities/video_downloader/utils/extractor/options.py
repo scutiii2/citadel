@@ -13,10 +13,14 @@ _KBIT_TO_BYTES_PER_SECOND = 125  # 1 kbit/s = 125 bytes/s
 
 def available_presets(info: MediaInfo) -> list[Preset]:
     """Presets the site can serve. An unknown format list offers "best" plus audio."""
+    if info.photo_count:
+        return [PRESETS["photos"]]
     has_video = any(f.has_video for f in info.formats) or not info.formats
     heights = [f.height for f in info.formats if f.has_video and f.height]
     offered: list[Preset] = []
     for preset in PRESETS.values():
+        if preset.kind == "photo":
+            continue
         if preset.kind == "audio":
             offered.append(preset)
         elif not has_video:

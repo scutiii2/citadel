@@ -1,9 +1,9 @@
 {
-  "summary": "Probe and download public video or audio on armory, scoped to your authenticated account. Files expire automatically; tools never wait for a download.",
+  "summary": "Probe and download public video, music and photos on armory, scoped to your authenticated account. Files expire automatically; tools never wait for a download.",
   "tools": [
     {
       "name": "tool_vid_probe",
-      "purpose": "Inspect a public video and its unblocked quality presets",
+      "purpose": "Inspect public media and its unblocked download options",
       "connection": "Public HTTP(S)",
       "commands": [
         "probe"
@@ -43,7 +43,7 @@
           "name": "url",
           "required": true,
           "default": null,
-          "description": "Full public http(s) link to a single video."
+          "description": "Full public http(s) link to a video, music track, image or single photo post (TikTok, Instagram, Pinterest)."
         }
       ]
     },
@@ -55,13 +55,13 @@
           "name": "url",
           "required": true,
           "default": null,
-          "description": "Full public http(s) link to a single video."
+          "description": "Full public http(s) link to a video, music track, image or single photo post (TikTok, Instagram, Pinterest)."
         },
         {
           "name": "preset",
           "required": false,
           "default": "best",
-          "description": "Unblocked preset from probe."
+          "description": "Unblocked preset from probe; use photos for images or photo carousels (ZIP)."
         }
       ]
     },
