@@ -1,5 +1,16 @@
 # ember_admin
 
+
+## Router agent configuration
+
+The Agents page edits the internal Router using `agents.manage`. Its form exposes
+agent/tier selection, local voters, Jev fallback, thresholds, narrowing, timeouts,
+size-to-tier mapping and trace metadata. Chat roles and tools are fixed read-only
+invariants. Saving is explicit and uses Garrison's deployment override; failed
+saves retain drafts. Cards show running/offline/disabled state and unavailable
+local/fallback readiness. Reset and disable use the existing agent lifecycle.
+
+
 Admin web app for ember, built with Vue 3, TypeScript and Vite. It runs on
 port 5176 (`EMBER_ADMIN_PORT`) and talks only to [ember_api](../ember_api)
 over the same origin, like [ember_web](../ember_web): its Vite server forwards

@@ -55,6 +55,12 @@ def bind_usage() -> tuple[list[dict[str, Any]], Token]:
 def reset_usage(token: Token) -> None:
     _usage_sink.reset(token)
 
+
+def record_usage(rows: list[dict[str, Any]]) -> None:
+    """Record internal-agent work once in the current turn's existing usage sink."""
+    if (sink := _usage_sink.get()) is not None:
+        sink.extend(rows)
+
 _attachments: ContextVar[str] = ContextVar("delegation_pdf_attachments", default="")
 
 

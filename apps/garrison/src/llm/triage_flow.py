@@ -42,6 +42,8 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+from datetime import datetime, timezone
 from typing import Any
 
 from src.llm import decision, laya_provider
@@ -141,11 +143,16 @@ class TriageFlow:
     def __init__(
         self, locals_: dict[str, LayaQuestions], use_fallback: bool = True,
         thresholds: dict[str, dict[str, float]] | None = None, trace: bool | None = None,
+        settings_snapshot=None, check=None, on_usage=None, partial_results=False,
     ) -> None:
         self.locals = locals_
+        self.config = settings_snapshot or decision.settings()
+        self.check = check
+        self.on_usage = on_usage
+        self.partial_results = partial_results
         self.use_fallback = use_fallback
         self.trace = trace
-        configured = decision.settings().triage_thresholds
+        configured = self.config.triage_thresholds
         self.thresholds = {
             count: {**row, **configured.get(count, {}), **(thresholds or {}).get(count, {})}
             for count, row in DEFAULT_THRESHOLDS.items()
@@ -166,13 +173,28 @@ class TriageFlow:
         return self.use_fallback and decision.settings().triage_fallback and decision.available("triage", ("laya",))
 
     def _run_local(self, name: str, request: Request) -> dict[str, dict[str, Any]] | None:
+        if self.check:
+            self.check()
+        started, started_at = time.monotonic(), datetime.now(timezone.utc).isoformat()
+        tokens = None
         try:
-            answers, tokens = self.locals[name]._laya_answers(request)
+            if self.check:
+                answers, tokens = self.locals[name]._laya_answers(request, check=self.check)
+            else:
+                answers, tokens = self.locals[name]._laya_answers(request)
         except (ValueError, RuntimeError) as error:
             _log.warning("%s could not answer: %s", name, error)
             self._failures.append(f"{name}: {error}")
             return None
+        finally:
+            if self.on_usage:
+                self.on_usage({"provider_id": "laya", "model": CHECKPOINTS[name],
+                               "started_at": started_at, "duration_ms": round((time.monotonic()-started)*1000),
+                               "input_tokens": tokens, "output_tokens": 0 if tokens is not None else None,
+                               "ok": tokens is not None, "reason": "" if tokens is not None else "local_failed"})
         self.tokens += tokens
+        if self.check:
+            self.check()
         return answers
 
     def _ask_voter(self, name: str, request: Request, qid: str) -> dict[str, Any] | None:
@@ -195,6 +217,10 @@ class TriageFlow:
 
     # -- settling ----------------------------------------------------------------------------------
     def answer(self, raw: str) -> ChatResult:
+        with decision.scoped_settings(self.config, self.on_usage, self.check):
+            return self._answer(raw)
+
+    def _answer(self, raw: str) -> ChatResult:
         # A longer text is refused outright unless Jev, with its larger window, may take it.
         limit = decision.settings().max_input_chars if self._fallback_ready() else laya_provider.MAX_INPUT_CHARS
         request = laya_provider.parse_request(raw, limit)
@@ -205,7 +231,13 @@ class TriageFlow:
         answers = {}
         for qid, spec in request.questions.items():
             settle = self._settle_choice if spec["type"] == "choice" else self._settle_other
-            answers[qid] = settle(request, qid, spec)
+            try:
+                answers[qid] = settle(request, qid, spec)
+            except ValueError:
+                if not self.partial_results:
+                    raise
+                answers[qid] = {"type": spec["type"], "choice": None, "uncertain": True,
+                                "answer_confidence": 0, "answered_by": "", "probabilities": {}}
         beyond = sorted({
             part for a in answers.values() for part in str(a.get("answered_by", ENGLISH)).split("+") if part != ENGLISH
         })

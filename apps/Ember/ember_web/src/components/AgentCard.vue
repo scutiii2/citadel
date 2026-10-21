@@ -20,11 +20,19 @@ const STATUS_ICON: Record<AgentStatus, string> = { running: "●", offline: "○
       <span class="status"><span aria-hidden="true">{{ STATUS_ICON[agent.status] }}</span> {{ STATUS_TEXT[agent.status] }}</span>
     </div>
     <code class="agent-id">{{ agent.id }}</code>
-    <div v-if="agent.entry || agent.orchestrator" class="tags">
+    <div v-if="agent.entry || agent.orchestrator || agent.internal_role" class="tags">
+      <span v-if="agent.internal_role === 'router'" class="tag">Internal / Router</span>
       <span v-if="agent.entry" class="tag entry-tag">Entry</span>
       <span v-if="agent.orchestrator" class="tag">Orchestrator</span>
     </div>
     <p class="focus">{{ agent.focus || "No description." }}</p>
+    <p v-if="agent.internal_role === 'router'" class="focus">
+      Laya English → typed-decisions<span v-if="agent.decision?.fallback"> → Jev fallback</span>.
+      <template v-if="agent.decision?.fallback_available === false">Fallback unavailable.</template>
+      <template v-if="agent.decision?.local_status === 'not_loaded'">Local models load on first use.</template>
+      <template v-if="agent.decision?.local_status === 'unavailable'">Local models unavailable.</template>
+      Internal routing; answers come from the selected agent.
+    </p>
     <AgentLlm :agent="agent" />
   </article>
   <BaseModal :open="opened" :title="agent.label" @close="opened = false">

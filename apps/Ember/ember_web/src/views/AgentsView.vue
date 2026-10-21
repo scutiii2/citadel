@@ -49,7 +49,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <PageLayout class="info-content" title="Agents" description="The AI agents behind ember. New chats go to the entry agent, which hands work to the others.">
+  <PageLayout class="info-content" title="Agents" description="The AI agents behind ember. The internal Router helps the entry agent choose a specialist and model.">
     <template #actions>
       <button type="button" class="chip" :disabled="refreshing" @click="refresh">Refresh</button>
     </template>

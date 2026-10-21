@@ -210,6 +210,9 @@ async def ask(
     progress notifications; chat_app's own tool call never needs to pass
     it explicitly, FastMCP supplies it automatically per request."""
 
+    if SPEC.internal_role == "router":
+        raise ValueError("Router is internal; ask is unavailable")
+
     async def on_event(event: dict[str, Any]) -> None:
         # progress/total are left at 0/None - chat_app's client reads
         # only the message string (a JSON-encoded event dict), not a
@@ -244,7 +247,9 @@ async def ask(
         started_at=started_at, finished_at=agent_events.now_iso(), delegated_by=delegated_by,
         model_tier=result.model_tier, reasoning_effort=result.reasoning_effort,
     )
-    await usage_log.append({**own_usage, "request_id": request_id, "depth": depth})
+    own_rows = [{**own_usage, "prompt": usage_log.prompt_messages(history or [], question)}] if result.model_executed else []
+    if result.model_executed:
+        await usage_log.append({**own_usage, "request_id": request_id, "depth": depth})
     reply = {
         "response": result.response,
         "tools_used": result.tools_used,
@@ -254,7 +259,7 @@ async def ask(
         "total_tokens": result.total_tokens,
         # Own usage first, then every delegated agent's, so callers can
         # break tokens down per agent (who, which provider/gateway, when).
-        "agent_usage": [{**own_usage, "prompt": usage_log.prompt_messages(history or [], question)}, *result.delegated_usage],
+        "agent_usage": [*own_rows, *result.delegated_usage],
         "input_tokens": result.input_tokens,
         "output_tokens": result.output_tokens,
         "context_tokens": result.context_tokens,
@@ -413,6 +418,8 @@ def interpret(text: str) -> dict[str, Any]:
     offered. Used by chat_app's summarization (see services/summarization.py)
     for a plain prompt-in, text-out step; `ask()` remains what a free-form
     chat question goes through, tool selection and all."""
+    if SPEC.internal_role == "router":
+        raise ValueError("Router is internal; interpret is unavailable")
     started_at = agent_events.now_iso()
     result = agent_config.run_interpret(text)
     own_usage = usage_log.own_row(
@@ -443,8 +450,14 @@ def status() -> dict[str, Any]:
     `private_extensions` says ask() understands private_extensions;
     `read_only_approval` says ask() understands allow_read_only;
     `exact_context` says ask() understands exact_context."""
+    role_info = {}
+    if SPEC.internal_role == "router":
+        from src.agents import router_service
+
+        role_info = {"internal_role": "router", "decision": router_service.status_summary()}
     return {
         **agent_config.status(),
+        **role_info,
         "tool_approval": True,
         "tool_filter": True,
         "tool_filter_all": True,
@@ -500,12 +513,28 @@ def cancel(request_id: str) -> dict[str, Any]:
     return {"cancelled": agent_config.cancel(request_id)}
 
 
+async def route(request: dict[str, Any], ctx: Context | None = None) -> dict[str, Any]:
+    """Internal routing contract; never exposed to assistant tool catalogs or browser proxy."""
+    from src.agents import router_service
+
+    return await router_service.route(request, _request_headers(ctx))
+
+
+if SPEC.internal_role == "router":
+    mcp.tool()(route)
+
+
 def main() -> None:
-    if agent_config.PROVIDER_ID == "laya":
+    role_info = {}
+    if SPEC.internal_role == "router":
+        from src.agents import router_service
+
+        role_info = {"internal_role": "router", "decision": router_service.status_summary()}
+    if agent_config.PROVIDER_ID == "laya" and SPEC.internal_role != "router":
         from src.llm import laya_provider
 
         laya_provider.prepare()
-    else:
+    elif agent_config.PROVIDER_ID != "laya":
         mcp_upstream.connect()
         mcp_upstream.warn_unmatched_tool_globs()
     agent_registry.register(
@@ -513,6 +542,7 @@ def main() -> None:
         entry=SPEC.entry, orchestrator=SPEC.orchestrator, focus=SPEC.focus,
         tiers=_OWN_TIERS, efforts=_OWN_EFFORTS, tool_allow=list(SPEC.tools.allow),
         delegable=SPEC.delegable,
+        **role_info,
     )
     try:
         # Same app, host, port and log level mcp.run(transport="streamable-http")

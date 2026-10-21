@@ -67,7 +67,7 @@ def specialists() -> list[RosterEntry]:
             tuple(g for g in a.get("tool_allow") or () if isinstance(g, str)),
         )
         for a in agent_registry.all_agents()
-        if not a.get("orchestrator") and a.get("delegable", True) and a["id"] != me
+        if not a.get("orchestrator") and not a.get("internal_role") and a.get("delegable", True) and a["id"] != me
     ]
 
 

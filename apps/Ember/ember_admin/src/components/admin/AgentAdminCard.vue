@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { AgentFile, AgentStatus, AgentTier } from "../../api/AgentsAdminClient";
+import type { AgentFile, AgentStatus, AgentTier, LiveAgent } from "../../api/AgentsAdminClient";
 
 /** One agent on the admin Agents page, drawn like ember_web's agent card
  * (name, id, role badges, what it is for, provider / gateway / model, status)
@@ -8,7 +8,7 @@ import type { AgentFile, AgentStatus, AgentTier } from "../../api/AgentsAdminCli
  * state when known; without it an agent switched off in its file reads
  * Disabled and the others show no state. The status is an icon and a word,
  * never colour alone. */
-const props = defineProps<{ agent: AgentFile; status?: AgentStatus; tiers?: AgentTier[] }>();
+const props = defineProps<{ agent: AgentFile; status?: AgentStatus; tiers?: AgentTier[]; decision?: LiveAgent["decision"] }>();
 defineEmits<{ edit: []; remove: []; reset: [] }>();
 
 const STATUS_TEXT: Record<AgentStatus, string> = { running: "Running", offline: "Offline", disabled: "Disabled" };
@@ -41,13 +41,20 @@ const rows = computed(() =>
       <span v-if="shownStatus" class="status" data-test="status"><span aria-hidden="true">{{ STATUS_ICON[shownStatus] }}</span> {{ STATUS_TEXT[shownStatus] }}</span>
     </div>
     <code class="agent-id">{{ agent.id }}</code>
-    <div v-if="agent.entry || agent.orchestrator" class="tags">
+    <div v-if="agent.entry || agent.orchestrator || agent.internal_role" class="tags">
+      <span v-if="agent.internal_role === 'router'" class="tag">Internal / Router</span>
       <span v-if="agent.entry" class="tag entry-tag">Entry</span>
       <span v-if="agent.orchestrator" class="tag">Orchestrator</span>
     </div>
     <p v-if="agent.error" class="problem" role="alert">{{ agent.error }}</p>
     <template v-else>
       <p class="focus">{{ agent.focus || "No description." }}</p>
+      <p v-if="agent.internal_role === 'router'" class="focus">
+        Local Laya triage<span v-if="agent.decision?.fallback !== false"> → Jev fallback</span>.
+        Agent and model decisions are configured in Edit.
+        <template v-if="decision?.fallback_available === false">Jev fallback unavailable: check the deployment credentials.</template>
+        <template v-if="decision?.local_status === 'unavailable'">Local checkpoints unavailable: prepare the cached models.</template>
+      </p>
       <div v-if="rows.length || tiers?.length" class="llm">
         <dl v-if="rows.length">
           <template v-for="row in rows" :key="row.label">

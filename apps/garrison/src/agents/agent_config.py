@@ -18,6 +18,7 @@ import anyio
 from dotenv import dotenv_values
 
 from src.agents import agent_spec, auto_route, delegation, memory_recall
+from src.agents import router_routing
 from src.agents import plan as plan_policy
 
 from src.core import approvals, internal_auth, questions, tool_filter
@@ -203,16 +204,14 @@ async def run_chat(
             await mcp_upstream.prefetch_private(private)
         # A confident classifier pick sends the question straight to a specialist, and this
         # agent's own model never runs (agents/auto_route.py; off unless configured).
-        routed = await auto_route.try_route(question, history, on_event, request_id, depth)
+        routed, routed_tier, auto_note = await router_routing.route_turn(
+            question, history, on_event, request_id, depth, model_tier)
         if routed is not None:
             routed.delegated_usage = delegated_usage
             return routed
         # A top-level turn that asked for no tier may get one from how hard its question looks (llm/auto_tier.py).
-        auto_note = ""
-        if not model_tier and depth == 0 and auto_tier.enabled() and model_tiers.own_tiers():
-            chosen = await auto_tier.pick(question, bool(history))
-            if chosen:
-                model_tier, auto_note = chosen.tier, chosen.note
+        if not model_tier and routed_tier:
+            model_tier = routed_tier
         resolution = (
             model_tiers.resolve(model_tier, model_tiers.own_tiers(), MODEL, agent_spec.current().id)
             if model_tier else model_tiers.clamp_default(
