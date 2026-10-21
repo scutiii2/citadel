@@ -28,7 +28,10 @@ as configured.
 
 from __future__ import annotations
 
+import json
+import logging
 import os
+import traceback
 from typing import Any, AsyncIterator, Sequence
 
 from anthropic import (
@@ -61,6 +64,7 @@ from src.mcp_client.mcp_upstream import call_tool, list_tools, tool_description
 
 
 PROVIDER_NAME = "anthropic"
+_log = logging.getLogger(__name__)
 
 _CACHE_CONTROL = {"type": "ephemeral"}
 
@@ -469,6 +473,7 @@ async def run_chat(
                 while True:
                     token_limits.enforce_context_limit(PROVIDER_ID, [system_prompt, *messages], route.current)
                     text_parts: list[str] = []
+                    stream_stage = "opening_stream"
                     try:
                         async with client.messages.stream(
                             model=model_name,
@@ -478,14 +483,27 @@ async def run_chat(
                             tools=tools,
                             **options.extra_kwargs(model_name),
                         ) as stream:
+                            stream_stage = "stream_events"
                             async for is_text, chunk in _stream_pieces(stream):
                                 if is_text:
                                     text_parts.append(chunk)
                                     if on_event:
                                         await on_event(step_event("token", text=chunk))
                                 await meter.chars(len(chunk))
+                            stream_stage = "final_message"
                             response = await stream.get_final_message()
                         break
+                    except json.JSONDecodeError as error:
+                        # Keep parser locations and stack frames, but omit exception text,
+                        # chained exceptions and locals that may contain gateway payloads.
+                        _log.error(
+                            "Anthropic response JSONDecodeError: gateway=%s model=%s request_id=%s "
+                            "stage=%s line=%s column=%s position=%s\n%s",
+                            route.current, model_name, request_id, stream_stage,
+                            error.lineno, error.colno, error.pos,
+                            "".join(traceback.format_tb(error.__traceback__)),
+                        )
+                        raise
                     except Exception as error:
                         if isinstance(error, BadRequestError) and classify(error) is None:
                             if not text_parts and options.drop_rejected(str(error), model_name):
