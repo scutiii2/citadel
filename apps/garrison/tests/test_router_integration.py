@@ -7,6 +7,8 @@ from src.agents import agent_spec, agent_routing, delegation, router_client, rou
 from src.agents.agent_spec import AgentSpec, LlmSpec, RosterEntry, TierInfo
 from src.agents.router_contract import DecisionOutcome, RouteResponse
 from src.core import approvals, internal_auth
+from src.llm import cancellation
+from src.llm.base_provider import ChatCancelled
 
 
 def setup(monkeypatch, response):
@@ -69,4 +71,48 @@ def test_unknown_explicit_tier_keeps_existing_model_resolution(monkeypatch):
 def test_empty_question_falls_back_without_request_validation_error(monkeypatch):
     decide = setup(monkeypatch, None)
     assert asyncio.run(router_routing.route_turn("", [], None, "r", 0)) == (None, None, "")
+    decide.assert_not_called()
+
+
+def test_summary_context_reaches_router_with_verbatim_latest_message(monkeypatch):
+    decide = setup(monkeypatch, None)
+    summarize = AsyncMock(return_value="Investigate a complex server deployment failure; preserve all data.")
+    monkeypatch.setattr(router_routing.context_summarizer, "routing_brief", summarize)
+    question = "do it\n[table_id: exact-123]"
+    history = [{"role": "assistant", "content": "Previous plan"}]
+    asyncio.run(router_routing.route_turn(question, history, None, "r", 0))
+    request = decide.call_args.args[0]
+    assert "complex server deployment" in request.subject
+    assert request.subject.endswith("User message: " + question)
+    assert request.choose_tier
+    assert history == [{"role": "assistant", "content": "Previous plan"}]
+
+
+def test_short_follow_up_can_choose_tier_when_summary_resolves_context(monkeypatch):
+    decide = setup(monkeypatch, None)
+    monkeypatch.setattr(router_routing.context_summarizer, "routing_brief", AsyncMock(return_value="Debug the server."))
+    asyncio.run(router_routing.route_turn("continue", [{"role": "assistant", "content": "plan"}], None, "r", 0))
+    assert decide.call_args.args[0].choose_tier
+
+
+def test_failed_summary_keeps_original_routing_behavior(monkeypatch):
+    decide = setup(monkeypatch, None)
+    monkeypatch.setattr(router_routing.context_summarizer, "routing_brief", AsyncMock(return_value=None))
+    asyncio.run(router_routing.route_turn("continue", [{"role": "assistant", "content": "plan"}], None, "r", 0))
+    request = decide.call_args.args[0]
+    assert request.subject == "Previous assistant message: plan\n\nUser message: continue"
+    assert not request.choose_tier
+
+
+def test_cancellation_during_summary_prevents_routing(monkeypatch):
+    decide = setup(monkeypatch, None)
+    async def cancelled_summary(*args):
+        cancellation.cancel("cancel-routing")
+        return "Debug the server."
+    monkeypatch.setattr(router_routing.context_summarizer, "routing_brief", cancelled_summary)
+    try:
+        with pytest.raises(ChatCancelled):
+            asyncio.run(router_routing.route_turn("continue", [{"role": "assistant", "content": "plan"}], None, "cancel-routing", 0))
+    finally:
+        cancellation.clear("cancel-routing")
     decide.assert_not_called()

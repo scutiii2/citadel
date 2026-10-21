@@ -1,5 +1,22 @@
 # ember_api
 
+## Conversation compaction
+
+Manual `/compact` (the existing `POST /api/chats/{id}/summarize`) and automatic
+compaction discover the dedicated `context-summarizer` agent. They use its
+tool-free `interpret` operation with a `compact` prompt, independently of the
+entry agent answering the chat. Garrison uses the same helper with a shorter
+`routing` prompt before Router decisions. The helper uses the existing light
+model tier, and usage is attributed to `context-summarizer`.
+
+Compaction still folds a prior summary into the new transcript, includes tool
+digests in its prompt, preserves exact identifiers and paths, and retains the
+cumulative original transcript as a log attachment. The transcript changes only
+after a usable summary returns. Each compaction call has a 60-second timeout.
+Missing/offline helper or failed summarization leaves manual compaction unchanged;
+automatic compaction keeps the available history and continues answering. An
+existing compacted summary is also available to subsequent routing briefs.
+
 
 ## Internal Router metadata and access
 

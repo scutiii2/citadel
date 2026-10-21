@@ -19,6 +19,25 @@ AGENT_ID = AGENTS[0]["id"]
 MESSAGE_TIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 
 
+@pytest.fixture
+def summarizer(client, agent, tmp_path, monkeypatch):
+    helper = {"id": "context-summarizer", "label": "Context Summarizer", "url": "http://summarizer.internal/mcp"}
+    (tmp_path / "config_agents.json").write_text(json.dumps({"agents": [*AGENTS, helper]}), encoding="utf-8")
+    calls = []
+    interpret = agent.interpret
+
+    async def tracked(url, caller, text):
+        calls.append((url, text))
+        result = await interpret(url, caller, text)
+        if url == helper["url"]:
+            result["agent_usage"] = [{"agent_id": helper["id"], "agent_label": helper["label"],
+                "provider_id": "claude", "model": "claude-test", "total_tokens": 10}]
+        return result
+
+    monkeypatch.setattr(agent, "interpret", tracked)
+    return calls
+
+
 def new_id() -> str:
     return str(uuid.uuid4())
 
@@ -439,7 +458,7 @@ def test_next_turn_history_carries_the_tool_digest(client: TestClient, agent: Fa
     assert chat(client, chat_id)["messages"][1]["content"] == "I found 3 results."
 
 
-def test_summary_prompt_sees_tool_results_but_the_stored_log_does_not(client: TestClient, agent: FakeAgent) -> None:
+def test_summary_prompt_sees_tool_results_but_the_stored_log_does_not(client: TestClient, agent: FakeAgent, summarizer) -> None:
     as_admin(client)
     chat_id = new_id()
     _chat_with_tool_answer(client, chat_id)
@@ -783,7 +802,7 @@ def seed(client: TestClient, chat_id: str, context_tokens: int = 1000) -> None:
     )
 
 
-def test_manual_summarize(client: TestClient, agent: FakeAgent) -> None:
+def test_manual_summarize(client: TestClient, agent: FakeAgent, summarizer) -> None:
     as_admin(client)
     chat_id = new_id()
     seed(client, chat_id)
@@ -791,12 +810,16 @@ def test_manual_summarize(client: TestClient, agent: FakeAgent) -> None:
     response = client.post(f"/api/chats/{chat_id}/summarize", json={})
 
     assert response.status_code == 200
+    assert summarizer[0][0] == "http://summarizer.internal/mcp"
+    assert "Mode: compact" in summarizer[0][1]
     messages = response.json()["messages"]
     assert [m.get("kind") for m in messages] == ["summary", "log_attachment"]
     assert messages[0]["content"] == "SUMMARY"
     assert "--- user ---\nq1" in messages[1]["content"]
     assert "q1" in agent.interprets[0]
-    assert client.get("/api/usage").json()["report"]["summary_tokens"] == 10
+    report = client.get("/api/usage").json()["report"]
+    assert report["summary_tokens"] == 10
+    assert any(row["agent"] == "context-summarizer" and row["tokens"] == 10 for row in report["by_agent"])
     # Nothing new since: no second agent call.
     client.post(f"/api/chats/{chat_id}/summarize", json={})
     assert len(agent.interprets) == 1
@@ -811,10 +834,10 @@ def test_summarize_needs_a_running_agent(client: TestClient, tmp_path) -> None:
     response = client.post(f"/api/chats/{chat_id}/summarize", json={})
 
     assert response.status_code == 503
-    assert response.json()["detail"] == "No agent is running"
+    assert response.json()["detail"] == "Context summarizer is not running"
 
 
-def test_failed_summarize_changes_nothing(client: TestClient, agent: FakeAgent) -> None:
+def test_failed_summarize_changes_nothing(client: TestClient, agent: FakeAgent, summarizer) -> None:
     agent.fail = "agent offline"
     as_admin(client)
     chat_id = new_id()
@@ -841,7 +864,7 @@ def test_clear_keeps_one_raw_log(client: TestClient, agent: FakeAgent) -> None:
     assert agent.asks[0]["history"] == []
 
 
-def test_auto_summarize_when_context_nearly_full(client: TestClient, agent: FakeAgent) -> None:
+def test_auto_summarize_when_context_nearly_full(client: TestClient, agent: FakeAgent, summarizer) -> None:
     as_admin(client)
     chat_id = new_id()
     seed(client, chat_id, context_tokens=100_000)  # >= 0.6 of the 150k cap
@@ -849,14 +872,19 @@ def test_auto_summarize_when_context_nearly_full(client: TestClient, agent: Fake
     start(client, chat_id, "q2")
     stream = events(client, chat_id)
 
+    assert summarizer[0][0] == "http://summarizer.internal/mcp"
+    assert "Mode: compact" in summarizer[0][1]
     types = [e["type"] for e in stream]
     assert "summarized" in types or ("snapshot" in types and len(agent.interprets) == 1)
     assert agent.asks[0]["history"] == [{"role": "assistant", "content": "SUMMARY"}]
     kinds = [m.get("kind") for m in chat(client, chat_id)["messages"]]
     assert kinds == ["summary", "log_attachment", None, None]
+    report = client.get("/api/usage").json()["report"]
+    assert report["summary_tokens"] == 10
+    assert any(row["agent"] == "context-summarizer" and row["tokens"] == 10 for row in report["by_agent"])
 
 
-def test_auto_summarize_failure_still_answers(client: TestClient, agent: FakeAgent) -> None:
+def test_auto_summarize_failure_still_answers(client: TestClient, agent: FakeAgent, summarizer) -> None:
     as_admin(client)
     chat_id = new_id()
     seed(client, chat_id, context_tokens=100_000)
@@ -865,6 +893,29 @@ def test_auto_summarize_failure_still_answers(client: TestClient, agent: FakeAge
     start(client, chat_id, "q2")
     events(client, chat_id)
 
+    assert len(agent.asks[0]["history"]) == 2
+    assert chat(client, chat_id)["messages"][-1]["content"] == "Hello!"
+
+
+def test_manual_compaction_requires_summarizer_and_preserves_chat(client, agent):
+    as_admin(client)
+    chat_id = new_id()
+    seed(client, chat_id)
+    before = chat(client, chat_id)["messages"]
+    response = client.post(f"/api/chats/{chat_id}/summarize", json={})
+    assert response.status_code == 503
+    assert "summarizer" in response.json()["detail"].lower()
+    assert chat(client, chat_id)["messages"] == before
+    assert not agent.interprets
+
+
+def test_auto_compaction_without_summarizer_still_answers(client, agent):
+    as_admin(client)
+    chat_id = new_id()
+    seed(client, chat_id, context_tokens=100_000)
+    start(client, chat_id, "q2")
+    events(client, chat_id)
+    assert not agent.interprets
     assert len(agent.asks[0]["history"]) == 2
     assert chat(client, chat_id)["messages"][-1]["content"] == "Hello!"
 

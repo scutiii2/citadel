@@ -11,6 +11,7 @@ came back - any failure raises SummarizeError and nothing changes.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,6 +21,8 @@ from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
 # Keeps repeated summaries from growing back toward the history they replace.
 SUMMARY_TOKEN_CAP = 2000
 MAX_RECOMPRESS_ATTEMPTS = 2
+SUMMARIZER_AGENT_ID = "context-summarizer"
+COMPACTION_TIMEOUT_SECONDS = 60
 
 SUMMARY = "summary"
 LOG_ATTACHMENT = "log_attachment"
@@ -111,7 +114,7 @@ def needs_summary(messages: list[dict[str, Any]], max_context: int, ratio: float
 
 def build_prompt(raw_text: str, prior_summary: str | None = None) -> str:
     instructions = (
-        "Summarize the conversation transcript below into a concise, dense "
+        "Mode: compact\nSummarize the conversation transcript below into a concise, dense "
         "briefing a continuing assistant can use as its only memory of "
         "everything that happened so far. Preserve every exact file path, "
         "identifier, URL, and tool-call argument/result value VERBATIM - "
@@ -177,10 +180,11 @@ async def summarize(
     summary = ""
     for attempt in range(MAX_RECOMPRESS_ATTEMPTS + 1):
         try:
-            result = await gateway.interpret(url, caller, prompt)
-        except AgentCallError as error:
+            async with asyncio.timeout(COMPACTION_TIMEOUT_SECONDS):
+                result = await gateway.interpret(url, caller, prompt)
+        except (AgentCallError, TimeoutError) as error:
             if attempt == 0:
-                raise SummarizeError(str(error)) from error
+                raise SummarizeError("The context summarizer timed out." if isinstance(error, TimeoutError) else str(error)) from error
             break  # keep the previous (longer) summary
         results.append(result)
         text = str(result.get("response") or "").strip()

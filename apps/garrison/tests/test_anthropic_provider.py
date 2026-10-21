@@ -49,15 +49,20 @@ def _fake_tool():
     )
 
 
-def test_run_interpret_uses_shared_output_cap(monkeypatch):
+@pytest.mark.parametrize("agent_limit,expected", [(None, 777), (2500, 2500)])
+def test_run_interpret_uses_agent_output_cap_or_shared_default(monkeypatch, agent_limit, expected):
+    from src.agents.agent_spec import LlmSpec
+    from src.llm.llm_options import LlmOptions
     monkeypatch.setenv("CLAUDE_API_KEY", "sk-test")
     response = SimpleNamespace(content=[], usage=_usage())
     client = SimpleNamespace(messages=SimpleNamespace(create=Mock(return_value=response)))
     with patch("src.llm.anthropic_provider._get_sync_client", return_value=client), \
-         patch("src.llm.anthropic_provider.token_limits.max_output_tokens", return_value=777):
+         patch("src.llm.anthropic_provider.token_limits.max_output_tokens", return_value=777), \
+         patch("src.llm.anthropic_provider.llm_options.for_provider", return_value=LlmOptions(
+             "anthropic", "context-summarizer", LlmSpec(provider="anthropic", max_tokens=agent_limit))):
         anthropic_provider.run_interpret("hello")
 
-    assert client.messages.create.call_args.kwargs["max_tokens"] == 777
+    assert client.messages.create.call_args.kwargs["max_tokens"] == expected
 
 
 def test_run_interpret_rejects_context_before_calling_anthropic(monkeypatch):

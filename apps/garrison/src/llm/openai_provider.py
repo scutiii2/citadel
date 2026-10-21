@@ -559,7 +559,8 @@ def run_interpret(text: str, model: str | None = None) -> ChatResult:
             response = client.responses.create(
                 model=model_name,
                 input=messages,
-                max_output_tokens=token_limits.max_output_tokens(PROVIDER_ID, route.current),
+                max_output_tokens=llm_options.for_provider(PROVIDER_ID).max_tokens(
+                    token_limits.max_output_tokens(PROVIDER_ID, route.current)),
             )
         except Exception as error:
             if route.advance(error) is None:

@@ -2,6 +2,8 @@
 
 import asyncio
 
+import pytest
+
 from src.services import step_digest, summarization
 
 
@@ -87,3 +89,39 @@ def test_summary_prompt_sees_steps_but_the_log_does_not():
     assert log["kind"] == summarization.LOG_ATTACHMENT
     assert "secret-value-17" not in log["content"]
     assert "--- assistant ---\na\n" in log["content"]
+
+
+def test_compaction_timeout_preserves_input(monkeypatch):
+    class SlowGateway:
+        async def interpret(self, *args):
+            await asyncio.sleep(1)
+
+    messages = [{"role": "user", "content": "Keep /exact/path and id-123."}]
+    monkeypatch.setattr(summarization, "COMPACTION_TIMEOUT_SECONDS", .01)
+    with pytest.raises(summarization.SummarizeError, match="timed out"):
+        asyncio.run(summarization.summarize(SlowGateway(), "helper-url", None, messages))
+    assert messages == [{"role": "user", "content": "Keep /exact/path and id-123."}]
+
+
+def test_compaction_folds_prior_summary_and_preserves_cumulative_log():
+    class Gateway:
+        def __init__(self):
+            self.prompts = []
+
+        async def interpret(self, url, caller, text):
+            self.prompts.append(text)
+            return {"response": "Combined summary", "agent_usage": [{"agent_id": "context-summarizer", "total_tokens": 9}]}
+
+    gateway = Gateway()
+    messages = [
+        {"role": "assistant", "kind": "summary", "content": "Earlier: preserve /exact/path."},
+        {"role": "assistant", "kind": "log_attachment", "content": "ORIGINAL RAW LOG\n"},
+        {"role": "user", "content": "Now investigate id-123."},
+    ]
+    outcome = asyncio.run(summarization.summarize(gateway, "helper-url", None, messages))
+    assert "Mode: compact" in gateway.prompts[0]
+    assert "Earlier: preserve /exact/path." in gateway.prompts[0]
+    assert "Now investigate id-123." in gateway.prompts[0]
+    assert "ORIGINAL RAW LOG" not in gateway.prompts[0]
+    assert outcome.messages[1]["content"] == "ORIGINAL RAW LOG\n--- user ---\nNow investigate id-123.\n"
+    assert outcome.results[0]["agent_usage"][0]["agent_id"] == "context-summarizer"

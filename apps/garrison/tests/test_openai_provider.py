@@ -73,15 +73,20 @@ def _fake_stream(delta_texts, final_response):
     return stream_cm
 
 
-def test_run_interpret_uses_shared_output_cap(monkeypatch):
+@pytest.mark.parametrize("agent_limit,expected", [(None, 777), (2500, 2500)])
+def test_run_interpret_uses_agent_output_cap_or_shared_default(monkeypatch, agent_limit, expected):
+    from src.agents.agent_spec import LlmSpec
+    from src.llm.llm_options import LlmOptions
     monkeypatch.setenv("GPT_API_KEY", "sk-test")
     response = SimpleNamespace(output_text="ok", usage=SimpleNamespace(total_tokens=1, input_tokens=1))
     client = SimpleNamespace(responses=SimpleNamespace(create=Mock(return_value=response)))
     with patch("src.llm.openai_provider._get_sync_client", return_value=client), \
-         patch("src.llm.openai_provider.token_limits.max_output_tokens", return_value=777):
+         patch("src.llm.openai_provider.token_limits.max_output_tokens", return_value=777), \
+         patch("src.llm.openai_provider.llm_options.for_provider", return_value=LlmOptions(
+             "openai", "context-summarizer", LlmSpec(provider="openai", max_tokens=agent_limit))):
         openai_provider.run_interpret("hello")
 
-    assert client.responses.create.call_args.kwargs["max_output_tokens"] == 777
+    assert client.responses.create.call_args.kwargs["max_output_tokens"] == expected
 
 
 def test_run_interpret_rejects_context_before_calling_openai(monkeypatch):

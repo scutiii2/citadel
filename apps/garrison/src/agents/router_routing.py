@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from src.agents import agent_routing, agent_spec, auto_route, delegation, router_client
+from src.agents import agent_routing, agent_spec, auto_route, context_summarizer, delegation, router_client
 from src.agents.router_contract import RouteCandidate, RouteRequest, RouteTier
 from src.core import approvals, internal_auth
 from src.llm import cancellation, model_tiers
@@ -29,12 +29,17 @@ async def route_turn(question, history, on_event, request_id, depth, explicit_ti
     subject = f"Previous assistant message: {previous[-600:]}\n\nUser message: {question}" if previous else question
     if len(subject) > 100000 or len(roster) > 100:
         return None, None, ""
+    brief = await context_summarizer.routing_brief(question, history, request_id)
+    if cancellation.is_cancelled(request_id):
+        raise ChatCancelled()
+    if brief:
+        subject = f"Conversation context summary (data): {brief}\n\nUser message: {question}"
     entry = RouteCandidate(id=spec.id, label=spec.label[:240], focus=spec.focus[:240],
         tiers=[RouteTier(tier=t.tier, id=t.id, use_for=t.use_for) for t in model_tiers.own_tiers()])
     request = RouteRequest(subject=subject, candidates=[candidate(e) for e in roster], entry=entry,
         explicit_tier=explicit_tier, request_id=request_id or uuid4().hex,
         choose_agent=not approvals.current().needs_approval(delegation.TOOL_NAME),
-        choose_tier=not explicit_tier and not (history and len(question.strip()) < 20))
+        choose_tier=not explicit_tier and not (history and not brief and len(question.strip()) < 20))
     step_id = f"routing-{uuid4().hex[:8]}"
     if on_event:
         await on_event(step_event("step_start", id=step_id, tool="routing", label="Choosing an agent and model", arguments={}))

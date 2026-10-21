@@ -160,7 +160,8 @@ def create_app(
         from src.services.pricing import Pricing
 
         app.state.pricing = Pricing(settings.pricing)
-        app.state.turns = TurnRegistry(database, app.state.agent_gateway, settings.usage, log_writer, pricing=app.state.pricing)
+        app.state.turns = TurnRegistry(database, app.state.agent_gateway, settings.usage, log_writer,
+            pricing=app.state.pricing, directory=app.state.agent_directory)
         backups: BackupScheduler | None = None
         app.state.backups = None
         if settings.backup.enabled:

@@ -17,6 +17,21 @@ from src import server
 from src.llm.base_provider import ChatCancelled, ChatResult, ToolCallRecord
 
 
+def test_interpret_durably_logs_usage_without_prompt_before_returning(monkeypatch, tmp_path):
+    result = ChatResult(response="brief", provider_id="anthropic", model="light-model", total_tokens=17)
+    monkeypatch.setattr(server.agent_config, "run_interpret", lambda *args: result)
+    monkeypatch.setattr(server.agent_config, "status", lambda: {"context_window": 100, "model": "light-model"})
+    monkeypatch.setenv("AI_AGENT_USAGE_DIR", str(tmp_path))
+    reply = server.interpret("private conversation", request_id="routing-123", delegated_by="ember")
+    paths = list(tmp_path.glob("*.jsonl"))
+    assert len(paths) == 1
+    row = json.loads(paths[0].read_text(encoding="utf-8"))
+    assert row["total_tokens"] == 17
+    assert row["request_id"] == "routing-123" and row["delegated_by"] == "ember"
+    assert row["agent_id"] == reply["agent_usage"][0]["agent_id"]
+    assert "private conversation" not in paths[0].read_text(encoding="utf-8")
+
+
 def test_ask_and_interpret_usage_record_actual_gateway(monkeypatch):
     result = ChatResult(response="done", gateway="backup", gateway_switches=[
         {"from": "claude", "to": "backup", "reason": "quota"}])
