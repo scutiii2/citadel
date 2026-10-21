@@ -601,8 +601,8 @@ Usage shows only the logged-in account, including for administrators. Workspace 
 
 ## Brains and Notes promotion
 
-Settings contains the account-owned Personal Brain connection editor. `/brains`
-is available to every valid signed-in account for shared/personal browsing and
+`/brains` contains the account-owned Personal Brain connection editor and is
+available to every valid signed-in account for shared/personal browsing and
 scoped search. Notes supports manual publication review, AI suggestions and
 pending-write reconciliation while retaining the original Note. Shared publishing
 requires server permission and explicit audience review. Chat auto-save has an

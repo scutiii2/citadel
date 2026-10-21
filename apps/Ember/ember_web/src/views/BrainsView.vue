@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import PageLayout from "../components/PageLayout.vue";
+import BrainConnectionForm from "../components/BrainConnectionForm.vue";
 import MarkdownContent from "../components/MarkdownContent.vue";
 import { brainsClient, type BrainResult, type BrainScope } from "../api/BrainsClient";
 import { errorMessage } from "../utils/errors";
@@ -24,7 +25,8 @@ onMounted(() => { if (path.value) void run("read"); });
 <template>
   <PageLayout title="Brains" description="Durable knowledge from the shared Instance Brain and your Personal Brain.">
     <div class="brain-column" :aria-busy="busy">
-      <p>All signed-in users can read the Instance Brain. Personal Brain contents remain scoped to your account. Configure your connection in Settings.</p>
+      <p>All signed-in users can read the Instance Brain. Personal Brain contents remain scoped to your account.</p>
+      <BrainConnectionForm scope="personal" />
       <fieldset :disabled="busy">
         <label>Destination<select v-model="scope"><option value="instance">Instance Brain</option><option value="personal">Personal Brain</option><option value="both">Both brains</option></select></label>
         <label>Search<input v-model="query" @keyup.enter="run('search')" /></label>
