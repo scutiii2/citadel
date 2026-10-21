@@ -102,6 +102,20 @@ folder with no entry starts offline. See
 Lists ai_agent's agent files as cards like ember_web's (plus port, URL and the Edit and Remove buttons) with their live status (running, offline, disabled; the status needs `chat.use`, otherwise it is left out). **New agent** and **Edit** open a form: id (fixed once created), name, port, URL (where ember and the other agents reach it; empty = this machine and the port), provider, an ordered gateway list (filtered by provider) with a model override per row, reasoning effort, strongest tier, persona, instructions, focus, allowed/denied tool globs, and the enabled, orchestrator and entry switches. Fields the form does not show are kept when saving. The form also edits the identity override, temperature, max tokens, max tool rounds, the highest effort a delegator may request, the weakest and strongest tier (with a preview of the model each tier resolves to). **Show prompt** builds the full system prompt the model receives from the draft and the shared prompts. **Shared prompts** (button in the page header) edits the text every agent shares: assistant name and description, the identity line template, the default instructions, the specialist list intro and the caveman rule; each has a reset to its default, and saving asks first because it restarts every agent. Remove asks for the agent id; the entry agent cannot be removed. ai_agent validates every change (refusals such as a port clash show in the form) and its supervisor starts, restarts or stops the agent within a few seconds. Needs a running agent to reach ai_agent.
 
 
+The **Run limits** section exposes each generation agent's total tokens per turn
+(`max_turn_tokens`, default 100,000), time per turn in seconds (`max_turn_seconds`,
+default 300), output tokens per model call (`max_tokens`), and model/tool rounds
+(`max_tool_rounds`). Blank fields inherit defaults; output and round defaults come
+from the gateway's configured limits. Each custom limit has its own reset button.
+Edits and resets remain drafts until Save, using the existing `agents.manage`
+permission and agent configuration API. Saving restarts the affected agent.
+Total turn tokens include input and output across that agent's model calls,
+including repeated history; these are turn budgets, not tokens-per-minute quotas.
+The token check runs after a response, so a turn may exceed its budget by one
+response. Time covers the agent's model/tool loop; an already-running external
+tool may finish after the turn stops. Local Laya and Router do not expose these
+generation limits.
+
 The **Gateways** list in each agent's Model section is a draft: its first row is
 primary and later rows are backups. Drag a row by its grip or use its up/down
 buttons; the model override moves with it. Add picks an unused gateway of the

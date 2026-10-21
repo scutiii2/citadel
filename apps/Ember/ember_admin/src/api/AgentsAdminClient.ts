@@ -24,6 +24,8 @@ export interface AgentLlm {
   temperature?: number;
   max_tokens?: number;
   max_tool_rounds?: number;
+  max_turn_tokens?: number;
+  max_turn_seconds?: number;
   max_effort?: string;
   min_tier?: string;
   max_tier?: string;
