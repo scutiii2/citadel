@@ -1,6 +1,7 @@
 """Only a failed model round retries; completed tool work survives a gateway switch."""
 
 import asyncio
+import json
 from dataclasses import replace
 from types import SimpleNamespace as NS
 from unittest.mock import AsyncMock, Mock
@@ -96,6 +97,36 @@ def test_non_gateway_failure_is_unchanged(monkeypatch, error):
     assert raised.value is error
     assert backup.messages.stream.call_count == 0
     assert not cooldown.is_in_cooldown("anthropic:claude")
+
+
+@pytest.mark.parametrize("stage", ["stream_events", "final_message"])
+def test_json_failure_logs_safe_traceback_and_preserves_error(monkeypatch, caplog, stage):
+    error = json.JSONDecodeError("private-error-message", "private-response-body", 1)
+    cm = _stream_cm([])
+    _, backup = clients(monkeypatch, [cm], [])
+    if stage == "stream_events":
+        async def broken_pieces(stream):
+            raise error
+            yield  # Make this an async generator, like _stream_pieces.
+        monkeypatch.setattr(provider, "_stream_pieces", broken_pieces)
+    else:
+        cm.__aenter__.return_value.get_final_message.side_effect = error
+
+    with pytest.raises(json.JSONDecodeError) as raised:
+        asyncio.run(provider.run_chat("private-question", [], request_id="diagnostic-request"))
+
+    assert raised.value is error
+    assert backup.messages.stream.call_count == 0
+    assert "JSONDecodeError" in caplog.text
+    assert "anthropic_provider.py" in caplog.text
+    assert f"stage={stage}" in caplog.text
+    assert "gateway=claude" in caplog.text
+    assert "model=" in caplog.text
+    assert "request_id=diagnostic-request" in caplog.text
+    assert "line=1 column=2 position=1" in caplog.text
+    assert "private-error-message" not in caplog.text
+    assert "private-response-body" not in caplog.text
+    assert "private-question" not in caplog.text
 
 
 def test_exhaustion_raises_last_error(monkeypatch):
