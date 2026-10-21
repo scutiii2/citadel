@@ -67,13 +67,27 @@ describe("MemoryView", () => {
   });
   it("deletes only after confirmation", async () => {
     await setup();
-    await button("Delete").trigger("click");
+    expect(wrapper.findAll("article button")).toHaveLength(1);
+    await button("Edit").trigger("click");
+    await button("Delete memory").trigger("click");
     expect(client.remove).not.toHaveBeenCalled();
     client.remove.mockResolvedValue();
     const confirm = document.body.querySelector<HTMLButtonElement>("dialog[open] .confirm")!;
     confirm.click(); await flushPromises();
     expect(client.remove).toHaveBeenCalledWith(1);
     expect(wrapper.text()).toContain("No saved memories yet.");
+    expect(document.body.querySelector("dialog[open][aria-label='Edit memory']")).toBeNull();
+  });
+  it("keeps the editor draft when deletion is cancelled", async () => {
+    await setup();
+    await button("Edit").trigger("click");
+    await wrapper.get("textarea").setValue("A corrected preference");
+    await button("Delete memory").trigger("click");
+    document.body.querySelector<HTMLButtonElement>("dialog[aria-label='Delete this memory?'] .cancel")!.click();
+    await flushPromises();
+    expect(wrapper.get("textarea").element.value).toBe("A corrected preference");
+    expect(document.body.querySelector("dialog[open][aria-label='Edit memory']")).not.toBeNull();
+    expect(client.remove).not.toHaveBeenCalled();
   });
   it("shows a recoverable loading failure", async () => {
     client.list.mockRejectedValueOnce(new Error("Offline"));
