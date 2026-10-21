@@ -9,6 +9,8 @@ Project-specific layer on top of `ember-design-system` (tokens, radius scale, fo
 
 **Core idea:** one product, two apps. Reuse before writing. Pick tokens and a pattern first, write styles second.
 
+**Mobile and responsive work:** read [mobile-ui.md](mobile-ui.md) before changing narrow layouts, touch controls, keyboard behavior, sheets or mobile navigation, and when reviewing those interactions. It adds mobile acceptance checks to this skill and the existing design system. Its shared usability rules also apply to the affected desktop flow.
+
 ## 1. Pick the app
 
 | Page is for | App |
