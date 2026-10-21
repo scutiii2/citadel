@@ -18,7 +18,7 @@ CAPABILITIES = pathlib.Path(__file__).resolve().parents[1] / "src" / "capabiliti
 # capability id -> the tools that declare readOnlyHint
 READ_ONLY = {
     "obsidian": {"tool_obsidian_list", "tool_obsidian_search", "tool_obsidian_read", "tool_obsidian_semanticSearch"},
-    "video": {"tool_vid_probe", "tool_vid_status", "tool_vid_listFiles"},
+    "video": {"tool_vid_probe", "tool_vid_status", "tool_vid_listFiles", "tool_vid_packages"},
     "pdf": {"tool_pdf_inspect", "tool_pdf_listFiles"},
     "vault": {"tool_vault_search", "tool_vault_listNotes", "tool_vault_readNote"},
     "usage": {"tool_usage_summary"},

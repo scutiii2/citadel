@@ -4,6 +4,26 @@ import json
 import httpx
 import pytest
 
+
+def test_package_routes_require_access_and_proxy_fixed_paths(client, db_gateway, upstream):
+    assert client.post('/api/video-downloader/packages', json={'name': 'Mix'}).status_code == 401
+    enable(client, db_gateway, 'video')
+    upstream.handler = lambda r: httpx.Response(200, json={'package_id': 'p_one', 'job_id': 'j_one'})
+    cases = [
+        ('POST', '/packages', {'name': 'Mix'}),
+        ('GET', '/packages', None),
+        ('GET', '/packages/p_one', None),
+        ('POST', '/packages/p_one/items', {'url': 'https://example.com/a', 'preset': 'best'}),
+        ('DELETE', '/packages/p_one/items/i_one', None),
+        ('POST', '/packages/p_one/start', {}),
+    ]
+    for method, path, body in cases:
+        assert client.request(method, '/api/video-downloader' + path, json=body).status_code == 200
+        assert upstream.requests[-1].url.path == '/video/ui' + path
+    upstream.handler = lambda r: httpx.Response(409, json={'error': {'code': 'package_locked', 'message': 'Locked'}})
+    response = client.post('/api/video-downloader/packages/p_one/items', json={'url': 'https://example.com/b'})
+    assert response.status_code == 409 and response.json()['error']['code'] == 'package_locked'
+
 from tests.test_registration import as_admin
 from tests.test_permission_split import limited_account
 

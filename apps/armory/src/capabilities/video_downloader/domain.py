@@ -4,7 +4,8 @@ from __future__ import annotations
 import logging
 import shutil
 
-from .contract import DownloadStarted, ListFilesResult, ProbeToolResult, StatusToolResult
+from .contract import (DownloadStarted, ListFilesResult, ProbeToolResult, StatusToolResult,
+                       PackageToolResult, PackageFailure, ListPackagesResult)
 from .utils.errors import DownloaderError, ErrorCode
 from .utils.service import Caller
 from src.config import settings
@@ -76,4 +77,60 @@ def list_files() -> ListFilesResult:
         for file in files:
             file.name = _text(file.name)
         return ListFilesResult(files=files, message=f"{len(files)} file(s), with fresh download links.")
+    return get_runtime().call(operation)
+
+
+def _package_text(package):
+    """Fence every user or remote text field returned to the model, on a detached snapshot."""
+    package.name = _text(package.name)
+    for item in package.items:
+        item.url = _text(item.url)
+        if item.title:
+            item.title = _text(item.title)
+    if package.status and package.status.file:
+        package.status.file.name = _text(package.status.file.name)
+    return package
+
+
+def package_action(action: str, package_id: str = '', name: str = '', urls: str = '', preset: str = 'best', item_id: str = '') -> PackageToolResult:
+    owner = caller()
+    async def operation(service):
+        failed = []
+        if action == 'create':
+            result = service.packages.create(owner, name)
+        elif action == 'add':
+            # Check ownership/lock before returning any batch failures.
+            service.packages._draft(owner, package_id)
+            links = [url.strip() for url in urls.split(',') if url.strip()]
+            if not links or len(links) > 50:
+                raise DownloaderError(ErrorCode.INVALID_REQUEST, 'Supply 1 to 50 comma-separated URLs.')
+            for url in links:
+                try:
+                    await service.packages.add(owner, package_id, url, preset)
+                except DownloaderError as error:
+                    if error.code == ErrorCode.PACKAGE_LOCKED:
+                        raise
+                    failed.append(PackageFailure(url=_text(url), code=str(error.code), message=error.message))
+            result = service.packages.get(owner, package_id)
+        elif action == 'remove':
+            result = service.packages.remove(owner, package_id, item_id)
+        elif action == 'start':
+            result = service.packages.get(owner, package_id)
+            if any(item.preset != 'photos' for item in result.items):
+                _require_ffmpeg()
+            service.packages.start(owner, package_id)
+            result = service.packages.get(owner, package_id)
+        else:
+            raise DownloaderError(ErrorCode.INVALID_REQUEST, 'Choose create, add, remove or start.')
+        return PackageToolResult(package=_package_text(result), failed=failed,
+            message='Package locked and queued. Poll status using its job_id.' if action == 'start' else
+                    f'Group updated; {len(result.items)} media link(s). {len(failed)} failed to add. Only draft groups can be edited.')
+    return get_runtime().call(operation)
+
+
+def list_packages(package_id: str = '') -> ListPackagesResult:
+    owner = caller()
+    async def operation(service):
+        packages = [service.packages.get(owner, package_id)] if package_id else service.packages.list(owner)
+        return ListPackagesResult(packages=[_package_text(p) for p in packages], message=f'{len(packages)} group(s). Started packages stay locked; completed packages include a ZIP link and item failures.')
     return get_runtime().call(operation)

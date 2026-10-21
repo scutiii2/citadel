@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { videoDownloaderClient as api, watchVideoJob } from '../api/VideoDownloaderClient'
 import VideoDownloaderView from './VideoDownloaderView.vue'
 
-vi.mock('../api/VideoDownloaderClient', () => ({ videoDownloaderClient: { probe: vi.fn(), listFiles: vi.fn(), startDownload: vi.fn(), cancelJob: vi.fn(), deleteFile: vi.fn() }, watchVideoJob: vi.fn() }))
+vi.mock('../api/VideoDownloaderClient', () => ({ videoDownloaderClient: { probe: vi.fn(), listFiles: vi.fn(), startDownload: vi.fn(), cancelJob: vi.fn(), deleteFile: vi.fn(), listPackages: vi.fn() }, watchVideoJob: vi.fn() }))
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn() }))
 let wrapper: VueWrapper
 const stop = vi.fn()
@@ -12,6 +12,7 @@ const realShow = HTMLDialogElement.prototype.showModal
 const realClose = HTMLDialogElement.prototype.close
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(api.listPackages).mockResolvedValue([])
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
   vi.mocked(api.listFiles).mockResolvedValue([{ file_id: 'f', name: 'Cat.mp4', kind: 'video', mime: 'video/mp4', size: 100, duration: 5, expires_at: Date.now() / 1000 + 3600, download_url: '/api/video-downloader/files/f/download' }])

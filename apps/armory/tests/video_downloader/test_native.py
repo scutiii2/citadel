@@ -42,6 +42,27 @@ def test_missing_identity_refuses_before_runtime(monkeypatch):
         domain.list_files()
 
 
+def test_package_capability_batches_links_fences_text_and_locks(native):
+    created = domain.package_action('create', name='My collection')
+    package_id = created.package.package_id
+    assert 'BEGIN REMOTE OUTPUT' in created.package.name
+    added = domain.package_action('add', package_id, urls='http://127.0.0.1/private,https://example.com/good')
+    assert len(added.package.items) == 1
+    assert len(added.failed) == 1 and added.failed[0].code == 'blocked_host'
+    assert 'BEGIN REMOTE OUTPUT' in added.package.items[0].url
+    started = domain.package_action('start', package_id)
+    assert started.package.job_id
+    with pytest.raises(DownloaderError) as error:
+        domain.package_action('add', package_id, urls='https://example.com/late')
+    assert error.value.code == ErrorCode.PACKAGE_LOCKED
+    async def wait(service):
+        return await service.wait(service.get_job(domain.caller(), started.package.job_id))
+    assert native.call(wait)['type'] == 'done'
+    package = domain.list_packages(package_id).packages[0]
+    assert package.status.file.kind == 'package' and 'BEGIN REMOTE OUTPUT' in package.status.file.name
+    assert 'BEGIN REMOTE OUTPUT' in package.items[0].title
+
+
 def test_exposed_without_token_refuses(native, monkeypatch):
     monkeypatch.setattr(domain, "settings", replace(domain.settings, host="0.0.0.0", internal_api_token=""))
     for operation in [lambda: domain.probe("https://example.com/v"), lambda: domain.download("https://example.com/v"), lambda: domain.status("missing"), domain.list_files]:
@@ -228,7 +249,7 @@ def test_refresh_load_help_tools_and_reload_preserve_runtime(tmp_path, monkeypat
         assert response.status_code == 200
         response = client.patch("/capabilities/video", json={"enabled": True})
         assert response.status_code == 200 and response.json()["load_error"] is None
-        names = {"tool_vid_probe", "tool_vid_download", "tool_vid_status", "tool_vid_listFiles"}
+        names = {"tool_vid_probe", "tool_vid_download", "tool_vid_status", "tool_vid_listFiles", "tool_vid_package", "tool_vid_packages"}
         assert set(response.json()["tools"]) == names
         assert importlib.import_module("src.capabilities.video_downloader.utils.policy.socket_guard") is guard_module
         help_response = client.get("/commands/help/video")

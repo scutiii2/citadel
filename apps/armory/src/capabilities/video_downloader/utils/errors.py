@@ -27,6 +27,8 @@ class ErrorCode(StrEnum):
     LIMIT_EXCEEDED = "limit_exceeded"
     FILE_NOT_FOUND = "file_not_found"
     JOB_NOT_FOUND = "job_not_found"
+    PACKAGE_NOT_FOUND = "package_not_found"
+    PACKAGE_LOCKED = "package_locked"
     INVALID_REQUEST = "invalid_request"
     INTERNAL = "internal_error"
 
@@ -48,6 +50,8 @@ _HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.LIMIT_EXCEEDED: 413,
     ErrorCode.FILE_NOT_FOUND: 404,
     ErrorCode.JOB_NOT_FOUND: 404,
+    ErrorCode.PACKAGE_NOT_FOUND: 404,
+    ErrorCode.PACKAGE_LOCKED: 409,
     ErrorCode.INVALID_REQUEST: 422,
     ErrorCode.INTERNAL: 500,
 }

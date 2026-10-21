@@ -8,6 +8,7 @@ import UrlBar from '../components/videoDownloader/UrlBar.vue'
 import ProbeCard from '../components/videoDownloader/ProbeCard.vue'
 import JobCard from '../components/videoDownloader/JobCard.vue'
 import FileRow from '../components/videoDownloader/FileRow.vue'
+import PackagePanel from '../components/videoDownloader/PackagePanel.vue'
 import { useVideoDownloaderStore } from '../stores/videoDownloader'
 import { useAuthStore } from '../stores/auth'
 import { plural } from '../utils/videoDownloader/format'
@@ -62,6 +63,7 @@ async function confirmAction(): Promise<void> {
       <UrlBar v-model="store.url" :loading="store.checking" :can-check="store.canCheck" @check="store.check()" />
       <p v-if="store.error" class="error" role="alert">{{ store.error }}</p>
       <ProbeCard v-if="store.result" :result="store.result" :selected="store.selected" :busy="store.starting" @select="store.select" @download="store.start()" />
+      <PackagePanel :source="store.result" :preset="store.selectedOption?.id ?? null" @completed="store.refreshFiles()" />
       <section v-if="store.jobs.length" aria-label="Downloads">
         <h3>Downloads</h3>
         <ul class="list">

@@ -21,6 +21,29 @@ HEADERS = {"X-Internal-Token": "test", "X-Requester-Uid": "alice"}
 OTHER = {**HEADERS, "X-Requester-Uid": "bob"}
 
 
+def test_video_package_routes_ownership_and_lock(native):
+    client, _, runtime, _ = native
+    created = client.post('/video/ui/packages', headers=HEADERS, json={'name': 'Mix'})
+    assert created.status_code == 200
+    package_id = created.json()['package_id']
+    path = f'/video/ui/packages/{package_id}'
+    assert client.get('/video/ui/packages', headers=OTHER).json() == []
+    assert client.get(path, headers=OTHER).status_code == 404
+    assert client.get('/video/ui/packages/missing', headers=OTHER).json() == client.get(path, headers=OTHER).json()
+    added = client.post(path + '/items', headers=HEADERS, json={'url': 'https://example.com/a', 'preset': 'best'})
+    assert len(added.json()['items']) == 1
+    started = client.post(path + '/start', headers=HEADERS, json={})
+    assert started.status_code == 200
+    late = client.post(path + '/items', headers=HEADERS, json={'url': 'https://example.com/b', 'preset': 'best'})
+    assert late.status_code == 409 and late.json()['error']['code'] == 'package_locked'
+    async def wait(service):
+        from src.capabilities.video_downloader.utils.service import Caller
+        return await service.wait(service.get_job(Caller('uid:alice'), started.json()['job_id']))
+    runtime.call(wait)
+    status = client.get(path, headers=HEADERS).json()
+    assert status['state'] == 'done' and status['status']['file']['kind'] == 'package'
+
+
 @pytest.fixture
 def native(tmp_path, monkeypatch):
     from src.capabilities.video_downloader import domain

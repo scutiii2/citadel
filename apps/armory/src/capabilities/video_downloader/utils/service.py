@@ -63,6 +63,8 @@ class DownloadService:
         self._limits = limits
         self._public_base_url = public_base_url.rstrip("/")
         self._file_ttl = file_ttl_seconds
+        from .packages import PackageManager
+        self.packages = PackageManager(self)
 
     @property
     def store(self) -> FileStore:
@@ -119,6 +121,21 @@ class DownloadService:
             )
 
     async def _run_download(self, session: str, url: str, preset: Preset, emit: Emit, cancel: threading.Event) -> dict:
+        work_dir = await self._store.make_work_dir()
+        try:
+            info, downloaded = await self._download_to_work(session, url, preset, work_dir, emit, cancel)
+            suffix = downloaded.path.suffix
+            stored = await self._store.commit_file(
+                session, downloaded.path, name=safe_filename(info.title, "media") + suffix,
+                mime=mime_for(suffix), kind=preset.kind, duration=info.duration,
+            )
+        finally:
+            await self._store.remove_work_dir(work_dir)
+        file = self.file_info(stored)
+        return {"file_id": stored.file_id, "file": file.model_dump(mode="json")}
+
+    async def _download_to_work(self, session, url, preset, work_dir, emit, cancel):
+        """Shared guarded extraction for single downloads and package members; caller owns scratch cleanup."""
         info = await asyncio.to_thread(self._extractor.probe, url)
         if cancel.is_set():  # cancelled while probing: don't start the download
             raise DownloaderError(ErrorCode.CANCELLED, "The download was cancelled.")
@@ -130,32 +147,20 @@ class DownloadService:
             else:
                 emit({"type": "progress", "percent": progress.percent, "speed": progress.speed, "eta": progress.eta})
 
-        work_dir = await self._store.make_work_dir()
-        try:
-            downloaded = await asyncio.to_thread(
-                self._extractor.download,
-                url,
-                preset,
-                work_dir,
-                max_bytes=self._limits.max_file_bytes,
-                # The download extracts again; duration and live status are re-checked on that extraction.
-                max_duration_seconds=self._limits.max_duration_seconds,
-                on_progress=on_progress,
-                cancel=cancel,
-            )
-            suffix = downloaded.path.suffix
-            stored = await self._store.commit_file(
-                session,
-                downloaded.path,
-                name=safe_filename(info.title, "media") + suffix,
-                mime=mime_for(suffix),
-                kind=preset.kind,
-                duration=info.duration,
-            )
-        finally:
-            await self._store.remove_work_dir(work_dir)
-        file = self.file_info(stored)
-        return {"file_id": stored.file_id, "file": file.model_dump(mode="json")}
+        downloaded = await asyncio.to_thread(
+            self._extractor.download,
+            url,
+            preset,
+            work_dir,
+            max_bytes=self._limits.max_file_bytes,
+            # The download extracts again; duration and live status are re-checked on that extraction.
+            max_duration_seconds=self._limits.max_duration_seconds,
+            on_progress=on_progress,
+            cancel=cancel,
+        )
+        if cancel.is_set():
+            raise DownloaderError(ErrorCode.CANCELLED, "The download was cancelled.")
+        return info, downloaded
 
     # --- jobs --------------------------------------------------------------
 
@@ -219,6 +224,7 @@ class DownloadService:
     async def sweep(self) -> int:
         """Delete expired files and forget old finished jobs."""
         self._jobs.prune(older_than=time.time() - self._file_ttl)
+        self.packages.prune(time.time() - self._file_ttl)
         return await self._store.sweep()
 
 

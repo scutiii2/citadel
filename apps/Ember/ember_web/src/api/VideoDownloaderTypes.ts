@@ -1,6 +1,6 @@
 // Mirrors video_downloader/src/models.py and the job events in src/service.py. Keep both in step.
 
-export type FileKind = 'video' | 'audio' | 'photo'
+export type FileKind = 'video' | 'audio' | 'photo' | 'package'
 export type JobState = 'queued' | 'downloading' | 'processing' | 'done' | 'error'
 
 export interface FileInfo {
@@ -50,4 +50,22 @@ export interface JobStatus {
   eta: number | null
   file: FileInfo | null // null for a done job whose file has since been deleted or expired
   error: { code: string; message: string } | null
+}
+
+export interface PackageItem {
+  item_id: string
+  url: string
+  preset: string
+  title: string | null
+  state: 'pending' | 'downloading' | 'done' | 'error'
+  error: { code: string; message: string } | null
+}
+
+export interface MediaPackage {
+  package_id: string
+  name: string
+  state: 'draft' | JobState
+  items: PackageItem[]
+  job_id: string | null
+  status: JobStatus | null
 }

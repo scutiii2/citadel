@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PresetOption(BaseModel):
@@ -31,7 +31,7 @@ from src.capabilities.video_downloader.utils.store.file_store import StoredFile 
 class FileInfo(BaseModel):
     file_id: str
     name: str
-    kind: str  # video, audio or photo (image/ZIP)
+    kind: str  # video, audio, photo (image/ZIP), or package (ZIP)
     mime: str
     size: int
     duration: float | None = None
@@ -74,3 +74,29 @@ class ProbeRequest(BaseModel):
 class DownloadRequest(BaseModel):
     url: str
     preset: str
+
+
+class PackageCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=150)
+
+
+class PackageAdd(DownloadRequest):
+    url: str = Field(min_length=1, max_length=8192)
+
+
+class PackageItem(BaseModel):
+    item_id: str
+    url: str
+    preset: str
+    title: str | None = None
+    state: str = 'pending'
+    error: ErrorInfo | None = None
+
+
+class PackageInfo(BaseModel):
+    package_id: str
+    name: str
+    state: str = 'draft'
+    items: list[PackageItem] = Field(default_factory=list)
+    job_id: str | None = None
+    status: JobStatus | None = None

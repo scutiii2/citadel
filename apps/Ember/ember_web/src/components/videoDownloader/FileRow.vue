@@ -10,7 +10,7 @@ defineEmits<{ remove: [] }>()
 
 <template>
   <li class="row">
-    <span class="kind" :class="file.kind">{{ file.mime === 'application/zip' ? 'photo ZIP' : file.kind === 'audio' ? 'music' : file.kind }}</span>
+    <span class="kind" :class="file.kind">{{ file.kind === 'package' ? 'package ZIP' : file.mime === 'application/zip' ? 'photo ZIP' : file.kind === 'audio' ? 'music' : file.kind }}</span>
     <div class="grow">
       <div class="name" :title="file.name">{{ file.name }}</div>
       <div class="muted small">

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from src.capabilities.video_downloader.utils.models import FileInfo, JobStatus, ProbeResult
+from src.capabilities.video_downloader.utils.models import FileInfo, JobStatus, ProbeResult, PackageInfo
 
 
 class ProbeToolResult(ProbeResult):
@@ -22,4 +22,21 @@ class StatusToolResult(JobStatus):
 
 class ListFilesResult(BaseModel):
     files: list[FileInfo]
+    message: str
+
+
+class PackageFailure(BaseModel):
+    url: str
+    code: str
+    message: str
+
+
+class PackageToolResult(BaseModel):
+    package: PackageInfo
+    failed: list[PackageFailure] = []
+    message: str
+
+
+class ListPackagesResult(BaseModel):
+    packages: list[PackageInfo]
     message: str
