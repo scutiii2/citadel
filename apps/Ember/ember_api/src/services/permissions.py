@@ -30,8 +30,10 @@ TRAFFIC_VIEW = "traffic.view"
 AGENTS_MANAGE = "agents.manage"
 TICKETS_CREATE = "tickets.create"
 TICKETS_MANAGE = "tickets.manage"
+BRAIN_INSTANCE_PUBLISH = "brain.instance.publish"
 
 ALL_PERMISSIONS = MappingProxyType({
+    BRAIN_INSTANCE_PUBLISH: "Publish durable knowledge to the shared Instance Brain",
     CHAT_USE: "Chat with ai_agent instances",
     TOOLS_VIEW: "Browse tools, capabilities, help and resources",
     TOOLS_EXECUTE: "Run tools directly and through chat agents",

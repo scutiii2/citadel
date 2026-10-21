@@ -61,6 +61,8 @@ class ChatSummary:
     message_count: int
     updated_at: str
     running: bool
+    save_to_second_brain: bool = False
+    second_brain_scope: str = "instance"
 
 
 @dataclass(frozen=True)
@@ -90,6 +92,8 @@ def _summary(data: dict[str, Any]) -> ChatSummary:
         message_count=int(data.get("message_count", 0)),
         updated_at=str(data.get("updated_at", "")),
         running=bool(data.get("running", False)),
+        save_to_second_brain=bool(data.get("save_to_second_brain", False)),
+        second_brain_scope="personal" if data.get("second_brain_scope") == "personal" else "instance",
     )
 
 
@@ -187,6 +191,8 @@ class EmberClient:
         title: str | None = None,
         ask_before_tools: bool = False,
         allowed_tools: list[str] | None = None,
+        save_to_second_brain: bool | None = None,
+        second_brain_scope: str | None = None,
     ) -> int:
         """Saves the question and starts the answer. Returns the sequence to watch events after."""
         body: dict[str, Any] = {"question": question, "agent_id": agent_id, "caveman": False, "enabled_extensions": []}
@@ -195,6 +201,12 @@ class EmberClient:
         if ask_before_tools:
             body["ask_before_tools"] = True
             body["allowed_tools"] = allowed_tools or []
+        if save_to_second_brain is not None:
+            body["save_to_second_brain"] = save_to_second_brain
+        if second_brain_scope is not None:
+            if second_brain_scope not in {"instance", "personal"}:
+                raise ValueError("Choose instance or personal brain")
+            body["second_brain_scope"] = second_brain_scope
         data = await self._request("POST", f"/api/chats/{chat_id}/turns", body=body)
         return int(data["sequence"])
 

@@ -17,12 +17,12 @@ logger = logging.getLogger(__name__)
 
 @catalog
 class IndexRuntime:
-    def __init__(self, index, interval: float):
+    def __init__(self, index, interval: float, *, stop=None):
         self.index = index
         self.interval = max(1, interval)
         self.refreshing = False
         self.error = ""
-        self._stop = threading.Event()
+        self._stop = stop if stop is not None else threading.Event()
         self._thread = threading.Thread(target=self._run, name="obsidian-index", daemon=True)
         self._thread.start()
 

@@ -23,6 +23,7 @@ defineProps<{
   /** Puts a dot on the gear, e.g. while a tool waits for an answer. */
   attention: boolean;
   secondBrainAvailable?: boolean;
+  secondBrainScope?: "instance" | "personal" | null;
   saveToSecondBrain?: boolean;
   secondBrainPending?: boolean;
 }>();
@@ -33,6 +34,7 @@ const emit = defineEmits<{
   "update:planLean": [value: boolean];
   "update:chime": [value: boolean];
   "update:saveToSecondBrain": [value: boolean];
+  "update:secondBrainScope": [value: "instance" | "personal"];
   "clear-allowed": [];
 }>();
 
@@ -82,11 +84,16 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
     <div v-if="open" class="panel" role="group" aria-label="Chat settings" @keydown.esc.stop="closeWithEscape">
       <p class="note">Applies instantly. Saved on this device.</p>
       <template v-if="secondBrainAvailable">
+          <label>Auto-save destination
+            <select :value="secondBrainScope ?? ''" :disabled="secondBrainPending" @change="emit('update:secondBrainScope', ($event.target as HTMLSelectElement).value as 'instance' | 'personal')">
+              <option disabled value="">Choose a brain</option><option value="personal">Personal Brain (only you)</option><option value="instance">Instance Brain (all signed-in users)</option>
+            </select>
+          </label>
         <ToggleSwitch
           small
           title="Ask the agent to save a summary after each exchange. Tool approval and vault write settings still apply."
           :checked="saveToSecondBrain ?? false"
-          :disabled="secondBrainPending"
+          :disabled="secondBrainPending || secondBrainScope === null"
           :aria-busy="secondBrainPending ?? false"
           @change="emit('update:saveToSecondBrain', checked($event))"
         >Save to second brain</ToggleSwitch>

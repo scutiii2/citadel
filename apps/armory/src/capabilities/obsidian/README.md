@@ -1,6 +1,6 @@
 # capabilities/obsidian/
 
-Six tools for the Obsidian **Local REST API** plugin and a hybrid index of its read-only mounted vault. Chat id `obsidian`, label "Obsidian". The configured vault is shared by callers of this Armory instance; it is separate from ember's per-account Notes and filesystem-based `/vault` capability.
+Six tools for authorized instance and personal Obsidian brains, with remote or legacy mounted hybrid retrieval. Chat id `obsidian`, label "Obsidian". Distinct from per-account Notes and the filesystem-based `/vault` capability. Shared writes require `brain.instance.publish`; all reads require trusted signed-in identity.
 
 ## Tools
 
@@ -11,18 +11,18 @@ Six tools for the Obsidian **Local REST API** plugin and a hybrid index of its r
 | `tool_obsidian_read` | Read fenced, capped note text | HTTPS / Bearer |
 | `tool_obsidian_write` | Create a .md note; replace only with `overwrite=true` and writes enabled | HTTPS / Bearer |
 | `tool_obsidian_append` | Append to a .md note when writes are enabled | HTTPS / Bearer |
-| `tool_obsidian_semanticSearch` | Hybrid search with heading citations and wikilink boost | Local mount / Ollama / SQLite |
+| `tool_obsidian_semanticSearch` | Hybrid search with heading citations and wikilink boost | REST or legacy mount / Ollama / SQLite |
 
 ## Slash commands
 
 | Tool | Slash command | Parameters |
 | --- | --- | --- |
-| `tool_obsidian_list` | `/obsidian list` | <ul><li>`folder` - optional, default `""`. Vault-relative folder; empty means root.</li></ul> |
-| `tool_obsidian_search` | `/obsidian search` | <ul><li>`query` - required. Simple text search query.</li></ul> |
-| `tool_obsidian_read` | `/obsidian read` | <ul><li>`path` - required. Vault-relative note path.</li></ul> |
-| `tool_obsidian_write` | `/obsidian write` | <ul><li>`path` - required. Vault-relative .md path.</li><li>`text` - required. Full Markdown text; empty clears the note when replacing.</li><li>`overwrite` - optional, default `false`. Set true to permit replacing an existing note.</li></ul> |
-| `tool_obsidian_append` | `/obsidian append` | <ul><li>`path` - required. Vault-relative .md path.</li><li>`text` - required. Literal Markdown to append.</li></ul> |
-| `tool_obsidian_semanticSearch` | `/obsidian semantic_search` | <ul><li>`query` - required. Meaning or keywords.</li><li>`top_k` - optional, default `5`. Number of cited chunks, between 1 and 20.</li></ul> |
+| `tool_obsidian_list` | `/obsidian list` | <ul><li>`folder` - optional, default `""`. Vault-relative folder; empty means root.</li><li>`scope` - optional, default `instance`. `instance` or `personal`.</li></ul> |
+| `tool_obsidian_search` | `/obsidian search` | <ul><li>`query` - required. Simple text search query.</li><li>`scope` - optional, default `instance`. `instance` or `personal` or both for searching.</li></ul> |
+| `tool_obsidian_read` | `/obsidian read` | <ul><li>`path` - required. Vault-relative note path.</li><li>`scope` - optional, default `instance`. `instance` or `personal`.</li></ul> |
+| `tool_obsidian_write` | `/obsidian write` | <ul><li>`path` - required. Vault-relative .md path.</li><li>`text` - required. Full Markdown text; empty clears the note when replacing.</li><li>`overwrite` - optional, default `false`. Set true to permit replacing an existing note.</li><li>`scope` - optional, default `instance`. `instance` or `personal`.</li></ul> |
+| `tool_obsidian_append` | `/obsidian append` | <ul><li>`path` - required. Vault-relative .md path.</li><li>`text` - required. Literal Markdown to append.</li><li>`scope` - optional, default `instance`. `instance` or `personal`.</li></ul> |
+| `tool_obsidian_semanticSearch` | `/obsidian semantic_search` | <ul><li>`query` - required. Meaning or keywords.</li><li>`top_k` - optional, default `5`. Number of cited chunks, between 1 and 20.</li><li>`scope` - optional, default `instance`. `instance` or `personal` or both for searching.</li></ul> |
 
 ## Typical workflow
 
@@ -95,3 +95,22 @@ Point the plugin at the dedicated Citadel vault on ZimaOS. Use these vault-relat
 This capability does not create the vault or enable automatic writes. Per-chat automatic saving is controlled separately in Ember.
 
 Protocol reference: [Local REST API OpenAPI specification](https://github.com/coddingtonbear/obsidian-local-rest-api/blob/main/docs/openapi.yaml). Structure follows the [capability conventions](../README.md).
+
+## Managed connections and promotion
+
+Ember API owns encrypted, revisioned connections. Armory resolves each operation
+through `EMBER_API_URL` (local default `http://127.0.0.1:8030`, Compose
+`http://ember_api:8030`) using the shared internal token and trusted requester UID.
+Saved/disabled revisions apply without a restart; they override legacy environment
+configuration. Personal HTTPS connections pin checked DNS addresses, reject
+backend loopback/link-local/metadata and redirects, and always verify TLS.
+
+The internal `/brains/operation` gateway supports dedicated signed-in browsing
+without a Supermarket opt-in and deterministic create-only publication for Ember.
+Promotion checks Local REST API >=5.2.0 for documented conditional-create support.
+AI selection happens only in Ember's tool-free interpretation path; Armory never
+calls a model to choose Notes for promotion.
+
+Managed indexes are leased by connection/generation/model, with bounded refresh
+and embedding concurrency, idle retirement, source attribution and partial-source
+errors. See [full operations and state lifecycle](../../../../../docs/obsidian-brains.md).

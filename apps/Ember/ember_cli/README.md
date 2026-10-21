@@ -98,3 +98,11 @@ The tests use a fake ember_api and a scripted prompt. The client was also run on
 ember_api (its own code, a temporary database and a fake agent): login, the agent list, a streamed
 answer with a tool approval, `/chats`, `/open`, `/usage`, logout. That run predates ember_api's switch to
 one entry agent (`GET /api/agent`); chat_cli now asks for the entry agent and has no agent picker.
+
+## Brain destination compatibility
+
+Chat summaries preserve `save_to_second_brain` and `second_brain_scope`, defaulting
+older records to disabled/instance. The API client accepts optional explicit
+auto-save/destination turn parameters and omits them when unspecified, preserving
+the server preference. New vault settings and promotion review remain in Ember
+Web/Admin. See [Obsidian brains](../../../docs/obsidian-brains.md).

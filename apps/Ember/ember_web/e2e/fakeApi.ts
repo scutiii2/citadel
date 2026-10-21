@@ -566,6 +566,11 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       return json(route, { kind, choice: options[0]!.title, probabilities, confidence: 0.8, uncertain: false });
     }
 
+    if (method === "GET" && path.startsWith("/api/brains/connections/")) return json(route, {
+      id: null, scope: path.endsWith("instance") ? "instance" : "personal", label: "Brain", endpoint: "", folder: "Inbox",
+      enabled: false, allow_write: false, credential_configured: false, revision: 0, generation: null, status: "not_configured"
+    });
+    if (method === "GET" && ["/api/brains/destinations", "/api/brains/suggestions", "/api/brains/promotions"].includes(path)) return json(route, []);
     // Laya's tag suggestions. The fake "reads" the note: it suggests the account's tags that the text mentions.
     if (path === "/api/notes/suggest-tags" && method === "POST") {
       const { title, body, tags } = request.postDataJSON() as NoteBody;

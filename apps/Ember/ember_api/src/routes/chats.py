@@ -40,6 +40,7 @@ from src.deps import (
 from src.models import Account, Chat
 from src.routes.mcp import get_agent_directory
 from src.routes.server_info import EXTENSION_ID_PATTERN, get_server_info
+from src.services.brain_connections import BrainConnections
 from src.services import question_answers, second_brain, suggestions, summarization
 from src.services.agent_directory import NO_AGENT_RUNNING, AgentDirectory
 from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
@@ -220,6 +221,7 @@ class UpdateChatRequest(BaseModel):
     folder_id: int | None = None
     pinned: bool | None = None
     save_to_second_brain: bool | None = None
+    second_brain_scope: Literal["instance", "personal"] | None = None
 
     @field_validator("title")
     @classmethod
@@ -228,7 +230,7 @@ class UpdateChatRequest(BaseModel):
 
     @model_validator(mode="after")
     def something_to_change(self) -> UpdateChatRequest:
-        if self.title is None and self.pinned is None and self.save_to_second_brain is None and "folder_id" not in self.model_fields_set:
+        if self.title is None and self.pinned is None and self.save_to_second_brain is None and self.second_brain_scope is None and "folder_id" not in self.model_fields_set:
             raise ValueError("send a title, a folder_id, pinned or save_to_second_brain")
         return self
 
@@ -256,6 +258,7 @@ class TurnRequest(BaseModel):
     caveman: bool = False
     # None uses the saved preference; older clients never enable it accidentally.
     save_to_second_brain: bool | None = None
+    second_brain_scope: Literal["instance", "personal"] | None = None
     # The agent may keep a task checklist (update_plan); plan_lean asks it to update the list only on a status change.
     plan: bool = True
     plan_lean: bool = True
@@ -358,6 +361,7 @@ class ChatSummaryOut(BaseModel):
     folder_id: int | None = None
     pinned: bool = False
     save_to_second_brain: bool = False
+    second_brain_scope: Literal["instance", "personal"] = "instance"
 
     @classmethod
     def of(cls, chat: Chat, running: bool = False) -> ChatSummaryOut:
@@ -372,6 +376,7 @@ class ChatSummaryOut(BaseModel):
             folder_id=chat.folder_id,
             pinned=chat.pinned,
             save_to_second_brain=chat.save_to_second_brain,
+            second_brain_scope=chat.second_brain_scope,
         )
 
 
@@ -543,20 +548,22 @@ async def search_chats(
     return [SearchHitOut.of(hit) for hit in await search.search(q)]
 
 
-async def _second_brain_available(account: Account, store: DocumentStore, info: McpServerInfo) -> bool:
+async def _second_brain_available(account: Account, store: DocumentStore, info: McpServerInfo, box=None, scope="instance") -> bool:
     try:
-        return await second_brain.available(account, store, info)
+        return await second_brain.available(account, store, info, scope=scope, connections=BrainConnections(store, box) if box else None)
     except (DbGatewayError, McpServerUnavailable, McpServerRefused):
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Could not check Obsidian capability availability") from None
 
 
 @router.get("/second-brain")
 async def second_brain_status(
+    scope: Literal["instance", "personal", "both"] = "instance",
+    box: SecretBox = Depends(get_secret_box),
     account: Account = Depends(require_chat),
     store: DocumentStore = Depends(get_db_gateway),
     info: McpServerInfo = Depends(get_server_info),
 ) -> dict[str, bool]:
-    return {"available": await _second_brain_available(account, store, info)}
+    return {"available": await _second_brain_available(account, store, info, box, scope)}
 
 
 @router.get("/{chat_id}")
@@ -640,6 +647,7 @@ async def put_chat(
 @router.patch("/{chat_id}")
 async def update_chat(
     body: UpdateChatRequest,
+    box: SecretBox = Depends(get_secret_box),
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
@@ -650,12 +658,13 @@ async def update_chat(
 ) -> ChatSummaryOut:
     """Renames, files (folder_id; null takes it out of its folder) or pins a
     chat. Allowed while an answer is being written: it changes no messages."""
-    changes: dict[str, Any] = {"title": body.title, "pinned": body.pinned, "save_to_second_brain": body.save_to_second_brain}
+    changes: dict[str, Any] = {"title": body.title, "pinned": body.pinned, "save_to_second_brain": body.save_to_second_brain, "second_brain_scope": body.second_brain_scope}
     if "folder_id" in body.model_fields_set:
         changes["folder_id"] = body.folder_id
     try:
-        await chats.get(chat_id)
-        if body.save_to_second_brain is True and not await _second_brain_available(account, store, info):
+        previous = await chats.get(chat_id)
+        destination = body.second_brain_scope or previous.second_brain_scope
+        if (body.save_to_second_brain is True or body.second_brain_scope is not None and previous.save_to_second_brain) and not await _second_brain_available(account, store, info, box, destination):
             raise HTTPException(status.HTTP_409_CONFLICT, "Add and activate the Obsidian capability before enabling auto-save")
         chat = await chats.update(chat_id, **changes)
     except ChatNotFound as error:
@@ -762,15 +771,22 @@ async def start_turn(
         raise limit_reached(block)
 
     try:
-        saved_preference = (await chats.get(chat_id)).save_to_second_brain
+        saved_chat = await chats.get(chat_id)
+        saved_preference = saved_chat.save_to_second_brain
+        saved_scope = saved_chat.second_brain_scope
     except ChatNotFound:
         saved_preference = False
+        saved_scope = "instance"
+    brain_scope = body.second_brain_scope or saved_scope
+    brain_notice = ""
     auto_save = saved_preference if body.save_to_second_brain is None else body.save_to_second_brain
     if auto_save:
-        active = await _second_brain_available(account, db_gateway, info)
+        active = await _second_brain_available(account, db_gateway, info, box, brain_scope)
         permitted = active and "tool_obsidian_write" not in body.disabled_tools and "*" not in body.disabled_tools
         if body.save_to_second_brain is True and not permitted:
             raise HTTPException(status.HTTP_409_CONFLICT, "Add and activate Obsidian and enable its write tool before auto-saving")
+        if not permitted:
+            brain_notice = "Auto-save was disabled because the selected brain or publish permission is unavailable. No other destination was used."
         auto_save = permitted
 
     question = {"role": "user", "content": body.question, "at": message_time()}
@@ -788,8 +804,8 @@ async def start_turn(
     except ChatLimitError as error:
         raise _too_large(error) from error
 
-    if body.save_to_second_brain is not None:
-        chat = await chats.update(chat_id, save_to_second_brain=body.save_to_second_brain)
+    if body.save_to_second_brain is not None or body.second_brain_scope is not None or brain_notice:
+        chat = await chats.update(chat_id, save_to_second_brain=auto_save, second_brain_scope=brain_scope)
 
     # When the administrator requires it, the browser's choice does not matter:
     # every tool asks, and no tool is pre-allowed.
@@ -806,6 +822,8 @@ async def start_turn(
         options = TurnOptions(
             caveman=body.caveman,
             save_to_second_brain=auto_save,
+            second_brain_scope=brain_scope,
+            second_brain_notice=brain_notice,
             plan=body.plan,
             plan_lean=body.plan_lean,
             exact_context=body.exact_context,

@@ -17,8 +17,8 @@ from src.db import Base, Database
 from src.services.migrations import BASELINE, MIGRATIONS_DIR, MigrationRunner
 
 # The newest real migration; the tests' throwaway one comes after it.
-HEAD = "0024"
-NEXT = "0025"
+HEAD = "0025"
+NEXT = "0026"
 
 
 def drop_account_uid(conn: sqlite3.Connection) -> None:
@@ -37,6 +37,8 @@ def drop_log_prompts(conn: sqlite3.Connection) -> None:
 
 def drop_second_brain(conn: sqlite3.Connection) -> None:
     """Undo the chat option on model-built databases rewound before 0024."""
+    if "second_brain_scope" in {row[1] for row in conn.execute("PRAGMA table_info(chats)")}:
+        conn.execute("ALTER TABLE chats DROP COLUMN second_brain_scope")
     if "save_to_second_brain" in {row[1] for row in conn.execute("PRAGMA table_info(chats)")}:
         conn.execute("ALTER TABLE chats DROP COLUMN save_to_second_brain")
 
@@ -290,7 +292,7 @@ def test_account_uid_is_backfilled_unique_and_removed_by_the_downgrade(tmp_path:
 
     with closing(sqlite3.connect(path)) as conn:
         for table, rows in children.items():
-            expected = [(*row, 0) for row in rows] if table == "chats" else rows
+            expected = [(*row, 0, "instance") for row in rows] if table == "chats" else rows
             assert conn.execute(f"SELECT * FROM {table}").fetchall() == expected
         uids = [row[0] for row in conn.execute("SELECT uid FROM accounts ORDER BY id")]
         assert len(uids) == 2 and len(set(uids)) == 2
@@ -450,7 +452,7 @@ class TestDatabaseFromBeforeMigrations:
     def test_it_is_only_stamped_when_the_baseline_is_the_newest_revision(self, tmp_path: Path) -> None:
         path = self.build_legacy(tmp_path)
         scripts = tmp_path / "baseline_only"
-        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*", "0024*"))
+        shutil.copytree(MIGRATIONS_DIR, scripts, ignore=shutil.ignore_patterns("__pycache__", "0002*", "0003*", "0004*", "0005*", "0006*", "0007*", "0008*", "0009*", "0010*", "0011*", "0012*", "0013*", "0014*", "0015*", "0016*", "0017*", "0018*", "0019*", "0020*", "0021*", "0022*", "0023*", "0024*", "0025*"))
         calls: list[int] = []
 
         async def backup() -> None:

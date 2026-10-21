@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StrictBool
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +34,7 @@ from src.services.nav_preference_service import purge_owner as purge_nav_prefere
 from src.services.template_service import purge_owner as purge_templates
 from src.services.user_extension_service import purge_owner as purge_user_extensions
 from src.services.notes import purge_owner as purge_notes
+from src.services.brain_connections import purge_owner as purge_brains
 from src.services.otp_service import OtpService
 from src.services.permissions import (
     ADMIN_ROLE, is_known_permission, ADMIN_PERMISSIONS, ACCOUNTS_VIEW, ACCOUNTS_MANAGE,
@@ -297,6 +298,7 @@ async def update_account(
 @router.delete("/accounts/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_account(
     account_id: int,
+    request: Request,
     admin: Account = Depends(require_accounts_delete),
     admin_service: AdminService = Depends(get_admin_service),
     logs: LogWriter = Depends(get_log_writer),
@@ -323,6 +325,14 @@ async def delete_account(
         await purge_account_capabilities(store, uid)
         await purge_templates(store, uid)
         await purge_user_extensions(store, uid)
+        await purge_brains(store, uid)
+        from src.services.brain_gateway import BrainGateway
+        from src.services.brain_connections import BrainError
+        try:
+            await BrainGateway(request.app.state.upstream, request.app.state.settings.mcp_server_url,
+                request.app.state.internal_token).operation(uid, "retire", "personal")
+        except BrainError:
+            await logs.error(admin.id, "admin.brain_purge", "Personal derived brain state could not be purged; access has been revoked")
     except DbGatewayError as error:
         await logs.error(
             admin.id, "admin.settings_purge", f"Saved settings of deleted account '{username}' were not purged ({error})"

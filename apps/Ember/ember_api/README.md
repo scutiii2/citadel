@@ -743,3 +743,29 @@ db_gateway's `configs/config_connections.json` (see its `.example`). Calls send 
 gateway. Routes get it from `get_db_gateway` in `src/deps.py`; tests use `FakeDbGateway`
 (the `db_gateway` fixture). The notes routes are the first user.
 
+
+## Obsidian brains
+
+Authenticated `/api/brains` routes manage scoped vault connections and Notes
+promotion. See [operations and storage](../../../docs/obsidian-brains.md).
+
+| Route | Responsibility |
+| --- | --- |
+| `GET/PUT /api/brains/connections/{instance|personal}` | Safe settings read and revision-checked explicit save; instance management requires `settings.manage`. |
+| `POST /api/brains/connections/{scope}/test` | Bounded read-only candidate test; no activation or publication. |
+| `GET /api/brains/destinations` | Authorized destination labels, revisions and write availability. |
+| `POST /api/brains/browse` | Signed-in browse/read/status/scoped hybrid search, independent of Supermarket opt-in. |
+| `POST /api/brains/internal/resolve` | Internal-token/trusted-UID snapshots for Armory; never a browser credential API. |
+| `GET /api/brains/notes/{id}/review` | Owned Note content/hash/revision for publication review. |
+| `GET /api/brains/promotions` | Owned publication receipts and changed-source state. |
+| `POST /api/brains/notes/{id}/promote` | Recoverable, create-only reviewed publication; preserves the source Note. |
+| `POST /api/brains/promotions/{id}/reconcile` | Confirm a pending write by content hash without another write. |
+| `GET /api/brains/suggestions` | Current, authorized, non-dismissed AI proposals. |
+| `POST /api/brains/suggestions/review` | Explicit AI review, private-note consent, 20 Notes/40,000 characters, usage limits/accounting. |
+| `POST /api/brains/suggestions/{id}/dismiss` | Owned, content/destination-specific dismissal. |
+
+Migration `0025` grants `brain.instance.publish` to Administrator only and preserves
+existing chat auto-save destinations as `instance`. Chat summaries/updates/turns
+carry additive `second_brain_scope` (`instance|personal`); loss of access disables
+auto-save with a visible notice. Keys use existing SecretBox encryption in
+db_gateway, and account deletion purges all personal brain records.

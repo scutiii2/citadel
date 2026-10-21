@@ -91,6 +91,8 @@ class TurnOptions:
 
     caveman: bool = False
     save_to_second_brain: bool = False
+    second_brain_scope: str = "instance"
+    second_brain_notice: str = ""
     # Task checklist toggles: the agent may use update_plan, and updates it only on a status change.
     plan: bool = True
     plan_lean: bool = True
@@ -560,15 +562,18 @@ class TurnRegistry:
         if turn.options.private_skipped:
             await self._publish(turn, {"type": "notice", "notices": [dict(n) for n in turn.options.private_skipped]})
         agent_question = question
+        if turn.options.second_brain_notice:
+            await self._publish(turn, {"type": "notice", "notices": [{"id": "brain", "label": "Auto-save", "error": turn.options.second_brain_notice}]})
         if turn.options.save_to_second_brain:
             agent_question = second_brain.save_request(
-                question, turn.chat_id, turn.request_id, str(messages[-1].get("at") or message_time()),
+                question, turn.chat_id, turn.request_id, str(messages[-1].get("at") or message_time()), turn.options.second_brain_scope,
             )
         turn.asking = True
         try:
             result = await self._gateway.ask(
                 turn.agent.url,
-                turn.caller,
+                Caller(turn.caller.username, turn.caller.email, turn.caller.uid,
+                       turn.options.second_brain_scope if turn.options.save_to_second_brain else ""),
                 question=agent_question,
                 history=summarization.history_for_agent(earlier),
                 request_id=turn.request_id,

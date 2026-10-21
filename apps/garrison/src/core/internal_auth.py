@@ -57,6 +57,7 @@ class Requester:
     username: str = ""
     email: str = ""
     uid: str = ""
+    brain_scope: str = ""
 
     @classmethod
     def from_headers(cls, headers: Mapping[str, str] | None) -> "Requester":
@@ -69,6 +70,7 @@ class Requester:
             username if isinstance(username, str) else "",
             email if isinstance(email, str) else "",
             uid if isinstance(uid, str) else "",
+            headers.get("X-Brain-Destination", "") if headers.get("X-Brain-Destination", "") in {"personal", "instance"} else "",
         )
 
     def __bool__(self) -> bool:
@@ -99,6 +101,8 @@ def requester_meta() -> dict[str, Any] | None:
     identity = {"username": requester.username, "email": requester.email}
     if requester.uid:
         identity["uid"] = requester.uid
+    if requester.brain_scope:
+        identity["brain_scope"] = requester.brain_scope
     return {REQUESTER_META_KEY: identity}
 
 
@@ -115,6 +119,8 @@ def outbound_headers() -> dict[str, str]:
         headers[REQUESTER_EMAIL_HEADER] = requester.email
     if requester.uid:
         headers[REQUESTER_UID_HEADER] = requester.uid
+    if requester.brain_scope:
+        headers["X-Brain-Destination"] = requester.brain_scope
     return headers
 
 

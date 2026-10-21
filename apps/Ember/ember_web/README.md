@@ -582,3 +582,12 @@ Production browser tests cover phone layouts, installation metadata, offline she
 loading, API cache exclusion and reconnection.
 
 Usage shows only the logged-in account, including for administrators. Workspace and per-user usage inspection lives in ember_admin.
+
+## Brains and Notes promotion
+
+Settings contains the account-owned Personal Brain connection editor. `/brains`
+is available to every valid signed-in account for shared/personal browsing and
+scoped search. Notes supports manual publication review, AI suggestions and
+pending-write reconciliation while retaining the original Note. Shared publishing
+requires server permission and explicit audience review. Chat auto-save has an
+explicit destination. See [operations and verification](../../../docs/obsidian-brains.md).

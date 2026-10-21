@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BrainConnectionForm from "../components/BrainConnectionForm.vue";
 import PageLayout from "../components/PageLayout.vue";
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import { getCurrentInstance } from "vue";
@@ -184,7 +185,7 @@ const groups = computed(() =>
     (g) => g.defs.length > 0,
   ),
 );
-const noMatches = computed(() => shown.value.size === 0);
+const noMatches = computed(() => shown.value.size === 0 && (onlyModified.value || !/brain|obsidian|vault|connection/i.test(query.value)));
 
 const saved = computed(() => ({
   caveman: chat.caveman, plan: chat.plan, planLean: chat.planLean, approvalMode: chat.approvalMode, chime: chat.chime,
@@ -366,6 +367,7 @@ onMounted(() => {
       </div>
     </template>
     <div ref="root" class="column">
+      <BrainConnectionForm v-show="!onlyModified && (!query.trim() || /brain|obsidian|vault|connection/i.test(query))" scope="personal" />
       <p v-if="noMatches" class="muted empty">
         No settings match "{{ query }}".
         <button type="button" class="link" @click="query = ''">Clear search</button>

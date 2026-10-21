@@ -22,6 +22,7 @@ services:
       MCP_HOST: 0.0.0.0
       MCP_PORT: "8010"
       DB_GATEWAY_URL: http://treasury:8071
+      EMBER_API_URL: http://ember_api:8030
     volumes:
       - ./docker/configs/armory/extensions.json:/app/configs/config_extensions.json:ro
       - armory_data:/app/.data

@@ -277,6 +277,20 @@ export const useChatStore = defineStore("chat", () => {
   const secondBrainOnline = ref(false);
   const secondBrainPending = ref(false);
   const draftSecondBrain = ref(false);
+  const draftBrainScope = ref<"instance" | "personal" | null>(null);
+  const secondBrainScope = computed(() => active.value ? active.value.secondBrainScope ?? "instance" : draftBrainScope.value);
+  async function setSecondBrainScope(scope: "instance" | "personal") {
+    if (secondBrainPending.value) return;
+    const conversation = active.value;
+    if (!conversation) { draftBrainScope.value = scope; return; }
+    const started = generation;
+    secondBrainPending.value = true;
+    try {
+      const saved = await chatsClient.update(conversation.id, { second_brain_scope: scope });
+      if (started === generation) conversation.secondBrainScope = saved.second_brain_scope ?? scope;
+    } catch (error) { if (started === generation) saveError.value = errorMessage(error); }
+    finally { if (started === generation) secondBrainPending.value = false; }
+  }
   const secondBrainAvailable = computed(() => accountCaps.ready && accountCaps.capabilities.includes("obsidian")
     && auth.hasPermission("tools.execute") && secondBrainOnline.value);
   const saveToSecondBrain = computed(() => active.value ? (active.value.saveToSecondBrain ?? false) : draftSecondBrain.value);
@@ -303,6 +317,7 @@ export const useChatStore = defineStore("chat", () => {
     const conversation = active.value;
     if (!conversation) {
       draftSecondBrain.value = on;
+      if (on && !draftBrainScope.value) draftBrainScope.value = "instance";
       return; // A fresh chat is created and its preference saved with the first question.
     }
     const started = generation;
@@ -449,8 +464,8 @@ export const useChatStore = defineStore("chat", () => {
         // While a save is outstanding the local values win: this list may have
         // been requested before the change and would write the old ones back.
         const keepLocal = known !== undefined && (pending.length > 0 || saving);
-        const filing = keepLocal ? { folderId: known.folderId, pinned: known.pinned, saveToSecondBrain: known.saveToSecondBrain }
-          : { folderId: c.folderId, pinned: c.pinned, saveToSecondBrain: c.saveToSecondBrain };
+        const filing = keepLocal ? { folderId: known.folderId, pinned: known.pinned, saveToSecondBrain: known.saveToSecondBrain, secondBrainScope: known.secondBrainScope }
+          : { folderId: c.folderId, pinned: c.pinned, saveToSecondBrain: c.saveToSecondBrain, secondBrainScope: c.secondBrainScope };
         if (c.id === activeId.value && known) return { ...known, title: c.title, running: known.running, ...filing };
         return unchanged ? { ...known, title: c.title, ...filing } : { ...c, ...filing };
       });
@@ -516,7 +531,7 @@ export const useChatStore = defineStore("chat", () => {
       conversation.messages = detail.messages;
       conversation.messagesLoaded = true;
       conversation.running = detail.running;
-      if (!secondBrainPending.value) conversation.saveToSecondBrain = detail.saveToSecondBrain ?? false;
+      if (!secondBrainPending.value) { conversation.saveToSecondBrain = detail.saveToSecondBrain ?? false; conversation.secondBrainScope = detail.secondBrainScope ?? "instance"; }
       if (detail.running && id === activeId.value) follow(id, 0);
     } catch (err) {
       if (started === generation) loadError.value = errorMessage(err);
@@ -535,6 +550,7 @@ export const useChatStore = defineStore("chat", () => {
       clearSuggestion();
       generation += 1;
       draftSecondBrain.value = false;
+    draftBrainScope.value = null;
       secondBrainPending.value = false;
       pending = [];
       saveError.value = "";
@@ -920,7 +936,7 @@ export const useChatStore = defineStore("chat", () => {
       const turn = await chatsClient.startTurn(id, {
         question,
         caveman: caveman.value,
-        ...(sendSecondBrain ? { save_to_second_brain: autoSave } : {}),
+        ...(sendSecondBrain ? { save_to_second_brain: autoSave, second_brain_scope: secondBrainScope.value ?? "instance" } : {}),
         ...(plan.value ? {} : { plan: false }),
         ...(planLean.value ? {} : { plan_lean: false }),
         ...(contextPanel.value && contextAccuracy.value === "exact" ? { exact_context: true } : {}),
@@ -941,6 +957,7 @@ export const useChatStore = defineStore("chat", () => {
       if (started !== generation) return true;
       conversation.agentId = turn.chat.agent_id ?? undefined;
       conversation.saveToSecondBrain = turn.chat.save_to_second_brain ?? false;
+      conversation.secondBrainScope = turn.chat.second_brain_scope ?? "instance";
       conversation.running = true;
       conversation.updatedAt = Date.parse(`${turn.chat.updated_at}Z`);
       if (activeId.value === id) follow(id, turn.sequence, began);
@@ -1098,6 +1115,7 @@ export const useChatStore = defineStore("chat", () => {
 
   function newChat(): void {
     draftSecondBrain.value = false;
+    draftBrainScope.value = null;
     unfollow();
     clearSuggestion();
     sendError.value = "";
@@ -1469,6 +1487,8 @@ export const useChatStore = defineStore("chat", () => {
     setSearch,
     clearSearch,
     caveman,
+    secondBrainScope,
+    setSecondBrainScope,
     secondBrainAvailable,
     saveToSecondBrain,
     secondBrainPending,

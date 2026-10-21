@@ -156,6 +156,7 @@ class ChatService:
     async def update(
         self, chat_id: str, *, title: str | None = None, folder_id: int | None = UNSET,
         pinned: bool | None = None, save_to_second_brain: bool | None = None,
+        second_brain_scope: str | None = None,
     ) -> Chat:
         """Changes whichever of title, folder and pin are given. `folder_id`
         None takes the chat out of its folder; a folder of another account is
@@ -176,6 +177,8 @@ class ChatService:
             chat.pinned = pinned
         if save_to_second_brain is not None:
             chat.save_to_second_brain = save_to_second_brain
+        if second_brain_scope is not None:
+            chat.second_brain_scope = second_brain_scope
         await self._session.commit()
         return chat
 

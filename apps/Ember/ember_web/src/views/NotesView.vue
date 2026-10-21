@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NotePromotionPanel from "../components/NotePromotionPanel.vue";
 import PageLayout from "../components/PageLayout.vue";
 import { computed, getCurrentInstance, onMounted, onUnmounted, reactive, ref } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
@@ -309,6 +310,7 @@ function preview(note: Note): string {
       <button type="button" class="primary new-note" @click="startNew">New note</button>
     </template>
     <div class="column">
+      <NotePromotionPanel :note-id="selected && selected !== NEW ? selected : null" :dirty="dirty" :source-version="JSON.stringify([openedAt, saved.title, saved.body, saved.tags])" />
 
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       <p v-if="loadError" class="error" role="alert">Could not load your notes: {{ loadError }}</p>

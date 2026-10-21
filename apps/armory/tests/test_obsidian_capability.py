@@ -274,6 +274,7 @@ def test_loader_toggle_tools_commands_and_help(tmp_path, monkeypatch, api):
         "list", "search", "read", "write", "append", "semantic_search",
     }
     module = importlib.import_module("src.capabilities.obsidian.tool")
+    monkeypatch.setattr(module, "_gateway", lambda scope: api[0].ObsidianGateway("https://vault.invalid", "test-key"))
     monkeypatch.setattr(module, "settings", replace(
         settings, obsidian_base_url="https://vault.invalid", obsidian_api_key="test-key",
         obsidian_allow_write=False, obsidian_verify_tls=True,
