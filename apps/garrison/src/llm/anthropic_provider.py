@@ -446,6 +446,9 @@ async def run_chat(
     options = llm_options.for_provider(PROVIDER_ID)
     guard = options.turn_guard()
     checklist = plan.Checklist()
+    empty_answer_retried = False
+    malformed_stream_retries: set[str] = set()
+    failed_stream_tokens = 0
     stop_message = 'Reached maximum tool-call rounds without a final answer.'
     # The full prompt just sent (all resent history + this round's tool
     # results), not a sum across rounds like total_tokens - this is what
@@ -471,8 +474,11 @@ async def run_chat(
                 # text first; "token_reset" tells the client to drop it, since
                 # the real answer is the text of the final (non-tool) round.
                 while True:
+                    if cancellation.is_cancelled(request_id):
+                        raise ChatCancelled()
                     token_limits.enforce_context_limit(PROVIDER_ID, [system_prompt, *messages], route.current)
                     text_parts: list[str] = []
+                    stream_chars = 0
                     stream_stage = "opening_stream"
                     try:
                         async with client.messages.stream(
@@ -485,6 +491,7 @@ async def run_chat(
                         ) as stream:
                             stream_stage = "stream_events"
                             async for is_text, chunk in _stream_pieces(stream):
+                                stream_chars += len(chunk)
                                 if is_text:
                                     text_parts.append(chunk)
                                     if on_event:
@@ -493,23 +500,43 @@ async def run_chat(
                             stream_stage = "final_message"
                             response = await stream.get_final_message()
                         break
-                    except json.JSONDecodeError as error:
-                        # Keep parser locations and stack frames, but omit exception text,
-                        # chained exceptions and locals that may contain gateway payloads.
-                        _log.error(
-                            "Anthropic response JSONDecodeError: gateway=%s model=%s request_id=%s "
-                            "stage=%s line=%s column=%s position=%s\n%s",
-                            route.current, model_name, request_id, stream_stage,
-                            error.lineno, error.colno, error.pos,
-                            "".join(traceback.format_tb(error.__traceback__)),
-                        )
-                        raise
                     except Exception as error:
-                        if isinstance(error, BadRequestError) and classify(error) is None:
+                        if isinstance(error, json.JSONDecodeError):
+                            # Omit exception text, chained exceptions and locals that
+                            # may contain gateway payloads; retain parser stack frames.
+                            _log.error(
+                                "Anthropic response JSONDecodeError: gateway=%s model=%s request_id=%s "
+                                "stage=%s line=%s column=%s position=%s\n%s",
+                                route.current, model_name, request_id, stream_stage,
+                                error.lineno, error.colno, error.pos,
+                                "".join(traceback.format_tb(error.__traceback__)),
+                            )
+                            if classify(error) is None:
+                                raise
+                            # Failed streams lack final usage. Charge an estimate to
+                            # the guard without labelling it as reported token usage.
+                            failed_stream_tokens += token_limits.estimate_context_tokens(
+                                [system_prompt, *messages, schemas]
+                            ) + (stream_chars + len(error.doc) + 3) // 4
+                            guard.check_tokens(total_tokens + failed_stream_tokens)
+                            await meter.round_done(None)
+                            if route.current not in malformed_stream_retries:
+                                malformed_stream_retries.add(route.current)
+                                _log.warning("Retrying malformed response stream: gateway=%s request_id=%s",
+                                             route.current, request_id)
+                                if text_parts and on_event:
+                                    await on_event(step_event("token_reset"))
+                                continue
+                        elif isinstance(error, BadRequestError) and classify(error) is None:
                             if not text_parts and options.drop_rejected(str(error), model_name):
                                 continue
                         switch = route.advance(error)
                         if switch is None:
+                            if isinstance(error, json.JSONDecodeError):
+                                raise TurnStopped(
+                                    "The model gateway returned an invalid response stream after retrying. "
+                                    "Please try again or choose another gateway."
+                                ) from None
                             raise
                         if on_event:
                             if text_parts:
@@ -527,11 +554,48 @@ async def run_chat(
                 cached_input_tokens += _usage_count(response.usage, "cache_read_input_tokens")
                 await meter.round_done(prompt_tokens + response.usage.output_tokens)
                 context_tokens = prompt_tokens
-                guard.check_tokens(total_tokens)
+                guard.check_tokens(total_tokens + failed_stream_tokens)
 
                 if response.stop_reason != "tool_use":
+                    answer = "".join(block.text for block in response.content if block.type == "text")
+                    streamed_answer = "".join(text_parts)
+                    if not answer.strip():
+                        answer = streamed_answer
+                    if not answer.strip():
+                        _log.warning(
+                            "Anthropic returned no visible answer: gateway=%s model=%s request_id=%s "
+                            "stop_reason=%s content_types=%s input_tokens=%s output_tokens=%s retried=%s",
+                            route.current, model_name, request_id, response.stop_reason,
+                            [block.type for block in response.content], prompt_tokens,
+                            _usage_count(response.usage, "output_tokens"), empty_answer_retried,
+                        )
+                        stop_message = "The model returned no visible answer. Please try again or choose another model."
+                        if response.stop_reason == "max_tokens":
+                            stop_message = (
+                                "The model reached its output limit without producing a visible answer. "
+                                "Try a higher output limit or lower reasoning effort."
+                            )
+                        elif response.stop_reason == "refusal":
+                            stop_message = "The model declined this request without providing an explanation."
+                        if empty_answer_retried or response.stop_reason not in ("end_turn", "max_tokens"):
+                            break
+                        empty_answer_retried = True
+                        # Keep completed tool results in history; only repeat the model round.
+                        # Do not resend an empty assistant message or private thinking blocks.
+                        messages.append({"role": "user", "content": (
+                            "Your previous response contained no visible answer or tool call. "
+                            "Continue the request using the available tools if needed, "
+                            "or provide a visible answer explaining what you can do."
+                        )})
+                        if text_parts and on_event:
+                            await on_event(step_event("token_reset"))
+                        continue
+                    if answer != streamed_answer and on_event:
+                        if text_parts:
+                            await on_event(step_event("token_reset"))
+                        await on_event(step_event("token", text=answer))
                     return ChatResult(
-                        response="".join(text_parts),
+                        response=answer,
                         tools_used=tools_used,
                         tool_calls=tool_calls,
                         provider_id=PROVIDER_ID,

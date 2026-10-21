@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import traceback
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import lru_cache
@@ -33,7 +35,15 @@ _FAILURE_WORDS = {
 
 @catalog
 def classify(error: Exception) -> FailureKind | None:
-    """Inspect SDK identity before status/wording so local failures never retry."""
+    """Inspect SDK origin before status/wording so local failures never retry."""
+    if isinstance(error, json.JSONDecodeError):
+        # The Messages SDK parses SSE event data before producing message/tool
+        # events. Only this parser's failures represent malformed upstream data.
+        if any(frame.f_globals.get("__name__") == "anthropic._streaming"
+               and frame.f_code.co_name == "json"
+               for frame, _ in traceback.walk_tb(error.__traceback__)):
+            return FailureKind.unavailable
+        return None
     if not isinstance(error, _SDK_ERRORS):
         return None
     status = getattr(error, "status_code", None)
