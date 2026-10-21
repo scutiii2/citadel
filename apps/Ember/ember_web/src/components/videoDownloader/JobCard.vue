@@ -51,3 +51,14 @@ const stateText = computed(() => {
 </template>
 
 <style scoped src="./videoDownloader.css"></style>
+<style scoped>
+.panel { padding: 16px; background: var(--bg); }
+.row { align-items: flex-start; flex-wrap: nowrap; }
+.grow { min-width: 0; }
+.name { font-size: .9em; font-weight: 500; }
+.name .small { display: block; margin-top: 3px; color: var(--muted); }
+.grow > .small { margin-top: 6px; font-size: .75em; }
+progress { height: 4px; border-radius: var(--radius-full); }
+.panel :deep(button.action) { border-radius: var(--radius-full); }
+.panel :deep(.action .label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+</style>

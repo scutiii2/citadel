@@ -97,7 +97,7 @@ async function confirmAction() {
         <ActionButton icon="clear" class="danger" :disabled="store.busy || !store.removable(group.package_id)" @click="confirm = { kind: 'delete-package', id: group.package_id, name: group.name }">Remove package</ActionButton>
       </div>
     </article>
-    <ConfirmModal v-if="confirm" :open="true" :title="confirmTitle" :message="confirmMessage" :confirm-label="confirmLabel" :danger="confirm.kind !== 'start'" :busy="store.busy" @confirm="confirmAction" @close="!store.busy && (confirm = null)" />
+    <Teleport to="body"><ConfirmModal v-if="confirm" :open="true" :title="confirmTitle" :message="confirmMessage" :confirm-label="confirmLabel" :danger="confirm.kind !== 'start'" :busy="store.busy" @confirm="confirmAction" @close="!store.busy && (confirm = null)" /></Teleport>
   </section>
 </template>
 
@@ -123,6 +123,10 @@ small { display: block; }
 .danger-zone { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 14px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-lg); font-size: .85em; }
 .packages :deep(button.action) { border-radius: var(--radius-full); }
 .packages :deep(button.action .label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+.packages { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.group { background: var(--bg); padding: 18px; }
+.items li { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.items li .grow { min-width: 0; }
 progress { width: 100%; accent-color: var(--accent); }
 @media (max-width: 767px) { .create-group { align-items: stretch; flex-direction: column; } }
 </style>

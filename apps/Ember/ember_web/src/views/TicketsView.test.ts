@@ -63,6 +63,43 @@ beforeEach(() => {
 });
 
 describe("TicketsView", () => {
+  it("uses an inline thread and keeps a reply when the selected row is clicked again", async () => {
+    client.get.mockResolvedValue(ticket(1, { comments: [] }));
+    const wrapper = await mountView("/tickets/1");
+    expect(wrapper.find('section.ticket-thread[aria-label="Ticket #1"]').exists()).toBe(true);
+    await wrapper.get("textarea[aria-label='Reply']").setValue("Keep this draft");
+    await rows(wrapper).find(row => row.text().includes("Ticket 1"))!.trigger("click");
+    await flushPromises();
+    expect(client.get).toHaveBeenCalledTimes(1);
+    expect(wrapper.get<HTMLTextAreaElement>("textarea[aria-label='Reply']").element.value).toBe("Keep this draft");
+  });
+  it("keeps the conversation and reply draft while filtering or polling the list", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    vi.spyOn(document, "hidden", "get").mockReturnValue(false);
+    client.get.mockResolvedValue(ticket(1, { comments: [] }));
+    const wrapper = await mountView("/tickets/1");
+    await wrapper.get("textarea[aria-label='Reply']").setValue("More context");
+    await wrapper.get("input[aria-label='Search ticket titles']").setValue("no match");
+    await vi.advanceTimersByTimeAsync(30_000); await flushPromises();
+    expect(rows(wrapper)).toHaveLength(0);
+    expect(wrapper.get(".detail-title").text()).toBe("Ticket 1");
+    expect(wrapper.get<HTMLTextAreaElement>("textarea[aria-label='Reply']").element.value).toBe("More context");
+  });
+  it("loads an unread update on the selected ticket without clearing a reply", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    vi.spyOn(document, "hidden", "get").mockReturnValue(false);
+    client.get.mockResolvedValue(ticket(1, { has_unread: false, comments: [] }));
+    const wrapper = await mountView("/tickets/1");
+    await wrapper.get("textarea[aria-label='Reply']").setValue("A reply in progress");
+    client.list.mockResolvedValue([ticket(1, { has_unread: true })]);
+    await vi.advanceTimersByTimeAsync(30_000); await flushPromises();
+    client.get.mockResolvedValue(ticket(1, { has_unread: false, comments: [{ id: 9, ticket_id: 1, author: "support", author_role: "staff", body: "New support reply", created_at: "2026-10-21T00:00:00Z" }] }));
+    await rows(wrapper)[0]!.trigger("click"); await flushPromises();
+    expect(wrapper.get(".thread").text()).toContain("New support reply");
+    expect(wrapper.get<HTMLTextAreaElement>("textarea[aria-label='Reply']").element.value).toBe("A reply in progress");
+    expect(rows(wrapper)[0]!.classes()).not.toContain("unread");
+  });
+
   it("keeps a ticket seen when its initial list response arrives after the detail", async () => {
     let finishList!: (rows: Ticket[]) => void;
     client.list.mockImplementationOnce(() => new Promise(resolve => { finishList = resolve; }));
@@ -77,7 +114,7 @@ describe("TicketsView", () => {
     const wrapper = await mountView("/tickets/42");
     expect(client.get).toHaveBeenCalledWith(42);
     expect(wrapper.find(".detail-title").text()).toBe("Ticket 42");
-    await wrapper.find('dialog[aria-label="Ticket #42"] button.close').trigger("click");
+    await wrapper.find('section[aria-label="Ticket #42"] button.close').trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.path).toBe("/tickets");
     expect(wrapper.find(".detail-title").exists()).toBe(false);
@@ -94,7 +131,7 @@ describe("TicketsView", () => {
   it("shows the error for an unknown or foreign deep link", async () => {
     client.get.mockRejectedValue(new ApiError(404, "No ticket 404."));
     const wrapper = await mountView("/tickets/404");
-    expect(wrapper.find('dialog[aria-label="Ticket #404"] .error').text()).toContain("No ticket 404.");
+    expect(wrapper.find('section[aria-label="Ticket #404"] .error').text()).toContain("No ticket 404.");
     expect(wrapper.find(".detail-title").exists()).toBe(false);
   });
 
@@ -324,7 +361,7 @@ describe("TicketsView", () => {
     client.get.mockImplementationOnce(() => new Promise((resolve) => { finishDetail = resolve; }));
     const wrapper = await mountView();
     await rows(wrapper)[1]!.trigger("click");
-    await wrapper.find('dialog[aria-label="Ticket #1"] button.close').trigger("click");
+    await wrapper.find('section[aria-label="Ticket #1"] button.close').trigger("click");
     finishDetail(ticket(1, { comments: [] }));
     await flushPromises();
     expect(wrapper.find(".detail-title").exists()).toBe(false);
@@ -353,7 +390,7 @@ describe("TicketsView", () => {
     await button(wrapper, "Send").trigger("click");
     await flushPromises();
     expect((wrapper.find("textarea[aria-label='Reply']").element as HTMLTextAreaElement).value).toBe("Keep these details");
-    expect(wrapper.find('dialog[aria-label="Ticket #1"] .error').text()).toContain("Support is unreachable.");
+    expect(wrapper.find('section[aria-label="Ticket #1"] .error').text()).toContain("Support is unreachable.");
   });
 
   it.each(["comment", "close"] as const)("does not reopen a dismissed detail after %s succeeds", async (operation) => {
@@ -370,7 +407,7 @@ describe("TicketsView", () => {
       await button(wrapper, "Close ticket").trigger("click");
       await button(wrapper, "Close the ticket").trigger("click");
     }
-    await wrapper.find('dialog[aria-label="Ticket #1"] button.close').trigger("click");
+    await wrapper.find('section[aria-label="Ticket #1"] button.close').trigger("click");
     finishAction(ticket(1, { status: operation === "close" ? "closed" : "open", comments: [] }));
     await flushPromises();
     expect(wrapper.find(".detail-title").exists()).toBe(false);
