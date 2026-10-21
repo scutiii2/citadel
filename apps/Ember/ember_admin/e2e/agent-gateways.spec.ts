@@ -5,7 +5,8 @@ interface AgentConfig {
   label: string;
   port: number;
   entry?: boolean;
-  llm: { provider: string; gateway?: string; model?: string; fallback_gateways?: (string | { gateway: string; model?: string })[] };
+  llm: { provider: string; gateway?: string; model?: string; fallback_gateways?: (string | { gateway: string; model?: string })[];
+    max_turn_tokens?: number; max_turn_seconds?: number; max_tokens?: number; max_tool_rounds?: number };
 }
 
 test("ordered gateways fit each viewport and save only the edited agent", async ({ page }, testInfo) => {
@@ -42,10 +43,21 @@ test("ordered gateways fit each viewport and save only the edited agent", async 
   await page.locator('[data-id="researcher"] [data-test="edit"]').click();
   const dialog = page.getByRole("dialog", { name: "Edit Researcher" });
   await expect(dialog.locator('[data-test="gateway-row"]')).toHaveCount(3);
+  await dialog.getByRole("textbox", { name: "Total tokens per turn", exact: true }).fill("250000");
+  await dialog.getByRole("textbox", { name: "Time per turn (seconds)", exact: true }).fill("600");
+  await dialog.getByRole("textbox", { name: "Output tokens per model call", exact: true }).fill("8000");
+  await dialog.getByRole("textbox", { name: "Model/tool rounds", exact: true }).fill("12");
   for (const width of [1280, 768, 375]) {
     await page.setViewportSize({ width, height: 900 });
     expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     await expect(dialog.getByRole("combobox", { name: "Primary gateway", exact: true })).toBeVisible();
+    await dialog.locator('[data-test="run-limits"]').scrollIntoViewIfNeeded();
+    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await expect(dialog.getByRole("textbox", { name: "Total tokens per turn", exact: true })).toHaveValue("250000");
+    for (const theme of ["light", "dark"]) {
+      await page.evaluate((value) => { document.documentElement.style.colorScheme = value; }, theme);
+      await page.screenshot({ path: testInfo.outputPath(`run-limits-${width}-${theme}.png`) });
+    }
   }
   await dialog.getByRole("button", { name: "Move openrouter up", exact: true }).click();
   await expect(dialog.locator('[data-test="gateway"]')).toHaveValue("openrouter");
@@ -60,11 +72,14 @@ test("ordered gateways fit each viewport and save only the edited agent", async 
   expect(writes).toEqual([{ id: "researcher", config: expect.objectContaining({ llm: expect.objectContaining({
     gateway: "openrouter", model: "router-custom", fallback_gateways: [
       { gateway: "claude", model: "claude-custom" }, { gateway: "bedrock" },
-    ],
+    ], max_turn_tokens: 250000, max_turn_seconds: 600, max_tokens: 8000, max_tool_rounds: 12,
   }) }) }]);
   expect(agents[0]!.llm?.gateway).toBe("claude");
   await expect(page.locator('[data-id="researcher"]')).toContainText("openrouter → claude → bedrock");
   await page.locator('[data-id="researcher"] [data-test="edit"]').click();
+  await expect(dialog.locator('[data-test="max-turn-tokens"]')).toHaveValue("250000");
+  await expect(dialog.locator('[data-test="max-turn-seconds"]')).toHaveValue("600");
+  await dialog.locator('[data-test="max-turn-tokens"]').fill("500000");
   const rows = dialog.locator('[data-test="gateway-row"]');
   await rows.nth(2).locator('[data-test="drag-handle"]').dragTo(rows.nth(0));
   await expect(dialog.locator('[data-test="gateway"]')).toHaveValue("bedrock");
@@ -72,6 +87,7 @@ test("ordered gateways fit each viewport and save only the edited agent", async 
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog.locator('[data-test="form-error"]')).toContainText("This gateway is unavailable.");
   await expect(dialog).toBeVisible();
+  await expect(dialog.locator('[data-test="max-turn-tokens"]')).toHaveValue("500000");
   expect(writes).toHaveLength(1);
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.locator('[data-id="researcher"]')).toContainText("openrouter → claude → bedrock");

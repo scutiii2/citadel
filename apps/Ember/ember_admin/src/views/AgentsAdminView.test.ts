@@ -340,6 +340,95 @@ describe("AgentsAdminView", () => {
     expect(config).not.toHaveProperty("routing");
   });
 
+  it("loads and saves per-agent turn limits only after Save", async () => {
+    const agent: AgentFile = { ...EMBER, llm: { ...EMBER.llm!, max_turn_tokens: 250000, max_turn_seconds: 600 } };
+    vi.mocked(agentsAdminClient.list).mockResolvedValue([agent, CALC]);
+    const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(agent);
+    const wrapper = await mounted();
+    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    expect(wrapper.find<HTMLInputElement>("[data-test=max-turn-tokens]").element.value).toBe("250000");
+    expect(wrapper.find<HTMLInputElement>("[data-test=max-turn-seconds]").element.value).toBe("600");
+    expect(wrapper.find("[data-test=unsaved]").exists()).toBe(false);
+    await wrapper.find("[data-test=max-turn-tokens]").setValue("500000");
+    await wrapper.find("[data-test=max-turn-seconds]").setValue("900.5");
+    expect(wrapper.find("[data-test=unsaved]").exists()).toBe(true);
+    expect(update).not.toHaveBeenCalled();
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(update).toHaveBeenCalledWith("ember", expect.objectContaining({
+      llm: expect.objectContaining({ max_turn_tokens: 500000, max_turn_seconds: 900.5 }),
+    }));
+    expect(agent.llm!.max_turn_tokens).toBe(250000);
+    wrapper.unmount();
+  });
+
+  it("leaves default turn limits unset and explains their scope", async () => {
+    const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(EMBER);
+    const wrapper = await mounted();
+    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    expect(wrapper.find<HTMLInputElement>("[data-test=max-turn-tokens]").element.placeholder).toContain("100,000");
+    expect(wrapper.find<HTMLInputElement>("[data-test=max-turn-seconds]").element.placeholder).toContain("300");
+    expect(wrapper.find("[data-test=run-limits]").text()).toContain("input and output");
+    expect(wrapper.find("[data-test=run-limits]").text()).toContain("one response");
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(update.mock.calls[0]![1].llm).not.toHaveProperty("max_turn_tokens");
+    expect(update.mock.calls[0]![1].llm).not.toHaveProperty("max_turn_seconds");
+    wrapper.unmount();
+  });
+
+  it("resets each run limit to its inherited default", async () => {
+    const agent: AgentFile = { ...EMBER, llm: { ...EMBER.llm!, max_turn_tokens: 250000,
+      max_turn_seconds: 600, max_tokens: 4096, max_tool_rounds: 12 } };
+    vi.mocked(agentsAdminClient.list).mockResolvedValue([agent, CALC]);
+    const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(agent);
+    const wrapper = await mounted();
+    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    for (const field of ["max-turn-tokens", "max-turn-seconds", "max-tokens", "max-tool-rounds"]) {
+      await wrapper.find(`[data-setting-id="${field}"] button[title="Back to default"]`).trigger("click");
+      expect(wrapper.find<HTMLInputElement>(`[data-test=${field}]`).element.value).toBe("");
+    }
+    expect(update).not.toHaveBeenCalled();
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    for (const key of ["max_turn_tokens", "max_turn_seconds", "max_tokens", "max_tool_rounds"]) {
+      expect(update.mock.calls[0]![1].llm).not.toHaveProperty(key);
+    }
+    wrapper.unmount();
+  });
+
+  it.each([
+    ["max-turn-tokens", "0"], ["max-turn-tokens", "1.5"], ["max-turn-tokens", "100000001"],
+    ["max-turn-seconds", "0"], ["max-turn-seconds", "0.0001"], ["max-turn-seconds", "86401"],
+    ["max-turn-seconds", "not a number"],
+  ])("rejects invalid %s value %s before saving", async (field, value) => {
+    const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(EMBER);
+    const wrapper = await mounted();
+    await wrapper.find("[data-id=ember] [data-test=edit]").trigger("click");
+    await wrapper.find(`[data-test=${field}]`).setValue(value);
+    await wrapper.find("form").trigger("submit");
+    expect(update).not.toHaveBeenCalled();
+    expect(wrapper.find("[data-test=form-error]").text()).toContain("must be");
+    wrapper.unmount();
+  });
+
+  it("drops run limits when switching to the local Laya provider", async () => {
+    const agent: AgentFile = { ...CALC, llm: { ...CALC.llm!, max_turn_tokens: 250000, max_turn_seconds: 600 } };
+    vi.mocked(agentsAdminClient.list).mockResolvedValue([EMBER, agent]);
+    const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(agent);
+    const wrapper = await mounted();
+    await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
+    await wrapper.find("[data-test=max-turn-tokens]").setValue("invalid");
+    await wrapper.find("[data-test=provider]").setValue("laya");
+    expect(wrapper.find("[data-test=run-limits]").exists()).toBe(false);
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(update).toHaveBeenCalledOnce();
+    expect(update.mock.calls[0]![1].llm).not.toHaveProperty("max_turn_tokens");
+    expect(update.mock.calls[0]![1].llm).not.toHaveProperty("max_turn_seconds");
+    wrapper.unmount();
+  });
+
   it("leaves plan_tool out while the checklist is on and writes false when it is switched off", async () => {
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(EMBER);
     const wrapper = await mounted();

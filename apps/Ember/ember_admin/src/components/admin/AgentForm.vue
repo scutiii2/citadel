@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import type { AgentConfig, AgentFile, ProviderCatalog } from "../../api/AgentsAdminClient";
 import BaseModal from "../BaseModal.vue";
 import ToggleSwitch from "../ToggleSwitch.vue";
+import SettingRow from "../SettingRow.vue";
 import AgentGatewayList, { type GatewayRow } from "./AgentGatewayList.vue";
 import RouterPolicyForm from "./RouterPolicyForm.vue";
 import { routerPolicyDefaults, validateRouterPolicy } from "../../utils/routerPolicy";
@@ -55,6 +56,8 @@ const identity = ref("");
 const temperature = ref("");
 const maxTokens = ref("");
 const maxToolRounds = ref("");
+const maxTurnTokens = ref("");
+const maxTurnSeconds = ref("");
 const maxEffort = ref("");
 const previewCaveman = ref(false);
 const persona = ref("");
@@ -93,7 +96,7 @@ function draftSignature(): string {
     orchestrator.value, planTool.value, provider.value,
     gatewayRows.value.map(({ gateway, model }) => [gateway, model]),
     effort.value, minTier.value, maxTier.value, identity.value, temperature.value,
-    maxTokens.value, maxToolRounds.value, maxEffort.value, persona.value,
+    maxTokens.value, maxToolRounds.value, maxTurnTokens.value, maxTurnSeconds.value, maxEffort.value, persona.value,
     instructions.value, focus.value, allow.value, deny.value,
     decision.value,
   ]);
@@ -131,6 +134,8 @@ watch(
     temperature.value = a?.llm?.temperature === undefined ? "" : String(a.llm.temperature);
     maxTokens.value = a?.llm?.max_tokens === undefined ? "" : String(a.llm.max_tokens);
     maxToolRounds.value = a?.llm?.max_tool_rounds === undefined ? "" : String(a.llm.max_tool_rounds);
+    maxTurnTokens.value = a?.llm?.max_turn_tokens === undefined ? "" : String(a.llm.max_turn_tokens);
+    maxTurnSeconds.value = a?.llm?.max_turn_seconds === undefined ? "" : String(a.llm.max_turn_seconds);
     maxEffort.value = a?.llm?.max_effort ?? "";
     previewCaveman.value = false;
     persona.value = a?.persona ?? "";
@@ -206,15 +211,17 @@ function buildConfig(): AgentConfig | null {
   }));
   if (!isLaya.value && backups.length) llm.fallback_gateways = backups;
   else delete llm.fallback_gateways;
-  const numbers = {
+  const numbers = isLaya.value ? {} : {
     temperature: optionalNumber(temperature.value, "Temperature", 0, 2, false),
-    max_tokens: optionalNumber(maxTokens.value, "Max tokens", 1, 1_000_000, true),
-    max_tool_rounds: optionalNumber(maxToolRounds.value, "Max tool rounds", 1, 100, true),
+    max_tokens: optionalNumber(maxTokens.value, "Output tokens per model call", 1, 1_000_000, true),
+    max_tool_rounds: optionalNumber(maxToolRounds.value, "Model/tool rounds", 1, 100, true),
+    max_turn_tokens: optionalNumber(maxTurnTokens.value, "Total tokens per turn", 1, 100_000_000, true),
+    max_turn_seconds: optionalNumber(maxTurnSeconds.value, "Time per turn", 0.001, 86_400, false),
   };
   if (Object.values(numbers).includes(null as never)) return null;
   if (isLaya.value) {
     // Laya triage runs locally and takes no generation or tier settings.
-    for (const key of ["reasoning_effort", "max_tier", "min_tier", "max_effort", "temperature", "max_tokens", "max_tool_rounds"]) delete llm[key];
+    for (const key of ["reasoning_effort", "max_tier", "min_tier", "max_effort", "temperature", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds"]) delete llm[key];
   } else {
     setOrDrop("reasoning_effort", effort.value === "off" ? "" : effort.value);
     setOrDrop("min_tier", minTier.value);
@@ -320,13 +327,36 @@ function previewPrompt(): void {
         </ul>
         <div v-if="!isLaya" class="row">
           <label class="field grow"><span>Temperature</span><input v-model="temperature" data-test="temperature" type="text" inputmode="decimal" autocomplete="off" placeholder="Model default" /></label>
-          <label class="field grow"><span>Max tokens</span><input v-model="maxTokens" data-test="max-tokens" type="text" inputmode="numeric" autocomplete="off" placeholder="Gateway limit" /></label>
-          <label class="field grow"><span>Max tool rounds</span><input v-model="maxToolRounds" data-test="max-tool-rounds" type="text" inputmode="numeric" autocomplete="off" placeholder="Default" /></label>
         </div>
         <label v-if="!isLaya" class="field"><span>Highest effort a delegating agent may request</span>
           <select v-model="maxEffort" data-test="max-effort"><option value="">No limit</option><option v-for="e in EFFORTS" :key="e" :value="e">{{ e }}</option></select>
         </label>
         <small v-if="!isLaya">The orchestrator picks the lightest tier in this range that fits each task. Tier models are set per gateway in ai_agent's gateways directory.</small>
+      </fieldset>
+
+      <fieldset v-if="!isLaya" :disabled="busy" :aria-busy="busy" data-test="run-limits">
+        <legend>Run limits</legend>
+        <p class="hint">Limits apply to each turn this agent runs. Leave a field blank to use its default. Changes apply after Save.</p>
+        <SettingRow setting-id="max-turn-tokens" label="Total tokens per turn"
+          description="Counts input and output across this agent's model calls, including repeated history. Checked after each response, so usage can exceed the budget by one response."
+          :modified="!!maxTurnTokens.trim()" @reset="maxTurnTokens = ''">
+          <input v-model="maxTurnTokens" class="limit-input" aria-label="Total tokens per turn" data-test="max-turn-tokens" type="text" inputmode="numeric" autocomplete="off" placeholder="Default: 100,000" />
+        </SettingRow>
+        <SettingRow setting-id="max-turn-seconds" label="Time per turn (seconds)"
+          description="Time budget for this agent's model and tool loop. An external tool already running may finish after the turn stops."
+          :modified="!!maxTurnSeconds.trim()" @reset="maxTurnSeconds = ''">
+          <input v-model="maxTurnSeconds" class="limit-input" aria-label="Time per turn (seconds)" data-test="max-turn-seconds" type="text" inputmode="decimal" autocomplete="off" placeholder="Default: 300" />
+        </SettingRow>
+        <SettingRow setting-id="max-tokens" label="Output tokens per model call"
+          description="Maximum output for a single response, including thinking where the model counts it. Blank uses the gateway's configured limit."
+          :modified="!!maxTokens.trim()" @reset="maxTokens = ''">
+          <input v-model="maxTokens" class="limit-input" aria-label="Output tokens per model call" data-test="max-tokens" type="text" inputmode="numeric" autocomplete="off" placeholder="Gateway limit" />
+        </SettingRow>
+        <SettingRow setting-id="max-tool-rounds" label="Model/tool rounds"
+          description="Maximum model calls in the tool loop. A round can request several tools; allow another round for the final answer. Blank uses the gateway's configured default."
+          :modified="!!maxToolRounds.trim()" @reset="maxToolRounds = ''">
+          <input v-model="maxToolRounds" class="limit-input" aria-label="Model/tool rounds" data-test="max-tool-rounds" type="text" inputmode="numeric" autocomplete="off" placeholder="Gateway default" />
+        </SettingRow>
       </fieldset>
 
       <RouterPolicyForm v-if="isRouter" v-model="decision" :busy="busy" />
@@ -392,6 +422,7 @@ input:not([type="checkbox"]), select, textarea {
   font: inherit;
 }
 textarea { resize: vertical; }
+input.limit-input { width: 160px; max-width: 100%; }
 input:disabled, select:disabled { opacity: 0.6; }
 fieldset { display: grid; gap: 10px; margin: 0; padding: 10px 12px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
 legend { padding: 0 6px; color: var(--muted); font-size: 0.85em; }
