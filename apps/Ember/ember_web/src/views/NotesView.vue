@@ -27,6 +27,7 @@ import { errorMessage, formatUtc } from "../utils/errors";
  * switch that says whether agents may read it. */
 
 const NEW = "new";
+const mobileToolsOpen = ref(false);
 
 const notes = ref<Note[]>([]);
 const loading = ref(true);
@@ -142,6 +143,7 @@ onMounted(load);
 
 function show(target: string | null): void {
   selected.value = target;
+  mobileToolsOpen.value = false;
   formError.value = "";
   notice.value = "";
   const note = target === null || target === NEW ? undefined : notes.value.find((n) => n.id === target);
@@ -305,12 +307,11 @@ function preview(note: Note): string {
 </script>
 
 <template>
-  <PageLayout class="notes info-content" title="Notes" description="Private notes, just for your account.">
+  <PageLayout class="notes info-content" :class="{ 'note-open': selected !== null }" title="Notes" description="Your thoughts, kept close." wide fill>
     <template #actions>
-      <button type="button" class="primary new-note" @click="startNew">New note</button>
+      <button type="button" class="primary new-note" :disabled="saving || removing" @click="startNew">New note</button>
     </template>
     <div class="column">
-      <NotePromotionPanel :note-id="selected && selected !== NEW ? selected : null" :dirty="dirty" :source-version="JSON.stringify([openedAt, saved.title, saved.body, saved.tags])" />
 
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       <p v-if="loadError" class="error" role="alert">Could not load your notes: {{ loadError }}</p>
@@ -318,6 +319,7 @@ function preview(note: Note): string {
 
       <div v-else-if="!loadError" :class="['layout', { editing: selected !== null }]">
         <div class="list-pane">
+          <div class="list-heading"><span>All notes</span><span>{{ notes.length }}/{{ NOTES_MAX }} notes</span></div>
           <p v-if="notes.length === 0 && selected !== NEW" class="muted empty">You have no notes yet.</p>
           <ul v-else class="list" aria-label="Notes">
             <li v-if="selected === NEW">
@@ -327,7 +329,7 @@ function preview(note: Note): string {
               </button>
             </li>
             <li v-for="n in notes" :key="n.id">
-              <button type="button" :class="['note-row', { active: n.id === selected }]" :aria-current="n.id === selected" @click="go(n.id)">
+              <button type="button" :class="['note-row', { active: n.id === selected }]" :aria-current="n.id === selected" :disabled="saving || removing" @click="go(n.id)">
                 <span class="title">{{ n.id === selected && form.title.trim() ? form.title.trim() : n.title }}</span>
                 <span v-if="preview(n)" class="snippet">{{ preview(n) }}</span>
                 <span v-if="n.tags.length || n.agent_readable || n.last_editor === 'agent'" class="row-tags">
@@ -339,18 +341,36 @@ function preview(note: Note): string {
               </button>
             </li>
           </ul>
-          <p class="muted count">{{ notes.length }}/{{ NOTES_MAX }} notes</p>
+          <details v-if="selected === null" class="library-publishing">
+            <summary>Obsidian &amp; publishing <span aria-hidden="true">›</span></summary>
+            <NotePromotionPanel :note-id="null" :dirty="false" />
+          </details>
         </div>
 
         <form v-if="selected !== null" class="editor" @submit.prevent="save">
-          <button type="button" class="chip back" @click="go(null)">‹ All notes</button>
+          <div class="editor-head">
+            <button type="button" class="chip back" :disabled="saving || removing" @click="go(null)">‹ All notes</button>
+            <span class="privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3" /></svg>{{ form.agentReadable ? "Agents can read" : "Private note" }}</span>
+          </div>
+          <div class="editor-scroll">
+          <div class="writing">
           <p v-if="savedEditor === 'agent'" class="agent-edit-note">
             An agent last changed this note. Saving your own changes removes this mark.
           </p>
-          <label>
-            Title
-            <input v-model="form.title" type="text" :maxlength="NOTE_TITLE_MAX" aria-label="Title" :disabled="saving || removing" />
+          <label class="title-field">
+            <span class="sr-only">Title</span>
+            <input v-model="form.title" type="text" :maxlength="NOTE_TITLE_MAX" aria-label="Title" placeholder="Untitled note" :disabled="saving || removing" />
           </label>
+          <label class="body-field">
+            <span class="sr-only">Note</span>
+            <textarea v-model="form.body" rows="10" placeholder="Start writing…" :maxlength="NOTE_BODY_MAX" aria-label="Note text" :disabled="saving || removing" />
+            <span class="muted count">{{ form.body.length }}/{{ NOTE_BODY_MAX }}</span>
+          </label>
+          </div>
+          <button type="button" class="mobile-tools-toggle" :aria-expanded="mobileToolsOpen" aria-controls="note-tools" @click="mobileToolsOpen = !mobileToolsOpen">Note details &amp; tools <span aria-hidden="true">{{ mobileToolsOpen ? "⌃" : "⌄" }}</span></button>
+          <div id="note-tools" :class="['note-tools', { expanded: mobileToolsOpen }]">
+          <details class="tag-tools">
+            <summary><span>Tags</span><span class="summary-hint">{{ form.tags.join(", ") || "Add tags" }} <span aria-hidden="true">›</span></span></summary>
           <div class="field">
             <div class="field-head">
               <span class="field-label">Tags</span>
@@ -425,11 +445,9 @@ function preview(note: Note): string {
             </div>
             <p v-if="generateError" class="error" role="alert">{{ generateError }}</p>
           </div>
-          <label>
-            Note
-            <textarea v-model="form.body" rows="14" :maxlength="NOTE_BODY_MAX" aria-label="Note text" :disabled="saving || removing" />
-            <span class="muted count">{{ form.body.length }}/{{ NOTE_BODY_MAX }}</span>
-          </label>
+          </details>
+          <details class="agent-tools">
+            <summary><span>Agent access</span><span class="summary-hint">{{ form.agentReadable ? "Agents can read" : "Only you" }} <span aria-hidden="true">›</span></span></summary>
           <div class="agent-access">
             <ToggleSwitch
               :checked="form.agentReadable"
@@ -442,6 +460,19 @@ function preview(note: Note): string {
               Agents can read this note. Be careful what you put in it: do not store passwords, keys or other private data.
             </p>
           </div>
+          </details>
+          <details class="publishing-tools">
+            <summary><span>Obsidian &amp; publishing</span><span aria-hidden="true">›</span></summary>
+      <NotePromotionPanel :note-id="selected && selected !== NEW ? selected : null" :dirty="dirty" :source-version="JSON.stringify([openedAt, saved.title, saved.body, saved.tags])" />
+          </details>
+          <details v-if="selected !== NEW" class="manage-tools">
+            <summary>Manage note <span aria-hidden="true">›</span></summary>
+            <div class="danger-zone">
+              <b>Danger zone</b>
+              <button type="button" class="danger" :disabled="saving || removing" @click="confirmDelete = true">Delete this note</button>
+            </div>
+          </details>
+          </div>
           <p v-if="formError" class="error" role="alert">{{ formError }}</p>
           <div v-if="conflict" class="conflict" role="alert">
             <p>
@@ -453,16 +484,17 @@ function preview(note: Note): string {
               <button type="button" class="chip" @click="keepMine">Save mine anyway</button>
             </div>
           </div>
+          </div>
           <div class="actions">
             <span v-if="dirty" class="unsaved" role="status"><i aria-hidden="true" />Unsaved changes</span>
-            <button type="submit" class="primary" :disabled="!canSave" :aria-busy="saving">Save</button>
-          </div>
-          <div v-if="selected !== NEW" class="danger-zone">
-            <b>Danger zone</b>
-            <button type="button" class="danger" :disabled="saving || removing" @click="confirmDelete = true">Delete this note</button>
+            <button type="submit" class="primary" :disabled="!canSave" :aria-busy="saving">{{ saving ? "Saving…" : "Save" }}</button>
           </div>
         </form>
-        <p v-else class="muted placeholder">Pick a note, or start a new one.</p>
+        <div v-else class="placeholder">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>
+          <h3>A little room to think</h3><p>Pick a note, or start a new one.</p>
+          <button type="button" class="chip" @click="startNew">Create a note</button>
+        </div>
       </div>
     </div>
 
@@ -498,228 +530,92 @@ function preview(note: Note): string {
 </template>
 
 <style scoped>
-.notice {
-  margin: 8px 0;
-  color: var(--muted);
-}
-.layout {
-  display: grid;
-  grid-template-columns: minmax(200px, 270px) 1fr;
-  gap: 16px;
-  margin-top: 12px;
-  align-items: start;
-}
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.list-pane,
-.editor { min-width: 0; }
-.new-note { flex-shrink: 0; }
-.note-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text);
-  background: var(--surface);
-  font: inherit;
-  font-size: 0.9em;
-  text-align: left;
-  cursor: pointer;
-}
-.note-row:hover,
-.note-row.active {
-  border-color: var(--accent);
-}
-.title {
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-.snippet {
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-.note-row .muted {
-  font-size: 0.85em;
-}
-.count {
-  margin: 6px 0 0;
-  font-size: 0.8em;
-}
-.row-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  color: var(--text);
-  background: var(--bg);
-  font-size: 0.8em;
-}
-.agent-mark {
-  border-color: var(--warning);
-  color: var(--warning);
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.9em;
-}
-.field-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-.tag.pick {
-  color: var(--text);
-  font: inherit;
-  font-size: 0.8em;
-  cursor: pointer;
-}
-.tag.pick:hover {
-  border-color: var(--accent);
-}
-.agent-access {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.conflict {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--warning);
-  border-radius: var(--radius-md);
-  font-size: 0.9em;
-}
-.conflict p {
-  margin: 0;
-}
-.conflict-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.agent-edit-note {
-  margin: 0;
-  padding: 6px 10px;
-  border: 1px solid var(--warning);
-  border-radius: var(--radius-md);
-  color: var(--text);
-  font-size: 0.85em;
-}
-.agent-warning {
-  margin: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--warning);
-  border-radius: var(--radius-md);
-  color: var(--text);
-  background: color-mix(in srgb, var(--warning) 12%, var(--bg));
-  font-size: 0.9em;
-}
-.editor {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.editor input { width: 100%; }
-.editor textarea { width: 100%; min-height: 280px; }
-.notes button:focus-visible,
-.editor input:focus-visible,
-.editor textarea:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.editor label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.9em;
-}
-.editor textarea {
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text);
-  background: var(--bg);
-  font: inherit;
-  resize: vertical;
-}
-.actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-}
-.unsaved {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85em;
-  color: var(--muted);
-}
-.unsaved i {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  background: var(--accent);
-}
-.danger-zone {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--danger);
-  border-radius: var(--radius-lg);
-}
-.back {
-  display: none;
-  align-self: flex-start;
-}
-.placeholder {
-  margin: 0;
-  padding: 24px 0;
-}
-
-/* Narrow screens: the list, or the open note, one at a time. */
+.column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.notice { margin: 0 0 12px; color: var(--muted); font-size: .9em; }
+.layout { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); flex: 1; min-height: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.list-pane { min-width: 0; overflow-y: auto; background: color-mix(in srgb, var(--surface) 50%, var(--bg)); border-right: 1px solid var(--border); padding: 20px 12px; }
+.list-heading { display: flex; justify-content: space-between; gap: 10px; padding: 0 10px 16px; font-size: .75em; color: var(--muted); }
+.list-heading > :first-child { text-transform: uppercase; letter-spacing: .08em; }
+.list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.empty { padding: 8px 10px; font-size: .9em; }
+.new-note { flex-shrink: 0; min-height: 40px; }
+.note-row { display: flex; flex-direction: column; gap: 7px; width: 100%; padding: 14px 12px; border: 1px solid transparent; border-radius: var(--radius-md); color: var(--text); background: transparent; font: inherit; font-size: .9em; text-align: left; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.note-row:hover { background: var(--surface); }
+.note-row.active { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--bg); box-shadow: inset 3px 0 var(--accent); }
+.title { font-weight: 600; overflow-wrap: anywhere; }
+.snippet { color: var(--muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.note-row .muted { font-size: .8em; }
+.row-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font-size: .8em; overflow-wrap: anywhere; }
+.agent-mark { border-color: var(--warning); color: var(--warning); }
+.editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
+.editor-head { display: flex; align-items: center; gap: 16px; padding: 16px 28px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.privacy { display: inline-flex; gap: 7px; align-items: center; font-size: .8em; color: var(--muted); }
+.privacy svg, .placeholder svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.privacy svg { width: 15px; height: 15px; }
+.editor-scroll { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; scroll-padding: 20px; }
+.writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; min-height: 310px; padding: 30px 36px 20px; }
+.title-field, .body-field { display: flex; flex-direction: column; min-width: 0; }
+.notes .editor .title-field input { width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 1.65em; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; }
+.body-field { flex: 1; gap: 12px; }
+.editor textarea { width: 100%; min-height: 230px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--text); font: inherit; line-height: 1.9; resize: vertical; }
+.count { align-self: flex-end; font-size: .75em; color: var(--muted); }
+.note-tools { flex-shrink: 0; border-top: 1px solid var(--border); padding: 0 28px; }
+.note-tools > details + details { border-top: 1px solid var(--border); }
+summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 0; font-size: .85em; cursor: pointer; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary > [aria-hidden], .summary-hint { color: var(--muted); }
+.summary-hint { font-size: .9em; min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.summary-hint > span { margin-left: 12px; }
+.note-tools details[open] > summary { color: var(--accent); }
+.field, .agent-access { display: flex; flex-direction: column; gap: 12px; padding: 0 0 16px; }
+.field-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.field-label { margin-right: auto; font-size: .85em; color: var(--muted); }
+.suggestions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tag.pick { font: inherit; font-size: .8em; cursor: pointer; }
+.tag.pick:hover { border-color: var(--accent); }
+.conflict { display: flex; flex-direction: column; gap: 8px; margin: 12px 20px; padding: 12px; border: 1px solid var(--warning); border-radius: var(--radius-md); font-size: .9em; }
+.conflict p { margin: 0; }
+.conflict-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.agent-edit-note, .agent-warning { margin: 0; padding: 10px 12px; border: 1px solid var(--warning); border-radius: var(--radius-md); font-size: .85em; }
+.agent-warning { background: color-mix(in srgb, var(--warning) 12%, var(--bg)); }
+.editor-scroll > .error { margin: 12px 20px; }
+.actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 14px 28px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg); }
+.actions .primary { min-width: 76px; min-height: 40px; }
+.actions .primary[aria-busy="true"]::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 7px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); vertical-align: -1px; animation: save-spin .7s linear infinite; }
+@keyframes save-spin { to { transform: rotate(360deg); } }
+.unsaved { display: inline-flex; align-items: center; gap: 7px; margin-right: auto; font-size: .8em; color: var(--muted); }
+.unsaved i { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--accent); flex-shrink: 0; }
+.danger-zone { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-lg); font-size: .85em; }
+.back, .mobile-tools-toggle { display: none; }
+.placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 28px; color: var(--muted); text-align: center; }
+.placeholder svg { width: 34px; height: 34px; color: var(--accent); }
+.placeholder h3 { color: var(--text); }
+.placeholder p { margin: 0 0 8px; font-size: .9em; }
+.library-publishing { margin: 24px 10px 0; border-top: 1px solid var(--border); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.notes button:focus-visible, .notes summary:focus-visible, .editor input:focus-visible, .editor textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (min-width: 1200px) { .writing { padding-inline: max(36px, calc((100% - 760px) / 2)); } }
+@media (max-width: 900px) and (min-width: 768px) { .layout { grid-template-columns: 220px minmax(0, 1fr); } .writing { padding-inline: 22px; } .note-tools, .actions { padding-inline: 20px; } }
 @media (max-width: 767px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-  .layout.editing .list-pane,
-  .layout:not(.editing) .placeholder {
-    display: none;
-  }
-  .back {
-    display: inline-block;
-  }
+  .notes :deep(.page-column) { padding: 18px 16px 12px; }
+  .notes :deep(.page-head) { flex-direction: row; align-items: center; margin-bottom: 16px; gap: 10px; }
+  .notes :deep(.page-title) { margin: 0; }
+  .notes :deep(.page-description) { display: none; }
+  .notes.note-open :deep(.page-head) { display: none; }
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .layout.editing .list-pane, .layout:not(.editing) .placeholder { display: none; }
+  .list-pane { border-right: 0; padding: 16px 10px; }
+  .note-row { min-height: 100px; }
+  .editor-head { padding: 12px 16px; justify-content: space-between; gap: 10px; }
+  .back { display: inline-block; min-height: 40px; }
+  .writing { min-height: 310px; padding: 24px 20px 18px; }
+  .notes .editor .title-field input { font-size: 1.45em; }
+  .editor textarea { min-height: 250px; }
+  .mobile-tools-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 15px 20px; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: var(--bg); font: inherit; font-size: .85em; cursor: pointer; }
+  .note-tools { display: none; padding-inline: 20px; }
+  /* Keep an open publication dialog visible when resizing from desktop. */
+  .note-tools.expanded, .note-tools:has(dialog[open]) { display: block; }
+  .actions { padding: 12px 16px; }
 }
 </style>

@@ -23,6 +23,7 @@ test("Notes promotion reviews shared audience, keeps failed draft and preserves 
   await page.getByLabel("Title", { exact: true }).fill("Deployment procedure");
   await page.getByLabel("Note text", { exact: true }).fill("Reusable deployment steps");
   await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.locator("summary").filter({ hasText: "Obsidian & publishing" }).click();
   await page.getByRole("button", { name: "Promote to Obsidian", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Review Obsidian publication" });
   await expect(dialog).toBeVisible();

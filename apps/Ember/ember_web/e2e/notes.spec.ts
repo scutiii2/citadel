@@ -2,6 +2,37 @@ import { expect, test } from "@playwright/test";
 import { installFakeApi } from "./fakeApi.ts";
 import { flipSwitch, logIn } from "./helpers.ts";
 
+test("notes: focused editor keeps Save reachable at desktop, tablet and mobile widths", async ({ page }) => {
+  const api = await installFakeApi(page);
+  await logIn(page);
+  await page.goto("/notes");
+  await page.getByRole("button", { name: "New note" }).click();
+  await page.getByLabel("Title", { exact: true }).fill("A quiet workspace");
+  await page.getByLabel("Note text").fill("A long thought.\n".repeat(200));
+  await expect(page.getByLabel("Add a tag")).toBeHidden();
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    for (const width of [1440, 768, 375]) {
+      await page.setViewportSize({ width, height: 812 });
+      const save = page.getByRole("button", { name: "Save", exact: true });
+      await expect(save).toBeInViewport();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await expect(page.getByRole("list", { name: "Notes", exact: true })).toBeVisible({ visible: width >= 768 });
+      await expect(page.getByRole("button", { name: "All notes" })).toBeVisible({ visible: width < 768 });
+    }
+  }
+  await page.getByRole("button", { name: "Note details & tools" }).click();
+  await page.locator("summary").filter({ hasText: "Tags" }).click();
+  await page.getByLabel("Add a tag").fill("reflection");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
+  expect([...api.notes.values()][0]?.tags).toEqual(["reflection"]);
+  await page.getByRole("button", { name: "All notes" }).click();
+  await expect(page.getByRole("list", { name: "Notes", exact: true })).toBeVisible();
+  await page.getByRole("list", { name: "Notes", exact: true }).getByRole("button").click();
+  await expect(page.getByLabel("Note text")).toHaveValue("A long thought.\n".repeat(200));
+});
+
 test("notes: write one, edit it, and delete it after a confirmation", async ({ page }) => {
   const api = await installFakeApi(page);
   await logIn(page);
@@ -29,6 +60,7 @@ test("notes: write one, edit it, and delete it after a confirmation", async ({ p
   expect([...api.notes.values()][0]?.body).toBe("milk, eggs");
 
   // Delete: Cancel keeps it, Delete note removes it.
+  await page.locator("summary").filter({ hasText: "Manage note" }).click();
   await page.getByRole("button", { name: "Delete this note" }).click();
   const dialog = page.getByRole("dialog", { name: "Delete this note?" });
   await dialog.getByRole("button", { name: "Cancel" }).click();
@@ -76,6 +108,7 @@ test("notes: tags and the agent switch are saved, with a warning while agents ca
 
   await page.getByRole("button", { name: "New note" }).click();
   await page.getByLabel("Title").fill("Wifi");
+  await page.locator("summary").filter({ hasText: "Tags" }).click();
   const tagBox = page.getByLabel("Add a tag");
   await tagBox.fill("Home Network");
   await tagBox.press("Enter");
@@ -86,6 +119,7 @@ test("notes: tags and the agent switch are saved, with a warning while agents ca
   await expect(chips).toContainText("home-network");
 
   // The switch is off at first; turning it on shows the warning, turning it off removes it.
+  await page.locator("summary").filter({ hasText: "Agent access" }).click();
   const agents = page.getByRole("switch", { name: "Let agents read this note" });
   await expect(agents).not.toBeChecked();
   await expect(page.getByRole("note")).toHaveCount(0);
@@ -123,6 +157,7 @@ test("notes: Suggest tags offers existing tags that fit, and nothing is added un
 
   await page.getByRole("button", { name: "New note" }).click();
   const suggest = page.getByRole("button", { name: "Suggest tags" });
+  await page.locator("summary").filter({ hasText: "Tags" }).click();
   await expect(suggest).toBeDisabled(); // nothing written yet
   await page.getByLabel("Title").fill("Pay the money I owe");
   await suggest.click();
@@ -154,6 +189,7 @@ test("notes: the tag box offers your existing tags in its own list, by keyboard 
 
   await page.getByRole("button", { name: "New note" }).click();
   await page.getByLabel("Title").fill("Cinema night");
+  await page.locator("summary").filter({ hasText: "Tags" }).click();
   const box = page.getByRole("combobox", { name: "Add a tag" });
   await box.focus();
   const options = page.getByRole("listbox", { name: "Your tags" }).getByRole("option");

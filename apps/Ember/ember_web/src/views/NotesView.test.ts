@@ -57,6 +57,18 @@ const dialogButton = (text: string) =>
 const rows = (w: VueWrapper) => w.findAll("ul[aria-label='Notes'] li");
 
 describe("NotesView", () => {
+  it("keeps secondary tools collapsed while the title and note stay in the writing area", async () => {
+    const w = await setup([note("a", "First", "one")]);
+    await rows(w)[0]!.get("button").trigger("click");
+    const tags = w.get("details.tag-tools");
+    expect(tags.attributes("open")).toBeUndefined();
+    expect(w.find(".writing input[aria-label=Title]").exists()).toBe(true);
+    expect(w.find(".writing textarea").exists()).toBe(true);
+    await tags.get("summary").trigger("click");
+    await w.get("input[aria-label=Title]").setValue("Changed");
+    await w.get("details.agent-tools input[role=switch]").setValue(true);
+    expect(w.get(".actions").text()).toContain("Unsaved changes");
+  });
   it("says so when there are no notes", async () => {
     const w = await setup();
 
