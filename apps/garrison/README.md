@@ -28,6 +28,22 @@ and an MCP *client* (to `mcp_server`, via a persistent connection - see
    `.venv_garrison` and installs this project into it in editable mode on
    first run, then runs `py -m src.supervisor`. See Agents below.
 
+### CPU-only Docker image
+
+Garrison's Dockerfile installs PyTorch from its CPU wheel index before the
+application dependencies. This keeps Laya available without downloading the
+CUDA/Triton stack on CPU-only hosts such as ZimaOS. The build checks that the
+installed PyTorch has neither CUDA nor ROCm support. SymPy, Transformers,
+Tokenizers and the Laya model weights are still needed.
+
+An older image keeps its GPU packages until it is replaced. From the repo root,
+rebuild and recreate Garrison using the same Compose files as your deployment:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.zima.yml build garrison
+docker compose -f docker-compose.yml -f docker-compose.zima.yml up -d --no-deps garrison
+```
+
 ## Agents
 
 Each ai_agent instance is defined by one file, `agents/<id>.json`. The file
