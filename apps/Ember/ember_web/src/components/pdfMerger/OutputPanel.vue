@@ -8,10 +8,8 @@ const plan = usePlanStore()
 </script>
 
 <template>
-  <section class="panel">
-    <h2>Output</h2>
+  <section class="output-options" aria-label="PDF output settings">
     <div class="grid">
-      <label>File name<input v-model="plan.output.filename" placeholder="merged.pdf" /></label>
       <label>Title<input v-model="plan.output.title" placeholder="Contract package" /></label>
       <label>Author<input v-model="plan.output.author" placeholder="Jane Cruz" /></label>
       <SegmentedControl class="wide" v-model="plan.output.image_page_size" label="Image page size" :options="[{value:'A4',label:'A4'},{value:'Letter',label:'Letter'},{value:'match',label:'Match image'}]" />
@@ -25,6 +23,10 @@ const plan = usePlanStore()
   </section>
 </template>
 <style scoped>
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.grid > label:not(.toggle) { display: grid; gap: 6px; font-size: .85em; color: var(--muted); }
+input { font: inherit; width: 100%; min-width: 0; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 9px 11px; }
+input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Three-option pills are wider than a grid column; give them the whole row so they never scroll. */
 .wide { grid-column: 1 / -1; }
 </style>

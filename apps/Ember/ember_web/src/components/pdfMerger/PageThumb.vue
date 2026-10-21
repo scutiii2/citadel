@@ -8,7 +8,7 @@ import { renderPage } from '../../lib/pdfMerger/pdfThumbs'
 import type { PageItem } from '../../lib/pdfMerger/segments'
 
 const props = defineProps<{ item: PageItem; kind: FileKind; label: string }>()
-const THUMB_WIDTH = 96
+const THUMB_WIDTH = 180
 const root = ref<HTMLElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const visible = ref(false)
@@ -48,11 +48,12 @@ onBeforeUnmount(() => observer?.disconnect())
 
 <template>
   <figure ref="root" class="thumb">
-    <div class="paper" :style="{ transform: `rotate(${item.rotate}deg)` }">
-      <canvas v-if="kind === 'pdf' && !failed" ref="canvas" />
+    <div class="paper">
+      <canvas v-if="kind === 'pdf' && !failed" ref="canvas" :style="{ transform: `rotate(${item.rotate}deg) scale(${item.rotate % 180 ? 0.7 : 1})` }" />
       <img
         v-else-if="kind === 'image' && visible && !failed"
         :src="contentUrl(item.fileId)"
+        :style="{ transform: `rotate(${item.rotate}deg) scale(${item.rotate % 180 ? 0.7 : 1})` }"
         alt=""
         draggable="false"
         @error="failed = true"

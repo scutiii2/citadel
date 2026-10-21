@@ -13,7 +13,7 @@ function setup() {
   const files = useFilesStore()
   files.add({ file_id: 'f_a', name: 'a.pdf', kind: 'pdf', pages: 2, size: 1, expires_at: 0 })
   files.add({ file_id: 'f_b', name: 'b.pdf', kind: 'pdf', pages: 2, size: 1, expires_at: 0 })
-  const wrapper = mount(SourceList, { global: { plugins: [pinia], stubs: {ConfirmModal: {props:['open'], emits:['confirm'], template: `<button v-if="open" class="confirm-test" @click="$emit('confirm')">Confirm</button>`}} } })
+  const wrapper = mount(SourceList, { global: { plugins: [pinia], stubs: {Teleport: true, ConfirmModal: {props:['open'], emits:['confirm'], template: `<button v-if="open" class="confirm-test" @click="$emit('confirm')">Confirm</button>`}} } })
   return { files, wrapper }
 }
 

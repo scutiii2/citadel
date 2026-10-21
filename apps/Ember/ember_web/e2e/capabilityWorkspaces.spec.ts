@@ -152,7 +152,7 @@ test('native PDF workspace uploads JSON, renders worker previews, reorders pages
   // PDF.js must paint nonempty canvases using the built module worker under production CSP.
   await expect.poll(() => page.locator('ol.strip canvas').evaluateAll(canvases => canvases.filter(element => {
     const canvas = element as HTMLCanvasElement
-    if (canvas.width !== 96 || canvas.height <= 0) return false
+    if (canvas.width !== 180 || canvas.height <= 0) return false
     const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
     return pixels.some((value, index) => index % 4 === 0 && value < 180 && pixels[index + 3]! > 0)
   }).length)).toBe(2)
@@ -162,7 +162,7 @@ test('native PDF workspace uploads JSON, renders worker previews, reorders pages
   await pages.first().focus()
   await pages.first().press('Alt+ArrowRight')
   await expect(pages.first()).toContainText('Woods p1')
-  await page.getByRole('button', { name: 'Merge', exact: true }).click()
+  await page.getByRole('button', { name: 'Merge PDF', exact: true }).click()
   const downloadLink = page.getByRole('link', { name: /Download merged.pdf/ })
   await expect(downloadLink).toBeVisible()
   expect(api.media.merges[0]).toMatchObject({ segments: [{ file_id: 'pdf-2', pages: '1' }, { file_id: 'pdf-1', pages: '1' }] })
@@ -176,6 +176,76 @@ test('native PDF workspace uploads JSON, renders worker previews, reorders pages
   expect((await downloaded).suggestedFilename()).toBe('merged.pdf')
   await screenshots(page, info, 'pdf-workspace')
   expect(errors).toEqual([])
+  expect(api.unexpected).toEqual([])
+})
+
+test('PDF workspace preserves edits across mobile modes and keeps merge and dialogs reachable', async ({ page }, info) => {
+  const api = await installFakeApi(page, { media: true })
+  await logIn(page)
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/capabilities/pdf_merger')
+  const picker = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Add files', exact: true }).first().click()
+  await (await picker).setFiles([
+    { name: 'Coast.pdf', mimeType: 'application/pdf', buffer: samplePdf('Coastal field notes') },
+    { name: 'Woods.pdf', mimeType: 'application/pdf', buffer: samplePdf('Woodland field notes') },
+  ])
+  const pages = page.locator('ol.strip > li')
+  await expect(pages).toHaveCount(2)
+  await page.getByRole('button', { name: 'Move Woods p1 earlier', exact: true }).click()
+  await expect(pages.first()).toContainText('Woods p1')
+  await page.getByRole('textbox', { name: 'Output file', exact: true }).fill('Field notes.pdf')
+  const modes = page.locator('.mobile-tabs')
+  await modes.getByRole('button', { name: /^Files/ }).click()
+  const source = page.locator('.source-list > li').first()
+  await source.getByText('File options', { exact: true }).click()
+  await source.getByRole('textbox', { name: 'Pages', exact: true }).fill('9')
+  await expect(source.getByRole('alert')).toBeVisible()
+  const merge = page.getByRole('button', { name: 'Merge PDF', exact: true })
+  await expect(merge).toBeDisabled()
+  await page.getByRole('button', { name: 'Output options', exact: true }).click()
+  const options = page.getByRole('dialog', { name: 'Output options', exact: true })
+  await expect(options).toBeVisible()
+  await options.getByRole('textbox', { name: 'Title', exact: true }).fill('Field work')
+  for (const theme of ['light', 'dark'] as const) {
+    await page.evaluate(theme => { document.documentElement.style.colorScheme = theme }, theme)
+    for (const width of [1440, 768, 375]) {
+      await page.setViewportSize({ width, height: 812 })
+      await expect(options).toBeVisible()
+      expect(await options.evaluate(e => e.scrollWidth <= e.clientWidth)).toBe(true)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    }
+  }
+  await options.getByRole('button', { name: 'Close', exact: true }).click()
+  await modes.getByRole('button', { name: /^Pages/ }).click()
+  await expect(page.getByRole('textbox', { name: 'Output file' })).toHaveValue('Field notes.pdf')
+  await expect(merge).toBeDisabled()
+  await modes.getByRole('button', { name: /^Files/ }).click()
+  await source.getByRole('textbox', { name: 'Pages', exact: true }).fill('all')
+  await source.getByRole('button', { name: 'Remove file', exact: true }).click()
+  const remove = page.getByRole('dialog', { name: 'Remove source file?', exact: true })
+  await remove.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(page.locator('.source-list > li')).toHaveCount(2)
+  await source.getByRole('button', { name: 'Remove file', exact: true }).click()
+  // The confirmation must survive its source pane becoming hidden.
+  await page.evaluate(() => (document.querySelector('.mobile-tabs button') as HTMLButtonElement).click())
+  await expect(remove).toBeVisible()
+  await remove.getByRole('button', { name: 'Remove', exact: true }).click()
+  await expect(page.locator('.source-list > li')).toHaveCount(1)
+  for (const theme of ['light', 'dark'] as const) {
+    await page.evaluate(theme => { document.documentElement.style.colorScheme = theme }, theme)
+    for (const width of [1440, 768, 375]) {
+      await page.setViewportSize({ width, height: 812 })
+      await expect(merge).toBeVisible()
+      const bounds = await merge.boundingBox()
+      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(812 - (width < 768 ? 52 : 0))
+      expect(await page.locator('.pdf-page').evaluate(e => e.scrollWidth <= e.clientWidth)).toBe(true)
+      await page.screenshot({ path: info.outputPath(`pdf-redesign-${theme}-${width}.png`) })
+    }
+  }
+  await merge.click()
+  await expect(page.getByRole('link', { name: /Download merged.pdf/ })).toBeVisible()
+  expect(api.media.merges[0]).toMatchObject({ output: { filename: 'Field notes.pdf', title: 'Field work' }, segments: [{ file_id: 'pdf-2', pages: '1' }] })
   expect(api.unexpected).toEqual([])
 })
 

@@ -44,7 +44,8 @@ function onDrop(index: number): void {
 
 <template>
   <section v-if="files.sources.length" class="panel">
-    <h2>Source files</h2>
+    <h2>Source files <span class="muted small">{{ files.sources.length }}</span></h2>
+    <p class="page-hint">Pick pages and adjust each file.</p>
     <ol class="source-list" aria-label="Source files. Press Alt and an arrow key to move a file.">
       <li
         v-for="(source, index) in files.sources"
@@ -57,6 +58,10 @@ function onDrop(index: number): void {
       >
         <SourceRow
           :source="source"
+          :can-move-up="index > 0"
+          :can-move-down="index < files.sources.length - 1"
+          @move-up="files.moveSource(index, index - 1)"
+          @move-down="files.moveSource(index, index + 1)"
           @range="files.setRange(source.info.file_id, $event)"
           @rotate="files.rotate(source.info.file_id)"
           @fit="files.setFit(source.info.file_id, $event)"
@@ -66,6 +71,6 @@ function onDrop(index: number): void {
         />
       </li>
     </ol>
-    <ConfirmModal :open="removing !== null" title="Remove source file?" :message="`Remove ${removing?.info.name ?? 'this file'} from your files and merge plan?`" confirm-label="Remove" danger :busy="busy" @close="!busy && (removing = null)" @confirm="confirmRemove" />
+    <Teleport to="body"><ConfirmModal :open="removing !== null" title="Remove source file?" :message="`Remove ${removing?.info.name ?? 'this file'} from your files and merge plan?`" confirm-label="Remove" danger :busy="busy" @close="!busy && (removing = null)" @confirm="confirmRemove" /></Teleport>
   </section>
 </template>

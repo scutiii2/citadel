@@ -6,6 +6,8 @@ import { ref } from 'vue'
 const emit = defineEmits<{ files: [File[]] }>()
 const over = ref(false)
 const input = ref<HTMLInputElement | null>(null)
+function openPicker(): void { input.value?.click() }
+defineExpose({ openPicker })
 
 function onDrop(event: DragEvent): void {
   over.value = false
