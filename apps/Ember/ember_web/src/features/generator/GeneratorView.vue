@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { McpServerClient } from "../../api/tools/McpServerClient";
@@ -209,7 +210,7 @@ onBeforeUnmount(() => {
 
 <template>
   <PageLayout title="Generator" description="Passwords, passphrases, PINs and one-time codes." class="generator" wide fill>
-    <form class="generator-workspace" @submit.prevent="canRun && generate()">
+    <WorkspaceLayout mobile="stack" as="form" class="generator-workspace" @submit.prevent="canRun && generate()">
       <div class="type-picker">
         <div class="desktop-types"><SegmentedControl :model-value="tab" aria-label="Generator type" :options="TABS" @update:model-value="requestTab" /></div>
         <label class="mobile-type">Generator type
@@ -301,13 +302,13 @@ onBeforeUnmount(() => {
         </section>
       </div>
       <footer class="generate-footer"><p>Generated values aren't saved.</p><button type="submit" class="primary" :disabled="!canRun" :aria-busy="busy"><svg v-if="!busy" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 13-2l2 7M4 12l2 7a8 8 0 0 0 13-2" /></svg>{{ generateLabel }}</button></footer>
-    </form>
+    </WorkspaceLayout>
     <ConfirmModal :open="leaving !== null" title="Discard the generated value?" :message="`Generated values are not stored. Leaving this ${leaving?.page ? 'page' : 'tab'} removes the one you made, so copy it first if you still need it.`" confirm-label="Discard and leave" @confirm="answerLeave(true)" @close="answerLeave(false)" />
   </PageLayout>
 </template>
 
 <style scoped>
-.generator-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: 'type options' 'result options' 'footer options'; flex: 1; min-width: 0; min-height: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.generator-workspace { --workspace-columns: minmax(0, 1fr) 300px; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: 'type options' 'result options' 'footer options'; }
 .type-picker { grid-area: type; padding: 22px 24px 0; min-width: 0; }
 .work-scroll { display: contents; }
 .mobile-type { display: none; }
@@ -390,7 +391,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .field input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
 
 @media (max-width: 1050px) and (min-width: 768px) {
-  .generator-workspace { grid-template-columns: minmax(0, 1fr) 250px; }
+  .generator-workspace { --workspace-columns: minmax(0, 1fr) 250px; }
   .type-picker { padding: 20px 18px 0; }
   .desktop-types :deep(.segmented) { flex-wrap: wrap; border-radius: var(--radius-lg); overflow-x: visible; }
   .result-panel { padding-inline: 18px; }
@@ -400,7 +401,6 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 @media (max-width: 767px) {
   .generator :deep(.page-column) { padding: 20px 16px 12px; }
   .generator :deep(.page-head) { margin-bottom: 20px; }
-  .generator-workspace { display: flex; flex-direction: column; border: 0; border-radius: 0; }
   .type-picker { flex-shrink: 0; padding: 0; }
   .desktop-types { display: none; }
   .mobile-type { display: grid; gap: 7px; color: var(--muted); font-size: .8em; }

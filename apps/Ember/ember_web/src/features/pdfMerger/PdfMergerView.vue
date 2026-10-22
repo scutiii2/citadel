@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import PageLayout from '../../components/layout/PageLayout.vue'
@@ -41,7 +42,7 @@ onBeforeRouteLeave(stop)
       <p v-if="files.uploading" class="muted small" role="status">Uploading {{ files.uploading }} file(s)...</p>
       <ul v-if="files.errors.length" class="errors"><li v-for="(message,index) in files.errors" :key="index" role="alert">{{ message }} <button type="button" class="link" @click="files.dismissError(index)">Dismiss</button></li></ul>
     </div>
-    <div :class="['workspace', `mode-${mode}`]">
+    <WorkspaceLayout mobile="stack" :class="['workspace', `mode-${mode}`]">
       <div class="mobile-tabs"><SegmentedControl mode="tabs" id-prefix="pdf" v-model="mode" :options="modes" aria-label="PDF workspace" /></div>
       <div id="pdf-panel-pages" :role="narrow ? 'tabpanel' : undefined" :aria-labelledby="narrow ? 'pdf-tab-pages' : undefined" class="pages-panel">
         <PageStrip />
@@ -61,7 +62,7 @@ onBeforeRouteLeave(stop)
         <div class="output-row"><input id="pdf-output-name" v-model="plan.output.filename" aria-label="Output file" placeholder="merged.pdf" /><ActionButton icon="summarize" class="options-button" @click="outputOpen = true">Output options</ActionButton></div>
         <MergeBar />
       </footer>
-    </div>
+    </WorkspaceLayout>
     <BaseModal :open="outputOpen" title="Output options" class="pdf-options-modal" @close="outputOpen = false"><OutputPanel /><p class="muted small">Options apply to your next merge.</p></BaseModal>
   </PageLayout>
 </template>

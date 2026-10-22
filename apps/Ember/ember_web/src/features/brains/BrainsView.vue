@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import PageLayout from "../../components/layout/PageLayout.vue";
@@ -140,7 +141,7 @@ onMounted(async () => {
       </article>
     </section>
 
-    <div v-else class="brain-workspace" :class="{ reading: mobileReading }" :aria-busy="busy">
+    <WorkspaceLayout v-else class="brain-workspace" :class="{ reading: mobileReading }" :aria-busy="busy">
       <aside class="browser" aria-label="Brain folders and documents">
         <nav class="breadcrumbs" aria-label="Vault folders">
           <template v-for="(crumb, index) in breadcrumbs" :key="crumb.path">
@@ -188,7 +189,7 @@ onMounted(async () => {
         </div>
         <footer v-if="document" class="reader-footer">Reading from the {{ scopeLabel(document.scope) }}</footer>
       </section>
-    </div>
+    </WorkspaceLayout>
 
     <BaseModal class="connection-modal" :open="connectionOpen" title="Personal connection" @close="connectionOpen = false">
       <BrainConnectionForm scope="personal" />
@@ -216,7 +217,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .feedback p { margin: 4px 0; }
 .feedback .error { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .feedback .error button { flex-shrink: 0; }
-.brain-workspace { display: grid; grid-template-columns: 260px minmax(0, 1fr); flex: 1; min-height: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.brain-workspace { --workspace-columns: 260px minmax(0, 1fr); }
 .browser { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow-y: auto; padding: 18px 12px; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 50%, var(--bg)); }
 .breadcrumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 0 10px 15px; font-size: .8em; color: var(--muted); }
 .breadcrumbs button { min-width: 0; max-width: 100%; padding: 2px 0; border: 0; border-radius: var(--radius-sm); color: var(--muted); background: transparent; font-size: 1em; overflow-wrap: anywhere; }
@@ -273,7 +274,7 @@ button.file-row.active { border-color: color-mix(in srgb, var(--accent) 45%, var
 @keyframes brain-spin { to { transform: rotate(360deg); } }
 .error { color: var(--danger); }
 @media (max-width: 900px) and (min-width: 768px) {
-  .brain-workspace { grid-template-columns: 220px minmax(0, 1fr); }
+  .brain-workspace { --workspace-columns: 220px minmax(0, 1fr); }
   .document-content { padding: 24px; }
 }
 @media (max-width: 767px) {
@@ -286,7 +287,6 @@ button.file-row.active { border-color: color-mix(in srgb, var(--accent) 45%, var
   .connection-status { font-size: .7em; }
   .search-form input { font-size: max(1em, 16px); }
   .search-form button { min-height: 44px; padding-inline: 12px; }
-  .brain-workspace { grid-template-columns: minmax(0, 1fr); }
   .browser { border-right: 0; padding: 16px 12px; }
   .brain-workspace:not(.reading) .reader, .brain-workspace.reading .browser { display: none; }
   .mobile-reading :deep(.page-toolbar) { display: none; }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
@@ -130,7 +131,7 @@ async function remove(): Promise<void> {
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       <p v-if="loading" class="muted" role="status">Loading memories…</p>
       <div v-else-if="loadError" class="load-error" role="alert"><p>Could not load memories: {{ loadError }}</p><button type="button" class="chip" @click="load">Try again</button></div>
-      <div v-else :class="['layout', { editing: editorOpen }]">
+      <WorkspaceLayout v-else :class="['layout', { editing: editorOpen }]">
         <aside class="list-pane" aria-label="Memory list">
           <div class="list-heading"><span>All memories</span><span>{{ memories.length }}/{{ MEMORY_MAX }}</span></div>
           <label class="memory-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg><input v-model="query" type="search" aria-label="Search memories" placeholder="Search memories…" /></label>
@@ -167,7 +168,7 @@ async function remove(): Promise<void> {
           <footer class="form-actions"><span v-if="dirty" class="unsaved" role="status"><i aria-hidden="true" />Unsaved changes</span><span v-else class="saved-state">No unsaved changes</span><button type="submit" class="primary" :disabled="!canSave" :aria-busy="saving">{{ saving ? 'Saving…' : 'Save' }}</button></footer>
         </form>
         <div v-else class="placeholder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4c-5-5-10 2-6 5-6 2-2 9 2 7-1 6 4 6 4 2V4zm0 0c5-5 10 2 6 5 6 2 2 9-2 7 1 6-4 6-4 2" /></svg><h3>Keep the useful context</h3><p>Pick a memory, or add a new one.</p><button type="button" class="chip" :disabled="memories.length >= MEMORY_MAX" @click="openEditor()">Create a memory</button></div>
-      </div>
+      </WorkspaceLayout>
     </div>
     <ConfirmModal :open="deleting !== null" title="Delete this memory?" :message="removeError || 'Ember will no longer remember this. This cannot be undone.'" confirm-label="Delete memory" danger :busy="removing" @confirm="remove" @close="!removing && (deleting = null)" />
     <ConfirmModal :open="discardOpen" title="Discard your changes?" message="This memory has changes you have not saved." confirm-label="Discard" danger @confirm="answerDiscard(true)" @close="answerDiscard(false)" />
@@ -177,7 +178,7 @@ async function remove(): Promise<void> {
 <style scoped>
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .notice { margin: 0 0 12px; color: var(--muted); font-size: .85em; flex-shrink: 0; }
-.layout { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); flex: 1; min-height: 0; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+
 .list-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: color-mix(in srgb, var(--surface) 50%, var(--bg)); border-right: 1px solid var(--border); padding: 20px 12px; }
 .list-heading { display: flex; justify-content: space-between; gap: 10px; padding: 0 10px 12px; font-size: .75em; color: var(--muted); flex-shrink: 0; }
 .list-heading > :first-child { text-transform: uppercase; letter-spacing: .08em; }
@@ -236,7 +237,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .form-error { margin: 12px 20px; font-size: .85em; }
 button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (min-width: 1200px) { .writing { padding-inline: max(36px, calc((100% - 760px) / 2)); } }
-@media (max-width: 900px) and (min-width: 768px) { .layout { grid-template-columns: 220px minmax(0, 1fr); } .writing { padding-inline: 22px; } .manage-memory, .form-actions { padding-inline: 20px; } }
+@media (max-width: 900px) and (min-width: 768px) { .layout { --workspace-columns: 220px minmax(0, 1fr); } .writing { padding-inline: 22px; } .manage-memory, .form-actions { padding-inline: 20px; } }
 @media (max-width: 767px) {
   .memory :deep(.page-column) { padding: 18px 16px 12px; }
   .memory :deep(.page-head) { flex-direction: row; align-items: center; margin-bottom: 16px; gap: 10px; }
@@ -244,7 +245,6 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
   .memory :deep(.page-description) { display: none; }
   .memory.memory-open :deep(.page-head) { display: none; }
   .memory :deep(.page-actions button) { min-height: 44px; }
-  .layout { grid-template-columns: minmax(0, 1fr); }
   .layout.editing .list-pane, .layout:not(.editing) .placeholder { display: none; }
   .list-pane { border-right: 0; padding: 16px 10px; }
   .memory-search { min-height: 44px; }

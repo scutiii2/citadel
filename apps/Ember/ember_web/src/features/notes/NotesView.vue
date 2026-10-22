@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import NotePromotionPanel from "./components/NotePromotionPanel.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, getCurrentInstance, onMounted, onUnmounted, reactive, ref, useId } from "vue";
@@ -318,7 +319,7 @@ function preview(note: Note): string {
       <p v-if="loadError" class="error" role="alert">Could not load your notes: {{ loadError }}</p>
       <p v-if="loading" class="muted">Loading …</p>
 
-      <div v-else-if="!loadError" :class="['layout', { editing: selected !== null }]">
+      <WorkspaceLayout v-else-if="!loadError" :class="['layout', { editing: selected !== null }]">
         <div class="list-pane">
           <div class="list-heading"><span>All notes</span><span>{{ notes.length }}/{{ NOTES_MAX }} notes</span></div>
           <p v-if="notes.length === 0 && selected !== NEW" class="muted empty">You have no notes yet.</p>
@@ -496,7 +497,7 @@ function preview(note: Note): string {
           <h3>A little room to think</h3><p>Pick a note, or start a new one.</p>
           <button type="button" class="chip" @click="startNew">Create a note</button>
         </div>
-      </div>
+      </WorkspaceLayout>
     </div>
 
     <Teleport v-if="!loading && !loadError" :to="`#${publicationTarget}-${selected === null ? 'library' : 'editor'}`">
@@ -537,7 +538,7 @@ function preview(note: Note): string {
 <style scoped>
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .notice { margin: 0 0 12px; color: var(--muted); font-size: .9em; }
-.layout { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); flex: 1; min-height: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+
 .list-pane { min-width: 0; overflow-y: auto; background: color-mix(in srgb, var(--surface) 50%, var(--bg)); border-right: 1px solid var(--border); padding: 20px 12px; }
 .list-heading { display: flex; justify-content: space-between; gap: 10px; padding: 0 10px 16px; font-size: .75em; color: var(--muted); }
 .list-heading > :first-child { text-transform: uppercase; letter-spacing: .08em; }
@@ -601,14 +602,13 @@ summary > [aria-hidden], .summary-hint { color: var(--muted); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .notes button:focus-visible, .notes summary:focus-visible, .editor input:focus-visible, .editor textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (min-width: 1200px) { .writing { padding-inline: max(36px, calc((100% - 760px) / 2)); } }
-@media (max-width: 900px) and (min-width: 768px) { .layout { grid-template-columns: 220px minmax(0, 1fr); } .writing { padding-inline: 22px; } .note-tools, .actions { padding-inline: 20px; } }
+@media (max-width: 900px) and (min-width: 768px) { .layout { --workspace-columns: 220px minmax(0, 1fr); } .writing { padding-inline: 22px; } .note-tools, .actions { padding-inline: 20px; } }
 @media (max-width: 767px) {
   .notes :deep(.page-column) { padding: 18px 16px 12px; }
   .notes :deep(.page-head) { flex-direction: row; align-items: center; margin-bottom: 16px; gap: 10px; }
   .notes :deep(.page-title) { margin: 0; }
   .notes :deep(.page-description) { display: none; }
   .notes.note-open :deep(.page-head) { display: none; }
-  .layout { grid-template-columns: minmax(0, 1fr); }
   .layout.editing .list-pane, .layout:not(.editing) .placeholder { display: none; }
   .list-pane { border-right: 0; padding: 16px 10px; }
   .note-row { min-height: 100px; }

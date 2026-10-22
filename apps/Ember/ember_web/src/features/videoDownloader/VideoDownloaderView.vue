@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import PageLayout from '../../components/layout/PageLayout.vue'
@@ -77,7 +78,7 @@ async function confirmAction(): Promise<void> {
 
 <template>
   <PageLayout class="media-page" title="Media downloader" description="Video, music, and photos. Start with a link." wide fill>
-    <div :class="['media-workspace', `mode-${tab}`]">
+    <WorkspaceLayout mobile="stack" :class="['media-workspace', `mode-${tab}`]">
       <div class="mobile-tabs"><SegmentedControl mode="tabs" id-prefix="media-mobile" v-model="tab" :options="mobileTabs" aria-label="Media workspace" /></div>
       <div class="main-panel">
         <div class="desktop-tabs"><SegmentedControl mode="tabs" id-prefix="media-desktop" v-model="desktopTab" :options="desktopTabs" aria-label="Media workspace" /></div>
@@ -108,7 +109,7 @@ async function confirmAction(): Promise<void> {
         </ul>
         <p class="muted retention"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v6l4 2" /></svg>Save files to your device before they expire.</p>
       </aside>
-    </div>
+    </WorkspaceLayout>
     <BaseModal :open="fileDetails !== null" title="File details" @close="!confirming && (fileDetails = null)">
       <div v-if="fileDetails" class="file-details">
         <p class="file-details-name">{{ fileDetails.name }}</p>
@@ -121,7 +122,7 @@ async function confirmAction(): Promise<void> {
 </template>
 
 <style scoped>
-.media-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; flex: 1; min-height: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.media-workspace { --workspace-columns: minmax(0, 1fr) 300px; }
 .main-panel { padding: 22px 24px; min-width: 0; min-height: 0; overflow-y: auto; }
 .desktop-tabs { margin-bottom: 22px; }
 .mobile-tabs { display: none; }
@@ -154,11 +155,10 @@ async function confirmAction(): Promise<void> {
 h3 { font-size: 1em; margin: 0 0 12px; }
 .error { color: var(--danger); overflow-wrap: anywhere; }
 .muted { color: var(--muted); font-size: .85em; }
-@media (max-width: 1050px) and (min-width: 768px) { .media-workspace { grid-template-columns: minmax(0, 1fr) 250px; } .main-panel { padding: 20px 18px; } .files-panel { padding-inline: 14px; } }
+@media (max-width: 1050px) and (min-width: 768px) { .media-workspace { --workspace-columns: minmax(0, 1fr) 250px; } .main-panel { padding: 20px 18px; } .files-panel { padding-inline: 14px; } }
 @media (max-width: 767px) {
   .media-page :deep(.page-column) { padding: 20px 16px 12px; }
   .media-page :deep(.page-head) { margin-bottom: 18px; }
-  .media-workspace { display: flex; flex-direction: column; border: 0; border-radius: 0; }
   .mobile-tabs { display: block; flex-shrink: 0; margin-bottom: 18px; }
   .mobile-tabs :deep(.segmented-control), .mobile-tabs :deep(.segmented) { width: 100%; }
   .mobile-tabs :deep(button.segment) { flex: 1; min-height: 44px; padding-inline: 7px; }

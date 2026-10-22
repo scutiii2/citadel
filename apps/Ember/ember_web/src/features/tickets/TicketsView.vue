@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
@@ -304,7 +305,7 @@ async function reopenTicket(): Promise<void> {
       <SegmentedControl class="status-filters" v-model="filter" :options="filterOptions" aria-label="Ticket status" />
     </template>
     <p v-if="notice" class="notice" role="status">{{ notice }}</p>
-    <div class="ticket-workspace" :class="{ reading: detailOpen }">
+    <WorkspaceLayout class="ticket-workspace" :class="{ reading: detailOpen }">
       <aside class="ticket-browser" aria-label="Your tickets">
         <div class="list-heading"><span>Your tickets</span><span>{{ visibleTickets.length }} tickets</span></div>
         <div v-if="loadError" class="load-error error" role="alert"><p>Could not load your tickets: {{ loadError }}</p><button type="button" class="chip" @click="load">Try again</button></div>
@@ -361,7 +362,7 @@ async function reopenTicket(): Promise<void> {
         </form>
       </section>
       <div v-else class="thread-placeholder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v5a2 2 0 0 0 0 4v5H3v-5a2 2 0 0 0 0-4zM15 5v3m0 3v2m0 3v3" /></svg><h3>Your support conversation</h3><p>Choose a ticket to read replies, or start a new report.</p></div>
-    </div>
+    </WorkspaceLayout>
 
     <BaseModal class="new-ticket-modal" :open="newOpen" title="New ticket" @close="newOpen = false">
       <form class="form" @submit.prevent="submit">
@@ -396,7 +397,7 @@ async function reopenTicket(): Promise<void> {
 .status-filters :deep(.segmented) { flex-wrap: wrap; gap: 6px; border: 0; padding: 0; border-radius: 0; background: transparent; overflow: visible; }
 .status-filters :deep(button.segment) { padding: 6px 12px; border: 1px solid var(--border); font-size: .75em; }
 .status-filters :deep(button.segment.active) { border-color: var(--accent); }
-.ticket-workspace { display: grid; grid-template-columns: 300px minmax(0, 1fr); flex: 1; min-height: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.ticket-workspace { --workspace-columns: 300px minmax(0, 1fr); }
 .ticket-browser { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; padding: 18px 12px; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 45%, var(--bg)); }
 .list-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 10px 14px; color: var(--muted); font-size: .75em; }
 .list-heading > :first-child { text-transform: uppercase; letter-spacing: .08em; }
@@ -462,7 +463,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .tickets button:focus-visible, .tickets input:focus-visible, .tickets select:focus-visible, .tickets textarea:focus-visible, .conversation:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); vertical-align: -1px; animation: ticket-spin .7s linear infinite; }
 @keyframes ticket-spin { to { transform: rotate(360deg); } }
-@media (max-width: 1000px) and (min-width: 768px) { .ticket-workspace { grid-template-columns: 240px minmax(0, 1fr); } .conversation { padding: 22px; } .detail-head, .reply { padding-inline: 20px; } }
+@media (max-width: 1000px) and (min-width: 768px) { .ticket-workspace { --workspace-columns: 240px minmax(0, 1fr); } .conversation { padding: 22px; } .detail-head, .reply { padding-inline: 20px; } }
 @media (max-width: 767px) {
   .tickets :deep(.page-column) { padding: 20px 16px 12px; }
   .tickets :deep(.page-head) { flex-direction: row; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
@@ -476,7 +477,6 @@ button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12
   .tickets .sort-control select { max-width: 135px; padding-inline: 7px; min-height: 44px; }
   .tickets .search-control input { font-size: max(1em, 16px); }
   .status-filters :deep(button.segment) { min-height: 44px; padding-inline: 9px; }
-  .ticket-workspace { grid-template-columns: minmax(0, 1fr); }
   .ticket-browser { border-right: 0; padding: 16px 12px; }
   .ticket-workspace.reading .ticket-browser, .ticket-workspace:not(.reading) .thread-placeholder { display: none; }
   .list { gap: 0; }
