@@ -1,4 +1,4 @@
-@import "./components/pageLayout.css";
+@import "./components/layout/pageLayout.css";
 
 /* ember_web theme: tokens first, then a full-height app shell. Each token is
    light-dark(light, dark), resolved by the page's `color-scheme`: "light dark"

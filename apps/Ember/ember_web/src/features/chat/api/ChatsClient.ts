@@ -1,0 +1,143 @@
+import { apiRequest } from "../../../api/http";
+import type { ApprovalDecision, ChatMessage, QuestionAnswer } from "../../../api/types";
+
+/** A chat as ember_api lists it: no transcript. Times are naive UTC. */
+export interface ChatSummary {
+  id: string;
+  title: string;
+  agent_id: string | null;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+  /** ember_api is writing an answer for it right now. */
+  running: boolean;
+  /** The folder it is filed in; absent from an older ember_api. */
+  folder_id?: number | null;
+  pinned?: boolean;
+  save_to_second_brain?: boolean;
+  second_brain_scope?: "instance" | "personal";
+}
+
+export interface ChatDetail extends ChatSummary {
+  messages: ChatMessage[];
+}
+
+export interface ChatWrite {
+  title: string;
+  agent_id: string | null;
+  messages: ChatMessage[];
+}
+
+export interface ChatImportItem extends ChatWrite {
+  id: string;
+  /** Milliseconds since the epoch. */
+  created_at: number;
+  updated_at: number;
+}
+
+export interface TurnStart {
+  question: string;
+  caveman: boolean;
+  save_to_second_brain?: boolean;
+  second_brain_scope?: "instance" | "personal";
+  /** Sent only when off: the agent may not keep a task checklist this turn. */
+  plan?: boolean;
+  /** Sent only when off: the agent may update its checklist on any step, not just a status change. */
+  plan_lean?: boolean;
+  /** Sent only when on: the agent counts the context window's parts with its provider, not an estimate. */
+  exact_context?: boolean;
+  /** mcp_server extensions whose tools the agent may use. */
+  enabled_extensions: string[];
+  /** Tools of the built-in capabilities this account switched off for its own chats. */
+  disabled_tools?: string[];
+  /** Used only when this turn creates the chat. */
+  title?: string;
+  /** Regenerate / edit: index of the question this one replaces; it and
+   * everything after it are dropped first. */
+  truncate_to?: number;
+  /** Ask before each tool runs (answers go to `decide`). */
+  ask_before_tools?: boolean;
+  /** Tools the user already allowed for this chat: they run without asking. */
+  allowed_tools?: string[];
+  /** "Auto" (with ask_before_tools): built-in tools that only read run without asking. */
+  allow_read_only?: boolean;
+  /** This page can show the agent's clickable questions and send answers back. */
+  can_ask?: boolean;
+}
+
+export interface TurnStarted {
+  chat: ChatSummary;
+  /** Watch /events with after=this for only newer events. */
+  sequence: number;
+}
+
+/** Where the query sits in a piece of text, in characters. */
+export interface MatchSpan {
+  start: number;
+  length: number;
+}
+
+/** A chat found by search: its title and/or the first matching message. */
+export interface ChatSearchHit {
+  id: string;
+  /** Current folder; absent from an older API. */
+  folder_id?: number | null;
+  title: string;
+  updated_at: string;
+  title_match: MatchSpan | null;
+  snippet: (MatchSpan & { text: string }) | null;
+  message_index: number | null;
+  /** How many messages contain the query. */
+  message_matches: number;
+}
+
+/** What PATCH /api/chats/{id} can change; send only what changes
+ * (`folder_id: null` takes the chat out of its folder). */
+export interface ChatChanges {
+  title?: string;
+  folder_id?: number | null;
+  pinned?: boolean;
+  save_to_second_brain?: boolean;
+  second_brain_scope?: "instance" | "personal";
+}
+
+const path = (id: string) => `/api/chats/${encodeURIComponent(id)}`;
+
+/** ember_api's /api/chats routes (chat.use): this account's chat history
+ * and the chat turns ember_api runs. */
+export const chatsClient = {
+  secondBrainAvailability: () => apiRequest<{ available: boolean }>("GET", "/api/chats/second-brain?scope=both"),
+  list: () => apiRequest<ChatSummary[]>("GET", "/api/chats"),
+  /** Titles and message text; needs at least 2 characters. */
+  search: (query: string) =>
+    apiRequest<ChatSearchHit[]>("GET", `/api/chats/search?q=${encodeURIComponent(query)}`),
+  get: (id: string) => apiRequest<ChatDetail>("GET", path(id)),
+  /** The message the user will probably type next ({text: null} for none). */
+  suggestion: (id: string) => apiRequest<{ text: string | null }>("GET", `${path(id)}/suggestion`),
+  put: (id: string, chat: ChatWrite) => apiRequest<ChatSummary>("PUT", path(id), chat),
+  rename: (id: string, title: string) => apiRequest<ChatSummary>("PATCH", path(id), { title }),
+  update: (id: string, changes: ChatChanges) => apiRequest<ChatSummary>("PATCH", path(id), changes),
+  remove: (id: string) => apiRequest<void>("DELETE", path(id)),
+  removeAll: () => apiRequest<void>("DELETE", "/api/chats"),
+  importChats: (chats: ChatImportItem[]) =>
+    apiRequest<{ imported: number; skipped: number }>("POST", "/api/chats/import", { chats }),
+  /** Saves the question and starts the answer in ember_api. */
+  startTurn: (id: string, turn: TurnStart) => apiRequest<TurnStarted>("POST", `${path(id)}/turns`, turn),
+  /** Answers a tool the running answer waits to run (an approval_request's id). */
+  decide: (id: string, stepId: string, decision: ApprovalDecision) =>
+    apiRequest<{ decided: boolean }>("POST", `${path(id)}/approvals`, { step_id: stepId, decision }),
+  /** Answers (or skips) the questions the running answer waits on (a question_request's id). */
+  answerQuestion: (id: string, stepId: string, payload: { answers: QuestionAnswer[]; skipped: boolean }) =>
+    apiRequest<{ answered: boolean }>("POST", `${path(id)}/questions`, { step_id: stepId, ...payload }),
+  cancel: (id: string) => apiRequest<{ cancelled: boolean }>("POST", `${path(id)}/cancel`),
+  /** Replaces the history with a summary plus the raw log (asks an agent). */
+  summarize: (id: string) => apiRequest<ChatDetail>("POST", `${path(id)}/summarize`, {}),
+  /** A new chat holding the messages up to and including answer `upto`. */
+  branch: (id: string, upto: number) => apiRequest<ChatDetail>("POST", `${path(id)}/branch`, { upto }),
+  /** Starts afresh, keeping the old messages as one raw log. */
+  clear: (id: string) => apiRequest<ChatDetail>("POST", `${path(id)}/clear`),
+  /** Appends messages (slash-command results), creating the chat if needed. */
+  append: (id: string, title: string, messages: ChatMessage[]) =>
+    apiRequest<ChatSummary>("POST", `${path(id)}/messages`, { title, messages }),
+  eventsUrl: (id: string, after: number) => `${path(id)}/events?after=${after}`,
+};

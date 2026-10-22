@@ -6,7 +6,7 @@ import {
   type EmailChangeResult,
   type RegisterInput,
   type RegisterResult,
-} from "../api/AuthClient";
+} from "../api/auth/AuthClient";
 import { onUnauthorized, UnauthorizedError } from "../api/http";
 
 /** Who is logged in. Other stores watch `account` to reset per-user state. */

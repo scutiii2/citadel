@@ -16,6 +16,9 @@ origin: ember_api owns the accounts and login sessions and proxies MCP to
 `ai_agent` (chat) and `mcp_server` (tools). The browser never holds a server
 URL, token or key.
 
+See [the source structure guide](src/README.md) for feature folders, shared
+components, and where to place new Vue files and their tests.
+
 ## Features
 
 - Generator presents masked results with Reveal and Copy beside them. Desktop
@@ -296,7 +299,7 @@ URL, token or key.
 - "Task checklist" and "Update only on change" toggles in the chat settings menu (on by default, remembered
   per account, also on the Settings page). Off sends `plan: false` / `plan_lean: false` with the turn: the
   agent gets no `update_plan` tool, or is told to change the checklist only when an item starts or
-  finishes. An agent can also turn the tool off for itself (`plan_tool`, in ember_admin's agent form). Every chat setting shows a short token-cost note (Settings rows, menu tooltips); the figures are rough and live in `src/utils/tokenCosts.ts`, so re-check them when ai_agent's prompts change.
+  finishes. An agent can also turn the tool off for itself (`plan_tool`, in ember_admin's agent form). Every chat setting shows a short token-cost note (Settings rows, menu tooltips); the figures are rough and live in `src/features/usage/utils/tokenCosts.ts`, so re-check them when ai_agent's prompts change.
 - Settings page (`/settings`, `chat.use`): your preferences in one place, grouped by task: Chat (terse
   replies, task checklist, ask before tools, chime, desktop notifications), Appearance (theme), Sidebar (see below). Workspace tool approval and the pages hidden from every sidebar (Usage and others; `GET /api/settings/pages`) are configured in ember_admin.
   A search box filters them as you type (label, description and extra keywords; Enter focuses the first
@@ -308,7 +311,7 @@ URL, token or key.
   separates the groups), or switch it off to hide it from the rail (hidden pages stay on the Overview page).
   Changes apply at once; a failed save reloads the server's copy and shows the error. Reset puts back the default.
   The rail draws nothing until the arrangement has loaded, so the icons don't jump. The rules are pure functions
-  in `src/utils/navArrangement.ts`.
+  in `src/utils/navigation/navArrangement.ts`.
 - Usage page: your 6-hour and weekly token limits, totals, tokens per day and
   per agent; admins also see every account. A "By" selector regroups the
   totals by agent, provider, gateway or model, and a "Recent calls" table lists
@@ -492,28 +495,20 @@ routes - `/api/mcp/agents/{id}` (agent status only) and `/api/mcp/server`
 
 ## Layout
 
-```
+```text
 src/
-  api/          http + AuthClient / ChatsClient / UsageClient / CommandsClient /
-                ExtensionsClient / AgentsClient / AttachmentsClient /
-                TemplatesClient / NavPreferencesClient / SharesClient / SettingsClient (ember_api REST),
-                McpClientBase / AiAgentClient / McpServerClient (MCP via ember_api), types
-  services/     ConversationStorage (chat history; one-time import of old local chats),
-                turnStream (watching a running answer), slashCommands
-  stores/       Pinia: auth, entryAgent, chat, templates, navPrefs, accountCapabilities
-  composables/  useChatShortcuts (window-level chat keys), useChatRoute (address bar <-> open chat),
-                useElapsed (running clock), useNotify (chime), useCompletionNotify (completion alerts), useSidebarCollapse (chat list),
-                useTheme (system / light / dark)
-  views/        pages: Overview, Chat, Capabilities, Agents, Usage, Tickets, Settings,
-                Account, Login, Register, VerifyEmail, NoAccess, SharedChat (public)
-  components/   reusable pieces: MessageList, ToolSteps, AgentActivity, ChatInput, CommandFormModal, MarkdownContent,
-                CopyButton, UsageChip, UsageGauges, UsageHeatmap, ElapsedTime, WelcomeCard, DownloadCards, TemplatePicker, TemplatesModal, ShareDialog, ConversationSidebar, EntryAgentTag, ToolRunForm, ToolResultPanel, ToolCard, CapabilitySection, ConfirmModal, NavRail, SidebarEditor, ChatSettingsMenu, SettingRow, AuthCard
-    analytics/  shared LineChart, hover/keyboard state in useBucketCursor and chart.css, used by Usage
-    infoPage.css  shared look of the Agents / Config pages
-  router/       routes + access guard, safe post-login redirect, pages (nav + Overview list)
-  utils/        markdown rendering, download markers, tool-schema forms, error/time formatting, chat export,
-                tool titles, tool-result formatting, attachment blocks in questions, clipboard, usage formatting, log-analytics helpers, saved-prompt helpers
+  features/     Screens with their private components, API clients, stores,
+                composables, services, library code, utilities, and tests
+  components/   Shared ui, layout, auth, content, analytics, and tool components
+  api/          Common transport/DTOs; auth, navigation, tools, files, analytics
+  stores/       Application-wide auth and navigation state
+  composables/  Shared theme and reusable time helpers
+  router/       Routes, access guards, redirects, page metadata
+  utils/        Shared browser, content, navigation, analytics, tool helpers,
+                and common error formatting
 ```
+
+[The source guide](src/README.md) describes feature ownership and placement rules.
 
 ## Security notes
 
@@ -559,7 +554,7 @@ roles within their own permissions.
 
 Administrators can open Ember Admin from the desktop rail or the Overview page (also on mobile). The link opens in a new tab and uses this host on port 5176 by default (matching Server Launcher; port 5175 is used by Video Downloader). Set `VITE_EMBER_ADMIN_URL` before starting Vite or building to use a different address, such as `https://admin.example.com/` or a reverse-proxy path `/admin/`. It appears for verified accounts with access to an Ember Admin page, including delegated administrators. Ember Admin's account menu has the matching "Ember" row back to this app (new tab, this host on port 5173 by default); set `VITE_EMBER_WEB_URL` in ember_admin to override it.
 
-Content pages share heading typography, description typography, and horizontal spacing through `ember_web/src/components/pageLayout.css` (also imported by Ember Admin).
+Content pages share heading typography, description typography, and horizontal spacing through `ember_web/src/components/layout/pageLayout.css` (also imported by Ember Admin).
 
 Capabilities uses compact cards matching Ember Admin. Selecting a card opens a fixed-height tool workspace with a searchable tool sidebar, parameter form and results. Resources are readable inside the modal; private extensions remain available only in chats. Account switches and custom page links remain on the cards.
 

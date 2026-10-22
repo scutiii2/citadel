@@ -9,6 +9,8 @@ ember_web/*
 ember_web/src/*
 !ember_web/src/components
 ember_web/src/components/*
-!ember_web/src/components/PwaStatus.vue
-!ember_web/src/components/pageLayout.css
+!ember_web/src/components/layout
+ember_web/src/components/layout/*
+!ember_web/src/components/layout/PwaStatus.vue
+!ember_web/src/components/layout/pageLayout.css
 scripts

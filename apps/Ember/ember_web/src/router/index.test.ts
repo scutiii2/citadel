@@ -1,16 +1,16 @@
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { authClient, type Account } from "../api/AuthClient";
+import { authClient, type Account } from "../api/auth/AuthClient";
 import { UnauthorizedError } from "../api/http";
-import { router } from "./index";
+import { router } from ".";
 import { NAV_PAGES, visiblePages } from "./pages";
-import { accountCapabilitiesClient } from "../api/AccountCapabilitiesClient";
-import { commandsClient } from "../api/CommandsClient";
+import { accountCapabilitiesClient } from "../features/capabilities/api/AccountCapabilitiesClient";
+import { commandsClient } from "../api/tools/CommandsClient";
 import { useAuthStore } from "../stores/auth";
 
-vi.mock("../api/AuthClient", () => ({ authClient: { me: vi.fn() } }));
-vi.mock("../api/AccountCapabilitiesClient", () => ({ accountCapabilitiesClient: { get: vi.fn() } }));
-vi.mock("../api/CommandsClient", () => ({ commandsClient: { capabilities: vi.fn() } }));
+vi.mock("../api/auth/AuthClient", () => ({ authClient: { me: vi.fn() } }));
+vi.mock("../features/capabilities/api/AccountCapabilitiesClient", () => ({ accountCapabilitiesClient: { get: vi.fn() } }));
+vi.mock("../api/tools/CommandsClient", () => ({ commandsClient: { capabilities: vi.fn() } }));
 
 const me = vi.mocked(authClient.me);
 

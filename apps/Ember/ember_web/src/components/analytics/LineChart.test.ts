@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
-import { formatDuration } from "../../utils/trafficAnalytics";
+import { formatDuration } from "../../utils/analytics/trafficAnalytics";
 import LineChart from "./LineChart.vue";
 
 const lines = [

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from "vue";
-import { axisLabel, bucketTitle, formatCount, niceCeil, type BucketSize } from "../../utils/logAnalytics";
+import { axisLabel, bucketTitle, formatCount, niceCeil, type BucketSize } from "../../utils/analytics/logAnalytics";
 import { useBucketCursor, type ChartPart } from "./useBucketCursor";
 
 /** Values over time: one 2px line per part, a point per bucket. A bucket with no

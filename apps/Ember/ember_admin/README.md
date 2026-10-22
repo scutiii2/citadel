@@ -248,7 +248,7 @@ Capabilities and extensions appear as cards. Open a card to see its tools, then 
 
 The integration modal uses a searchable tool browser beside the parameter form and output on desktop, stacked on mobile. Its header shows the integration identity and availability; tool output is formatted as JSON when possible.
 
-Content pages share heading typography, description typography, and horizontal spacing through `ember_web/src/components/pageLayout.css` (also imported by Ember Admin).
+Content pages share heading typography, description typography, and horizontal spacing through `ember_web/src/components/layout/pageLayout.css` (also imported by Ember Admin).
 
 Capabilities and extensions can be searched by their names and contributed tool names. Extension descriptions are also searchable; filtering does not change enabled state.
 
