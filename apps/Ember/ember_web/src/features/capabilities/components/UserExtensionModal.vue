@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, onUnmounted, reactive, ref, watch } from "vue";
 import type { UserExtension } from "../api/UserExtensionsClient";
 import { useUserExtensionsStore } from "../stores/userExtensions";
 import { errorMessage } from "../../../utils/errors";
@@ -21,6 +21,8 @@ const rows = ref<{ name: string; value: string }[]>([]);
 const replacing = ref(false);
 const saving = ref(false);
 const error = ref("");
+let session = 0;
+onUnmounted(() => { session++; });
 
 const editing = computed(() => props.extension !== null);
 const showEditor = computed(() => !editing.value || replacing.value);
@@ -46,8 +48,10 @@ const hostWarning = computed(
 
 // A fresh form each time it opens.
 watch(
-  () => props.open,
-  (isOpen) => {
+  () => [props.open, props.extension?.id] as const,
+  ([isOpen]) => {
+    session++;
+    saving.value = false;
     if (!isOpen) return;
     form.label = props.extension?.label ?? "";
     form.url = props.extension?.url ?? "";
@@ -78,6 +82,8 @@ function typedHeaders(): Record<string, string> {
 }
 
 async function save(): Promise<void> {
+  if (saving.value) return;
+  const request = session;
   error.value = "";
   saving.value = true;
   try {
@@ -86,17 +92,17 @@ async function save(): Promise<void> {
     const saved = props.extension
       ? await store.update(props.extension.id, headers ? { ...base, headers } : base)
       : await store.add(headers && Object.keys(headers).length > 0 ? { ...base, headers } : base);
-    emit("saved", saved);
+    if (request === session && props.open) emit("saved", saved);
   } catch (err) {
-    error.value = errorMessage(err);
+    if (request === session && props.open) error.value = errorMessage(err);
   } finally {
-    saving.value = false;
+    if (request === session) saving.value = false;
   }
 }
 </script>
 
 <template>
-  <BaseModal :open="open" :title="editing ? 'Edit private extension' : 'Add your own extension'" @close="emit('close')">
+  <BaseModal :open="open" :title="editing ? 'Edit private extension' : 'Add your own extension'" @close="!saving && emit('close')">
     <form class="form" @submit.prevent="save">
       <p class="muted">
         The address of an MCP server you run or trust (Streamable HTTP). Only you can see it and only your chats use it.
@@ -154,8 +160,8 @@ async function save(): Promise<void> {
 
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
-        <button type="button" class="ghost" @click="emit('close')">Cancel</button>
-        <button type="submit" class="primary" :disabled="saving">{{ saving ? "Saving ..." : editing ? "Save" : "Add" }}</button>
+        <button type="button" class="ghost"  :disabled="saving" @click="emit('close')">Cancel</button>
+        <button type="submit" class="primary" :disabled="saving" :aria-busy="saving">{{ saving ? "Saving ..." : editing ? "Save" : "Add" }}</button>
       </div>
     </form>
   </BaseModal>

@@ -103,3 +103,14 @@ describe("GuiResult", () => {
     expect(w.emitted("again")).toBeUndefined();
   });
 });
+
+it("offers clipboard retry with selectable result text on failure", async () => {
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn().mockRejectedValue(new Error("blocked")) } });
+  const w = mount(GuiResult, { props: { spec: { kind: "secret", field: "password" }, result: result({ password: "keep-me" }) } });
+  await w.get('[data-test="copy"]').trigger("click");
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(w.get('[role="alert"]').text()).toContain("Copy failed");
+  expect(w.get('[data-test="copy"]').text()).toBe("Retry copy");
+  expect(w.get('[data-test="secret"]').text()).toBe("keep-me");
+  w.unmount();
+});

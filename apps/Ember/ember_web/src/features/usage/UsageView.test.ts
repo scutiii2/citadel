@@ -515,3 +515,16 @@ it("does not fetch workspace usage without chat access", async () => {
   expect(mine).not.toHaveBeenCalled();
   expect(wrapper.text()).not.toContain("All accounts");
 });
+
+it("exports the loaded report period while a different period is pending or fails", async () => {
+  const w = await mountView();
+  let reject!: (error: Error) => void;
+  mine.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));
+  await rangeButton(w, "7 days").trigger("click");
+  await w.get("button.export").trigger("click");
+  expect(download).toHaveBeenLastCalledWith(expect.stringContaining("usage-30d-"), expect.stringContaining("30 days"), "text/markdown");
+  reject(new Error("unavailable")); await flushPromises();
+  await w.get("button.export").trigger("click");
+  expect(download).toHaveBeenLastCalledWith(expect.stringContaining("usage-30d-"), expect.stringContaining("30 days"), "text/markdown");
+  w.unmount();
+});

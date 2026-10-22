@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { nextTick, ref, useId, watch } from "vue";
 import type { CommandInfo } from "../../../api/tools/CommandsClient";
 import type { JsonSchema } from "../../../api/types";
 import { commandText } from "../../../utils/tools/toolSchema";
@@ -13,6 +13,7 @@ import ToolRunForm from "./ToolRunForm.vue";
 const props = defineProps<{ command: CommandInfo | null; schema: JsonSchema | null }>();
 const emit = defineEmits<{ submit: [text: string]; close: [] }>();
 
+const titleId = useId();
 const dialog = ref<HTMLDialogElement | null>(null);
 
 watch(
@@ -31,10 +32,10 @@ function run(args: Record<string, unknown>): void {
 </script>
 
 <template>
-  <dialog ref="dialog" class="command-form" @close="emit('close')" @cancel.prevent="emit('close')">
+  <dialog ref="dialog" class="command-form" :aria-labelledby="titleId" @close="emit('close')" @cancel.prevent="emit('close')">
     <template v-if="command && schema">
       <header>
-        <h3><code>/{{ command.capability }} {{ command.name }}</code></h3>
+        <h3 :id="titleId"><code>/{{ command.capability }} {{ command.name }}</code></h3>
         <button type="button" class="close" aria-label="Close" @click="emit('close')">×</button>
       </header>
       <p v-if="command.description" class="description">{{ command.description }}</p>
@@ -82,5 +83,8 @@ h3 code {
   margin: 6px 0 14px;
   font-size: 0.9em;
   color: var(--muted);
+}
+@media (pointer: coarse), (max-width: 767px) {
+  button.close { min-width: 44px; min-height: 44px; }
 }
 </style>

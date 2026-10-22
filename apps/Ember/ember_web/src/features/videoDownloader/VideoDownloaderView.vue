@@ -17,6 +17,11 @@ import { formatBytes, formatExpiry } from './utils/format'
 import type { FileInfo } from './api/VideoDownloaderTypes'
 
 const store = useVideoDownloaderStore()
+const narrow = ref(window.matchMedia?.('(max-width: 767px)').matches ?? false)
+const mediaQuery = window.matchMedia?.('(max-width: 767px)')
+function updateViewport(event: MediaQueryListEvent): void { narrow.value = event.matches }
+onMounted(() => mediaQuery?.addEventListener?.('change', updateViewport))
+onBeforeUnmount(() => mediaQuery?.removeEventListener?.('change', updateViewport))
 const auth = useAuthStore()
 const now = ref(Date.now() / 1000)
 const tab = ref<'download' | 'groups' | 'files'>('download')
@@ -73,10 +78,10 @@ async function confirmAction(): Promise<void> {
 <template>
   <PageLayout class="media-page" title="Media downloader" description="Video, music, and photos. Start with a link." wide fill>
     <div :class="['media-workspace', `mode-${tab}`]">
-      <div class="mobile-tabs"><SegmentedControl v-model="tab" :options="mobileTabs" aria-label="Media workspace" /></div>
+      <div class="mobile-tabs"><SegmentedControl mode="tabs" id-prefix="media-mobile" v-model="tab" :options="mobileTabs" aria-label="Media workspace" /></div>
       <div class="main-panel">
-        <div class="desktop-tabs"><SegmentedControl v-model="desktopTab" :options="desktopTabs" aria-label="Media workspace" /></div>
-        <div v-show="tab !== 'groups'" class="download-panel">
+        <div class="desktop-tabs"><SegmentedControl mode="tabs" id-prefix="media-desktop" v-model="desktopTab" :options="desktopTabs" aria-label="Media workspace" /></div>
+        <div v-show="tab !== 'groups'" :id="`media-${narrow ? 'mobile' : 'desktop'}-panel-download`" role="tabpanel" :aria-labelledby="`media-${narrow ? 'mobile' : 'desktop'}-tab-download`" class="download-panel">
           <h3 class="link-heading">Media link</h3>
           <UrlBar v-model="store.url" :loading="store.checking" :can-check="store.canCheck" @check="store.check()" />
           <p class="link-hint muted">Check a link to see the formats available for that media.</p>
@@ -90,9 +95,9 @@ async function confirmAction(): Promise<void> {
           </section>
           <p class="rights-note muted">Download only content you have the right to download.</p>
         </div>
-        <div v-show="tab === 'groups'" class="groups-panel"><PackagePanel :source="store.result" :preset="store.selectedOption?.id ?? null" @completed="store.refreshFiles()" /></div>
+        <div v-show="tab === 'groups'" :id="`media-${narrow ? 'mobile' : 'desktop'}-panel-groups`" role="tabpanel" :aria-labelledby="`media-${narrow ? 'mobile' : 'desktop'}-tab-groups`" class="groups-panel"><PackagePanel :source="store.result" :preset="store.selectedOption?.id ?? null" @completed="store.refreshFiles()" /></div>
       </div>
-      <aside class="files-panel" aria-label="My files">
+      <aside id="media-mobile-panel-files" :role="narrow ? 'tabpanel' : undefined" :aria-labelledby="narrow ? 'media-mobile-tab-files' : undefined" class="files-panel" aria-label="My files">
         <div class="files-heading"><h3>My files <span class="muted">{{ store.files.length }}</span></h3><ActionButton icon="summarize" :disabled="store.loadingFiles" :aria-busy="store.loadingFiles" @click="store.refreshFiles()">Refresh files</ActionButton></div>
         <p class="muted file-hint">Finished downloads are kept temporarily.</p>
         <p v-if="store.filesError" class="error" role="alert">{{ store.filesError }}</p>

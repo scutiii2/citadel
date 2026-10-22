@@ -15,6 +15,11 @@ import { usePlanStore } from './stores/plan'
 import { useAuthStore } from '../../stores/auth'
 const files = useFilesStore()
 const plan = usePlanStore()
+const narrow = ref(window.matchMedia?.('(max-width: 767px)').matches ?? false)
+const mediaQuery = window.matchMedia?.('(max-width: 767px)')
+function updateViewport(event: MediaQueryListEvent): void { narrow.value = event.matches }
+onMounted(() => mediaQuery?.addEventListener?.('change', updateViewport))
+onBeforeUnmount(() => mediaQuery?.removeEventListener?.('change', updateViewport))
 const auth = useAuthStore()
 const mode = ref<'pages' | 'files'>('pages')
 const outputOpen = ref(false)
@@ -37,15 +42,15 @@ onBeforeRouteLeave(stop)
       <ul v-if="files.errors.length" class="errors"><li v-for="(message,index) in files.errors" :key="index" role="alert">{{ message }} <button type="button" class="link" @click="files.dismissError(index)">Dismiss</button></li></ul>
     </div>
     <div :class="['workspace', `mode-${mode}`]">
-      <div class="mobile-tabs"><SegmentedControl v-model="mode" :options="modes" aria-label="PDF workspace" /></div>
-      <div class="pages-panel">
+      <div class="mobile-tabs"><SegmentedControl mode="tabs" id-prefix="pdf" v-model="mode" :options="modes" aria-label="PDF workspace" /></div>
+      <div id="pdf-panel-pages" :role="narrow ? 'tabpanel' : undefined" :aria-labelledby="narrow ? 'pdf-tab-pages' : undefined" class="pages-panel">
         <PageStrip />
         <div v-if="!plan.pages.length" class="empty-pages">
           <h3>Your PDF starts here</h3><p class="muted">Add PDFs or images, choose the pages you need, then arrange them in order.</p>
           <button type="button" class="add-files" @click="dropZone?.openPicker()">Choose files</button>
         </div>
       </div>
-      <aside class="files-panel" aria-label="Source files">
+      <aside id="pdf-panel-files" :role="narrow ? 'tabpanel' : undefined" :aria-labelledby="narrow ? 'pdf-tab-files' : undefined" class="files-panel" aria-label="Source files">
         <SourceList />
         <p v-if="!files.sources.length" class="muted small">Your source files will appear here.</p>
         <DropZone ref="dropZone" @files="files.upload($event)" />

@@ -108,6 +108,8 @@ test("make a folder, file and pin a chat, then delete the folder with it", async
   await sidebar.getByRole("button", { name: "Folder actions" }).click();
   await page.getByRole("menuitem", { name: "Delete" }).click();
   await expect(dialog).toContainText(`Delete folder "Work" and its 1 chat? This can't be undone.`);
+  await expect(dialog.getByRole("button", { name: "Delete", exact: true })).toBeDisabled();
+  await dialog.getByRole("textbox", { name: "Type Work to confirm" }).fill("Work");
   await dialog.getByRole("button", { name: "Delete" }).click();
   await expect(workHeader).toHaveCount(0);
   await expect(pinnedHeader).toHaveCount(0);

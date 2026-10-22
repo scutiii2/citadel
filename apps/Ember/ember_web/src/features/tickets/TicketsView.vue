@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { ticketsClient, type NewTicket, type Ticket, type TicketStatus } from "./api/TicketsClient";
 import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
@@ -126,7 +126,31 @@ const current = ref<Ticket | null>(null);
 const detailOpen = ref(false);
 const detailLoading = ref(false);
 const detailError = ref("");
-const reply = ref("");
+const replies = reactive<Record<number, string>>({});
+const reply = computed({
+  get: () => activeDetailId.value === null ? "" : replies[activeDetailId.value] ?? "",
+  set: (value: string) => { if (activeDetailId.value !== null) replies[activeDetailId.value] = value; },
+});
+const discardDrafts = ref(false);
+let leaveAnswer: ((value: boolean) => void) | null = null;
+const hasDrafts = computed(() => !!draft.title.trim() || !!draft.description.trim() || Object.values(replies).some(value => !!value.trim()));
+function answerLeave(discard: boolean): void {
+  discardDrafts.value = false;
+  leaveAnswer?.(discard);
+  leaveAnswer = null;
+}
+onBeforeRouteLeave(to => {
+  if (to.path === '/tickets' || /^\/tickets\/\d+$/.test(to.path)) return true;
+  if (saving.value || replying.value) return false;
+  if (!hasDrafts.value) return true;
+  discardDrafts.value = true;
+  return new Promise<boolean>(resolve => { leaveAnswer = resolve; });
+});
+function beforeUnload(event: BeforeUnloadEvent): void {
+  if (hasDrafts.value) { event.preventDefault(); event.returnValue = ""; }
+}
+onMounted(() => window.addEventListener("beforeunload", beforeUnload));
+onUnmounted(() => window.removeEventListener("beforeunload", beforeUnload));
 const replying = ref(false);
 const confirmOpen = ref(false);
 const closing = ref(false);
@@ -139,10 +163,10 @@ const timeline = computed(() => [
 
 // Dismissal and a newer selection invalidate pending detail responses.
 let detailSeq = 0;
-let activeDetailId: number | null = null;
+const activeDetailId = ref<number | null>(null);
 function open(ticket: Ticket): void {
   if (replying.value || closing.value) return;
-  if (detailOpen.value && activeDetailId === ticket.id) {
+  if (detailOpen.value && activeDetailId.value === ticket.id) {
     if (ticket.has_unread && !detailLoading.value) void loadDetail(ticket.id, true);
     return;
   }
@@ -151,14 +175,14 @@ function open(ticket: Ticket): void {
   void router.push(`/tickets/${ticket.id}`);
 }
 
-async function loadDetail(id: number, preserveReply = false): Promise<void> {
+async function loadDetail(id: number, _preserveReply = false): Promise<void> {
   const seq = ++detailSeq;
-  activeDetailId = id;
+  activeDetailId.value = id;
   current.value = current.value?.id === id ? current.value : tickets.value.find(ticket => ticket.id === id) ?? null;
   detailOpen.value = true;
   detailLoading.value = true;
   detailError.value = "";
-  if (!preserveReply) reply.value = "";
+  // Each ticket keeps its own unsent reply.
   try {
     const loaded = await ticketsClient.get(id);
     if (seq === detailSeq) {
@@ -176,7 +200,7 @@ async function loadDetail(id: number, preserveReply = false): Promise<void> {
 
 function dismiss(): void {
   ++detailSeq;
-  activeDetailId = null;
+  activeDetailId.value = null;
   current.value = null;
   detailOpen.value = false;
   detailLoading.value = false;
@@ -192,14 +216,14 @@ watch(() => route.params.id, value => {
   const id = Number(value);
   if (!/^\d+$/.test(String(value)) || !Number.isSafeInteger(id) || id < 1) {
     ++detailSeq;
-    activeDetailId = null;
+    activeDetailId.value = null;
     current.value = null;
     detailOpen.value = true;
     detailLoading.value = false;
     detailError.value = "Invalid ticket id.";
     return;
   }
-  if (!detailOpen.value || activeDetailId !== id) void loadDetail(id);
+  if (!detailOpen.value || activeDetailId.value !== id) void loadDetail(id);
 }, { immediate: true });
 
 onUnmounted(() => {
@@ -358,6 +382,7 @@ async function reopenTicket(): Promise<void> {
 
 
     <ConfirmModal :open="confirmOpen" title="Close this ticket?" message="Support will see it as closed. You can still add a comment later." confirm-label="Close the ticket" :busy="closing" @confirm="closeTicket" @close="confirmOpen = false" />
+    <ConfirmModal :open="discardDrafts" title="Discard ticket drafts?" message="Your unsent ticket and replies will be lost." confirm-label="Discard drafts" @confirm="answerLeave(true)" @close="answerLeave(false)" />
   </PageLayout>
 </template>
 
@@ -450,7 +475,7 @@ button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12
   .list-controls { gap: 8px; }
   .tickets .sort-control select { max-width: 135px; padding-inline: 7px; min-height: 44px; }
   .tickets .search-control input { font-size: max(1em, 16px); }
-  .status-filters :deep(button.segment) { min-height: 40px; padding-inline: 9px; }
+  .status-filters :deep(button.segment) { min-height: 44px; padding-inline: 9px; }
   .ticket-workspace { grid-template-columns: minmax(0, 1fr); }
   .ticket-browser { border-right: 0; padding: 16px 12px; }
   .ticket-workspace.reading .ticket-browser, .ticket-workspace:not(.reading) .thread-placeholder { display: none; }

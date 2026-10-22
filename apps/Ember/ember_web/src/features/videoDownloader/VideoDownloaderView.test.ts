@@ -127,3 +127,15 @@ describe('VideoDownloaderView', () => {
     expect(api.cancelJob).toHaveBeenCalledWith('j')
   })
 })
+
+it('connects desktop workspace tabs to their panels and changes them with arrows', async () => {
+ await setup()
+ const download = wrapper.get('#media-desktop-tab-download')
+ const groups = wrapper.get('#media-desktop-tab-groups')
+ expect(download.attributes('role')).toBe('tab')
+ expect(download.attributes('aria-controls')).toBe('media-desktop-panel-download')
+ expect(wrapper.get('#media-desktop-panel-download').attributes('aria-labelledby')).toBe(download.attributes('id'))
+ await download.trigger('keydown', { key: 'ArrowRight' })
+ expect(groups.attributes('aria-selected')).toBe('true')
+ expect(wrapper.get('#media-desktop-panel-groups').isVisible()).toBe(true)
+})

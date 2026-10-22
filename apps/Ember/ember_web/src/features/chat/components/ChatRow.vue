@@ -131,7 +131,7 @@ function onDragEnd(): void {
     />
     <template v-else>
       <span v-if="chat.running" class="running" title="An answer is being written" />
-      <span class="title" @dblclick.stop="emit('startRename')">{{ chat.title }}</span>
+      <button type="button" class="title select-chat" :aria-current="active ? 'page' : undefined" @click.stop="onClick" @dblclick.stop="emit('startRename')">{{ chat.title }}</button>
       <!-- pointerdown.stop: an open menu closes on any press outside it, so a
            press on this button must not reach it; the sidebar toggles instead. -->
       <button
@@ -156,6 +156,7 @@ function onDragEnd(): void {
 </template>
 
 <style scoped>
+.select-chat { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 /* The row's own box (.row and its active / locked / ticked states) is styled by
  * the sidebar: a component's root element takes its parent's scoped styles too. */
 .dragging {
@@ -222,5 +223,8 @@ function onDragEnd(): void {
   flex-shrink: 0;
   margin: 0 2px 0 0;
   cursor: pointer;
+}
+@media (max-width: 767px), (pointer: coarse) {
+  .more { min-width: 44px; min-height: 44px; }
 }
 </style>

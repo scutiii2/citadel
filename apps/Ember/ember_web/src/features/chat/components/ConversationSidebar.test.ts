@@ -1176,3 +1176,31 @@ describe("folder improvements", () => {
     expect(wrapper.find(".folder-label").exists()).toBe(false);
   });
 });
+
+
+describe("search composition and keyboard destinations", () => {
+  it("keeps composing text local until composition ends and supports Enter search", async () => {
+    const wrapper = mountSidebar();
+    const search = wrapper.get('input[type="search"]');
+    await search.trigger("compositionstart");
+    await search.setValue("composing");
+    await search.trigger("keydown", { key: "Enter", isComposing: true });
+    expect(wrapper.emitted("search")).toBeUndefined();
+    await search.trigger("compositionend");
+    expect(wrapper.emitted("search")).toEqual([["composing"]]);
+    await search.trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("search")).toEqual([["composing"], ["composing"]]);
+  });
+  it("uses a native destination button separate from management for chats and hits", async () => {
+    const wrapper = mountSidebar({ activeId: "1" });
+    const destination = wrapper.get("button.select-chat");
+    expect(destination.attributes("aria-current")).toBe("page");
+    await destination.trigger("click");
+    expect(wrapper.emitted("select")![0]).toEqual(["1"]);
+    expect(destination.find("button").exists()).toBe(false);
+    const results = searching([hit("1", { message_index: 3 })], { activeId: "1" });
+    await results.get("button.hit-select").trigger("click");
+    expect(results.emitted("select")![0]).toEqual(["1", 3]);
+    expect(results.get("button.hit-select").attributes("aria-current")).toBe("page");
+  });
+});

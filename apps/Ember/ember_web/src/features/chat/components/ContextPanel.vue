@@ -114,10 +114,10 @@ function formatPercent(percent: number): string {
 <style scoped>
 .context-panel {
   --part-system_prompt: var(--accent);
-  --part-agents: light-dark(#7048e8, #9775fa);
-  --part-builtin_tools: light-dark(#2a78d6, #3987e5);
-  --part-mcp_tools: light-dark(#1baf7a, #20c38a);
-  --part-messages: light-dark(#d9a400, #f0b429);
+  --part-agents: var(--context-agents);
+  --part-builtin_tools: var(--context-builtin-tools);
+  --part-mcp_tools: var(--context-mcp-tools);
+  --part-messages: var(--context-messages);
   --part-other: var(--muted);
   box-sizing: border-box;
   width: min(320px, calc(100vw - 32px));

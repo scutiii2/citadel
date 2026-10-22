@@ -41,8 +41,9 @@ for (const width of [375, 768]) {
     await page.goto("/capabilities");
     await expect(page.getByRole("heading", { name: "Capabilities", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await expect(page.getByRole('link', { name: 'Settings', exact: true }).last()).toBeVisible();
-    await page.getByRole('link', { name: 'Settings', exact: true }).last().click();
+    await page.getByRole("button", { name: "root - account menu", exact: true }).click();
+    await expect(page.getByRole("menuitem", { name: "Settings", exact: true })).toBeVisible();
+    await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.getByRole('searchbox', { name: 'Search settings' }).fill('theme');

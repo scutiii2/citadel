@@ -59,6 +59,7 @@ const emit = defineEmits<{
 const draft = ref("");
 const extraToolsOpen = ref(false);
 const extraToolsId = useId();
+const messageLabelId = useId();
 const toolbox = ref<HTMLElement | null>(null);
 const moreToolsButton = ref<HTMLButtonElement | null>(null);
 function closeExtraTools(event: PointerEvent): void {
@@ -335,12 +336,13 @@ function submit(): void {
   if (!canSend.value || props.busy) return;
   const typed = draft.value.trim();
   // Slash commands run a tool, not the agent: attachments wait for a question.
-  const files = isCommand.value ? [] : ready.value;
+  const command = isCommand.value;
+  const files = command ? [] : ready.value;
   emit("send", withAttachments(typed, files.map((a) => ({ filename: a.filename, chars: a.chars, truncated: a.truncated, text: a.text }))));
   flights.value++;
   draft.value = "";
   recallIndex.value = null;
-  if (!isCommand.value) attachments.value = attachments.value.filter((a) => a.state !== "ready");
+  if (!command) attachments.value = attachments.value.filter((a) => a.state !== "ready");
   void nextTick(autoGrow);
 }
 
@@ -430,12 +432,14 @@ function onKeydown(event: KeyboardEvent): void {
     <p v-if="recallIndex !== null" class="recall" aria-live="polite">
       Earlier question {{ recallIndex + 1 }} of {{ history.length }} · ↑ older · ↓ newer
     </p>
+    <span :id="messageLabelId" class="message-label">Message</span>
     <div :class="['box', { dragging }]">
       <input ref="fileInput" type="file" multiple hidden @change="onPick" />
       <ListComposer
         v-if="listMode"
         ref="listEditor"
         v-model="draft"
+        :aria-labelledby="messageLabelId"
         :initial-caret="initialListCaret"
         :placeholder="placeholder"
         @input="onInput"
@@ -445,6 +449,7 @@ function onKeydown(event: KeyboardEvent): void {
       <textarea
         v-else
         ref="textarea"
+        :aria-labelledby="messageLabelId"
         v-model="draft"
         rows="1"
         :placeholder="placeholder"

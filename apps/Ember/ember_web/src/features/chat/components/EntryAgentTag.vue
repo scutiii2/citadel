@@ -75,4 +75,7 @@ onMounted(() => void store.refresh());
     transform: rotate(360deg);
   }
 }
+@media (max-width: 767px), (pointer: coarse) {
+  .refresh { min-width: 44px; min-height: 44px; }
+}
 </style>

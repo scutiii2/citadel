@@ -24,9 +24,9 @@ Gate admin pages by permission in `ember_admin/src/router/pages.ts`; the guard i
 
 - Both `style.css` files hold the same tokens (admin's also sets `:focus-visible`). Change a token in **both** or the apps drift.
 - Every page view uses `PageLayout`; chat and auth screens are exempt. The enforced exemption list is `ChatView`, `LoginView`, `RegisterView`, `VerifyEmailView`, `NoAccessView`, `SharedChatView`, `ConfigIssuesView`, and the headerless `AdminView` route shell. Each routed child of `AdminView` owns its layout; the shell adds no column padding.
-- `PageLayout` owns the title, optional description, `actions` and `toolbar` slots, and view scrolling. Use `wide` for full-width pages and `fill` for workspace panels that scroll their own lists. Header geometry and typography live only in `ember_web/src/components/pageLayout.css` (admin imports it by relative path). Admin panel content styles stay in `adminPages.css` and `admin.css`. Existing information pages retain `info-content` to opt into `infoPage.css` body decorations; adding PageLayout alone must not restyle page content.
+- `PageLayout` owns the title, optional description, `actions` and `toolbar` slots, and view scrolling. Use `wide` for full-width pages and `fill` for workspace panels that scroll their own lists. Header geometry and typography live only in `ember_web/src/components/layout/pageLayout.css` (admin imports it by relative path). Admin panel content styles stay in `adminPages.css` and `admin.css`. Existing information pages retain `info-content` to opt into `infoPage.css` body decorations; adding PageLayout alone must not restyle page content.
 - Components exist in **both** apps as copies: `PageLayout`, `BaseModal`, `ConfirmModal`, `ToggleSwitch`, `SegmentedControl`, `SettingRow`, `LockSwitch`, `ActionButton`, `CopyButton`, `DeleteButton`, `AuthCard`, `EmberLogo`, `AccountMenu`, `UsageHeatmap`, `ToolRunForm`, `IntegrationToolsModal`, `SidebarEditor`. A fix to one needs the same fix in the other; say so in the proposal.
-- `ConfirmModal` lives in `components/` (web) and `components/admin/` (admin). Never call native `confirm()`.
+- `ConfirmModal` lives in `components/ui/dialogs/` (web) and `components/admin/` (admin). Never call native `confirm()`.
 - Admin extras: `StatTile`, `*Panel`, `*Drawer`, `TicketBoard`, `RoleEditor`.
 
 Before writing a component, grep both `components/` folders for an existing one.
@@ -46,10 +46,10 @@ Use these existing pages as implementation references:
 
 | Task | Reference under `apps/Ember/ember_web/src/` |
 |---|---|
-| Writing with secondary tools | `views/NotesView.vue`: list/editor, collapsed tools, persistent Save |
-| Reviewing short facts | `views/MemoryView.vue`: searchable rows, editor dialog/mobile sheet |
-| Reading durable documents | `views/BrainsView.vue`: scoped search, browser/reader, secondary connection settings |
-| Downloading and collecting media | `views/VideoDownloaderView.vue`, `components/videoDownloader/`: single-link flow, ZIP groups, temporary files |
+| Writing with secondary tools | `features/notes/NotesView.vue`: list/editor, collapsed tools, persistent Save |
+| Reviewing short facts | `features/memory/MemoryView.vue`: searchable rows, editor dialog/mobile sheet |
+| Reading durable documents | `features/brains/BrainsView.vue`: scoped search, browser/reader, secondary connection settings |
+| Downloading and collecting media | `features/videoDownloader/VideoDownloaderView.vue`, `features/videoDownloader/components/`: single-link flow, ZIP groups, temporary files |
 
 ## 3. Navigation placement
 

@@ -70,7 +70,7 @@ Real `<input type="checkbox" role="switch">` visually hidden (1px, opacity 0), f
 
 ## Segmented control (`SegmentedControl.vue`)
 
-Accent-filled pill track (`padding: 3px`), one equal-width button per option (`grid-auto-columns: 1fr`), a white thumb that slides by `translateX(calc(var(--i) * 100%))` over `0.18s`. Active label turns `--accent`; others stay white. Plain buttons with `aria-pressed` inside `role="group"`. Use for 2-5 mutually exclusive choices (period, tab).
+Neutral pill track with a tinted accent thumb that slides to the selected button. Labels may have different widths; measure the active button. Active text uses `--accent`; other text uses `--muted`. Plain buttons with `aria-pressed` inside `role="group"` are for mutually exclusive values such as a report period. When choices switch workspace panels, use tab semantics (`tablist`, `tab`, `tabpanel`), selected state, roving focus, panel relationships and arrow/Home/End keys. Keep draft-bearing panels mounted when switching. Give touch controls at least a 44px hit area in both dimensions.
 
 ## Modal (`BaseModal.vue`)
 

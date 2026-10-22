@@ -1,4 +1,4 @@
-import { computed, ref, toValue, type MaybeRefOrGetter, type Ref } from "vue";
+import { computed, ref, toValue, type MaybeRefOrGetter, type Ref, watch } from "vue";
 
 /** One thing a chart draws: a stacked segment or a line. */
 export interface ChartPart {
@@ -16,6 +16,9 @@ const MAX_TICKS = 6;
  * (a template ref), `count` the number of buckets. */
 export function useBucketCursor(plot: Ref<HTMLElement | null>, count: MaybeRefOrGetter<number>) {
   const active = ref<number | null>(null);
+  watch(() => toValue(count), (size) => {
+    if (active.value !== null && (active.value < 0 || active.value >= size)) active.value = null;
+  }, { flush: "sync" });
 
   const labelEvery = computed(() => Math.ceil(toValue(count) / MAX_TICKS));
 
@@ -29,12 +32,13 @@ export function useBucketCursor(plot: Ref<HTMLElement | null>, count: MaybeRefOr
 
   function select(event: PointerEvent): void {
     const box = plot.value?.getBoundingClientRect();
-    if (!box || box.width === 0) return;
+    if (!box || box.width === 0 || toValue(count) <= 0) return;
     const share = (event.clientX - box.left) / box.width;
     active.value = Math.min(toValue(count) - 1, Math.max(0, Math.floor(share * toValue(count))));
   }
 
   function onKey(event: KeyboardEvent): void {
+    if (toValue(count) <= 0) return;
     const last = toValue(count) - 1;
     const move: Record<string, number | null> = {
       ArrowLeft: Math.max(0, (active.value ?? last + 1) - 1),

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
+import { copyText } from "../../utils/browser/clipboard";
 import type { ToolRunResult } from "../../api/types";
 import { formatToolResult } from "../../utils/tools/toolResultFormat";
 import MarkdownContent from "../content/MarkdownContent.vue";
@@ -23,15 +24,18 @@ const formatted = computed(() => formatToolResult(props.result.text));
 const showRaw = ref(false);
 
 const copied = ref(false);
+const copyFailed = ref(false);
+let copyTimer: ReturnType<typeof setTimeout> | undefined;
+let disposed = false;
+onBeforeUnmount(() => { disposed = true; clearTimeout(copyTimer); });
 
 async function copy(): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(prettyJson.value ?? props.result.text);
-    copied.value = true;
-    setTimeout(() => (copied.value = false), 1500);
-  } catch {
-    // Clipboard blocked (permissions / insecure context): nothing to do.
-  }
+  const ok = await copyText(prettyJson.value ?? props.result.text);
+  if (disposed) return;
+  clearTimeout(copyTimer);
+  copied.value = ok;
+  copyFailed.value = !ok;
+  if (ok) copyTimer = setTimeout(() => (copied.value = false), 1500);
 }
 </script>
 
@@ -43,9 +47,10 @@ async function copy(): Promise<void> {
         <button v-if="formatted" type="button" class="copy" @click="showRaw = !showRaw">
           {{ showRaw ? "Formatted" : "Raw JSON" }}
         </button>
-        <button type="button" class="copy" @click="copy">{{ copied ? "Copied" : "Copy" }}</button>
+        <button type="button" class="copy" @click="copy">{{ copied ? "Copied" : copyFailed ? "Retry copy" : "Copy" }}</button>
       </span>
     </div>
+    <p v-if="copyFailed" role="alert" class="error">Copy failed. Retry or select the result text to copy manually.</p>
     <p v-if="!result.text" class="muted">(no text output)</p>
     <MarkdownContent v-else-if="formatted && !showRaw" :text="formatted" />
     <pre v-else-if="prettyJson" class="json">{{ prettyJson }}</pre>

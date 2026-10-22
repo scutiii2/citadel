@@ -100,8 +100,12 @@ async function generateTitles(): Promise<void> {
   titling.value = true;
   error.value = "";
   try {
-    const written = await triageClient.titles(rows.value.map((r) => r.description.trim()));
-    rows.value.forEach((row, i) => (row.title = written[i] ?? row.title));
+    const snapshot = rows.value.map((row) => ({ ...row }));
+    const written = await triageClient.titles(snapshot.map((r) => r.description.trim()));
+    snapshot.forEach((source, i) => {
+      const row = rows.value.find((current) => current.key === source.key);
+      if (row && row.description === source.description && row.title === source.title) row.title = written[i] ?? row.title;
+    });
   } catch (err) {
     error.value = errorMessage(err);
   } finally {
@@ -140,7 +144,7 @@ async function ask(): Promise<void> {
 }
 
 function close(): void {
-  if (!asking.value) emit("close");
+  if (!busy.value) emit("close");
 }
 </script>
 

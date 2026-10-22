@@ -238,3 +238,19 @@ describe("TagInput", () => {
     expect(visible(w)).toBe(false);
   });
 });
+
+it("keeps IME confirmation text until a normal Enter commits it", async () => {
+  const { w, tags } = setup();
+  await box(w).setValue("work");
+  await box(w).trigger("keydown", { key: "Enter", isComposing: true });
+  expect(tags.value).toEqual([]);
+  expect((box(w).element as HTMLInputElement).value).toBe("work");
+  await key(w, "Enter");
+  expect(tags.value).toEqual(["work"]);
+});
+it("associates a rejected tag with the textbox", async () => {
+  const { w } = setup(["one", "two", "three"]);
+  await box(w).setValue("four"); await key(w, "Enter");
+  expect(box(w).attributes("aria-invalid")).toBe("true");
+  expect(box(w).attributes("aria-describedby")).toBe(w.get('[role="alert"]').attributes("id"));
+});

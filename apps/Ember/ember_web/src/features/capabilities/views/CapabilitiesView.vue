@@ -199,18 +199,21 @@ async function run(args: Record<string, unknown>): Promise<void> {
   catch (err) { if (generation === runGeneration) result.value = { text: errorMessage(err), isError: true }; }
   finally { running.value = false; }
 }
+const readPending = ref(false);
 const reading = ref<string | null>(null), readUri = ref(""), readResult = ref<{uri: string; text: string} | null>(null), readError = ref("");
 let readGeneration = 0;
-watch([() => selected.value?.key, () => selected.value && available(selected.value)], () => { ++readGeneration; reading.value = null; readResult.value = null; readError.value = ""; }, { flush: "sync" });
+watch([() => selected.value?.key, () => selected.value && available(selected.value)], () => { ++readGeneration; readPending.value = false; reading.value = null; readResult.value = null; readError.value = ""; }, { flush: "sync" });
 async function startRead(r: ResourceInfo): Promise<void> {
-  ++readGeneration; readResult.value = null; readError.value = ""; readUri.value = r.uri; reading.value = r.uri;
+  ++readGeneration; readPending.value = false; readResult.value = null; readError.value = ""; readUri.value = r.uri; reading.value = r.uri;
   if (!r.template) await read(r.uri);
 }
 async function read(uri: string): Promise<void> {
-  if (!selected.value || !available(selected.value)) return;
+  if (readPending.value || !selected.value || !available(selected.value)) return;
   const generation = ++readGeneration;
+  readPending.value = true; readError.value = "";
   try { const text = await server.readResource(uri); if (generation === readGeneration) { readResult.value = { uri, text }; reading.value = null; } }
   catch (err) { if (generation === readGeneration) readError.value = errorMessage(err); }
+  finally { if (generation === readGeneration) readPending.value = false; }
 }
 const readShown = computed(() => readResult.value ? formatToolResult(readResult.value.text) ?? readResult.value.text : "");
 const modalOpen = ref(false), editing = ref<UserExtension | null>(null), pendingRemove = ref<UserExtension | null>(null), removing = ref(false);
@@ -273,7 +276,7 @@ onActivated(() => { if (canSeePrivate.value) void userExt.refresh(); });
             <p v-if="selected.kind === 'private'" class="private-note">Private extension tools are available in chats only and always ask first.</p>
             <p v-if="selected.online === false" class="notice">Offline · Tools cannot run until the connection returns.</p>
             <p v-if="selected.privateExtension?.error" class="error">{{ selected.privateExtension.error }}</p><p v-else-if="selected.kind === 'extension' && extensions.find(e => e.id === selected?.id)?.error" class="error">{{ extensions.find(e => e.id === selected?.id)?.error }}</p>
-            <template v-if="selected.resources.length"><div class="section-heading"><h4>Resources</h4><span>{{ selected.resources.length }}</span></div><ul class="resources"><li v-for="r in selected.resources" :key="r.uri"><button type="button" class="resource-link" :disabled="!available(selected)" @click="startRead(r)">{{ r.name }}</button><code>{{ r.uri }}</code></li></ul><ResourceReader v-model:uri="readUri" :reading="reading" :read-result="readResult" :read-error="readError" :text="readShown" @read="read" /></template>
+            <template v-if="selected.resources.length"><div class="section-heading"><h4>Resources</h4><span>{{ selected.resources.length }}</span></div><ul class="resources"><li v-for="r in selected.resources" :key="r.uri"><button type="button" class="resource-link" :disabled="!available(selected)" @click="startRead(r)">{{ r.name }}</button><code>{{ r.uri }}</code></li></ul><ResourceReader :pending="readPending" v-model:uri="readUri" :reading="reading" :read-result="readResult" :read-error="readError" :text="readShown" @read="read" /></template>
             <div v-if="selected.privateExtension && canPrivate" class="private-controls"><button class="edit-extension secondary" @click="edit(selected.privateExtension)">Edit connection</button><details class="danger-zone"><summary>Danger zone</summary><p>Remove this private extension and its saved headers.</p><button class="remove-extension danger" @click="pendingRemove = selected.privateExtension">Remove extension</button></details></div>
           </div>
           <footer class="detail-footer"><template v-if="selected.page && available(selected)"><a v-if="selected.page.external" :href="selected.page.to" class="primary" target="_blank" rel="noopener noreferrer">{{ selected.page.label ?? 'Open app' }} ↗</a><RouterLink v-else :to="selected.page.to" class="primary">Open {{ selected.label }} →</RouterLink></template><p v-else>{{ selected.kind === 'private' ? 'Tools are available in chats only.' : !available(selected) ? 'Enable and connect to use these tools.' : 'Choose a tool to view its details.' }}</p></footer>

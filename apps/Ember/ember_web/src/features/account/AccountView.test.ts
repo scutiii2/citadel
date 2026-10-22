@@ -167,3 +167,18 @@ describe("AccountView", () => {
     expect(wrapper.findComponent(ConfirmModal).exists()).toBe(false);
   });
 });
+
+it("validates password confirmation on blur and associates its error", async () => {
+  const w = await mountView([]);
+  await w.get("button.toggle-password").trigger("click");
+  const inputs = w.findAll('#account-password-form input');
+  await inputs[0]!.setValue("matching password");
+  await inputs[1]!.setValue("matching");
+  expect(w.find("#password-confirm-error").exists()).toBe(false);
+  await inputs[1]!.trigger("blur");
+  expect(inputs[1]!.attributes("aria-invalid")).toBe("true");
+  expect(inputs[1]!.attributes("aria-describedby")).toBe("password-confirm-error");
+  await inputs[1]!.setValue("matching password");
+  expect(w.find("#password-confirm-error").exists()).toBe(false);
+  w.unmount();
+});

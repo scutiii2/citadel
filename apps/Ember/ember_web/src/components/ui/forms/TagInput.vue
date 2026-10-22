@@ -95,6 +95,7 @@ function remove(tag: string): void {
 }
 
 function onKey(event: KeyboardEvent): void {
+  if (event.isComposing || event.keyCode === 229) return;
   const last = options.value.length - 1;
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     if (options.value.length === 0) return;
@@ -145,6 +146,8 @@ defineExpose({ commit, add });
         role="combobox"
         autocomplete="off"
         aria-label="Add a tag"
+        :aria-invalid="!!error"
+        :aria-describedby="error ? `${listId}-error` : undefined"
         aria-autocomplete="list"
         :aria-expanded="listVisible"
         :aria-controls="listId"
@@ -173,7 +176,7 @@ defineExpose({ commit, add });
         </li>
       </ul>
     </div>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="error" :id="`${listId}-error`" class="error" role="alert">{{ error }}</p>
   </div>
 </template>
 
@@ -255,5 +258,8 @@ defineExpose({ commit, add });
   color: var(--muted);
   font-size: 0.85em;
   white-space: nowrap;
+}
+@media (pointer: coarse), (max-width: 767px) {
+  .tag button { min-width: 44px; min-height: 44px; }
 }
 </style>

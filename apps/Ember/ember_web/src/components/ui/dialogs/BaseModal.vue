@@ -78,4 +78,7 @@ h3 {
   line-height: 1;
   color: var(--muted);
 }
+@media (pointer: coarse), (max-width: 767px) {
+  button.close { min-width: 44px; min-height: 44px; }
+}
 </style>

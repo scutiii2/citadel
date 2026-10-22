@@ -43,5 +43,5 @@ const auth = useAuthStore()
 .save-file:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .unavailable { font-size: .7em; }
 button.action { border: 0; padding: 5px; }
-@media (max-width: 767px) { .save-file, button.action { min-height: 40px; display: inline-flex; align-items: center; } .file-copy .name { font-size: .95em; } }
+@media (max-width: 767px) { .save-file, button.action { min-height: 44px; display: inline-flex; align-items: center; } button.action { min-width: 44px; } .file-copy .name { font-size: .95em; } }
 </style>

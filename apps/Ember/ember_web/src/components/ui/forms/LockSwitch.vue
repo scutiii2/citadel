@@ -110,4 +110,7 @@ defineProps<{ title?: string }>();
 .text {
   font-size: 0.9em;
 }
+@media (pointer: coarse), (max-width: 767px) {
+  label.lock { min-width: 44px; min-height: 44px; }
+}
 </style>

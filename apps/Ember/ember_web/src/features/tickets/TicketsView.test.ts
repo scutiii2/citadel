@@ -454,3 +454,14 @@ describe("TicketsView", () => {
     expect(client.close).not.toHaveBeenCalled();
   });
 });
+
+it("keeps separate unsent replies when switching between tickets", async () => {
+  client.get.mockImplementation(async id => ticket(id, { comments: [] }));
+  const w = await mountView("/tickets/1");
+  await w.get('textarea[aria-label="Reply"]').setValue("First draft");
+  await rows(w).find(row => row.text().includes("Ticket 2"))!.trigger("click"); await flushPromises();
+  expect(w.get<HTMLTextAreaElement>('textarea[aria-label="Reply"]').element.value).toBe("");
+  await w.get('textarea[aria-label="Reply"]').setValue("Second draft");
+  await rows(w).find(row => row.text().includes("Ticket 1"))!.trigger("click"); await flushPromises();
+  expect(w.get<HTMLTextAreaElement>('textarea[aria-label="Reply"]').element.value).toBe("First draft");
+});

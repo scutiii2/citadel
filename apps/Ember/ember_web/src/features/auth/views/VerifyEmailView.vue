@@ -14,33 +14,38 @@ const notice = ref(
   route.query.unsent ? "The verification email couldn't be sent. Try \"Send a new code\"." : "",
 );
 const busy = ref(false);
+const action = ref<"verify" | "resend" | null>(null);
+const codeError = ref(false);
 
 const email = computed(() => auth.account?.email ?? "your address");
 
 async function submit(): Promise<void> {
-  error.value = "";
-  busy.value = true;
+  if (busy.value) return;
+  error.value = ""; codeError.value = false;
+  busy.value = true; action.value = "verify";
   try {
     await auth.verifyEmail(code.value.trim());
     await router.replace({ name: "chat" });
   } catch (err) {
+    codeError.value = true;
     error.value = err instanceof Error ? err.message : String(err);
   } finally {
-    busy.value = false;
+    busy.value = false; action.value = null;
   }
 }
 
 async function resend(): Promise<void> {
+  if (busy.value) return;
   error.value = "";
-  notice.value = "";
-  busy.value = true;
+  notice.value = ""; codeError.value = false;
+  busy.value = true; action.value = "resend";
   try {
     await auth.resendVerification();
     notice.value = "A new code is on its way.";
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
   } finally {
-    busy.value = false;
+    busy.value = false; action.value = null;
   }
 }
 
@@ -55,14 +60,14 @@ async function logout(): Promise<void> {
     <form @submit.prevent="submit">
       <label>
         Verification code
-        <input v-model="code" autocomplete="one-time-code" spellcheck="false" required autofocus />
+        <input v-model="code" :aria-invalid="codeError" :aria-describedby="codeError ? 'verification-error' : undefined" autocomplete="one-time-code" spellcheck="false" required autofocus />
       </label>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" role="alert" id="verification-error">{{ error }}</p>
       <p v-else-if="notice" class="notice">{{ notice }}</p>
-      <button class="primary" :disabled="busy">Verify</button>
+      <button class="primary" :disabled="busy" :aria-busy="busy && action === 'verify'">{{ action === 'verify' ? "Verifying…" : "Verify" }}</button>
     </form>
     <template #footer>
-      <button type="button" class="link-button" :disabled="busy" @click="resend">Send a new code</button>
+      <button type="button" class="link-button" :disabled="busy" :aria-busy="busy && action === 'resend'" @click="resend">{{ action === 'resend' ? "Sending…" : "Send a new code" }}</button>
       &middot;
       <RouterLink to="/account">Change email</RouterLink>
       &middot;

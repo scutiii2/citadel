@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import MarkdownContent from "../../../components/content/MarkdownContent.vue";
-defineProps<{ reading: string | null; uri: string; readResult: { uri: string; text: string } | null; readError: string; text: string }>();
+defineProps<{ pending: boolean; reading: string | null; uri: string; readResult: { uri: string; text: string } | null; readError: string; text: string }>();
 const emit = defineEmits<{ 'update:uri': [value: string]; read: [uri: string] }>();
 </script>
 <template>
   <section v-if="reading || readResult || readError" class="reader">
-    <form v-if="reading" class="uri" @submit.prevent="emit('read', uri)">
+    <form v-if="reading" class="uri" @submit.prevent="!pending && emit('read', uri)">
       <label>
         URI
-        <input :value="uri" @input="emit('update:uri', ($event.target as HTMLInputElement).value)" type="text" spellcheck="false" />
+        <input :value="uri" @input="emit('update:uri', ($event.target as HTMLInputElement).value)" :disabled="pending" type="text" spellcheck="false" />
       </label>
-      <button class="primary">Read</button>
+      <button class="primary" :disabled="pending" :aria-busy="pending">{{ pending ? "Reading…" : "Read" }}</button>
     </form>
     <p v-if="readError" class="error">{{ readError }}</p>
     <template v-if="readResult">

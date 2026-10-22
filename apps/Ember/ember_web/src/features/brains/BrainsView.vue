@@ -285,16 +285,16 @@ button.file-row.active { border-color: color-mix(in srgb, var(--accent) 45%, var
   .scope-line :deep(button.segment) { flex: 1; min-height: 44px; padding-inline: 8px; }
   .connection-status { font-size: .7em; }
   .search-form input { font-size: max(1em, 16px); }
-  .search-form button { min-height: 40px; padding-inline: 12px; }
+  .search-form button { min-height: 44px; padding-inline: 12px; }
   .brain-workspace { grid-template-columns: minmax(0, 1fr); }
   .browser { border-right: 0; padding: 16px 12px; }
   .brain-workspace:not(.reading) .reader, .brain-workspace.reading .browser { display: none; }
   .mobile-reading :deep(.page-toolbar) { display: none; }
   button.file-row { min-height: 76px; padding: 16px 10px; }
-  .breadcrumbs button { min-height: 36px; }
+  .breadcrumbs button { min-width: 44px; min-height: 44px; }
   .reader-head { padding: 12px 16px; }
   .reader-head .reader-path { display: none; }
-  .back { display: inline-block; padding: 6px 0; border: 0; min-height: 40px; color: var(--muted); font-size: 1.1em; }
+  .back { display: inline-block; padding: 6px 0; border: 0; min-height: 44px; color: var(--muted); font-size: 1.1em; }
   .document-content { padding: 22px 20px; }
   .reader-footer { padding: 12px 16px; }
   .search-results { padding: 18px 20px; }

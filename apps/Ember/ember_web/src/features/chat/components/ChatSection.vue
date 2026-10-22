@@ -246,4 +246,7 @@ header:hover .more,
   padding: 0;
   list-style: none;
 }
+@media (max-width: 767px), (pointer: coarse) {
+  .more { min-width: 44px; min-height: 44px; }
+}
 </style>

@@ -27,7 +27,7 @@ If the new UI is ember_web or ember_admin (they carry the same shared components
 | `--bg` / `--surface` | page / cards, panels, rail, modals (one step above bg) |
 | `--text` / `--muted` | body / secondary text, icons, descriptions |
 | `--border` | every 1px outline and divider |
-| `--accent` (ember orange `#e8590c` / `#ff7a33`) + `--accent-contrast` | primary action, active state, focus ring, links |
+| `--accent` (ember orange `#b23d06` / `#ff7a33`) + `--accent-contrast` | primary action, active state, focus ring, links |
 | `--danger`, `--warning`, `--success` | destructive, caution, positive; status red is `--status-failed` |
 | `--code-bg` | code, chips, inline tags |
 

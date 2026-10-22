@@ -211,6 +211,7 @@ describe("delete", () => {
 
     dialogs.openDelete(folder(1, "Work"), 2);
     await flushPromises();
+    await type("Work");
     button("Delete").click();
     await flushPromises();
 
@@ -225,6 +226,7 @@ describe("delete", () => {
 
     dialogs.openDelete(folder(1, "Work"), 2);
     await flushPromises();
+    await type("Work");
     button("Delete").click();
     await flushPromises();
 
@@ -279,6 +281,7 @@ describe("details", () => {
     const dialogs = setup();
     dialogs.openDelete(folder(1, "Work"), 2);
     await flushPromises();
+    await type("Work");
     button("Delete").click();
     await flushPromises();
     expect(dialog()).not.toBeNull();
@@ -290,6 +293,7 @@ describe("details", () => {
     const dialogs = setup();
     dialogs.openDelete(folder(1, "Work"), 2);
     await flushPromises();
+    await type("Work");
     button("Delete").click();
     await flushPromises();
     expect(dialog()).toBeNull();
@@ -369,5 +373,30 @@ describe("a save that outlives its dialog", () => {
     settleRename(folder(2, "Another"));
     await flushPromises();
     expect(dialog()).toBeNull();
+  });
+});
+
+describe("bulk deletion confirmation", () => {
+  it("requires the exact folder name and resets it when another folder opens", async () => {
+    const dialogs = setup();
+    dialogs.openDelete(folder(1, "Work"), 2);
+    await flushPromises();
+    expect(button("Delete").disabled).toBe(true);
+    await type("work");
+    expect(button("Delete").disabled).toBe(true);
+    await type("Work");
+    expect(button("Delete").disabled).toBe(false);
+    dialogs.openDelete(folder(2, "Personal"), 1);
+    await flushPromises();
+    expect(input().value).toBe("");
+    expect(button("Delete").disabled).toBe(true);
+    expect(client.remove).not.toHaveBeenCalled();
+  });
+  it("allows deleting an empty folder without typed confirmation", async () => {
+    const dialogs = setup();
+    dialogs.openDelete(folder(1, "Empty"), 0);
+    await flushPromises();
+    expect(dialog()?.querySelector("input")).toBeNull();
+    expect(button("Delete").disabled).toBe(false);
   });
 });

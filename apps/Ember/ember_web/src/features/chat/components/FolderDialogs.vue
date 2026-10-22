@@ -19,6 +19,8 @@ const store = useFoldersStore();
 
 const mode = ref<Mode | null>(null);
 const name = ref("");
+const deleteName = ref("");
+const canDelete = computed(() => mode.value?.kind === "delete" && !busy.value && (mode.value.chatCount === 0 || deleteName.value === mode.value.folder.name));
 const error = ref("");
 const busy = ref(false);
 const nameInput = ref<HTMLInputElement | null>(null);
@@ -46,6 +48,7 @@ const deleteText = computed(() => {
 function begin(next: Mode, initialName = ""): void {
   mode.value = next;
   name.value = initialName;
+  deleteName.value = "";
   error.value = "";
   busy.value = false;
   // BaseModal opens its <dialog> one tick after `open` flips, so wait for it.
@@ -112,7 +115,7 @@ async function notifyCreated(onCreated: ((folder: ChatFolder) => void) | undefin
 
 async function confirmDelete(): Promise<void> {
   const m = mode.value;
-  if (m?.kind !== "delete" || busy.value) return;
+  if (m?.kind !== "delete" || !canDelete.value) return;
   busy.value = true;
   error.value = "";
   try {
@@ -135,21 +138,29 @@ async function confirmDelete(): Promise<void> {
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
         <button type="button" class="ghost" @click="requestClose">Cancel</button>
-        <button type="submit" class="primary" :disabled="!canSave">{{ busy ? "Saving …" : "Save" }}</button>
+        <button type="submit" class="primary" :aria-busy="busy" :disabled="!canSave">{{ busy ? "Saving …" : "Save" }}</button>
       </div>
     </form>
     <div v-else-if="mode" class="form">
       <p class="confirm">{{ deleteText }}</p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <div class="danger-zone">
+      <h4>Danger zone</h4>
+      <label v-if="mode.kind === 'delete' && mode.chatCount > 0">Type {{ mode.folder.name }} to confirm
+        <input v-model="deleteName" type="text" autocomplete="off" :disabled="busy" />
+      </label>
       <div class="buttons">
         <button ref="cancelButton" type="button" class="ghost" @click="requestClose">Cancel</button>
-        <DeleteButton :busy="busy" @click="confirmDelete" />
+        <DeleteButton :busy="busy" :disabled="!canDelete" @click="confirmDelete" />
+      </div>
       </div>
     </div>
   </BaseModal>
 </template>
 
 <style scoped>
+.danger-zone { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--danger) 5%, var(--surface)); }
+.danger-zone h4 { margin: 0; color: var(--danger); }
 .form {
   display: flex;
   flex-direction: column;
@@ -208,4 +219,18 @@ button:disabled {
 .ghost {
   background: transparent;
 }
+
+button[aria-busy="true"]:not(.delete-button)::before {
+  content: "";
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: pending-spin 0.75s linear infinite;
+}
+@keyframes pending-spin { to { transform: rotate(360deg); } }
 </style>

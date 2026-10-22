@@ -90,3 +90,11 @@ describe("UsageHeatmap", () => {
     expect(cellFor(wrapper, "2026-10-01")!.classes()).toContain("level-4");
   });
 });
+
+it("offers all daily values in a keyboard reachable table", () => {
+  const w = mountMap([{ date: "2026-10-01", tokens: 5432 }]);
+  expect(w.get("summary").text()).toContain("Daily usage table");
+  expect(w.get('[role="region"]').attributes("tabindex")).toBe("0");
+  const row = w.findAll("tbody tr").find(row => row.text().includes("2026-10-01"));
+  expect(row!.text()).toContain((5432).toLocaleString());
+});

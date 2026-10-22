@@ -75,6 +75,23 @@ const emit = defineEmits<{
   deleteFolder: [folder: ChatFolder];
 }>();
 
+const searchText = ref(props.query);
+const composing = ref(false);
+watch(() => props.query, (value) => { if (!composing.value) searchText.value = value; });
+function searchInput(event: Event): void {
+  searchText.value = (event.target as HTMLInputElement).value;
+  if (!composing.value && !(event as InputEvent).isComposing) emit("search", searchText.value);
+}
+function finishSearchComposition(event: CompositionEvent): void {
+  composing.value = false;
+  searchInput(event);
+}
+function searchKeydown(event: KeyboardEvent): void {
+  if (event.isComposing || composing.value || event.keyCode === 229) return;
+  if (event.key === "Enter") { event.preventDefault(); emit("search", searchText.value); }
+  if (event.key === "Escape") { event.preventDefault(); searchText.value = ""; emit("search", ""); }
+}
+
 /** `text` split around the match, for a <mark>; no match: all one part. */
 function parts(text: string, span: MatchSpan | null): { before: string; match: string; after: string } {
   if (!span) return { before: text, match: "", after: "" };
@@ -425,12 +442,14 @@ watch(
       </svg>
       <input
         type="search"
-        :value="query"
+        :value="searchText"
         placeholder="Search chats"
         aria-label="Search chats"
         maxlength="100"
-        @input="emit('search', ($event.target as HTMLInputElement).value)"
-        @keydown.esc.prevent="emit('search', '')"
+        @input="searchInput"
+        @compositionstart="composing = true"
+        @compositionend="finishSearchComposition"
+        @keydown="searchKeydown"
       />
     </div>
 
@@ -445,7 +464,7 @@ watch(
           :class="['row', 'hit', { active: h.id === activeId, locked }]"
           @click="emit('select', h.id, h.message_index ?? undefined)"
         >
-          <div class="hit-body">
+          <button type="button" class="hit-body hit-select" :aria-current="h.id === activeId ? 'page' : undefined" @click.stop="emit('select', h.id, h.message_index ?? undefined)">
             <span class="title">
               {{ parts(h.title, h.title_match).before }}<mark v-if="h.title_match">{{ parts(h.title, h.title_match).match }}</mark>{{ parts(h.title, h.title_match).after }}
             </span>
@@ -454,7 +473,7 @@ watch(
               {{ parts(h.snippet.text, h.snippet).before }}<mark>{{ parts(h.snippet.text, h.snippet).match }}</mark>{{ parts(h.snippet.text, h.snippet).after }}
             </span>
             <span v-if="h.message_matches > 1" class="count">{{ h.message_matches }} messages match</span>
-          </div>
+          </button>
         </li>
       </ul>
     </template>
@@ -552,6 +571,7 @@ watch(
 </template>
 
 <style scoped>
+.hit-select { width: 100%; padding: 0; border: 0; color: inherit; background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -786,5 +806,8 @@ mark {
 .row.ticked {
   color: var(--text);
   background: var(--bg);
+}
+@media (max-width: 767px), (pointer: coarse) {
+  .new-folder { min-width: 44px; min-height: 44px; }
 }
 </style>

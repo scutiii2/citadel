@@ -386,7 +386,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
   border-radius: var(--radius-full);
   background: var(--surface);
 }
-.field input[type="range"]:focus-visible { outline: none; }
+.field input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .field input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
 
 @media (max-width: 1050px) and (min-width: 768px) {

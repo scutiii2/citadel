@@ -7,7 +7,7 @@
   --text: light-dark(#1c1c1f, #e8e8ea);
   --muted: light-dark(#6b6b73, #9a9aa3);
   --border: light-dark(#e3e3e6, #2f2f35);
-  --accent: light-dark(#e8590c, #ff7a33); /* ember orange */
+  --accent: light-dark(#b23d06, #ff7a33); /* ember orange */
   --accent-contrast: light-dark(#ffffff, #17171a);
   --code-bg: light-dark(#f3f3f4, #232328);
   --danger: light-dark(#d9480f, #ff8a4c);

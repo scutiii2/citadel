@@ -41,3 +41,71 @@ it("default AI review sends no private IDs and never publishes", async () => {
   expect(promotionsClient.suggest).toHaveBeenCalledWith([], []);
   expect(promotionsClient.publish).not.toHaveBeenCalled();
 });
+
+it("ignores a review resolving after the selected note changes", async () => {
+  let finish!: (value: Awaited<ReturnType<typeof promotionsClient.review>>) => void;
+  vi.mocked(promotionsClient.review).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const w = mount(NotePromotionPanel, { props: { noteId: "note", sourceVersion: "1", dirty: false } });
+  await flushPromises();
+  await w.findAll("button").find(b => b.text() === "Promote to Obsidian")!.trigger("click"); await flushPromises();
+  await w.setProps({ noteId: "other", sourceVersion: "2" });
+  finish({ note_id: "note", title: "Old", body: "Old content", source_hash: hash, source_revision: "1", agent_readable: false });
+  await flushPromises();
+  expect(w.find("textarea").exists()).toBe(false);
+  expect(w.find("dialog[open]").exists()).toBe(false);
+  w.unmount();
+});
+it("retains edited publication text and path after closing and switching notes", async () => {
+  const w = mount(NotePromotionPanel, { props: { noteId: "note", dirty: false } }); await flushPromises();
+  const open = () => w.findAll("button").find(b => b.text() === "Promote to Obsidian")!.trigger("click");
+  await open(); await flushPromises();
+  await w.get("textarea").setValue("My retained Markdown");
+  await w.get('input[maxlength="500"]').setValue("Inbox/custom.md");
+  await w.get("dialog").trigger("cancel");
+  await open(); await flushPromises();
+  expect(w.get<HTMLTextAreaElement>("textarea").element.value).toBe("My retained Markdown");
+  await w.setProps({ noteId: "other" }); await flushPromises();
+  await w.setProps({ noteId: "note", sourceVersion: "new" }); await flushPromises();
+  await open(); await flushPromises();
+  expect(w.get<HTMLTextAreaElement>("textarea").element.value).toBe("My retained Markdown");
+  expect(w.get<HTMLInputElement>('input[maxlength="500"]').element.value).toBe("Inbox/custom.md");
+  expect(promotionsClient.review).toHaveBeenCalledTimes(2);
+  w.unmount();
+});
+it("ignores publication completion after selecting another note", async () => {
+  let finish!: (value: Awaited<ReturnType<typeof promotionsClient.publish>>) => void;
+  vi.mocked(promotionsClient.publish).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const w = mount(NotePromotionPanel, { props: { noteId: "note", dirty: false } }); await flushPromises();
+  await w.findAll("button").find(b => b.text() === "Promote to Obsidian")!.trigger("click"); await flushPromises();
+  await w.findAll("button").find(b => b.text() === "Publish document")!.trigger("click");
+  await w.setProps({ noteId: "other" });
+  finish({ path: "old.md" } as Awaited<ReturnType<typeof promotionsClient.publish>>); await flushPromises();
+  expect(w.text()).not.toContain("Published old.md");
+  expect(w.find("dialog[open]").exists()).toBe(false);
+  w.unmount();
+});
+
+it("retains each suggestion draft when another suggestion opens without changing the selected Note", async () => {
+  vi.mocked(promotionsClient.suggestions).mockResolvedValue(["a", "b"].map(id => ({
+    id, note_id: id, title: id, source_hash: hash, source_revision: "now", scope: "personal",
+    destination_revision: 1, generation: "gen", folder: "Inbox", tags: [], reason: "Useful", draft: `Draft ${id}`,
+  })));
+  vi.mocked(promotionsClient.review).mockImplementation(async id => ({ note_id: id, title: id, body: id,
+    source_hash: hash, source_revision: "now", agent_readable: false }));
+  const w = mount(NotePromotionPanel, { props: { noteId: "selected", dirty: false } }); await flushPromises();
+  const review = (index: number) => w.findAll("article")[index]!.findAll("button").find(b => b.text() === "Review suggestion")!;
+  await review(0).trigger("click"); await flushPromises();
+  await w.get("textarea").setValue("Edited suggestion A");
+  await w.get('input[maxlength="500"]').setValue("Inbox/a-custom.md");
+  await w.get("dialog").trigger("cancel");
+  await review(1).trigger("click"); await flushPromises();
+  await w.get("textarea").setValue("Edited suggestion B");
+  await w.get("dialog").trigger("cancel");
+  await review(0).trigger("click"); await flushPromises();
+  expect(w.get<HTMLTextAreaElement>("textarea").element.value).toBe("Edited suggestion A");
+  expect(w.get<HTMLInputElement>('input[maxlength="500"]').element.value).toBe("Inbox/a-custom.md");
+  await w.get("dialog").trigger("cancel");
+  await review(1).trigger("click"); await flushPromises();
+  expect(w.get<HTMLTextAreaElement>("textarea").element.value).toBe("Edited suggestion B");
+  w.unmount();
+});

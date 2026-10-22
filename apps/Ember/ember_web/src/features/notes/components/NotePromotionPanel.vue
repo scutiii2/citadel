@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
+import { onBeforeRouteLeave, routerKey } from "vue-router";
 import { brainsClient, promotionsClient, type BrainDestination, type BrainScope, type PublicationReview, type PromotionSuggestion, type Publication } from "../../brains/api/BrainsClient";
 import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
@@ -21,16 +22,41 @@ const notice = ref("");
 const audience = ref(false);
 const consent = ref(false);
 const requestKey = ref("");
+let generation = 0;
+let refreshGeneration = 0;
+const dialogOpen = ref(false);
+const initialDraft = ref("");
+const initialPath = ref("");
+const retained = new Map<string, { review: PublicationReview; draft: string; path: string; scope: BrainScope; initialDraft: string; initialPath: string; requestKey: string }>();
+const edited = computed(() => !!review.value && (draft.value !== initialDraft.value || path.value !== initialPath.value));
+const hasDrafts = computed(() => edited.value || [...retained.values()].some(item => item.draft !== item.initialDraft || item.path !== item.initialPath));
+function retain(): void {
+  if (review.value) retained.set(review.value.note_id, { review: review.value, draft: draft.value, path: path.value, scope: scope.value, initialDraft: initialDraft.value, initialPath: initialPath.value, requestKey: requestKey.value });
+}
+const discardOpen = ref(false);
+let leaveAnswer: ((value: boolean) => void) | null = null;
+function answerLeave(discard: boolean): void { discardOpen.value = false; leaveAnswer?.(discard); leaveAnswer = null; }
+if (getCurrentInstance()?.appContext.provides[routerKey as symbol]) onBeforeRouteLeave(() => {
+  if (busy.value) return false;
+  if (!hasDrafts.value) return true;
+  discardOpen.value = true;
+  return new Promise<boolean>(resolve => { leaveAnswer = resolve; });
+});
+function beforeUnload(event: BeforeUnloadEvent): void { if (hasDrafts.value) { event.preventDefault(); event.returnValue = ""; } }
+onMounted(() => window.addEventListener("beforeunload", beforeUnload));
+onUnmounted(() => { ++generation; ++refreshGeneration; window.removeEventListener("beforeunload", beforeUnload); });
 const writable = computed(() => destinations.value.filter(d => d.writable));
 const destination = computed(() => writable.value.find(d => d.scope === scope.value));
 const notePublications = computed(() => publications.value.filter(p => p.note_id === props.noteId));
 async function refresh() {
-  try { [destinations.value, suggestions.value, publications.value] = await Promise.all([
-    brainsClient.destinations(), promotionsClient.suggestions(), promotionsClient.list()]); }
-  catch (e) { error.value = errorMessage(e); }
+  const request = ++refreshGeneration;
+  try { const result = await Promise.all([
+    brainsClient.destinations(), promotionsClient.suggestions(), promotionsClient.list()]);
+    if (request === refreshGeneration) [destinations.value, suggestions.value, publications.value] = result; }
+  catch (e) { if (request === refreshGeneration) error.value = errorMessage(e); }
 }
 onMounted(refresh);
-watch(() => [props.noteId, props.sourceVersion], () => { review.value = null; error.value = ""; void refresh(); });
+watch(() => [props.noteId, props.sourceVersion], () => { ++generation; retain(); review.value = null; dialogOpen.value = false; busy.value = false; error.value = ""; void refresh(); });
 watch(scope, () => { audience.value = false; });
 function newPath(title: string, folder: string) {
   const slug = title.replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-|-$/g, "").slice(0, 80) || "Note";
@@ -38,57 +64,81 @@ function newPath(title: string, folder: string) {
 }
 async function open(id: string, suggestion?: PromotionSuggestion) {
   if (busy.value) return;
+  const request = ++generation;
+  const sourceVersion = props.sourceVersion;
+  const selectedNote = props.noteId;
+  const ownsRequest = () => request === generation && selectedNote === props.noteId && sourceVersion === props.sourceVersion;
+  if (review.value?.note_id !== id) { retain(); review.value = null; dialogOpen.value = false; }
+  const previous = retained.get(id);
+  if (review.value?.note_id === id) { dialogOpen.value = true; return; }
   busy.value = true; error.value = ""; audience.value = false;
   try {
     await refresh();
+    if (!ownsRequest()) return;
     const note = await promotionsClient.review(id);
-    scope.value = suggestion?.scope ?? writable.value[0]?.scope ?? "personal";
+    if (!ownsRequest()) return;
+    scope.value = previous?.scope ?? suggestion?.scope ?? writable.value[0]?.scope ?? "personal";
     if (!destination.value) throw new Error("Configure a writable brain destination before promoting a Note.");
     if (suggestion && (suggestion.source_hash !== note.source_hash || suggestion.source_revision !== note.source_revision || suggestion.generation !== destination.value.generation))
       throw new Error("The Note or destination changed. Request a new suggestion.");
     draft.value = suggestion?.draft ?? `# ${note.title}\n\n${note.body}`;
     path.value = newPath(suggestion?.title ?? note.title, suggestion?.folder ?? destination.value.folder);
+    initialDraft.value = draft.value; initialPath.value = path.value;
+    if (previous) {
+      draft.value = previous.draft; path.value = previous.path;
+      notice.value = "Your publication draft was retained. Review it against the latest saved Note before publishing.";
+    }
     requestKey.value = crypto.randomUUID();
-    review.value = note;
-  } catch (e) { error.value = errorMessage(e); }
-  finally { busy.value = false; }
+    review.value = note; dialogOpen.value = true;
+  } catch (e) { if (ownsRequest()) error.value = errorMessage(e); }
+  finally { if (ownsRequest()) busy.value = false; }
 }
 async function suggest(selected: boolean) {
   if (busy.value) return;
+  const request = ++generation;
   busy.value = true; error.value = ""; consent.value = false;
   try {
     const ids = selected && props.noteId ? [props.noteId] : [];
-    suggestions.value = await promotionsClient.suggest(ids, ids);
+    const result = await promotionsClient.suggest(ids, ids);
+    if (request !== generation) return;
+    suggestions.value = result;
     notice.value = suggestions.value.length ? "Review each suggestion before publishing." : "No new promotion suggestions.";
-  } catch (e) { error.value = errorMessage(e); }
-  finally { busy.value = false; }
+  } catch (e) { if (request === generation) error.value = errorMessage(e); }
+  finally { if (request === generation) busy.value = false; }
 }
 async function reconcile(id: string) {
   if (busy.value) return;
+  const request = ++generation;
   busy.value = true; error.value = "";
-  try { await promotionsClient.reconcile(id); await refresh(); notice.value = "The reserved publication was reconciled."; }
-  catch (e) { error.value = errorMessage(e); }
-  finally { busy.value = false; }
+  try { await promotionsClient.reconcile(id); if (request !== generation) return; await refresh(); if (request !== generation) return; notice.value = "The reserved publication was reconciled."; }
+  catch (e) { if (request === generation) error.value = errorMessage(e); }
+  finally { if (request === generation) busy.value = false; }
 }
 async function dismiss(item: PromotionSuggestion) {
+  if (busy.value) return;
+  const request = ++generation;
   busy.value = true;
-  try { await promotionsClient.dismiss(item.id); suggestions.value = suggestions.value.filter(s => s.id !== item.id); }
-  catch (e) { error.value = errorMessage(e); }
-  finally { busy.value = false; }
+  try { await promotionsClient.dismiss(item.id); if (request !== generation) return; suggestions.value = suggestions.value.filter(s => s.id !== item.id); }
+  catch (e) { if (request === generation) error.value = errorMessage(e); }
+  finally { if (request === generation) busy.value = false; }
 }
 async function publish() {
   if (busy.value || !review.value || !destination.value || scope.value === "instance" && !audience.value) return;
+  const request = ++generation;
+  const noteId = review.value.note_id;
   busy.value = true; error.value = "";
   try {
     const result = await promotionsClient.publish(review.value.note_id, {
       source_hash: review.value.source_hash, source_revision: review.value.source_revision, scope: scope.value,
       destination_revision: destination.value.revision, generation: destination.value.generation!, path: path.value,
       draft: draft.value, idempotency_key: requestKey.value, shared_audience_reviewed: audience.value });
+    if (request !== generation) return;
     notice.value = `Published ${result.path}. The original Note is preserved.`;
-    review.value = null;
+    retained.delete(noteId);
+    review.value = null; dialogOpen.value = false;
     await refresh();
-  } catch (e) { error.value = errorMessage(e); }
-  finally { busy.value = false; }
+  } catch (e) { if (request === generation) error.value = errorMessage(e); }
+  finally { if (request === generation) busy.value = false; }
 }
 </script>
 <template>
@@ -109,7 +159,8 @@ async function publish() {
     <ConfirmModal :open="consent" title="Send this Note for AI review?" message="This sends the selected Note, including a private Note, to the configured AI provider. It does not change the Note agent-access switch." confirm-label="Send for review" @close="consent = false" @confirm="suggest(true)">
       <p>This explicitly sends the selected Note, including a private Note, to the configured AI provider. It does not change the Note's agent-access switch.</p>
     </ConfirmModal>
-    <BaseModal v-if="review" :open="true" title="Review Obsidian publication" wide @close="!busy && (review = null)">
+    <ConfirmModal :open="discardOpen" title="Discard publication drafts?" message="Edited publication drafts will be lost when you leave." confirm-label="Discard drafts" @confirm="answerLeave(true)" @close="answerLeave(false)" />
+    <BaseModal v-if="review" :open="dialogOpen" title="Review Obsidian publication" wide @close="!busy && (dialogOpen = false)">
       <fieldset :disabled="busy">
         <label>Destination<select v-model="scope" aria-label="Destination"><option v-for="d in writable" :key="d.scope" :value="d.scope">{{ d.label }} · {{ d.scope }}</option></select></label>
         <p v-if="scope === 'instance'">Audience: every signed-in user can read this document.</p><p v-else>Audience: only your account.</p>

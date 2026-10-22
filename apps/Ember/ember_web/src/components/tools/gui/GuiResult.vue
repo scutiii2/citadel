@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
+import { copyText } from "../../../utils/browser/clipboard";
 import type { GuiResultSpec } from "../../../api/tools/CapabilityPagesClient";
 import type { ToolRunResult } from "../../../api/types";
 import { resultValue } from "../../../utils/tools/guiPage";
@@ -22,6 +23,10 @@ const message = computed(() => {
 
 const revealed = ref(true);
 const copied = ref(false);
+const copyFailed = ref(false);
+let copyTimer: ReturnType<typeof setTimeout> | undefined;
+let disposed = false;
+onBeforeUnmount(() => { disposed = true; clearTimeout(copyTimer); });
 const secretText = computed(() => (value.value === undefined || value.value === null ? "" : String(value.value)));
 
 // What the person reads: spaced when the page asks for groups. Copy uses secretText.
@@ -34,13 +39,12 @@ const strength = computed(() => {
 });
 
 async function copy(): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(secretText.value);
-    copied.value = true;
-    setTimeout(() => (copied.value = false), 1500);
-  } catch {
-    // Clipboard blocked (permissions / insecure context): nothing to do.
-  }
+  const ok = await copyText(secretText.value);
+  if (disposed) return;
+  clearTimeout(copyTimer);
+  copied.value = ok;
+  copyFailed.value = !ok;
+  if (ok) copyTimer = setTimeout(() => (copied.value = false), 1500);
 }
 
 const rows = computed<Record<string, unknown>[]>(() =>
@@ -73,7 +77,7 @@ const scalars = computed(() =>
               <path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </button>
-          <button type="button" class="copy" data-test="copy" @click="copy">{{ copied ? "Copied" : "Copy" }}</button>
+          <button type="button" class="copy" data-test="copy" @click="copy">{{ copied ? "Copied" : copyFailed ? "Retry copy" : "Copy" }}</button>
         </div>
         <div v-if="strength" class="strength">
           <div class="bar" aria-hidden="true"><div :class="['fill', strength.level]" :style="{ width: `${strength.fraction * 100}%` }" /></div>
@@ -83,15 +87,18 @@ const scalars = computed(() =>
           </div>
         </div>
       </div>
+      <p v-if="copyFailed" role="alert" class="error">Copy failed. Retry or select the result text to copy manually.</p>
       <p v-if="detail" class="muted">{{ detail }}</p>
     </template>
     <p v-else-if="spec.kind === 'message'">{{ message }}</p>
     <template v-else-if="spec.kind === 'table'">
       <p v-if="rows.length === 0" class="muted">No rows.</p>
-      <table v-else>
+      <div v-else class="table-scroll" role="region" aria-label="Tool result table" tabindex="0">
+      <table>
         <thead><tr><th v-for="c in columns" :key="c">{{ c }}</th></tr></thead>
         <tbody><tr v-for="(r, i) in rows" :key="i"><td v-for="c in columns" :key="c">{{ r[c] ?? "" }}</td></tr></tbody>
       </table>
+      </div>
     </template>
     <dl v-else class="fields">
       <template v-for="[k, v] in scalars" :key="k"><dt>{{ k }}</dt><dd>{{ v }}</dd></template>
@@ -100,7 +107,7 @@ const scalars = computed(() =>
 </template>
 
 <style scoped>
-.gui-result { margin-top: 12px; }
+.gui-result { margin-top: 12px; min-width: 0; max-width: 100%; }
 .secret-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); }
 .secret-row { display: flex; gap: 8px; align-items: center; }
 .secret { flex: 1; min-width: 0; font-family: var(--mono); font-size: 1.25em; line-height: 1.5; word-break: break-all; }
@@ -118,6 +125,11 @@ const scalars = computed(() =>
 .strength-meta { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.8em; color: var(--muted); }
 .error { color: var(--danger); }
 .fields { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; }
+.table-scroll { max-width: 100%; overflow-x: auto; }
+th, td { overflow-wrap: anywhere; max-width: 28ch; }
 table { border-collapse: collapse; }
 th, td { padding: 4px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+@media (pointer: coarse), (max-width: 767px) {
+  .icon, .copy { min-width: 44px; min-height: 44px; }
+}
 </style>

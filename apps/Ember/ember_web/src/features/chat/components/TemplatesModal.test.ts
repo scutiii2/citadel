@@ -172,13 +172,18 @@ describe("editing and deleting", () => {
     expect(wrapper.findAll(".list li strong").map((s) => s.text())).toEqual(["Code review", "Summarize"]);
   });
 
-  it("Cancel goes back to the list without saving", async () => {
+  it("Back preserves a dirty prompt until explicit discard", async () => {
     const wrapper = await openModal();
     await wrapper.find("button.primary").trigger("click");
     await wrapper.find('input[type="text"]').setValue("half typed");
 
     await wrapper.find("button.ghost").trigger("click");
 
+    expect(wrapper.find("form").exists()).toBe(true);
+    await wrapper.getComponent(ConfirmModal).get(".cancel").trigger("click");
+    expect((wrapper.find('input[type="text"]').element as HTMLInputElement).value).toBe("half typed");
+    await wrapper.find("button.ghost").trigger("click");
+    await wrapper.getComponent(ConfirmModal).get(".confirm").trigger("click");
     expect(wrapper.find("form").exists()).toBe(false);
     expect(client.create).not.toHaveBeenCalled();
   });
@@ -228,4 +233,40 @@ describe("Esc", () => {
     await dialog.trigger("cancel");
     expect(wrapper.emitted("close")).toHaveLength(1);
   });
+});
+
+
+it("keeps a pending prompt editor owned across close and reopen", async () => {
+  let resolve!: (value: PromptTemplate) => void;
+  client.create.mockReturnValue(new Promise((done) => { resolve = done; }));
+  const wrapper = await openModal();
+  await wrapper.find("button.primary").trigger("click");
+  await wrapper.find('input[type="text"]').setValue("Pending");
+  await wrapper.find("textarea").setValue("My draft");
+  await wrapper.find("form").trigger("submit");
+  expect(wrapper.find('button[type="submit"]').attributes("aria-busy")).toBe("true");
+  expect(wrapper.find("button.ghost").attributes("disabled")).toBeDefined();
+  await wrapper.find("dialog").trigger("cancel");
+  expect(wrapper.emitted("close")).toBeUndefined();
+  await wrapper.setProps({ open: false });
+  await wrapper.setProps({ open: true });
+  await flushPromises();
+  expect((wrapper.find("textarea").element as HTMLTextAreaElement).value).toBe("My draft");
+  expect(wrapper.find("textarea").attributes("disabled")).toBeDefined();
+  resolve(tpl(3, "Pending", "My draft"));
+  await flushPromises();
+  expect(wrapper.find("form").exists()).toBe(false);
+});
+
+it("Close asks to discard and Cancel retains the prompt", async () => {
+  const wrapper = await openModal();
+  await wrapper.find("button.primary").trigger("click");
+  await wrapper.find("textarea").setValue("Unfinished");
+  await wrapper.find("button.close").trigger("click");
+  expect(wrapper.emitted("close")).toBeUndefined();
+  await wrapper.getComponent(ConfirmModal).get(".cancel").trigger("click");
+  expect((wrapper.find("textarea").element as HTMLTextAreaElement).value).toBe("Unfinished");
+  await wrapper.find("button.close").trigger("click");
+  await wrapper.getComponent(ConfirmModal).get(".confirm").trigger("click");
+  expect(wrapper.emitted("close")).toHaveLength(1);
 });

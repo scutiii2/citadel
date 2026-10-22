@@ -212,3 +212,24 @@ describe("when the question fails", () => {
     expect((wrapper.get("textarea").element as HTMLTextAreaElement).value).toBe("It is down");
   });
 });
+
+
+it("applies generated titles only to unchanged rows by their stable key", async () => {
+  let resolve!: (values: string[]) => void;
+  titles.mockReturnValue(new Promise((done) => { resolve = done; }));
+  const wrapper = mountModal();
+  await fillChoice(wrapper);
+  await button(wrapper, "Add option").trigger("click");
+  await input(wrapper, "Option 3 description").setValue("Third");
+  await button(wrapper, "Generate titles").trigger("click");
+  await input(wrapper, "Option 1 title").setValue("manual");
+  await input(wrapper, "Option 2 description").setValue("Updated description");
+  await wrapper.get('[aria-label="Remove option 3"]').trigger("click");
+  await button(wrapper, "Add option").trigger("click");
+  await input(wrapper, "Option 3 description").setValue("Replacement");
+  resolve(["database", "network", "obsolete"]);
+  await flushPromises();
+  expect((input(wrapper, "Option 1 title").element as HTMLInputElement).value).toBe("manual");
+  expect((input(wrapper, "Option 2 title").element as HTMLInputElement).value).toBe("");
+  expect((input(wrapper, "Option 3 title").element as HTMLInputElement).value).toBe("");
+});

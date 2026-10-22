@@ -24,13 +24,30 @@ const name = ref("");
 const body = ref("");
 const error = ref("");
 const saving = ref(false);
+const initial = ref({ name: "", body: "" });
+const dirty = computed(() => !!editing.value && (name.value !== initial.value.name || body.value !== initial.value.body));
+const pendingDeparture = ref<"back" | "close" | null>(null);
+function requestDeparture(destination: "back" | "close"): void {
+  if (saving.value) return;
+  if (dirty.value) { pendingDeparture.value = destination; return; }
+  backToList();
+  if (destination === "close") emit("close");
+}
+function discard(): void {
+  const destination = pendingDeparture.value;
+  pendingDeparture.value = null;
+  backToList();
+  if (destination === "close") emit("close");
+}
 
 const canSave = computed(() => name.value.trim() !== "" && body.value.trim() !== "" && !saving.value);
 
 function startEdit(template: PromptTemplate | null, prefill = ""): void {
+  if (saving.value) return;
   editing.value = { id: template?.id ?? null };
   name.value = template?.name ?? "";
   body.value = template?.body ?? prefill;
+  initial.value = { name: name.value, body: template?.body ?? "" };
   error.value = "";
   void nextTick(() => nameInput.value?.focus());
 }
@@ -47,8 +64,10 @@ watch(
     if (isOpen && !dialog.value?.open) {
       dialog.value?.showModal();
       void store.ensureLoaded();
-      if (props.draft.trim()) startEdit(null, props.draft);
-      else backToList();
+      if (!editing.value) {
+        if (props.draft.trim()) startEdit(null, props.draft);
+        else backToList();
+      }
     } else if (!isOpen && dialog.value?.open) {
       dialog.value.close();
     }
@@ -57,17 +76,18 @@ watch(
 
 async function save(): Promise<void> {
   if (!canSave.value || !editing.value) return;
+  const editor = editing.value;
   saving.value = true;
   error.value = "";
   try {
-    const { id } = editing.value;
+    const { id } = editor;
     if (id === null) await store.create(name.value, body.value);
     else await store.update(id, name.value, body.value);
-    backToList();
+    if (editing.value === editor) backToList();
   } catch (err) {
-    error.value = errorMessage(err);
+    if (editing.value === editor) error.value = errorMessage(err);
   } finally {
-    saving.value = false;
+    if (editing.value === editor || editing.value === null) saving.value = false;
   }
 }
 
@@ -86,8 +106,7 @@ async function remove(template: PromptTemplate): Promise<void> {
 
 // Esc steps back from the form to the list, then closes.
 function onCancel(): void {
-  if (editing.value) backToList();
-  else emit("close");
+  requestDeparture(editing.value ? "back" : "close");
 }
 </script>
 
@@ -95,23 +114,23 @@ function onCancel(): void {
   <dialog ref="dialog" class="templates" aria-label="Saved prompts" @close="emit('close')" @cancel.prevent="onCancel">
     <header>
       <h3>{{ editing ? (editing.id === null ? "New prompt" : "Edit prompt") : "Saved prompts" }}</h3>
-      <button type="button" class="close" aria-label="Close" @click="emit('close')">×</button>
+      <button type="button" class="close" aria-label="Close" @click="requestDeparture('close')" :disabled="saving">×</button>
     </header>
 
     <form v-if="editing" class="form" @submit.prevent="save">
       <label>
         Name
-        <input ref="nameInput" v-model="name" type="text" :maxlength="TEMPLATE_NAME_MAX" autocomplete="off" />
+        <input ref="nameInput" v-model="name" :disabled="saving" type="text" :maxlength="TEMPLATE_NAME_MAX" autocomplete="off" />
       </label>
       <label>
         Text
-        <textarea v-model="body" rows="8" :maxlength="TEMPLATE_BODY_MAX" />
+        <textarea v-model="body" :disabled="saving" rows="8" :maxlength="TEMPLATE_BODY_MAX" />
       </label>
       <small class="count">{{ body.length.toLocaleString() }} / {{ TEMPLATE_BODY_MAX.toLocaleString() }}</small>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
-        <button type="button" class="ghost" @click="backToList">Cancel</button>
-        <button type="submit" class="primary" :disabled="!canSave">{{ saving ? "Saving …" : "Save" }}</button>
+        <button type="button" class="ghost" @click="requestDeparture('back')" :disabled="saving">Back</button>
+        <button type="submit" class="primary" :aria-busy="saving" :disabled="!canSave">{{ saving ? "Saving …" : "Save" }}</button>
       </div>
     </form>
 
@@ -138,6 +157,7 @@ function onCancel(): void {
         <button type="button" class="primary" @click="startEdit(null)">New prompt</button>
       </div>
     </template>
+    <ConfirmModal v-if="pendingDeparture" open title="Discard prompt changes?" message="Your prompt has unsaved changes." confirm-label="Discard" danger @confirm="discard" @close="pendingDeparture = null" />
     <ConfirmModal
       v-if="pendingDelete"
       open
@@ -288,4 +308,18 @@ h3 {
 .link.danger:hover {
   color: var(--danger);
 }
+
+button[aria-busy="true"]:not(.delete-button)::before {
+  content: "";
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: pending-spin 0.75s linear infinite;
+}
+@keyframes pending-spin { to { transform: rotate(360deg); } }
 </style>

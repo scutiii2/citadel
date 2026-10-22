@@ -259,10 +259,13 @@ svg {
   gap: 2px;
 }
 .icon-btn {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: none;
   border-radius: var(--radius-md);

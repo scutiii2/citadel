@@ -1,6 +1,7 @@
 import { useAuthStore } from "../../../stores/auth";
 import { createPinia, setActivePinia } from "pinia";
-import { mount } from "@vue/test-utils";
+import { commandsClient } from "../../../api/tools/CommandsClient";
+import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { JsonSchema } from "../../../api/types";
 import ToolRunForm from "./ToolRunForm.vue";
@@ -76,8 +77,8 @@ describe("ToolRunForm live mode", () => {
       },
     };
     const w = mountForm({ schema });
-    expect(w.get("#field-ratio").attributes("step")).toBe("any");
-    expect(w.get("#field-count").attributes("step")).toBe("1");
+    expect(w.get('[id$="-ratio"]').attributes("step")).toBe("any");
+    expect(w.get('[id$="-count"]').attributes("step")).toBe("1");
   });
 
   it("a normal form ignores change events", async () => {
@@ -96,4 +97,45 @@ beforeEach(() => {
 it("does not run a live form without tools.execute", () => {
   useAuthStore().account!.permissions = [];
   expect(mountForm({ live: true }).emitted("run")).toBeUndefined();
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+it.each(["success", "failure"])("ignores old dependent choices %s after replacement and clearing", async (outcome) => {
+  const first = deferred<never[]>(); const second = deferred<never[]>();
+  vi.mocked(commandsClient.options).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  const w = mountForm({ schema: { type: "object", properties: {
+    parent: { type: "string" }, child: { type: "string", options_url: "/choices", depends_on: "parent" },
+  } } });
+  await w.get('[id$="-parent"]').setValue("A");
+  await w.get('[id$="-parent"]').setValue("B");
+  if (outcome === "failure") first.reject(new Error("old failure")); else first.resolve([]);
+  await flushPromises();
+  expect(w.get('[id$="-child"]').element.tagName).toBe("SELECT");
+  expect(w.get('[id$="-child"]').attributes("disabled")).toBeDefined();
+  await w.get('[id$="-parent"]').setValue("");
+  second.resolve([]); await flushPromises();
+  expect(w.get('[id$="-child"]').text()).toContain("choose parent first");
+  w.unmount();
+});
+it.each(["success", "failure"])("keeps a newer upload busy after older same-name upload %s", async (outcome) => {
+  const first = deferred<string>(); const second = deferred<string>();
+  vi.mocked(commandsClient.upload).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  const w = mountForm({ schema: { type: "object", properties: { file: { type: "string", input: "file" } } } });
+  const input = w.get('input[type="file"]');
+  Object.defineProperty(input.element, "files", { configurable: true, value: [new File(["a"], "same.txt")] });
+  await input.trigger("change");
+  Object.defineProperty(input.element, "files", { configurable: true, value: [new File(["b"], "same.txt")] });
+  await input.trigger("change");
+  if (outcome === "failure") first.reject(new Error("old failure")); else first.resolve("/old/path");
+  await flushPromises();
+  expect(w.get('button.run').attributes("disabled")).toBeDefined();
+  second.resolve("/new/path"); await flushPromises();
+  await w.get("form").trigger("submit");
+  expect(w.emitted("run")!.at(-1)).toEqual([{ file: "/new/path" }]);
+  w.unmount();
 });

@@ -100,8 +100,8 @@ function submit(): void {
       />
     </section>
     <div class="buttons">
-      <button type="submit" class="submit" :disabled="!complete || answering">Submit</button>
-      <button type="button" class="skip" :disabled="answering" @click="emit('skip', pending.id)">Skip</button>
+      <button type="submit" class="submit" :aria-busy="answering" :disabled="!complete || answering">{{ answering ? "Submitting ..." : "Submit" }}</button>
+      <button type="button" class="skip" :aria-busy="answering" :disabled="answering" @click="emit('skip', pending.id)">{{ answering ? "Waiting ..." : "Skip" }}</button>
     </div>
     <p class="note">The agent waits for you. Skip lets it go on with its best guess.</p>
   </form>
@@ -214,4 +214,18 @@ header {
   font-size: 0.75em;
   color: var(--muted);
 }
+
+button[aria-busy="true"]:not(.delete-button)::before {
+  content: "";
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: pending-spin 0.75s linear infinite;
+}
+@keyframes pending-spin { to { transform: rotate(360deg); } }
 </style>

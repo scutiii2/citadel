@@ -98,7 +98,7 @@ test("the approval mode chip is locked to Ask every time while the administrator
   expect(api.unexpected).toEqual([]);
 });
 
-test("Settings: the Ask before tools row picks the mode and applies it on Save", async ({ page }) => {
+test("Settings: the Ask before tools row picks the mode and applies it instantly", async ({ page }) => {
   const api = await installFakeApi(page);
   await logIn(page);
   await page.goto("/settings");
@@ -107,7 +107,6 @@ test("Settings: the Ask before tools row picks the mode and applies it on Save",
   await expect(row).toContainText("No tool asks first.");
   await row.getByRole("button", { name: "Auto" }).click();
   await expect(row).toContainText("Tools that only read run on their own");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Unsaved changes")).toHaveCount(0);
 
   await page.goto("/");

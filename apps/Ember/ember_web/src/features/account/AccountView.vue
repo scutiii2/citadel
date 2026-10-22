@@ -65,9 +65,10 @@ const passwordForm = reactive({
   done: false,
 });
 
+const confirmTouched = ref(false);
 const passwordMismatch = computed(
   () =>
-    passwordForm.confirm !== "" && passwordForm.next !== passwordForm.confirm,
+    confirmTouched.value && passwordForm.confirm !== "" && passwordForm.next !== passwordForm.confirm,
 );
 
 async function changeEmail(): Promise<void> {
@@ -132,7 +133,8 @@ onMounted(loadDevices);
 async function changePassword(): Promise<void> {
   passwordForm.error = "";
   passwordForm.done = false;
-  if (passwordMismatch.value) return;
+  confirmTouched.value = true;
+  if (passwordForm.next !== passwordForm.confirm) return;
   passwordForm.busy = true;
   try {
     await auth.changePassword(passwordForm.current, passwordForm.next);
@@ -374,6 +376,7 @@ async function changePassword(): Promise<void> {
               <PasswordInput
                 label="New password"
                 v-model="passwordForm.next"
+                @input="confirmTouched = false"
                 autocomplete="new-password"
                 minlength="8"
                 required
@@ -381,6 +384,10 @@ async function changePassword(): Promise<void> {
               <PasswordInput
                 label="Repeat new password"
                 v-model="passwordForm.confirm"
+                @input="confirmTouched = false"
+                @blur="confirmTouched = true"
+                :aria-invalid="passwordMismatch"
+                :aria-describedby="passwordMismatch ? 'password-confirm-error' : undefined"
                 autocomplete="new-password"
                 required
               />
@@ -390,7 +397,7 @@ async function changePassword(): Promise<void> {
                 autocomplete="current-password"
                 required
               />
-              <p v-if="passwordMismatch" class="error" role="alert">
+              <p v-if="passwordMismatch" id="password-confirm-error" class="error" role="alert">
                 The new passwords don't match.
               </p>
               <p v-else-if="passwordForm.error" class="error" role="alert">

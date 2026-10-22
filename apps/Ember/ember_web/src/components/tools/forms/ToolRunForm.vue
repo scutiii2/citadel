@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from "vue";
 import { useAuthStore } from "../../../stores/auth";
 import { commandsClient, type ParamOption } from "../../../api/tools/CommandsClient";
 import type { JsonSchema } from "../../../api/types";
@@ -30,10 +30,24 @@ interface RemoteOptions {
   options: ParamOption[];
   error: string;
 }
+const formId = useId();
+const fieldId = (name: string) => `${formId}-${name}`;
+function describedBy(field: ToolField): string | undefined {
+  return [
+    errors.value[field.name] ? `${fieldId(field.name)}-error` : null,
+    remote[field.name]?.state === "failed" ? `${fieldId(field.name)}-remote` : null,
+    field.description ? `${fieldId(field.name)}-description` : null,
+  ].filter(Boolean).join(" ") || undefined;
+}
+const optionRequests = new Map<string, symbol>();
+const uploadRequests = new Map<string, symbol>();
+onBeforeUnmount(() => { optionRequests.clear(); uploadRequests.clear(); });
 const remote = reactive<Record<string, RemoteOptions>>({});
 
 async function loadOptions(field: ToolField): Promise<void> {
   if (!field.optionsUrl) return;
+  const request = Symbol();
+  optionRequests.set(field.name, request);
   const args: Record<string, string> = {};
   if (field.dependsOn) {
     const parent = values.value[field.dependsOn];
@@ -46,8 +60,10 @@ async function loadOptions(field: ToolField): Promise<void> {
   remote[field.name] = { state: "loading", options: [], error: "" };
   try {
     const options = await commandsClient.options(field.optionsUrl, args);
+    if (optionRequests.get(field.name) !== request) return;
     remote[field.name] = { state: "ready", options, error: "" };
   } catch (err) {
+    if (optionRequests.get(field.name) !== request) return;
     // Like chat_app: the field falls back to a plain text box.
     remote[field.name] = { state: "failed", options: [], error: errorMessage(err) };
   }
@@ -123,14 +139,17 @@ const uploading = computed(() => Object.values(uploads).some((u) => u.state === 
 
 async function upload(field: ToolField, file: File | undefined): Promise<void> {
   if (!file || !auth.hasPermission("files.upload")) return;
+  const request = Symbol();
+  uploadRequests.set(field.name, request);
   uploads[field.name] = { filename: file.name, state: "uploading", error: "" };
   values.value[field.name] = "";
   try {
     const path = await commandsClient.upload(file);
-    if (uploads[field.name]?.filename !== file.name) return; // replaced meanwhile
+    if (uploadRequests.get(field.name) !== request) return;
     values.value[field.name] = path;
     uploads[field.name] = { filename: file.name, state: "done", error: "" };
   } catch (err) {
+    if (uploadRequests.get(field.name) !== request) return;
     uploads[field.name] = { filename: file.name, state: "failed", error: errorMessage(err) };
   }
 }
@@ -193,11 +212,11 @@ function inputType(field: ToolField): string {
 
     <div v-for="f in fields" :key="f.name" :class="['field', { invalid: errors[f.name] }]">
       <label v-if="f.widget === 'checkbox'" class="check">
-        <input v-model="values[f.name]" type="checkbox" />
+        <input v-model="values[f.name]" type="checkbox" :aria-invalid="!!errors[f.name]" :aria-describedby="describedBy(f)" />
         <span>{{ f.label }}</span>
       </label>
       <template v-else>
-        <label :for="`field-${f.name}`">
+        <label :for="fieldId(f.name)">
           {{ f.label }}<span v-if="f.required" class="req" title="Required">*</span>
           <code class="name">{{ f.name }}</code>
         </label>
@@ -210,7 +229,7 @@ function inputType(field: ToolField): string {
           @dragleave="onDropLeave($event, f.name)"
           @drop.prevent="onDrop(f, $event)"
         >
-          <input :disabled="!auth.hasPermission('files.upload')" :id="`field-${f.name}`" type="file" class="file-input" @change="onFileInput(f, $event)" />
+          <input :disabled="!auth.hasPermission('files.upload')" :id="fieldId(f.name)" :aria-invalid="!!errors[f.name]" :aria-describedby="describedBy(f)" type="file" class="file-input" @change="onFileInput(f, $event)" />
           <span v-if="!uploads[f.name]" class="muted">Drop a file here or choose one</span>
           <span v-else-if="uploads[f.name]!.state === 'uploading'" class="muted">uploading {{ uploads[f.name]!.filename }} ...</span>
           <span v-else-if="uploads[f.name]!.state === 'done'">✓ {{ uploads[f.name]!.filename }}</span>
@@ -218,7 +237,7 @@ function inputType(field: ToolField): string {
         </div>
 
         <template v-else-if="choicesOf(f) !== null">
-          <select :id="`field-${f.name}`" v-model="values[f.name]" :disabled="remote[f.name]?.state === 'loading' || remote[f.name]?.state === 'waiting'" @change="onSelect(f)">
+          <select :id="fieldId(f.name)" :aria-invalid="!!errors[f.name]" :aria-describedby="describedBy(f)" v-model="values[f.name]" :disabled="remote[f.name]?.state === 'loading' || remote[f.name]?.state === 'waiting'" @change="onSelect(f)">
             <option value="">
               {{
                 remote[f.name]?.state === "loading"
@@ -242,7 +261,7 @@ function inputType(field: ToolField): string {
 
         <textarea
           v-else-if="f.widget === 'json' || f.widget === 'textarea'"
-          :id="`field-${f.name}`"
+          :id="fieldId(f.name)" :aria-invalid="!!errors[f.name]" :aria-describedby="describedBy(f)"
           v-model="values[f.name] as string"
           rows="4"
           spellcheck="false"
@@ -251,18 +270,18 @@ function inputType(field: ToolField): string {
         />
         <div v-else-if="f.widget === 'range'" class="range-row">
           <input
-            :id="`field-${f.name}`"
+            :id="fieldId(f.name)" :aria-invalid="!!errors[f.name]" :aria-describedby="describedBy(f)"
             v-model="values[f.name] as string"
             type="range"
             :step="f.step ?? (f.kind === 'integer' ? 1 : 'any')"
             :min="f.min"
             :max="f.max"
           />
-          <output class="readout" :for="`field-${f.name}`">{{ values[f.name] }}</output>
+          <output class="readout" :for="fieldId(f.name)">{{ values[f.name] }}</output>
         </div>
         <input
           v-else
-          :id="`field-${f.name}`"
+          :id="fieldId(f.name)" :aria-invalid="!!errors[f.name]" :aria-describedby="describedBy(f)"
           v-model="values[f.name] as string"
           :type="inputType(f)"
           :step="f.step ?? (f.kind === 'integer' ? 1 : 'any')"
@@ -276,11 +295,11 @@ function inputType(field: ToolField): string {
           <option v-for="e in f.examples" :key="e" :value="e" />
         </datalist>
       </template>
-      <small v-if="errors[f.name]" class="error">{{ errors[f.name] }}</small>
-      <small v-else-if="remote[f.name]?.state === 'failed'" class="hint">
+      <small :id="`${fieldId(f.name)}-error`" v-if="errors[f.name]" class="error">{{ errors[f.name] }}</small>
+      <small :id="`${fieldId(f.name)}-remote`" v-if="remote[f.name]?.state === 'failed'" class="hint">
         Couldn't load the choices ({{ remote[f.name]!.error }}) - type the value instead.
       </small>
-      <small v-else-if="f.description" class="hint">{{ f.description }}</small>
+      <small :id="`${fieldId(f.name)}-description`" v-if="f.description" class="hint">{{ f.description }}</small>
     </div>
 
     <button v-if="!live" type="submit" class="run" :disabled="running || uploading || !auth.hasPermission('tools.execute')">

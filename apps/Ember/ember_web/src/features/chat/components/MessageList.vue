@@ -32,6 +32,8 @@ import WelcomeCard from "./WelcomeCard.vue";
 import { useMessageScroll } from "../composables/useMessageScroll";
 
 const props = defineProps<{
+  conversationId?: string | null;
+  draftScope?: number | null;
   messages: ChatMessage[];
   streaming: string;
   activity: string;
@@ -109,10 +111,15 @@ function isDeciding(id: string): boolean {
 // The question being edited (its index) and its draft text.
 const editingIndex = ref<number | null>(null);
 const editDraft = ref("");
+let editSource: ChatMessage | null = null;
+let editConversation: string | null | undefined;
+const drafts = new Map<string | null | undefined, { index: number; text: string; source: ChatMessage }>();
 const editArea = ref<HTMLTextAreaElement[]>([]);
 
 async function startEdit(index: number): Promise<void> {
   editingIndex.value = index;
+  editSource = props.messages[index] ?? null;
+  editConversation = props.conversationId;
   editDraft.value = userParts.value[index]?.text ?? "";
   await nextTick();
   const area = editArea.value[0];
@@ -129,6 +136,8 @@ function autoGrow(area: HTMLTextAreaElement): void {
 }
 
 function cancelEdit(): void {
+  drafts.delete(props.conversationId);
+  confirmingEdit.value = false;
   editingIndex.value = null;
 }
 
@@ -138,7 +147,7 @@ const confirmingEdit = ref(false);
 
 function saveEdit(): void {
   const index = editingIndex.value;
-  if (index === null) return;
+  if (index === null || props.busy || props.canChange === false || editConversation !== props.conversationId || props.messages[index] !== editSource) return;
   const hasFiles = (userParts.value[index]?.attachments.length ?? 0) > 0;
   if (!editDraft.value.trim() && !hasFiles) return;
   // Everything after this question goes: ask before dropping later exchanges.
@@ -156,6 +165,8 @@ function confirmEdit(): void {
 }
 
 function sendEdit(index: number): void {
+  if (props.busy || props.canChange === false || editConversation !== props.conversationId || props.messages[index] !== editSource) return;
+  drafts.delete(props.conversationId);
   editingIndex.value = null;
   emit("edit", index, editDraft.value);
 }
@@ -163,8 +174,36 @@ function sendEdit(index: number): void {
 // A running answer or a switched chat closes an open edit.
 watch(
   () => [props.busy, props.canChange === false],
-  () => (editingIndex.value = null),
+  () => { editingIndex.value = null; confirmingEdit.value = false; },
 );
+
+watch(() => props.conversationId, (current, previous) => {
+  if (editingIndex.value !== null && editSource) drafts.set(previous, { index: editingIndex.value, text: editDraft.value, source: editSource });
+  editingIndex.value = null;
+  confirmingEdit.value = false;
+  const saved = drafts.get(current);
+  if (saved && props.messages[saved.index] === saved.source) {
+    editingIndex.value = saved.index;
+    editDraft.value = saved.text;
+    editSource = saved.source;
+    editConversation = current;
+  }
+});
+
+watch(() => props.draftScope, () => {
+  drafts.clear();
+  cancelEdit();
+  editDraft.value = "";
+  editSource = null;
+});
+
+function editKeydown(event: KeyboardEvent): void {
+  if (event.isComposing || event.keyCode === 229) return;
+  if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    event.preventDefault();
+    saveEdit();
+  }
+}
 
 // The day label above the first message of each day (null: none). `now` is
 // read when the list changes, so "Today" can be stale after midnight until then.
@@ -221,7 +260,7 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
             aria-label="Edit your question"
             @input="autoGrow($event.target as HTMLTextAreaElement)"
             @keydown.esc.prevent="cancelEdit"
-            @keydown.enter.exact.prevent="saveEdit"
+            @keydown="editKeydown"
           />
           <p v-if="userParts[i]?.attachments.length" class="edit-note">
             Attached files stay with the question ({{ userParts[i]?.attachments.length }}).
@@ -336,19 +375,19 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
             <pre>{{ formatArguments(a.arguments) }}</pre>
           </details>
           <div class="buttons">
-            <button type="button" class="allow" :disabled="isDeciding(a.id)" @click="emit('decide', a.id, 'allow')">
-              Allow once
+            <button type="button" class="allow" :aria-busy="isDeciding(a.id)" :disabled="isDeciding(a.id)" @click="emit('decide', a.id, 'allow')">
+              {{ isDeciding(a.id) ? "Deciding ..." : "Allow once" }}
             </button>
             <button
               v-if="!approvalRequired"
               type="button"
-              :disabled="isDeciding(a.id)"
+              :aria-busy="isDeciding(a.id)" :disabled="isDeciding(a.id)"
               @click="emit('decide', a.id, 'always')"
             >
-              Allow for this chat
+              {{ isDeciding(a.id) ? "Deciding ..." : "Allow for this chat" }}
             </button>
-            <button type="button" class="deny" :disabled="isDeciding(a.id)" @click="emit('decide', a.id, 'deny')">
-              Deny
+            <button type="button" class="deny" :aria-busy="isDeciding(a.id)" :disabled="isDeciding(a.id)" @click="emit('decide', a.id, 'deny')">
+              {{ isDeciding(a.id) ? "Deciding ..." : "Deny" }}
             </button>
           </div>
           <p class="note">No answer within 4 minutes counts as Deny.</p>
@@ -771,4 +810,18 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
     opacity: 0.3;
   }
 }
+
+button[aria-busy="true"]:not(.delete-button)::before {
+  content: "";
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: pending-spin 0.75s linear infinite;
+}
+@keyframes pending-spin { to { transform: rotate(360deg); } }
 </style>

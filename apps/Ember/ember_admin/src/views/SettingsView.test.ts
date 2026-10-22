@@ -26,12 +26,12 @@ async function show() {
   return { wrapper, router };
 }
 
-it("keeps theme and sidebar changes as drafts until Save", async () => {
+it("applies theme immediately while keeping sidebar changes as drafts until Save", async () => {
   const { wrapper } = await show();
   expect(wrapper.find(".settings-save-bar").exists()).toBe(false);
   await wrapper.get('button[data-value="dark"]').trigger("click");
   await wrapper.get('input[aria-label="Show Capabilities in the sidebar"]').setValue(false);
-  expect(useTheme().theme.value).toBe("system");
+  expect(useTheme().theme.value).toBe("dark");
   expect(useNavPrefsStore().prefs.hidden).toEqual([]);
   expect(localStorage.getItem("ember_admin.nav.1")).toBeNull();
   await wrapper.get("button.save").trigger("click");
@@ -47,7 +47,7 @@ it("Revert restores saved preferences and clears the unsaved bar", async () => {
   await wrapper.get('button[data-value="dark"]').trigger("click");
   await wrapper.get('input[aria-label="Show Capabilities in the sidebar"]').setValue(false);
   await wrapper.get("button.revert").trigger("click");
-  expect(wrapper.get('button[data-value="system"]').attributes("aria-pressed")).toBe("true");
+  expect(wrapper.get('button[data-value="dark"]').attributes("aria-pressed")).toBe("true");
   expect((wrapper.get('input[aria-label="Show Capabilities in the sidebar"]').element as HTMLInputElement).checked).toBe(true);
   expect(wrapper.find(".settings-save-bar").exists()).toBe(false);
   wrapper.unmount();
@@ -56,6 +56,7 @@ it("Revert restores saved preferences and clears the unsaved bar", async () => {
 it("asks before leaving with drafts and protects reload", async () => {
   const { wrapper, router } = await show();
   await wrapper.get('button[data-value="dark"]').trigger("click");
+  await wrapper.get('input[aria-label="Show Capabilities in the sidebar"]').setValue(false);
   const unload = new Event("beforeunload", { cancelable: true });
   window.dispatchEvent(unload);
   expect(unload.defaultPrevented).toBe(true);
@@ -71,6 +72,26 @@ it("asks before leaving with drafts and protects reload", async () => {
   await wrapper.get("button.confirm").trigger("click");
   await leave;
   expect(router.currentRoute.value.path).toBe("/profile");
+  expect(useTheme().theme.value).toBe("dark");
+  wrapper.unmount();
+});
+
+
+it("applies and resets theme without unsaved changes or leave protection", async () => {
+  const { wrapper, router } = await show();
+  await wrapper.get('button[data-value="dark"]').trigger("click");
+  expect(useTheme().theme.value).toBe("dark");
+  expect(localStorage.getItem("ember_admin.theme")).toBe("dark");
+  expect(document.documentElement.style.colorScheme).toBe("dark");
+  expect(wrapper.find(".settings-save-bar").exists()).toBe(false);
+  const unload = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(unload);
+  expect(unload.defaultPrevented).toBe(false);
+  await wrapper.get('button[aria-label="Reset Theme to its default"]').trigger("click");
   expect(useTheme().theme.value).toBe("system");
+  expect(localStorage.getItem("ember_admin.theme")).toBe("system");
+  expect(wrapper.find(".settings-save-bar").exists()).toBe(false);
+  await router.push("/profile");
+  expect(router.currentRoute.value.path).toBe("/profile");
   wrapper.unmount();
 });

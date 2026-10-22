@@ -40,6 +40,7 @@ const today = utcDay(new Date());
 // The last 12 months for the heatmap, whatever period is chosen above.
 const year = ref<MyUsage | null>(null);
 const usage = ref<MyUsage | null>(null);
+const loadedRange = ref<RangeKey>("30d");
 const groupBy = ref<UsageGroupBy>("agent");
 const records = ref<UsageRecordRow[]>([]);
 const recordsFailed = ref(false);
@@ -53,6 +54,7 @@ let latestLoad = 0;
 
 async function load(): Promise<void> {
   const mine = ++latestLoad;
+  const requestedRange = range.value;
   loading.value = true;
   error.value = "";
   try {
@@ -67,6 +69,7 @@ async function load(): Promise<void> {
     ]);
     if (mine !== latestLoad) return;
     usage.value = report;
+    loadedRange.value = requestedRange;
     records.value = rows;
     recordsFailed.value = failed;
   } catch (err) {
@@ -177,10 +180,10 @@ function exportReport(): void {
   const now = new Date();
   const text = usageToMarkdown(current.report, {
     username: auth.account?.username ?? "me",
-    rangeLabel: currentRange.value.label,
+    rangeLabel: RANGES.find(r => r.key === loadedRange.value)!.label,
     generatedAt: now,
   });
-  downloadText(exportFileName(`usage-${range.value}-${utcDay(now)}`, "md"), text, "text/markdown");
+  downloadText(exportFileName(`usage-${loadedRange.value}-${utcDay(now)}`, "md"), text, "text/markdown");
 }
 
 watch([range, groupBy], load);

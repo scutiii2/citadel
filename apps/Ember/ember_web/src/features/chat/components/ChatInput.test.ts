@@ -933,3 +933,26 @@ describe("the triage question button", () => {
     expect(wrapper.emitted("triage")).toHaveLength(1);
   });
 });
+
+
+it("keeps ready attachments through a slash command and sends them with the next question", async () => {
+  const wrapper = mountInput();
+  const question = withAttachments("Read this", [{ filename: "notes.txt", chars: 5, truncated: false, text: "hello" }]);
+  (wrapper.vm as unknown as { restore: (q: string) => void }).restore(question);
+  await flushPromises();
+  await wrapper.find("textarea").setValue("/help");
+  await wrapper.find("form").trigger("submit");
+  expect(wrapper.emitted("send")![0]).toEqual(["/help"]);
+  expect(wrapper.find(".attachments li").text()).toContain("notes.txt");
+  await wrapper.find("textarea").setValue("Read this");
+  await wrapper.find("form").trigger("submit");
+  expect(wrapper.emitted("send")![1]).toEqual([question]);
+  expect(wrapper.find(".attachments").exists()).toBe(false);
+});
+
+it("labels the message composer independently of its suggested question", () => {
+  const wrapper = mountInput({ suggestion: "What happened?" });
+  const id = wrapper.find("textarea").attributes("aria-labelledby");
+  expect(id).toBeTruthy();
+  expect(document.getElementById(id!)?.textContent).toBe("Message");
+});

@@ -38,7 +38,7 @@ interface SettingDef extends SearchableSetting {
 
 // Icon paths are on a 16px grid, stroke only. The scope chip says where a group's
 // settings live.
-const SCOPE_NOTE = "Applied when you save. Stored on this device.";
+const SCOPE_NOTE = "Applies instantly. Saved on this device.";
 const GROUPS = [
   { id: "chat", title: "Chat", icon: "M2 3h12v8H7l-3 3v-3H2z", scope: "This device" },
   {
@@ -222,7 +222,7 @@ const approvalChoice = computed<ApprovalMode>({
   get: () => (chat.forceToolApproval ? "ask" : draft.value.approvalMode),
   set: (mode) => {
     if (chat.forceToolApproval) return;
-    // Nothing asks any more: say so first. The choice is a draft until Save, like the rest.
+    // Confirm the permissive mode before applying this device preference.
     if (mode === "allow_all" && draft.value.approvalMode !== "allow_all") allowAllOpen.value = true;
     else draft.value.approvalMode = mode;
   },
@@ -236,7 +236,23 @@ const approvalDescription = computed(() =>
     ? "Your administrator requires approval before every tool."
     : (APPROVAL_MODES.find((m) => m.id === draft.value.approvalMode)?.description ?? ""),
 );
-const dirty = computed(() => JSON.stringify(draft.value) !== JSON.stringify(saved.value));
+// Account settings remain drafts. Device preferences use the existing persistent setters immediately.
+watch(() => [draft.value.caveman, draft.value.plan, draft.value.planLean, draft.value.approvalMode,
+  draft.value.chime, draft.value.browserNotifications, draft.value.liveTokens, draft.value.contextPanel,
+  draft.value.contextAccuracy, draft.value.theme] as const, (next, old) => {
+  if (next[0] !== old[0]) chat.setCaveman(next[0]);
+  if (next[1] !== old[1]) chat.setPlan(next[1]);
+  if (next[2] !== old[2]) chat.setPlanLean(next[2]);
+  if (next[3] !== old[3] && !chat.forceToolApproval) chat.setApprovalMode(next[3]);
+  if (next[4] !== old[4]) chat.setChime(next[4]);
+  if (next[5] !== old[5]) chat.setBrowserNotifications(next[5]);
+  if (next[6] !== old[6]) chat.setLiveTokens(next[6]);
+  if (next[7] !== old[7]) chat.setContextPanel(next[7]);
+  if (next[8] !== old[8]) chat.setContextAccuracy(next[8]);
+  if (next[9] !== old[9]) setTheme(next[9]);
+});
+const dirty = computed(() => draft.value.suggestions !== saved.value.suggestions
+  || JSON.stringify(draft.value.sidebar) !== JSON.stringify(saved.value.sidebar));
 watch(saved, (next, previous) => {
   if (saving.value) return;
   for (const key of Object.keys(next) as (keyof typeof next)[]) {
@@ -262,17 +278,7 @@ async function save(): Promise<void> {
       navPrefs.prefs = result;
       draft.value.sidebar = structuredClone(result);
     }
-    chat.setCaveman(next.caveman);
-    chat.setPlan(next.plan);
-    chat.setPlanLean(next.planLean);
-    if (!chat.forceToolApproval) chat.setApprovalMode(next.approvalMode);
-    else draft.value.approvalMode = chat.approvalMode;
-    chat.setChime(next.chime);
-    chat.setBrowserNotifications(next.browserNotifications);
-    chat.setLiveTokens(next.liveTokens);
-    chat.setContextPanel(next.contextPanel);
-    chat.setContextAccuracy(next.contextAccuracy);
-    setTheme(next.theme);
+
   } catch (err) { if (accountId === auth.account?.id) saveError.value = errorMessage(err); }
   finally { saving.value = false; }
 }

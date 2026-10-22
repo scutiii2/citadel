@@ -215,3 +215,18 @@ describe("editing", () => {
     expect(w.get(".saved-headers").text()).toContain("No headers");
   });
 });
+
+it("ignores an earlier save after an external close and another extension opens", async () => {
+  let finish!: (value: UserExtension) => void;
+  client.update.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const w = open(SAVED);
+  await w.get("form").trigger("submit");
+  expect(w.get('button[type="submit"]').attributes("aria-busy")).toBe("true");
+  await w.setProps({ open: false });
+  await w.setProps({ open: true, extension: { ...SAVED, id: "next", label: "Next" } });
+  finish(SAVED); await flushPromises();
+  expect(w.emitted("saved")).toBeUndefined();
+  expect(w.get<HTMLInputElement>('input[name="label"]').element.value).toBe("Next");
+  expect(w.get('button[type="submit"]').attributes("aria-busy")).toBe("false");
+  w.unmount();
+});

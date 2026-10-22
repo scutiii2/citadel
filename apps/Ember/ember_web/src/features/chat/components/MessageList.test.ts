@@ -767,3 +767,49 @@ describe("question cards", () => {
     expect((wrapper.find("button.skip").element as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+
+describe("edit ownership and composition", () => {
+  it("retains an edit only in its cached conversation and clears its truncation confirmation", async () => {
+    const a = [user("a1"), assistant("answer"), user("a2")];
+    const b = [user("b1"), assistant("answer b"), user("b2")];
+    const wrapper = mountList({ conversationId: "a", messages: a });
+    await wrapper.findAll('button[aria-label="Edit and resend"]')[0]!.trigger("click");
+    await wrapper.find("textarea").setValue("Draft for A");
+    await wrapper.find("textarea").trigger("keydown", { key: "Enter" });
+    expect(wrapper.findComponent(ConfirmModal).exists()).toBe(true);
+    await wrapper.setProps({ conversationId: "b", messages: b });
+    expect(wrapper.find("textarea").exists()).toBe(false);
+    expect(wrapper.findComponent(ConfirmModal).exists()).toBe(false);
+    expect(wrapper.emitted("edit")).toBeUndefined();
+    await wrapper.setProps({ conversationId: "a", messages: a });
+    expect((wrapper.find("textarea").element as HTMLTextAreaElement).value).toBe("Draft for A");
+    await wrapper.find("textarea").trigger("keydown", { key: "Enter" });
+    await wrapper.getComponent(ConfirmModal).get(".confirm").trigger("click");
+    expect(wrapper.emitted("edit")).toEqual([[0, "Draft for A"]]);
+  });
+  it("does not resend an edited question while composing or for a replaced message", async () => {
+    const wrapper = mountList({ conversationId: "a", messages: [user("original")] });
+    await wrapper.find('button[aria-label="Edit and resend"]').trigger("click");
+    await wrapper.find("textarea").setValue("composing");
+    await wrapper.find("textarea").trigger("keydown", { key: "Enter", isComposing: true });
+    await wrapper.find("textarea").trigger("keydown", { key: "Enter", keyCode: 229 });
+    expect(wrapper.emitted("edit")).toBeUndefined();
+    await wrapper.setProps({ messages: [user("replacement")] });
+    await wrapper.find("textarea").trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("edit")).toBeUndefined();
+  });
+});
+
+
+it("clears cached editing drafts when the account scope changes", async () => {
+  const a = [user("A")];
+  const wrapper = mountList({ conversationId: "a", draftScope: 1, messages: a });
+  await wrapper.find('button[aria-label="Edit and resend"]').trigger("click");
+  await wrapper.find("textarea").setValue("private draft");
+  await wrapper.setProps({ conversationId: "b", messages: [user("B")] });
+  await wrapper.setProps({ draftScope: 2 });
+  await wrapper.setProps({ conversationId: "a", messages: a });
+  expect(wrapper.find("textarea").exists()).toBe(false);
+  expect(wrapper.emitted("edit")).toBeUndefined();
+});

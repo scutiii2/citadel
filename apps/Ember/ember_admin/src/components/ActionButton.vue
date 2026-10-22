@@ -93,4 +93,7 @@ defineProps<{ icon: ActionIcon; quiet?: boolean; iconOnly?: boolean }>();
     padding: 6px;
   }
 }
+@media (pointer: coarse), (max-width: 767px) {
+  button.action { min-width: 44px; min-height: 44px; }
+}
 </style>

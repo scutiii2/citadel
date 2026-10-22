@@ -60,3 +60,17 @@ describe('SourceRow', () => {
     expect(wrapper.emitted('remove')).toHaveLength(1)
   })
 })
+
+it('hides intermediate range errors until blur and associates the final error', async () => {
+ const w = mount(SourceRow, { props: { source: source() } })
+ const input = w.get('input[aria-label="Pages"]')
+ await input.trigger('focus')
+ await input.setValue('1-')
+ await w.setProps({ source: source({ range: '1-', rangeError: 'Incomplete range' }) })
+ expect(w.find('[role="alert"]').exists()).toBe(false)
+ expect(input.attributes('aria-invalid')).toBe('false')
+ await input.trigger('blur')
+ expect(input.attributes('aria-invalid')).toBe('true')
+ expect(input.attributes('aria-describedby')).toBe(w.get('[role="alert"]').attributes('id'))
+ w.unmount()
+})

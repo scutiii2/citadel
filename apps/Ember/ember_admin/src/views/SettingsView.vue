@@ -15,13 +15,11 @@ const { theme, setTheme } = useTheme();
 const navPrefs = useNavPrefsStore();
 const auth = useAuthStore();
 const saved = computed(() => ({
-  theme: theme.value,
   sidebar: { order: [...navPrefs.prefs.order], pinned: [...navPrefs.prefs.pinned], hidden: [...navPrefs.prefs.hidden] },
 }));
 const draft = ref(structuredClone(saved.value));
 const dirty = computed(() => JSON.stringify(draft.value) !== JSON.stringify(saved.value));
 watch(saved, (next, previous) => {
-  if (draft.value.theme === previous.theme) draft.value.theme = next.theme;
   if (JSON.stringify(draft.value.sidebar) === JSON.stringify(previous.sidebar)) {
     draft.value.sidebar = structuredClone(next.sidebar);
   }
@@ -30,7 +28,6 @@ function revert(): void { draft.value = structuredClone(saved.value); }
 function save(): void {
   if (!dirty.value) return;
   if (JSON.stringify(draft.value.sidebar) !== JSON.stringify(saved.value.sidebar)) navPrefs.update(draft.value.sidebar);
-  setTheme(draft.value.theme);
   revert();
 }
 watch(() => auth.account?.id, revert);
@@ -57,7 +54,7 @@ const onlyModified = ref(false);
 const options: { value: Theme; label: string }[] = [
   { value: "system", label: "System" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" },
 ];
-const themeModified = computed(() => draft.value.theme !== DEFAULT_THEME);
+const themeModified = computed(() => theme.value !== DEFAULT_THEME);
 const sidebarModified = computed(() => !isDefault(draft.value.sidebar));
 const count = computed(() => Number(themeModified.value) + Number(sidebarModified.value));
 function matches(words: string): boolean {
@@ -76,13 +73,13 @@ const showSidebar = computed(() => matches("sidebar pages order pin hide navigat
     <div class="column">
 
 
-      <p class="scope">Applied when you save. Stored on this device. Sidebar preferences are separate for each account and from Ember Web.</p>
+      <p class="scope">Theme applies instantly. Saved on this device. Sidebar preferences apply when you save and are separate for each account and from Ember Web.</p>
       <p v-if="navPrefs.error" class="save-error" role="alert">{{ navPrefs.error }}</p>
 
       <section v-if="showTheme" aria-label="Appearance">
         <h3>Appearance</h3>
-        <div class="card"><SettingRow setting-id="appearance-theme" label="Theme" description="Light, dark, or follow your system." :modified="themeModified" @reset="draft.theme = DEFAULT_THEME">
-          <SegmentedControl v-model="draft.theme" :options="options" aria-label="Theme" />
+        <div class="card"><SettingRow setting-id="appearance-theme" label="Theme" description="Light, dark, or follow your system." :modified="themeModified" @reset="setTheme(DEFAULT_THEME)">
+          <SegmentedControl :model-value="theme" @update:model-value="setTheme" :options="options" aria-label="Theme" />
         </SettingRow></div>
       </section>
       <section v-if="showSidebar" aria-label="Sidebar"><h3>Sidebar</h3><div class="card"><SidebarEditor v-model="draft.sidebar" /></div></section>

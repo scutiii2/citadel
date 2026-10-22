@@ -21,13 +21,20 @@ test("the Ember rail moves to the bottom on mobile and remembers the theme", asy
       expect(box!.y + box!.height).toBe(800);
     }
     expect(await page.evaluate<boolean>("document.documentElement.scrollWidth <= window.innerWidth")).toBe(true);
-    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+    const account = page.getByRole("button", { name: "root - account menu", exact: true });
+    await expect(account).toBeVisible();
+    await account.click();
+    await expect(page.getByRole("menuitem", { name: "Log out", exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
   }
-  await page.getByRole("button", { name: /^Theme: System/ }).click();
-  await page.getByRole("button", { name: /^Theme: Light/ }).click();
+  await page.getByRole("button", { name: "root - account menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: /^Theme\s+System$/ }).click();
+  await page.getByRole("menuitem", { name: /^Theme\s+Light$/ }).click();
   expect(await page.evaluate<string>("document.documentElement.style.colorScheme")).toBe("dark");
   await page.reload();
-  await expect(page.getByRole("button", { name: /^Theme: Dark/ })).toBeVisible();
+  await page.getByRole("button", { name: "root - account menu", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: /^Theme\s+Dark$/ })).toBeVisible();
+  await page.keyboard.press("Escape");
   await nav.getByRole("link", { name: "Extensions", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Extensions", exact: true })).toBeVisible();
   expect(state.unexpected).toEqual([]);

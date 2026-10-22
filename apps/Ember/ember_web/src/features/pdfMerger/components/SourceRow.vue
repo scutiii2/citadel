@@ -8,8 +8,9 @@ import { formatBytes, plural } from '../lib/format'
 import type { SourceState } from '../stores/files'
 
 const props = defineProps<{ source: SourceState; canMoveUp?: boolean; canMoveDown?: boolean }>()
+const editingRange = ref(false)
 const expanded = ref(!!props.source.rangeError)
-watch(() => props.source.rangeError, error => { if (error) expanded.value = true })
+watch(() => props.source.rangeError, error => { if (error && !editingRange.value) expanded.value = true })
 const emit = defineEmits<{
   range: [string]
   rotate: []
@@ -43,18 +44,22 @@ function onFit(event: Event): void {
     </div>
   </div>
   <details class="source-options" :open="expanded" @toggle="expanded = ($event.target as HTMLDetailsElement).open">
-    <summary :aria-label="`File options for ${source.info.name}`">File options<span v-if="source.rangeError" class="error"> · Fix pages</span></summary>
+    <summary :aria-label="`File options for ${source.info.name}`">File options<span v-if="source.rangeError && !editingRange" class="error"> · Fix pages</span></summary>
     <div class="source-controls"><div class="control">
       <template v-if="source.info.kind === 'pdf'">
         <label>Pages<input
           class="range"
-          :class="{ invalid: source.rangeError }"
+          :class="{ invalid: source.rangeError && !editingRange }"
+          :aria-invalid="!!source.rangeError && !editingRange"
+          :aria-describedby="source.rangeError && !editingRange ? `range-error-${source.info.file_id}` : undefined"
+          @focus="editingRange = true"
+          @blur="editingRange = false"
           :value="source.range"
           aria-label="Pages"
           placeholder="all"
           @input="onRange"
         /></label>
-        <div v-if="source.rangeError" class="error small" role="alert">{{ source.rangeError }}</div>
+        <div v-if="source.rangeError && !editingRange" :id="`range-error-${source.info.file_id}`" class="error small" role="alert">{{ source.rangeError }}</div>
       </template>
       <label v-else>Image fit<select aria-label="Image fit" :value="source.fit ?? ''" @change="onFit">
         <option value="">Default fit</option>

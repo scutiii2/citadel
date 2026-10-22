@@ -6,6 +6,8 @@ import { onBeforeUnmount, onMounted, ref, watchPostEffect } from "vue";
 const props = defineProps<{
   options: readonly { value: T; label: string; disabled?: boolean }[];
   ariaLabel?: string;
+  mode?: "tabs";
+  idPrefix?: string;
   label?: string;
 }>();
 
@@ -14,6 +16,23 @@ const root = ref<HTMLDivElement>();
 const buttons = ref<HTMLButtonElement[]>([]);
 const position = ref({ left: 0, top: 0, width: 0, height: 0 });
 let observer: ResizeObserver | undefined;
+
+function onTabKey(event: KeyboardEvent): void {
+  if (props.mode !== "tabs") return;
+  const available = props.options.filter(option => !option.disabled);
+  const current = available.findIndex(option => option.value === model.value);
+  let index: number;
+  if (event.key === "Home") index = 0;
+  else if (event.key === "End") index = available.length - 1;
+  else if (event.key === "ArrowRight") index = (current + 1) % available.length;
+  else if (event.key === "ArrowLeft") index = (current - 1 + available.length) % available.length;
+  else return;
+  const option = available[index];
+  if (!option) return;
+  event.preventDefault();
+  model.value = option.value;
+  buttons.value.find(button => button.dataset.value === option.value)?.focus();
+}
 
 function updatePosition(): void {
   const selected = buttons.value.find((button) => button.dataset.value === model.value);
@@ -42,7 +61,7 @@ onBeforeUnmount(() => observer?.disconnect());
 </script>
 
 <template>
-  <div class="segmented-control" role="group" :aria-label="ariaLabel ?? label">
+  <div class="segmented-control" :role="mode === 'tabs' ? 'tablist' : 'group'" :aria-label="ariaLabel ?? label">
     <span v-if="label" class="group-label">{{ label }}</span>
     <div ref="root" class="segmented">
     <span class="thumb" aria-hidden="true" :style="{ width: `${position.width}px`, height: `${position.height}px`, top: `${position.top}px`, transform: `translateX(${position.left}px)`, opacity: position.width ? 1 : 0 }" />
@@ -54,7 +73,13 @@ onBeforeUnmount(() => observer?.disconnect());
       type="button"
       class="segment"
       :class="{ active: o.value === model }"
-      :aria-pressed="o.value === model"
+      :role="mode === 'tabs' ? 'tab' : undefined"
+      :id="mode === 'tabs' ? `${idPrefix}-tab-${o.value}` : undefined"
+      :aria-controls="mode === 'tabs' ? `${idPrefix}-panel-${o.value}` : undefined"
+      :aria-selected="mode === 'tabs' ? o.value === model : undefined"
+      :tabindex="mode === 'tabs' ? (o.value === model ? 0 : -1) : undefined"
+      :aria-pressed="mode === 'tabs' ? undefined : o.value === model"
+      @keydown="onTabKey"
       :disabled="o.disabled"
       @click="model = o.value"
     >

@@ -42,7 +42,7 @@ test('media groups accept multiple links and lock membership after starting a pa
   await logIn(page)
   await page.goto('/capabilities/video_downloader')
   await expect(page).toHaveURL(/\/capabilities\/media_downloader$/)
-  await page.getByRole('button', { name: 'Download groups', exact: true }).click()
+  await page.getByRole('tab', { name: 'Download groups', exact: true }).click()
   await page.getByRole('textbox', { name: 'Group name' }).fill('My collection')
   await page.getByRole('button', { name: 'Create group', exact: true }).click()
   const panel = page.getByRole('article', { name: 'My collection' })
@@ -98,15 +98,15 @@ test('media modes preserve drafts, checked formats, and file details across mobi
   await page.setViewportSize({ width: 375, height: 812 })
   await page.goto('/capabilities/media_downloader')
   const tabs = page.locator('.mobile-tabs')
-  await tabs.getByRole('button', { name: 'Groups', exact: true }).click()
+  await tabs.getByRole('tab', { name: 'Groups', exact: true }).click()
   await page.getByRole('textbox', { name: 'Group name' }).fill('Weekend draft')
-  await tabs.getByRole('button', { name: 'Download', exact: true }).click()
+  await tabs.getByRole('tab', { name: 'Download', exact: true }).click()
   await page.getByRole('textbox', { name: 'Media link' }).fill('https://example.com/media')
   await page.getByRole('button', { name: 'Check', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Checked media' })).toBeVisible()
-  await tabs.getByRole('button', { name: 'Groups', exact: true }).click()
+  await tabs.getByRole('tab', { name: 'Groups', exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Group name' })).toHaveValue('Weekend draft')
-  await tabs.getByRole('button', { name: /^My files/ }).click()
+  await tabs.getByRole('tab', { name: /^My files/ }).click()
   await expect(page.getByRole('link', { name: 'Download A saved video.mp4', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'File options for A saved video.mp4' }).click()
   const details = page.getByRole('dialog', { name: 'File details' })
@@ -138,7 +138,13 @@ test('native PDF workspace uploads JSON, renders worker previews, reorders pages
   const workers: string[] = []
   page.on('worker', worker => workers.push(worker.url()))
   page.on('pageerror', error => errors.push(error.message))
-  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
+  page.on('console', message => {
+    // The optional MCP notification GET deliberately returns 405 in fakeApi.
+    // Its browser resource message can arrive after login; retain all other errors.
+    const optionalStream = message.text().includes('405 (Method Not Allowed)')
+      && /\/api\/mcp\/agents\/agent-1$/.test(message.location().url)
+    if (message.type() === 'error' && !optionalStream) errors.push(message.text())
+  })
   await logIn(page)
   errors.length = 0 // The login probe intentionally receives 401 before sign-in.
   await page.goto('/capabilities/pdf_merger')
@@ -196,10 +202,11 @@ test('PDF workspace preserves edits across mobile modes and keeps merge and dial
   await expect(pages.first()).toContainText('Woods p1')
   await page.getByRole('textbox', { name: 'Output file', exact: true }).fill('Field notes.pdf')
   const modes = page.locator('.mobile-tabs')
-  await modes.getByRole('button', { name: /^Files/ }).click()
+  await modes.getByRole('tab', { name: /^Files/ }).click()
   const source = page.locator('.source-list > li').first()
   await source.getByText('File options', { exact: true }).click()
   await source.getByRole('textbox', { name: 'Pages', exact: true }).fill('9')
+  await source.getByRole('textbox', { name: 'Pages', exact: true }).blur()
   await expect(source.getByRole('alert')).toBeVisible()
   const merge = page.getByRole('button', { name: 'Merge PDF', exact: true })
   await expect(merge).toBeDisabled()
@@ -217,10 +224,10 @@ test('PDF workspace preserves edits across mobile modes and keeps merge and dial
     }
   }
   await options.getByRole('button', { name: 'Close', exact: true }).click()
-  await modes.getByRole('button', { name: /^Pages/ }).click()
+  await modes.getByRole('tab', { name: /^Pages/ }).click()
   await expect(page.getByRole('textbox', { name: 'Output file' })).toHaveValue('Field notes.pdf')
   await expect(merge).toBeDisabled()
-  await modes.getByRole('button', { name: /^Files/ }).click()
+  await modes.getByRole('tab', { name: /^Files/ }).click()
   await source.getByRole('textbox', { name: 'Pages', exact: true }).fill('all')
   await source.getByRole('button', { name: 'Remove file', exact: true }).click()
   const remove = page.getByRole('dialog', { name: 'Remove source file?', exact: true })
@@ -253,7 +260,13 @@ test('native video workspace probes presets, follows a job and downloads its fil
   const api = await installFakeApi(page, { media: true })
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
-  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
+  page.on('console', message => {
+    // The optional MCP notification GET deliberately returns 405 in fakeApi.
+    // Its browser resource message can arrive after login; retain all other errors.
+    const optionalStream = message.text().includes('405 (Method Not Allowed)')
+      && /\/api\/mcp\/agents\/agent-1$/.test(message.location().url)
+    if (message.type() === 'error' && !optionalStream) errors.push(message.text())
+  })
   await logIn(page)
   errors.length = 0
   await page.goto('/capabilities/media_downloader')
@@ -268,7 +281,7 @@ test('native video workspace probes presets, follows a job and downloads its fil
   await expect(page.getByRole('status').filter({ hasText: 'Done' })).toBeVisible()
   const links = page.getByRole('link', { name: /Download Coastal walk.mp4/ })
   await expect(links).toHaveCount(1)
-  await page.locator('.mobile-tabs').getByRole('button', { name: /^My files/ }).click()
+  await page.locator('.mobile-tabs').getByRole('tab', { name: /^My files/ }).click()
   await expect(links).toHaveCount(1)
   expect(api.media.downloads).toEqual([{ url: 'https://www.youtube.com/watch?v=public-example', preset: '720p' }])
   const downloaded = page.waitForEvent('download')

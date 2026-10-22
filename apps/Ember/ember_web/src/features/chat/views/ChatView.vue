@@ -421,8 +421,10 @@ useChatShortcuts({
       <TurnNotices :notices="notices" @dismiss="chat.dismissNotices()" />
       <p v-if="chatLoading" class="loading">Loading chat …</p>
       <MessageList
-        v-else
+        v-show="!chatLoading"
         class="messages"
+        :conversation-id="active?.id ?? null"
+        :draft-scope="auth.account?.id ?? null"
         :messages="messages"
         :streaming="streaming"
         :activity="activity"

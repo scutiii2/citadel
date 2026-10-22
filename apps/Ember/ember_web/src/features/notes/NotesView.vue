@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import NotePromotionPanel from "./components/NotePromotionPanel.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
-import { computed, getCurrentInstance, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, getCurrentInstance, onMounted, onUnmounted, reactive, ref, useId } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
 import {
   NOTE_BODY_MAX,
@@ -36,6 +36,7 @@ const notice = ref("");
 
 // The open note: a note id, NEW for one not saved yet, or null for none.
 const selected = ref<string | null>(null);
+const publicationTarget = useId();
 const form = reactive({ title: "", body: "", tags: [] as string[], agentReadable: false });
 const saved = reactive({ title: "", body: "", tags: [] as string[], agentReadable: false });
 // What is typed in the tag box but not added yet (TagInput's v-model:text) and the component itself.
@@ -343,7 +344,7 @@ function preview(note: Note): string {
           </ul>
           <details v-if="selected === null" class="library-publishing">
             <summary>Obsidian &amp; publishing <span aria-hidden="true">›</span></summary>
-            <NotePromotionPanel :note-id="null" :dirty="false" />
+            <div :id="`${publicationTarget}-library`" />
           </details>
         </div>
 
@@ -463,7 +464,7 @@ function preview(note: Note): string {
           </details>
           <details class="publishing-tools">
             <summary><span>Obsidian &amp; publishing</span><span aria-hidden="true">›</span></summary>
-      <NotePromotionPanel :note-id="selected && selected !== NEW ? selected : null" :dirty="dirty" :source-version="JSON.stringify([openedAt, saved.title, saved.body, saved.tags])" />
+      <div :id="`${publicationTarget}-editor`" />
           </details>
           <details v-if="selected !== NEW" class="manage-tools">
             <summary>Manage note <span aria-hidden="true">›</span></summary>
@@ -497,6 +498,10 @@ function preview(note: Note): string {
         </div>
       </div>
     </div>
+
+    <Teleport v-if="!loading && !loadError" :to="`#${publicationTarget}-${selected === null ? 'library' : 'editor'}`">
+      <NotePromotionPanel :note-id="selected && selected !== NEW ? selected : null" :dirty="dirty" :source-version="JSON.stringify([openedAt, saved.title, saved.body, saved.tags])" />
+    </Teleport>
 
     <ConfirmModal
       :open="confirmDelete"

@@ -9,7 +9,7 @@
   --text: light-dark(#1c1c1f, #e8e8ea);
   --muted: light-dark(#6b6b73, #9a9aa3);
   --border: light-dark(#e3e3e6, #2f2f35);
-  --accent: light-dark(#e8590c, #ff7a33); /* ember orange */
+  --accent: light-dark(#b23d06, #ff7a33); /* ember orange, text-safe on base and tinted light surfaces */
   --accent-contrast: light-dark(#ffffff, #17171a);
   --user-bubble: light-dark(#f1efe9, #2a2a30);
   --code-bg: light-dark(#f3f3f4, #232328);
@@ -31,6 +31,11 @@
   --http-5xx: var(--status-failed);
   --latency-p50: light-dark(#2a78d6, #3987e5);
   --latency-p95: light-dark(#8e5bd6, #a174e0);
+  /* Context categories always carry matching text labels. */
+  --context-agents: light-dark(#7048e8, #9775fa);
+  --context-builtin-tools: light-dark(#2a78d6, #3987e5);
+  --context-mcp-tools: light-dark(#1baf7a, #20c38a);
+  --context-messages: light-dark(#d9a400, #f0b429);
   /* Shared status colors: failed red, running blue;
      a finished run is the quiet default. Blue and red validated together; each
      state also carries an icon and a label, so colour is never the only cue. */
@@ -94,6 +99,20 @@ input {
   font: inherit;
   color: inherit;
 }
+
+button[aria-busy="true"]::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: ember-busy 0.7s linear infinite;
+}
+@keyframes ember-busy { to { transform: rotate(360deg); } }
 
 :focus-visible {
   outline: 2px solid var(--accent);

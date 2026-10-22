@@ -63,4 +63,7 @@ withDefaults(defineProps<{ to: string; external?: boolean; label?: string }>(), 
     padding: 6px;
   }
 }
+@media (pointer: coarse), (max-width: 767px) {
+  a.open-page { min-width: 44px; min-height: 44px; }
+}
 </style>
