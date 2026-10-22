@@ -86,7 +86,7 @@ describe("capabilities the account has not added", () => {
   it("refuses to run one, and says where to add it", async () => {
     const out = await new SlashCommandRunner().run("/files export", [], []);
 
-    expect(out).toBe('❌ "files" isn\'t added to your account. Add it in the Supermarket.');
+    expect(out).toBe('❌ "files" isn\'t added to your account. Enable it on the Capabilities page.');
     expect(runTool).not.toHaveBeenCalled();
   });
 

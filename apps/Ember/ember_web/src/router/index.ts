@@ -44,13 +44,11 @@ export const router = createRouter({
       // tools.view for the capabilities and tools, chat.use for switching extensions.
       meta: { permission: ["tools.view", "chat.use"] },
     },
-    // Declared before /capabilities/:name so a capability named "supermarket" can never shadow it.
+    // The catalog and account choices now share the Capabilities workspace.
     {
       path: "/capabilities/supermarket",
       name: "supermarket",
-      component: () => import("../views/SupermarketView.vue"),
-      // tools.view for the built-in capabilities, chat.use for the extensions.
-      meta: { permission: ["tools.view", "chat.use"] },
+      redirect: (to) => ({ path: "/capabilities", query: { ...to.query, state: undefined }, hash: to.hash }),
     },
     { path: "/capabilities/video_downloader", redirect: (to) => ({ path: "/capabilities/media_downloader", query: to.query, hash: to.hash }) },
     ...NATIVE_CAPABILITY_ROUTES,
@@ -61,9 +59,9 @@ export const router = createRouter({
       meta: { permission: "tools.view" },
     },
     // The Extensions page was merged into Capabilities; old links and bookmarks still work.
-    { path: "/extensions", redirect: (to) => ({ path: "/capabilities", query: to.query }) },
+    { path: "/extensions", redirect: (to) => ({ path: "/capabilities", query: { ...to.query, tab: "extensions" }, hash: to.hash }) },
     // An extension no longer has a page of its own; its card on Capabilities has everything.
-    { path: "/extensions/:id", redirect: "/capabilities" },
+    { path: "/extensions/:id", redirect: { path: "/capabilities", query: { tab: "extensions" } } },
     {
       path: "/agents",
       name: "agents",

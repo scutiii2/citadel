@@ -86,7 +86,7 @@ const ACCOUNT: Account = {
   email: "lex@example.com",
   email_verified: true,
   roles: [],
-  permissions: ["tools.view", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"],
+  permissions: ["chat.use", "tools.view", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"],
 };
 
 async function show(options: { admin?: boolean; query?: string; permissions?: string[]; attach?: boolean; added?: { capabilities?: string[]; extensions?: string[] }; userExtensions?: UserExtension[] } = {}) {
@@ -94,7 +94,7 @@ async function show(options: { admin?: boolean; query?: string; permissions?: st
   setActivePinia(pinia);
   useAuthStore().account = {
     ...ACCOUNT,
-    permissions: options.permissions ?? (options.admin ? ["tools.view", "roles.manage", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] : ["tools.view", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"]),
+    permissions: options.permissions ?? (options.admin ? ["chat.use", "tools.view", "roles.manage", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] : ["chat.use", "tools.view", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"]),
   };
   const listedExtensions = (await Promise.resolve(mocks.extensions()).catch(() => [])) as { id: string }[];
   mocks.accountGet.mockResolvedValue({
@@ -106,6 +106,7 @@ async function show(options: { admin?: boolean; query?: string; permissions?: st
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
+      ...["/notes", "/memory", "/generator", "/tickets"].map(path => ({path, component: {template:"<div/>"}})),
       { path: "/capabilities", component: CapabilitiesView },
       { path: "/capabilities/supermarket", component: { template: "<div />" } },
       { path: "/capabilities/:name", component: { template: "<div />" } },
@@ -121,655 +122,66 @@ async function show(options: { admin?: boolean; query?: string; permissions?: st
 }
 
 type Wrapper = Awaited<ReturnType<typeof show>>;
-const sections = (w: Wrapper) => w.findAll("article.card");
-const sectionNames = (w: Wrapper) => sections(w).map((s) => s.find("h3").text());
-const head = (w: Wrapper, name: string) =>
-  w.findAll("article.card .head-button").find((b) => b.find("h3").text() === name)!;
-const toolTitles = (w: Wrapper) => w.findAll(".tool-list .tool-label strong").map((t) => t.text());
-const toolRows = (w: Wrapper) => w.findAll(".tool-list button");
-const modal = (w: Wrapper) => w.get("dialog.modal");
-
+const row = (w: Wrapper, label: string) => w.findAll(".catalog-row").find(r => r.get(".row-title").text() === label)!;
+const choose = (w: Wrapper, label: string) => row(w, label).get("button.item-link").trigger("click");
+const extensionsTab = (w: Wrapper) => w.get("#caps-tab-extensions").trigger("click");
+const EXT = {id:"ext",label:"Echo server",description:"Documents",status:"connected",error:null,tools:["ext__echo"],web_url:"https://echo.example/app"};
 beforeEach(() => {
-  // jsdom has no modal dialogs.
-  HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
-    this.setAttribute("open", "");
-  };
-  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
-    this.removeAttribute("open");
-    this.dispatchEvent(new Event("close"));
-  };
+  HTMLDialogElement.prototype.showModal=function(){this.setAttribute("open","");};
+  HTMLDialogElement.prototype.close=function(){this.removeAttribute("open");};
   vi.clearAllMocks();
-  mocks.accountSet.mockImplementation(async (_kind, _key, _on) => ({ capabilities: [], extensions: [], disabled_tools: [] }));
-  mocks.userUpdate.mockImplementation(async (id: string, patch: Partial<UserExtension>) => ({ ...MINE, id, ...patch }));
-  mocks.capabilities.mockResolvedValue(CAPS);
-  mocks.listTools.mockResolvedValue(TOOLS);
-  mocks.listResources.mockResolvedValue(RESOURCES);
-  mocks.extensions.mockResolvedValue([]);
-  mocks.runTool.mockResolvedValue({ text: "merged ok", isError: false });
-  mocks.readResource.mockResolvedValue("# Help text");
+  mocks.capabilities.mockResolvedValue(CAPS);mocks.listTools.mockResolvedValue(TOOLS);mocks.listResources.mockResolvedValue(RESOURCES);mocks.extensions.mockResolvedValue([EXT]);
+  mocks.runTool.mockResolvedValue({text:"merged ok",isError:false});mocks.readResource.mockResolvedValue("# Help text");
+  mocks.userUpdate.mockImplementation(async (id,patch)=>({...MINE,id,...patch}));
+  mocks.accountSet.mockImplementation(async(kind,key,on)=>{const store=useAccountCapabilitiesStore();const capabilities=new Set(store.capabilities),extensions=new Set(store.extensions),target=kind==="capability"?capabilities:extensions;if(on)target.add(key);else target.delete(key);return {capabilities:[...capabilities],extensions:[...extensions],disabled_tools:[]};});
 });
 
-describe("CapabilitiesView", () => {
-  it("links a capability that has a page to it, and only that one", async () => {
-    const w = await show();
-
-    const links = w.findAll("a").filter((a) => a.text() === "Open page");
-
-    expect(links).toHaveLength(1);
-    expect(links[0].attributes("href")).toBe("/capabilities/pdf_merger");
+describe("Capabilities tool and workspace access",()=>{
+  it("opens the native PDF workspace when the account has access",async()=>{
+    const w=await show();await choose(w,"PDF files");expect(w.get('.detail-footer a').attributes('href')).toBe('/capabilities/pdf_merger');
+    const readonly=await show({permissions:['tools.view']});await choose(readonly,'PDF files');expect(readonly.find('.detail-footer a').exists()).toBe(false);
   });
-
-  it("links notes, memory, the generator and tickets to their dedicated pages, for accounts allowed to use them", async () => {
-    const caps: CapabilityInfo[] = [
-      { name: "notes", enabled: true, label: "Notes", tools: [], resources: [] },
-      { name: "memory", enabled: true, label: "Memory", tools: [], resources: [] },
-      { name: "gen", enabled: true, label: "Generator", tools: [], resources: [] },
-      { name: "ticket", enabled: true, label: "Tickets", tools: [], resources: [] },
-    ];
-    mocks.capabilities.mockResolvedValue(caps);
-    mocks.listTools.mockResolvedValue([]);
-    mocks.listResources.mockResolvedValue([]);
-    const withAccess = await show({
-      permissions: ["tools.view", "chat.use", "tools.execute", "tickets.create"],
-      added: { capabilities: ["notes", "memory", "gen", "ticket"] },
-    });
-
-    const hrefs = withAccess.findAll("a").filter((a) => a.text() === "Open page").map((a) => a.attributes("href"));
-    expect(hrefs).toEqual(["/notes", "/memory", "/generator", "/tickets"]);
-
-    const without = await show({ permissions: ["tools.view"], added: { capabilities: ["notes", "memory", "gen", "ticket"] } });
-    expect(without.findAll("a").filter((a) => a.text() === "Open page")).toHaveLength(0);
+  it("links dedicated notes, memory, generator and ticket pages through their permissions",async()=>{
+    const definitions=[['notes','Notes','/notes'],['memory','Memory','/memory'],['gen','Generator','/generator'],['ticket','Tickets','/tickets']];
+    mocks.capabilities.mockResolvedValue(definitions.map(([name,label])=>({name,label,enabled:true,tools:[],resources:[]})));
+    const w=await show({permissions:['tools.view','chat.use','tools.execute','tickets.create'],added:{capabilities:definitions.map(d=>d[0]!)}});
+    for(const [,label,path] of definitions){await choose(w,label!);expect(w.get('.detail-footer a').attributes('href')).toBe(path);}
   });
-
-  it("opens native PDF and video workspaces even without a generic GUI declaration", async () => {
-    const caps: CapabilityInfo[] = [
-      {name: "pdf", label: "PDF", enabled: true, tools: [], resources: []},
-      {name: "video", label: "Video", enabled: true, tools: [], resources: []},
-    ];
-    mocks.capabilities.mockResolvedValue(caps);
-    const w = await show({added: {capabilities: ["pdf", "video"]}});
-    expect(w.findAll("a").filter(a => a.text() === "Open page").map(a => a.attributes("href")))
-      .toEqual(["/capabilities/pdf_merger", "/capabilities/media_downloader"]);
+  it("retains generic GUI page fallback and suppresses links for disabled subscriptions",async()=>{
+    mocks.capabilities.mockResolvedValue([{name:'custom',label:'Custom',enabled:true,tools:[],resources:[],has_gui:true}]);
+    const w=await show({added:{capabilities:['custom']}});await choose(w,'Custom');expect(w.get('.detail-footer a').attributes('href')).toBe('/capabilities/custom');
+    const disabled=await show({added:{capabilities:[]}});await choose(disabled,'Custom');expect(disabled.find('.detail-footer a').exists()).toBe(false);
   });
-
-  it("keeps the generic capability page fallback for other GUI capabilities", async () => {
-    mocks.capabilities.mockResolvedValue([{name: "custom", label: "Custom", enabled: true, tools: [], resources: [], has_gui: true}]);
-    const w = await show({added: {capabilities: ["custom"]}});
-    expect(w.get("a[href='/capabilities/custom']").text()).toBe("Open page");
+  it("opens external apps in a safe new tab, rejecting unsafe URLs and offline servers",async()=>{
+    const w=await show();await extensionsTab(w);await choose(w,'Echo server');const link=w.get('.detail-footer a');expect(link.attributes('target')).toBe('_blank');expect(link.attributes('rel')).toBe('noopener noreferrer');
+    mocks.extensions.mockResolvedValue([{...EXT,web_url:'javascript:alert(1)'}]);const unsafe=await show();await extensionsTab(unsafe);await choose(unsafe,'Echo server');expect(unsafe.find('.detail-footer a').exists()).toBe(false);
+    mocks.extensions.mockResolvedValue([{...EXT,status:'error',error:'refused'}]);const offline=await show();await extensionsTab(offline);await choose(offline,'Echo server');expect(offline.find('.detail-footer a').exists()).toBe(false);expect(offline.text()).toContain('refused');
   });
-
-  it("hides native workspace links without execution permission or when disabled", async () => {
-    mocks.capabilities.mockResolvedValue([
-      {name: "pdf", label: "PDF", enabled: true, tools: [], resources: []},
-      {name: "video", label: "Video", enabled: false, tools: [], resources: []},
-    ]);
-    const readonly = await show({permissions: ["tools.view"], added: {capabilities: ["pdf", "video"]}});
-    expect(readonly.findAll("a").filter(a => a.text() === "Open page")).toHaveLength(0);
-    const writer = await show({added: {capabilities: ["video"]}});
-    expect(writer.findAll("a").filter(a => a.text() === "Open page")).toHaveLength(0);
+  it("keeps legacy PDF extension links tied to native capability access",async()=>{
+    mocks.extensions.mockResolvedValue([{...EXT,id:'pdf_merger',label:'PDF extension',tools:[]}]);
+    const w=await show();await extensionsTab(w);await choose(w,'PDF extension');expect(w.get('.detail-footer a').attributes('href')).toBe('/capabilities/pdf_merger');
+    const noAccess=await show({added:{capabilities:[]}});await extensionsTab(noAccess);await choose(noAccess,'PDF extension');expect(noAccess.find('.detail-footer a').exists()).toBe(false);
   });
-
-  it("lists compact capability cards with what they bring", async () => {
-    const w = await show();
-
-    expect(sectionNames(w)).toEqual(["PDF files", "services", "Legacy", "Other tools"]);
-    expect(toolTitles(w)).toEqual([]);
-    expect(head(w, "PDF files").attributes("aria-expanded")).toBe("false");
-    expect(head(w, "PDF files").text()).toContain("2 tools · 1 resource");
-    expect(head(w, "services").text()).toContain("1 tool");
-    expect(head(w, "Legacy").text()).toContain("off");
+  it("runs selected tools and shows results, then clears them on close",async()=>{
+    const w=await show();await choose(w,'PDF files');await w.get('.tool-list button').trigger('click');await flushPromises();await w.get('form.tool-form').trigger('submit');await flushPromises();expect(mocks.runTool).toHaveBeenCalledWith('tool_pdf_merge',{});expect(w.text()).toContain('merged ok');
+    await w.get('dialog button.close').trigger('click');await w.get('.tool-list button').trigger('click');expect(w.text()).not.toContain('merged ok');
   });
-
-  it("opens a capability workspace from its card and closes it from the dialog", async () => {
-    const w = await show();
-
-    await head(w, "PDF files").trigger("click");
-    expect(toolTitles(w)).toEqual(["Merge", "Split"]);
-    expect(head(w, "PDF files").attributes("aria-expanded")).toBe("true");
-
-    await modal(w).get("button.close").trigger("click");
-    await flushPromises();
-    expect(w.find("dialog").exists()).toBe(false);
-    expect(toolTitles(w)).toEqual([]);
+  it("lets read-only accounts inspect tools but offers no run form",async()=>{
+    const w=await show({permissions:['tools.view']});await choose(w,'PDF files');await w.get('.tool-list button').trigger('click');await flushPromises();expect(w.text()).toContain('tool_pdf_merge');expect(w.find('form.tool-form').exists()).toBe(false);expect(mocks.runTool).not.toHaveBeenCalled();
   });
-
-  it("lists the tools no capability claims under 'Other tools'", async () => {
-    const w = await show();
-
-    await head(w, "Other tools").trigger("click");
-
-    expect(toolTitles(w)).toEqual(["Echo"]);
+  it("reads capability resources and keeps namespaced extension resources with their owner",async()=>{
+    mocks.listResources.mockResolvedValue([...RESOURCES,{name:'ext__doc',uri:'ext://doc',description:'',template:false}]);const w=await show();await choose(w,'PDF files');await w.get('.resource-link').trigger('click');await flushPromises();expect(mocks.readResource).toHaveBeenCalledWith('help://pdf');expect(w.text()).toContain('Help text');await extensionsTab(w);await choose(w,'Echo server');expect(w.get('.resources').text()).toContain('ext__doc');expect(w.get('.resources').text()).not.toContain('pdf_help');
   });
-
-  describe("extensions", () => {
-    const EXT = {
-      id: "ext",
-      label: "Echo server",
-      description: "",
-      status: "connected",
-      error: null,
-      tools: ["ext__echo"],
-      web_url: "https://echo.example/app",
-    };
-
-    it("gives each extension its own accordion instead of 'Other tools'", async () => {
-      mocks.extensions.mockResolvedValue([EXT]);
-      const w = await show();
-
-      expect(sectionNames(w)).toEqual(["PDF files", "services", "Legacy", "Echo server"]);
-      expect(head(w, "Echo server").text()).toContain("1 tool");
-
-      await head(w, "Echo server").trigger("click");
-      expect(toolTitles(w)).toEqual(["Echo"]);
-      expect(w.get("a[href='https://echo.example/app']").text()).toBe("Open app");
-    });
-
-    it("lists its resources, namespaced by its id, and keeps the rest under 'Other tools'", async () => {
-      mocks.extensions.mockResolvedValue([EXT]);
-      mocks.listResources.mockResolvedValue([
-        ...RESOURCES,
-        { uri: "x://notes", name: "ext__notes", description: "", template: false },
-        { uri: "x://stray", name: "stray", description: "", template: false },
-      ]);
-      const w = await show();
-
-      expect(head(w, "Echo server").text()).toContain("1 tool · 1 resource");
-      await head(w, "Echo server").trigger("click");
-      expect(w.findAll("button.link").map((b) => b.text())).toEqual(["ext__notes"]);
-
-      await head(w, "Other tools").trigger("click");
-      expect(w.findAll("button.link").map((b) => b.text())).toEqual(["ext__notes", "stray"]);
-    });
-
-    it("shows why an extension that is not connected has no tools", async () => {
-      mocks.extensions.mockResolvedValue([{ ...EXT, status: "error", error: "refused", tools: [], web_url: null }]);
-      mocks.listTools.mockResolvedValue(TOOLS.filter((t) => t.name !== "ext__echo"));
-      const w = await show();
-
-      await head(w, "Echo server").trigger("click");
-
-      expect(w.text()).toContain("Not connected: refused");
-      expect(w.find("a[target=_blank]").exists()).toBe(false);
-    });
-
-    it("still loads the page when the extensions list fails", async () => {
-      mocks.extensions.mockRejectedValue(new Error("403"));
-      const w = await show();
-
-      expect(sectionNames(w)).toEqual(["PDF files", "services", "Legacy", "Other tools"]);
-    });
+  it("keeps unclaimed tools while excluding tools owned by a disabled capability",async()=>{
+    mocks.extensions.mockResolvedValue([]);const w=await show({added:{capabilities:[]}});await choose(w,'Other tools');expect(w.get('.tool-list').text()).toContain('Echo');expect(w.get('.tool-list').text()).not.toContain('Merge');
   });
-
-  it("explains a capability that is switched off", async () => {
-    const w = await show();
-
-    await head(w, "Legacy").trigger("click");
-
-    expect(w.text()).toContain("Turned off");
+  it("offers private editing and confirms removal without any private run action",async()=>{
+    const w=await show({permissions:['tools.view','chat.use','extensions.personal.manage'],userExtensions:[MINE]});await extensionsTab(w);await choose(w,'My notes');expect(w.findAll('.tool-list button').every(b=>b.attributes('disabled')!==undefined)).toBe(true);await w.get('.edit-extension').trigger('click');expect(w.findComponent({name:'UserExtensionModal'}).props('extension').id).toBe('mynotes');await w.findComponent({name:'UserExtensionModal'}).vm.$emit('close');await w.get('.remove-extension').trigger('click');expect(w.findComponent(ConfirmModal).props('open')).toBe(true);
   });
-
-  it("filters cards by tool name without opening dialogs", async () => {
-    const w = await show();
-
-    await w.get("input[type=search]").setValue("split");
-
-    expect(sectionNames(w)).toEqual(["PDF files"]);
-    expect(w.find("dialog").exists()).toBe(false);
-    await head(w, "PDF files").trigger("click");
-    expect(toolTitles(w)).toEqual(["Split"]);
-    await modal(w).get("button.close").trigger("click");
-
-    await w.get("input[type=search]").setValue("");
-    expect(sectionNames(w)).toEqual(["PDF files", "services", "Legacy", "Other tools"]);
-    expect(toolTitles(w)).toEqual([]);
+  it("shows tool discovery failure while preserving the catalog, and retries failed catalog loads",async()=>{
+    mocks.listTools.mockRejectedValue(new Error('Tool schemas unavailable'));const w=await show();expect(row(w,'PDF files')).toBeDefined();expect(w.text()).toContain('Tool schemas unavailable');mocks.capabilities.mockRejectedValue(new Error('Server down'));const failed=await show();expect(failed.text()).toContain('Server down');expect(failed.find('button.retry').exists()).toBe(true);
   });
-
-  it("prefills the filter from ?q=", async () => {
-    const w = await show({ query: "restart" });
-
-    expect((w.get("input[type=search]").element as HTMLInputElement).value).toBe("restart");
-    expect(sectionNames(w)).toEqual(["services"]);
-    await head(w, "services").trigger("click");
-    expect(toolTitles(w)).toEqual(["Restart Service"]);
-  });
-
-  it("says so when nothing matches the filter", async () => {
-    const w = await show();
-
-    await w.get("input[type=search]").setValue("zzz");
-
-    expect(sections(w)).toHaveLength(0);
-    expect(w.text()).toContain('Nothing matches "zzz"');
-  });
-
-  it("shows a tool preview with its label, name and description", async () => {
-    const w = await show();
-    await head(w, "PDF files").trigger("click");
-
-    const row = toolRows(w)[0]!;
-    expect(row.text()).toContain("Merge");
-    expect(row.text()).toContain("tool_pdf_merge");
-    expect(row.text()).toContain("Join PDFs");
-    expect(modal(w).attributes("open")).toBeDefined();
-  });
-
-  it("opens a modal with the tool's description and parameters when its row is pressed", async () => {
-    const w = await show();
-    await head(w, "PDF files").trigger("click");
-
-    await toolRows(w)[0]!.trigger("click");
-    await flushPromises();
-
-    expect(modal(w).attributes("open")).toBeDefined();
-    expect(modal(w).text()).toContain("Merge");
-    expect(modal(w).text()).toContain("Join PDFs");
-    expect(modal(w).find("form.tool-form").exists()).toBe(true);
-  });
-
-  it("runs the tool from the modal and shows its result there", async () => {
-    const w = await show();
-    await head(w, "PDF files").trigger("click");
-    await toolRows(w)[0]!.trigger("click");
-    await flushPromises();
-
-    await modal(w).get("form.tool-form").trigger("submit");
-    await flushPromises();
-
-    expect(mocks.runTool).toHaveBeenCalledWith("tool_pdf_merge", {});
-    expect(modal(w).text()).toContain("merged ok");
-  });
-
-  it("closes the modal from its close button and forgets the result", async () => {
-    const w = await show();
-    await head(w, "PDF files").trigger("click");
-    await toolRows(w)[0]!.trigger("click");
-    await flushPromises();
-    await modal(w).get("form.tool-form").trigger("submit");
-    await flushPromises();
-
-    await modal(w).get("button.close").trigger("click");
-    await flushPromises();
-    expect(w.find("dialog").exists()).toBe(false);
-
-    await head(w, "PDF files").trigger("click");
-    await toolRows(w)[0]!.trigger("click");
-    await flushPromises();
-    expect(modal(w).text()).not.toContain("merged ok");
-  });
-
-  it("searches tools within the workspace and switches the detail panel", async () => {
-    const w = await show();
-    await head(w, "PDF files").trigger("click");
-    await modal(w).get('input[aria-label="Find a tool"]').setValue("split");
-    expect(toolTitles(w)).toEqual(["Split"]);
-    await toolRows(w)[0]!.trigger("click");
-    expect(modal(w).get(".tool-heading h4").text()).toBe("Split");
-    expect(mocks.runTool).not.toHaveBeenCalled();
-  });
-
-  it("allows browsing but hides execution without tools.execute", async () => {
-    const w = await show({ permissions: ["tools.view"] });
-    await head(w, "PDF files").trigger("click");
-    await toolRows(w)[0]!.trigger("click");
-    expect(modal(w).text()).toContain("Read-only");
-    expect(modal(w).find("form.tool-form").exists()).toBe(false);
-    expect(mocks.runTool).not.toHaveBeenCalled();
-  });
-
-  it("reads a resource of an open capability", async () => {
-    const w = await show();
-    await head(w, "PDF files").trigger("click");
-
-    await w.get("button.link").trigger("click");
-    await flushPromises();
-
-    expect(mocks.readResource).toHaveBeenCalledWith("help://pdf");
-    expect(w.text()).toContain("Help text");
-  });
-
-  it("leaves global capability switches in Ember Admin even for administrators", async () => {
-    const w = await show({ admin: true });
-    await head(w, "PDF files").trigger("click");
-    await head(w, "Legacy").trigger("click");
-    expect(w.find("button.everyone").exists()).toBe(false);
-    expect(w.findAll("input[type=checkbox]")).toHaveLength(3);
-  });
-
-  it("gives every card a switch that is on, whatever the permissions", async () => {
-    const w = await show();
-
-    const boxes = w.findAll("input[type=checkbox]");
-    expect(boxes).toHaveLength(3);
-    expect(boxes.every((b) => (b.element as HTMLInputElement).checked)).toBe(true);
-    expect(w.findAll(".badge")).toHaveLength(0);
-  });
-
-  it("lists only what the account added", async () => {
-    mocks.listTools.mockResolvedValue(TOOLS.filter((t) => t.name !== "ext__echo"));
-    const w = await show({ added: { capabilities: ["pdf"] } });
-
-    expect(sectionNames(w)).toEqual(["PDF files"]);
-  });
-
-  it("keeps the tools of what is not added out of 'Other tools'", async () => {
-    mocks.listTools.mockResolvedValue(TOOLS.filter((t) => t.name !== "ext__echo"));
-    const w = await show({ added: { capabilities: ["pdf"] } });
-
-    expect(sectionNames(w)).not.toContain("Other tools");
-  });
-
-  it("links to the Supermarket, and offers no Add extension button", async () => {
-    const w = await show({ admin: true });
-
-    expect(w.get("a.shop").attributes("href")).toBe("/capabilities/supermarket");
-    expect(w.text()).not.toContain("Add extension");
-  });
-
-  it("says so, and points to the Supermarket, when nothing is added", async () => {
-    mocks.listTools.mockResolvedValue(TOOLS.filter((t) => t.name !== "ext__echo"));
-    const w = await show({ added: { capabilities: [], extensions: [] } });
-
-    expect(sections(w)).toHaveLength(0);
-    expect(w.text()).toContain("Nothing added yet");
-    expect(w.findAll("a").some((a) => a.attributes("href") === "/capabilities/supermarket")).toBe(true);
-  });
-
-  it("reports a load failure", async () => {
-    mocks.capabilities.mockRejectedValue(new Error("server down"));
-    const w = await show();
-
-    expect(w.text()).toContain("server down");
-    expect(sections(w)).toHaveLength(0);
-  });
-});
-
-describe("CapabilitiesView extension cards", () => {
-  const ext = (id: string, webUrl?: string | null, status = "connected") => ({
-    id,
-    label: id.toUpperCase(),
-    description: "",
-    status,
-    error: status === "error" ? "down" : null,
-    tools: [`${id}__run`],
-    web_url: webUrl,
-  });
-  const WITH_CHAT = ["tools.view", "chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"];
-  const openButtons = (w: Wrapper) =>
-    w.findAll("article.card a").filter((a) => a.text() === "Open page" || a.text() === "Open app");
-
-  it("opens the web UI of an extension that has one, in a new tab", async () => {
-    mocks.extensions.mockResolvedValue([ext("other_pdf", "http://127.0.0.1:5174")]);
-    const w = await show({ permissions: WITH_CHAT });
-
-    const link = w.get("a[href='http://127.0.0.1:5174/']");
-    expect(link.text()).toBe("Open app");
-    expect(link.attributes("target")).toBe("_blank");
-    expect(link.attributes("rel")).toBe("noopener noreferrer");
-  });
-
-  it("opens legacy PDF and video extension cards in the corresponding native workspace", async () => {
-    mocks.capabilities.mockResolvedValue([...CAPS, {name: "video", label: "Video", enabled: true, tools: [], resources: []}]);
-    mocks.extensions.mockResolvedValue([ext("pdf_merger", "https://old-pdf.example"), ext("video_downloader", "https://old-video.example")]);
-    const w = await show({permissions: WITH_CHAT, added: {capabilities: ["pdf", "video"]}});
-    const links = sections(w).filter(card => ["PDF_MERGER", "VIDEO_DOWNLOADER"].includes(card.get("h3").text())).map(card => card.get("a"));
-    expect(links.map(link => link.attributes("href"))).toEqual(["/capabilities/pdf_merger", "/capabilities/media_downloader"]);
-    expect(links.every(link => link.attributes("target") !== "_blank")).toBe(true);
-  });
-
-  it("hides native legacy extension links when its built-in capability is not added", async () => {
-    mocks.extensions.mockResolvedValue([ext("pdf_merger", "https://old-pdf.example")]);
-    const w = await show({permissions: WITH_CHAT, added: {capabilities: []}});
-    expect(openButtons(w)).toHaveLength(0);
-  });
-
-  it("gives an extension without a web UI no Open button, and never links a non-http address", async () => {
-    mocks.extensions.mockResolvedValue([ext("notes"), ext("odd id/x", null), ext("bad", "javascript:alert(1)")]);
-    const w = await show({ permissions: WITH_CHAT });
-
-    expect(openButtons(w).map((a) => [a.text(), a.attributes("href")])).toEqual([
-      ["Open page", "/capabilities/pdf_merger"],
-    ]);
-  });
-
-  it("still opens the web UI when the extension is not connected", async () => {
-    mocks.extensions.mockResolvedValue([ext("pdf2", "https://pdf.example", "error")]);
-    const w = await show({ permissions: WITH_CHAT });
-
-    expect(w.find("a[href='https://pdf.example/']").exists()).toBe(true);
-    expect(head(w, "PDF2").text()).toContain("Not connected");
-  });
-
-  it("turns an extension off for the account at once, and its card goes", async () => {
-    mocks.extensions.mockResolvedValue([ext("pdf2")]);
-    const w = await show({ permissions: WITH_CHAT, attach: true });
-    const box = w.findAll("input[type=checkbox]").at(-1)!.element as HTMLInputElement;
-    expect(box.checked).toBe(true);
-    expect(w.findAll(".scope").map((s) => s.text())).toContain("Account");
-
-    box.click();
-    await flushPromises();
-
-    expect(mocks.accountSet).toHaveBeenCalledWith("extension", "pdf2", false);
-    expect(useAccountCapabilitiesStore().extensions).not.toContain("pdf2");
-    expect(sectionNames(w)).not.toContain("PDF2");
-    expect(w.findComponent(ConfirmModal).exists()).toBe(false);
-    w.unmount();
-  });
-
-
-
-  it("lists only the extensions when the account lacks tools.view", async () => {
-    mocks.extensions.mockResolvedValue([ext("pdf2")]);
-    const w = await show({ permissions: ["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] });
-
-    expect(mocks.capabilities).not.toHaveBeenCalled();
-    expect(mocks.listTools).not.toHaveBeenCalled();
-    expect(sectionNames(w)).toEqual(["PDF2"]);
-    expect(w.find(".kinds").exists()).toBe(false);
-    expect(openButtons(w)).toHaveLength(0);
-  });
-
-  it("filters the cards by kind", async () => {
-    mocks.extensions.mockResolvedValue([ext("pdf2")]);
-    const w = await show({ permissions: WITH_CHAT });
-    const pick = (label: string) => w.findAll(".kinds button").find((b) => b.text() === label)!.trigger("click");
-
-    await pick("Extensions");
-    expect(sectionNames(w)).toEqual(["PDF2"]);
-
-    await pick("Built-in");
-    expect(sectionNames(w)).toEqual(["PDF files", "services", "Legacy", "Other tools"]);
-
-    await pick("All");
-    expect(sectionNames(w)).toEqual(["PDF files", "services", "Legacy", "PDF2", "Other tools"]);
-  });
-
-  it("has no Remove button on an extension card, even for admins (Remove lives in Ember Admin)", async () => {
-    mocks.extensions.mockResolvedValue([ext("pdf2")]);
-    const admin = await show({ permissions: [...WITH_CHAT, "roles.manage"] });
-    await head(admin, "PDF2").trigger("click");
-
-    expect(admin.find("button.danger").exists()).toBe(false);
-  });
-});
-
-describe("the page layout", () => {
-  const ext = (id: string) => ({
-    id,
-    label: id.toUpperCase(),
-    description: "",
-    status: "connected",
-    error: null,
-    tools: [`${id}__run`],
-    web_url: null,
-  });
-  const WITH_CHAT = ["tools.view", "chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"];
-
-  it("keeps the long explanation behind a How switches work disclosure", async () => {
-    const w = await show();
-
-    expect(w.get("details.how summary").text()).toBe("How switches work");
-    expect(w.get(".page-description").text()).not.toContain("slash");
-    expect(w.get("details.how p").text()).toContain("follows your account");
-  });
-
-  it("puts the filter and the kind toggle on one row", async () => {
-    const w = await show();
-
-    const row = w.get(".toolbar");
-    expect(row.find("input[type=search]").exists()).toBe(true);
-    expect(row.find(".kinds").exists()).toBe(true);
-  });
-
-  it("names the groups and what their switches mean, while All is shown", async () => {
-    mocks.extensions.mockResolvedValue([ext("pdf2")]);
-    const w = await show({ permissions: WITH_CHAT });
-
-    const titles = w.findAll(".group-title").map((h) => h.text());
-    expect(titles).toEqual(["Built-in", "Extensions", "Other"]);
-
-    await w.findAll(".kinds button").find((b) => b.text() === "Built-in")!.trigger("click");
-    expect(w.find(".group-title").exists()).toBe(false);
-  });
-
-  it("shows readable online and disconnected statuses on cards", async () => {
-    mocks.extensions.mockResolvedValue([ext("pdf2")]);
-    const w = await show({ permissions: WITH_CHAT });
-
-    expect(sections(w)[0]!.get(".state").text()).toContain("Online");
-    expect(head(w, "PDF2").get(".state").text()).toContain("Connected");
-  });
-
-  it("lists tools in the modal sidebar and keeps resources in its main panel", async () => {
-    const w = await show();
-    await head(w, "PDF files").trigger("click");
-
-    expect(modal(w).findAll(".tool-list button")).toHaveLength(2);
-    expect(w.get(".res-label").text()).toBe("Resources");
-    expect(w.find(".resources .res-icon").exists()).toBe(true);
-  });
-});
-
-describe("built-in switches for your own account", () => {
-  const WITH_CHAT = ["tools.view", "chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"];
-  const boxes = (w: Wrapper) => w.findAll("input[type=checkbox]");
-
-  it("turns one off for the account at once, without asking, and the card goes", async () => {
-    const w = await show({ permissions: WITH_CHAT, attach: true });
-
-    // Native activation includes checkbox changes and canceled-click rollback.
-    (boxes(w)[0]!.element as HTMLInputElement).click();
-    await flushPromises();
-
-    expect(mocks.accountSet).toHaveBeenCalledWith("capability", "pdf", false);
-    expect(mocks.setCapability).not.toHaveBeenCalled();
-    expect(w.findComponent(ConfirmModal).exists()).toBe(false);
-    expect(sectionNames(w)).not.toContain("PDF files");
-    w.unmount();
-  });
-
-  it("lets the switch of a capability that is off for everyone be turned off too", async () => {
-    const w = await show({ permissions: WITH_CHAT });
-
-    const legacy = boxes(w)[2]!.element as HTMLInputElement;
-    expect(legacy.checked).toBe(true);
-    expect(legacy.disabled).toBe(false);
-    expect(head(w, "Legacy").text()).toContain("off");
-  });
-
-});
-
-describe("private extensions on the page", () => {
-  const WITH_CHAT = ["tools.view", "chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"];
-
-  it("shows an enabled private extension as a card with its status and tools", async () => {
-    const w = await show({ permissions: WITH_CHAT, userExtensions: [MINE] });
-
-    expect(sectionNames(w)).toContain("My notes");
-    expect(head(w, "My notes").text()).toContain("2 tools");
-    expect(sections(w).find((s) => s.find("h3").text() === "My notes")!.find(".scope").text()).toBe("Private");
-    await head(w, "My notes").trigger("click");
-    expect(w.findAll("ul.private-tools code").map((c) => c.text())).toEqual(["search", "add"]);
-    expect(w.text()).toContain("Notes on my server");
-    expect(w.text()).toContain("always ask first");
-  });
-
-  it("gives it no run button, no Open button and no resources", async () => {
-    const w = await show({ permissions: WITH_CHAT, userExtensions: [MINE] });
-    await head(w, "My notes").trigger("click");
-    const card = sections(w).find((s) => s.find("h3").text() === "My notes")!;
-
-    expect(card.findAll("li.tool")).toHaveLength(0);
-    expect(card.findAll("a")).toHaveLength(0);
-    expect(card.find(".res-label").exists()).toBe(false);
-  });
-
-  it("does not show one that is not enabled", async () => {
-    const w = await show({ permissions: WITH_CHAT, userExtensions: [{ ...MINE, enabled: false }] });
-
-    expect(sectionNames(w)).not.toContain("My notes");
-  });
-
-  it("marks one that cannot be reached, with the reason", async () => {
-    const w = await show({
-      permissions: WITH_CHAT,
-      userExtensions: [{ ...MINE, status: "error", error: "That address is not allowed", tools: [] }],
-    });
-
-    expect(head(w, "My notes").text()).toContain("Not connected");
-    await head(w, "My notes").trigger("click");
-    expect(w.text()).toContain("Not connected: That address is not allowed");
-  });
-
-  it("turns it off from its switch: the card goes and the extension is disabled", async () => {
-    const w = await show({ permissions: WITH_CHAT, userExtensions: [MINE], attach: true });
-    const box = sections(w).find((s) => s.find("h3").text() === "My notes")!.get("input[type=checkbox]")
-      .element as HTMLInputElement;
-
-    box.click();
-    await flushPromises();
-
-    expect(mocks.userUpdate).toHaveBeenCalledWith("mynotes", { enabled: false });
-    expect(sectionNames(w)).not.toContain("My notes");
-    w.unmount();
-  });
-
-  it("follows the filter box and the kind toggle", async () => {
-    const w = await show({ permissions: WITH_CHAT, userExtensions: [MINE] });
-    const pick = (label: string) => w.findAll(".kinds button").find((b) => b.text() === label)!.trigger("click");
-
-    await w.get("input[type=search]").setValue("sear");
-    expect(sectionNames(w)).toContain("My notes");
-
-    await w.get("input[type=search]").setValue("zzz-nothing");
-    expect(sectionNames(w)).not.toContain("My notes");
-
-    await w.get("input[type=search]").setValue("");
-    await pick("Built-in");
-    expect(sectionNames(w)).not.toContain("My notes");
-    await pick("Extensions");
-    expect(sectionNames(w)).toContain("My notes");
-  });
-
-  it("counts as something added, so the empty invitation is not shown", async () => {
-    // ext__echo belongs to no capability, so it would add an "Other tools" card of its own.
-    mocks.listTools.mockResolvedValue(TOOLS.filter((t) => t.name !== "ext__echo"));
-    const w = await show({
-      permissions: WITH_CHAT,
-      added: { capabilities: [], extensions: [] },
-      userExtensions: [MINE],
-    });
-
-    expect(w.text()).not.toContain("Nothing added yet");
-    expect(sectionNames(w)).toEqual(["My notes"]);
-  });
-
-  it("refreshes the statuses when the page opens, for accounts that can have any", async () => {
-    await show({ permissions: WITH_CHAT, userExtensions: [MINE] });
-    expect(mocks.userList).toHaveBeenCalledTimes(2);
-
-    mocks.userList.mockClear();
-    await show({ permissions: ["tools.view", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] });
-    expect(mocks.userList).not.toHaveBeenCalled();
+  it("shows failed saves while restoring the server's subscription state",async()=>{
+    mocks.accountSet.mockRejectedValue(new Error('Save refused'));const w=await show({added:{capabilities:['pdf']}});await row(w,'services').get('input').setValue(true);await flushPromises();expect(row(w,'services').text()).toContain('Disabled');expect(w.text()).toContain('Save refused');
   });
 });

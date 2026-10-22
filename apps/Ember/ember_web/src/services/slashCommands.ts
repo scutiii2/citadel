@@ -218,7 +218,7 @@ export class SlashCommandRunner {
       const parsed = parseCommand(text);
       const builtIn = (await this.builtIns()).some((c) => c.capability === parsed.capability);
       if (enabledCapabilities && builtIn && !enabledCapabilities.includes(parsed.capability)) {
-        throw new CommandError(`"${parsed.capability}" isn't added to your account. Add it in the Supermarket.`);
+        throw new CommandError(`"${parsed.capability}" isn't added to your account. Enable it on the Capabilities page.`);
       }
       const commands = await this.list(enabledExtensions, enabledCapabilities);
       const ofCapability = commands.filter((c) => c.capability === parsed.capability);

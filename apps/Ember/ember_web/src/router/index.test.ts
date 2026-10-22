@@ -251,12 +251,12 @@ describe("the merged Capabilities page", () => {
     expect(router.currentRoute.value.name).toBe("capabilities");
   });
 
-  it("opens the Supermarket for chat.use alone", async () => {
+  it("redirects Supermarket bookmarks for chat.use alone", async () => {
     me.mockResolvedValue({ ...ACCOUNT, permissions: ["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] });
 
     await router.push("/capabilities/supermarket");
 
-    expect(router.currentRoute.value.name).toBe("supermarket");
+    expect(router.currentRoute.value.name).toBe("capabilities");
   });
 
   it("keeps the Supermarket from being taken for a capability page", () => {

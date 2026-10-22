@@ -78,7 +78,7 @@ test("workspace tool approval stays in Admin even for administrators", async ({ 
   expect(api.unexpected).toEqual([]);
 });
 
-test("page headings and horizontal margins match across content pages", async ({ page }) => {
+test("page headings and column padding match across content pages", async ({ page }) => {
   await installFakeApi(page);
   await logIn(page);
   for (const width of [1280, 768, 375]) {
@@ -93,7 +93,7 @@ test("page headings and horizontal margins match across content pages", async ({
  const style = getComputedStyle(title);
  const description = document.querySelector('.page-description');
  const desc = description && getComputedStyle(description);
- return { font: style.fontFamily, size: style.fontSize, weight: style.fontWeight, lineHeight: style.lineHeight, left: title.getBoundingClientRect().left, padding: getComputedStyle(column).paddingInlineStart, description: desc && { font: desc.fontFamily, size: desc.fontSize, weight: desc.fontWeight, lineHeight: desc.lineHeight } };
+ return { font: style.fontFamily, size: style.fontSize, weight: style.fontWeight, lineHeight: style.lineHeight, left: title.getBoundingClientRect().left - column.getBoundingClientRect().left, padding: getComputedStyle(column).paddingInlineStart, description: desc && { font: desc.fontFamily, size: desc.fontSize, weight: desc.fontWeight, lineHeight: desc.lineHeight } };
 })()`);
       if (baseline) expect(appearance).toEqual(baseline);
       else baseline = appearance;

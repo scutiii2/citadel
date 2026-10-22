@@ -4,11 +4,12 @@ import type { ToolInfo, ToolRunResult } from "../api/types";
 import BaseModal from "./BaseModal.vue";
 import ToolResultPanel from "./ToolResultPanel.vue";
 import ToolRunForm from "./ToolRunForm.vue";
+import CopyButton from "./CopyButton.vue";
 
 /** A tool's details in a modal: its description, the form for its parameters
  * to run it, and the last result. Open while `tool` is set; the parent holds
  * the run state. */
-defineProps<{ tool: ToolInfo | null; running: boolean; result: ToolRunResult | null }>();
+defineProps<{ tool: ToolInfo | null; running: boolean; result: ToolRunResult | null; command?: string }>();
 const auth = useAuthStore();
 const emit = defineEmits<{ close: []; run: [args: Record<string, unknown>] }>();
 </script>
@@ -18,6 +19,7 @@ const emit = defineEmits<{ close: []; run: [args: Record<string, unknown>] }>();
     <div v-if="tool" class="body">
       <code class="name">{{ tool.name }}</code>
       <p v-if="tool.description" class="description">{{ tool.description }}</p>
+      <p v-if="command" class="tool-command"><span>Slash command</span><code>{{ command }}</code><CopyButton :text="command" label="Copy command" /></p>
       <!-- key: a fresh form (and its defaults) per tool -->
       <ToolRunForm v-if="auth.hasPermission('tools.execute')" :key="tool.name" :schema="tool.inputSchema" :running="running" @run="(args) => emit('run', args)" />
       <ToolResultPanel v-if="result" :result="result" />
@@ -42,4 +44,7 @@ const emit = defineEmits<{ close: []; run: [args: Record<string, unknown>] }>();
   white-space: pre-wrap;
   color: var(--muted);
 }
+.tool-command { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; color: var(--muted); font-size: .85em; }
+.tool-command code { overflow-wrap: anywhere; }
+.tool-command :deep(button) { min-width: 44px; min-height: 44px; }
 </style>

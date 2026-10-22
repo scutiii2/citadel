@@ -156,7 +156,7 @@ test("global capability switches are absent for administrators", async ({ page }
   const api = await installFakeApi(page, { admin: true });
   await logIn(page);
   await page.goto("/capabilities");
-  const card = page.locator("article.card").filter({ has: page.getByRole("heading", { name: "PDF files" }) });
+  const card = page.locator("article.catalog-row").filter({ has: page.getByRole("button", { name: "View PDF files", exact: true }) });
   await card.getByRole("button", { name: /PDF files/ }).click();
   await expect(page.getByRole("button", { name: "Turn off for everyone" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Turn on for everyone" })).toHaveCount(0);

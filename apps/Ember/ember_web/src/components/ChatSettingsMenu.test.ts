@@ -188,7 +188,7 @@ describe("ChatSettingsMenu", () => {
 
     const link = w.get("a.extensions");
     expect(link.text()).toBe("Extensions: pdf, fs");
-    expect(link.attributes("href")).toBe("/capabilities");
+    expect(link.attributes("href")).toBe("/capabilities?tab=extensions");
   });
 
   it("says extensions are off when none are enabled", async () => {
