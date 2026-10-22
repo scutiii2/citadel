@@ -41,7 +41,7 @@ URL, token or key.
   compatible through a redirect from `/capabilities/video_downloader`. Private/login-only posts are unavailable.
   Draft, completed, and failed download groups can be removed after confirmation; active groups must finish first.
   Removing a group keeps its downloaded ZIP available in Downloads until separately deleted or expired.
-  Add Armory's `pdf` or `video` capability in the Supermarket, then use its card's
+  Enable Armory's `pdf` or `video` capability on Capabilities, then use its details pane's
   Open page button. Both need `tools.execute`; uploads also need `files.upload`,
   and content previews/downloads need `files.download`. Both also have sidebar entries
   (`NAV_PAGES` in `src/router/pages.ts`), which an admin can hide like any other page.
@@ -261,20 +261,18 @@ URL, token or key.
   (not attached files), highlights the match and shows the current folder
   name on filed chats; opening a result scrolls to
   the first matching message and flashes it.
-- Capabilities page (the old Tools and Capabilities pages in one; `/tools` redirects here): only what the account has added is listed. Each capability is a
-  collapsed card, opened by clicking it or while a filter is typed. Its tools run in place from forms generated from their
-  JSON Schema (the same form as the command form). Tools show readable titles (`tool_srv_startApp` -> "Start App")
-  and JSON results render as fields and tables, with the raw JSON a click away. The card switch turns the item off for the
-  account and its card leaves the page. An account that has added nothing sees "Nothing added yet" with a link to the Supermarket.
-- Supermarket (`/capabilities/supermarket`, `tools.use` or `chat.use`; opened from a button on the Capabilities page): every built-in
-  capability and extension in two sections, with Add and Disable per row. What an account has added is kept in ember_api
-  (`/api/account-capabilities`), so it follows the account across devices; a new account starts with nothing added. Two exclusive
-  filter chips, Enabled and Disabled, narrow the lists (clicking the active chip clears it; the choice is in the address as
-  `?state=`). A capability an administrator turned off for everyone shows "Off for everyone" and cannot be added. Global capability switches and shared extension management live in ember_admin.
-- Private extensions (`chat.use`): the Supermarket's "My extensions" section adds an MCP server only this account can see, with an
+- Capabilities (`/capabilities`, `tools.view` or `chat.use`) combines the tool browser and account catalog.
+  Separate **Capabilities** and **Extensions** tabs retain their own searches, selection and scroll position.
+  Enabled items come first; disabled items remain below in grey. Offline items are more muted and explicitly
+  labeled Offline. Account switches remain pending until saving finishes; disabling keeps the item and its data.
+  Desktop uses a list and detail pane; phones open details with Back. The detail pane offers available native
+  workspaces, tool forms, results and resources. Private tools stay chat-only. Accounts without `tools.view`
+  see extensions only. Global capability and shared extension administration stays in ember_admin.
+  `/capabilities/supermarket` redirects here; `/extensions` opens the Extensions tab. No API changes.
+- Private extensions (`chat.use`): the Extensions tab adds an MCP server only this account can see, with an
   optional set of headers (a token or key). Header values are write-only: they are stored encrypted by ember_api and never shown
   again; editing offers "Replace headers", which replaces the whole set. Each row has Enable/Disable, Edit and Remove, and shows
-  its live status (a probe cached for a minute). Enabled ones also appear as "Private" cards on the Capabilities page, listing
+  its live status (a probe cached for a minute). They remain labeled "Private" in the Extensions tab, listing
   their tools; those tools work in chats only (always asking first, and every later tool in that turn asks too) and cannot be run
   from the page. When a private extension could not be used in an answer, a banner above the messages says which and why until
   the next question. It is live only and not saved with the chat.
@@ -324,24 +322,11 @@ URL, token or key.
   current offset rounded to a whole hour, so a half-hour zone can be off by an
   hour and a daylight-saving change inside the period is ignored.
   The page also reads each capability's resources and lets admins switch capabilities on/off.
-- Capabilities page (`tools.use` or `chat.use`): only mcp_server's built-in capabilities and extensions the account has added
-  (other MCP servers) as one list of identical collapsible cards (All / Built-in / Extensions filter,
-  and a tool filter). A card shows a status dot, name and id, what it brings, an Open button and an
-  on/off switch with who it is for. Every card's switch is for "Account": turning it off removes the item from the account
-  and its card leaves the page. What the account has added follows it across devices; a new account starts with nothing added.
-  An account that has added nothing sees "Nothing added yet" with a link to the Supermarket. The tools of capabilities not
-  added are sent as `disabled_tools` with each question. Global switches live in ember_admin. A capability off for everyone stays dimmed and its account switch can still be turned off.
-  An extension's Open button leads to its `web_url` (for
-  example `pdf_merger` and its web app) in a new tab, labelled "Open app"; only http(s) addresses
-  count, and it works without `tools.use` and when the extension is not connected. An extension with no
-  web app has no Open button: its card lists its tools as rows that open the run form (a failed
-  extension shows its error and no tools). `/extensions` and `/extensions/<id>` redirect to this page. Without `tools.use` only the extensions are listed. Tools that
-  no capability or extension lists go under "Other tools".
-- Supermarket (`/capabilities/supermarket`, `tools.use` or `chat.use`; opened from a button on the Capabilities page): every built-in
-  capability and extension in two sections, with Add and Disable per row. What an account has added is kept in ember_api
-  (`/api/account-capabilities`), so it follows the account across devices; a new account starts with nothing added. Two exclusive
-  filter chips, Enabled and Disabled, narrow the lists (clicking the active chip clears it; the choice is in the address as
-  `?state=`). A capability an administrator turned off for everyone shows "Off for everyone" and cannot be added. Global capability switches and shared extension management live in ember_admin.
+- Capabilities provides the account's complete catalog in two tabs (see above). Unclaimed tools and resources
+  stay under Other tools. Shared extension apps open only validated HTTP(S) URLs in a new tab; legacy PDF/video
+  extensions link to their native workspaces only with the matching built-in subscription and permission.
+  Offline or disabled tools cannot run. Account choices follow the account across devices; disabling a
+  capability still sends its tool names as `disabled_tools` with each question.
 - Agents page (`chat.use`): a card per agent from `GET /api/agents` - name, id,
   Entry / Orchestrator badges, what it is for, its provider / gateway / model
   (a value the agent file does not set is left out), and a status (running,
