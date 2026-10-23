@@ -37,6 +37,9 @@ class FakeEmailSender:
     async def send_email_verification(self, to: str, code: str, expires_at: datetime) -> None:
         self._record("verify", to, code)
 
+    async def send_notification(self, to: str, subject: str, body: str) -> None:
+        self._record("notification", to, f"{subject}\n\n{body}")
+
     def _record(self, kind: str, to: str, code: str) -> None:
         if self.fail:
             raise EmailDeliveryError("SMTP is down (fake)")

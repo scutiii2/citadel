@@ -1,0 +1,6 @@
+Your event "$title" starts in $lead minutes.
+
+When: $when
+Calendar: $sources
+
+You get this because you set an alert in Ember's Calendar. Change it there at any time.

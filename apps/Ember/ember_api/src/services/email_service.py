@@ -36,6 +36,8 @@ class EmailSender(Protocol):
 
     async def send_email_verification(self, to: str, code: str, expires_at: datetime) -> None: ...
 
+    async def send_notification(self, to: str, subject: str, body: str) -> None: ...
+
 
 class McpEmailSender:
     """Use the shared MCP SMTP service; Ember owns templates, never credentials."""
@@ -58,6 +60,9 @@ class McpEmailSender:
             "Verify your Ember email",
             render_template("email_verification", code=code, expires_at=f"{expires_at:%Y-%m-%d %H:%M}"),
         )
+
+    async def send_notification(self, to: str, subject: str, body: str) -> None:
+        await self._send(to, subject, body)
 
     async def _send(self, to: str, subject: str, body: str) -> None:
         headers = identity_headers("ember", "", self._internal_token)
