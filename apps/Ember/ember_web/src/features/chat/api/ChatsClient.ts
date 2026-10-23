@@ -46,10 +46,6 @@ export interface TurnStart {
   plan_lean?: boolean;
   /** Sent only when on: the agent counts the context window's parts with its provider, not an estimate. */
   exact_context?: boolean;
-  /** mcp_server extensions whose tools the agent may use. */
-  enabled_extensions: string[];
-  /** Tools of the built-in capabilities this account switched off for its own chats. */
-  disabled_tools?: string[];
   /** Used only when this turn creates the chat. */
   title?: string;
   /** Regenerate / edit: index of the question this one replaces; it and

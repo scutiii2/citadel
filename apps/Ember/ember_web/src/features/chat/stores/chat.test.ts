@@ -1,4 +1,4 @@
-import { accountCapabilitiesClient } from "../../capabilities/api/AccountCapabilitiesClient";
+import { extensionsClient } from "../../capabilities/api/ExtensionsClient";
 import { flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,9 +10,7 @@ import { withAttachments } from "../../../utils/content/attachments";
 import { useAuthStore } from "../../../stores/auth";
 import { useChatStore } from "./chat";
 
-vi.mock("../../capabilities/api/AccountCapabilitiesClient", () => ({
-  accountCapabilitiesClient: { get: vi.fn(), set: vi.fn() },
-}));
+vi.mock("../../capabilities/api/ExtensionsClient", () => ({ extensionsClient: { list: vi.fn() } }));
 vi.mock("../api/ChatsClient", () => ({
   chatsClient: {
     list: vi.fn(),
@@ -95,7 +93,7 @@ async function openChat(messages: ChatMessage[]) {
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
-  vi.mocked(accountCapabilitiesClient.get).mockResolvedValue({ capabilities: [], extensions: [], disabled_tools: [] });
+  vi.mocked(extensionsClient.list).mockResolvedValue([]);
   client.startTurn.mockResolvedValue({ chat: { ...summary("c1"), running: true }, sequence: 5 });
   client.search.mockResolvedValue([]);
   client.remove.mockResolvedValue(undefined);
@@ -106,7 +104,7 @@ beforeEach(() => {
 
 describe("per-chat second brain option", () => {
   it("waits for server confirmation and sends the saved choice with the turn", async () => {
-    vi.mocked(accountCapabilitiesClient.get).mockResolvedValue({ capabilities: ["obsidian"], extensions: [], disabled_tools: [] });
+    vi.mocked(extensionsClient.list).mockResolvedValue([]);
     const chat = await openChat([]);
     await flushPromises();
     expect(chat.secondBrainAvailable).toBe(true);
@@ -126,7 +124,7 @@ describe("per-chat second brain option", () => {
   });
 
   it("keeps the previous choice when saving fails", async () => {
-    vi.mocked(accountCapabilitiesClient.get).mockResolvedValue({ capabilities: ["obsidian"], extensions: [], disabled_tools: [] });
+    vi.mocked(extensionsClient.list).mockResolvedValue([]);
     const chat = await openChat([]);
     client.update.mockRejectedValue(new Error("storage unavailable"));
     await chat.setSaveToSecondBrain(true);
@@ -136,7 +134,7 @@ describe("per-chat second brain option", () => {
   });
 
   it("does not offer saving when the capability is offline", async () => {
-    vi.mocked(accountCapabilitiesClient.get).mockResolvedValue({ capabilities: ["obsidian"], extensions: [], disabled_tools: [] });
+    vi.mocked(extensionsClient.list).mockResolvedValue([]);
     client.secondBrainAvailability.mockResolvedValue({ available: false });
     const chat = await openChat([]);
     await chat.setSaveToSecondBrain(true);

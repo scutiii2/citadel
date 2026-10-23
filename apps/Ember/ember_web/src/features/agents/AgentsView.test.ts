@@ -1,11 +1,13 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { agentsClient, type AgentListing } from "./api/AgentsClient";
+import { accountAgentsClient, agentsClient, type AgentListing } from "./api/AgentsClient";
 import AgentsView from "./AgentsView.vue";
 
-vi.mock("./api/AgentsClient", () => ({ agentsClient: { list: vi.fn() } }));
+vi.mock("./api/AgentsClient", () => ({ agentsClient: { list: vi.fn() }, accountAgentsClient: { get: vi.fn(), set: vi.fn() } }));
 
 const list = vi.mocked(agentsClient.list);
+const mine = vi.mocked(accountAgentsClient.get);
+const setUse = vi.mocked(accountAgentsClient.set);
 
 const agent = (id: string, extra: Partial<AgentListing> = {}): AgentListing => ({
   id,
@@ -44,6 +46,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
   list.mockResolvedValue(AGENTS);
+  mine.mockResolvedValue({ disabled: [] });
 });
 
 afterEach(() => {
@@ -168,5 +171,29 @@ describe("AgentsView", () => {
     wrapper.unmount();
     await vi.advanceTimersByTimeAsync(30_000);
     expect(list).toHaveBeenCalledTimes(2);
+  });
+
+  it("offers the switch on specialists only and keeps it pending until the server answers", async () => {
+    mine.mockResolvedValue({ disabled: ["pdf"] });
+    let answer!: (value: { disabled: string[] }) => void;
+    setUse.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    const wrapper = await mountView();
+
+    const boxes = wrapper.findAll<HTMLInputElement>(".agent-card input[role=switch]");
+    expect(boxes).toHaveLength(3); // not the entry agent
+    const reviewer = wrapper.findAll(".agent-card").find((c) => c.text().includes("REVIEWER"))!;
+    expect(reviewer.find<HTMLInputElement>("input").element.checked).toBe(true);
+    const pdf = wrapper.findAll(".agent-card").find((c) => c.text().includes("PDF"))!;
+    expect(pdf.find<HTMLInputElement>("input").element.checked).toBe(false);
+
+    await reviewer.find("input").setValue(false);
+    expect(setUse).toHaveBeenCalledWith("reviewer", false);
+    expect(reviewer.attributes("aria-busy")).toBe("true");
+    expect(reviewer.find<HTMLInputElement>("input").element.disabled).toBe(true);
+
+    answer({ disabled: ["pdf", "reviewer"] });
+    await flushPromises();
+    expect(reviewer.find<HTMLInputElement>("input").element.checked).toBe(false);
+    expect(reviewer.attributes("aria-busy")).toBe("false");
   });
 });

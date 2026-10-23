@@ -32,6 +32,13 @@ export interface AgentListing {
   tiers: ModelTier[];
 }
 
+/** The agents this account switched off, kept in ember_api. Ember leaves them out of its roster. */
+export const accountAgentsClient = {
+  get: () => apiRequest<{ disabled: string[] }>("GET", "/api/account-agents"),
+  set: (agentId: string, enabled: boolean) =>
+    apiRequest<{ disabled: string[] }>("PUT", `/api/account-agents/${encodeURIComponent(agentId)}`, { enabled }),
+};
+
 export const agentsClient = {
   list: () => apiRequest<AgentListing[]>("GET", "/api/agents"),
 };

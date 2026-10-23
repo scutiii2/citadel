@@ -328,12 +328,12 @@ components, and where to place new Vue files and their tests.
 - Capabilities provides the account's complete catalog in two tabs (see above). Unclaimed tools and resources
   stay under Other tools. Shared extension apps open only validated HTTP(S) URLs in a new tab; legacy PDF/video
   extensions link to their native workspaces only with the matching built-in subscription and permission.
-  Offline or disabled tools cannot run. Account choices follow the account across devices; disabling a
-  capability still sends its tool names as `disabled_tools` with each question.
+  Offline tools cannot run. Capabilities and shared extensions are managed by administrators (an agent's
+  `tools.allow` decides who may call them); only a user's own private extensions have a switch here.
 - Agents page (`chat.use`): a card per agent from `GET /api/agents` - name, id,
   Entry / Orchestrator badges, what it is for, its provider / gateway / model
   (a value the agent file does not set is left out), and a status (running,
-  offline, disabled; an icon and a word). Read-only, refreshed every 15 s: new chats
+  offline, disabled; an icon and a word). Refreshed every 15 s. Each specialist has a switch ("Used in your chats", pending until the server answers) that leaves it out of Ember's roster for this account: new chats
   always go to the entry agent, there is no per-agent chat.
 - Account page (click your username): profile with email verification status,
   separate security and roles/access panels, expandable permissions, and a

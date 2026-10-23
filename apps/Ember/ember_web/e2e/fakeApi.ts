@@ -154,8 +154,8 @@ export interface FakeApi {
   /** Requests captured only by the opt-in native media workspace fake. */
   media: { uploads: { filename: string; data: string }[]; merges: Record<string, unknown>[]; downloads: { url: string; preset: string }[] };
   tickets: Map<number, StoredTicket>;
-  /** What the account has added (GET and PUT /api/account-capabilities). */
-  accountCapabilities: { capabilities: Set<string>; extensions: Set<string> };
+  /** The agents the account switched off (GET and PUT /api/account-agents). */
+  disabledAgents: Set<string>;
 
   /** The account's private extensions (/api/user-extensions). Header values are never kept or returned. */
   userExtensions: Map<string, StoredUserExtension>;
@@ -261,7 +261,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     calendar: { feeds: [], rules: [{ id: "r1", channel: "inapp", lead_minutes: 15, enabled: true }], alerts: [] },
     media: { uploads: [], merges: [], downloads: [] },
     tickets: new Map(),
-    accountCapabilities: { capabilities: new Set(), extensions: new Set() },
+    disabledAgents: new Set(),
     userExtensions: new Map(),
     settings: { forceToolApproval: false },
     accounts: new Map(),
@@ -282,12 +282,10 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     for (const a of ADMIN_ACCOUNTS) api.accounts.set(a.id, { ...a });
     for (const r of ADMIN_ROLES) api.roles.set(r.id, { ...r });
     for (const c of ADMIN_CAPABILITIES) api.capabilities.set(c.name, { ...c });
-    for (const c of ADMIN_CAPABILITIES) api.accountCapabilities.capabilities.add(c.name);
   }
   if (options.media) {
     for (const name of ['pdf', 'video']) {
       api.capabilities.set(name, { name, enabled: true, label: name === 'pdf' ? 'PDF merger' : 'Video downloader', tools: [], resources: [] });
-      api.accountCapabilities.capabilities.add(name);
     }
   }
   const pdfs = new Map<string, { info: { file_id: string; name: string; kind: string; pages: number; size: number; expires_at: number }; bytes: Buffer }>();
@@ -492,22 +490,12 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       found.enabled = (request.postDataJSON() as { enabled: boolean }).enabled;
       return json(route, found);
     }
-    // What the account has added, and the tools of the capabilities it has not.
-    const accountView = () => ({
-      capabilities: [...api.accountCapabilities.capabilities].sort(),
-      extensions: [...api.accountCapabilities.extensions].sort(),
-      disabled_tools: [...api.capabilities.values()]
-        .filter((c) => !api.accountCapabilities.capabilities.has(c.name))
-        .flatMap((c) => c.tools)
-        .sort(),
-    });
-    if (method === "GET" && path === "/api/account-capabilities") return json(route, accountView());
-    const accountItem = /^\/api\/account-capabilities\/(capability|extension)\/([A-Za-z0-9_.-]+)$/.exec(path);
-    if (method === "PUT" && accountItem) {
-      const set = accountItem[1] === "capability" ? api.accountCapabilities.capabilities : api.accountCapabilities.extensions;
-      if ((request.postDataJSON() as { enabled: boolean }).enabled) set.add(accountItem[2]!);
-      else set.delete(accountItem[2]!);
-      return json(route, accountView());
+    if (method === "GET" && path === "/api/account-agents") return json(route, { disabled: [...api.disabledAgents].sort() });
+    const accountAgent = /^\/api\/account-agents\/([A-Za-z0-9_.-]+)$/.exec(path);
+    if (method === "PUT" && accountAgent) {
+      if ((request.postDataJSON() as { enabled: boolean }).enabled) api.disabledAgents.delete(accountAgent[1]!);
+      else api.disabledAgents.add(accountAgent[1]!);
+      return json(route, { disabled: [...api.disabledAgents].sort() });
     }
     if (method === "GET" && path === "/api/extensions") return json(route, []);
 
@@ -735,7 +723,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     }
 
     if (method === "GET" && path === "/api/chats/second-brain") {
-      return json(route, { available: api.accountCapabilities.capabilities.has("obsidian") && api.capabilities.get("obsidian")?.enabled === true });
+      return json(route, { available: api.capabilities.get("obsidian")?.enabled === true });
     }
     const chatPath = /^\/api\/chats\/([A-Za-z0-9-]+)(\/[a-z]+)?$/.exec(path);
     if (chatPath) {

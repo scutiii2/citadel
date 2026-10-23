@@ -3,10 +3,12 @@ import { ref } from "vue";
 import type { AgentListing, AgentStatus } from "../api/AgentsClient";
 import AgentLlm from "./AgentLlm.vue";
 import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
+import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
 
 /** One agent on the Agents page: name, id, role badges, what it is for, its
  * provider / gateway / model, and whether it is running. The card opens a dialog with the full description. The status is an icon and a word, never colour alone. */
-defineProps<{ agent: AgentListing }>();
+defineProps<{ agent: AgentListing; off?: boolean; pending?: boolean }>();
+defineEmits<{ toggle: [agentId: string, enabled: boolean] }>();
 const opened = ref(false);
 
 const STATUS_TEXT: Record<AgentStatus, string> = { running: "Running", offline: "Offline", disabled: "Disabled" };
@@ -14,7 +16,7 @@ const STATUS_ICON: Record<AgentStatus, string> = { running: "●", offline: "○
 </script>
 
 <template>
-  <article :class="['agent-card', agent.status, { entry: agent.entry }]">
+  <article :class="['agent-card', agent.status, { entry: agent.entry, off }]" :aria-busy="pending">
     <div class="head">
       <button type="button" class="open-card" aria-haspopup="dialog" :aria-label="`Open ${agent.label}`" @click="opened = true"><h3>{{ agent.label }}</h3></button>
       <span class="status"><span aria-hidden="true">{{ STATUS_ICON[agent.status] }}</span> {{ STATUS_TEXT[agent.status] }}</span>
@@ -34,6 +36,15 @@ const STATUS_ICON: Record<AgentStatus, string> = { running: "●", offline: "○
       Internal routing; answers come from the selected agent.
     </p>
     <AgentLlm :agent="agent" />
+    <ToggleSwitch
+      v-if="!agent.entry && !agent.orchestrator && !agent.internal_role"
+      small
+      :aria-label="`Use ${agent.label}`"
+      :checked="!off"
+      :disabled="pending"
+      title="Let Ember hand work to this agent in your chats."
+      @change="$emit('toggle', agent.id, ($event.target as HTMLInputElement).checked)"
+    >{{ pending ? "Saving…" : off ? "Off for your chats" : "Used in your chats" }}</ToggleSwitch>
   </article>
   <BaseModal :open="opened" :title="agent.label" @close="opened = false">
     <code class="agent-id">{{ agent.id }}</code>
@@ -53,6 +64,8 @@ const STATUS_ICON: Record<AgentStatus, string> = { running: "●", offline: "○
   border-radius: var(--radius-lg);
   background: var(--surface);
 }
+.agent-card.off .focus { opacity: 0.7; }
+.agent-card :deep(.toggle) { margin-top: auto; padding-top: 6px; }
 .agent-card.entry {
   border-color: var(--accent);
 }

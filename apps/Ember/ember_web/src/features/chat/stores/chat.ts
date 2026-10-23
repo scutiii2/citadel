@@ -37,7 +37,7 @@ import { errorMessage } from "../../../utils/errors";
 import { toolTitle } from "../../../utils/tools/toolTitles";
 import { triageAnswerText, triageQuestionText } from "../utils/triageMessage";
 import { useAuthStore } from "../../../stores/auth";
-import { useAccountCapabilitiesStore } from "../../capabilities/stores/accountCapabilities";
+import { extensionsClient } from "../../capabilities/api/ExtensionsClient";
 
 const TITLE_MAX_CHARS = 60;
 // While a chat other than the open one is still being answered, the list is
@@ -239,12 +239,16 @@ export const useChatStore = defineStore("chat", () => {
   // whose answer was sent but not yet confirmed by the agent.
   const pendingQuestions = ref<PendingQuestion[]>([]);
   const answeringQuestions = ref<string[]>([]);
-  // What this account has added on the Capabilities page, kept in ember_api:
-  // the extensions whose tools the agent (and slash commands) may use, and the
-  // built-in capabilities it may use. Nothing is added to begin with.
-  const accountCaps = useAccountCapabilitiesStore();
-  const enabledExtensions = computed(() => accountCaps.extensions);
-  const enabledCapabilities = computed(() => accountCaps.capabilities);
+  // Shared extensions are on for everyone; which agent may call their tools is that
+  // agent's tools.allow. Built-in capabilities need no list: every slash command is offered.
+  const enabledExtensions = ref<string[]>([]);
+  async function loadExtensions(): Promise<void> {
+    const accountId = auth.account?.id;
+    let ids: string[] = [];
+    try { if (accountId) ids = (await extensionsClient.list()).map((e) => e.id); } catch { /* none: only built-in commands */ }
+    if (auth.account?.id === accountId) enabledExtensions.value = ids;
+  }
+  watch(() => auth.account?.id, () => void loadExtensions(), { immediate: true });
   // Slash commands (tools.view): the runner caches the command list and tool
   // schemas, so it's replaced per account.
   let commandRunner = new SlashCommandRunner();
@@ -291,8 +295,7 @@ export const useChatStore = defineStore("chat", () => {
     } catch (error) { if (started === generation) saveError.value = errorMessage(error); }
     finally { if (started === generation) secondBrainPending.value = false; }
   }
-  const secondBrainAvailable = computed(() => accountCaps.ready && accountCaps.capabilities.includes("obsidian")
-    && auth.hasPermission("tools.execute") && secondBrainOnline.value);
+  const secondBrainAvailable = computed(() => auth.hasPermission("tools.execute") && secondBrainOnline.value);
   const saveToSecondBrain = computed(() => active.value ? (active.value.saveToSecondBrain ?? false) : draftSecondBrain.value);
   let availabilityRequest = 0;
 
@@ -300,7 +303,7 @@ export const useChatStore = defineStore("chat", () => {
     const mine = ++availabilityRequest;
     const accountId = auth.account?.id;
     secondBrainOnline.value = false;
-    if (!accountCaps.ready || !accountCaps.capabilities.includes("obsidian") || !auth.hasPermission("tools.execute")) return;
+    if (!auth.hasPermission("tools.execute")) return;
     try {
       const status = await chatsClient.secondBrainAvailability();
       if (mine === availabilityRequest && auth.account?.id === accountId) secondBrainOnline.value = status.available;
@@ -309,7 +312,7 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
-  watch(() => [auth.account?.id, accountCaps.ready, accountCaps.capabilities.includes("obsidian"), auth.hasPermission("tools.execute")],
+  watch(() => [auth.account?.id, auth.hasPermission("tools.execute")],
     () => void refreshSecondBrainAvailability(), { immediate: true });
 
   async function setSaveToSecondBrain(on: boolean): Promise<void> {
@@ -788,15 +791,15 @@ export const useChatStore = defineStore("chat", () => {
     if (!auth.hasPermission("tools.view")) return;
     const started = generation;
     try {
-      const list = await commandRunner.list(enabledExtensions.value, enabledCapabilities.value);
+      const list = await commandRunner.list(enabledExtensions.value);
       if (started === generation) commands.value = list;
     } catch {
       if (started === generation) commands.value = [];
     }
   }
 
-  // The suggestions follow what the account has added.
-  watch([enabledExtensions, enabledCapabilities], () => {
+  // The suggestions follow the shared extensions.
+  watch(enabledExtensions, () => {
     void loadCommands();
   });
 
@@ -813,7 +816,7 @@ export const useChatStore = defineStore("chat", () => {
     clockStart.value = began;
     const started = generation;
     try {
-      const result = await commandRunner.run(text, enabledExtensions.value, enabledCapabilities.value);
+      const result = await commandRunner.run(text, enabledExtensions.value);
       if (started !== generation) return;
       const seconds = Number(((Date.now() - began) / 1000).toFixed(1));
       await appendMessages(
@@ -894,13 +897,6 @@ export const useChatStore = defineStore("chat", () => {
       await runCommand(question);
       return true;
     }
-    // What the account added, as ember_api last saved it: needed before anything is changed.
-    await accountCaps.settled();
-    if (!accountCaps.ready) {
-      sendError.value = `Couldn't check which capabilities you added, so nothing was sent: ${accountCaps.error || "not loaded yet"}`;
-      return false;
-    }
-    const disabledTools = accountCaps.disabledTools;
     const autoSave = secondBrainAvailable.value && saveToSecondBrain.value;
     const sendSecondBrain = secondBrainAvailable.value || active.value?.saveToSecondBrain === true;
     // The administrator may have changed what is required since the page loaded.
@@ -941,8 +937,6 @@ export const useChatStore = defineStore("chat", () => {
         ...(planLean.value ? {} : { plan_lean: false }),
         ...(contextPanel.value && contextAccuracy.value === "exact" ? { exact_context: true } : {}),
         can_ask: true,
-        enabled_extensions: enabledExtensions.value,
-        ...(disabledTools.length ? { disabled_tools: disabledTools } : {}),
         title: conversation.title,
         ...(truncateTo === undefined ? {} : { truncate_to: truncateTo }),
         ...(askBeforeTools.value || forceToolApproval.value
@@ -1527,7 +1521,6 @@ export const useChatStore = defineStore("chat", () => {
     answerQuestion,
     skipQuestion,
     enabledExtensions,
-    enabledCapabilities,
     refreshCommands,
     clearChat,
     summarizeChat,

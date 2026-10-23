@@ -3,14 +3,14 @@ import { installFakeApi } from "./fakeApi.ts";
 import { logIn } from "./helpers.ts";
 const row = (page: Page, label: string) => page.locator('article.catalog-row').filter({has:page.getByRole('button',{name:`View ${label}`,exact:true})});
 
-test('disabled capabilities stay in the list and can be enabled again without a page change',async({page})=>{
+test('shared capabilities are managed by administrators, so the list has no switch for them',async({page})=>{
  const api=await installFakeApi(page,{admin:true});await logIn(page);await page.goto('/capabilities');
- const pdf=row(page,'PDF files');await expect(pdf.getByRole('switch')).toBeChecked();await pdf.locator('label.toggle').click();await expect(pdf.getByRole('switch')).not.toBeChecked();await expect(pdf).toHaveClass(/disabled/);await expect(pdf).toContainText('Disabled');
- await pdf.locator('label.toggle').click();await expect(pdf.getByRole('switch')).toBeChecked();await page.reload();await expect(pdf.getByRole('switch')).toBeChecked();expect(api.unexpected).toEqual([]);
+ const pdf=row(page,'PDF files');await expect(pdf).toBeVisible();await expect(pdf.getByRole('switch')).toHaveCount(0);
+ await pdf.getByRole('button',{name:'View PDF files',exact:true}).click();await expect(page.locator('.account-control')).toHaveCount(0);expect(api.unexpected).toEqual([]);
 });
-test('old Supermarket links redirect and extensions are enabled on their own tab',async({page})=>{
+test('old Supermarket links redirect and shared extensions have no switch either',async({page})=>{
  const api=await installFakeApi(page,{admin:true});await page.route('**/api/extensions',route=>route.fulfill({json:[{id:'echo',label:'Echo server',description:'',status:'connected',error:null,tools:[]}]}));await logIn(page);await page.goto('/capabilities/supermarket?tab=extensions');await expect(page).toHaveURL(/\/capabilities\?tab=extensions$/);
- const echo=row(page,'Echo server');await expect(echo).toContainText('Disabled');await echo.locator('label.toggle').click();await expect(echo.getByRole('switch')).toBeChecked();await page.getByRole('tab',{name:'Capabilities',exact:true}).click();await expect(echo).toHaveCount(0);await page.getByRole('tab',{name:'Extensions',exact:true}).click();await expect(echo.getByRole('switch')).toBeChecked();expect(api.unexpected).toEqual([]);
+ const echo=row(page,'Echo server');await expect(echo).toContainText('Enabled');await expect(echo.getByRole('switch')).toHaveCount(0);expect(api.unexpected).toEqual([]);
 });
 test('private extensions are added, enabled, edited and removed from the Extensions tab',async({page})=>{
  const api=await installFakeApi(page);await logIn(page);await page.goto('/capabilities?tab=extensions');await page.getByRole('button',{name:'+ Add extension',exact:true}).click();await page.getByLabel('Label',{exact:true}).fill('My notes');await page.getByLabel('Address',{exact:true}).fill('https://notes.example.com/mcp');await page.getByRole('button',{name:'Add header',exact:true}).click();await page.locator('.header-name').fill('Authorization');await page.locator('.header-value').fill('Bearer example');await page.getByRole('dialog',{name:'Add your own extension'}).getByRole('button',{name:'Add',exact:true}).click();

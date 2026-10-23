@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory, type RouteLocationRaw } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import ChatView from "../features/chat/views/ChatView.vue";
-import { accountCapabilitiesClient } from "../features/capabilities/api/AccountCapabilitiesClient";
 import { commandsClient } from "../api/tools/CommandsClient";
 import { NATIVE_CAPABILITY_ROUTES } from "./capabilityPages";
 
@@ -163,17 +162,12 @@ router.beforeEach(async (to): Promise<true | RouteLocationRaw> => {
     return { name: home?.name ?? "no-access" };
   }
   if (to.name === "no-access" && home) return { name: home.name };
-  if (to.meta.capability) {
+  if (to.meta.capability && auth.hasPermission("tools.view")) {
+    // Execution access does not imply permission to browse the global catalog.
+    // Native API routes always enforce the capability's current enabled state.
     try {
-      const [added, available] = await Promise.all([
-        accountCapabilitiesClient.get(),
-        // Execution access does not imply permission to browse the global catalog.
-        // Native API routes always enforce the capability's current enabled state.
-        auth.hasPermission("tools.view") ? commandsClient.capabilities() : null,
-      ]);
-      if (auth.account?.id !== account.id ||
-          !added.capabilities.includes(to.meta.capability) ||
-          (available !== null && !available.some((c) => c.name === to.meta.capability && c.enabled))) {
+      const available = await commandsClient.capabilities();
+      if (auth.account?.id !== account.id || !available.some((c) => c.name === to.meta.capability && c.enabled)) {
         return { name: home?.name ?? "no-access" };
       }
     } catch {

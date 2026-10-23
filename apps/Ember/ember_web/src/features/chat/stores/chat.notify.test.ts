@@ -1,5 +1,5 @@
 import { notifyCompletion, clearCompletionNotifications } from "../composables/useCompletionNotify";
-import { accountCapabilitiesClient } from "../../capabilities/api/AccountCapabilitiesClient";
+import { extensionsClient } from "../../capabilities/api/ExtensionsClient";
 import { flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,9 +10,7 @@ import { watchTurn, type WatchEnd } from "../services/turnStream";
 import { useAuthStore } from "../../../stores/auth";
 import { useChatStore } from "./chat";
 
-vi.mock("../../capabilities/api/AccountCapabilitiesClient", () => ({
-  accountCapabilitiesClient: { get: vi.fn(), set: vi.fn() },
-}));
+vi.mock("../../capabilities/api/ExtensionsClient", () => ({ extensionsClient: { list: vi.fn() } }));
 vi.mock("../api/ChatsClient", () => ({
   chatsClient: {
     list: vi.fn(),
@@ -109,7 +107,7 @@ async function running() {
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
-  vi.mocked(accountCapabilitiesClient.get).mockResolvedValue({ capabilities: [], extensions: [], disabled_tools: [] });
+  vi.mocked(extensionsClient.list).mockResolvedValue([]);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-01T10:00:00Z"));
   watch.mockImplementation(

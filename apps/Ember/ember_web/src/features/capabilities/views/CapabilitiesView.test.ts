@@ -8,7 +8,6 @@ import type { UserExtension } from "../api/UserExtensionsClient";
 import type { ResourceInfo, ToolInfo } from "../../../api/types";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 import { useAuthStore } from "../../../stores/auth";
-import { useAccountCapabilitiesStore } from "../stores/accountCapabilities";
 import CapabilitiesView from "./CapabilitiesView.vue";
 
 const mocks = vi.hoisted(() => ({
@@ -19,8 +18,6 @@ const mocks = vi.hoisted(() => ({
   readResource: vi.fn(),
   runTool: vi.fn(),
   extensions: vi.fn(),
-  accountGet: vi.fn(),
-  accountSet: vi.fn(),
   userList: vi.fn(),
   userUpdate: vi.fn(),
 }));
@@ -42,9 +39,6 @@ vi.mock("../../../api/tools/McpServerClient", () => ({
   },
 }));
 
-vi.mock("../api/AccountCapabilitiesClient", () => ({
-  accountCapabilitiesClient: { get: mocks.accountGet, set: mocks.accountSet },
-}));
 vi.mock("../api/UserExtensionsClient", () => ({
   userExtensionsClient: { list: mocks.userList, create: vi.fn(), update: mocks.userUpdate, remove: vi.fn() },
 }));
@@ -89,19 +83,13 @@ const ACCOUNT: Account = {
   permissions: ["chat.use", "tools.view", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"],
 };
 
-async function show(options: { admin?: boolean; query?: string; permissions?: string[]; attach?: boolean; added?: { capabilities?: string[]; extensions?: string[] }; userExtensions?: UserExtension[] } = {}) {
+async function show(options: { admin?: boolean; query?: string; permissions?: string[]; attach?: boolean; userExtensions?: UserExtension[] } = {}) {
   const pinia = createPinia();
   setActivePinia(pinia);
   useAuthStore().account = {
     ...ACCOUNT,
     permissions: options.permissions ?? (options.admin ? ["chat.use", "tools.view", "roles.manage", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] : ["chat.use", "tools.view", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"]),
   };
-  const listedExtensions = (await Promise.resolve(mocks.extensions()).catch(() => [])) as { id: string }[];
-  mocks.accountGet.mockResolvedValue({
-    capabilities: options.added?.capabilities ?? CAPS.map((c) => c.name),
-    extensions: options.added?.extensions ?? listedExtensions.map((e) => e.id),
-    disabled_tools: [],
-  });
   mocks.userList.mockResolvedValue(options.userExtensions ?? []);
   const router = createRouter({
     history: createMemoryHistory(),
@@ -133,7 +121,6 @@ beforeEach(() => {
   mocks.capabilities.mockResolvedValue(CAPS);mocks.listTools.mockResolvedValue(TOOLS);mocks.listResources.mockResolvedValue(RESOURCES);mocks.extensions.mockResolvedValue([EXT]);
   mocks.runTool.mockResolvedValue({text:"merged ok",isError:false});mocks.readResource.mockResolvedValue("# Help text");
   mocks.userUpdate.mockImplementation(async (id,patch)=>({...MINE,id,...patch}));
-  mocks.accountSet.mockImplementation(async(kind,key,on)=>{const store=useAccountCapabilitiesStore();const capabilities=new Set(store.capabilities),extensions=new Set(store.extensions),target=kind==="capability"?capabilities:extensions;if(on)target.add(key);else target.delete(key);return {capabilities:[...capabilities],extensions:[...extensions],disabled_tools:[]};});
 });
 
 describe("Capabilities tool and workspace access",()=>{
@@ -144,13 +131,14 @@ describe("Capabilities tool and workspace access",()=>{
   it("links dedicated notes, memory, generator and ticket pages through their permissions",async()=>{
     const definitions=[['notes','Notes','/notes'],['memory','Memory','/memory'],['gen','Generator','/generator'],['ticket','Tickets','/tickets']];
     mocks.capabilities.mockResolvedValue(definitions.map(([name,label])=>({name,label,enabled:true,tools:[],resources:[]})));
-    const w=await show({permissions:['tools.view','chat.use','tools.execute','tickets.create'],added:{capabilities:definitions.map(d=>d[0]!)}});
+    const w=await show({permissions:['tools.view','chat.use','tools.execute','tickets.create']});
     for(const [,label,path] of definitions){await choose(w,label!);expect(w.get('.detail-footer a').attributes('href')).toBe(path);}
   });
-  it("retains generic GUI page fallback and suppresses links for disabled subscriptions",async()=>{
+  it("retains generic GUI page fallback and suppresses links for offline capabilities",async()=>{
     mocks.capabilities.mockResolvedValue([{name:'custom',label:'Custom',enabled:true,tools:[],resources:[],has_gui:true}]);
-    const w=await show({added:{capabilities:['custom']}});await choose(w,'Custom');expect(w.get('.detail-footer a').attributes('href')).toBe('/capabilities/custom');
-    const disabled=await show({added:{capabilities:[]}});await choose(disabled,'Custom');expect(disabled.find('.detail-footer a').exists()).toBe(false);
+    const w=await show();await choose(w,'Custom');expect(w.get('.detail-footer a').attributes('href')).toBe('/capabilities/custom');
+    mocks.capabilities.mockResolvedValue([{name:'custom',label:'Custom',enabled:false,tools:[],resources:[],has_gui:true}]);
+    const offline=await show();await choose(offline,'Custom');expect(offline.find('.detail-footer a').exists()).toBe(false);
   });
   it("opens external apps in a safe new tab, rejecting unsafe URLs and offline servers",async()=>{
     const w=await show();await extensionsTab(w);await choose(w,'Echo server');const link=w.get('.detail-footer a');expect(link.attributes('target')).toBe('_blank');expect(link.attributes('rel')).toBe('noopener noreferrer');
@@ -160,7 +148,7 @@ describe("Capabilities tool and workspace access",()=>{
   it("keeps legacy PDF extension links tied to native capability access",async()=>{
     mocks.extensions.mockResolvedValue([{...EXT,id:'pdf_merger',label:'PDF extension',tools:[]}]);
     const w=await show();await extensionsTab(w);await choose(w,'PDF extension');expect(w.get('.detail-footer a').attributes('href')).toBe('/capabilities/pdf_merger');
-    const noAccess=await show({added:{capabilities:[]}});await extensionsTab(noAccess);await choose(noAccess,'PDF extension');expect(noAccess.find('.detail-footer a').exists()).toBe(false);
+    mocks.capabilities.mockResolvedValue(CAPS.map(c=>({...c,enabled:false})));const noAccess=await show();await extensionsTab(noAccess);await choose(noAccess,'PDF extension');expect(noAccess.find('.detail-footer a').exists()).toBe(false);
   });
   it("runs selected tools and shows results, then clears them on close",async()=>{
     const w=await show();await choose(w,'PDF files');await w.get('.tool-list button').trigger('click');await flushPromises();await w.get('form.tool-form').trigger('submit');await flushPromises();expect(mocks.runTool).toHaveBeenCalledWith('tool_pdf_merge',{});expect(w.text()).toContain('merged ok');
@@ -172,8 +160,8 @@ describe("Capabilities tool and workspace access",()=>{
   it("reads capability resources and keeps namespaced extension resources with their owner",async()=>{
     mocks.listResources.mockResolvedValue([...RESOURCES,{name:'ext__doc',uri:'ext://doc',description:'',template:false}]);const w=await show();await choose(w,'PDF files');await w.get('.resource-link').trigger('click');await flushPromises();expect(mocks.readResource).toHaveBeenCalledWith('help://pdf');expect(w.text()).toContain('Help text');await extensionsTab(w);await choose(w,'Echo server');expect(w.get('.resources').text()).toContain('ext__doc');expect(w.get('.resources').text()).not.toContain('pdf_help');
   });
-  it("keeps unclaimed tools while excluding tools owned by a disabled capability",async()=>{
-    mocks.extensions.mockResolvedValue([]);const w=await show({added:{capabilities:[]}});await choose(w,'Other tools');expect(w.get('.tool-list').text()).toContain('Echo');expect(w.get('.tool-list').text()).not.toContain('Merge');
+  it("keeps unclaimed tools while excluding tools owned by a capability",async()=>{
+    mocks.extensions.mockResolvedValue([]);const w=await show();await choose(w,'Other tools');expect(w.get('.tool-list').text()).toContain('Echo');expect(w.get('.tool-list').text()).not.toContain('Merge');
   });
   it("offers private editing and confirms removal without any private run action",async()=>{
     const w=await show({permissions:['tools.view','chat.use','extensions.personal.manage'],userExtensions:[MINE]});await extensionsTab(w);await choose(w,'My notes');expect(w.findAll('.tool-list button').every(b=>b.attributes('disabled')!==undefined)).toBe(true);await w.get('.edit-extension').trigger('click');expect(w.findComponent({name:'UserExtensionModal'}).props('extension').id).toBe('mynotes');await w.findComponent({name:'UserExtensionModal'}).vm.$emit('close');await w.get('.remove-extension').trigger('click');expect(w.findComponent(ConfirmModal).props('open')).toBe(true);
@@ -181,7 +169,7 @@ describe("Capabilities tool and workspace access",()=>{
   it("shows tool discovery failure while preserving the catalog, and retries failed catalog loads",async()=>{
     mocks.listTools.mockRejectedValue(new Error('Tool schemas unavailable'));const w=await show();expect(row(w,'PDF files')).toBeDefined();expect(w.text()).toContain('Tool schemas unavailable');mocks.capabilities.mockRejectedValue(new Error('Server down'));const failed=await show();expect(failed.text()).toContain('Server down');expect(failed.find('button.retry').exists()).toBe(true);
   });
-  it("shows failed saves while restoring the server's subscription state",async()=>{
-    mocks.accountSet.mockRejectedValue(new Error('Save refused'));const w=await show({added:{capabilities:['pdf']}});await row(w,'services').get('input').setValue(true);await flushPromises();expect(row(w,'services').text()).toContain('Disabled');expect(w.text()).toContain('Save refused');
+  it("shows failed private saves while restoring the server's state",async()=>{
+    mocks.userUpdate.mockRejectedValue(new Error('Save refused'));const w=await show({userExtensions:[{...MINE,enabled:false}]});await extensionsTab(w);await row(w,'My notes').get('input').setValue(true);await flushPromises();expect(row(w,'My notes').text()).toContain('Disabled');expect(w.text()).toContain('Save refused');
   });
 });
