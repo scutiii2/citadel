@@ -49,6 +49,8 @@ export default defineConfig({
       ],
     },
     workbox: {
+      // Push alerts: the worker's push and click handlers live in public/push-sw.js.
+      importScripts: ['push-sw.js'],
       // Cache only versioned UI files. Account data, API calls, and downloads stay on the network.
       globPatterns: ['**/*.{js,css,html}'],
       navigateFallback: '/index.html',

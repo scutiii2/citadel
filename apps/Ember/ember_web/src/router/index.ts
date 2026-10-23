@@ -99,6 +99,12 @@ export const router = createRouter({
       meta: { permission: "tickets.create" },
     },
     {
+      path: "/calendar",
+      name: "calendar",
+      component: () => import("../features/calendar/CalendarView.vue"),
+      meta: { permission: "calendar.use" },
+    },
+    {
       path: "/settings",
       name: "settings",
       component: () => import("../features/settings/SettingsView.vue"),
