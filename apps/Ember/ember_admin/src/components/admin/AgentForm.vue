@@ -6,6 +6,8 @@ import ToggleSwitch from "../ToggleSwitch.vue";
 import SettingRow from "../SettingRow.vue";
 import AgentGatewayList, { type GatewayRow } from "./AgentGatewayList.vue";
 import RouterPolicyForm from "./RouterPolicyForm.vue";
+import ToolScopePicker from "./ToolScopePicker.vue";
+import type { CapabilityInfo } from "../../api/CommandsClient";
 import { routerPolicyDefaults, validateRouterPolicy } from "../../utils/routerPolicy";
 
 /** Create or edit one agent file. The parent keeps `open`, saves on `save`
@@ -16,6 +18,7 @@ const props = defineProps<{
   open: boolean;
   initial: AgentFile | null;
   providers: ProviderCatalog;
+  capabilities: CapabilityInfo[];
   suggestedPort: number;
   busy: boolean;
   error: string;
@@ -366,6 +369,7 @@ function previewPrompt(): void {
         <label class="field"><span>Persona</span><textarea v-model="persona" data-test="persona" rows="3" /></label>
         <label class="field"><span>Instructions</span><textarea v-model="instructions" data-test="instructions" rows="8" placeholder="Empty = the shared default instructions" /></label>
         <label class="field"><span>Focus</span><input v-model="focus" data-test="focus" type="text" autocomplete="off" placeholder="One line the entry agent uses to pick this specialist" /></label>
+        <ToolScopePicker v-model="allow" :capabilities="capabilities" />
         <div class="row">
           <label class="field grow"><span>Allowed tools</span><input v-model="allow" data-test="allow" type="text" autocomplete="off" placeholder="All tools, or e.g. calc_*, convert_*" /></label>
           <label class="field grow"><span>Denied tools</span><input v-model="deny" data-test="deny" type="text" autocomplete="off" placeholder="None" /></label>
