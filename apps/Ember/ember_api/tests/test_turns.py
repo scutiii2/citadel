@@ -7,6 +7,7 @@ import time
 import uuid
 
 import pytest
+import httpx
 from fastapi.testclient import TestClient
 
 from src.config import UsageSettings
@@ -926,13 +927,22 @@ def test_bad_summarize_ratio_is_refused(ratio: float) -> None:
         UsageSettings.from_config({"auto_summarize_ratio": ratio})
 
 
-def test_turn_passes_only_valid_extension_ids(client: TestClient, agent: FakeAgent) -> None:
+def test_turn_enables_every_extension_mcp_server_lists(client: TestClient, agent: FakeAgent, upstream) -> None:
     as_admin(client)
+    upstream.handler = lambda request: httpx.Response(200, json=[{"id": "notes"}, {"id": "wiki_2"}, {"label": "no id"}])
     chat_id = new_id()
-    assert start(client, chat_id, enabled_extensions=["notes", "wiki_2", "notes"]).status_code == 202
+    assert start(client, chat_id, enabled_extensions=["../etc"]).status_code == 202  # the browser's say is ignored
     events(client, chat_id)
     assert agent.asks[-1]["enabled_extensions"] == ["notes", "wiki_2"]
-    assert start(client, new_id(), enabled_extensions=["../etc"]).status_code == 422
+
+
+def test_turn_runs_without_extensions_when_mcp_server_cannot_list_them(client: TestClient, agent: FakeAgent, upstream) -> None:
+    as_admin(client)
+    upstream.handler = lambda request: httpx.Response(503, json={"error": "down"})
+    chat_id = new_id()
+    assert start(client, chat_id).status_code == 202
+    events(client, chat_id)
+    assert agent.asks[-1]["enabled_extensions"] == []
 
 
 def test_the_checklist_toggles_default_on_and_reach_the_agent(client: TestClient, agent: FakeAgent) -> None:

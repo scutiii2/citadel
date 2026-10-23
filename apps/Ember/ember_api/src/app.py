@@ -23,7 +23,7 @@ from src.json_only import JsonOnlyMiddleware
 from src.security import SecurityMiddleware
 from src.routes import (
     account,
-    account_capabilities,
+    account_agents,
     admin,
     agent_admin,
     attachments,
@@ -224,7 +224,7 @@ def create_app(
     app.include_router(brains.router)
     app.include_router(memory.router)
     app.include_router(triage.router)
-    app.include_router(account_capabilities.router)
+    app.include_router(account_agents.router)
     app.include_router(user_extensions.router)
     app.include_router(shares.router)
     app.include_router(shares.public_router)

@@ -8,13 +8,11 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from pydantic import BaseModel, Field
 
-from src.deps import get_db_gateway, get_log_writer, require_permission
+from src.deps import get_log_writer, require_permission
 from src.models import Account
 from src.routes.attachments import AttachmentIn
 from src.routes.server_info import get_server_info, _call
-from src.services.account_capability_service import AccountCapabilityService
 from src.services.capability_files import Area, CapabilityFilesGateway, PUBLIC
-from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import McpServerInfo
 from src.services.text_extraction import MAX_FILE_BYTES
@@ -65,15 +63,7 @@ def gateway(request: Request) -> CapabilityFilesGateway:
 def install(area: Area) -> None:
     routes = APIRouter(prefix=f"/api/{PUBLIC[area]}")
 
-    async def access(account: Account = Depends(require_permission("tools.execute")),
-                     store: DocumentStore = Depends(get_db_gateway)) -> Account:
-        try:
-            added = await AccountCapabilityService(store, account.uid).get()
-        except DbGatewayError as error:
-            raise HTTPException(503, "Account capabilities storage is unavailable") from error
-        if area not in added.capabilities:
-            raise HTTPException(403, "Add this capability from the Supermarket first.")
-        return account
+    access = require_permission("tools.execute")
 
     @routes.get("/files")
     async def files(account: Account = Depends(access), client: CapabilityFilesGateway = Depends(gateway)):

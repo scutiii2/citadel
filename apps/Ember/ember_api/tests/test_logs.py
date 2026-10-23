@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import uuid
 
+import httpx
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -65,11 +67,12 @@ def test_logs_page_needs_a_logs_permission_per_kind(client: TestClient, email: F
     assert client.get("/api/logs/secrets").status_code == 422
 
 
-def test_chat_turns_are_traced_and_agent_failures_logged(client: TestClient, agent: FakeAgent) -> None:
+def test_chat_turns_are_traced_and_agent_failures_logged(client: TestClient, agent: FakeAgent, upstream) -> None:
     as_admin(client)
+    upstream.handler = lambda request: httpx.Response(200, json=[{"id": "notes"}])
     root = my_id(client)
     chat_id = str(uuid.uuid4())
-    body = {"question": "What is up?", "agent_id": AGENTS[0]["id"], "enabled_extensions": ["notes"]}
+    body = {"question": "What is up?", "agent_id": AGENTS[0]["id"]}
     assert client.post(f"/api/chats/{chat_id}/turns", json=body).status_code == 202
     events(client, chat_id)
 
@@ -81,7 +84,7 @@ def test_chat_turns_are_traced_and_agent_failures_logged(client: TestClient, age
 
     agent.fail = "provider rate limited"
     other = str(uuid.uuid4())
-    client.post(f"/api/chats/{other}/turns", json={**body, "enabled_extensions": []})
+    client.post(f"/api/chats/{other}/turns", json=body)
     events(client, other)
     assert messages(client, "error", root) == [f"{AGENTS[0]['id']}: provider rate limited"]
 

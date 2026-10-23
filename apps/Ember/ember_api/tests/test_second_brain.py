@@ -13,7 +13,6 @@ def obsidian(client, upstream):
     upstream.handler = lambda request: httpx.Response(200, json=[{
         "name": "obsidian", "enabled": True, "tools": ["tool_obsidian_write"],
     }])
-    assert client.put("/api/account-capabilities/capability/obsidian", json={"enabled": True}).status_code == 200
     return client
 
 
@@ -60,14 +59,7 @@ def test_unsubscribed_and_offline_capability_cannot_enable(obsidian, upstream):
     assert start(obsidian, chat_id, save_to_second_brain=True).status_code == 409
     assert obsidian.get(f"/api/chats/{chat_id}").status_code == 404
     upstream.handler = lambda request: httpx.Response(200, json=[{"name": "obsidian", "enabled": True, "tools": ["tool_obsidian_write"]}])
-    obsidian.put("/api/account-capabilities/capability/obsidian", json={"enabled": False})
-    assert start(obsidian, new_id(), save_to_second_brain=True).status_code == 409
-
-
-def test_disabling_write_tool_does_not_silently_auto_save(obsidian, agent):
-    chat_id = new_id()
-    assert start(obsidian, chat_id, save_to_second_brain=True, disabled_tools=["tool_obsidian_write"]).status_code == 409
-    assert not agent.asks
+    assert start(obsidian, new_id(), save_to_second_brain=True).status_code == 202
 
 
 def test_second_brain_requires_login(client):
