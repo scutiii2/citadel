@@ -28,6 +28,12 @@ dependencies = [
     "alembic>=1.13,<2.0",
     # Encrypts the header values of users' private extensions at rest.
     "cryptography>=42",
+    # Calendar: read ICS feeds, expand recurrences, send web push alerts.
+    "icalendar>=6.0",
+    "recurring-ical-events>=3.0",
+    "pywebpush>=2.0",
+    # Time zone database for zoneinfo on Windows.
+    "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]

@@ -20,7 +20,10 @@ from src.models import AppSetting
 # Every account's answers ask before each tool runs, whatever its browser sends.
 FORCE_TOOL_APPROVAL = "force_tool_approval"
 
-BOOLEAN_SETTINGS: dict[str, bool] = {FORCE_TOOL_APPROVAL: False}
+# Which alert channels the calendar may use for everyone; each is on until an administrator switches it off.
+CALENDAR_CHANNELS = ("calendar_inapp", "calendar_email", "calendar_push")
+
+BOOLEAN_SETTINGS: dict[str, bool] = {FORCE_TOOL_APPROVAL: False, **{name: True for name in CALENDAR_CHANNELS}}
 
 # Page ids (route paths) the administrator hid from every account's sidebar.
 HIDDEN_PAGES = "hidden_pages"

@@ -97,4 +97,6 @@ def test_the_boolean_settings_list_is_unchanged(client: TestClient) -> None:
     as_admin(client)
     hide(client, ["/usage"])
 
-    assert client.get("/api/settings").json() == {"force_tool_approval": False}
+    assert client.get("/api/settings").json() == {
+        "force_tool_approval": False, "calendar_inapp": True, "calendar_email": True, "calendar_push": True,
+    }

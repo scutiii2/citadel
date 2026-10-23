@@ -35,7 +35,7 @@ class TestTheSwitch:
     def test_it_is_off_by_default(self, client: TestClient) -> None:
         as_admin(client)
 
-        assert client.get("/api/settings").json() == {FORCE_TOOL_APPROVAL: False}
+        assert client.get("/api/settings").json() == {FORCE_TOOL_APPROVAL: False, "calendar_inapp": True, "calendar_email": True, "calendar_push": True}
 
     def test_reading_needs_a_login(self, client: TestClient) -> None:
         assert client.get("/api/settings").status_code == 401
@@ -44,9 +44,9 @@ class TestTheSwitch:
         as_admin(client)
 
         force(client, True)
-        assert client.get("/api/settings").json() == {FORCE_TOOL_APPROVAL: True}
+        assert client.get("/api/settings").json() == {FORCE_TOOL_APPROVAL: True, "calendar_inapp": True, "calendar_email": True, "calendar_push": True}
         force(client, False)
-        assert client.get("/api/settings").json() == {FORCE_TOOL_APPROVAL: False}
+        assert client.get("/api/settings").json() == {FORCE_TOOL_APPROVAL: False, "calendar_inapp": True, "calendar_email": True, "calendar_push": True}
 
     def test_any_logged_in_account_can_read_it(self, client: TestClient, email: FakeEmailSender) -> None:
         as_admin(client)
@@ -54,7 +54,7 @@ class TestTheSwitch:
         make_member(client, email)
         login(client, "alice")
 
-        assert client.get("/api/settings").json() == {FORCE_TOOL_APPROVAL: True}
+        assert client.get("/api/settings").json() == {FORCE_TOOL_APPROVAL: True, "calendar_inapp": True, "calendar_email": True, "calendar_push": True}
 
     def test_only_an_admin_can_change_it(self, client: TestClient, email: FakeEmailSender) -> None:
         as_admin(client)
@@ -62,7 +62,7 @@ class TestTheSwitch:
         login(client, "alice")
 
         assert client.put(URL, json={"value": True}).status_code == 403
-        assert client.get("/api/settings").json() == {FORCE_TOOL_APPROVAL: False}
+        assert client.get("/api/settings").json() == {FORCE_TOOL_APPROVAL: False, "calendar_inapp": True, "calendar_email": True, "calendar_push": True}
 
     def test_a_logged_out_visitor_cannot_change_it(self, client: TestClient) -> None:
         assert client.put(URL, json={"value": True}).status_code == 401
