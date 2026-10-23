@@ -168,3 +168,17 @@ def test_a_bare_tool_name_is_still_checked_against_the_users_switched_off_tools(
             call.assert_not_called()
     finally:
         tool_filter.reset(token)
+
+
+def test_agent_blocked_reads_only_the_agent_entries():
+    token = tool_filter.bind(["agent:poet", "tool_calc"])
+    try:
+        assert tool_filter.agent_blocked("poet")
+        assert not tool_filter.agent_blocked("calc")
+    finally:
+        tool_filter.reset(token)
+    token = tool_filter.bind(["*"])
+    try:
+        assert not tool_filter.agent_blocked("poet")
+    finally:
+        tool_filter.reset(token)

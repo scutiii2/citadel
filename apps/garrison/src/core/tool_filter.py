@@ -35,3 +35,14 @@ def blocked() -> frozenset[str]:
 def is_blocked(name: str) -> bool:
     names = _blocked.get()
     return "*" in names or name in names
+
+
+# A specialist the asking user switched off rides in the same set as "agent:<id>",
+# so it reaches delegates and old agents' fail-closed check without a new argument.
+AGENT_PREFIX = "agent:"
+
+
+def agent_blocked(agent_id: str) -> bool:
+    """True when the user switched this specialist off. A bare "*" does not count:
+    it blocks tools, and tool-less specialists stay offered."""
+    return AGENT_PREFIX + agent_id in _blocked.get()

@@ -243,6 +243,10 @@ def call(
         configured = ", ".join(agent_registry.list_agent_ids()) or "(none configured)"
         raise ValueError(f"unknown agent_id {agent_id!r} - configured agents: {configured}")
 
+    if tool_filter.agent_blocked(agent_id):
+        # The roster omits it, but the model may still name it.
+        raise PermissionError(f"agent {agent_id!r} is switched off for this user")
+
     # A delegate has no way to ask the user, so when this turn asks before
     # tools run, the delegate's tools that would need asking are refused.
     approval_mode = "off" if approvals.current().mode == "off" else "deny"

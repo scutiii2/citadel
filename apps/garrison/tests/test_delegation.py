@@ -106,6 +106,18 @@ def test_call_raises_for_an_unknown_agent_id(monkeypatch):
         assert "unknown agent_id 'nope'" in str(error)
 
 
+def test_call_refuses_an_agent_the_user_switched_off(monkeypatch):
+    from src.core import tool_filter
+
+    _configure_agents(monkeypatch, [{"id": "claude-agent", "label": "Claude Agent", "url": "http://x/mcp"}])
+    token = tool_filter.bind(["agent:claude-agent"])
+    try:
+        with pytest.raises(PermissionError, match="switched off"):
+            delegation.call("claude-agent", "hi", depth=0)
+    finally:
+        tool_filter.reset(token)
+
+
 def test_call_returns_the_sub_agents_response_on_success(monkeypatch):
     _configure_agents(monkeypatch, [{"id": "openai-agent", "label": "OpenAI Agent", "url": "http://127.0.0.1:9101/mcp"}])
 

@@ -79,7 +79,8 @@ async def roster_for() -> list[RosterEntry]:
 
 
 def _usable_specialists() -> list[RosterEntry]:
-    found = specialists()
+    # A specialist the user switched off is gone whatever the catalog says.
+    found = [entry for entry in specialists() if not tool_filter.agent_blocked(entry.id)]
     live = _live_tool_names()
     if not live:
         # Unreadable or empty catalog: nothing can be judged, so nobody is left out.

@@ -139,3 +139,12 @@ def test_blocking_every_tool_leaves_only_specialists_that_need_none(monkeypatch)
 
 def test_an_empty_catalog_offers_everyone_even_when_the_user_blocked_everything(monkeypatch):
     assert _roster_ids(monkeypatch, [], blocked=["*"]) == ["researcher", "notes", "poet"]
+
+
+def test_roster_leaves_out_a_specialist_the_user_switched_off(monkeypatch):
+    assert _roster_ids(monkeypatch, LIVE, blocked=("agent:poet",)) == ["researcher", "notes"]
+
+
+def test_roster_keeps_tool_less_specialists_when_only_tools_are_blocked(monkeypatch):
+    assert _roster_ids(monkeypatch, LIVE, blocked=("*",)) == ["poet"]
+    assert _roster_ids(monkeypatch, None, blocked=("agent:poet",)) == ["researcher", "notes"]

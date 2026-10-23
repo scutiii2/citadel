@@ -375,7 +375,7 @@ agent itself), as lines of `<id> - <label>: <focus>`. Because it is per turn,
 a specialist that starts or stops shows up without a restart. A specialist with
 tools of its own (`tools.allow`, apart from the ticket tools) is left out when
 none of them is offered right now: its capability is switched off on mcp_server,
-or the asking user switched those tools off (`disabled_tools`). A specialist with
+or the asking user switched the specialist off (`agent:<id>` in `disabled_tools`). A specialist with
 no tools of its own always stays. If mcp_server's tool list cannot be read, or is
 empty, nobody is left out. The
 `agent_id` argument of `delegate_to_agent` is an enum of the roster ids. An
@@ -510,10 +510,10 @@ Set `AI_AGENT_USAGE_DIR` to write somewhere else. A cancelled turn writes no
 line; only completed asks do. A write failure logs a warning and never fails
 the turn. `.data/usage/` is gitignored.
 
-## Tools the user switched off
+## Tools and agents the user switched off
 
-`ask` also takes `disabled_tools`: mcp_server tool names the asking user switched
-off for their own chats (`src/core/tool_filter.py`). For that turn the agent does
+`ask` also takes `disabled_tools`: `agent:<id>` entries for specialists the asking user switched
+off for their own chats (the roster leaves them out and `delegate_to_agent` refuses them), plus mcp_server tool names (`src/core/tool_filter.py`). For that turn the agent does
 not offer them (`list_tools`) and refuses a call to one the model names anyway.
 A delegated agent is told the same list. `status()` reports `tool_filter: true`
 so ember_api can refuse an agent that would ignore the option.
