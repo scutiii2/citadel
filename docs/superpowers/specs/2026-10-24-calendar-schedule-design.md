@@ -31,15 +31,23 @@ Rejected: an armory capability like `pdf_merger`. Armory holds no accounts, emai
 
 ## Backend (ember_api)
 
-### Tables (one Alembic migration)
+### Storage: db_gateway collections (no Alembic migration)
 
-- `calendar_feeds`: `id`, `account_id`, `name`, `color`, `url_enc` (Fernet via `secret_box`, key `EMBER_SECRETS_KEY`), `enabled`, `etag`, `last_fetch_at`, `last_error`.
-- `alarm_rules`: `id`, `account_id`, `channel` (`inapp` | `email` | `push`), `lead_minutes`, `enabled`.
-- `push_subscriptions`: `id`, `account_id`, `endpoint` (unique), `p256dh`, `auth`, `created_at`.
-- `calendar_alerts`: `id`, `account_id`, `rule_id`, `event_key` (uid + start UTC), `title`, `start_utc`, `channel`, `status` (`sent` | `failed`), `created_at`, `seen_at`. Unique on (`rule_id`, `event_key`): an alert fires at most once per rule and event.
-- `calendar_prefs`: `account_id`, `timezone` (IANA name; the browser's zone is saved on first visit).
+`ember_api/src/services/db_gateway.py` states that new data without joins or foreign keys goes to db_gateway, as nav preferences and private extensions do. Calendar data has no joins, so it follows that rule. Every key starts with the account `uid`. The `DocumentStore` protocol (`get`, `put`, `create`, `delete`, `query` with equality filters) is all that is used.
 
-The default rule is created on first use of the calendar API, not in the migration.
+| Collection | Key | Document |
+| --- | --- | --- |
+| `calendar_feeds` | `<uid>:<feed_id>` | `owner`, `id`, `name`, `color`, `url_enc` (Fernet via `SecretBox.encrypt_map({"url": ...})`), `enabled`, `last_fetch_at`, `last_error`, `created_at` (the ETag is kept only in the in-memory feed cache) |
+| `calendar_rules` | `<uid>:<rule_id>` | `owner`, `id`, `channel` (`inapp` \| `email` \| `push`), `lead_minutes`, `enabled` |
+| `calendar_push` | `<uid>:<sha256(endpoint)[:32]>` | `owner`, `endpoint`, `p256dh`, `auth`, `created_at` |
+| `calendar_alerts` | `<uid>:<rule_id>:<sha256(event_key)[:24]>` | `owner`, `rule_id`, `title`, `start_utc`, `channel`, `status` (`sent` \| `failed`), `seen` (bool), `created_at` |
+| `calendar_prefs` | `<uid>` | `owner`, `timezone` |
+
+`DocumentStore.create` is create-if-absent, so an alert fires at most once per rule and event: the scheduler calls `create` first and dispatches only when it returns `True`.
+
+The default rule (in-app, 15 minutes) is created on the first `GET /alarms` of an account that has no rules. Alerts older than 7 days are deleted by the scheduler during feed refresh.
+
+Consequence: if db_gateway is down, the calendar page and the scheduler fail (503 on routes, scheduler skips the tick and logs). ember_api itself keeps running.
 
 ### Services
 
@@ -55,7 +63,7 @@ Started in the app lifespan, in the style of `BackupScheduler`. It never blocks 
 
 1. Every `feed_refresh_minutes`, refresh each enabled feed of accounts that have at least one enabled rule, and keep the expanded events for the next `lookahead_hours` in memory. A failing feed records `last_error` and keeps its previous events.
 2. Every `tick_seconds`, for each enabled rule whose channel is on in the admin config, find events with `start - lead <= now` and `now - (start - lead) <= late_grace_minutes`.
-3. For each match, insert the `calendar_alerts` row first. If the unique key rejects it, the alert already fired and nothing else happens. Otherwise dispatch to the channel.
+3. For each match, `create` the `calendar_alerts` document first. If it returns `False`, the alert already fired and nothing else happens. Otherwise dispatch to the channel. Only accounts that are active, have a verified email (when verification is required) and hold `calendar.use` are processed.
 4. A channel error sets that row to `failed` and never stops other channels or accounts.
 5. After downtime longer than the grace window, missed alerts are dropped, not sent in a burst.
 
@@ -82,10 +90,7 @@ The feed URL is accepted on create and never returned. `PATCH` may replace it. A
 
 `calendar_channels` = `{inapp: bool, email: bool, push: bool}`. A rule on a disabled channel stays stored but is not dispatched, and the UI shows it as unavailable.
 
-VAPID keys are generated into `.env` on first start, like `EMBER_SECRETS_KEY`. The Config issues page warns when:
-- email is on but the armory `email` capability is offline;
-- push is on but the site is not served over https (localhost excepted);
-- the secrets key is missing, so stored feed URLs cannot be read.
+VAPID keys are generated into `.env` on first start, like `EMBER_SECRETS_KEY`. The Config issues page warns when push cannot work: `calendar.enabled` is true but ember is not served over https (the same host and `cookie_secure` test as the existing cookie warning). An offline `email` capability shows up as failed email alerts and a line in the Errors log, not as a Config issue. A missing secrets key cannot happen, because it is generated at startup.
 
 ### Static (`configs/config_app.json`, new `calendar` block)
 
@@ -104,11 +109,11 @@ VAPID keys are generated into `.env` on first start, like `EMBER_SECRETS_KEY`. T
 
 ### Per user
 
-Rules in `alarm_rules`, the saved timezone, and push subscriptions (one per browser). Email goes to the account's verified address. A push rule needs at least one subscription.
+Rules in `calendar_rules`, the saved timezone, and push subscriptions (one per browser). Email goes to the account's verified address. A push rule needs at least one subscription.
 
 ### Permission
 
-`calendar.use`, held by Administrator. Existing roles keep what they have. Read-only access to alerts follows the same permission. The sidebar page can be hidden with the existing pages setting. No per-account capability toggle.
+`calendar.use`, added to `ALL_PERMISSIONS`; permissions sync into the database at startup and Administrator receives every permission, so no migration is needed. Existing roles keep what they have; an administrator grants it to other roles. Read-only access to alerts follows the same permission. The sidebar page can be hidden with the existing pages setting. No per-account capability toggle.
 
 ## Frontend
 
@@ -123,7 +128,9 @@ Before building, read `.agents/skills/ember-frontend-design/SKILL.md` and `ember
 - Alerts panel: list of rules (channel, lead time 5/10/15/30/60 or custom, enabled), add and remove. A rule whose channel is off shows why. Enabling push happens on a user click: permission prompt, service worker registration, `POST /push/subscribe`.
 - Event dialog: a TS util ported from the reference with tests — description and Teams-footer split, Outlook safelink unwrap, http(s)-only links, Teams join button, dedupe source dots.
 - `useAlertPoller` polls `GET /alerts?unseen=1` every 30 s and on tab focus, shows a toast and a browser `Notification` (pattern of `useCompletionNotify`), and marks alerts seen on dismiss.
-- `public/sw.js` handles `push` and `notificationclick` (opens `/calendar`).
+- The app already ships a service worker (`vite-plugin-pwa`, generateSW). `public/push-sw.js` handles `push` and `notificationclick` (opens `/calendar`) and is added through `workbox.importScripts`. Push therefore works only in the built app (`vite preview` or production), not on the dev server.
+- Calendar is a normal `NAV_PAGES` entry. Because the page is not backed by an mcp_server capability, check `NavRail.vue` and the frontend skill's rule about the rail versus the account menu when placing it.
+- Shared code cannot import features (`architecture.test.ts`): the alert poller is mounted from the layout, which may compose features.
 
 ### ember_admin
 
@@ -136,11 +143,11 @@ Settings section with the three channel switches; Config issues warnings as abov
 - Size and time caps on fetch; limits on feeds and rules per account.
 - Ownership checks on every id; POST bodies must be JSON (existing rule).
 - Push payloads carry the title and start time only.
-- Deleting an account deletes its feeds, rules, subscriptions, alerts and prefs.
+- Deleting an account purges its documents in all five collections (a `purge_owner` hook next to the existing ones in `routes/admin.py`, best effort like the others).
 
 ## Testing
 
-- pytest: expander (recurrence, exceptions, cancelled, DST, floating times); scheduler with a fake clock (fires once, grace window, several rules, channel failure isolated, disabled channel); fetcher (SSRF, redirect, size, timeout, ETag); routes (permission, ownership, URL never returned); migration parity test; account deletion purge.
+- pytest: expander (recurrence, exceptions, cancelled, DST, floating times); scheduler with a fake clock (fires once, grace window, several rules, channel failure isolated, disabled channel); fetcher (SSRF, redirect, size, timeout, ETag); routes (permission, ownership, URL never returned); account deletion purge. The tests use the existing in-memory `FakeDbGateway`.
 - vitest: event util, store, poller.
 - Playwright against the fake API, light and dark, at 1280, 768 and 375 widths.
 - Email and push use fake senders in tests. A live email and push smoke check is manual.
