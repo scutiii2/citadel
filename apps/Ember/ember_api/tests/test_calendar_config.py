@@ -39,3 +39,14 @@ def test_channel_switches_default_on_and_admin_can_flip(client: TestClient) -> N
     assert [body[n] for n in ("calendar_inapp", "calendar_email", "calendar_push")] == [True, True, True]
     assert client.put("/api/admin/settings/calendar_push", json={"value": False}).json() == {"calendar_push": False}
     assert client.get("/api/settings").json()["calendar_push"] is False
+
+
+def test_push_over_plain_http_on_a_reachable_host_is_a_warning(tmp_path) -> None:
+    import dataclasses
+
+    from src.services.config_validation import _check_deployment
+    from tests.conftest import make_settings
+
+    reachable = dataclasses.replace(make_settings(tmp_path), host="0.0.0.0")
+    assert any(key == "calendar.enabled" for key, _ in _check_deployment(reachable))
+    assert not any(key == "calendar.enabled" for key, _ in _check_deployment(make_settings(tmp_path)))

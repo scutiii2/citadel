@@ -70,8 +70,9 @@ def test_a_failing_purge_never_blocks_the_deletion(client: TestClient, email: Fa
         sent = purges(upstream)
         assert len(sent) == 1 and sent[0].url.host == "mcp-server.internal"
         errors = client.get("/api/logs/error", params={"actor": root}).json()
-        assert errors[0]["source"] == "admin.memory_purge"
-        assert f"deleted account '{name}'" in errors[0]["message"]
+        memory_error = next(entry for entry in errors if entry["source"] == "admin.memory_purge")
+        assert memory_error["source"] == "admin.memory_purge"
+        assert f"deleted account '{name}'" in memory_error["message"]
         assert identities[name] not in str(errors)
         assert identities[name] not in caplog.text
 
@@ -90,7 +91,8 @@ def test_an_unreachable_mcp_server_never_blocks_the_deletion(client: TestClient,
     assert client.delete(f"/api/admin/accounts/{alice}").status_code == 204
     assert "alice" not in uids(client)
     errors = client.get("/api/logs/error", params={"actor": root}).json()
-    assert errors[0]["source"] == "admin.memory_purge"
+    memory_error = next(entry for entry in errors if entry["source"] == "admin.memory_purge")
+    assert memory_error["source"] == "admin.memory_purge"
     assert uid not in str(errors)
     assert uid not in caplog.text
 

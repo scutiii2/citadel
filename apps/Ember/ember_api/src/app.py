@@ -28,6 +28,7 @@ from src.routes import (
     agent_admin,
     attachments,
     capability_files,
+    calendar as calendar_routes,
     auth,
     chat_folders,
     chats,
@@ -51,6 +52,8 @@ from src.services.agent_directory import AgentDirectory, HttpRegistrySource
 from src.services.agent_gateway import AgentGateway, McpAgentGateway
 from src.services.auth_service import AuthService
 from src.services.capability_files import CapabilityFailure
+from src.services.calendar_runtime import build_calendar_runtime
+from src.services.calendar_store import CalendarError
 from src.services.backup_service import BackupScheduler, DatabaseBackup
 from src.services.migrations import MigrationRunner
 from src.services.chat_service import MAX_CHAT_BYTES
@@ -162,6 +165,14 @@ def create_app(
         app.state.pricing = Pricing(settings.pricing)
         app.state.turns = TurnRegistry(database, app.state.agent_gateway, settings.usage, log_writer,
             pricing=app.state.pricing, directory=app.state.agent_directory)
+        app.state.calendar = (
+            build_calendar_runtime(
+                settings=settings, database=database, store=app.state.db_gateway, box=secret_box,
+                email_sender=app.state.email_sender, log_writer=log_writer,
+            )
+            if settings.calendar.enabled
+            else None
+        )
         backups: BackupScheduler | None = None
         app.state.backups = None
         if settings.backup.enabled:
@@ -175,6 +186,8 @@ def create_app(
         try:
             yield
         finally:
+            if app.state.calendar is not None:
+                await app.state.calendar.close()
             if backups is not None:
                 await backups.stop()
             # Before the database closes: running turns save what they have.
@@ -223,6 +236,11 @@ def create_app(
     app.include_router(traffic_routes.router)
     app.include_router(attachments.router)
     app.include_router(capability_files.router)
+    app.include_router(calendar_routes.router)
+
+    @app.exception_handler(CalendarError)
+    async def calendar_error(_request: Request, error: CalendarError):
+        return JSONResponse({"detail": str(error)}, status_code=error.status)
 
     @app.exception_handler(CapabilityFailure)
     async def capability_failure(_request: Request, error: CapabilityFailure):

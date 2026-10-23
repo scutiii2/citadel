@@ -795,3 +795,41 @@ existing chat auto-save destinations as `instance`. Chat summaries/updates/turns
 carry additive `second_brain_scope` (`instance|personal`); loss of access disables
 auto-save with a visible notice. Keys use existing SecretBox encryption in
 db_gateway, and account deletion purges all personal brain records.
+
+
+## Calendar
+
+Private read-only schedules use ICS links and require `calendar.use`. Calendar data is stored in db_gateway documents. Configure the `calendar` block in `configs/config_app.json`:
+
+| Key | Default |
+| --- | --- |
+| `enabled` | true |
+| `tick_seconds` | 30 |
+| `feed_refresh_minutes` | 10 |
+| `lookahead_hours` | 48 |
+| `late_grace_minutes` | 5 |
+| `max_feeds_per_account` | 10 |
+| `max_alarm_rules` | 10 |
+| `max_ics_bytes` | 5242880 |
+| `fetch_timeout_s` | 15 |
+| `allow_private_urls` | false |
+
+`push_contact` defaults to `mailto:admin@example.com`; set a contact starting with `mailto:` or `https://`. The admin Settings switches `calendar_inapp`, `calendar_email` and `calendar_push` default to on and control each channel for every account.
+
+`EMBER_VAPID_PRIVATE_KEY` and `EMBER_VAPID_PUBLIC_KEY` are generated into `.env` on first start. Deleting them requires every browser to subscribe again. Web push requires HTTPS and the built web app (`vite preview` or production). Email alerts use the existing Email capability.
+
+All calendar routes require a signed-in account with `calendar.use`; data is private to its immutable account UID. Feed URLs are accepted for writes and never returned.
+
+| Method | Route | Behavior |
+| --- | --- | --- |
+| GET/POST | `/api/calendar/feeds` | List calendars or add an encrypted ICS link. |
+| PATCH/DELETE | `/api/calendar/feeds/{id}` | Update or remove an owned calendar. |
+| GET | `/api/calendar/events?from=&to=` | Expanded, merged events over at most 62 days, with feed errors. |
+| GET/POST | `/api/calendar/alarms` | List or add rules; first visit seeds an in-app rule 15 minutes before events. |
+| PATCH/DELETE | `/api/calendar/alarms/{id}` | Update or remove an owned rule. |
+| GET/PUT | `/api/calendar/prefs` | Read or save the account timezone. |
+| GET | `/api/calendar/push/key` | Public VAPID key. |
+| POST | `/api/calendar/push/subscribe` | Save this browser's subscription. |
+| POST | `/api/calendar/push/unsubscribe` | Remove this browser's subscription. |
+| GET | `/api/calendar/alerts?unseen=1` | Unseen in-app alerts. |
+| POST | `/api/calendar/alerts/{id}/seen` | Dismiss an owned alert. |

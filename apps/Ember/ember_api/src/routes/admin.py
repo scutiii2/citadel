@@ -24,6 +24,7 @@ from src.deps import (
 )
 from src.config import Settings
 from src.models import Account, InviteCode, Permission, Role
+from src.services.calendar_store import purge_owner as purge_calendar
 from src.services.admin_service import AccountStatus, AdminError, AdminService, DelegationError, NotFoundError
 from src.services.email_service import EmailDeliveryError, EmailSender
 from src.services.log_service import LogWriter
@@ -325,6 +326,7 @@ async def delete_account(
         await purge_account_capabilities(store, uid)
         await purge_templates(store, uid)
         await purge_user_extensions(store, uid)
+        await purge_calendar(store, uid)
         await purge_brains(store, uid)
         from src.services.brain_gateway import BrainGateway
         from src.services.brain_connections import BrainError
