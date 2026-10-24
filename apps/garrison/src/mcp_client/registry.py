@@ -223,10 +223,13 @@ class McpClientRegistry:
         if meta is not None:
             extra["meta"] = meta
 
-        try:
-            return await session.call_tool(
+        async def call(on: Any) -> types.CallToolResult:
+            return await on.call_tool(
                 upstream_name, arguments, read_timeout_seconds=timedelta(seconds=CALL_TIMEOUT_SECONDS), **extra
             )
+
+        try:
+            return await call(session)
         except RuntimeError as error:
             if str(error) != "Session terminated":
                 raise
@@ -234,9 +237,7 @@ class McpClientRegistry:
             recovered_session = self._sessions.get(server_id)
             if recovered_session is None:
                 raise
-            return await recovered_session.call_tool(
-                upstream_name, arguments, read_timeout_seconds=timedelta(seconds=CALL_TIMEOUT_SECONDS), **extra
-            )
+            return await call(recovered_session)
 
     @catalog
     async def aclose(self) -> None:
