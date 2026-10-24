@@ -67,10 +67,10 @@ def _env():
 
 def test_push_reaches_every_subscription() -> None:
     cal, sent = store(), []
-    asyncio.run(cal.add_push("https://push.example/a", "k", "s"))
-    asyncio.run(cal.add_push("https://push.example/b", "k", "s"))
+    asyncio.run(cal.add_push("https://fcm.googleapis.com/a", "k", "s"))
+    asyncio.run(cal.add_push("https://fcm.googleapis.com/b", "k", "s"))
     asyncio.run(push_channel(sent).send(MESSAGE, WHO, cal))
-    assert sorted(e for e, _, _ in sent) == ["https://push.example/a", "https://push.example/b"]
+    assert sorted(e for e, _, _ in sent) == ["https://fcm.googleapis.com/a", "https://fcm.googleapis.com/b"]
     _, payload, claims = sent[0]
     assert payload == {"title": "Standup BCC: x", "body": "Starts in 15 min", "url": "/calendar"}
     assert claims == {"sub": "mailto:admin@example.com"}
@@ -83,7 +83,7 @@ def test_push_without_a_subscription_is_a_channel_error() -> None:
 
 def test_a_gone_subscription_is_removed() -> None:
     cal, sent = store(), []
-    asyncio.run(cal.add_push("https://push.example/a", "k", "s"))
+    asyncio.run(cal.add_push("https://fcm.googleapis.com/a", "k", "s"))
     gone = WebPushException("gone", response=types.SimpleNamespace(status_code=410))
     with pytest.raises(ChannelError):
         asyncio.run(push_channel(sent, gone).send(MESSAGE, WHO, cal))

@@ -122,7 +122,7 @@ def test_prefs_timezone(client: TestClient) -> None:
 def test_push_key_subscribe_and_unsubscribe(client: TestClient) -> None:
     as_admin(client)
     assert len(client.get(f"{URL}/push/key").json()["key"]) > 60
-    body = {"endpoint": "https://push.example/a", "keys": {"p256dh": "k", "auth": "s"}}
+    body = {"endpoint": "https://fcm.googleapis.com/a", "keys": {"p256dh": "k", "auth": "s"}}
     assert client.post(f"{URL}/push/subscribe", json=body).status_code == 204
     assert client.post(f"{URL}/push/subscribe", json={**body, "endpoint": "http://push.example/a"}).status_code == 400
     assert client.post(f"{URL}/push/unsubscribe", json={"endpoint": body["endpoint"]}).status_code == 204

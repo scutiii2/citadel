@@ -13,6 +13,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from src.config import CalendarSettings
@@ -32,6 +33,13 @@ CHANNELS = ("inapp", "email", "push")
 MIN_LEAD, MAX_LEAD = 1, 1440
 MAX_NAME = 60
 MAX_PUSH = 10
+# Browsers hand out endpoints on their vendor's push service; anything else would make the server POST to a host the user picked.
+PUSH_HOSTS = ("fcm.googleapis.com", ".push.services.mozilla.com", ".notify.windows.com", ".push.apple.com", "web.push.apple.com")
+
+
+def _push_host_ok(endpoint: str) -> bool:
+    host = urlsplit(endpoint).hostname or ""
+    return any(host == h or (h.startswith(".") and host.endswith(h)) for h in PUSH_HOSTS)
 ALERT_KEEP = timedelta(days=7)
 PAGE = 100
 DEFAULT_RULE = ("inapp", 15)
@@ -309,7 +317,7 @@ class CalendarStore:
         return [PushSubscription(d["key"], d["endpoint"], d["p256dh"], d["auth"]) for d in await self._mine(PUSH)]
 
     async def add_push(self, endpoint: str, p256dh: str, auth: str) -> None:
-        if not endpoint.startswith("https://") or len(endpoint) > 1000 or not p256dh or not auth:
+        if not endpoint.startswith("https://") or len(endpoint) > 1000 or not _push_host_ok(endpoint) or not p256dh or not auth:
             raise CalendarInvalid("That push subscription is not valid")
         key = self._key(_digest(endpoint, 32))
         if len(await self._mine(PUSH)) >= MAX_PUSH and await self._store.get(PUSH, key) is None:

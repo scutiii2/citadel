@@ -94,12 +94,14 @@ def test_timezone_defaults_to_utc_and_must_be_a_real_zone() -> None:
 
 def test_push_subscriptions_are_unique_per_endpoint_and_capped() -> None:
     cal = make(FakeDbGateway())
-    asyncio.run(cal.add_push("https://push.example/a", "k", "s"))
-    asyncio.run(cal.add_push("https://push.example/a", "k2", "s2"))
+    asyncio.run(cal.add_push("https://fcm.googleapis.com/a", "k", "s"))
+    asyncio.run(cal.add_push("https://fcm.googleapis.com/a", "k2", "s2"))
     (sub,) = asyncio.run(cal.push_subscriptions())
-    assert sub.p256dh == "k2" and sub.info() == {"endpoint": "https://push.example/a", "keys": {"p256dh": "k2", "auth": "s2"}}
+    assert sub.p256dh == "k2" and sub.info() == {"endpoint": "https://fcm.googleapis.com/a", "keys": {"p256dh": "k2", "auth": "s2"}}
     with pytest.raises(CalendarInvalid):
         asyncio.run(cal.add_push("http://push.example/a", "k", "s"))
+    with pytest.raises(CalendarInvalid):
+        asyncio.run(cal.add_push("https://10.0.0.5/a", "k", "s"))
     asyncio.run(cal.remove_push_key(sub.key))
     assert asyncio.run(cal.push_subscriptions()) == []
 

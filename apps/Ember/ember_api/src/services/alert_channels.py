@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
 
+import requests
 from py_vapid import Vapid
 from pywebpush import WebPushException, webpush
 
@@ -70,7 +71,9 @@ PushSender = Callable[[dict[str, Any], str, Vapid, dict[str, str]], None]
 
 
 def send_web_push(subscription: dict[str, Any], payload: str, vapid: Vapid, claims: dict[str, str]) -> None:
-    webpush(subscription_info=subscription, data=payload, vapid_private_key=vapid, vapid_claims=claims, ttl=600)
+    session = requests.Session()
+    session.max_redirects = 0  # a push service answers directly; a redirect could point at an internal host
+    webpush(subscription_info=subscription, data=payload, vapid_private_key=vapid, vapid_claims=claims, ttl=600, requests_session=session)
 
 
 class PushChannel:
