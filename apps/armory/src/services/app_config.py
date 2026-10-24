@@ -75,8 +75,6 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, Field
-
 from src.utils.catalog import catalog
 
 
