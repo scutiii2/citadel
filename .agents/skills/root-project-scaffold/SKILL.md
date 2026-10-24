@@ -6,7 +6,7 @@ description: Create or audit a new top-level project directory under apps/ (a ne
 # root_project_scaffold
 
 Every Python project in this repo's `apps/` folder (`mcp_server`, `ai_agent`, `ember_api`,
-`chat_cli`, `catalog_service`, `server_launcher`, `db_gateway`, `chess` and `ascension`;
+`chat_cli`, `server_launcher`, `db_gateway`, `chess` and `ascension`;
 `PDFMerger` and `MediaDownloader` each hold a Python app and a web app) shares one top-level shape. The three Ember projects sit together in
 `apps/Ember/` (`ember_api`, plus the Node apps `ember_web` and `ember_admin`, which have their
 own layout - see ember-feature-scaffold); everything else is `apps/<name>/`. A new root-level project must match it, not
@@ -74,7 +74,7 @@ changes the convention for every project after it.
    port a variable the bat sets (`set CHESS_PORT=8070`, read by `src/config.py`
    as an override) and add the project to the launcher's `_PROJECT_PORT_ENV` so
    a built launcher exe sees the default port. Pick a free port: 8010 mcp_server,
-   8020 catalog_service, 8030 ember_api, 8040 pdf_merger, 8060 ascension,
+   8030 ember_api, 8040 pdf_merger, 8060 ascension,
    8070 chess, 8071 db_gateway, 9100+ ai_agent agents.
 6. Services reached over HTTP/MCP by other projects must take the shared
    `INTERNAL_API_TOKEN` from a secrets file (`.env` in each project) and, for

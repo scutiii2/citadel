@@ -30,11 +30,6 @@ the source of truth this skill compresses; read it first. Running shape:
 `ember_api --MCP--> ai_agent (entry) --delegate_to_agent--> specialists`, each
 agent one provider+model, all `--MCP-->` mcp_server.
 
-**REQUIRED SUB-SKILL:** Use checking-the-catalog before writing any new
-reusable function/class here (a provider helper, a config loader, a
-formatter) - check `catalog_service` for an existing tagged building
-block before designing the interface from scratch.
-
 ## Path 1 - New agent (file only)
 
 1. Create `apps/garrison/agents/<id>.json`. The stem is the id

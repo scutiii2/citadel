@@ -1,4 +1,0 @@
-[
-  {"project": "mcp_server", "path": "../armory/src"},
-  {"project": "ai_agent", "path": "../garrison/src"}
-]

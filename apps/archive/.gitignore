@@ -1,4 +1,0 @@
-.venv_archive/
-data/catalog_cache.json
-__pycache__/
-*.pyc

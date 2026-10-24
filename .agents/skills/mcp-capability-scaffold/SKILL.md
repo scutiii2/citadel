@@ -9,11 +9,6 @@ description: Scaffold a new capability (tool) in mcp_server, or add a tool/comma
 
 Read one existing capability end to end first if you haven't seen this codebase's pattern before — `server_manager/` is the reference; its `tool.py` shows every mechanical convention below in one file, even though its domain (managed apps) won't match what you're building.
 
-**REQUIRED SUB-SKILL:** Use checking-the-catalog before writing any new
-function/class in `domain.py` — check `catalog_service` for an existing
-tagged building block in mcp_server/ai_agent before designing
-the interface from scratch.
-
 ## Before scaffolding: is this a new capability or a new tool on an existing one?
 
 - **New capability** (a new domain of logic entirely, e.g. "check transport queue status" or "query a ticketing system"): full scaffold, steps below.
