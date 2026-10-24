@@ -354,6 +354,23 @@ def test_reviewer_cannot_use_memory_tools_but_keeps_everything_else():
     assert spec.tools.allows("tool_srv_listApps")
 
 
+def test_reviewer_cannot_use_skill_tools_and_ember_can():
+    app_dir = Path(__file__).resolve().parents[1]
+    tool_path = app_dir.parent / "armory" / "src" / "capabilities" / "skills" / "tool.py"
+    skill_tools = [
+        node.name for node in ast.parse(tool_path.read_text(encoding="utf-8")).body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("tool_")
+    ]
+    assert skill_tools  # the real tool names, so a rename cannot silently defeat the globs
+
+    # The tracked JSON text: a machine's agent_overrides.json may replace either agent.
+    reviewer = json.loads((app_dir / "agents" / "reviewer.json").read_text(encoding="utf-8"))
+    ember = json.loads((app_dir / "agents" / "ember.json").read_text(encoding="utf-8"))
+    scope = lambda data: agent_spec.ToolScope(allow=tuple(data["tools"].get("allow", ())), deny=tuple(data["tools"].get("deny", ())))
+    assert not any(scope(reviewer).allows(name) for name in skill_tools)
+    assert all(scope(ember).allows(name) for name in skill_tools)
+
+
 def test_memory_recall_defaults_to_false_and_loads_true(tmp_path):
     base = {"port": 9103, "llm": {"provider": "anthropic"}}
     assert agent_spec.load_file(_write(tmp_path, "calc", base)).memory_recall is False
@@ -390,9 +407,26 @@ def test_laya_cannot_recall_skills(tmp_path):
         agent_spec.load_file(path)
 
 
-def test_no_tracked_agent_has_skill_recall_on_yet():
-    specs = agent_spec.load_dir(agent_spec.AGENTS_DIR)
-    assert [spec.id for spec in specs if spec.skill_recall] == []
+def test_skill_learning_defaults_to_false_loads_true_and_must_be_a_boolean(tmp_path):
+    base = {"port": 9103, "llm": {"provider": "anthropic"}}
+    assert agent_spec.load_file(_write(tmp_path, "calc", base)).skill_learning is False
+    assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "skill_learning": True})).skill_learning is True
+    with pytest.raises(AgentSpecError, match="skill_learning"):
+        agent_spec.load_file(_write(tmp_path, "calc", {**base, "skill_learning": "yes"}))
+
+
+def test_laya_cannot_learn_skills(tmp_path):
+    path = _write(tmp_path, "triage", {"port": 9110, "llm": {"provider": "laya"}, "tools": {"deny": ["*"]}, "skill_learning": True})
+    with pytest.raises(AgentSpecError, match="skill_learning"):
+        agent_spec.load_file(path)
+
+
+def test_only_the_entry_agent_recalls_skills_and_nobody_learns_them_by_default():
+    # The tracked JSON text, not load_dir or load_file: a machine's agent_overrides.json may replace any agent.
+    files = {path.stem: json.loads(path.read_text(encoding="utf-8")) for path in agent_spec.AGENTS_DIR.glob("*.json")}
+    assert [name for name, data in sorted(files.items()) if data.get("skill_recall")] == ["ember"]
+    # Learning bills an extra model call per qualifying turn: an operator switches it on per agent.
+    assert [name for name, data in files.items() if data.get("skill_learning")] == []
 
 
 def test_only_the_entry_agent_has_memory_recall_on():

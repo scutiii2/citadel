@@ -552,7 +552,7 @@ def _recall_chat(monkeypatch, recall_calls, cancel_first=False):
 
     reloaded = importlib.reload(agent_config)
     spec = SimpleNamespace(id="ember", entry=False, orchestrator=False, internal_role=None,
-        memory_recall=True, skill_recall=False, plan_tool=True, llm=SimpleNamespace(max_effort=None, min_tier=None, max_tier=None))
+        memory_recall=True, skill_recall=False, skill_learning=False, plan_tool=True, llm=SimpleNamespace(max_effort=None, min_tier=None, max_tier=None))
     monkeypatch.setattr(reloaded.agent_spec, "current", lambda: spec)
 
     async def fake_recall(question, on_event=None):
@@ -629,6 +629,49 @@ def test_skills_work_without_memory_recall(monkeypatch):
 
     assert skill_calls == [("hi", "hi")]
     assert provider.call_args.args[0] == "SKILLS hi"
+
+
+def _learning_chat(monkeypatch, scheduled, learning=True):
+    """_recall_chat with skill_learning switched on and a recording stand-in for the reflection."""
+    reloaded, provider = _recall_chat(monkeypatch, [])
+    reloaded.agent_spec.current().skill_learning = learning
+    monkeypatch.setattr(reloaded.skill_reflection, "schedule", lambda *args: scheduled.append(args))
+    return reloaded, provider
+
+
+def test_a_finished_top_level_turn_is_handed_to_skill_reflection(monkeypatch):
+    import asyncio
+
+    scheduled = []
+    reloaded, provider = _learning_chat(monkeypatch, scheduled)
+
+    result = asyncio.run(reloaded.run_chat("hi", [], [], "req-1"))
+
+    assert len(scheduled) == 1
+    question, handed, request_id = scheduled[0]
+    assert (question, request_id) == ("hi", "req-1") and handed is result
+
+
+def test_skill_reflection_is_off_unless_the_agent_asks_for_it(monkeypatch):
+    import asyncio
+
+    scheduled = []
+    reloaded, provider = _learning_chat(monkeypatch, scheduled, learning=False)
+
+    asyncio.run(reloaded.run_chat("hi", [], [], "req-1"))
+
+    assert scheduled == []
+
+
+def test_a_delegated_turn_is_never_handed_to_skill_reflection(monkeypatch):
+    import asyncio
+
+    scheduled = []
+    reloaded, provider = _learning_chat(monkeypatch, scheduled)
+
+    asyncio.run(reloaded.run_chat("hi", [], [], "req-2", depth=1))
+
+    assert scheduled == []
 
 
 def test_a_delegated_turn_does_not_search_skills(monkeypatch):

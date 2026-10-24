@@ -60,6 +60,12 @@ def test_the_automatic_memory_recall_step_is_skipped():
     assert "memory_recall" not in out and "search" in out
 
 
+def test_the_automatic_skill_recall_step_is_skipped():
+    recall = step("skill_recall", {}, "1 skill(s)")
+    assert digest([recall], full=True) == ""
+    assert not has_visible_steps([recall])
+
+
 def test_delegation_is_kept():
     out = digest([step("delegate_to_agent", {"agent": "calc"}, "42")], full=True)
     assert "delegate_to_agent" in out and "42" in out

@@ -54,7 +54,10 @@ agent one provider+model, all `--MCP-->` mcp_server.
    `persona`, `instructions`, `focus`, `tools.{allow,deny}` (fnmatch on tool names without the
    `main__` prefix; empty allow = all; deny wins), `orchestrator`,
    `memory_recall` (entry agent only: loads the user's newest saved notes before
-   the question), `delegable` (`false` keeps the agent out of every roster; it is
+   the question), `skill_recall` (loads the user's approved skills that match the
+   question; needs `tool_skill_*` allowed), `skill_learning` (proposes a skill for
+   the user's approval after a multi-tool turn; billed, off by default; also needs
+   `tool_skill_*` allowed), `delegable` (`false` keeps the agent out of every roster; it is
    called directly, like `title-writer` and `tag-writer`) and `plan_tool`
    (`false` stops it offering `update_plan`; set it `false` on every specialist,
    the checklist is the orchestrator's). There is no `routing` block any more.
