@@ -38,7 +38,7 @@ Follows `root-project-scaffold`:
 - Own venv. Dependencies: `fastapi`, `uvicorn`, `python-chess`. Optional extra
   `laya`, same name as in `ai_agent`.
 - Port 8070 (8010 mcp_server, 8020 catalog_service, 8030 ember_api,
-  8040 pdf_merger, 8050 video_downloader are taken).
+  8040 pdf_merger, 8050 media_downloader are taken).
 - `.env` holds `INTERNAL_API_TOKEN`, the same shared value as the other
   projects, with a committed `.env.example`. Every route requires it
   (`X-Internal-Token`) once set, like `ai_agent` and `mcp_server`.

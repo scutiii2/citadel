@@ -18,8 +18,8 @@ async def download_video(request: Request):
         enabled = False
     if not enabled or is_exposed_without_token(settings.host, settings.internal_api_token):
         return JSONResponse({"error": "File not available"}, status_code=404)
-    from src.capabilities.video_downloader.utils.errors import DownloaderError
-    from src.capabilities.video_downloader.utils.store.names import content_disposition
+    from src.capabilities.media_downloader.utils.errors import DownloaderError
+    from src.capabilities.media_downloader.utils.store.names import content_disposition
     try:
         exp = int(request.query_params.get("exp", ""))
         sig = request.query_params.get("sig", "")

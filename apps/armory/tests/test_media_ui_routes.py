@@ -12,9 +12,9 @@ from src import media_ui_routes
 from src.services import capability_registry, pdf_runtime, video_downloads
 from src.capabilities.pdf_merger.utils.config import Settings as PdfSettings
 from src.capabilities.pdf_merger.utils.service import Caller as PdfCaller
-from src.capabilities.video_downloader.utils.config import Settings as VideoSettings
-from src.capabilities.video_downloader.utils.policy.url_policy import UrlPolicy
-from tests.video_downloader.conftest import FakeExtractor, public_resolver
+from src.capabilities.media_downloader.utils.config import Settings as VideoSettings
+from src.capabilities.media_downloader.utils.policy.url_policy import UrlPolicy
+from tests.media_downloader.conftest import FakeExtractor, public_resolver
 
 
 HEADERS = {"X-Internal-Token": "test", "X-Requester-Uid": "alice"}
@@ -39,7 +39,7 @@ def test_delete_package_http_requires_owner_and_rejects_active_jobs(native):
     finally:
         extractor.hold.set()
         async def wait(service):
-            from src.capabilities.video_downloader.utils.service import Caller
+            from src.capabilities.media_downloader.utils.service import Caller
             return await service.wait(service.get_job(Caller('uid:alice'), started.json()['job_id']))
         runtime.call(wait)
     assert client.delete(path, headers=HEADERS).status_code == 200
@@ -47,7 +47,7 @@ def test_delete_package_http_requires_owner_and_rejects_active_jobs(native):
 
 
 def test_package_start_without_ffmpeg_returns_503_and_keeps_draft_editable(native, monkeypatch):
-    from src.capabilities.video_downloader import domain
+    from src.capabilities.media_downloader import domain
     client, _, runtime, _ = native
     created = client.post('/video/ui/packages', headers=HEADERS, json={'name': 'Collection'})
     path = f'/video/ui/packages/{created.json()["package_id"]}'
@@ -64,7 +64,7 @@ def test_package_start_without_ffmpeg_returns_503_and_keeps_draft_editable(nativ
     started = client.post(path + '/start', headers=HEADERS, json={})
     assert started.status_code == 200
     async def wait(service):
-        from src.capabilities.video_downloader.utils.service import Caller
+        from src.capabilities.media_downloader.utils.service import Caller
         return await service.wait(service.get_job(Caller('uid:alice'), started.json()['job_id']))
     runtime.call(wait)
 
@@ -85,7 +85,7 @@ def test_video_package_routes_ownership_and_lock(native):
     late = client.post(path + '/items', headers=HEADERS, json={'url': 'https://example.com/b', 'preset': 'best'})
     assert late.status_code == 409 and late.json()['error']['code'] == 'package_locked'
     async def wait(service):
-        from src.capabilities.video_downloader.utils.service import Caller
+        from src.capabilities.media_downloader.utils.service import Caller
         return await service.wait(service.get_job(Caller('uid:alice'), started.json()['job_id']))
     runtime.call(wait)
     status = client.get(path, headers=HEADERS).json()
@@ -94,7 +94,7 @@ def test_video_package_routes_ownership_and_lock(native):
 
 @pytest.fixture
 def native(tmp_path, monkeypatch):
-    from src.capabilities.video_downloader import domain
+    from src.capabilities.media_downloader import domain
     pdf = pdf_runtime.Runtime(PdfSettings(store_dir=tmp_path / "pdf", signing_key=b"p" * 32))
     extractor = FakeExtractor()
     video = video_downloads.VideoRuntime(VideoSettings(store_dir=tmp_path / "video", signing_key=b"v" * 32),
@@ -187,8 +187,8 @@ def test_pdf_cancel_preserves_queue_status(native):
 
 
 def test_photos_cross_http_boundary_without_ffmpeg(native, monkeypatch):
-    from src.capabilities.video_downloader import domain
-    from src.capabilities.video_downloader.utils.service import Caller
+    from src.capabilities.media_downloader import domain
+    from src.capabilities.media_downloader.utils.service import Caller
     client, _, video, extractor = native
     monkeypatch.setattr(domain.shutil, "which", lambda _: None)
     extractor.info = replace(extractor.info, photo_count=3, duration=None, formats=[])
@@ -209,7 +209,7 @@ def test_photos_cross_http_boundary_without_ffmpeg(native, monkeypatch):
 
 
 def test_video_policy_download_status_delete_and_cancel(native):
-    from src.capabilities.video_downloader.utils.service import Caller
+    from src.capabilities.media_downloader.utils.service import Caller
     client, _, video, extractor = native
     assert client.post("/video/ui/probe", headers=HEADERS, json={"url": "http://127.0.0.1/private"}).status_code == 403
     assert client.post("/video/ui/downloads", headers=HEADERS, json={"url": "http://127.0.0.1/private", "preset": "720p"}).status_code == 403

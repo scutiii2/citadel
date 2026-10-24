@@ -6,7 +6,7 @@ what it does:
 - `server_manager/` - start/stop/restart/list Docker containers and app logs, with owner email notifications from ServerWatcher (`/server ...`).
 - `generator/` - passwords, passphrases, PINs, TOTP (`/gen ...`).
 - `web_research/` - web search and page read through Tavily (`/web ...`).
-- `video_downloader/` - public video/music/photo probes, queued downloads, status and signed file links (`/video ...`); photo carousels become numbered ZIPs.
+- `media_downloader/` - public video/music/photo probes, queued downloads, status and signed file links (`/video ...`); photo carousels become numbered ZIPs.
 - `firecrawl/` - scrape and crawl through Firecrawl (`/scrape ...`).
 - `usage_report/` - token usage per agent, model or day (`/usage ...`).
 - `vault/` - read-only notes vault (`/vault ...`).

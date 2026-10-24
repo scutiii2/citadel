@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 @catalog
 def load_video_settings():
     """Use armory's config loader and the standalone caps/TTL shape, validating bounds."""
-    from src.capabilities.video_downloader.utils.config import Limits, Settings
+    from src.capabilities.media_downloader.utils.config import Limits, Settings
     raw = load_config(settings.video_config_path)
     limits = Limits.from_config(raw.get("limits", {}))
     for field in fields(limits):
@@ -74,7 +74,7 @@ class VideoRuntime:
             raise self._error
 
     def _run(self):
-        from src.capabilities.video_downloader.utils.service import build_service
+        from src.capabilities.media_downloader.utils.service import build_service
         from src.services.file_sweeper import run_sweeper
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)

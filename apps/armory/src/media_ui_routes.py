@@ -42,7 +42,7 @@ async def media_ui(request):
         if kind == "pdf":
             from src.services.pdf_errors import MergerError as ServiceError
         else:
-            from src.capabilities.video_downloader.utils.errors import DownloaderError as ServiceError
+            from src.capabilities.media_downloader.utils.errors import DownloaderError as ServiceError
         body = await request.json() if request.method == "POST" and not request.url.path.endswith("/cancel") else None
         result = await asyncio.to_thread(_pdf_operation if kind == "pdf" else _video_operation, request, uid, body)
         if isinstance(result, FileResponse):
@@ -109,9 +109,9 @@ def _pdf_operation(request, uid, body):
 
 
 def _video_operation(request, uid, body):
-    from src.capabilities.video_downloader.domain import _require_ffmpeg
-    from src.capabilities.video_downloader.utils.models import DownloadRequest, ProbeRequest, PackageCreate, PackageAdd
-    from src.capabilities.video_downloader.utils.service import Caller
+    from src.capabilities.media_downloader.domain import _require_ffmpeg
+    from src.capabilities.media_downloader.utils.models import DownloadRequest, ProbeRequest, PackageCreate, PackageAdd
+    from src.capabilities.media_downloader.utils.service import Caller
     from src.services.video_downloads import get_runtime
 
     caller = Caller("uid:" + uid)
