@@ -52,7 +52,6 @@ async def route(raw: dict, headers) -> dict:
     accepting = True
 
     def observed(row):
-        nonlocal accepting
         with lock:
             if accepting:
                 records.append(row)
