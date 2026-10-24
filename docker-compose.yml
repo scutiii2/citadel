@@ -1,4 +1,4 @@
-# Stack: ember_web / ember_admin -> ember_api -> armory / garrison / treasury.
+# Stack: ember_web / ember_admin -> ember_api -> armory / garrison / treasury; garrison -> laya_lb -> laya.
 # Start:  docker compose up -d --build
 # Needs a root .env with INTERNAL_API_TOKEN (see .env.example). Per-app
 # secrets stay in apps/<app>/.env and are loaded when the file exists.
@@ -42,12 +42,44 @@ services:
       AI_AGENT_HOST: 0.0.0.0
       AI_AGENT_ADVERTISE_URL: http://garrison
       MCP_SERVER_URL: http://armory:8010/mcp
-      # Shared Laya service (Python/laya_service): start it after this stack, it joins the `core` network.
+      # Laya models live in the laya service below (built from Python/LayaAgent), behind laya_lb.
       LAYA_SERVICE_URL: http://laya_lb:9120
     volumes:
       - ./docker/configs/garrison/servers.json:/app/configs/config_servers.json:ro
       - agent_data:/app/.data
     depends_on: [armory]
+    networks: [core]
+
+  # Laya models: N replicas (LAYA_REPLICAS, default 2) behind one nginx address, built from the sibling
+  # Python/LayaAgent project. Each replica holds its own copy of the models in RAM; weights are shared in laya_models.
+  # After changing the replica count, run: docker compose restart laya_lb
+  laya:
+    build: ../LayaAgent
+    restart: unless-stopped
+    environment:
+      LAYA_TOKEN: ${LAYA_TOKEN:-}
+      LAYA_WARM: "1"
+    volumes:
+      - laya_models:/models
+    deploy:
+      replicas: ${LAYA_REPLICAS:-2}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9120/health')"]
+      interval: 15s
+      timeout: 5s
+      start_period: 120s
+    networks: [core]
+
+  laya_lb:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LAYA_PORT:-9120}:9120"
+    volumes:
+      - ../LayaAgent/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      laya:
+        condition: service_healthy
     networks: [core]
 
   treasury:
@@ -112,3 +144,4 @@ volumes:
   agent_data:
   treasury_data:
   ember_api_data:
+  laya_models:
