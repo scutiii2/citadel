@@ -357,6 +357,22 @@ async def run_chat(
             lambda: ProviderCounter(_OpenAIRequestCounter(client, model_name), model_name),
         )
 
+    async def result(response: str) -> ChatResult:
+        return ChatResult(
+            response=response,
+            tools_used=tools_used,
+            tool_calls=tool_calls,
+            provider_id=PROVIDER_ID,
+            gateway=route.current,
+            gateway_switches=[switch.as_dict() for switch in route.switches],
+            model=model_name,
+            total_tokens=total_tokens,
+            context_tokens=context_tokens,
+            **await breakdown(),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
     try:
         async with guard.timeout():
             for _ in range(options.max_tool_rounds(token_limits.max_tool_rounds(PROVIDER_ID, route.current))):
@@ -431,20 +447,7 @@ async def run_chat(
 
                 function_calls = [item for item in response.output if getattr(item, "type", "") == "function_call"]
                 if not function_calls:
-                    return ChatResult(
-                        response="".join(text_parts) or response.output_text,
-                        tools_used=tools_used,
-                        tool_calls=tool_calls,
-                        provider_id=PROVIDER_ID,
-                        gateway=route.current,
-                        gateway_switches=[switch.as_dict() for switch in route.switches],
-                        model=model_name,
-                        total_tokens=total_tokens,
-                        context_tokens=context_tokens,
-                        **await breakdown(),
-                        input_tokens=input_tokens,
-                        output_tokens=output_tokens,
-                    )
+                    return await result("".join(text_parts) or response.output_text)
 
                 if text_parts and on_event:
                     await on_event(step_event("token_reset"))
@@ -496,20 +499,7 @@ async def run_chat(
     if on_event:
         await on_event(step_event("token_reset"))
         await on_event(step_event("token", text=stop_message))
-    return ChatResult(
-        response=stop_message,
-        tools_used=tools_used,
-        tool_calls=tool_calls,
-        provider_id=PROVIDER_ID,
-        gateway=route.current,
-        gateway_switches=[switch.as_dict() for switch in route.switches],
-        model=model_name,
-        total_tokens=total_tokens,
-        context_tokens=context_tokens,
-        **await breakdown(),
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-    )
+    return await result(stop_message)
 
 
 def run_interpret(text: str, model: str | None = None) -> ChatResult:

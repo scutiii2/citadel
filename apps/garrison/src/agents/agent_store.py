@@ -202,18 +202,23 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
         raise
 
 
+def _load_spec(agent_id: str, data: dict[str, Any]) -> AgentSpec:
+    """Parse `data` as agent file `agent_id` through a scratch file, so errors name `<id>.json`."""
+    with tempfile.TemporaryDirectory() as scratch:
+        candidate = Path(scratch) / f"{agent_id}.json"
+        candidate.write_text(json.dumps(data), encoding="utf-8")
+        try:
+            return agent_spec.load_file(candidate)
+        except AgentSpecError as error:
+            raise AgentStoreError(str(error).replace(str(candidate), f"{agent_id}.json")) from error
+
+
 def _validate_change(agent_id: str, data: dict[str, Any], directory: Path) -> AgentSpec:
     """Raise AgentStoreError unless `data` is a valid file for `agent_id` and
     the whole folder stays valid with it."""
     if not isinstance(data, dict):
         raise AgentStoreError("the agent must be a JSON object")
-    with tempfile.TemporaryDirectory() as scratch:
-        candidate = Path(scratch) / f"{agent_id}.json"
-        candidate.write_text(json.dumps(data), encoding="utf-8")
-        try:
-            spec = agent_spec.load_file(candidate)
-        except AgentSpecError as error:
-            raise AgentStoreError(str(error).replace(str(candidate), f"{agent_id}.json")) from error
+    spec = _load_spec(agent_id, data)
     _check_gateway(spec)
     others = _other_specs(agent_id, directory)
     if spec.enabled and spec.internal_role == "router" and any(
@@ -298,13 +303,7 @@ def preview_prompt(
     if not isinstance(data, dict):
         raise AgentStoreError("the agent must be a JSON object")
     _path_of(agent_id, directory)
-    with tempfile.TemporaryDirectory() as scratch:
-        candidate = Path(scratch) / f"{agent_id}.json"
-        candidate.write_text(json.dumps(data), encoding="utf-8")
-        try:
-            spec = agent_spec.load_file(candidate)
-        except AgentSpecError as error:
-            raise AgentStoreError(str(error).replace(str(candidate), f"{agent_id}.json")) from error
+    spec = _load_spec(agent_id, data)
     roster = [
         RosterEntry(id=o.id, label=o.label, focus=o.focus)
         for o in _other_specs(agent_id, directory)
