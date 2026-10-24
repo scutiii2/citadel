@@ -20,7 +20,7 @@ Originally adapted from the retired chat_app's LLM layer.
   answers with confidences. It validates the request and hands it to
   `triage_flow.py`. No tools or text generation, and no API key.
 - **`laya_agent.py`** - `LAYAAgent`, the only connection to Laya: the shared Laya
-  service (`Python/laya_service`) over HTTP. Garrison loads no Laya model itself.
+  service (`Python/LayaAgent`) over HTTP. Garrison loads no Laya model itself.
 - **`triage_flow.py`** - asks the Laya service for a decision strategy per question
   type, then adds the fallback classifier (Jev) for what it could not settle.
 - **`laya_classifier.py`** - the `laya` backend of the decision layer: one `choice`

@@ -1,4 +1,4 @@
-"""LAYAAgent: Garrison's only connection to Laya, the shared Laya service (Python/laya_service).
+"""LAYAAgent: Garrison's only connection to Laya, the shared Laya service (Python/LayaAgent).
 
 The service owns both Laya models and every local decision strategy; Garrison sends it typed questions and
 a strategy name (`ask`) and, when it adds the cloud fallback (Jev) as one more voter, asks it to mix that

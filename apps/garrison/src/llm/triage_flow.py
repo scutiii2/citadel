@@ -4,7 +4,7 @@ Every request runs here (llm/laya_provider.py hands it over). Per question type 
 voters that `classifier.triage_order` / `triage_enabled` allow (English then typed by default) and asks the
 Laya service for the matching strategy (llm/laya_agent.py: english-then-typed, typed-then-english,
 english-only or typed-only). The service owns the local rules: each model against its own confidence
-threshold, narrowing the options, comparing the models (see laya_service/README.md). What stays here is Jev:
+threshold, narrowing the options, comparing the models (see LayaAgent/README.md). What stays here is Jev:
 
   1. The service settled the question: that is the answer. Nothing leaves the machine.
   2. Otherwise, with `triage_fallback` on, a backend available and Jev enabled for the type, Jev is asked over the

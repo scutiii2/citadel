@@ -1,6 +1,6 @@
 """A stand-in for LAYAAgent (the Laya service client): scripted `ask` results, one per call, and a scripted `combine`.
 
-The decision rules themselves are the service's and are tested there (laya_service/tests); these tests cover what
+The decision rules themselves are the service's and are tested there (LayaAgent/tests); these tests cover what
 Garrison does with the service's answers."""
 
 from __future__ import annotations
