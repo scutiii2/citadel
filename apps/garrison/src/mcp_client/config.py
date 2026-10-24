@@ -14,16 +14,13 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from src.core.catalog import catalog
 from src.core.config_files import read_section
 
 
-@catalog
 class ConfigError(ValueError):
     """Raised for a malformed config_servers.json servers entry."""
 
 
-@catalog
 @dataclass(frozen=True)
 class AuthConfig:
     type: str  # "none" | "header" | "bearer_env"
@@ -32,7 +29,6 @@ class AuthConfig:
     header_value: str | None = None
 
 
-@catalog
 @dataclass(frozen=True)
 class ServerConfig:
     id: str
@@ -105,7 +101,6 @@ def _build_server(server_id: str, raw: dict[str, Any]) -> ServerConfig:
     )
 
 
-@catalog
 def load_servers_config(path: Path, url_overrides: dict[str, str] | None = None) -> dict[str, ServerConfig]:
     """Load and validate every entry in `path` (config_servers.json servers).
 

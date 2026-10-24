@@ -8,7 +8,6 @@ from typing import Any
 
 import yaml
 
-from src.utils.catalog import catalog
 
 
 @dataclass
@@ -21,7 +20,6 @@ class Chunk:
     wikilinks: list[str]
 
 
-@catalog
 def chunk_note(path: str, text: str) -> list[Chunk]:
     """Split outside code fences by heading, then into roughly 450-token spans.
 

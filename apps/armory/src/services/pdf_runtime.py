@@ -15,12 +15,10 @@ from dataclasses import asdict, replace
 from urllib.parse import urlsplit
 
 from src.services.app_config import load_config
-from src.utils.catalog import catalog
 
 logger = logging.getLogger(__name__)
 
 
-@catalog
 class Runtime:
     """Keep mutable PDF state on a dedicated loop, leaving blocking I/O offloaded."""
 
@@ -111,7 +109,6 @@ def _engine_config(settings):
     )
 
 
-@catalog
 def get_runtime(settings):
     """Lazy process-wide PDF engine. Configuration changes require an Armory restart."""
     global _runtime

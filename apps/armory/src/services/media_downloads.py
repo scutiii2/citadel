@@ -17,13 +17,11 @@ from urllib.parse import urlsplit
 
 from src.config import settings
 from src.services.app_config import load_config
-from src.utils.catalog import catalog
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
 
 
-@catalog
 def load_media_settings():
     """Use armory's config loader and the standalone caps/TTL shape, validating bounds."""
     from src.capabilities.media_downloader.utils.config import Limits, Settings
@@ -55,7 +53,6 @@ def load_media_settings():
     return config, caller_jobs
 
 
-@catalog
 class MediaRuntime:
     """Serialize service access on a persistent loop; jobs outlive individual tool calls."""
     def __init__(self, config, *, extractor=None, policy=None, max_caller_downloads=2):

@@ -9,7 +9,6 @@ crashing or showing nothing.
 
 from __future__ import annotations
 
-from src.core.catalog import catalog
 
 CONTEXT_WINDOWS: dict[str, int] = {
     "convaiinnovations/laya": 512,
@@ -25,7 +24,6 @@ CONTEXT_WINDOWS: dict[str, int] = {
 DEFAULT_CONTEXT_WINDOW = 128_000
 
 
-@catalog
 def context_window_for(model: str | None) -> int:
     if model:
         lowered = model.lower()

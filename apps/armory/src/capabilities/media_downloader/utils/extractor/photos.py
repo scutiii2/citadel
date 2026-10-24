@@ -13,7 +13,6 @@ import requests
 from PIL import Image, UnidentifiedImageError
 from pillow_heif import register_heif_opener
 
-from src.utils.catalog import catalog
 from .models import DownloadedFile, DownloadProgress, MediaInfo
 from .ytdlp import map_error
 from ..errors import DownloaderError, ErrorCode
@@ -57,7 +56,6 @@ def _read_bounded(response, limit, cancel=None):
     response._content_consumed = True
 
 
-@catalog
 class PhotoSession(requests.Session):
     """HTTP(S) only; no ambient proxy/netrc, bounded metadata and redirect bodies."""
     def __init__(self):
@@ -93,7 +91,6 @@ def _social_host(host):
     return any(host == base or host.endswith("." + base) for base in ("tiktok.com", "instagram.com", "pinterest.com", "pin.it"))
 
 
-@catalog
 class PhotoExtractor:
     """Inspect one public image or social post; preserve original photo bytes."""
     def __init__(self, *, guard=GUARD, session_factory=PhotoSession):

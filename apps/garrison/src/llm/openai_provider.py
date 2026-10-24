@@ -42,7 +42,6 @@ from openai import APIStatusError, AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, B
 
 from src.llm.turn_guard import TurnStopped
 from src.agents import agent_routing, agent_spec, ask_user, delegation, plan
-from src.core.catalog import catalog
 from src.llm.gateway_failover import GatewayRoute, classify
 
 from src.core import approvals, questions
@@ -283,14 +282,12 @@ def _dispatch(name: str, arguments: dict[str, Any], depth: int) -> str:
     return call_tool(name, arguments)
 
 
-@catalog
 def _route_for_turn() -> GatewayRoute:
     return GatewayRoute.for_turn(PROVIDER_ID, _OpenAI._gateway_name(),
                                  (choice.gateway for choice in agent_spec.current().llm.fallback_gateways),
                                  lambda gateway: has_api_key(gateway))
 
 
-@catalog
 def _model_for_route(route: GatewayRoute, requested: str | None) -> str:
     primary = _OpenAI._gateway_name()
     if route.current == primary:
@@ -300,7 +297,6 @@ def _model_for_route(route: GatewayRoute, requested: str | None) -> str:
     return llm_config.model_for_gateway(PROVIDER_ID, primary, route.current, requested or DEFAULT_MODEL, explicit)
 
 
-@catalog
 def _strip_reasoning(messages: list[Any]) -> list[Any]:
     """Reasoning item ids and encrypted payloads cannot cross gateway boundaries."""
     return [message for message in messages

@@ -12,7 +12,6 @@ from html import escape
 from pathlib import Path
 from string import Template
 
-from src.utils.catalog import catalog
 
 TEMPLATE_DIR = Path(__file__).parent / "email_templates"
 
@@ -24,7 +23,6 @@ def available_templates() -> list[str]:
     return sorted(path.stem for path in TEMPLATE_DIR.glob("*.html"))
 
 
-@catalog
 def render_email_template(name: str, **values: str) -> str:
     """Fill ``email_templates/<name>.html`` and return the HTML body.
 

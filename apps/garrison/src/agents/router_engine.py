@@ -6,12 +6,10 @@ import time
 from dataclasses import replace
 
 from src.agents.router_contract import DecisionOutcome, RouterPolicy, RouteRequest, RouteResponse, VoterUsage
-from src.core.catalog import catalog
 from src.llm import decision, laya_provider
 from src.llm.triage_flow import TriageFlow
 
 
-@catalog
 class RouterEngine:
     def __init__(self, voters=None):
         self.voters = voters if voters is not None else {

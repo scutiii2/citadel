@@ -36,7 +36,6 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any, Mapping
 
-from src.core.catalog import catalog
 from src.core.config_files import TUNING_PATH, read_section
 
 _log = logging.getLogger(__name__)
@@ -165,7 +164,6 @@ class ClassifierSettings:
         return self.chains.get(feature, DEFAULT_CHAIN)
 
 
-@catalog
 def settings() -> ClassifierSettings:
     """The `classifier` section of config_tuning.json over the defaults above (all off)."""
     return _snapshot.get() or _load_settings()
@@ -386,7 +384,6 @@ def available(feature: str, exclude: tuple[str, ...] = ()) -> bool:
     return bool(_usable(feature, exclude))
 
 
-@catalog
 def ask_choice(
     subject: str, criteria: Mapping[str, str], question: str, feature: str, *,
     min_confidence: int | None = None, exclude: tuple[str, ...] = (), timeout: float | None = None,
@@ -434,7 +431,6 @@ def ask_choice(
     return answer
 
 
-@catalog
 def classify_size(message: str, timeout: float | None = None) -> Choice:
     """How hard `message` looks: one of SIZE_CRITERIA's names, with the backend's confidence."""
     return ask_choice(

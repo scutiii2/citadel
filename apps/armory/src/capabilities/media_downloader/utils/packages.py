@@ -12,7 +12,6 @@ import zipfile
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from src.utils.catalog import catalog
 from .errors import DownloaderError, ErrorCode
 from .extractor.presets import get_preset
 from .models import ErrorInfo, PackageInfo, PackageItem
@@ -29,7 +28,6 @@ class _Package:
     info: PackageInfo
 
 
-@catalog
 class PackageManager:
     """Account-scoped editable drafts with an atomic, permanent lock at queue admission."""
 

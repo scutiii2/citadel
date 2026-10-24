@@ -75,7 +75,6 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from src.utils.catalog import catalog
 
 
 # ${NAME}, where NAME is a normal environment-variable identifier. A "$"
@@ -216,7 +215,6 @@ def _resolve_placeholder(name: str, *, where: str, config_path: Path) -> str:
     return value
 
 
-@catalog
 def resolve_section(value: Any, *, where: str, config_path: Path) -> Any:
     """Substitute ${VAR} inside every string of one subtree of the config.
 
@@ -253,7 +251,6 @@ def resolve_section(value: Any, *, where: str, config_path: Path) -> Any:
     return value
 
 
-@catalog
 def load_config(config_path: Path) -> dict[str, Any]:
     """Read and parse one config file. Raises on anything unusable.
 
@@ -286,7 +283,6 @@ def _require(section: dict[str, Any], key: str, *, prefix: str, config_path: Pat
     return section[key]
 
 
-@catalog
 def normalize_recipient_domain(value: str) -> str:
     """One ``email.allowed_recipient_domains`` entry, in comparison form.
 
@@ -316,7 +312,6 @@ SUPPORTED_EMAIL_SECURITY = ("starttls", "ssl", "none")
 # `security` can be inferred rather than demanded from every deployment.
 IMPLICIT_TLS_PORT = 465
 
-@catalog
 def load_email_config(config_path: Path) -> EmailConfig:
     """Parse config_email.json into an EmailConfig.
 

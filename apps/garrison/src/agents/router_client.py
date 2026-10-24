@@ -11,7 +11,6 @@ from mcp.client.streamable_http import streamablehttp_client
 from src.agents import agent_registry, agent_spec
 from src.agents.router_contract import RouteRequest, RouteResponse, VoterUsage
 from src.core import internal_auth
-from src.core.catalog import catalog
 from src.llm import cancellation
 
 
@@ -51,7 +50,6 @@ async def _call(agent: dict, request: RouteRequest) -> dict:
             return json.loads(next(c.text for c in result.content if c.type == "text"))
 
 
-@catalog
 async def decide(request: RouteRequest) -> RouteResponse | None:
     if not internal_auth.TOKEN or cancellation.is_cancelled(request.request_id):
         return None

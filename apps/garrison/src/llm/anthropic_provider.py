@@ -47,7 +47,6 @@ from anthropic.lib.streaming import AsyncMessageStream
 
 from src.llm.turn_guard import TurnStopped
 from src.agents import agent_routing, agent_spec, ask_user, delegation, plan
-from src.core.catalog import catalog
 from src.llm.gateway_failover import GatewayRoute, classify
 
 from src.core import approvals, questions
@@ -343,14 +342,12 @@ def _prompt_tokens(usage: Any) -> int:
     )
 
 
-@catalog
 def _route_for_turn() -> GatewayRoute:
     return GatewayRoute.for_turn(PROVIDER_ID, _Anthropic._gateway_name(),
                                  (choice.gateway for choice in agent_spec.current().llm.fallback_gateways),
                                  lambda gateway: has_api_key(gateway))
 
 
-@catalog
 def _model_for_route(route: GatewayRoute, requested: str | None) -> str:
     primary = _Anthropic._gateway_name()
     if route.current == primary:
@@ -360,7 +357,6 @@ def _model_for_route(route: GatewayRoute, requested: str | None) -> str:
     return llm_config.model_for_gateway(PROVIDER_ID, primary, route.current, requested or DEFAULT_MODEL, explicit)
 
 
-@catalog
 def _strip_thinking(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Copy assistant content without signatures issued by the previous gateway."""
     stripped = []

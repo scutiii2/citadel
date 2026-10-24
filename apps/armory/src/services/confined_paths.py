@@ -14,7 +14,6 @@ from fnmatch import fnmatch
 from pathlib import Path, PurePosixPath
 from typing import Iterator
 
-from src.utils.catalog import catalog
 
 # Names (fnmatch, case-insensitive) that are never read or listed.
 BLOCKED_NAMES: tuple[str, ...] = (
@@ -47,7 +46,6 @@ def is_blocked_name(name: str) -> bool:
     return any(fnmatch(lowered, pattern) for pattern in BLOCKED_NAMES)
 
 
-@catalog
 class ConfinedRoot:
     """A folder tools may read, optionally only files with certain suffixes."""
 

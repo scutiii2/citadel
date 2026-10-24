@@ -1,13 +1,11 @@
 """Dispatch photo posts and images alongside yt-dlp video/music downloads."""
 from urllib.parse import urlsplit
 
-from src.utils.catalog import catalog
 from .photos import IMAGE_SUFFIXES, PhotoExtractor
 from .ytdlp import YtDlpExtractor
 from ..errors import DownloaderError, ErrorCode
 
 
-@catalog
 class MediaExtractor:
     def __init__(self):
         self._photos = PhotoExtractor()

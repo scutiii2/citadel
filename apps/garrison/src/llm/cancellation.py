@@ -24,7 +24,6 @@ from __future__ import annotations
 import threading
 from contextvars import ContextVar, Token
 
-from src.core.catalog import catalog
 
 _lock = threading.Lock()
 _cancelled: set[str] = set()
@@ -66,7 +65,6 @@ def _cancel_tree(request_id: str) -> None:
         pending.extend(_children.get(current, ()))
 
 
-@catalog
 def link(parent_id: str, child_id: str) -> None:
     """Link a delegate and preserve cancellation racing with its startup."""
     with _lock:
@@ -76,7 +74,6 @@ def link(parent_id: str, child_id: str) -> None:
             _cancel_tree(child_id)
 
 
-@catalog
 def register(request_id: str | None) -> None:
     """Preserve cancellation received while a turn was starting.
 
@@ -85,7 +82,6 @@ def register(request_id: str | None) -> None:
     """
 
 
-@catalog
 def cancel(request_id: str | None) -> bool:
     """Requests cancellation of the given turn. Returns False for a
     missing/empty id so the caller can tell "nothing to cancel" apart
@@ -97,7 +93,6 @@ def cancel(request_id: str | None) -> bool:
     return True
 
 
-@catalog
 def is_cancelled(request_id: str | None) -> bool:
     if not request_id:
         return False
@@ -105,7 +100,6 @@ def is_cancelled(request_id: str | None) -> bool:
         return request_id in _cancelled
 
 
-@catalog
 def clear(request_id: str | None) -> None:
     """Removes a finished turn's entry so the set doesn't grow unbounded
     over the process lifetime. Safe to call whether or not the turn was

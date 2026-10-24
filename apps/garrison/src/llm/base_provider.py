@@ -23,7 +23,6 @@ import anyio.to_thread
 from src.agents import agent_events
 
 from src.mcp_client import tool_progress
-from src.core.catalog import catalog
 from src.llm import cooldown
 
 
@@ -35,7 +34,6 @@ want live events - every call site must no-op cleanly when this is None,
 never assume it's set."""
 
 
-@catalog
 def step_event(kind: str, **fields: Any) -> dict[str, Any]:
     """Stamps a `type` key onto an event dict - the one place that shape
     is defined, so server.py's ctx.report_progress(message=json.dumps(...))
@@ -126,7 +124,6 @@ class ChatCancelled(Exception):
     error - this is an expected user action, not a failure."""
 
 
-@catalog
 @dataclass
 class ToolCallRecord:
     """One tool invocation's full detail - name, the arguments the model
@@ -137,7 +134,6 @@ class ToolCallRecord:
     result: str
 
 
-@catalog
 @dataclass
 class ChatResult:
     response: str
@@ -176,7 +172,6 @@ class ChatResult:
     model_executed: bool = True
 
 
-@catalog
 class BaseProvider:
     """Shared, provider-agnostic pieces of claude_provider.py and
     openai_provider.py: key/cooldown checks, the delegate-or-call_tool
@@ -193,7 +188,6 @@ class BaseProvider:
     PROVIDER_ID: str
     DEFAULT_MODEL_FALLBACK: str
 
-    @catalog
     @classmethod
     def has_api_key(cls) -> bool:
         """Whether the CURRENTLY SELECTED gateway (see GATEWAY_ENV) has its
@@ -204,12 +198,10 @@ class BaseProvider:
         """
         raise NotImplementedError
 
-    @catalog
     @classmethod
     def is_available(cls) -> bool:
         return cls.has_api_key() and not cooldown.is_in_cooldown(cls.PROVIDER_ID)
 
-    @catalog
     @classmethod
     def resolve_default_model(cls) -> str:
         return cls.DEFAULT_MODEL_FALLBACK

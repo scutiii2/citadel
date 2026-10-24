@@ -5,10 +5,8 @@ from pathlib import Path
 from src.capabilities.obsidian.utils.chunking import chunk_note
 from src.capabilities.obsidian.utils.gateway import vault_path
 from src.capabilities.obsidian.utils.index import VaultIndex
-from src.utils.catalog import catalog
 
 
-@catalog
 class RemoteVaultIndex(VaultIndex):
     def __init__(self, gateway, embedder, store, check=lambda: None):
         super().__init__(Path("."), embedder, store)

@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any
 
 from src.agents.agent_spec import TIERS
-from src.core.catalog import catalog
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
 GATEWAYS_DIR = _ROOT / "gateways"
@@ -29,7 +28,6 @@ _NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 _config: dict[str, Any] | None = None
 
 
-@catalog
 def load_gateways() -> dict[str, Any]:
     """Raw gateway blocks grouped by provider, cached until process restart.
 
@@ -111,7 +109,6 @@ def _resolve(value: Any) -> Any:
     return value
 
 
-@catalog
 def gateway(provider: str, gateway_name: str) -> dict[str, Any]:
     """One gateway's config block, e.g. gateway("anthropic", "openrouter")
     - {ENV_VAR} placeholders resolved to their live env var value (None if
@@ -136,7 +133,6 @@ def _text(entry: dict[str, Any], key: str, where: str) -> str:
     return value.strip()
 
 
-@catalog
 def tiers(provider: str, gateway_name: str) -> dict[str, TierModel]:
     """The strength tiers one gateway offers, e.g. tiers("anthropic",
     "claude") - {"light": TierModel(...), ...} in ladder order (light,
@@ -167,7 +163,6 @@ def tiers(provider: str, gateway_name: str) -> dict[str, TierModel]:
     return found
 
 
-@catalog
 def model_for_gateway(provider: str, primary_gateway: str, gateway_name: str,
                       requested_model: str | None, explicit_model: str | None) -> str:
     """Translate primary tier ids while honoring an explicit backup model first."""

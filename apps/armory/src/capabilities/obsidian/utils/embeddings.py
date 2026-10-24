@@ -8,7 +8,6 @@ import urllib.request
 from typing import Protocol
 from urllib.parse import urlsplit
 
-from src.utils.catalog import catalog
 
 
 class Embedder(Protocol):
@@ -17,7 +16,6 @@ class Embedder(Protocol):
     def embed(self, texts: list[str]) -> list[list[float]]: ...
 
 
-@catalog
 class OllamaEmbedder:
     """Batch embeddings from a user-operated Ollama instance; no remote AI provider."""
 

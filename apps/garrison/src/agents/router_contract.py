@@ -7,7 +7,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from src.core.catalog import catalog
 
 Tier = Literal["light", "standard", "heavy", "extreme"]
 DEFAULT_THRESHOLDS = {
@@ -21,7 +20,6 @@ class Message(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
-@catalog
 class RouterPolicy(Message):
     choose_agent: bool = True
     choose_tier: bool = True

@@ -6,10 +6,8 @@ import urllib.request
 from src.config import settings
 from src.services import identity_context
 from src.capabilities.obsidian.utils.gateway import ObsidianGateway, ObsidianGatewayError, _NoRedirect
-from src.utils.catalog import catalog
 
 
-@catalog
 def resolve(scope: str, operation: str, uid: str | None = None) -> dict:
     uid = uid if uid is not None else identity_context.current_uid()
     if scope not in {"instance", "personal"} or not settings.internal_api_token or not uid:
@@ -33,7 +31,6 @@ def resolve(scope: str, operation: str, uid: str | None = None) -> dict:
         raise ObsidianGatewayError("Brain connection is unavailable or access was refused. Check your destination and permissions.") from None
 
 
-@catalog
 def gateway(snapshot: dict) -> ObsidianGateway:
     if snapshot["source"] == "legacy":
         return ObsidianGateway(settings.obsidian_base_url, settings.obsidian_api_key,

@@ -22,7 +22,6 @@ from typing import Any, Callable
 from mcp import types
 from mcp.client.session import ClientSession
 
-from src.core.catalog import catalog
 from src.mcp_client.config import ServerConfig, load_servers_config
 from src.mcp_client.schema import inline_refs
 from src.mcp_client.transports import open_session
@@ -78,7 +77,6 @@ def _namespace(server_id: str, tools: list[types.Tool]) -> list[types.Tool]:
     ]
 
 
-@catalog
 class McpClientRegistry:
     """Owns every live upstream connection for the life of the process.
     Connect once via connect_all(), then call list_tools()/call_tool()
@@ -98,11 +96,9 @@ class McpClientRegistry:
         # (the shared internal token - see mcp_upstream.connect()).
         self._extra_headers: dict[str, str] = {}
 
-    @catalog
     def statuses(self) -> list[ServerStatus]:
         return list(self._statuses)
 
-    @catalog
     async def connect_all(
         self,
         config_path: Path,
@@ -133,7 +129,6 @@ class McpClientRegistry:
             await stack.aclose()
         await self._connect_one(server_id, config)
 
-    @catalog
     async def _connect_one(self, server_id: str, config: ServerConfig) -> ServerStatus:
         local_stack = AsyncExitStack()
         try:
@@ -169,7 +164,6 @@ class McpClientRegistry:
         self._statuses.append(status)
         return status
 
-    @catalog
     async def _live_tools_for(self, server_id: str, session: ClientSession) -> list[types.Tool]:
         try:
             listed = await session.list_tools()
@@ -179,7 +173,6 @@ class McpClientRegistry:
         self._last_known_tools[server_id] = namespaced_tools
         return namespaced_tools
 
-    @catalog
     async def list_tools(self) -> list[types.Tool]:
         """The merged catalog, fetched live from every connected server on
         each call - so a server's tools changing at runtime is reflected
@@ -190,7 +183,6 @@ class McpClientRegistry:
         )
         return [tool for tools in results for tool in tools]
 
-    @catalog
     async def call_tool(
         self,
         name: str,
@@ -239,7 +231,6 @@ class McpClientRegistry:
                 raise
             return await call(recovered_session)
 
-    @catalog
     async def aclose(self) -> None:
         """Close every open connection. One server failing to close
         cleanly must not stop the others."""

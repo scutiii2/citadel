@@ -15,7 +15,6 @@ import urllib.request
 from typing import Any
 from urllib.parse import quote, urlencode, urlsplit
 
-from src.utils.catalog import catalog
 
 MAX_RESPONSE_BYTES = 2_000_000
 MAX_HITS = 50
@@ -29,7 +28,6 @@ class ObsidianGatewayError(Exception):
         self.status = status
 
 
-@catalog
 def vault_path(path: str, *, folder: bool = False, markdown: bool = False) -> str:
     """Validate a literal vault-relative POSIX path before URL encoding it.
 
@@ -60,7 +58,6 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-@catalog
 class ObsidianGateway:
     """HTTPS/Bearer client with bounded responses, timeout and opt-in writes/TLS bypass."""
 

@@ -28,7 +28,6 @@ from types import TracebackType
 import paramiko
 
 from src.config import settings
-from src.utils.catalog import catalog
 
 
 def _new_client(
@@ -76,7 +75,6 @@ class SSHCommandResult:
         return self.exit_status == 0
 
 
-@catalog
 class SSHClient:
     """Context-manager SSH connection with key-then-password auth fallback.
 
@@ -116,7 +114,6 @@ class SSHClient:
         self._connect()
         return self
 
-    @catalog
     def _connect(self) -> None:
         assert self._client is not None
         last_error: Exception | None = None
@@ -167,7 +164,6 @@ class SSHClient:
             f"SSH connection to {self.user}@{self.host} failed: {last_error}.{hint}"
         )
 
-    @catalog
     def run(self, command: str) -> SSHCommandResult:
         assert self._client is not None, "SSHClient must be used as a context manager"
         _stdin, stdout, stderr = self._client.exec_command(command, timeout=self.command_timeout)
@@ -176,7 +172,6 @@ class SSHClient:
         code = stdout.channel.recv_exit_status()
         return SSHCommandResult(stdout=out, stderr=err, exit_status=code)
 
-    @catalog
     def run_login_shell(self, command: str, shell: str = "bash") -> SSHCommandResult:
         """Run a command through an actual login shell, not a bare
         exec_command(). A raw exec_command() doesn't source any profile,
@@ -215,7 +210,6 @@ class SSHClient:
             self._client.close()
 
 
-@catalog
 def run_command(
     host: str,
     user: str,
@@ -292,7 +286,6 @@ def sftp_upload_dir(host: str, user: str, password: str, local_dir: str, remote_
         client.close()
 
 
-@catalog
 def sftp_write_file(host: str, user: str, key: str | None, password: str | None, remote_path: str, content: str) -> None:
     """Write a single small text file to the remote host over SFTP -
     useful for staging a generated script before running it with

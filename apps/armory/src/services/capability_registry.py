@@ -35,7 +35,6 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.resources.templates import ResourceTemplate
 from mcp.server.fastmcp.tools.base import Tool
 
-from src.utils.catalog import catalog
 
 
 @dataclass
@@ -56,7 +55,6 @@ class _CapabilityHandle:
 _REGISTRY: dict[str, _CapabilityHandle] = {}
 
 
-@catalog
 @contextmanager
 def capturing(mcp: FastMCP, name: str, label: str | None = None) -> Iterator[None]:
     """Wrap a capability's import block; records whatever it registered.

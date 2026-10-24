@@ -6,10 +6,8 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.utils.catalog import catalog
 
 
-@catalog
 def record_delivery(path: Path, owner: str, outcome: str, recipient_count: int, message_id: str = "") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(path, timeout=15) as db:
@@ -21,7 +19,6 @@ def record_delivery(path: Path, owner: str, outcome: str, recipient_count: int, 
                    (datetime.now(timezone.utc).isoformat(), owner, outcome, recipient_count, message_id))
 
 
-@catalog
 def read_audit(path: Path, owner: str, limit: int = 50) -> list[dict]:
     if not owner or not path.exists():
         return []
