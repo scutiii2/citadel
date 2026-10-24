@@ -26,7 +26,8 @@ class _PurgeLogFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         def redact(value):
             text = str(value)
-            return re.sub(r"(/memory/owners/)[^\s\"?]+", r"\1[redacted]", text) if "/memory/owners/" in text else value
+            # Also covers /skills/owners/<uid>, which SkillsClient calls through the same HTTPX client.
+            return re.sub(r"(/(?:memory|skills)/owners/)[^\s\"?]+", r"\1[redacted]", text) if "/owners/" in text else value
 
         record.msg = redact(record.msg)
         if isinstance(record.args, tuple):

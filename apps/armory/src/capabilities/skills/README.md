@@ -27,7 +27,7 @@ Reusable how-tos the assistant proposes after solving a multi-step task. Three t
 
 ## Rules
 
-- No MCP tool can approve, edit or retire a skill. `services/skill_store.set_status` is for the user's side (ember_api routes, a later step); until those exist every proposal stays `proposed` and is never returned.
+- No MCP tool can approve, edit or retire a skill. `services/skill_store.set_status` is reached only from `src/skill_routes.py`, which ember_api calls for the signed-in account (list, approve/retire/re-propose, delete, and purge on account deletion; internal token required, `/skills/owners/{uid}/skills...`). A test pins that the tool and domain files never mention `set_status`. Until a skill is approved on Ember's Skills page it stays `proposed` and is never returned.
 - Search returns only `active` skills, at most 3, ranked by FTS5. A query word of three or more characters also matches longer words that start with it.
 - Limits: 80 / 300 / 1200 / 200 characters for title / when_to_use / steps / tools; 20 proposed and 50 active skills per account. A skill with the same title (ignoring case and spacing, unless retired) is stored once.
 - The model must not put secrets or text copied from tool results into a skill. That rule is in the tool description (an instruction), not enforced by code. Search results are fenced as data (`services/untrusted.py`), which is not a security boundary.

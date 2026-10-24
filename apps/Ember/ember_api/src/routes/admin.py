@@ -317,6 +317,10 @@ async def delete_account(
         await logs.error(
             admin.id, "admin.memory_purge", f"Memory notes of deleted account '{username}' were not purged (mcp_server did not confirm)"
         )
+    if not await request.app.state.skills.purge(uid):
+        await logs.error(
+            admin.id, "admin.skills_purge", f"Skills of deleted account '{username}' were not purged (mcp_server did not confirm)"
+        )
     try:  # best effort, like the memory purge: the account is already gone
         await purge_notes(store, uid)
     except DbGatewayError as error:

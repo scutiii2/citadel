@@ -30,7 +30,7 @@ describe("OverviewView", () => {
     const { wrapper, router } = setup(["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage", "watchers.view"]);
     expect(wrapper.find(".primary").attributes("href")).toBe("/");
     expect(wrapper.findAll(".card").map((link) => link.attributes("href"))).toEqual([
-      "/agents", "/capabilities", "/notes", "/memory", "/brains", "/generator", "/capabilities/pdf_merger", "/capabilities/media_downloader", "/usage", "/settings", "/account",
+      "/agents", "/capabilities", "/notes", "/memory", "/skills", "/brains", "/generator", "/capabilities/pdf_merger", "/capabilities/media_downloader", "/usage", "/settings", "/account",
     ]);
     expect(wrapper.text()).toContain("Signed in as ada");
     await wrapper.find('.card[href="/capabilities"]').trigger("click");
