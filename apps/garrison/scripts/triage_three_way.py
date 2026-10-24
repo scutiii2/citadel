@@ -7,9 +7,13 @@ from __future__ import annotations
 
 from src.llm.decision import TRIAGE_COUNTS, TRIAGE_VOTERS
 from src.llm.laya_provider import LayaQuestions
-from src.llm.triage_flow import (  # noqa: F401 - re-exported
+from src.llm.triage_flow import (
     CHECKPOINTS, DEFAULT_THRESHOLDS, ENGLISH, JEV, MAX_NARROWING, TYPED, TriageFlow, final_answer,
 )
+
+__all__ = [
+    "CHECKPOINTS", "DEFAULT_THRESHOLDS", "ENGLISH", "JEV", "MAX_NARROWING", "TYPED", "TriageFlow", "final_answer",
+]
 
 
 def parse_threshold(text: str) -> tuple[str, str, float]:
