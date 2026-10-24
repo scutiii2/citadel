@@ -1,7 +1,6 @@
 """Resolve complete local Laya snapshots without fetching any model artifacts."""
 from pathlib import Path
 
-from src.core.catalog import catalog
 
 
 def _snapshot(checkpoint: str) -> Path:
@@ -17,7 +16,6 @@ def _snapshot(checkpoint: str) -> Path:
     return root / subfolder if subfolder else root
 
 
-@catalog
 def cached_checkpoint(checkpoint: str) -> str:
     """An absolute complete checkpoint directory, or a safe unavailable error."""
     try:

@@ -18,7 +18,6 @@ from typing import Any
 
 import anyio.to_thread
 
-from src.core.catalog import catalog
 from src.llm import cancellation, decision
 from src.llm.base_provider import ChatCancelled, ChatResult, step_event
 
@@ -291,7 +290,6 @@ def _ask_fallback(request: Request, qids: list[str]) -> tuple[dict[str, dict[str
     return answers, tokens, problems
 
 
-@catalog
 class LayaQuestions:
     """Load one English Laya checkpoint and answer typed questions about a text.
 
