@@ -39,7 +39,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.llm import cancellation
+from src.core.broker import Broker
 from src.llm.base_provider import ChatCancelled, OnEvent, step_event
 
 APPROVAL_MODES = ("off", "ask", "deny")
@@ -114,7 +114,7 @@ def mark_tainted() -> None:
         policy.tainted = True
 
 
-class ApprovalBroker:
+class ApprovalBroker(Broker[str]):
     """The approvals waiting on a user, keyed by (request_id, step_id).
 
     `decide()` and `wait()` both run on the server's event loop (the `decide`
@@ -122,9 +122,7 @@ class ApprovalBroker:
     """
 
     def __init__(self, timeout: float = DECISION_TIMEOUT_SECONDS, poll: float = POLL_SECONDS) -> None:
-        self._timeout = timeout
-        self._poll = poll
-        self._pending: dict[tuple[str, str], asyncio.Future[str]] = {}
+        super().__init__(timeout, poll)
 
     def pending(self, request_id: str) -> list[str]:
         return [step for (request, step) in self._pending if request == request_id]
@@ -133,39 +131,14 @@ class ApprovalBroker:
         """The user's decision (`allow`, `always` or `deny`), or `timeout` /
         `cancelled`. A second wait on the same step replaces the first,
         which then reads as denied."""
-        loop = asyncio.get_running_loop()
-        key = (request_id, step_id)
-        previous = self._pending.get(key)
-        if previous is not None and not previous.done():
-            previous.set_result("deny")
-        future: asyncio.Future[str] = loop.create_future()
-        self._pending[key] = future
-        deadline = loop.time() + self._timeout
-        try:
-            while True:
-                if cancellation.is_cancelled(request_id):
-                    return "cancelled"
-                remaining = deadline - loop.time()
-                if remaining <= 0:
-                    return "timeout"
-                try:
-                    return await asyncio.wait_for(asyncio.shield(future), min(self._poll, remaining))
-                except asyncio.TimeoutError:
-                    continue
-        finally:
-            if self._pending.get(key) is future:
-                del self._pending[key]
+        return await self._wait(request_id, step_id, replaced="deny", cancelled="cancelled", timed_out="timeout")
 
     def decide(self, request_id: str, step_id: str, decision: str) -> bool:
         """Answers a pending approval. False when there is none: unknown
         step, already answered, or the turn moved on. Each is answered once."""
         if decision not in DECISIONS:
             raise ValueError(f"decision must be one of {', '.join(DECISIONS)}")
-        future = self._pending.get((request_id, step_id))
-        if future is None or future.done():
-            return False
-        future.set_result(decision)
-        return True
+        return self._resolve(request_id, step_id, decision)
 
 
 BROKER = ApprovalBroker()

@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.agents import ask_user
-from src.llm import cancellation
+from src.core.broker import Broker
 from src.llm.base_provider import ChatCancelled, OnEvent, step_event
 
 MAX_WAIT_SECONDS = 3600.0
@@ -62,7 +62,7 @@ class Answer:
     answers: tuple[dict[str, Any], ...] = ()
 
 
-class QuestionBroker:
+class QuestionBroker(Broker[Answer]):
     """The questions waiting on a user, keyed by (request_id, step_id).
 
     `answer()` and `wait()` both run on the server's event loop (the
@@ -75,50 +75,29 @@ class QuestionBroker:
         poll: float = POLL_SECONDS,
         keepalive: float = KEEPALIVE_SECONDS,
     ) -> None:
-        self._timeout = timeout
-        self._poll = poll
+        super().__init__(timeout, poll)
         self._keepalive = keepalive
-        self._pending: dict[tuple[str, str], asyncio.Future[Answer]] = {}
 
     async def wait(self, request_id: str, step_id: str, on_event: OnEvent | None = None) -> Answer:
         """The user's answer, or a skip, `timeout` or `cancelled`. A second
         wait on the same step replaces the first, which then reads as skipped."""
-        loop = asyncio.get_running_loop()
-        key = (request_id, step_id)
-        previous = self._pending.get(key)
-        if previous is not None and not previous.done():
-            previous.set_result(Answer("skipped"))
-        future: asyncio.Future[Answer] = loop.create_future()
-        self._pending[key] = future
-        deadline = loop.time() + self._timeout
-        next_keepalive = loop.time() + self._keepalive
-        try:
-            while True:
-                if cancellation.is_cancelled(request_id):
-                    return Answer("cancelled")
-                now = loop.time()
-                remaining = deadline - now
-                if remaining <= 0:
-                    return Answer("timeout")
-                if on_event is not None and now >= next_keepalive:
-                    await on_event(step_event("keepalive"))
-                    next_keepalive = now + self._keepalive
-                try:
-                    return await asyncio.wait_for(asyncio.shield(future), min(self._poll, remaining))
-                except asyncio.TimeoutError:
-                    continue
-        finally:
-            if self._pending.get(key) is future:
-                del self._pending[key]
+        next_keepalive = asyncio.get_running_loop().time() + self._keepalive
+
+        async def tick(now: float) -> None:
+            nonlocal next_keepalive
+            if on_event is not None and now >= next_keepalive:
+                await on_event(step_event("keepalive"))
+                next_keepalive = now + self._keepalive
+
+        return await self._wait(
+            request_id, step_id,
+            replaced=Answer("skipped"), cancelled=Answer("cancelled"), timed_out=Answer("timeout"), tick=tick,
+        )
 
     def answer(self, request_id: str, step_id: str, answers: list[dict[str, Any]], skipped: bool) -> bool:
         """Answers a pending question. False when there is none: unknown step,
         already answered, or the turn moved on."""
-        future = self._pending.get((request_id, step_id))
-        if future is None or future.done():
-            return False
-        future.set_result(Answer("skipped") if skipped else Answer("answered", tuple(answers)))
-        return True
+        return self._resolve(request_id, step_id, Answer("skipped") if skipped else Answer("answered", tuple(answers)))
 
 
 BROKER = QuestionBroker()
