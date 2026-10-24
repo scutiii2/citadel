@@ -199,10 +199,6 @@ has_api_key = _OpenAI.has_api_key
 is_available = _OpenAI.is_available
 
 
-def _limit_gateway() -> str:
-    return _OpenAI._gateway_name()
-
-
 def _tool_schemas(
     enabled_extensions: list[str] | None = None, roster: Sequence[RosterEntry] = ()
 ) -> list[dict[str, Any]]:
