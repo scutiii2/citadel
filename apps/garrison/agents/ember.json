@@ -4,6 +4,7 @@
   "entry": true,
   "orchestrator": true,
   "memory_recall": true,
+  "skill_recall": true,
   "llm": {
     "provider": "anthropic",
     "gateway": "openrouter"
@@ -15,6 +16,7 @@
     "allow": [
       "tool_mem_*",
       "tool_notes_*",
+      "tool_skill_*",
       "tool_ticket_*"
     ],
     "deny": []

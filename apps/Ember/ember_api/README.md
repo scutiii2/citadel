@@ -164,6 +164,26 @@ routes on mcp_server; both services need the same internal token and the memory
 capability must be enabled. Upstream failures return 503, missing/disabled memory
 returns 404, and redirects are refused. Private `/api/notes` remains separate.
 
+## Skills page API
+
+Skills are how-tos the assistant proposed after solving a task (armory's `skills`
+capability). Only an `active` skill is ever returned to the assistant, and these routes
+are the only way to activate one: no agent tool can. They require a verified account
+with `chat.use`; the owner is always the authenticated account's internal uid.
+
+| Method | Route | Behavior |
+| --- | --- | --- |
+| GET | `/api/skills` | All the account's skills, newest first; `[{id, title, when_to_use, steps, tools, status, successes, failures, created_at, failing}]`. `status` is `proposed`, `active` or `retired`; `failing` is true once the skill failed 3 or more times and more often than it worked, and the assistant is no longer offered it. |
+| PUT | `/api/skills/{id}` | `{title, when_to_use, steps, tools}` rewrites the text (80/300/1200/200 characters; tools optional). The status stays and the worked and failed counts reset. 409 with the reason for a duplicate title, 404 when missing. |
+| PUT | `/api/skills/{id}/status` | `{status}` approves (`active`), rejects or retires (`retired`) or sends back for review (`proposed`); 409 at the 50-active-skills cap, 404 when missing. |
+| DELETE | `/api/skills/{id}` | Deletes an owned skill (204); 404 when missing. |
+
+ember_api forwards these to token-protected `/skills/owners/{uid}/skills` routes on
+mcp_server. Upstream failures return 503, a disabled capability returns 404, and
+redirects are refused. Changes are logged by action only, never skill text. Deleting an
+account asks mcp_server to purge its skills (`DELETE /skills/owners/{uid}`, best effort,
+logged as `admin.skills_purge` when it fails).
+
 Backend for [ember_web](../ember_web). It owns ember_web's user accounts and
 login sessions (its own database, separate from chat_app's) and will proxy
 all of ember_web's MCP traffic to `ai_agent` and `mcp_server`, so the
@@ -198,9 +218,9 @@ top-level context fields still describe its own window.
 
 ## Setup and running
 
-`run.bat` creates `.venv_ember_api`, installs the project (editable, with dev
-extras) on first run, then starts the server on `EMBER_API_PORT` (default
-`8030`). server_launcher lists it as **Ember API**.
+The server listens on `EMBER_API_PORT` (default `8030`).
+
+In Docker: `dev_deploy.bat` in this folder rebuilds and restarts the `ember_api` container from the root `docker-compose.yml` (see [docs/deployment.md](../../../docs/deployment.md)).
 
 Manually:
 

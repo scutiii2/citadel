@@ -21,10 +21,10 @@ over the same origin, like [ember_web](../ember_web): its Vite server forwards
 Needs `ember_api` and `mcp_server` running (ember_api proxies the capability
 and extension calls to mcp_server).
 
-- `run.bat` installs `node_modules` on first run, then starts Vite. Extra
-  arguments go to Vite.
-- `server_launcher` lists it as **Ember Admin** (detected from `run.bat`).
-- `npm run dev`
+- `npm install` once, then `npm run dev` starts Vite (port `EMBER_ADMIN_PORT`, default 5176).
+  Extra arguments go to Vite after `--`.
+- `dev_deploy.bat` rebuilds and restarts the `ember_admin` container from the root `docker-compose.yml`
+  (see [docs/deployment.md](../../../docs/deployment.md)).
 
 Open <http://127.0.0.1:5176> and log in with an account that has
 at least one of the page permissions below. A login made in ember_web also works here: cookies are not

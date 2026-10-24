@@ -255,8 +255,8 @@ class Settings:
 def load_settings() -> Settings:
     """Reads config_app.json (created from its .example if missing) and makes
     sure .env exists (built from the old secrets/ files, else .env.example).
-    EMBER_API_HOST / EMBER_API_PORT win over the file, so server_launcher
-    and run.bat can pick the port."""
+    EMBER_API_HOST / EMBER_API_PORT win over the file, so a launcher or
+    container can pick the port."""
     raw = load_json_config(CONFIGS_DIR / "config_app.json")
     ensure_env_file(ENV_PATH, ENV_PATH.with_name(".env.example"), LEGACY_SECRETS_DIR)
     database_path = _project_path(raw.get("database_path", "data/ember_api.db"))

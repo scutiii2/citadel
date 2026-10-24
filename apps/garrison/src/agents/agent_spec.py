@@ -36,7 +36,7 @@ TIERS = ("light", "standard", "heavy", "extreme")
 _DEFAULT_GATEWAY = {"anthropic": "claude", "openai": "gpt", "laya": "local"}
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
-_TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "orchestrator", "memory_recall", "plan_tool", "delegable", "internal_role", "decision"}
+_TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "orchestrator", "memory_recall", "skill_recall", "skill_learning", "plan_tool", "delegable", "internal_role", "decision"}
 _LLM_KEYS = {"provider", "gateway", "model", "temperature", "reasoning_effort", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort", "fallback_gateways"}
 _TOOLS_KEYS = {"allow", "deny"}
 
@@ -140,6 +140,10 @@ class AgentSpec:
     orchestrator: bool = False
     # Load the user's newest saved notes at the start of each top-level turn (agents/memory_recall.py).
     memory_recall: bool = False
+    # Load the user's approved skills that match the question at the start of each top-level turn (agents/skill_recall.py).
+    skill_recall: bool = False
+    # After a qualifying turn, draft a skill and propose it for the user's approval (agents/skill_reflection.py).
+    skill_learning: bool = False
     # Offer the update_plan checklist tool (agents/plan.py); the chat's own toggle can still switch it off.
     plan_tool: bool = True
     # False keeps the agent out of every orchestrator's roster: it is called directly (ember_api), never delegated to.
@@ -355,11 +359,17 @@ def load_file(path: Path) -> AgentSpec:
 
     orchestrator = check.boolean(data, "orchestrator", False)
     memory_recall = check.boolean(data, "memory_recall", False)
+    skill_recall = check.boolean(data, "skill_recall", False)
+    skill_learning = check.boolean(data, "skill_learning", False)
     if provider == "laya":
         if orchestrator or check.boolean(data, "entry", False):
             raise check.fail("llm.provider", "Laya triage must be a specialist, not an entry agent or orchestrator")
         if memory_recall:
             raise check.fail("memory_recall", "Laya triage has no tools, so it cannot recall memory")
+        if skill_recall:
+            raise check.fail("skill_recall", "Laya triage has no tools, so it cannot recall skills")
+        if skill_learning:
+            raise check.fail("skill_learning", "Laya triage has no tools, so it cannot learn skills")
         if llm.gateway not in (None, "local"):
             raise check.fail("llm.gateway", "Laya triage runs locally; cloud gateways are not supported")
         if llm.model not in (None, "convaiinnovations/laya"):
@@ -375,7 +385,7 @@ def load_file(path: Path) -> AgentSpec:
         from src.agents.router_contract import RouterPolicy
 
         if (provider != "laya" or check.boolean(data, "entry", False) or orchestrator
-                or check.boolean(data, "delegable", True) or memory_recall
+                or check.boolean(data, "delegable", True) or memory_recall or skill_recall or skill_learning
                 or check.boolean(data, "plan_tool", True) or "*" not in tools.deny):
             raise check.fail("internal_role", "router requires local Laya, no chat roles, no tools, memory or plan")
         try:
@@ -400,6 +410,8 @@ def load_file(path: Path) -> AgentSpec:
         tools=tools,
         orchestrator=orchestrator,
         memory_recall=memory_recall,
+        skill_recall=skill_recall,
+        skill_learning=skill_learning,
         plan_tool=check.boolean(data, "plan_tool", True),
         delegable=check.boolean(data, "delegable", True),
         source=path,
@@ -444,7 +456,7 @@ def current() -> AgentSpec:
         file = os.getenv("AI_AGENT_FILE")
         if not file:
             raise AgentSpecError(
-                "AI_AGENT_FILE is not set - start agents with run.bat (python -m src.supervisor), "
+                "AI_AGENT_FILE is not set - start agents with python -m src.supervisor, "
                 "or set AI_AGENT_FILE to an agents/<id>.json path"
             )
         _current = load_file(Path(file))

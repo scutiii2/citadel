@@ -17,7 +17,7 @@ from typing import Any
 import anyio
 from dotenv import dotenv_values
 
-from src.agents import agent_spec, auto_route, delegation, memory_recall
+from src.agents import agent_spec, auto_route, delegation, memory_recall, skill_recall, skill_reflection
 from src.agents import router_routing
 from src.agents import plan as plan_policy
 
@@ -226,6 +226,10 @@ async def run_chat(
                 raise ChatCancelled()
             # Only the question the model sees changes; attachments and the stored chat keep the original.
             provider_question = await memory_recall.with_recall(question, on_event)
+        if depth == 0 and agent_spec.current().skill_recall:
+            if cancellation.is_cancelled(request_id):
+                raise ChatCancelled()
+            provider_question = await skill_recall.with_skills(question, provider_question, on_event)
         if inspect.iscoroutinefunction(_PROVIDER_MODULE.run_chat):
             result = await _PROVIDER_MODULE.run_chat(
                 provider_question, history, resolution.model, enabled_extensions, request_id, depth,
@@ -249,6 +253,9 @@ async def run_chat(
         result.reasoning_effort = effort.effort
         result.effort_note = effort.note
         result.private_extension_errors = list(private.errors)
+        if depth == 0 and agent_spec.current().skill_learning:
+            # In the background and after the answer exists: learning never delays or changes the turn.
+            skill_reflection.schedule(question, result, request_id)
         return result
     finally:
         llm_options.reset_effort(effort_token)

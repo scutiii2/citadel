@@ -19,11 +19,13 @@ starting/stopping/restarting/listing managed apps. Built to be called by
 2. Run the server:
 
    ```
-   run.bat
+   cd apps/armory
+   py -m venv .venv_mcp
+   .venv_mcp\Scripts\pip install -e ".[dev]"
+   .venv_mcp\Scripts\python -m src.run
    ```
 
-   (from `apps/armory/` - creates `.venv_mcp` and installs this project
-   into it in editable mode on first run, then runs `py -m src.run`.)
+   (Create the venv and install once; afterwards only the last line.)
 
 ## Configuration
 
@@ -67,7 +69,8 @@ staff routes, even when the chat capability is offline. SQLite storage defaults
 to `specifics/tickets/.data/tickets.db`, configurable with `MCP_TICKETS_DB_PATH`.
 See `configs/config_tickets.json.example` for tags, automatic-report caps,
 priority thresholds and classifier limits. Optional `LAYA_URL` points at the
-Laya agent's MCP address (a Garrison agent, which asks the shared Laya service) for advisory grouping and
+Triage Assistant's MCP address (a Garrison agent on port 9111, which asks the shared Laya service; in Docker use
+`http://garrison:9111/mcp`, because 127.0.0.1 is the container itself) for advisory grouping and
 tagging; blank skips Laya. Armory holds no Laya model.
 Ember permissions and triage interfaces are planned separately.
 
@@ -114,22 +117,14 @@ pytest
 
 ## Docker
 
-See `zima_host.yaml` for a ZimaOS "customized app" Docker Compose recipe.
+Armory runs as the `armory` service of the root `docker-compose.yml`, with `treasury` started as its dependency. Rebuild
+it on this machine with `dev_deploy.bat` in this folder, or `docker compose up -d --build armory` from the repo root.
+Deploying to the ZimaOS box is covered in [docs/deployment.md](../../docs/deployment.md).
 
-
-The recipe loads credentials from the host file
-`/media/HDD320-1/MCPArchitecture/mcp_server/.env` (the same project `.env`
-used by local startup, already gitignored). Place the file at that path
-before starting the customized app; Compose does not upload it for you.
-Keep `SMTP_PASSWORD` there and restrict the file's permissions to the
-account managing the deployment. Keep the host path in `env_file` and the
-volume mount in step if you move the deployment.
-
-The SMTP password previously embedded in this recipe must be revoked at
-the mail provider. Put a replacement password in the deployment `.env`,
-then recreate the container and verify ServerWatcher email delivery. Removing
-it from the recipe does not remove it from Git history or rotate it.
-
+Container-only configs are mounted from `docker/configs/armory/`, and the host Docker socket is mounted for the
+Server Manager capability. Credentials such as `SMTP_PASSWORD` come from this folder's `.env` (gitignored).
+The SMTP password the old `zima_host.yaml` recipe once held must still be revoked at the mail provider, because
+removing the file does not remove it from Git history.
 
 ### PDF chat attachments
 

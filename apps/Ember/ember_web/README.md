@@ -108,6 +108,15 @@ components, and where to place new Vue files and their tests.
   a shared internal token configured in ember_api and mcp_server; an unavailable
   store shows an error with Retry. Unsaved memory drafts ask before being discarded.
 
+- A Skills page (`/skills`, `chat.use`) lists the how-tos the assistant proposed, in
+  three groups: Waiting for approval, Active and Retired. Approve, Reject, Retire,
+  Send back for review, Edit (a dialog for the title, when to use, steps and tools)
+  and a confirmed Delete are the only controls; a proposal is never used until it is
+  approved. Active skills show how often they worked and failed. One that failed
+  three or more times, more than it worked, is flagged "Often fails" and Ember is no
+  longer offered it until you edit it (which starts its counts over) or retire it.
+  It needs mcp_server's `skills` capability switched on.
+
 - The context panel shows prompt cost per agent call for delegated answers,
   with Exact or Estimated counts. Context accuracy applies to every agent;
   Exact makes about five count requests per changed agent prompt, cached after that.
@@ -418,10 +427,10 @@ No `.env` is needed: nothing server-specific is compiled into the bundle.
 
 Run with any of:
 
-- `run.bat` - installs `node_modules` on first run, then starts Vite.
-  Extra arguments go to Vite (e.g. `run.bat --open`).
-- `server_launcher` - lists it as **Ember Web** (detected from `run.bat`).
-- `npm run dev`
+- `npm install` once, then `npm run dev` starts Vite (port `EMBER_WEB_PORT`, default 5173).
+  Extra arguments go to Vite after `--` (e.g. `npm run dev -- --open`).
+- `dev_deploy.bat` - rebuilds and restarts the `ember_web` container from the root `docker-compose.yml`
+  (see [docs/deployment.md](../../../docs/deployment.md)).
 
 Then open <http://127.0.0.1:5173> and log in (first time: the ember_api
 bootstrap admin - see ember_api's README).

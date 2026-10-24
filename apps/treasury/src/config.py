@@ -140,7 +140,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         seed_from_example(path)
     config = parse_app_config(_read_json(path))
     override = os.getenv(PORT_ENV_VAR)
-    if override:  # server_launcher passes the port it assigned
+    if override:  # a launcher or container passes the port it assigned
         try:
             port = int(override)
         except ValueError as error:

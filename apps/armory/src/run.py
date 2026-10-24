@@ -186,6 +186,9 @@ async def _serve() -> None:
         install_download_routes(app)
         # Deletes an account's memory notes when ember_api deletes the account. See memory_routes.py.
         install_memory_routes(app)
+        # The user's side of learned skills: approve, retire, delete, purge. See skill_routes.py.
+        from src.skill_routes import install_skill_routes
+        install_skill_routes(app)
         from src.brain_routes import install_brain_routes
         install_brain_routes(app)
         # Support tickets are always available to ember_api, even when chat tools are off.

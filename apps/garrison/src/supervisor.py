@@ -1,7 +1,7 @@
 """Starts every agent in ai_agent/agents/ as its own `python -m src.server`
 child process and keeps them running.
 
-run.bat runs this module, so server_launcher still sees one ai_agent
+Run it with `python -m src.supervisor`; it is the one process per ai_agent
 instance. All agent files are validated before any child starts. Each
 child's output is relayed line by line as "[<agent id>] ...". A child that
 exits on its own is deregistered (it could not clean up after itself),

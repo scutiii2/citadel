@@ -1,0 +1,19 @@
+{
+  "summary": "Reusable how-tos the assistant proposes after solving a task. Nothing is used until you approve it; search returns approved skills only.",
+  "tools": [
+    {"name": "tool_skill_search", "purpose": "Search your approved skills; an empty query lists the newest", "connection": "Local SQLite", "commands": ["search"]},
+    {"name": "tool_skill_mark", "purpose": "Record whether a followed skill worked (MCP-only: assistant feedback)", "connection": "Local SQLite", "commands": []},
+    {"name": "tool_skill_propose", "purpose": "Propose a skill for your approval (MCP-only: written by the assistant)", "connection": "Local SQLite", "commands": []}
+  ],
+  "commands": [
+    {"name": "search", "tool": "tool_skill_search", "params": [
+      {"name": "query", "required": false, "default": "", "description": "Words describing the task; empty lists the newest approved skills."}
+    ]}
+  ],
+  "workflow": [
+    {"sequence": "1", "tool": "tool_skill_search", "ai_only_step": false, "explanation": "Look for an approved skill before a multi-step task."},
+    {"sequence": "2", "tool": "tool_skill_mark", "ai_only_step": true, "explanation": "Record whether the followed skill solved the task."},
+    {"sequence": "3", "tool": "tool_skill_propose", "ai_only_step": true, "explanation": "After solving a new multi-step task, propose a skill."},
+    {"sequence": "4", "tool": "(manual - no tool)", "ai_only_step": false, "explanation": "You approve or retire proposed skills; a proposal is never used before that."}
+  ]
+}

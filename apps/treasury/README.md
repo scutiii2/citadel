@@ -18,11 +18,15 @@ instance "default" ───> connection "scratch" ─> SQLite file (cache off)
 
 ## Setup and run
 ```
-run.bat
+py -m venv .venv_treasury
+.venv_treasury\Scripts\pip install -e ".[dev]"
+.venv_treasury\Scripts\python -m src.run
 ```
-First run creates the venv and installs dependencies, then seeds `.env`,
+Create the venv and install once. The first start seeds `.env`,
 `configs/config_app.json` and `configs/config_connections.json` from their `.example` twins.
 Default port is 8071 (`DB_GATEWAY_PORT` overrides it).
+
+In Docker: `dev_deploy.bat` in this folder rebuilds and restarts the `treasury` container from the root `docker-compose.yml` (see [docs/deployment.md](../../docs/deployment.md)).
 
 Tests: `.venv_treasury\Scripts\python.exe -m pytest`
 
