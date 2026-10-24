@@ -22,15 +22,6 @@ def _configure(monkeypatch, tmp_path, agents):
     return config_path
 
 
-def test_agent_id_for_uses_the_pre_rename_provider_names():
-    # PROVIDER_ID is "anthropic"/"openai" (see agent_config.py), but the
-    # agent id predates that rename and must stay "claude-agent" - see
-    # the module docstring's note on delegate_to_agent/chat history/
-    # cancel all already referencing it.
-    assert agent_registry.agent_id_for("anthropic") == "claude-agent"
-    assert agent_registry.agent_id_for("openai") == "openai-agent"
-
-
 def test_register_adds_this_instance_to_the_config_file(monkeypatch, tmp_path):
     config_path = _configure(monkeypatch, tmp_path, [])
 

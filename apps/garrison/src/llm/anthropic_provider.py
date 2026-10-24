@@ -108,29 +108,31 @@ class _Anthropic(BaseProvider):
                    for name in names)
 
     @classmethod
-    def get_client(cls, gateway: str | None = None) -> AsyncAnthropic | AsyncAnthropicBedrock | AsyncAnthropicVertex:
+    def _build_client(cls, gateway: str | None, cache: dict[str, Any], plain: Any, bedrock: Any, vertex: Any) -> Any:
+        """Resolve the gateway and build (once, cached in `cache`) its SDK client from the
+        given classes: the Async* ones for get_client(), the sync ones for get_sync_client()."""
         gateway_name = gateway or cls._gateway_name()
-        if gateway_name in cls._clients:
-            return cls._clients[gateway_name]
+        if gateway_name in cache:
+            return cache[gateway_name]
 
         if gateway_name == "bedrock":
             cfg = llm_config.gateway(PROVIDER_NAME, "bedrock")
-            cls._clients[gateway_name] = AsyncAnthropicBedrock(
+            cache[gateway_name] = bedrock(
                 aws_access_key=cfg.get("aws_access_key_id"),
                 aws_secret_key=cfg.get("aws_secret_access_key"),
                 aws_region=cfg.get("aws_region"),
             )
-            return cls._clients[gateway_name]
+            return cache[gateway_name]
 
         if gateway_name == "vertex":
             cfg = llm_config.gateway(PROVIDER_NAME, "vertex")
             if not cfg.get("project_id"):
                 raise ValueError("gateways/anthropic/vertex.json project_id env var not set")
-            cls._clients[gateway_name] = AsyncAnthropicVertex(project_id=cfg["project_id"], region=cfg.get("region"))
-            return cls._clients[gateway_name]
+            cache[gateway_name] = vertex(project_id=cfg["project_id"], region=cfg.get("region"))
+            return cache[gateway_name]
 
         # Every other block ("claude" itself, "openrouter", "litellm",
-        # "helicone", "portkey", ...) is a plain AsyncAnthropic() build -
+        # "helicone", "portkey", ...) is a plain Anthropic() build -
         # The gateway file supplies api_key/auth_token/base_url, "claude"'s
         # own block just leaves base_url unset (SDK default).
         cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
@@ -141,49 +143,19 @@ class _Anthropic(BaseProvider):
                 f"gateways/anthropic/{gateway_name}.json: neither its api_key nor "
                 "auth_token env var is set in .env"
             )
-        cls._clients[gateway_name] = AsyncAnthropic(api_key=api_key, auth_token=auth_token, base_url=cfg.get("base_url"))
-        return cls._clients[gateway_name]
+        cache[gateway_name] = plain(api_key=api_key, auth_token=auth_token, base_url=cfg.get("base_url"))
+        return cache[gateway_name]
+
+    @classmethod
+    def get_client(cls, gateway: str | None = None) -> AsyncAnthropic | AsyncAnthropicBedrock | AsyncAnthropicVertex:
+        return cls._build_client(gateway, cls._clients, AsyncAnthropic, AsyncAnthropicBedrock, AsyncAnthropicVertex)
 
     @classmethod
     def get_sync_client(cls, gateway: str | None = None) -> Anthropic | AnthropicBedrock | AnthropicVertex:
-        """Same gateway resolution as get_client() above, but builds the
-        plain synchronous SDK classes (Anthropic/AnthropicBedrock/
-        AnthropicVertex) instead of their Async* counterparts. Exists
-        solely for run_interpret(), which does a single, non-streaming,
-        non-`await`ed `client.messages.create(...)` call - get_client()'s
-        AsyncAnthropic etc. would hand that call site an unawaited
-        coroutine instead of a response. Cached separately in
-        `_sync_client` so this never collides with get_client()'s `_client`."""
-        gateway_name = gateway or cls._gateway_name()
-        if gateway_name in cls._sync_clients:
-            return cls._sync_clients[gateway_name]
-
-        if gateway_name == "bedrock":
-            cfg = llm_config.gateway(PROVIDER_NAME, "bedrock")
-            cls._sync_clients[gateway_name] = AnthropicBedrock(
-                aws_access_key=cfg.get("aws_access_key_id"),
-                aws_secret_key=cfg.get("aws_secret_access_key"),
-                aws_region=cfg.get("aws_region"),
-            )
-            return cls._sync_clients[gateway_name]
-
-        if gateway_name == "vertex":
-            cfg = llm_config.gateway(PROVIDER_NAME, "vertex")
-            if not cfg.get("project_id"):
-                raise ValueError("gateways/anthropic/vertex.json project_id env var not set")
-            cls._sync_clients[gateway_name] = AnthropicVertex(project_id=cfg["project_id"], region=cfg.get("region"))
-            return cls._sync_clients[gateway_name]
-
-        cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
-        api_key = cfg.get("api_key")
-        auth_token = cfg.get("auth_token")
-        if not api_key and not auth_token:
-            raise ValueError(
-                f"gateways/anthropic/{gateway_name}.json: neither its api_key nor "
-                "auth_token env var is set in .env"
-            )
-        cls._sync_clients[gateway_name] = Anthropic(api_key=api_key, auth_token=auth_token, base_url=cfg.get("base_url"))
-        return cls._sync_clients[gateway_name]
+        """Same as get_client(), but the plain synchronous SDK classes, cached separately.
+        Exists solely for run_interpret(), whose single non-streaming
+        `client.messages.create(...)` call is never awaited."""
+        return cls._build_client(gateway, cls._sync_clients, Anthropic, AnthropicBedrock, AnthropicVertex)
 
     @classmethod
     def resolve_default_model(cls) -> str:

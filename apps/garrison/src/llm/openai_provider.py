@@ -98,10 +98,12 @@ class _OpenAI(BaseProvider):
                    for name in names)
 
     @classmethod
-    def get_client(cls, gateway: str | None = None) -> AsyncOpenAI | AsyncAzureOpenAI:
+    def _build_client(cls, gateway: str | None, cache: dict[str, Any], plain: Any, azure: Any) -> Any:
+        """Resolve the gateway and build (once, cached in `cache`) its SDK client from the
+        given classes: the Async* ones for get_client(), the sync ones for get_sync_client()."""
         gateway_name = gateway or cls._gateway_name()
-        if gateway_name in cls._clients:
-            return cls._clients[gateway_name]
+        if gateway_name in cache:
+            return cache[gateway_name]
 
         if gateway_name == "azure":
             cfg = llm_config.gateway(PROVIDER_NAME, "azure")
@@ -110,15 +112,15 @@ class _OpenAI(BaseProvider):
                     "gateways/openai/azure.json: AZURE_OPENAI_ENDPOINT / "
                     "AZURE_OPENAI_API_KEY not set in .env"
                 )
-            cls._clients[gateway_name] = AsyncAzureOpenAI(
+            cache[gateway_name] = azure(
                 azure_endpoint=cfg["azure_endpoint"],
                 api_version=cfg.get("api_version"),
                 api_key=cfg["api_key"],
             )
-            return cls._clients[gateway_name]
+            return cache[gateway_name]
 
         # Every other block ("gpt" itself, "together", "groq", "ollama",
-        # ...) is a plain AsyncOpenAI() build - the gateway file supplies
+        # ...) is a plain OpenAI() build - the gateway file supplies
         # api_key/base_url, "gpt"'s own block just leaves base_url unset
         # (SDK default).
         cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
@@ -128,44 +130,18 @@ class _OpenAI(BaseProvider):
                 f"gateways/openai/{gateway_name}.json: its api_key env var is not "
                 "set in .env"
             )
-        cls._clients[gateway_name] = AsyncOpenAI(api_key=secret, base_url=cfg.get("base_url"))
-        return cls._clients[gateway_name]
+        cache[gateway_name] = plain(api_key=secret, base_url=cfg.get("base_url"))
+        return cache[gateway_name]
+
+    @classmethod
+    def get_client(cls, gateway: str | None = None) -> AsyncOpenAI | AsyncAzureOpenAI:
+        return cls._build_client(gateway, cls._clients, AsyncOpenAI, AsyncAzureOpenAI)
 
     @classmethod
     def get_sync_client(cls, gateway: str | None = None) -> OpenAI | AzureOpenAI:
-        """Same gateway resolution as get_client() above, but builds the
-        plain synchronous SDK classes (OpenAI/AzureOpenAI) instead of their
-        Async* counterparts - used by run_interpret(), whose
-        client.responses.create(...) calls are never awaited. Cached
-        separately in `_sync_client` so this never collides with
-        get_client()'s `_client`."""
-        gateway_name = gateway or cls._gateway_name()
-        if gateway_name in cls._sync_clients:
-            return cls._sync_clients[gateway_name]
-
-        if gateway_name == "azure":
-            cfg = llm_config.gateway(PROVIDER_NAME, "azure")
-            if not cfg.get("azure_endpoint") or not cfg.get("api_key"):
-                raise ValueError(
-                    "gateways/openai/azure.json: AZURE_OPENAI_ENDPOINT / "
-                    "AZURE_OPENAI_API_KEY not set in .env"
-                )
-            cls._sync_clients[gateway_name] = AzureOpenAI(
-                azure_endpoint=cfg["azure_endpoint"],
-                api_version=cfg.get("api_version"),
-                api_key=cfg["api_key"],
-            )
-            return cls._sync_clients[gateway_name]
-
-        cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
-        secret = cfg.get("api_key") or cfg.get("auth_token")
-        if not secret:
-            raise ValueError(
-                f"gateways/openai/{gateway_name}.json: its api_key env var is not "
-                "set in .env"
-            )
-        cls._sync_clients[gateway_name] = OpenAI(api_key=secret, base_url=cfg.get("base_url"))
-        return cls._sync_clients[gateway_name]
+        """Same as get_client(), but the plain synchronous SDK classes, cached separately.
+        Used by run_interpret(), whose client.responses.create(...) calls are never awaited."""
+        return cls._build_client(gateway, cls._sync_clients, OpenAI, AzureOpenAI)
 
     @classmethod
     def resolve_default_model(cls) -> str:
