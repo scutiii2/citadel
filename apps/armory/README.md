@@ -67,7 +67,8 @@ staff routes, even when the chat capability is offline. SQLite storage defaults
 to `specifics/tickets/.data/tickets.db`, configurable with `MCP_TICKETS_DB_PATH`.
 See `configs/config_tickets.json.example` for tags, automatic-report caps,
 priority thresholds and classifier limits. Optional `LAYA_URL` points at the
-Laya agent's MCP address for advisory grouping and tagging; blank skips Laya.
+Laya agent's MCP address (a Garrison agent, which asks the shared Laya service) for advisory grouping and
+tagging; blank skips Laya. Armory holds no Laya model.
 Ember permissions and triage interfaces are planned separately.
 
 Every capability can be turned off without touching code, live - no

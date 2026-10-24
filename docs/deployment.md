@@ -104,6 +104,12 @@ publishes the two web ports on all interfaces so the LAN can reach them.
    Skip `MCP_HOST`, `MCP_PORT` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. Do not use `localhost`
    for another service.
 
+   **Laya.** The Laya models run in their own project, `Python/laya_service` (outside this repo), not inside Garrison.
+   Compose sets `LAYA_SERVICE_URL=http://laya_lb:9120` for Garrison. After the stack is up, start the service from its
+   own folder: `docker compose up -d --build` (see its README for `LAYA_REPLICAS`, `LAYA_TOKEN` and `LAYA_OFFLINE`). It
+   joins this stack's `citadel_core` network, so the stack must be running first. If it sets a `LAYA_TOKEN`, put the same
+   value in `apps/garrison/.env`. Until it is up, Laya questions fail and Jev (where allowed) answers alone.
+
    `apps/Ember/ember_api/.env` must exist before the first start. Compose bind-mounts it, and if it is missing Docker
    creates a directory in its place and ember_api fails. ember_api writes `EMBER_SECRETS_KEY` into this file, so keep
    it when you rebuild.
@@ -208,7 +214,7 @@ from `main` with just those paths:
 - `apps/armory`, `apps/garrison`, `apps/treasury`, `apps/Ember`
 - `docs/deployment.md`
 
-It leaves out other docs, skills, `tools/`, `apps/archive`, the Python `tests/` folders and `apps/Ember/ember_cli`.
+It leaves out other docs, skills, `tools/`, the Python `tests/` folders and `apps/Ember/ember_cli`.
 `e2e/` and the `src/*.test.ts` files stay because the web apps' tsconfig includes them. The path lists are at the top
 of the script; add a path there when you add a compose service.
 

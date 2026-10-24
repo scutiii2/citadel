@@ -1,18 +1,20 @@
 """`check_triage_cases --three-way`: the Triage Assistant's flow (src/llm/triage_flow.py, where the rules are
-written down) run over loaded checkpoints. The flow itself moved there; this file only loads the two Laya checkpoints
-at the window the script asks for and re-exports what the script and its tests use.
+written down) run against the Laya service. The flow itself lives there; this file only sets the window the script asks for
+and re-exports what the script and its tests use.
 """
 
 from __future__ import annotations
 
 from src.llm.decision import TRIAGE_COUNTS, TRIAGE_VOTERS
-from src.llm.laya_provider import LayaQuestions
+from dataclasses import replace
+
+from src.llm import decision, laya_agent, laya_provider
 from src.llm.triage_flow import (
-    CHECKPOINTS, DEFAULT_THRESHOLDS, ENGLISH, JEV, MAX_NARROWING, TYPED, TriageFlow, final_answer,
+    CHECKPOINTS, DEFAULT_THRESHOLDS, ENGLISH, JEV, TYPED, TriageFlow,
 )
 
 __all__ = [
-    "CHECKPOINTS", "DEFAULT_THRESHOLDS", "ENGLISH", "JEV", "MAX_NARROWING", "TYPED", "TriageFlow", "final_answer",
+    "CHECKPOINTS", "DEFAULT_THRESHOLDS", "ENGLISH", "JEV", "TYPED", "TriageFlow",
 ]
 
 
@@ -30,24 +32,17 @@ def parse_threshold(text: str) -> tuple[str, str, float]:
 
 
 class ThreeWayTriage(TriageFlow):
-    """TriageFlow that can load its own checkpoints and be reused across requests (one at a time). It always returns
-    the full answer: the script's tables and path labels read the trace."""
-
-    def __init__(
-        self, locals_: dict[str, LayaQuestions], use_fallback: bool = True,
-        thresholds: dict[str, dict[str, float]] | None = None, trace: bool | None = True,
-    ) -> None:
-        super().__init__(locals_, use_fallback, thresholds, trace)
+    """TriageFlow for the script: one window for every request, reusable across requests (one at a time). It always
+    returns the full answer: the script's tables and path labels read the trace."""
 
     @classmethod
     def load(
         cls, max_len: int, use_fallback: bool = True, thresholds: dict[str, dict[str, float]] | None = None,
     ) -> "ThreeWayTriage":
-        import laya
-
-        models = {name: LayaQuestions(laya.load(model), window=max_len) for name, model in CHECKPOINTS.items()}
-        return cls(models, use_fallback, thresholds)
+        config = replace(decision.settings(), triage_window=max_len)
+        return cls(use_fallback, thresholds, True, settings_snapshot=config)
 
     def prepare(self) -> None:
-        for questions in self.locals.values():
-            questions._warm()
+        laya_provider.prepare()
+        if not laya_agent.agent().health():
+            raise SystemExit("The Laya service does not answer: start it and set LAYA_SERVICE_URL")

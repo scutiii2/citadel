@@ -6,24 +6,28 @@ import pytest
 from src.agents.router_contract import RouteRequest, RouteCandidate, RouterPolicy
 from src.agents.router_engine import RouterEngine
 from src.llm import decision
-from src.llm.laya_provider import LayaQuestions
+from tests.fake_laya import FakeService, choice, result
 
 
-class Engine:
-    def __init__(self, confidence=.99, choice="ops"):
-        self.calls = []
-        self.confidence = confidence
-        self.choice = choice
+class Engine(FakeService):
+    """The Laya service answering every question with `choice` (or the first option) at `confidence`."""
 
-    def predict(self, text, questions, **kwargs):
-        self.calls.append((text, questions))
-        answers = {}
+    def __init__(self, confidence=.99, pick="ops", tokens=12):
+        super().__init__()
+        self.confidence, self.pick, self.tokens = confidence, pick, tokens
+
+    @property
+    def calls(self):
+        return self.asked
+
+    def ask(self, strategy, text, questions, max_len, **tuning):
+        self.asked.append({"strategy": strategy, "text": text, "questions": questions, "max_len": max_len, **tuning})
+        answers = []
         for qid, spec in questions.items():
             options = list(spec["criteria"])
-            choice = self.choice if self.choice in options else options[0]
-            answers[qid] = {"choice": choice, "answer_confidence": self.confidence,
-                            "probabilities": {k: .99 if k == choice else .01 / (len(options)-1) for k in options}}
-        return {"answers": answers, "usage": {"input_tokens": 12}}
+            pick = self.pick if self.pick in options else options[0]
+            answers.append((qid, choice(pick, self.confidence, options, uncertain=self.confidence < .75)))
+        return result(*answers, tokens=self.tokens)
 
 
 def request(**changes):
@@ -32,9 +36,8 @@ def request(**changes):
 
 
 def router(engine=None):
-    english = Engine() if engine is None else engine
-    return RouterEngine({"laya-english": LayaQuestions(engine=english, window=4096),
-                         "laya-typed": LayaQuestions(engine=Engine(), window=4096)}), english
+    service = Engine() if engine is None else engine
+    return RouterEngine(service), service
 
 
 def test_local_success_and_usage():
@@ -42,7 +45,7 @@ def test_local_success_and_usage():
     response = r.route(request(), RouterPolicy())
     assert response.agent.choice == "ops" and not response.agent.uncertain
     assert response.size.choice == "tiny" and not response.size.uncertain
-    assert len(model.calls) == 1  # both questions in one local prediction
+    assert len(model.calls) == 1  # both questions in one service call
     assert len(response.usage) == 1 and response.usage[0].input_tokens == 12
     assert response.usage[0].model == "convaiinnovations/laya"
 
@@ -88,9 +91,9 @@ def test_cancelled_before_inference_records_no_work():
 def test_timeout_after_local_work_retains_usage_and_abstains():
     clock = [0.0]
     class Slow(Engine):
-        def predict(self, *args, **kwargs):
+        def ask(self, *args, **kwargs):
             clock[0] = 11
-            return super().predict(*args, **kwargs)
+            return super().ask(*args, **kwargs)
     r, _ = router(Slow())
     result = r.route(request(), RouterPolicy(), clock=lambda: clock[0])
     assert result.agent.reason == "timeout" and result.usage[0].input_tokens == 12
@@ -98,12 +101,12 @@ def test_timeout_after_local_work_retains_usage_and_abstains():
 
 def test_agent_failure_does_not_discard_independent_size(monkeypatch):
     from src.llm.triage_flow import TriageFlow
-    original = TriageFlow._settle_choice
-    def settle(self, req, qid, spec):
+    original = TriageFlow._settle
+    def settle(self, req, qid, spec, local):
         if qid == "agent":
             raise ValueError("no model could settle agent")
-        return original(self, req, qid, spec)
-    monkeypatch.setattr(TriageFlow, "_settle_choice", settle)
+        return original(self, req, qid, spec, local)
+    monkeypatch.setattr(TriageFlow, "_settle", settle)
     r, _ = router()
     result = r.route(request(), RouterPolicy())
     assert result.agent.uncertain and not result.size.uncertain

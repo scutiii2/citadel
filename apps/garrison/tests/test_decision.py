@@ -6,7 +6,9 @@ import json
 
 import pytest
 
-from src.llm import decision, laya_classifier, laya_provider
+from types import SimpleNamespace
+
+from src.llm import decision, laya_agent, laya_classifier, laya_provider
 from src.llm.decision import Choice, ClassifierError, ClassifierSettings
 
 CRITERIA = {"database": "SQL and storage", "network": "Connections"}
@@ -228,13 +230,14 @@ def test_post_json_turns_every_failure_into_a_classifier_error(monkeypatch):
 def fake_laya(monkeypatch, *, answer=None, error=None):
     sent = []
 
-    def answer_typed(request):
-        sent.append(request)
-        if error:
-            raise error
-        return {"answer": answer}, 77
+    class Service:
+        def ask(self, strategy, text, questions, max_len, **tuning):
+            sent.append(SimpleNamespace(strategy=strategy, text=text, questions=questions))
+            if error:
+                raise error
+            return {"answers": {"answer": answer}, "calls": [{"input_tokens": 77}]}
 
-    monkeypatch.setattr(laya_provider, "answer_typed", answer_typed)
+    monkeypatch.setattr(laya_agent, "agent", lambda: Service())
     return sent
 
 
@@ -246,27 +249,29 @@ def test_laya_answers_one_choice_question(monkeypatch):
     picked = laya_classifier.ask_choice("connection reset", CRITERIA, "Which area?", 3.0)
 
     assert picked == Choice("network", 82, 77, "laya", laya_provider.DEFAULT_MODEL, {"database": 0.18, "network": 0.82})
+    assert sent[0].strategy == "english-only"
     assert sent[0].text == "connection reset" and sent[0].questions["answer"]["criteria"] == CRITERIA
     assert sent[0].questions["answer"]["instructions"] == "Which area?"
 
 
-@pytest.mark.parametrize("make", [
-    lambda: ("x" * 4001, CRITERIA),                       # too long for Laya
-    lambda: ("text", {str(i): f"option {i}" for i in range(11)}),  # too many options
-])
-def test_laya_hands_over_what_does_not_fit(monkeypatch, make):
+def test_laya_hands_over_a_text_that_does_not_fit(monkeypatch):
     fake_laya(monkeypatch, answer={})
-    subject, criteria = make()
     with pytest.raises(ClassifierError, match="Laya could not answer"):
-        laya_classifier.ask_choice(subject, criteria, "Which?", 3.0)
+        laya_classifier.ask_choice("x" * 4001, CRITERIA, "Which?", 3.0)
+
+
+def test_laya_hands_over_options_the_service_refuses(monkeypatch):
+    fake_laya(monkeypatch, error=laya_agent.LayaServiceError("question 'answer' (choice) criteria must be an object of 2 to 10", status=422))
+    with pytest.raises(ClassifierError, match="Laya could not answer"):
+        laya_classifier.ask_choice("text", {str(i): f"option {i}" for i in range(11)}, "Which?", 3.0)
 
 
 def test_laya_that_cannot_read_the_whole_text_is_a_classifier_error(monkeypatch):
-    fake_laya(monkeypatch, error=laya_provider._InputTooLong("too long"))
+    fake_laya(monkeypatch, error=laya_agent.LayaServiceError("too long"))
     with pytest.raises(ClassifierError, match="too long"):
         laya_classifier.ask_choice("text", CRITERIA, "Which?", 3.0)
-    fake_laya(monkeypatch, error=RuntimeError("Laya is not installed"))
-    with pytest.raises(ClassifierError, match="not installed"):
+    fake_laya(monkeypatch, error=laya_agent.LayaServiceError("Laya is not configured"))
+    with pytest.raises(ClassifierError, match="not configured"):
         laya_classifier.ask_choice("text", CRITERIA, "Which?", 3.0)
 
 

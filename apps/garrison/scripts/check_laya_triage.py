@@ -1,14 +1,14 @@
 """Small real-model smoke evaluation, not an accuracy or calibration benchmark.
 
 Run from ai_agent: python -m scripts.check_laya_triage
-Loads only local Laya; never calls a cloud LLM or changes agent configuration.
+Asks the Laya service only (LAYA_SERVICE_URL); never calls a cloud LLM or changes agent configuration.
 Sends the triage example schema below through the same provider path agents use.
 """
 
 import json
 
 from scripts.check_triage_cases import CATEGORY, NEEDS_INVESTIGATION, SEVERITY
-from src.llm.laya_provider import LayaQuestions
+from src.llm import laya_provider
 
 TRIAGE_QUESTIONS = {"category": CATEGORY, "severity": SEVERITY, "needs_investigation": NEEDS_INVESTIGATION}
 
@@ -27,11 +27,10 @@ CASES = [
 
 
 def main() -> None:
-    laya = LayaQuestions()
     correct = 0
     uncertain = 0
     for text, expected in CASES:
-        result = laya.answer(json.dumps({"text": text, "questions": TRIAGE_QUESTIONS}))
+        result = laya_provider.answer(json.dumps({"text": text, "questions": TRIAGE_QUESTIONS}))
         data = json.loads(result.response)
         category = data["answers"]["category"]["choice"]
         correct += category == expected

@@ -15,11 +15,16 @@ Originally adapted from the retired chat_app's LLM layer.
   when the agent file's `llm.provider` is `anthropic`.
 - **`openai_provider.py`** - OpenAI Responses API provider, pinned when
   the provider is `openai`.
-- **`laya_provider.py`** - local typed-question answerer: the caller sends JSON
+- **`laya_provider.py`** - typed-question answerer: the caller sends JSON
   `choice`, `score` and `noul` questions about a short text and gets JSON
-  answers with confidences. No tools, text generation, cloud fallback or
-  API key. Inference runs in a worker thread; weights load before registration.
-  Imports only when `laya` is the selected provider.
+  answers with confidences. It validates the request and hands it to
+  `triage_flow.py`. No tools or text generation, and no API key.
+- **`laya_agent.py`** - `LAYAAgent`, the only connection to Laya: the shared Laya
+  service (`Python/laya_service`) over HTTP. Garrison loads no Laya model itself.
+- **`triage_flow.py`** - asks the Laya service for a decision strategy per question
+  type, then adds the fallback classifier (Jev) for what it could not settle.
+- **`laya_classifier.py`** - the `laya` backend of the decision layer: one `choice`
+  question answered by the service's `english-only` strategy.
 - **`llm_options.py`** - one agent's `llm` settings (temperature,
   reasoning effort, max tokens, tool rounds) as request kwargs; a
   parameter the API rejects with a 400 is dropped for the rest of the

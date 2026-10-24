@@ -28,13 +28,20 @@ and an MCP *client* (to `mcp_server`, via a persistent connection - see
    `.venv_garrison` and installs this project into it in editable mode on
    first run, then runs `py -m src.supervisor`. See Agents below.
 
-### CPU-only Docker image
+### Laya models
 
-Garrison's Dockerfile installs PyTorch from its CPU wheel index before the
-application dependencies. This keeps Laya available without downloading the
-CUDA/Triton stack on CPU-only hosts such as ZimaOS. The build checks that the
-installed PyTorch has neither CUDA nor ROCm support. SymPy, Transformers,
-Tokenizers and the Laya model weights are still needed.
+Garrison does not install Laya, PyTorch or the model weights, and no Garrison code loads a Laya model.
+Both models and every local decision rule live in the shared Laya service (`Python/laya_service`, behind a
+load balancer); Garrison reaches it over HTTP through one client, `LAYAAgent` (`src/llm/laya_agent.py`).
+Set `LAYA_SERVICE_URL` (the root `docker-compose.yml` sets it to `http://laya_lb:9120`) and `LAYA_TOKEN` if the
+service has one. Start the Citadel stack first (it creates the `citadel_core` network), then the service
+(`docker compose up -d --build` in `laya_service/`); Garrison finds it by name when it first needs it. Without `LAYA_SERVICE_URL` no Laya model is available: the Triage Assistant, the Router's
+local voters and the `laya` classifier backend report that, and Jev (where allowed) answers alone.
+For local development run the service (`run.bat` in `laya_service/`) and set `LAYA_SERVICE_URL=http://127.0.0.1:9120`
+in `apps/garrison/.env`.
+
+Garrison sends the service a strategy name per question type and gets the answers back; what stays in Garrison is
+the cloud fallback (Jev) and its use. See [Triage flow](#triage-flow-laya-english-laya-typed-decisions-jev).
 
 An older image keeps its GPU packages until it is replaced. From the repo root,
 rebuild and recreate Garrison using the same Compose files as your deployment:
@@ -231,7 +238,7 @@ Then set `agents_registry_url` in `apps/Ember/ember_api/configs/config_app.json`
 
 `agents/triage-assistant.json` defines a local specialist backed by Laya, a
 small model that answers typed questions about a short text. It is part of the
-tracked roster. Laya is a regular dependency, installed with `pip install -e .`;
+tracked roster. The models run in the Laya service (see Laya models above);
 set `enabled: false` if this installation should not run it. Restart the
 supervisor after changing the roster. Its provider is `laya`, gateway `local`,
 model `convaiinnovations/laya`; no cloud model or API key is used.
@@ -263,7 +270,7 @@ question, a JSON string:
   Text after the JSON object is ignored.
 - `local_only: true` (optional) keeps the request on Laya's own models: the English checkpoint, then the
   typed-decisions checkpoint when English is unsure, and never the fallback classifier (Jev), whatever `classifier`
-  says. Both models load at start-up in every flow. Unsure answers stay marked `uncertain`, and a text Laya cannot
+  says. The service loads both models at its start-up. Unsure answers stay marked `uncertain`, and a text Laya cannot
   read whole is an error. ember_api's tag suggestions and triage questions and mcp_server's ticket grouping use it,
   so their text never leaves the machine.
 
@@ -271,7 +278,10 @@ The response is JSON: `{"answers": {id: {...}}, "uncertain": bool}`. Each
 answer has `type`, the result (`choice`/`score`/`noul`), `answer_confidence`
 and `uncertain` (confidence below `min_confidence`). A request with an unknown
 field, type, or out-of-range size is rejected before inference with an
-"Invalid Laya request" error.
+"Invalid Laya request" error. Garrison checks only the envelope (the JSON, `text`, `min_confidence`, `trace`,
+`local_only`); the question rules above (types, `criteria` shapes, option and question counts) are the Laya
+service's, checked with its `POST /v1/validate`, so there is one definition for every caller. If the service cannot
+be reached the questions go unchecked and Jev, where allowed, may still answer.
 
 The top-level `uncertain` is true if ANY answer is uncertain, so callers that
 mix question types should read the per-answer `uncertain` flags (score
@@ -279,24 +289,33 @@ questions in particular tend to have lower confidence).
 
 The English checkpoint has a 512-token limit including the question heads, so
 keep texts and criteria short. Input Laya reports as truncated is rejected
-instead of answering from partial evidence. The model loads before the agent
-registers as running; the first load may download weights. Loading/inference
-errors propagate without an LLM fallback (Jev below is a classifier, not an LLM answer). History is deliberately excluded and
+instead of answering from partial evidence. At start-up the agent only checks that the Laya service answers
+and logs a warning if not; the service downloads weights on its first start. Service errors
+propagate without an LLM fallback (Jev below is a classifier, not an LLM answer). History is deliberately excluded and
 `interpret`/summarization is unsupported. Cancellation is checked before and
-after inference.
+after the service call.
 
 ### Triage flow (Laya English, Laya typed-decisions, Jev)
 
-Every request goes through `src/llm/triage_flow.py` (the whole flow is written at the top of that file). Laya English
-answers first; the `typed-decisions` checkpoint only if English is not sure; the fallback (Jev, gated by
-`triage_fallback`, a key and the triage chain, see below) only when those two cannot settle a question. Each
-model has its own confidence threshold, by number of options left (2 options: English 0.90, typed 0.80, Jev 0.90;
-3 or more: 0.75, 0.55, 0.90), changed with `classifier.triage_thresholds`
-(`{"3+": {"laya-typed": 0.6}}`) or, for one request, by sending `min_confidence`. Between the steps options far
-below the best (`triage_prune_ratio`) are dropped and the models asked again, and when nobody is ever sure the
-models' confidence-weighted values are compared pairwise (`triage_pair_ratio`): the answer then carries `also_check`,
-or `"unknown": true` with `candidates`, and is always `uncertain` (no model was sure, so a clear leader is still provisional). Score questions take the first model that meets its 3+ threshold. A noul question uses the 2-option thresholds, and Jev
-decides it only when typed is unsure and the fallback is on. A `local_only` request never reaches Jev.
+Every request goes through `src/llm/triage_flow.py` (the whole flow is written at the top of that file). For each
+question type Garrison reads the local voters that `classifier.triage_order` and `triage_enabled` allow and asks the
+Laya service for the matching strategy: English then typed = `english-then-typed` (the default), typed first =
+`typed-then-english`, one voter = `english-only` / `typed-only`. The service runs the local rules, each model against
+its own confidence threshold by number of options left (2 options: English 0.90, typed 0.80; 3 or more: 0.75, 0.55),
+changed with `classifier.triage_thresholds` (`{"3+": {"laya-typed": 0.6}}`) or, for one request, by sending
+`min_confidence`. Between the steps it drops options far below the best (`triage_prune_ratio`) and asks again, and
+when no model is ever sure it compares the models' confidence-weighted values pairwise (`triage_pair_ratio`): the
+answer then carries `also_check`, or `"unknown": true` with `candidates`, and is always `uncertain`. Garrison sends
+these settings and the window (`triage_window`) with every request. The rules and the other strategies
+(`most-confident`, `average`, `consensus`) are in `laya_service/README.md`.
+
+Jev (gated by `triage_fallback`, a key and the triage chain, see below) is asked only about what the service could
+not settle, over the options it left, with a threshold of 0.90 (2 options and 3 or more alike, `triage_thresholds`
+changes it). An unsure Jev is asked again once over the options all the models' averaged probabilities narrow to;
+if nobody is sure, the service compares all the voters as above. Averaging and comparing are the service's
+`/v1/combine`. Score questions take the first model that meets its 3+ threshold. A noul question uses the 2-option
+thresholds, and Jev decides it only when typed is unsure and the fallback is on. If the service cannot be reached,
+Jev answers alone (when allowed). A `local_only` request never reaches Jev.
 
 Which models answer which question type, and in what order, is set per type in `configs/config_tuning.json`
 (`classifier`; the `.example` shows the defaults):
@@ -320,8 +339,9 @@ or `noul`), `answer_confidence`, `uncertain`, `answered_by`, `probabilities` (2 
 or set `classifier.triage_trace`, for the full answer: also `resolved_by`, `eliminated`, `disagreement`, a `note` and a
 `rounds` trace of every model call (about 480 tokens). `check_triage_cases --rounds` always reads the full one.
 
-- Both checkpoints read `classifier.triage_window` tokens (default 4096) and are loaded before the agent registers:
-  the second one downloads on first start (about 2 minutes) and the two models need roughly 1.6-3.4 GB of RAM.
+- Both checkpoints read `classifier.triage_window` tokens (default 4096). They live in the Laya service, which loads
+  both at its start (the second downloads on first start, about 2 minutes) and needs roughly 1.6-3.4 GB of RAM per
+  replica; Garrison itself needs none of it.
 - The checks measured so far: English 20/23 and typed 21/23 on the 47 cases in `scripts/check_triage_cases.py` with
   Laya alone; both are confidently wrong on sarcasm and "the server room is on fire", where nothing asks Jev.
 - An old `config_tuning.json` may still hold `triage_flow` or `triage_confidence_gap` (settings of the removed
@@ -412,12 +432,11 @@ operation is not available through the browser MCP proxy or the assistant's tool
 catalog. It has no tools, private extensions, memory recall or plan capability.
 Internal role invariants are validated on file/Admin changes and at startup.
 
-Local models must already be cached completely. Router probes Hub snapshots using
-`local_files_only=True`, then loads an absolute local directory. It never fetches
-missing weights. Checkpoint preparation remains an operator action; ordinary chat
-abstains from unavailable local voters and can use the configured Jev fallback.
-Readiness summaries distinguish missing caches, unloaded cached models and missing
-fallback credentials. The normal Triage Assistant retains its existing loader.
+Router's local voters are the Laya service's too. To make sure Router never triggers a weight download, run the
+service with `LAYA_OFFLINE=1`: it then loads only checkpoints that are already cached completely, and preparing
+them stays an operator action. Ordinary chat abstains from unavailable local voters and can use the configured Jev
+fallback. Readiness summaries report `local_status` `loaded` when the service answers its health check and
+`unavailable` when it is missing or unreachable, and flag missing fallback credentials.
 
 Defaults: 10-second overall deadline (1-30 configurable), 3-second remote timeout,
 4,000 local subject characters, 16,000 remote subject characters, and at most nine

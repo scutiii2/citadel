@@ -1,20 +1,18 @@
 """Router contract smoke cases, or an explicit live classifier comparison.
 
 Offline is the default and uses synthetic predictions: it measures plumbing, not
-model accuracy. --live uses installed local models and environment credentials;
+model accuracy. --live uses the Laya service (LAYA_SERVICE_URL) and environment credentials;
 it never dispatches specialist work. Run live only in a prepared deployment.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import time
 
 from src.agents.router_contract import RouterPolicy, RouteCandidate, RouteRequest, RouteTier
 from src.agents.router_engine import RouterEngine
 from src.llm import decision
-from src.llm.laya_provider import LayaQuestions
 
 CASES = [
     ("general", "What is a prime number?", "none", "tiny"),
@@ -28,26 +26,30 @@ CASES = [
 ]
 
 
-class FixtureModel:
+class FixtureService:
+    """Stands in for the Laya service: answers each question the way the case expects."""
+
     def __init__(self, agent, size):
         self.expected = {"agent": agent, "size": size}
 
-    def predict(self, subject, questions, **kwargs):
+    def validate(self, questions):
+        pass
+
+    def ask(self, strategy, subject, questions, max_len, **tuning):
         answers = {}
         for qid, spec in questions.items():
             choices = list(spec["criteria"])
             expected = self.expected[qid]
             chosen = expected if expected in choices else choices[0]
             confidence = .99 if expected is not None else .1
-            answers[qid] = {"choice": chosen, "answer_confidence": confidence,
+            answers[qid] = {"type": "choice", "choice": chosen, "answer_confidence": confidence,
+                "uncertain": confidence < .75, "answered_by": "laya-english",
                 "probabilities": {c: .99 if c == chosen else .01/(len(choices)-1) for c in choices}}
-        return {"answers": answers, "usage": {"input_tokens": 1}}
+        return {"answers": answers, "uncertain": any(a["uncertain"] for a in answers.values()),
+                "calls": [{"model": "fixture", "input_tokens": 1, "duration_ms": 0, "ok": True}]}
 
 
 def evaluate(*, live=False):
-    # Never download model weights from this benchmark, including live mode.
-    if live:
-        os.environ["HF_HUB_OFFLINE"] = "1"
     tiers = [RouteTier(tier=t) for t in ("light", "standard", "heavy")]
     candidates = [RouteCandidate(id="ops", label="Operations", focus="Server status, deployments and database operations", tiers=tiers),
                   RouteCandidate(id="researcher", label="Researcher", focus="Research, comparisons and tabular analysis", tiers=tiers)]
@@ -58,8 +60,7 @@ def evaluate(*, live=False):
         if live:
             engine, policy = RouterEngine(), RouterPolicy()
         else:
-            engine = RouterEngine({v: LayaQuestions(engine=FixtureModel(expected_agent, expected_size), window=4096)
-                                   for v in ("laya-english", "laya-typed")})
+            engine = RouterEngine(FixtureService(expected_agent, expected_size))
             policy = RouterPolicy(fallback=False, prune_ratio=0)
         started = time.monotonic()
         result = engine.route(request, policy)

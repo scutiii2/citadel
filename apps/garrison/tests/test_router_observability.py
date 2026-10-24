@@ -7,27 +7,33 @@ from src.core import internal_auth
 from src.llm import decision
 
 
-def test_readiness_distinguishes_unloaded_local_and_unavailable_fallback(monkeypatch):
-    from src.agents import router_models
+class _Service:
+    def __init__(self, healthy):
+        self.configured, self._healthy = True, healthy
 
-    monkeypatch.setattr(router_models, "cached_checkpoint", lambda checkpoint: "cached")
+    def health(self):
+        return self._healthy
+
+
+def test_readiness_distinguishes_a_running_laya_service_and_unavailable_fallback(monkeypatch):
     spec = replace(agent_spec.current(), internal_role="router", decision=RouterPolicy())
     monkeypatch.setattr(agent_spec, "current", lambda: spec)
+    monkeypatch.setattr(router_service.laya_agent, "agent", lambda: _Service(True))
+    monkeypatch.setattr(router_service.laya_agent, "configured", lambda: True)
     monkeypatch.setattr(decision, "available", lambda *args: False)
     summary = router_service.status_summary()
-    assert summary["local_status"] == "not_loaded"
+    assert summary["local_status"] == "loaded"
     assert summary["fallback_available"] is False
     assert "thresholds" not in summary
 
 
-def test_missing_local_checkpoints_publish_degraded_state(monkeypatch):
-    from src.agents import router_models
-
+def test_an_unreachable_or_missing_laya_service_publishes_degraded_state(monkeypatch):
     spec = replace(agent_spec.current(), internal_role="router", decision=RouterPolicy())
     monkeypatch.setattr(agent_spec, "current", lambda: spec)
-    def missing(checkpoint):
-        raise RuntimeError("missing cache")
-    monkeypatch.setattr(router_models, "cached_checkpoint", missing)
+    monkeypatch.setattr(router_service.laya_agent, "configured", lambda: True)
+    monkeypatch.setattr(router_service.laya_agent, "agent", lambda: _Service(False))
+    assert router_service.status_summary()["local_status"] == "unavailable"
+    monkeypatch.setattr(router_service.laya_agent, "configured", lambda: False)
     assert router_service.status_summary()["local_status"] == "unavailable"
 
 

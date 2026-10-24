@@ -42,6 +42,8 @@ services:
       AI_AGENT_HOST: 0.0.0.0
       AI_AGENT_ADVERTISE_URL: http://garrison
       MCP_SERVER_URL: http://armory:8010/mcp
+      # Shared Laya service (Python/laya_service): start it after this stack, it joins the `core` network.
+      LAYA_SERVICE_URL: http://laya_lb:9120
     volumes:
       - ./docker/configs/garrison/servers.json:/app/configs/config_servers.json:ro
       - agent_data:/app/.data

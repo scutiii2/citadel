@@ -184,9 +184,9 @@ def test_rounds_flag_prints_the_tables_after_the_summary_table(monkeypatch, caps
 
     monkeypatch.setattr(cases, "load_env", lambda: None)
     monkeypatch.setattr(decision, "settings", decision.ClassifierSettings)
-    monkeypatch.setattr(laya_provider.LayaQuestions, "prepare", lambda self: None)
+    monkeypatch.setattr(laya_provider, "prepare", lambda: None)
     answers = {"category": CHECKOUT}
-    monkeypatch.setattr(laya_provider.LayaQuestions, "answer", lambda self, raw: FakeLaya(answers).answer(raw))
+    monkeypatch.setattr(laya_provider, "answer", lambda raw: FakeLaya(answers).answer(raw))
 
     assert cases.main(["--case", "vague", "--rounds"]) == 0
     out = capsys.readouterr().out
@@ -196,13 +196,18 @@ def test_rounds_flag_prints_the_tables_after_the_summary_table(monkeypatch, caps
 
 # --- the wider case set -----------------------------------------------------------------------------
 
+# The Laya service's limits (laya_service/src/laya_service/answers.py); the cases should reach them.
+LAYA_MAX_OPTIONS = 10
+LAYA_MAX_QUESTIONS = 8
+
+
 def test_the_wider_set_reaches_every_shape_the_triage_setup_handles():
     by_name = {case.name: case for case in cases.CASES}
     questions = [q for case in cases.CASES for q in case.questions.values()]
     # two-option choice questions (the pair rule), a ten-option one (Laya's maximum) and an eight-question request
     assert any(q["type"] == "choice" and len(q["criteria"]) == 2 for q in questions)
-    assert any(q["type"] == "choice" and len(q["criteria"]) == laya_provider.MAX_OPTIONS for q in questions)
-    assert max(len(case.questions) for case in cases.CASES) == laya_provider.MAX_QUESTIONS
+    assert any(q["type"] == "choice" and len(q["criteria"]) == LAYA_MAX_OPTIONS for q in questions)
+    assert max(len(case.questions) for case in cases.CASES) == LAYA_MAX_QUESTIONS
     # text shapes: Laya's window overflow, the issue first or last, another language, an instruction hidden in the text
     assert 1000 < len(by_name["medium-text"].text) < laya_provider.MAX_INPUT_CHARS
     assert len(by_name["long-key-first"].text) > laya_provider.MAX_INPUT_CHARS

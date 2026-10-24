@@ -12,24 +12,14 @@ from src.agents.router_contract import DecisionOutcome, RouteRequest, RouteRespo
 from src.agents.router_engine import RouterEngine
 from src.core import internal_auth, usage_log
 from src.llm import cancellation
-from src.llm import decision
+from src.llm import decision, laya_agent
 
 _engine = RouterEngine()
 
 
 def status_summary() -> dict:
-    from src.agents.router_models import cached_checkpoint
-
     policy = agent_spec.current().decision
-    models = [model for name, model in _engine.voters.items()
-              if (name == "laya-english" and policy.english) or (name == "laya-typed" and policy.typed)]
-    local_status = "loaded" if models and all(m._engine is not None for m in models) else "not_loaded"
-    try:
-        for model in models:
-            if model._engine is None:
-                cached_checkpoint(model._checkpoint)
-    except RuntimeError:
-        local_status = "unavailable"
+    local_status = "loaded" if laya_agent.configured() and laya_agent.agent().health() else "unavailable"
     return {**policy.summary(), "local_status": local_status,
             "fallback_available": bool(policy.fallback and decision.available("triage", ("laya",)))}
 
