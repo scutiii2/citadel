@@ -21,7 +21,7 @@ function mount() {
 
 beforeEach(() => {
   setActivePinia(createPinia());
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   vi.stubGlobal("Notification", undefined);
 });
 
@@ -59,4 +59,34 @@ describe("useAlertPoller", () => {
     expect(poller.alerts.value).toEqual([]);
     unmount();
   });
+
+  it("clears the previous account's alerts immediately when another permitted account signs in", async () => {
+    const auth = useAuthStore();
+    auth.account = { id: 1, email_verified: true, permissions: ["calendar.use"] } as never;
+    client.unseenAlerts.mockResolvedValueOnce([ALERT]);
+    const { poller, unmount } = mount();
+    await vi.waitFor(() => expect(poller.alerts.value).toEqual([ALERT]));
+    client.unseenAlerts.mockReturnValueOnce(new Promise(() => {}));
+    auth.account = { id: 2, email_verified: true, permissions: ["calendar.use"] } as never;
+    expect(poller.alerts.value).toEqual([]);
+    expect(client.unseenAlerts).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
+  it("rejects a pending response from the previous account after a permitted account switch", async () => {
+    const auth = useAuthStore();
+    auth.account = { id: 1, email_verified: true, permissions: ["calendar.use"] } as never;
+    let finishOld!: (alerts: typeof ALERT[]) => void;
+    client.unseenAlerts.mockReturnValueOnce(new Promise((resolve) => { finishOld = resolve; }));
+    const { poller, unmount } = mount();
+    const nextAlert = { ...ALERT, id: "a2", title: "Private meeting for account two" };
+    client.unseenAlerts.mockResolvedValueOnce([nextAlert]);
+    auth.account = { id: 2, email_verified: true, permissions: ["calendar.use"] } as never;
+    await vi.waitFor(() => expect(poller.alerts.value).toEqual([nextAlert]));
+    finishOld([ALERT]);
+    await nextTick();
+    expect(poller.alerts.value).toEqual([nextAlert]);
+    unmount();
+  });
+
 });

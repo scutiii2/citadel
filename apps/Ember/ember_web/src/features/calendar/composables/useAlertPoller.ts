@@ -49,20 +49,22 @@ export function useAlertPoller() {
   const onVisible = () => { if (!document.hidden) void poll(); };
 
   watch(
-    active,
-    (on) => {
+    () => [auth.account?.id ?? null, active.value] as const,
+    ([, on]) => {
       generation += 1;
       clearInterval(timer);
       alerts.value = [];
+      notified.clear();
       if (on) {
         void poll();
         timer = setInterval(() => void poll(), INTERVAL_MS);
       }
     },
-    { immediate: true },
+    { immediate: true, flush: "sync" },
   );
   document.addEventListener("visibilitychange", onVisible);
   onBeforeUnmount(() => {
+    generation += 1;
     clearInterval(timer);
     document.removeEventListener("visibilitychange", onVisible);
   });

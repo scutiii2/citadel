@@ -138,7 +138,19 @@ export interface StoredTicket {
   comments?: { id: number; ticket_id: number; author: string; author_role: "reporter" | "staff" | "ai" | "system"; body: string; created_at: string }[];
 }
 
+interface CalendarFeedStub {
+  id: string;
+  name: string;
+  color: string;
+  enabled: boolean;
+  last_fetch_at: string | null;
+  last_error: string | null;
+}
+interface RuleStub { id: string; channel: string; lead_minutes: number; enabled: boolean }
+interface AlertStub { id: string; title: string; start_utc: string; channel: string; created_at: string }
+
 export interface FakeApi {
+  calendar: { feeds: CalendarFeedStub[]; rules: RuleStub[]; alerts: AlertStub[] };
   /** Requests captured only by the opt-in native media workspace fake. */
   media: { uploads: { filename: string; data: string }[]; merges: Record<string, unknown>[]; downloads: { url: string; preset: string }[] };
   tickets: Map<number, StoredTicket>;
@@ -244,8 +256,9 @@ const event = (sequence: number, body: Record<string, unknown>) =>
 export const ANSWER_PIECES = ["The capital ", "of France ", "is Paris."];
 export const ANSWER = ANSWER_PIECES.join("");
 
-export async function installFakeApi(page: Page, options: { admin?: boolean; tickets?: boolean; media?: boolean } = {}): Promise<FakeApi> {
+export async function installFakeApi(page: Page, options: { admin?: boolean; tickets?: boolean; media?: boolean; calendar?: boolean } = {}): Promise<FakeApi> {
   const api: FakeApi = {
+    calendar: { feeds: [], rules: [{ id: "r1", channel: "inapp", lead_minutes: 15, enabled: true }], alerts: [] },
     media: { uploads: [], merges: [], downloads: [] },
     tickets: new Map(),
     accountCapabilities: { capabilities: new Set(), extensions: new Set() },
@@ -264,7 +277,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     folders: new Map(),
   };
   const baseAccount = options.admin ? ADMIN_ACCOUNT : ACCOUNT;
-  const account = { ...baseAccount, permissions: [...baseAccount.permissions, ...(options.tickets ? ["tickets.create"] : []), ...(options.media ? ["tools.view", "tools.execute", "files.download"] : [])] };
+  const account = { ...baseAccount, permissions: [...baseAccount.permissions, ...(options.tickets ? ["tickets.create"] : []), ...(options.calendar ? ["calendar.use"] : []), ...(options.media ? ["tools.view", "tools.execute", "files.download"] : [])] };
   if (options.admin) {
     for (const a of ADMIN_ACCOUNTS) api.accounts.set(a.id, { ...a });
     for (const r of ADMIN_ROLES) api.roles.set(r.id, { ...r });
@@ -410,7 +423,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       return json(route, account);
     }
     if (method === "GET" && path === "/api/settings") {
-      return json(route, { force_tool_approval: api.settings.forceToolApproval });
+      return json(route, { force_tool_approval: api.settings.forceToolApproval, calendar_inapp: true, calendar_email: true, calendar_push: false });
     }
     if (method === "PUT" && path === "/api/admin/settings/force_tool_approval") {
       const { value } = request.postDataJSON() as { value: boolean };
@@ -747,6 +760,71 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       }
       if (method === "POST" && tail === "/turns") return startTurn(route, api, id!);
       if (method === "GET" && tail === "/events") return streamTurn(route, api, id!);
+    }
+
+    if (path.startsWith("/api/calendar")) {
+      const cal = api.calendar;
+      if (path === "/api/calendar/feeds" && method === "GET") return json(route, cal.feeds);
+      if (path === "/api/calendar/feeds" && method === "POST") {
+        const body = request.postDataJSON() as { name: string; color: string };
+        const feed = { id: `f${cal.feeds.length + 1}`, name: body.name, color: body.color, enabled: true, last_fetch_at: null, last_error: null };
+        cal.feeds.push(feed);
+        return json(route, feed, 201);
+      }
+      const feedMatch = path.match(/^\/api\/calendar\/feeds\/([a-z0-9]+)$/);
+      if (feedMatch && method === "PATCH") {
+        const feed = cal.feeds.find((f) => f.id === feedMatch[1]);
+        if (!feed) return json(route, { detail: "No such calendar" }, 404);
+        const body = request.postDataJSON() as Partial<CalendarFeedStub> & { url?: string };
+        for (const key of ["name", "color", "enabled"] as const) {
+          if (body[key] !== undefined) Object.assign(feed, { [key]: body[key] });
+        }
+        return json(route, feed);
+      }
+      if (feedMatch && method === "DELETE") {
+        cal.feeds = cal.feeds.filter((f) => f.id !== feedMatch[1]);
+        return route.fulfill({ status: 204 });
+      }
+      if (path === "/api/calendar/events" && method === "GET") {
+        // The initial Work week view hides weekends; keep the fixture inside its requested weekdays.
+        const start = new Date(url.searchParams.get("from")!);
+        while (start.getDay() === 0 || start.getDay() === 6) start.setDate(start.getDate() + 1);
+        start.setHours(10, 0, 0, 0);
+        const end = new Date(start.getTime() + 3600_000);
+        return json(route, {
+          events: cal.feeds.length ? [{ uid: "e1", title: "Standup", start: start.toISOString(), end: end.toISOString(), all_day: false, location: "Room 1", description: "Agenda", sources: [{ name: cal.feeds[0]!.name, color: cal.feeds[0]!.color }] }] : [],
+          errors: [],
+        });
+      }
+      if (path === "/api/calendar/alarms" && method === "GET") return json(route, cal.rules);
+      if (path === "/api/calendar/alarms" && method === "POST") {
+        const body = request.postDataJSON() as { channel: string; lead_minutes: number };
+        const rule = { id: `r${cal.rules.length + 1}`, channel: body.channel, lead_minutes: body.lead_minutes, enabled: true };
+        cal.rules.push(rule);
+        return json(route, rule, 201);
+      }
+      const ruleMatch = path.match(/^\/api\/calendar\/alarms\/([a-z0-9]+)$/);
+      if (ruleMatch && method === "PATCH") {
+        const rule = cal.rules.find((r) => r.id === ruleMatch[1]);
+        if (!rule) return json(route, { detail: "No such alert" }, 404);
+        Object.assign(rule, request.postDataJSON() as Partial<Omit<RuleStub, "id">>);
+        return json(route, rule);
+      }
+      if (ruleMatch && method === "DELETE") {
+        cal.rules = cal.rules.filter((r) => r.id !== ruleMatch[1]);
+        return route.fulfill({ status: 204 });
+      }
+      if (path === "/api/calendar/push/key" && method === "GET") return json(route, { key: "A".repeat(87) });
+      if (["/api/calendar/push/subscribe", "/api/calendar/push/unsubscribe"].includes(path) && method === "POST") {
+        return route.fulfill({ status: 204 });
+      }
+      if (path === "/api/calendar/prefs") return json(route, { timezone: "UTC", saved: true });
+      if (path === "/api/calendar/alerts" && method === "GET") return json(route, cal.alerts);
+      const seenMatch = path.match(/^\/api\/calendar\/alerts\/([a-z0-9-]+)\/seen$/);
+      if (seenMatch && method === "POST") {
+        cal.alerts = cal.alerts.filter((a) => a.id !== seenMatch[1]);
+        return route.fulfill({ status: 204 });
+      }
     }
 
     api.unexpected.push(`${method} ${path}`);
