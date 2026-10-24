@@ -160,7 +160,7 @@ test("global capability switches are absent for administrators", async ({ page }
   await card.getByRole("button", { name: /PDF files/ }).click();
   await expect(page.getByRole("button", { name: "Turn off for everyone" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Turn on for everyone" })).toHaveCount(0);
-  await expect(card.getByRole("switch")).toBeChecked();
+  await expect(card.getByRole("switch")).toHaveCount(0); // shared capabilities have no per-account switch
   expect(api.capabilities.get("pdf")?.enabled).toBe(true);
   expect(api.unexpected).toEqual([]);
 });
