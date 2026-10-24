@@ -26,6 +26,7 @@ READ_ONLY = {
     "web": {"tool_web_search", "tool_web_readPage"},
     "notes": {"tool_notes_listNotes", "tool_notes_searchNotes", "tool_notes_readNote"},
     "memory": {"tool_mem_search"},
+    "skills": {"tool_skill_search"},
 }
 # Capabilities whose tools change something, spend credits or crawl, or run commands: none may declare it.
 # generator joined it when its tools gained email_to (they can send mail).
