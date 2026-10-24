@@ -64,6 +64,7 @@ limits) resolved from the agent file.
   with a `user`/`assistant` role and string content. Privileged roles, extra
   fields, and structured tool activity are rejected before provider setup or
   history trimming; providers generate tool calls/results within their own loop.
+- `broker.py` - the wait/resolve core shared by the approval and question brokers.
 - `approvals.py` - per-call tool approval handling.
 - `usage_log.py` - append-only per-agent usage log.
 

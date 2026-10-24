@@ -1,4 +1,4 @@
-// Mirrors video_downloader/src/models.py and the job events in src/service.py. Keep both in step.
+// Mirrors media_downloader/src/models.py and the job events in src/service.py. Keep both in step.
 
 export type FileKind = 'video' | 'audio' | 'photo' | 'package'
 export type JobState = 'queued' | 'downloading' | 'processing' | 'done' | 'error'
