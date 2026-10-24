@@ -24,25 +24,12 @@ from src.llm import model_tiers
 
 _CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / ".data" / "agent_registry.json"
 
-# "claude"/"openai" rather than this instance's own AI_AGENT_PROVIDER
-# ("anthropic"/"openai" - see agent_config.py) for the id prefix: the
-# provider id was renamed from "claude" to "anthropic" without renaming
-# the agent id, and delegate_to_agent calls, stored chat
-# `provider` fields on old chat turns, and cancel's `provider` param all
-# already reference "claude-agent" - deriving straight from PROVIDER_ID
-# would silently rename that out from under them.
-_AGENT_ID_PREFIX = {"anthropic": "claude", "openai": "openai"}
-
 _log = logging.getLogger(__name__)
 
 _LOCK_TIMEOUT_SECONDS = 5.0
 _LOCK_POLL_SECONDS = 0.05
 _REPLACE_ATTEMPTS = 10
 _REPLACE_POLL_SECONDS = 0.05
-
-
-def agent_id_for(provider_id: str) -> str:
-    return f"{_AGENT_ID_PREFIX.get(provider_id, provider_id)}-agent"
 
 
 def _read(path: Path) -> list[dict[str, Any]]:

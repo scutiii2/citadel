@@ -53,5 +53,18 @@
     "enabled": true,
     "keep": 14,
     "every_hours": 24
+  },
+  "calendar": {
+    "enabled": true,
+    "tick_seconds": 30,
+    "feed_refresh_minutes": 10,
+    "lookahead_hours": 48,
+    "late_grace_minutes": 5,
+    "max_feeds_per_account": 10,
+    "max_alarm_rules": 10,
+    "max_ics_bytes": 5242880,
+    "fetch_timeout_s": 15,
+    "allow_private_urls": false,
+    "push_contact": "mailto:admin@example.com"
   }
 }

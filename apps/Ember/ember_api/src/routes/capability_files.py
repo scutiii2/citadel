@@ -8,13 +8,11 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from pydantic import BaseModel, Field
 
-from src.deps import get_db_gateway, get_log_writer, require_permission
+from src.deps import get_log_writer, require_permission
 from src.models import Account
 from src.routes.attachments import AttachmentIn
 from src.routes.server_info import get_server_info, _call
-from src.services.account_capability_service import AccountCapabilityService
 from src.services.capability_files import Area, CapabilityFilesGateway, PUBLIC
-from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import McpServerInfo
 from src.services.text_extraction import MAX_FILE_BYTES
@@ -65,15 +63,7 @@ def gateway(request: Request) -> CapabilityFilesGateway:
 def install(area: Area) -> None:
     routes = APIRouter(prefix=f"/api/{PUBLIC[area]}")
 
-    async def access(account: Account = Depends(require_permission("tools.execute")),
-                     store: DocumentStore = Depends(get_db_gateway)) -> Account:
-        try:
-            added = await AccountCapabilityService(store, account.uid).get()
-        except DbGatewayError as error:
-            raise HTTPException(503, "Account capabilities storage is unavailable") from error
-        if area not in added.capabilities:
-            raise HTTPException(403, "Add this capability from the Supermarket first.")
-        return account
+    access = require_permission("tools.execute")
 
     @routes.get("/files")
     async def files(account: Account = Depends(access), client: CapabilityFilesGateway = Depends(gateway)):
@@ -136,50 +126,50 @@ def install(area: Area) -> None:
     else:
         @routes.get('/packages')
         async def packages(account: Account = Depends(access), client: CapabilityFilesGateway = Depends(gateway)):
-            return client.local_links('video', await client.request('video', 'GET', '/packages', account))
+            return client.local_links('media', await client.request('media', 'GET', '/packages', account))
 
         @routes.post('/packages')
         async def create_package(body: PackageIn, account: Account = Depends(access),
                                  client: CapabilityFilesGateway = Depends(gateway)):
-            return await client.request('video', 'POST', '/packages', account, json=body.model_dump())
+            return await client.request('media', 'POST', '/packages', account, json=body.model_dump())
 
         @routes.get('/packages/{package_id}')
         async def package(package_id: str = Path(pattern=ID), account: Account = Depends(access),
                           client: CapabilityFilesGateway = Depends(gateway)):
-            return client.local_links('video', await client.request('video', 'GET', f'/packages/{package_id}', account))
+            return client.local_links('media', await client.request('media', 'GET', f'/packages/{package_id}', account))
 
         @routes.post('/packages/{package_id}/items')
         async def add_media(body: DownloadIn, package_id: str = Path(pattern=ID), account: Account = Depends(access),
                             client: CapabilityFilesGateway = Depends(gateway)):
-            return await client.request('video', 'POST', f'/packages/{package_id}/items', account, json=body.model_dump())
+            return await client.request('media', 'POST', f'/packages/{package_id}/items', account, json=body.model_dump())
 
         @routes.delete('/packages/{package_id}', status_code=204)
         async def delete_package(package_id: str = Path(pattern=ID), account: Account = Depends(access),
                                  client: CapabilityFilesGateway = Depends(gateway), logs: LogWriter = Depends(get_log_writer)):
-            await client.request('video', 'DELETE', f'/packages/{package_id}', account)
+            await client.request('media', 'DELETE', f'/packages/{package_id}', account)
             await logs.action(account, 'video.package_delete', f'Removed package {package_id}')
 
         @routes.delete('/packages/{package_id}/items/{item_id}')
         async def remove_media(package_id: str = Path(pattern=ID), item_id: str = Path(pattern=ID),
                                account: Account = Depends(access), client: CapabilityFilesGateway = Depends(gateway)):
-            return await client.request('video', 'DELETE', f'/packages/{package_id}/items/{item_id}', account)
+            return await client.request('media', 'DELETE', f'/packages/{package_id}/items/{item_id}', account)
 
         @routes.post('/packages/{package_id}/start')
         async def start_package(package_id: str = Path(pattern=ID), account: Account = Depends(access),
                                 client: CapabilityFilesGateway = Depends(gateway), logs: LogWriter = Depends(get_log_writer)):
-            result = await client.request('video', 'POST', f'/packages/{package_id}/start', account, json={})
+            result = await client.request('media', 'POST', f'/packages/{package_id}/start', account, json={})
             await logs.action(account, 'video.package_start', f'Started package {package_id} as job {result["job_id"]}')
             return result
 
         @routes.post("/probe")
         async def probe(body: ProbeIn, account: Account = Depends(access),
                         client: CapabilityFilesGateway = Depends(gateway)):
-            return await client.request("video", "POST", "/probe", account, json=body.model_dump())
+            return await client.request("media", "POST", "/probe", account, json=body.model_dump())
 
         @routes.post("/downloads")
         async def start(body: DownloadIn, account: Account = Depends(access),
                         client: CapabilityFilesGateway = Depends(gateway), logs: LogWriter = Depends(get_log_writer)):
-            result = await client.request("video", "POST", "/downloads", account, json=body.model_dump())
+            result = await client.request("media", "POST", "/downloads", account, json=body.model_dump())
             await logs.action(account, "video.download", f"Started download job {result['job_id']}")
             return result
 
@@ -187,4 +177,4 @@ def install(area: Area) -> None:
 
 
 install("pdf")
-install("video")
+install("media")

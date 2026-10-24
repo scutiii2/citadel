@@ -2,10 +2,8 @@
 
 from typing import Any
 
-from src.core.catalog import catalog
 
 
-@catalog
 def validate_history(history: list[dict[str, Any]]) -> list[dict[str, str]]:
     """Copy text-only user/assistant messages; reject privileged roles and SDK items.
 

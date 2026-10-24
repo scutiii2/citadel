@@ -34,10 +34,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.utils.catalog import catalog
 
 
-@catalog
 @dataclass(frozen=True)
 class CapabilityMeta:
     id: str

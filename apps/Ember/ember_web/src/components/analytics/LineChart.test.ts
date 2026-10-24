@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
-import { formatDuration } from "../../utils/trafficAnalytics";
+import { formatDuration } from "../../utils/analytics/trafficAnalytics";
 import LineChart from "./LineChart.vue";
 
 const lines = [
@@ -104,4 +104,14 @@ describe("optional area fill", () => {
     expect(filled.findAll("polyline")).toHaveLength(1);
     expect(filled.findAll(".dot:not(.ringed)")).toHaveLength(1);
   });
+});
+
+it("clears the selected bucket when refreshed series shrinks", async () => {
+  const w = chart();
+  await w.get(".plot").trigger("keydown", { key: "End" });
+  expect(w.find(".tooltip").exists()).toBe(true);
+  await w.setProps({ series: series.slice(0, 1) });
+  expect(w.find(".tooltip").exists()).toBe(false);
+  await w.get(".plot").trigger("keydown", { key: "Home" });
+  expect(w.find(".tooltip").exists()).toBe(true);
 });

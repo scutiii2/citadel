@@ -4,6 +4,10 @@ import { apiRequest } from "./http";
 export interface AppSettings {
   /** Every answer asks before each tool runs, and "allow for this chat" is not offered. */
   force_tool_approval: boolean;
+  /** Calendar alert channels left on for everyone. */
+  calendar_inapp: boolean;
+  calendar_email: boolean;
+  calendar_push: boolean;
 }
 
 export type SettingName = keyof AppSettings;

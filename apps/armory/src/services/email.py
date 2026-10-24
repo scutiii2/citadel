@@ -36,7 +36,6 @@ from email.utils import formatdate, make_msgid
 from html import unescape
 
 from src.services.app_config import EmailConfig
-from src.utils.catalog import catalog
 from src.services.watcher_recipients import parse_recipients
 
 
@@ -127,7 +126,6 @@ def _html_to_text(body_html: str) -> str:
     return "\n".join(line for line in lines if line)
 
 
-@catalog
 def send_email(
     config: EmailConfig,
     capability_alias: str,

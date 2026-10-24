@@ -1,16 +1,14 @@
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { authClient, type Account } from "../api/AuthClient";
+import { authClient, type Account } from "../api/auth/AuthClient";
 import { UnauthorizedError } from "../api/http";
-import { router } from "./index";
+import { router } from ".";
 import { NAV_PAGES, visiblePages } from "./pages";
-import { accountCapabilitiesClient } from "../api/AccountCapabilitiesClient";
-import { commandsClient } from "../api/CommandsClient";
+import { commandsClient } from "../api/tools/CommandsClient";
 import { useAuthStore } from "../stores/auth";
 
-vi.mock("../api/AuthClient", () => ({ authClient: { me: vi.fn() } }));
-vi.mock("../api/AccountCapabilitiesClient", () => ({ accountCapabilitiesClient: { get: vi.fn() } }));
-vi.mock("../api/CommandsClient", () => ({ commandsClient: { capabilities: vi.fn() } }));
+vi.mock("../api/auth/AuthClient", () => ({ authClient: { me: vi.fn() } }));
+vi.mock("../api/tools/CommandsClient", () => ({ commandsClient: { capabilities: vi.fn() } }));
 
 const me = vi.mocked(authClient.me);
 
@@ -155,10 +153,9 @@ const ACCOUNT_WITH_TOOLS = { ...ACCOUNT, permissions: ["chat.use", "tools.view",
 
 describe("native capability pages", () => {
   beforeEach(() => {
-    vi.mocked(accountCapabilitiesClient.get).mockResolvedValue({ capabilities: ["pdf", "video"], extensions: [], disabled_tools: [] });
     vi.mocked(commandsClient.capabilities).mockResolvedValue([
       { name: "pdf", label: "PDF merger", enabled: true, tools: [], resources: [] },
-      { name: "video", label: "Media downloader", enabled: true, tools: [], resources: [] },
+      { name: "media", label: "Media downloader", enabled: true, tools: [], resources: [] },
     ]);
   });
   it.each([["pdf_merger", "pdf-merger"], ["media_downloader", "media-downloader"]])("opens %s as a dedicated route", async (path, name) => {
@@ -187,19 +184,13 @@ describe("native capability pages", () => {
   });
   it("ignores capability answers received after the account changes", async () => {
     me.mockResolvedValue(ACCOUNT_WITH_TOOLS);
-    let resolve!: (value: Awaited<ReturnType<typeof accountCapabilitiesClient.get>>) => void;
-    vi.mocked(accountCapabilitiesClient.get).mockReturnValue(new Promise((done) => { resolve = done; }));
+    let resolve!: (value: Awaited<ReturnType<typeof commandsClient.capabilities>>) => void;
+    vi.mocked(commandsClient.capabilities).mockReturnValue(new Promise((done) => { resolve = done; }));
     const navigation = router.push("/capabilities/pdf_merger");
-    await vi.waitFor(() => expect(accountCapabilitiesClient.get).toHaveBeenCalled());
+    await vi.waitFor(() => expect(commandsClient.capabilities).toHaveBeenCalled());
     useAuthStore().account = { ...ACCOUNT_WITH_TOOLS, id: 2 };
-    resolve({ capabilities: ["pdf"], extensions: [], disabled_tools: [] });
+    resolve([{ name: "pdf", label: "PDF merger", enabled: true, tools: [], resources: [] }]);
     await navigation;
-    expect(router.currentRoute.value.name).toBe("chat");
-  });
-  it("refuses a capability the account has not added", async () => {
-    me.mockResolvedValue(ACCOUNT_WITH_TOOLS);
-    vi.mocked(accountCapabilitiesClient.get).mockResolvedValue({capabilities: [], extensions: [], disabled_tools: []});
-    await router.push("/capabilities/pdf_merger");
     expect(router.currentRoute.value.name).toBe("chat");
   });
   it("refuses an offline capability", async () => {
@@ -212,7 +203,7 @@ describe("native capability pages", () => {
     me.mockResolvedValue({...ACCOUNT, permissions: ["chat.use"]});
     await router.push("/capabilities/pdf_merger");
     expect(router.currentRoute.value.name).toBe("chat");
-    expect(accountCapabilitiesClient.get).not.toHaveBeenCalled();
+    expect(commandsClient.capabilities).not.toHaveBeenCalled();
   });
 });
 

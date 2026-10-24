@@ -44,6 +44,20 @@ where that logic lives instead.
   and re-exposes their tools as this server's own, namespaced. The
   proxying/aggregation engine behind `config_extensions.json` and the
   `/extensions` HTTP routes.
+- **`job_events.py`**, **`job_queue.py`** - the replayable event log
+  (`Job`) and the slot-holding core (`JobQueueBase`: concurrency limit,
+  cooperative timeout, cancel, prune) behind the `pdf_merger` and
+  `media_downloader` queues. Each capability keeps its own events, error
+  codes and messages.
+- **`session_file_store.py`** - `SessionFileStore`: owner-scoped files
+  on disk with a sidecar index, quota, expiry sweep and scratch dirs, shared
+  by both stores. A capability subclasses it with its own stored-file
+  dataclass, write flow and errors.
+- **`link_signing.py`**, **`file_sweeper.py`** - HMAC-signed expiring
+  download links (`LinkSigner`) and the background sweep loop
+  (`run_sweeper`), used by both capabilities.
+- **`media_downloads.py`**, **`pdf_runtime.py`** - the process-wide
+  runtime each of the two file capabilities owns on a dedicated event loop.
 
 ## Adding a new services client
 

@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, expect, it, vi } from "vitest";
 import { authClient } from "../api/AuthClient";
-import { router } from "./index";
+import { router } from ".";
 
 vi.mock("../api/AuthClient", () => ({ authClient: { me: vi.fn() } }));
 

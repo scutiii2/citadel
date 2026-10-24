@@ -19,6 +19,10 @@ watch(
   { immediate: true },
 );
 
+function onNativeClose(): void {
+  if (props.open) emit("close");
+}
+
 /** A click on the backdrop lands on the <dialog> itself, not on its content. */
 function onClick(event: MouseEvent): void {
   if (event.target === dialog.value) emit("close");
@@ -26,7 +30,7 @@ function onClick(event: MouseEvent): void {
 </script>
 
 <template>
-  <dialog ref="dialog" :class="['modal', { 'side-modal': side }]" :aria-label="title" @close="emit('close')" @cancel.prevent="emit('close')" @click="onClick">
+  <dialog ref="dialog" :class="['modal', { 'side-modal': side }]" :aria-label="title" @close="onNativeClose" @cancel.prevent="emit('close')" @click="onClick">
     <header>
       <h3>{{ title }}</h3>
       <button type="button" class="close" aria-label="Close" @click="emit('close')">×</button>
@@ -87,5 +91,8 @@ h3 {
   font-size: 1.4em;
   line-height: 1;
   color: var(--muted);
+}
+@media (pointer: coarse), (max-width: 767px) {
+  button.close { min-width: 44px; min-height: 44px; }
 }
 </style>

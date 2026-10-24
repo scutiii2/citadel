@@ -6,7 +6,7 @@ WORKDIR /src/ember_admin
 COPY ember_admin/package.json ember_admin/package-lock.json ./
 RUN npm ci
 COPY ember_admin/ ./
-COPY ember_web/src/components/PwaStatus.vue ember_web/src/components/pageLayout.css /src/ember_web/src/components/
+COPY ember_web/src/components/layout/PwaStatus.vue ember_web/src/components/layout/pageLayout.css /src/ember_web/src/components/layout/
 # The shared files resolve their imports (vue, virtual:pwa-register) from ember_web.
 RUN ln -s /src/ember_admin/node_modules /src/ember_web/node_modules \
     && npm run build

@@ -4,8 +4,8 @@ Ported from the standalone PDFMerger engine. These modules contain no server, RE
 
 - `converters/`: validates PDFs and supported raster images and converts images to PDF pages.
 - `engine/`: expands page selections and assembles ordered PDF output with rotations, metadata and bookmarks.
-- `store/`: owner-scoped files and quotas, safe names, MIME sniffing, signed links and expiry sweeping.
-- `jobs/`: cooperative cancellation, bounded merge concurrency and replayable progress events.
+- `store/`: owner-scoped files and quotas (on `src/services/session_file_store.py`), safe names and MIME sniffing. Signed links and the expiry sweeper are shared in `src/services/link_signing.py` and `file_sweeper.py`.
+- `jobs/`: bounded merge concurrency and progress events on the shared `src/services/job_queue.py` and `job_events.py`.
 - `service.py`: shared facade composing the engine, store, queue and signer.
 - `models.py`, `errors.py`, `config.py`: engine models, typed errors and immutable settings.
 

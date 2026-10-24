@@ -61,7 +61,7 @@ that should stay inside a single account.
 
 ## Native capability workspace API
 
-Media groups use fixed `/api/video-downloader/packages` GET/POST routes, GET
+Media groups use fixed `/api/media-downloader/packages` GET/POST routes, GET
 `/packages/{id}`, POST `/packages/{id}/items` (`{url,preset}`), DELETE
 `/packages/{id}/items/{item_id}` and POST `/packages/{id}/start`. The same
 `tools.execute` and added `video` capability checks apply. Armory owns groups,
@@ -69,7 +69,7 @@ validates URLs and permanently locks membership when queue admission succeeds.
 Nested ZIP links are rewritten to authenticated same-origin file downloads.
 Restart Armory and ember_api after deployment; no database migration is needed.
 
-PDF/video workspaces proxy only fixed Armory routes (`/pdf/ui`, `/video/ui`,
+PDF/video workspaces proxy only fixed Armory routes (`/pdf/ui`, `/media/ui`,
 and the existing `/upload/pdf`). Armory must be restarted after installing
 the HTTP adapters, with the shared internal token configured and `pdf` / `video`
 online. The authenticated account must add the native capability from the
@@ -88,13 +88,13 @@ No new permissions or role grants are introduced.
 | GET | `/api/pdf-merger/jobs/{id}` | `{job_id,state,done,total,result,error}`; queued/progress/done/error. |
 | POST | `/api/pdf-merger/jobs/{id}/cancel` | Cooperatively cancel an owned merge. |
 | GET | `/api/pdf-merger/files/{id}/download` | Check ownership, then stream a fresh signed Armory download. |
-| POST | `/api/video-downloader/probe` | `{url}` through Armory UrlPolicy; metadata and presets. |
-| POST | `/api/video-downloader/downloads` | `{url,preset}`; return `{job_id}` immediately. |
-| GET | `/api/video-downloader/jobs/{id}` | Owned JobStatus with progress, file or structured error. |
-| POST | `/api/video-downloader/jobs/{id}/cancel` | Cooperatively cancel an owned download. |
-| GET | `/api/video-downloader/files` | Owned unexpired media files. |
-| DELETE | `/api/video-downloader/files/{id}` | Delete an owned media file (204). |
-| GET | `/api/video-downloader/files/{id}/download` | Check ownership, then stream a fresh signed Armory download (Range supported). |
+| POST | `/api/media-downloader/probe` | `{url}` through Armory UrlPolicy; metadata and presets. |
+| POST | `/api/media-downloader/downloads` | `{url,preset}`; return `{job_id}` immediately. |
+| GET | `/api/media-downloader/jobs/{id}` | Owned JobStatus with progress, file or structured error. |
+| POST | `/api/media-downloader/jobs/{id}/cancel` | Cooperatively cancel an owned download. |
+| GET | `/api/media-downloader/files` | Owned unexpired media files. |
+| DELETE | `/api/media-downloader/files/{id}` | Delete an owned media file (204). |
+| GET | `/api/media-downloader/files/{id}/download` | Check ownership, then stream a fresh signed Armory download (Range supported). |
 
 Identity always comes from the session's stable UID, never browser headers or
 request bodies. Armory enforces file/job ownership, quotas, expiry, merge limits,
@@ -340,7 +340,7 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `PATCH` | `/api/chats/{id}` | `chat.use` | `{title?, folder_id?, pinned?}` (at least one) -> the chat row. `folder_id: null` takes the chat out of its folder. `404` unknown chat or a folder that is not this account's. Allowed while an answer is being written; filing and pinning do not change `updated_at`. |
 | `DELETE` | `/api/chats/{id}`, `/api/chats` | `chat.use` | `204`; one chat, or all of this account's. |
 | `POST` | `/api/chats/import` | `chat.use` | `{chats: [{id, title, agent_id, messages, created_at, updated_at}]}` (times in ms) -> `{imported, skipped}`. Existing ids are skipped, never replaced. |
-| `POST` | `/api/chats/{id}/turns` | `chat.use` | `{question, agent_id?, caveman?, enabled_extensions?, disabled_tools?, title?, truncate_to?, ask_before_tools?, allowed_tools?, allow_read_only?, can_ask?, plan?, plan_lean?}` -> `202 {chat, sequence}`. `enabled_extensions`: extension ids whose tools the agent may use (none by default). `disabled_tools`: mcp_server tool names (at most 500) of the built-in capabilities the account switched off for its own chats; the agent neither offers nor runs them, and the turn fails with an error if the agent is too old to leave them out. `truncate_to` (regenerate / edit): index of the typed question this one replaces; it and everything after it are dropped first (`422` unless that message is a question the user typed, `404` for an unknown chat). `ask_before_tools`: the agent asks before each tool runs, except `allowed_tools` (names, at most 200; the tools the user allowed for this chat); see `/approvals` below. `can_ask: true` lets the agent ask clickable questions; clients that cannot show them, such as `chat_cli`, leave it out. Older agents that do not report `user_questions: true` simply never get the question tool. `plan` and `plan_lean` (both default `true`) are the chat's task-checklist toggles: `plan: false` withholds the `update_plan` tool for the turn, `plan_lean: false` drops the "update only when an item changes status" instruction; an agent that does not report `plan_toggle: true` ignores them. `agent_id` is accepted but ignored: every turn goes to the entry agent (`GET /api/agent`). Saves the question (creating the chat) and starts the answer **in ember_api**: it finishes, is saved and counts toward the usage limits even if the browser leaves. `503` no entry agent is registered, `409` already answering, `429` usage limit or 3 answers already running. |
+| `POST` | `/api/chats/{id}/turns` | `chat.use` | `{question, agent_id?, caveman?, title?, truncate_to?, ask_before_tools?, allowed_tools?, allow_read_only?, can_ask?, plan?, plan_lean?}` -> `202 {chat, sequence}`. Extensions and tools are not chosen per request: ember_api turns on every extension mcp_server lists, and each agent's `tools.allow` decides what it may call. The agents the account switched off (`/api/account-agents`) are sent to the agent as `agent:<id>` filter entries; the turn fails with an error if the agent is too old to leave them out. `truncate_to` (regenerate / edit): index of the typed question this one replaces; it and everything after it are dropped first (`422` unless that message is a question the user typed, `404` for an unknown chat). `ask_before_tools`: the agent asks before each tool runs, except `allowed_tools` (names, at most 200; the tools the user allowed for this chat); see `/approvals` below. `can_ask: true` lets the agent ask clickable questions; clients that cannot show them, such as `chat_cli`, leave it out. Older agents that do not report `user_questions: true` simply never get the question tool. `plan` and `plan_lean` (both default `true`) are the chat's task-checklist toggles: `plan: false` withholds the `update_plan` tool for the turn, `plan_lean: false` drops the "update only when an item changes status" instruction; an agent that does not report `plan_toggle: true` ignores them. `agent_id` is accepted but ignored: every turn goes to the entry agent (`GET /api/agent`). Saves the question (creating the chat) and starts the answer **in ember_api**: it finishes, is saved and counts toward the usage limits even if the browser leaves. `503` no entry agent is registered, `409` already answering, `429` usage limit or 3 answers already running. |
 | `GET` | `/api/chats/{id}/events?after=N` | `chat.use` | Server-Sent Events of the chat's running (or just finished) answer: a `snapshot` of the text and tool steps so far when joining late, then `token` / `step_*` / `summarizing` / `question_request` / `question_resolved` events and, when the entry agent delegates, `agent_start` / `agent_end` (a specialist begins or finishes; keys `agent_id`, `agent_label`, `delegated_by`, `question` cut to 500 characters, `step_id`, `ok`, `at`) and `agent_token` (the specialist's streamed `text`, chunks cut to 4,000 characters; never saved with the answer). The `snapshot` carries pending `questions: [{id, questions}]` so a reload restores them; `question_request` carries `{id, questions}` and `question_resolved` carries `{id, outcome}` (answered, skipped, timeout or cancelled). ai_agent-only `keepalive` events are dropped. It also carries `active_agents: [{agent_id, label, since, step_id}]`, the delegated agents working now, outermost first (the entry agent itself is not listed; the browser adds it); it is cleared when the turn ends. Its `steps` carry their `id` (live viewers only; the id is not saved) and `agent_id` / `agent_label`. Then last `final` `{message, cancelled}` or `error`. `404` when there's nothing to watch. The saved answer carries `model`, `total_tokens`, `input_tokens`, `output_tokens`, `duration_s` (the whole turn, seconds), `context_tokens` / `context_window` when ai_agent reported them, and `steps: [{tool, label, arguments, ok, result, agent_id?, agent_label?}]` (`agent_id` / `agent_label` only on steps a delegated agent ran; results cut to 4,000 characters, at most 50 steps), and, when the answer ran more than one agent (its own plus delegated ones), `agent_usage: [{agent, agent_label?, provider_id?, gateway?, model?, input_tokens?, output_tokens?, total_tokens, started_at?, finished_at?}]` (times ISO-8601 UTC with `Z`) (at most 20; an answer from one agent has none). Every answer also carries `agent`, the id of the ember agent that wrote it (older answers lack it). |
 | `POST` | `/api/chats/{id}/approvals` | `chat.use` | `{step_id, decision: allow \| always \| deny}` answers a tool the running answer waits to run (the `id` of an `approval_request` event) -> `{decided: true}`. `404` no answer running, `409` nothing waiting for that step (unknown or already answered), `502` agent unreachable. Only the chat's own account can; logged as `tool.approval`. |
 | `POST` | `/api/chats/{id}/questions` | `chat.use` | Answers or skips the clickable questions the running answer waits on (`question_request` event): `{step_id, skipped?, answers?: [{selected, other}]}` -> `{answered: true}`. `404` no answer running, `409` nothing waiting, `422` invalid answer, `502` agent unreachable. |
@@ -360,7 +360,7 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `DELETE` | `/api/templates/{id}` | `chat.use` | `204`; `404` if missing or another account's. |
 | `GET` | `/api/nav-preferences` | any logged-in account | How this account arranges its nav rail: `{order, pinned, hidden}`, lists of page ids (route paths such as `/agents`). All empty means the default arrangement. |
 | `PUT` | `/api/nav-preferences` | any logged-in account | Replaces it with the same shape. At most 50 ids per list, each 1-64 characters (`422` otherwise). Repeats are dropped; `pinned` and `hidden` keep only ids in `order`, and a hidden page is never pinned. ember_api does not know the page list, so unknown ids are kept. Returns what was stored. |
-| `DELETE` | `/api/nav-preferences` | any logged-in account | Back to the default arrangement. `204`, also when nothing was saved. | Nav preferences and account capabilities are kept in db_gateway (one document per account, keyed by uid). While it is down, `GET` answers the default arrangement and saving gives `503`; account capabilities answer `503` for every call (an empty set would disable all tools). Migration `0023` drops the old tables, and refuses to run while any still holds rows: copy them to the gateway or empty them first. |
+| `DELETE` | `/api/nav-preferences` | any logged-in account | Back to the default arrangement. `204`, also when nothing was saved. | Nav preferences and the account's switched-off agents are kept in db_gateway (one document per account, keyed by uid). While it is down, `GET` answers the default arrangement and saving gives `503`; account agents answer `503` for every call (an empty list would switch every agent back on). Migration `0023` drops the old tables, and refuses to run while any still holds rows: copy them to the gateway or empty them first. |
 | `GET` | `/api/notes` | `chat.use` | This account's private notes, newest edit first: `[{id, title, body, tags, agent_readable, last_editor, created_at, updated_at}]`. Kept in db_gateway, not in this database. |
 | `GET` | `/api/notes/tags` | `chat.use` | The tags this account already uses, most used first: `[{tag, count}]`. |
 | `POST` | `/api/notes/suggest-tags` | `chat.use` | `{title?, body?, tags?}` (the note as the editor holds it): which of this account's existing tags, not already in `tags`, Laya thinks fit. `{suggested, checked, skipped}`. Needs a running agent whose file uses the `laya` provider, else `503`. Laya answers alone (`local_only`: English, then typed-decisions; no fallback to Jev). |
@@ -375,8 +375,8 @@ Tags are trimmed and lowercased, repeats are dropped, and each is 1 to 30 charac
 Tag suggestions (`services/tag_suggestions.py`): ember_api finds the running agent whose definition uses the `laya` provider (`AgentDirectory.find_by_provider`) and sends it `ask` with a text and one yes/no question per candidate tag. The text is the first 700 characters of title and body, at most 8 candidates (the most used) are checked, 4 per call (a call Laya finds too long is retried one tag at a time), and the whole request has a 30 second limit. Only answers that are yes (0.5 or more) and not marked uncertain are returned, best first, at most 5. Laya runs locally, so the note text does not leave the machine; the agent logs a usage row for each call. The suggestions are rough (Laya's confidence is uncalibrated), so the page only offers them and never applies one.
 
 Every notes route answers `503` `Notes storage is unavailable` when db_gateway cannot be reached; the rest of the API is unaffected. Create, edit and delete are written to the action log without the note text, and so is each time the agent switch is turned on or off ("Let agents read a note", "Stopped agents reading a note"). Deleting an account removes its notes (best effort: a failure is logged as an error and the deletion still succeeds).
-| `GET` | `/api/account-capabilities` | any logged-in account | Which built-in capabilities and server-listed extensions this account has added: `{capabilities, extensions, disabled_tools}`. A new account has nothing added. `disabled_tools` is the sorted tool names of every mcp_server capability not added, read from mcp_server's `/capabilities` (`502` if it is unreachable). |
-| `PUT` | `/api/account-capabilities/{kind}/{key}` | any logged-in account | `{enabled: bool}` adds or removes one item (`kind`: `capability` or `extension`; `key` 1-64 characters of `A-Za-z0-9_.-`, else `422`). Same reply as `GET`. Repeating a change is a no-op; at most 200 items per account (`409`). Logged as `account.capability_enable` / `_disable` (or `extension`). Removing an extension through `DELETE /api/extensions/{id}` clears it from every account. |
+| `GET` | `/api/account-agents` | any logged-in account | The specialist agents this account switched off: `{disabled: [agent ids]}`. A new account has every agent on. `503` while db_gateway is down (an empty list would switch them all back on). |
+| `PUT` | `/api/account-agents/{agent_id}` | any logged-in account | `{enabled: bool}` switches one agent on or off for this account's chats (`agent_id` 1-64 characters of `A-Za-z0-9_.-`, else `422`). Same reply as `GET`. Repeating a change is a no-op; at most 200 agents per account (`409`). Logged as `account.agent_enable` / `account.agent_disable`. The entry agent leaves a switched-off specialist out of its roster and refuses to delegate to it. |
 | `GET` | `/api/user-extensions` | `chat.use` | This account's own MCP servers ("private extensions"): `[{id, label, description, url, header_names, enabled, status, error, tools}]`. `id` is a slug of the label, unique per account. `status` is `connected`, `error` or `unknown`, from `ai_agent`'s `probe_extension`, cached for 60 seconds; a disabled extension is not probed and reports `unknown`. Header **values** are never returned, only their names. |
 | `POST` | `/api/user-extensions` | `chat.use` | `{label, url, description?, headers?}` -> `201` the extension, probed once. Saved even if it cannot be reached right now. `422` with a message for a bad address (http or https only, no username or password) or header (up to 20; name `A-Za-z0-9-`; value 1-2000 characters, no control characters; `Host`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Upgrade`, `TE`, `Trailer`, `Proxy-Authorization` and `Cookie` are refused); `409` at 20 extensions. |
 | `PATCH` | `/api/user-extensions/{id}` | `chat.use` | Any of `{label, description, url, headers, enabled}` -> the extension. `headers`, when present, replaces all of them (send it only when the user retyped them). A URL with a new host and no `headers` clears the saved headers, so a token is never sent to another host unasked. `404` for another account's id, `422` for an empty body. |
@@ -593,12 +593,13 @@ calls (in each call's `_meta`), so mcp_server sees who asked either way.
 - **Usage limits** (`services/usage_service.py`, config `usage`): tokens of
   every answer and summary are recorded per agent; a question over the
   6-hour or weekly cap is refused with `429` before anything is saved.
-- **Extensions:** the agent only gets tools of the extensions the user
-  switched on (`enabled_extensions`, validated as ids); adding one makes
-  mcp_server connect to any URL, so that is admin-only.
-- **Tools switched off by the user:** `disabled_tools` (validated as tool
-  names) is passed to the agent as it is; ember_web works the names out from
-  the built-in capabilities the account switched off on the Capabilities page.
+- **Extensions:** ember_api turns on every extension mcp_server lists; the
+  browser cannot name one. Which agent may call an extension's tools is that
+  agent's `tools.allow`. Adding an extension makes mcp_server connect to any
+  URL, so that is admin-only.
+- **Agents switched off by the user:** the browser cannot send tool switches
+  any more. ember_api reads the account's switched-off agents from db_gateway
+  and passes them to the agent as `agent:<id>` entries in `disabled_tools`.
 - **Errors:** an unhandled exception answers a generic `500` and is written
   to the error log with its traceback (under the account, when logged in).
 - **Summaries** (`services/summarization.py`, port of chat_app's): manual
@@ -795,3 +796,41 @@ existing chat auto-save destinations as `instance`. Chat summaries/updates/turns
 carry additive `second_brain_scope` (`instance|personal`); loss of access disables
 auto-save with a visible notice. Keys use existing SecretBox encryption in
 db_gateway, and account deletion purges all personal brain records.
+
+
+## Calendar
+
+Private read-only schedules use ICS links and require `calendar.use`. Calendar data is stored in db_gateway documents. Configure the `calendar` block in `configs/config_app.json`:
+
+| Key | Default |
+| --- | --- |
+| `enabled` | true |
+| `tick_seconds` | 30 |
+| `feed_refresh_minutes` | 10 |
+| `lookahead_hours` | 48 |
+| `late_grace_minutes` | 5 |
+| `max_feeds_per_account` | 10 |
+| `max_alarm_rules` | 10 |
+| `max_ics_bytes` | 5242880 |
+| `fetch_timeout_s` | 15 |
+| `allow_private_urls` | false |
+
+`push_contact` defaults to `mailto:admin@example.com`; set a contact starting with `mailto:` or `https://`. The admin Settings switches `calendar_inapp`, `calendar_email` and `calendar_push` default to on and control each channel for every account.
+
+`EMBER_VAPID_PRIVATE_KEY` and `EMBER_VAPID_PUBLIC_KEY` are generated into `.env` on first start. Deleting them requires every browser to subscribe again. Web push requires HTTPS and the built web app (`vite preview` or production). Email alerts use the existing Email capability.
+
+All calendar routes require a signed-in account with `calendar.use`; data is private to its immutable account UID. Feed URLs are accepted for writes and never returned.
+
+| Method | Route | Behavior |
+| --- | --- | --- |
+| GET/POST | `/api/calendar/feeds` | List calendars or add an encrypted ICS link. |
+| PATCH/DELETE | `/api/calendar/feeds/{id}` | Update or remove an owned calendar. |
+| GET | `/api/calendar/events?from=&to=` | Expanded, merged events over at most 62 days, with feed errors. |
+| GET/POST | `/api/calendar/alarms` | List or add rules; first visit seeds an in-app rule 15 minutes before events. |
+| PATCH/DELETE | `/api/calendar/alarms/{id}` | Update or remove an owned rule. |
+| GET/PUT | `/api/calendar/prefs` | Read or save the account timezone. |
+| GET | `/api/calendar/push/key` | Public VAPID key. |
+| POST | `/api/calendar/push/subscribe` | Save this browser's subscription. |
+| POST | `/api/calendar/push/unsubscribe` | Remove this browser's subscription. |
+| GET | `/api/calendar/alerts?unseen=1` | Unseen in-app alerts. |
+| POST | `/api/calendar/alerts/{id}/seen` | Dismiss an owned alert. |

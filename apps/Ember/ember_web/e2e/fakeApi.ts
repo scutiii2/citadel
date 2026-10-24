@@ -138,12 +138,24 @@ export interface StoredTicket {
   comments?: { id: number; ticket_id: number; author: string; author_role: "reporter" | "staff" | "ai" | "system"; body: string; created_at: string }[];
 }
 
+interface CalendarFeedStub {
+  id: string;
+  name: string;
+  color: string;
+  enabled: boolean;
+  last_fetch_at: string | null;
+  last_error: string | null;
+}
+interface RuleStub { id: string; channel: string; lead_minutes: number; enabled: boolean }
+interface AlertStub { id: string; title: string; start_utc: string; channel: string; created_at: string }
+
 export interface FakeApi {
+  calendar: { feeds: CalendarFeedStub[]; rules: RuleStub[]; alerts: AlertStub[] };
   /** Requests captured only by the opt-in native media workspace fake. */
   media: { uploads: { filename: string; data: string }[]; merges: Record<string, unknown>[]; downloads: { url: string; preset: string }[] };
   tickets: Map<number, StoredTicket>;
-  /** What the account has added (GET and PUT /api/account-capabilities). */
-  accountCapabilities: { capabilities: Set<string>; extensions: Set<string> };
+  /** The agents the account switched off (GET and PUT /api/account-agents). */
+  disabledAgents: Set<string>;
 
   /** The account's private extensions (/api/user-extensions). Header values are never kept or returned. */
   userExtensions: Map<string, StoredUserExtension>;
@@ -244,11 +256,12 @@ const event = (sequence: number, body: Record<string, unknown>) =>
 export const ANSWER_PIECES = ["The capital ", "of France ", "is Paris."];
 export const ANSWER = ANSWER_PIECES.join("");
 
-export async function installFakeApi(page: Page, options: { admin?: boolean; tickets?: boolean; media?: boolean } = {}): Promise<FakeApi> {
+export async function installFakeApi(page: Page, options: { admin?: boolean; tickets?: boolean; media?: boolean; calendar?: boolean } = {}): Promise<FakeApi> {
   const api: FakeApi = {
+    calendar: { feeds: [], rules: [{ id: "r1", channel: "inapp", lead_minutes: 15, enabled: true }], alerts: [] },
     media: { uploads: [], merges: [], downloads: [] },
     tickets: new Map(),
-    accountCapabilities: { capabilities: new Set(), extensions: new Set() },
+    disabledAgents: new Set(),
     userExtensions: new Map(),
     settings: { forceToolApproval: false },
     accounts: new Map(),
@@ -264,24 +277,22 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     folders: new Map(),
   };
   const baseAccount = options.admin ? ADMIN_ACCOUNT : ACCOUNT;
-  const account = { ...baseAccount, permissions: [...baseAccount.permissions, ...(options.tickets ? ["tickets.create"] : []), ...(options.media ? ["tools.view", "tools.execute", "files.download"] : [])] };
+  const account = { ...baseAccount, permissions: [...baseAccount.permissions, ...(options.tickets ? ["tickets.create"] : []), ...(options.calendar ? ["calendar.use"] : []), ...(options.media ? ["tools.view", "tools.execute", "files.download"] : [])] };
   if (options.admin) {
     for (const a of ADMIN_ACCOUNTS) api.accounts.set(a.id, { ...a });
     for (const r of ADMIN_ROLES) api.roles.set(r.id, { ...r });
     for (const c of ADMIN_CAPABILITIES) api.capabilities.set(c.name, { ...c });
-    for (const c of ADMIN_CAPABILITIES) api.accountCapabilities.capabilities.add(c.name);
   }
   if (options.media) {
-    for (const name of ['pdf', 'video']) {
-      api.capabilities.set(name, { name, enabled: true, label: name === 'pdf' ? 'PDF merger' : 'Video downloader', tools: [], resources: [] });
-      api.accountCapabilities.capabilities.add(name);
+    for (const name of ['pdf', 'media']) {
+      api.capabilities.set(name, { name, enabled: true, label: name === 'pdf' ? 'PDF merger' : 'Media downloader', tools: [], resources: [] });
     }
   }
   const pdfs = new Map<string, { info: { file_id: string; name: string; kind: string; pages: number; size: number; expires_at: number }; bytes: Buffer }>();
   let videoDone = false;
   let videoPolls = 0;
   const videoBytes = Buffer.from('Mock video download fixture');
-  const videoFile = { file_id: 'video-file', name: 'Coastal walk.mp4', kind: 'video', mime: 'video/mp4', size: videoBytes.length, duration: 125, expires_at: Date.now() / 1000 + 21600, download_url: '/api/video-downloader/files/video-file/download' };
+  const videoFile = { file_id: 'video-file', name: 'Coastal walk.mp4', kind: 'video', mime: 'video/mp4', size: videoBytes.length, duration: 125, expires_at: Date.now() / 1000 + 21600, download_url: '/api/media-downloader/files/video-file/download' };
   let loggedIn = false;
 
   // Opt-in media fixtures share routing across this test's browser context.
@@ -327,10 +338,10 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       }
       if (path.endsWith('/cancel') && method === 'POST') return json(route, {});
     }
-    if (options.media && path.startsWith('/api/video-downloader/')) {
+    if (options.media && path.startsWith('/api/media-downloader/')) {
       const method = request.method();
-      if (path === '/api/video-downloader/packages' && method === 'GET') return json(route, []);
-      if (path === '/api/video-downloader/probe' && method === 'POST') return json(route, {
+      if (path === '/api/media-downloader/packages' && method === 'GET') return json(route, []);
+      if (path === '/api/media-downloader/probe' && method === 'POST') return json(route, {
         url: (request.postDataJSON() as { url: string }).url, title: 'Coastal walk at sunset', duration: 125, thumbnail: 'https://example.com/thumbnail.jpg', uploader: 'Field recordings',
         options: [
           { id: 'best', label: 'Best quality', kind: 'video', estimated_bytes: 900000000, blocked: true, code: 'too_large', reason: 'Exceeds the file size limit' },
@@ -338,17 +349,17 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
           { id: 'audio-mp3', label: 'Audio (MP3)', kind: 'audio', estimated_bytes: 3000000, blocked: false, code: null, reason: null },
         ],
       });
-      if (path === '/api/video-downloader/downloads' && method === 'POST') {
+      if (path === '/api/media-downloader/downloads' && method === 'POST') {
         api.media.downloads.push(request.postDataJSON() as { url: string; preset: string });
         return json(route, { job_id: 'video-job' }, 202);
       }
-      if (path === '/api/video-downloader/jobs/video-job' && method === 'GET') {
+      if (path === '/api/media-downloader/jobs/video-job' && method === 'GET') {
         videoDone = ++videoPolls > 1;
         return json(route, { job_id: 'video-job', state: videoDone ? 'done' : 'downloading', percent: videoDone ? 100 : 42, speed: videoDone ? null : 1200000, eta: videoDone ? null : 12, file: videoDone ? videoFile : null, error: null });
       }
-      if (path === '/api/video-downloader/files' && method === 'GET') return json(route, videoDone ? [videoFile] : []);
-      if (path === '/api/video-downloader/files/video-file/download' && method === 'GET') return route.fulfill({ status: 200, contentType: 'video/mp4', headers: { 'Content-Disposition': 'attachment; filename="Coastal walk.mp4"' }, body: videoBytes });
-      if (path === '/api/video-downloader/files/video-file' && method === 'DELETE') { videoDone = false; return route.fulfill({ status: 204 }); }
+      if (path === '/api/media-downloader/files' && method === 'GET') return json(route, videoDone ? [videoFile] : []);
+      if (path === '/api/media-downloader/files/video-file/download' && method === 'GET') return route.fulfill({ status: 200, contentType: 'video/mp4', headers: { 'Content-Disposition': 'attachment; filename="Coastal walk.mp4"' }, body: videoBytes });
+      if (path === '/api/media-downloader/files/video-file' && method === 'DELETE') { videoDone = false; return route.fulfill({ status: 204 }); }
       if (path.endsWith('/cancel') && method === 'POST') return json(route, {});
     }
     if (path === "/api/tickets/unread-count" && request.method() === "GET") {
@@ -410,7 +421,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       return json(route, account);
     }
     if (method === "GET" && path === "/api/settings") {
-      return json(route, { force_tool_approval: api.settings.forceToolApproval });
+      return json(route, { force_tool_approval: api.settings.forceToolApproval, calendar_inapp: true, calendar_email: true, calendar_push: false });
     }
     if (method === "PUT" && path === "/api/admin/settings/force_tool_approval") {
       const { value } = request.postDataJSON() as { value: boolean };
@@ -479,22 +490,12 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       found.enabled = (request.postDataJSON() as { enabled: boolean }).enabled;
       return json(route, found);
     }
-    // What the account has added, and the tools of the capabilities it has not.
-    const accountView = () => ({
-      capabilities: [...api.accountCapabilities.capabilities].sort(),
-      extensions: [...api.accountCapabilities.extensions].sort(),
-      disabled_tools: [...api.capabilities.values()]
-        .filter((c) => !api.accountCapabilities.capabilities.has(c.name))
-        .flatMap((c) => c.tools)
-        .sort(),
-    });
-    if (method === "GET" && path === "/api/account-capabilities") return json(route, accountView());
-    const accountItem = /^\/api\/account-capabilities\/(capability|extension)\/([A-Za-z0-9_.-]+)$/.exec(path);
-    if (method === "PUT" && accountItem) {
-      const set = accountItem[1] === "capability" ? api.accountCapabilities.capabilities : api.accountCapabilities.extensions;
-      if ((request.postDataJSON() as { enabled: boolean }).enabled) set.add(accountItem[2]!);
-      else set.delete(accountItem[2]!);
-      return json(route, accountView());
+    if (method === "GET" && path === "/api/account-agents") return json(route, { disabled: [...api.disabledAgents].sort() });
+    const accountAgent = /^\/api\/account-agents\/([A-Za-z0-9_.-]+)$/.exec(path);
+    if (method === "PUT" && accountAgent) {
+      if ((request.postDataJSON() as { enabled: boolean }).enabled) api.disabledAgents.delete(accountAgent[1]!);
+      else api.disabledAgents.add(accountAgent[1]!);
+      return json(route, { disabled: [...api.disabledAgents].sort() });
     }
     if (method === "GET" && path === "/api/extensions") return json(route, []);
 
@@ -722,7 +723,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     }
 
     if (method === "GET" && path === "/api/chats/second-brain") {
-      return json(route, { available: api.accountCapabilities.capabilities.has("obsidian") && api.capabilities.get("obsidian")?.enabled === true });
+      return json(route, { available: api.capabilities.get("obsidian")?.enabled === true });
     }
     const chatPath = /^\/api\/chats\/([A-Za-z0-9-]+)(\/[a-z]+)?$/.exec(path);
     if (chatPath) {
@@ -747,6 +748,71 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       }
       if (method === "POST" && tail === "/turns") return startTurn(route, api, id!);
       if (method === "GET" && tail === "/events") return streamTurn(route, api, id!);
+    }
+
+    if (path.startsWith("/api/calendar")) {
+      const cal = api.calendar;
+      if (path === "/api/calendar/feeds" && method === "GET") return json(route, cal.feeds);
+      if (path === "/api/calendar/feeds" && method === "POST") {
+        const body = request.postDataJSON() as { name: string; color: string };
+        const feed = { id: `f${cal.feeds.length + 1}`, name: body.name, color: body.color, enabled: true, last_fetch_at: null, last_error: null };
+        cal.feeds.push(feed);
+        return json(route, feed, 201);
+      }
+      const feedMatch = path.match(/^\/api\/calendar\/feeds\/([a-z0-9]+)$/);
+      if (feedMatch && method === "PATCH") {
+        const feed = cal.feeds.find((f) => f.id === feedMatch[1]);
+        if (!feed) return json(route, { detail: "No such calendar" }, 404);
+        const body = request.postDataJSON() as Partial<CalendarFeedStub> & { url?: string };
+        for (const key of ["name", "color", "enabled"] as const) {
+          if (body[key] !== undefined) Object.assign(feed, { [key]: body[key] });
+        }
+        return json(route, feed);
+      }
+      if (feedMatch && method === "DELETE") {
+        cal.feeds = cal.feeds.filter((f) => f.id !== feedMatch[1]);
+        return route.fulfill({ status: 204 });
+      }
+      if (path === "/api/calendar/events" && method === "GET") {
+        // The initial Work week view hides weekends; keep the fixture inside its requested weekdays.
+        const start = new Date(url.searchParams.get("from")!);
+        while (start.getDay() === 0 || start.getDay() === 6) start.setDate(start.getDate() + 1);
+        start.setHours(10, 0, 0, 0);
+        const end = new Date(start.getTime() + 3600_000);
+        return json(route, {
+          events: cal.feeds.length ? [{ uid: "e1", title: "Standup", start: start.toISOString(), end: end.toISOString(), all_day: false, location: "Room 1", description: "Agenda", sources: [{ name: cal.feeds[0]!.name, color: cal.feeds[0]!.color }] }] : [],
+          errors: [],
+        });
+      }
+      if (path === "/api/calendar/alarms" && method === "GET") return json(route, cal.rules);
+      if (path === "/api/calendar/alarms" && method === "POST") {
+        const body = request.postDataJSON() as { channel: string; lead_minutes: number };
+        const rule = { id: `r${cal.rules.length + 1}`, channel: body.channel, lead_minutes: body.lead_minutes, enabled: true };
+        cal.rules.push(rule);
+        return json(route, rule, 201);
+      }
+      const ruleMatch = path.match(/^\/api\/calendar\/alarms\/([a-z0-9]+)$/);
+      if (ruleMatch && method === "PATCH") {
+        const rule = cal.rules.find((r) => r.id === ruleMatch[1]);
+        if (!rule) return json(route, { detail: "No such alert" }, 404);
+        Object.assign(rule, request.postDataJSON() as Partial<Omit<RuleStub, "id">>);
+        return json(route, rule);
+      }
+      if (ruleMatch && method === "DELETE") {
+        cal.rules = cal.rules.filter((r) => r.id !== ruleMatch[1]);
+        return route.fulfill({ status: 204 });
+      }
+      if (path === "/api/calendar/push/key" && method === "GET") return json(route, { key: "A".repeat(87) });
+      if (["/api/calendar/push/subscribe", "/api/calendar/push/unsubscribe"].includes(path) && method === "POST") {
+        return route.fulfill({ status: 204 });
+      }
+      if (path === "/api/calendar/prefs") return json(route, { timezone: "UTC", saved: true });
+      if (path === "/api/calendar/alerts" && method === "GET") return json(route, cal.alerts);
+      const seenMatch = path.match(/^\/api\/calendar\/alerts\/([a-z0-9-]+)\/seen$/);
+      if (seenMatch && method === "POST") {
+        cal.alerts = cal.alerts.filter((a) => a.id !== seenMatch[1]);
+        return route.fulfill({ status: 204 });
+      }
     }
 
     api.unexpected.push(`${method} ${path}`);

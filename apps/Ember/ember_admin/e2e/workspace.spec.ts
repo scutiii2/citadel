@@ -67,7 +67,7 @@ test("an administrator saves tool approval through the unsaved bar", async ({ pa
 
   const approval = page.getByRole("switch", { name: "Require approval for every tool" });
   const bar = page.getByRole("group", { name: "Unsaved change" });
-  await expect(page.getByText("Applies to all accounts")).toBeVisible();
+  await expect(page.locator("section.card").filter({ has: page.getByRole("heading", { name: "Tool approval", exact: true }) }).getByText("Applies to all accounts", { exact: true })).toBeVisible();
   await expect(bar).toHaveCount(0);
 
   // Flipping it is only a draft: the bar says who it reaches, and nothing is sent.

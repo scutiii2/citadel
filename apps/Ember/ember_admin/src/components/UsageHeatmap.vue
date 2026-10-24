@@ -41,6 +41,14 @@ const tokensText = (day: HeatDay) => `${day.tokens.toLocaleString()} ${day.token
       <template v-if="active"><strong>{{ active.date }}</strong><span>{{ tokensText(active) }}</span></template>
       <span v-else>Hover a day to see its usage.</span>
     </div>
+    <details class="daily-values">
+      <summary>Daily usage table</summary>
+      <div class="daily-table" role="region" aria-label="Daily token usage values" tabindex="0">
+        <table><thead><tr><th scope="col">Date (UTC)</th><th scope="col">Tokens</th></tr></thead>
+          <tbody><tr v-for="day in weeks.flat().filter(day => day.level !== null)" :key="day.date"><th scope="row">{{ day.date }}</th><td>{{ day.tokens.toLocaleString() }}</td></tr></tbody>
+        </table>
+      </div>
+    </details>
     <div class="legend" aria-hidden="true">
       Less
       <span v-for="level in [0, 1, 2, 3, 4]" :key="level" :class="['cell', `level-${level}`]" />
@@ -110,4 +118,7 @@ const tokensText = (day: HeatDay) => `${day.tokens.toLocaleString()} ${day.token
   font-size: 0.75em;
   color: var(--muted);
 }
+.daily-table { max-height: 320px; overflow: auto; max-width: 100%; }
+.daily-table th, .daily-table td { padding: 6px 12px; text-align: left; }
+.daily-values summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 </style>

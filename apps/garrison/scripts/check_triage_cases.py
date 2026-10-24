@@ -10,8 +10,8 @@ Run from ai_agent:
     python -m scripts.check_triage_cases --rounds        # a table of every model call for each reviewed question
     python -m scripts.check_triage_cases --three-way --rounds   # Laya English, Laya typed-decisions and Jev as separate voters
 
-It calls the same code the Triage Assistant runs (LayaQuestions.answer), so the orchestrator is not
-involved. It loads the local Laya model, reads the `classifier` section of configs/config_tuning.json and
+It calls the same code the Triage Assistant runs (laya_provider.answer), so the orchestrator is not
+involved. It asks the Laya service (LAYA_SERVICE_URL), reads the `classifier` section of configs/config_tuning.json and
 the keys in .env, and sends each case's text to the fallback backend when the section turns it on (a few
 cents of tokens in all). Each row shows how a question was settled:
 
@@ -483,7 +483,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.three_way:
         from scripts.triage_three_way import ThreeWayTriage
 
-        print("loading Laya English and typed-decisions (the first run may download weights)...", flush=True)
+        print("using the Laya service (English and typed-decisions)..", flush=True)
         from scripts.triage_three_way import parse_threshold
 
         thresholds: dict[str, dict[str, float]] = {}
@@ -492,10 +492,12 @@ def main(argv: list[str] | None = None) -> int:
             thresholds.setdefault(count, {})[name] = value
         laya = ThreeWayTriage.load(args.max_len, use_fallback=not args.baseline, thresholds=thresholds)
     else:
-        from src.llm.laya_provider import LayaQuestions
+        from types import SimpleNamespace
 
-        laya = LayaQuestions()
-        print("loading Laya (the first run may download weights)...", flush=True)
+        from src.llm import laya_provider
+
+        laya = SimpleNamespace(answer=laya_provider.answer, prepare=laya_provider.prepare)
+        print("using the Laya service...", flush=True)
     laya.prepare()
     rows: list[Row] = []
     errors: dict[str, str] = {}

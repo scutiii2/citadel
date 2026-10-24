@@ -36,7 +36,7 @@ test("profile changes a password and forgets a remembered device after confirmat
   expect(state.unexpected).toEqual([]);
 });
 
-test("settings saves drafts and persists them on reload", async ({ page }) => {
+test("settings applies theme instantly and saves sidebar drafts for reload", async ({ page }) => {
   const state = newState();
   await installFakeApi(page, state);
   await page.goto("/settings");
@@ -47,9 +47,13 @@ test("settings saves drafts and persists them on reload", async ({ page }) => {
   await expect(capabilitySwitch).not.toBeChecked();
   const nav = page.getByRole("navigation", { name: "Admin sections" });
   await expect(nav.getByRole("link", { name: "Capabilities", exact: true })).toHaveCount(1);
-  await expect(page.getByRole("button", { name: /^Theme: System/ })).toBeVisible();
+  expect(await page.evaluate<string>("document.documentElement.style.colorScheme")).toBe("dark");
+  await page.getByRole("button", { name: "root - account menu", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: /^Theme\s+Dark$/ })).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Revert", exact: true }).click();
   await expect(capabilitySwitch).toBeChecked();
+  await expect(page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("group", { name: "Unsaved settings" })).toHaveCount(0);
   await page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true }).click();
   await capabilitySwitch.focus();
@@ -72,8 +76,10 @@ test("settings saves drafts and persists them on reload", async ({ page }) => {
   for (const width of [1280, 768, 375]) {
     await page.setViewportSize({ width, height: 800 });
     expect(await page.evaluate<boolean>("document.documentElement.scrollWidth <= innerWidth")).toBe(true);
-    await expect(page.getByRole("link", { name: "Profile", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Settings", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "root - account menu", exact: true }).click();
+    await expect(page.getByRole("menuitem", { name: "Profile", exact: true })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Settings", exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
   }
   expect(state.unexpected).toEqual([]);
 });

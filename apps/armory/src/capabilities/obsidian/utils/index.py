@@ -8,10 +8,8 @@ from pathlib import Path, PurePosixPath
 from src.capabilities.obsidian.utils.chunking import Chunk, chunk_note
 from src.capabilities.obsidian.utils.embeddings import Embedder
 from src.capabilities.obsidian.utils.index_store import IndexStore
-from src.utils.catalog import catalog
 
 
-@catalog
 class VaultIndex:
     def __init__(self, vault: Path, embedder: Embedder, store: IndexStore):
         self.vault, self.embedder, self.store = vault.resolve(), embedder, store

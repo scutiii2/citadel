@@ -34,7 +34,6 @@ from mcp.client.streamable_http import streamablehttp_client
 from src.agents import agent_events, agent_registry, agent_spec, plan
 
 from src.core import approvals, internal_auth, tool_filter
-from src.core.catalog import catalog
 from src.agents.agent_spec import REASONING_EFFORTS, TIERS, RosterEntry
 from src.llm import cancellation
 
@@ -64,7 +63,6 @@ def record_usage(rows: list[dict[str, Any]]) -> None:
 _attachments: ContextVar[str] = ContextVar("delegation_pdf_attachments", default="")
 
 
-@catalog(description="Preserve uploaded PDF/image file references across specialist delegations")
 def bind_attachments(question: str, history: list[dict[str, Any]]) -> Token:
     # Carry only file metadata, never the extracted document text or unrelated history.
     sources = [str(item.get("content", "")) for item in history if item.get("role") == "user"] + [question]
@@ -242,6 +240,10 @@ def call(
     if agent is None:
         configured = ", ".join(agent_registry.list_agent_ids()) or "(none configured)"
         raise ValueError(f"unknown agent_id {agent_id!r} - configured agents: {configured}")
+
+    if tool_filter.agent_blocked(agent_id):
+        # The roster omits it, but the model may still name it.
+        raise PermissionError(f"agent {agent_id!r} is switched off for this user")
 
     # A delegate has no way to ask the user, so when this turn asks before
     # tools run, the delegate's tools that would need asking are refused.

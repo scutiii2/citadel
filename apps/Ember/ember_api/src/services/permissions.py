@@ -31,8 +31,10 @@ AGENTS_MANAGE = "agents.manage"
 TICKETS_CREATE = "tickets.create"
 TICKETS_MANAGE = "tickets.manage"
 BRAIN_INSTANCE_PUBLISH = "brain.instance.publish"
+CALENDAR_USE = "calendar.use"
 
 ALL_PERMISSIONS = MappingProxyType({
+    CALENDAR_USE: "Keep a read-only schedule from ICS links and get alerts before events",
     BRAIN_INSTANCE_PUBLISH: "Publish durable knowledge to the shared Instance Brain",
     CHAT_USE: "Chat with ai_agent instances",
     TOOLS_VIEW: "Browse tools, capabilities, help and resources",

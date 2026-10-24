@@ -57,13 +57,14 @@ limits) resolved from the agent file.
 
 ### [`core/`](core/) - shared plumbing
 
-- `catalog.py`, `seed.py`, `config_files.py` - `@catalog` stub, `.example`
-  seeding, and the paths/readers for `../configs/`.
+- `seed.py`, `config_files.py` - `.example` seeding, and the paths/readers
+  for `../configs/`.
 - `internal_auth.py` - internal API token and requester identity.
 - `chat_history.py` - accepts only caller-supplied `{role, content}` messages
   with a `user`/`assistant` role and string content. Privileged roles, extra
   fields, and structured tool activity are rejected before provider setup or
   history trimming; providers generate tool calls/results within their own loop.
+- `broker.py` - the wait/resolve core shared by the approval and question brokers.
 - `approvals.py` - per-call tool approval handling.
 - `usage_log.py` - append-only per-agent usage log.
 

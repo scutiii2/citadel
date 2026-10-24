@@ -9,7 +9,6 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from src.core.catalog import catalog
 from src.core.seed import seed_from_example
 
 CONFIGS_DIR = Path(__file__).resolve().parent.parent.parent / "configs"
@@ -39,7 +38,6 @@ def read_section(path: Path, section: str, default: Any = _REQUIRED) -> Any:
     return raw[section]
 
 
-@catalog
 def seed_tuning(path: Path = TUNING_PATH) -> None:
     """Seed shared tuning, preserving a legacy config_limits.json and keeping it
     as a rollback backup. An existing tuning file is always authoritative.

@@ -4,7 +4,6 @@ import { ACCOUNT, ANSWER, installFakeApi, PASSWORD } from "./fakeApi.ts";
 test("second brain toggle persists per chat and is sent with the next question", async ({ page }) => {
   const api = await installFakeApi(page, { admin: true });
   api.capabilities.set("obsidian", { name: "obsidian", enabled: true, label: "Obsidian", tools: ["tool_obsidian_write"], resources: [] });
-  api.accountCapabilities.capabilities.add("obsidian");
   api.chats.set("second-brain-0001", { id: "second-brain-0001", title: "Second brain", agent_id: "agent-1", messages: [], running: false });
   await page.goto("/");
   await page.getByLabel("Username").fill(ACCOUNT.username);

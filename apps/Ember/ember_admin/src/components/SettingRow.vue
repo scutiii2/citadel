@@ -107,4 +107,7 @@ const emit = defineEmits<{ reset: [] }>();
   clip-path: inset(50%);
   white-space: nowrap;
 }
+@media (pointer: coarse), (max-width: 767px) {
+  button.reset { min-width: 44px; min-height: 44px; }
+}
 </style>

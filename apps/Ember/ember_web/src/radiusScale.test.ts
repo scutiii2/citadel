@@ -97,7 +97,7 @@ describe("findLiteralRadii", () => {
 // `sm` step would round them into blobs. Adding a file here needs the same reason.
 const ALLOWED_LITERALS: Record<string, string[]> = {
   "components/analytics/chart.css": ["2px"],
-  "components/UsageHeatmap.vue": ["2px"],
+  "components/analytics/UsageHeatmap.vue": ["2px"],
 };
 
 /** Every `.vue` and `.css` file under `src/`, keyed by its path from `src/` (read from disk: Vitest
@@ -122,7 +122,7 @@ describe("the radius scale", () => {
   it("scans the app's styles, CSS files included", () => {
     expect(Object.keys(sources).length).toBeGreaterThan(50);
     expect(sources["style.css"]).toContain("--radius-md");
-    expect(sources["components/UsageHeatmap.vue"]).toContain("border-radius");
+    expect(sources["components/analytics/UsageHeatmap.vue"]).toContain("border-radius");
   });
 
   it("uses a token in every component: no literal border radius outside the allowed marks", () => {

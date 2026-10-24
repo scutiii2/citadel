@@ -75,9 +75,6 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, Field
-
-from src.utils.catalog import catalog
 
 
 # ${NAME}, where NAME is a normal environment-variable identifier. A "$"
@@ -218,7 +215,6 @@ def _resolve_placeholder(name: str, *, where: str, config_path: Path) -> str:
     return value
 
 
-@catalog
 def resolve_section(value: Any, *, where: str, config_path: Path) -> Any:
     """Substitute ${VAR} inside every string of one subtree of the config.
 
@@ -255,7 +251,6 @@ def resolve_section(value: Any, *, where: str, config_path: Path) -> Any:
     return value
 
 
-@catalog
 def load_config(config_path: Path) -> dict[str, Any]:
     """Read and parse one config file. Raises on anything unusable.
 
@@ -288,7 +283,6 @@ def _require(section: dict[str, Any], key: str, *, prefix: str, config_path: Pat
     return section[key]
 
 
-@catalog
 def normalize_recipient_domain(value: str) -> str:
     """One ``email.allowed_recipient_domains`` entry, in comparison form.
 
@@ -318,7 +312,6 @@ SUPPORTED_EMAIL_SECURITY = ("starttls", "ssl", "none")
 # `security` can be inferred rather than demanded from every deployment.
 IMPLICIT_TLS_PORT = 465
 
-@catalog
 def load_email_config(config_path: Path) -> EmailConfig:
     """Parse config_email.json into an EmailConfig.
 
@@ -623,3 +616,22 @@ def migrate_capabilities_config(config_path: Path, ids: list[str]) -> None:
         data.setdefault(capability_id, {"enabled": True})
     data[_SCANNER_MARKER] = {"migrated": True}
     _write_config(config_path, data)
+
+
+RENAMED_CAPABILITIES = {"video": "media"}
+
+
+def migrate_renamed_capabilities(config_path: Path) -> None:
+    """Move the entry of a renamed capability to its new id, so its on/off state survives.
+    An entry already under the new id wins. Writes only when something moved."""
+    if not config_path.exists():
+        return
+    data = load_config(config_path)
+    moved = False
+    for old, new in RENAMED_CAPABILITIES.items():
+        if old in data:
+            data.setdefault(new, data[old])
+            del data[old]
+            moved = True
+    if moved:
+        _write_config(config_path, data)

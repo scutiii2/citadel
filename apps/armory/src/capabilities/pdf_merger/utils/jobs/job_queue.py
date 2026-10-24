@@ -13,15 +13,14 @@ never exceed the concurrency limit and always clean up after themselves.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import secrets
 import threading
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable
-from dataclasses import dataclass, field
+from collections.abc import Awaitable, Callable
 
 from src.capabilities.pdf_merger.utils.errors import ErrorCode, MergerError
+from src.services.job_events import Job
+from src.services.job_queue import JobQueueBase
 
 logger = logging.getLogger(__name__)
 
@@ -29,68 +28,21 @@ ProgressFn = Callable[[int], None]
 Work = Callable[[ProgressFn, threading.Event], Awaitable[dict]]
 
 
-@dataclass
-class Job:
-    id: str
-    session: str
-    created_at: float
-    events: list[dict] = field(default_factory=list)
-    finished: bool = False
-    cancel_event: threading.Event = field(default_factory=threading.Event, repr=False)
-    _changed: asyncio.Event = field(default_factory=asyncio.Event, repr=False)
-
-    def cancel(self) -> None:
-        """Ask the job to stop: a queued job never starts, a running one stops cooperatively."""
-        self.cancel_event.set()
-
-    def publish(self, event: dict, *, final: bool = False) -> None:
-        """Append an event. Events after the final one are dropped."""
-        if self.finished:
-            return
-        self.events.append(event)
-        self.finished = final
-        self._changed.set()
-
-    async def stream(self) -> AsyncIterator[dict]:
-        """Every event so far, then new ones as they arrive, ending after the final event."""
-        index = 0
-        while True:
-            while index < len(self.events):
-                yield self.events[index]
-                index += 1
-            if self.finished:
-                return
-            self._changed.clear()
-            await self._changed.wait()
-
-
-class JobQueue:
+class JobQueue(JobQueueBase):
     """Runs submitted merge work under a concurrency limit and a timeout."""
 
     def __init__(self, max_concurrent: int, timeout_seconds: float, clock: Callable[[], float] = time.time) -> None:
-        self._semaphore = asyncio.Semaphore(max_concurrent)
-        self._timeout = timeout_seconds
-        self._clock = clock
-        self._jobs: dict[str, Job] = {}
-        self._tasks: set[asyncio.Task] = set()
+        super().__init__(max_concurrent, timeout_seconds, clock)
 
     def submit(self, session: str, total_pages: int, work: Work) -> Job:
-        job = Job(id="j_" + secrets.token_hex(12), session=session, created_at=self._clock())
-        self._jobs[job.id] = job
-        task = asyncio.create_task(self._run(job, total_pages, work))
-        self._tasks.add(task)  # keep a reference so the task is not garbage-collected
-        task.add_done_callback(self._tasks.discard)
-        return job
+        return self._start(session, lambda job: self._run(job, total_pages, work))
 
     async def _run(self, job: Job, total: int, work: Work) -> None:
-        loop = asyncio.get_running_loop()
+        publish = self._publisher(job)
         cancel = job.cancel_event
 
         def progress(done: int) -> None:
-            try:
-                loop.call_soon_threadsafe(job.publish, {"type": "progress", "done": done, "total": total})
-            except RuntimeError:  # the loop closed while a worker thread was still running
-                pass
+            publish({"type": "progress", "done": done, "total": total})
 
         timeout_event = {
             "type": "error",
@@ -98,16 +50,15 @@ class JobQueue:
             "message": f"The merge took longer than {self._timeout:g} seconds and was stopped. Try fewer pages.",
         }
         job.publish({"type": "queued", "total": total})
-        async with self._semaphore:
-            if cancel.is_set():  # cancelled while queued: never start the work
-                job.publish(timeout_event, final=True)
-                return
+
+        def start() -> Awaitable[dict]:
             job.publish({"type": "progress", "done": 0, "total": total})
-            task = asyncio.ensure_future(work(progress, cancel))
-            await asyncio.wait({task}, timeout=self._timeout)
-            if not task.done():
-                cancel.set()
-                await asyncio.wait({task})  # hold the slot until the work has really stopped
+            return work(progress, cancel)
+
+        task, _ = await self._in_slot(job, start)
+        if task is None:  # cancelled while queued
+            job.publish(timeout_event, final=True)
+            return
         try:
             result = task.result()
         except MergerError as error:
@@ -127,24 +78,8 @@ class JobQueue:
         else:
             job.publish({"type": "done", **result}, final=True)
 
-    def cancel(self, job: Job) -> None:
-        job.cancel()
-
     def get(self, job_id: str, session: str) -> Job:
-        job = self._jobs.get(job_id)
-        if job is None or job.session != session:
+        job = self._find(job_id, session)
+        if job is None:
             raise MergerError(ErrorCode.JOB_NOT_FOUND, "This job is not available.")
         return job
-
-    async def wait(self, job: Job) -> dict:
-        final: dict = {}
-        async for event in job.stream():
-            final = event
-        return final
-
-    def prune(self, older_than: float) -> int:
-        """Forget finished jobs created before ``older_than``."""
-        stale = [job_id for job_id, job in self._jobs.items() if job.finished and job.created_at < older_than]
-        for job_id in stale:
-            del self._jobs[job_id]
-        return len(stale)

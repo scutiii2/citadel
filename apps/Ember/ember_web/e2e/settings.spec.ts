@@ -40,7 +40,6 @@ test("search, change and reset settings on the Settings page", async ({ page }) 
   await expect(resetTerse).toBeVisible();
 
   // It is saved in the browser: a reload keeps it.
-  await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.reload();
   await expect(page.getByRole("switch", { name: "Terse replies" })).toBeChecked();
   await expect(page.getByText("1 modified")).toBeVisible();
@@ -48,13 +47,9 @@ test("search, change and reset settings on the Settings page", async ({ page }) 
   // The theme: a fixed choice changes the page's colour scheme, its reset goes back to System.
   expect(await colorScheme(page)).toBe("light dark");
   await page.getByRole("group", { name: "Theme" }).getByRole("button", { name: "Dark" }).click();
-  expect(await colorScheme(page)).toBe("light dark");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
   expect(await colorScheme(page)).toBe("dark");
   await expect(page.getByText("2 modified")).toBeVisible();
   await page.getByRole("button", { name: "Reset Theme to its default" }).click();
-  expect(await colorScheme(page)).toBe("dark");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
   expect(await colorScheme(page)).toBe("light dark");
 
   // Reset the last one: the badge goes away.
@@ -62,7 +57,6 @@ test("search, change and reset settings on the Settings page", async ({ page }) 
   await expect(page.getByRole("switch", { name: "Terse replies" })).not.toBeChecked();
   await expect(page.getByText(/\d+ modified/)).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Save", exact: true }).click();
 
   // The fake knew every request the page made.
   expect(api.unexpected).toEqual([]);
@@ -102,11 +96,13 @@ test("page headings and column padding match across content pages", async ({ pag
   }
 });
 
-test("settings drafts stay unsaved, can be reverted, and protect navigation", async ({ page }) => {
+test("account settings stay unsaved, can be reverted, and protect navigation", async ({ page }) => {
   const api = await installFakeApi(page);
   await logIn(page);
   await page.goto('/settings');
-  await flipSwitch(page, 'Terse replies');
+  const suggestions = page.getByRole('switch', { name: 'Suggest next prompt' });
+  const initialSuggestions = await suggestions.isChecked();
+  await flipSwitch(page, 'Suggest next prompt');
   const bar = page.getByRole('group', { name: 'Unsaved settings' });
   for (const width of [1280, 375]) {
     await page.setViewportSize({ width, height: 800 });
@@ -117,8 +113,8 @@ test("settings drafts stay unsaved, can be reverted, and protect navigation", as
   expect(stored).not.toBe('true');
   await bar.getByRole('button', { name: 'Revert' }).click();
   await expect(bar).toHaveCount(0);
-  await expect(page.getByRole('switch', { name: 'Terse replies' })).not.toBeChecked();
-  await flipSwitch(page, 'Terse replies');
+  await expect(suggestions).toBeChecked({ checked: initialSuggestions });
+  await flipSwitch(page, 'Suggest next prompt');
   await page.getByRole('link', { name: 'Capabilities', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Discard unsaved settings?' });
   await expect(dialog).toBeVisible();

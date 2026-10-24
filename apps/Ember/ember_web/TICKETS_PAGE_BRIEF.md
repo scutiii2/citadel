@@ -6,9 +6,9 @@ Handoff for Codex. Delete this file when the work is merged.
 
 `ember_web` already has a user tickets page:
 
-- View: `apps/Ember/ember_web/src/views/TicketsView.vue` (list, status filter, new-ticket modal, detail modal with comment thread, reply, close with confirm)
-- Client: `apps/Ember/ember_web/src/api/TicketsClient.ts` (`list`, `get`, `create`, `comment`, `close`)
-- Helpers: `apps/Ember/ember_web/src/utils/tickets.ts`
+- View: `apps/Ember/ember_web/src/features/tickets/TicketsView.vue` (list, status filter, new-ticket modal, detail modal with comment thread, reply, close with confirm)
+- Client: `apps/Ember/ember_web/src/features/tickets/api/TicketsClient.ts` (`list`, `get`, `create`, `comment`, `close`)
+- Helpers: `apps/Ember/ember_web/src/features/tickets/utils/tickets.ts`
 - Backend: `apps/Ember/ember_api/src/routes/tickets.py`, `src/services/ticket_gateway.py`
 - Admin side (do not break): `apps/Ember/ember_admin` tickets kanban
 

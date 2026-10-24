@@ -56,4 +56,7 @@ onBeforeUnmount(() => {
 .copy.failed {
   color: var(--danger);
 }
+@media (pointer: coarse), (max-width: 767px) {
+  button.copy { min-width: 44px; min-height: 44px; }
+}
 </style>

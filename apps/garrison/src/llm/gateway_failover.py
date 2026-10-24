@@ -12,7 +12,6 @@ from typing import Callable, Iterable
 import anthropic
 import openai
 
-from src.core.catalog import catalog
 from src.core.config_files import TUNING_PATH, read_section
 from src.llm import cooldown
 
@@ -33,7 +32,6 @@ _FAILURE_WORDS = {
 }
 
 
-@catalog
 def classify(error: Exception) -> FailureKind | None:
     """Inspect SDK origin before status/wording so local failures never retry."""
     if isinstance(error, json.JSONDecodeError):
@@ -69,7 +67,6 @@ def classify(error: Exception) -> FailureKind | None:
     return None
 
 
-@catalog
 @lru_cache(maxsize=1)
 def _cooldown_settings() -> tuple[float, float, float]:
     """Load once during provider startup so routing never reads disk on a failure."""
@@ -82,7 +79,6 @@ def _cooldown_settings() -> tuple[float, float, float]:
 _cooldown_settings()
 
 
-@catalog
 def cooldown_seconds(kind: FailureKind, error: Exception) -> float:
     """Honor a gateway's rate-limit delay; use configured delays for outages."""
     if kind == FailureKind.rate_limit:
@@ -93,7 +89,6 @@ def cooldown_seconds(kind: FailureKind, error: Exception) -> float:
 
 
 @dataclass(frozen=True)
-@catalog
 class SwitchInfo:
     """Public switch metadata contains no gateway error text."""
 
@@ -106,7 +101,6 @@ class SwitchInfo:
 
 
 @dataclass
-@catalog
 class GatewayRoute:
     """Move forward through one credentialed candidate list for a whole turn."""
 

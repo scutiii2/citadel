@@ -3,7 +3,7 @@ import { storeToRefs } from "pinia";
 import { watch } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
 import AdminNav from "./components/AdminNav.vue";
-import PwaStatus from "../../ember_web/src/components/PwaStatus.vue";
+import PwaStatus from "../../ember_web/src/components/layout/PwaStatus.vue";
 import { useAuthStore } from "./stores/auth";
 
 const auth = useAuthStore();

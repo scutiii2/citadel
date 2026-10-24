@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import urlsplit, urlunsplit
 
-from src.core.catalog import catalog
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 AGENTS_DIR = PROJECT_ROOT / "agents"
@@ -53,7 +52,6 @@ class AgentSpecError(Exception):
 
 
 @dataclass(frozen=True)
-@catalog
 class GatewayChoice:
     """A same-provider backup and its optional model override."""
 

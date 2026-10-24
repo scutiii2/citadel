@@ -48,6 +48,7 @@ from src.services.app_config import (
     capability_enabled,
     load_capabilities_config,
     migrate_capabilities_config,
+    migrate_renamed_capabilities,
     save_capabilities_config,
 )
 
@@ -146,6 +147,7 @@ class CapabilityLoader:
         (its tools stay listed). A folder with no entry stays unloaded."""
         self.scan()
         ids = [record.id for record in self._records.values() if record.load_error is None]
+        migrate_renamed_capabilities(self._config_path)
         migrate_capabilities_config(self._config_path, ids)
         config = load_capabilities_config(self._config_path)
         for record in self._records.values():

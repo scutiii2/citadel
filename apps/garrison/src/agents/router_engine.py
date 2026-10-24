@@ -6,18 +6,13 @@ import time
 from dataclasses import replace
 
 from src.agents.router_contract import DecisionOutcome, RouterPolicy, RouteRequest, RouteResponse, VoterUsage
-from src.core.catalog import catalog
-from src.llm import decision, laya_provider
+from src.llm import decision
 from src.llm.triage_flow import TriageFlow
 
 
-@catalog
 class RouterEngine:
-    def __init__(self, voters=None):
-        self.voters = voters if voters is not None else {
-            "laya-english": laya_provider.LayaQuestions(window=4096, local_only=True),
-            "laya-typed": laya_provider.LayaQuestions(checkpoint="typed-decisions", window=4096, local_only=True),
-        }
+    def __init__(self, service=None):
+        self.service = service  # the LAYAAgent that TriageFlow asks; None means the process-wide one
 
     def route(self, request: RouteRequest, policy: RouterPolicy, *, cancelled=lambda: False,
               clock=time.monotonic, on_usage=None) -> RouteResponse:
@@ -90,7 +85,7 @@ class RouterEngine:
             check()
             if len(request.subject) > 4000 and not (policy.fallback and decision.available("triage", ("laya",))):
                 return abstain("input_too_long")
-            flow = TriageFlow(self.voters, trace=True, settings_snapshot=config, check=check,
+            flow = TriageFlow(trace=True, service=self.service, settings_snapshot=config, check=check,
                               on_usage=observed, partial_results=True)
             answers = json.loads(flow.answer(json.dumps({"text": request.subject, "questions": questions})).response)["answers"]
             check()

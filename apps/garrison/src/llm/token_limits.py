@@ -11,7 +11,6 @@ import json
 import math
 from typing import Any
 
-from src.core.catalog import catalog
 from src.core.config_files import TUNING_PATH, read_section
 
 _CONFIG_PATH = TUNING_PATH
@@ -67,7 +66,6 @@ def _load_config() -> dict[str, dict[str, Any]]:
     return parsed
 
 
-@catalog
 def limits_for(provider_id: str, gateway_id: str | None = None) -> dict[str, int]:
     """Return default, provider, and optional gateway-specific token limits."""
     config = _load_config()
@@ -80,31 +78,26 @@ def limits_for(provider_id: str, gateway_id: str | None = None) -> dict[str, int
     }
 
 
-@catalog
 def max_output_tokens(provider_id: str, gateway_id: str | None = None) -> int:
     return limits_for(provider_id, gateway_id)["max_output_tokens"]
 
 
-@catalog
 def max_context_tokens(provider_id: str, gateway_id: str | None = None) -> int:
     return limits_for(provider_id, gateway_id)["max_context_tokens"]
 
 
-@catalog
 def max_tool_rounds(provider_id: str, gateway_id: str | None = None) -> int:
     """Max model<->tool rounds per ask() before giving up. A multi-step task
     needs one round per tool call plus one for the final answer."""
     return limits_for(provider_id, gateway_id)["max_tool_rounds"]
 
 
-@catalog
 def estimate_context_tokens(messages: list[Any]) -> int:
     """Conservatively estimate provider-neutral prompt tokens from request data."""
     encoded = json.dumps(messages, ensure_ascii=False, default=str, separators=(",", ":"))
     return max(1, math.ceil(len(encoded) / 4))
 
 
-@catalog
 def enforce_context_limit(provider_id: str, messages: list[Any], gateway_id: str | None = None) -> None:
     estimated = estimate_context_tokens(messages)
     limit = max_context_tokens(provider_id, gateway_id)
@@ -114,7 +107,6 @@ def enforce_context_limit(provider_id: str, messages: list[Any], gateway_id: str
         )
 
 
-@catalog
 def trim_history_to_fit(
     history: list[Any], provider_id: str, gateway_id: str | None = None, reserve_ratio: float = 0.5,
 ) -> list[Any]:
@@ -137,7 +129,6 @@ def trim_history_to_fit(
     return trimmed
 
 
-@catalog
 def reset_cache() -> None:
     """Clear only the module's config cache; primarily useful after config reloads."""
     global _config

@@ -42,7 +42,6 @@ from openai import APIStatusError, AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, B
 
 from src.llm.turn_guard import TurnStopped
 from src.agents import agent_routing, agent_spec, ask_user, delegation, plan
-from src.core.catalog import catalog
 from src.llm.gateway_failover import GatewayRoute, classify
 
 from src.core import approvals, questions
@@ -98,10 +97,12 @@ class _OpenAI(BaseProvider):
                    for name in names)
 
     @classmethod
-    def get_client(cls, gateway: str | None = None) -> AsyncOpenAI | AsyncAzureOpenAI:
+    def _build_client(cls, gateway: str | None, cache: dict[str, Any], plain: Any, azure: Any) -> Any:
+        """Resolve the gateway and build (once, cached in `cache`) its SDK client from the
+        given classes: the Async* ones for get_client(), the sync ones for get_sync_client()."""
         gateway_name = gateway or cls._gateway_name()
-        if gateway_name in cls._clients:
-            return cls._clients[gateway_name]
+        if gateway_name in cache:
+            return cache[gateway_name]
 
         if gateway_name == "azure":
             cfg = llm_config.gateway(PROVIDER_NAME, "azure")
@@ -110,15 +111,15 @@ class _OpenAI(BaseProvider):
                     "gateways/openai/azure.json: AZURE_OPENAI_ENDPOINT / "
                     "AZURE_OPENAI_API_KEY not set in .env"
                 )
-            cls._clients[gateway_name] = AsyncAzureOpenAI(
+            cache[gateway_name] = azure(
                 azure_endpoint=cfg["azure_endpoint"],
                 api_version=cfg.get("api_version"),
                 api_key=cfg["api_key"],
             )
-            return cls._clients[gateway_name]
+            return cache[gateway_name]
 
         # Every other block ("gpt" itself, "together", "groq", "ollama",
-        # ...) is a plain AsyncOpenAI() build - the gateway file supplies
+        # ...) is a plain OpenAI() build - the gateway file supplies
         # api_key/base_url, "gpt"'s own block just leaves base_url unset
         # (SDK default).
         cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
@@ -128,44 +129,18 @@ class _OpenAI(BaseProvider):
                 f"gateways/openai/{gateway_name}.json: its api_key env var is not "
                 "set in .env"
             )
-        cls._clients[gateway_name] = AsyncOpenAI(api_key=secret, base_url=cfg.get("base_url"))
-        return cls._clients[gateway_name]
+        cache[gateway_name] = plain(api_key=secret, base_url=cfg.get("base_url"))
+        return cache[gateway_name]
+
+    @classmethod
+    def get_client(cls, gateway: str | None = None) -> AsyncOpenAI | AsyncAzureOpenAI:
+        return cls._build_client(gateway, cls._clients, AsyncOpenAI, AsyncAzureOpenAI)
 
     @classmethod
     def get_sync_client(cls, gateway: str | None = None) -> OpenAI | AzureOpenAI:
-        """Same gateway resolution as get_client() above, but builds the
-        plain synchronous SDK classes (OpenAI/AzureOpenAI) instead of their
-        Async* counterparts - used by run_interpret(), whose
-        client.responses.create(...) calls are never awaited. Cached
-        separately in `_sync_client` so this never collides with
-        get_client()'s `_client`."""
-        gateway_name = gateway or cls._gateway_name()
-        if gateway_name in cls._sync_clients:
-            return cls._sync_clients[gateway_name]
-
-        if gateway_name == "azure":
-            cfg = llm_config.gateway(PROVIDER_NAME, "azure")
-            if not cfg.get("azure_endpoint") or not cfg.get("api_key"):
-                raise ValueError(
-                    "gateways/openai/azure.json: AZURE_OPENAI_ENDPOINT / "
-                    "AZURE_OPENAI_API_KEY not set in .env"
-                )
-            cls._sync_clients[gateway_name] = AzureOpenAI(
-                azure_endpoint=cfg["azure_endpoint"],
-                api_version=cfg.get("api_version"),
-                api_key=cfg["api_key"],
-            )
-            return cls._sync_clients[gateway_name]
-
-        cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
-        secret = cfg.get("api_key") or cfg.get("auth_token")
-        if not secret:
-            raise ValueError(
-                f"gateways/openai/{gateway_name}.json: its api_key env var is not "
-                "set in .env"
-            )
-        cls._sync_clients[gateway_name] = OpenAI(api_key=secret, base_url=cfg.get("base_url"))
-        return cls._sync_clients[gateway_name]
+        """Same as get_client(), but the plain synchronous SDK classes, cached separately.
+        Used by run_interpret(), whose client.responses.create(...) calls are never awaited."""
+        return cls._build_client(gateway, cls._sync_clients, OpenAI, AzureOpenAI)
 
     @classmethod
     def resolve_default_model(cls) -> str:
@@ -197,10 +172,6 @@ _get_client = _OpenAI.get_client
 _get_sync_client = _OpenAI.get_sync_client
 has_api_key = _OpenAI.has_api_key
 is_available = _OpenAI.is_available
-
-
-def _limit_gateway() -> str:
-    return _OpenAI._gateway_name()
 
 
 def _tool_schemas(
@@ -311,14 +282,12 @@ def _dispatch(name: str, arguments: dict[str, Any], depth: int) -> str:
     return call_tool(name, arguments)
 
 
-@catalog
 def _route_for_turn() -> GatewayRoute:
     return GatewayRoute.for_turn(PROVIDER_ID, _OpenAI._gateway_name(),
                                  (choice.gateway for choice in agent_spec.current().llm.fallback_gateways),
                                  lambda gateway: has_api_key(gateway))
 
 
-@catalog
 def _model_for_route(route: GatewayRoute, requested: str | None) -> str:
     primary = _OpenAI._gateway_name()
     if route.current == primary:
@@ -328,7 +297,6 @@ def _model_for_route(route: GatewayRoute, requested: str | None) -> str:
     return llm_config.model_for_gateway(PROVIDER_ID, primary, route.current, requested or DEFAULT_MODEL, explicit)
 
 
-@catalog
 def _strip_reasoning(messages: list[Any]) -> list[Any]:
     """Reasoning item ids and encrypted payloads cannot cross gateway boundaries."""
     return [message for message in messages
@@ -383,6 +351,22 @@ async def run_chat(
         return await breakdown_fields(
             context_tokens, system_prompt, roster_text, schemas,
             lambda: ProviderCounter(_OpenAIRequestCounter(client, model_name), model_name),
+        )
+
+    async def result(response: str) -> ChatResult:
+        return ChatResult(
+            response=response,
+            tools_used=tools_used,
+            tool_calls=tool_calls,
+            provider_id=PROVIDER_ID,
+            gateway=route.current,
+            gateway_switches=[switch.as_dict() for switch in route.switches],
+            model=model_name,
+            total_tokens=total_tokens,
+            context_tokens=context_tokens,
+            **await breakdown(),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
         )
 
     try:
@@ -459,20 +443,7 @@ async def run_chat(
 
                 function_calls = [item for item in response.output if getattr(item, "type", "") == "function_call"]
                 if not function_calls:
-                    return ChatResult(
-                        response="".join(text_parts) or response.output_text,
-                        tools_used=tools_used,
-                        tool_calls=tool_calls,
-                        provider_id=PROVIDER_ID,
-                        gateway=route.current,
-                        gateway_switches=[switch.as_dict() for switch in route.switches],
-                        model=model_name,
-                        total_tokens=total_tokens,
-                        context_tokens=context_tokens,
-                        **await breakdown(),
-                        input_tokens=input_tokens,
-                        output_tokens=output_tokens,
-                    )
+                    return await result("".join(text_parts) or response.output_text)
 
                 if text_parts and on_event:
                     await on_event(step_event("token_reset"))
@@ -524,20 +495,7 @@ async def run_chat(
     if on_event:
         await on_event(step_event("token_reset"))
         await on_event(step_event("token", text=stop_message))
-    return ChatResult(
-        response=stop_message,
-        tools_used=tools_used,
-        tool_calls=tool_calls,
-        provider_id=PROVIDER_ID,
-        gateway=route.current,
-        gateway_switches=[switch.as_dict() for switch in route.switches],
-        model=model_name,
-        total_tokens=total_tokens,
-        context_tokens=context_tokens,
-        **await breakdown(),
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-    )
+    return await result(stop_message)
 
 
 def run_interpret(text: str, model: str | None = None) -> ChatResult:

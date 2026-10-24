@@ -88,6 +88,11 @@ export async function installFakeApi(page: Page, permissions?: string[]) {
     if (method === "GET" && path === "/api/settings") {
       return json(route, { force_tool_approval: api.settings.forceToolApproval });
     }
+    if (method === "GET" && path === "/api/settings/pages") return json(route, { hidden: [] });
+    if (method === "GET" && path === "/api/brains/connections/instance") return json(route, {
+      id: null, scope: "instance", label: "Brain", endpoint: "", folder: "Inbox", enabled: false,
+      allow_write: false, credential_configured: false, revision: 0, generation: null, status: "not_configured",
+    });
     if (method === "PUT" && path === "/api/admin/settings/force_tool_approval") {
       const { value } = request.postDataJSON() as { value: boolean };
       api.settings.forceToolApproval = value;

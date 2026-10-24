@@ -11,7 +11,6 @@ from pathlib import Path
 from src.config import settings
 from src.services import brain_resolver
 from src.services.obsidian_index import IndexRuntime, get_runtime
-from src.utils.catalog import catalog
 
 _embedding_slots = threading.BoundedSemaphore(2)
 _refresh_slots = threading.BoundedSemaphore(2)
@@ -37,7 +36,6 @@ class Entry:
     retired: bool = False
 
 
-@catalog
 class ScopedIndexes:
     def __init__(self):
         self.entries = {}

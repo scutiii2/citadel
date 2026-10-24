@@ -19,7 +19,6 @@ from typing import Any
 import anyio.to_thread
 
 from src.llm.base_provider import ChatResult
-from src.core.catalog import catalog
 
 _DEFAULT_DIR = Path(__file__).resolve().parent.parent.parent / ".data" / "usage"
 _log = logging.getLogger(__name__)
@@ -95,7 +94,6 @@ def _write(row: dict[str, Any], directory: Path) -> None:
             file.write(json.dumps(row) + "\n")
 
 
-@catalog
 def append_sync(row: dict[str, Any], directory: Path | None = None) -> None:
     """Persist completed synchronous work even when its caller stopped waiting."""
     try:

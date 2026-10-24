@@ -1,0 +1,518 @@
+import { requestCompletionPermission } from "../chat/composables/useCompletionNotify";
+import { flushPromises, mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
+import { reactive } from "vue";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { authClient } from "../../api/auth/AuthClient";
+import { navPreferencesClient } from "../../api/navigation/NavPreferencesClient";
+import { settingsClient } from "../../api/navigation/SettingsClient";
+import { useAuthStore } from "../../stores/auth";
+import { useTheme } from "../../composables/useTheme";
+import SettingsView from "./SettingsView.vue";
+
+vi.mock("../../api/navigation/SettingsClient", () => ({ settingsClient: { get: vi.fn(), set: vi.fn() } }));
+vi.mock("../../api/navigation/NavPreferencesClient", () => ({
+  navPreferencesClient: { get: vi.fn(), save: vi.fn(), reset: vi.fn() },
+}));
+
+// The chat store is big and talks to ember_api; this page only reads and sets
+// four preferences on it, so a plain stand-in is enough.
+const chat = reactive({
+  caveman: false,
+  plan: true,
+  planLean: true,
+  approvalMode: "allow_all" as string,
+  chime: true,
+  browserNotifications: false,
+  liveTokens: true,
+  contextPanel: true,
+  contextAccuracy: "estimate" as string,
+  forceToolApproval: false,
+  setCaveman: vi.fn((on: boolean) => (chat.caveman = on)),
+  setPlan: vi.fn((on: boolean) => (chat.plan = on)),
+  setPlanLean: vi.fn((on: boolean) => (chat.planLean = on)),
+  setApprovalMode: vi.fn((mode: string) => (chat.approvalMode = mode)),
+  setChime: vi.fn((on: boolean) => (chat.chime = on)),
+  setBrowserNotifications: vi.fn((on: boolean) => (chat.browserNotifications = on)),
+  setLiveTokens: vi.fn((on: boolean) => (chat.liveTokens = on)),
+  setContextPanel: vi.fn((on: boolean) => (chat.contextPanel = on)),
+  setContextAccuracy: vi.fn((mode: string) => (chat.contextAccuracy = mode)),
+  refreshSettings: vi.fn(() => Promise.resolve()),
+});
+vi.mock("../chat/stores/chat", () => ({ useChatStore: () => chat }));
+
+vi.mock("../chat/composables/useCompletionNotify", () => ({ requestCompletionPermission: vi.fn(async () => "") }));
+
+const client = vi.mocked(settingsClient);
+
+const MEMBER = ["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"];
+const ADMIN = ["chat.use", "roles.manage", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"];
+
+const mounted: ReturnType<typeof mount>[] = [];
+afterEach(() => mounted.splice(0).forEach(w => w.unmount()));
+
+async function mountView(permissions: string[] = MEMBER, forced = false) {
+  setActivePinia(createPinia());
+  useAuthStore().account = {
+    id: 1,
+    username: "ada",
+    email: "ada@example.com",
+    email_verified: true,
+    roles: [],
+    permissions,
+  };
+  client.get.mockResolvedValue({ force_tool_approval: forced });
+  vi.mocked(navPreferencesClient.get).mockResolvedValue({ order: [], pinned: [], hidden: [] });
+  const wrapper = mount(SettingsView, { attachTo: document.body });
+  mounted.push(wrapper);
+  await flushPromises();
+  return wrapper;
+}
+
+const rowIds = (w: Awaited<ReturnType<typeof mountView>>) =>
+  w.findAll("[data-setting-id]").map((r) => r.attributes("data-setting-id"));
+const row = (w: Awaited<ReturnType<typeof mountView>>, id: string) => w.get(`[data-setting-id="${id}"]`);
+const search = (w: Awaited<ReturnType<typeof mountView>>) => w.get("input.search");
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  localStorage.clear();
+  document.body.innerHTML = "";
+  chat.caveman = false;
+  chat.plan = true;
+  chat.planLean = true;
+  chat.approvalMode = "allow_all";
+  chat.chime = true;
+  chat.browserNotifications = false;
+  chat.liveTokens = true;
+  chat.contextPanel = true;
+  chat.contextAccuracy = "estimate";
+  chat.forceToolApproval = false;
+  useTheme().setTheme("system");
+  document.documentElement.style.colorScheme = "";
+});
+
+describe("SettingsView", () => {
+  it("keeps prompt suggestions as a draft until Save, then persists them", async () => {
+    const w = await mountView();
+    const set = vi
+      .spyOn(authClient, "setPreferences")
+      .mockResolvedValue({ ...useAuthStore().account!, prompt_suggestions: false });
+    expect(row(w, "chat-suggestions").find("button.reset").exists()).toBe(false);
+
+    await row(w, "chat-suggestions").get("input").setValue(false);
+    await flushPromises();
+
+    expect(set).not.toHaveBeenCalled();
+    expect(useAuthStore().promptSuggestions).toBe(true);
+    await w.get("button.save").trigger("click");
+    await flushPromises();
+    expect(set).toHaveBeenCalledWith({ prompt_suggestions: false });
+    expect(useAuthStore().promptSuggestions).toBe(false);
+    expect(row(w, "chat-suggestions").find("button.reset").exists()).toBe(true);
+  });
+
+  it("resets prompt suggestions to on, which is their default", async () => {
+    const w = await mountView();
+    useAuthStore().account = { ...useAuthStore().account!, prompt_suggestions: false };
+    const set = vi
+      .spyOn(authClient, "setPreferences")
+      .mockResolvedValue({ ...useAuthStore().account!, prompt_suggestions: true });
+    await flushPromises();
+
+    await row(w, "chat-suggestions").get("button.reset").trigger("click");
+    await flushPromises();
+
+    expect(set).not.toHaveBeenCalled();
+    await w.get("button.save").trigger("click");
+    await flushPromises();
+    expect(set).toHaveBeenCalledWith({ prompt_suggestions: true });
+    expect(useAuthStore().promptSuggestions).toBe(true);
+  });
+
+  it("keeps the old value when the server refuses the change", async () => {
+    const w = await mountView();
+    vi.spyOn(authClient, "setPreferences").mockRejectedValue(new Error("down"));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await row(w, "chat-suggestions").get("input").setValue(false);
+    await flushPromises();
+
+    await w.get("button.save").trigger("click");
+    await flushPromises();
+    expect(useAuthStore().promptSuggestions).toBe(true);
+    expect(w.get('[role="alert"]').text()).toContain("down");
+    expect((row(w, "chat-suggestions").get("input").element as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("lists the chat and appearance settings, grouped, and no administration for a member", async () => {
+    const w = await mountView();
+
+    expect(w.findAll("h3").map((h) => h.text())).toEqual(["Chat", "Context display", "Appearance", "Sidebar"]);
+    expect(rowIds(w)).toEqual([
+      "chat-terse", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions",
+      "context-live-tokens", "context-panel", "context-accuracy", "appearance-theme", "sidebar-pages",
+    ]);
+    expect(w.text()).not.toContain("Tool approval");
+  });
+
+
+  it("notes the token cost of every chat setting", async () => {
+    const w = await mountView();
+
+    for (const id of ["chat-terse", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions"]) {
+      expect(row(w, id).get("[data-test=cost]").text(), id).toMatch(/token/i);
+    }
+    expect(row(w, "chat-plan").get("[data-test=cost]").text()).toContain("200 input tokens");
+    expect(row(w, "chat-chime").get("[data-test=cost]").text()).toMatch(/^No token cost/);
+  });
+
+  it("shows no modified badge, dot or reset while everything is at its default", async () => {
+    const w = await mountView();
+
+    expect(w.find(".badge").exists()).toBe(false);
+    expect(w.find(".dot").exists()).toBe(false);
+    expect(w.find("button.reset").exists()).toBe(false);
+  });
+
+  it("marks a changed switch, counts it, and puts it back with its reset", async () => {
+    const w = await mountView();
+
+    await row(w, "chat-terse").get("input").setValue(true);
+
+    expect(chat.setCaveman).toHaveBeenCalled();
+    expect(row(w, "chat-terse").find(".dot").exists()).toBe(true);
+    expect(w.get(".badge").text()).toBe("1 modified");
+
+    await row(w, "chat-terse").get("button.reset").trigger("click");
+
+    expect(chat.setCaveman).toHaveBeenCalled();
+    expect(row(w, "chat-terse").find(".dot").exists()).toBe(false);
+    expect(w.find(".badge").exists()).toBe(false);
+  });
+
+  it("applies checklist switches instantly and locks the lean one while the checklist is off", async () => {
+    const w = await mountView();
+    expect((row(w, "chat-plan-lean").get("input").element as HTMLInputElement).disabled).toBe(false);
+
+    await row(w, "chat-plan").get("input").setValue(false);
+    expect((row(w, "chat-plan-lean").get("input").element as HTMLInputElement).disabled).toBe(true);
+    expect(chat.setPlan).toHaveBeenCalledWith(false);
+    expect(w.get(".badge").text()).toBe("1 modified");
+
+    expect(w.find(".settings-save-bar").exists()).toBe(false);
+
+    expect(chat.setPlan).toHaveBeenCalledWith(false);
+    expect(chat.planLean).toBe(true);
+  });
+
+  it("resets the chime to on, which is its default", async () => {
+    chat.chime = false;
+    const w = await mountView();
+    expect(row(w, "chat-chime").find("button.reset").exists()).toBe(true);
+
+    await row(w, "chat-chime").get("button.reset").trigger("click");
+
+    expect(chat.setChime).toHaveBeenCalledWith(true);
+    expect(w.find(".badge").exists()).toBe(false);
+  });
+
+  it("applies context display switches instantly and locks the accuracy while the panel is hidden", async () => {
+    const w = await mountView();
+    const exact = () => row(w, "context-accuracy").findAll("button").find((b) => b.text() === "Exact")!;
+    expect(exact().attributes("disabled")).toBeUndefined();
+
+    await row(w, "context-live-tokens").get("input").setValue(false);
+    await exact().trigger("click");
+    await row(w, "context-panel").get("input").setValue(false);
+
+    expect(exact().attributes("disabled")).toBeDefined();
+    expect(chat.setLiveTokens).toHaveBeenCalled();
+    expect(w.get(".badge").text()).toBe("3 modified");
+
+    expect(w.find(".settings-save-bar").exists()).toBe(false);
+
+    expect(chat.setLiveTokens).toHaveBeenCalledWith(false);
+    expect(chat.setContextPanel).toHaveBeenCalledWith(false);
+    expect(chat.setContextAccuracy).toHaveBeenCalledWith("exact");
+  });
+
+  it("resets the context display settings to their defaults", async () => {
+    chat.liveTokens = false;
+    chat.contextAccuracy = "exact";
+    const w = await mountView();
+
+    await row(w, "context-live-tokens").get("button.reset").trigger("click");
+    await row(w, "context-accuracy").get("button.reset").trigger("click");
+
+    expect(w.find(".badge").exists()).toBe(false);
+    expect(chat.setLiveTokens).toHaveBeenCalled();
+  });
+
+  it("changes the theme and resets it to System", async () => {
+    const w = await mountView();
+    const light = row(w, "appearance-theme")
+      .findAll("button")
+      .find((b) => b.text() === "Light")!;
+
+    await light.trigger("click");
+
+    expect(document.documentElement.style.colorScheme).toBe("light");
+    expect(row(w, "appearance-theme").find(".dot").exists()).toBe(true);
+
+    await row(w, "appearance-theme").get("button.reset").trigger("click");
+
+    expect(document.documentElement.style.colorScheme).not.toBe("light");
+    expect(row(w, "appearance-theme").find(".dot").exists()).toBe(false);
+  });
+
+  it("locks Ask before tools to Ask every time, and says why, while an administrator forces approval", async () => {
+    const w = await mountView(MEMBER, true);
+    chat.forceToolApproval = true;
+    await flushPromises();
+
+    const buttons = row(w, "chat-ask-tools").findAll("button:not(.reset)");
+    expect(buttons.map((b) => b.text())).toEqual(["Ask every time", "Auto", "Allow all"]);
+    expect(buttons.map((b) => (b.element as HTMLButtonElement).disabled)).toEqual([false, true, true]);
+    expect(buttons[0]!.attributes("aria-pressed") ?? buttons[0]!.attributes("aria-checked")).toBe("true");
+    expect(row(w, "chat-ask-tools").text()).toContain("Your administrator requires approval");
+    expect(row(w, "chat-ask-tools").find("button.reset").exists()).toBe(false);
+  });
+
+  describe("tool approval", () => {
+    // jsdom does not implement <dialog>.showModal; give it the open flag the dialog reads.
+    const realShowModal = HTMLDialogElement.prototype.showModal;
+    const realClose = HTMLDialogElement.prototype.close;
+    beforeEach(() => {
+      HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+        this.setAttribute("open", "");
+      };
+      HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+        this.removeAttribute("open");
+        this.dispatchEvent(new Event("close"));
+      };
+    });
+    afterEach(() => {
+      HTMLDialogElement.prototype.showModal = realShowModal;
+      HTMLDialogElement.prototype.close = realClose;
+    });
+    const modeButtons = (w: Awaited<ReturnType<typeof mountView>>) => row(w, "chat-ask-tools").findAll("button:not(.reset)");
+    const dialogConfirm = () => document.body.querySelector<HTMLButtonElement>("dialog[open] .confirm");
+
+    it("starts on Allow all, as before the picker existed, and describes the chosen mode", async () => {
+      const w = await mountView();
+
+      expect(row(w, "chat-ask-tools").text()).toContain("No tool asks first.");
+      expect(row(w, "chat-ask-tools").find(".dot").exists()).toBe(false);
+    });
+
+    it("applies Auto immediately", async () => {
+      const w = await mountView();
+
+      await modeButtons(w)[1]!.trigger("click");
+      expect(chat.setApprovalMode).toHaveBeenCalledWith("auto");
+      expect(row(w, "chat-ask-tools").text()).toContain("Tools that only read run on their own");
+      expect(row(w, "chat-ask-tools").find(".dot").exists()).toBe(true);
+      expect(w.find(".settings-save-bar").exists()).toBe(false);
+
+      expect(chat.setApprovalMode).toHaveBeenCalledExactlyOnceWith("auto");
+    });
+
+    it("asks before Allow all is even a draft, and Cancel keeps the old mode", async () => {
+      chat.approvalMode = "ask";
+      const w = await mountView();
+
+      await modeButtons(w)[2]!.trigger("click");
+      await flushPromises();
+      expect(document.body.querySelector("dialog[open]")?.textContent).toContain("Allow every tool to run without asking?");
+      document.body.querySelector<HTMLButtonElement>("dialog[open] button.cancel")!.click();
+      await flushPromises();
+
+      expect(row(w, "chat-ask-tools").text()).toContain("Every tool waits for your answer.");
+    });
+
+    it("takes Allow all after the confirmation", async () => {
+      chat.approvalMode = "ask";
+      const w = await mountView();
+      await modeButtons(w)[2]!.trigger("click");
+      await flushPromises();
+
+      dialogConfirm()!.click();
+      await flushPromises();
+
+      expect(row(w, "chat-ask-tools").text()).toContain("No tool asks first.");
+    });
+
+    it("needs no confirmation to go back to a stricter mode, and Back to default resets", async () => {
+      chat.approvalMode = "auto";
+      const w = await mountView();
+
+      await modeButtons(w)[0]!.trigger("click");
+      expect(document.body.querySelector("dialog[open]")).toBeNull();
+      await row(w, "chat-ask-tools").get("button.reset").trigger("click");
+      await flushPromises();
+
+      expect(row(w, "chat-ask-tools").text()).toContain("No tool asks first.");
+    });
+  });
+
+
+  it("re-reads what the administrator requires when it opens", async () => {
+    await mountView();
+
+    expect(chat.refreshSettings).toHaveBeenCalledOnce();
+  });
+});
+
+describe("group headers", () => {
+  it("name where the settings live, with the full note as a tooltip", async () => {
+    const w = await mountView();
+
+    const scopes = w.findAll(".scope");
+    expect(scopes.map((c) => c.text())).toEqual(["This device", "This device", "This device", "Your account"]);
+    expect(scopes[0]!.attributes("title")).toBe("Applies instantly. Saved on this device.");
+    expect(scopes[3]!.attributes("title")).toBe("Applied when you save. Stored on your account.");
+    expect(w.text()).not.toContain("Applies instantly. Saved on this device.");
+  });
+});
+
+describe("modified filter", () => {
+  it("is a pill that shows only the changed settings, and toggles back", async () => {
+    chat.caveman = true;
+    const w = await mountView();
+    expect(rowIds(w)).toHaveLength(12);
+    expect(w.get(".badge").attributes("aria-pressed")).toBe("false");
+
+    await w.get(".badge").trigger("click");
+
+    expect(rowIds(w)).toEqual(["chat-terse"]);
+    expect(w.findAll("h3").map((h) => h.text())).toEqual(["Chat"]);
+    expect(w.get(".badge").attributes("aria-pressed")).toBe("true");
+
+    await w.get(".badge").trigger("click");
+    expect(rowIds(w)).toHaveLength(12);
+  });
+
+  it("drops the filter once nothing is modified any more", async () => {
+    chat.caveman = true;
+    const w = await mountView();
+    await w.get(".badge").trigger("click");
+
+    await row(w, "chat-terse").get("button.reset").trigger("click");
+
+    expect(w.find(".badge").exists()).toBe(false);
+    expect(rowIds(w)).toHaveLength(12);
+  });
+});
+
+describe("search", () => {
+  it("filters the settings as you type, hiding a group with no match", async () => {
+    const w = await mountView();
+
+    await search(w).setValue("chime");
+
+    expect(rowIds(w)).toEqual(["chat-chime"]);
+    expect(w.findAll("h3").map((h) => h.text())).toEqual(["Chat"]);
+  });
+
+  it("finds a setting by a keyword it does not show", async () => {
+    const w = await mountView();
+
+    await search(w).setValue("dark mode");
+
+    expect(rowIds(w)).toEqual(["appearance-theme"]);
+  });
+
+
+  it("says nothing matches, and Clear search brings everything back", async () => {
+    const w = await mountView();
+
+    await search(w).setValue("zzz");
+
+    expect(w.text()).toContain('No settings match "zzz"');
+    expect(rowIds(w)).toEqual([]);
+    await w.get("button.link").trigger("click");
+    expect(rowIds(w)).toHaveLength(12);
+    expect((search(w).element as HTMLInputElement).value).toBe("");
+  });
+
+  it("Enter focuses the first setting that is left, Escape clears the search", async () => {
+    const w = await mountView();
+    await search(w).setValue("chime");
+
+    await search(w).trigger("keydown", { key: "Enter" });
+    expect(document.activeElement).toBe(row(w, "chat-chime").get("input").element);
+
+    await search(w).trigger("keydown", { key: "Escape" });
+    expect((search(w).element as HTMLInputElement).value).toBe("");
+    expect(rowIds(w)).toHaveLength(12);
+  });
+});
+
+it("keeps workspace tool approval in Ember Admin", async () => {
+  const w = await mountView(ADMIN);
+  expect(w.text()).not.toContain("Tool approval");
+  expect(w.text()).not.toContain("Applies to all accounts");
+  expect(rowIds(w)).toHaveLength(12);
+});
+
+it("reverts account drafts while retaining applied device preferences", async () => {
+  const w = await mountView();
+  await row(w, "chat-terse").get("input").setValue(true);
+  await row(w, "appearance-theme").findAll("button").find(b => b.text() === "Dark")!.trigger("click");
+  await w.get('button[aria-label="Pin Chat to the top"]').trigger("click");
+  expect(vi.mocked(navPreferencesClient.save)).not.toHaveBeenCalled();
+  expect(chat.caveman).toBe(true);
+  await w.get("button.revert").trigger("click");
+  expect(w.find(".settings-save-bar").exists()).toBe(false);
+  expect((row(w, "chat-terse").get("input").element as HTMLInputElement).checked).toBe(true);
+  expect(w.find(".tag").exists()).toBe(false);
+});
+
+it("saves local preferences and sidebar edits together", async () => {
+  const w = await mountView();
+  vi.mocked(navPreferencesClient.save).mockImplementation(async prefs => prefs);
+  await row(w, "chat-terse").get("input").setValue(true);
+  await row(w, "appearance-theme").findAll("button").find(b => b.text() === "Dark")!.trigger("click");
+  await w.get('button[aria-label="Pin Chat to the top"]').trigger("click");
+  await w.get("button.save").trigger("click");
+  await flushPromises();
+  expect(chat.setCaveman).toHaveBeenCalledWith(true);
+  expect(document.documentElement.style.colorScheme).toBe("dark");
+  expect(navPreferencesClient.save).toHaveBeenCalledWith(expect.objectContaining({ pinned: ["/"] }));
+  expect(w.find(".settings-save-bar").exists()).toBe(false);
+});
+
+it("keeps unsaved settings after a sidebar save fails, and supports retry", async () => {
+  const w = await mountView();
+  vi.mocked(navPreferencesClient.save).mockRejectedValueOnce(new Error("Sidebar unavailable")).mockImplementation(async prefs => prefs);
+  await w.get('button[aria-label="Pin Chat to the top"]').trigger("click");
+  await row(w, "chat-terse").get("input").setValue(true);
+  await w.get("button.save").trigger("click");
+  await flushPromises();
+  expect(w.get('[role="alert"]').text()).toBe("Sidebar unavailable");
+  expect(chat.setCaveman).toHaveBeenCalled();
+  await w.get("button.save").trigger("click");
+  await flushPromises();
+  expect(w.find(".settings-save-bar").exists()).toBe(false);
+  expect(chat.setCaveman).toHaveBeenCalledWith(true);
+});
+
+it("requests permission and immediately persists granted notifications", async () => {
+  const w = await mountView();
+  await row(w, "chat-notifications").get("input").setValue(true);
+  await flushPromises();
+  expect(requestCompletionPermission).toHaveBeenCalledOnce();
+  expect(chat.browserNotifications).toBe(true);
+  expect(w.find(".settings-save-bar").exists()).toBe(false);
+  expect(chat.setBrowserNotifications).toHaveBeenCalledWith(true);
+});
+it("explains blocked notifications and leaves the setting off", async () => {
+  vi.mocked(requestCompletionPermission).mockResolvedValueOnce("Notifications are blocked.");
+  const w = await mountView();
+  await row(w, "chat-notifications").get("input").setValue(true);
+  await flushPromises();
+  expect(w.get('[role="status"]').text()).toBe("Notifications are blocked.");
+  expect((row(w, "chat-notifications").get("input").element as HTMLInputElement).checked).toBe(false);
+  expect(chat.setBrowserNotifications).not.toHaveBeenCalled();
+});

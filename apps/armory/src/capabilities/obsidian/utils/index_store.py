@@ -12,7 +12,6 @@ from typing import Protocol
 import sqlite_vec
 
 from src.capabilities.obsidian.utils.chunking import Chunk
-from src.utils.catalog import catalog
 
 
 class IndexStore(Protocol):
@@ -24,7 +23,6 @@ class IndexStore(Protocol):
     def paths(self) -> list[str]: ...
 
 
-@catalog
 class SqliteIndexStore:
     """Persist source signatures and atomically replace a note's chunks and vectors."""
 

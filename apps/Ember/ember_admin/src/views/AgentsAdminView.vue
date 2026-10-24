@@ -8,6 +8,8 @@ import {
   type LiveAgent,
   type ProviderCatalog,
 } from "../api/AgentsAdminClient";
+import { capabilitiesAdminClient } from "../api/CapabilitiesAdminClient";
+import type { CapabilityInfo } from "../api/CommandsClient";
 import AgentAdminCard from "../components/admin/AgentAdminCard.vue";
 import AgentForm from "../components/admin/AgentForm.vue";
 import SharedPromptsModal from "../components/admin/SharedPromptsModal.vue";
@@ -20,6 +22,7 @@ const SETTLE_MS = 3000;
 
 const agents = ref<AgentFile[]>([]);
 const providers = ref<ProviderCatalog>({});
+const capabilities = ref<CapabilityInfo[]>([]);
 const live = ref<Record<string, LiveAgent>>({});
 const loading = ref(true);
 const error = ref("");
@@ -61,6 +64,8 @@ async function load(): Promise<void> {
     agents.value = files;
     providers.value = catalog;
     error.value = "";
+    // Needs capabilities.manage; without it the picker is empty and the text fields still work.
+    capabilities.value = await capabilitiesAdminClient.list().catch(() => []);
   } catch (err) {
     error.value = errorMessage(err);
   } finally {
@@ -196,6 +201,7 @@ onBeforeUnmount(() => clearTimeout(settleTimer));
       :open="formOpen"
       :initial="editing"
       :providers="providers"
+      :capabilities="capabilities"
       :suggested-port="suggestedPort"
       :busy="saving"
       :error="formError"

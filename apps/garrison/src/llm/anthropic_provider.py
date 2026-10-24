@@ -47,7 +47,6 @@ from anthropic.lib.streaming import AsyncMessageStream
 
 from src.llm.turn_guard import TurnStopped
 from src.agents import agent_routing, agent_spec, ask_user, delegation, plan
-from src.core.catalog import catalog
 from src.llm.gateway_failover import GatewayRoute, classify
 
 from src.core import approvals, questions
@@ -108,29 +107,31 @@ class _Anthropic(BaseProvider):
                    for name in names)
 
     @classmethod
-    def get_client(cls, gateway: str | None = None) -> AsyncAnthropic | AsyncAnthropicBedrock | AsyncAnthropicVertex:
+    def _build_client(cls, gateway: str | None, cache: dict[str, Any], plain: Any, bedrock: Any, vertex: Any) -> Any:
+        """Resolve the gateway and build (once, cached in `cache`) its SDK client from the
+        given classes: the Async* ones for get_client(), the sync ones for get_sync_client()."""
         gateway_name = gateway or cls._gateway_name()
-        if gateway_name in cls._clients:
-            return cls._clients[gateway_name]
+        if gateway_name in cache:
+            return cache[gateway_name]
 
         if gateway_name == "bedrock":
             cfg = llm_config.gateway(PROVIDER_NAME, "bedrock")
-            cls._clients[gateway_name] = AsyncAnthropicBedrock(
+            cache[gateway_name] = bedrock(
                 aws_access_key=cfg.get("aws_access_key_id"),
                 aws_secret_key=cfg.get("aws_secret_access_key"),
                 aws_region=cfg.get("aws_region"),
             )
-            return cls._clients[gateway_name]
+            return cache[gateway_name]
 
         if gateway_name == "vertex":
             cfg = llm_config.gateway(PROVIDER_NAME, "vertex")
             if not cfg.get("project_id"):
                 raise ValueError("gateways/anthropic/vertex.json project_id env var not set")
-            cls._clients[gateway_name] = AsyncAnthropicVertex(project_id=cfg["project_id"], region=cfg.get("region"))
-            return cls._clients[gateway_name]
+            cache[gateway_name] = vertex(project_id=cfg["project_id"], region=cfg.get("region"))
+            return cache[gateway_name]
 
         # Every other block ("claude" itself, "openrouter", "litellm",
-        # "helicone", "portkey", ...) is a plain AsyncAnthropic() build -
+        # "helicone", "portkey", ...) is a plain Anthropic() build -
         # The gateway file supplies api_key/auth_token/base_url, "claude"'s
         # own block just leaves base_url unset (SDK default).
         cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
@@ -141,49 +142,19 @@ class _Anthropic(BaseProvider):
                 f"gateways/anthropic/{gateway_name}.json: neither its api_key nor "
                 "auth_token env var is set in .env"
             )
-        cls._clients[gateway_name] = AsyncAnthropic(api_key=api_key, auth_token=auth_token, base_url=cfg.get("base_url"))
-        return cls._clients[gateway_name]
+        cache[gateway_name] = plain(api_key=api_key, auth_token=auth_token, base_url=cfg.get("base_url"))
+        return cache[gateway_name]
+
+    @classmethod
+    def get_client(cls, gateway: str | None = None) -> AsyncAnthropic | AsyncAnthropicBedrock | AsyncAnthropicVertex:
+        return cls._build_client(gateway, cls._clients, AsyncAnthropic, AsyncAnthropicBedrock, AsyncAnthropicVertex)
 
     @classmethod
     def get_sync_client(cls, gateway: str | None = None) -> Anthropic | AnthropicBedrock | AnthropicVertex:
-        """Same gateway resolution as get_client() above, but builds the
-        plain synchronous SDK classes (Anthropic/AnthropicBedrock/
-        AnthropicVertex) instead of their Async* counterparts. Exists
-        solely for run_interpret(), which does a single, non-streaming,
-        non-`await`ed `client.messages.create(...)` call - get_client()'s
-        AsyncAnthropic etc. would hand that call site an unawaited
-        coroutine instead of a response. Cached separately in
-        `_sync_client` so this never collides with get_client()'s `_client`."""
-        gateway_name = gateway or cls._gateway_name()
-        if gateway_name in cls._sync_clients:
-            return cls._sync_clients[gateway_name]
-
-        if gateway_name == "bedrock":
-            cfg = llm_config.gateway(PROVIDER_NAME, "bedrock")
-            cls._sync_clients[gateway_name] = AnthropicBedrock(
-                aws_access_key=cfg.get("aws_access_key_id"),
-                aws_secret_key=cfg.get("aws_secret_access_key"),
-                aws_region=cfg.get("aws_region"),
-            )
-            return cls._sync_clients[gateway_name]
-
-        if gateway_name == "vertex":
-            cfg = llm_config.gateway(PROVIDER_NAME, "vertex")
-            if not cfg.get("project_id"):
-                raise ValueError("gateways/anthropic/vertex.json project_id env var not set")
-            cls._sync_clients[gateway_name] = AnthropicVertex(project_id=cfg["project_id"], region=cfg.get("region"))
-            return cls._sync_clients[gateway_name]
-
-        cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
-        api_key = cfg.get("api_key")
-        auth_token = cfg.get("auth_token")
-        if not api_key and not auth_token:
-            raise ValueError(
-                f"gateways/anthropic/{gateway_name}.json: neither its api_key nor "
-                "auth_token env var is set in .env"
-            )
-        cls._sync_clients[gateway_name] = Anthropic(api_key=api_key, auth_token=auth_token, base_url=cfg.get("base_url"))
-        return cls._sync_clients[gateway_name]
+        """Same as get_client(), but the plain synchronous SDK classes, cached separately.
+        Exists solely for run_interpret(), whose single non-streaming
+        `client.messages.create(...)` call is never awaited."""
+        return cls._build_client(gateway, cls._sync_clients, Anthropic, AnthropicBedrock, AnthropicVertex)
 
     @classmethod
     def resolve_default_model(cls) -> str:
@@ -371,14 +342,12 @@ def _prompt_tokens(usage: Any) -> int:
     )
 
 
-@catalog
 def _route_for_turn() -> GatewayRoute:
     return GatewayRoute.for_turn(PROVIDER_ID, _Anthropic._gateway_name(),
                                  (choice.gateway for choice in agent_spec.current().llm.fallback_gateways),
                                  lambda gateway: has_api_key(gateway))
 
 
-@catalog
 def _model_for_route(route: GatewayRoute, requested: str | None) -> str:
     primary = _Anthropic._gateway_name()
     if route.current == primary:
@@ -388,7 +357,6 @@ def _model_for_route(route: GatewayRoute, requested: str | None) -> str:
     return llm_config.model_for_gateway(PROVIDER_ID, primary, route.current, requested or DEFAULT_MODEL, explicit)
 
 
-@catalog
 def _strip_thinking(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Copy assistant content without signatures issued by the previous gateway."""
     stripped = []
@@ -462,6 +430,23 @@ async def run_chat(
         return await breakdown_fields(
             context_tokens, system_prompt, roster_text, schemas,
             lambda: ProviderCounter(_AnthropicRequestCounter(client, model_name), model_name),
+        )
+
+    async def result(response: str) -> ChatResult:
+        return ChatResult(
+            response=response,
+            tools_used=tools_used,
+            tool_calls=tool_calls,
+            provider_id=PROVIDER_ID,
+            gateway=route.current,
+            gateway_switches=[switch.as_dict() for switch in route.switches],
+            model=model_name,
+            total_tokens=total_tokens,
+            context_tokens=context_tokens,
+            **await breakdown(),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_input_tokens=cached_input_tokens,
         )
 
     try:
@@ -594,21 +579,7 @@ async def run_chat(
                         if text_parts:
                             await on_event(step_event("token_reset"))
                         await on_event(step_event("token", text=answer))
-                    return ChatResult(
-                        response=answer,
-                        tools_used=tools_used,
-                        tool_calls=tool_calls,
-                        provider_id=PROVIDER_ID,
-                        gateway=route.current,
-                        gateway_switches=[switch.as_dict() for switch in route.switches],
-                        model=model_name,
-                        total_tokens=total_tokens,
-                        context_tokens=context_tokens,
-                        **await breakdown(),
-                        input_tokens=input_tokens,
-                        output_tokens=output_tokens,
-                        cached_input_tokens=cached_input_tokens,
-                    )
+                    return await result(answer)
 
                 if text_parts and on_event:
                     await on_event(step_event("token_reset"))
@@ -661,21 +632,7 @@ async def run_chat(
     if on_event:
         await on_event(step_event("token_reset"))
         await on_event(step_event("token", text=stop_message))
-    return ChatResult(
-        response=stop_message,
-        tools_used=tools_used,
-        tool_calls=tool_calls,
-        provider_id=PROVIDER_ID,
-        gateway=route.current,
-        gateway_switches=[switch.as_dict() for switch in route.switches],
-        model=model_name,
-        total_tokens=total_tokens,
-        context_tokens=context_tokens,
-        **await breakdown(),
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cached_input_tokens=cached_input_tokens,
-    )
+    return await result(stop_message)
 
 
 def run_interpret(text: str, model: str | None = None) -> ChatResult:

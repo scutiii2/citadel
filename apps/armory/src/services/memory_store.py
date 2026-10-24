@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.utils.catalog import catalog
 
 MAX_NOTE_CHARS = 500
 MAX_NOTES = 200
@@ -77,7 +76,6 @@ def _fts_expression(query: str) -> str:
     return " OR ".join(f'"{word}"*' if len(word) >= _PREFIX_MIN else f'"{word}"' for word in words)
 
 
-@catalog
 def save(path: Path, owner: str, text: str) -> SaveOutcome:
     """Store one note; an identical note (ignoring case and spacing) is not stored twice."""
     owner = _owner(owner)
@@ -106,7 +104,6 @@ def save(path: Path, owner: str, text: str) -> SaveOutcome:
         return SaveOutcome(id=cursor.lastrowid, duplicate=False)
 
 
-@catalog
 def search(path: Path, owner: str, query: str = "", limit: int = DEFAULT_LIMIT) -> list[Note]:
     """Ranked matches for `query`, or the newest notes when the query has no words."""
     owner = _owner(owner)
@@ -129,7 +126,6 @@ def search(path: Path, owner: str, query: str = "", limit: int = DEFAULT_LIMIT) 
     return [Note(id=r["id"], text=r["text"], created_at=r["created_at"]) for r in rows]
 
 
-@catalog
 def forget(path: Path, owner: str, note_id: int) -> bool:
     """Delete one of the owner's notes; False when it does not exist or is not theirs."""
     owner = _owner(owner)
@@ -144,7 +140,6 @@ def forget(path: Path, owner: str, note_id: int) -> bool:
         return True
 
 
-@catalog
 def update(path: Path, owner: str, note_id: int, text: str, expected_text: str) -> Note | None:
     """Atomically edit an owner's memory and its search index, refusing stale or duplicate text."""
     owner = _owner(owner)
@@ -171,7 +166,6 @@ def update(path: Path, owner: str, note_id: int, text: str, expected_text: str) 
         return Note(id=note_id, text=clean, created_at=row["created_at"])
 
 
-@catalog
 def purge_owner(path: Path, owner: str) -> int:
     """Delete every note of `owner` (their account was deleted); returns how many."""
     owner = _owner(owner)

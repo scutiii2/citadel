@@ -4,10 +4,8 @@ import ipaddress
 import socket
 import urllib.request
 
-from src.utils.catalog import catalog
 
 
-@catalog
 def checked_addresses(host: str, port: int, *, personal: bool) -> list:
     answers = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     if not answers:

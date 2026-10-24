@@ -112,4 +112,7 @@ defineProps<{ small?: boolean; title?: string }>();
 .text {
   font-size: 0.9em;
 }
+@media (pointer: coarse), (max-width: 767px) {
+  label.toggle { min-width: 44px; min-height: 44px; }
+}
 </style>

@@ -16,11 +16,11 @@ export const CAPABILITY_PAGES: Record<string, CapabilityPage> = {
   ticket: { to: "/tickets", permission: "tickets.create" },
   pdf: {
     to: "/capabilities/pdf_merger", permission: "tools.execute", aliases: ["pdf_merger"],
-    route: { path: "/capabilities/pdf_merger", name: "pdf-merger", component: () => import("../views/PdfMergerView.vue") },
+    route: { path: "/capabilities/pdf_merger", name: "pdf-merger", component: () => import("../features/pdfMerger/PdfMergerView.vue") },
   },
-  video: {
+  media: {
     to: "/capabilities/media_downloader", permission: "tools.execute", aliases: ["video_downloader", "media_downloader"],
-    route: { path: "/capabilities/media_downloader", name: "media-downloader", component: () => import("../views/VideoDownloaderView.vue") },
+    route: { path: "/capabilities/media_downloader", name: "media-downloader", component: () => import("../features/mediaDownloader/MediaDownloaderView.vue") },
   },
 };
 

@@ -23,7 +23,7 @@ from src.capabilities.pdf_merger.utils.jobs.job_queue import Job, JobQueue, Prog
 from src.capabilities.pdf_merger.utils.models import MergePlan, MergeResult, OutputOptions
 from src.capabilities.pdf_merger.utils.store.file_store import FileStore, StoredFile
 from src.capabilities.pdf_merger.utils.store.names import ensure_pdf_suffix, file_stem, safe_filename
-from src.capabilities.pdf_merger.utils.store.signing import LinkSigner
+from src.services.link_signing import LinkSigner
 from src.capabilities.pdf_merger.utils.store.sniff import SNIFF_BYTES, sniff_mime
 
 

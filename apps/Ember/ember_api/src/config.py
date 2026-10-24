@@ -179,6 +179,44 @@ class DbGatewaySettings:
 
 
 @dataclass(frozen=True)
+class CalendarSettings:
+    """config_app.json's "calendar" block: ICS schedule feeds and the alerts before events."""
+
+    enabled: bool = True
+    tick_seconds: int = 30
+    feed_refresh_minutes: int = 10
+    lookahead_hours: int = 48
+    late_grace_minutes: int = 5
+    max_feeds_per_account: int = 10
+    max_alarm_rules: int = 10
+    max_ics_bytes: int = 5 * 1024 * 1024
+    fetch_timeout_s: int = 15
+    allow_private_urls: bool = False
+    # The "sub" claim of web push messages; push services may contact it.
+    push_contact: str = "mailto:admin@example.com"
+
+    @classmethod
+    def from_config(cls, raw: dict) -> CalendarSettings:
+        positive = (
+            "tick_seconds", "feed_refresh_minutes", "lookahead_hours", "late_grace_minutes",
+            "max_feeds_per_account", "max_alarm_rules", "max_ics_bytes", "fetch_timeout_s",
+        )
+        numbers = {name: int(raw.get(name, getattr(cls, name))) for name in positive}
+        for name, value in numbers.items():
+            if value < 1:
+                raise ValueError(f"calendar.{name} must be at least 1")
+        contact = str(raw.get("push_contact") or cls.push_contact)
+        if not contact.startswith(("mailto:", "https://")):
+            raise ValueError("calendar.push_contact must start with mailto: or https://")
+        return cls(
+            enabled=bool(raw.get("enabled", True)),
+            allow_private_urls=bool(raw.get("allow_private_urls", False)),
+            push_contact=contact,
+            **numbers,
+        )
+
+
+@dataclass(frozen=True)
 class Settings:
     host: str
     port: int
@@ -201,6 +239,7 @@ class Settings:
     pricing: PricingSettings = field(default_factory=PricingSettings)
     backup: BackupSettings = field(default_factory=BackupSettings)
     db_gateway: DbGatewaySettings = field(default_factory=DbGatewaySettings)
+    calendar: CalendarSettings = field(default_factory=CalendarSettings)
     # Where these settings came from (the Config issues page re-reads it).
     config_path: Path = CONFIGS_DIR / "config_app.json"
 
@@ -243,6 +282,7 @@ def load_settings() -> Settings:
         pricing=PricingSettings.from_config(load_json_config(CONFIGS_DIR / "config_pricing.json")),
         backup=BackupSettings.from_config(raw.get("backup", {})),
         db_gateway=DbGatewaySettings.from_config(raw.get("db_gateway", {})),
+        calendar=CalendarSettings.from_config(raw.get("calendar", {})),
         config_path=CONFIGS_DIR / "config_app.json",
     )
 

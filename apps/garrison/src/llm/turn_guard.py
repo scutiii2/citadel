@@ -6,14 +6,12 @@ import asyncio
 import json
 from typing import Any
 
-from src.core.catalog import catalog
 
 
 class TurnStopped(Exception):
     """A guard ended the turn with an explanation safe to show the user."""
 
 
-@catalog
 class TurnGuard:
     """Bound elapsed time, reported tokens, and identical calls within one turn.
 

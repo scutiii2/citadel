@@ -39,9 +39,10 @@ from src.deps import (
 )
 from src.models import Account, Chat
 from src.routes.mcp import get_agent_directory
-from src.routes.server_info import EXTENSION_ID_PATTERN, get_server_info
+from src.routes.server_info import get_server_info
 from src.services.brain_connections import BrainConnections
 from src.services import question_answers, second_brain, suggestions, summarization
+from src.services.account_agent_service import AccountAgentService, blocked_names
 from src.services.agent_directory import NO_AGENT_RUNNING, AgentDirectory
 from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
 from src.services.chat_search import (
@@ -264,16 +265,6 @@ class TurnRequest(BaseModel):
     plan_lean: bool = True
     # Count what fills the context window with the provider's own token counter, not an estimate.
     exact_context: bool = False
-    # mcp_server extension ids whose tools the agent may use.
-    enabled_extensions: list[str] = Field(default_factory=list, max_length=50)
-
-    @field_validator("enabled_extensions")
-    @classmethod
-    def extension_ids(cls, ids: list[str]) -> list[str]:
-        bad = [i for i in ids if not re.fullmatch(EXTENSION_ID_PATTERN, i)]
-        if bad:
-            raise ValueError(f"not an extension id: {bad[0][:64]!r}")
-        return ids
     # Ask the user before each tool runs (they answer through
     # POST /api/chats/{id}/approvals). allowed_tools: tools they already
     # allowed for this chat, which run without asking.
@@ -285,11 +276,8 @@ class TurnRequest(BaseModel):
     # The browser can show the agent's clickable questions (answers go to
     # POST /api/chats/{id}/questions). Off for clients that cannot, e.g. chat_cli.
     can_ask: bool = False
-    # mcp_server tool names the account switched off for its own chats (the
-    # tools of the built-in capabilities it turned off on the Capabilities page).
-    disabled_tools: list[str] = Field(default_factory=list, max_length=MAX_DISABLED_TOOLS)
 
-    @field_validator("allowed_tools", "disabled_tools")
+    @field_validator("allowed_tools")
     @classmethod
     def tool_names(cls, names: list[str]) -> list[str]:
         bad = [n for n in names if not _TOOL_NAME.fullmatch(n)]
@@ -550,7 +538,7 @@ async def search_chats(
 
 async def _second_brain_available(account: Account, store: DocumentStore, info: McpServerInfo, box=None, scope="instance") -> bool:
     try:
-        return await second_brain.available(account, store, info, scope=scope, connections=BrainConnections(store, box) if box else None)
+        return await second_brain.available(account, info, scope=scope, connections=BrainConnections(store, box) if box else None)
     except (DbGatewayError, McpServerUnavailable, McpServerRefused):
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Could not check Obsidian capability availability") from None
 
@@ -781,10 +769,9 @@ async def start_turn(
     brain_notice = ""
     auto_save = saved_preference if body.save_to_second_brain is None else body.save_to_second_brain
     if auto_save:
-        active = await _second_brain_available(account, db_gateway, info, box, brain_scope)
-        permitted = active and "tool_obsidian_write" not in body.disabled_tools and "*" not in body.disabled_tools
+        permitted = await _second_brain_available(account, db_gateway, info, box, brain_scope)
         if body.save_to_second_brain is True and not permitted:
-            raise HTTPException(status.HTTP_409_CONFLICT, "Add and activate Obsidian and enable its write tool before auto-saving")
+            raise HTTPException(status.HTTP_409_CONFLICT, "Activate Obsidian and enable its write tool before auto-saving")
         if not permitted:
             brain_notice = "Auto-save was disabled because the selected brain or publish permission is unavailable. No other destination was used."
         auto_save = permitted
@@ -810,6 +797,17 @@ async def start_turn(
     # When the administrator requires it, the browser's choice does not matter:
     # every tool asks, and no tool is pre-allowed.
     forced = await app_settings.get_bool(FORCE_TOOL_APPROVAL)
+    # Closed on failure: an empty list would quietly offer agents the account switched off.
+    try:
+        switched_off_agents = await AccountAgentService(db_gateway, account.uid).disabled()
+    except DbGatewayError as error:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Account agents storage is unavailable") from error
+    # Every extension mcp_server lists is on: which agent may call which tool is the agent
+    # file's tools.allow. Without the listing the answer still runs, just without extension tools.
+    try:
+        extension_ids = tuple(e["id"] for e in await info.extensions(account) if isinstance(e, dict) and isinstance(e.get("id"), str))
+    except (McpServerUnavailable, McpServerRefused):
+        extension_ids = ()
     # The caller's own private extensions, read here from db_gateway: the browser cannot name one.
     # If the gateway is down the answer still runs, without them, and says so.
     try:
@@ -827,11 +825,11 @@ async def start_turn(
             plan=body.plan,
             plan_lean=body.plan_lean,
             exact_context=body.exact_context,
-            enabled_extensions=tuple(dict.fromkeys(body.enabled_extensions)),
+            enabled_extensions=extension_ids,
             ask_before_tools=body.ask_before_tools or forced,
             allowed_tools=() if forced else tuple(dict.fromkeys(body.allowed_tools)),
             allow_read_only=body.allow_read_only and body.ask_before_tools and not forced,
-            disabled_tools=tuple(dict.fromkeys(body.disabled_tools)) if TOOLS_EXECUTE in account.permission_names else ("*",),
+            disabled_tools=blocked_names(switched_off_agents) if TOOLS_EXECUTE in account.permission_names else ("*",),
             can_ask=body.can_ask,
             private_extensions=private.items,
             private_skipped=private.skipped,

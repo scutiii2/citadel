@@ -7,7 +7,6 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from typing import Any
 
-from src.core.catalog import catalog
 from src.llm.base_provider import OnEvent, step_event
 
 TOOL_NAME = "update_plan"
@@ -78,7 +77,6 @@ def tool_parameters() -> dict[str, Any]:
     }
 
 
-@catalog
 class Checklist:
     """Validate complete snapshots and emit them without external tool dispatch."""
 

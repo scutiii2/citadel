@@ -10,12 +10,10 @@ import logging
 import threading
 from pathlib import Path
 
-from src.utils.catalog import catalog
 
 logger = logging.getLogger(__name__)
 
 
-@catalog
 class IndexRuntime:
     def __init__(self, index, interval: float, *, stop=None):
         self.index = index

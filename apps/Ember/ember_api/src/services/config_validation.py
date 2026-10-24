@@ -134,6 +134,13 @@ def _check_deployment(settings: Settings) -> list[Problem]:
                 "the session cookie can travel unencrypted. Serve ember over HTTPS and set it to true",
             )
         )
+    if settings.calendar.enabled and not settings.cookie_secure and not _is_local_host(settings.host):
+        problems.append(
+            (
+                "calendar.enabled",
+                "is true while ember is not served over HTTPS: browsers refuse web push alerts there. Serve ember over HTTPS and set cookie_secure to true",
+            )
+        )
     if settings.cookie_secure and settings.security.hsts_max_age == 0:
         problems.append(
             (

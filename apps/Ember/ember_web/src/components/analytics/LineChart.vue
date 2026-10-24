@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from "vue";
-import { axisLabel, bucketTitle, formatCount, niceCeil, type BucketSize } from "../../utils/logAnalytics";
+import { axisLabel, bucketTitle, formatCount, niceCeil, type BucketSize } from "../../utils/analytics/logAnalytics";
 import { useBucketCursor, type ChartPart } from "./useBucketCursor";
 
 /** Values over time: one 2px line per part, a point per bucket. A bucket with no
@@ -142,7 +142,7 @@ const shown = (value: number | null) => (value === null ? "–" : props.format(v
           />
         </div>
         <p v-if="empty" class="none">{{ emptyText }}</p>
-        <div v-if="active !== null" class="tooltip" role="status" :style="tooltipStyle">
+        <div v-if="active !== null && series[active]" class="tooltip" role="status" :style="tooltipStyle">
           <strong class="when">{{ bucketTitle(series[active]!.bucket, bucket) }}</strong>
           <span v-for="line in lines" :key="line.id" class="line">
             <span class="key" :style="{ background: line.color }" />

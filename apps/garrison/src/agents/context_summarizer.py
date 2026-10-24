@@ -7,7 +7,6 @@ import anyio
 
 from src.agents import agent_registry, agent_spec, delegation
 from src.core import internal_auth
-from src.core.catalog import catalog
 from src.llm import cancellation
 
 AGENT_ID = "context-summarizer"
@@ -16,7 +15,6 @@ HISTORY_CHARS = 32000
 BRIEF_CHARS = 1600
 
 
-@catalog
 async def routing_brief(question: str, history: list[dict], request_id: str) -> str | None:
     """Summarize available history for routing, or abstain without blocking chat.
 

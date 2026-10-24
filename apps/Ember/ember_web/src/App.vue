@@ -2,9 +2,10 @@
 import { storeToRefs } from "pinia";
 import { onBeforeUnmount, onMounted, watch } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
-import NavRail from "./components/NavRail.vue";
-import PwaStatus from "./components/PwaStatus.vue";
-import { usePageVisibilityStore } from "./stores/pageVisibility";
+import NavRail from "./components/layout/NavRail.vue";
+import AlertToasts from "./features/calendar/components/AlertToasts.vue";
+import PwaStatus from "./components/layout/PwaStatus.vue";
+import { usePageVisibilityStore } from "./stores/navigation/pageVisibility";
 import { useAuthStore } from "./stores/auth";
 
 const auth = useAuthStore();
@@ -48,6 +49,7 @@ watch(account, (now) => {
 
 <template>
   <PwaStatus app-name="Ember" offline-message="Reconnect to send messages and use server tools." />
+  <AlertToasts />
   <div class="shell">
     <NavRail />
     <main class="page" :class="{ 'has-tabs': account && !auth.needsVerification }">

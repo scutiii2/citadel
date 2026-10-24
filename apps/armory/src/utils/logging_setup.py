@@ -17,14 +17,12 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from src.utils.catalog import catalog
 
 _MAX_BYTES = 5_000_000
 _BACKUP_COUNT = 3
 _FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 
 
-@catalog
 def configure_logging(log_dir: Path) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
     formatter = logging.Formatter(_FORMAT)

@@ -15,12 +15,10 @@ from dataclasses import asdict, replace
 from urllib.parse import urlsplit
 
 from src.services.app_config import load_config
-from src.utils.catalog import catalog
 
 logger = logging.getLogger(__name__)
 
 
-@catalog
 class Runtime:
     """Keep mutable PDF state on a dedicated loop, leaving blocking I/O offloaded."""
 
@@ -38,7 +36,7 @@ class Runtime:
 
     async def _initialize(self):
         from src.capabilities.pdf_merger.utils.service import build_service
-        from src.capabilities.pdf_merger.utils.store.sweeper import run_sweeper
+        from src.services.file_sweeper import run_sweeper
 
         self.service = build_service(self.config)
         await self.service.store.load_index()
@@ -111,7 +109,6 @@ def _engine_config(settings):
     )
 
 
-@catalog
 def get_runtime(settings):
     """Lazy process-wide PDF engine. Configuration changes require an Armory restart."""
     global _runtime

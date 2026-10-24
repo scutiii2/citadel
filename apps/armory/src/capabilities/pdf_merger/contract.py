@@ -1,7 +1,7 @@
 """PDF request and result schemas."""
 from pydantic import BaseModel
 
-from .utils.models import FileInfo, MergePlan, MergeResult, OutputOptions, Segment
+from .utils.models import FileInfo, MergePlan, MergeResult
 
 
 class FailedItem(BaseModel):

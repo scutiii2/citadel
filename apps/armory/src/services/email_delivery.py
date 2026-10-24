@@ -9,7 +9,6 @@ from src.config import settings
 from src.services import capability_registry, email_audit, identity_context
 from src.services.app_config import load_email_config
 from src.services.email import send_email
-from src.utils.catalog import catalog
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,6 @@ class EmailDeliveryError(RuntimeError):
     """Delivery failed; the message must not be retried automatically."""
 
 
-@catalog
 def deliver_email(
     to: list[str], subject: str, body_text: str | None,
     *, body_html: str | None = None, capability_alias: str = "email",
