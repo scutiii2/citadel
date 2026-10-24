@@ -4,12 +4,13 @@ import { skillsClient, type Skill } from "./api/SkillsClient";
 import SkillsView from "./SkillsView.vue";
 
 vi.mock("./api/SkillsClient", () => ({
-  skillsClient: { list: vi.fn(), setStatus: vi.fn(), remove: vi.fn() },
+  skillsClient: { list: vi.fn(), setStatus: vi.fn(), update: vi.fn(), remove: vi.fn() },
+  SKILL_LIMITS: { title: 80, when_to_use: 300, steps: 1200, tools: 200 },
 }));
 const client = vi.mocked(skillsClient);
 const skill = (id: number, status: Skill["status"], extra: Partial<Skill> = {}): Skill => ({
   id, title: `Skill ${id}`, when_to_use: "an app is hung", steps: "stop it, then start it", tools: "tool_srv_stopApp",
-  status, successes: 0, failures: 0, created_at: "2026-10-25T00:00:00Z", ...extra,
+  status, successes: 0, failures: 0, created_at: "2026-10-25T00:00:00Z", failing: false, ...extra,
 });
 let wrapper: VueWrapper;
 const realShow = HTMLDialogElement.prototype.showModal;
@@ -74,10 +75,64 @@ describe("SkillsView", () => {
     expect(wrapper.text()).toContain("No skills yet.");
   });
 
-  it("flags a skill that fails more often than it works", async () => {
-    await setup([skill(1, "active", { successes: 1, failures: 3 }), skill(2, "active", { successes: 5, failures: 3 })]);
-    expect(wrapper.get('article[aria-label="Skill 1"]').text()).toContain("Often fails");
+  it("flags a skill the server marks as failing and says Ember no longer gets it", async () => {
+    await setup([skill(1, "active", { successes: 1, failures: 3, failing: true }), skill(2, "active", { successes: 5, failures: 3 })]);
+    const flagged = wrapper.get('article[aria-label="Skill 1"]').text();
+    expect(flagged).toContain("Often fails");
+    expect(flagged).toContain("no longer offered this skill");
     expect(wrapper.get('article[aria-label="Skill 2"]').text()).not.toContain("Often fails");
+  });
+
+  describe("editing", () => {
+    const dialog = () => wrapper.get('dialog[aria-label="Edit skill"]');
+    const field = (label: string) => dialog().findAll("label").find((l) => l.text().startsWith(label))!.get("input, textarea");
+
+    it("opens the dialog filled with the skill and saves the changed text, replacing the card", async () => {
+      await setup([skill(1, "active", { failures: 3, failing: true })]);
+      await wrapper.get('button[aria-label="Edit skill Skill 1"]').trigger("click");
+      expect((field("Title").element as HTMLInputElement).value).toBe("Skill 1");
+      expect((field("Steps").element as HTMLTextAreaElement).value).toBe("stop it, then start it");
+
+      await field("Title").setValue("Reboot an app");
+      await field("Steps").setValue("kill it, then launch it");
+      client.update.mockResolvedValue(skill(1, "active", { title: "Reboot an app", steps: "kill it, then launch it" }));
+      await dialog().get("form").trigger("submit");
+      await flushPromises();
+
+      expect(client.update).toHaveBeenCalledWith(1, {
+        title: "Reboot an app", when_to_use: "an app is hung", steps: "kill it, then launch it", tools: "tool_srv_stopApp",
+      });
+      const card = wrapper.get('article[aria-label="Reboot an app"]').text();
+      expect(card).not.toContain("Often fails");
+      expect(wrapper.text()).toContain("counts started over");
+    });
+
+    it("will not save an empty required field", async () => {
+      await setup([skill(1, "proposed")]);
+      await wrapper.get('button[aria-label="Edit skill Skill 1"]').trigger("click");
+      await field("Steps").setValue("   ");
+      expect(dialog().get("button[type=submit]").attributes("disabled")).toBeDefined();
+      await dialog().get("form").trigger("submit");
+      expect(client.update).not.toHaveBeenCalled();
+    });
+
+    it("shows the server's reason and keeps the dialog open when the save is refused", async () => {
+      await setup([skill(1, "proposed")]);
+      await wrapper.get('button[aria-label="Edit skill Skill 1"]').trigger("click");
+      client.update.mockRejectedValue(new Error("Another skill already has that title."));
+      await dialog().get("form").trigger("submit");
+      await flushPromises();
+      expect(dialog().text()).toContain("already has that title");
+      expect(dialog().attributes("open")).toBeDefined();
+    });
+
+    it("cancels without calling the API", async () => {
+      await setup([skill(1, "proposed")]);
+      await wrapper.get('button[aria-label="Edit skill Skill 1"]').trigger("click");
+      await dialog().findAll("button").find((b) => b.text() === "Cancel")!.trigger("click");
+      expect(client.update).not.toHaveBeenCalled();
+      expect(dialog().attributes("open")).toBeUndefined();
+    });
   });
 
   it("shows an error and keeps the skill where it was when the update fails", async () => {

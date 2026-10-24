@@ -5,7 +5,7 @@ Approving here is the only way a skill becomes usable; no agent tool can do it.
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from src.deps import get_log_writer, require_permission
 from src.models import Account
@@ -20,6 +20,21 @@ SkillId = Annotated[int, Path(gt=0)]
 
 class StatusBody(BaseModel):
     status: Literal["proposed", "active", "retired"]
+
+
+class EditBody(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+    when_to_use: str = Field(min_length=1, max_length=300)
+    steps: str = Field(min_length=1, max_length=1200)
+    tools: str = Field(default="", max_length=200)
+
+    @field_validator("title", "when_to_use", "steps", "tools")
+    @classmethod
+    def clean(cls, value: str, info) -> str:
+        clean = " ".join(value.split())
+        if not clean and info.field_name != "tools":
+            raise ValueError("Cannot be empty")
+        return clean
 
 
 def get_skills(request: Request) -> SkillsClient:
@@ -42,6 +57,17 @@ async def set_skill_status(skill_id: SkillId, body: StatusBody, account: Account
     except SkillsError as error:
         raise HTTPException(error.status, str(error)) from error
     await logs.action(account, "skills.status", f"Set a skill to {body.status}")
+    return skill
+
+
+@router.put("/{skill_id}", response_model=Skill)
+async def edit_skill(skill_id: SkillId, body: EditBody, account: Account = Depends(require_chat),
+                     skills: SkillsClient = Depends(get_skills), logs: LogWriter = Depends(get_log_writer)):
+    try:
+        skill = await skills.update(account.uid, skill_id, body.model_dump())
+    except SkillsError as error:
+        raise HTTPException(error.status, str(error)) from error
+    await logs.action(account, "skills.edit", "Edited a skill")
     return skill
 
 

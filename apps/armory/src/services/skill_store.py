@@ -27,6 +27,10 @@ MAX_QUERY_WORDS = 10
 # Shorter query words match whole words only: "a"* would match nearly every skill.
 _PREFIX_MIN = 3
 
+# A skill that failed this often, and more often than it worked, is no longer offered to the
+# model; the user edits it (which resets the counts) or retires it. See is_failing.
+FAILING_MIN = 3
+
 PROPOSED, ACTIVE, RETIRED = "proposed", "active", "retired"
 STATUSES = (PROPOSED, ACTIVE, RETIRED)
 SUCCESS, FAILURE = "success", "failure"
@@ -36,6 +40,10 @@ _NO_OWNER = "No account identity is known for this request, so skills are unavai
 
 class SkillStoreError(ValueError):
     """A request the skill store cannot honour; the message is safe to show the model."""
+
+
+class SkillConflict(SkillStoreError):
+    """The change clashes with another skill or a cap (a duplicate title, too many active skills)."""
 
 
 @dataclass(frozen=True)
@@ -58,6 +66,13 @@ class ProposeOutcome:
 
 
 _COLUMNS = "id, title, when_to_use, steps, tools, status, successes, failures, created_at"
+# The SQL form of is_failing, for queries that must leave failing skills out.
+_NOT_FAILING = f"NOT (failures >= {FAILING_MIN} AND failures > successes)"
+
+
+def is_failing(skill: Skill) -> bool:
+    """Whether the skill failed at least FAILING_MIN times, and more often than it worked."""
+    return skill.failures >= FAILING_MIN and skill.failures > skill.successes
 
 
 def _owner(owner: str | None) -> str:
@@ -131,7 +146,7 @@ def propose(path: Path, owner: str, title: str, when_to_use: str, steps: str, to
 
 def search(path: Path, owner: str, query: str = "", limit: int = DEFAULT_LIMIT) -> list[Skill]:
     """Ranked `active` skills for `query`, or the newest active ones when the query has no words.
-    Proposed and retired skills are never returned here."""
+    Proposed, retired and failing skills are never returned here."""
     owner = _owner(owner)
     if not path.exists():
         return []
@@ -139,17 +154,44 @@ def search(path: Path, owner: str, query: str = "", limit: int = DEFAULT_LIMIT) 
     with closing(_connect(path)) as db:
         if not expression:
             rows = db.execute(
-                f"SELECT {_COLUMNS} FROM skills WHERE owner = ? AND status = ? ORDER BY id DESC LIMIT ?",
+                f"SELECT {_COLUMNS} FROM skills WHERE owner = ? AND status = ? AND {_NOT_FAILING} ORDER BY id DESC LIMIT ?",
                 (owner, ACTIVE, limit),
             ).fetchall()
         else:
             rows = db.execute(
                 "SELECT s.id, s.title, s.when_to_use, s.steps, s.tools, s.status, s.successes, s.failures, s.created_at "
                 "FROM skills_fts JOIN skills s ON s.id = skills_fts.rowid "
-                "WHERE skills_fts MATCH ? AND s.owner = ? AND s.status = ? ORDER BY skills_fts.rank LIMIT ?",
+                f"WHERE skills_fts MATCH ? AND s.owner = ? AND s.status = ? AND {_NOT_FAILING} "
+                "ORDER BY skills_fts.rank LIMIT ?",
                 (expression, owner, ACTIVE, limit),
             ).fetchall()
     return [_row(r) for r in rows]
+
+
+def update(path: Path, owner: str, skill_id: int, title: str, when_to_use: str, steps: str, tools: str = "") -> Skill | None:
+    """Rewrite one of the owner's skills; None when it is not theirs. The status stays, the success and
+    failure counts reset (an edited skill is a new version) and the search index follows. Called from the
+    user's side only, never from a model tool."""
+    owner = _owner(owner)
+    title = _clean("title", title, MAX_TITLE_CHARS)
+    when_to_use = _clean("when_to_use text", when_to_use, MAX_WHEN_CHARS)
+    steps = _clean("steps", steps, MAX_STEPS_CHARS)
+    tools = _clean("tools list", tools, MAX_TOOLS_CHARS, required=False)
+    if not path.exists():
+        return None
+    norm = title.lower()
+    with closing(_connect(path)) as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        if db.execute("SELECT 1 FROM skills WHERE id = ? AND owner = ?", (skill_id, owner)).fetchone() is None:
+            return None
+        if db.execute("SELECT 1 FROM skills WHERE owner = ? AND norm = ? AND status != ? AND id != ?",
+                      (owner, norm, RETIRED, skill_id)).fetchone() is not None:
+            raise SkillConflict("Another skill already has that title.")
+        db.execute("UPDATE skills SET title = ?, when_to_use = ?, steps = ?, tools = ?, norm = ?, "
+                   "successes = 0, failures = 0 WHERE id = ?", (title, when_to_use, steps, tools, norm, skill_id))
+        db.execute("DELETE FROM skills_fts WHERE rowid = ?", (skill_id,))
+        db.execute("INSERT INTO skills_fts (rowid, body) VALUES (?, ?)", (skill_id, f"{title} {when_to_use} {steps}"))
+        return _row(db.execute(f"SELECT {_COLUMNS} FROM skills WHERE id = ?", (skill_id,)).fetchone())
 
 
 def list_skills(path: Path, owner: str, status: str | None = None) -> list[Skill]:
@@ -182,7 +224,7 @@ def set_status(path: Path, owner: str, skill_id: int, status: str) -> bool:
         if status == ACTIVE and row["status"] != ACTIVE:
             active = db.execute("SELECT COUNT(*) FROM skills WHERE owner = ? AND status = ?", (owner, ACTIVE)).fetchone()[0]
             if active >= MAX_ACTIVE:
-                raise SkillStoreError(f"You already have {MAX_ACTIVE} active skills. Retire one first.")
+                raise SkillConflict(f"You already have {MAX_ACTIVE} active skills. Retire one first.")
         db.execute("UPDATE skills SET status = ? WHERE id = ?", (status, skill_id))
         return True
 

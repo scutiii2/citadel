@@ -173,7 +173,8 @@ with `chat.use`; the owner is always the authenticated account's internal uid.
 
 | Method | Route | Behavior |
 | --- | --- | --- |
-| GET | `/api/skills` | All the account's skills, newest first; `[{id, title, when_to_use, steps, tools, status, successes, failures, created_at}]`. `status` is `proposed`, `active` or `retired`. |
+| GET | `/api/skills` | All the account's skills, newest first; `[{id, title, when_to_use, steps, tools, status, successes, failures, created_at, failing}]`. `status` is `proposed`, `active` or `retired`; `failing` is true once the skill failed 3 or more times and more often than it worked, and the assistant is no longer offered it. |
+| PUT | `/api/skills/{id}` | `{title, when_to_use, steps, tools}` rewrites the text (80/300/1200/200 characters; tools optional). The status stays and the worked and failed counts reset. 409 with the reason for a duplicate title, 404 when missing. |
 | PUT | `/api/skills/{id}/status` | `{status}` approves (`active`), rejects or retires (`retired`) or sends back for review (`proposed`); 409 at the 50-active-skills cap, 404 when missing. |
 | DELETE | `/api/skills/{id}` | Deletes an owned skill (204); 404 when missing. |
 

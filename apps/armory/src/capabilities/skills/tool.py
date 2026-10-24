@@ -51,6 +51,7 @@ def tool_skill_search(query: Query = "") -> SearchResult:
 @offload
 def tool_skill_mark(skill_id: SkillId, outcome: Outcome) -> MarkResult:
     """After you followed an approved skill, record whether it solved the task. Call it once per
-    skill per task. Repeated failures tell the user the skill needs editing or retiring.
+    skill per task. Be honest: a skill that keeps failing (3 or more times, more often than it
+    worked) stops being offered until the user edits or retires it.
     """
     return domain.mark(skill_id, outcome)

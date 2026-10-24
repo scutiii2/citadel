@@ -1,5 +1,6 @@
 """The signed-in account's learned skills: a thin authenticated proxy to mcp_server."""
 
+import json
 import logging
 
 import httpx
@@ -13,7 +14,7 @@ URL = "/api/skills"
 SKILL = {
     "id": 1, "title": "Restart an app", "when_to_use": "an app is hung", "steps": "stop it, then start it",
     "tools": "tool_srv_stopApp", "status": "proposed", "successes": 0, "failures": 0,
-    "created_at": "2026-10-25T00:00:00+00:00",
+    "created_at": "2026-10-25T00:00:00+00:00", "failing": False,
 }
 
 
@@ -102,6 +103,64 @@ def test_logs_never_include_skill_text_or_uid(client, upstream, caplog):
     assert client.delete(f"{URL}/1").status_code == 204
     assert uid not in caplog.text
     assert "stop it, then start it" not in caplog.text
+
+
+EDIT = {"title": "Reboot an app", "when_to_use": "an app freezes", "steps": "kill it, then launch it", "tools": "tool_srv_restartApp"}
+
+
+def test_editing_sends_the_cleaned_fields_for_the_authenticated_uid(client_factory, upstream):
+    client = client_factory(internal_token="shared-test-token")
+    as_admin(client)
+    uid = uids(client)["root"]
+    edited = {**SKILL, **EDIT, "status": "active", "failing": False}
+    seen = {}
+
+    def respond(request):
+        seen["path"], seen["method"], seen["token"] = request.url.path, request.method, request.headers["X-Internal-Token"]
+        seen["body"] = request.read()
+        return httpx.Response(200, json=edited)
+
+    upstream.handler = respond
+    response = client.put(f"{URL}/1", json={**EDIT, "title": "  Reboot   an app ", "uid": "b" * 32})
+
+    assert response.status_code == 200 and response.json()["title"] == "Reboot an app"
+    assert (seen["method"], seen["path"], seen["token"]) == ("PUT", f"/skills/owners/{uid}/skills/1", "shared-test-token")
+    assert json.loads(seen["body"]) == EDIT
+
+
+@pytest.mark.parametrize("body", [
+    {**EDIT, "title": " "}, {**EDIT, "title": "x" * 81}, {**EDIT, "when_to_use": ""}, {**EDIT, "steps": "x" * 1201},
+    {**EDIT, "tools": "x" * 201}, {"title": "only"}, {},
+])
+def test_editing_is_validated_before_upstream(client, upstream, body):
+    as_admin(client)
+    upstream.requests.clear()
+    assert client.put(f"{URL}/1", json=body).status_code == 422
+    assert not upstream.requests
+
+
+def test_editing_shows_the_reason_for_a_clash_but_other_failures_stay_generic(client, upstream):
+    as_admin(client)
+    upstream.handler = lambda request: httpx.Response(409, json={"error": "Another skill already has that title."})
+    response = client.put(f"{URL}/1", json=EDIT)
+    assert response.status_code == 409 and "already has that title" in response.json()["detail"]
+
+    upstream.handler = lambda request: httpx.Response(500, json={"error": "stack trace with secrets"})
+    response = client.put(f"{URL}/1", json=EDIT)
+    assert response.status_code == 503 and "secrets" not in response.text
+
+    upstream.handler = lambda request: httpx.Response(404, json={"error": "Skill not found"})
+    assert client.put(f"{URL}/1", json=EDIT).status_code == 404
+
+
+def test_editing_requires_login_and_permission(client):
+    assert client.put(f"{URL}/1", json=EDIT).status_code == 401
+
+
+def test_the_failing_flag_is_passed_through(client, upstream):
+    as_admin(client)
+    upstream.handler = lambda request: httpx.Response(200, json=[{**SKILL, "status": "active", "failures": 3, "failing": True}])
+    assert client.get(URL).json()[0]["failing"] is True
 
 
 def purges(upstream):

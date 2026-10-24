@@ -98,6 +98,74 @@ def test_mark_counts_only_active_skills(db):
         store.mark(db, "alice", skill_id, "maybe")
 
 
+def active(db, owner="alice", title="Restart an app"):
+    skill_id = propose(db, owner=owner, title=title).id
+    store.set_status(db, owner, skill_id, "active")
+    return skill_id
+
+
+def fail(db, skill_id, times):
+    for _ in range(times):
+        store.mark(db, "alice", skill_id, "failure")
+
+
+def test_a_skill_that_keeps_failing_is_no_longer_offered(db):
+    skill_id = active(db)
+    store.mark(db, "alice", skill_id, "success")
+    fail(db, skill_id, store.FAILING_MIN - 1)
+    assert [s.id for s in store.search(db, "alice", "restart")] == [skill_id]  # two failures: still offered
+
+    fail(db, skill_id, 1)  # 3 failures against 1 success
+    skill = store.list_skills(db, "alice")[0]
+    assert store.is_failing(skill)
+    assert store.search(db, "alice", "restart") == [] and store.search(db, "alice") == []
+
+
+def test_failures_that_do_not_outnumber_the_successes_do_not_quarantine(db):
+    skill_id = active(db)
+    for _ in range(3):
+        store.mark(db, "alice", skill_id, "success")
+    fail(db, skill_id, 3)  # 3 and 3: a tie is not "more often than it worked"
+    assert not store.is_failing(store.list_skills(db, "alice")[0])
+    assert len(store.search(db, "alice", "restart")) == 1
+
+
+def test_editing_rewrites_the_skill_resets_the_counts_and_brings_it_back(db):
+    skill_id = active(db)
+    fail(db, skill_id, store.FAILING_MIN)
+    assert store.search(db, "alice", "restart") == []
+
+    edited = store.update(db, "alice", skill_id, "Reboot an app", "an app freezes", "kill it, then launch it", "tool_srv_restartApp")
+
+    assert (edited.title, edited.status, edited.successes, edited.failures) == ("Reboot an app", "active", 0, 0)
+    assert [s.id for s in store.search(db, "alice", "freezes")] == [skill_id]
+    assert store.search(db, "alice", "hung") == []  # the index follows the new text
+
+
+def test_editing_keeps_the_status_and_works_on_any_status(db):
+    proposed = propose(db).id
+    assert store.update(db, "alice", proposed, "New", "when", "steps").status == "proposed"
+    assert store.search(db, "alice", "new") == []
+
+
+def test_editing_is_owner_scoped_validated_and_refuses_a_duplicate_title(db):
+    first = propose(db, title="First").id
+    propose(db, title="Second")
+    assert store.update(db, "bob", first, "T", "w", "s") is None
+    assert store.update(db, "alice", 999, "T", "w", "s") is None
+    with pytest.raises(store.SkillStoreError, match="already has that title"):
+        store.update(db, "alice", first, " SECOND ", "w", "s")
+    with pytest.raises(store.SkillStoreError):
+        store.update(db, "alice", first, "T", "   ", "s")
+    with pytest.raises(store.SkillStoreError, match="limit"):
+        store.update(db, "alice", first, "T" * 81, "w", "s")
+    assert store.update(db, "alice", first, "First", "w", "s").title == "First"  # its own title is fine
+
+
+def test_editing_never_creates_the_file(db):
+    assert store.update(db, "alice", 1, "T", "w", "s") is None and not db.exists()
+
+
 def test_retired_skill_leaves_search(db):
     skill_id = propose(db).id
     store.set_status(db, "alice", skill_id, "active")

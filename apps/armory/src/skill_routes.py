@@ -44,6 +44,18 @@ class StatusBody(BaseModel):
     status: str
 
 
+class EditBody(BaseModel):
+    title: str
+    when_to_use: str
+    steps: str
+    tools: str = ""
+
+
+def _view(skill: skill_store.Skill) -> dict:
+    """The JSON shape of a skill. `failing` is the store's rule, so no client has to repeat it."""
+    return {**asdict(skill), "failing": skill_store.is_failing(skill)}
+
+
 def _refuse(request: Request) -> JSONResponse | None:
     """The shared gate: token, capability switch and uid shape."""
     if not _token_valid(request):
@@ -65,7 +77,7 @@ async def owner_skills(request: Request) -> Response:
     try:
         if request.method == "GET":
             skills = await asyncio.to_thread(skill_store.list_skills, path, uid)
-            return JSONResponse([asdict(skill) for skill in skills])
+            return JSONResponse([_view(skill) for skill in skills])
         if request.method == "DELETE":
             removed = await asyncio.to_thread(skill_store.delete, path, uid, skill_id)
             return Response(status_code=204) if removed else JSONResponse({"error": "Skill not found"}, status_code=404)
@@ -78,13 +90,36 @@ async def owner_skills(request: Request) -> Response:
             return JSONResponse({"error": "Skill not found"}, status_code=404)
         skills = await asyncio.to_thread(skill_store.list_skills, path, uid)
         skill = next((s for s in skills if s.id == skill_id), None)
-        return JSONResponse(asdict(skill)) if skill else JSONResponse({"error": "Skill not found"}, status_code=404)
+        return JSONResponse(_view(skill)) if skill else JSONResponse({"error": "Skill not found"}, status_code=404)
     except (ValidationError, json.JSONDecodeError):
         return JSONResponse({"error": "Invalid request: send a status"}, status_code=422)
     except skill_store.SkillStoreError as error:
         return JSONResponse({"error": str(error)}, status_code=409)
     except (sqlite3.Error, OSError):
         return JSONResponse({"error": "Skill storage is unavailable"}, status_code=503)
+
+
+async def edit_skill(request: Request) -> Response:
+    """Rewrite a skill's text. The status stays and the success/failure counts reset."""
+    if (refusal := _refuse(request)) is not None:
+        return refusal
+    if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
+        return JSONResponse({"error": "Expected JSON"}, status_code=415)
+    try:
+        body = EditBody.model_validate(await request.json())
+        skill = await asyncio.to_thread(
+            skill_store.update, settings.skills_db_path, request.path_params["uid"], request.path_params["skill_id"],
+            body.title, body.when_to_use, body.steps, body.tools,
+        )
+    except (ValidationError, json.JSONDecodeError):
+        return JSONResponse({"error": "Invalid request: send title, when_to_use, steps and tools"}, status_code=422)
+    except skill_store.SkillConflict as error:
+        return JSONResponse({"error": str(error)}, status_code=409)
+    except skill_store.SkillStoreError as error:
+        return JSONResponse({"error": str(error)}, status_code=422)
+    except (sqlite3.Error, OSError):
+        return JSONResponse({"error": "Skill storage is unavailable"}, status_code=503)
+    return JSONResponse(_view(skill)) if skill else JSONResponse({"error": "Skill not found"}, status_code=404)
 
 
 async def purge_skills_owner(request: Request) -> JSONResponse:
@@ -117,4 +152,5 @@ def install_skill_routes(app: Starlette) -> None:
     app.add_route("/skills/owners/{uid}", purge_skills_owner, methods=["DELETE"])
     app.add_route("/skills/owners/{uid}/skills", owner_skills, methods=["GET"])
     app.add_route("/skills/owners/{uid}/skills/{skill_id:int}", owner_skills, methods=["DELETE"])
+    app.add_route("/skills/owners/{uid}/skills/{skill_id:int}", edit_skill, methods=["PUT"])
     app.add_route("/skills/owners/{uid}/skills/{skill_id:int}/status", owner_skills, methods=["PUT"])

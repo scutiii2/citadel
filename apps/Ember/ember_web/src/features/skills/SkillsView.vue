@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
+import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import { errorMessage } from "../../utils/errors";
-import { skillsClient, type Skill, type SkillStatus } from "./api/SkillsClient";
+import { SKILL_LIMITS, skillsClient, type Skill, type SkillStatus, type SkillText } from "./api/SkillsClient";
 
 const skills = ref<Skill[]>([]);
 const loading = ref(true);
@@ -58,8 +59,28 @@ async function remove(): Promise<void> {
   finally { removing.value = false; }
 }
 
-/** Three or more failures that outnumber the successes: worth a second look. */
-const oftenFails = (skill: Skill): boolean => skill.failures >= 3 && skill.failures > skill.successes;
+const editing = ref<Skill | null>(null);
+const draft = ref<SkillText>({ title: "", when_to_use: "", steps: "", tools: "" });
+const saving = ref(false);
+const editError = ref("");
+const filled = computed(() => draft.value.title.trim() !== "" && draft.value.when_to_use.trim() !== "" && draft.value.steps.trim() !== "");
+function askEdit(skill: Skill): void {
+  editing.value = skill;
+  draft.value = { title: skill.title, when_to_use: skill.when_to_use, steps: skill.steps, tools: skill.tools };
+  editError.value = "";
+}
+async function saveEdit(): Promise<void> {
+  if (!editing.value || saving.value || !filled.value) return;
+  saving.value = true;
+  editError.value = "";
+  try {
+    const updated = await skillsClient.update(editing.value.id, draft.value);
+    skills.value = skills.value.map((s) => (s.id === updated.id ? updated : s));
+    editing.value = null;
+    notice.value = "Skill saved. Its worked and failed counts started over.";
+  } catch (error) { editError.value = errorMessage(error); }
+  finally { saving.value = false; }
+}
 </script>
 
 <template>
@@ -73,7 +94,8 @@ const oftenFails = (skill: Skill): boolean => skill.failures >= 3 && skill.failu
       <section v-for="group in groups" v-show="group.items.length" :key="group.status" class="group" :aria-label="group.title">
         <header><h2>{{ group.title }} <span class="count">{{ group.items.length }}</span></h2><p class="muted">{{ group.hint }}</p></header>
         <article v-for="skill in group.items" :key="skill.id" class="skill" :aria-label="skill.title">
-          <h3>{{ skill.title }}<span v-if="oftenFails(skill)" class="badge">Often fails</span></h3>
+          <h3>{{ skill.title }}<span v-if="skill.failing" class="badge">Often fails</span></h3>
+          <p v-if="skill.failing" class="failing-note">Ember is no longer offered this skill. Edit it to try again, or retire it.</p>
           <p class="when"><b>When to use:</b> {{ skill.when_to_use }}</p>
           <p class="steps">{{ skill.steps }}</p>
           <p v-if="skill.tools" class="muted tools">Tools: {{ skill.tools }}</p>
@@ -83,11 +105,26 @@ const oftenFails = (skill: Skill): boolean => skill.failures >= 3 && skill.failu
             <button v-if="skill.status === 'proposed'" type="button" class="chip" :disabled="busyId !== null" @click="move(skill, 'retired', 'Skill rejected.')">Reject</button>
             <button v-if="skill.status === 'active'" type="button" class="chip" :disabled="busyId !== null" @click="move(skill, 'retired', 'Skill retired.')">Retire</button>
             <button v-if="skill.status === 'retired'" type="button" class="chip" :disabled="busyId !== null" @click="move(skill, 'proposed', 'Skill sent back for review.')">Send back for review</button>
+            <button type="button" class="chip" :aria-label="'Edit skill ' + skill.title" :disabled="busyId !== null" @click="askEdit(skill)">Edit</button>
             <button type="button" class="danger" :aria-label="'Delete skill ' + skill.title" :disabled="busyId !== null" @click="askDelete(skill)">Delete</button>
           </div>
         </article>
       </section>
     </template>
+    <BaseModal :open="editing !== null" title="Edit skill" @close="!saving && (editing = null)">
+      <form class="edit-form" @submit.prevent="saveEdit">
+        <label>Title<input v-model="draft.title" type="text" :maxlength="SKILL_LIMITS.title" :disabled="saving" /></label>
+        <label>When to use<textarea v-model="draft.when_to_use" rows="2" :maxlength="SKILL_LIMITS.when_to_use" :disabled="saving" /></label>
+        <label>Steps<textarea v-model="draft.steps" rows="7" :maxlength="SKILL_LIMITS.steps" :disabled="saving" /></label>
+        <label>Tools <span class="muted">(optional, comma-separated)</span><input v-model="draft.tools" type="text" :maxlength="SKILL_LIMITS.tools" :disabled="saving" /></label>
+        <p class="muted hint">Saving starts the worked and failed counts over. Keep the steps generic: no names, secrets or personal details.</p>
+        <p v-if="editError" class="error" role="alert">{{ editError }}</p>
+        <div class="actions">
+          <button type="button" class="chip" :disabled="saving" @click="editing = null">Cancel</button>
+          <button type="submit" class="primary" :disabled="saving || !filled" :aria-busy="saving">{{ saving ? "Saving…" : "Save" }}</button>
+        </div>
+      </form>
+    </BaseModal>
     <ConfirmModal :open="deleting !== null" title="Delete this skill?" :message="removeError || 'Ember will no longer know it. This cannot be undone.'" confirm-label="Delete skill" danger :busy="removing" @confirm="remove" @close="!removing && (deleting = null)" />
   </PageLayout>
 </template>
@@ -104,6 +141,13 @@ const oftenFails = (skill: Skill): boolean => skill.failures >= 3 && skill.failu
 .steps { white-space: pre-wrap; line-height: 1.6; }
 .tools, .when { font-size: .85em; }
 .badge { padding: 2px 8px; font-size: .7em; font-weight: 500; color: var(--danger); border: 1px solid var(--danger); border-radius: var(--radius-full); }
+.failing-note { color: var(--danger); font-size: .85em; }
+.edit-form { display: flex; flex-direction: column; gap: 12px; }
+.edit-form label { display: flex; flex-direction: column; gap: 4px; font-size: .85em; }
+.edit-form input, .edit-form textarea { font: inherit; padding: 8px 10px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md); resize: vertical; }
+.edit-form input:focus-visible, .edit-form textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.edit-form .actions { justify-content: flex-end; margin-top: 4px; }
+.hint { margin: 0; font-size: .8em; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .primary, .chip, .danger { font: inherit; font-size: .85em; padding: 8px 14px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-full); cursor: pointer; }
 .primary { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); font-weight: 600; }

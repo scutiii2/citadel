@@ -29,6 +29,8 @@ class Skill(BaseModel):
     successes: int = Field(ge=0)
     failures: int = Field(ge=0)
     created_at: str
+    # It failed often and more often than it worked, so mcp_server no longer offers it to the assistant.
+    failing: bool = False
 
 
 class SkillsError(Exception):
@@ -44,6 +46,14 @@ _MESSAGES = {
 }
 
 
+def _reason(response: httpx.Response) -> str:
+    try:
+        text = response.json().get("error")
+    except (ValueError, AttributeError):
+        return ""
+    return text[:200] if isinstance(text, str) else ""
+
+
 class SkillsClient:
     def __init__(self, client: httpx.AsyncClient, mcp_url: str, token: str | None) -> None:
         self._client = client
@@ -53,12 +63,16 @@ class SkillsClient:
     def _owner(self, uid: str) -> str:
         return f"{self._base}/skills/owners/{quote(uid, safe='')}"
 
-    async def _send(self, method: str, url: str, body: dict | None = None) -> httpx.Response:
+    async def _send(self, method: str, url: str, body: dict | None = None, *, show_reason: bool = False) -> httpx.Response:
+        """`show_reason` passes mcp_server's own 409/422 sentence on (it is about the user's text, never about
+        other data), for the edit form; everywhere else a fixed message is used."""
         try:
             response = await self._client.request(method, url, headers=self._headers, json=body,
                                                   timeout=httpx.Timeout(10), follow_redirects=False)
         except httpx.HTTPError as error:
             raise SkillsError(503, "Skill storage is unavailable") from error
+        if show_reason and response.status_code in (409, 422):
+            raise SkillsError(response.status_code, _reason(response) or _MESSAGES[response.status_code])
         if response.status_code in _MESSAGES:
             raise SkillsError(response.status_code, _MESSAGES[response.status_code])
         if not response.is_success:
@@ -77,6 +91,10 @@ class SkillsClient:
 
     async def set_status(self, uid: str, skill_id: int, status: SkillStatus) -> Skill:
         response = await self._send("PUT", f"{self._owner(uid)}/skills/{skill_id}/status", {"status": status})
+        return self._parse(response, Skill)
+
+    async def update(self, uid: str, skill_id: int, fields: dict[str, str]) -> Skill:
+        response = await self._send("PUT", f"{self._owner(uid)}/skills/{skill_id}", fields, show_reason=True)
         return self._parse(response, Skill)
 
     async def delete(self, uid: str, skill_id: int) -> None:

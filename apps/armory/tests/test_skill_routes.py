@@ -85,6 +85,53 @@ def test_another_owners_skill_is_not_found(client, db):
     assert store.list_skills(db, UID_A)[0].status == "proposed"
 
 
+EDIT = {"title": "Reboot an app", "when_to_use": "an app freezes", "steps": "kill it, then launch it", "tools": "tool_srv_restartApp"}
+
+
+def test_list_marks_a_failing_skill(client, db):
+    skill_id = propose(db)
+    store.set_status(db, UID_A, skill_id, "active")
+    assert client.get(url(), headers=HEADERS).json()[0]["failing"] is False
+    for _ in range(store.FAILING_MIN):
+        store.mark(db, UID_A, skill_id, "failure")
+    assert client.get(url(), headers=HEADERS).json()[0]["failing"] is True
+
+
+def test_editing_rewrites_the_text_resets_the_counts_and_keeps_the_status(client, db):
+    skill_id = propose(db)
+    store.set_status(db, UID_A, skill_id, "active")
+    for _ in range(store.FAILING_MIN):
+        store.mark(db, UID_A, skill_id, "failure")
+
+    response = client.put(url(tail=f"/{skill_id}"), headers=HEADERS, json=EDIT)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["title"], body["status"], body["failures"], body["failing"]) == ("Reboot an app", "active", 0, False)
+    assert [s.id for s in store.search(db, UID_A, "freezes")] == [skill_id]
+
+
+def test_editing_errors(client, db):
+    first, _ = propose(db, title="First"), propose(db, title="Second")
+    assert client.put(url(tail=f"/{first}"), headers=HEADERS, json={**EDIT, "title": "second"}).status_code == 409
+    assert client.put(url(tail=f"/{first}"), headers=HEADERS, json={**EDIT, "steps": " "}).status_code == 422
+    assert client.put(url(tail=f"/{first}"), headers=HEADERS, json={**EDIT, "title": "x" * 81}).status_code == 422
+    assert client.put(url(tail=f"/{first}"), headers=HEADERS, json={"title": "only a title"}).status_code == 422
+    assert client.put(url(tail=f"/{first}"), headers={**HEADERS, "content-type": "text/plain"}, content="x").status_code == 415
+    assert client.put(url(tail="/999"), headers=HEADERS, json=EDIT).status_code == 404
+    assert client.put(url(UID_B, f"/{first}"), headers=HEADERS, json=EDIT).status_code == 404
+    assert store.list_skills(db, UID_A)[-1].title == "First"
+
+
+def test_editing_needs_the_token_a_valid_uid_and_the_capability(client, db, online):
+    skill_id = propose(db)
+    assert client.put(url(tail=f"/{skill_id}"), json=EDIT).status_code == 401
+    assert client.put(url("alice", f"/{skill_id}"), headers=HEADERS, json=EDIT).status_code == 400
+    online["on"] = False
+    assert client.put(url(tail=f"/{skill_id}"), headers=HEADERS, json=EDIT).status_code == 404
+    assert store.list_skills(db, UID_A)[0].title == "Restart an app"
+
+
 def test_bad_status_and_bad_bodies_are_422(client, db):
     skill_id = propose(db)
     for body in ({"status": "banana"}, {}, {"status": 5}):
@@ -146,4 +193,5 @@ def test_the_model_tools_cannot_reach_these_routes_or_set_status():
 
     tool_source = (pathlib.Path(skill_routes.__file__).parent / "capabilities" / "skills" / "tool.py").read_text(encoding="utf-8")
     domain_source = (pathlib.Path(skill_routes.__file__).parent / "capabilities" / "skills" / "domain.py").read_text(encoding="utf-8")
-    assert "set_status" not in tool_source and "set_status" not in domain_source
+    for user_side_only in ("set_status", "skill_store.update", "skill_store.delete", "list_skills"):
+        assert user_side_only not in tool_source and user_side_only not in domain_source

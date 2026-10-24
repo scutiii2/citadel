@@ -110,10 +110,12 @@ components, and where to place new Vue files and their tests.
 
 - A Skills page (`/skills`, `chat.use`) lists the how-tos the assistant proposed, in
   three groups: Waiting for approval, Active and Retired. Approve, Reject, Retire,
-  Send back for review and a confirmed Delete are the only controls; a proposal is
-  never used until it is approved. Active skills show how often they worked and
-  failed, and one that failed three or more times, more than it worked, is flagged
-  "Often fails". It needs mcp_server's `skills` capability switched on.
+  Send back for review, Edit (a dialog for the title, when to use, steps and tools)
+  and a confirmed Delete are the only controls; a proposal is never used until it is
+  approved. Active skills show how often they worked and failed. One that failed
+  three or more times, more than it worked, is flagged "Often fails" and Ember is no
+  longer offered it until you edit it (which starts its counts over) or retire it.
+  It needs mcp_server's `skills` capability switched on.
 
 - The context panel shows prompt cost per agent call for delegated answers,
   with Exact or Estimated counts. Context accuracy applies to every agent;
