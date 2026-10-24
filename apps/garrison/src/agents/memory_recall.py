@@ -35,7 +35,7 @@ STEP_LABEL = "Loading saved notes"
 SEARCH_TIMEOUT_SECONDS = 5
 
 
-def _message(raw: str) -> str:
+def envelope_message(raw: str) -> str:
     """The envelope's `message` text; the raw text itself when it is not such an envelope."""
     try:
         envelope = json.loads(raw)
@@ -61,7 +61,7 @@ async def with_recall(question: str, on_event: OnEvent | None = None) -> str:
         # A slow memory service must not hold the turn: a timeout is just another quiet failure.
         with anyio.fail_after(SEARCH_TIMEOUT_SECONDS):
             raw = await anyio.to_thread.run_sync(_search, abandon_on_cancel=True)
-        text = _message(raw.strip())
+        text = envelope_message(raw.strip())
     except Exception as error:  # noqa: BLE001 - recall is best effort; the turn must go on
         _log.debug("memory recall skipped: %s", type(error).__name__)
         return question

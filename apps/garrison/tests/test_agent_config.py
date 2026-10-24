@@ -552,7 +552,7 @@ def _recall_chat(monkeypatch, recall_calls, cancel_first=False):
 
     reloaded = importlib.reload(agent_config)
     spec = SimpleNamespace(id="ember", entry=False, orchestrator=False, internal_role=None,
-        memory_recall=True, plan_tool=True, llm=SimpleNamespace(max_effort=None, min_tier=None, max_tier=None))
+        memory_recall=True, skill_recall=False, plan_tool=True, llm=SimpleNamespace(max_effort=None, min_tier=None, max_tier=None))
     monkeypatch.setattr(reloaded.agent_spec, "current", lambda: spec)
 
     async def fake_recall(question, on_event=None):
@@ -591,6 +591,68 @@ def test_recall_runs_once_per_turn_and_only_changes_the_provider_question(monkey
     assert recall_calls == ["hi"]
     provider.assert_awaited_once()
     assert provider.call_args.args[0] == "NOTES hi"
+
+
+def _skill_chat(monkeypatch, skill_calls, memory_recall_on=True, cancel_first=False):
+    """_recall_chat with skill_recall switched on and a fake skill search."""
+    reloaded, provider = _recall_chat(monkeypatch, [], cancel_first=cancel_first)
+    spec = reloaded.agent_spec.current()
+    spec.skill_recall, spec.memory_recall = True, memory_recall_on
+
+    async def fake_skills(question, prompt, on_event=None):
+        skill_calls.append((question, prompt))
+        return "SKILLS " + prompt
+
+    monkeypatch.setattr(reloaded.skill_recall, "with_skills", fake_skills)
+    return reloaded, provider
+
+
+def test_skills_search_the_original_question_and_wrap_the_notes_prompt(monkeypatch):
+    import asyncio
+
+    skill_calls = []
+    reloaded, provider = _skill_chat(monkeypatch, skill_calls)
+
+    asyncio.run(reloaded.run_chat("hi", [], [], "req-1"))
+
+    assert skill_calls == [("hi", "NOTES hi")]
+    assert provider.call_args.args[0] == "SKILLS NOTES hi"
+
+
+def test_skills_work_without_memory_recall(monkeypatch):
+    import asyncio
+
+    skill_calls = []
+    reloaded, provider = _skill_chat(monkeypatch, skill_calls, memory_recall_on=False)
+
+    asyncio.run(reloaded.run_chat("hi", [], [], "req-1"))
+
+    assert skill_calls == [("hi", "hi")]
+    assert provider.call_args.args[0] == "SKILLS hi"
+
+
+def test_a_delegated_turn_does_not_search_skills(monkeypatch):
+    import asyncio
+
+    skill_calls = []
+    reloaded, provider = _skill_chat(monkeypatch, skill_calls)
+
+    asyncio.run(reloaded.run_chat("hi", [], [], "req-1", depth=1))
+
+    assert skill_calls == [] and provider.call_args.args[0] == "hi"
+
+
+def test_a_cancelled_request_does_not_search_skills(monkeypatch):
+    import asyncio
+
+    skill_calls = []
+    reloaded, provider = _skill_chat(monkeypatch, skill_calls, cancel_first=True)
+
+    with pytest.raises(reloaded.ChatCancelled):
+        asyncio.run(reloaded.run_chat("hi", [], [], "req-2"))
+
+    assert skill_calls == []
+    provider.assert_not_awaited()
 
 
 def test_a_delegated_turn_does_not_recall(monkeypatch):
