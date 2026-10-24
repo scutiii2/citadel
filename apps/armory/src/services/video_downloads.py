@@ -75,7 +75,7 @@ class VideoRuntime:
 
     def _run(self):
         from src.capabilities.video_downloader.utils.service import build_service
-        from src.capabilities.video_downloader.utils.store.sweeper import run_sweeper
+        from src.services.file_sweeper import run_sweeper
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
         try:

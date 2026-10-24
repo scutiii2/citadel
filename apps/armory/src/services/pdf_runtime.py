@@ -38,7 +38,7 @@ class Runtime:
 
     async def _initialize(self):
         from src.capabilities.pdf_merger.utils.service import build_service
-        from src.capabilities.pdf_merger.utils.store.sweeper import run_sweeper
+        from src.services.file_sweeper import run_sweeper
 
         self.service = build_service(self.config)
         await self.service.store.load_index()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.capabilities.pdf_merger.utils.store.signing import LinkSigner
+from src.services.link_signing import LinkSigner
 
 
 def test_sign_and_verify():

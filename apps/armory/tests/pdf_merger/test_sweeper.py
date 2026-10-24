@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from src.capabilities.pdf_merger.utils.store.sweeper import run_sweeper
+from src.services.file_sweeper import run_sweeper
 
 
 class FakeService:

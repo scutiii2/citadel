@@ -1,6 +1,6 @@
 import asyncio
 
-from src.capabilities.video_downloader.utils.store.sweeper import run_sweeper
+from src.services.file_sweeper import run_sweeper
 
 
 class FakeService:

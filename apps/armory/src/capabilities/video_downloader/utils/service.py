@@ -23,7 +23,7 @@ from src.capabilities.video_downloader.utils.models import ErrorInfo, FileInfo, 
 from src.capabilities.video_downloader.utils.policy.url_policy import UrlPolicy
 from src.capabilities.video_downloader.utils.store.file_store import FileStore, StoredFile
 from src.capabilities.video_downloader.utils.store.names import mime_for, safe_filename
-from src.capabilities.video_downloader.utils.store.signing import LinkSigner
+from src.services.link_signing import LinkSigner
 
 _STATE_BY_EVENT = {"queued": "queued", "progress": "downloading", "processing": "processing", "done": "done", "error": "error"}
 
