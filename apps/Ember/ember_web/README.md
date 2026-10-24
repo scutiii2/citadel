@@ -72,7 +72,7 @@ components, and where to place new Vue files and their tests.
   Polling stops on route leave; stale account/request responses are ignored.
   File deletion and job cancellation use ConfirmModal. DownloadCards, CopyButton,
   ActionButton, ElapsedTime, SegmentedControl and ToggleSwitch are reused.
-- These workspaces call only `/api/pdf-merger` and `/api/video-downloader` on
+- These workspaces call only `/api/pdf-merger` and `/api/media-downloader` on
   ember_api. Armory owns jobs/files and validates video URLs with UrlPolicy.
   Signed upstream downloads are fetched by ember_api after checking ownership;
   the browser receives authenticated same-origin download links.

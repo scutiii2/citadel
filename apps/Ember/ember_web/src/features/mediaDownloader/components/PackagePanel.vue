@@ -4,7 +4,7 @@ import { onBeforeRouteLeave } from 'vue-router'
 import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
 import ConfirmModal from '../../../components/ui/dialogs/ConfirmModal.vue'
 import DownloadCards from '../../../components/content/DownloadCards.vue'
-import type { ProbeResult } from '../api/VideoDownloaderTypes'
+import type { ProbeResult } from '../api/MediaDownloaderTypes'
 import { useMediaPackagesStore } from '../stores/mediaPackages'
 import { useAuthStore } from '../../../stores/auth'
 
@@ -101,7 +101,7 @@ async function confirmAction() {
   </section>
 </template>
 
-<style scoped src="./videoDownloader.css"></style>
+<style scoped src="./mediaDownloader.css"></style>
 <style scoped>
 .packages, .group { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); padding: 14px; min-width: 0; }
 .packages, .editor { display: flex; flex-direction: column; gap: 12px; }

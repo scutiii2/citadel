@@ -7,7 +7,7 @@ description: Create or audit a new top-level project directory under apps/ (a ne
 
 Every Python project in this repo's `apps/` folder (`mcp_server`, `ai_agent`, `ember_api`,
 `chat_cli`, `catalog_service`, `server_launcher`, `db_gateway`, `chess` and `ascension`;
-`PDFMerger` and `VideoDownloader` each hold a Python app and a web app) shares one top-level shape. The three Ember projects sit together in
+`PDFMerger` and `MediaDownloader` each hold a Python app and a web app) shares one top-level shape. The three Ember projects sit together in
 `apps/Ember/` (`ember_api`, plus the Node apps `ember_web` and `ember_admin`, which have their
 own layout - see ember-feature-scaffold); everything else is `apps/<name>/`. A new root-level project must match it, not
 invent its own layout — consistency here is what lets `server_launcher.py`,

@@ -18,7 +18,7 @@ CAPABILITIES = pathlib.Path(__file__).resolve().parents[1] / "src" / "capabiliti
 # capability id -> the tools that declare readOnlyHint
 READ_ONLY = {
     "obsidian": {"tool_obsidian_list", "tool_obsidian_search", "tool_obsidian_read", "tool_obsidian_semanticSearch"},
-    "video": {"tool_vid_probe", "tool_vid_status", "tool_vid_listFiles", "tool_vid_packages"},
+    "media": {"tool_media_probe", "tool_media_status", "tool_media_listFiles", "tool_media_packages"},
     "pdf": {"tool_pdf_inspect", "tool_pdf_listFiles"},
     "vault": {"tool_vault_search", "tool_vault_listNotes", "tool_vault_readNote"},
     "usage": {"tool_usage_summary"},
@@ -80,4 +80,4 @@ def test_capabilities_that_change_things_or_spend_credits_never_declare_it(folde
 
 
 def test_video_download_is_not_read_only(loaded):
-    assert "tool_vid_download" in loaded and not declared(loaded["tool_vid_download"])
+    assert "tool_media_download" in loaded and not declared(loaded["tool_media_download"])

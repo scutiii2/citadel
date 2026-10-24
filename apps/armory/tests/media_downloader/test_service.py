@@ -40,7 +40,7 @@ async def test_download_stores_file_and_reports_done(service, fake_extractor):
     assert final["type"] == "done"
     assert final["file"]["name"] == "Cat video.mp4"
     assert final["file"]["kind"] == "video"
-    assert "/video/files/" in final["file"]["download_url"] and "sig=" in final["file"]["download_url"]
+    assert "/media/files/" in final["file"]["download_url"] and "sig=" in final["file"]["download_url"]
     stored = service.get_file(WEB, final["file_id"])
     assert service.file_path(stored).read_bytes() == fake_extractor.content
     types = [e["type"] for e in job.events]

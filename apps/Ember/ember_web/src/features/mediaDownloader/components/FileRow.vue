@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ActionButton from "../../../components/ui/buttons/ActionButton.vue"
 import { useAuthStore } from '../../../stores/auth'
-import type { FileInfo } from '../api/VideoDownloaderTypes'
+import type { FileInfo } from '../api/MediaDownloaderTypes'
 import { formatBytes, formatDuration, formatExpiry } from '../utils/format'
 
 defineProps<{ file: FileInfo; now: number; busy?: boolean }>()
@@ -27,7 +27,7 @@ const auth = useAuthStore()
   </li>
 </template>
 
-<style scoped src="./videoDownloader.css"></style>
+<style scoped src="./mediaDownloader.css"></style>
 <style scoped>
 .file-row { padding: 18px 0; border-bottom: 1px solid var(--border); }
 .file-top { display: flex; align-items: flex-start; gap: 10px; }

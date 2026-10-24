@@ -1,12 +1,12 @@
 import { createPinia } from 'pinia'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { videoDownloaderClient as api, watchVideoJob } from './api/VideoDownloaderClient'
-import VideoDownloaderView from './VideoDownloaderView.vue'
-import { useVideoDownloaderStore } from './stores/videoDownloader'
+import { mediaDownloaderClient as api, watchVideoJob } from './api/MediaDownloaderClient'
+import MediaDownloaderView from './MediaDownloaderView.vue'
+import { useMediaDownloaderStore } from './stores/mediaDownloader'
 import { useAuthStore } from '../../stores/auth'
 
-vi.mock('./api/VideoDownloaderClient', () => ({ videoDownloaderClient: { probe: vi.fn(), listFiles: vi.fn(), startDownload: vi.fn(), cancelJob: vi.fn(), deleteFile: vi.fn(), listPackages: vi.fn() }, watchVideoJob: vi.fn() }))
+vi.mock('./api/MediaDownloaderClient', () => ({ mediaDownloaderClient: { probe: vi.fn(), listFiles: vi.fn(), startDownload: vi.fn(), cancelJob: vi.fn(), deleteFile: vi.fn(), listPackages: vi.fn() }, watchVideoJob: vi.fn() }))
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn() }))
 let wrapper: VueWrapper
 const stop = vi.fn()
@@ -17,7 +17,7 @@ beforeEach(() => {
   vi.mocked(api.listPackages).mockResolvedValue([])
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
-  vi.mocked(api.listFiles).mockResolvedValue([{ file_id: 'f', name: 'Cat.mp4', kind: 'video', mime: 'video/mp4', size: 100, duration: 5, expires_at: Date.now() / 1000 + 3600, download_url: '/api/video-downloader/files/f/download' }])
+  vi.mocked(api.listFiles).mockResolvedValue([{ file_id: 'f', name: 'Cat.mp4', kind: 'video', mime: 'video/mp4', size: 100, duration: 5, expires_at: Date.now() / 1000 + 3600, download_url: '/api/media-downloader/files/f/download' }])
   vi.mocked(api.probe).mockResolvedValue({ url: 'https://example.com/cat', title: 'Cat', duration: 5, thumbnail: 'http://unsafe/thumbnail', uploader: 'Uploader', options: [{ id: '720p', label: '720p', blocked: false, estimated_bytes: 100, code: null, reason: null, kind: 'video' }, { id: 'best', label: 'Best', blocked: true, estimated_bytes: 10000, code: 'too_large', reason: 'Too large', kind: 'video' }] })
   vi.mocked(api.startDownload).mockResolvedValue({ job_id: 'j' })
   vi.mocked(api.cancelJob).mockResolvedValue()
@@ -25,7 +25,7 @@ beforeEach(() => {
   vi.mocked(watchVideoJob).mockReturnValue(stop)
 })
 afterEach(() => { wrapper?.unmount(); HTMLDialogElement.prototype.showModal = realShow; HTMLDialogElement.prototype.close = realClose })
-async function setup() { wrapper = mount(VideoDownloaderView, { attachTo: document.body, global: { plugins: [createPinia()] } }); await flushPromises() }
+async function setup() { wrapper = mount(MediaDownloaderView, { attachTo: document.body, global: { plugins: [createPinia()] } }); await flushPromises() }
 const button = (text: string) => (text === 'Download' ? wrapper.findAll('.probe button') : wrapper.findAll('button')).find(b => b.text() === text)!
 async function start() {
   await wrapper.get('input[type=url]').setValue('https://example.com/cat')
@@ -34,7 +34,7 @@ async function start() {
   await button('Download').trigger('click')
   await flushPromises()
 }
-describe('VideoDownloaderView', () => {
+describe('MediaDownloaderView', () => {
   it('preserves a group draft and active watchers when switching workspace tabs', async () => {
     await setup()
     await start()
@@ -98,7 +98,7 @@ describe('VideoDownloaderView', () => {
   })
   it('disables saving expired files', async () => {
     await setup()
-    const store = useVideoDownloaderStore()
+    const store = useMediaDownloaderStore()
     store.files[0]!.expires_at = 0
     await flushPromises()
     expect(wrapper.find('.save-file').exists()).toBe(false)
@@ -106,11 +106,11 @@ describe('VideoDownloaderView', () => {
   })
   it('offers file downloads only with files.download permission', async () => {
     await setup()
-    const store = useVideoDownloaderStore()
+    const store = useMediaDownloaderStore()
     const permission = vi.spyOn(useAuthStore(), 'hasPermission').mockReturnValue(true)
     store.files = store.files.map(file => ({ ...file }))
     await flushPromises()
-    expect(wrapper.get('.save-file').attributes('href')).toBe('/api/video-downloader/files/f/download')
+    expect(wrapper.get('.save-file').attributes('href')).toBe('/api/media-downloader/files/f/download')
     permission.mockReturnValue(false)
     store.files = store.files.map(file => ({ ...file }))
     await flushPromises()

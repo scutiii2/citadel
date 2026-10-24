@@ -16,14 +16,14 @@ from src import commands
 from src.capabilities.media_downloader import domain
 from src.capabilities.media_downloader.utils.errors import DownloaderError, ErrorCode
 from src.capabilities.media_downloader.utils.policy.url_policy import UrlPolicy
-from src.services import capability_meta, capability_registry, identity_context, video_downloads
+from src.services import capability_meta, capability_registry, identity_context, media_downloads
 from src.services.capability_loader import CapabilityLoader
 from tests.media_downloader.conftest import public_resolver
 
 
 @pytest.fixture
 def native(settings, fake_extractor, monkeypatch):
-    runtime = video_downloads.VideoRuntime(settings, extractor=fake_extractor, policy=UrlPolicy(public_resolver), max_caller_downloads=1)
+    runtime = media_downloads.MediaRuntime(settings, extractor=fake_extractor, policy=UrlPolicy(public_resolver), max_caller_downloads=1)
     monkeypatch.setattr(domain, "get_runtime", lambda: runtime)
     monkeypatch.setattr(domain.shutil, "which", lambda name: "/mock/ffmpeg")
     monkeypatch.setattr(domain, "settings", replace(domain.settings, host="127.0.0.1", internal_api_token=""))
@@ -119,7 +119,7 @@ def test_job_returns_before_download_finishes_and_accounts_are_isolated(native, 
     result = domain.status(job_id)
     assert result.state == "done" and result.file
     assert "BEGIN REMOTE OUTPUT" in result.file.name
-    assert "/video/files/" in result.file.download_url
+    assert "/media/files/" in result.file.download_url
     assert "BEGIN REMOTE OUTPUT" in domain.list_files().files[0].name
     # Renaming the account never changes ownership.
     username = identity_context._username.set("renamed-alice")
@@ -139,12 +139,12 @@ def test_close_cancels_jobs_and_stops_loop(native, fake_extractor):
 
 
 def test_signed_route_and_range_disabled_and_invalid_links(native, monkeypatch):
-    from src import video_routes
+    from src import media_routes
     from src.command_routes import install_command_routes
-    monkeypatch.setattr(video_routes, "get_runtime", lambda: native)
+    monkeypatch.setattr(media_routes, "get_runtime", lambda: native)
     enabled = [True]
     monkeypatch.setattr(capability_registry, "is_enabled", lambda name: enabled[0])
-    monkeypatch.setattr(video_routes, "settings", replace(video_routes.settings, host="127.0.0.1", internal_api_token=""))
+    monkeypatch.setattr(media_routes, "settings", replace(media_routes.settings, host="127.0.0.1", internal_api_token=""))
     async def store(service):
         work = await service.store.make_work_dir()
         path = work / "mock.mp4"
@@ -184,7 +184,7 @@ def test_file_ttl_blocks_still_signed_link(native):
 
 
 def test_ttl_sweeper_runs_without_tool_calls(settings, fake_extractor):
-    runtime = video_downloads.VideoRuntime(replace(settings, sweep_interval_seconds=0.01), extractor=fake_extractor, policy=UrlPolicy(public_resolver))
+    runtime = media_downloads.MediaRuntime(replace(settings, sweep_interval_seconds=0.01), extractor=fake_extractor, policy=UrlPolicy(public_resolver))
     try:
         async def operation(service):
             work = await service.store.make_work_dir()
@@ -206,8 +206,8 @@ def test_native_config_uses_existing_shape(tmp_path, monkeypatch):
     path = tmp_path / "config_media_downloader.json"
     example = Path(__file__).parents[2] / "specifics/media_downloader/configs/config_media_downloader.json.example"
     path.with_suffix(".json.example").write_text(example.read_text())
-    monkeypatch.setattr(video_downloads, "settings", replace(video_downloads.settings, video_config_path=path, video_public_base_url="https://armory.example", video_signing_key="test-only-key"))
-    config, max_caller = video_downloads.load_video_settings()
+    monkeypatch.setattr(media_downloads, "settings", replace(media_downloads.settings, media_config_path=path, media_public_base_url="https://armory.example", media_signing_key="test-only-key"))
+    config, max_caller = media_downloads.load_media_settings()
     assert config.limits.max_file_bytes == 500 * 1024 * 1024
     assert config.file_ttl_seconds == 21600 and config.download_link_seconds == 3600
     assert config.public_base_url == "https://armory.example" and max_caller == 2
@@ -218,9 +218,9 @@ def test_native_config_uses_existing_shape(tmp_path, monkeypatch):
 def test_native_config_rejects_unusable_limits(tmp_path, monkeypatch, patch):
     path = tmp_path / "video.json"
     path.write_text(json.dumps(patch))
-    monkeypatch.setattr(video_downloads, "settings", replace(video_downloads.settings, video_config_path=path))
+    monkeypatch.setattr(media_downloads, "settings", replace(media_downloads.settings, media_config_path=path))
     with pytest.raises(ValueError):
-        video_downloads.load_video_settings()
+        media_downloads.load_media_settings()
 
 
 def test_refresh_load_help_tools_and_reload_preserve_runtime(tmp_path, monkeypatch, native, fake_extractor):
@@ -230,7 +230,7 @@ def test_refresh_load_help_tools_and_reload_preserve_runtime(tmp_path, monkeypat
     from src.help_routes import install_help_routes
     fake_extractor.hold = threading.Event()
     job_id = domain.download("https://example.com/v", "720p").job_id
-    monkeypatch.setattr(video_downloads, "_runtime", native)
+    monkeypatch.setattr(media_downloads, "_runtime", native)
     server = FastMCP("native-video-test")
     monkeypatch.setattr(src.server, "mcp", server)
     monkeypatch.setattr(capability_registry, "_REGISTRY", {})
@@ -247,29 +247,29 @@ def test_refresh_load_help_tools_and_reload_preserve_runtime(tmp_path, monkeypat
     with TestClient(app) as client:
         response = client.post("/capabilities/refresh")
         assert response.status_code == 200
-        response = client.patch("/capabilities/video", json={"enabled": True})
+        response = client.patch("/capabilities/media", json={"enabled": True})
         assert response.status_code == 200 and response.json()["load_error"] is None
-        names = {"tool_vid_probe", "tool_vid_download", "tool_vid_status", "tool_vid_listFiles", "tool_vid_package", "tool_vid_packages"}
+        names = {"tool_media_probe", "tool_media_download", "tool_media_status", "tool_media_listFiles", "tool_media_package", "tool_media_packages"}
         assert set(response.json()["tools"]) == names
         assert importlib.import_module("src.capabilities.media_downloader.utils.policy.socket_guard") is guard_module
-        help_response = client.get("/commands/help/video")
+        help_response = client.get("/commands/help/media")
         assert help_response.status_code == 200
-        assert "/video probe" in help_response.text
+        assert "/media probe" in help_response.text
         data = json.loads((Path(__file__).parents[2] / "src/capabilities/media_downloader/help.json").read_text())
         assert {tool["name"] for tool in data["tools"]} == names
         readme = (Path(__file__).parents[2] / "src/capabilities/media_downloader/README.md").read_text()
         assert all(name in readme for name in names)
-        assert client.patch("/capabilities/video", json={"enabled": False}).status_code == 200
-        assert client.patch("/capabilities/video", json={"enabled": True}).json()["load_error"] is None
+        assert client.patch("/capabilities/media", json={"enabled": False}).status_code == 200
+        assert client.patch("/capabilities/media", json={"enabled": True}).json()["load_error"] is None
         tool = importlib.import_module("src.capabilities.media_downloader.tool")
         monkeypatch.setattr(tool.domain, "settings", domain.settings)
-        assert asyncio.run(tool.tool_vid_status(job_id)).state != "done"
-        assert video_downloads.get_runtime() is native
+        assert asyncio.run(tool.tool_media_status(job_id)).state != "done"
+        assert media_downloads.get_runtime() is native
         fake_extractor.hold.set()
         async def wait(service):
             await service.wait(service.get_job(domain.caller(), job_id))
         native.call(wait)
-        assert asyncio.run(tool.tool_vid_status(job_id)).state == "done"
+        assert asyncio.run(tool.tool_media_status(job_id)).state == "done"
 
 
 def test_tool_surfaces_stable_error_code(native, monkeypatch):
@@ -277,4 +277,4 @@ def test_tool_surfaces_stable_error_code(native, monkeypatch):
     tool = importlib.import_module("src.capabilities.media_downloader.tool")
     monkeypatch.setattr(tool, "domain", domain)
     with pytest.raises(ToolError, match="blocked_host:"):
-        asyncio.run(tool.tool_vid_probe("http://127.0.0.1/private"))
+        asyncio.run(tool.tool_media_probe("http://127.0.0.1/private"))

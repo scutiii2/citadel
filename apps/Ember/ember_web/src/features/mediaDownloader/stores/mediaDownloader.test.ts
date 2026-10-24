@@ -1,13 +1,13 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { videoDownloaderClient as api, watchVideoJob } from '../api/VideoDownloaderClient'
-import type { FileInfo, JobStatus, ProbeResult } from '../api/VideoDownloaderTypes'
+import { mediaDownloaderClient as api, watchVideoJob } from '../api/MediaDownloaderClient'
+import type { FileInfo, JobStatus, ProbeResult } from '../api/MediaDownloaderTypes'
 import { ApiError } from '../../../api/http'
-import { useVideoDownloaderStore } from './videoDownloader'
+import { useMediaDownloaderStore } from './mediaDownloader'
 import { useAuthStore } from '../../../stores/auth'
 
-vi.mock('../api/VideoDownloaderClient', () => ({ videoDownloaderClient: { probe: vi.fn(), listFiles: vi.fn(), startDownload: vi.fn(), cancelJob: vi.fn(), deleteFile: vi.fn() }, watchVideoJob: vi.fn() }))
-const file: FileInfo = { file_id: 'f', name: 'a.mp4', kind: 'video', mime: 'video/mp4', size: 10, duration: 5, expires_at: 99, download_url: '/api/video-downloader/files/f/download' }
+vi.mock('../api/MediaDownloaderClient', () => ({ mediaDownloaderClient: { probe: vi.fn(), listFiles: vi.fn(), startDownload: vi.fn(), cancelJob: vi.fn(), deleteFile: vi.fn() }, watchVideoJob: vi.fn() }))
+const file: FileInfo = { file_id: 'f', name: 'a.mp4', kind: 'video', mime: 'video/mp4', size: 10, duration: 5, expires_at: 99, download_url: '/api/media-downloader/files/f/download' }
 const probe: ProbeResult = { url: 'https://example.com/v', title: 'Video', thumbnail: null, duration: 10, uploader: null, options: [{ id: 'best', label: 'Best', kind: 'video', estimated_bytes: null, blocked: true, code: 'too_large', reason: 'Too large' }, { id: '720p', label: '720p', kind: 'video', estimated_bytes: 100, blocked: false, code: null, reason: null }] }
 let update: (status: JobStatus) => void
 const stop = vi.fn()
@@ -19,9 +19,9 @@ beforeEach(() => {
   vi.mocked(api.listFiles).mockResolvedValue([file])
   vi.mocked(watchVideoJob).mockImplementation((_id, fn) => { update = fn; return stop })
 })
-describe('video downloader state', () => {
+describe('media downloader state', () => {
   it('selects only available presets and displays readable error codes', async () => {
-    const store = useVideoDownloaderStore()
+    const store = useMediaDownloaderStore()
     store.url = probe.url
     await store.check()
     expect(store.selected).toBe('720p')
@@ -34,7 +34,7 @@ describe('video downloader state', () => {
   it('discards a probe if the typed URL changes during the request', async () => {
     let resolve!: (p: ProbeResult) => void
     vi.mocked(api.probe).mockReturnValue(new Promise(r => { resolve = r }))
-    const store = useVideoDownloaderStore()
+    const store = useMediaDownloaderStore()
     store.url = probe.url
     const check = store.check()
     store.url = 'https://example.com/other'
@@ -43,7 +43,7 @@ describe('video downloader state', () => {
     expect(store.result).toBeNull()
   })
   it('keeps progress monotonic, refreshes finished files, and reconnects after leaving', async () => {
-    const store = useVideoDownloaderStore()
+    const store = useMediaDownloaderStore()
     store.activate()
     store.url = probe.url
     await store.check()
@@ -65,7 +65,7 @@ describe('video downloader state', () => {
     store.stopWatching()
   })
   it('resets private state on account change and rejects stale start responses', async () => {
-    const store = useVideoDownloaderStore()
+    const store = useMediaDownloaderStore()
     store.url = probe.url
     await store.check()
     let resolve!: (j: { job_id: string }) => void
@@ -80,7 +80,7 @@ describe('video downloader state', () => {
     expect(store.starting).toBe(false)
   })
   it('keeps files after a deletion failure and ignores an older list after deletion', async () => {
-    const store = useVideoDownloaderStore()
+    const store = useMediaDownloaderStore()
     await store.refreshFiles()
     vi.mocked(api.deleteFile).mockRejectedValueOnce(new Error('Offline'))
     expect(await store.remove('f')).toBe(false)

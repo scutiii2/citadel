@@ -1,7 +1,7 @@
 # Video downloader capability implementation plan
 
-**Goal:** Port the approved VideoDownloader MCP brief into native armory tools in an isolated branch from main.
-**Spec:** Python/VideoDownloader/docs/codex-armory-capability-brief.md (read-only source).
+**Goal:** Port the approved MediaDownloader MCP brief into native armory tools in an isolated branch from main.
+**Spec:** Python/MediaDownloader/docs/codex-armory-capability-brief.md (read-only source).
 **Architecture:** Keep the existing policy, guarded yt-dlp adapter, file store, signer and async queue inside capability utils. A process-owned runtime in services runs that queue on a dedicated loop; offloaded tools bridge short operations onto it. Signed files are served on armory's existing listener.
 **Tech stack:** Python, FastMCP, Starlette, yt-dlp with guarded curl-cffi, pytest.
 
@@ -18,7 +18,7 @@ Account UID owns files and jobs; absent identity and exposed tokenless deploymen
 
 ## Execution record
 
-- Worktree: `.worktrees/video-downloader-capability`, branch `codex/video-downloader-capability`, based on main `49efd21c`.
+- Worktree: `.worktrees/media-downloader-capability`, branch `codex/media-downloader-capability`, based on main `49efd21c`.
 - Catalog check: live localhost:8020 refused connections; documented cache absent. Existing config loader, identity context, offload, untrusted fencing and HTTP/lifespan mechanisms were reused after inspecting source.
 - Baseline first failed collection because openpyxl was absent; dependencies were installed in this worktree's isolated venv. No baseline code defect was found.
 - Ported policy/store/queue/signer/extractor/service tests failed before the capability existed, then passed after relocation. Native tests caught missing help metadata, changing guard module identities on reload, and dropped MCP error codes; each was corrected and rerun green.

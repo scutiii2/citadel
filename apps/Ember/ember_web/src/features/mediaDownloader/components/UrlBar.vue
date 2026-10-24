@@ -18,7 +18,7 @@ defineEmits<{ 'update:modelValue': [value: string]; check: [] }>()
   </form>
 </template>
 
-<style scoped src="./videoDownloader.css"></style>
+<style scoped src="./mediaDownloader.css"></style>
 <style scoped>
 .url-bar { flex-wrap: nowrap; gap: 8px; padding: 7px 8px 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .url-bar input { min-width: 0; padding: 4px 0; border: 0; border-radius: 0; background: transparent; font-size: .9em; }

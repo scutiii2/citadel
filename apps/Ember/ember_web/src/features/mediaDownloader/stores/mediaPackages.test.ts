@@ -1,11 +1,11 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { videoDownloaderClient as api } from '../api/VideoDownloaderClient'
+import { mediaDownloaderClient as api } from '../api/MediaDownloaderClient'
 import { useMediaPackagesStore } from './mediaPackages'
 import { useAuthStore } from '../../../stores/auth'
-import type { MediaPackage } from '../api/VideoDownloaderTypes'
+import type { MediaPackage } from '../api/MediaDownloaderTypes'
 
-vi.mock('../api/VideoDownloaderClient', () => ({ videoDownloaderClient: {
+vi.mock('../api/MediaDownloaderClient', () => ({ mediaDownloaderClient: {
   listPackages: vi.fn(), createPackage: vi.fn(), addPackageItem: vi.fn(), startPackage: vi.fn(), removePackageItem: vi.fn(), deletePackage: vi.fn(),
 } }))
 const draft: MediaPackage = { package_id: 'p', name: 'Mix', state: 'draft', items: [], job_id: null, status: null }

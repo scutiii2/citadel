@@ -6,7 +6,7 @@ import pytest
 
 
 def test_package_routes_require_access_and_proxy_fixed_paths(client, db_gateway, upstream):
-    assert client.post('/api/video-downloader/packages', json={'name': 'Mix'}).status_code == 401
+    assert client.post('/api/media-downloader/packages', json={'name': 'Mix'}).status_code == 401
     enable(client, db_gateway, 'video')
     upstream.handler = lambda r: httpx.Response(200, json={'package_id': 'p_one', 'job_id': 'j_one'})
     cases = [
@@ -18,15 +18,15 @@ def test_package_routes_require_access_and_proxy_fixed_paths(client, db_gateway,
         ('POST', '/packages/p_one/start', {}),
     ]
     for method, path, body in cases:
-        assert client.request(method, '/api/video-downloader' + path, json=body).status_code == 200
-        assert upstream.requests[-1].url.path == '/video/ui' + path
+        assert client.request(method, '/api/media-downloader' + path, json=body).status_code == 200
+        assert upstream.requests[-1].url.path == '/media/ui' + path
     upstream.handler = lambda r: httpx.Response(409, json={'error': {'code': 'package_locked', 'message': 'Locked'}})
-    response = client.post('/api/video-downloader/packages/p_one/items', json={'url': 'https://example.com/b'})
+    response = client.post('/api/media-downloader/packages/p_one/items', json={'url': 'https://example.com/b'})
     assert response.status_code == 409 and response.json()['error']['code'] == 'package_locked'
 
 
 def test_package_delete_requires_login_and_proxies_conflicts(client, upstream):
-    path = '/api/video-downloader/packages/p_one'
+    path = '/api/media-downloader/packages/p_one'
     assert client.delete(path).status_code == 401
     as_admin(client)
     upstream.handler = lambda r: httpx.Response(409, json={'error': {'code': 'package_locked', 'message': 'Still downloading'}})
@@ -34,7 +34,7 @@ def test_package_delete_requires_login_and_proxies_conflicts(client, upstream):
     upstream.handler = lambda r: httpx.Response(200, json={'ok': True})
     assert client.delete(path).status_code == 204
     assert upstream.requests[-1].method == 'DELETE'
-    assert upstream.requests[-1].url.path == '/video/ui/packages/p_one'
+    assert upstream.requests[-1].url.path == '/media/ui/packages/p_one'
 
 from tests.test_registration import as_admin
 from tests.test_permission_split import limited_account
@@ -53,13 +53,13 @@ def enable(client, db_gateway, *areas):
     return uid
 
 
-@pytest.mark.parametrize('area', ['pdf-merger', 'video-downloader'])
+@pytest.mark.parametrize('area', ['pdf-merger', 'media-downloader'])
 def test_login_is_required(client, area, upstream):
     assert client.get(f'/api/{area}/files').status_code == 401
     assert not upstream.requests
 
 
-@pytest.mark.parametrize('area', ['pdf-merger', 'video-downloader'])
+@pytest.mark.parametrize('area', ['pdf-merger', 'media-downloader'])
 def test_tools_view_cannot_execute(client, email, area):
     limited_account(client, email, 'tools.view')
     assert client.get(f'/api/{area}/files').status_code == 403
@@ -73,7 +73,7 @@ def test_files_and_jobs_use_trusted_identity_and_local_download_links(client_fac
         file = {'file_id': 'f_one', 'download_url': f'http://private/{area}/files/f_one/download?exp=42&sig=secret'}
         return httpx.Response(200, json=[file] if request.url.path.endswith('/files') else {'result': file})
     upstream.handler = serve
-    for area, public in [('pdf', 'pdf-merger'), ('video', 'video-downloader')]:
+    for area, public in [('pdf', 'pdf-merger'), ('media', 'media-downloader')]:
         result = client.get(f'/api/{public}/files', headers={'X-Requester-Uid': 'other', 'X-Internal-Token': 'evil'})
         assert result.status_code == 200, result.text
         assert result.json()[0]['download_url'] == f'/api/{public}/files/f_one/download'
@@ -108,10 +108,10 @@ def test_merge_probe_start_cancel_and_delete_use_fixed_paths(client, db_gateway,
     assert upstream.requests[-1].url.path == '/pdf/ui/merge'
     assert json.loads(upstream.requests[-1].content)['segments'][0]['pages'] == '2,1'
     assert client.post('/api/pdf-merger/merge', json={'segments': []}).status_code == 422
-    assert client.post('/api/video-downloader/probe', json={'url': 'http://localhost/private'}).status_code == 200
-    assert upstream.requests[-1].url.path == '/video/ui/probe'  # Armory, not this proxy, owns UrlPolicy.
-    assert client.post('/api/video-downloader/downloads', json={'url': 'https://public.example/v', 'preset': 'best'}).status_code == 200
-    for public, area in [('pdf-merger', 'pdf'), ('video-downloader', 'video')]:
+    assert client.post('/api/media-downloader/probe', json={'url': 'http://localhost/private'}).status_code == 200
+    assert upstream.requests[-1].url.path == '/media/ui/probe'  # Armory, not this proxy, owns UrlPolicy.
+    assert client.post('/api/media-downloader/downloads', json={'url': 'https://public.example/v', 'preset': 'best'}).status_code == 200
+    for public, area in [('pdf-merger', 'pdf'), ('media-downloader', 'media')]:
         assert client.post(f'/api/{public}/jobs/j_one/cancel', json={}).status_code == 200
         assert upstream.requests[-1].url.path == f'/{area}/ui/jobs/j_one/cancel'
         assert client.delete(f'/api/{public}/files/f_one').status_code == 204
@@ -120,24 +120,24 @@ def test_merge_probe_start_cancel_and_delete_use_fixed_paths(client, db_gateway,
 def test_policy_errors_missing_files_and_unavailable_upstream(client, db_gateway, upstream):
     enable(client, db_gateway, 'video')
     upstream.handler = lambda r: httpx.Response(400, json={'error': {'code': 'url_blocked', 'message': 'Use a public URL.'}})
-    response = client.post('/api/video-downloader/probe', json={'url': 'http://127.0.0.1'})
+    response = client.post('/api/media-downloader/probe', json={'url': 'http://127.0.0.1'})
     assert response.status_code == 400 and response.json()['error']['code'] == 'url_blocked'
     upstream.handler = lambda r: httpx.Response(404, json={'error': {'code': 'file_not_found', 'message': 'Unavailable'}})
-    assert client.delete('/api/video-downloader/files/f_foreign').status_code == 404
+    assert client.delete('/api/media-downloader/files/f_foreign').status_code == 404
     upstream.unreachable = True
-    assert client.get('/api/video-downloader/files').status_code == 502
+    assert client.get('/api/media-downloader/files').status_code == 502
 
 
 def test_download_checks_ownership_and_never_follows_foreign_origins(client, db_gateway, upstream):
     enable(client, db_gateway, 'video')
     def serve(request):
-        if request.url.path == '/video/ui/files':
-            return httpx.Response(200, json=[{'file_id': 'f_one', 'download_url': 'http://untrusted.invalid/video/files/f_one/download?exp=42&sig=test'}])
+        if request.url.path == '/media/ui/files':
+            return httpx.Response(200, json=[{'file_id': 'f_one', 'download_url': 'http://untrusted.invalid/media/files/f_one/download?exp=42&sig=test'}])
         assert request.url.host == 'mcp-server.internal'
         return httpx.Response(206, content=b'clip', headers={'content-type': 'video/mp4', 'content-range': 'bytes 0-3/4'})
     upstream.handler = serve
-    assert client.get('/api/video-downloader/files/f_other/download').status_code == 404
-    response = client.get('/api/video-downloader/files/f_one/download', headers={'Range': 'bytes=0-3'})
+    assert client.get('/api/media-downloader/files/f_other/download').status_code == 404
+    response = client.get('/api/media-downloader/files/f_one/download', headers={'Range': 'bytes=0-3'})
     assert response.status_code == 206 and response.content == b'clip'
     assert response.headers['cache-control'] == 'no-store'
     assert upstream.requests[-1].headers['range'] == 'bytes=0-3'
@@ -146,15 +146,15 @@ def test_download_checks_ownership_and_never_follows_foreign_origins(client, db_
 def test_download_accepts_public_proxy_prefix_but_fetches_fixed_internal_path(client, db_gateway, upstream):
     enable(client, db_gateway, 'video')
     def serve(request):
-        if request.url.path == '/video/ui/files':
+        if request.url.path == '/media/ui/files':
             return httpx.Response(200, json=[{'file_id': 'f_one', 'download_url':
-                'https://public.example/armory/video/files/f_one/download?exp=42&sig=test'}])
+                'https://public.example/armory/media/files/f_one/download?exp=42&sig=test'}])
         assert request.url.host == 'mcp-server.internal'
-        assert request.url.path == '/video/files/f_one/download'
+        assert request.url.path == '/media/files/f_one/download'
         assert request.url.query == b'exp=42&sig=test'
         return httpx.Response(200, content=b'clip')
     upstream.handler = serve
-    response = client.get('/api/video-downloader/files/f_one/download')
+    response = client.get('/api/media-downloader/files/f_one/download')
     assert response.status_code == 200 and response.content == b'clip'
 
 
@@ -177,7 +177,7 @@ def test_pdf_content_remains_account_scoped(client, db_gateway, upstream):
 def test_actionable_policy_and_dependency_errors_survive_proxy(client, db_gateway, upstream, status, code, message):
     enable(client, db_gateway, 'video')
     upstream.handler = lambda r: httpx.Response(status, json={'error': {'code': code, 'message': message}})
-    response = client.post('/api/video-downloader/probe', json={'url': 'http://127.0.0.1'})
+    response = client.post('/api/media-downloader/probe', json={'url': 'http://127.0.0.1'})
     assert response.status_code == status
     assert response.json()['error'] == {'code': code, 'message': message}
 
@@ -193,14 +193,14 @@ def test_connection_failures_hide_internal_details(client, db_gateway, upstream,
 
 @pytest.mark.parametrize('link', [
     'http://other.invalid/private?exp=1&sig=x',
-    'http://other.invalid/video/files/f_one/download',
-    'http://[invalid/video/files/f_one/download?exp=1&sig=x',
+    'http://other.invalid/media/files/f_one/download',
+    'http://[invalid/media/files/f_one/download?exp=1&sig=x',
 ])
 def test_download_rejects_invalid_signed_path(client, db_gateway, upstream, link):
     enable(client, db_gateway, 'video')
     upstream.handler = lambda r: httpx.Response(200, json=[{'file_id': 'f_one', 'download_url': link}])
     count = len(upstream.requests)
-    response = client.get('/api/video-downloader/files/f_one/download')
+    response = client.get('/api/media-downloader/files/f_one/download')
     assert response.status_code == 502
     assert len(upstream.requests) == count + 1
 
@@ -236,5 +236,5 @@ def test_transfer_permissions_are_independent_of_tool_execution(client, email, d
     db_gateway.records[('account_capabilities', uid)] = {'capabilities': ['pdf', 'video']}
     assert client.post('/api/pdf-merger/files', json={'filename': 'x.pdf', 'data': 'eA=='}).status_code == 403
     assert client.get('/api/pdf-merger/files/f_one/content').status_code == 403
-    assert client.get('/api/video-downloader/files/f_one/download').status_code == 403
+    assert client.get('/api/media-downloader/files/f_one/download').status_code == 403
     assert not upstream.requests

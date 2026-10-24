@@ -93,10 +93,10 @@ def install_command_routes(app: Starlette) -> None:
     app.add_route("/pdf/files/{file_id}/download", download_pdf, methods=["GET"])
     from contextlib import asynccontextmanager
     import asyncio
-    from src.video_routes import download_video
-    from src.services.video_downloads import close_runtime
+    from src.media_routes import download_video
+    from src.services.media_downloads import close_runtime
 
-    app.add_route("/video/files/{file_id}/download", download_video, methods=["GET"])
+    app.add_route("/media/files/{file_id}/download", download_video, methods=["GET"])
     original_lifespan = app.router.lifespan_context
 
     @asynccontextmanager

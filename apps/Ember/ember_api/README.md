@@ -61,7 +61,7 @@ that should stay inside a single account.
 
 ## Native capability workspace API
 
-Media groups use fixed `/api/video-downloader/packages` GET/POST routes, GET
+Media groups use fixed `/api/media-downloader/packages` GET/POST routes, GET
 `/packages/{id}`, POST `/packages/{id}/items` (`{url,preset}`), DELETE
 `/packages/{id}/items/{item_id}` and POST `/packages/{id}/start`. The same
 `tools.execute` and added `video` capability checks apply. Armory owns groups,
@@ -69,7 +69,7 @@ validates URLs and permanently locks membership when queue admission succeeds.
 Nested ZIP links are rewritten to authenticated same-origin file downloads.
 Restart Armory and ember_api after deployment; no database migration is needed.
 
-PDF/video workspaces proxy only fixed Armory routes (`/pdf/ui`, `/video/ui`,
+PDF/video workspaces proxy only fixed Armory routes (`/pdf/ui`, `/media/ui`,
 and the existing `/upload/pdf`). Armory must be restarted after installing
 the HTTP adapters, with the shared internal token configured and `pdf` / `video`
 online. The authenticated account must add the native capability from the
@@ -88,13 +88,13 @@ No new permissions or role grants are introduced.
 | GET | `/api/pdf-merger/jobs/{id}` | `{job_id,state,done,total,result,error}`; queued/progress/done/error. |
 | POST | `/api/pdf-merger/jobs/{id}/cancel` | Cooperatively cancel an owned merge. |
 | GET | `/api/pdf-merger/files/{id}/download` | Check ownership, then stream a fresh signed Armory download. |
-| POST | `/api/video-downloader/probe` | `{url}` through Armory UrlPolicy; metadata and presets. |
-| POST | `/api/video-downloader/downloads` | `{url,preset}`; return `{job_id}` immediately. |
-| GET | `/api/video-downloader/jobs/{id}` | Owned JobStatus with progress, file or structured error. |
-| POST | `/api/video-downloader/jobs/{id}/cancel` | Cooperatively cancel an owned download. |
-| GET | `/api/video-downloader/files` | Owned unexpired media files. |
-| DELETE | `/api/video-downloader/files/{id}` | Delete an owned media file (204). |
-| GET | `/api/video-downloader/files/{id}/download` | Check ownership, then stream a fresh signed Armory download (Range supported). |
+| POST | `/api/media-downloader/probe` | `{url}` through Armory UrlPolicy; metadata and presets. |
+| POST | `/api/media-downloader/downloads` | `{url,preset}`; return `{job_id}` immediately. |
+| GET | `/api/media-downloader/jobs/{id}` | Owned JobStatus with progress, file or structured error. |
+| POST | `/api/media-downloader/jobs/{id}/cancel` | Cooperatively cancel an owned download. |
+| GET | `/api/media-downloader/files` | Owned unexpired media files. |
+| DELETE | `/api/media-downloader/files/{id}` | Delete an owned media file (204). |
+| GET | `/api/media-downloader/files/{id}/download` | Check ownership, then stream a fresh signed Armory download (Range supported). |
 
 Identity always comes from the session's stable UID, never browser headers or
 request bodies. Armory enforces file/job ownership, quotas, expiry, merge limits,

@@ -12,7 +12,7 @@ test('media groups accept multiple links and lock membership after starting a pa
   let group: Record<string, any> | null = null
   let running = false
   let finished = false
-  await page.route('**/api/video-downloader/packages**', async route => {
+  await page.route('**/api/media-downloader/packages**', async route => {
     const request = route.request()
     const path = new URL(request.url()).pathname
     if (request.method() === 'DELETE' && path.endsWith('/p_group')) {
@@ -90,9 +90,9 @@ test('media modes preserve drafts, checked formats, and file details across mobi
   const api = await installFakeApi(page, { media: true })
   const expiry = Date.now() / 1000 + 3600
   let deleted = false
-  await page.route('**/api/video-downloader/files**', route => {
+  await page.route('**/api/media-downloader/files**', route => {
     if (route.request().method() === 'DELETE') { deleted = true; return route.fulfill({ status: 204 }) }
-    return route.fulfill({ json: deleted ? [] : [{ file_id: 'saved', name: 'A saved video.mp4', kind: 'video', mime: 'video/mp4', size: 1024, duration: 60, expires_at: expiry, download_url: '/api/video-downloader/files/saved/download' }] })
+    return route.fulfill({ json: deleted ? [] : [{ file_id: 'saved', name: 'A saved video.mp4', kind: 'video', mime: 'video/mp4', size: 1024, duration: 60, expires_at: expiry, download_url: '/api/media-downloader/files/saved/download' }] })
   })
   await logIn(page)
   await page.setViewportSize({ width: 375, height: 812 })
@@ -298,10 +298,10 @@ test('media workspace downloads a TikTok photo carousel as a ZIP (mock API)', as
   const api = await installFakeApi(page, { media: true })
   const url = 'https://www.tiktok.com/@alice/photo/1234567890'
   const file = { file_id: 'photos', name: 'Holiday.zip', kind: 'photo', mime: 'application/zip', size: 1024, duration: null,
-    expires_at: Date.now() / 1000 + 21600, download_url: '/api/video-downloader/files/photos/download' }
+    expires_at: Date.now() / 1000 + 21600, download_url: '/api/media-downloader/files/photos/download' }
   let done = false
   const downloads: unknown[] = []
-  await page.route('**/api/video-downloader/**', async route => {
+  await page.route('**/api/media-downloader/**', async route => {
     const request = route.request()
     const path = new URL(request.url()).pathname
     if (path.endsWith('/probe')) return route.fulfill({ json: { url, title: 'Holiday', duration: null, uploader: 'alice', thumbnail: null, photo_count: 3,

@@ -200,7 +200,7 @@ class DownloadService:
 
     def file_info(self, stored: StoredFile) -> FileInfo:
         exp, sig = self._signer.sign(stored.file_id)
-        url = f"{self._public_base_url}/video/files/{stored.file_id}/download?exp={exp}&sig={sig}"
+        url = f"{self._public_base_url}/media/files/{stored.file_id}/download?exp={exp}&sig={sig}"
         return FileInfo.of(stored, url)
 
     def list_files(self, caller: Caller) -> list[StoredFile]:

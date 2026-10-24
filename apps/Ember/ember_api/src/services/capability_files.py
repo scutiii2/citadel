@@ -11,8 +11,8 @@ from src.models import Account
 from src.services.mcp_server_info import base_url
 from src.services.mcp_session import identity_headers
 
-Area = Literal["pdf", "video"]
-PUBLIC = {"pdf": "pdf-merger", "video": "video-downloader"}
+Area = Literal["pdf", "media"]
+PUBLIC = {"pdf": "pdf-merger", "media": "media-downloader"}
 
 
 class CapabilityFailure(Exception):

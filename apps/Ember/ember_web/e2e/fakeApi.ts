@@ -284,15 +284,15 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     for (const c of ADMIN_CAPABILITIES) api.capabilities.set(c.name, { ...c });
   }
   if (options.media) {
-    for (const name of ['pdf', 'video']) {
-      api.capabilities.set(name, { name, enabled: true, label: name === 'pdf' ? 'PDF merger' : 'Video downloader', tools: [], resources: [] });
+    for (const name of ['pdf', 'media']) {
+      api.capabilities.set(name, { name, enabled: true, label: name === 'pdf' ? 'PDF merger' : 'Media downloader', tools: [], resources: [] });
     }
   }
   const pdfs = new Map<string, { info: { file_id: string; name: string; kind: string; pages: number; size: number; expires_at: number }; bytes: Buffer }>();
   let videoDone = false;
   let videoPolls = 0;
   const videoBytes = Buffer.from('Mock video download fixture');
-  const videoFile = { file_id: 'video-file', name: 'Coastal walk.mp4', kind: 'video', mime: 'video/mp4', size: videoBytes.length, duration: 125, expires_at: Date.now() / 1000 + 21600, download_url: '/api/video-downloader/files/video-file/download' };
+  const videoFile = { file_id: 'video-file', name: 'Coastal walk.mp4', kind: 'video', mime: 'video/mp4', size: videoBytes.length, duration: 125, expires_at: Date.now() / 1000 + 21600, download_url: '/api/media-downloader/files/video-file/download' };
   let loggedIn = false;
 
   // Opt-in media fixtures share routing across this test's browser context.
@@ -338,10 +338,10 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       }
       if (path.endsWith('/cancel') && method === 'POST') return json(route, {});
     }
-    if (options.media && path.startsWith('/api/video-downloader/')) {
+    if (options.media && path.startsWith('/api/media-downloader/')) {
       const method = request.method();
-      if (path === '/api/video-downloader/packages' && method === 'GET') return json(route, []);
-      if (path === '/api/video-downloader/probe' && method === 'POST') return json(route, {
+      if (path === '/api/media-downloader/packages' && method === 'GET') return json(route, []);
+      if (path === '/api/media-downloader/probe' && method === 'POST') return json(route, {
         url: (request.postDataJSON() as { url: string }).url, title: 'Coastal walk at sunset', duration: 125, thumbnail: 'https://example.com/thumbnail.jpg', uploader: 'Field recordings',
         options: [
           { id: 'best', label: 'Best quality', kind: 'video', estimated_bytes: 900000000, blocked: true, code: 'too_large', reason: 'Exceeds the file size limit' },
@@ -349,17 +349,17 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
           { id: 'audio-mp3', label: 'Audio (MP3)', kind: 'audio', estimated_bytes: 3000000, blocked: false, code: null, reason: null },
         ],
       });
-      if (path === '/api/video-downloader/downloads' && method === 'POST') {
+      if (path === '/api/media-downloader/downloads' && method === 'POST') {
         api.media.downloads.push(request.postDataJSON() as { url: string; preset: string });
         return json(route, { job_id: 'video-job' }, 202);
       }
-      if (path === '/api/video-downloader/jobs/video-job' && method === 'GET') {
+      if (path === '/api/media-downloader/jobs/video-job' && method === 'GET') {
         videoDone = ++videoPolls > 1;
         return json(route, { job_id: 'video-job', state: videoDone ? 'done' : 'downloading', percent: videoDone ? 100 : 42, speed: videoDone ? null : 1200000, eta: videoDone ? null : 12, file: videoDone ? videoFile : null, error: null });
       }
-      if (path === '/api/video-downloader/files' && method === 'GET') return json(route, videoDone ? [videoFile] : []);
-      if (path === '/api/video-downloader/files/video-file/download' && method === 'GET') return route.fulfill({ status: 200, contentType: 'video/mp4', headers: { 'Content-Disposition': 'attachment; filename="Coastal walk.mp4"' }, body: videoBytes });
-      if (path === '/api/video-downloader/files/video-file' && method === 'DELETE') { videoDone = false; return route.fulfill({ status: 204 }); }
+      if (path === '/api/media-downloader/files' && method === 'GET') return json(route, videoDone ? [videoFile] : []);
+      if (path === '/api/media-downloader/files/video-file/download' && method === 'GET') return route.fulfill({ status: 200, contentType: 'video/mp4', headers: { 'Content-Disposition': 'attachment; filename="Coastal walk.mp4"' }, body: videoBytes });
+      if (path === '/api/media-downloader/files/video-file' && method === 'DELETE') { videoDone = false; return route.fulfill({ status: 204 }); }
       if (path.endsWith('/cancel') && method === 'POST') return json(route, {});
     }
     if (path === "/api/tickets/unread-count" && request.method() === "GET") {

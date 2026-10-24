@@ -155,7 +155,7 @@ describe("native capability pages", () => {
   beforeEach(() => {
     vi.mocked(commandsClient.capabilities).mockResolvedValue([
       { name: "pdf", label: "PDF merger", enabled: true, tools: [], resources: [] },
-      { name: "video", label: "Media downloader", enabled: true, tools: [], resources: [] },
+      { name: "media", label: "Media downloader", enabled: true, tools: [], resources: [] },
     ]);
   });
   it.each([["pdf_merger", "pdf-merger"], ["media_downloader", "media-downloader"]])("opens %s as a dedicated route", async (path, name) => {

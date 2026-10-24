@@ -6,7 +6,7 @@ what it does:
 - `server_manager/` - start/stop/restart/list Docker containers and app logs, with owner email notifications from ServerWatcher (`/server ...`).
 - `generator/` - passwords, passphrases, PINs, TOTP (`/gen ...`).
 - `web_research/` - web search and page read through Tavily (`/web ...`).
-- `media_downloader/` - public video/music/photo probes, queued downloads, status and signed file links (`/video ...`); photo carousels become numbered ZIPs.
+- `media_downloader/` - public video/music/photo probes, queued downloads, status and signed file links (`/media ...`); photo carousels become numbered ZIPs.
 - `firecrawl/` - scrape and crawl through Firecrawl (`/scrape ...`).
 - `usage_report/` - token usage per agent, model or day (`/usage ...`).
 - `vault/` - read-only notes vault (`/vault ...`).
@@ -367,5 +367,5 @@ work can declare `PROCESS_LIFETIME_MODULES = ("utils",)` in its package. The
 loader preserves these direct child packages and their descendants when it
 reloads wrappers, then attaches them to the fresh parent package. Changes to
 retained modules require a server restart. All other capabilities keep the
-default full purge. VideoDownloader uses this to retain one queue/store and
+default full purge. MediaDownloader uses this to retain one queue/store and
 coherent socket/curl guard identities while its tools are reloaded.

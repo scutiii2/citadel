@@ -112,7 +112,7 @@ def _video_operation(request, uid, body):
     from src.capabilities.media_downloader.domain import _require_ffmpeg
     from src.capabilities.media_downloader.utils.models import DownloadRequest, ProbeRequest, PackageCreate, PackageAdd
     from src.capabilities.media_downloader.utils.service import Caller
-    from src.services.video_downloads import get_runtime
+    from src.services.media_downloads import get_runtime
 
     caller = Caller("uid:" + uid)
     path = request.url.path
@@ -167,7 +167,7 @@ def _video_operation(request, uid, body):
 
 
 def install_media_ui_routes(app):
-    for kind in ("pdf", "video"):
+    for kind in ("pdf", "media"):
         base = f"/{kind}/ui"
         app.add_route(base + "/files", media_ui, methods=["GET"])
         app.add_route(base + "/files/{file_id}", media_ui, methods=["DELETE"])
@@ -175,10 +175,10 @@ def install_media_ui_routes(app):
         app.add_route(base + "/jobs/{job_id}/cancel", media_ui, methods=["POST"])
     app.add_route("/pdf/ui/files/{file_id}/content", media_ui, methods=["GET"])
     app.add_route("/pdf/ui/merge", media_ui, methods=["POST"])
-    app.add_route("/video/ui/probe", media_ui, methods=["POST"])
-    app.add_route("/video/ui/downloads", media_ui, methods=["POST"])
-    app.add_route('/video/ui/packages', media_ui, methods=['GET', 'POST'])
-    app.add_route('/video/ui/packages/{package_id}', media_ui, methods=['GET', 'DELETE'])
-    app.add_route('/video/ui/packages/{package_id}/items', media_ui, methods=['POST'])
-    app.add_route('/video/ui/packages/{package_id}/items/{item_id}', media_ui, methods=['DELETE'])
-    app.add_route('/video/ui/packages/{package_id}/start', media_ui, methods=['POST'])
+    app.add_route("/media/ui/probe", media_ui, methods=["POST"])
+    app.add_route("/media/ui/downloads", media_ui, methods=["POST"])
+    app.add_route('/media/ui/packages', media_ui, methods=['GET', 'POST'])
+    app.add_route('/media/ui/packages/{package_id}', media_ui, methods=['GET', 'DELETE'])
+    app.add_route('/media/ui/packages/{package_id}/items', media_ui, methods=['POST'])
+    app.add_route('/media/ui/packages/{package_id}/items/{item_id}', media_ui, methods=['DELETE'])
+    app.add_route('/media/ui/packages/{package_id}/start', media_ui, methods=['POST'])

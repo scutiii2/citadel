@@ -12,12 +12,12 @@ import ProbeCard from './components/ProbeCard.vue'
 import JobCard from './components/JobCard.vue'
 import FileRow from './components/FileRow.vue'
 import PackagePanel from './components/PackagePanel.vue'
-import { useVideoDownloaderStore } from './stores/videoDownloader'
+import { useMediaDownloaderStore } from './stores/mediaDownloader'
 import { useAuthStore } from '../../stores/auth'
 import { formatBytes, formatExpiry } from './utils/format'
-import type { FileInfo } from './api/VideoDownloaderTypes'
+import type { FileInfo } from './api/MediaDownloaderTypes'
 
-const store = useVideoDownloaderStore()
+const store = useMediaDownloaderStore()
 const narrow = ref(window.matchMedia?.('(max-width: 767px)').matches ?? false)
 const mediaQuery = window.matchMedia?.('(max-width: 767px)')
 function updateViewport(event: MediaQueryListEvent): void { narrow.value = event.matches }

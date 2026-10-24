@@ -4,7 +4,7 @@ import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
 import DownloadCards from '../../../components/content/DownloadCards.vue'
 import ElapsedTime from '../../../components/ui/status/ElapsedTime.vue'
 import { formatEta, formatSpeed } from '../utils/format'
-import type { VideoJob } from '../stores/videoDownloader'
+import type { VideoJob } from '../stores/mediaDownloader'
 
 const props = defineProps<{ job: VideoJob; busy?: boolean }>()
 defineEmits<{ cancel: []; dismiss: [] }>()
@@ -50,7 +50,7 @@ const stateText = computed(() => {
   </li>
 </template>
 
-<style scoped src="./videoDownloader.css"></style>
+<style scoped src="./mediaDownloader.css"></style>
 <style scoped>
 .panel { padding: 16px; background: var(--bg); }
 .row { align-items: flex-start; flex-wrap: nowrap; }

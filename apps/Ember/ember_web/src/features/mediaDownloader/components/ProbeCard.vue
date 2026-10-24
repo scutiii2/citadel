@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
 import CopyButton from '../../../components/ui/buttons/CopyButton.vue'
 import SegmentedControl from '../../../components/ui/forms/SegmentedControl.vue'
-import type { ProbeResult } from '../api/VideoDownloaderTypes'
+import type { ProbeResult } from '../api/MediaDownloaderTypes'
 import { formatBytes, formatDuration } from '../utils/format'
 
 const props = defineProps<{ result: ProbeResult; selected: string | null; busy?: boolean }>()
@@ -44,7 +44,7 @@ const blockedOptions = computed(() => props.result.options.filter(o => o.blocked
   </section>
 </template>
 
-<style scoped src="./videoDownloader.css"></style>
+<style scoped src="./mediaDownloader.css"></style>
 <style scoped>
 .panel.probe { display: block; padding: 0; overflow: hidden; background: var(--bg); }
 .preview-row { display: flex; align-items: flex-start; gap: 16px; padding: 18px; }

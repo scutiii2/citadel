@@ -2,7 +2,7 @@
   "summary": "Probe and download public media, or collect links in draft groups and start locked ZIP packages. Account-scoped files expire automatically; tools return immediately.",
   "tools": [
     {
-      "name": "tool_vid_probe",
+      "name": "tool_media_probe",
       "purpose": "Inspect public media and its unblocked download options",
       "connection": "Public HTTP(S)",
       "commands": [
@@ -10,7 +10,7 @@
       ]
     },
     {
-      "name": "tool_vid_download",
+      "name": "tool_media_download",
       "purpose": "Queue a download and return a job id immediately",
       "connection": "Public HTTP(S), local FFmpeg",
       "commands": [
@@ -18,7 +18,7 @@
       ]
     },
     {
-      "name": "tool_vid_status",
+      "name": "tool_media_status",
       "purpose": "Poll your job and get a fresh signed link",
       "connection": "Local queue",
       "commands": [
@@ -26,7 +26,7 @@
       ]
     },
     {
-      "name": "tool_vid_listFiles",
+      "name": "tool_media_listFiles",
       "purpose": "List your unexpired files with fresh signed links",
       "connection": "Local store",
       "commands": [
@@ -34,7 +34,7 @@
       ]
     },
     {
-      "name": "tool_vid_package",
+      "name": "tool_media_package",
       "purpose": "Create a draft group, add/remove media, or start and lock its ZIP download",
       "connection": "Public HTTP(S), local queue/store",
       "commands": [
@@ -42,7 +42,7 @@
       ]
     },
     {
-      "name": "tool_vid_packages",
+      "name": "tool_media_packages",
       "purpose": "List your groups or inspect package progress, item failures and fresh ZIP links",
       "connection": "Local queue/store",
       "commands": [
@@ -53,7 +53,7 @@
   "commands": [
     {
       "name": "probe",
-      "tool": "tool_vid_probe",
+      "tool": "tool_media_probe",
       "params": [
         {
           "name": "url",
@@ -65,7 +65,7 @@
     },
     {
       "name": "download",
-      "tool": "tool_vid_download",
+      "tool": "tool_media_download",
       "params": [
         {
           "name": "url",
@@ -83,7 +83,7 @@
     },
     {
       "name": "status",
-      "tool": "tool_vid_status",
+      "tool": "tool_media_status",
       "params": [
         {
           "name": "job_id",
@@ -95,12 +95,12 @@
     },
     {
       "name": "files",
-      "tool": "tool_vid_listFiles",
+      "tool": "tool_media_listFiles",
       "params": []
     },
     {
       "name": "package",
-      "tool": "tool_vid_package",
+      "tool": "tool_media_package",
       "params": [
         {
           "name": "action",
@@ -142,7 +142,7 @@
     },
     {
       "name": "packages",
-      "tool": "tool_vid_packages",
+      "tool": "tool_media_packages",
       "params": [
         {
           "name": "package_id",
@@ -156,37 +156,37 @@
   "workflow": [
     {
       "sequence": "1",
-      "tool": "tool_vid_probe",
+      "tool": "tool_media_probe",
       "ai_only_step": false,
       "explanation": "Inspect the URL and choose an unblocked preset."
     },
     {
       "sequence": "2",
-      "tool": "tool_vid_download",
+      "tool": "tool_media_download",
       "ai_only_step": false,
       "explanation": "Start the download; retain its job_id."
     },
     {
       "sequence": "3",
-      "tool": "tool_vid_status",
+      "tool": "tool_media_status",
       "ai_only_step": false,
       "explanation": "Poll until done or error, then open the signed download_url."
     },
     {
       "sequence": "4",
-      "tool": "tool_vid_listFiles",
+      "tool": "tool_media_listFiles",
       "ai_only_step": false,
       "explanation": "Find earlier unexpired files or renew a download link."
     },
     {
       "sequence": "5",
-      "tool": "tool_vid_package",
+      "tool": "tool_media_package",
       "ai_only_step": false,
       "explanation": "For a package: create a named group, add URLs with chosen presets, then start. The accepted start permanently locks membership."
     },
     {
       "sequence": "6",
-      "tool": "tool_vid_packages",
+      "tool": "tool_media_packages",
       "ai_only_step": false,
       "explanation": "Inspect group items and failures; completed packages include one ZIP of successful downloads. Status also accepts the package job_id."
     }

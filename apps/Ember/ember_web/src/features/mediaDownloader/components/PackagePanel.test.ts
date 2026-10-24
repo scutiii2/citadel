@@ -2,11 +2,11 @@ import { createPinia } from 'pinia'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import PackagePanel from './PackagePanel.vue'
-import { videoDownloaderClient as api } from '../api/VideoDownloaderClient'
-import type { MediaPackage } from '../api/VideoDownloaderTypes'
+import { mediaDownloaderClient as api } from '../api/MediaDownloaderClient'
+import type { MediaPackage } from '../api/MediaDownloaderTypes'
 import { ApiError } from '../../../api/http'
 
-vi.mock('../api/VideoDownloaderClient', () => ({ videoDownloaderClient: {
+vi.mock('../api/MediaDownloaderClient', () => ({ mediaDownloaderClient: {
   listPackages: vi.fn(), createPackage: vi.fn(), addPackageItem: vi.fn(), removePackageItem: vi.fn(), startPackage: vi.fn(), deletePackage: vi.fn(),
 } }))
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn() }))

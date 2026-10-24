@@ -1,19 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { videoDownloaderClient as api, watchVideoJob } from './VideoDownloaderClient'
+import { mediaDownloaderClient as api, watchVideoJob } from './MediaDownloaderClient'
 import { ApiError, onUnauthorized } from '../../../api/http'
-import type { JobStatus } from './VideoDownloaderTypes'
+import type { JobStatus } from './MediaDownloaderTypes'
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); onUnauthorized(() => {}) })
-describe('video downloader client', () => {
+describe('media downloader client', () => {
   it('uses authenticated same-origin JSON and encodes opaque IDs', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', fetcher)
     await api.cancelJob('a/b')
-    expect(fetcher).toHaveBeenCalledWith('/api/video-downloader/jobs/a%2Fb/cancel', expect.objectContaining({ method: 'POST', credentials: 'same-origin', body: '{}', headers: { 'Content-Type': 'application/json' } }))
+    expect(fetcher).toHaveBeenCalledWith('/api/media-downloader/jobs/a%2Fb/cancel', expect.objectContaining({ method: 'POST', credentials: 'same-origin', body: '{}', headers: { 'Content-Type': 'application/json' } }))
     await api.deleteFile('a/b')
-    expect(fetcher).toHaveBeenLastCalledWith('/api/video-downloader/files/a%2Fb', expect.objectContaining({ method: 'DELETE' }))
+    expect(fetcher).toHaveBeenLastCalledWith('/api/media-downloader/files/a%2Fb', expect.objectContaining({ method: 'DELETE' }))
     await api.deletePackage('a/b')
-    expect(fetcher).toHaveBeenLastCalledWith('/api/video-downloader/packages/a%2Fb', expect.objectContaining({ method: 'DELETE', credentials: 'same-origin' }))
+    expect(fetcher).toHaveBeenLastCalledWith('/api/media-downloader/packages/a%2Fb', expect.objectContaining({ method: 'DELETE', credentials: 'same-origin' }))
   })
   it('preserves error codes and invokes the session handler on 401', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'Protected', error: { code: 'drm_protected', message: 'Protected' } }), { status: 422 })).mockResolvedValueOnce(new Response('{}', { status: 401 })))

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { videoDownloaderClient as api, watchVideoJob } from '../api/VideoDownloaderClient'
-import type { FileInfo, JobState, JobStatus, ProbeResult } from '../api/VideoDownloaderTypes'
+import { mediaDownloaderClient as api, watchVideoJob } from '../api/MediaDownloaderClient'
+import type { FileInfo, JobState, JobStatus, ProbeResult } from '../api/MediaDownloaderTypes'
 import { ApiError } from '../../../api/http'
 import { friendlyError } from '../utils/messages'
 import { errorMessage } from '../../../utils/errors'
@@ -24,7 +24,7 @@ export function videoError(error: unknown): string {
   return error instanceof ApiError ? friendlyError(error.code ?? '', error.message) : errorMessage(error)
 }
 
-export const useVideoDownloaderStore = defineStore('videoDownloader', () => {
+export const useMediaDownloaderStore = defineStore('mediaDownloader', () => {
   const auth = useAuthStore()
   const url = ref('')
   const result = ref<ProbeResult | null>(null)

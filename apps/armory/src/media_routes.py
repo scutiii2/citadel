@@ -7,13 +7,13 @@ from starlette.responses import FileResponse, JSONResponse
 from src.config import settings
 from src.services import capability_registry
 from src.services.internal_token import is_exposed_without_token
-from src.services.video_downloads import get_runtime
+from src.services.media_downloads import get_runtime
 
 
 async def download_video(request: Request):
     # Do not initialize a disabled capability or disclose the presence of a file.
     try:
-        enabled = capability_registry.is_enabled("video")
+        enabled = capability_registry.is_enabled("media")
     except KeyError:
         enabled = False
     if not enabled or is_exposed_without_token(settings.host, settings.internal_api_token):

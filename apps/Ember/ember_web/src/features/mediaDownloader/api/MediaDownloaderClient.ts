@@ -1,10 +1,10 @@
 import { apiRequest, ApiError } from '../../../api/http'
-import type { FileInfo, JobStatus, ProbeResult, MediaPackage } from './VideoDownloaderTypes'
+import type { FileInfo, JobStatus, ProbeResult, MediaPackage } from './MediaDownloaderTypes'
 
-const BASE = '/api/video-downloader'
+const BASE = '/api/media-downloader'
 const id = encodeURIComponent
 
-export const videoDownloaderClient = {
+export const mediaDownloaderClient = {
   probe: (url: string) => apiRequest<ProbeResult>('POST', `${BASE}/probe`, { url }),
   startDownload: (url: string, preset: string) => apiRequest<{ job_id: string }>('POST', `${BASE}/downloads`, { url, preset }),
   getJobStatus: (jobId: string) => apiRequest<JobStatus>('GET', `${BASE}/jobs/${id(jobId)}`),
@@ -30,7 +30,7 @@ export function watchVideoJob(jobId: string, update: (status: JobStatus) => void
   }
   const poll = async () => {
     try {
-      const status = await videoDownloaderClient.getJobStatus(jobId)
+      const status = await mediaDownloaderClient.getJobStatus(jobId)
       if (stopped) return
       failures = 0
       update(status)

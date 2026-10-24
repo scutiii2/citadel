@@ -28,7 +28,7 @@ src/
     settings/
     tickets/
     usage/
-    videoDownloader/
+    mediaDownloader/
   components/
     ui/
       buttons/        # Actions, copy, delete, save, page links

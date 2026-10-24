@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
-import { videoDownloaderClient as api } from '../api/VideoDownloaderClient'
-import type { MediaPackage } from '../api/VideoDownloaderTypes'
+import { mediaDownloaderClient as api } from '../api/MediaDownloaderClient'
+import type { MediaPackage } from '../api/MediaDownloaderTypes'
 import { useAuthStore } from '../../../stores/auth'
-import { videoError } from './videoDownloader'
+import { videoError } from './mediaDownloader'
 
 export const useMediaPackagesStore = defineStore('mediaPackages', () => {
   const auth = useAuthStore()

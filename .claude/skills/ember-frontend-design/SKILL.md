@@ -49,7 +49,7 @@ Use these existing pages as implementation references:
 | Writing with secondary tools | `features/notes/NotesView.vue`: list/editor, collapsed tools, persistent Save |
 | Reviewing short facts | `features/memory/MemoryView.vue`: searchable rows, editor dialog/mobile sheet |
 | Reading durable documents | `features/brains/BrainsView.vue`: scoped search, browser/reader, secondary connection settings |
-| Downloading and collecting media | `features/videoDownloader/VideoDownloaderView.vue`, `features/videoDownloader/components/`: single-link flow, ZIP groups, temporary files |
+| Downloading and collecting media | `features/mediaDownloader/MediaDownloaderView.vue`, `features/mediaDownloader/components/`: single-link flow, ZIP groups, temporary files |
 
 ## 3. Navigation placement
 

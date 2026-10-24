@@ -24,39 +24,39 @@ logger = logging.getLogger(__name__)
 
 
 @catalog
-def load_video_settings():
+def load_media_settings():
     """Use armory's config loader and the standalone caps/TTL shape, validating bounds."""
     from src.capabilities.media_downloader.utils.config import Limits, Settings
-    raw = load_config(settings.video_config_path)
+    raw = load_config(settings.media_config_path)
     limits = Limits.from_config(raw.get("limits", {}))
     for field in fields(limits):
         value = getattr(limits, field.name)
         minimum = 0 if field.name == "max_queued_downloads" else 1
         if not math.isfinite(value) or value < minimum:
-            raise ValueError(f"{settings.video_config_path}: invalid {field.name}")
+            raise ValueError(f"{settings.media_config_path}: invalid {field.name}")
     ttl = float(raw.get("file_ttl_hours", 6)) * 3600
     sweep = float(raw.get("sweep_interval_minutes", 10)) * 60
     link = float(raw.get("download_link_minutes", 60)) * 60
     caller_jobs = raw.get("limits", {}).get("max_caller_downloads", 2)
     if any(not math.isfinite(v) or v < 1 for v in (ttl, sweep, link)):
-        raise ValueError(f"{settings.video_config_path}: TTLs and sweep interval must be positive")
+        raise ValueError(f"{settings.media_config_path}: TTLs and sweep interval must be positive")
     if not isinstance(caller_jobs, int) or isinstance(caller_jobs, bool) or caller_jobs < 1:
-        raise ValueError(f"{settings.video_config_path}: max_caller_downloads must be a positive integer")
-    base_url = settings.video_public_base_url.rstrip("/") or f"http://127.0.0.1:{settings.port}"
+        raise ValueError(f"{settings.media_config_path}: max_caller_downloads must be a positive integer")
+    base_url = settings.media_public_base_url.rstrip("/") or f"http://127.0.0.1:{settings.port}"
     parsed = urlsplit(base_url)
     if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
-        raise ValueError("MCP_VIDEO_PUBLIC_BASE_URL must be an http(s) base URL without credentials, query or fragment")
-    key = settings.video_signing_key.encode() or secrets.token_bytes(32)
-    if not settings.video_signing_key:
-        logger.warning("MCP_VIDEO_SIGNING_KEY unset: video links stop working after restart")
-    config = Settings(store_dir=settings.video_store_dir, log_dir=settings.video_log_dir,
+        raise ValueError("MCP_MEDIA_PUBLIC_BASE_URL must be an http(s) base URL without credentials, query or fragment")
+    key = settings.media_signing_key.encode() or secrets.token_bytes(32)
+    if not settings.media_signing_key:
+        logger.warning("MCP_MEDIA_SIGNING_KEY unset: video links stop working after restart")
+    config = Settings(store_dir=settings.media_store_dir, log_dir=settings.media_log_dir,
                       public_base_url=base_url, signing_key=key, limits=limits,
                       file_ttl_seconds=int(ttl), sweep_interval_seconds=int(sweep), download_link_seconds=int(link))
     return config, caller_jobs
 
 
 @catalog
-class VideoRuntime:
+class MediaRuntime:
     """Serialize service access on a persistent loop; jobs outlive individual tool calls."""
     def __init__(self, config, *, extractor=None, policy=None, max_caller_downloads=2):
         self._config = config
@@ -120,12 +120,12 @@ _runtime = None
 _lock = threading.Lock()
 
 
-def get_runtime() -> VideoRuntime:
+def get_runtime() -> MediaRuntime:
     global _runtime
     with _lock:
         if _runtime is None:
-            config, caller_jobs = load_video_settings()
-            _runtime = VideoRuntime(config, max_caller_downloads=caller_jobs)
+            config, caller_jobs = load_media_settings()
+            _runtime = MediaRuntime(config, max_caller_downloads=caller_jobs)
         return _runtime
 
 
