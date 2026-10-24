@@ -450,7 +450,7 @@ def current() -> AgentSpec:
         file = os.getenv("AI_AGENT_FILE")
         if not file:
             raise AgentSpecError(
-                "AI_AGENT_FILE is not set - start agents with run.bat (python -m src.supervisor), "
+                "AI_AGENT_FILE is not set - start agents with python -m src.supervisor, "
                 "or set AI_AGENT_FILE to an agents/<id>.json path"
             )
         _current = load_file(Path(file))

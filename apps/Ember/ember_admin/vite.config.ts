@@ -71,7 +71,7 @@ export default defineConfig({
     restoreMocks: true,
   },
   server: {
-    // Set by run.bat / server_launcher. strictPort: fail instead of silently
+    // Set by the launcher or the environment. strictPort: fail instead of silently
     // moving to the next port, so the launcher's port is always the real one.
     port: Number(process.env.EMBER_ADMIN_PORT ?? 5176),
     strictPort: true,

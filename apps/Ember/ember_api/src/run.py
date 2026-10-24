@@ -1,4 +1,4 @@
-"""ember_api entry point: ``py -m src.run`` (see run.bat)."""
+"""ember_api entry point: ``py -m src.run``."""
 
 from __future__ import annotations
 
