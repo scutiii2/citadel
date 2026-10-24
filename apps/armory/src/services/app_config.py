@@ -623,3 +623,22 @@ def migrate_capabilities_config(config_path: Path, ids: list[str]) -> None:
         data.setdefault(capability_id, {"enabled": True})
     data[_SCANNER_MARKER] = {"migrated": True}
     _write_config(config_path, data)
+
+
+RENAMED_CAPABILITIES = {"video": "media"}
+
+
+def migrate_renamed_capabilities(config_path: Path) -> None:
+    """Move the entry of a renamed capability to its new id, so its on/off state survives.
+    An entry already under the new id wins. Writes only when something moved."""
+    if not config_path.exists():
+        return
+    data = load_config(config_path)
+    moved = False
+    for old, new in RENAMED_CAPABILITIES.items():
+        if old in data:
+            data.setdefault(new, data[old])
+            del data[old]
+            moved = True
+    if moved:
+        _write_config(config_path, data)

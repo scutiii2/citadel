@@ -233,7 +233,7 @@ def test_transfer_permissions_are_independent_of_tool_execution(client, email, d
         async with client.app.state.database.sessions() as session:
             return await session.scalar(select(Account.uid).where(Account.username == 'alice'))
     uid = client.portal.call(member_uid)
-    db_gateway.records[('account_capabilities', uid)] = {'capabilities': ['pdf', 'video']}
+    db_gateway.records[('account_capabilities', uid)] = {'capabilities': ['pdf', 'media']}
     assert client.post('/api/pdf-merger/files', json={'filename': 'x.pdf', 'data': 'eA=='}).status_code == 403
     assert client.get('/api/pdf-merger/files/f_one/content').status_code == 403
     assert client.get('/api/media-downloader/files/f_one/download').status_code == 403

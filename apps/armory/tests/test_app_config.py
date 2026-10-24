@@ -23,6 +23,7 @@ from src.services.app_config import (
     load_extension_config,
     load_extensions_config,
     migrate_capabilities_config,
+    migrate_renamed_capabilities,
     resolve_section,
     save_capabilities_config,
     save_extension_config,
@@ -881,3 +882,19 @@ def test_migrate_capabilities_creates_a_missing_file(tmp_path: Path):
     migrate_capabilities_config(path, ["vault"])
 
     assert json.loads(path.read_text(encoding="utf-8")) == {"vault": {"enabled": True}, "_scanner": {"migrated": True}}
+
+
+def test_renamed_capability_keeps_its_state_under_the_new_id(tmp_path: Path):
+    path = tmp_path / "capabilities.json"
+    path.write_text(json.dumps({"video": {"enabled": False}, "gen": {"enabled": True}}))
+    migrate_renamed_capabilities(path)
+    assert json.loads(path.read_text()) == {"gen": {"enabled": True}, "media": {"enabled": False}}
+
+
+def test_renamed_capability_does_not_override_a_new_entry_or_a_missing_file(tmp_path: Path):
+    path = tmp_path / "capabilities.json"
+    migrate_renamed_capabilities(path)
+    assert not path.exists()
+    path.write_text(json.dumps({"video": {"enabled": False}, "media": {"enabled": True}}))
+    migrate_renamed_capabilities(path)
+    assert json.loads(path.read_text()) == {"media": {"enabled": True}}
