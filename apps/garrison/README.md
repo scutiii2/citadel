@@ -20,13 +20,13 @@ and an MCP *client* (to `mcp_server`, via a persistent connection - see
    you're running), or the key(s) for whichever `llm.gateway` your agent
    files point at instead. Both can be set at once - one file backs every agent.
 
-2. Make sure `mcp_server` is running (`apps/armory/run.bat`) -
+2. Make sure `mcp_server` is running (`py -m src.run` in `apps/armory/`) -
    `apps/garrison/configs/config_servers.json` points at its default
    `http://127.0.0.1:8010/mcp`.
 
-3. Start the agents with `run.bat` (from `apps/garrison/`). It creates
-   `.venv_garrison` and installs this project into it in editable mode on
-   first run, then runs `py -m src.supervisor`. See Agents below.
+3. Start the agents from `apps/garrison/`: create `.venv_garrison` and install the
+   project once (`py -m venv .venv_garrison`, then `.venv_garrison\Scripts\pip install -e ".[dev]"`),
+   then run `.venv_garrison\Scripts\python -m src.supervisor`. See Agents below.
 
 ### Laya models
 
@@ -44,11 +44,12 @@ Garrison sends the service a strategy name per question type and gets the answer
 the cloud fallback (Jev) and its use. See [Triage flow](#triage-flow-laya-english-laya-typed-decisions-jev).
 
 An older image keeps its GPU packages until it is replaced. From the repo root,
-rebuild and recreate Garrison using the same Compose files as your deployment:
+rebuild and recreate Garrison (`dev_deploy.bat` in this folder does the same on a dev machine). On the ZimaOS box
+`COMPOSE_FILE` in the root `.env` already selects the overlay, so no `-f` flags are needed:
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.zima.yml build garrison
-docker compose -f docker-compose.yml -f docker-compose.zima.yml up -d --no-deps garrison
+docker compose build garrison
+docker compose up -d --no-deps garrison
 ```
 
 ## Agents
@@ -204,7 +205,7 @@ every file before it starts anything and refuses to start, naming the file
 and field, on a bad file, a shared port among enabled agents, or a wrong
 number of entry agents.
 
-`run.bat` starts all agents: it runs `python -m src.supervisor`, which
+`python -m src.supervisor` starts all agents: it
 spawns one `python -m src.server` child per enabled file (env
 `AI_AGENT_FILE`), prefixes each child's output with `[<agent id>] `, and
 restarts a crashed child with backoff (1s, 2s, 4s... capped at 60s; left
@@ -225,7 +226,7 @@ page can show an agent that is stopped or disabled. On the ai_agent machine:
 - `AI_AGENT_HOST=0.0.0.0` so it accepts outside connections.
 - `AI_AGENT_ADVERTISE_URL=http://10.0.0.5` (an address peers can reach, no
   path). This is the address registered for each agent; without it a bind-all
-  host registers as `127.0.0.1`. Leave the port out when `run.bat` starts
+  host registers as `127.0.0.1`. Leave the port out when the supervisor starts
   several agents: each one adds its own port. A value with a port is used as
   is (single instance).
 - The same `INTERNAL_API_TOKEN` as ember_api, and the ports open in the

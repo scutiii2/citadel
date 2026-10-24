@@ -418,10 +418,10 @@ No `.env` is needed: nothing server-specific is compiled into the bundle.
 
 Run with any of:
 
-- `run.bat` - installs `node_modules` on first run, then starts Vite.
-  Extra arguments go to Vite (e.g. `run.bat --open`).
-- `server_launcher` - lists it as **Ember Web** (detected from `run.bat`).
-- `npm run dev`
+- `npm install` once, then `npm run dev` starts Vite (port `EMBER_WEB_PORT`, default 5173).
+  Extra arguments go to Vite after `--` (e.g. `npm run dev -- --open`).
+- `dev_deploy.bat` - rebuilds and restarts the `ember_web` container from the root `docker-compose.yml`
+  (see [docs/deployment.md](../../../docs/deployment.md)).
 
 Then open <http://127.0.0.1:5173> and log in (first time: the ember_api
 bootstrap admin - see ember_api's README).

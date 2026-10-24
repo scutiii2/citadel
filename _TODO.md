@@ -19,24 +19,19 @@ The capability exists at `apps/armory/src/capabilities/firecrawl/`, but its test
 - Configure `FIRECRAWL_API_KEY` if needed, or use `FIRECRAWL_API_URL` for self-hosted Firecrawl.
 - Try `/scrape page` on a real URL, then check map links and crawl `data` against the v2 response shapes.
 
-## Run apps in Docker to test the server_manager tools (added 2026-10-07)
+## Verify the Docker deployment end to end (rewritten 2026-10-25)
 
-**Context**: The `server_manager` tools (`apps/armory/src/capabilities/server_manager/`) talk to the Docker socket via `docker.from_env()` and act on containers by name. Checked 2026-10-07: their 23 unit tests pass, but they cannot work on the dev PC. There is no Docker (no CLI, no Docker Desktop, no engine pipe), and the apps run as plain Windows processes through `server_launcher`, so `list` would show no app containers. On ZimaOS, `apps/armory/zima_host.yaml` runs `mcp_server` as a container but does not mount `/var/run/docker.sock`, so the tools fail there too.
+**Done**: Dockerfiles for every service, one root `docker-compose.yml` (`core` network, service-name URLs, `0.0.0.0` binds), the Zima overlay, container-only configs in `docker/configs/`, volumes for the data folders, the Docker socket mounted into `armory`, Laya (`laya` replicas behind `laya_lb`, built from `../LayaAgent`) in the stack, `dev_deploy.bat` per service and `tools/deploy.bat` (publish to `live`, push `.env` and `config_*.json`, set `COMPOSE_FILE` on the server). `server_launcher` and the per-app `run.bat` files are gone. See `docs/deployment.md`.
 
-**Plan**:
-- **Dockerfiles**: one per app; none exist. Python apps (`mcp_server`, `ai_agent`, `ember_api`, `pdf_merger`, `media_downloader`) on `python:3.13-slim` plus `pip install .`. Web apps (`ember_web`, `pdf_merger_web`, `media_downloader_web`) need a Node build stage, then nginx or the Vite dev server.
-- **Compose file**: one `docker-compose.yml` with a fixed `container_name` per app (these are the names `/server start <name>` uses).
-- **Networking**: configs hard-code `127.0.0.1` (`ai_agent/configs/config_servers.json`, `ember_api/configs/config_app.json` `mcp_server_url`, `mcp_server/configs/config_extensions.json`). In containers these become service names such as `http://mcp_server:8010/mcp`, and each service must bind `0.0.0.0`. Use env overrides or a docker config variant.
-- **Docker socket**: mount `/var/run/docker.sock` into the `mcp_server` container. This gives it root-equivalent control of the host. Dev PC needs Docker Desktop with WSL2.
-- **Data**: volumes for `ember_api/data` and `ai_agent/.data`.
-- **Self-stop**: `/server stop mcp-server` kills the server running the tool; expected, but it cannot be restarted from the same chat.
-- `server_launcher` stays as the local-process manager; containers are a second way to run the apps.
+**Still to verify** (none of it has been run on the box):
+- `tools/deploy.bat` options 1 to 3 against the real server: the `scp` copies, the `COMPOSE_FILE` line written over `ssh`, and the publish to `origin/live`.
+- A full `docker compose up -d --build` on ZimaOS with `LayaAgent` next to `Citadel`, then `tool_srv_listApps` returning the `citadel-*` containers.
+- `LAYA_URL=http://garrison:9111/mcp` in `apps/armory/.env`: confirm garrison listens on 9111 inside the container and tickets get grouped.
+- Self-stop: `/server stop armory` kills the server running the tool; expected, but it cannot be restarted from the same chat.
 
-**Smallest first step**: compose with `mcp_server` plus one app (for example `pdf_merger`), enough to test `list`, `restart` and `logs`.
+**SMTP credential rotation (repository cleaned 2026-10-09)**: `zima_host.yaml` is deleted (2026-10-25), but its old inline password remains in Git history. Still required: revoke the exposed password at the mail provider, put a replacement `SMTP_PASSWORD` in the deployment `.env`, recreate the container and verify email delivery.
 
-**SMTP credential rotation (repository cleaned 2026-10-09)**: `zima_host.yaml` now loads credentials from the deployment's gitignored `.env`; the inline password is removed. Still required: revoke the exposed password at the mail provider, put a replacement `SMTP_PASSWORD` in the deployment `.env`, recreate the container and verify email delivery. The old password remains in Git history until revoked.
-
-**Revisit when**: user wants it built (Docker Desktop installed first).
+**Revisit when**: the next deploy to the box.
 
 ## Verify specialist agents and consider follow-up features (added 2026-10-07)
 
@@ -89,28 +84,9 @@ Items 1 to 6 are complete; item 7 remains open.
 
 **Revisit when**: user continues chess; start with the to-do list above.
 
-## Ascension card images in the UI (added 2026-10-10)
+## Ascension (dropped from this repo, 2026-10-25)
 
-**Context**: Every Ascended will get card art. For now two shared placeholders stand in for each card: `apps/ascension/ascended/ascended_common_front_template.png` and `apps/ascension/ascended/ascended_common_back_template.png` (tracked, `e212f9a`). Each Ascended has its own folder `apps/ascension/ascended/<id>/` (with `catalog.json`) where its own assets will be added later. Today the Ember page shows no images: Ascended cards are text, and the menu showcase uses a letter in a circle.
-
-**Plan**:
-- mini_games: a route that serves an Ascended's card image (front or back). It serves `ascended/<id>/` assets when they exist and falls back to the shared placeholder. The catalog or the route decides the file names, never the client; reject any path outside `ascendeds/`.
-- ember_api: a pass-through route for the image. The existing gateway handles JSON only, so it needs a binary response with a content type and cache headers, still behind `ascension.play`, still fixed routes. An `<img>` tag cannot send custom headers, so check how the session cookie reaches the route.
-- ember_web: show the front on Ascended cards, the menu showcase, the starter pick and the battle arena; the back for Ascended not collected yet or a flip on the details dialog (decide in the design). Keep the letter orb as the fallback when an image fails to load.
-
-**Open points**: card tier or rarity frames over the placeholder, image size and format for the real art, and whether the front or back shows for a fainted Ascended.
-
-**Revisit when**: user wants it built. Brainstorm the design first, then write the spec and plan.
-
-## Split Ascension out of mini_games and make the Ember page a game host (added 2026-10-11)
-
-- **Done 2026-10-11:** Ascension owns `apps/ascension/`, its backend, database and config.
-- **Done 2026-10-11:** Ascension owns its Vue UI in `apps/ascension/web`, built and served by its API.
-- **Done 2026-10-11:** Ember hosts registered games at `/games`; administrators register,
-  refresh and deregister URLs. Single-use tickets establish game bearer sessions,
-  roles grant `games.<id>.play`, and the old proxy is removed. Existing game data stays in place.
-
-See `docs/superpowers/plans/2026-10-11-game-host.md` for deployment setup.
+`apps/ascension` is no longer in Citadel: its design docs, plans, specs and `docker/configs/ascension` were deleted, and only the `0013_ascension_permission.py` migration remains. The old items (card images in the UI, splitting Ascension out of `mini_games`, the game host at `/games`) are closed here. If the game returns as its own project, track its card-image work there.
 
 ## Context breakdown for delegated agents (added 2026-10-17)
 

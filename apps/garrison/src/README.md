@@ -12,7 +12,7 @@ Entry points stay at the package root; everything else is grouped by concern.
   tools. `interpret` is the non-agentic, single-completion path ember_api
   uses for chat summarization; `ask` is the full tool-calling loop for
   free-form chat; `decide` answers a tool waiting for approval.
-- `supervisor.py` - `python -m src.supervisor` (what `run.bat` runs):
+- `supervisor.py` - `python -m src.supervisor` (starts all agents):
   spawns one `src.server` child per enabled agent file, relays output,
   restarts crashed children with backoff.
 

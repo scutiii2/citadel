@@ -4,7 +4,7 @@ A terminal chat with an ember agent. It logs in to [ember_api](../Ember/ember_ap
 account and works like the web chat: every question goes to ember_api's entry agent, which hands
 work to specialist agents, and answers stream as they are written, with
 tool progress, saved chats, usage limits and tool approvals. It is an interactive program,
-not a server, so `server_launcher` does not start it.
+not a server, so it has no compose service.
 
 ## Requirements
 
@@ -14,13 +14,14 @@ not a server, so `server_launcher` does not start it.
 ## Run
 
 ```bat
-run.bat
-run.bat --user ada
-run.bat --url http://127.0.0.1:8030 --ask
+py -m venv .venv_ember_cli
+.venv_ember_cli\Scripts\pip install -e ".[dev]"
+.venv_ember_cli\Scripts\python -m src.main
+.venv_ember_cli\Scripts\python -m src.main --user ada
+.venv_ember_cli\Scripts\python -m src.main --url http://127.0.0.1:8030 --ask
 ```
 
-`run.bat` creates `.venv_ember_cli` on first run and installs the project. Or, from an
-activated environment: `python -m src.main`.
+Create the venv and install once; afterwards only the `python -m src.main` lines.
 
 | Option | Meaning |
 |---|---|

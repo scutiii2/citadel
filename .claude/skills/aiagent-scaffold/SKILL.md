@@ -6,8 +6,8 @@ description: Add a new AI agent (a persona/specialist, a delegate-able or entry 
 # ai_agent scaffolding
 
 Since multi-agent phase 1 (2026-10-04) **one file per agent**:
-`apps/garrison/agents/<id>.json`. `run.bat` starts `python -m src.supervisor`,
-which spawns one `python -m src.server` child per enabled file (env
+`apps/garrison/agents/<id>.json`. `python -m src.supervisor` (run from `apps/garrison/`) starts all agents:
+it spawns one `python -m src.server` child per enabled file (env
 `AI_AGENT_FILE`), registers it under its file-name id, prefixes its output
 `[<id>] ` and restarts a crashed child with backoff. An agent file is required
 to start an instance; there is no env-var-only start. Adding an agent is a
@@ -82,7 +82,7 @@ agent one provider+model, all `--MCP-->` mcp_server.
    tracked file on that machine; ember_admin's Reset to defaults drops it. Edit
    the tracked file for a change everyone should get. Keep the README field
    table in step when adding a field.
-4. Restart `run.bat` (the supervisor validates **every** file before starting
+4. Restart the supervisor (`python -m src.supervisor`; it validates **every** file before starting
    anything and names the file and field on error; it also refuses a shared port
    among enabled agents or anything but exactly one `entry: true`). It watches
    `agents/` and the overrides file, so an admin edit is picked up without a
@@ -239,7 +239,7 @@ ember_api owns usage limits and the usage reports.
 
 ## Verify before calling it done
 
-- **Agent file**: start `run.bat`. A bad file, a shared port or a wrong number
+- **Agent file**: start `python -m src.supervisor`. A bad file, a shared port or a wrong number
   of entry agents stops the supervisor with the file and field named. Then
   `[<id>]` lines appear and the agent is listed in `.data/agent_registry.json`;
   `GET /api/agent` on ember_api names the entry agent. Stop with Ctrl+C and

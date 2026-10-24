@@ -198,9 +198,9 @@ top-level context fields still describe its own window.
 
 ## Setup and running
 
-`run.bat` creates `.venv_ember_api`, installs the project (editable, with dev
-extras) on first run, then starts the server on `EMBER_API_PORT` (default
-`8030`). server_launcher lists it as **Ember API**.
+The server listens on `EMBER_API_PORT` (default `8030`).
+
+In Docker: `dev_deploy.bat` in this folder rebuilds and restarts the `ember_api` container from the root `docker-compose.yml` (see [docs/deployment.md](../../../docs/deployment.md)).
 
 Manually:
 
