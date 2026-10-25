@@ -35,6 +35,7 @@ export interface FakeState {
   /** Names whose next "online" fails. */
   failing: Set<string>;
   unexpected: string[];
+  triageStrategy: string | null;
 }
 
 export function newState(): FakeState {
@@ -47,6 +48,7 @@ export function newState(): FakeState {
     discoverable: [cap("fresh", { enabled: false, loaded: false, tools: [] })],
     failing: new Set(["fresh"]),
     unexpected: [],
+    triageStrategy: null,
   };
 }
 
@@ -66,6 +68,10 @@ export async function installFakeApi(page: Page, state: FakeState): Promise<void
     if (method === "GET" && ["/api/brains/destinations", "/api/brains/suggestions", "/api/brains/promotions"].includes(pathname)) return json(route, []);
     if (pathname === "/api/commands/help" && method === "GET") return json(route, { capabilities: state.capabilities.map((c) => ({ capability: `/${c.name}`, summary: `Explore the tools provided by ${c.label}.` })) });
     if (pathname === "/api/commands" && method === "GET") return json(route, []);
+    if (pathname === "/api/admin/triage-strategy" && ["GET", "PUT"].includes(method)) {
+      if (method === "PUT") state.triageStrategy = request.postDataJSON().value;
+      return json(route, { default: state.triageStrategy, strategies: ["english-only", "typed-only", "auto"] });
+    }
     if (pathname === "/api/auth/me") return json(route, { ...ADMIN_ACCOUNT, permissions: state.permissions ?? ADMIN_ACCOUNT.permissions });
     if (method === "GET" && pathname === "/api/admin/usage") return json(route, [
       { account_id: 2, username: "alice", tokens: 123, turns: 1, last_used_at: null },
