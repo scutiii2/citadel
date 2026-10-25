@@ -7,6 +7,10 @@ configured per-request policy. Usage counting and rate limits live in chat_app.
 
 from __future__ import annotations
 
+from contextvars import ContextVar, Token
+from types import MappingProxyType
+from collections.abc import Mapping
+
 import json
 import math
 from typing import Any
@@ -128,6 +132,31 @@ def trim_history_to_fit(
     while len(trimmed) > 2 and estimate_context_tokens(trimmed) > budget:
         trimmed = trimmed[2:]
     return trimmed
+
+
+# The asking user's own caps for one turn, set by run_chat from ask(limits=...). Like
+# tool_filter.py it is a ContextVar, so the providers' signatures stay as they are.
+USER_FIELDS = ("max_output_tokens", "max_tool_rounds")
+_user_limits: ContextVar[Mapping[str, int]] = ContextVar("user_limits", default=MappingProxyType({}))
+
+
+def bind_user_limits(limits: dict[str, Any] | None) -> Token:
+    """Cap this turn at the user's values. Anything but a positive int for a known field is dropped."""
+    clean = {
+        field: value for field, value in (limits or {}).items()
+        if field in USER_FIELDS and isinstance(value, int) and not isinstance(value, bool) and value > 0
+    }
+    return _user_limits.set(clean)
+
+
+def reset_user_limits(token: Token) -> None:
+    _user_limits.reset(token)
+
+
+def apply_user_limit(field: str, value: int) -> int:
+    """`value`, lowered to the user's cap for `field` when they set one. Never raises it."""
+    cap = _user_limits.get().get(field)
+    return value if cap is None else min(value, cap)
 
 
 def reset_cache() -> None:
