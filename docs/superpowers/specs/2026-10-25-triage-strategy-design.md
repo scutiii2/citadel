@@ -1,7 +1,7 @@
 # Triage strategy: per-user choice (ember_web) and admin default (ember_admin)
 
 ## Goal
-A user picks which LayaAgent decision strategy answers their prompts sent straight to the Triage Assistant from ember_web. An administrator sets the default strategy in ember_admin. The default applies to every LayaAgent caller, not only Ember.
+A user picks which LayaAgent decision strategy answers their prompts sent straight to the Triage Assistant from ember_web. An administrator sets the default strategy in ember_admin. The default applies to every LayaAgent caller that names no strategy of its own, not only Ember.
 
 ## Scope
 - In: Garrison strategy resolution, a one-key admin overlay, ember_api admin and account routes, ember_web Settings row, ember_admin control.
@@ -16,29 +16,29 @@ A user picks which LayaAgent decision strategy answers their prompts sent straig
 ## Decisions
 - Strategy names come from the service (`GET /v1/strategies`), never a copy in Garrison or Ember.
 - Resolution order: request `strategy`, then admin default, then current behaviour (derived from voter config). An unset admin default keeps today's behaviour.
-- Admin default is stored in Garrison (`configs/tuning_overrides.json`), so it covers every caller. Per-user value is stored in ember_api's DB. A null user value means "use the admin default".
+- Admin default is stored in Garrison (`configs/config_tuning_overrides.json`), so it covers every caller. Per-user value is stored in ember_api's DB. A null user value means "use the admin default".
 - Jev fallback after an uncertain result is unchanged.
 
 ## Garrison
 - `LAYAAgent.strategies()` calls `GET /v1/strategies` and returns `{strategies, default}`.
-- The request JSON accepts optional `strategy`. `laya_provider.parse_request` rejects an unknown name with 422 (`Invalid Laya request`).
+- The request JSON accepts optional `strategy`. `laya_provider.parse_request` checks that it is a non-empty string. `TriageFlow` checks the name against the service list and rejects an unknown name with 422 (`Invalid Laya request`). If listing is unavailable, the request proceeds unchecked; a 422 from `/v1/ask` remains an invalid request and never triggers Jev fallback.
 - `TriageFlow._ask_locals`: when a strategy resolves, all questions in the request go to the service in one call under that strategy. Otherwise the existing grouping runs.
-- New `src/core/tuning_overrides.py`: holds `triage_strategy` only. `load()`, `save(patch)`, atomic write with the temp-file-and-replace pattern of `config_files.seed_tuning`. An unreadable or invalid file is ignored and logged. File shape: `{"classifier": {"triage_strategy": "..."}}`, so the full tuning spec reuses it.
+- New `src/core/tuning_overrides.py`: holds `triage_strategy` only. `triage_strategy()`, `set_triage_strategy(value)`, atomic write with the temp-file-and-replace pattern of `config_files.seed_tuning`. An unreadable or invalid file is ignored and logged. File shape: `{"classifier": {"triage_strategy": "..."}}`, so the full tuning spec reuses it.
 - Internal-token endpoints:
-  - `GET /admin/triage-strategy` returns `{default, strategies}` (`default` null when unset).
-  - `PUT /admin/triage-strategy` takes `{strategy: str | null}`, validates against the service list, saves, returns the same shape. Null clears the override.
+  - `GET /agents/triage-strategy` returns `{default, strategies}` (`default` null when unset).
+  - `PUT /agents/triage-strategy` takes `{strategy: str | null}`, validates against the service list, saves, returns the same shape. Null clears the override.
 
 ## ember_api
-- Permission `tuning.manage` in `services/permissions.py`, in the admin role set.
-- `routes/admin_triage_strategy.py` proxies GET and PUT through a service modelled on `services/agent_admin.py`. 502 when Garrison is unreachable; Garrison validation errors pass on as 400. Each change is written to the activity log with before and after.
-- Table `account_tuning(account_id pk, triage_strategy null, updated_at)` via Alembic migration. The tuning spec's migration later adds columns to this table.
-- `GET /api/account/triage-strategy` returns `{value, default, strategies}`. `PUT` takes `{value: str | null}` and validates against the strategy list. Garrison down: GET returns the stored value with `strategies: []`; PUT is refused with 503.
+- Reuse `settings.manage` for the Workspace settings control. No new permission or role migration.
+- `routes/triage_strategy.py` proxies GET and PUT through a service modelled on `services/agent_admin.py`. 502 when Garrison is unreachable; Garrison validation errors pass on as 400. Each change is written to the activity log with before and after.
+- Nullable `accounts.triage_strategy` (`String(40)`) via Alembic migration `0026`, mirroring `accounts.prompt_suggestions`. No separate tuning table.
+- `GET /api/account/triage-strategy` returns `{value, default, strategies}`. `PUT` takes `{value: str | null}` and validates against the strategy list. Garrison down: GET returns the stored value with `strategies: []`; picking a name is refused with 503, while clearing with null remains available. An empty service list also makes picking unavailable (503).
 - `TriageQuestions.ask` adds `strategy` to the Laya request JSON only when the account value is set. ember_web never sends it.
-- A stored value the service no longer lists fails with 503 from Garrison; there is no silent fallback.
+- A stored value the service no longer lists makes `/api/triage/ask` return 422 with Garrison's `Invalid Laya request: unknown strategy ...` message; there is no silent fallback.
 
 ## UI
-- ember_web Settings: a "Triage strategy" row, dropdown with "Default (<admin's choice>)" first, then the strategies with their call cost (1 call, 1-2+, 2).
-- ember_admin: a "Triage strategy" control with a dropdown and Save. "Auto (service default)" clears the override.
+- ember_web Settings: a "Triage strategy" row, dropdown with "Default (<admin's choice, or not set>)" first, then the service strategies. The selected strategy's description shows its call cost (1 call, 1-2+, 2).
+- ember_admin: a "Triage strategy" control with a dropdown and Save. "Not set (follows triage_order)" clears the override and restores voter-derived behavior; `auto` remains a separate service strategy.
 - Both follow `ember-frontend-design` and `ember-design-system`. No reduced-motion handling (`AGENTS.md`).
 
 ## Tests

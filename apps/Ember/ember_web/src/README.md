@@ -52,6 +52,7 @@ src/
     contracts/        # Shared protocol constants and limit-window types
     auth/             # Session/account client
     navigation/       # Navigation preferences and page settings
+    triage/           # Account Triage strategy client
     tools/            # Shared tool catalog, execution, GUI contracts
     files/            # Attachment ingestion
     analytics/        # Shared log client
@@ -116,3 +117,10 @@ behavior and design fixes consistent between the apps.
 
 Run `npm run build`, `npm test`, and `npm run test:e2e` from `ember_web` after
 restructuring. Check Admin too when changing its shared imports.
+
+Settings includes an account-scoped **Triage strategy** row using
+`api/triage/TriageStrategyClient.ts`. It saves with the other account drafts,
+shows the selected strategy's local model call cost, and offers "Default" to
+follow the administrator's choice (or voter settings when none is set). An
+unavailable list disables picking; stored choices remain visible. Account
+changes reload the value and discard late responses from the previous account.
