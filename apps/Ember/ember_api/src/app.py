@@ -26,6 +26,7 @@ from src.routes import (
     account_agents,
     admin,
     agent_admin,
+    admin_tuning,
     attachments,
     bard,
     capability_files,
@@ -221,6 +222,7 @@ def create_app(
     app.include_router(admin.router)
     app.include_router(agent_admin.router)
     app.include_router(agent_admin.prompts_router)
+    app.include_router(admin_tuning.router)
     app.include_router(chats.router)
     app.include_router(chat_folders.router)
     app.include_router(templates.router)
