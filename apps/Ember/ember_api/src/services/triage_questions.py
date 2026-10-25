@@ -103,7 +103,8 @@ def parse_titles(response: str, count: int) -> list[str]:
 
 
 def build_request(
-    kind: Kind, text: str, question: str, options: list[Option], trace: bool = False, levels: list[str] | None = None
+    kind: Kind, text: str, question: str, options: list[Option], trace: bool = False, levels: list[str] | None = None,
+    strategy: str | None = None,
 ) -> str:
     """ai_agent's Laya question format: one question, id `q`. `levels` (score only) are the level
     descriptions, lowest first."""
@@ -120,6 +121,8 @@ def build_request(
     request: dict[str, Any] = {"text": text, "questions": {QID: spec}, "local_only": True}
     if trace:
         request["trace"] = True
+    if strategy:
+        request["strategy"] = strategy
     return json.dumps(request)
 
 
@@ -188,7 +191,7 @@ class TriageQuestions:
 
     async def ask(
         self, caller: Caller, kind: Kind, text: str, question: str, options: list[Option], trace: bool = False,
-        levels: list[str] | None = None,
+        levels: list[str] | None = None, strategy: str | None = None,
     ) -> AskOutcome:
         """Asks the Triage Assistant directly (no orchestrator) and returns the readable answer."""
         agent = await self._directory.find_by_provider(LAYA_PROVIDER)
@@ -196,7 +199,7 @@ class TriageQuestions:
             raise TriageUnavailable("the Triage Assistant is not running")
         try:
             result = await self._gateway.ask(
-                agent.url, caller, question=build_request(kind, text, question, options, trace, levels), history=[],
+                agent.url, caller, question=build_request(kind, text, question, options, trace, levels, strategy), history=[],
                 request_id=uuid.uuid4().hex, caveman=False, enabled_extensions=[], on_event=_ignore_event,
             )
         except AgentCallError as error:

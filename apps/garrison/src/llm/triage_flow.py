@@ -155,6 +155,8 @@ class TriageFlow:
                     thresholds=thresholds, prune_ratio=config.triage_prune_ratio, pair_ratio=config.triage_pair_ratio,
                 )
             except LayaServiceError as error:
+                if error.status == 422:
+                    raise ValueError(f"Invalid Laya request: {error}") from None
                 _log.warning("Laya could not answer: %s", error)
                 self._failures.append(f"laya: {error}")
                 self._record(error.calls, started_at)

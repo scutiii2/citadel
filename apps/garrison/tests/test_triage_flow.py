@@ -399,3 +399,15 @@ def test_a_service_that_cannot_list_strategies_still_gets_the_request(monkeypatc
     service.strategies = down
     TriageFlow(service=service).answer(two_questions(strategy="consensus"))
     assert [c["strategy"] for c in service.asked] == ["consensus"]
+
+
+@pytest.mark.parametrize("fallback", [False, True])
+def test_a_strategy_refused_by_ask_is_invalid_even_when_listing_failed(monkeypatch, fallback):
+    configure(monkeypatch, fallback=fallback)
+    monkeypatch.setattr(triage_flow.tuning_overrides, "triage_strategy", lambda: None)
+    service = FakeService(LayaServiceError("unknown strategy 'retired'", status=422))
+    service.strategies = lambda: (_ for _ in ()).throw(LayaServiceError("down"))
+    fallback_calls = jev(monkeypatch, jev_answer("a", 0.99), jev_answer("a", 0.99))
+    with pytest.raises(ValueError, match="^Invalid Laya request: unknown strategy 'retired'"):
+        TriageFlow(service=service).answer(two_questions(strategy="retired"))
+    assert fallback_calls == []
