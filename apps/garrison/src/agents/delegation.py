@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from collections.abc import Iterable
 from uuid import uuid4
 from contextvars import ContextVar, Token
 from typing import Any
@@ -87,6 +88,18 @@ def bind_caveman(on: bool) -> Token:
 
 def reset_caveman(token: Token) -> None:
     _caveman.reset(token)
+
+
+_enabled_extensions: ContextVar[tuple[str, ...]] = ContextVar("delegation_enabled_extensions", default=())
+
+
+def bind_enabled_extensions(ids: Iterable[str]) -> Token:
+    """The extensions the user enabled for this chat; a specialist's tools from any other extension stay hidden."""
+    return _enabled_extensions.set(tuple(ids))
+
+
+def reset_enabled_extensions(token: Token) -> None:
+    _enabled_extensions.reset(token)
 
 
 # Each hop is itself a full up-to-6-round ask() call, so this bounds a
@@ -265,7 +278,7 @@ def call(
         arguments: dict[str, Any] = {
             "question": question,
             "history": [],
-            "enabled_extensions": [],
+            "enabled_extensions": list(_enabled_extensions.get()),
             "request_id": child_id,
             "depth": depth + 1,
             "approval_mode": approval_mode,

@@ -397,6 +397,26 @@ def test_call_forwards_the_chats_caveman_toggle_only_when_it_is_on(monkeypatch):
     assert "caveman" not in seen[0] and seen[1]["caveman"] is True and "caveman" not in seen[2]
 
 
+def test_call_forwards_the_extensions_the_user_enabled_for_the_chat(monkeypatch):
+    _configure_agents(monkeypatch, [{"id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
+    seen = []
+
+    async def _fake_call_tool(url, name, arguments, on_progress=None):
+        seen.append(arguments)
+        return {"response": "4"}
+
+    with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool):
+        delegation.call("calc", "2+2?", depth=0)
+        token = delegation.bind_enabled_extensions(["bard"])
+        try:
+            delegation.call("calc", "2+2?", depth=0)
+        finally:
+            delegation.reset_enabled_extensions(token)
+
+    # A delegate sees an extension's tools only when the chat enabled that extension; its own allow list narrows further.
+    assert seen[0]["enabled_extensions"] == [] and seen[1]["enabled_extensions"] == ["bard"]
+
+
 def test_dispatch_turns_a_structured_question_into_text(monkeypatch):
     seen = []
     monkeypatch.setattr(delegation, "call", lambda agent_id, question, depth, **extra: seen.append(question) or "ok")
