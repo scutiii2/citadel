@@ -89,6 +89,14 @@ class AgentAdmin:
         providers = body.get("providers") if isinstance(body, dict) else None
         return providers if isinstance(providers, dict) else {}
 
+    async def tuning(self, account: Account) -> dict[str, Any]:
+        """garrison's editable tuning: {defaults, overrides, effective}."""
+        return await self._request("GET", "/agents/tuning", account)
+
+    async def set_tuning(self, account: Account, changes: dict[str, Any]) -> dict[str, Any]:
+        """Save `changes` (dotted path -> value, None = back to the file's value); returns the new view."""
+        return await self._request("PUT", "/agents/tuning", account, json=changes)
+
     async def list(self, account: Account) -> list[dict[str, Any]]:
         body = await self._request("GET", "/agents/files", account)
         agents = body.get("agents") if isinstance(body, dict) else None

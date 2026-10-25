@@ -64,3 +64,15 @@ retained file; copy back any settings changed after migration.
   own `{id, label, url, entry, orchestrator, focus}` on startup and removes
   it on clean shutdown, so never edit it by hand. Gitignored with the rest
   of `.data/`; created on first start.
+
+## tuning_overrides.json
+
+Written by the admin Tuning page (ember_admin), not by hand. It holds only what an admin
+changed, as flat dotted paths such as `"token_limits.default.max_tool_rounds": 20`, and is
+merged over `config_tuning.json` when that file is read. Delete a line (or reset it on the page)
+to go back to the file's value. Gitignore it like the other local configs. Keys that are not
+listed in `src/core/tuning_overrides.py` (URLs, models, chains, `triage_order`) stay file-only.
+Each agent process notices a change at the start of its next turn; no restart is needed.
+
+In Docker, this path links to `.data/admin_tuning_overrides.json` in the existing `agent_data` volume.
+The numeric tuning overlay survives container recreation independently of the existing triage-strategy store.

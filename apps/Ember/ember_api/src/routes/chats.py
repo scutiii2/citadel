@@ -42,6 +42,7 @@ from src.routes.mcp import get_agent_directory
 from src.routes.server_info import get_server_info
 from src.services.brain_connections import BrainConnections
 from src.services import question_answers, second_brain, suggestions, summarization
+from src.services.tuning_limits_service import TuningLimitsService
 from src.services.account_agent_service import AccountAgentService, blocked_names
 from src.services.agent_directory import NO_AGENT_RUNNING, AgentDirectory
 from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
@@ -817,7 +818,12 @@ async def start_turn(
             (), ({"id": "private", "label": "Private extensions", "error": "Private extensions storage is unavailable"},)
         )
     try:
+        limits = await TuningLimitsService(db_gateway, account.uid).get()
+    except DbGatewayError:
+        limits = {}
+    try:
         options = TurnOptions(
+            limits=limits,
             caveman=body.caveman,
             save_to_second_brain=auto_save,
             second_brain_scope=brain_scope,

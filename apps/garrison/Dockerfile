@@ -10,5 +10,7 @@ COPY pyproject.toml ./
 RUN mkdir src && touch src/__init__.py     && pip install .     && pip uninstall -y ai-agent     && rm -rf src build
 
 COPY . .
+# Keep the public configs path while persisting admin edits in agent_data.
+RUN ln -s /app/.data/admin_tuning_overrides.json /app/configs/tuning_overrides.json
 EXPOSE 9100
 CMD ["python", "-m", "src.supervisor"]

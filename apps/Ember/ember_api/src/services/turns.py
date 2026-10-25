@@ -108,6 +108,8 @@ class TurnOptions:
     allow_read_only: bool = False
     # Tools the account switched off for its own chats; the agent neither offers nor runs them.
     disabled_tools: tuple[str, ...] = ()
+    # Account caps only lower the configured response limits.
+    limits: dict[str, int] = field(default_factory=dict)
     # The browser can show the agent's clickable questions and send answers back.
     can_ask: bool = False
     # The account's enabled private extensions as ai_agent wants them ({id, label, url, headers});
@@ -591,6 +593,7 @@ class TurnRegistry:
                 plan_lean=turn.options.plan_lean,
                 exact_context=turn.options.exact_context,
                 private_extensions=list(turn.options.private_extensions) or None,
+                limits=dict(turn.options.limits) or None,
             )
         except AgentCallError as error:
             await self._logs.error(turn.account_id, "chat.answer", f"{turn.agent.id}: {error}")

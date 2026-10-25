@@ -15,6 +15,8 @@ import json
 import os
 import sys
 from uuid import uuid4
+from pathlib import Path
+from src.core import config_files, tuning_overrides
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -171,6 +173,7 @@ async def ask(
     plan_lean: bool = True,
     allow_read_only: bool = False,
     exact_context: bool = False,
+    limits: dict[str, int] | None = None,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Ask this agent a question. Runs its own tool-calling loop against
@@ -205,6 +208,8 @@ async def ask(
     plan: the chat allows the update_plan checklist tool (default on); it is
     offered only when this agent's plan_tool is on too. plan_lean: ask the
     model to update the checklist only when an item changes status.
+    limits: the asking user's own output-token and tool-round caps; lower only.
+
     exact_context: count what fills the context window with the provider's own
     token counter; the result's `context_breakdown_exact` says whether that worked.
     ctx, if the MCP client requested it, is FastMCP's injected Context -
@@ -234,11 +239,12 @@ async def ask(
         if reasoning_effort:
             tier_args["reasoning_effort"] = reasoning_effort
         private_args = {"private_extensions": private_extensions} if private_extensions else {}
+        limit_args = {"limits": limits} if limits else {}
         result = await agent_config.run_chat(
             question, history or [], enabled_extensions or [], request_id, depth,
             on_event=on_event, caveman=caveman, approval_mode=approval_mode, allowed_tools=allowed_tools,
             disabled_tools=disabled_tools, ask_user=ask_user, plan=plan, plan_lean=plan_lean,
-            allow_read_only=allow_read_only, exact_context=exact_context, **tier_args, **private_args,
+            allow_read_only=allow_read_only, exact_context=exact_context, **tier_args, **private_args, **limit_args,
         )
     except ChatCancelled:
         return _cancelled_result()
@@ -414,6 +420,32 @@ async def agent_prompt_preview(request: Request) -> JSONResponse:
     return JSONResponse({"prompt": prompt})
 
 
+def _tuning_overlay() -> Path:
+    return config_files.TUNING_PATH.with_name(tuning_overrides.OVERLAY_NAME)
+
+
+@mcp.custom_route("/agents/tuning", methods=["GET"])
+async def tuning_get(_request: Request) -> JSONResponse:
+    """The editable tuning values: the file's, the admin's changes, and the two merged."""
+    return JSONResponse(await asyncio.to_thread(config_files.tuning_view, config_files.TUNING_PATH))
+
+
+@mcp.custom_route("/agents/tuning", methods=["PUT"])
+async def tuning_put(request: Request) -> JSONResponse:
+    """Body: {"token_limits.default.max_tool_rounds": 20, ...}; null puts a path back to the
+    file's value. Nothing is saved if any change is refused. Each agent process picks the
+    edit up at the start of its next turn."""
+    changes = await _json_object(request)
+    if changes is None:
+        return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
+    try:
+        await asyncio.to_thread(tuning_overrides.save, changes, _tuning_overlay())
+    except tuning_overrides.TuningError as error:
+        return JSONResponse({"error": str(error)}, status_code=400)
+    tuning_overrides.poll(_tuning_overlay())
+    return JSONResponse(await asyncio.to_thread(config_files.tuning_view, config_files.TUNING_PATH))
+
+
 @mcp.custom_route("/agents/triage-strategy", methods=["GET"])
 async def triage_strategy_get(_request: Request) -> JSONResponse:
     """The admin default strategy of the Triage Assistant and the strategies the Laya service offers."""
@@ -472,7 +504,8 @@ def status() -> dict[str, Any]:
     `plan_toggle` says ask() understands plan and plan_lean;
     `private_extensions` says ask() understands private_extensions;
     `read_only_approval` says ask() understands allow_read_only;
-    `exact_context` says ask() understands exact_context."""
+    `exact_context` says ask() understands exact_context.
+    `user_limits` says ask() understands limits."""
     role_info = {}
     if SPEC.internal_role == "router":
         from src.agents import router_service
@@ -488,6 +521,7 @@ def status() -> dict[str, Any]:
         "plan_toggle": True,
         "read_only_approval": True,
         "exact_context": True,
+        "user_limits": True,
         # laya answers typed questions locally and never lists tools through mcp_upstream.
         "private_extensions": agent_config.PROVIDER_ID != "laya",
     }

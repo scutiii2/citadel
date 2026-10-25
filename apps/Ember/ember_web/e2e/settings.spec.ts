@@ -135,13 +135,13 @@ test("the account triage strategy is a draft until Save and Default clears it", 
   await expect(select).toHaveValue("");
   await select.selectOption("typed-only");
   expect(api.triageStrategy).toBeNull();
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("group", { name: "Unsaved settings", exact: true }).getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.locator(".settings-save-bar")).toHaveCount(0);
   expect(api.triageStrategy).toBe("typed-only");
   await page.reload();
   await expect(select).toHaveValue("typed-only");
   await select.selectOption("");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("group", { name: "Unsaved settings", exact: true }).getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.locator(".settings-save-bar")).toHaveCount(0);
   expect(api.triageStrategy).toBeNull();
   expect(api.unexpected).toEqual([]);

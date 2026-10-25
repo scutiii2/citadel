@@ -1,0 +1,31 @@
+import { expect, test } from "@playwright/test";
+import { installFakeApi } from "./fakeApi.ts";
+import { logIn } from "./helpers.ts";
+
+test("response limits retain drafts through search, save, clear, and show a ceiling refusal", async ({ page }) => {
+  const api = await installFakeApi(page);
+  await logIn(page);
+  await page.goto("/settings");
+  const group = page.locator('section[aria-label="Response limits"]');
+  const rounds = group.getByRole("spinbutton", { name: "Most tool rounds", exact: true });
+  await expect(rounds).toHaveValue("");
+  await expect(rounds).toHaveAttribute("max", "15");
+  await rounds.fill("4");
+  const search = page.getByRole("searchbox", { name: "Search settings" });
+  await search.fill("theme");
+  await search.fill("");
+  await expect(rounds).toHaveValue("4");
+  await group.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(group.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  await page.reload();
+  await expect(rounds).toHaveValue("4");
+  await group.getByRole("button", { name: "Use defaults", exact: true }).click();
+  await expect(rounds).toHaveValue("");
+  await page.reload();
+  await expect(rounds).toHaveValue("");
+  await rounds.fill("16");
+  await group.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(group.getByRole("alert")).toContainText("cannot be above 15");
+  await expect(rounds).toHaveValue("16");
+  expect(api.unexpected).toEqual([]);
+});
