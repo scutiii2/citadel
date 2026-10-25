@@ -1,7 +1,7 @@
 import { computed, ref } from "vue";
 import { useAuthStore } from "../../../stores/auth";
 import { attachmentsClient } from "../../../api/files/AttachmentsClient";
-import { splitAttachments, PDF_FILE, TABLE_FILE, tableHeader } from "../../../utils/content/attachments";
+import { splitAttachments, AUDIO_FILE, PDF_FILE, TABLE_FILE, audioHeader, tableHeader } from "../../../utils/content/attachments";
 import { errorMessage } from "../../../utils/errors";
 
 /** File uploads, previews, and input events for one chat composer. */
@@ -44,6 +44,13 @@ export function useComposerAttachments() {
       };
       attachments.value.push(entry);
       const live = attachments.value[attachments.value.length - 1]!; // the reactive copy
+      if (AUDIO_FILE.test(file.name)) {
+        void attachmentsClient.audio(file).then((result) => {
+          const text = audioHeader(result);
+          Object.assign(live, { state: "ready", text, chars: text.length });
+        }).catch((err: unknown) => Object.assign(live, { state: "error", error: errorMessage(err) }));
+        continue;
+      }
       if (PDF_FILE.test(file.name)) {
         void attachmentsClient.pdf(file).then((result) => {
           const image = result.kind === "image";

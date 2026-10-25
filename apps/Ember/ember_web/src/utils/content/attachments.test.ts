@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../../api/types";
-import { questionHistory, splitAttachments, tableHeader, TABLE_FILE, withAttachments } from "./attachments";
+import { AUDIO_FILE, audioHeader, questionHistory, splitAttachments, tableHeader, TABLE_FILE, withAttachments } from "./attachments";
 
 const user = (content: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ role: "user", content, ...extra });
 const assistant = (content: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ role: "assistant", content, ...extra });
@@ -90,5 +90,18 @@ describe("tableHeader", () => {
     expect(TABLE_FILE.test("book.xlsx")).toBe(true);
     expect(TABLE_FILE.test("notes.txt")).toBe(false);
     expect(TABLE_FILE.test("old.xls")).toBe(false);
+  });
+});
+
+describe("audio attachments", () => {
+  it("recognises the supported audio suffixes only", () => {
+    for (const name of ["a.mp3", "A.WAV", "talk.m4a", "x.ogg", "x.flac", "x.webm"]) expect(AUDIO_FILE.test(name)).toBe(true);
+    for (const name of ["a.pdf", "a.csv", "a.mp4", "mp3"]) expect(AUDIO_FILE.test(name)).toBe(false);
+  });
+
+  it("writes a header the agent can act on", () => {
+    const header = audioHeader({ file_id: "a".repeat(32), duration_s: 12.34, expires_at: 99 });
+    expect(header).toContain(`[Audio file_id: ${"a".repeat(32)} | 12.3 s | expires_at: 99 |`);
+    expect(header).toContain("tool_scribe_transcribe");
   });
 });
