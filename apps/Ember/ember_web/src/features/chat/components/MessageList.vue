@@ -15,8 +15,10 @@ import { FILE_ONLY_QUESTION, splitAttachments } from "../../../utils/content/att
 import { hideDownloadMarkers, parseDownloads } from "../../../utils/content/downloads";
 import { clockTime, dayDividers, fullTime } from "../utils/messageTime";
 import { toolTitle } from "../../../utils/tools/toolTitles";
+import { bardFileIds } from "../../../utils/tools/bardAudio";
 import { compactNumber } from "../../../utils/analytics/usageFormat";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
+import BardAudio from "./BardAudio.vue";
 import ChatAttachment from "../../../components/content/ChatAttachment.vue";
 import AgentActivity from "./AgentActivity.vue";
 import CopyButton from "../../../components/ui/buttons/CopyButton.vue";
@@ -301,6 +303,7 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
         </div>
         <div v-else class="assistant">
           <ToolSteps v-if="m.steps?.length" :steps="m.steps" class="saved-steps" />
+          <BardAudio v-for="id in bardFileIds(m.steps)" :key="id" :file-id="id" />
           <MarkdownContent :text="parseDownloads(m.content).text" />
           <DownloadCards :downloads="parseDownloads(m.content).downloads" />
           <div class="actions">
@@ -355,6 +358,7 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
       <div v-if="busy" class="assistant live">
         <PlanPanel :plans="plans ?? []" />
         <ToolSteps v-if="steps.length" :steps="steps" live />
+        <BardAudio v-for="id in bardFileIds(steps)" :key="id" :file-id="id" />
         <!-- A tool the agent wants to run waits here; nothing runs until the
              user answers (or a few minutes pass, which counts as no). What is
              shown is the tool's real name and arguments, not the model's words. -->

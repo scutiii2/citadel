@@ -10,10 +10,9 @@ Citadel runs as containers from one `docker-compose.yml`:
 | `armory` | MCP server (capabilities, including Server Manager) | internal 8010 |
 | `garrison` | AI agent | internal |
 | `treasury` | database gateway | internal 8071 |
-| `laya` (replicas), `laya_lb` | Laya models behind an nginx balancer, built from the sibling `LayaAgent` project | internal 9120 |
 
-Only the two web apps publish ports (`laya_lb` also binds `127.0.0.1:9120`). The rest talk over the internal `core`
-network.
+Only the two web apps publish ports. The rest talk over the internal `core` network. Laya is not in this stack: it runs
+from the separate `LayaAgent` project (see "Laya" below) and garrison reaches it as `http://laya_lb:9120`.
 
 ## 1. Local (Windows, macOS, Linux with Docker Desktop or Engine)
 
@@ -79,9 +78,10 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    Already cloned `main`? Switch in place; the containers keep running:
    `git fetch origin live && git switch -c live --track origin/live`.
 
-2. **Put `LayaAgent` next to `Citadel`**, at `/media/ZimaOS-HD/Apps/LayaAgent`. It is a separate project, so `live` does
-   not carry it. The `laya` service builds from `../LayaAgent`, and `laya_lb` mounts `../LayaAgent/nginx.conf`. Compose
-   stops with `path ".../LayaAgent" not found` if it is missing.
+2. **Deploy `LayaAgent` separately** (it is its own project and Citadel's compose does not start it). Start the Citadel
+   stack first: it creates the `citadel_core` network. Then run `docker compose up -d --build` in the `LayaAgent`
+   folder (`/media/ZimaOS-HD/Apps/LayaAgent`). Its `laya_lb` joins `citadel_core`, so garrison reaches it as
+   `http://laya_lb:9120`. See `LayaAgent/deployment.md` for replicas, port and weights.
 
 3. **Create the `.env` files.** They are gitignored, so `live` does not hold them and `git pull` never touches them.
    The simplest way is deploy option 2, which copies yours from the PC. To create them by hand, run from the Citadel
@@ -106,17 +106,15 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | File | Keys to fill in |
    |---|---|
    | `apps/armory/.env` | Only the capability keys you use: `SMTP_PASSWORD`, `TEAMS_WEBHOOK_URL`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://garrison:9111/mcp` to group tickets with the triage agent) |
-   | `apps/garrison/.env` | `CLAUDE_API_KEY`, or the keys of the gateway your agents use; `HF_TOKEN` if used; `LAYA_TOKEN` (must equal the root one) |
+   | `apps/garrison/.env` | `CLAUDE_API_KEY`, or the keys of the gateway your agents use; `HF_TOKEN` if used; `LAYA_TOKEN` (must equal the one in `LayaAgent`'s `.env`) |
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
    | `apps/Ember/ember_api/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
 
    - The root token reaches every service and overrides any `INTERNAL_API_TOKEN` in a per-app file.
    - Skip `MCP_HOST`, `MCP_PORT`, `LAYA_SERVICE_URL` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. Do
      not use `localhost` for another service.
-   - **Laya settings** go in the root `.env`: `LAYA_TOKEN` (the same value as in `apps/garrison/.env`), `LAYA_REPLICAS`
-     (default 2) and `LAYA_PORT`. Each replica loads its own copy of the models, and `laya_lb` starts only after a
-     replica is healthy; the first start downloads the weights, so allow a few minutes. Do not run LayaAgent's own
-     `docker-compose.yml` at the same time: it uses the same port.
+   - **Laya settings** (`LAYA_TOKEN`, `LAYA_REPLICAS`, `LAYA_PORT`) belong in `LayaAgent`'s own `.env`, not here. Each
+     replica loads its own copy of the models in RAM, so keep `LAYA_REPLICAS` low on a small box.
    - `apps/Ember/ember_api/.env` must exist before the first start. Compose bind-mounts it, and if it is missing Docker
      creates a directory in its place and ember_api fails. ember_api writes `EMBER_SECRETS_KEY` into it, so keep it
      when you rebuild.
@@ -229,7 +227,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 | Symptom | Cause and fix |
 |---|---|
 | `set INTERNAL_API_TOKEN in .env` | The root `.env` is missing or empty. |
-| `path ".../LayaAgent" not found` | `LayaAgent` is not next to `Citadel`. See first-time setup, step 2. |
+| garrison cannot reach Laya | LayaAgent is not running, or it started before Citadel and could not join `citadel_core`. Start Citadel, then run `docker compose up -d` in `LayaAgent`. |
 | `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
 | `scp` will not log in | Check `DEPLOY_HOST` and that the folder exists. Run `ssh <host>` by hand to test. |
 | `openssl: command not found` | Use the `/dev/urandom` command in first-time setup, step 3. A failed `echo` leaves an empty `.env`, so run it again. |

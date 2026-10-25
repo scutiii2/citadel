@@ -50,7 +50,11 @@
       "model": "typesafe-ai/jev"
     },
     "chains": {
-      "triage": ["jev", "jev_vercel"]
-    }
+      "triage": ["jev", "jev_vercel"],
+      "auto_tier": ["jev", "jev_vercel"],
+      "auto_route": ["jev", "jev_vercel"]
+    },
+    "auto_tier": { "enabled": false, "min_confidence": 60 },
+    "auto_route": { "enabled": false, "min_confidence": 60 }
   }
 }

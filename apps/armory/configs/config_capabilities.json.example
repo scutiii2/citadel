@@ -31,5 +31,11 @@
   },
   "ticket": {
     "enabled": true
+  },
+  "notes": {
+    "enabled": true
+  },
+  "skills": {
+    "enabled": true
   }
 }

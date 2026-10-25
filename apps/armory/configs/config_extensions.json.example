@@ -29,5 +29,13 @@
     "headers": { "X-Internal-Token": "${INTERNAL_API_TOKEN}" },
     "forward_requester": true,
     "web_url": "http://127.0.0.1:5175"
+  },
+  "bard": {
+    "_comment": "Bard's MCP endpoint (Python/Bard). It requires the shared internal token, sent here as a header. Start Bard before mcp_server so the connection succeeds at startup. forward_requester sends the asking user's username upstream (_meta.requester); Bard keeps each user's audio private to them and refuses a call without it. Ember plays the audio through ember_api (GET /api/bard/audio/{file_id}), so there is no web_url.",
+    "label": "Bard",
+    "description": "Text to speech: turns text into an MP3 and plays it in chat. English voice.",
+    "url": "http://127.0.0.1:8090/mcp",
+    "headers": { "X-Internal-Token": "${INTERNAL_API_TOKEN}" },
+    "forward_requester": true
   }
 }
