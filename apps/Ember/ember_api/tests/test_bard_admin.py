@@ -1,4 +1,4 @@
-from src.services.permissions import ALL_PERMISSIONS, BARD_ADMIN, STAFF_PERMISSIONS
+from src.services.permissions import ALL_PERMISSIONS, BARD_ADMIN, BARD_DELETE, STAFF_PERMISSIONS
 from tests.conftest import ADMIN_USERNAME
 from tests.test_permission_split import limited_account
 from tests.test_registration import as_admin
@@ -48,6 +48,27 @@ def test_a_member_becomes_admin_when_the_permission_is_granted_and_stops_when_it
     assert check(client, "alice").json() == {"admin": True}
     assert client.delete(f"/api/admin/roles/{role_id}/permissions/{BARD_ADMIN}").status_code == 200
     assert check(client, "alice").json() == {"admin": False}
+
+
+def test_bard_delete_is_its_own_staff_permission_and_admin_does_not_imply_it(client, email):
+    assert BARD_DELETE == "bard.delete"
+    assert BARD_DELETE in ALL_PERMISSIONS and BARD_DELETE in STAFF_PERMISSIONS
+    client.app.state.internal_token = TOKEN
+    limited_account(client, email, BARD_ADMIN)
+
+    def can_delete(username):
+        body = {"username": username, "permission": BARD_DELETE}
+        return client.post("/api/bard/internal/admin-check", headers=HEADERS, json=body).json()
+
+    assert check(client, "alice").json() == {"admin": True}
+    assert can_delete("alice") == {"admin": False}
+    assert can_delete(ADMIN_USERNAME) == {"admin": True}
+
+
+def test_admin_check_refuses_other_permissions(client):
+    client.app.state.internal_token = TOKEN
+    body = {"username": ADMIN_USERNAME, "permission": "accounts.manage"}
+    assert client.post("/api/bard/internal/admin-check", headers=HEADERS, json=body).status_code == 422
 
 
 def test_a_disabled_account_is_not_admin(client, email):

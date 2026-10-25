@@ -34,8 +34,10 @@ TICKETS_MANAGE = "tickets.manage"
 BRAIN_INSTANCE_PUBLISH = "brain.instance.publish"
 CALENDAR_USE = "calendar.use"
 BARD_ADMIN = "bard.admin"
+BARD_DELETE = "bard.delete"
 
 ALL_PERMISSIONS = MappingProxyType({
+    BARD_DELETE: "Delete installed Bard text-to-speech voices",
     BARD_ADMIN: "Install Bard text-to-speech voices and list the voices available to download",
     CALENDAR_USE: "Keep a read-only schedule from ICS links and get alerts before events",
     BRAIN_INSTANCE_PUBLISH: "Publish durable knowledge to the shared Instance Brain",
@@ -75,7 +77,7 @@ STAFF_PERMISSIONS = frozenset({
     ACCOUNTS_VIEW, ACCOUNTS_MANAGE, ACCOUNTS_DELETE, ROLES_VIEW, ROLES_MANAGE, ROLES_ASSIGN,
     INVITES_MANAGE, SETTINGS_MANAGE, CAPABILITIES_MANAGE, EXTENSIONS_MANAGE, AGENTS_MANAGE, TUNING_MANAGE,
     LOGS_VIEW, LOGS_ERRORS_VIEW, LOGS_CHAT_VIEW, LOGS_CHAT_PROMPTS_VIEW, CONFIG_ISSUES_VIEW,
-    TRAFFIC_VIEW, USAGE_ALL_VIEW, TICKETS_MANAGE, BARD_ADMIN,
+    TRAFFIC_VIEW, USAGE_ALL_VIEW, TICKETS_MANAGE, BARD_ADMIN, BARD_DELETE,
 })
 
 ADMIN_ROLE = "Administrator"
