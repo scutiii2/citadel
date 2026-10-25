@@ -65,3 +65,37 @@ def test_without_a_url_nothing_is_configured(monkeypatch):
         laya_agent.agent().ask("auto", "t", QUESTIONS, 512)
     monkeypatch.setenv("LAYA_SERVICE_URL", "http://laya:9120")
     assert laya_agent.configured() is True
+
+
+def test_strategies_lists_the_service_names_and_its_default(monkeypatch):
+    seen = {}
+
+    def get(url, headers=None, timeout=None):
+        seen.update(url=url, headers=headers)
+        return httpx.Response(200, json={"default": "auto", "strategies": ["english-only", "auto"]})
+
+    monkeypatch.setattr(httpx, "get", get)
+    result = LAYAAgent("http://laya:9120/", token="t").strategies()
+    assert result == {"strategies": ["english-only", "auto"], "default": "auto"}
+    assert seen == {"url": "http://laya:9120/v1/strategies", "headers": {"X-Internal-Token": "t"}}
+
+
+def test_strategies_accepts_a_mapping_of_names(monkeypatch):
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: httpx.Response(200, json={"default": "auto", "strategies": {"a": "x", "b": "y"}}))
+    assert LAYAAgent("http://laya:9120").strategies()["strategies"] == ["a", "b"]
+
+
+def test_strategies_errors_become_service_errors(monkeypatch):
+    with pytest.raises(LayaServiceError, match="not configured"):
+        LAYAAgent("").strategies()
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: httpx.Response(500, text="boom"))
+    with pytest.raises(LayaServiceError) as refused:
+        LAYAAgent("http://laya:9120").strategies()
+    assert refused.value.status == 500
+
+    def down(*a, **k):
+        raise httpx.ConnectError("no route")
+
+    monkeypatch.setattr(httpx, "get", down)
+    with pytest.raises(LayaServiceError, match="could not be reached"):
+        LAYAAgent("http://laya:9120").strategies()

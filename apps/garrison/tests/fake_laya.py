@@ -39,14 +39,22 @@ def result(*answers: tuple[str, dict[str, Any]], tokens: int = 10, ok: bool = Tr
             "calls": [{"model": "convaiinnovations/laya", "input_tokens": tokens, "duration_ms": 1, "ok": ok}]}
 
 
+STRATEGIES = ("english-only", "typed-only", "english-then-typed", "typed-then-english",
+              "most-confident", "average", "consensus", "auto")
+
+
 class FakeService:
     """`results` are returned by `ask` in order (an Exception is raised, a callable is called with the request).
     `mixed` is what `combine` returns: a dict, or a callable of (voters, options)."""
 
-    def __init__(self, *results: Any, mixed: Any = None, invalid: str = "") -> None:
+    def __init__(self, *results: Any, mixed: Any = None, invalid: str = "", strategy_names: tuple[str, ...] = STRATEGIES) -> None:
+        self.strategy_names = strategy_names
         self.results, self.mixed, self.invalid = list(results), mixed, invalid
         self.asked: list[dict[str, Any]] = []
         self.combined: list[dict[str, Any]] = []
+
+    def strategies(self):
+        return {"strategies": list(self.strategy_names), "default": "auto"}
 
     def ask(self, strategy, text, questions, max_len, **tuning):
         self.asked.append({"strategy": strategy, "text": text, "questions": copy.deepcopy(questions),
