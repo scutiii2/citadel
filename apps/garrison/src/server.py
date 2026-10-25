@@ -56,6 +56,7 @@ from starlette.responses import JSONResponse
 _CONFIG_ERROR_NAMES = {"AgentConfigError", "AgentRoleError", "ConfigError", "AgentSpecError"}
 try:
     from src.agents import agent_config, agent_events, agent_registry, agent_store
+    from src.llm import triage_strategy
     from src.core import approvals, internal_auth, questions, usage_log
     from src.mcp_client import mcp_upstream
     from src.llm.base_provider import ChatCancelled
@@ -411,6 +412,24 @@ async def agent_prompt_preview(request: Request) -> JSONResponse:
     except agent_store.AgentStoreError as error:
         return _store_error(error)
     return JSONResponse({"prompt": prompt})
+
+
+@mcp.custom_route("/agents/triage-strategy", methods=["GET"])
+async def triage_strategy_get(_request: Request) -> JSONResponse:
+    """The admin default strategy of the Triage Assistant and the strategies the Laya service offers."""
+    return JSONResponse(await asyncio.to_thread(triage_strategy.describe))
+
+
+@mcp.custom_route("/agents/triage-strategy", methods=["PUT"])
+async def triage_strategy_put(request: Request) -> JSONResponse:
+    """Body: {"strategy": "<name>" | null}; null clears the default."""
+    body = await _json_object(request)
+    if body is None or "strategy" not in body or not (body["strategy"] is None or isinstance(body["strategy"], str)):
+        return JSONResponse({"error": "body must be {\"strategy\": \"<name>\" | null}"}, status_code=400)
+    try:
+        return JSONResponse(await asyncio.to_thread(triage_strategy.update, body["strategy"]))
+    except triage_strategy.StrategyError as error:
+        return JSONResponse({"error": str(error)}, status_code=error.status)
 
 
 @mcp.tool()
