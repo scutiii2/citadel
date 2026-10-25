@@ -1,0 +1,152 @@
+# Scribe (speech to text) — design
+
+Date: 2026-10-25
+Status: design approved in chat, awaiting written-spec review
+
+## Goal
+
+Ember users attach an audio file to a chat question and the agent returns its English transcript. An agent calls one tool; the transcript comes back as the tool result. Extension tools have no slash commands, so there is no `/scribe` command in v1. Scribe is its own service, the counterpart of Bard (text to speech, `2026-10-25-bard-design.md`), reached through Armory as an MCP extension.
+
+## Scope
+
+In scope:
+- A standalone Python service, `Python/Scribe/`, with its own git repo, venv and port (8091).
+- Local transcription with faster-whisper (CPU, model `small.en`, int8), English only.
+- Audio decoding with ffmpeg; accepted formats mp3, wav, m4a, ogg, flac, webm.
+- One MCP tool, `tool_scribe_transcribe`.
+- Per-account audio uploads with a time-to-live and a quota; a transcript cache.
+- An ember_api upload route and an ember_web attachment path for audio files.
+- Registration as an Armory extension.
+
+Out of scope (can be added later without changing this design):
+- Microphone dictation in the chat box, streaming and WebSocket input.
+- Speaker labels, translation, other languages, other engines (the engine sits behind an interface).
+- A transcript download link or a standalone Scribe web page.
+- A Scribe audit log, admin-managed models (Bard's voice download and delete).
+
+## Decision: separate service, Armory extension
+
+Same reasoning as Bard: a heavy native dependency (CTranslate2, the Whisper model) and CPU-bound work should not share a process with Armory or with Piper, and the service may later move to a GPU machine. Scribe copies Bard's small scaffolding (config, errors, identity, middleware, store, run) instead of importing it; the two repos stay independent.
+
+```
+ember_web ──POST /api/attachments/audio──► ember_api ──POST /api/files──► Scribe :8091
+agent ──tools/call──► Armory (/mcp proxy, extension "scribe") ──► Scribe :8091/mcp
+```
+
+Audio reaches Scribe only through ember_api, which hides Scribe's origin, applies permissions and logs the action, as `/api/attachments/pdf` does for PDFMerger. The agent never fetches audio by URL.
+
+## Scribe service
+
+### Layout
+
+```
+Python/Scribe/
+  AGENTS.md, CLAUDE.md (@AGENTS.md), README.md, pyproject.toml, .env.example, .gitignore, Dockerfile, docker-compose.yml
+  src/ config.py errors.py contract.py engine.py store.py service.py identity.py middleware.py app.py run.py
+  tests/
+  .data/                (gitignored)  models/  audio/
+```
+
+### Components
+
+| Unit | Responsibility |
+| --- | --- |
+| `config.py` | `Settings` from environment (`SCRIBE_*`, `INTERNAL_API_TOKEN`); `exposed_without_token`. |
+| `engine.py` | `SttEngine` protocol and `WhisperEngine`. ffmpeg decodes to 16 kHz mono wav through an async subprocess; faster-whisper runs in a worker thread. `probe(path)` returns the duration. |
+| `store.py` | `AudioStore`: uploads and transcripts per owner, deterministic ids, time-to-live, quota, atomic writes. |
+| `service.py` | `ScribeService.upload` / `transcribe`: validate, store, cache lookup, transcribe under a semaphore (default 1). One lock per (owner, file id) so identical concurrent requests transcribe once. |
+| `identity.py` | `owner_from_context`: the asking user's name from `_meta.requester.username`. |
+| `middleware.py` | `InternalTokenMiddleware`: `X-Internal-Token` on `/mcp` and `/api`. |
+| `app.py` | `build_app(settings, engine=None)`: FastMCP tool, `POST /api/files`, `GET /health`. |
+| `run.py` | `python -m src.run`: refuses to start exposed without a token, then runs uvicorn. |
+
+### Tool
+
+The result model ends with `message`, as Armory's contract rules require.
+
+| Tool | Arguments | Result |
+| --- | --- | --- |
+| `tool_scribe_transcribe` | `file_id` (required), `timestamps` (optional, default false) | `text`, `duration_s`, `language` (`"en"`), `segments` (only with `timestamps`: `start_s`, `end_s`, `text`), `cached`, `message` |
+
+It carries `meta={"keywords": ["transcribe", "speech to text", "stt", "audio", "dictation"], "display_label": "Transcribing audio"}`. Extension tools reach clients namespaced as `scribe__tool_scribe_transcribe`.
+
+### Files and cache
+
+- Upload id is `sha256(owner + NUL + audio bytes)[:32]`, hex: stable, so re-uploading the same file is a no-op.
+- Files live in `.data/audio/<sha256(owner)[:16]>/<file_id>.bin` with a `<file_id>.json` sidecar (`filename`, `size_bytes`, `duration_s`, `created_at`). The transcript is cached beside it as `<file_id>.<model>.json`; the model name in the key stops a model change from serving stale text.
+- Expiry is by `created_at` (default 24 hours). `get` deletes an expired file; `put` removes the owner's expired files first; startup sweeps everything. There is no background sweeper.
+- Quota per owner (default 200 MB); a write that would exceed it fails with `quota_exceeded`.
+- Each id is checked against `^[0-9a-f]{32}$` before any path is built. Another owner's file, a missing file and a malformed id all answer "not found".
+
+### HTTP
+
+- `POST /api/files`: raw audio bytes as the body, `X-Requester-Username` (missing header is 401) and `X-Filename`. Answers `{file_id, duration_s, size_bytes, expires_at}`. Rejects with 413 over `SCRIBE_MAX_BYTES` (default 25 MB), 400 for a format ffmpeg cannot read, 400 over `SCRIBE_MAX_SECONDS` (default 600).
+- `GET /health` returns `{"ok": true}` and needs no token.
+
+Validation is by ffmpeg probe, not by file name or declared type. The duration check runs at upload, so a too-long file fails in the attachment chip, not later in the agent's tool call.
+
+### Concurrency and limits
+
+- One transcription at a time by default (`SCRIBE_CONCURRENCY`); the others wait on the semaphore. Every blocking call (model, file IO) runs through `asyncio.to_thread`; ffmpeg runs as an asyncio subprocess.
+- Transcription is bounded by `SCRIBE_TIMEOUT_S`; a timeout fails with `engine_failed`, with the temp wav removed.
+- The 600-second cap is a guess. `small.en` int8 on CPU is expected to run several times faster than real time, but this machine has not been measured. Plan Task 1 benchmarks it and sets the default so a full-length file finishes inside the MCP call timeout.
+
+### Auth and identity
+
+Same as Bard: with `INTERNAL_API_TOKEN` set, `/mcp` and `/api/*` need a matching `X-Internal-Token` (constant-time compare); `run.py` exits when `SCRIBE_HOST` is not loopback and the token is empty; Armory forwards `_meta.requester` when the extension entry sets `forward_requester`; the owner key is the username; a tool call with no username fails with `identity_required`.
+
+### Errors
+
+`ScribeError` subclasses carry a stable `code`: `audio_rejected`, `file_not_found`, `quota_exceeded`, `engine_failed`, `identity_required`. The tool layer turns them into `ToolError` with the message; the message never contains a filesystem path.
+
+## Armory registration
+
+An entry in `apps/armory/configs/config_extensions.json.example` (and, by the operator, the real `config_extensions.json`):
+
+```json
+"scribe": {
+  "label": "Scribe",
+  "description": "Speech to text: transcribes an attached audio file to English text.",
+  "url": "http://127.0.0.1:8091/mcp",
+  "headers": { "X-Internal-Token": "${INTERNAL_API_TOKEN}" },
+  "forward_requester": true
+}
+```
+
+Armory handshakes with each extension at startup, so Scribe must be running first; an unreachable Scribe marks only that extension as errored.
+
+## ember_api
+
+- `POST /api/attachments/audio` in `routes/attachments.py`: body `AttachmentIn` (base64 JSON, as every POST to ember_api; see `json_only.py`), permission `files.upload`, 413 over 25 MB (`MAX_FILE_BYTES` is 15 MB today; the audio route uses its own limit and `AttachmentIn.data` needs a matching larger cap). Suffix check: `.mp3 .wav .m4a .ogg .flac .webm`. It forwards the bytes to `POST {scribe_url}/api/files` with the account's identity headers and the internal token, logs `attachments.audio` through `LogWriter`, and answers `{filename, file_id, duration_s, expires_at}`.
+- A small `ScribeGateway` service (httpx, like `CapabilityFilesGateway`) does the forward; Scribe errors map to 400 for rejected audio and 502 for an unreachable Scribe or a refused internal token.
+- New setting `scribe_url` (default `http://127.0.0.1:8091`).
+
+## ember_web
+
+- `utils/content/attachments.ts` gets `AUDIO_FILE` (the suffix regex) beside `PDF_FILE` and `TABLE_FILE`.
+- `api/files/AttachmentsClient.ts` gets `audio(file)` posting to `/api/attachments/audio`.
+- `useComposerAttachments.ts` routes audio files to `attachmentsClient.audio` and folds a header line into the question, in the same style as the PDF header:
+  `[Audio file_id: <id> | <duration> s | expires_at: <ts> | call scribe tool_scribe_transcribe with this file_id to get the transcript]`
+  There is no text preview, so the chip shows the file name and duration.
+- `ChatAttachment.vue` already parses `[Image file_id ...]` / `[PDFMerger file_id ...]` headers to render chips; it gets one more pattern for `[Audio file_id ...]`. `splitAttachments` handles the restore-on-edit path the same way.
+- No new component: the transcript is the tool result and the generic formatter shows `message` first.
+
+Per `AGENTS.md`: no reduced-motion setting, media query or test.
+
+## Testing
+
+- Scribe unit tests with a fake engine: config, store (hit, miss, expiry, quota, id validation, owner isolation), service (cache, concurrency, errors, duration cap), HTTP route and middleware.
+- Engine tests that need ffmpeg or the real model skip when those are missing.
+- One MCP handshake test against a real uvicorn server on a free port: upload a short wav over HTTP, list tools, call `tool_scribe_transcribe` with `_meta.requester`.
+- ember_api: route tests with the existing `upstream` fake (identity headers, error mapping, size and suffix limits, login and permission required).
+- ember_web: vitest for `AUDIO_FILE`, the composer header line, and `ChatAttachment` parsing.
+- Armory: a test that the example extension config parses and contains `scribe`.
+
+## Risks and open points
+
+- faster-whisper, CTranslate2 and the ONNX/PyAV wheels on Python 3.14 on this Windows machine have not been installed or run. Plan Task 1 does a real transcription first; if wheels are missing, pin a lower Python for Scribe's venv.
+- asyncio subprocesses need the Proactor event loop on Windows. uvicorn's default loop works; `--reload` would not.
+- `small.en` is downloaded on first use (about 500 MB), not committed. Pre-download it in the Docker build or a `scripts` step so the first request does not stall; check the model licence before redistribution.
+- Speed is unmeasured (see Concurrency and limits). If CPU is too slow, options are `base.en`, a lower duration cap, or a GPU host; the engine interface allows each.
+- Stale `pdf_merger` and `media_downloader` entries remain in `config_extensions.json.example`. Not changed here.
+- Uploads hold user audio for 24 hours on the Scribe machine; the docs must say so.

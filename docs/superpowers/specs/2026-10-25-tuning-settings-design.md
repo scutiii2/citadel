@@ -8,8 +8,8 @@ This round: garrison `config_tuning.json` only. Armory, treasury and ember_api c
 
 ## Decisions
 - Approach A. Garrison keeps no database.
-  - Admin values live in a new overlay file `apps/garrison/configs/tuning_overrides.json`, written atomically by garrison.
-  - Per-user values live in ember_api's DB, table `account_tuning`, and are sent to garrison with each chat call.
+  - Admin values live in a new overlay file `apps/garrison/configs/tuning_overrides.json`, written atomically by garrison. It mirrors `src/agents/prompt_config.py` (`config_prompts.json`): the file holds only what an admin changed, as flat dotted paths (`"token_limits.default.max_tool_rounds": 20`).
+  - Per-user values live in treasury through ember_api's `DocumentStore` (collection `tuning_limits`, key the account uid), the same way `nav_preferences` does. No Alembic migration. They are sent to garrison with each chat call.
 - Precedence: `config_tuning.json` < admin overlay < user value, and a user value is clamped to the admin-effective value (the user can only lower).
 - Keys not in the allowlist (URLs, models, chains, `triage_order`) stay file-only.
 
@@ -22,25 +22,26 @@ This round: garrison `config_tuning.json` only. Armory, treasury and ember_api c
 | `classifier` | `triage_thresholds`, `triage_enabled`, `timeout_seconds`, `max_input_chars`, `triage_fallback`, `triage_trace`, `triage_window`, `triage_prune_ratio`, `triage_pair_ratio` | admin |
 
 ## Garrison
-- New `src/core/tuning_overrides.py`: schema allowlist (type, min, max per key), `load()`, `save(patch)`, `reset(path)`, `effective()`.
+- New `src/core/tuning_overrides.py` (stdlib only, like `prompt_config.py`): an allowlist of dotted paths with a type and range each, `load()`, `save(changes)`, `apply(raw, path)`, `signature()`, `poll()`.
   - Writes use the temp-file-and-replace pattern from `config_files.seed_tuning`. In Docker, the configs path links to `.data/admin_tuning_overrides.json` in the existing persistent `agent_data` volume; atomic writes preserve that link.
   - An unreadable or invalid overlay is ignored, falls back to file defaults, and is logged.
-- Readers (`token_limits.py`, `decision.py`, failover and classifier users) read through `effective()`. Each agent process checks the overlay's mtime on use and calls its own `reset_cache()` when it changed, so no cross-process signal is needed.
-- Endpoints, internal-token protected like the existing admin routes:
-  - `GET /admin/tuning` returns `{defaults, overrides, effective, schema}`.
-  - `PUT /admin/tuning` takes a partial patch, validates it, saves, and returns `effective`.
-  - `DELETE /admin/tuning?path=token_limits.default.max_tool_rounds` resets one key.
-- Chat request accepts optional `limits: {max_output_tokens, max_tool_rounds}`; `token_limits.limits_for` applies `min(user, effective)`.
+- `config_files.read_section` merges the overlay into `config_tuning.json` for every reader (`token_limits.py`, `decision.py`, `gateway_failover.py`), so no reader changes its parsing.
+- Each cached reader registers its `reset_cache` with the overlay module. `run_chat` calls `tuning_overrides.poll()` at the start of a turn; when the overlay's mtime changed it runs the resets. No cross-process signal is needed.
+- Endpoints, internal-token protected (under the `/agents` prefix already guarded by `PROTECTED_PATHS`):
+  - `GET /agents/tuning` returns `{defaults, overrides, effective}`.
+  - `PUT /agents/tuning` takes `{path: value | null}`; `null` resets a path. It validates, saves, and returns the same body as GET.
+- `ask()` accepts optional `limits: {max_output_tokens, max_tool_rounds}`. The clamp is applied in `llm_options.max_tokens` and `max_tool_rounds`, because an agent file's `llm.max_tokens` overrides `token_limits` and would otherwise bypass a user limit. `status()` reports `user_limits: true` so ember_api only sends the field to an agent that understands it.
 
 ## ember_api
 - Permission `tuning.manage` in `services/permissions.py`, added to the admin role set.
 - `routes/admin_tuning.py` proxies GET/PUT through the existing `AgentAdmin` service in `services/agent_admin.py` (502 when garrison is unreachable, garrison validation errors passed on as 400). Every change is written to the activity log with before and after.
 - `routes/account_tuning.py`: `GET/PUT/DELETE /api/account/tuning` reads, saves and clears the account's two values, validated against the admin ceiling that the GET returns.
-- Table `account_tuning(account_id pk, max_output_tokens null, max_tool_rounds null, updated_at)` via an Alembic migration. A null means "use the admin value".
-- The chat proxy adds the account's `limits` to each request to garrison.
+- `services/tuning_limits_service.py` stores one document per account in treasury (`{owner, max_output_tokens, max_tool_rounds, updated_at}`); a missing field means "use the admin value".
+- The turn adds the account's `limits` to `TurnOptions`, and `AgentGateway.ask` sends them when the agent's `status` has `user_limits`. If reading `tuning_limits` fails, the turn runs without user limits; the existing disabled-agents 503 remains unchanged.
+- Delegated sub-agents run in other processes and do not receive the user's limits; they use the admin values.
 
 ## UI
-- ember_admin: a Tuning view under admin navigation, forms generated from the garrison `schema`; each field shows its default, a "changed" badge when overridden, and a reset button. Follows `ember-frontend-design` and `ember-design-system`.
+- ember_admin: a Tuning view under admin navigation, with a fixed list of fields (labels, units and ranges kept in the view); each field shows its default, a "changed" badge when overridden, and a reset button. Follows `ember-frontend-design` and `ember-design-system`.
 - ember_web: a "Response limits" row in Settings with two number inputs; each shows the admin cap as its max, and a clear button.
 
 ## Errors
