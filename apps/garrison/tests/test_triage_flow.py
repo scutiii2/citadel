@@ -332,3 +332,70 @@ def test_run_chat_goes_through_the_flow(monkeypatch):
 
     chat = asyncio.run(laya_provider.run_chat(request_json(), [], None, []))
     assert json.loads(chat.response)["answers"]["area"]["choice"] == "a" and service.asked[0]["strategy"] == "english-then-typed"
+
+
+# --- the strategy -----------------------------------------------------------------------------------------
+
+def two_questions(**extra):
+    return json.dumps({"text": "t", "questions": {
+        "area": {"type": "choice", "instructions": "Which?", "criteria": OPTIONS},
+        "other": {"type": "choice", "instructions": "Which?", "criteria": OPTIONS},
+    }, **extra})
+
+
+def sure_pair():
+    return result(("area", choice("a", 0.9, uncertain=False)), ("other", choice("a", 0.9, uncertain=False)))
+
+
+def test_a_requested_strategy_replaces_the_voter_derived_one(monkeypatch):
+    configure(monkeypatch, fallback=False)
+    monkeypatch.setattr(triage_flow.tuning_overrides, "triage_strategy", lambda: None)
+    service = FakeService(sure_pair())
+    TriageFlow(service=service).answer(two_questions(strategy="consensus"))
+    assert [(c["strategy"], list(c["questions"])) for c in service.asked] == [("consensus", ["area", "other"])]
+
+
+def test_the_admin_default_applies_when_the_request_names_none(monkeypatch):
+    configure(monkeypatch, fallback=False)
+    monkeypatch.setattr(triage_flow.tuning_overrides, "triage_strategy", lambda: "typed-only")
+    service = FakeService(sure_pair())
+    TriageFlow(service=service).answer(two_questions())
+    assert [c["strategy"] for c in service.asked] == ["typed-only"]
+
+
+def test_the_request_beats_the_admin_default(monkeypatch):
+    configure(monkeypatch, fallback=False)
+    monkeypatch.setattr(triage_flow.tuning_overrides, "triage_strategy", lambda: "typed-only")
+    service = FakeService(sure_pair())
+    TriageFlow(service=service).answer(two_questions(strategy="average"))
+    assert [c["strategy"] for c in service.asked] == ["average"]
+
+
+def test_without_either_the_voters_choose(monkeypatch):
+    configure(monkeypatch, fallback=False)
+    monkeypatch.setattr(triage_flow.tuning_overrides, "triage_strategy", lambda: None)
+    service = FakeService(sure_pair())
+    TriageFlow(service=service).answer(two_questions())
+    assert [c["strategy"] for c in service.asked] == ["english-then-typed"]
+
+
+def test_an_unknown_strategy_is_refused_with_the_valid_names(monkeypatch):
+    configure(monkeypatch, fallback=False)
+    monkeypatch.setattr(triage_flow.tuning_overrides, "triage_strategy", lambda: None)
+    service = FakeService(sure_pair(), strategy_names=("auto", "typed-only"))
+    with pytest.raises(ValueError, match=r"Invalid Laya request: unknown strategy 'nope'; choose one of: auto, typed-only"):
+        TriageFlow(service=service).answer(two_questions(strategy="nope"))
+    assert service.asked == []
+
+
+def test_a_service_that_cannot_list_strategies_still_gets_the_request(monkeypatch):
+    configure(monkeypatch, fallback=False)
+    monkeypatch.setattr(triage_flow.tuning_overrides, "triage_strategy", lambda: None)
+    service = FakeService(sure_pair())
+
+    def down():
+        raise LayaServiceError("down")
+
+    service.strategies = down
+    TriageFlow(service=service).answer(two_questions(strategy="consensus"))
+    assert [c["strategy"] for c in service.asked] == ["consensus"]
