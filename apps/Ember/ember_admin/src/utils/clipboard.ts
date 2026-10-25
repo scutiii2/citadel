@@ -19,7 +19,8 @@ function legacyCopy(text: string): boolean {
   area.style.position = "fixed";
   area.style.opacity = "0";
   const previous = document.activeElement;
-  document.body.appendChild(area);
+  // Inside the open modal when there is one: a modal <dialog> makes the rest of the page inert, so a textarea on <body> cannot take focus.
+  (previous?.closest("dialog") ?? document.body).appendChild(area);
   // Focused as well as selected: some browsers only copy from the focused element.
   area.focus();
   area.select();

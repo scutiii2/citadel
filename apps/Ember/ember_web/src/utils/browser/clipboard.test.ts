@@ -51,6 +51,25 @@ describe("copyText", () => {
     input.remove();
   });
 
+  it("puts the helper textarea inside an open modal dialog", async () => {
+    setClipboard(undefined);
+    let parent: Element | null = null;
+    setExecCommand(() => {
+      parent = document.activeElement?.parentElement ?? null;
+      return true;
+    });
+    const dialog = document.createElement("dialog");
+    const button = document.createElement("button");
+    dialog.appendChild(button);
+    document.body.appendChild(dialog);
+    button.focus();
+
+    await copyText("x");
+
+    expect(parent).toBe(dialog);
+    dialog.remove();
+  });
+
   it("falls back when the API refuses (blocked permission)", async () => {
     setClipboard({ writeText: vi.fn().mockRejectedValue(new Error("denied")) });
     setExecCommand(() => true);
