@@ -457,6 +457,7 @@ useChatShortcuts({
       <div class="composer-area">
         <ChatInput
           ref="input"
+          :conversation-id="activeId"
           :busy="busy"
           :commands="commands"
           :history="history"
