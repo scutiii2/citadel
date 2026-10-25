@@ -435,6 +435,7 @@ def test_run_chat_sends_agent_llm_options_and_retries_without_a_rejected_one(mon
 
     assert result.response == "ok"
     first, second = stream.call_args_list
-    assert first.kwargs["temperature"] == 0.0
+    assert first.kwargs["extra_body"] == {"temperature": 0.0}
+    assert "temperature" not in first.kwargs
     assert first.kwargs["max_tokens"] == 321
-    assert "temperature" not in second.kwargs
+    assert "extra_body" not in second.kwargs

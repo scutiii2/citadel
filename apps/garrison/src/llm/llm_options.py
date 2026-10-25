@@ -73,7 +73,11 @@ class LlmOptions:
         kwargs: dict[str, Any] = {}
         for option in self._sent(model):
             if option == "temperature":
-                kwargs["temperature"] = self._llm.temperature
+                if self._provider_id == "anthropic":
+                    # The anthropic SDK's messages.stream() has no temperature keyword (a TypeError, not a 400).
+                    kwargs["extra_body"] = {"temperature": self._llm.temperature}
+                else:
+                    kwargs["temperature"] = self._llm.temperature
             elif self._provider_id == "anthropic":
                 kwargs["output_config"] = {"effort": self._effort()}
             else:

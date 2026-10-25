@@ -19,7 +19,8 @@ def test_defaults_send_nothing_extra():
 def test_anthropic_kwargs():
     llm = LlmSpec(provider="anthropic", temperature=0.0, reasoning_effort="high", max_tokens=4096, max_tool_rounds=3)
     options = LlmOptions("anthropic", "calc", llm)
-    assert options.extra_kwargs("m") == {"temperature": 0.0, "output_config": {"effort": "high"}}
+    # The anthropic SDK has no temperature keyword, so it travels in extra_body.
+    assert options.extra_kwargs("m") == {"extra_body": {"temperature": 0.0}, "output_config": {"effort": "high"}}
     assert options.max_tokens(1000) == 4096
     assert options.max_tool_rounds(6) == 3
 
@@ -48,4 +49,4 @@ def test_a_rejection_on_one_model_does_not_drop_the_option_for_another():
     assert options.drop_rejected("temperature: not supported", "model-a") is True
 
     assert options.extra_kwargs("model-a") == {"output_config": {"effort": "high"}}
-    assert options.extra_kwargs("model-b") == {"temperature": 0.5, "output_config": {"effort": "high"}}
+    assert options.extra_kwargs("model-b") == {"extra_body": {"temperature": 0.5}, "output_config": {"effort": "high"}}
