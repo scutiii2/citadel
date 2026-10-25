@@ -15,6 +15,8 @@ import json
 import os
 import sys
 from uuid import uuid4
+from pathlib import Path
+from src.core import config_files, tuning_overrides
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -416,6 +418,32 @@ async def agent_prompt_preview(request: Request) -> JSONResponse:
     except agent_store.AgentStoreError as error:
         return _store_error(error)
     return JSONResponse({"prompt": prompt})
+
+
+def _tuning_overlay() -> Path:
+    return config_files.TUNING_PATH.with_name(tuning_overrides.OVERLAY_NAME)
+
+
+@mcp.custom_route("/agents/tuning", methods=["GET"])
+async def tuning_get(_request: Request) -> JSONResponse:
+    """The editable tuning values: the file's, the admin's changes, and the two merged."""
+    return JSONResponse(await asyncio.to_thread(config_files.tuning_view, config_files.TUNING_PATH))
+
+
+@mcp.custom_route("/agents/tuning", methods=["PUT"])
+async def tuning_put(request: Request) -> JSONResponse:
+    """Body: {"token_limits.default.max_tool_rounds": 20, ...}; null puts a path back to the
+    file's value. Nothing is saved if any change is refused. Each agent process picks the
+    edit up at the start of its next turn."""
+    changes = await _json_object(request)
+    if changes is None:
+        return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
+    try:
+        await asyncio.to_thread(tuning_overrides.save, changes, _tuning_overlay())
+    except tuning_overrides.TuningError as error:
+        return JSONResponse({"error": str(error)}, status_code=400)
+    tuning_overrides.poll(_tuning_overlay())
+    return JSONResponse(await asyncio.to_thread(config_files.tuning_view, config_files.TUNING_PATH))
 
 
 @mcp.custom_route("/agents/triage-strategy", methods=["GET"])
