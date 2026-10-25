@@ -28,7 +28,7 @@ Task 8 writes these back into the spec.
 2. **No new permission.** The admin control reuses `settings.manage` (it sits on the Workspace settings page). No `tuning.manage`, no role migration.
 3. **Per-user value is a column `accounts.triage_strategy`** (nullable `String(40)`), mirroring `accounts.prompt_suggestions`, not a new `account_tuning` table. The full tuning spec can move it later.
 4. **The admin "unset" state is "not set", not `auto`.** Clearing the override restores the voter-derived behaviour, which is not the service's `auto`. The admin control's first option reads "Not set (follows triage_order)", and a user's first option reads "Default (<admin's choice, or not set>)".
-5. **Overlay file is `configs/config_tuning_overrides.json`**, so the existing `.gitignore` rule `config_*.json` already ignores it.
+5. **Overlay file is `.data/tuning_overrides.json`** (changed after review: `configs/` is baked into the image, so a file there is lost on rebuild; `.data/` is the `agent_data` volume and is gitignored).
 6. **A stored user value the service no longer lists** makes `/api/triage/ask` return 422 with Garrison's message (`Invalid Laya request: unknown strategy ...`), not 503.
 
 ## File Structure

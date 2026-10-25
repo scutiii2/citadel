@@ -1,4 +1,7 @@
-"""Admin overrides of Garrison's tuning, kept beside config_tuning.json in configs/config_tuning_overrides.json.
+"""Admin overrides of Garrison's tuning, kept in .data/tuning_overrides.json.
+
+It lives in .data/ (runtime state, the `agent_data` volume in Docker) rather than configs/, because configs/ is
+baked into the image and an admin's change there would be lost on every rebuild.
 
 One key so far: `classifier.triage_strategy`, the Laya service strategy the Triage Assistant uses when a request
 names none. The file is read on every use, so every agent process sees a change at once and none needs a restart.
@@ -13,9 +16,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from src.core.config_files import CONFIGS_DIR
-
-OVERRIDES_PATH = CONFIGS_DIR / "config_tuning_overrides.json"
+OVERRIDES_PATH = Path(__file__).resolve().parent.parent.parent / ".data" / "tuning_overrides.json"
 
 _log = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ def set_triage_strategy(value: str | None, path: Path | None = None) -> None:
     else:
         section["triage_strategy"] = value
     raw["classifier"] = section
+    path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, suffix=".tmp", delete=False) as output:

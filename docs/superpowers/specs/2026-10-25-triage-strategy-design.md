@@ -16,7 +16,7 @@ A user picks which LayaAgent decision strategy answers their prompts sent straig
 ## Decisions
 - Strategy names come from the service (`GET /v1/strategies`), never a copy in Garrison or Ember.
 - Resolution order: request `strategy`, then admin default, then current behaviour (derived from voter config). An unset admin default keeps today's behaviour.
-- Admin default is stored in Garrison (`configs/config_tuning_overrides.json`), so it covers every caller. Per-user value is stored in ember_api's DB. A null user value means "use the admin default".
+- Admin default is stored in Garrison (`.data/tuning_overrides.json`, in the `agent_data` volume so a rebuild keeps it), so it covers every caller. Per-user value is stored in ember_api's DB. A null user value means "use the admin default".
 - Jev fallback after an uncertain result is unchanged.
 
 ## Garrison

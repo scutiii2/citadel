@@ -1,4 +1,4 @@
-"""The admin overlay (configs/config_tuning_overrides.json): one key for now, the Triage Assistant's default strategy."""
+"""The admin overlay (.data/tuning_overrides.json): one key for now, the Triage Assistant's default strategy."""
 
 from __future__ import annotations
 
@@ -38,3 +38,13 @@ def test_a_broken_file_reads_as_unset_and_is_replaced_by_a_write(tmp_path, caplo
 def test_a_write_leaves_no_temporary_file(tmp_path):
     tuning_overrides.set_triage_strategy("auto", tmp_path / "o.json")
     assert [p.name for p in tmp_path.iterdir()] == ["o.json"]
+
+
+def test_a_write_creates_the_missing_data_folder(tmp_path):
+    path = tmp_path / ".data" / "o.json"
+    tuning_overrides.set_triage_strategy("auto", path)
+    assert tuning_overrides.triage_strategy(path) == "auto"
+
+
+def test_the_default_path_is_in_the_data_folder():
+    assert tuning_overrides.OVERRIDES_PATH.parent.name == ".data"

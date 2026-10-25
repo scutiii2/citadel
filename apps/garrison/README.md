@@ -307,7 +307,7 @@ invalid requests (422), including when `/v1/ask` rejects one after listing was u
 these refusals never trigger Jev fallback.
 
 The shared `src/core/tuning_overrides.py` reads the admin default from
-`configs/config_tuning_overrides.json` on every request and writes it atomically.
+`.data/tuning_overrides.json` (the `agent_data` volume in Docker, so it survives a rebuild) on every request and writes it atomically.
 `GET /agents/triage-strategy` returns `{default, strategies}`; `PUT` takes
 `{strategy: string | null}` and returns the same shape. Both require the internal
 token. Null clears the override and restores voter-derived behavior, independently
