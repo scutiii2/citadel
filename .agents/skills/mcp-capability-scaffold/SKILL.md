@@ -75,7 +75,7 @@ Use the standard library logger, not `print()` or a bespoke handler. `apps/armor
 
 ## Background job watchers (long-running external jobs)
 
-A capability that follows an external job or app in the background subclasses `JobWatcher` from `apps/armory/src/services/watcher.py`. The base owns threading, backoff polling, state persistence, cancellation and startup resume. The capability owns what to poll and what to do with the result. The worked example is `apps/armory/src/capabilities/server_manager/utils/server_watcher.py` (`ServerWatcher`), with its owner-email helper in `utils/notify.py`.
+A capability that follows an external job or app in the background subclasses `JobWatcher` from `apps/armory/src/capabilities/server_manager/utils/watcher.py`. The base owns threading, backoff polling, state persistence, cancellation and startup resume. The capability owns what to poll and what to do with the result. The worked example is `apps/armory/src/capabilities/server_manager/utils/server_watcher.py` (`ServerWatcher`), with its owner-email helper in `utils/notify.py`.
 
 - Define `backoff_schedule` (a tiered `[(elapsed_seconds_cutoff, interval_seconds), ...]` table), `poll()` returning `(WatcherPhase, detail_dict)`, and `from_record()` reconstructing the subclass from its saved record. Use `on_completed()` for completion work and `on_state_change()` for phase-transition work; the latter runs after the phase has been saved, not on every poll.
 - Start the watcher from the capability's tool layer only after the initiating action succeeds. `tool_srv_startApp` and `tool_srv_restartApp` call `watch_app(name)` after starting the app; the helper records `current_username()` and `current_email()` as its owner.
@@ -84,7 +84,7 @@ A capability that follows an external job or app in the background subclasses `J
 - State files live at `{state_dir}/{YourWatcherClassName}/instances/{key}.json`. ServerWatcher uses `settings.watchers_dir` (`MCP_WATCHERS_DIR`); classes share the root and each owns its own class folder. Keep generated state out of the capability's code folder.
 - Polling elapsed time is measured from the original start, so resume keeps its cadence. ServerWatcher polls every 30 seconds for the first 10 minutes, then every 5 minutes, with `(float("inf"), 300.0)` as the open-ended final tier.
 - Decide notifications per capability and document them in its README. ServerWatcher emails only the owner: one notification when the app stops or is removed, and batches of new timestamped error lines with a one-hour cooldown. Cursor, pending lines and last-email time are persisted; cancelled watchers suppress email.
-- Email delivery goes through the Email capability's `services/email_delivery.py`, using the `notification` template. The helper returns `sent`, `skipped: ...` or `failed: ...`; mail trouble must not stop polling. `services/watcher_recipients.py` remains available to the Email capability, but ServerWatcher does not use recipient lists or expose recipient-management tools.
+- Email delivery goes through the Email capability's `services/email/delivery.py`, using the `notification` template. The helper returns `sent`, `skipped: ...` or `failed: ...`; mail trouble must not stop polling. `services/email/recipients.py` remains available to the Email capability, but ServerWatcher does not use recipient lists or expose recipient-management tools.
 
 ## Registering a brand-new capability
 

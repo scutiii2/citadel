@@ -1,0 +1,237 @@
+"""Email notifications via smtplib.
+
+Stdlib only (``smtplib`` + ``email.mime``) - no extra pip dependency, on
+the same "reach for stdlib first" principle as
+other modules' use of ``sqlite3``.
+
+SMTP settings come from the ``"email"`` section of the JSON config file
+(see ``services/app_config.py`` and ``config.json.example``), not from env
+vars, since they're structured and include a password.
+
+Three transports are supported, because the sending account is usually a
+mainstream consumer provider and they don't agree: implicit TLS on 465
+(``"ssl"``), STARTTLS on 587 (``"starttls"``), and no TLS at all
+(``"none"``) for a relay on the local network. ``"none"`` exists for LAN
+relays and nothing else - it puts the credentials and the message on the
+wire in the clear, so it's only defensible on a link you already trust.
+
+This module raises on a failed send rather than swallowing the error, so
+callers can tell "sent" from "failed to send". Whether a failure should
+abort the surrounding operation is a call-site decision: a long-running
+job usually wants to log the failure and carry on, which is easy to do
+with a ``try``/``except`` there and impossible to undo if this module
+silently succeeded instead.
+
+Message bodies are the caller's business - build the HTML in the
+capability that knows what it's announcing, and pass it in.
+"""
+
+from __future__ import annotations
+
+import re
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid
+from html import unescape
+
+from src.services.app_config import EmailConfig
+from src.services.email.recipients import parse_recipients
+
+
+# Anything inside these is code, not prose, and would otherwise land in the
+# plain-text part as a wall of CSS.
+_SCRIPT_OR_STYLE = re.compile(r"<(script|style)\b[^>]*>.*?</\1>", re.DOTALL | re.IGNORECASE)
+
+# Links are pulled out as "text (url)" because the one thing these messages
+# exist to carry is a link, and a tag stripper that only kept the
+# anchor text would produce a plain-text part telling the reader to click
+# something that isn't there.
+_ANCHOR = re.compile(r'<a\b[^>]*?href="([^"]*)"[^>]*>(.*?)</a>', re.DOTALL | re.IGNORECASE)
+
+# Tags that end a visual line. Without this the whole document collapses
+# onto one line, since HTML's own newlines are just source formatting.
+_BLOCK_BREAK = re.compile(r"<br\s*/?>|</(?:p|div|h[1-6]|li|tr|table|blockquote)\s*>", re.IGNORECASE)
+
+_ANY_TAG = re.compile(r"<[^>]+>")
+
+# Stands in for a line break between the tag stripping and the whitespace
+# flattening below. A real "\n" can't do the job: the source's own
+# newlines are indentation of the HTML file, not of the text, and by the
+# time the tags are gone the two are indistinguishable.
+_LINE_BREAK = "\x00"
+
+# Appended to every message this module sends, so a recipient never mistakes
+# a notification for a mailbox somebody reads.
+AUTO_GENERATED_NOTICE = "This is an auto-generated message. Do not reply."
+
+SUBJECT_PREFIX = "EMBER"
+
+_MESSAGE_ID = re.compile(r"<[^<>\s@]+@[^<>\s@]+>")
+
+
+def validate_message_id(value: str) -> str:
+    """Require a single bracketed Message-ID, without embedded headers."""
+    _validate_header(value)
+    if not _MESSAGE_ID.fullmatch(value):
+        raise ValueError("Provide a bracketed Message-ID such as <id@example.com>.")
+    return value
+
+
+def _validate_header(value: str) -> None:
+    if any(ord(char) < 32 or ord(char) == 127 for char in value):
+        raise ValueError("Email headers must not contain control characters.")
+
+
+def _validate_address(value: str) -> None:
+    _validate_header(value)
+    try:
+        parsed = parse_recipients(value)
+    except ValueError:
+        raise ValueError("Provide a valid email address.") from None
+    if parsed != [value]:
+        raise ValueError("Provide one email address per recipient entry.")
+
+
+def format_subject(subject: str) -> str:
+    """``[EMBER] <subject>``: the agent name, then the context of the message."""
+    return f"[{SUBJECT_PREFIX}] {subject}"
+
+
+def _html_to_text(body_html: str) -> str:
+    """Best-effort plain-text rendering of an HTML body.
+
+    Deliberately a regex stripper rather than a parser: the bodies this
+    handles are small templates written inside this project, so the
+    failure modes of regex-on-HTML (comments containing tags, unquoted
+    attributes, ``<`` in text that isn't markup) aren't reachable from the
+    call sites, and the alternative - ``html.parser`` plus a subclass, or a
+    dependency - is a lot of machinery for a fallback part.
+
+    Known limits: no layout at all, so tables and lists come out as flat
+    lines, and only ``href="..."`` in double quotes is recovered. Pass
+    ``body_text`` explicitly when the wording of the text part matters.
+    """
+    # Dropped so the sentinel below can't be forged by the body itself.
+    text = body_html.replace(_LINE_BREAK, "")
+    text = _SCRIPT_OR_STYLE.sub("", text)
+    text = _ANCHOR.sub(r"\2 (\1)", text)
+    text = _BLOCK_BREAK.sub(_LINE_BREAK, text)
+    text = _ANY_TAG.sub("", text)
+    text = unescape(text)
+    # One line per block, with runs of whitespace inside it collapsed -
+    # otherwise a paragraph wrapped across three source lines arrives as
+    # three lines with ragged indentation.
+    lines = [" ".join(line.split()) for line in text.split(_LINE_BREAK)]
+    return "\n".join(line for line in lines if line)
+
+
+def send_email(
+    config: EmailConfig,
+    capability_alias: str,
+    subject: str,
+    body_html: str | None,
+    *,
+    to: list[str] | None = None,
+    body_text: str | None = None,
+    in_reply_to: str | None = None,
+    references: list[str] | None = None,
+    prefix_subject: bool = True,
+) -> str:
+    """SMTP transport; application callers use ``email_delivery.deliver_email``.
+
+    Return the generated Message-ID after SMTP accepts every recipient. HTML
+    produces multipart/alternative; ``body_html=None`` sends plain text only.
+    Optional reply headers link this message to its parent and ancestry.
+
+    The subject is sent as ``[EMBER] <subject>`` and an
+    auto-generated notice is appended to each part; callers pass neither.
+    ``prefix_subject=False`` preserves the caller's subject for account emails.
+    Build ``body_html`` with ``email_render.render_email_template`` for the
+    standard layouts.
+
+    ``to`` defaults to ``config.to``, the standing recipient list. Pass it
+    explicitly to target a different audience - a different recipient, or one
+    specific person the message is about - without needing a second
+    ``EmailConfig``/SMTP setup for each.
+
+    ``body_text`` is optional and derived from the HTML when omitted. The
+    derivation is what makes the text part worth having: an HTML-only body
+    is a spam signal at Gmail and Yahoo, and a part that only appears when
+    a caller remembers to write one would be missing from exactly the
+    messages that must not be filtered. The parameter stays as an override
+    for a caller that can phrase its own content better than a stripper
+    can infer it.
+    """
+    recipients = to if to is not None else config.to
+    if not recipients:
+        raise ValueError("No recipients: pass to=[...] or set a non-empty 'to' list in config.json")
+
+    _validate_header(subject)
+    _validate_header(capability_alias)
+    _validate_address(config.from_address)
+    for recipient in recipients:
+        _validate_address(recipient)
+    ancestry = list(dict.fromkeys(validate_message_id(value) for value in references or []))
+    if in_reply_to is not None:
+        validate_message_id(in_reply_to)
+        if in_reply_to not in ancestry:
+            ancestry.append(in_reply_to)
+    if body_html is None and body_text is None:
+        raise ValueError("Provide a plain text or HTML email body.")
+
+    if config.security not in ("ssl", "starttls", "none"):
+        # Checked before opening a socket: a config that can't say how to
+        # protect the connection must not get as far as offering a password
+        # to a server.
+        raise ValueError(
+            f"Unknown email security mode {config.security!r}; expected one of ssl, starttls, none."
+        )
+
+    text_part = body_text if body_text is not None else _html_to_text(body_html or "")
+    plain = MIMEText(f"{text_part}\n\n{AUTO_GENERATED_NOTICE}", "plain")
+    message = MIMEMultipart("alternative") if body_html is not None else plain
+    message["Subject"] = format_subject(subject) if prefix_subject else subject
+    message["From"] = config.from_address
+    message["To"] = ", ".join(recipients)
+    # Some receivers reject or penalize a message with no Date or
+    # Message-ID, and threading in the reader's client depends on the
+    # latter. smtplib adds neither.
+    message["Date"] = formatdate(localtime=True)
+    # make_msgid() defaults to the sending machine's hostname, which on a
+    # home server is something like "desktop.lan": it leaks internal naming
+    # and doesn't match the From domain, which is itself a spam heuristic.
+    message["Message-ID"] = make_msgid(domain=config.from_address.rpartition("@")[2] or None)
+    if in_reply_to is not None:
+        message["In-Reply-To"] = in_reply_to
+    if ancestry:
+        message["References"] = " ".join(ancestry)
+
+    # Order is the protocol, not a preference: RFC 2046 says the last part
+    # of a multipart/alternative is the one the client should prefer, so
+    # plain text must come first for the HTML to win.
+    if body_html is not None:
+        message.attach(plain)
+        message.attach(MIMEText(f'{body_html}\n<p style="color:#888;font-size:12px;font-style:italic;">{AUTO_GENERATED_NOTICE}</p>', "html"))
+    raw_message = message.as_string()
+
+    # smtplib exposes implicit TLS as a separate class rather than a flag,
+    # because the socket is wrapped before the greeting - there is no plain
+    # session on which starttls() could be called.
+    if config.security == "ssl":
+        client = smtplib.SMTP_SSL(config.smtp_server, config.smtp_port, timeout=15)
+    else:
+        client = smtplib.SMTP(config.smtp_server, config.smtp_port, timeout=15)
+
+    with client as server:
+        if config.security == "starttls":
+            server.starttls()
+        if config.password:
+            # An empty password means the relay doesn't want AUTH at all.
+            # Offering it anyway is not harmless: a server with no AUTH
+            # extension answers with an error and the send fails.
+            server.login(config.from_address, config.password)
+        refused = server.sendmail(config.from_address, recipients, raw_message)
+        if refused:
+            raise RuntimeError("Email delivery was incomplete: one or more recipients were refused.")
+    return str(message["Message-ID"])

@@ -1,4 +1,4 @@
-"""Tests for services/email.py.
+"""Tests for services/email/send.py.
 
 ``smtplib.SMTP`` is mocked - these assert on what would be sent and to
 whom, not on real SMTP behavior. Note the mock stands in for the context
@@ -13,8 +13,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.services.app_config import EmailConfig
-from src.services.email import AUTO_GENERATED_NOTICE, send_email
-from src.services.email_render import render_email_template
+from src.services.email.send import AUTO_GENERATED_NOTICE, send_email
+from src.services.email.render import render_email_template
 
 
 CONFIG = EmailConfig(
@@ -241,7 +241,7 @@ def test_date_and_message_id_headers_are_set():
 
 
 def test_every_message_ends_with_the_auto_generated_notice(monkeypatch):
-    from src.services import email as email_module
+    from src.services.email import send as email_module
 
     sent = []
 

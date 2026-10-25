@@ -75,13 +75,13 @@ files/jobs share the same unavailable response. Expected service failures retain
 their native HTTP status and `{error:{code,message}}` body; unexpected failures
 return a sanitized 503. Jobs remain in memory and are lost on restart.
 
-`src/services/pdf_runtime.py` owns one process-wide service on a dedicated event loop. This keeps the file index, quota reservations and job queue on one loop and preserves the service and sweeper across capability reloads. Tool wrappers use `@offload`, so the synchronous wait blocks a worker thread while the engine performs asynchronous work. There is no public job or polling tool.
+`src/capabilities/pdf_merger/utils/pdf_runtime.py` owns one process-wide service on a dedicated event loop. This keeps the file index, quota reservations and job queue on one loop and preserves the service and sweeper across capability reloads. Tool wrappers use `@offload`, so the synchronous wait blocks a worker thread while the engine performs asynchronous work. There is no public job or polling tool.
 
 A merge waits up to the configured deadline and requests cooperative cancellation on timeout. Python worker threads cannot be forcibly killed, so cleanup may finish after the timeout response. A concurrency slot remains occupied until the work actually stops. Shutdown cancels outstanding jobs and waits for cleanup.
 
 Generated state is described in [STATIC-GUIDELINES.md](STATIC-GUIDELINES.md). Application logs use Armory's standard logging; this capability creates no separate cache or log directory.
 
-Signed `/pdf/files/{file_id}/download` URLs are bearer links: anyone holding a valid link can download until the signature or stored file expires. They require no account identity after signature verification. Inspect, list, merge and ordinary file lookup always enforce account ownership; malformed, missing, expired and other-owner file IDs return the same unavailable-file error. Tool result filenames are returned as fenced untrusted data. Stable error types live in `src/services/pdf_errors.py` so a retained engine and reloaded HTTP/MCP wrappers share the same exception boundary.
+Signed `/pdf/files/{file_id}/download` URLs are bearer links: anyone holding a valid link can download until the signature or stored file expires. They require no account identity after signature verification. Inspect, list, merge and ordinary file lookup always enforce account ownership; malformed, missing, expired and other-owner file IDs return the same unavailable-file error. Tool result filenames are returned as fenced untrusted data. Stable error types live in `src/capabilities/pdf_merger/utils/pdf_errors.py` so a retained engine and reloaded HTTP/MCP wrappers share the same exception boundary.
 
 ## Related vault notes
 

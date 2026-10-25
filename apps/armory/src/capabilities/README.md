@@ -72,7 +72,7 @@ Nothing outside this list belongs at a capability's top level - a new
 runtime/generated file goes in a dot-folder, a new curated static
 reference file goes in `static/`, a new Python file goes in `utils/`.
 
-Shared infrastructure (`services/ssh.py`, `services/email.py`,
+Shared infrastructure (`services/ssh.py`, `services/email/send.py`,
 `services/app_config.py`) stays one level up,
 at `src/services/` - every capability reuses the same clients and config
 loader rather than each folder inventing its own.

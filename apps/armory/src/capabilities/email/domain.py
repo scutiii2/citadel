@@ -1,7 +1,9 @@
 """Typed email operations; shared services own transport, config and audit."""
 from src.capabilities.email.contract import AuditResult, AuditRow, SendResult
-from src.services import email_audit, email_delivery, identity_context
-from src.services.watcher_recipients import parse_recipients
+from src.services import identity_context
+from src.services.email import audit as email_audit
+from src.services.email import delivery as email_delivery
+from src.services.email.recipients import parse_recipients
 
 
 def send(to: str, subject: str, body_text: str | None = None, body_html: str | None = None,

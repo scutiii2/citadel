@@ -9,7 +9,7 @@ from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
 from src import upload_routes
-from src.services import tables
+from src.capabilities.tables.utils import tables
 from src.upload_routes import install_upload_routes
 
 CSV = b"region,units\nEU,10\nUS,20\n"

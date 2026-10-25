@@ -4,7 +4,8 @@ There is deliberately no approve or retire here: only the user's side (ember_api
 """
 from src.capabilities.skills.contract import MarkResult, ProposeResult, SearchResult
 from src.config import settings
-from src.services import identity_context, skill_store, untrusted
+from src.services import identity_context, untrusted
+from src.capabilities.skills.utils import skill_store
 from src.services.internal_token import is_exposed_without_token
 
 

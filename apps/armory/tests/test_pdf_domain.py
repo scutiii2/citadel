@@ -27,7 +27,7 @@ def test_exposed_without_token_refuses_even_identified_caller(caller, monkeypatc
 def test_native_upload_merge_and_isolation(caller, monkeypatch, tmp_path):
     import pikepdf
     from src.capabilities.pdf_merger.contract import MergePlan
-    from src.services.pdf_runtime import Runtime
+    from src.capabilities.pdf_merger.utils.pdf_runtime import Runtime
     from src.capabilities.pdf_merger.utils.config import Settings
     from src.capabilities.pdf_merger.utils.errors import MergerError
 

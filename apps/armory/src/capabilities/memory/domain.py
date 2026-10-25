@@ -1,7 +1,8 @@
 """Typed memory operations; memory_store owns storage, identity_context the owner."""
 from src.capabilities.memory.contract import ClearResult, ForgetResult, SaveResult, SearchResult
 from src.config import settings
-from src.services import identity_context, memory_store, untrusted
+from src.services import identity_context, untrusted
+from src.capabilities.memory.utils import memory_store
 from src.services.internal_token import is_exposed_without_token
 
 

@@ -34,7 +34,9 @@ from starlette.exceptions import HTTPException
 from starlette.responses import JSONResponse
 
 from src.config import settings
-from src.services import capability_registry, table_loader, tables
+from src.services import capability_registry
+from src.capabilities.tables.utils import table_loader
+from src.capabilities.tables.utils import tables
 from src.services.identity_context import REQUESTER_UID_HEADER, REQUESTER_USERNAME_HEADER
 
 # Deliberately tight, not a generic upload endpoint: no built-in tool

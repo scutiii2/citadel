@@ -86,7 +86,7 @@ class Settings:
     memory_db_path: Path = Path(_env("MCP_MEMORY_DB_PATH", "specifics/memory/.data/memory.db"))
     # Per-user learned skills (capabilities/skills). Runtime state: gitignored.
     skills_db_path: Path = Path(_env("MCP_SKILLS_DB_PATH", "specifics/skills/.data/skills.db"))
-    # Support tickets (services/tickets.py): SQLite file, and the optional Laya
+    # Support tickets (capabilities/tickets/utils/service.py): SQLite file, and the optional Laya
     # agent's MCP address (http://host:9111/mcp) used to group and tag tickets.
     # Blank LAYA_URL skips Laya; tickets still work.
     tickets_db_path: Path = Path(_env("MCP_TICKETS_DB_PATH", "specifics/tickets/.data/tickets.db"))

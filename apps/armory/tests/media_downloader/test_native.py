@@ -16,7 +16,8 @@ from src import commands
 from src.capabilities.media_downloader import domain
 from src.capabilities.media_downloader.utils.errors import DownloaderError, ErrorCode
 from src.capabilities.media_downloader.utils.policy.url_policy import UrlPolicy
-from src.services import capability_meta, capability_registry, identity_context, media_downloads
+from src.services import capability_meta, capability_registry, identity_context
+from src.capabilities.media_downloader.utils import media_downloads
 from src.services.capability_loader import CapabilityLoader
 from tests.media_downloader.conftest import public_resolver
 
@@ -139,7 +140,7 @@ def test_close_cancels_jobs_and_stops_loop(native, fake_extractor):
 
 
 def test_signed_route_and_range_disabled_and_invalid_links(native, monkeypatch):
-    from src import media_routes
+    from src.capabilities.media_downloader import routes as media_routes
     from src.command_routes import install_command_routes
     monkeypatch.setattr(media_routes, "get_runtime", lambda: native)
     enabled = [True]

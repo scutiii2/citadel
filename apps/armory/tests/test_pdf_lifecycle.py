@@ -9,7 +9,8 @@ from mcp.server.fastmcp import FastMCP
 
 from src import capability_help, commands
 from src.config import settings
-from src.services import capability_meta, capability_registry, pdf_runtime
+from src.services import capability_meta, capability_registry
+from src.capabilities.pdf_merger.utils import pdf_runtime
 from src.services.capability_loader import CapabilityLoader
 
 
@@ -33,7 +34,7 @@ def test_pdf_refresh_help_and_runtime_survive_reload(tmp_path, monkeypatch):
         assert {"tool_pdf_inspect", "tool_pdf_listFiles", "tool_pdf_merge"} <= tools.keys()
         assert tools["tool_pdf_merge"].annotations.readOnlyHint is False
         tool_module = importlib.import_module("src.capabilities.pdf_merger.tool")
-        from src.services.pdf_errors import ErrorCode, MergerError
+        from src.capabilities.pdf_merger.utils.pdf_errors import ErrorCode, MergerError
         from mcp.server.fastmcp.exceptions import ToolError
         def fail_merge(_):
             raise MergerError(ErrorCode.INVALID_RANGE, "Bad range")

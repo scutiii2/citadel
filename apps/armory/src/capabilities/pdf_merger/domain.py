@@ -4,7 +4,7 @@ from pathlib import Path
 from src.config import settings
 from src.services import identity_context, untrusted
 from src.services.internal_token import is_exposed_without_token
-from src.services.pdf_runtime import get_runtime
+from src.capabilities.pdf_merger.utils.pdf_runtime import get_runtime
 
 from .contract import FailedItem, FileInfo, InspectResult, LinkedFileInfo, ListFilesResult, MergePlan, MergeToolResult
 from .utils.service import Caller

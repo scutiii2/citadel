@@ -12,7 +12,7 @@ from src.config import settings
 from src.services.identity_context import current_uid, current_username
 from src.services.internal_token import is_exposed_without_token
 from src.services.untrusted import fenced_and_capped
-from src.services.media_downloads import get_runtime
+from src.capabilities.media_downloader.utils.media_downloads import get_runtime
 
 logger = logging.getLogger(__name__)
 

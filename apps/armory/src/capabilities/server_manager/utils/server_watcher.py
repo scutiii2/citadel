@@ -20,7 +20,7 @@ from typing import Any, TypeVar
 from src.capabilities.server_manager.utils import notify
 from src.config import settings
 from src.services import identity_context
-from src.services.watcher import JobWatcher, WatcherPhase, WatcherRecord
+from src.capabilities.server_manager.utils.watcher import JobWatcher, WatcherPhase, WatcherRecord
 
 T = TypeVar("T")
 

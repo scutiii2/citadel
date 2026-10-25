@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from src.capabilities.generator import domain
-from src.services import email_delivery
+from src.services.email import delivery as email_delivery
 
 RFC_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
 

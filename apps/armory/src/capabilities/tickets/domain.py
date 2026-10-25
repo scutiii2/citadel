@@ -3,9 +3,10 @@ from typing import Any
 
 from src.capabilities.tickets.contract import CreateResult, DetailResult, ListResult
 from src.config import settings
-from src.services import identity_context, tickets, untrusted
+from src.services import identity_context, untrusted
+from src.capabilities.tickets.utils import service as tickets
 from src.services.internal_token import is_exposed_without_token
-from src.services.tickets import TicketError, TicketNotFound
+from src.capabilities.tickets.utils.service import TicketError, TicketNotFound
 
 _NO_USER = "No signed-in user is known for this request, so tickets are unavailable."
 

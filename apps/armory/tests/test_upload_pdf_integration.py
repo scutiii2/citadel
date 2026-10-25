@@ -15,7 +15,7 @@ from starlette.testclient import TestClient
 from src import command_routes, upload_routes
 from src.services import capability_registry
 from src.services.identity_context import IdentityContextMiddleware
-from src.services.pdf_runtime import Runtime
+from src.capabilities.pdf_merger.utils.pdf_runtime import Runtime
 
 HEADERS = {"X-Internal-Token": "shared", "X-Requester-UID": "account-alice", "X-Requester-Username": "same-name"}
 OTHER = {**HEADERS, "X-Requester-UID": "account-bob"}

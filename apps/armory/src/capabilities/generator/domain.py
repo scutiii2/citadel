@@ -28,8 +28,8 @@ from src.capabilities.generator.contract import (
     TotpSecretResult,
 )
 from src.capabilities.generator.utils.wordlist import WORDS
-from src.services import email_delivery
-from src.services.watcher_recipients import parse_recipients
+from src.services.email import delivery as email_delivery
+from src.services.email.recipients import parse_recipients
 
 SYMBOLS = "!@#$%^&*()-_=+[]{};:,.?"
 AMBIGUOUS = set("Il1O0o")

@@ -29,8 +29,8 @@ from src.capabilities.tables.contract import (
     TableListResult,
     ValueCount,
 )
-from src.services.table_loader import parse_date, parse_number
-from src.services.tables import Table, TableRegistry
+from src.capabilities.tables.utils.table_loader import parse_date, parse_number
+from src.capabilities.tables.utils.tables import Table, TableRegistry
 
 MAX_ROWS_SHOWN = 50
 MAX_GROUPS = 100
