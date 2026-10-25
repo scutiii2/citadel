@@ -27,6 +27,7 @@ from src.routes import (
     admin,
     agent_admin,
     attachments,
+    bard,
     capability_files,
     calendar as calendar_routes,
     auth,
@@ -239,6 +240,7 @@ def create_app(
     app.include_router(logs.router)
     app.include_router(traffic_routes.router)
     app.include_router(attachments.router)
+    app.include_router(bard.router)
     app.include_router(capability_files.router)
     app.include_router(calendar_routes.router)
 

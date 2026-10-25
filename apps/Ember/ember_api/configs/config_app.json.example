@@ -9,6 +9,7 @@
   "require_email_verification": true,
   "agents_registry_path": "../../garrison/.data/agent_registry.json",
   "mcp_server_url": "http://127.0.0.1:8010/mcp",
+  "bard_url": "http://127.0.0.1:8090",
   "db_gateway": {
     "url": "http://127.0.0.1:8071",
     "instance": "ember",
