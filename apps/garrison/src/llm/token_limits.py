@@ -153,10 +153,10 @@ def reset_user_limits(token: Token) -> None:
     _user_limits.reset(token)
 
 
-def apply_user_limit(field: str, value: int) -> int:
+def apply_user_limit(field: str, value: int, ceiling: int | None = None) -> int:
     """`value`, lowered to the user's cap for `field` when they set one. Never raises it."""
     cap = _user_limits.get().get(field)
-    return value if cap is None else min(value, cap)
+    return value if cap is None else min(value, cap, ceiling if ceiling is not None else value)
 
 
 def reset_cache() -> None:

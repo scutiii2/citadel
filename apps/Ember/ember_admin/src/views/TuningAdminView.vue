@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, getCurrentInstance, onMounted, onUnmounted, ref } from "vue";
+import { onBeforeRouteLeave, routerKey } from "vue-router";
+import ConfirmModal from "../components/admin/ConfirmModal.vue";
 import SettingRow from "../components/SettingRow.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import PageLayout from "../components/PageLayout.vue";
@@ -130,7 +132,25 @@ async function save(): Promise<void> {
   }
 }
 
-onMounted(load);
+const discardOpen = ref(false);
+let discardAnswer: ((value: boolean) => void) | null = null;
+function answerDiscard(discard: boolean): void {
+  if (discard) cancel();
+  discardOpen.value = false;
+  discardAnswer?.(discard);
+  discardAnswer = null;
+}
+if (getCurrentInstance()?.appContext.provides[routerKey as symbol]) onBeforeRouteLeave(() => {
+  if (saving.value) return false;
+  if (!dirty.value) return true;
+  discardOpen.value = true;
+  return new Promise<boolean>(resolve => { discardAnswer = resolve; });
+});
+function beforeUnload(event: BeforeUnloadEvent): void {
+  if (dirty.value || saving.value) { event.preventDefault(); event.returnValue = ""; }
+}
+onMounted(() => { void load(); window.addEventListener("beforeunload", beforeUnload); });
+onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); answerDiscard(false); });
 </script>
 
 <template>
@@ -160,6 +180,7 @@ onMounted(load);
       </div>
     </template>
     <p v-else class="muted" role="status">Loading tuning…</p>
+    <ConfirmModal v-if="discardOpen" :open="discardOpen" title="Discard unsaved tuning?" message="Your tuning changes have not been saved." confirm-label="Discard changes" @confirm="answerDiscard(true)" @close="answerDiscard(false)" />
   </PageLayout>
 </template>
 

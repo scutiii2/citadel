@@ -74,3 +74,14 @@ def test_ask_forwards_limits_to_run_chat():
         assert run_chat.call_args.kwargs["limits"] == {"max_output_tokens": 500}
         asyncio.run(server.ask("hi"))
         assert "limits" not in run_chat.call_args.kwargs
+
+
+def test_stored_user_limits_follow_a_lowered_admin_cap_despite_agent_overrides():
+    token = token_limits.bind_user_limits({"max_output_tokens": 3000, "max_tool_rounds": 7})
+    try:
+        assert _options(max_tokens=4096, max_tool_rounds=8).max_tokens(2048) == 2048
+        assert _options(max_tokens=4096, max_tool_rounds=8).max_tool_rounds(3) == 3
+    finally:
+        token_limits.reset_user_limits(token)
+    assert _options(max_tokens=4096, max_tool_rounds=8).max_tokens(2048) == 4096
+    assert _options(max_tokens=4096, max_tool_rounds=8).max_tool_rounds(3) == 8

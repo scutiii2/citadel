@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import SettingRow from "../../../components/ui/forms/SettingRow.vue";
-import { computed, onMounted, ref } from "vue";
-import { tuningClient, type AccountLimits, type Limits } from "../../../api/navigation/TuningClient";
+import { computed, onMounted, reactive, ref } from "vue";
+import { tuningClient, type AccountLimits } from "../../../api/navigation/TuningClient";
+import { adoptLimits, emptyLimitsState, limitsDirty, limitsPayload, type ResponseLimitsState } from "../utils/responseLimits";
 import { errorMessage } from "../../../utils/errors";
 
 /** Two caps for the user's own answers. They only lower what the admin allows, so each box's
@@ -11,45 +12,32 @@ const FIELDS = [
   { id: "max_tool_rounds", label: "Most tool rounds", unit: "rounds", hint: "How many times the agent may use tools before it must answer." },
 ] as const;
 
-const stored = ref<AccountLimits | null>(null);
-const draft = ref<Record<string, string>>({});
+const state = defineModel<ResponseLimitsState>({ default: () => reactive(emptyLimitsState()) });
+const stored = computed(() => state.value.stored);
+const draft = computed(() => state.value.draft);
 const error = ref("");
-const saving = ref(false);
+const saving = computed(() => state.value.pending);
+const dirty = computed(() => limitsDirty(state.value));
+const anySet = computed(() => stored.value !== null && FIELDS.some(f => stored.value!.limits[f.id] !== null));
 
-const text = (value: number | null): string => (value === null ? "" : String(value));
-
-function adopt(value: AccountLimits): void {
-  stored.value = value;
-  draft.value = Object.fromEntries(FIELDS.map((f) => [f.id, text(value.limits[f.id])]));
+function adopt(value: AccountLimits, owner: ResponseLimitsState): void {
+  if (state.value === owner) Object.assign(owner, adoptLimits(value));
 }
-
-const dirty = computed(() => stored.value !== null && FIELDS.some((f) => draft.value[f.id] !== text(stored.value!.limits[f.id])));
-const anySet = computed(() => stored.value !== null && FIELDS.some((f) => stored.value!.limits[f.id] !== null));
-
-function payload(): Limits {
-  const value = (id: string): number | null => (draft.value[id] === "" ? null : Number(draft.value[id]));
-  return { max_output_tokens: value("max_output_tokens"), max_tool_rounds: value("max_tool_rounds") };
-}
-
-async function run(action: () => Promise<void>): Promise<void> {
-  saving.value = true;
+async function run(action: (owner: ResponseLimitsState) => Promise<void>): Promise<void> {
+  const owner = state.value;
+  if (owner.pending) return;
+  owner.pending = true;
   error.value = "";
-  try {
-    await action();
-  } catch (err) {
-    error.value = errorMessage(err);
-  } finally {
-    saving.value = false;
-  }
+  try { await action(owner); }
+  catch (err) { if (state.value === owner) error.value = errorMessage(err); }
+  finally { owner.pending = false; }
 }
-
-const save = () => run(async () => adopt(await tuningClient.save(payload())));
-const clear = () => run(async () => {
+const save = () => run(async owner => adopt(await tuningClient.save(limitsPayload(owner.draft)), owner));
+const clear = () => run(async owner => {
   await tuningClient.reset();
-  adopt({ limits: { max_output_tokens: null, max_tool_rounds: null }, ceiling: stored.value!.ceiling });
+  adopt({ limits: { max_output_tokens: null, max_tool_rounds: null }, ceiling: owner.stored!.ceiling }, owner);
 });
-
-onMounted(() => run(async () => adopt(await tuningClient.get())));
+onMounted(() => { if (!stored.value) void run(async owner => adopt(await tuningClient.get(), owner)); });
 </script>
 
 <template>

@@ -424,7 +424,12 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       return json(route, account);
     }
     if (path === "/api/account/tuning") {
-      if (method === "PUT") responseLimits = request.postDataJSON();
+      if (method === "PUT") {
+        const limits = request.postDataJSON();
+        if (limits.max_tool_rounds > 15) return json(route, { detail: "max_tool_rounds cannot be above 15" }, 400);
+        if (limits.max_output_tokens > 2048) return json(route, { detail: "max_output_tokens cannot be above 2048" }, 400);
+        responseLimits = limits;
+      }
       if (method === "DELETE") { responseLimits = { max_output_tokens: null, max_tool_rounds: null }; return route.fulfill({ status: 204 }); }
       return json(route, { limits: responseLimits, ceiling: { max_output_tokens: 2048, max_tool_rounds: 15 } });
     }

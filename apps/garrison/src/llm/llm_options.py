@@ -48,10 +48,10 @@ class LlmOptions:
         self._dropped: set[tuple[str, str]] = set()
 
     def max_tokens(self, default: int) -> int:
-        return token_limits.apply_user_limit("max_output_tokens", self._llm.max_tokens or default)
+        return token_limits.apply_user_limit("max_output_tokens", self._llm.max_tokens or default, default)
 
     def max_tool_rounds(self, default: int) -> int:
-        return token_limits.apply_user_limit("max_tool_rounds", self._llm.max_tool_rounds or default)
+        return token_limits.apply_user_limit("max_tool_rounds", self._llm.max_tool_rounds or default, default)
 
     def turn_guard(self):
         """A fresh budget and call history for each turn, never cached."""

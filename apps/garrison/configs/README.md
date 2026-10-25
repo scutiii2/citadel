@@ -73,3 +73,6 @@ merged over `config_tuning.json` when that file is read. Delete a line (or reset
 to go back to the file's value. Gitignore it like the other local configs. Keys that are not
 listed in `src/core/tuning_overrides.py` (URLs, models, chains, `triage_order`) stay file-only.
 Each agent process notices a change at the start of its next turn; no restart is needed.
+
+In Docker, this path links to `.data/admin_tuning_overrides.json` in the existing `agent_data` volume.
+The numeric tuning overlay survives container recreation independently of the existing triage-strategy store.

@@ -148,13 +148,42 @@ def check(path: str, value: Any) -> bool | int | float:
     return value if rule.kind == "int" else float(value)
 
 
+def _validate_triage(changes: dict[str, Any], path: Path) -> None:
+    """Keep an enabled voter in each file-only order, as decision._triage_order requires."""
+    if not any(key.startswith("classifier.triage_enabled.") for key in changes):
+        return
+    base = path.with_name("config_tuning.json")
+    if not base.exists():
+        base = base.with_name(base.name + ".example")
+    try:
+        raw = json.loads(base.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raw = {}
+    classifier = raw.get("classifier", {}) if isinstance(raw, dict) else {}
+    if not isinstance(classifier, dict):
+        classifier = {}
+    # Matches decision.DEFAULT_TRIAGE_ORDER; enabled voters default to true there.
+    orders = {"choice": ("laya-english", "laya-typed", "jev"),
+              "noul": ("laya-typed", "jev"), "score": ("laya-english", "laya-typed", "jev")}
+    orders.update(classifier.get("triage_order", {}))
+    enabled = classifier.get("triage_enabled", {})
+    for kind, voters in orders.items():
+        if not any(changes.get(f"classifier.triage_enabled.{voter}.{kind}",
+                               enabled.get(voter, {}).get(kind, True)) for voter in voters):
+            raise TuningError(f"classifier.triage_enabled must leave an enabled voter in triage_order.{kind}")
+
+
 def load(path: Path = PATH) -> dict[str, Any]:
     """What the overlay sets. An unreadable file is empty; a bad entry is skipped and logged."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as error:
+        _log.warning("%s is unreadable and ignored: %s", path.name, error)
         return {}
     if not isinstance(data, dict):
+        _log.warning("%s must be an object and is ignored", path.name)
         return {}
     good: dict[str, Any] = {}
     for key, value in data.items():
@@ -162,6 +191,11 @@ def load(path: Path = PATH) -> dict[str, Any]:
             good[key] = check(key, value)
         except TuningError as error:
             _log.warning("ignoring %s in %s: %s", key, path.name, error)
+    try:
+        _validate_triage(good, path)
+    except TuningError as error:
+        _log.warning("ignoring incompatible voters in %s: %s", path.name, error)
+        good = {key: value for key, value in good.items() if not key.startswith("classifier.triage_enabled.")}
     return good
 
 
@@ -193,6 +227,10 @@ def save(changes: dict[str, Any], path: Path = PATH) -> dict[str, Any]:
             current.pop(key, None)
         else:
             current[key] = check(key, value)
+    _validate_triage(current, path)
+    # Docker exposes the required configs path as a link into the persistent data volume.
+    # Replace the target atomically, retaining the link across successive saves.
+    path = path.resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
     try:

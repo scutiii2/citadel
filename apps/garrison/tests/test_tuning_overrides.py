@@ -210,3 +210,53 @@ def test_an_admin_edit_reaches_token_limits_after_poll(tuning, monkeypatch):
     tuning_overrides.poll(overlay)
     assert token_limits.max_tool_rounds("anthropic") == 30
     token_limits.reset_cache()
+
+
+def test_save_rejects_disabling_the_last_voter_in_the_file_order(tuning):
+    path, overlay = tuning
+    tuning_overrides.save({"classifier.triage_enabled.laya-typed.noul": False}, overlay)
+    before = overlay.read_bytes()
+    with pytest.raises(TuningError, match="classifier.triage_enabled"):
+        tuning_overrides.save({"classifier.triage_enabled.jev.noul": False}, overlay)
+    assert overlay.read_bytes() == before
+
+
+def test_invalid_voter_combination_on_disk_falls_back_to_the_file(tuning, monkeypatch):
+    from src.llm import decision
+    path, overlay = tuning
+    overlay.write_text(json.dumps({
+        "classifier.triage_enabled.laya-typed.noul": False,
+        "classifier.triage_enabled.jev.noul": False,
+        "classifier.triage_trace": True,
+    }), encoding="utf-8")
+    monkeypatch.setattr(decision, "read_section", config_files.read_section)
+    monkeypatch.setattr(decision, "TUNING_PATH", path)
+    decision.reset_cache()
+    try:
+        assert decision.settings().triage_enabled["jev"]["noul"] is True
+        assert decision.settings().triage_trace is True
+    finally:
+        decision.reset_cache()
+
+
+def test_save_preserves_a_persistent_overlay_symlink(tuning, tmp_path):
+    _, overlay = tuning
+    target = tmp_path / ".data" / "admin_tuning_overrides.json"
+    target.parent.mkdir()
+    overlay.symlink_to(target)
+    tuning_overrides.save({"classifier.triage_trace": True}, overlay)
+    assert overlay.is_symlink()
+    assert json.loads(target.read_text(encoding="utf-8")) == {"classifier.triage_trace": True}
+    # Another container's configs link can read the same retained volume file.
+    recreated = tmp_path / "recreated" / tuning_overrides.OVERLAY_NAME
+    recreated.parent.mkdir()
+    recreated.symlink_to(target)
+    assert tuning_overrides.load(recreated) == {"classifier.triage_trace": True}
+
+
+@pytest.mark.parametrize("body", ["{not json", "[]"])
+def test_malformed_overlay_is_logged_and_ignored(tuning, caplog, body):
+    _, overlay = tuning
+    overlay.write_text(body, encoding="utf-8")
+    assert tuning_overrides.load(overlay) == {}
+    assert any(record.name == tuning_overrides.__name__ and "ignored" in record.getMessage() for record in caplog.records)

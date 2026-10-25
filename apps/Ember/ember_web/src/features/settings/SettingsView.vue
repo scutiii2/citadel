@@ -16,6 +16,8 @@ import {
 } from "../chat/utils/approvalMode";
 import { CONTEXT_ACCURACY_OPTIONS, DEFAULT_CONTEXT_ACCURACY } from "../chat/utils/contextAccuracy";
 import { TOKEN_COSTS } from "../usage/utils/tokenCosts";
+import { tuningClient } from "../../api/navigation/TuningClient";
+import { adoptLimits, emptyLimitsState, limitsDirty, limitsPayload } from "./utils/responseLimits";
 import ResponseLimits from "./components/ResponseLimits.vue";
 import SidebarEditor from "./components/SidebarEditor.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
@@ -214,6 +216,9 @@ const strategyOptions = computed(() => [
   ...strategyNames.value.map((name) => ({ value: name, label: name, cost: STRATEGY_COST[name] ?? "" })),
 ]);
 
+const limitsState = ref(emptyLimitsState());
+const responseDirty = computed(() => limitsDirty(limitsState.value));
+const responseSaving = computed(() => limitsState.value.pending && limitsState.value.stored !== null);
 const query = ref("");
 const onlyModified = ref(false);
 const root = useTemplateRef<HTMLElement>("root");
@@ -308,7 +313,7 @@ watch(() => [draft.value.caveman, draft.value.plan, draft.value.planLean, draft.
 });
 const dirty = computed(() => draft.value.suggestions !== saved.value.suggestions
   || JSON.stringify(draft.value.sidebar) !== JSON.stringify(saved.value.sidebar)
-  || draft.value.triageStrategy !== saved.value.triageStrategy);
+  || draft.value.triageStrategy !== saved.value.triageStrategy || responseDirty.value);
 watch(saved, (next, previous) => {
   if (saving.value) return;
   for (const key of Object.keys(next) as (keyof typeof next)[]) {
@@ -319,18 +324,24 @@ watch(saved, (next, previous) => {
 });
 watch(() => auth.account?.id, () => {
   strategyInfo.value = null;
+  limitsState.value = emptyLimitsState();
   draft.value = structuredClone(saved.value);
   saveError.value = "";
   void loadStrategy();
 });
-function revert(): void { draft.value = structuredClone(saved.value); saveError.value = ""; }
+function revert(): void { draft.value = structuredClone(saved.value); if (limitsState.value.stored) limitsState.value = adoptLimits(limitsState.value.stored); saveError.value = ""; }
 async function save(): Promise<void> {
-  if (saving.value || requestingNotifications.value || !dirty.value) return;
+  if (saving.value || responseSaving.value || requestingNotifications.value || !dirty.value) return;
   saving.value = true;
   saveError.value = "";
   const accountId = auth.account?.id;
   const next: typeof saved.value = JSON.parse(JSON.stringify(draft.value));
   try {
+    if (responseDirty.value) {
+      const result = await tuningClient.save(limitsPayload(limitsState.value.draft));
+      if (accountId !== auth.account?.id) return;
+      limitsState.value = adoptLimits(result);
+    }
     if (next.suggestions !== auth.promptSuggestions) await auth.setPromptSuggestions(next.suggestions);
     if (accountId !== auth.account?.id) return;
     if (JSON.stringify(next.sidebar) !== JSON.stringify(navPrefs.prefs)) {
@@ -359,13 +370,13 @@ function answerDiscard(discard: boolean): void {
 }
 // Unit mounts without a router still exercise draft/save behavior.
 if (getCurrentInstance()?.appContext.provides[routerKey as symbol]) onBeforeRouteLeave(() => {
-  if (saving.value) return false;
+  if (saving.value || responseSaving.value) return false;
   if (!dirty.value) return true;
   discardOpen.value = true;
   return new Promise<boolean>(resolve => { discardAnswer = resolve; });
 });
 function beforeUnload(event: BeforeUnloadEvent): void {
-  if (dirty.value || saving.value) { event.preventDefault(); event.returnValue = ""; }
+  if (dirty.value || saving.value || responseSaving.value) { event.preventDefault(); event.returnValue = ""; }
 }
 onMounted(() => window.addEventListener("beforeunload", beforeUnload));
 onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); answerDiscard(false); });
@@ -384,6 +395,7 @@ const modified = computed(() => ({
   "appearance-theme": draft.value.theme !== DEFAULT_THEME,
   "sidebar-pages": !isDefault(draft.value.sidebar),
   "triage-strategy": draft.value.triageStrategy !== "",
+  "response-limits": Object.values(limitsState.value.draft).some(value => value !== ""),
 }));
 const modifiedCount = computed(() => Object.values(modified.value).filter(Boolean).length);
 
@@ -604,7 +616,7 @@ onMounted(() => {
           <SidebarEditor v-if="shown.has('sidebar-pages')" v-model="draft.sidebar" />
         </div>
         <div v-else-if="g.id === 'limits'" class="card">
-          <ResponseLimits v-if="shown.has('response-limits')" />
+          <ResponseLimits v-if="shown.has('response-limits')" :key="auth.account?.id" v-model="limitsState" />
         </div>
         <div v-else-if="g.id === 'triage'" class="card">
           <SettingRow
@@ -630,8 +642,8 @@ onMounted(() => {
     </div>
     <div v-if="dirty || saving" class="settings-save-bar" role="group" aria-label="Unsaved settings" :aria-busy="saving">
       <div><span>Unsaved changes</span><p v-if="saveError" class="save-error" role="alert">{{ saveError }}</p></div>
-      <button type="button" class="revert" :disabled="saving || requestingNotifications" @click="revert">Revert</button>
-      <button type="button" class="save" :disabled="saving || requestingNotifications" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
+      <button type="button" class="revert" :disabled="saving || responseSaving || requestingNotifications" @click="revert">Revert</button>
+      <button type="button" class="save" :disabled="saving || responseSaving || requestingNotifications" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
     </div>
     <ConfirmModal
       v-if="allowAllOpen"

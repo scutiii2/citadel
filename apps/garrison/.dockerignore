@@ -13,3 +13,6 @@ data/
 *.db
 *.db-*
 *.tmp
+
+# Runtime tuning is retained in the agent_data volume, never baked into an image.
+configs/tuning_overrides.json

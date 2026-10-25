@@ -5,6 +5,7 @@ import { reactive } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authClient } from "../../api/auth/AuthClient";
 import { triageStrategyClient, type TriageStrategyInfo } from "../../api/triage/TriageStrategyClient";
+import { tuningClient } from "../../api/navigation/TuningClient";
 import { navPreferencesClient } from "../../api/navigation/NavPreferencesClient";
 import { settingsClient } from "../../api/navigation/SettingsClient";
 import { useAuthStore } from "../../stores/auth";
@@ -636,4 +637,38 @@ it("finds response limits by their output keyword", async () => {
   await search(w).setValue("output");
   expect(w.get('section[aria-label="Response limits"]').text()).toContain("Your account");
   expect(w.find('[data-field="max_tool_rounds"]').exists()).toBe(true);
+});
+
+
+it("preserves a response-limit draft when search hides and restores the group", async () => {
+  const w = await mountView();
+  await w.get('[data-field="max_tool_rounds"]').setValue("4");
+  await search(w).setValue("theme");
+  await search(w).setValue("");
+  await flushPromises();
+  expect((w.get('[data-field="max_tool_rounds"]').element as HTMLInputElement).value).toBe("4");
+});
+
+it("protects a response-limit draft from page unload and saves it with account settings", async () => {
+  const w = await mountView();
+  await w.get('[data-field="max_tool_rounds"]').setValue("4");
+  const event = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(true);
+  vi.mocked(tuningClient.save).mockResolvedValue({ limits: { max_output_tokens: null, max_tool_rounds: 4 }, ceiling: { max_output_tokens: 2048, max_tool_rounds: 15 } });
+  await w.get('.settings-save-bar button.save').trigger("click");
+  await flushPromises();
+  expect(tuningClient.save).toHaveBeenCalledWith({ max_output_tokens: null, max_tool_rounds: 4 });
+  expect(w.find('.settings-save-bar').exists()).toBe(false);
+});
+
+
+it("does not block other settings or page unload while response limits initially load", async () => {
+  vi.mocked(tuningClient.get).mockImplementationOnce(() => new Promise(() => {}));
+  const w = await mountView();
+  const event = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(false);
+  await row(w, "chat-suggestions").get("input").setValue(false);
+  expect(w.get('.settings-save-bar button.save').attributes("disabled")).toBeUndefined();
 });

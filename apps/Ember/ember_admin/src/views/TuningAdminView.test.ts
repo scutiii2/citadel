@@ -1,6 +1,6 @@
 // apps/Ember/ember_admin/src/views/TuningAdminView.test.ts
 import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { tuningClient, type TuningView } from "../api/TuningClient";
 import TuningAdminView from "./TuningAdminView.vue";
 
@@ -22,9 +22,13 @@ const view = (overrides: TuningView["overrides"] = {}): TuningView => {
 
 beforeEach(() => vi.clearAllMocks());
 
+const mounted: ReturnType<typeof mount>[] = [];
+afterEach(() => mounted.splice(0).forEach(w => w.unmount()));
+
 async function show(v: TuningView) {
   vi.mocked(tuningClient.get).mockResolvedValue(v);
   const wrapper = mount(TuningAdminView);
+  mounted.push(wrapper);
   await flushPromises();
   return wrapper;
 }
@@ -78,4 +82,17 @@ it("shows the refusal and keeps the draft", async () => {
 it("disables Save until something changed", async () => {
   const wrapper = await show(view());
   expect(wrapper.get('[data-test="save"]').attributes("disabled")).toBeDefined();
+});
+
+
+it("protects an unsaved admin draft from page unload until cancelled", async () => {
+  const wrapper = await show(view());
+  await wrapper.get('[data-path="token_limits.default.max_tool_rounds"]').setValue("4");
+  const dirtyEvent = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(dirtyEvent);
+  expect(dirtyEvent.defaultPrevented).toBe(true);
+  await wrapper.get('[data-test="cancel"]').trigger("click");
+  const cleanEvent = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(cleanEvent);
+  expect(cleanEvent.defaultPrevented).toBe(false);
 });
