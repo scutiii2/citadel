@@ -1,10 +1,13 @@
 @echo off
 rem Deploy menu: publish the code to the live branch and/or copy the git-ignored .env and
-rem config_*.json files to the deployment machine over scp.
-rem Override the target: set DEPLOY_HOST / DEPLOY_DIR before running.
+rem config_*.json files to the deployment machine in ONE ssh session (one password prompt).
+rem The server refuses root over ssh, so we log in as a normal user. If the copy cannot write,
+rem option 6 copies the one-time "chown" command and opens the server's web terminal (root shell).
+rem Override the target: set DEPLOY_HOST / DEPLOY_DIR / DEPLOY_WEB_PORT before running.
 setlocal enabledelayedexpansion
-if not defined DEPLOY_HOST set "DEPLOY_HOST=root@scutiserver1.local"
+if not defined DEPLOY_HOST set "DEPLOY_HOST=lex@scutiserver1.local"
 if not defined DEPLOY_DIR set "DEPLOY_DIR=/media/ZimaOS-HD/Apps/Citadel"
+if not defined DEPLOY_WEB_PORT set "DEPLOY_WEB_PORT=7681"
 set "ROOT=%~dp0.."
 set "APPS=apps/armory apps/garrison apps/treasury apps/Ember/ember_api"
 
@@ -17,16 +20,18 @@ echo   2  Push .env and config files to the server
 echo   3  Both (publish, then push)
 echo   4  Preview publish ^(dry run^)
 echo   5  Preview push ^(dry run^)
+echo   6  Fix server folder permissions ^(chown helper^)
 echo   Q  Quit
 echo.
-choice /c 12345Q /n /m "What do you want to do? "
+choice /c 123456Q /n /m "What do you want to do? "
 set "PICK=%errorlevel%"
-if %PICK%==6 exit /b 0
+if %PICK%==7 exit /b 0
 if %PICK%==1 call :publish
 if %PICK%==2 call :push
 if %PICK%==3 call :publish && call :push
 if %PICK%==4 call :publish --dry-run
 if %PICK%==5 call :push --dry-run
+if %PICK%==6 call :fixperms
 goto menu
 
 rem :publish [--dry-run]
@@ -37,27 +42,58 @@ if "%~1"=="" call :reminder "Code is on the live branch. On the server:" "git pu
 exit /b 0
 
 rem :push [--dry-run]
+rem Packs every existing file into one tar stream and unpacks it over a single ssh connection,
+rem so the password is asked once. The same connection makes plain "docker compose" use the Zima
+rem overlay (COMPOSE_FILE in the server .env; the dev .env stays untouched).
 :push
 set "DRY="
 if /i "%~1"=="--dry-run" set "DRY=1"
-set /a COUNT=0, FAILED=0
-call :send ".env"
-call :composefile
+set "LIST=%TEMP%\citadel_push.txt"
+type nul > "%LIST%"
+set /a COUNT=0
+call :add ".env"
 for %%A in (%APPS%) do (
-    call :send "%%A/.env"
-    for %%F in ("%ROOT%\%%A\configs\config_*.json") do call :send "%%A/configs/%%~nxF"
+    call :add "%%A/.env"
+    for %%F in ("%ROOT%\%%A\configs\config_*.json") do call :add "%%A/configs/%%~nxF"
 )
 echo.
-echo Copied !COUNT! file(s), !FAILED! failed.
-if !FAILED! gtr 0 (echo Check ssh access to %DEPLOY_HOST% and that %DEPLOY_DIR% exists. & exit /b 1)
-if not defined DRY call :reminder ".env and config files are on the server. On the server:" "docker compose up -d --build" "(run git pull first if the code changed; if only .env/config changed, add --force-recreate)"
+if !COUNT!==0 (echo Nothing to send. & del "%LIST%" & exit /b 0)
+if defined DRY (echo Would send !COUNT! file^(s^) and set COMPOSE_FILE in the server .env. & del "%LIST%" & exit /b 0)
+echo Sending !COUNT! file^(s^) in one ssh session. Enter the password once.
+tar -cf - -C "%ROOT%" -T "%LIST%" | ssh "%DEPLOY_HOST%" "tar -xf - --no-same-permissions -C '%DEPLOY_DIR%' && cd '%DEPLOY_DIR%' && { grep -q '^COMPOSE_FILE=' .env || printf '\nCOMPOSE_FILE=docker-compose.yml:docker-compose.zima.yml\n' >> .env; }"
+set "RC=!errorlevel!"
+del "%LIST%"
+if not "!RC!"=="0" (
+    echo.
+    echo FAILED. Nothing may have been copied. Check the error above.
+    echo If it says Permission denied, press Y to run the chown helper, then run this option again.
+    choice /c YN /n /m "Run the chown helper now? "
+    if !errorlevel!==1 call :fixperms
+    exit /b 1
+)
+echo Done.
+call :reminder ".env and config files are on the server. In the web terminal:" "docker compose up -d --build" "(run git pull first if the code changed; if only .env/config changed, add --force-recreate)"
 exit /b 0
 
-rem Make plain "docker compose" on the server use the Zima overlay too (dev .env stays untouched).
-:composefile
-if defined DRY (echo would set COMPOSE_FILE in the server .env & exit /b 0)
-ssh "%DEPLOY_HOST%" "grep -q '^COMPOSE_FILE=' '%DEPLOY_DIR%/.env' || printf '\nCOMPOSE_FILE=docker-compose.yml:docker-compose.zima.yml\n' >> '%DEPLOY_DIR%/.env'"
-if errorlevel 1 (echo FAILED  COMPOSE_FILE in server .env & set /a FAILED+=1) else (echo set     COMPOSE_FILE in server .env)
+rem :add <path relative to the Citadel root, same path on the server>
+:add
+if not exist "%ROOT%\%~1" (echo skip    %~1 ^(missing locally^) & exit /b 0)
+>>"%LIST%" echo %~1
+set /a COUNT+=1
+echo %~1
+exit /b 0
+
+rem The server's ssh user cannot chown by itself; root only exists in the web terminal.
+rem Copies the command to the clipboard and opens that terminal: paste, Enter.
+:fixperms
+for /f "tokens=1,2 delims=@" %%U in ("%DEPLOY_HOST%") do (set "SVUSER=%%U" & set "SVHOST=%%V")
+set "FIXCMD=chown -R %SVUSER% %DEPLOY_DIR%"
+echo %FIXCMD%| clip
+echo.
+echo Copied to the clipboard:
+echo   %FIXCMD%
+echo Opening http://%SVHOST%:%DEPLOY_WEB_PORT%/ ^(root shell^). Paste the command there and press Enter.
+start "" "http://%SVHOST%:%DEPLOY_WEB_PORT%/"
 exit /b 0
 
 rem :reminder <heading> <command> [note]
@@ -69,13 +105,4 @@ echo   cd %DEPLOY_DIR%
 echo   %~2
 if not "%~3"=="" echo   %~3
 echo ----------------------------
-exit /b 0
-
-rem :send <path relative to the Citadel root, same path on the server>
-:send
-set "SRC=%ROOT%\%~1"
-if not exist "%SRC%" (echo skip    %~1 ^(missing locally^) & exit /b 0)
-if defined DRY (echo would copy %~1 & set /a COUNT+=1 & exit /b 0)
-scp -q "%SRC%" "%DEPLOY_HOST%:%DEPLOY_DIR%/%~1"
-if errorlevel 1 (echo FAILED  %~1 & set /a FAILED+=1) else (echo copied  %~1 & set /a COUNT+=1)
 exit /b 0

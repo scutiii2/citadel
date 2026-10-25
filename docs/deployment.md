@@ -55,13 +55,16 @@ Double-click it for a menu:
 | Option | Does |
 |---|---|
 | 1 | Publish code to the `live` branch (see "The live branch") |
-| 2 | Copy the gitignored `.env` and `config_*.json` files to the server over `scp`, and set `COMPOSE_FILE` in the server's `.env` |
+| 2 | Copy the gitignored `.env` and `config_*.json` files to the server as one `tar` stream over a single `ssh` connection (one password prompt), and set `COMPOSE_FILE` in the server's `.env` |
 | 3 | Both: publish, then push |
 | 4, 5 | Dry-run previews of 1 and 2 |
+| 6 | Chown helper: copies `chown -R <user> <dir>` to the clipboard and opens the server's web terminal (root shell) so you can paste it |
 
-The target is `root@scutiserver1.local:/media/ZimaOS-HD/Apps/Citadel`. Set `DEPLOY_HOST` and `DEPLOY_DIR` before running
-to change it. After each action the script prints the commands to run on the server. Option 2 overwrites the server's
-copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the server generated itself.
+The target is `lex@scutiserver1.local:/media/ZimaOS-HD/Apps/Citadel`. The server refuses root over ssh, so the script logs
+in as `lex`; the web terminal is at `http://scutiserver1.local:7681/`. If option 2 fails with `Permission denied`, run
+option 6 once (it also offers itself after a failed push). Set `DEPLOY_HOST`, `DEPLOY_DIR` and `DEPLOY_WEB_PORT` before
+running to change them. After each action the script prints the commands to run on the server. Option 2 overwrites the
+server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the server generated itself.
 
 ### First-time setup on the box
 
