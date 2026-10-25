@@ -29,6 +29,9 @@ class Account(Base):
     # Chat shows a predicted next prompt after each answer (costs one small
     # model call per answer, so the account can switch it off).
     prompt_suggestions: Mapped[bool] = mapped_column(default=True, server_default=true())
+    # The Laya decision strategy this account's prompts to the Triage Assistant use; None follows the
+    # administrator's default (see routes/triage_strategy.py).
+    triage_strategy: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
     roles: Mapped[list[Role]] = relationship(
