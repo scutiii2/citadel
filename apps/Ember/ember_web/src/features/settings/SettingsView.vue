@@ -95,6 +95,13 @@ const DEFS: SettingDef[] = [
     keywords: ["caveman", "brief", "short"],
   },
   {
+    id: "chat-independent",
+    group: "chat",
+    label: "Independent prompts",
+    description: "Send each question alone, without the earlier messages of the chat.",
+    keywords: ["history", "context", "memory", "separate", "tokens"],
+  },
+  {
     id: "chat-plan",
     group: "chat",
     label: "Task checklist",
@@ -240,7 +247,7 @@ const groups = computed(() =>
 const noMatches = computed(() => shown.value.size === 0 && (onlyModified.value || !/brain|obsidian|vault|connection/i.test(query.value)));
 
 const saved = computed(() => ({
-  caveman: chat.caveman, plan: chat.plan, planLean: chat.planLean, approvalMode: chat.approvalMode, chime: chat.chime,
+  caveman: chat.caveman, independent: chat.independent, plan: chat.plan, planLean: chat.planLean, approvalMode: chat.approvalMode, chime: chat.chime,
   browserNotifications: chat.browserNotifications,
   liveTokens: chat.liveTokens, contextPanel: chat.contextPanel, contextAccuracy: chat.contextAccuracy,
   suggestions: auth.promptSuggestions, theme: theme.value,
@@ -299,7 +306,7 @@ const approvalDescription = computed(() =>
 // Account settings remain drafts. Device preferences use the existing persistent setters immediately.
 watch(() => [draft.value.caveman, draft.value.plan, draft.value.planLean, draft.value.approvalMode,
   draft.value.chime, draft.value.browserNotifications, draft.value.liveTokens, draft.value.contextPanel,
-  draft.value.contextAccuracy, draft.value.theme] as const, (next, old) => {
+  draft.value.contextAccuracy, draft.value.theme, draft.value.independent] as const, (next, old) => {
   if (next[0] !== old[0]) chat.setCaveman(next[0]);
   if (next[1] !== old[1]) chat.setPlan(next[1]);
   if (next[2] !== old[2]) chat.setPlanLean(next[2]);
@@ -310,6 +317,7 @@ watch(() => [draft.value.caveman, draft.value.plan, draft.value.planLean, draft.
   if (next[7] !== old[7]) chat.setContextPanel(next[7]);
   if (next[8] !== old[8]) chat.setContextAccuracy(next[8]);
   if (next[9] !== old[9]) setTheme(next[9]);
+  if (next[10] !== old[10]) chat.setIndependent(next[10]);
 });
 const dirty = computed(() => draft.value.suggestions !== saved.value.suggestions
   || JSON.stringify(draft.value.sidebar) !== JSON.stringify(saved.value.sidebar)
@@ -383,6 +391,7 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
 
 const modified = computed(() => ({
   "chat-terse": draft.value.caveman !== false,
+  "chat-independent": draft.value.independent !== false,
   "chat-plan": draft.value.plan !== true,
   "chat-plan-lean": draft.value.planLean !== true,
   "chat-ask-tools": draft.value.approvalMode !== DEFAULT_APPROVAL_MODE,
@@ -478,6 +487,17 @@ onMounted(() => {
             @reset="draft.caveman = false"
           >
             <ToggleSwitch small aria-label="Terse replies" :checked="draft.caveman" @change="draft.caveman = checked($event)" />
+          </SettingRow>
+          <SettingRow
+            v-if="shown.has('chat-independent')"
+            setting-id="chat-independent"
+            label="Independent prompts"
+            description="Send each question alone, without the earlier messages of the chat."
+            :modified="modified['chat-independent']"
+            :cost="TOKEN_COSTS.independent"
+            @reset="draft.independent = false"
+          >
+            <ToggleSwitch small aria-label="Independent prompts" :checked="draft.independent" @change="draft.independent = checked($event)" />
           </SettingRow>
           <SettingRow
             v-if="shown.has('chat-plan')"

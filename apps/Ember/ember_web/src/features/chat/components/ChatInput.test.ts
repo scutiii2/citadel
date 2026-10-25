@@ -956,3 +956,13 @@ it("labels the message composer independently of its suggested question", () => 
   expect(id).toBeTruthy();
   expect(document.getElementById(id!)?.textContent).toBe("Message");
 });
+
+it("toggles independent prompts from the button beside Send", async () => {
+  const wrapper = mountInput({ independent: false });
+  const button = wrapper.get("button.independent");
+  expect(button.attributes("aria-pressed")).toBe("false");
+  await button.trigger("click");
+  expect(wrapper.emitted("update:independent")).toEqual([[true]]);
+  await wrapper.setProps({ independent: true });
+  expect(wrapper.get("button.independent").attributes("aria-pressed")).toBe("true");
+});

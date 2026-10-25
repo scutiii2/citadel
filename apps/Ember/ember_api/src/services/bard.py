@@ -20,6 +20,31 @@ class BardGateway:
     def __init__(self, client: httpx.AsyncClient, base_url: str, token: str | None):
         self.client, self.base, self.token = client, base_url.rstrip("/"), token
 
+    async def speak(self, account: Account, text: str, voice: str | None) -> dict:
+        """Generate owned audio without sending speech text to the chat agent."""
+        return await self._json("POST", "speak", account, {"text": text, "voice": voice})
+
+    async def voices(self, account: Account) -> dict:
+        """Return installed voices only; choosing one belongs to the current run."""
+        return await self._json("GET", "voices", account)
+
+    async def _json(self, method: str, endpoint: str, account: Account, body: dict | None = None) -> dict:
+        headers = identity_headers(account.username, account.email, self.token, account.uid)
+        try:
+            response = await self.client.request(method, f"{self.base}/api/{endpoint}", headers=headers,
+                                                 json=body, timeout=120)
+        except httpx.HTTPError as error:
+            raise HTTPException(502, "Bard is unreachable. Try again.") from error
+        if response.status_code == 200:
+            return response.json()
+        if response.status_code in (400, 413):
+            try:
+                message = response.json().get("message")
+            except ValueError:
+                message = None
+            raise HTTPException(response.status_code, message or "Bard rejected the text or voice.")
+        raise HTTPException(502, "Bard is unavailable; check its internal connection.")
+
     async def stream(self, file_id: str, account: Account, range_header: str | None = None) -> StreamingResponse:
         headers = identity_headers(account.username, account.email, self.token, account.uid)
         headers["Accept-Encoding"] = "identity"

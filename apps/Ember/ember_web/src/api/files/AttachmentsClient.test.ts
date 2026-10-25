@@ -6,6 +6,20 @@ vi.mock("../http", () => ({ apiRequest: vi.fn() }));
 
 const request = vi.mocked(apiRequest);
 
+describe("attachmentsClient.dictate", () => {
+  it("posts WebM bytes and returns the transcript", async () => {
+    request.mockResolvedValue({ text: "hello", duration_s: 2 });
+    expect(await attachmentsClient.dictate(new Blob(["voice"], { type: "audio/webm" }))).toEqual({ text: "hello", duration_s: 2 });
+    expect(request).toHaveBeenCalledWith("POST", "/api/attachments/dictate", { filename: "dictation.webm", data: btoa("voice") }, undefined, undefined);
+  });
+  it("rejects oversized recordings before upload", async () => {
+    const blob = new Blob(["x"]);
+    Object.defineProperty(blob, "size", { value: 21 * 1024 * 1024 });
+    await expect(attachmentsClient.dictate(blob)).rejects.toThrow("20 MB");
+    expect(request).not.toHaveBeenCalled();
+  });
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   request.mockResolvedValue({} as never);

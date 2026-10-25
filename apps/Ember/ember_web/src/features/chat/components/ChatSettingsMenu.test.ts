@@ -4,6 +4,7 @@ import ChatSettingsMenu from "./ChatSettingsMenu.vue";
 
 const BASE = {
   caveman: false,
+  independent: false,
   plan: true,
   planLean: true,
   askBeforeTools: false,
@@ -122,19 +123,22 @@ describe("ChatSettingsMenu", () => {
 
     expect(w.findAll("label").map((l) => l.text())).toEqual([
       "Terse replies",
+      "Independent prompts",
       "Task checklist",
       "Update only on change",
       "Chime when done",
     ]);
     const boxes = w.findAll("input[type=checkbox]");
-    expect(boxes.map((b) => (b.element as HTMLInputElement).checked)).toEqual([false, true, true, true]);
+    expect(boxes.map((b) => (b.element as HTMLInputElement).checked)).toEqual([false, false, true, true, true]);
 
     await boxes[0]!.setValue(true);
-    await boxes[1]!.setValue(false);
+    await boxes[1]!.setValue(true);
     await boxes[2]!.setValue(false);
     await boxes[3]!.setValue(false);
+    await boxes[4]!.setValue(false);
 
     expect(w.emitted("update:caveman")).toEqual([[true]]);
+    expect(w.emitted("update:independent")).toEqual([[true]]);
     expect(w.emitted("update:plan")).toEqual([[false]]);
     expect(w.emitted("update:planLean")).toEqual([[false]]);
     expect(w.emitted("update:chime")).toEqual([[false]]);
@@ -146,9 +150,9 @@ describe("ChatSettingsMenu", () => {
 
     const titles = w.findAll("label").map((l) => l.attributes("title") ?? "");
 
-    expect(titles).toHaveLength(4);
+    expect(titles).toHaveLength(5);
     for (const title of titles) expect(title).toMatch(/token/i);
-    expect(titles[1]).toContain("200 input tokens");
+    expect(titles[2]).toContain("200 input tokens");
   });
 
   it("hides 'Update only on change' while the task checklist is off", async () => {

@@ -28,6 +28,14 @@ export const PDF_FILE = /\.(pdf|png|jpe?g|webp|tiff?|gif|heic)$/i;
 
 export const TABLE_FILE = /\.(csv|xlsx)$/i;
 
+/** Audio the agent can transcribe with Scribe. */
+export const AUDIO_FILE = /\.(mp3|wav|m4a|ogg|flac|webm)$/i;
+
+/** The line that stands in for an audio attachment's text: the id Scribe needs and what to do with it. */
+export function audioHeader(a: { file_id: string; duration_s: number; expires_at: number }): string {
+  return `[Audio file_id: ${a.file_id} | ${a.duration_s.toFixed(1)} s | expires_at: ${a.expires_at} | call scribe tool_scribe_transcribe with this file_id to get the transcript; preserve this file_id when delegating]`;
+}
+
 const MAX_LISTED_COLUMNS = 30;
 
 /** The line that opens an attachment's text for a table: the id the data tools

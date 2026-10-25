@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onDeactivated, ref, useId, watch } from "vue";
 import { useAuthStore } from "../../../stores/auth";
 import type { CommandInfo } from "../../../api/tools/CommandsClient";
 import { EXTENSION_SEPARATOR } from "../../../api/contracts/extensions";
@@ -11,6 +11,7 @@ import { paramSuggestions } from "../utils/commandParams";
 import { appendToDraft, filterTemplates, preview, templateQuery } from "../utils/templates";
 import { fieldsFromSchema, type ToolField } from "../../../utils/tools/toolSchema";
 import TemplatePicker from "./TemplatePicker.vue";
+import { useDictation } from "../composables/useDictation";
 import { useComposerAttachments } from "../composables/useComposerAttachments";
 import type ListComposerInstance from "./ListComposer.vue";
 import { hasComposerList } from "../utils/composerLists";
@@ -29,6 +30,7 @@ const ListComposer = defineAsyncComponent(loadListComposer);
 const props = withDefaults(
   defineProps<{
     busy: boolean;
+    conversationId?: string | null;
     commands?: CommandInfo[];
     history?: string[];
     templates?: PromptTemplate[];
@@ -36,8 +38,9 @@ const props = withDefaults(
     templatesLoading?: boolean;
     templatesError?: string;
     suggestion?: string | null;
+    independent?: boolean;
   }>(),
-  { commands: () => [], history: () => [], templates: () => [], templatesLoading: false, templatesError: "", suggestion: null },
+  { commands: () => [], history: () => [], templates: () => [], templatesLoading: false, templatesError: "", suggestion: null, independent: false },
 );
 // suggestion: the predicted next question. It is the placeholder while the box
 // is empty; Tab on the empty box takes it (suggestionUsed), and it can be edited.
@@ -54,6 +57,7 @@ const emit = defineEmits<{
   manageTemplates: [draft: string];
   suggestionUsed: [];
   triage: [];
+  "update:independent": [value: boolean];
 }>();
 
 const draft = ref("");
@@ -94,6 +98,12 @@ watch(draft, async (value) => {
   }
 });
 const auth = useAuthStore();
+const { state: dictationState, error: dictationError, supported: dictationSupported,
+  requesting: requestingMic, toggle: toggleDictation, cancel: cancelDictation } = useDictation(insertText);
+watch(() => auth.account?.id, cancelDictation);
+watch(() => props.conversationId, cancelDictation);
+onDeactivated(cancelDictation);
+watch(() => auth.hasPermission("files.upload"), (allowed) => { if (!allowed) cancelDictation(); });
 const fileInput = ref<HTMLInputElement | null>(null);
 const {
   attachments, reading, ready, dragging,
@@ -475,6 +485,14 @@ function onKeydown(event: KeyboardEvent): void {
             />
           </svg>
         </button>
+        <button v-if="auth.hasPermission('files.upload') && dictationSupported" type="button" class="attach dictation"
+          :class="{ recording: dictationState === 'recording' }"
+          :aria-label="dictationState === 'recording' ? 'Stop dictation' : 'Dictate message'"
+          :title="dictationState === 'recording' ? 'Stop dictation' : 'Dictate message'"
+          :aria-pressed="dictationState === 'recording'" :aria-busy="requestingMic || dictationState === 'transcribing'"
+          :disabled="requestingMic || dictationState === 'transcribing'" @click="toggleDictation">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0zM5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+        </button>
         <button type="button" class="attach" title="Ask a multiple choice or yes or no question" aria-label="Ask a multiple choice or yes or no question" @click="extraToolsOpen = false; emit('triage')">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <path
@@ -502,6 +520,13 @@ function onKeydown(event: KeyboardEvent): void {
         <!-- The chat page's own controls (settings, status) sit beside the attach button. -->
         <slot name="tools" />
         <span class="spacer" />
+        <button type="button" class="attach independent" :class="{ on: independent }" :aria-pressed="independent"
+          :title="independent ? 'Independent prompts on: the agent does not see earlier messages' : 'Independent prompts off: the agent sees the chat history'"
+          aria-label="Independent prompts" @click="emit('update:independent', !independent)">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M12 7v5l3 2M4.5 7.5A9 9 0 1 1 3 12M3 4v4h4M3 3l18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
         <span class="send-slot">
           <button v-if="busy" type="button" class="round stop" title="Stop (Esc)" @click="emit('stop')">
             <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
@@ -527,11 +552,26 @@ function onKeydown(event: KeyboardEvent): void {
         </span>
       </div>
     </div>
+    <p v-if="dictationError" class="dictation-error" role="alert">{{ dictationError }}</p>
+    <p v-else-if="dictationState === 'recording' || dictationState === 'transcribing'" class="dictation-status" role="status">
+      {{ dictationState === 'recording' ? 'Recording · tap the microphone to stop (150 s maximum)' : 'Transcribing …' }}
+    </p>
     <p class="keys">Enter to send · Shift+Enter for a new line or next list item</p>
   </form>
 </template>
 
 <style scoped>
+.independent.on { color: var(--accent); }
+.independent:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dictation.recording { color: var(--danger); }
+.dictation.recording svg { animation: mic-pulse 1s ease-in-out infinite alternate; }
+.dictation:disabled { opacity: 0.5; cursor: wait; }
+.dictation:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dictation-error, .dictation-status { margin: 6px 0 0; font-size: 0.85em; overflow-wrap: anywhere; }
+.dictation-error { color: var(--danger); }
+.dictation-status { color: var(--muted); }
+@keyframes mic-pulse { to { opacity: 0.45; transform: scale(1.12); } }
+
 .message-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .composer {
   position: relative;
@@ -753,13 +793,13 @@ textarea {
   .box { padding: 8px; border-radius: var(--radius-lg); background: var(--bg); }
   textarea { padding: 6px 4px; }
   .tools { gap: 2px; margin-left: 0; }
-  .toolbox { position: relative; display: block; }
+  .toolbox { position: static; display: block; }
   .attach.more-tools { display: grid; width: 44px; }
   .extra-tools { display: none; }
   .extra-tools.open {
     position: absolute;
-    bottom: calc(100% + 8px);
-    left: 0;
+    bottom: calc(100% + 4px);
+    left: 12px;
     z-index: 17;
     display: flex;
     align-items: center;

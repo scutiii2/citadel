@@ -90,6 +90,8 @@ class TurnOptions:
     """What the browser chose for this question."""
 
     caveman: bool = False
+    # The agent gets no earlier messages (and nothing is summarized for it).
+    independent: bool = False
     save_to_second_brain: bool = False
     second_brain_scope: str = "instance"
     second_brain_notice: str = ""
@@ -544,9 +546,9 @@ class TurnRegistry:
             return
         question = str(messages[-1]["content"])
         turn.question = question
-        earlier = messages[:-1]
+        earlier = [] if turn.options.independent else messages[:-1]
 
-        if summarization.needs_summary(
+        if earlier and summarization.needs_summary(
             earlier, self._usage.max_context_tokens_per_chat, self._usage.auto_summarize_ratio
         ):
             earlier = await self._auto_summarize(turn, earlier, messages[-1])

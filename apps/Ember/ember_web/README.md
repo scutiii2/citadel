@@ -21,6 +21,11 @@ components, and where to place new Vue files and their tests.
 
 ## Features
 
+- Dictate from the microphone beside Attach (`files.upload`, WebM recording support). Click again to stop, or recording stops at 150 seconds. Scribe's transcript is appended to the editable draft. Status and microphone/service errors appear below the composer; nothing is sent automatically.
+- Read aloud from an assistant message's action row (`tools.execute` and `files.download`). Choose an installed Bard voice on every run; no choice is remembered. Markdown is stripped, text is batched at 3,500 characters and the next batch is synthesized during playback. Stop cancels requests and hidden audio. Existing agent-created audio cards still work.
+
+Speech checks: `npm test -- --maxWorkers=2`, `npx vue-tsc -b --noEmit` and `npm run test:e2e -- speech.spec.ts`. Chrome uses its fake microphone device and API fixtures for these browser tests. There is no separate lint script configured; TypeScript unused-variable/parameter checks and the suite's structural/style rules apply.
+
 - Generator presents masked results with Reveal and Copy beside them. Desktop
   keeps options in a companion pane; mobile uses a type picker and collapsible
   options with Generate above the navigation. Passwords, passphrases, PINs,

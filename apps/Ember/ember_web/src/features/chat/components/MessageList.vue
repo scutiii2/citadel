@@ -19,6 +19,7 @@ import { bardClips } from "../../../utils/tools/bardAudio";
 import { compactNumber } from "../../../utils/analytics/usageFormat";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 import BardAudio from "./BardAudio.vue";
+import ReadAloudButton from "./ReadAloudButton.vue";
 import ChatAttachment from "../../../components/content/ChatAttachment.vue";
 import AgentActivity from "./AgentActivity.vue";
 import CopyButton from "../../../components/ui/buttons/CopyButton.vue";
@@ -249,6 +250,7 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
           <DownloadCards :downloads="parseDownloads(m.content).downloads" />
           <div class="actions">
             <time v-if="m.at" class="stamp" :datetime="m.at" :title="fullTime(m.at)">{{ clockTime(m.at) }}</time>
+            <ReadAloudButton :text="parseDownloads(m.content).text" :scope="conversationId" />
             <UsageChip :message="m" :agent-label="agentLabel(m)" />
           </div>
         </div>
@@ -309,6 +311,7 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
           <div class="actions">
             <time v-if="m.at" class="stamp" :datetime="m.at" :title="fullTime(m.at)">{{ clockTime(m.at) }}</time>
             <CopyButton :text="parseDownloads(m.content).text" label="Copy answer" />
+            <ReadAloudButton :text="parseDownloads(m.content).text" :scope="conversationId" />
             <button
               v-if="canChange && i === messages.length - 1 && regenerateIndex !== undefined && regenerateIndex >= 0"
               type="button"

@@ -38,6 +38,8 @@ export interface ChatImportItem extends ChatWrite {
 export interface TurnStart {
   question: string;
   caveman: boolean;
+  /** Sent only when on: the agent gets no earlier messages of this chat. */
+  independent?: boolean;
   save_to_second_brain?: boolean;
   second_brain_scope?: "instance" | "personal";
   /** Sent only when off: the agent may not keep a task checklist this turn. */

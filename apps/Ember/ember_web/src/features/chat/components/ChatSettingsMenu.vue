@@ -9,6 +9,8 @@ import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
 
 defineProps<{
   caveman: boolean;
+  /** Each question is sent alone, without the chat's earlier messages. */
+  independent: boolean;
   plan: boolean;
   /** Ask the agent to update its checklist only when an item changes status. */
   planLean: boolean;
@@ -30,6 +32,7 @@ defineProps<{
 
 const emit = defineEmits<{
   "update:caveman": [value: boolean];
+  "update:independent": [value: boolean];
   "update:plan": [value: boolean];
   "update:planLean": [value: boolean];
   "update:chime": [value: boolean];
@@ -106,6 +109,14 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
         @change="emit('update:caveman', checked($event))"
       >
         Terse replies
+      </ToggleSwitch>
+      <ToggleSwitch
+        small
+        title="Send each question alone: the agent does not see the earlier messages of this chat. They stay on screen. Sends fewer input tokens."
+        :checked="independent"
+        @change="emit('update:independent', checked($event))"
+      >
+        Independent prompts
       </ToggleSwitch>
       <ToggleSwitch
         small

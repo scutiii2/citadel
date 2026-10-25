@@ -46,11 +46,13 @@ export async function apiRequest<T>(
   path: string,
   body?: unknown,
   headers?: Record<string, string>,
+  signal?: AbortSignal,
 ): Promise<T> {
   // Every POST is JSON, even with no payload: ember_api rejects anything
   // else as a CSRF guard. Other methods send a body only when given one.
   // `headers` adds request headers such as an Idempotency-Key.
   const init: RequestInit = { method, credentials: "same-origin" };
+  if (signal) init.signal = signal;
   const sent: Record<string, string> = { ...headers };
   if (method === "POST" || body !== undefined) {
     sent["Content-Type"] = "application/json";
