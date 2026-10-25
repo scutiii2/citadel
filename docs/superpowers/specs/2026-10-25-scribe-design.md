@@ -11,7 +11,7 @@ Ember users attach an audio file to a chat question and the agent returns its En
 
 In scope:
 - A standalone Python service, `Python/Scribe/`, with its own git repo, venv and port (8091).
-- Local transcription with faster-whisper (CPU, model `small.en`, int8), English only.
+- Local transcription with faster-whisper (CPU, model `base.en`, int8), English only.
 - Audio decoding with ffmpeg; accepted formats mp3, wav, m4a, ogg, flac, webm.
 - One MCP tool, `tool_scribe_transcribe`.
 - Per-account audio uploads with a time-to-live and a quota; a transcript cache.
@@ -52,7 +52,7 @@ Python/Scribe/
 | Unit | Responsibility |
 | --- | --- |
 | `config.py` | `Settings` from environment (`SCRIBE_*`, `INTERNAL_API_TOKEN`); `exposed_without_token`. |
-| `engine.py` | `SttEngine` protocol and `WhisperEngine`. ffmpeg decodes to 16 kHz mono wav through an async subprocess; faster-whisper runs in a worker thread. `probe(path)` returns the duration. |
+| `engine.py` | `SttEngine` protocol and `WhisperEngine`. `decode(path)` runs ffmpeg through an async subprocess and returns 16 kHz mono s16le PCM in memory (its length is the duration); `transcribe(pcm)` runs faster-whisper in a worker thread on a numpy array. No temp wav exists. |
 | `store.py` | `AudioStore`: uploads and transcripts per owner, deterministic ids, time-to-live, quota, atomic writes. |
 | `service.py` | `ScribeService.upload` / `transcribe`: validate, store, cache lookup, transcribe under a semaphore (default 1). One lock per (owner, file id) so identical concurrent requests transcribe once. |
 | `identity.py` | `owner_from_context`: the asking user's name from `_meta.requester.username`. |
@@ -80,7 +80,7 @@ It carries `meta={"keywords": ["transcribe", "speech to text", "stt", "audio", "
 
 ### HTTP
 
-- `POST /api/files`: raw audio bytes as the body, `X-Requester-Username` (missing header is 401) and `X-Filename`. Answers `{file_id, duration_s, size_bytes, expires_at}`. Rejects with 413 over `SCRIBE_MAX_BYTES` (default 25 MB), 400 for a format ffmpeg cannot read, 400 over `SCRIBE_MAX_SECONDS` (default 600).
+- `POST /api/files`: raw audio bytes as the body, `X-Requester-Username` (missing header is 401) and `X-Filename`. Answers `{file_id, duration_s, size_bytes, expires_at}`. Rejects with 413 over `SCRIBE_MAX_BYTES` (default 25 MB), 400 for a format ffmpeg cannot read, 400 over `SCRIBE_MAX_SECONDS` (default 150).
 - `GET /health` returns `{"ok": true}` and needs no token.
 
 Validation is by ffmpeg probe, not by file name or declared type. The duration check runs at upload, so a too-long file fails in the attachment chip, not later in the agent's tool call.
@@ -88,8 +88,8 @@ Validation is by ffmpeg probe, not by file name or declared type. The duration c
 ### Concurrency and limits
 
 - One transcription at a time by default (`SCRIBE_CONCURRENCY`); the others wait on the semaphore. Every blocking call (model, file IO) runs through `asyncio.to_thread`; ffmpeg runs as an asyncio subprocess.
-- Transcription is bounded by `SCRIBE_TIMEOUT_S`; a timeout fails with `engine_failed`, with the temp wav removed.
-- The 600-second cap is a guess. `small.en` int8 on CPU is expected to run several times faster than real time, but this machine has not been measured. Plan Task 1 benchmarks it and sets the default so a full-length file finishes inside the MCP call timeout.
+- Transcription is bounded by `SCRIBE_TIMEOUT_S`; a timeout fails with `engine_failed` (default 110 s, under Armory's 120 s call timeout).
+- Measured on this machine (Ryzen 7 7445HS, 6 cores, int8, beam 1): `small.en` ran at x0.5 real time and `base.en` at x1.6. Defaults are therefore `base.en`, 150 s of audio and a 110 s timeout, so a full-length file finishes inside the call budget. Raise model and caps together on a faster or GPU host; an async job design was considered and left out of v1.
 
 ### Auth and identity
 
@@ -117,7 +117,7 @@ Armory handshakes with each extension at startup, so Scribe must be running firs
 
 ## ember_api
 
-- `POST /api/attachments/audio` in `routes/attachments.py`: body `AttachmentIn` (base64 JSON, as every POST to ember_api; see `json_only.py`), permission `files.upload`, 413 over 25 MB (`MAX_FILE_BYTES` is 15 MB today; the audio route uses its own limit and `AttachmentIn.data` needs a matching larger cap). Suffix check: `.mp3 .wav .m4a .ogg .flac .webm`. It forwards the bytes to `POST {scribe_url}/api/files` with the account's identity headers and the internal token, logs `attachments.audio` through `LogWriter`, and answers `{filename, file_id, duration_s, expires_at}`.
+- `POST /api/attachments/audio` in `routes/attachments.py`: body `AttachmentIn` (base64 JSON, as every POST to ember_api; see `json_only.py`), permission `files.upload`, 413 over 20 MB (`MAX_FILE_BYTES` is 15 MB today, so the audio route has its own `AudioIn` model and limit; 20 MB, not Scribe's 25 MB, because base64 of 25 MB would not fit the request cap for `/api/attachments`). Suffix check: `.mp3 .wav .m4a .ogg .flac .webm`. It forwards the bytes to `POST {scribe_url}/api/files` with the account's identity headers and the internal token, logs `attachments.audio` through `LogWriter`, and answers `{filename, file_id, duration_s, expires_at}`.
 - A small `ScribeGateway` service (httpx, like `CapabilityFilesGateway`) does the forward; Scribe errors map to 400 for rejected audio and 502 for an unreachable Scribe or a refused internal token.
 - New setting `scribe_url` (default `http://127.0.0.1:8091`).
 
@@ -128,7 +128,7 @@ Armory handshakes with each extension at startup, so Scribe must be running firs
 - `useComposerAttachments.ts` routes audio files to `attachmentsClient.audio` and folds a header line into the question, in the same style as the PDF header:
   `[Audio file_id: <id> | <duration> s | expires_at: <ts> | call scribe tool_scribe_transcribe with this file_id to get the transcript]`
   There is no text preview, so the chip shows the file name and duration.
-- `ChatAttachment.vue` already parses `[Image file_id ...]` / `[PDFMerger file_id ...]` headers to render chips; it gets one more pattern for `[Audio file_id ...]`. `splitAttachments` handles the restore-on-edit path the same way.
+- `ChatAttachment.vue` needs no change: only image headers get special rendering; any other attachment, the audio header included, shows as a collapsed block with its text. `splitAttachments` handles the restore-on-edit path as it does for PDFs.
 - No new component: the transcript is the tool result and the generic formatter shows `message` first.
 
 Per `AGENTS.md`: no reduced-motion setting, media query or test.
@@ -139,14 +139,14 @@ Per `AGENTS.md`: no reduced-motion setting, media query or test.
 - Engine tests that need ffmpeg or the real model skip when those are missing.
 - One MCP handshake test against a real uvicorn server on a free port: upload a short wav over HTTP, list tools, call `tool_scribe_transcribe` with `_meta.requester`.
 - ember_api: route tests with the existing `upstream` fake (identity headers, error mapping, size and suffix limits, login and permission required).
-- ember_web: vitest for `AUDIO_FILE`, the composer header line, and `ChatAttachment` parsing.
+- ember_web: vitest for `AUDIO_FILE` and the `audioHeader` line.
 - Armory: a test that the example extension config parses and contains `scribe`.
 
 ## Risks and open points
 
-- faster-whisper, CTranslate2 and the ONNX/PyAV wheels on Python 3.14 on this Windows machine have not been installed or run. Plan Task 1 does a real transcription first; if wheels are missing, pin a lower Python for Scribe's venv.
+- faster-whisper 1.2.1 installs and runs on Python 3.14 on this Windows machine (real transcription verified end to end).
 - asyncio subprocesses need the Proactor event loop on Windows. uvicorn's default loop works; `--reload` would not.
-- `small.en` is downloaded on first use (about 500 MB), not committed. Pre-download it in the Docker build or a `scripts` step so the first request does not stall; check the model licence before redistribution.
+- `base.en` is downloaded on first use (about 150 MB), not committed. Pre-download it in the Docker build or a `scripts` step so the first request does not stall; check the model licence before redistribution.
 - Speed is unmeasured (see Concurrency and limits). If CPU is too slow, options are `base.en`, a lower duration cap, or a GPU host; the engine interface allows each.
 - Stale `pdf_merger` and `media_downloader` entries remain in `config_extensions.json.example`. Not changed here.
 - Uploads hold user audio for 24 hours on the Scribe machine; the docs must say so.
