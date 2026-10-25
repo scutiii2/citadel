@@ -24,7 +24,8 @@ The capability exists at `apps/armory/src/capabilities/firecrawl/`, but its test
 **Done**: Dockerfiles for every service, one root `docker-compose.yml` (`core` network, service-name URLs, `0.0.0.0` binds), the Zima overlay, container-only configs in `docker/configs/`, volumes for the data folders, the Docker socket mounted into `armory`, Laya (`laya` replicas behind `laya_lb`, built from `../LayaAgent`) in the stack, `dev_deploy.bat` per service and `tools/deploy.bat` (publish to `live`, push `.env` and `config_*.json`, set `COMPOSE_FILE` on the server). `server_launcher` and the per-app `run.bat` files are gone. See `docs/deployment.md`.
 
 **Still to verify** (none of it has been run on the box):
-- `tools/deploy.bat` options 1 to 3 against the real server: the `scp` copies, the `COMPOSE_FILE` line written over `ssh`, and the publish to `origin/live`.
+- `tools/deploy.bat` against the real server: option 2 (one-session `tar` push as `lex`, `COMPOSE_FILE` line, the chown helper) and option 1 (publish to `origin/live`). Same for `LayaAgent/tools/deploy.bat` and `Bard/tools/deploy.bat` (Bard: publish creates `origin/live`; first start downloads the Piper voice).
+- Bard in the stack: start Citadel, then `Bard` (`docker compose up -d --build` there), restart armory, and check `bard__tool_bard_speak` plays in chat.
 - A full `docker compose up -d --build` on ZimaOS with `LayaAgent` next to `Citadel`, then `tool_srv_listApps` returning the `citadel-*` containers.
 - `LAYA_URL=http://garrison:9111/mcp` in `apps/armory/.env`: confirm garrison listens on 9111 inside the container and tickets get grouped.
 - Self-stop: `/server stop armory` kills the server running the tool; expected, but it cannot be restarted from the same chat.
@@ -50,25 +51,11 @@ Optional follow-up features, not implemented:
 
 **Revisit when**: user wants the manual checks run or picks a follow-up feature.
 
-## Close the agentic-harness gaps in ai_agent (added 2026-10-09)
+## Sandboxed workspace for ai_agent (added 2026-10-09)
 
-**Context**: Review on 2026-10-09 found `apps/garrison` is a tool-calling agent runtime with delegation and approvals (tool loop in `src/llm/anthropic_provider.py` and `openai_provider.py`, `delegate_to_agent`, `approvals.review`, `ask_user`), not yet a full agentic harness. Missing pieces, easiest first. Do them together as one batch.
+**Context**: Items 1 to 6 of the 2026-10-09 agentic-harness review (budget guard, delegated cancel, plan tool, tool-activity persistence, compaction, persistent memory) are done. One remains.
 
-1. **Budget and stuck-loop guard — done** (`160df65`): shared guard in both provider loops; per-agent `llm.max_turn_tokens` and `llm.max_turn_seconds` beside `max_tool_rounds` (defaults 100,000 tokens / 300 seconds). Stops before a third consecutive identical tool call; intervening work resets the repetition count. Tokens are checked at response boundaries, so one response can exceed the cap.
-2. **Cancel through delegation — done** (`1d8f203`): unique child request IDs linked to the parent; forwards Stop to each peer's MCP `cancel` tool. Deadline cancellation survives parent cleanup and late delegate startup; late worker events are dropped. Cancellation remains cooperative for tools already running.
-3. **Plan/todo tool — done** (`5069200`): local `update_plan` tool with per-turn pending / in_progress / done checklists, offered by both providers. Live `plan_update` snapshots retain delegated-agent identity; small Ember API pass-through, reconnect snapshots, and Ember web panel make them visible.
-4. **Tool-activity persistence across turns — done** (`55f1a1f`, `705340f`, `a92e059`): an answer's stored `steps` now reach the model as a text digest (`apps/Ember/ember_api/src/services/step_digest.py`). The last 3 tool-using answers carry full lines (args cut to 200, results to 300, block to 1,500 characters); older ones carry tool names only, also capped at 1,500 characters. `update_plan` and `ask_user` are skipped. The block is labelled as a record, not instructions; built at send time and never stored. Spec: `docs/superpowers/specs/2026-10-09-tool-activity-digest-design.md`.
-5. **Compaction/summarizing — mostly existed, remainder done**: summarizing already lived in `ember_api` (`services/summarization.py`: auto at `auto_summarize_ratio` 0.6, manual button, 2,000-token cap, raw `log_attachment`), and `ai_agent`'s `trim_history_to_fit` is only a fallback. What was missing, the summarizer seeing tool results, is covered by item 4 (`render_messages(include_steps=True)` in the summary prompt only).
-6. **Persistent memory — done** (`9cf776f`, `6950a67`): a `memory` capability in `apps/armory/src/capabilities/memory/` (tools `tool_mem_save`, `tool_mem_search`, `tool_mem_forget`; slash commands `/memory save|search|forget`); per-user notes in SQLite with FTS5 at `specifics/memory/.data/memory.db`, 500 characters per note and 200 notes per user; the model saves only user-stated facts (a tool-description rule, not enforced by code); recall is on demand. Known weakness: the model must remember to search. Next step if that proves unreliable: automatic recall injected each turn. Spec: `docs/superpowers/specs/2026-10-10-persistent-memory-design.md`.
-   Follow-ups:
-   1. **Done** (`cc675cd`, `118a4b2`, `1e2a0d6`, `0c90aba`, `61c495f`): notes are keyed on a stable account uid and purged when an account is deleted (spec docs/superpowers/specs/2026-10-10-memory-owner-uid-design.md).
-   2. **Done**: `apps/garrison/agents/reviewer.json` now has `"tools": { "deny": ["tool_mem_*"] }`, so the reviewer agent (the only specialist without a tool scope) cannot save notes from other agents' output; a test pins it against the real memory tool names.
-   3. **Done**: every memory tool refuses when `MCP_HOST` is not loopback and `INTERNAL_API_TOKEN` is empty (`is_exposed_without_token` in `apps/armory/src/services/internal_token.py`, also used by the startup banner); it cannot tell a container port published only to localhost, so such a setup needs the token too.
-   4. **Done** (`a84ebbe`, `6bf32ae`): the entry agent loads the newest notes at the start of each turn (agent-file key `memory_recall`, `apps/garrison/src/agents/memory_recall.py`; spec docs/superpowers/specs/2026-10-10-memory-auto-recall-design.md). Relevance-ranked recall and recall for specialist agents are not built.
-   5. Retry or periodically sweep failed memory purges (a purge is best effort today: orphaned notes stay when mcp_server was unreachable or had no token).
-7. **Sandboxed workspace (files and shell)**: isolated per-user directory and a limited command runner, fitted to the approval flow. Real security risk. Best as a new `mcp_server` capability, not inside `ai_agent`. Hardest.
-
-Items 1 to 6 are complete; item 7 remains open.
+**Open**: a sandboxed workspace (files and shell): an isolated per-user directory and a limited command runner, fitted to the approval flow. Real security risk. Best as a new `mcp_server` capability, not inside `ai_agent`. Hardest. Also open from the memory work: retry or periodically sweep failed memory purges (a purge is best effort today: orphaned notes stay when mcp_server was unreachable or had no token).
 
 **Revisit when**: user wants to tackle a sandboxed workspace; brainstorm that design first.
 
@@ -83,10 +70,6 @@ Items 1 to 6 are complete; item 7 remains open.
 **Optional phase 2**: stronger chess engine, `Python/chess/docs/phase-2-stronger-engine.md`. Stockfish, if added, is a separate picker; Laya stays.
 
 **Revisit when**: user continues chess; start with the to-do list above.
-
-## Ascension (dropped from this repo, 2026-10-25)
-
-`apps/ascension` is no longer in Citadel: its design docs, plans, specs and `docker/configs/ascension` were deleted, and only the `0013_ascension_permission.py` migration remains. The old items (card images in the UI, splitting Ascension out of `mini_games`, the game host at `/games`) are closed here. If the game returns as its own project, track its card-image work there.
 
 ## Context breakdown for delegated agents (added 2026-10-17)
 
@@ -111,7 +94,6 @@ Items 1 to 6 are complete; item 7 remains open.
 
 **Revisit when**: user wants Stop to feel instant. Read the provider streaming code and `dispatch_with_progress` first, then propose the exact change for step 1.
 
-
 ## Frontend for db_gateway (added 2026-10-18)
 
 **Context**: `apps/treasury` is backend only (`auth.py`, `config.py`, `registry.py`, `run.py`, `seed.py`, `backends/`); no UI exists. Only `ember_web` (`NotesView.vue`, `NotesClient.ts`) touches it, as a notes feature. Build a gateway frontend that uses the ember_web and ember_admin designs (shared tokens, components, radius scale, in-app confirms).
@@ -120,7 +102,6 @@ Items 1 to 6 are complete; item 7 remains open.
 - Follow the `ember-frontend-design` and `ember-feature-scaffold` skills; any new `ember_api` route proxies to the gateway behind a permission.
 
 **Revisit when**: user wants it built. Brainstorm the design first.
-
 
 ## Full cross-provider gateway fallback (added 2026-10-19)
 
