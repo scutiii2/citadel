@@ -39,6 +39,7 @@ export const router = createRouter({
         { path: "accounts", name: "admin-accounts", component: () => import("../views/AccountsAdminView.vue"), meta: { permission: ADMIN_SECTIONS[1]!.permission } },
         { path: "roles", name: "admin-roles", component: () => import("../views/RolesAdminView.vue"), meta: { permission: ADMIN_SECTIONS[2]!.permission } },
         { path: "invites", name: "admin-invites", component: () => import("../views/InvitesAdminView.vue"), meta: { permission: "invites.manage" } },
+        { path: "tuning", name: "admin-tuning", component: () => import("../views/TuningAdminView.vue"), meta: { permission: "tuning.manage" } },
         { path: "settings", name: "admin-settings", component: () => import("../views/WorkspaceSettingsView.vue"), meta: { permission: "settings.manage" } },
       ],
     },
