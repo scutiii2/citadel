@@ -21,9 +21,9 @@ from src.agents import agent_spec, auto_route, delegation, memory_recall, skill_
 from src.agents import router_routing
 from src.agents import plan as plan_policy
 
-from src.core import approvals, internal_auth, questions, tool_filter
+from src.core import approvals, internal_auth, questions, tool_filter, tuning_overrides
 from src.private_extensions import turn as private_turn
-from src.llm import auto_tier, context_breakdown, llm_config, llm_options, model_tiers
+from src.llm import auto_tier, context_breakdown, llm_config, llm_options, model_tiers, token_limits
 from src.llm import reasoning_effort as effort_limits
 from src.core.seed import seed_from_example
 from src.core.chat_history import validate_history
@@ -126,6 +126,7 @@ async def run_chat(
     plan_lean: bool = True,
     allow_read_only: bool = False,
     exact_context: bool = False,
+    limits: dict[str, int] | None = None,
 ) -> ChatResult:
     """Run a chat completion request through the configured provider.
 
@@ -152,6 +153,8 @@ async def run_chat(
     exact_context: count the parts of the context window with the provider's own
     token counter (llm/context_breakdown.py) instead of estimating them; any failure
     falls back to the estimate.
+
+    limits: the user's own output-token and tool-round caps for this turn; lower only.
 
     private_extensions: the user's own MCP servers for this turn, as ember_api
     sent them (see private_extensions/turn.py). Their tools are offered after
@@ -183,6 +186,7 @@ async def run_chat(
     )
     effort = effort_limits.resolve(reasoning_effort, agent_spec.current().llm.max_effort, agent_spec.current().id)
     cancellation.register(request_id)
+    tuning_overrides.poll()
     request_token = cancellation.bind_request(request_id)
     delegated_usage, usage_token = delegation.bind_usage()
     attachment_token = delegation.bind_attachments(question, history)
@@ -195,6 +199,7 @@ async def run_chat(
     private_token = private_turn.bind(private)
     exact_token = context_breakdown.bind_exact(exact_context)
     effort_token = llm_options.bind_effort(effort.effort)
+    limits_token = token_limits.bind_user_limits(limits)
     try:
         if cancellation.is_cancelled(request_id):
             raise ChatCancelled()
@@ -259,6 +264,7 @@ async def run_chat(
             skill_reflection.schedule(question, result, request_id)
         return result
     finally:
+        token_limits.reset_user_limits(limits_token)
         llm_options.reset_effort(effort_token)
         context_breakdown.reset_exact(exact_token)
         private_turn.reset(private_token)

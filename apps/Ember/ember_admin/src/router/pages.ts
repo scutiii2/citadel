@@ -16,7 +16,7 @@ export interface AdminPage {
   permission: string | string[];
 }
 
-export const ADMIN_PERMISSIONS = ["accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage", "settings.manage", "capabilities.manage", "extensions.manage", "agents.manage", "tickets.manage", "usage.all.view", "config.issues.view", ...ANALYTICS_PERMISSIONS];
+export const ADMIN_PERMISSIONS = ["accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage", "settings.manage", "capabilities.manage", "extensions.manage", "agents.manage", "tuning.manage", "tickets.manage", "usage.all.view", "config.issues.view", ...ANALYTICS_PERMISSIONS];
 
 /** Administration destinations share their permission rules with nested routes. */
 export const ADMIN_SECTIONS: AdminPage[] = [
@@ -25,6 +25,7 @@ export const ADMIN_SECTIONS: AdminPage[] = [
   { to: "/admin/roles", label: "Roles & permissions", icon: ["M12 3 3 7v5c0 5 5 8 9 10 4-2 9-5 9-10V7zM8 12l3 3 5-6"], permission: ["roles.view", "roles.manage", "roles.assign"] },
   { to: "/admin/invites", label: "Invites", icon: ["M3 5h18v14H3zM3 5l9 8 9-8"], permission: "invites.manage" },
   { to: "/admin/settings", label: "Workspace settings", icon: ["M4 6h3M11 6h9M4 12h9M17 12h3M4 18h5M13 18h7", "M11 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0M17 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0M13 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0"], permission: "settings.manage" },
+  { to: "/admin/tuning", label: "Tuning", icon: ["M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3", "M1 14h6M9 8h6M17 16h6"], permission: "tuning.manage" },
 ];
 
 /** The rail's default arrangement (before an account saves its own). The Overview
@@ -38,6 +39,7 @@ const DEFAULT_ORDER = [
   "/analytics",
   "/usage",
   "/admin/settings",
+  "/admin/tuning",
   "/admin/invites",
   "/tickets",
 ];

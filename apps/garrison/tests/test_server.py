@@ -223,6 +223,7 @@ def test_status_delegates_to_agent_config():
             "plan_toggle": True,
             "read_only_approval": True,
             "exact_context": True,
+            "user_limits": True,
             "private_extensions": True,
         }
 

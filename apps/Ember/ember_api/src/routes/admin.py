@@ -31,6 +31,7 @@ from src.services.log_service import LogWriter
 from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.memory_purger import MemoryPurger
 from src.services.account_agent_service import purge_owner as purge_account_agents
+from src.services.tuning_limits_service import purge_owner as purge_tuning_limits
 from src.services.nav_preference_service import purge_owner as purge_nav_preferences
 from src.services.template_service import purge_owner as purge_templates
 from src.services.user_extension_service import purge_owner as purge_user_extensions
@@ -327,6 +328,7 @@ async def delete_account(
         await logs.error(admin.id, "admin.notes_purge", f"Notes of deleted account '{username}' were not purged ({error})")
     try:
         await purge_nav_preferences(store, uid)
+        await purge_tuning_limits(store, uid)
         await purge_account_agents(store, uid)
         await purge_templates(store, uid)
         await purge_user_extensions(store, uid)

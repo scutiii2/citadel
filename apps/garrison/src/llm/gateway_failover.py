@@ -12,6 +12,7 @@ from typing import Callable, Iterable
 import anthropic
 import openai
 
+from src.core import tuning_overrides
 from src.core.config_files import TUNING_PATH, read_section
 from src.llm import cooldown
 
@@ -77,6 +78,15 @@ def _cooldown_settings() -> tuple[float, float, float]:
 
 # Providers import this module before serving requests, outside the event loop.
 _cooldown_settings()
+
+
+def reset_cache() -> None:
+    """Reload cooldowns so later failures do not read disk."""
+    _cooldown_settings.cache_clear()
+    _cooldown_settings()
+
+
+tuning_overrides.on_change(reset_cache)
 
 
 def cooldown_seconds(kind: FailureKind, error: Exception) -> float:

@@ -23,7 +23,7 @@ This round: garrison `config_tuning.json` only. Armory, treasury and ember_api c
 
 ## Garrison
 - New `src/core/tuning_overrides.py`: schema allowlist (type, min, max per key), `load()`, `save(patch)`, `reset(path)`, `effective()`.
-  - Writes use the temp-file-and-replace pattern from `config_files.seed_tuning`.
+  - Writes use the temp-file-and-replace pattern from `config_files.seed_tuning`. In Docker, the configs path links to `.data/admin_tuning_overrides.json` in the existing persistent `agent_data` volume; atomic writes preserve that link.
   - An unreadable or invalid overlay is ignored, falls back to file defaults, and is logged.
 - Readers (`token_limits.py`, `decision.py`, failover and classifier users) read through `effective()`. Each agent process checks the overlay's mtime on use and calls its own `reset_cache()` when it changed, so no cross-process signal is needed.
 - Endpoints, internal-token protected like the existing admin routes:
@@ -34,8 +34,8 @@ This round: garrison `config_tuning.json` only. Armory, treasury and ember_api c
 
 ## ember_api
 - Permission `tuning.manage` in `services/permissions.py`, added to the admin role set.
-- `routes/admin_tuning.py` proxies the three endpoints through a `TuningAdmin` service modelled on `services/agent_admin.py` (502 when garrison is unreachable, garrison validation errors passed on as 400). Every change is written to the activity log with before and after.
-- `routes/account_tuning.py`: `GET/PUT /api/account/tuning` reads and saves the account's two values, validated against the admin ceiling that the GET returns.
+- `routes/admin_tuning.py` proxies GET/PUT through the existing `AgentAdmin` service in `services/agent_admin.py` (502 when garrison is unreachable, garrison validation errors passed on as 400). Every change is written to the activity log with before and after.
+- `routes/account_tuning.py`: `GET/PUT/DELETE /api/account/tuning` reads, saves and clears the account's two values, validated against the admin ceiling that the GET returns.
 - Table `account_tuning(account_id pk, max_output_tokens null, max_tool_rounds null, updated_at)` via an Alembic migration. A null means "use the admin value".
 - The chat proxy adds the account's `limits` to each request to garrison.
 
@@ -46,12 +46,14 @@ This round: garrison `config_tuning.json` only. Armory, treasury and ember_api c
 ## Errors
 - Out-of-range or unknown key: 400 with the key path in the message.
 - Garrison down: 502 in admin routes; the account GET still returns the stored values and marks the ceiling unknown, and the PUT is refused.
-- Chat is never blocked by an invalid stored user value; garrison clamps it.
+- Chat is never blocked by an invalid stored user value; garrison clamps it. A stored user cap also follows a newly lowered admin ceiling when an agent file supplies its own limit.
+- Only a failed `tuning_limits` read falls back to no user limits. The existing disabled-agents read remains closed on failure with 503.
+- Voter switches are validated together against the file-only triage order; a change cannot disable its last usable voter.
 
 ## Tests
 - Garrison: schema validation, merge precedence, user clamp, atomic write, invalid-overlay fallback, mtime reload.
-- ember_api: permission gate, activity log entry, proxy error mapping, account route ceiling check, migration up and down.
-- Playwright: one spec for the admin Tuning view, one for the Settings row.
+- ember_api: permission gate, activity log entry, proxy error mapping, account route ceiling checks, storage and chat forwarding, and the tuning-only fallback with the disabled-agents 503 preserved. No migration is needed.
+- UI: Vitest component and Settings integration tests plus one Playwright spec for the admin Tuning view and one for the Settings row, covering save/reset and draft retention. Both pages protect unsaved drafts on navigation.
 
 ## Not checked or deferred
 - Classifier edits change routing quality; no eval is run on save. Admin sees the file default beside each value to revert.

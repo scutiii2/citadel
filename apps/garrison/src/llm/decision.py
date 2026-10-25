@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any, Mapping
 
+from src.core import tuning_overrides
 from src.core.config_files import TUNING_PATH, read_section
 
 _log = logging.getLogger(__name__)
@@ -437,3 +438,6 @@ def classify_size(message: str, timeout: float | None = None) -> Choice:
         message, SIZE_CRITERIA, SIZE_QUESTION, "auto_tier",
         min_confidence=settings().auto_tier.min_confidence, timeout=timeout,
     )
+
+
+tuning_overrides.on_change(reset_cache)

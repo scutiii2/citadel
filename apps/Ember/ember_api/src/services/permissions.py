@@ -28,6 +28,7 @@ LOGS_CHAT_PROMPTS_VIEW = "logs.chat.prompts.view"
 CONFIG_ISSUES_VIEW = "config.issues.view"
 TRAFFIC_VIEW = "traffic.view"
 AGENTS_MANAGE = "agents.manage"
+TUNING_MANAGE = "tuning.manage"
 TICKETS_CREATE = "tickets.create"
 TICKETS_MANAGE = "tickets.manage"
 BRAIN_INSTANCE_PUBLISH = "brain.instance.publish"
@@ -62,6 +63,7 @@ ALL_PERMISSIONS = MappingProxyType({
     LOGS_CHAT_PROMPTS_VIEW: "Read the prompts each agent received in the chat-turn log (needs logs.chat.view)",
     CONFIG_ISSUES_VIEW: "See problems in ember_api's config and secret files",
     TRAFFIC_VIEW: "See network traffic charts (requests, latency, upstream calls)",
+    TUNING_MANAGE: "Change garrison's runtime tuning (token limits, failover, classifier)",
     AGENTS_MANAGE: "Create, edit and remove ai_agent agents (provider, gateway, persona, tools)",
     TICKETS_CREATE: "Report bugs, suggest features and follow your own tickets",
     TICKETS_MANAGE: "See every ticket, triage them and set status, priority and assignee",
@@ -71,7 +73,7 @@ ALL_PERMISSIONS = MappingProxyType({
 # config_app.json sets require_email_verification to false (see Account.permission_names).
 STAFF_PERMISSIONS = frozenset({
     ACCOUNTS_VIEW, ACCOUNTS_MANAGE, ACCOUNTS_DELETE, ROLES_VIEW, ROLES_MANAGE, ROLES_ASSIGN,
-    INVITES_MANAGE, SETTINGS_MANAGE, CAPABILITIES_MANAGE, EXTENSIONS_MANAGE, AGENTS_MANAGE,
+    INVITES_MANAGE, SETTINGS_MANAGE, CAPABILITIES_MANAGE, EXTENSIONS_MANAGE, AGENTS_MANAGE, TUNING_MANAGE,
     LOGS_VIEW, LOGS_ERRORS_VIEW, LOGS_CHAT_VIEW, LOGS_CHAT_PROMPTS_VIEW, CONFIG_ISSUES_VIEW,
     TRAFFIC_VIEW, USAGE_ALL_VIEW, TICKETS_MANAGE, BARD_ADMIN,
 })

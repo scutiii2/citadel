@@ -53,6 +53,7 @@ def _build_agent(approvals: bool = True, private: bool | None = None, read_only:
         private_extensions: list[dict] | None = None,
         allow_read_only: bool = False,
         exact_context: bool = False,
+        limits: dict[str, int] | None = None,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         headers = ctx.request_context.request.headers
@@ -74,11 +75,12 @@ def _build_agent(approvals: bool = True, private: bool | None = None, read_only:
             "private": private_extensions,
             "allow_read_only": allow_read_only,
             "exact_context": exact_context,
+            "limits": limits,
         }
 
     @mcp.tool()
     def status() -> dict[str, Any]:
-        flags = {"tool_approval": True, "tool_filter": True, "user_questions": True, "plan_toggle": True, "exact_context": True} if approvals else {}
+        flags = {"tool_approval": True, "tool_filter": True, "user_questions": True, "plan_toggle": True, "exact_context": True, "user_limits": True} if approvals else {}
         extras = {**({"private_extensions": True} if private else {}), **({"read_only_approval": True} if read_only else {})}
         return {"available": True, **flags, **extras}
 
@@ -404,3 +406,11 @@ def test_an_agent_from_before_auto_just_asks_about_every_tool(before_auto_agent_
 
     assert result["approval"] == {"mode": "ask", "allowed": []}
     assert result["allow_read_only"] is False
+
+
+def test_user_limits_are_sent_to_agents_that_understand_them(agent_url: str) -> None:
+    assert _ask(McpAgentGateway(None), agent_url, limits={"max_output_tokens": 500})["limits"] == {"max_output_tokens": 500}
+
+
+def test_user_limits_are_omitted_for_older_agents(old_agent_url: str) -> None:
+    assert _ask(McpAgentGateway(None), old_agent_url, limits={"max_output_tokens": 500})["limits"] is None

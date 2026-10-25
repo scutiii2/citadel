@@ -97,3 +97,6 @@ node_modules/
 
 # docker compose secrets (INTERNAL_API_TOKEN)
 /.env
+
+# Admin runtime tuning overlay
+apps/garrison/configs/tuning_overrides.json
