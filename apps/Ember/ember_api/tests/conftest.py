@@ -145,6 +145,7 @@ class FakeAgent:
         private_extensions=None,
         allow_read_only=False,
         exact_context=False,
+        limits=None,
     ):
         self.asks.append(
             {
@@ -158,6 +159,7 @@ class FakeAgent:
                 "approval_mode": approval_mode,
                 "allowed_tools": allowed_tools,
                 "disabled_tools": disabled_tools,
+                "limits": limits,
                 "ask_user": ask_user,
                 "plan": plan,
                 "plan_lean": plan_lean,

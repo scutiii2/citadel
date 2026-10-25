@@ -66,6 +66,7 @@ class AgentGateway(Protocol):
         private_extensions: list[dict[str, Any]] | None = None,
         allow_read_only: bool = False,
         exact_context: bool = False,
+        limits: dict[str, int] | None = None,
     ) -> dict[str, Any]: ...
 
     async def interpret(self, url: str, caller: Caller, text: str) -> dict[str, Any]: ...
@@ -150,6 +151,7 @@ class McpAgentGateway:
         private_extensions=None,
         allow_read_only=False,
         exact_context=False,
+        limits=None,
     ):
         arguments = {
             "question": question,
@@ -215,6 +217,11 @@ class McpAgentGateway:
                     "does not support them). Turn them off in the Supermarket or restart the agent."
                 )
             arguments["private_extensions"] = private_extensions
+        if limits:
+            # Older agents keep their configured caps.
+            status = await self._call(url, caller, "status", {})
+            if status.get("user_limits"):
+                arguments["limits"] = limits
         return await self._call(url, caller, "ask", arguments, on_event)
 
     async def interpret(self, url, caller, text):
