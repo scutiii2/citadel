@@ -175,3 +175,18 @@ def test_the_provider_is_available_only_when_the_service_is_configured(monkeypat
     assert laya_provider.is_available() is False
     monkeypatch.setenv("LAYA_SERVICE_URL", "http://laya:9120")
     assert laya_provider.is_available() is True
+
+
+STRATEGY_BODY = {"text": "t", "questions": {"q": {"type": "choice", "instructions": "?", "criteria": {"a": "A", "b": "B"}}}}
+
+
+def test_a_request_may_name_a_strategy():
+    request = laya_provider.parse_request(json.dumps({**STRATEGY_BODY, "strategy": " typed-only "}))
+    assert request.strategy == "typed-only"
+    assert laya_provider.parse_request(json.dumps(STRATEGY_BODY)).strategy is None
+
+
+@pytest.mark.parametrize("value", ["", "  ", 3, None, ["typed-only"]])
+def test_a_bad_strategy_is_refused(value):
+    with pytest.raises(ValueError, match="strategy must be a non-empty string"):
+        laya_provider.parse_request(json.dumps({**STRATEGY_BODY, "strategy": value}))

@@ -30,7 +30,7 @@ MAX_INPUT_CHARS = 4000
 # representative local examples before using these answers for actions.
 MIN_CONFIDENCE = 0.7
 
-_REQUEST_KEYS = {"text", "questions", "min_confidence", "trace", "local_only"}
+_REQUEST_KEYS = {"text", "questions", "min_confidence", "trace", "local_only", "strategy"}
 # Jev's labels for a noul question that gives none; the question rules themselves are the Laya service's (POST /v1/validate).
 _NOUL_DEFAULTS = {"false": "No: the statement is false.", "true": "Yes: the statement is true."}
 
@@ -47,6 +47,8 @@ class Request:
     # Only Laya's own models answer (English and typed-decisions, where classifier.triage_enabled allows them for the
     # question type): no fallback classifier (Jev).
     local_only: bool = False
+    # A Laya service decision strategy that replaces the one the voter settings would choose (llm/triage_flow.py).
+    strategy: str | None = None
 
 
 def _fail(message: str) -> ValueError:
@@ -91,7 +93,12 @@ def parse_request(raw: str, max_chars: int = MAX_INPUT_CHARS) -> Request:
     local_only = data.get("local_only", False)
     if not isinstance(local_only, bool):
         raise _fail("local_only must be true or false")
-    return Request(text, questions, float(min_confidence), trace, local_only)
+    strategy = data.get("strategy")
+    if "strategy" in data:
+        if not _is_text(strategy):
+            raise _fail("strategy must be a non-empty string")
+        strategy = strategy.strip()
+    return Request(text, questions, float(min_confidence), trace, local_only, strategy)
 
 
 def _with_eliminated(spec: dict[str, Any], answer: dict[str, Any], eliminated: list[str]) -> dict[str, Any]:
