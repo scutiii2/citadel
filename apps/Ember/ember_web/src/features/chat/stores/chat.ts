@@ -68,6 +68,10 @@ function cavemanKey(accountId: number): string {
   return `ember_web.caveman.${accountId}`;
 }
 
+function independentKey(accountId: number): string {
+  return `ember_web.independent.${accountId}`;
+}
+
 function planKey(accountId: number): string {
   return `ember_web.plan.${accountId}`;
 }
@@ -195,6 +199,8 @@ export const useChatStore = defineStore("chat", () => {
   const starting = ref(false); // question sent, turn not confirmed yet
   // "Terse replies": asks ai_agent for short answers. Remembered per account.
   const caveman = ref(false);
+  // "Independent prompts": each question is sent without the chat's earlier messages. Remembered per account.
+  const independent = ref(false);
   // "Task checklist": the agent may keep a step-by-step checklist for multi-step
   // tasks. On by default; remembered per account. "Lean updates" asks it to
   // change the list only when an item changes status (fewer tokens).
@@ -566,6 +572,7 @@ export const useChatStore = defineStore("chat", () => {
       listReady.value = false;
       setSearch("");
       caveman.value = accountId !== null && readPreference(cavemanKey(accountId)) === "1";
+      independent.value = accountId !== null && readPreference(independentKey(accountId)) === "1";
       plan.value = accountId === null || readPreference(planKey(accountId)) !== "0";
       planLean.value = accountId === null || readPreference(planLeanKey(accountId)) !== "0";
       approvalMode.value = accountId !== null ? readApprovalMode(accountId) : DEFAULT_APPROVAL_MODE;
@@ -932,6 +939,7 @@ export const useChatStore = defineStore("chat", () => {
       const turn = await chatsClient.startTurn(id, {
         question,
         caveman: caveman.value,
+        ...(independent.value ? { independent: true } : {}),
         ...(sendSecondBrain ? { save_to_second_brain: autoSave, second_brain_scope: secondBrainScope.value ?? "instance" } : {}),
         ...(plan.value ? {} : { plan: false }),
         ...(planLean.value ? {} : { plan_lean: false }),
@@ -1304,6 +1312,12 @@ export const useChatStore = defineStore("chat", () => {
     if (accountId !== undefined) writePreference(cavemanKey(accountId), on ? "1" : "0");
   }
 
+  function setIndependent(on: boolean): void {
+    independent.value = on;
+    const accountId = auth.account?.id;
+    if (accountId !== undefined) writePreference(independentKey(accountId), on ? "1" : "0");
+  }
+
   /** After extensions were added or removed: re-read tools and commands. */
   function refreshCommands(): void {
     commandRunner.invalidate();
@@ -1481,7 +1495,8 @@ export const useChatStore = defineStore("chat", () => {
     setSearch,
     clearSearch,
     caveman,
-    secondBrainScope,
+    independent,
+secondBrainScope,
     setSecondBrainScope,
     secondBrainAvailable,
     saveToSecondBrain,
@@ -1489,6 +1504,7 @@ export const useChatStore = defineStore("chat", () => {
     setSaveToSecondBrain,
     refreshSecondBrainAvailability,
     setCaveman,
+    setIndependent,
     plan,
     setPlan,
     planLean,

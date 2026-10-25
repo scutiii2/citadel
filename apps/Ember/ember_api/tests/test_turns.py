@@ -508,6 +508,18 @@ def test_truncate_to_zero_restarts_the_conversation(client: TestClient, agent: F
     assert agent.asks[0]["history"] == []
 
 
+def test_independent_sends_no_history_but_still_saves_the_chat(client: TestClient, agent: FakeAgent) -> None:
+    as_admin(client)
+    chat_id = new_id()
+    _two_exchanges(client, chat_id, agent)
+
+    assert start(client, chat_id, "q3", independent=True).status_code == 202
+
+    events(client, chat_id)
+    assert agent.asks[-1]["question"] == "q3" and agent.asks[-1]["history"] == []
+    assert [m["content"] for m in chat(client, chat_id)["messages"]][:4] == ["q1", "Hello!", "q2", "Hello!"]
+
+
 @pytest.mark.parametrize("index", [1, 4, 99])
 def test_truncate_to_must_point_at_a_typed_question(client: TestClient, agent: FakeAgent, index: int) -> None:
     as_admin(client)

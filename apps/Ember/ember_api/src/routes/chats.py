@@ -258,6 +258,8 @@ class TurnRequest(BaseModel):
     # Ignored: every question goes to the entry agent. Kept so older browsers still validate.
     agent_id: str | None = Field(default=None, max_length=120)
     caveman: bool = False
+    # Send no earlier messages to the agent: this question stands alone. The chat still saves them.
+    independent: bool = False
     # None uses the saved preference; older clients never enable it accidentally.
     save_to_second_brain: bool | None = None
     second_brain_scope: Literal["instance", "personal"] | None = None
@@ -825,6 +827,7 @@ async def start_turn(
         options = TurnOptions(
             limits=limits,
             caveman=body.caveman,
+            independent=body.independent,
             save_to_second_brain=auto_save,
             second_brain_scope=brain_scope,
             second_brain_notice=brain_notice,

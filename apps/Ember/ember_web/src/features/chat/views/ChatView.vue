@@ -51,6 +51,7 @@ const {
   livePlans,
   busy,
   caveman,
+  independent,
   secondBrainAvailable,
   secondBrainScope,
   saveToSecondBrain,
@@ -475,6 +476,7 @@ useChatShortcuts({
           <template #tools>
             <ChatSettingsMenu
               :caveman="caveman"
+              :independent="independent"
               :second-brain-scope="secondBrainScope"
               @update:second-brain-scope="chat.setSecondBrainScope"
               :second-brain-available="secondBrainAvailable"
@@ -490,6 +492,7 @@ useChatShortcuts({
               :enabled-extensions="enabledExtensions"
               :attention="pendingApprovals.length > 0"
               @update:caveman="chat.setCaveman"
+              @update:independent="chat.setIndependent"
               @update:plan="chat.setPlan"
               @update:plan-lean="chat.setPlanLean"
               @update:chime="chat.setChime"

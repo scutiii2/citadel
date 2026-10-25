@@ -163,6 +163,17 @@ describe("what a question sends", () => {
 
     expect(client.startTurn.mock.calls[0]![1]).not.toHaveProperty("ask_before_tools");
     expect(client.startTurn.mock.calls[0]![1]).not.toHaveProperty("allowed_tools");
+    expect(client.startTurn.mock.calls[0]![1]).not.toHaveProperty("independent");
+  });
+
+  it("sends independent only while Independent prompts is on", async () => {
+    const chat = await storeWith({ c1: FOUR });
+    chat.setIndependent(true);
+    await chat.selectChat("c1");
+
+    await chat.send("hello");
+
+    expect(client.startTurn.mock.calls[0]![1]).toMatchObject({ independent: true });
   });
 
   it("Auto asks about tools and also says read-only tools may run unasked", async () => {
