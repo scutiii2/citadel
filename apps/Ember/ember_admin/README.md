@@ -49,7 +49,7 @@ scoped by port, so the same ember_api session cookie is sent.
 | Accounts (`/admin/accounts`) | any of `accounts.view`, `accounts.manage`, `accounts.delete`, `roles.assign` |
 | Roles & permissions (`/admin/roles`) | any of `roles.view`, `roles.manage`, `roles.assign` |
 | Invites (`/admin/invites`) | `invites.manage` |
-| Workspace settings (`/admin/settings`): tool approval and Sidebar pages (which ember_web pages every account's sidebar shows; nav only) | `settings.manage` |
+| Workspace settings (`/admin/settings`): tool approval, Triage strategy, and Sidebar pages (which ember_web pages every account's sidebar shows; nav only) | `settings.manage` |
 | Profile (`/profile`; `/account` redirects here) | any logged-in account |
 | Personal settings (`/settings`) | any logged-in account |
 | Email verification (`/verify-email`) | any logged-in account |
@@ -300,3 +300,9 @@ the password field is write-only and an unchanged value preserves the key. Test
 reads the candidate; Save applies a revision without restart; Disable revokes new
 operations. `brain.instance.publish` separately permits publishing shared knowledge.
 See [brain operations](../../../docs/obsidian-brains.md).
+
+The Workspace settings **Triage strategy** panel lists Laya's service strategies
+and saves the administrator's default explicitly. "Not set (follows triage_order)"
+clears the override; `auto` is a separate service strategy. Save stays pending
+until confirmation, failed drafts remain available, and an unavailable list
+disables picking while keeping the stored default visible.

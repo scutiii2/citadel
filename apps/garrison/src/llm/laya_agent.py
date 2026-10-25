@@ -44,12 +44,27 @@ class LAYAAgent:
         except httpx.HTTPError:
             return False
 
+    def _headers(self) -> dict[str, str]:
+        return {"X-Internal-Token": self._token} if self._token else {}
+
+    def strategies(self) -> dict[str, Any]:
+        """The service's strategy names and its default: `{"strategies": [...], "default": "auto"}`."""
+        if not self.configured:
+            raise LayaServiceError("Laya is not configured: set LAYA_SERVICE_URL")
+        try:
+            response = httpx.get(f"{self._url}/v1/strategies", headers=self._headers(), timeout=TIMEOUT_SECONDS)
+        except httpx.HTTPError as error:
+            raise LayaServiceError(f"The Laya service could not be reached: {error}") from error
+        if not response.is_success:
+            raise LayaServiceError(f"The Laya service refused the request ({response.status_code})", status=response.status_code)
+        body = response.json()
+        return {"strategies": list(body["strategies"]), "default": body.get("default")}
+
     def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         if not self.configured:
             raise LayaServiceError("Laya is not configured: set LAYA_SERVICE_URL")
-        headers = {"X-Internal-Token": self._token} if self._token else {}
         try:
-            response = httpx.post(f"{self._url}{path}", headers=headers, json=body, timeout=TIMEOUT_SECONDS)
+            response = httpx.post(f"{self._url}{path}", headers=self._headers(), json=body, timeout=TIMEOUT_SECONDS)
         except httpx.HTTPError as error:
             raise LayaServiceError(f"The Laya service could not be reached: {error}") from error
         if response.is_success:

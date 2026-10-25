@@ -63,6 +63,7 @@ const json = (route: Route, body: unknown, status = 200) =>
 export async function installFakeApi(page: Page, permissions?: string[]) {
   const api = {
     settings: { forceToolApproval: false },
+    triageStrategy: null as string | null,
     accounts: new Map(ADMIN_ACCOUNTS.map(a => [a.id, { ...a }])),
     roles: new Map(ADMIN_ROLES.map(r => [r.id, { ...r }])),
     unexpected: [] as string[],
@@ -84,6 +85,10 @@ export async function installFakeApi(page: Page, permissions?: string[]) {
       }
       loggedIn = true;
       return json(route, account);
+    }
+    if (path === "/api/admin/triage-strategy" && ["GET", "PUT"].includes(method)) {
+      if (method === "PUT") api.triageStrategy = request.postDataJSON().value;
+      return json(route, { default: api.triageStrategy, strategies: ["english-only", "typed-only", "auto"] });
     }
     if (method === "GET" && path === "/api/settings") {
       return json(route, { force_tool_approval: api.settings.forceToolApproval });

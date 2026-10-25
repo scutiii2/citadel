@@ -32,6 +32,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from src.core import tuning_overrides
+
 from src.llm import decision, laya_agent, laya_provider
 from src.llm.base_provider import ChatResult
 from src.llm.decision import TRIAGE_VOTERS
@@ -102,6 +104,7 @@ class TriageFlow:
         self.tokens = 0
         self._failures: list[str] = []
         self._override: float | None = None
+        self._strategy: str | None = None
 
     def threshold(self, name: str, count: int) -> float:
         if self._override is not None:
@@ -134,6 +137,9 @@ class TriageFlow:
         config = decision.settings()
         groups: dict[str, dict[str, Any]] = {}
         for qid, spec in request.questions.items():
+            if self._strategy:
+                groups.setdefault(self._strategy, {})[qid] = spec
+                continue
             local = tuple(v for v in config.voters(spec["type"]) if v != JEV)
             if local in _STRATEGIES:
                 groups.setdefault(_STRATEGIES[local], {})[qid] = spec
@@ -149,6 +155,8 @@ class TriageFlow:
                     thresholds=thresholds, prune_ratio=config.triage_prune_ratio, pair_ratio=config.triage_pair_ratio,
                 )
             except LayaServiceError as error:
+                if error.status == 422:
+                    raise ValueError(f"Invalid Laya request: {error}") from None
                 _log.warning("Laya could not answer: %s", error)
                 self._failures.append(f"laya: {error}")
                 self._record(error.calls, started_at)
@@ -169,6 +177,15 @@ class TriageFlow:
                 raise ValueError(f"Invalid Laya request: {error}") from None
             _log.warning("Laya questions could not be validated: %s", error)
 
+        if self._strategy:
+            try:
+                names = self.service.strategies()["strategies"]
+            except LayaServiceError as error:
+                _log.warning("Laya strategies could not be listed: %s", error)
+                return
+            if self._strategy not in names:
+                raise ValueError(f"Invalid Laya request: unknown strategy {self._strategy!r}; choose one of: {', '.join(names)}")
+
     def _no_answer(self, qid: str) -> str:
         """The error for a question nobody answered, with what the Laya service said when it failed."""
         return f"no model could answer {qid!r}" + (f" ({'; '.join(self._failures)})" if self._failures else "")
@@ -186,6 +203,7 @@ class TriageFlow:
         data, _ = json.JSONDecoder().raw_decode(raw.lstrip())
         self._override = float(data["min_confidence"]) if "min_confidence" in data else None
         self.tokens, self._failures = 0, []
+        self._strategy = request.strategy or tuning_overrides.triage_strategy()
         self._validate(request)
         local = self._ask_locals(request)
         answers = {}

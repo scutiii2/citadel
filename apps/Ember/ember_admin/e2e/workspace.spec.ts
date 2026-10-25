@@ -298,3 +298,25 @@ test('role list and permission options scroll independently', async ({ page }) =
   }
   expect(api.unexpected).toEqual([]);
 });
+
+
+test("a default triage strategy is saved explicitly and can be cleared", async ({ page }) => {
+  const api = await installFakeApi(page);
+  await logInAdmin(page);
+  await page.goto("/admin/settings");
+  const select = page.getByRole("combobox", { name: "Default triage strategy" });
+  await expect(select).toHaveValue("");
+  await select.selectOption("typed-only");
+  expect(api.triageStrategy).toBeNull();
+  const panel = page.locator(".card").filter({ has: page.getByRole("heading", { name: "Triage strategy", exact: true }) });
+  await panel.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(panel.getByText("Saved", { exact: true })).toBeVisible();
+  expect(api.triageStrategy).toBe("typed-only");
+  await page.reload();
+  await expect(select).toHaveValue("typed-only");
+  await select.selectOption("");
+  await panel.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(panel.getByText("Saved", { exact: true })).toBeVisible();
+  expect(api.triageStrategy).toBeNull();
+  expect(api.unexpected).toEqual([]);
+});

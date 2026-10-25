@@ -300,7 +300,22 @@ after the service call.
 
 ### Triage flow (Laya English, Laya typed-decisions, Jev)
 
-Every request goes through `src/llm/triage_flow.py` (the whole flow is written at the top of that file). For each
+A request may carry `"strategy"`, using any name offered by Laya's `GET /v1/strategies`.
+Resolution is the request value, then the admin default, then the existing voter settings.
+When an override resolves, all questions use it in one service call. Unknown names are
+invalid requests (422), including when `/v1/ask` rejects one after listing was unavailable;
+these refusals never trigger Jev fallback.
+
+The shared `src/core/tuning_overrides.py` reads the admin default from
+`.data/tuning_overrides.json` (the `agent_data` volume in Docker, so it survives a rebuild) on every request and writes it atomically.
+`GET /agents/triage-strategy` returns `{default, strategies}`; `PUT` takes
+`{strategy: string | null}` and returns the same shape. Both require the internal
+token. Null clears the override and restores voter-derived behavior, independently
+of the service's `auto` strategy. If Laya cannot list strategies, GET retains the
+stored default with `strategies: []`; setting a name requires the service, while
+clearing does not. The existing `config_tuning.json` remains authoritative for voters.
+
+Every request goes through `src/llm/triage_flow.py` (the whole flow is written at the top of that file). Without an override, for each
 question type Garrison reads the local voters that `classifier.triage_order` and `triage_enabled` allow and asks the
 Laya service for the matching strategy: English then typed = `english-then-typed` (the default), typed first =
 `typed-then-english`, one voter = `english-only` / `typed-only`. The service runs the local rules, each model against
