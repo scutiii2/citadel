@@ -204,6 +204,24 @@ async def attachment_audio(
     logs: LogWriter = Depends(get_log_writer),
 ) -> AttachmentAudioOut:
     """Keep the original for Scribe's transcribe tool; the agent gets the file_id."""
+    filename, content = _audio_content(body)
+    gateway = ScribeGateway(request.app.state.upstream, request.app.state.settings.scribe_url,
+                            request.app.state.internal_token)
+    uploaded = await gateway.upload(account, filename, content)
+    await logs.action(account, "attachments.audio", f"Attached '{filename}' ({len(content):,} bytes) for transcription")
+    return AttachmentAudioOut(
+        filename=filename, file_id=uploaded["file_id"], duration_s=float(uploaded["duration_s"]),
+        expires_at=float(uploaded["expires_at"]),
+    )
+
+
+class DictationOut(BaseModel):
+    text: str
+    duration_s: float
+
+
+def _audio_content(body: AudioIn) -> tuple[str, bytes]:
+    """Keep dictation and attachments under identical audio validation rules."""
     filename = body.filename.replace("\\", "/").rsplit("/", 1)[-1]
     if not filename.lower().endswith(_AUDIO_SUFFIXES):
         raise HTTPException(400, "Upload an mp3, wav, m4a, ogg, flac or webm file")
@@ -213,11 +231,20 @@ async def attachment_audio(
         raise HTTPException(400, "data must be base64") from error
     if len(content) > _MAX_AUDIO_BYTES:
         raise HTTPException(413, "The audio is larger than 20 MB")
+    return filename, content
+
+
+@router.post("/dictate")
+async def dictate(
+    body: AudioIn,
+    request: Request,
+    account: Account = Depends(require_chat),
+    logs: LogWriter = Depends(get_log_writer),
+) -> DictationOut:
+    """Return speech as draft text without asking the chat agent to transcribe it."""
+    filename, content = _audio_content(body)
     gateway = ScribeGateway(request.app.state.upstream, request.app.state.settings.scribe_url,
                             request.app.state.internal_token)
-    uploaded = await gateway.upload(account, filename, content)
-    await logs.action(account, "attachments.audio", f"Attached '{filename}' ({len(content):,} bytes) for transcription")
-    return AttachmentAudioOut(
-        filename=filename, file_id=uploaded["file_id"], duration_s=float(uploaded["duration_s"]),
-        expires_at=float(uploaded["expires_at"]),
-    )
+    result = await gateway.transcribe(account, filename, content)
+    await logs.action(account, "attachments.dictate", f"Transcribed {len(content):,} bytes of dictated audio")
+    return DictationOut(text=result["text"], duration_s=float(result["duration_s"]))

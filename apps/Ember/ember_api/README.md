@@ -1,5 +1,15 @@
 # ember_api
 
+## Speech HTTP routes
+
+| Route | Permission | Behavior |
+| --- | --- | --- |
+| `POST /api/attachments/dictate` | `files.upload` | `AudioIn` base64 JSON, supported audio suffix, 20 MB cap; returns `{text, duration_s}` from Scribe. Logs `attachments.dictate` without transcript text. |
+| `POST /api/bard/speak` | `tools.execute` + `files.download` | JSON `{text, voice?}`; returns `{file_id, duration_s, voice}`. Logs `bard.speak` without spoken text. |
+| `GET /api/bard/voices` | `tools.execute` + `files.download` | Returns `{voices: string[]}` for installed voices only. |
+
+Speech gateways supply account identity and the internal token. Rejected audio/text remains 400, quota/size 413 and unreachable services or refused internal credentials become 502. Existing audio upload and Bard streaming routes retain their contracts.
+
 ## Triage strategy
 
 Migration `0026` adds nullable `accounts.triage_strategy`. Null follows Garrison's

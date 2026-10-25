@@ -16,11 +16,18 @@ class ScribeGateway:
         self.client, self.base, self.token = client, base_url.rstrip("/"), token
 
     async def upload(self, account: Account, filename: str, content: bytes) -> dict:
+        return await self._audio_request("files", account, filename, content)
+
+    async def transcribe(self, account: Account, filename: str, content: bytes) -> dict:
+        """Transcribe through the same owner, quota and cache as attached audio."""
+        return await self._audio_request("transcribe", account, filename, content)
+
+    async def _audio_request(self, endpoint: str, account: Account, filename: str, content: bytes) -> dict:
         headers = identity_headers(account.username, account.email, self.token, account.uid)
         headers["X-Filename"] = filename
         headers["Content-Type"] = "application/octet-stream"
         try:
-            response = await self.client.post(f"{self.base}/api/files", headers=headers, content=content, timeout=120)
+            response = await self.client.post(f"{self.base}/api/{endpoint}", headers=headers, content=content, timeout=120)
         except httpx.HTTPError as error:
             raise HTTPException(502, "Scribe is unreachable. Try again.") from error
         if response.status_code == 200:
