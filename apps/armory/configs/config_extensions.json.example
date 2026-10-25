@@ -37,5 +37,13 @@
     "url": "http://127.0.0.1:8090/mcp",
     "headers": { "X-Internal-Token": "${INTERNAL_API_TOKEN}" },
     "forward_requester": true
+  },
+  "scribe": {
+    "_comment": "Scribe's MCP endpoint (Python/Scribe). It requires the shared internal token, sent here as a header. Start Scribe before mcp_server so the connection succeeds at startup. forward_requester sends the asking user's username upstream (_meta.requester); Scribe keeps each user's audio private to them and refuses a call without it. Audio is uploaded through ember_api (POST /api/attachments/audio), so there is no web_url.",
+    "label": "Scribe",
+    "description": "Speech to text: transcribes an attached audio file to English text.",
+    "url": "http://127.0.0.1:8091/mcp",
+    "headers": { "X-Internal-Token": "${INTERNAL_API_TOKEN}" },
+    "forward_requester": true
   }
 }

@@ -8,5 +8,15 @@
       "X-Internal-Token": "${INTERNAL_API_TOKEN}"
     },
     "forward_requester": true
+  },
+  "scribe": {
+    "_comment": "Scribe runs from Python/Scribe (its own compose project, joined to this stack's core network), so Armory reaches it by service name. Start the Citadel stack first, then Scribe, then restart armory so its startup handshake succeeds. Scribe needs the same INTERNAL_API_TOKEN as this stack.",
+    "label": "Scribe",
+    "description": "Speech to text: transcribes an attached audio file to English text.",
+    "url": "http://scribe:8091/mcp",
+    "headers": {
+      "X-Internal-Token": "${INTERNAL_API_TOKEN}"
+    },
+    "forward_requester": true
   }
 }
