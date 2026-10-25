@@ -11,6 +11,11 @@ import { useAuthStore } from "../../stores/auth";
 import { useTheme } from "../../composables/useTheme";
 import SettingsView from "./SettingsView.vue";
 
+vi.mock("../../api/navigation/TuningClient", () => ({ tuningClient: {
+  get: vi.fn(async () => ({ limits: { max_output_tokens: null, max_tool_rounds: null }, ceiling: { max_output_tokens: 2048, max_tool_rounds: 15 } })),
+  save: vi.fn(), reset: vi.fn(),
+} }));
+
 vi.mock("../../api/navigation/SettingsClient", () => ({ settingsClient: { get: vi.fn(), set: vi.fn() } }));
 vi.mock("../../api/navigation/NavPreferencesClient", () => ({
   navPreferencesClient: { get: vi.fn(), save: vi.fn(), reset: vi.fn() },
@@ -154,10 +159,10 @@ describe("SettingsView", () => {
   it("lists the chat and appearance settings, grouped, and no administration for a member", async () => {
     const w = await mountView();
 
-    expect(w.findAll("h3").map((h) => h.text())).toEqual(["Chat", "Context display", "Appearance", "Sidebar", "Triage Assistant"]);
+    expect(w.findAll("h3").map((h) => h.text())).toEqual(["Chat", "Context display", "Appearance", "Sidebar", "Response limits", "Triage Assistant"]);
     expect(rowIds(w)).toEqual([
       "chat-terse", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions",
-      "context-live-tokens", "context-panel", "context-accuracy", "appearance-theme", "sidebar-pages", "triage-strategy",
+      "context-live-tokens", "context-panel", "context-accuracy", "appearance-theme", "sidebar-pages", "max_output_tokens", "max_tool_rounds", "triage-strategy",
     ]);
     expect(w.text()).not.toContain("Tool approval");
   });
@@ -375,7 +380,7 @@ describe("group headers", () => {
     const w = await mountView();
 
     const scopes = w.findAll(".scope");
-    expect(scopes.map((c) => c.text())).toEqual(["This device", "This device", "This device", "Your account", "Your account"]);
+    expect(scopes.map((c) => c.text())).toEqual(["This device", "This device", "This device", "Your account", "Your account", "Your account"]);
     expect(scopes[0]!.attributes("title")).toBe("Applies instantly. Saved on this device.");
     expect(scopes[3]!.attributes("title")).toBe("Applied when you save. Stored on your account.");
     expect(w.text()).not.toContain("Applies instantly. Saved on this device.");
@@ -386,7 +391,7 @@ describe("modified filter", () => {
   it("is a pill that shows only the changed settings, and toggles back", async () => {
     chat.caveman = true;
     const w = await mountView();
-    expect(rowIds(w)).toHaveLength(13);
+    expect(rowIds(w)).toHaveLength(15);
     expect(w.get(".badge").attributes("aria-pressed")).toBe("false");
 
     await w.get(".badge").trigger("click");
@@ -396,7 +401,7 @@ describe("modified filter", () => {
     expect(w.get(".badge").attributes("aria-pressed")).toBe("true");
 
     await w.get(".badge").trigger("click");
-    expect(rowIds(w)).toHaveLength(13);
+    expect(rowIds(w)).toHaveLength(15);
   });
 
   it("drops the filter once nothing is modified any more", async () => {
@@ -407,7 +412,7 @@ describe("modified filter", () => {
     await row(w, "chat-terse").get("button.reset").trigger("click");
 
     expect(w.find(".badge").exists()).toBe(false);
-    expect(rowIds(w)).toHaveLength(13);
+    expect(rowIds(w)).toHaveLength(15);
   });
 });
 
@@ -438,7 +443,7 @@ describe("search", () => {
     expect(w.text()).toContain('No settings match "zzz"');
     expect(rowIds(w)).toEqual([]);
     await w.get("button.link").trigger("click");
-    expect(rowIds(w)).toHaveLength(13);
+    expect(rowIds(w)).toHaveLength(15);
     expect((search(w).element as HTMLInputElement).value).toBe("");
   });
 
@@ -451,7 +456,7 @@ describe("search", () => {
 
     await search(w).trigger("keydown", { key: "Escape" });
     expect((search(w).element as HTMLInputElement).value).toBe("");
-    expect(rowIds(w)).toHaveLength(13);
+    expect(rowIds(w)).toHaveLength(15);
   });
 });
 
@@ -459,7 +464,7 @@ it("keeps workspace tool approval in Ember Admin", async () => {
   const w = await mountView(ADMIN);
   expect(w.text()).not.toContain("Tool approval");
   expect(w.text()).not.toContain("Applies to all accounts");
-  expect(rowIds(w)).toHaveLength(13);
+  expect(rowIds(w)).toHaveLength(15);
 });
 
 it("reverts account drafts while retaining applied device preferences", async () => {
@@ -623,4 +628,12 @@ it("explains the local model call cost of the selected strategy", async () => {
   const w = await mountView();
   await row(w, "triage-strategy").get("select").setValue("typed-only");
   expect(row(w, "triage-strategy").text()).toContain("Costs 1 call");
+});
+
+
+it("finds response limits by their output keyword", async () => {
+  const w = await mountView();
+  await search(w).setValue("output");
+  expect(w.get('section[aria-label="Response limits"]').text()).toContain("Your account");
+  expect(w.find('[data-field="max_tool_rounds"]').exists()).toBe(true);
 });

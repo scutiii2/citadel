@@ -295,6 +295,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
   let videoPolls = 0;
   const videoBytes = Buffer.from('Mock video download fixture');
   const videoFile = { file_id: 'video-file', name: 'Coastal walk.mp4', kind: 'video', mime: 'video/mp4', size: videoBytes.length, duration: 125, expires_at: Date.now() / 1000 + 21600, download_url: '/api/media-downloader/files/video-file/download' };
+  let responseLimits = { max_output_tokens: null as number | null, max_tool_rounds: null as number | null };
   let loggedIn = false;
 
   // Opt-in media fixtures share routing across this test's browser context.
@@ -421,6 +422,11 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       }
       loggedIn = true;
       return json(route, account);
+    }
+    if (path === "/api/account/tuning") {
+      if (method === "PUT") responseLimits = request.postDataJSON();
+      if (method === "DELETE") { responseLimits = { max_output_tokens: null, max_tool_rounds: null }; return route.fulfill({ status: 204 }); }
+      return json(route, { limits: responseLimits, ceiling: { max_output_tokens: 2048, max_tool_rounds: 15 } });
     }
     if (path === "/api/account/triage-strategy" && ["GET", "PUT"].includes(method)) {
       if (method === "PUT") api.triageStrategy = request.postDataJSON().value;

@@ -16,6 +16,7 @@ import {
 } from "../chat/utils/approvalMode";
 import { CONTEXT_ACCURACY_OPTIONS, DEFAULT_CONTEXT_ACCURACY } from "../chat/utils/contextAccuracy";
 import { TOKEN_COSTS } from "../usage/utils/tokenCosts";
+import ResponseLimits from "./components/ResponseLimits.vue";
 import SidebarEditor from "./components/SidebarEditor.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import ToggleSwitch from "../../components/ui/forms/ToggleSwitch.vue";
@@ -34,7 +35,7 @@ import { filterSettings, type SearchableSetting } from "./utils/settingsSearch";
 
 interface SettingDef extends SearchableSetting {
   id: string;
-  group: "chat" | "context" | "appearance" | "sidebar" | "triage";
+  group: "chat" | "context" | "appearance" | "sidebar" | "limits" | "triage";
 }
 
 // Icon paths are on a 16px grid, stroke only. The scope chip says where a group's
@@ -62,6 +63,9 @@ const GROUPS = [
     note: "Applied when you save. Stored on your account.",
   },
   {
+    id: "limits", title: "Response limits", icon: "M2 4h12M2 8h8M2 12h5", scope: "Your account", note: "Applied when you save. Stored on your account.",
+  },
+  {
     id: "triage",
     title: "Triage Assistant",
     icon: "M8 2l5 2v4c0 3-2 5-5 6-3-1-5-3-5-6V4z",
@@ -72,6 +76,7 @@ const GROUPS = [
 const SEARCH_ICON = "M7 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10M11 11l3.5 3.5";
 
 const DEFS: SettingDef[] = [
+  { id: "response-limits", group: "limits", label: "Response limits", description: "Set lower limits for your answers.", keywords: ["tokens", "tool rounds", "length", "output"] },
   {
     id: "triage-strategy",
     group: "triage",
@@ -597,6 +602,9 @@ onMounted(() => {
 
         <div v-else-if="g.id === 'sidebar'" class="card">
           <SidebarEditor v-if="shown.has('sidebar-pages')" v-model="draft.sidebar" />
+        </div>
+        <div v-else-if="g.id === 'limits'" class="card">
+          <ResponseLimits v-if="shown.has('response-limits')" />
         </div>
         <div v-else-if="g.id === 'triage'" class="card">
           <SettingRow
