@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What Armory offers and what it shares</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #eb6c36;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+      letter-spacing: -0.02em; line-height: 1.15; color: var(--color-ink); margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · Catalog and shared mechanisms</p>
+    <h1>What Armory offers and what it shares</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="armory-catalog-title armory-catalog-desc">
+        <title id="armory-catalog-title">What Armory offers and what it shares</title>
+        <desc id="armory-catalog-desc">Sixteen capabilities in four groups, backed by four shared mechanisms for trust, background jobs, files and extensions.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+        </defs>
+        <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+        <rect x="40" y="56" width="880" height="264" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/><rect x="52" y="60" width="132" height="12" rx="2" fill="#f5f5f5"/><text x="118.0" y="69" fill="rgba(45,49,66,0.40)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">CAPABILITY CATALOG</text>
+        <rect x="40" y="344" width="880" height="176" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/><rect x="52" y="348" width="128" height="12" rx="2" fill="#f5f5f5"/><text x="116.0" y="357" fill="rgba(45,49,66,0.40)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">SHARED MECHANISMS</text>
+        <rect x="52" y="88" width="416" height="96" rx="6" fill="#f5f5f5"/>
+        <rect x="52" y="88" width="416" height="96" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="60" y="96" width="48" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="84.0" y="105" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">OPERATE</text>
+        <text x="64" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="start">Operate</text>
+        <text x="64" y="138" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">server_manager  start, stop, read logs of Docker apps; emails on crash</text>
+        <text x="64" y="150" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">email  send and reply; the one mail path, hidden audit log</text>
+        <text x="64" y="162" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">generator  passwords, PINs, TOTP codes; stores nothing</text>
+        <text x="64" y="174" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">tables  ask questions of an attached CSV or XLSX, 30 min</text>
+        <rect x="492" y="88" width="416" height="96" rx="6" fill="#f5f5f5"/>
+        <rect x="492" y="88" width="416" height="96" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="500" y="96" width="48" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="524.0" y="105" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">OUTSIDE</text>
+        <text x="504" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="start">Read the outside</text>
+        <text x="504" y="138" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">web_research  Tavily search and page read, text capped and fenced</text>
+        <text x="504" y="150" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">firecrawl  page, map, crawl; spends credits so never read-only</text>
+        <text x="504" y="162" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">vault  read-only search of the Obsidian vault folder</text>
+        <text x="504" y="174" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">repo_reader  read-only git log, diff, grep; secrets excluded</text>
+        <rect x="52" y="208" width="416" height="96" rx="6" fill="#f5f5f5"/>
+        <rect x="52" y="208" width="416" height="96" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="60" y="216" width="60" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="90.0" y="225" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">KNOWLEDGE</text>
+        <text x="64" y="244" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="start">Knowledge and agent support</text>
+        <text x="64" y="258" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">usage_report  token totals per agent, model and day</text>
+        <text x="64" y="270" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">obsidian  personal brains, hybrid search with Ollama</text>
+        <text x="64" y="282" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">skills  how-tos the assistant proposes; user must approve</text>
+        <text x="64" y="294" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">memory  short per-user facts, 500 chars, 200 per account</text>
+        <rect x="492" y="208" width="416" height="96" rx="6" fill="#f5f5f5"/>
+        <rect x="492" y="208" width="416" height="96" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="500" y="216" width="48" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="524.0" y="225" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ACCOUNT</text>
+        <text x="504" y="244" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="start">Account data and files</text>
+        <text x="504" y="258" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">notes  the user&#x27;s shared Notes via treasury; no delete</text>
+        <text x="504" y="270" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">tickets  SQLite store, optional Laya classifier</text>
+        <text x="504" y="282" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">pdf_merger  inspect and merge PDFs; signed links, about 6 h</text>
+        <text x="504" y="294" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">media_downloader  probe and download media; yt-dlp, gallery-dl</text>
+        <rect x="52" y="376" width="196" height="120" rx="6" fill="#f5f5f5"/>
+        <rect x="52" y="376" width="196" height="120" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+        <rect x="60" y="384" width="40" height="12" rx="2" fill="transparent" stroke="#eb6c36" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="80.0" y="393" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">TRUST</text>
+        <text x="64" y="424" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="start">Identity and trust</text>
+        <text x="64" y="438" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">requester from headers or _meta</text>
+        <text x="64" y="450" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">never a tool parameter</text>
+        <text x="64" y="462" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">data keyed on account uid</text>
+        <text x="64" y="474" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">remote bind needs a token</text>
+        <rect x="272" y="376" width="196" height="120" rx="6" fill="#f5f5f5"/>
+        <rect x="272" y="376" width="196" height="120" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="280" y="384" width="32" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="296.0" y="393" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">JOBS</text>
+        <text x="284" y="424" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="start">Job watcher</text>
+        <text x="284" y="438" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">thread with backoff and resume</text>
+        <text x="284" y="450" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">server watch: poll 30 s, 10 min</text>
+        <text x="284" y="462" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">then every 5 min; mail on crash</text>
+        <text x="284" y="474" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">error emails: at most 1 per hour</text>
+        <rect x="492" y="376" width="196" height="120" rx="6" fill="#f5f5f5"/>
+        <rect x="492" y="376" width="196" height="120" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="500" y="384" width="40" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="520.0" y="393" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FILES</text>
+        <text x="504" y="424" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="start">Files and downloads</text>
+        <text x="504" y="438" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">opaque id, 10 min, per account</text>
+        <text x="504" y="450" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">PDF, media: session file store</text>
+        <text x="504" y="462" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">signed links, about 6 h expiry</text>
+        <text x="504" y="474" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">file sweeper clears old files</text>
+        <rect x="712" y="376" width="196" height="120" rx="6" fill="#f5f5f5"/>
+        <rect x="712" y="376" width="196" height="120" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="720" y="384" width="40" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="740.0" y="393" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PROXY</text>
+        <text x="724" y="424" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="start">Extensions proxy</text>
+        <text x="724" y="438" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">MCP client: Bard, Scribe, URLs</text>
+        <text x="724" y="450" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">tools merged, names prefixed</text>
+        <text x="724" y="462" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">requester sent only if enabled</text>
+        <text x="724" y="474" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">connects at startup only</text>
+        <line x1="40" y1="540" x2="920" y2="540" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="40" y="556" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="110" y="548" width="14" height="10" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="130" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Component</text>
+        <rect x="195" y="548" width="14" height="10" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+        <text x="215" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Focal</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

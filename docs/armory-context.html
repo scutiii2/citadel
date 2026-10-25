@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How Armory connects to the Citadel services</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #eb6c36;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+      letter-spacing: -0.02em; line-height: 1.15; color: var(--color-ink); margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · System context</p>
+    <h1>How Armory connects to the Citadel services</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="armory-context-title armory-context-desc">
+        <title id="armory-context-title">How Armory connects to the Citadel services</title>
+        <desc id="armory-context-desc">ember_web and ember_admin go through ember_api, garrison speaks MCP directly, and Armory&#x27;s core calls treasury, extensions, Docker and outside APIs.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+        </defs>
+        <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+        <rect x="412" y="64" width="296" height="404" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/><rect x="424" y="68" width="108" height="12" rx="2" fill="#f5f5f5"/><text x="478.0" y="77" fill="rgba(45,49,66,0.40)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">ARMORY · :8010</text>
+        <path d="M 168,224 L 180.0,224.0 Q 188,224 188.0,232.0 L 188.0,232.0 Q 188,240 196.0,240.0 L 208,240" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 168,324 L 180.0,324.0 Q 188,324 188.0,316.0 L 188.0,272.0 Q 188,264 196.0,264.0 L 208,264" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 348,120 L 428,120" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <path d="M 348,234 L 364.0,234.0 Q 372,234 372.0,226.0 L 372.0,152.0 Q 372,144 380.0,144.0 L 428,144" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <path d="M 348,252 L 428,252" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 428,270 L 348,270" fill="none" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <path d="M 544,288 L 544,336" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 660,132 L 676.0,132.0 Q 684,132 684.0,140.0 L 684.0,344.0 Q 684,352 676.0,352.0 L 660,352" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 660,372 L 716.0,372.0 Q 724,372 724.0,364.0 L 724.0,244.0 Q 724,236 732.0,236.0 L 784,236" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 660,392 L 732.0,392.0 Q 740,392 740.0,384.0 L 740.0,332.0 Q 740,324 748.0,324.0 L 784,324" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 660,412 L 784,412" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 660,432 L 764.0,432.0 Q 772,432 772.0,440.0 L 772.0,492.0 Q 772,500 780.0,500.0 L 784,500" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="354.0" y="100" width="68" height="12" rx="2" fill="#f5f5f5"/><text x="388" y="109" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">MCP SESSION</text>
+        <rect x="382.0" y="232" width="44" height="12" rx="2" fill="#f5f5f5"/><text x="404" y="241" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ROUTES</text>
+        <rect x="366.0" y="278" width="44" height="12" rx="2" fill="#f5f5f5"/><text x="388" y="287" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">BRAINS</text>
+        <rect x="40" y="192" width="128" height="56" rx="6" fill="#f5f5f5"/>
+        <rect x="40" y="192" width="128" height="56" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+        <text x="104.0" y="212" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">ember_web</text>
+        <text x="104.0" y="226" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Vue 3 chat</text>
+        <text x="104.0" y="238" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">HTTPS + cookie</text>
+        <rect x="40" y="296" width="128" height="56" rx="6" fill="#f5f5f5"/>
+        <rect x="40" y="296" width="128" height="56" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+        <text x="104.0" y="316" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">ember_admin</text>
+        <text x="104.0" y="330" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">capabilities admin</text>
+        <text x="104.0" y="342" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">HTTPS + cookie</text>
+        <rect x="208" y="96" width="140" height="64" rx="6" fill="#f5f5f5"/>
+        <rect x="208" y="96" width="140" height="64" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+        <text x="278.0" y="120" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">garrison</text>
+        <text x="278.0" y="134" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">agent runtime :9111</text>
+        <text x="278.0" y="146" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">_meta.requester</text>
+        <rect x="208" y="216" width="140" height="72" rx="6" fill="#f5f5f5"/>
+        <rect x="208" y="216" width="140" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="278.0" y="244" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">ember_api</text>
+        <text x="278.0" y="258" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">gateway :8030</text>
+        <text x="278.0" y="270" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">owns brain links</text>
+        <rect x="428" y="96" width="232" height="72" rx="6" fill="#f5f5f5"/>
+        <rect x="428" y="96" width="232" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="544.0" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">MCP endpoint</text>
+        <text x="544.0" y="138" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">POST /mcp, streamable HTTP</text>
+        <text x="544.0" y="150" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">X-Internal-Token guard</text>
+        <rect x="428" y="216" width="232" height="72" rx="6" fill="#f5f5f5"/>
+        <rect x="428" y="216" width="232" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="544.0" y="244" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Plain HTTP routes</text>
+        <text x="544.0" y="258" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">capabilities, extensions, uploads</text>
+        <text x="544.0" y="270" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">downloads, tickets, memory</text>
+        <rect x="428" y="336" width="232" height="112" rx="6" fill="#f5f5f5"/>
+        <rect x="428" y="336" width="232" height="112" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+        <text x="544.0" y="378" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Capabilities and shared services</text>
+        <text x="544.0" y="392" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">16 features, one folder each</text>
+        <text x="544.0" y="404" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">identity, jobs, files, email</text>
+        <text x="544.0" y="416" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">loaded live, no restart</text>
+        <rect x="784" y="204" width="136" height="64" rx="6" fill="#f5f5f5"/>
+        <rect x="784" y="204" width="136" height="64" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="852.0" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">treasury</text>
+        <text x="852.0" y="242" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">DB gateway :8071</text>
+        <text x="852.0" y="254" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Notes in ember.db</text>
+        <rect x="784" y="292" width="136" height="64" rx="6" fill="#f5f5f5"/>
+        <rect x="784" y="292" width="136" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+        <text x="852.0" y="316" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Extensions</text>
+        <text x="852.0" y="330" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Bard :8090, Scribe :8091</text>
+        <text x="852.0" y="342" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">any MCP by URL</text>
+        <rect x="784" y="380" width="136" height="64" rx="6" fill="#f5f5f5"/>
+        <rect x="784" y="380" width="136" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+        <text x="852.0" y="404" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Docker host</text>
+        <text x="852.0" y="418" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">start, stop, logs</text>
+        <text x="852.0" y="430" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">of managed apps</text>
+        <rect x="784" y="468" width="136" height="64" rx="6" fill="#f5f5f5"/>
+        <rect x="784" y="468" width="136" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+        <text x="852.0" y="492" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Outside APIs</text>
+        <text x="852.0" y="506" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Tavily, Firecrawl, SMTP</text>
+        <text x="852.0" y="518" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">SSH, Obsidian, files</text>
+        <line x1="40" y1="540" x2="920" y2="540" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="40" y="556" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="110" y="548" width="14" height="10" rx="2" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+        <text x="130" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Caller</text>
+        <rect x="180" y="548" width="14" height="10" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="200" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Component</text>
+        <rect x="265" y="548" width="14" height="10" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+        <text x="285" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Focal</text>
+        <rect x="330" y="548" width="14" height="10" rx="2" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="350" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Store / state</text>
+        <rect x="435" y="548" width="14" height="10" rx="2" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+        <text x="455" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Outside system</text>
+        <line x1="545" y1="553" x2="569" y2="553" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <text x="577" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">MCP call</text>
+        <line x1="637" y1="553" x2="661" y2="553" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <text x="669" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Lookup back</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>
