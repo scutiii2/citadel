@@ -43,7 +43,7 @@ top level is a **closed whitelist** - nothing else is allowed there:
   hand-maintained, committed vs. gitignored). Every capability has at
   least one dot-folder or a `static/` folder today, so this file is
   mandatory, not optional.
-- **`__init__.py`** - registers `META` (step 7 below).
+- **`__init__.py`** - declares a `Capability` subclass and exposes `CAPABILITY` (step 7 below).
 - **`utils/`** - any other `.py` file this capability needs (its own
   `__init__.py` too). Nothing non-Python belongs here, except its own
   `README.md`.
@@ -313,27 +313,39 @@ adding or removing a declaration means changing that test too.
    install (`<id>` is the short id from step 7 below, not necessarily the
    folder name).
 
-7. In `capabilities/<name>/__init__.py`, register this capability's
-   chat-facing slash id and display label - **once, here, and nowhere
-   else**:
+7. In `capabilities/<name>/__init__.py`, subclass `Capability`
+   (`services/capability_base.py`) to declare this capability's chat-facing
+   slash id and display label - **once, here, and nowhere else**:
 
    ```python
-   from src.services import capability_meta
+   from src.services.capability_base import Capability
 
-   META = capability_meta.register(folder="<name>", id="<id>", label="<Display Label>")
+
+   class MyThing(Capability):
+       id = "<id>"
+       label = "<Display Label>"
+
+
+   CAPABILITY = MyThing()
    ```
+
+   The folder is inferred from the module path. Optional: set
+   `process_lifetime_modules` (see below), and override
+   `install_routes(app)` to mount always-on HTTP routes (they stay up while
+   the tools are off; the loader mounts them once at startup, so a new
+   folder's routes need a restart).
 
    `<id>` is what chat users type as `/<id> ...` and what
    `PATCH /capabilities/{id}` toggles - pick something shorter than the
    folder name if the folder name is unwieldy (e.g. `id="server"` for
    `server_manager`), or equal to it if not. See
-   `services/capability_meta.py`'s docstring for exactly who reads `META`
+   `services/capability_meta.py`'s docstring for exactly who reads this
    next: the loader (`services/capability_loader.py`), every `@command` in this capability's
    `tool.py` (no `capability=` argument needed on any of them - they
    infer it from here automatically), and ember_admin's Capabilities page,
    via `GET /capabilities`'s `label`/`tools` fields.
 
-8. Create the folder with its `__init__.py` (`META`) and `tool.py`. Press
+8. Create the folder with its `__init__.py` (`CAPABILITY`) and `tool.py`. Press
    Refresh on the Capabilities page of ember_admin (or
    `POST /capabilities/refresh`): the capability appears offline. Switch it
    online to load it. After editing its code, switch it offline and online
@@ -345,7 +357,7 @@ adding or removing a declaration means changing that test too.
    `services/capability_loader.py` does the work: it lists the folders,
    imports `tool.py` inside `capability_registry.capturing()` so the
    capability can be switched off later, and on every online it removes the
-   old tools, `@command` entries and `META`, deletes the folder's cached
+   old tools, `@command` entries and identity, deletes the folder's cached
    bytecode and imports it fresh. An import that raises leaves the
    capability offline and keeps the error as `load_error`. See
    `capability_routes.py` for the HTTP side.
@@ -363,7 +375,7 @@ the first time one needs to.
 ## Process-lifetime engine modules
 
 A capability whose engine owns process-wide library patches or live background
-work can declare `PROCESS_LIFETIME_MODULES = ("utils",)` in its package. The
+work can set `process_lifetime_modules = ("utils",)` on its `Capability` subclass. The
 loader preserves these direct child packages and their descendants when it
 reloads wrappers, then attaches them to the fresh parent package. Changes to
 retained modules require a server restart. All other capabilities keep the

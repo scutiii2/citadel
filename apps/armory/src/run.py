@@ -54,8 +54,6 @@ async def _serve() -> None:
         from src.capability_routes import install_capability_routes
         from src.command_routes import install_command_routes
         from src.download_routes import install_download_routes
-        from src.capabilities.memory.routes import install_memory_routes
-        from src.capabilities.tickets.routes import install_ticket_routes
         from src.extension_routes import install_extension_routes
         from src.help_routes import install_help_routes
         from src.upload_routes import install_upload_routes
@@ -114,15 +112,8 @@ async def _serve() -> None:
         # Where a caller fetches a file a tool offered it (via ember_api); a plain route checked against
         # the internal token and the requester. See download_routes.py.
         install_download_routes(app)
-        # Deletes an account's memory notes when ember_api deletes the account. See capabilities/memory/routes.py.
-        install_memory_routes(app)
-        # The user's side of learned skills: approve, retire, delete, purge. See capabilities/skills/routes.py.
-        from src.capabilities.skills.routes import install_skill_routes
-        install_skill_routes(app)
-        from src.capabilities.obsidian.routes import install_brain_routes
-        install_brain_routes(app)
-        # Support tickets are always available to ember_api, even when chat tools are off.
-        install_ticket_routes(app)
+        # Each capability mounts its own always-on routes (memory, skills, obsidian, tickets), even when its tools are off.
+        capability_loader.install_routes(app)
 
         # uvicorn.Server(...).serve(), not uvicorn.run(): run() calls asyncio.run() and would
         # nest a second event loop inside this one.

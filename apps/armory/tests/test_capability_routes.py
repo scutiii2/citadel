@@ -223,8 +223,9 @@ def test_patch_by_the_old_folder_name_replies_under_the_new_id(tmp_path, monkeyp
         install_capability_routes(app, loader)
         with TestClient(app) as test_client:
             (folder / "__init__.py").write_text(
-                "from src.services import capability_meta\n"
-                'META = capability_meta.register(folder="widgets", id="wid", label="Widgets")\n'
+                "from src.services.capability_base import Capability\n\n"
+                'class Widgets(Capability):\n    id = "wid"\n    label = "Widgets"\n\n'
+                "CAPABILITY = Widgets()\n"
             )
             (folder / "tool.py").write_text(
                 "from src.server import mcp\n\n@mcp.tool()\ndef tool_wid_run() -> str:\n    return 'v1'\n"

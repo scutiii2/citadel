@@ -1,6 +1,12 @@
 """Server manager: start, stop, restart and list the Docker containers on
 this host."""
 
-from src.services import capability_meta
+from src.services.capability_base import Capability
 
-META = capability_meta.register(folder="server_manager", id="server", label="Server Manager")
+
+class ServerManager(Capability):
+    id = "server"
+    label = "Server Manager"
+
+
+CAPABILITY = ServerManager()

@@ -1,6 +1,12 @@
 """Generator: random passwords, passphrases, PINs and one-time codes, plus
 TOTP secrets and the current TOTP code for a secret."""
 
-from src.services import capability_meta
+from src.services.capability_base import Capability
 
-META = capability_meta.register(folder="generator", id="gen", label="Generator")
+
+class Generator(Capability):
+    id = "gen"
+    label = "Generator"
+
+
+CAPABILITY = Generator()
