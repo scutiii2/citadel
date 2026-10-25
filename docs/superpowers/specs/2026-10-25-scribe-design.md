@@ -1,7 +1,7 @@
 # Scribe (speech to text) — design
 
 Date: 2026-10-25
-Status: design approved in chat, awaiting written-spec review
+Status: implemented; dictation HTTP and composer extension added 2026-10-26
 
 ## Goal
 
@@ -16,10 +16,11 @@ In scope:
 - One MCP tool, `tool_scribe_transcribe`.
 - Per-account audio uploads with a time-to-live and a quota; a transcript cache.
 - An ember_api upload route and an ember_web attachment path for audio files.
+- Microphone dictation into Ember's editable chat draft, through the same Scribe service.
 - Registration as an Armory extension.
 
 Out of scope (can be added later without changing this design):
-- Microphone dictation in the chat box, streaming and WebSocket input.
+- Streaming and WebSocket input.
 - Speaker labels, translation, other languages, other engines (the engine sits behind an interface).
 - A transcript download link or a standalone Scribe web page.
 - A Scribe audit log, admin-managed models (Bard's voice download and delete).
@@ -135,6 +136,16 @@ Per `AGENTS.md`: no reduced-motion setting, media query or test.
 
 ## Testing
 
+### Dictation extension (2026-10-26)
+
+`POST /api/transcribe` accepts raw audio with the same identity headers, internal-token middleware and error mapping as `/api/files`. It calls `ScribeService.upload`, then `transcribe(owner, file_id, False)`, and returns `{text, duration_s}`. Cache, quota, semaphore, 25 MB service limit and 150 s duration limit stay in force. Invalid audio is 400, byte/quota excess 413, missing identity/token 401 and engine failure 503.
+
+Ember's `POST /api/attachments/dictate` uses `AudioIn`, the same suffix/base64/20 MB checks as `/audio`, and `files.upload`. `ScribeGateway.transcribe` supplies the signed-in identity and internal token. The route logs `attachments.dictate` with byte count only and returns `{text, duration_s}`. Audio rejection and quota remain 400/413; connection, service and internal-auth failures become 502.
+
+`attachmentsClient.dictate(blob, signal?)` sends WebM as base64 JSON. `features/chat/composables/useDictation.ts` owns the recorder, microphone tracks, 150 s auto-stop timer and abort controller. States are idle, recording, transcribing and error. A second click stops recording. `ChatInput.vue` appends the transcript through its existing draft insertion helper; it does not send it. The microphone appears beside Attach with `files.upload` and WebM MediaRecorder support, pulses while recording and displays status and inline permission/service errors. Cancellation, account/chat changes, deactivation and disposal stop tracks and suppress late responses.
+
+Tests cover the HTTP route/cache/errors, Ember proxy permissions/validation/audit, client limits and recorder lifecycle. Chrome speech tests capture WebM and verify editable draft insertion at desktop, 768 and 375 widths with a fake API; live model accuracy is a separate service check.
+
 - Scribe unit tests with a fake engine: config, store (hit, miss, expiry, quota, id validation, owner isolation), service (cache, concurrency, errors, duration cap), HTTP route and middleware.
 - Engine tests that need ffmpeg or the real model skip when those are missing.
 - One MCP handshake test against a real uvicorn server on a free port: upload a short wav over HTTP, list tools, call `tool_scribe_transcribe` with `_meta.requester`.
@@ -147,6 +158,6 @@ Per `AGENTS.md`: no reduced-motion setting, media query or test.
 - faster-whisper 1.2.1 installs and runs on Python 3.14 on this Windows machine (real transcription verified end to end).
 - asyncio subprocesses need the Proactor event loop on Windows. uvicorn's default loop works; `--reload` would not.
 - `base.en` is downloaded on first use (about 150 MB), not committed. Pre-download it in the Docker build or a `scripts` step so the first request does not stall; check the model licence before redistribution.
-- Speed is unmeasured (see Concurrency and limits). If CPU is too slow, options are `base.en`, a lower duration cap, or a GPU host; the engine interface allows each.
+- Concurrency defaults use the measurements above. A live WebM dictation browser check passed on 2026-10-26 using cached `base.en`, an isolated HTTP server and generated microphone speech. Physical microphone accuracy remains a device check.
 - Stale `pdf_merger` and `media_downloader` entries remain in `config_extensions.json.example`. Not changed here.
 - Uploads hold user audio for 24 hours on the Scribe machine; the docs must say so.

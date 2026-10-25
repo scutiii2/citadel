@@ -303,6 +303,19 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
+    // Vite serves source modules under /src/api; only intercept actual API calls.
+    if (!path.startsWith("/api/")) return route.continue();
+    if (path === "/api/attachments/dictate" && request.method() === "POST") {
+      return json(route, { text: "Dictated words ready to edit.", duration_s: 1 });
+    }
+    if (path === "/api/bard/voices" && request.method() === "GET") return json(route, { voices: ["test-voice", "another-voice"] });
+    if (path === "/api/bard/speak" && request.method() === "POST") {
+      const body = request.postDataJSON() as { text: string; voice: string };
+      return json(route, { file_id: "a".repeat(32), voice: body.voice, duration_s: 0.4 });
+    }
+    if (/^\/api\/bard\/audio\/[0-9a-f]{32}$/.test(path)) {
+      return route.fulfill({ status: 200, contentType: "audio/wav", body: sampleSpeechAudio() });
+    }
     const attachmentContent = path.match(/^\/api\/attachments\/files\/([A-Za-z0-9_-]+)\/content$/);
     if (attachmentContent && request.method() === 'GET') {
       const found = pdfs.get(attachmentContent[1]!);
@@ -955,6 +968,18 @@ async function mcpAgent(route: Route) {
 }
 
 /** Small valid PDF with byte-accurate xref offsets, used for real PDF.js worker previews. */
+/** Short PCM audio so Chrome exercises real media events in speech tests. */
+export function sampleSpeechAudio(): Buffer {
+  const samples = 6400;
+  const wav = Buffer.alloc(44 + samples * 2);
+  wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write("WAVEfmt ", 8);
+  wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(16000, 24); wav.writeUInt32LE(32000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+  wav.write("data", 36); wav.writeUInt32LE(samples * 2, 40);
+  for (let i = 0; i < samples; i++) wav.writeInt16LE(Math.round(1000 * Math.sin(i * 2 * Math.PI * 440 / 16000)), 44 + i * 2);
+  return wav;
+}
+
 export function samplePdf(label: string, pageCount = 1): Buffer {
   const kids = Array.from({ length: pageCount }, (_, i) => `${4 + i * 2} 0 R`).join(' ');
   const objects = [

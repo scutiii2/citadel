@@ -1,7 +1,7 @@
 # Bard (text to speech) — design
 
 Date: 2026-10-25
-Status: design approved in chat, awaiting written-spec review
+Status: implemented; browser read-aloud extension added 2026-10-26
 
 ## Goal
 
@@ -16,6 +16,7 @@ In scope:
 - Per-account audio files with a cache, a time-to-live and a quota.
 - An ember_api route that streams a stored audio file to the browser.
 - An in-chat audio player with a download link in ember_web.
+- Read aloud from assistant action rows with explicit per-run voice selection and pipelined sentence batches.
 - Registration as an Armory extension.
 
 Out of scope (decided, can be added later without changing this design):
@@ -128,6 +129,18 @@ Per `AGENTS.md`: no reduced-motion setting, media query or test.
 
 ## Testing
 
+### Read-aloud extension (2026-10-26)
+
+`POST /api/speak` accepts JSON `{text, voice?}` and calls `BardService.speak`, preserving cleaned-text validation (default maximum 5,000 characters), cache, owner isolation, quota and semaphore. It returns `{file_id, duration_s, voice}`. `GET /api/voices` returns `{voices: string[]}` containing only installed voices and no default. Both routes use the file route's requester header and internal-token checks. Malformed input, rejected text and unavailable voice return 400, quota 413 and synthesis failure 503.
+
+Ember proxies these through `POST /api/bard/speak` and `GET /api/bard/voices` in `routes/bard.py`, with the same `tools.execute` and `files.download` permission pair as `/audio`. `BardGateway` forwards identity/token server-side. Speak logs `bard.speak` with the generated file ID, never the spoken text. Invalid text/voice and quota remain 400/413; upstream connection, internal-auth and service failures become 502.
+
+`utils/content/speechBatches.ts` parses Markdown into plain prose, skips code fences/blocks and HTML blocks, keeps common English abbreviations together, and groups sentences up to 3,500 characters. Oversized sentences split at whitespace; oversized words split at the cap. Empty/code-only messages have no batches.
+
+`ReadAloudButton.vue` lives in assistant action rows and uses the existing `PopupMenu`. Every run fetches installed voices and requires a new explicit choice; no voice is remembered or preselected. Every batch carries that choice. `useReadAloud.ts` requests the first batch, starts hidden same-origin audio playback when ready and synthesizes at most one batch ahead. No additional transcript card is inserted. Busy and stop states stay on the button; stop aborts pending fetches and audio playback. Scope/account changes, deactivation and disposal cancel the run, and late responses cannot restart it. Starting another read-aloud run stops the previous one. Existing agent-generated `BardAudio` cards and MCP tools remain available.
+
+Vitest covers the client, batching, queue and voice button, including oversized sentences, abbreviations, empty text, failed prefetch, stop and late replies. Chrome tests use playable PCM fixtures to verify three ordered clips, fixed voice, stop and the menu reopening; real Piper synthesis is a separate service check.
+
 - Bard unit tests with a fake engine: text preparation, configuration, store (hit, miss, expiry, quota, id validation, owner isolation), service (cache, concurrency, errors), HTTP routes and middleware.
 - Engine tests that need ffmpeg or a real Piper voice skip when those are missing.
 - One MCP handshake test against a real uvicorn server on a free port: list tools, call `tool_bard_speak` with `_meta.requester`, fetch the file over HTTP.
@@ -137,7 +150,7 @@ Per `AGENTS.md`: no reduced-motion setting, media query or test.
 
 ## Risks and open points
 
-- Piper and ffmpeg on this Windows machine: `piper-tts==1.8.0` installs and imports on Python 3.14 here, and ffmpeg is on PATH; a real synthesis has not been run yet (plan Task 1 does it first).
+- Piper and ffmpeg on this Windows machine: real synthesis and three-batch browser playback passed on 2026-10-26 using the installed `en_US-lessac-medium` voice, isolated HTTP servers and the Vite dev server. Browser playback was accelerated to 16x for this check.
 - asyncio subprocesses need the Proactor event loop on Windows. uvicorn's default loop works; `--reload` would not.
 - Range support relies on Starlette's `FileResponse`; a test pins it.
 - Stale `pdf_merger` and `media_downloader` entries remain in `config_extensions.json.example`. Not changed here.
