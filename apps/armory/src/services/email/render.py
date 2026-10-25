@@ -1,10 +1,5 @@
-"""Renders the body templates in ``templates/`` for ``send_email()``.
-
-Templates are plain ``string.Template`` files so a message's wording can be
-changed without touching Python. Values are HTML-escaped by default, since
-they usually carry names or text a user typed; a name ending in ``_html``
-opts out for markup the caller built itself.
-"""
+"""Renders the body templates in ``templates/`` for ``send_email()`` (plain ``string.Template`` files).
+Values are HTML-escaped by default; a name ending in ``_html`` opts out."""
 
 from __future__ import annotations
 
@@ -25,10 +20,7 @@ def available_templates() -> list[str]:
 
 def render_email_template(name: str, **values: str) -> str:
     """Fill ``templates/<name>.html`` and return the HTML body.
-
-    Raises ``ValueError`` for an unknown template (or a name that tries to
-    leave the folder) and ``KeyError`` for a placeholder with no value.
-    """
+    Raises ``ValueError`` for an unknown template or one leaving the folder, ``KeyError`` for a missing placeholder."""
     if name not in available_templates():
         raise ValueError(f"Unknown email template {name!r}; expected one of {available_templates()}.")
     source = (TEMPLATE_DIR / f"{name}.html").read_text(encoding="utf-8")

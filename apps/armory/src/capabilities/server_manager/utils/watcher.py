@@ -1,9 +1,5 @@
-"""Shared background-polling watcher base class.
-
-Owns threading, backoff-schedule polling, state persistence, and
-startup resume. What "poll" and "job finished" mean is entirely
-subclass-owned - one subclass per capability.
-"""
+"""Shared background-polling watcher base class: threading, backoff polling, state persistence, startup resume.
+What "poll" and "job finished" mean is subclass-owned."""
 
 from __future__ import annotations
 
@@ -54,15 +50,12 @@ class JobWatcher(ABC):
 
     @abstractmethod
     def poll(self) -> tuple[WatcherPhase, dict[str, Any]]:
-        """Call this job's status check. Return the new phase and a detail
-        dict to persist. Raise on transient error - run() catches it,
-        logs, and retries on the next tick rather than crashing the
-        thread."""
+        """Check this job's status; return the new phase and a detail dict to persist.
+        Raise on transient error; run() logs it and retries next tick."""
 
     def on_completed(self, detail: dict[str, Any]) -> None:
-        """Called once, when phase transitions into COMPLETED. Default:
-        no-op. May mutate `detail` in place to add fields (e.g. a
-        downloaded file's path) before it's persisted."""
+        """Called once when phase becomes COMPLETED; default no-op.
+        May mutate `detail` in place before it is persisted."""
 
     def on_state_change(
         self, old: WatcherPhase, new: WatcherPhase, detail: dict[str, Any]
@@ -106,9 +99,8 @@ class JobWatcher(ABC):
         return None
 
     def run(self) -> None:
-        """Thread target: backoff loop, state persistence, terminal
-        handling. Safe to call directly (synchronously) in tests when
-        `poll()` is finite/deterministic."""
+        """Thread target: backoff loop, state persistence, terminal handling.
+        Safe to call synchronously in tests when `poll()` is finite."""
         start = datetime.fromisoformat(self._started_at)
         phase = WatcherPhase.RUNNING
         detail: dict[str, Any] = {}
@@ -195,10 +187,8 @@ class JobWatcher(ABC):
 
     @classmethod
     def resume_all(cls, state_dir: Path) -> list["JobWatcher"]:
-        """Reload every persisted RUNNING record for this subclass and
-        restart it. A record that fails to read/reconstruct is logged
-        and skipped, not fatal - matches the existing
-        degrade-to-empty behavior for a corrupt state file."""
+        """Reload every persisted RUNNING record for this subclass and restart it.
+        A record that fails to read is logged and skipped, not fatal."""
         started: list[JobWatcher] = []
         watcher_dir = state_dir / cls.__name__ / "instances"
         if not watcher_dir.is_dir():

@@ -1,9 +1,5 @@
-"""Every failure a caller can see, as a code plus a plain-language message.
-
-Routers turn DownloaderError into an HTTP error body; MCP tools turn it into a
-ToolError. Anything else that escapes is logged and reported as
-internal_error, so raw exception text never reaches a caller.
-"""
+"""Every caller-visible failure as a code plus a plain message.
+Anything else is logged and reported as internal_error, so raw exception text never leaks."""
 
 from __future__ import annotations
 

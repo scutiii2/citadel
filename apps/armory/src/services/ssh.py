@@ -1,22 +1,5 @@
-"""One SSH client for the whole server.
-
-Every capability that needs a remote shell goes through this module, so
-connection handling, auth-fallback order, host-key verification, and
-timeout behavior are identical everywhere and tested once. Resist adding
-a second paramiko-connecting code path elsewhere - that's how you end up
-with three implementations that each retry slightly differently and only
-two of which check host keys.
-
-**Host keys are verified.** Unknown ones are rejected, against
-``settings.ssh_known_hosts`` (your normal ``~/.ssh/known_hosts`` by
-default, so hosts you've already reached from this machine just work).
-The reason this matters isn't really first-contact interception, it's the
-second connection onward: with verification off, a host key that
-*changed* - the actual signal that something is wrong - is accepted in
-silence. Set ``SSH_HOST_KEY_POLICY=auto`` to trust-on-first-use instead;
-it records what it accepts, so a lab machine can be enrolled that way and
-then switched back to rejecting.
-"""
+"""One SSH client for the whole server, so connection handling, auth fallback, host-key verification and timeouts are identical everywhere.
+Host keys are verified against ``settings.ssh_known_hosts``; unknown ones are rejected. Set ``SSH_HOST_KEY_POLICY=auto`` for trust-on-first-use."""
 
 from __future__ import annotations
 
@@ -35,11 +18,7 @@ def _new_client(
     known_hosts: Path | str | None = None,
     host_key_policy: str | None = None,
 ) -> paramiko.SSHClient:
-    """A paramiko client with host-key verification already set up.
-
-    Every connect path in this module goes through here - the point is
-    that there's nowhere left to accidentally omit the policy.
-    """
+    """A paramiko client with host-key verification already set up; every connect path goes through here."""
     policy_name = (host_key_policy or settings.ssh_host_key_policy).strip().lower()
     if policy_name not in {"reject", "auto"}:
         raise ValueError(
@@ -50,9 +29,7 @@ def _new_client(
     client = paramiko.SSHClient()
 
     if policy_name == "auto" and not path.exists():
-        # Create it so paramiko has somewhere to persist what it accepts -
-        # load_host_keys() is what tells the client which file to write
-        # back to, and it raises if the file is missing.
+        # Create it so paramiko can persist accepted keys; load_host_keys() raises if the file is missing.
         path.parent.mkdir(parents=True, exist_ok=True)
         path.touch()
     if path.exists():
@@ -77,11 +54,7 @@ class SSHCommandResult:
 
 class SSHClient:
     """Context-manager SSH connection with key-then-password auth fallback.
-
-    Usage:
-        with SSHClient(host, user, key=key_path, password=password) as ssh:
-            result = ssh.run("systemctl status nginx")
-    """
+    Usage: ``with SSHClient(host, user, key=key_path, password=password) as ssh: ssh.run("...")``."""
 
     def __init__(
         self,
@@ -148,10 +121,8 @@ class SSHClient:
             except Exception as error:  # noqa: BLE001
                 last_error = error
 
-        # Deliberately not just "auth failed": with host-key verification
-        # on, the most likely first-run failure is an unknown host key,
-        # and calling that an auth problem sends you off checking
-        # passwords for no reason.
+        # Not just "auth failed": with host-key verification on, the likely first-run failure is an unknown host key,
+        # and calling it an auth problem sends you checking passwords for nothing.
         hint = ""
         if isinstance(last_error, paramiko.SSHException) and "known_hosts" in str(last_error):
             hint = (
@@ -173,26 +144,8 @@ class SSHClient:
         return SSHCommandResult(stdout=out, stderr=err, exit_status=code)
 
     def run_login_shell(self, command: str, shell: str = "bash") -> SSHCommandResult:
-        """Run a command through an actual login shell, not a bare
-        exec_command(). A raw exec_command() doesn't source any profile,
-        so an unqualified command fails with "command not found" whenever
-        the target binary is only on PATH because the user's shell rc
-        file put it there - common for service accounts that ship their
-        own environment setup.
-
-        ``shell`` picks which login shell to wrap with, since that isn't
-        guessable from the username: pass "csh" for accounts whose
-        environment lives in .cshrc, "bash" (the default) otherwise.
-        Domain code knows which kind of account it's connecting as; this
-        method deliberately doesn't try to infer it.
-
-        ``command`` is shell-quoted before being embedded. The previous
-        version interpolated it into a double-quoted string, where
-        ``$(...)``, backticks, ``\\`` and ``"`` all escape the wrapper and
-        run as separate commands. That is reachable input, not theoretical:
-        tool arguments here originate from an LLM, which may be
-        summarizing a log file or a web page an attacker controls. Quoting
-        makes the whole string one argument no matter what's in it."""
+        """Run a command through an actual login shell, since a bare exec_command() sources no profile and may not find binaries on PATH.
+        ``shell`` picks the wrapper ("bash" default, "csh" for .cshrc accounts). ``command`` is shell-quoted because tool arguments originate from an LLM and may come from attacker-controlled text."""
         quoted = shlex.quote(command)
         if shell == "csh":
             wrapped = f"/bin/csh -c {quoted}"
@@ -219,22 +172,8 @@ def run_command(
     command: str,
     timeout: int = 30,
 ) -> tuple[bool, str, str]:
-    """Bare exec_command (no login-shell wrapping), returning
-    (connected, stdout, stderr) - a one-shot convenience wrapper for
-    domain code that doesn't need to hold a connection open.
-
-    "connected" reflects whether the SSH connection and command execution
-    completed without raising. It does NOT check the remote command's own
-    exit code, so a command that ran but printed only to stderr still
-    reports connected=True with the text in stderr rather than stdout. Use
-    ``SSHClient`` directly if you need the exit status.
-
-    Distinct from ``SSHClient.run_login_shell()``, which wraps the command
-    in an actual login shell. Prefer this one by default - it's cheaper
-    and quotes nothing - and switch to ``run_login_shell()`` at the
-    specific call site where a command turns out to need the profile
-    sourced to be found on PATH.
-    """
+    """Bare exec_command (no login shell), returning (connected, stdout, stderr).
+    "connected" means the connection and execution completed, not that the command exited 0; use ``SSHClient`` for the exit status or ``run_login_shell()`` if the profile is needed for PATH."""
     try:
         with SSHClient(host, user, key=key, password=password, command_timeout=timeout) as ssh:
             result = ssh.run(command)
@@ -244,16 +183,8 @@ def run_command(
 
 
 def sftp_upload_dir(host: str, user: str, password: str, local_dir: str, remote_dir: str) -> int:
-    """Recursively upload local_dir's contents into remote_dir over SFTP,
-    password auth. Returns the number of files uploaded.
-
-    Opens its own one-off connection rather than reusing ``SSHClient``,
-    which is exec-focused and never opens an SFTP channel. Note this
-    means the local machine running the MCP server needs the files
-    already staged on its own filesystem - a capability built on this is
-    tied to wherever this process runs, unlike one that only needs
-    network reach to the remote host.
-    """
+    """Recursively upload local_dir's contents into remote_dir over SFTP with password auth; returns the file count.
+    Opens its own connection (``SSHClient`` has no SFTP channel), so files must already be staged on this machine."""
     import os
 
     client = _new_client()
@@ -287,11 +218,8 @@ def sftp_upload_dir(host: str, user: str, password: str, local_dir: str, remote_
 
 
 def sftp_write_file(host: str, user: str, key: str | None, password: str | None, remote_path: str, content: str) -> None:
-    """Write a single small text file to the remote host over SFTP -
-    useful for staging a generated script before running it with
-    ``SSHClient.run()``. Distinct from ``sftp_upload_dir`` above (which
-    recursively uploads a whole local directory): this writes one string
-    to one remote path, with no local file involved at all."""
+    """Write a single small text file to the remote host over SFTP, e.g. to stage a script before ``SSHClient.run()``.
+    Unlike ``sftp_upload_dir``, it writes one string to one remote path."""
     client = _new_client()
     try:
         if key:

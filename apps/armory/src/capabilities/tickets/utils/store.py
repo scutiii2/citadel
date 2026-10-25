@@ -1,11 +1,5 @@
-"""SQLite storage for support tickets, ticket groups and comments.
-
-Every method is synchronous and opens its own short connection; callers on the
-event loop reach it through asyncio.to_thread. Reading never creates the
-database file. Ticket text is never logged. The only rules enforced here are the
-atomic ones that need one transaction: automatic-report dedupe and cap, and
-reporter reopening with its system comment.
-"""
+"""SQLite storage for support tickets, groups and comments; synchronous, one short connection per call.
+Enforces only the atomic rules (automatic-report dedupe and cap, reporter reopening); text is never logged."""
 
 from __future__ import annotations
 
@@ -185,9 +179,8 @@ class TicketStore:
             return cursor.rowcount == 1
 
     def reopen_own(self, ticket_id: int, owner: str, now: str) -> bool | None:
-        """Reopen and record the event together. None hides missing/foreign tickets;
-        False means the owner's ticket is already active. Caller roles cannot
-        create this system comment through the ordinary comment service."""
+        """Reopen and record the event together. None hides missing/foreign tickets; False means already active.
+        Callers cannot create this system comment through the ordinary comment service."""
         if not self._path.exists():
             return None
         with closing(self._connect()) as db, db:

@@ -1,8 +1,5 @@
-"""Process-owned queue and file store, deliberately outside the reloadable capability.
-
-All mutable state belongs to one background event loop. Offloaded tool threads
-submit short operations; yt-dlp itself runs in asyncio's worker executor.
-"""
+"""Process-owned queue and file store, outside the reloadable capability.
+All mutable state belongs to one background event loop."""
 from __future__ import annotations
 
 import asyncio

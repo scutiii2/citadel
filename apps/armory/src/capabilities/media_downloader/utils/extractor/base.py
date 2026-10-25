@@ -26,9 +26,5 @@ class Extractor(Protocol):
         on_progress: Callable[[DownloadProgress], None],
         cancel: threading.Event,
     ) -> DownloadedFile:
-        """Download into ``work_dir`` and return the finished file. Blocking: call through asyncio.to_thread.
-
-        The download extracts the page again, so live streams and media longer than
-        ``max_duration_seconds`` (None = no limit) are refused on that extraction too.
-        Raises DownloaderError (cancelled, too_large, too_long, live_stream, ...). Stops soon after ``cancel`` is set.
-        """
+        """Download into ``work_dir`` and return the finished file. Blocking: call via asyncio.to_thread.
+        Raises DownloaderError (cancelled, too_large, too_long, live_stream, ...); stops soon after ``cancel`` is set."""

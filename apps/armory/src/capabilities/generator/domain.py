@@ -1,11 +1,5 @@
-"""Password, passphrase, PIN and TOTP generation.
-
-Generation is pure standard library (`secrets`, `hmac`, `hashlib`). All
-randomness comes from `secrets` (the OS CSPRNG), never `random`. Nothing
-generated is stored or logged; callers get it back once, or - when
-`email_to` is given - it goes to that inbox through the email delivery
-service and is left out of the result, so it never reaches the caller.
-"""
+"""Password, passphrase, PIN and TOTP generation from `secrets` (OS CSPRNG), never `random`.
+Nothing is stored or logged; with `email_to` the value is emailed and left out of the result."""
 
 from __future__ import annotations
 

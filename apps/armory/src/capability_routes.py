@@ -1,56 +1,5 @@
-"""HTTP endpoints for built-in capabilities: status, live enable/disable, refresh.
-
-Mounted onto the Starlette app that ``mcp.streamable_http_app()`` returns,
-the same technique ``extension_routes.py`` uses (see ``run.py``): plain
-HTTP routes alongside the MCP surface, not tools - toggling what this
-server can do is a human/admin action, not something a model should be
-able to do to itself.
-
-GET /capabilities returns a JSON array shaped exactly like::
-
-    {
-        "name": "server",
-        "enabled": true,
-        "label": "Server Manager",
-        "tools": ["tool_srv_listApps", ...],
-        "resources": [],
-        "has_gui": false,
-        "load_error": null,
-        "missing": false,
-        "loaded": true
-    }
-
-``label``/``tools``/``resources`` let chat_app derive its Capabilities
-page grouping (which tool belongs to which capability, and what to call
-it) entirely from this one live response, instead of hand-maintaining
-its own copy - see chat_app's ``services/tool_capabilities.py``.
-``loaded`` is false for a folder that was discovered but never brought
-online (its tools are not imported yet), ``load_error`` holds the text of
-the last failed import, and ``missing`` means the folder is gone from disk.
-
-POST /capabilities/refresh rescans ``src/capabilities/`` so a folder added
-while the server runs shows up (offline), and returns the same array.
-
-GET /capabilities/{name}/gui returns that capability's GUI page (the
-validated ``gui/page.json``) or 404 when it has none; ``has_gui`` says
-which capabilities do.
-
-PATCH /capabilities/{name} takes ``{"enabled": bool}`` and returns that
-same shape for the capability just changed - 404 for an unknown name,
-400 for a missing/non-boolean ``enabled``, 409 when going online fails
-(the import raised, the id or a tool name clashes, or the folder is gone;
-the body is ``{"error": "<message>"}``). Going online re-imports the
-capability from disk, so an edited file takes effect.
-
-Persist-then-apply, same ordering as ``extensions.add_extension``, for
-going offline: ``save_capabilities_config`` writes to disk first, and only
-then does ``capability_registry.set_enabled`` touch the live server. A
-disk-write failure (a deleted config directory, a full disk) then raises
-before anything live changes, so config_capabilities.json and the running
-server's actual tool/resource list can never disagree about what a
-failed request did. Going online is the reverse: the import can fail, so
-it is applied first and persisted after (a failed import writes nothing).
-"""
+"""HTTP endpoints for built-in capabilities: status, live enable/disable, refresh; plain routes beside the MCP surface, not tools.
+GET /capabilities, POST /capabilities/refresh, GET /capabilities/{name}/gui, PATCH /capabilities/{name} ``{"enabled": bool}`` (404/400/409 on unknown/bad body/import failure)."""
 
 from __future__ import annotations
 

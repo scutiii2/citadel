@@ -1,10 +1,5 @@
 """HTTP endpoint for the chat-invocable command registry: GET /commands.
-
-Mounted the same way extension_routes.py's /extensions is (see run.py):
-a plain HTTP route alongside the MCP surface, not a tool - chat_app's
-command execution/autocomplete path polls this, no model ever calls
-it.
-"""
+A plain route beside the MCP surface, not a tool; chat_app polls it."""
 
 from __future__ import annotations
 
@@ -28,11 +23,8 @@ def _spec_json(spec: commands.CommandSpec) -> dict[str, str]:
 
 
 def _is_capability_enabled(name: str) -> bool:
-    # A command whose capability the registry has never heard of (should
-    # only happen in a test that registers a command directly, never for
-    # a real capability - run.py's capturing() covers every one of
-    # those) fails open, same "absent means enabled" rule
-    # app_config.capability_enabled() already applies to the config file.
+    # A command whose capability the registry does not know fails open ("absent means enabled"),
+    # like app_config.capability_enabled().
     try:
         return capability_registry.is_enabled(name)
     except KeyError:

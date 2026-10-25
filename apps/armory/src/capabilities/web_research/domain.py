@@ -1,9 +1,5 @@
-"""Search the web and read pages through Tavily.
-
-Tavily fetches the pages, so this server never opens a connection to an
-address a caller chose. Web text is capped and fenced (`services/untrusted.py`)
-before it is returned: it reaches a model, and a page can say anything.
-"""
+"""Search the web and read pages through Tavily, so this server never opens a caller-chosen address.
+Web text is capped and fenced (`services/untrusted.py`) before it reaches a model."""
 
 from __future__ import annotations
 

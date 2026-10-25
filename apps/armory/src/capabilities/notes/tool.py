@@ -1,6 +1,5 @@
-"""MCP tool wrappers for the notes capability - thin on purpose.
-Open the gateway from settings, call the domain function. The notes are the ones on the user's
-Notes page in ember; memory (`/memory`) is a different, separate store."""
+"""MCP tool wrappers for the notes capability; thin on purpose.
+These are ember's Notes page notes; memory (`/memory`) is a separate store."""
 
 from __future__ import annotations
 

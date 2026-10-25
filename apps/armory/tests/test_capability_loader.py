@@ -1,11 +1,5 @@
-"""CapabilityLoader against fixture packages in a temp folder.
-
-Each test writes a package ``<unique>/capabilities/<folder>/`` with the
-same shape as a real capability (__init__.py registers META, tool.py
-registers a tool and a command), puts its parent on sys.path, and points a
-loader at it. ``src.server.mcp`` is swapped for a fresh FastMCP because a
-fixture's tool.py does ``from src.server import mcp`` at import time.
-"""
+"""CapabilityLoader against fixture packages in a temp folder, shaped like real capabilities (__init__.py registers META, tool.py a tool and command).
+The package's parent goes on sys.path and ``src.server.mcp`` is swapped for a fresh FastMCP, since tool.py imports it."""
 
 from __future__ import annotations
 

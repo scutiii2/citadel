@@ -1,6 +1,5 @@
-"""MCP tool wrappers for the server_manager capability - thin on purpose.
-The start, stop and restart tools also manage the app's ServerWatcher.
-No config: call the domain function, return its result."""
+"""MCP tool wrappers for the server_manager capability; thin, no config.
+Start, stop and restart also manage the app's ServerWatcher."""
 
 from __future__ import annotations
 

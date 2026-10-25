@@ -1,18 +1,5 @@
-"""Require the shared internal token (X-Internal-Token) on /mcp.
-
-Every caller of this server's /mcp endpoint is another server in this
-repo - chat_app, ai_agent, ember_api - never a browser or an end user, and
-each of them already holds INTERNAL_API_TOKEN (the same value everywhere,
-see .env). Checking it here means a process
-that can merely reach the port can no longer call every tool with
-arguments of its choosing.
-
-Only enforced when a token is configured: an unconfigured deployment keeps
-today's loopback-only trust model (run.py's banner warns about a
-non-loopback bind in that case). The plain-HTTP admin routes (/commands,
-/capabilities, /extensions, /help) keep their own trust model; /upload
-checks the token itself (upload_routes.py).
-"""
+"""Require the shared internal token (X-Internal-Token) on /mcp, which only trusted servers (chat_app, ai_agent, ember_api) call.
+Enforced only when a token is configured, else the loopback-only trust model applies (run.py warns); /upload checks the token itself."""
 
 from __future__ import annotations
 
@@ -26,18 +13,14 @@ LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
 def is_exposed_without_token(host: str, token: str) -> bool:
-    """True when the server listens beyond loopback and no internal token is
-    set: anything that can route to the port can then call every tool, and
-    the identity it sends is whatever it claims. Any host not in
-    LOOPBACK_HOSTS counts (0.0.0.0, a LAN address, even 127.0.0.2), the safe
-    direction."""
+    """True when the server listens beyond loopback and no internal token is set, so anyone reaching the port can call every tool.
+    Any host not in LOOPBACK_HOSTS counts, the safe direction."""
     return not token and host not in LOOPBACK_HOSTS
 
 
 class InternalTokenMiddleware:
-    """Plain ASGI middleware: rejects a request to /mcp whose
-    X-Internal-Token doesn't match (constant-time), with 401 JSON, before
-    the MCP transport ever sees it. Lifespan and other paths pass through."""
+    """Plain ASGI middleware: rejects a /mcp request whose X-Internal-Token doesn't match (constant-time) with 401 JSON.
+    Lifespan and other paths pass through."""
 
     def __init__(self, app, token: str) -> None:
         self.app = app

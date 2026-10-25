@@ -1,11 +1,5 @@
 """Per-user learned skills in SQLite, searched with FTS5.
-
-A skill is a short reusable how-to an agent proposed after solving a task: when to use it,
-the steps and the tools involved. A proposal starts as `proposed` and is never returned by
-`search` until the user makes it `active`; the model has no way to do that itself. Every
-function takes the owner explicitly and only touches that owner's rows. Reading never creates
-the database file. Skill text is never logged.
-"""
+A proposal is `proposed` and hidden from `search` until the user makes it `active`; functions take the owner explicitly, and skill text is never logged."""
 
 from __future__ import annotations
 
@@ -169,9 +163,8 @@ def search(path: Path, owner: str, query: str = "", limit: int = DEFAULT_LIMIT) 
 
 
 def update(path: Path, owner: str, skill_id: int, title: str, when_to_use: str, steps: str, tools: str = "") -> Skill | None:
-    """Rewrite one of the owner's skills; None when it is not theirs. The status stays, the success and
-    failure counts reset (an edited skill is a new version) and the search index follows. Called from the
-    user's side only, never from a model tool."""
+    """Rewrite one of the owner's skills; None when it is not theirs. Status stays, counts reset, search index follows.
+    Called from the user's side only, never from a model tool."""
     owner = _owner(owner)
     title = _clean("title", title, MAX_TITLE_CHARS)
     when_to_use = _clean("when_to_use text", when_to_use, MAX_WHEN_CHARS)

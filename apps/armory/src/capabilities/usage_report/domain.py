@@ -1,9 +1,5 @@
-"""Add up ai_agent's usage log.
-
-ai_agent appends one JSON row per answer to `<usage_dir>/YYYY-MM-DD.<agent id>.jsonl`.
-The date in the file name picks the files to read, so a long history costs
-nothing for a short report. Read-only; a bad line is counted, never fatal.
-"""
+"""Add up ai_agent's usage log (`<usage_dir>/YYYY-MM-DD.<agent id>.jsonl`, one JSON row per answer).
+The file date picks files to read; read-only, and a bad line is counted, never fatal."""
 
 from __future__ import annotations
 

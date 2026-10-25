@@ -1,7 +1,5 @@
-"""Tests for capability_help.py's build_help() - the target/command
-rendering logic behind GET /commands/help/{capability}. Uses a temp
-help.json plus an isolated capability_meta registry, same "swap in
-isolated state" pattern as test_command_routes.py."""
+"""Tests for capability_help.py's build_help(), the logic behind GET /commands/help/{capability}.
+Uses a temp help.json and an isolated capability_meta registry, like test_command_routes.py."""
 
 from __future__ import annotations
 

@@ -1,13 +1,5 @@
-"""Watches one Docker app for as long as it runs, and tells its owner when it goes wrong.
-
-`JobWatcher` owns the thread, the schedule, state persistence and resume. This subclass says
-what a poll is (is the app still listed and running; any new error lines in its log) and what
-to do about it (one email to the owner). Everything the watcher needs to resume after a
-restart travels in the persisted record's `detail`.
-
-The watcher is started by `watch_app` after `tool_srv_startApp` / `tool_srv_restartApp` and
-paused around stop/restart by `pause_watch`, so a deliberate stop is never reported as a crash.
-"""
+"""Watches one Docker app while it runs and emails its owner when it goes wrong.
+`JobWatcher` owns the thread and resume; this subclass defines the poll and the alert. Started by `watch_app`, paused by `pause_watch` so a deliberate stop is not reported."""
 
 from __future__ import annotations
 

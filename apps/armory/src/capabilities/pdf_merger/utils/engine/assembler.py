@@ -1,9 +1,5 @@
-"""Build the output PDF from converted parts with pikepdf (qpdf).
-
-Each source PDF is opened once however many parts use it. The whole build
-runs in one worker thread; ``on_page`` is called from that thread, so
-callers must hand progress back to the event loop thread-safely.
-"""
+"""Build the output PDF from converted parts with pikepdf (qpdf), opening each source once.
+Runs in one worker thread, so ``on_page`` callers must hand progress back thread-safely."""
 
 from __future__ import annotations
 
@@ -88,8 +84,6 @@ class Assembler:
         on_page: Callable[[int], None] | None = None,
         cancel: threading.Event | None = None,
     ) -> int:
-        """Write the merged PDF to ``out_path``; returns its page count.
-
-        If ``cancel`` is set mid-build, raises MERGE_TIMEOUT before anything is saved.
-        """
+        """Write the merged PDF to ``out_path`` and return its page count.
+        If ``cancel`` is set mid-build, raises MERGE_TIMEOUT before anything is saved."""
         return await asyncio.to_thread(_assemble, parts, out_path, title, author, bookmarks, on_page, cancel)

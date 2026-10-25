@@ -1,8 +1,5 @@
 """Process-owned periodic indexing, outside the reloadable capability like pdf_runtime.
-
-Refresh runs in its own daemon worker; searches use independent SQLite WAL readers.
-No scan, model call, or refresh waits on Armory's asyncio request-handling loop.
-"""
+Refresh runs in its own daemon worker; searches use independent SQLite WAL readers."""
 from __future__ import annotations
 
 import atexit

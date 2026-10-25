@@ -1,15 +1,5 @@
-"""Tables an uploaded CSV or XLSX file became, kept in memory for the data tools.
-
-Modeled on `services/downloads.py`: nothing here names a file on disk. The id
-is random and opaque, the data is held in memory, and an entry is bound to the
-account that uploaded it. Another account, an expired id and an unknown id are
-indistinguishable (`get` -> None), so ids cannot be probed. A restart drops
-every table; the person attaches the file again.
-
-Data is column-major (`data[column][row]`) so a tool that needs one column
-walks one tuple. Plain threads call this (tools run in `@offload` worker
-threads, the upload route on the event loop), so every change takes the lock.
-"""
+"""Tables from uploaded CSV/XLSX files, held in memory, each bound to its uploading account.
+Other-account, expired and unknown ids are indistinguishable (`get` -> None); a restart drops all. Data is column-major and every change takes the lock."""
 
 from __future__ import annotations
 
@@ -90,9 +80,7 @@ class TableRegistry:
 
     def add(self, owner: str, filename: str, parsed: ParsedTable, size_bytes: int) -> Table:
         """Keeps `parsed` for `owner`, evicting the oldest entries to stay inside the caps.
-
-        The byte cap is charged the larger of the file size and an estimate of the
-        memory the parsed cells use."""
+        The byte cap charges the larger of file size and estimated parsed memory."""
         if not owner:
             raise TableRefused("The caller is not identified, so the table cannot be kept.")
         charge = max(size_bytes, parsed.row_count * len(parsed.columns) * self._bytes_per_cell)

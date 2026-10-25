@@ -1,68 +1,5 @@
-"""Loaders for this server's JSON config files under configs/.
-
-Three different kinds of configuration live in this project, deliberately
-kept apart:
-
-  - ``src/config.py`` - process settings read from environment
-    variables (bind host/port, where the configs/secrets/data
-    directories live). Small, flat, always present.
-  - this file - structured, per-deployment data read from JSON files
-    under ``configs/`` (``settings.email_config_path`` /
-    ``extensions_config_path`` / ``capabilities_config_path``): mail
-    settings, installed extensions, capability toggles. Too nested to be
-    comfortable as env vars, and split one file per concern rather than
-    one file with a section per concern, so each can be committed,
-    diffed, and reasoned about on its own.
-  - the environment - the actual secret *values*, which a config file
-    only refers to by name (see below). Real values live under
-    ``secrets/*.env``.
-
-Each config file's top-level JSON *is* its content - ``config_extensions.json``
-is ``{"reference": {...}, "other": {...}}`` directly, not
-``{"extensions": {...}}``. There is no wrapper key to unwrap; ``load_config``
-below just reads and parses one file, and every loader in this module
-resolves the whole document (or, for extensions, one entry of it) it
-gets handed.
-
-A string anywhere in a config file may contain ``${VAR}``, which is
-replaced with that environment variable's value::
-
-    "password": "${SMTP_PASSWORD}"
-
-That keeps every config file free of secrets - it names them instead of
-holding them - while the values live in ``secrets/*.env`` in
-development, or get injected by the service manager, container runtime,
-or a secrets manager in production. Swapping that backend later means
-changing how the environment gets populated, not any config file's
-format and not any domain code.
-
-Write ``$$`` for a literal ``$`` if a value genuinely needs to contain
-``${...}`` text rather than have it substituted.
-
-Substitution is *per entry* within ``config_extensions.json`` (several
-extensions can share one file), and over the *whole file* for
-``config_email.json`` (there's only one email config per file): each
-loader resolves only what it's about to
-read, never eagerly. Resolving eagerly was the obvious implementation
-and it was wrong - back when everything lived in one config.json, one
-unset SSH password made an unrelated host, or even email, fail to load.
-A deployment is allowed to have half its secrets present; only the half
-it actually uses has to be.
-
-Deliberately fails loudly, at load time, with a message naming the file
-and the exact key - rather than returning ``{}`` or an empty string and
-letting a capability fail much later with a confusing error deep inside
-domain logic. The rule for which exception: ``KeyError`` when something
-required is absent (a config key, an environment variable), ``ValueError``
-when it's present but unusable (malformed JSON, an empty secret).
-
-Add a loader function as capabilities need one, following
-``load_email_config`` below: read the file, resolve it (or the one entry
-you need) with ``resolve_section``, validate what's required, return a
-frozen dataclass. Domain code should take that dataclass, never a raw
-dict - that way a typo in a config file is caught here instead of at the
-call site.
-"""
+"""Loaders for this server's JSON config files under configs/, split one file per concern.
+Strings may use ``${VAR}`` (``$$`` for a literal ``$``), resolved per entry so one unset secret can't break unrelated config; failures raise KeyError (absent) or ValueError (unusable) naming file and key."""
 
 from __future__ import annotations
 
@@ -77,15 +14,8 @@ from urllib.parse import urlsplit
 
 
 
-# ${NAME}, where NAME is a normal environment-variable identifier. A "$"
-# not followed by "{" is left alone, so ordinary text and anything shell-
-# flavored ("$HOME", "US$5") passes through untouched.
-#
-# "$$" is an escape for a literal "$", so "$${NAME}" survives as the text
-# "${NAME}" instead of being looked up (same convention as
-# docker-compose). Without it there'd be no way to store a string that
-# genuinely contains ${...} - which is easy to hit by accident, e.g. a
-# template or a comment describing this very syntax.
+# ${NAME} (a normal env-var identifier) is expanded; a "$" not followed by "{" is left alone.
+# "$$" escapes a literal "$" (as in docker-compose), so "$${NAME}" survives as "${NAME}".
 _ENV_PLACEHOLDER = re.compile(r"\$\$|\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
@@ -94,66 +24,27 @@ class EmailConfig:
     smtp_server: str
     smtp_port: int
     from_address: str
-    # The standing recipient list, and empty is a real configuration: a
-    # deployment that only mails one-time codes to addresses the caller
-    # names (see `allowed_recipient_domains`) has nobody standing behind
-    # it. `send_email` refuses an empty final recipient list at send time,
-    # which is the moment it actually matters.
+    # The standing recipient list; empty is valid for deployments that only mail one-time codes to
+    # caller-named addresses (see `allowed_recipient_domains`). `send_email` refuses an empty final list.
     to: list[str] = field(default_factory=list)
-    # Empty means "connect and send without authenticating". That's not a
-    # degraded fallback, it's how LAN relays and local MTAs normally work -
-    # they authorize by source address, and offering AUTH to them makes the
-    # send fail outright. A consumer provider will simply reject the mail
-    # instead, which is the correct outcome for a missing password.
+    # Empty means connect and send without authenticating: LAN relays and local MTAs authorize by source address,
+    # and a consumer provider rejects the mail, which is correct for a missing password.
     password: str = ""
     # How the connection is protected: "starttls" | "ssl" | "none".
-    # Defaults to STARTTLS, which is what this module did before the field
-    # existed; `load_email_config` infers a better default from the port.
+    # Defaults to STARTTLS; `load_email_config` infers a better default from the port.
     security: str = "starttls"
-    # Domains that a caller may name any address at, for a capability that
-    # otherwise only sends to the exact addresses above. Currently unused
-    # (its one consumer, the OTP capability, was removed), kept as
-    # reusable EmailConfig infrastructure for a future capability with the
-    # same "email an address the caller supplies" shape. Empty is the
-    # default and means "no domains", never "any domain": widening an
-    # allowlist because a key is absent is the one failure mode here that
-    # nobody would notice, so the absent case is the strict one.
+    # Domains a caller may name any address at; currently unused (its OTP consumer was removed), kept as infrastructure.
+    # Empty means "no domains", never "any domain", so an absent key is the strict case.
     allowed_recipient_domains: list[str] = field(default_factory=list)
-    # Optional MS Teams incoming-webhook URL, shared across capabilities
-    # that alert on state transitions (none currently).
-    # Lives here rather than a dedicated config file because it's the same
-    # kind of thing as `to` - "who/what gets notified" -
-    # just a different transport. Empty (the default) means Teams alerts
-    # are off; nothing treats an empty string as a URL to POST to.
+    # Optional MS Teams incoming-webhook URL for state-transition alerts (none currently).
+    # Empty means Teams alerts are off; an empty string is never POSTed to.
     teams_webhook_url: str = ""
 
 
 @dataclass(frozen=True)
 class ExtensionConfig:
-    """One other MCP server this server connects out to as a client and
-    re-exposes as its own namespaced tools (see ``services/extensions.py``).
-
-    Two transports, chosen by which of ``command``/``url`` the config
-    entry supplies (see ``_build_extension``):
-
-    - ``transport="stdio"`` - this server spawns the upstream as a local
-      subprocess. ``command``/``args`` are exactly what
-      ``StdioServerParameters`` wants - kept as plain strings here rather
-      than parsed further, since the right shape for "how do I launch
-      this process" is whatever the upstream server's own README says to
-      run.
-    - ``transport="http"`` - the upstream is already running somewhere
-      and this server connects to it as a client over streamable HTTP,
-      the same way ``chat_app/src/chat_app/services/mcp_client.py``
-      already talks to *this* server. ``url`` is that server's MCP
-      endpoint.
-
-    ``command`` and ``url`` both default to their transport's "unused"
-    value (``""`` / ``None``) rather than being made fully optional
-    without a default, so a config built directly (as
-    ``extension_routes.py``'s POST handler does) only has to supply the
-    fields its transport actually uses.
-    """
+    """One other MCP server this server connects to as a client and re-exposes as namespaced tools (see ``services/extensions.py``).
+    Transport is "stdio" (spawned local subprocess via ``command``/``args``) or "http" (``url`` of a running server), chosen in ``_build_extension``."""
 
     id: str
     label: str
@@ -162,26 +53,20 @@ class ExtensionConfig:
     args: list[str] = field(default_factory=list)
     transport: str = "stdio"
     url: str | None = None
-    # http transport only: extra HTTP headers sent on every request to the
-    # upstream (e.g. {"X-Internal-Token": "${INTERNAL_API_TOKEN}"} for an
-    # upstream that, like this server, requires the shared internal token).
-    # Values are resolved from the environment at load time, so they are
-    # secrets: never persisted by save_extension_config, never reported.
+    # http transport only: extra headers sent on every request to the upstream (e.g. {"X-Internal-Token": "${INTERNAL_API_TOKEN}"}).
+    # Values are resolved from the environment at load time, so they are secrets: never persisted or reported.
     headers: dict[str, str] = field(default_factory=dict, repr=False)
-    # Opt-in: send the asking user's username/email upstream as
-    # ``_meta.requester`` on each proxied call. Off by default so an
-    # extension never receives identity data it did not ask for.
+    # Opt-in: send the asking user's username/email upstream as ``_meta.requester`` on each proxied call.
+    # Off by default so an extension never receives identity data it did not ask for.
     forward_requester: bool = False
-    # The extension's own web app, if it has one (an http(s) address the
-    # user's browser can reach, not necessarily the MCP url). ember's
-    # Extensions page links to it; nothing here ever requests it.
+    # The extension's own web app, if any (an http(s) address the browser can reach, not necessarily the MCP url).
+    # ember's Extensions page links to it; nothing here requests it.
     web_url: str | None = None
 
 
 def _web_url(entry: dict[str, Any], *, id_: str, config_path: Path) -> str | None:
-    """The optional ``web_url`` of an entry: absent -> None, else a non-empty
-    http(s) URL with a host. Anything else (a ``javascript:`` link, a
-    relative path) is rejected so it can never reach a browser as a link."""
+    """The optional ``web_url`` of an entry: absent -> None, else a non-empty http(s) URL with a host.
+    Anything else (``javascript:``, relative path) is rejected so it never reaches a browser as a link."""
     if "web_url" not in entry:
         return None
     value = entry["web_url"]
@@ -203,10 +88,8 @@ def _resolve_placeholder(name: str, *, where: str, config_path: Path) -> str:
             f"(or however this deployment supplies secrets)."
         )
     if value == "":
-        # Almost always "SMTP_PASSWORD=" left blank in .env rather than a
-        # genuinely empty secret - and a blank password fails later at
-        # SMTP login with a far less obvious message. Write "" directly in
-        # the config file if an empty value is really what you want.
+        # Almost always "SMTP_PASSWORD=" left blank in .env, which fails later at SMTP login with a vague message.
+        # Write "" directly in the config file if empty is intended.
         raise ValueError(
             f"Config file {config_path} refers to ${{{name}}} at '{where}', but "
             f"{name} is set to an empty string. Give it a value, or put a "
@@ -216,21 +99,8 @@ def _resolve_placeholder(name: str, *, where: str, config_path: Path) -> str:
 
 
 def resolve_section(value: Any, *, where: str, config_path: Path) -> Any:
-    """Substitute ${VAR} inside every string of one subtree of the config.
-
-    ``where`` is that subtree's *full* dotted path from the top of the
-    document ("email", "hosts.desktop"), not a name local to it, and it is
-    extended as the walk descends. Callers resolve a slice but errors still
-    read ``hosts.desktop.password`` - the operator has to open config.json
-    and find the line, and a path relative to whatever the loader happened
-    to pass in would send them looking in the wrong place. Pass ``""`` for
-    a whole document.
-
-    Recurses through dicts and lists so any section added later gets this
-    for free. Only values are touched, never keys - a computed key name
-    would make the config unreadable for no benefit. Non-string scalars
-    (ints, bools, null) pass through untouched.
-    """
+    """Substitute ${VAR} inside every string of one subtree of the config, recursing through dicts and lists.
+    ``where`` is the subtree's full dotted path ("hosts.desktop") for error messages; only values change, never keys."""
     if isinstance(value, dict):
         return {
             key: resolve_section(item, where=f"{where}.{key}" if where else str(key), config_path=config_path)
@@ -252,11 +122,8 @@ def resolve_section(value: Any, *, where: str, config_path: Path) -> Any:
 
 
 def load_config(config_path: Path) -> dict[str, Any]:
-    """Read and parse one config file. Raises on anything unusable.
-
-    Returns the document exactly as written, ``${VAR}`` placeholders and
-    all; a loader resolves the part it needs with ``resolve_section``.
-    """
+    """Read and parse one config file, raising on anything unusable.
+    Returns the document as written, ``${VAR}`` placeholders included; resolve with ``resolve_section``."""
     example_path = config_path.with_name(config_path.name + ".example")
     if not config_path.exists() and example_path.exists():
         shutil.copyfile(example_path, config_path)
@@ -284,50 +151,19 @@ def _require(section: dict[str, Any], key: str, *, prefix: str, config_path: Pat
 
 
 def normalize_recipient_domain(value: str) -> str:
-    """One ``email.allowed_recipient_domains`` entry, in comparison form.
-
-    Public, so a capability that checks a caller-supplied address against
-    this allowlist can call this rather than reimplementing it - two
-    spellings of "normalized" is how an allowlist quietly stops matching
-    what the operator wrote - and an ``EmailConfig`` can be built
-    directly, in a test or a hand-written setup, without ever passing
-    through this loader. Both sides calling the same function is what
-    makes that safe.
-
-    A leading ``@`` or ``.`` is stripped rather than rejected: asked for a
-    domain, people write ``@example.com`` or ``.example.com`` about as
-    often as the bare form, and all three plainly mean the same thing.
-    Nothing else is repaired - this is not an address parser, and a value
-    that isn't a domain just fails to match anything, which is the
-    direction a mistake here should fail in.
-    """
+    """One ``email.allowed_recipient_domains`` entry in comparison form; public so capabilities share one normalization.
+    A leading ``@`` or ``.`` is stripped; nothing else is repaired, so a non-domain fails to match."""
     return value.strip().lower().lstrip("@.")
 
 
 SUPPORTED_EMAIL_SECURITY = ("starttls", "ssl", "none")
 
-# The IANA-registered port for implicit-TLS message submission. Gmail,
-# Outlook, Yahoo, iCloud and every mainstream host use it for exactly that,
-# so seeing it in the config is enough to know the transport - which is why
-# `security` can be inferred rather than demanded from every deployment.
+# The IANA implicit-TLS submission port, used by mainstream providers, so `security` can be inferred from it.
 IMPLICIT_TLS_PORT = 465
 
 def load_email_config(config_path: Path) -> EmailConfig:
-    """Parse config_email.json into an EmailConfig.
-
-    ``from`` is a Python keyword, so it can't be a dataclass field name -
-    it's read from the JSON as ``from`` and exposed as ``from_address``.
-
-    ``password``, ``security``, ``to`` and ``allowed_recipient_domains``
-    are the only optional keys. ``password`` is optional because an
-    unauthenticated relay is a legitimate setup, not a mistake to guard
-    against; ``security`` because the port already implies it in the
-    common cases; ``allowed_recipient_domains`` because its absence is a
-    *stricter* deployment, not an unconfigured one; ``to`` because a
-    deployment that only ever mails caller-supplied addresses (see
-    ``allowed_recipient_domains``) has no standing recipient list and
-    shouldn't have to invent one to pass validation.
-    """
+    """Parse config_email.json into an EmailConfig; ``from`` is read from JSON and exposed as ``from_address``.
+    Optional keys: ``password`` (unauthenticated relays), ``security`` (implied by port), ``allowed_recipient_domains`` (absent is stricter), ``to``."""
     section = load_config(config_path)
     section = resolve_section(section, where="", config_path=config_path)
 
@@ -335,36 +171,28 @@ def load_email_config(config_path: Path) -> EmailConfig:
         return _require(section, key, prefix="", config_path=config_path)
 
     def as_string_list(value: Any) -> list[str]:
-        # A bare string is the obvious thing to write for one recipient (or
-        # one domain), and iterating it character-by-character would be a
-        # nasty way to find out otherwise.
+        # A bare string is the obvious way to write one recipient or domain; iterating it per character would be a nasty surprise.
         if isinstance(value, str):
             value = [value]
         return [str(item) for item in value]
 
-    # Empty is allowed.
-    # `send_email` already refuses with "No recipients" at send time, so a
-    # load-time failure would only forbid the legitimate config that sends
-    # exclusively to addresses the caller names.
+    # Empty is allowed: `send_email` already refuses "No recipients" at send time, and a load-time failure
+    # would forbid configs that send only to caller-named addresses.
     recipients = as_string_list(section.get("to", []))
 
     domains = [
         normalize_recipient_domain(entry)
         for entry in as_string_list(section.get("allowed_recipient_domains", []))
     ]
-    # A blank entry - the "" left behind by editing a JSON list - is
-    # dropped rather than rejected. It can only ever fail to match, so
-    # keeping it would widen nothing; all it would do is appear in the
-    # refusal message a caller reads to work out what it should have said.
+    # A blank entry (left by editing a JSON list) is dropped, not rejected: it can only fail to match
+    # and would just appear in refusal messages.
     domains = [domain for domain in domains if domain]
 
     port = int(required("smtp_port"))
     inferred = "ssl" if port == IMPLICIT_TLS_PORT else "starttls"
     security = str(section.get("security", inferred)).strip().lower()
     if security not in SUPPORTED_EMAIL_SECURITY:
-        # No permissive fallback on a typo. Quietly downgrading "tls" to a
-        # plaintext or unverified connection would send the password in the
-        # clear, and nothing about the run would say so.
+        # No permissive fallback on a typo: downgrading "tls" to plaintext or unverified would silently send the password in the clear.
         raise ValueError(
             f"Config file {config_path}: 'security' is {security!r}, "
             f"expected one of {', '.join(SUPPORTED_EMAIL_SECURITY)}."
@@ -389,19 +217,8 @@ def _extensions_section(config_path: Path) -> dict[str, Any]:
 
 
 def _build_extension(id_: str, entry: Any, *, config_path: Path) -> ExtensionConfig:
-    """Resolve and validate one raw extension entry into an ExtensionConfig.
-
-    The unit of resolution is deliberately a single entry, so an
-    extension whose ``args`` names an unset ``${VAR}`` can't stop a
-    working sibling from connecting.
-
-    Transport is inferred from which of ``command``/``url`` the entry
-    supplies, not from a separate ``transport`` key - the two are
-    mutually exclusive ways to say "how do I reach this server", and a
-    ``transport`` key that could disagree with them would just be
-    another way for the config to be self-contradictory. Both present or
-    both absent is rejected outright rather than guessed at.
-    """
+    """Resolve and validate one raw extension entry into an ExtensionConfig, one entry at a time so a bad sibling can't block it.
+    Transport is inferred from ``command`` vs ``url``; both or neither is rejected."""
     if not isinstance(entry, dict):
         raise ValueError(f"Config file {config_path}: '{id_}' must be an object")
 
@@ -468,19 +285,15 @@ def _build_extension(id_: str, entry: Any, *, config_path: Path) -> ExtensionCon
 
 
 def load_extensions_config(config_path: Path) -> dict[str, ExtensionConfig]:
-    """Parse config_extensions.json into ExtensionConfigs keyed by id.
-
-    Called once at startup for the full set - see ``_build_extension``
-    for why one broken entry doesn't stop the rest from loading.
-    """
+    """Parse config_extensions.json into ExtensionConfigs keyed by id, once at startup.
+    See ``_build_extension`` for why one broken entry doesn't stop the rest."""
     section = _extensions_section(config_path)
     return {id_: _build_extension(id_, entry, config_path=config_path) for id_, entry in section.items()}
 
 
 def load_extension_config(config_path: Path, id_: str) -> ExtensionConfig:
-    """One extension by id, with the available ids listed if it's not
-    there. Only the named entry is resolved, so a broken sibling can't
-    stop this one from loading."""
+    """One extension by id, listing the available ids if missing.
+    Only the named entry is resolved, so a broken sibling can't block it."""
     section = _extensions_section(config_path)
     if id_ not in section:
         known = ", ".join(sorted(section)) or "none configured"
@@ -495,27 +308,8 @@ def _write_config(config_path: Path, data: dict[str, Any]) -> None:
 
 
 def save_extension_config(config_path: Path, config: ExtensionConfig) -> None:
-    """Insert or overwrite one entry in config_extensions.json, leaving
-    every other entry untouched.
-
-    Reads with ``load_config`` (not a loader that resolves placeholders),
-    so an unrelated ``${VAR}`` in another extension's ``args`` passes
-    through byte-for-byte instead of being baked in as its resolved
-    value. ``config`` itself is expected to already hold whatever it
-    wants written literally (this is the shape ``services/extensions.py``'s
-    runtime ``add_extension`` passes straight from an HTTP request body,
-    which never contains ``${VAR}`` placeholders to begin with).
-
-    Written by transport: a stdio config's ``command``/``args``, or for
-    an http config just ``url``, so a re-read through
-    ``load_extensions_config`` gets exactly what ``_build_extension``
-    expects for that transport - no leftover empty ``command``/``url``
-    from the other branch's field defaults.
-
-    ``headers`` is never written: by the time a config reaches here its
-    header values are resolved secrets, not ``${VAR}`` placeholders. An
-    extension that needs headers is configured by hand in the file.
-    """
+    """Insert or overwrite one entry in config_extensions.json, leaving every other entry untouched.
+    Reads with ``load_config`` so other entries' ``${VAR}`` pass through unresolved; writes only the transport's fields, and never ``headers`` (resolved secrets; configure by hand)."""
     data = load_config(config_path)
 
     entry: dict[str, Any] = {"label": config.label, "description": config.description}
@@ -533,34 +327,19 @@ def save_extension_config(config_path: Path, config: ExtensionConfig) -> None:
 
 def delete_extension_config(config_path: Path, extension_id: str) -> None:
     """Remove one entry from config_extensions.json.
-
-    Idempotent - removing an id that's already absent is not an error,
-    since the caller's goal ("this id must not be configured") is
-    already true.
-    """
+    Idempotent: removing an absent id is not an error."""
     data = load_config(config_path)
     data.pop(extension_id, None)
     _write_config(config_path, data)
 
 
-# --- capabilities ----------------------------------------------------------
-# Which built-in capabilities (src/capabilities/<name>/) are enabled.
-# Read at startup by run.py, which applies the state to the live
-# FastMCP instance via services/capability_registry.py, and written by
-# capability_routes.py's PATCH /capabilities/<name> - the same route
-# also applies the change live, so this file and the running server
-# never disagree about which capabilities are on.
+# --- capabilities ---
+# Which built-in capabilities (src/capabilities/<name>/) are enabled: read at startup by run.py, written by capability_routes.py's PATCH, which also applies the change live.
 
 
 def load_capabilities_config(config_path: Path) -> dict[str, dict[str, Any]]:
     """Read config_capabilities.json: which capabilities are enabled.
-
-    Missing file -> {} (every capability enabled) rather than raising,
-    unlike every loader above. Every capability was always enabled before
-    this file existed, so a deployment that never creates it - or hasn't
-    updated past this feature yet - must keep behaving exactly as it did,
-    not fail to start.
-    """
+    A missing file gives {} (all enabled), unlike other loaders, so deployments predating it keep working."""
     if not config_path.exists():
         return {}
     return load_config(config_path)
@@ -568,14 +347,7 @@ def load_capabilities_config(config_path: Path) -> dict[str, dict[str, Any]]:
 
 def capability_enabled(config: dict[str, dict[str, Any]], name: str) -> bool:
     """True unless `name` is present in `config` with `"enabled": false`.
-
-    A capability absent from the file - the common case, since most
-    deployments only ever write down the one they want to turn *off* - is
-    enabled. Widening that default (treating an unlisted capability as
-    disabled) would mean every capability vanishes the moment this file
-    is created for any reason, which is the toggle equivalent of the
-    "absent extensions section" bug this same module used to have.
-    """
+    An unlisted capability is enabled; defaulting to disabled would make every capability vanish once the file exists."""
     entry = config.get(name, {})
     if not isinstance(entry, dict):
         return True
@@ -583,14 +355,8 @@ def capability_enabled(config: dict[str, dict[str, Any]], name: str) -> bool:
 
 
 def save_capabilities_config(config_path: Path, name: str, enabled: bool) -> None:
-    """Persist one capability's enabled state, leaving every other entry
-    untouched. Mirrors save_extension_config's shape.
-
-    Missing file is fine here - unlike every ``load_*``/``save_extension_*``
-    function above, which all require config_extensions.json to already
-    exist: this is the first thing to ever write config_capabilities.json
-    for a deployment that has never toggled anything before.
-    """
+    """Persist one capability's enabled state, leaving other entries untouched; mirrors save_extension_config.
+    A missing file is fine: this is the first writer of config_capabilities.json."""
     data = load_config(config_path) if config_path.exists() else {}
     data.setdefault(name, {})["enabled"] = enabled
     _write_config(config_path, data)
@@ -600,15 +366,8 @@ _SCANNER_MARKER = "_scanner"
 
 
 def migrate_capabilities_config(config_path: Path, ids: list[str]) -> None:
-    """Once, when the folder scanner first runs: write ``enabled: true`` for
-    every capability that has no entry, then set a marker.
-
-    Before the scanner, "no entry" meant enabled, and existing capabilities rely on
-    that. After it, a folder that appears later with no entry is offline until
-    an admin brings it online. The marker is what tells the two apart, so
-    nothing that is on today goes dark on the next restart. Does nothing once
-    the marker is there.
-    """
+    """Once, on the folder scanner's first run: write ``enabled: true`` for every capability without an entry, then set a marker.
+    Afterwards a new folder with no entry stays offline until an admin enables it; does nothing once the marker exists."""
     data = load_config(config_path) if config_path.exists() else {}
     if _SCANNER_MARKER in data:
         return

@@ -1,7 +1,5 @@
 """Typed skill operations; skill_store owns storage, identity_context the owner.
-
-There is deliberately no approve or retire here: only the user's side (ember_api) may activate a skill.
-"""
+No approve or retire here: only the user's side (ember_api) may activate a skill."""
 from src.capabilities.skills.contract import MarkResult, ProposeResult, SearchResult
 from src.config import settings
 from src.services import identity_context, untrusted

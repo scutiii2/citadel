@@ -1,10 +1,5 @@
 """Laya as an advisory ticket classifier: pairwise "same issue?" and tag choice.
-
-Laya has a 512-token window, so every request is short: each report is a title
-plus the first 500 characters of its description. Answers are advisory; an
-uncertain answer is never acted on. Transport errors and timeouts propagate so
-the caller can fall back to "no grouping".
-"""
+Requests are short (title plus first 500 characters); uncertain answers are ignored and transport errors propagate for fallback."""
 
 from __future__ import annotations
 

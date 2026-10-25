@@ -1,8 +1,5 @@
 """Fixed, authenticated HTTP adapters for Ember's native media screens.
-
-The internal token authenticates the gateway; the UID still scopes every
-operation. Services and their process-owned loops remain the state owners.
-"""
+The internal token authenticates the gateway; the UID scopes every operation."""
 from __future__ import annotations
 
 import asyncio

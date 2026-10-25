@@ -1,13 +1,5 @@
-"""HTTP endpoints for `/help` and `/<capability> help`: GET /commands/help
-and GET /commands/help/{capability}.
-
-Mounted the same way command_routes.py's /commands is (see run.py): a
-plain HTTP route alongside the MCP surface, not a tool - chat_app's
-commands.py intercepts "/help" and "/<capability> help ..." before
-either ever reaches the tool registry and calls one of these instead of
-a real MCP tool call (see that module's docstring and
-capability_help.py's).
-"""
+"""HTTP endpoints for `/help` and `/<capability> help`: GET /commands/help and /commands/help/{capability}.
+Plain routes beside the MCP surface, not tools; chat_app's commands.py calls them instead of a tool (see capability_help.py)."""
 
 from __future__ import annotations
 
@@ -26,10 +18,7 @@ async def get_help_index(request: Request) -> JSONResponse:
 async def get_help(request: Request) -> JSONResponse:
     capability_id = request.path_params["capability"]
 
-    # Same "fail closed" reasoning as command_routes.py's
-    # _is_capability_enabled: a disabled (or never-registered) built-in
-    # capability's help shouldn't be reachable any more than its
-    # commands are.
+    # Fail closed like command_routes.py: a disabled or unregistered capability's help is unreachable.
     try:
         enabled = capability_registry.is_enabled(capability_id)
     except KeyError:

@@ -1,14 +1,5 @@
-"""Load mcp_server's single ``.env`` file into the process environment.
-
-Replaces the old ``.secrets/secret_*.env`` one-file-per-concern split. If
-``.env`` is missing, it is built once: from the legacy ``.secrets/*.env``
-files when any exist (so real values survive the move), otherwise from
-``.env.example``. The legacy folder is left in place for the operator to
-delete.
-
-Must run before any ``src.*`` import that reads settings: ``Settings``
-field defaults read ``os.getenv()`` at import time.
-"""
+"""Load mcp_server's single ``.env`` into the process environment.
+A missing ``.env`` is built from legacy ``.secrets/*.env`` files, else ``.env.example``; must run before any ``src.*`` import that reads settings."""
 
 from __future__ import annotations
 
@@ -19,11 +10,8 @@ from dotenv import load_dotenv
 
 
 def migrate_legacy_secrets(env_path: Path, legacy_dir: Path) -> bool:
-    """Build ``env_path`` from ``legacy_dir/*.env``; True if it was written.
-
-    Does nothing when ``env_path`` already exists or no legacy file does.
-    Each legacy file is copied verbatim under a header naming its source.
-    """
+    """Build ``env_path`` from ``legacy_dir/*.env``; True if written.
+    No-op when ``env_path`` exists or no legacy file does; each file is copied verbatim under a source header."""
     if env_path.exists() or not legacy_dir.is_dir():
         return False
     legacy_files = sorted(legacy_dir.glob("*.env"))

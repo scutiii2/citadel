@@ -1,9 +1,5 @@
 """Internal account-scoped Memory page routes and account-deletion purge.
-
-A plain HTTP route and not a tool, so no model can name a user: only
-ember_api calls them for the signed-in account. Checked against the
-internal token like /upload (an unset token never validates).
-"""
+Plain HTTP, not tools, so no model can name a user; checked against the internal token."""
 
 from __future__ import annotations
 

@@ -1,8 +1,5 @@
 """Small, config-driven Local REST API client, modeled on notes/utils/gateway.py.
-
-Unlike the notes gateway, errors never include remote response text or exception
-details: those can contain the configured address, authorization, or vault content.
-"""
+Errors never include remote response text or details, which can leak the address, authorization or vault content."""
 
 from __future__ import annotations
 
@@ -30,11 +27,7 @@ class ObsidianGatewayError(Exception):
 
 def vault_path(path: str, *, folder: bool = False, markdown: bool = False) -> str:
     """Validate a literal vault-relative POSIX path before URL encoding it.
-
-    Percent escapes are refused rather than decoded: this prevents ambiguous or
-    repeatedly encoded traversal from changing meaning in an HTTP intermediary.
-    Colons also exclude Windows drive-relative paths and alternate data streams.
-    """
+    Percent escapes and colons are refused (ambiguous traversal, Windows drive paths, alternate data streams)."""
     invalid = (
         path.startswith(("/", "\\"))
         or any(char in path for char in ("\\", ":", "%"))
@@ -127,11 +120,8 @@ class ObsidianGateway:
         self._write("PUT", path, text, overwrite=overwrite)
 
     def require_create_only(self) -> None:
-        """Promotion requires the plugin's documented conditional-write contract.
-
-        See obsidian-local-rest-api 5.2 OpenAPI, Conditional writes. Older or
-        unrecognized servers are refused rather than relying on a racy GET/PUT.
-        """
+        """Promotion requires the plugin's conditional-write contract (obsidian-local-rest-api 5.2 OpenAPI).
+        Older or unrecognized servers are refused rather than using a racy GET/PUT."""
         details = self._json("GET", "/")
         versions = details.get("versions") if isinstance(details, dict) else None
         version = versions.get("self", "") if isinstance(versions, dict) else ""
@@ -149,9 +139,8 @@ class ObsidianGateway:
         endpoint = "/vault/" + quote(target, safe="/")
         create_only = method == "PUT" and not overwrite
         if create_only:
-            # Probe for compatibility with older plugin releases. Also send the
-            # atomic condition so a concurrent creator cannot be overwritten on
-            # plugin versions supporting If-None-Match.
+            # Probe for older plugin releases; also send If-None-Match so a concurrent
+            # creator is not overwritten on plugin versions that support it.
             try:
                 self._send("GET", endpoint, accept="text/markdown")
             except ObsidianGatewayError as error:

@@ -21,11 +21,8 @@ class Chunk:
 
 
 def chunk_note(path: str, text: str) -> list[Chunk]:
-    """Split outside code fences by heading, then into roughly 450-token spans.
-
-    Short sections stay short so a chunk never silently changes heading context.
-    YAML is safe-loaded and converted to JSON-safe metadata (dates become strings).
-    """
+    """Split outside code fences by heading, then into ~450-token spans.
+    YAML is safe-loaded into JSON-safe metadata (dates become strings)."""
     frontmatter: dict[str, Any] = {}
     match = re.match(r"\A---\s*\n(.*?)\n---\s*(?:\n|$)", text, re.DOTALL)
     if match:

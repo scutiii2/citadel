@@ -1,10 +1,5 @@
-"""Read-only questions about a table an uploaded file became: describe,
-filter, group, rank. Plain Python over column tuples - no pandas, no `eval`,
-no expression strings. Every result is capped, and says so when it is.
-
-Functions take the registry and the caller's name instead of reaching for
-globals, so tests (and the tool wrappers) decide which store and which owner.
-"""
+"""Read-only questions about an uploaded table: describe, filter, group, rank. Plain Python, no pandas or `eval`.
+Results are capped and say so; functions take the registry and caller name so tests choose the store and owner."""
 
 from __future__ import annotations
 
@@ -94,9 +89,8 @@ def rows(
     descending: bool = True,
     limit: int = 10,
 ) -> RowsResult:
-    """The rows of a table: ranked by `sort_by` when one is given, else those that
-    satisfy `conditions`, else the first ones. One entry point over `top_n`,
-    `filter_rows` and `head`, which keep their own rules and messages."""
+    """The rows of a table: ranked by `sort_by`, else those matching `conditions`, else the first ones.
+    One entry point over `top_n`, `filter_rows` and `head`."""
     if sort_by.strip():
         return top_n(registry, owner, table_id, sort_by, limit, descending, conditions)
     if conditions:

@@ -1,11 +1,5 @@
-"""Read-only git over the projects in the workspace.
-
-Only fixed git subcommands run, with no shell. A caller's text goes in as a
-pattern, a revision or a path, never as an option: revisions are checked
-against a strict character set, paths go after `--`, patterns after `-e`.
-Secret files are left out of every command with pathspec excludes, and the
-repo path itself goes through `ConfinedRoot`.
-"""
+"""Read-only git over the workspace projects; only fixed subcommands run, with no shell.
+Caller text is never an option: revisions are charset-checked, paths follow `--`, patterns `-e`; secret files are excluded."""
 
 from __future__ import annotations
 

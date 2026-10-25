@@ -1,9 +1,5 @@
 """Per-user memory notes in SQLite, searched with FTS5.
-
-A note is one short fact, preference or instruction. Every function takes
-the owner explicitly and only ever touches that owner's rows. Reading never
-creates the database file. Note text is never logged.
-"""
+Every function takes the owner explicitly; reading never creates the database; text is never logged."""
 
 from __future__ import annotations
 
@@ -69,9 +65,8 @@ def _connect(path: Path) -> sqlite3.Connection:
 
 
 def _fts_expression(query: str) -> str:
-    """Quote every word so user text can never be read as FTS syntax; OR them for recall.
-    A word of three or more characters also matches longer words that start with it
-    ("movie" finds "movies"); the index does no stemming."""
+    """Quote every word so user text is never read as FTS syntax; OR them for recall.
+    Words of 3+ characters also match longer words starting with them (no stemming)."""
     words = re.findall(r"\w+", query or "")[:MAX_QUERY_WORDS]
     return " OR ".join(f'"{word}"*' if len(word) >= _PREFIX_MIN else f'"{word}"' for word in words)
 

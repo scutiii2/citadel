@@ -1,31 +1,5 @@
 """Finds capability folders and brings them online, offline, or back after an edit.
-
-``run.py`` used to import each capability by hand at startup, so a new
-capability needed a restart. The loader replaces that: it lists the folders
-of ``src/capabilities/``, reads each package's ``META`` (id and label), and
-loads the ones the config says to. ``POST /capabilities/refresh`` runs the
-same scan on the live server, so a folder dropped in while it runs appears.
-
-Going online always imports the capability fresh: its old state is removed
-(tools, resource templates, ``@command`` entries, ``META``), every module
-under its folder is purged from ``sys.modules``, its ``__pycache__`` folders
-are deleted, and the package is imported again inside
-``capability_registry.capturing()``. ``importlib.reload`` would miss
-submodules such as ``domain.py``. The ``__pycache__`` delete matters because
-Python trusts a cached ``.pyc`` when the source has the same mtime (whole
-seconds) and size, so a quick same-size edit would otherwise run old code.
-Capabilities may opt a direct child package into PROCESS_LIFETIME_MODULES for
-process-owned engines or global library patches; changes to those require restart.
-Otherwise only the capability's own folder is purged; a shared ``src.services`` module
-edited meanwhile is not reloaded.
-
-Everything runs on the event-loop thread under one lock. The decorators in a
-capability's ``tool.py`` mutate ``mcp``'s tool dict, and a worker thread
-would race the loop that lists tools. An import takes milliseconds.
-
-A failed import rolls back to offline and keeps the error text in the
-record, so one broken capability never takes the server or its siblings down.
-"""
+Going online imports fresh: old state removed, the folder's modules purged from ``sys.modules`` and its ``__pycache__`` deleted, then re-imported inside ``capability_registry.capturing()``. Modules in PROCESS_LIFETIME_MODULES need a restart. Runs on the event-loop thread under one lock; a failed import rolls back to offline and keeps the error text."""
 
 from __future__ import annotations
 
@@ -142,9 +116,8 @@ class CapabilityLoader:
         return CapabilityRecord(folder, meta.id, meta.label)
 
     def startup(self) -> None:
-        """Scan, migrate the config once, then load every folder that has an
-        entry; a folder with ``enabled: false`` is imported and then switched off
-        (its tools stay listed). A folder with no entry stays unloaded."""
+        """Scan, migrate the config once, then load every folder with an entry.
+        ``enabled: false`` is imported then switched off (tools stay listed); no entry stays unloaded."""
         self.scan()
         ids = [record.id for record in self._records.values() if record.load_error is None]
         migrate_renamed_capabilities(self._config_path)
@@ -168,11 +141,8 @@ class CapabilityLoader:
     # --- switching -----------------------------------------------------------
 
     async def set_online(self, name: str, online: bool) -> str:
-        """Online: fresh import, then persist (a failed import changes nothing
-        on disk). Offline: persist, then hide the tools. A capability that was
-        registered outside the scanner is only toggled, not reloaded. Returns
-        the id the capability is registered under afterwards (going online can
-        rename a record from its folder name to its META id)."""
+        """Online: fresh import, then persist. Offline: persist, then hide the tools. Capabilities registered outside the scanner are only toggled.
+        Returns the id it is registered under afterwards (going online can rename a record from folder name to its META id)."""
         async with self._lock:
             record = self.record_for(name)
             if record is None:

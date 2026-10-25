@@ -1,15 +1,5 @@
-"""Typed operations on the notes a user let agents use.
-
-ember_api owns the notes and db_gateway stores them. This reads and changes them for the
-asking account only (`identity_context.current_uid()` is ember's account uid, the same
-value ember_api stores as a note's owner) and only the notes whose `agent_readable`
-switch is on. Anything else, including another account's note and a note whose switch is
-off, is reported as "no such note" so a caller cannot tell the difference.
-
-Agents can create a note, change one that is already shared, and append to it. They cannot
-delete a note or change its switch. The limits below repeat ember_api's
-(`apps/Ember/ember_api/src/services/notes.py`); change them together.
-"""
+"""Typed operations on the notes a user let agents use (`agent_readable` on), for the asking account only.
+Other notes are reported as "no such note". Limits mirror ember_api's `services/notes.py`; change them together."""
 
 from __future__ import annotations
 
@@ -226,9 +216,8 @@ def _item_key(line: str) -> str | None:
 
 
 def _without_known_items(body: str, text: str) -> tuple[str, int]:
-    """`text` less the list items `body` (or an earlier line of `text`) already has, and how
-    many were left out. Lines that are not list items are always kept, so prose cannot lose a
-    line that happens to match."""
+    """`text` less the list items `body` (or an earlier line of `text`) already has, and how many were dropped.
+    Non-list lines are always kept."""
     known = {key for line in body.splitlines() if (key := _item_key(line))}
     kept: list[str] = []
     skipped = 0

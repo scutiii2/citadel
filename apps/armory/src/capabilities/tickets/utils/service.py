@@ -1,7 +1,5 @@
-"""Support tickets: validation, automatic-report guards, tagging, Laya grouping and
-priority elevation. The service never raises because Laya is down; it just
-skips grouping and tagging. Ticket text is never logged.
-"""
+"""Support tickets: validation, automatic-report guards, tagging, Laya grouping and priority elevation.
+Never raises when Laya is down (skips grouping and tagging); ticket text is never logged."""
 
 from __future__ import annotations
 

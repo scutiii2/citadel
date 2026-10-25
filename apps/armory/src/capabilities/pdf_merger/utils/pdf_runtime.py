@@ -1,8 +1,5 @@
 """One event loop owns PDF jobs, quotas and cleanup across capability reloads.
-
-The owner lives outside the reloadable capability to prevent duplicate sweepers
-and indexes on an offline/online cycle. Engine imports remain lazy.
-"""
+It lives outside the reloadable capability to avoid duplicate sweepers; engine imports stay lazy."""
 from __future__ import annotations
 
 import atexit

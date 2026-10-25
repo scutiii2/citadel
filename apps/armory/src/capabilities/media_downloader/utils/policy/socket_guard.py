@@ -1,24 +1,5 @@
-"""Block connections to non-public addresses, including redirect targets.
-
-yt-dlp follows HTTP redirects inside its own HTTP handler, so a URL that passed
-UrlPolicy could still redirect to http://127.0.0.1/... The guard wraps
-socket.getaddrinfo, which every outgoing connection goes through (urllib,
-urllib3, http.client), and refuses disallowed answers while a thread is inside
-``active()``. It also closes DNS-rebinding gaps, because the checked answer is
-the one the connection uses. Threads outside ``active()`` (uvicorn, the event
-loop's resolver) are untouched.
-
-The default rule also refuses ports other than 80 and 443, so a redirect can't
-reach a non-web service on a public host either.
-
-External downloaders (ffmpeg and friends) open their own sockets, which this
-guard can't see; ytdlp.py refuses them while the guard is active and refuses
-live streams up front.
-
-libcurl (yt-dlp's curl_cffi impersonation handler) resolves names and follows
-redirects in C, also out of sight. curl_guard.py checks every curl_cffi hop
-with ``check_host`` and pins libcurl to the checked IPs.
-"""
+"""Block connections to non-public addresses, including redirect targets, by wrapping socket.getaddrinfo.
+Applies only inside ``active()``; also refuses ports other than 80/443. External downloaders and libcurl bypass it (see ytdlp.py, curl_guard.py)."""
 
 from __future__ import annotations
 
@@ -66,9 +47,7 @@ class SocketGuard:
 
     def install(self) -> None:
         """Replace socket.getaddrinfo with the guarded wrapper (idempotent).
-
-        Also routes yt-dlp's curl_cffi requests through ``check_host`` (see curl_guard.py).
-        """
+        Also routes curl_cffi requests through ``check_host`` (see curl_guard.py)."""
         from src.capabilities.media_downloader.utils.policy import curl_guard  # late import: curl_guard imports this module
 
         curl_guard.install()
@@ -90,11 +69,8 @@ class SocketGuard:
         return getattr(self._local, "depth", 0) > 0
 
     def check_host(self, host: str, port: int) -> list[str]:
-        """Resolve ``host`` through the guarded lookup and return the checked IPs.
-
-        For clients that resolve on their own (libcurl): connect only to the returned IPs.
-        Inside ``active()`` a disallowed answer raises BlockedAddressError and sets ``blocked``.
-        """
+        """Resolve ``host`` through the guarded lookup and return the checked IPs, for clients that resolve on their own.
+        A disallowed answer inside ``active()`` raises BlockedAddressError and sets ``blocked``."""
         if self._original is None:
             raise RuntimeError("SocketGuard.check_host needs the guard installed")
         results = self._getaddrinfo(host, port, type=socket.SOCK_STREAM)

@@ -1,13 +1,5 @@
-"""Per-watcher email recipients.
-
-One JSON file per watcher class, ``{state_dir}/{WatcherClass}/recipients.json``,
-mapping watcher key -> list of addresses. Kept beside - not inside - the
-class's ``instances/`` record folder so JobWatcher.resume_all()/list_watchers() (which glob
-that folder for records) never mistake it for one, and so a record deleted
-on stop doesn't take the recipients with it.
-
-Runtime state, never committed (state dirs are gitignored).
-"""
+"""Per-watcher email recipients: ``{state_dir}/{WatcherClass}/recipients.json``, mapping watcher key to addresses.
+Kept beside the ``instances/`` record folder so resume_all() never mistakes it for a record. Runtime state, gitignored."""
 
 from __future__ import annotations
 
@@ -22,9 +14,8 @@ _lock = threading.Lock()
 
 
 def parse_recipients(text: str) -> list[str]:
-    """Split a comma/semicolon/whitespace separated string into unique,
-    validated addresses (case-insensitive de-dupe, order kept). Raises
-    ValueError naming the first malformed address."""
+    """Split a comma/semicolon/whitespace separated string into unique, validated addresses (case-insensitive, order kept).
+    Raises ValueError naming the first malformed address."""
     seen: set[str] = set()
     result: list[str] = []
     for raw in re.split(r"[,;\s]+", text or ""):

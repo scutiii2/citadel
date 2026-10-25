@@ -1,23 +1,5 @@
-"""Start, stop, restart, and list the Docker containers on this host.
-
-Unlike `host_health`/`otp`, this doesn't go through `infra/ssh.py` or
-`infra/app_config.py` - there's nothing to dial out to. The intended
-deployment (see `../../../zima_host.yaml`) runs this server itself as a
-container on the same ZimaOS box as the apps it manages, with the host's
-Docker socket bind-mounted in, so `docker.from_env()` talks to the same
-Docker daemon every other app on that box is already running under.
-
-The client is built fresh on every call rather than cached at import
-time or held as a module-level singleton. Two reasons: `run.py` imports
-every capability unconditionally now (even a disabled one, so it can be
-re-enabled live - see `capabilities/README.md`), so building the client
-at import time would crash the *entire* server's startup the moment the
-socket isn't mounted yet, instead of failing only the one tool call that
-needed it. And unlike an SSH connection there's no per-call round-trip
-cost being saved by holding one open - `docker.from_env()` just reads
-`DOCKER_HOST`/inspects the socket path, it doesn't itself talk to the
-daemon until the first real call does.
-"""
+"""Start, stop, restart and list Docker containers on this host via the mounted Docker socket.
+The client is built per call so a missing socket fails one tool call, not server startup."""
 
 from __future__ import annotations
 
@@ -58,9 +40,7 @@ def _known_app_names(client: docker.DockerClient) -> list[str]:
 
 
 def _image_label(container) -> str:
-    """The image's own tag if it has one, else its short id - a container
-    started from a now-untagged (dangling) image otherwise has no name at
-    all to show, which reads as a bug rather than a fact about the image."""
+    """The image's own tag if it has one, else its short id (a dangling image would otherwise show no name)."""
     try:
         image = container.image
     except ImageNotFound:
@@ -141,8 +121,7 @@ def get_app_logs(name: str, lines: int = 500) -> AppLogsResult:
 
 def read_app_logs(name: str, lines: int = 200, contains: str | None = None) -> AppLogTextResult:
     """The newest `lines` log lines of an app as text, secrets masked.
-    With `contains`, only lines holding it (case-insensitive) are kept; the
-    search looks through the newest MAX_LOG_LINES lines."""
+    `contains` keeps only matching lines (case-insensitive) among the newest MAX_LOG_LINES."""
     if not 1 <= lines <= MAX_READ_LINES:
         raise ValueError(f"lines must be between 1 and {MAX_READ_LINES}, not {lines}")
     needle = (contains or "").strip().lower()

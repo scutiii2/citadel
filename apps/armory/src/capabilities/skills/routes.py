@@ -1,10 +1,5 @@
 """Internal account-scoped Skills page routes and account-deletion purge.
-
-A plain HTTP route and not a tool, so no model can name a user or approve a skill: only
-ember_api calls them for the signed-in account. This is the one place that reaches
-`skill_store.set_status`. Checked against the internal token like /upload (an unset token
-never validates).
-"""
+Plain HTTP, not tools, so no model can approve a skill; the only caller of `skill_store.set_status`, checked against the internal token."""
 
 from __future__ import annotations
 

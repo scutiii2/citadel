@@ -1,9 +1,5 @@
-"""Scrape pages, map sites and crawl them through Firecrawl.
-
-Firecrawl fetches the pages, so this server never opens a connection to an
-address a caller chose. Web text is capped and fenced (`services/untrusted.py`)
-before it is returned: it reaches a model, and a page can say anything.
-"""
+"""Scrape pages, map sites and crawl them through Firecrawl, so this server never opens a caller-chosen address.
+Web text is capped and fenced (`services/untrusted.py`) before it reaches a model."""
 
 from __future__ import annotations
 

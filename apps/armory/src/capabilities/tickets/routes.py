@@ -1,12 +1,5 @@
-"""HTTP routes for support tickets, mounted like /download (see run.py).
-
-Plain HTTP, not tools: ember_api is the caller. Every request needs
-X-Internal-Token. The requester comes from X-Requester-Username and is the only
-source of the reporter's display name; their uid (X-Requester-Uid) is the owner key. Reporter routes (/tickets) only ever touch
-the requester's own tickets; staff routes (/ticket-admin) see everything and
-are called by ember_api only for accounts allowed to manage tickets. These
-routes stay up when the `tickets` capability is switched off.
-"""
+"""HTTP routes for support tickets, mounted like /download (see run.py); plain HTTP, ember_api is the caller.
+All need X-Internal-Token; /tickets touches only the requester's own tickets, /ticket-admin is staff-only. They stay up when `tickets` is off."""
 
 from __future__ import annotations
 

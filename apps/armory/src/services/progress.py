@@ -1,16 +1,5 @@
-"""Live progress reporting for long-running tool calls.
-
-``domain.py`` code calls ``report("Connecting to host...")`` at each notable
-step. It has no idea who is listening: ``offload.offload_with_progress``
-binds a sink for the duration of one tool call, forwarding each message to
-the MCP client as a ``notifications/progress``. With no sink bound (unit
-tests, watcher threads, a client that sent no progress token) ``report`` is
-a silent no-op, so domain code never needs a ``progress`` parameter.
-
-A ``ContextVar`` carries the sink because ``asyncio.to_thread`` copies the
-calling context into its worker thread - the same reason
-``identity_context`` works there.
-"""
+"""Live progress reporting for long tool calls: ``domain.py`` calls ``report("...")``; ``offload.offload_with_progress`` binds a sink forwarding it as ``notifications/progress``.
+With no sink (tests, watcher threads, no progress token) it is a no-op. A ``ContextVar`` carries the sink across ``asyncio.to_thread``."""
 
 from __future__ import annotations
 

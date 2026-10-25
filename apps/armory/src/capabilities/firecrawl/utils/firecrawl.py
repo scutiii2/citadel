@@ -17,11 +17,8 @@ class FirecrawlError(RuntimeError):
 
 
 class FirecrawlClient:
-    """Blocking client. Callers run it off the event loop (see `@offload`).
-
-    The hosted API needs a key. A self-hosted instance (custom `base_url`)
-    may run without one, so the key is only required for the hosted address.
-    """
+    """Blocking client; callers run it off the event loop (see `@offload`).
+    The key is required only for the hosted address, not a self-hosted `base_url`."""
 
     def __init__(self, api_key: str, base_url: str = "", timeout: int = TIMEOUT_SECONDS) -> None:
         self._base_url = (base_url or HOSTED_URL).rstrip("/")

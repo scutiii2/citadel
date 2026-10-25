@@ -1,8 +1,5 @@
 """MergeService: the one facade the REST routers and MCP tools call.
-
-It composes the store, converters, planner, assembler, job queue and link
-signer. Routers and tools hold no logic of their own.
-"""
+Routers and tools hold no logic of their own."""
 
 from __future__ import annotations
 

@@ -1,10 +1,5 @@
 """Tests for the server-manager domain logic.
-
-No real Docker daemon: every test patches `docker.from_env` with a fake
-client built from `MagicMock`, exercising the wiring (which container
-method gets called, how a missing container or a missing daemon is
-reported) rather than Docker itself.
-"""
+Docker is faked via `docker.from_env` and `MagicMock`; they check the wiring and error reporting, not Docker."""
 
 from __future__ import annotations
 
@@ -46,9 +41,7 @@ def _fake_client(containers: list):
 
 
 def test_unreachable_daemon_gives_a_recoverable_message():
-    """The caller is a model or a person reading its answer, not someone
-    who can inspect the socket themselves - the message has to say what
-    to actually do."""
+    """The reader can't inspect the socket themselves, so the message must say what to do."""
     with patch("docker.from_env", side_effect=DockerException("no such file")):
         with pytest.raises(RuntimeError, match="docker.sock"):
             domain.list_apps()
@@ -105,9 +98,7 @@ def test_restart_app_calls_restart_not_stop_then_start():
 
 
 def test_unknown_app_name_lists_the_names_that_exist():
-    """The caller is a model that guessed the container name - naming
-    the alternatives lets it recover on the next turn, same convention
-    as host_health's unknown-host error."""
+    """The caller is a model that guessed the container name; naming the alternatives lets it recover next turn."""
     client = _fake_client([_fake_container("jellyfin"), _fake_container("plex")])
 
     with patch("docker.from_env", return_value=client):
@@ -172,9 +163,7 @@ def test_empty_host_reports_no_apps_rather_than_raising():
 
 
 def test_dangling_image_falls_back_to_the_short_id():
-    """A container started from an untagged (dangling) image has no tag
-    to show - reporting nothing there would look like a bug, not a fact
-    about the image."""
+    """A container from an untagged (dangling) image has no tag; reporting nothing would look like a bug."""
     container = _fake_container("orphan", tags=[])
 
     client = _fake_client([container])

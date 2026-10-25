@@ -1,10 +1,5 @@
-"""Tests for the @command decorator and its registry - see
-src/commands.py. Each test gets its own empty registry via
-monkeypatch (swapping the module's _COMMANDS dict for the duration of
-the test) rather than mutating the real one in place, so this file
-can't clobber registrations other test files rely on being real (e.g.
-test_otp_commands.py, which asserts against the actual otp
-capability's registrations)."""
+"""Tests for the @command decorator and its registry (src/commands.py).
+Each test monkeypatches an empty _COMMANDS so it can't clobber registrations other test files rely on."""
 
 from __future__ import annotations
 

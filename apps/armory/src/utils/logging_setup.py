@@ -1,14 +1,5 @@
-"""Wires Python logging to disk. Called once, from run.py's main().
-
-Mirrors chat_app/src/utils/logging_setup.py - see that module's
-docstring for the reasoning (root logger so uvicorn's own request/error
-logs land here too; a StreamHandler alongside the file handler because
-attaching any handler to the root logger suppresses Python's stderr
-"lastResort" handler). Deliberately duplicated rather than shared: the
-two apps live in separate venvs with no dependency between them (see
-services/app_config.py's docstring for the same convention elsewhere in
-this repo).
-"""
+"""Wires Python logging to disk; called once from run.py's main().
+Mirrors chat_app/src/utils/logging_setup.py (root logger for uvicorn, plus a StreamHandler since a root handler suppresses stderr's lastResort); duplicated because the apps share no venv."""
 
 from __future__ import annotations
 

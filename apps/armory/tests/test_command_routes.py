@@ -1,6 +1,5 @@
-"""Tests for GET /commands - same Starlette TestClient pattern as
-test_extension_routes.py. Uses monkeypatch to swap in an isolated
-registry per test, same reasoning as test_commands.py."""
+"""Tests for GET /commands, with the same TestClient pattern as test_extension_routes.py.
+Monkeypatch swaps in an isolated registry per test, as in test_commands.py."""
 
 from __future__ import annotations
 
@@ -70,10 +69,7 @@ def test_list_commands_omits_a_disabled_capabilitys_commands(client, monkeypatch
 
 
 def test_list_commands_includes_a_command_whose_capability_the_registry_never_heard_of(client, monkeypatch):
-    """Fails open: a command isn't hidden just because nothing called
-    capturing() for its capability (shouldn't happen for a real
-    capability, but a hidden command from a registry gap would be a
-    confusing way to find out)."""
+    """Fails open: a command isn't hidden just because nothing called capturing() for its capability."""
     def fn():
         ...
 

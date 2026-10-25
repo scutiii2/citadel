@@ -1,16 +1,5 @@
-"""Word list for passphrases: the EFF long word list for dice-generated
-passphrases (7,776 words, so each word adds log2(7776), about 12.9 bits).
-
-Source: https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt
-Copyright (c) 2016 Electronic Frontier Foundation, licensed CC BY 3.0 US
-(https://creativecommons.org/licenses/by/3.0/us/). The words are unchanged;
-only the dice-roll numbers were dropped.
-
-Four entries contain a hyphen (drop-down, felt-tip, t-shirt, yo-yo). Pick a
-separator other than "-" if a passphrase must be split back into words.
-Duplicates are dropped at import, so a slip here can never shrink the
-effective list silently.
-"""
+"""EFF long word list (7,776 words, ~12.9 bits each), CC BY 3.0 US: https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt
+Four entries contain a hyphen; duplicates are dropped at import."""
 
 from __future__ import annotations
 

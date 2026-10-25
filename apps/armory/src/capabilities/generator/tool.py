@@ -1,7 +1,5 @@
-"""MCP tool wrappers for the generator capability - thin on purpose.
-No config: call the domain function, return its result. Generated values
-come back in the result (or, with `email_to`, go to that inbox and are left
-out of the result) and are neither stored nor logged."""
+"""MCP tool wrappers for the generator capability; thin, no config.
+Values are returned once (or emailed with `email_to`), never stored or logged."""
 
 from __future__ import annotations
 

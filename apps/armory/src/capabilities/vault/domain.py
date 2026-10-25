@@ -1,8 +1,5 @@
-"""Search and read the Obsidian vault. Read-only, markdown only.
-
-Every path goes through `ConfinedRoot`, so a caller cannot leave the vault
-or reach `.obsidian`, `.git` or anything that looks like a secret.
-"""
+"""Search and read the Obsidian vault, read-only and markdown only.
+Paths go through `ConfinedRoot`, so `.obsidian`, `.git` and secret-like files are unreachable."""
 
 from __future__ import annotations
 

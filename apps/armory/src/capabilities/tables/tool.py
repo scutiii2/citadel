@@ -55,9 +55,8 @@ def tool_tables_describe(table_id: TableId) -> DescribeResult:
     return domain.describe(*_caller(), table_id)
 
 
-# `head` and `top` are two slash commands over this one tool: `/data head table_id=...` is the
-# first rows, `/data top table_id=... sort_by=...` ranks by a column. Its `conditions` are
-# structured, so the command form cannot fill them; the agent can.
+# `head` and `top` are two slash commands over this one tool. Its structured `conditions`
+# cannot be filled from the command form; the agent can.
 @command(name="head", description="Show the first rows of a table")
 @command(name="top", description="Highest or lowest rows of a column")
 @mcp.tool(meta={"keywords": ["table", "csv", "excel", "xlsx", "spreadsheet", "rows", "head", "preview", "first", "filter", "where", "search", "find", "top", "bottom", "highest", "lowest", "largest", "smallest", "rank", "data"], "display_label": "Reading table rows"})

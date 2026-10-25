@@ -1,16 +1,5 @@
-"""Turns an uploaded CSV or XLSX file into a typed `ParsedTable`.
-
-Stdlib `csv` plus `openpyxl` in read-only mode - no pandas. Everything is
-refused with a `TableRefused` whose message is safe to show to the caller.
-
-Typing is per column, after the whole file is read: number when at least 95%
-of the non-empty cells parse as numbers, else date when at least 95% parse as
-ISO dates, else text. A cell that fails the chosen type becomes empty and is
-counted in the table's `notes`, so a stray "n/a" never silently skews a total
-without the caller being told.
-
-Callers run `load_table` off the event loop (it is blocking, CPU-bound work).
-"""
+"""Turns an uploaded CSV or XLSX file into a typed `ParsedTable` (stdlib `csv` plus read-only `openpyxl`).
+Column type is number (95%+ parse), else date (95%+ ISO), else text; failed cells become empty and are counted in `notes`. Blocking: run off the event loop."""
 
 from __future__ import annotations
 
