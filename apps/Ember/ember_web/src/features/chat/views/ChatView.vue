@@ -461,6 +461,8 @@ useChatShortcuts({
           :commands="commands"
           :history="history"
           :suggestion="suggestion"
+          :independent="independent"
+          @update:independent="chat.setIndependent"
           :schema-for="chat.commandSchema"
           :templates="templates.templates"
           :templates-loading="templates.loading"

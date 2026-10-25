@@ -36,8 +36,9 @@ const props = withDefaults(
     templatesLoading?: boolean;
     templatesError?: string;
     suggestion?: string | null;
+    independent?: boolean;
   }>(),
-  { commands: () => [], history: () => [], templates: () => [], templatesLoading: false, templatesError: "", suggestion: null },
+  { commands: () => [], history: () => [], templates: () => [], templatesLoading: false, templatesError: "", suggestion: null, independent: false },
 );
 // suggestion: the predicted next question. It is the placeholder while the box
 // is empty; Tab on the empty box takes it (suggestionUsed), and it can be edited.
@@ -54,6 +55,7 @@ const emit = defineEmits<{
   manageTemplates: [draft: string];
   suggestionUsed: [];
   triage: [];
+  "update:independent": [value: boolean];
 }>();
 
 const draft = ref("");
@@ -502,6 +504,13 @@ function onKeydown(event: KeyboardEvent): void {
         <!-- The chat page's own controls (settings, status) sit beside the attach button. -->
         <slot name="tools" />
         <span class="spacer" />
+        <button type="button" class="attach independent" :class="{ on: independent }" :aria-pressed="independent"
+          :title="independent ? 'Independent prompts on: the agent does not see earlier messages' : 'Independent prompts off: the agent sees the chat history'"
+          aria-label="Independent prompts" @click="emit('update:independent', !independent)">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M12 7v5l3 2M4.5 7.5A9 9 0 1 1 3 12M3 4v4h4M3 3l18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
         <span class="send-slot">
           <button v-if="busy" type="button" class="round stop" title="Stop (Esc)" @click="emit('stop')">
             <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
@@ -659,6 +668,8 @@ function onKeydown(event: KeyboardEvent): void {
 .attach:hover {
   color: var(--text);
 }
+.independent.on { color: var(--accent); }
+.independent:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .recall {
   margin: 0 0 4px 12px;
   font-size: 0.75em;

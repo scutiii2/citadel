@@ -6,6 +6,7 @@
  * Re-check them when those prompts change. */
 export type CostedSetting =
   | "terse"
+  | "independent"
   | "plan"
   | "planLean"
   | "askTools"
@@ -19,6 +20,8 @@ export type CostedSetting =
 export const TOKEN_COSTS: Record<CostedSetting, string> = {
   terse:
     "Adds about 120 input tokens to every model call, but shorter answers usually save more output tokens than that.",
+  independent:
+    "Saves input tokens: each question is sent without the earlier messages of the chat, so the agent cannot refer back to them.",
   plan:
     "Adds about 200 input tokens to every model call, plus about 15-25 output tokens per item each time the agent updates the list (roughly 400-500 for a 5-step task). Off costs nothing.",
   planLean:

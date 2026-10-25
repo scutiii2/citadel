@@ -30,6 +30,7 @@ vi.mock("../../api/triage/TriageStrategyClient", () => ({
 // four preferences on it, so a plain stand-in is enough.
 const chat = reactive({
   caveman: false,
+  independent: false,
   plan: true,
   planLean: true,
   approvalMode: "allow_all" as string,
@@ -40,6 +41,7 @@ const chat = reactive({
   contextAccuracy: "estimate" as string,
   forceToolApproval: false,
   setCaveman: vi.fn((on: boolean) => (chat.caveman = on)),
+  setIndependent: vi.fn((on: boolean) => (chat.independent = on)),
   setPlan: vi.fn((on: boolean) => (chat.plan = on)),
   setPlanLean: vi.fn((on: boolean) => (chat.planLean = on)),
   setApprovalMode: vi.fn((mode: string) => (chat.approvalMode = mode)),
@@ -91,6 +93,7 @@ beforeEach(() => {
   localStorage.clear();
   document.body.innerHTML = "";
   chat.caveman = false;
+  chat.independent = false;
   chat.plan = true;
   chat.planLean = true;
   chat.approvalMode = "allow_all";
@@ -162,7 +165,7 @@ describe("SettingsView", () => {
 
     expect(w.findAll("h3").map((h) => h.text())).toEqual(["Chat", "Context display", "Appearance", "Sidebar", "Response limits", "Triage Assistant"]);
     expect(rowIds(w)).toEqual([
-      "chat-terse", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions",
+      "chat-terse", "chat-independent", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions",
       "context-live-tokens", "context-panel", "context-accuracy", "appearance-theme", "sidebar-pages", "max_output_tokens", "max_tool_rounds", "triage-strategy",
     ]);
     expect(w.text()).not.toContain("Tool approval");
@@ -172,7 +175,7 @@ describe("SettingsView", () => {
   it("notes the token cost of every chat setting", async () => {
     const w = await mountView();
 
-    for (const id of ["chat-terse", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions"]) {
+    for (const id of ["chat-terse", "chat-independent", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions"]) {
       expect(row(w, id).get("[data-test=cost]").text(), id).toMatch(/token/i);
     }
     expect(row(w, "chat-plan").get("[data-test=cost]").text()).toContain("200 input tokens");
@@ -392,7 +395,7 @@ describe("modified filter", () => {
   it("is a pill that shows only the changed settings, and toggles back", async () => {
     chat.caveman = true;
     const w = await mountView();
-    expect(rowIds(w)).toHaveLength(15);
+    expect(rowIds(w)).toHaveLength(16);
     expect(w.get(".badge").attributes("aria-pressed")).toBe("false");
 
     await w.get(".badge").trigger("click");
@@ -402,7 +405,7 @@ describe("modified filter", () => {
     expect(w.get(".badge").attributes("aria-pressed")).toBe("true");
 
     await w.get(".badge").trigger("click");
-    expect(rowIds(w)).toHaveLength(15);
+    expect(rowIds(w)).toHaveLength(16);
   });
 
   it("drops the filter once nothing is modified any more", async () => {
@@ -413,7 +416,7 @@ describe("modified filter", () => {
     await row(w, "chat-terse").get("button.reset").trigger("click");
 
     expect(w.find(".badge").exists()).toBe(false);
-    expect(rowIds(w)).toHaveLength(15);
+    expect(rowIds(w)).toHaveLength(16);
   });
 });
 
@@ -444,7 +447,7 @@ describe("search", () => {
     expect(w.text()).toContain('No settings match "zzz"');
     expect(rowIds(w)).toEqual([]);
     await w.get("button.link").trigger("click");
-    expect(rowIds(w)).toHaveLength(15);
+    expect(rowIds(w)).toHaveLength(16);
     expect((search(w).element as HTMLInputElement).value).toBe("");
   });
 
@@ -457,7 +460,7 @@ describe("search", () => {
 
     await search(w).trigger("keydown", { key: "Escape" });
     expect((search(w).element as HTMLInputElement).value).toBe("");
-    expect(rowIds(w)).toHaveLength(15);
+    expect(rowIds(w)).toHaveLength(16);
   });
 });
 
@@ -465,7 +468,7 @@ it("keeps workspace tool approval in Ember Admin", async () => {
   const w = await mountView(ADMIN);
   expect(w.text()).not.toContain("Tool approval");
   expect(w.text()).not.toContain("Applies to all accounts");
-  expect(rowIds(w)).toHaveLength(15);
+  expect(rowIds(w)).toHaveLength(16);
 });
 
 it("reverts account drafts while retaining applied device preferences", async () => {

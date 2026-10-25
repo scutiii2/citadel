@@ -3,7 +3,7 @@ import { TOKEN_COSTS, withTokenCost, type CostedSetting } from "./tokenCosts";
 
 describe("tokenCosts", () => {
   it("has a note for every chat setting", () => {
-    const settings: CostedSetting[] = ["terse", "plan", "planLean", "askTools", "chime", "notifications", "suggestions", "liveTokens", "contextPanel", "contextAccuracy"];
+    const settings: CostedSetting[] = ["terse", "independent", "plan", "planLean", "askTools", "chime", "notifications", "suggestions", "liveTokens", "contextPanel", "contextAccuracy"];
     expect(Object.keys(TOKEN_COSTS).sort()).toEqual([...settings].sort());
     for (const key of settings) expect(TOKEN_COSTS[key].length).toBeGreaterThan(10);
   });
