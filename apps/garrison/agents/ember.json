@@ -17,7 +17,8 @@
       "tool_mem_*",
       "tool_notes_*",
       "tool_skill_*",
-      "tool_ticket_*"
+      "tool_ticket_*",
+      "u_*"
     ],
     "deny": []
   }
