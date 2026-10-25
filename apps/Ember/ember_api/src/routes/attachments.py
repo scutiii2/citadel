@@ -20,6 +20,7 @@ from src.routes.server_info import get_server_info
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import McpServerInfo, McpServerRefused, McpServerUnavailable
 from src.services.permissions import FILES_UPLOAD
+from src.services.scribe import ScribeGateway
 from src.services.capability_files import CapabilityFilesGateway
 from src.services.text_extraction import MAX_FILE_BYTES, ExtractionError, extract_text_async
 
@@ -174,4 +175,49 @@ async def attachment_pdf(
         text=text,
         char_count=chars,
         truncated=truncated,
+    )
+
+
+_AUDIO_SUFFIXES = (".mp3", ".wav", ".m4a", ".ogg", ".flac", ".webm")
+# 20 MB, not Scribe's 25 MB: base64 of 25 MB would not fit ember_api's request cap for this path.
+_MAX_AUDIO_BYTES = 20 * 1024 * 1024
+_MAX_AUDIO_BASE64 = (_MAX_AUDIO_BYTES + 2) // 3 * 4
+
+
+class AudioIn(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    data: str = Field(min_length=1, max_length=_MAX_AUDIO_BASE64)
+
+
+class AttachmentAudioOut(BaseModel):
+    filename: str
+    file_id: str
+    duration_s: float
+    expires_at: float
+
+
+@router.post("/audio")
+async def attachment_audio(
+    body: AudioIn,
+    request: Request,
+    account: Account = Depends(require_chat),
+    logs: LogWriter = Depends(get_log_writer),
+) -> AttachmentAudioOut:
+    """Keep the original for Scribe's transcribe tool; the agent gets the file_id."""
+    filename = body.filename.replace("\\", "/").rsplit("/", 1)[-1]
+    if not filename.lower().endswith(_AUDIO_SUFFIXES):
+        raise HTTPException(400, "Upload an mp3, wav, m4a, ogg, flac or webm file")
+    try:
+        content = base64.b64decode(body.data, validate=True)
+    except (binascii.Error, ValueError) as error:
+        raise HTTPException(400, "data must be base64") from error
+    if len(content) > _MAX_AUDIO_BYTES:
+        raise HTTPException(413, "The audio is larger than 20 MB")
+    gateway = ScribeGateway(request.app.state.upstream, request.app.state.settings.scribe_url,
+                            request.app.state.internal_token)
+    uploaded = await gateway.upload(account, filename, content)
+    await logs.action(account, "attachments.audio", f"Attached '{filename}' ({len(content):,} bytes) for transcription")
+    return AttachmentAudioOut(
+        filename=filename, file_id=uploaded["file_id"], duration_s=float(uploaded["duration_s"]),
+        expires_at=float(uploaded["expires_at"]),
     )
