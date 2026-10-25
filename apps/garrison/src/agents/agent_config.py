@@ -21,7 +21,7 @@ from src.agents import agent_spec, auto_route, delegation, memory_recall, skill_
 from src.agents import router_routing
 from src.agents import plan as plan_policy
 
-from src.core import approvals, internal_auth, questions, tool_filter
+from src.core import approvals, internal_auth, questions, tool_filter, tuning_overrides
 from src.private_extensions import turn as private_turn
 from src.llm import auto_tier, context_breakdown, llm_config, llm_options, model_tiers
 from src.llm import reasoning_effort as effort_limits
@@ -183,6 +183,7 @@ async def run_chat(
     )
     effort = effort_limits.resolve(reasoning_effort, agent_spec.current().llm.max_effort, agent_spec.current().id)
     cancellation.register(request_id)
+    tuning_overrides.poll()
     request_token = cancellation.bind_request(request_id)
     delegated_usage, usage_token = delegation.bind_usage()
     attachment_token = delegation.bind_attachments(question, history)

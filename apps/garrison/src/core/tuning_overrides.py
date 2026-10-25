@@ -211,3 +211,28 @@ def signature(path: Path = PATH) -> int | None:
         return path.stat().st_mtime_ns
     except OSError:
         return None
+
+
+_resets: list[Callable[[], None]] = []
+_seen: int | None = None  # the overlay signature this process last acted on
+
+
+def on_change(reset: Callable[[], None]) -> None:
+    """Run `reset` (a reader's reset_cache) when poll() sees the overlay changed."""
+    _resets.append(reset)
+
+
+def poll(path: Path | None = None) -> None:
+    """Call at the start of a turn. One stat; runs the registered resets only when the
+    overlay was rewritten since the last call in this process. A failing reset is logged,
+    never raised: a turn must not break because an edit was bad."""
+    global _seen
+    current = signature(path or PATH)
+    if current == _seen:
+        return
+    _seen = current
+    for reset in _resets:
+        try:
+            reset()
+        except Exception:
+            _log.exception("tuning reset %s failed", getattr(reset, "__name__", reset))

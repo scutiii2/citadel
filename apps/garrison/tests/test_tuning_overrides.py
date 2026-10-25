@@ -167,3 +167,46 @@ def test_every_allowed_extreme_is_accepted_by_the_real_loaders(tuning, monkeypat
     finally:
         token_limits.reset_cache()
         decision.reset_cache()
+
+
+def test_poll_clears_registered_caches_once_per_change(tuning, monkeypatch):
+    _, overlay = tuning
+    calls = []
+    monkeypatch.setattr(tuning_overrides, "_resets", [lambda: calls.append(1)])
+    monkeypatch.setattr(tuning_overrides, "_seen", None)
+
+    tuning_overrides.poll(overlay)                      # no file: nothing changed
+    assert calls == []
+    tuning_overrides.save({"classifier.triage_trace": True}, overlay)
+    tuning_overrides.poll(overlay)
+    tuning_overrides.poll(overlay)                      # same file: no second reset
+    assert calls == [1]
+
+
+def test_a_failing_reset_does_not_stop_the_others_or_the_turn(tuning, monkeypatch):
+    _, overlay = tuning
+    calls = []
+
+    def boom():
+        raise ValueError("bad file")
+
+    monkeypatch.setattr(tuning_overrides, "_resets", [boom, lambda: calls.append(1)])
+    monkeypatch.setattr(tuning_overrides, "_seen", None)
+    tuning_overrides.save({"classifier.triage_trace": True}, overlay)
+    tuning_overrides.poll(overlay)
+    assert calls == [1]
+
+
+def test_an_admin_edit_reaches_token_limits_after_poll(tuning, monkeypatch):
+    from src.llm import token_limits
+
+    path, overlay = tuning
+    monkeypatch.setattr(token_limits, "_CONFIG_PATH", path)
+    monkeypatch.setattr(tuning_overrides, "_seen", None)
+    token_limits.reset_cache()
+    assert token_limits.max_tool_rounds("anthropic") == 15
+    tuning_overrides.save({"token_limits.default.max_tool_rounds": 30}, overlay)
+    assert token_limits.max_tool_rounds("anthropic") == 15      # cached until the poll
+    tuning_overrides.poll(overlay)
+    assert token_limits.max_tool_rounds("anthropic") == 30
+    token_limits.reset_cache()

@@ -11,6 +11,7 @@ import json
 import math
 from typing import Any
 
+from src.core import tuning_overrides
 from src.core.config_files import TUNING_PATH, read_section
 
 _CONFIG_PATH = TUNING_PATH
@@ -133,3 +134,6 @@ def reset_cache() -> None:
     """Clear only the module's config cache; primarily useful after config reloads."""
     global _config
     _config = None
+
+
+tuning_overrides.on_change(reset_cache)
