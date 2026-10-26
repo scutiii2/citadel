@@ -114,7 +114,6 @@ Hard break, no compat shim. All 20 `agents/*.json` migrate in the same change se
 
 - Router and auto-tier callers use `decision.py` chains directly today; phase 3 must port each to the wrapper without changing their thresholds. Cases in `scripts/check_*` and `tests/test_router_*` are the regression net.
 - Jev's `score`/`noul` answers come from a choice reduction; keep that mapping tested.
-- `english-then-typed` does not skip English for `noul` questions (the service's `auto` does, because of an English yes/no label bug). Verify noul quality; if poor, the `laya` gateway may switch to `auto` for noul only.
 - Confirm `english-then-typed` appears in `GET /v1/strategies` of the deployed service.
 - Rename touches the docker network name and port env; verify `dev_deploy.bat` and the ZimaOS overlay.
 
