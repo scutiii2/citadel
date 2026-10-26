@@ -1,9 +1,5 @@
-"""Tests for services/email.py.
-
-``smtplib.SMTP`` is mocked - these assert on what would be sent and to
-whom, not on real SMTP behavior. Note the mock stands in for the context
-manager, so the assertions read off ``__enter__``'s return value.
-"""
+"""Tests for services/email/send.py.
+``smtplib.SMTP`` is mocked, so these assert on what would be sent and to whom; assertions read ``__enter__``'s return value."""
 
 from __future__ import annotations
 
@@ -13,8 +9,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.services.app_config import EmailConfig
-from src.services.email import AUTO_GENERATED_NOTICE, send_email
-from src.services.email_render import render_email_template
+from src.services.email.send import AUTO_GENERATED_NOTICE, send_email
+from src.services.email.render import render_email_template
 
 
 CONFIG = EmailConfig(
@@ -55,9 +51,7 @@ def test_send_email_uses_the_configured_recipients_by_default():
 
 
 def test_to_override_replaces_rather_than_extends_the_config_list():
-    """An override targets a different audience entirely - an approver, or
-    the one person a message is about. Appending to the standing list
-    instead would quietly CC everyone on it."""
+    """An override targets a different audience entirely; appending to the standing list would CC everyone on it."""
     smtp, server = _smtp_mock()
 
     with patch("smtplib.SMTP", smtp):
@@ -89,11 +83,8 @@ def test_empty_recipient_list_raises_instead_of_silently_sending_nothing():
     smtp.assert_not_called()
 
 
-# --- transport ---------------------------------------------------------
-# The sending account is usually a consumer provider, and they disagree
-# about how the connection is protected. Each mode has to reach a
-# different smtplib entry point, and picking the wrong one doesn't
-# degrade - it fails to connect or, worse, sends the password in clear.
+# --- transport ---
+# Each mode must reach a different smtplib entry point; the wrong one fails to connect or sends the password in clear.
 
 
 def test_starttls_mode_upgrades_a_plain_connection():
@@ -109,9 +100,7 @@ def test_starttls_mode_upgrades_a_plain_connection():
 
 
 def test_ssl_mode_uses_smtp_ssl_and_never_calls_starttls():
-    """SMTP_SSL wraps the socket before the greeting, so starttls() on it
-    is an error rather than a redundant no-op - the two modes are separate
-    code paths, not a flag."""
+    """SMTP_SSL wraps the socket before the greeting, so starttls() on it is an error; the modes are separate code paths."""
     smtp_ssl, server = _smtp_mock()
     config = EmailConfig(**{**CONFIG.__dict__, "smtp_port": 465, "security": "ssl"})
 
@@ -125,9 +114,7 @@ def test_ssl_mode_uses_smtp_ssl_and_never_calls_starttls():
 
 
 def test_none_mode_sends_without_any_tls():
-    """For a relay on your own network that offers no TLS at all. Calling
-    starttls() there aborts the send, which is why this can't just be
-    starttls-and-hope."""
+    """A relay with no TLS at all: calling starttls() there aborts the send."""
     smtp, server = _smtp_mock()
     config = EmailConfig(**{**CONFIG.__dict__, "security": "none", "password": ""})
 
@@ -140,9 +127,7 @@ def test_none_mode_sends_without_any_tls():
 
 
 def test_empty_password_skips_authentication_entirely():
-    """A relay that authorizes by source address has no AUTH extension,
-    and offering credentials to it is an error response, not a harmless
-    extra step - so an absent password must mean 'do not log in'."""
+    """A relay that authorizes by source address has no AUTH extension, so an absent password must mean "do not log in"."""
     smtp, server = _smtp_mock()
     config = EmailConfig(**{**CONFIG.__dict__, "password": ""})
 
@@ -171,9 +156,7 @@ def test_unknown_security_mode_raises_before_opening_a_connection():
 
 
 def test_plain_text_part_comes_before_the_html_part():
-    """RFC 2046 makes the LAST part of a multipart/alternative the
-    preferred one, so this order is what makes clients still render the
-    HTML while the text part exists for the ones that can't."""
+    """RFC 2046 prefers the LAST multipart/alternative part, so this order keeps the HTML rendering."""
     smtp, server = _smtp_mock()
 
     with patch("smtplib.SMTP", smtp):
@@ -185,9 +168,7 @@ def test_plain_text_part_comes_before_the_html_part():
 
 
 def test_plain_text_is_derived_from_the_html_without_the_caller_asking():
-    """Existing call sites pass HTML only, and an HTML-only body is a spam
-    signal at the providers these approval links are sent to - so the text
-    part cannot depend on callers remembering to supply one."""
+    """Existing call sites pass HTML only, which is a spam signal; the text part can't depend on callers supplying one."""
     smtp, server = _smtp_mock()
 
     with patch("smtplib.SMTP", smtp):
@@ -200,9 +181,7 @@ def test_plain_text_is_derived_from_the_html_without_the_caller_asking():
 
 
 def test_derived_text_keeps_link_targets():
-    """The whole point of these messages is a URL that lives in an href.
-    A stripper that kept only the anchor text would produce a plain part
-    telling the reader to click something that isn't there."""
+    """These messages exist to carry a URL in an href; keeping only anchor text would tell the reader to click something absent."""
     smtp, server = _smtp_mock()
     html = '<p><a href="https://example.com/approvals/tok3n">Review this request</a></p>'
 
@@ -225,9 +204,7 @@ def test_body_text_overrides_the_derived_version():
 
 
 def test_date_and_message_id_headers_are_set():
-    """smtplib adds neither, and receivers penalize or reject a message
-    without them - which for an approval link means the action silently
-    never gets approved."""
+    """smtplib adds neither header, and receivers penalize messages without them, so an approval link might never be approved."""
     smtp, server = _smtp_mock()
 
     with patch("smtplib.SMTP", smtp):
@@ -241,7 +218,7 @@ def test_date_and_message_id_headers_are_set():
 
 
 def test_every_message_ends_with_the_auto_generated_notice(monkeypatch):
-    from src.services import email as email_module
+    from src.services.email import send as email_module
 
     sent = []
 

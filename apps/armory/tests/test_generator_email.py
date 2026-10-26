@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from src.capabilities.generator import domain
-from src.services import email_delivery
+from src.services.email import delivery as email_delivery
 
 RFC_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
 
@@ -23,7 +23,7 @@ def sent(monkeypatch):
 
 
 def test_pin_is_emailed_and_left_out_of_the_result(sent):
-    result = domain.generate_pin(6, email_to="me@example.com")
+    result = domain.desk.generate_pin(6, email_to="me@example.com")
 
     assert result.pin is None
     assert result.emailed_to == "me@example.com"
@@ -34,8 +34,8 @@ def test_pin_is_emailed_and_left_out_of_the_result(sent):
 
 
 def test_password_and_passphrase_are_emailed(sent):
-    password = domain.generate_password(email_to="a@example.com, b@example.com")
-    phrase = domain.generate_passphrase(email_to="a@example.com")
+    password = domain.desk.generate_password(email_to="a@example.com, b@example.com")
+    phrase = domain.desk.generate_passphrase(email_to="a@example.com")
 
     assert password.password is None and password.emailed_to == "a@example.com, b@example.com"
     assert sent[0]["to"] == ["a@example.com", "b@example.com"]
@@ -43,29 +43,29 @@ def test_password_and_passphrase_are_emailed(sent):
 
 
 def test_totp_secret_hides_both_the_secret_and_the_uri(sent):
-    result = domain.generate_totp_secret("Ember", "me", email_to="me@example.com")
+    result = domain.desk.generate_totp_secret("Ember", "me", email_to="me@example.com")
 
     assert result.secret is None and result.otpauth_uri is None
     assert "otpauth://totp/" in sent[0]["body"]
 
 
 def test_totp_code_is_emailed(sent):
-    result = domain.get_totp_code(RFC_SECRET, at=59, email_to="me@example.com")
+    result = domain.desk.get_totp_code(RFC_SECRET, at=59, email_to="me@example.com")
 
     assert result.code is None and "287082" in sent[0]["body"] and "287082" not in result.message
 
 
 def test_no_email_to_returns_the_value_and_sends_nothing(sent):
-    result = domain.generate_pin(6)
+    result = domain.desk.generate_pin(6)
 
     assert result.pin and result.emailed_to is None and sent == []
 
 
 def test_bad_address_fails_before_anything_is_sent(sent):
     with pytest.raises(ValueError, match="valid email addresses"):
-        domain.generate_pin(6, email_to="not-an-address")
+        domain.desk.generate_pin(6, email_to="not-an-address")
     with pytest.raises(ValueError, match="control characters"):
-        domain.generate_pin(6, email_to="a@example.com\nBcc: x@example.com")
+        domain.desk.generate_pin(6, email_to="a@example.com\nBcc: x@example.com")
     assert sent == []
 
 
@@ -76,4 +76,4 @@ def test_failed_delivery_never_returns_the_value(monkeypatch):
     monkeypatch.setattr(email_delivery, "deliver_email", boom)
 
     with pytest.raises(email_delivery.EmailUnavailable):
-        domain.generate_pin(6, email_to="me@example.com")
+        domain.desk.generate_pin(6, email_to="me@example.com")

@@ -1,4 +1,11 @@
 """Shared outgoing email and threaded replies."""
-from src.services import capability_meta
 
-META = capability_meta.register(folder="email", id="email", label="Email")
+from src.services.capability_base import Capability
+
+
+class Email(Capability):
+    id = "email"
+    label = "Email"
+
+
+CAPABILITY = Email()

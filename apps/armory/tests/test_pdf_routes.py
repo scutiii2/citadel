@@ -19,7 +19,7 @@ def setup(tmp_path, monkeypatch):
     path = tmp_path / "private-generated.pdf"
     path.write_bytes(b"%PDF-test")
     download = Mock(return_value=(path, "merged report.pdf"))
-    domain = SimpleNamespace(download=download, PdfError=PdfError)
+    domain = SimpleNamespace(desk=SimpleNamespace(download=download), PdfError=PdfError)
     monkeypatch.setitem(sys.modules, "src.capabilities.pdf_merger.domain", domain)
     import src.capabilities.pdf_merger as package
     monkeypatch.setattr(package, "domain", domain, raising=False)

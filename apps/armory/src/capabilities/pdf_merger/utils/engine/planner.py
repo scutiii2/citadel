@@ -1,8 +1,5 @@
 """Validate a MergePlan against stored files and expand it into concrete pages.
-
-Runs before a job is queued, so every plan error reaches the caller as an
-immediate 4xx instead of a failed job.
-"""
+Runs before queuing, so plan errors reach the caller as an immediate 4xx."""
 
 from __future__ import annotations
 

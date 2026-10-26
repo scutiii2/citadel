@@ -1,35 +1,5 @@
-"""Address checks for yt-dlp's curl_cffi (browser impersonation) handler.
-
-Some sites (TikTok) only answer a request that looks like a real browser, which
-yt-dlp does through curl_cffi. libcurl resolves names and follows redirects in
-C, so the getaddrinfo wrapper in socket_guard.py never sees those connections.
-
-``install()`` makes yt-dlp's ``CurlCFFIRH`` use ``GuardedSession``. While the
-calling thread is inside a SocketGuard's ``active()`` block, each request:
-
-* is rebuilt from its parsed parts (scheme, host, port, path, query), so libcurl
-  connects to the same host we checked; odd hosts are refused;
-* resolves its host with ``SocketGuard.check_host`` (same allow rule, sets
-  ``guard.blocked``) before anything is sent;
-* pins libcurl to the checked IPs with ``CURLOPT_RESOLVE``, so a second DNS
-  answer (rebinding) can't change the target;
-* never uses a proxy (CURLOPT_PROXY "" and CURLOPT_NOPROXY "*", so *_proxy env vars
-  are ignored too); a proxy configured by yt-dlp is refused, since a proxy resolves
-  names itself;
-* never lets libcurl follow redirects: we follow ``Location`` ourselves, up to 5
-  hops, checking and pinning every hop (303, and 301/302 after POST, become GET;
-  307/308 keep method and body; only http and https).
-
-Refusals raise ``BlockedCurlRequest``: a BlockedAddressError that is also a
-curl_cffi RequestsError, so yt-dlp reports it as a TransportError (and does not
-retry the request on another handler). Outside ``active()`` sessions behave
-exactly like curl_cffi's own.
-
-The guard leans on yt-dlp/curl_cffi internals. ``install()`` re-checks them every
-time; if one is gone after an upgrade it fails closed: the CurlCFFI handler is taken
-out of yt-dlp's registry (no impersonation) and an error is logged. ``update.bat``
-runs tests/test_curl_guard.py after upgrading yt-dlp.
-"""
+"""Address checks for yt-dlp's curl_cffi handler, which libcurl resolves and redirects in C, past socket_guard.
+While inside ``active()`` each request is host-checked, IP-pinned, proxy-free and followed manually (5 hops max); refusals raise ``BlockedCurlRequest``. If curl_cffi internals change, ``install()`` fails closed."""
 
 from __future__ import annotations
 
@@ -356,12 +326,8 @@ def _disable_curl_handler(problems: list[str]) -> None:
 
 
 def install() -> None:
-    """Make yt-dlp's curl_cffi handler create GuardedSession instances (idempotent).
-
-    Called by SocketGuard.install(), so any process that guards sockets also guards libcurl. Must run
-    before a YoutubeDL is created. If the guard's assumptions about yt-dlp/curl_cffi no longer hold,
-    the curl handler is unregistered instead (no impersonation, but no unguarded requests either).
-    """
+    """Make yt-dlp's curl_cffi handler create GuardedSession instances (idempotent); call before creating a YoutubeDL.
+    If the guard's assumptions no longer hold, the curl handler is unregistered instead."""
     if _curlcffi is None:
         return
     global _original_create_instance

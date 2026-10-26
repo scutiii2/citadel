@@ -18,7 +18,8 @@ import uvicorn
 
 from src import commands, capability_help
 from src.config import settings
-from src.services import capability_meta, capability_registry, email_delivery
+from src.services import capability_meta, capability_registry
+from src.services.email import delivery as email_delivery
 from src.services.capability_loader import CapabilityLoader
 from src.services.identity_context import IdentityContextMiddleware
 from src.services.internal_token import InternalTokenMiddleware

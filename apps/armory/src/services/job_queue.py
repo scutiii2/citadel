@@ -1,10 +1,5 @@
 """The slot-holding core shared by the pdf_merger and media_downloader job queues.
-
-A queue runs submitted work under a concurrency limit and a cooperative timeout (Python cannot
-kill threads): when the timeout passes the job's ``cancel`` event is set and the work is awaited
-until it really stops, so the slot is never released early. Each capability owns what its jobs
-publish (events, error codes, messages); this base owns the bookkeeping.
-"""
+Runs work under a concurrency limit and cooperative timeout (threads can't be killed), holding the slot until the work stops; capabilities own their events and errors."""
 
 from __future__ import annotations
 
@@ -48,10 +43,7 @@ class JobQueueBase:
 
     async def _in_slot(self, job: Job, make_work: Callable[[], Awaitable[dict]]) -> tuple[asyncio.Future | None, bool]:
         """Wait for a slot, run ``make_work()`` in it and hold the slot until it stops.
-
-        Returns ``(None, False)`` when the job was cancelled while queued (the work never
-        starts), else ``(task, timed_out)``.
-        """
+        Returns ``(None, False)`` if cancelled while queued, else ``(task, timed_out)``."""
         async with self._semaphore:
             if job.cancel_event.is_set():
                 return None, False

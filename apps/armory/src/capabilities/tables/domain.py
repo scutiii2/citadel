@@ -1,10 +1,5 @@
-"""Read-only questions about a table an uploaded file became: describe,
-filter, group, rank. Plain Python over column tuples - no pandas, no `eval`,
-no expression strings. Every result is capped, and says so when it is.
-
-Functions take the registry and the caller's name instead of reaching for
-globals, so tests (and the tool wrappers) decide which store and which owner.
-"""
+"""Read-only questions about an uploaded table: describe, filter, group, rank. Plain Python, no pandas or `eval`.
+Results are capped and say so; functions take the registry and caller name so tests choose the store and owner."""
 
 from __future__ import annotations
 
@@ -29,8 +24,8 @@ from src.capabilities.tables.contract import (
     TableListResult,
     ValueCount,
 )
-from src.services.table_loader import parse_date, parse_number
-from src.services.tables import Table, TableRegistry
+from src.capabilities.tables.utils.table_loader import parse_date, parse_number
+from src.capabilities.tables.utils.tables import Table, TableRegistry
 
 MAX_ROWS_SHOWN = 50
 MAX_GROUPS = 100
@@ -54,170 +49,6 @@ _COMPARE: dict[str, Callable[[Any, Any], bool]] = {
 
 class TableNotFound(ValueError):
     """The id is unknown, expired or belongs to someone else - deliberately not told apart."""
-
-
-def list_tables(registry: TableRegistry, owner: str) -> TableListResult:
-    tables = [
-        TableInfo(
-            table_id=table.id,
-            filename=table.filename,
-            rows=table.row_count,
-            columns=len(table.columns),
-            minutes_left=max(0, round(registry.seconds_left(table) / 60)),
-        )
-        for table in registry.list_for(owner)
-    ]
-    message = f"{len(tables)} tables." if tables else "No tables. Ask the user to attach a CSV or Excel file."
-    return TableListResult(tables=tables, message=message)
-
-
-def describe(registry: TableRegistry, owner: str, table_id: str) -> DescribeResult:
-    table = _table(registry, owner, table_id)
-    columns = [_summarize(table, index) for index in range(len(table.columns))]
-    return DescribeResult(
-        table_id=table.id,
-        filename=table.filename,
-        sheet=table.sheet,
-        rows=table.row_count,
-        columns=columns,
-        notes=list(table.notes),
-        message=f"{table.filename}: {table.row_count} rows, {len(table.columns)} columns.",
-    )
-
-
-def rows(
-    registry: TableRegistry,
-    owner: str,
-    table_id: str,
-    conditions: list[Condition] | None = None,
-    sort_by: str = "",
-    descending: bool = True,
-    limit: int = 10,
-) -> RowsResult:
-    """The rows of a table: ranked by `sort_by` when one is given, else those that
-    satisfy `conditions`, else the first ones. One entry point over `top_n`,
-    `filter_rows` and `head`, which keep their own rules and messages."""
-    if sort_by.strip():
-        return top_n(registry, owner, table_id, sort_by, limit, descending, conditions)
-    if conditions:
-        return filter_rows(registry, owner, table_id, conditions, limit)
-    return head(registry, owner, table_id, limit)
-
-
-def head(registry: TableRegistry, owner: str, table_id: str, limit: int = 10) -> RowsResult:
-    table = _table(registry, owner, table_id)
-    _check_limit(limit, MAX_ROWS_SHOWN)
-    return _rows_result(table, range(table.row_count), limit, "rows")
-
-
-def filter_rows(
-    registry: TableRegistry, owner: str, table_id: str, conditions: list[Condition], limit: int = 20
-) -> RowsResult:
-    table = _table(registry, owner, table_id)
-    _check_limit(limit, MAX_ROWS_SHOWN)
-    if not conditions:
-        raise ValueError("Give at least one condition. Use the head tool to see rows without a test.")
-    return _rows_result(table, _matching(table, conditions), limit, "matching rows")
-
-
-def aggregate(
-    registry: TableRegistry,
-    owner: str,
-    table_id: str,
-    measures: list[Measure],
-    group_by: list[str] | None = None,
-    conditions: list[Condition] | None = None,
-    sort_by: str = "",
-    descending: bool = True,
-    limit: int = 25,
-) -> AggregateResult:
-    table = _table(registry, owner, table_id)
-    group_by = group_by or []
-    if len(group_by) > MAX_GROUP_COLUMNS:
-        raise ValueError(f"Group by at most {MAX_GROUP_COLUMNS} columns.")
-    if not 1 <= len(measures) <= MAX_MEASURES:
-        raise ValueError(f"Give between 1 and {MAX_MEASURES} measures.")
-    _check_limit(limit, MAX_GROUPS)
-    group_indexes = [_column(table, name) for name in group_by]
-    plan = [(measure.fn, _measure_column(table, measure)) for measure in measures]
-    labels = [f"{fn}({table.columns[index]})" for fn, index in plan]
-
-    groups: dict[tuple, list[_Accumulator]] = {}
-    for row in _matching(table, conditions or []):
-        key = tuple(table.data[index][row] for index in group_indexes)
-        accumulators = groups.get(key)
-        if accumulators is None:
-            accumulators = groups[key] = [_Accumulator() for _ in plan]
-        for accumulator, (_fn, index) in zip(accumulators, plan, strict=True):
-            accumulator.add(table.data[index][row])
-
-    if not group_indexes and not groups:
-        groups[()] = [_Accumulator() for _ in plan]
-    items = [(key, [acc.result(fn) for acc, (fn, _i) in zip(accs, plan, strict=True)]) for key, accs in groups.items()]
-    items = _sorted(items, _sort_position(table, sort_by, group_indexes, labels), descending)
-    shown = items[:limit]
-    capped = f" Showing the first {limit}; narrow with a condition or a smaller limit." if len(items) > limit else ""
-    return AggregateResult(
-        table_id=table.id,
-        group_by=[table.columns[index] for index in group_indexes],
-        measures=labels,
-        groups=[GroupRow(keys=[_show(k) for k in key], values=[_show(v) for v in values]) for key, values in shown],
-        total_groups=len(items),
-        shown=len(shown),
-        message=f"{len(items)} groups.{capped}",
-    )
-
-
-def top_n(
-    registry: TableRegistry,
-    owner: str,
-    table_id: str,
-    column: str,
-    n: int = 10,
-    largest: bool = True,
-    conditions: list[Condition] | None = None,
-) -> RowsResult:
-    table = _table(registry, owner, table_id)
-    _check_limit(n, MAX_ROWS_SHOWN)
-    index = _column(table, column)
-    if table.kinds[index] == "text":
-        raise ValueError(f"Rank by a number or date column; {table.columns[index]!r} is text.")
-    values = table.data[index]
-    candidates = [row for row in _matching(table, conditions or []) if values[row] is not None]
-    pick = heapq.nlargest if largest else heapq.nsmallest
-    chosen = pick(n, candidates, key=values.__getitem__)
-    word = "highest" if largest else "lowest"
-    result = _rows_result(table, chosen, n, f"rows with a value in {table.columns[index]!r}")
-    result.total_matches = len(candidates)
-    result.message = f"The {len(chosen)} {word} of {len(candidates)} rows by {table.columns[index]!r}."
-    return result
-
-
-def value_counts(registry: TableRegistry, owner: str, table_id: str, column: str, limit: int = 20) -> CountsResult:
-    table = _table(registry, owner, table_id)
-    _check_limit(limit, MAX_GROUPS)
-    index = _column(table, column)
-    counter = Counter(value for value in table.data[index] if value is not None)
-    nulls = table.row_count - sum(counter.values())
-    more = f" Showing the top {limit}." if len(counter) > limit else ""
-    empty = f" {nulls} cells are empty." if nulls else ""
-    return CountsResult(
-        table_id=table.id,
-        column=table.columns[index],
-        counts=[ValueCount(value=_show(value), count=count) for value, count in counter.most_common(limit)],
-        distinct=len(counter),
-        message=f"{len(counter)} distinct values.{more}{empty}",
-    )
-
-
-def _table(registry: TableRegistry, owner: str, table_id: str) -> Table:
-    table = registry.get(table_id.strip(), owner)
-    if table is None:
-        raise TableNotFound(
-            "Table not found or expired. Ask the user to attach the file again, "
-            "or list the tables with tool_tables_listTables."
-        )
-    return table
 
 
 def _check_limit(limit: int, maximum: int) -> None:
@@ -402,3 +233,159 @@ def _sorted(items: list[tuple[tuple, list]], position: tuple[str, int], descendi
     missing = [item for item in items if sort_value(item) is None]
     present.sort(key=sort_value, reverse=descending)
     return present + missing
+
+
+class TableDesk:
+    """Read-only questions about one account's tables."""
+
+    def __init__(self, registry: TableRegistry, owner: str) -> None:
+        self._registry = registry
+        self._owner = owner
+
+    def list_tables(self) -> TableListResult:
+        tables = [
+            TableInfo(
+                table_id=table.id,
+                filename=table.filename,
+                rows=table.row_count,
+                columns=len(table.columns),
+                minutes_left=max(0, round(self._registry.seconds_left(table) / 60)),
+            )
+            for table in self._registry.list_for(self._owner)
+        ]
+        message = f"{len(tables)} tables." if tables else "No tables. Ask the user to attach a CSV or Excel file."
+        return TableListResult(tables=tables, message=message)
+
+    def describe(self, table_id: str) -> DescribeResult:
+        table = self._table(table_id)
+        columns = [_summarize(table, index) for index in range(len(table.columns))]
+        return DescribeResult(
+            table_id=table.id,
+            filename=table.filename,
+            sheet=table.sheet,
+            rows=table.row_count,
+            columns=columns,
+            notes=list(table.notes),
+            message=f"{table.filename}: {table.row_count} rows, {len(table.columns)} columns.",
+        )
+
+    def rows(
+        self, table_id: str,
+        conditions: list[Condition] | None = None,
+        sort_by: str = "",
+        descending: bool = True,
+        limit: int = 10,
+    ) -> RowsResult:
+        """The rows of a table: ranked by `sort_by`, else those matching `conditions`, else the first ones.
+        One entry point over `top_n`, `filter_rows` and `head`."""
+        if sort_by.strip():
+            return self.top_n(table_id, sort_by, limit, descending, conditions)
+        if conditions:
+            return self.filter_rows(table_id, conditions, limit)
+        return self.head(table_id, limit)
+
+    def head(self, table_id: str, limit: int = 10) -> RowsResult:
+        table = self._table(table_id)
+        _check_limit(limit, MAX_ROWS_SHOWN)
+        return _rows_result(table, range(table.row_count), limit, "rows")
+
+    def filter_rows(
+        self, table_id: str, conditions: list[Condition], limit: int = 20
+    ) -> RowsResult:
+        table = self._table(table_id)
+        _check_limit(limit, MAX_ROWS_SHOWN)
+        if not conditions:
+            raise ValueError("Give at least one condition. Use the head tool to see rows without a test.")
+        return _rows_result(table, _matching(table, conditions), limit, "matching rows")
+
+    def aggregate(
+        self, table_id: str,
+        measures: list[Measure],
+        group_by: list[str] | None = None,
+        conditions: list[Condition] | None = None,
+        sort_by: str = "",
+        descending: bool = True,
+        limit: int = 25,
+    ) -> AggregateResult:
+        table = self._table(table_id)
+        group_by = group_by or []
+        if len(group_by) > MAX_GROUP_COLUMNS:
+            raise ValueError(f"Group by at most {MAX_GROUP_COLUMNS} columns.")
+        if not 1 <= len(measures) <= MAX_MEASURES:
+            raise ValueError(f"Give between 1 and {MAX_MEASURES} measures.")
+        _check_limit(limit, MAX_GROUPS)
+        group_indexes = [_column(table, name) for name in group_by]
+        plan = [(measure.fn, _measure_column(table, measure)) for measure in measures]
+        labels = [f"{fn}({table.columns[index]})" for fn, index in plan]
+
+        groups: dict[tuple, list[_Accumulator]] = {}
+        for row in _matching(table, conditions or []):
+            key = tuple(table.data[index][row] for index in group_indexes)
+            accumulators = groups.get(key)
+            if accumulators is None:
+                accumulators = groups[key] = [_Accumulator() for _ in plan]
+            for accumulator, (_fn, index) in zip(accumulators, plan, strict=True):
+                accumulator.add(table.data[index][row])
+
+        if not group_indexes and not groups:
+            groups[()] = [_Accumulator() for _ in plan]
+        items = [(key, [acc.result(fn) for acc, (fn, _i) in zip(accs, plan, strict=True)]) for key, accs in groups.items()]
+        items = _sorted(items, _sort_position(table, sort_by, group_indexes, labels), descending)
+        shown = items[:limit]
+        capped = f" Showing the first {limit}; narrow with a condition or a smaller limit." if len(items) > limit else ""
+        return AggregateResult(
+            table_id=table.id,
+            group_by=[table.columns[index] for index in group_indexes],
+            measures=labels,
+            groups=[GroupRow(keys=[_show(k) for k in key], values=[_show(v) for v in values]) for key, values in shown],
+            total_groups=len(items),
+            shown=len(shown),
+            message=f"{len(items)} groups.{capped}",
+        )
+
+    def top_n(
+        self, table_id: str,
+        column: str,
+        n: int = 10,
+        largest: bool = True,
+        conditions: list[Condition] | None = None,
+    ) -> RowsResult:
+        table = self._table(table_id)
+        _check_limit(n, MAX_ROWS_SHOWN)
+        index = _column(table, column)
+        if table.kinds[index] == "text":
+            raise ValueError(f"Rank by a number or date column; {table.columns[index]!r} is text.")
+        values = table.data[index]
+        candidates = [row for row in _matching(table, conditions or []) if values[row] is not None]
+        pick = heapq.nlargest if largest else heapq.nsmallest
+        chosen = pick(n, candidates, key=values.__getitem__)
+        word = "highest" if largest else "lowest"
+        result = _rows_result(table, chosen, n, f"rows with a value in {table.columns[index]!r}")
+        result.total_matches = len(candidates)
+        result.message = f"The {len(chosen)} {word} of {len(candidates)} rows by {table.columns[index]!r}."
+        return result
+
+    def value_counts(self, table_id: str, column: str, limit: int = 20) -> CountsResult:
+        table = self._table(table_id)
+        _check_limit(limit, MAX_GROUPS)
+        index = _column(table, column)
+        counter = Counter(value for value in table.data[index] if value is not None)
+        nulls = table.row_count - sum(counter.values())
+        more = f" Showing the top {limit}." if len(counter) > limit else ""
+        empty = f" {nulls} cells are empty." if nulls else ""
+        return CountsResult(
+            table_id=table.id,
+            column=table.columns[index],
+            counts=[ValueCount(value=_show(value), count=count) for value, count in counter.most_common(limit)],
+            distinct=len(counter),
+            message=f"{len(counter)} distinct values.{more}{empty}",
+        )
+
+    def _table(self, table_id: str) -> Table:
+        table = self._registry.get(table_id.strip(), self._owner)
+        if table is None:
+            raise TableNotFound(
+                "Table not found or expired. Ask the user to attach the file again, "
+                "or list the tables with tool_tables_listTables."
+            )
+        return table

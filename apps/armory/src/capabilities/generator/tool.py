@@ -1,7 +1,5 @@
-"""MCP tool wrappers for the generator capability - thin on purpose.
-No config: call the domain function, return its result. Generated values
-come back in the result (or, with `email_to`, go to that inbox and are left
-out of the result) and are neither stored nor logged."""
+"""MCP tool wrappers for the generator capability; thin, no config.
+Values are returned once (or emailed with `email_to`), never stored or logged."""
 
 from __future__ import annotations
 
@@ -55,7 +53,7 @@ def tool_gen_generatePassword(
     of every chosen type. Deterministic rules, random output; the value is
     returned once and not stored. Tell the person to copy it now, unless
     `email_to` was set: then it is emailed, not returned, and not to be repeated."""
-    return domain.generate_password(length, use_upper, use_lower, use_digits, use_symbols, exclude_ambiguous, email_to)
+    return domain.desk.generate_password(length, use_upper, use_lower, use_digits, use_symbols, exclude_ambiguous, email_to)
 
 
 @command(name="passphrase", description="Generate a random passphrase")
@@ -72,7 +70,7 @@ def tool_gen_generatePassphrase(
     to type and remember than a random password; 6 words is about 78 bits.
     The value is returned once and not stored. If `email_to` was set it is
     emailed instead and not returned."""
-    return domain.generate_passphrase(words, separator, capitalize, add_number, email_to)
+    return domain.desk.generate_passphrase(words, separator, capitalize, add_number, email_to)
 
 
 @command(name="pin", description="Generate a random PIN or one-time code")
@@ -87,7 +85,7 @@ def tool_gen_generatePin(
     store and check it. If `email_to` was set it is emailed instead and not
     returned, so it cannot be checked later by the caller.
     For authenticator-app codes use `tool_gen_getTotpCode`."""
-    return domain.generate_pin(length, email_to)
+    return domain.desk.generate_pin(length, email_to)
 
 
 @command(name="totp_secret", description="Generate a TOTP secret for an authenticator app")
@@ -102,7 +100,7 @@ def tool_gen_generateTotpSecret(
     the secret to an authenticator app; `tool_gen_getTotpCode` then shows the
     same codes. The value is returned once and not stored. If `email_to` was
     set it is emailed instead and not returned."""
-    return domain.generate_totp_secret(issuer, account, email_to=email_to)
+    return domain.desk.generate_totp_secret(issuer, account, email_to=email_to)
 
 
 @command(name="totp", description="Show the current TOTP code for a secret")
@@ -121,4 +119,4 @@ def tool_gen_getTotpCode(
     the seconds left before it changes. Only the person who holds the secret
     should ask for this; the secret is not stored. If `email_to` was set the
     code is emailed instead and not returned."""
-    return domain.get_totp_code(secret, digits, period, email_to=email_to)
+    return domain.desk.get_totp_code(secret, digits, period, email_to=email_to)

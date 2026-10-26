@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Capability lifecycle</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #eb6c36;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+      letter-spacing: -0.02em; line-height: 1.15; color: var(--color-ink); margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">State machine · Live toggle, no restart</p>
+    <h1>Capability lifecycle</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="armory-lifecycle-title armory-lifecycle-desc">
+        <title id="armory-lifecycle-title">Capability lifecycle</title>
+        <desc id="armory-lifecycle-desc">A capability folder starts offline, goes online by a live toggle, can fail back to offline with its error kept, and is reported missing if the folder is deleted.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+        </defs>
+        <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+        <path d="M 200,136 L 300,136" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 460,122 L 560,122" fill="none" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <path d="M 560,150 L 460,150" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 380,176 L 380,272" fill="none" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <path d="M 420,272 L 420,176" fill="none" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <path d="M 300,160 L 258.0,160.0 Q 250,160 250.0,168.0 L 250.0,304.0 Q 250,312 242.0,312.0 L 200,312" fill="none" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <rect x="212.0" y="116" width="76" height="12" rx="2" fill="#f5f5f5"/><text x="250" y="125" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SCAN/REFRESH</text>
+        <rect x="470.0" y="102" width="80" height="12" rx="2" fill="#f5f5f5"/><text x="510" y="111" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ENABLED: TRUE</text>
+        <rect x="468.0" y="158" width="84" height="12" rx="2" fill="#f5f5f5"/><text x="510" y="167" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ENABLED: FALSE</text>
+        <rect x="293.0" y="218" width="80" height="12" rx="2" fill="#f5f5f5"/><text x="333" y="227" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">IMPORT RAISES</text>
+        <rect x="426.0" y="218" width="68" height="12" rx="2" fill="#f5f5f5"/><text x="460" y="227" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ROLLED BACK</text>
+        <rect x="158.0" y="234" width="84" height="12" rx="2" fill="#f5f5f5"/><text x="200" y="243" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FOLDER REMOVED</text>
+        <rect x="40" y="96" width="160" height="80" rx="6" fill="#f5f5f5"/>
+        <rect x="40" y="96" width="160" height="80" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+        <text x="120.0" y="128" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Folder on disk</text>
+        <text x="120.0" y="142" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">src/capabilities/&lt;name&gt;</text>
+        <text x="120.0" y="154" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">META in __init__.py</text>
+        <rect x="300" y="96" width="160" height="80" rx="6" fill="#f5f5f5"/>
+        <rect x="300" y="96" width="160" height="80" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="380.0" y="128" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Offline</text>
+        <text x="380.0" y="142" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">listed, not loaded</text>
+        <text x="380.0" y="154" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">no tools served</text>
+        <rect x="560" y="96" width="160" height="80" rx="6" fill="#f5f5f5"/>
+        <rect x="560" y="96" width="160" height="80" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+        <text x="640.0" y="128" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Online</text>
+        <text x="640.0" y="142" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">tools, commands, META</text>
+        <text x="640.0" y="154" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">registered live</text>
+        <rect x="300" y="272" width="160" height="80" rx="6" fill="#f5f5f5"/>
+        <rect x="300" y="272" width="160" height="80" rx="6" fill="rgba(235,108,54,0.05)" stroke="rgba(235,108,54,0.50)" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="380.0" y="304" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Failed import</text>
+        <text x="380.0" y="318" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">rolled back to offline</text>
+        <text x="380.0" y="330" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">error kept, PATCH gives 409</text>
+        <rect x="40" y="272" width="160" height="80" rx="6" fill="#f5f5f5"/>
+        <rect x="40" y="272" width="160" height="80" rx="6" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="120.0" y="304" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Missing</text>
+        <text x="120.0" y="318" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">folder deleted</text>
+        <text x="120.0" y="330" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">reported missing=true</text>
+        <rect x="520" y="232" width="400" height="112" rx="6" fill="#f5f5f5"/>
+        <rect x="520" y="232" width="400" height="112" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="528" y="240" width="60" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="558.0" y="249" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ON ENABLE</text>
+        <text x="532" y="270" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="start">What going online does</text>
+        <text x="532" y="284" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">1  remove old tools, commands and META</text>
+        <text x="532" y="296" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">2  purge the folder&#x27;s modules from sys.modules</text>
+        <text x="532" y="308" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">3  delete its __pycache__</text>
+        <text x="532" y="320" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">4  import tool.py while capturing registrations</text>
+        <text x="532" y="332" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">5  save {enabled} to config_capabilities.json</text>
+        <rect x="40" y="384" width="420" height="112" rx="6" fill="#f5f5f5"/>
+        <rect x="40" y="384" width="420" height="112" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="48" y="392" width="40" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="68.0" y="401" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">RULES</text>
+        <text x="52" y="422" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="start">Rules</text>
+        <text x="52" y="436" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">A new folder is never auto-loaded; it starts offline</text>
+        <text x="52" y="448" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">Edit code: switch off, then on. Service edits need a restart</text>
+        <text x="52" y="460" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">Process-lifetime modules survive reloads</text>
+        <text x="52" y="472" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">One broken capability never takes the others down</text>
+        <text x="52" y="484" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start">Renamed ids migrate on startup (video to media)</text>
+        <line x1="40" y1="540" x2="920" y2="540" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="40" y="556" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="110" y="548" width="14" height="10" rx="2" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+        <text x="130" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Caller</text>
+        <rect x="180" y="548" width="14" height="10" rx="2" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="200" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Store / state</text>
+        <rect x="285" y="548" width="14" height="10" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+        <text x="305" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Focal</text>
+        <rect x="350" y="548" width="14" height="10" rx="2" fill="rgba(235,108,54,0.05)" stroke="rgba(235,108,54,0.50)" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="370" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Boundary</text>
+        <rect x="430" y="548" width="14" height="10" rx="2" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="450" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Optional</text>
+        <rect x="510" y="548" width="14" height="10" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="530" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Component</text>
+        <line x1="595" y1="553" x2="619" y2="553" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <text x="627" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Go online</text>
+        <line x1="692" y1="553" x2="716" y2="553" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <text x="724" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Failure path</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

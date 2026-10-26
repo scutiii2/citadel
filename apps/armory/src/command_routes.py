@@ -1,10 +1,5 @@
 """HTTP endpoint for the chat-invocable command registry: GET /commands.
-
-Mounted the same way extension_routes.py's /extensions is (see run.py):
-a plain HTTP route alongside the MCP surface, not a tool - chat_app's
-command execution/autocomplete path polls this, no model ever calls
-it.
-"""
+A plain route beside the MCP surface, not a tool; chat_app polls it."""
 
 from __future__ import annotations
 
@@ -28,11 +23,8 @@ def _spec_json(spec: commands.CommandSpec) -> dict[str, str]:
 
 
 def _is_capability_enabled(name: str) -> bool:
-    # A command whose capability the registry has never heard of (should
-    # only happen in a test that registers a command directly, never for
-    # a real capability - run.py's capturing() covers every one of
-    # those) fails open, same "absent means enabled" rule
-    # app_config.capability_enabled() already applies to the config file.
+    # A command whose capability the registry does not know fails open ("absent means enabled"),
+    # like app_config.capability_enabled().
     try:
         return capability_registry.is_enabled(name)
     except KeyError:
@@ -70,7 +62,7 @@ async def download_pdf(request: Request) -> FileResponse | JSONResponse:
         return unavailable
     try:
         path, filename = await asyncio.to_thread(
-            domain.download, request.path_params["file_id"], exp, sig
+            domain.desk.download, request.path_params["file_id"], exp, sig
         )
         return FileResponse(
             path, filename=filename, media_type="application/octet-stream",
@@ -93,8 +85,8 @@ def install_command_routes(app: Starlette) -> None:
     app.add_route("/pdf/files/{file_id}/download", download_pdf, methods=["GET"])
     from contextlib import asynccontextmanager
     import asyncio
-    from src.media_routes import download_video
-    from src.services.media_downloads import close_runtime
+    from src.capabilities.media_downloader.routes import download_video
+    from src.capabilities.media_downloader.utils.media_downloads import close_runtime
 
     app.add_route("/media/files/{file_id}/download", download_video, methods=["GET"])
     original_lifespan = app.router.lifespan_context

@@ -27,7 +27,7 @@ def setup(monkeypatch):
         identities.append(current_uid())
         return SimpleNamespace(model_dump=lambda **_: FILE)
     upload = Mock(side_effect=save)
-    domain = SimpleNamespace(upload=upload, PdfError=PdfError)
+    domain = SimpleNamespace(desk=SimpleNamespace(upload=upload), PdfError=PdfError)
     monkeypatch.setitem(sys.modules, "src.capabilities.pdf_merger.domain", domain)
     import src.capabilities.pdf_merger as package
     monkeypatch.setattr(package, "domain", domain, raising=False)

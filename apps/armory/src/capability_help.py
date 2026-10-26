@@ -1,21 +1,5 @@
-"""Structured `/<capability> help` data - backs GET /commands/help and
-GET /commands/help/{capability}.
-
-Each capability keeps its own `help.json` next to its `README.md`
-(`capabilities/<folder>/help.json`), hand-maintained rather than parsed
-out of the README at request time: the README stays the narrative doc a
-person reads, `help.json` stays a small, stable shape a client renders,
-and the two are free to drift in wording without one having to be
-scraped from the other. See `capabilities/README.md`'s "Adding a new
-tool" section for the schema new capabilities should follow when they
-add their own.
-
-Not a tool: mounted as a plain HTTP route by `help_routes.py`, the same
-"nothing here a model needs to call" reasoning `command_routes.py`
-documents for `GET /commands` - chat_app's `commands.py` intercepts
-`/<capability> help ...` before it ever reaches the tool registry and
-calls this instead (see that module's docstring).
-"""
+"""Structured `/<capability> help` data behind GET /commands/help and /commands/help/{capability}.
+Each capability keeps a hand-maintained `help.json` beside its README (schema: `capabilities/README.md`); served by `help_routes.py`, not a tool."""
 
 from __future__ import annotations
 
@@ -31,10 +15,8 @@ _TARGETS = {"all", "tools", "commands", "workflow"}
 
 
 class HelpError(Exception):
-    """A user-facing problem resolving `/<capability> help` - unknown
-    capability, missing help.json, or an unknown target/command name.
-    Its message is safe to show verbatim in the chat log, same
-    convention as chat_app's own CommandError."""
+    """A user-facing problem resolving `/<capability> help`: unknown capability, missing help.json, or unknown target/command.
+    The message is safe to show verbatim in the chat log."""
 
 
 def _label(capability_id: str) -> str:
@@ -99,18 +81,8 @@ def _find_command(data: dict[str, Any], command_name: str) -> dict[str, Any]:
 
 
 def build_index() -> dict[str, Any]:
-    """The JSON body `GET /commands/help` (no capability path segment)
-    returns - one row per currently-enabled built-in capability, for
-    chat_app's bare top-level `/help` command (see `help_routes.py` /
-    chat_app's `commands.py::_execute_help_index()`). Same generic
-    `message` + `list[dict]` shape as `build_help()`, so it renders
-    through the same table formatter with no special-casing.
-
-    Skips a registered capability with no `help.json` on disk instead of
-    raising - unlike `build_help()`'s per-capability lookup, a single
-    capability missing its file shouldn't break the whole index for
-    every other one.
-    """
+    """The JSON body of `GET /commands/help`: one row per enabled built-in capability, for chat_app's `/help`.
+    Skips a capability with no `help.json` instead of raising."""
     rows: list[dict[str, Any]] = []
     for name in sorted(capability_registry.names()):
         if not capability_registry.is_enabled(name):
@@ -139,19 +111,8 @@ def build_index() -> dict[str, Any]:
 
 
 def build_help(capability_id: str, target: str = "all", command: str | None = None) -> dict[str, Any]:
-    """The JSON body `GET /commands/help/{capability}` returns.
-
-    Shaped so chat_app's existing generic result formatter
-    (`command_formatting.py`) renders it with no capability-specific
-    code: a `message` string plus zero or more `list[dict]` fields, each
-    dict sharing the same keys across its rows - exactly the shape every
-    other command result already follows.
-
-    `command` (a sub-command name like `"list"`) takes priority over
-    `target` when both are given - it answers "explain this one command"
-    rather than "show me a whole table". Raises `HelpError` for an
-    unknown capability, target, or command name.
-    """
+    """The JSON body of `GET /commands/help/{capability}`: a `message` plus `list[dict]` fields, rendered by chat_app's generic formatter.
+    `command` takes priority over `target`; raises `HelpError` for an unknown capability, target or command."""
     data = _load(capability_id)
     label = _label(capability_id)
 

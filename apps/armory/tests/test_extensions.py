@@ -1,14 +1,5 @@
 """Tests for services/extensions.py, the proxy/aggregation engine.
-
-Mostly mocked: stdio_client and ClientSession are replaced with fakes so
-namespacing and failure isolation can be checked fast, without spawning a
-process per test. The one thing a mock can't prove is that this module
-actually speaks the real MCP client protocol correctly against a real
-process - which is the highest-risk part of this mechanism - so
-test_real_fixture_server_end_to_end below spawns the real reference
-fixture (src/_fixtures/reference_extension_server.py) and
-drives the genuine connect/list/call path against it.
-"""
+Mostly mocked (fake stdio_client and ClientSession); test_real_fixture_server_end_to_end spawns the reference fixture (src/_fixtures/reference_extension_server.py) to prove the real protocol path."""
 
 from __future__ import annotations
 
@@ -28,19 +19,8 @@ from src.services import extensions
 from src.services.app_config import ExtensionConfig
 
 
-# --- fakes for the mocked tests ------------------------------------------
-# ExtensionRegistry._open_and_list only ever does two things with the SDK:
-# `stdio_client(params)` to get a (read, write) pair, then
-# `ClientSession(read, write)` to wrap it. Faking both lets a test drive
-# connect_all() through its real code path - real timeout handling, real
-# per-extension isolation, real namespacing - without a subprocess.
-#
-# The trick: fake stdio_client "yields" the fake session itself as the
-# `read` half, and fake ClientSession(read, write) just returns `read`
-# unchanged. ExtensionRegistry never inspects what stdio_client/
-# ClientSession hand back beyond passing them straight through, so this
-# is indistinguishable from the real thing as far as the code under test
-# can tell.
+# --- fakes for the mocked tests: fake stdio_client yields the fake session as `read`, fake ClientSession returns it unchanged ---
+# That lets connect_all() run its real path (timeouts, isolation, namespacing) without a subprocess.
 
 
 class _FakeSession:
@@ -99,21 +79,13 @@ def _install_fake_connection(monkeypatch: pytest.MonkeyPatch, session_or_error) 
         monkeypatch.setattr(extensions, "stdio_client", _fake_stdio_client_raising(session_or_error))
     else:
         monkeypatch.setattr(extensions, "stdio_client", _fake_stdio_client(session_or_error))
-    # ClientSession(read, write) -> read (the fake session smuggled through
-    # stdio_client's yield) - see the module comment above.
-    # **kwargs, not just (read, write): _open_and_list calls the real
-    # ClientSession with read_timeout_seconds= too - a fake that doesn't
-    # accept it raises TypeError, which _connect_one's broad except
-    # silently turns into an "error" status instead of "connected",
-    # exactly the kind of failure this fake exists to steer clear of.
+    # ClientSession(read, write) returns `read` (the fake session, see the module comment above).
+    # Takes **kwargs because the real call passes read_timeout_seconds=; a TypeError would silently become an "error" status.
     monkeypatch.setattr(extensions, "ClientSession", lambda read, write, **kwargs: read)
 
 
-# Same trick as _fake_stdio_client above, for the http transport:
-# streamablehttp_client's __aenter__ yields a 3-tuple (read, write,
-# get_session_id) rather than stdio_client's 2-tuple, so the fake session
-# is smuggled through as the first element and the other two are ignored,
-# same as _open_and_list itself discards the third.
+# Same trick as _fake_stdio_client for the http transport: streamablehttp_client yields a 3-tuple,
+# so the fake session goes first and the other two are ignored, as in _open_and_list.
 
 
 def _fake_streamablehttp_client(session: _FakeSession, seen: list[dict[str, Any]] | None = None):
@@ -177,11 +149,8 @@ def _config(**overrides: Any) -> ExtensionConfig:
 
 @pytest.mark.anyio
 async def test_tools_are_registered_under_extension_id_double_underscore_name(monkeypatch: pytest.MonkeyPatch):
-    """The property the whole feature depends on: a tool named `echo` from
-    the extension `reference` must show up as `reference__echo`, not
-    `echo` - otherwise two extensions offering the same tool name (or an
-    extension colliding with one of this server's own tools) would
-    silently shadow each other."""
+    """The feature depends on `echo` from `reference` appearing as `reference__echo`;
+    otherwise same-named tools or collisions with our own tools would silently shadow each other."""
     session = _FakeSession(tools=[_echo_tool(), _add_tool()])
     _install_fake_connection(monkeypatch, session)
 
@@ -236,10 +205,8 @@ async def test_connected_status_lists_the_namespaced_tool_names(monkeypatch: pyt
 
 @pytest.mark.anyio
 async def test_proxied_tool_definition_preserves_meta_annotations_and_icons(monkeypatch: pytest.MonkeyPatch):
-    """Regression test: meta/annotations/icons were silently dropped when
-    building _ProxiedTool.definition, which would break any feature (like
-    keyword-based tool filtering) that relies on an extension's own
-    declared metadata surviving the proxy."""
+    """Regression: meta/annotations/icons were dropped when building _ProxiedTool.definition,
+    breaking features (like keyword-based filtering) that rely on an extension's metadata."""
     tool = types.Tool(
         name="echo",
         description="Echo text back",
@@ -299,10 +266,8 @@ async def test_a_broken_extension_does_not_prevent_a_working_sibling(monkeypatch
 
 @pytest.mark.anyio
 async def test_a_broken_extension_does_not_prevent_our_own_tools_from_working(monkeypatch: pytest.MonkeyPatch):
-    """install() must still merge in this server's own tools even when
-    every configured extension failed to connect - a typo in one
-    extension's command must never be able to take the whole server
-    down."""
+    """install() must still merge this server's own tools when every extension failed to connect;
+    a typo in one command must never take the server down."""
     monkeypatch.setattr(extensions, "stdio_client", _fake_stdio_client_raising(ConnectionRefusedError("refused")))
     monkeypatch.setattr(extensions, "ClientSession", lambda read, write, **kwargs: read)
     monkeypatch.setattr(extensions, "load_extensions_config", lambda path: {"broken": _config()})
@@ -379,20 +344,15 @@ async def test_merged_call_tool_routes_a_plain_name_to_our_own_dispatch(monkeypa
 
     content, structured = await registry.merged_call_tool("builtin_tool", {})
 
-    # FastMCP's own call_tool() wraps a plain string return this way
-    # (content blocks plus a structured {"result": ...} form) - the point
-    # of this test isn't that shape, it's that a non-namespaced name goes
-    # through FastMCP's dispatch at all rather than being treated as an
-    # unknown proxied tool.
+    # FastMCP's call_tool() wraps a string return this way; the point is that a non-namespaced name
+    # goes through its dispatch rather than being treated as an unknown proxied tool.
     assert structured == {"result": "from builtin"}
     [block] = content
     assert block.text == "from builtin"
 
 
-# --- http transport ---------------------------------------------------
-# Mirrors the stdio mocked tests above: same namespacing, same failure
-# isolation, just connecting via streamablehttp_client instead of
-# stdio_client - see _open_and_list's branch on config.transport.
+# --- http transport ---
+# Mirrors the stdio mocked tests (namespacing, failure isolation) via streamablehttp_client; see _open_and_list's branch on config.transport.
 
 
 @pytest.mark.anyio
@@ -613,10 +573,8 @@ async def test_proxied_call_without_forward_flag_sends_no_meta_even_with_identit
     assert session.metas == [None]
 
 
-# --- runtime add()/remove() ------------------------------------------------
-# The other half of "toggleable extensions": connecting/disconnecting one
-# extension without disturbing any other, after the registry is already
-# up and running (not just at startup, like connect_all above).
+# --- runtime add()/remove() ---
+# Connect and disconnect one extension without disturbing others, after the registry is already running.
 
 
 @pytest.mark.anyio
@@ -684,9 +642,7 @@ async def test_remove_returns_false_for_an_unknown_id() -> None:
 
 @pytest.mark.anyio
 async def test_remove_of_an_errored_extension_needs_no_live_connection(monkeypatch: pytest.MonkeyPatch):
-    """An extension recorded as "error" never got a session or exit
-    stack - remove() must still clean up its status entry rather than
-    assuming a stack is always present."""
+    """An "error" extension never got a session or exit stack; remove() must still clean up its status entry."""
     monkeypatch.setattr(extensions, "load_extensions_config", lambda path: {})
     registry = extensions.ExtensionRegistry()
     await registry.connect_all(Path("unused.json"))
@@ -700,13 +656,8 @@ async def test_remove_of_an_errored_extension_needs_no_live_connection(monkeypat
     assert registry.statuses() == []
 
 
-# --- the genuine, unmocked end-to-end path --------------------------------
-# This is the one test in the suite that spawns a real subprocess. It
-# exists because the mocked tests above only prove ExtensionRegistry's own
-# logic is right; they say nothing about whether this module is actually
-# calling the SDK's stdio_client/ClientSession correctly against a real
-# MCP server speaking the real protocol over real stdio - which is the
-# highest-risk part of this whole mechanism.
+# --- the genuine, unmocked end-to-end path ---
+# The one test that spawns a real subprocess, since the mocked tests can't show the SDK's stdio_client/ClientSession are called correctly against a real MCP server.
 
 
 def _real_extension_config() -> ExtensionConfig:
@@ -759,12 +710,8 @@ async def test_real_fixture_server_end_to_end(tmp_path: Path):
 
 @pytest.mark.anyio
 async def test_concurrent_calls_to_the_real_fixture_server_both_succeed(tmp_path: Path):
-    """Covers the concurrency question this module's docstring answers by
-    reading the SDK source: two calls fired at once on the same session
-    must not cross-deliver results. Real subprocess, real concurrent
-    asyncio tasks - a mock of ClientSession couldn't prove anything about
-    this, since the risk is in the SDK's request/response routing, not in
-    our own code."""
+    """Two calls at once on the same session must not cross-deliver results (the concurrency question answered in the module docstring).
+    Needs a real subprocess and tasks: the risk is in the SDK's request/response routing."""
     registry = extensions.ExtensionRegistry()
     try:
         await registry._connect_one("reference", _real_extension_config())
@@ -782,14 +729,8 @@ async def test_concurrent_calls_to_the_real_fixture_server_both_succeed(tmp_path
 
 @pytest.mark.anyio
 async def test_add_then_remove_a_real_extension_tears_down_the_subprocess():
-    """The one test that actually proves the per-extension-exit-stack
-    refactor in _connect_one/remove works. A mocked ClientSession's
-    aclose() always "succeeds" trivially and proves nothing about whether
-    the underlying resources really closed - only a real subprocess can
-    show that removing one extension's connection genuinely tears it
-    down, rather than merely forgetting about it while it (and its
-    process) keeps running in the background.
-    """
+    """Proves the per-extension exit-stack refactor in _connect_one/remove: only a real subprocess shows that
+    removing a connection tears it down rather than just forgetting it."""
     registry = extensions.ExtensionRegistry()
     try:
         status = await registry.add("reference", _real_extension_config())
@@ -799,9 +740,8 @@ async def test_add_then_remove_a_real_extension_tears_down_the_subprocess():
         result = await registry.call("reference__add", {"a": 2, "b": 3})
         assert result.structuredContent == {"result": 5}
 
-        # Grab the live session before removing it, so the assertion below
-        # can prove *this exact connection* stopped working - not just
-        # that the registry forgot its name.
+        # Grab the live session first so the assertion proves this exact connection stopped working,
+        # not just that the registry forgot its name.
         session = registry._sessions["reference"]
 
         removed = await registry.remove("reference")
@@ -812,10 +752,8 @@ async def test_add_then_remove_a_real_extension_tears_down_the_subprocess():
         with pytest.raises(KeyError):
             await registry.call("reference__add", {"a": 1, "b": 1})
 
-        # The subprocess and its stdio pipes are actually gone: a call on
-        # the session directly (bypassing the registry, which no longer
-        # knows about this extension at all) fails rather than succeeding
-        # against a process that's still quietly running.
+        # The subprocess is gone: a direct call on the session (bypassing the registry) must fail
+        # rather than succeed against a still-running process.
         with pytest.raises(Exception):  # noqa: B017 - any failure proves the transport is closed
             await session.list_tools()
     finally:

@@ -1,11 +1,5 @@
-"""CapabilityLoader against fixture packages in a temp folder.
-
-Each test writes a package ``<unique>/capabilities/<folder>/`` with the
-same shape as a real capability (__init__.py registers META, tool.py
-registers a tool and a command), puts its parent on sys.path, and points a
-loader at it. ``src.server.mcp`` is swapped for a fresh FastMCP because a
-fixture's tool.py does ``from src.server import mcp`` at import time.
-"""
+"""CapabilityLoader against fixture packages in a temp folder, shaped like real capabilities (__init__.py exposes CAPABILITY, tool.py a tool and command).
+The package's parent goes on sys.path and ``src.server.mcp`` is swapped for a fresh FastMCP, since tool.py imports it."""
 
 from __future__ import annotations
 
@@ -60,8 +54,9 @@ def write_capability(root: Path, folder: str, capability_id: str, tool_name: str
     directory = root / folder
     directory.mkdir(exist_ok=True)
     (directory / "__init__.py").write_text(
-        "from src.services import capability_meta\n"
-        f'META = capability_meta.register(folder="{folder}", id="{capability_id}", label="{folder.title()}")\n'
+        "from src.services.capability_base import Capability\n\n"
+        f'class Fixture(Capability):\n    id = "{capability_id}"\n    label = "{folder.title()}"\n\n'
+        "CAPABILITY = Fixture()\n"
     )
     (directory / "tool.py").write_text(
         tool_source
@@ -92,6 +87,26 @@ def run(coro):
 
 def tool_names(mcp: FastMCP) -> set[str]:
     return set(mcp._tool_manager._tools)
+
+
+def test_install_routes_reaches_a_capability_that_was_never_loaded(loader_for, package):
+    from starlette.applications import Starlette
+
+    _, root = package
+    write_capability(root, "widgets", "wid", "tool_wid_run")
+    init = root / "widgets" / "__init__.py"
+    init.write_text(
+        init.read_text()
+        + "\n\ndef _mount(self, app):\n    app.state.mounted = 'widgets'\n\n\nFixture.install_routes = _mount\n"
+    )
+    loader = loader_for()
+    loader.scan()
+    app = Starlette()
+
+    loader.install_routes(app)
+
+    assert app.state.mounted == "widgets"
+    assert not loader.record_for("wid").loaded
 
 
 def test_scan_registers_a_new_folder_offline_without_importing_its_tools(loader_for, package, mcp):
@@ -351,3 +366,33 @@ def test_concurrent_toggles_do_not_interleave(loader_for, package, mcp):
     run(hammer())
 
     assert len(commands.all_commands()) == 1
+
+
+def _hook_capability(root, folder, capability_id, fail=False):
+    write_capability(root, folder, capability_id, f"tool_{capability_id}_run")
+    init = root / folder / "__init__.py"
+    action = "raise RuntimeError('boom')" if fail else "STARTED.append(self.id)"
+    init.write_text(
+        "STARTED = []\n" + init.read_text()
+        + f"\n\ndef _start(self):\n    {action}\n\n\nFixture.on_startup = _start\n"
+    )
+
+
+def test_run_startup_hooks_calls_only_loaded_enabled_capabilities_and_survives_failures(loader_for, package, mcp):
+    name, root = package
+    _hook_capability(root, "bad", "bad", fail=True)
+    _hook_capability(root, "good", "good")
+    _hook_capability(root, "off", "off")
+    _hook_capability(root, "idle", "idle")
+    loader = loader_for()
+    loader.scan()
+    for capability_id in ("bad", "good", "off"):
+        run(loader.set_online(capability_id, True))
+    run(loader.set_online("off", False))
+
+    loader.run_startup_hooks()
+
+    started = sys.modules[f"{name}.capabilities.good"].STARTED
+    assert started == ["good"]
+    assert sys.modules[f"{name}.capabilities.off"].STARTED == []
+    assert f"{name}.capabilities.idle" in sys.modules and sys.modules[f"{name}.capabilities.idle"].STARTED == []

@@ -1,8 +1,1 @@
-"""Dev fixtures - not real capabilities.
-
-Everything under here exists to test mechanisms (like services/extensions.py's
-proxy) against a real, running process, without pulling in an external
-dependency to do it. The leading underscore on the package name is
-intentional: it marks this as test scaffolding, not something a deployment
-would configure for actual use.
-"""
+"""Dev fixtures, not real capabilities: scaffolding to test mechanisms like services/extensions.py's proxy."""

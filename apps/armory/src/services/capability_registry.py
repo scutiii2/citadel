@@ -1,29 +1,5 @@
 """Live enable/disable for built-in capabilities.
-
-FastMCP's own surface only gets a capability halfway to toggleable:
-``mcp.add_tool()``/``mcp.remove_tool()`` are public, but there is no
-public way to remove a resource *template* (only ``add_template()`` on
-``ResourceManager``, confirmed against the installed mcp==1.28.0
-source - ``ResourceManager`` has no ``remove_resource``/
-``remove_template`` at all). So this module reaches into
-``mcp._tool_manager``/``mcp._resource_manager``'s private dicts for the
-other half, the same kind of justified reach ``services/extensions.py``
-already documents for ``mcp._mcp_server`` - there is no other way to do
-this with the SDK as installed.
-
-``run.py`` wraps each capability's import block in ``capturing(mcp,
-name)``, which diffs what got newly registered onto ``mcp`` before and
-after the block and stores those exact ``Tool``/``ResourceTemplate``
-objects - not just the bare functions. That matters: re-enabling a
-capability later puts back the precise object captured at import time,
-metadata (``meta``, ``description``, annotations) and all, rather than
-rebuilding one from scratch and needing to remember what the original
-``@mcp.tool(meta=...)`` call passed.
-
-Auto-discovering what a capability registered (rather than a
-hand-maintained list of its tool/resource names) means a capability
-that gains a second tool later is toggle-ready with no change here.
-"""
+FastMCP has no public way to remove a resource template (mcp==1.28.0), so this reaches into ``mcp._tool_manager``/``_resource_manager``. ``capturing(mcp, name)`` diffs what a block registered and stores the exact Tool/ResourceTemplate objects, so re-enabling restores their metadata."""
 
 from __future__ import annotations
 
@@ -44,11 +20,7 @@ class _CapabilityHandle:
     # True at capture time by construction: capturing() runs while the
     # tools/templates it just diffed are actually live on `mcp`.
     enabled: bool = True
-    # Human-readable display name - see capability_meta.py. Defaults to
-    # `name` itself (capturing()'s caller didn't pass one), same "fall
-    # back to the id, don't invent a blank" reasoning chat_app's old
-    # label_for_capability() used for an id its map hadn't caught up
-    # with yet.
+    # Human-readable display name (see capability_meta.py); defaults to `name`.
     label: str = ""
 
 
@@ -57,19 +29,8 @@ _REGISTRY: dict[str, _CapabilityHandle] = {}
 
 @contextmanager
 def capturing(mcp: FastMCP, name: str, label: str | None = None) -> Iterator[None]:
-    """Wrap a capability's import block; records whatever it registered.
-
-    Diffs ``mcp``'s tool/resource-template dicts before and after the
-    block runs, so anything the block's ``@mcp.tool()``/
-    ``@mcp.resource()`` decorators added is attributed to ``name`` -
-    without needing to know its tool/resource names in advance.
-
-    ``label`` is the human-readable display name for this capability
-    (see capability_meta.py) - exposed over ``GET /capabilities`` so
-    chat_app doesn't need its own hand-maintained copy. Defaults to
-    `name` when omitted, for a capability that hasn't registered a
-    capability_meta entry yet.
-    """
+    """Wrap a capability's import block; records whatever it registered by diffing ``mcp``'s tool/resource-template dicts.
+    ``label`` is the display name exposed over ``GET /capabilities`` (see capability_meta.py); defaults to `name`."""
     if name in _REGISTRY:
         raise ValueError(f"Capability {name!r} is already registered")
 
@@ -107,31 +68,21 @@ def label(name: str) -> str:
 
 
 def tool_names(name: str) -> list[str]:
-    """Every tool name captured for `name`, regardless of its current
-    enabled state - the handle keeps the original captured objects even
-    while disabled (see set_enabled()), so this is stable across a
-    toggle. Used by capability_routes.py to expose tool ownership over
-    ``GET /capabilities`` - the same list chat_app's tool_capabilities.py
-    used to hand-maintain locally."""
+    """Every tool name captured for `name`, regardless of enabled state (stable across a toggle).
+    Used by capability_routes.py to expose tool ownership over ``GET /capabilities``."""
     return sorted(tool.name for tool in _handle(name).tools)
 
 
 def resource_names(name: str) -> list[str]:
-    """Same as tool_names() above, for resource templates - keyed by
-    each template's `name` (its `@mcp.resource()` function's own name,
-    not its URI), matching what chat_app's list_resource_templates()
-    surfaces as `resource.name`."""
+    """Same as tool_names(), for resource templates, keyed by each template's `name` (function name, not URI)."""
     return sorted(
         template.name for template in _handle(name).resource_templates if getattr(template, "name", None)
     )
 
 
 def set_enabled(mcp: FastMCP, name: str, enabled: bool) -> None:
-    """Add or remove `name`'s tools/resource templates on the live
-    `mcp` instance. A no-op if `enabled` already matches the current
-    state - the toggle route calls this on every request regardless of
-    what it was before, and re-adding an already-live tool would hit
-    FastMCP's duplicate-tool warning for no reason."""
+    """Add or remove `name`'s tools/resource templates on the live `mcp` instance.
+    No-op if `enabled` already matches, avoiding FastMCP's duplicate-tool warning."""
     handle = _handle(name)
     if enabled == handle.enabled:
         return
@@ -151,9 +102,8 @@ def set_enabled(mcp: FastMCP, name: str, enabled: bool) -> None:
 
 
 def register_unloaded(name: str, label: str) -> None:
-    """Record a capability that exists on disk but has not been brought
-    online: an offline handle with no tools. Going online replaces it with
-    a captured one (capability_loader.py)."""
+    """Record a capability that exists on disk but is not online: an offline handle with no tools.
+    Going online replaces it with a captured one (capability_loader.py)."""
     if name in _REGISTRY:
         raise ValueError(f"Capability {name!r} is already registered")
     _REGISTRY[name] = _CapabilityHandle(enabled=False, label=label)

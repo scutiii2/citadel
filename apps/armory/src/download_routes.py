@@ -1,14 +1,5 @@
-"""GET /download?path=<id>: hands a caller a file a tool offered it.
-
-Mounted like /upload (see run.py): a plain HTTP route, not a tool, so a
-model cannot fetch or list files. ember_api's download proxy is the only
-caller; it sends X-Internal-Token and the requesting account in
-X-Requester-Username.
-
-`path` is an opaque id from `services/downloads.py`, never a file path.
-A wrong token is 401; an unknown, expired or someone else's id are all the
-same 404.
-"""
+"""GET /download?path=<id>: hands a caller a file a tool offered it; a plain route (like /upload), not a tool.
+`path` is an opaque id from `services/downloads.py`; wrong token is 401, unknown, expired or foreign ids are the same 404."""
 
 from __future__ import annotations
 

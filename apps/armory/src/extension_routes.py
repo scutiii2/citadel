@@ -1,40 +1,5 @@
-"""HTTP endpoints for configured extensions: status, and runtime
-add/remove.
-
-Mounted onto the Starlette app that ``mcp.streamable_http_app()`` returns,
-the same technique command_routes.py uses (see ``run.py``): plain HTTP
-routes alongside the MCP surface, not tools - there's nothing here a model
-needs to call, only something a human-facing UI (chat_app's sidebar,
-being built concurrently against these routes) polls and drives.
-
-GET /extensions returns a JSON array shaped exactly like::
-
-    {
-      "id": "reference",
-      "label": "Reference Extension (dev fixture)",
-      "description": "...",
-      "status": "connected",
-      "error": null,
-      "tools": ["reference__echo", "reference__add"],
-      "web_url": null
-    }
-
-``web_url`` is the extension's own web app (an http(s) address from its
-config entry, or null); ember's Extensions page links to it.
-
-That shape is a contract another agent is building chat_app's sidebar
-against concurrently - it is not this file's to redesign. POST
-/extensions returns one object of that same shape (the just-added
-extension's status), for the same reason.
-
-POST /extensions and DELETE /extensions/{id} only support the http
-transport, not stdio: adding a stdio extension means naming a command to
-spawn on *this* machine, which is a very different (and more dangerous -
-arbitrary local process execution) thing to hand a human-facing UI than
-"here is a URL where an MCP server is already running". A stdio extension
-is still fully supported - just only by hand-editing config.json, the
-same as before this feature existed.
-"""
+"""HTTP endpoints for configured extensions: status, and runtime add/remove; plain routes beside the MCP surface, not tools.
+GET/POST /extensions return the status shape (id, label, description, status, error, tools, web_url), a contract with chat_app's sidebar. POST and DELETE support only http transport, never stdio (it would spawn local processes)."""
 
 from __future__ import annotations
 
@@ -49,11 +14,8 @@ from src.config import settings
 from src.services import extensions
 from src.services.app_config import ExtensionConfig
 
-# Anything that isn't a lowercase letter or digit collapses to a single
-# "_". That alone guarantees the result never contains "__"
-# (extensions.NAMESPACE_SEPARATOR) - a run of separators collapses to one
-# underscore, so two would only appear if this code literally joined
-# pieces with "__" itself, which it doesn't.
+# Anything not a lowercase letter or digit collapses to a single "_", so the result
+# can never contain "__" (extensions.NAMESPACE_SEPARATOR).
 _SLUG_INVALID = re.compile(r"[^a-z0-9]+")
 
 
@@ -63,10 +25,7 @@ def _slugify(label: str) -> str:
 
 
 def _unique_extension_id(label: str) -> str:
-    """A slug of `label`, disambiguated against every currently-known
-    extension id by appending _2, _3, ... on collision - so two
-    extensions added with the same display label still get distinct
-    ids."""
+    """A slug of `label`, made unique among known extension ids by appending _2, _3, ... on collision."""
     base = _slugify(label)
     existing = {status.id for status in extensions.current_statuses()}
     if base not in existing:
@@ -94,13 +53,8 @@ async def list_extensions(request: Request) -> JSONResponse:
 
 
 async def create_extension(request: Request) -> JSONResponse:
-    """Add an http-transport extension at runtime, connect to it, and
-    persist it to config.json - see extensions.add_extension. A connect
-    failure (unreachable URL, wrong path, ...) is still a 201: the
-    extension is registered and saved either way, and `status`/`error` in
-    the body say whether it's currently reachable - exactly how a broken
-    config.json entry already behaves at startup.
-    """
+    """Add an http-transport extension at runtime, connect to it and persist it to config.json (see extensions.add_extension).
+    A connect failure is still a 201: it is registered and saved, and `status`/`error` report reachability."""
     try:
         body = await request.json()
     except Exception:  # noqa: BLE001 - malformed JSON is a 400, not a 500
@@ -132,9 +86,7 @@ async def create_extension(request: Request) -> JSONResponse:
     )
     status = await extensions.add_extension(config, settings.extensions_config_path)
     if status is None:
-        # Only possible if this route were somehow reachable before
-        # install_extensions() ran, which run.py's startup order doesn't
-        # allow - guarded anyway rather than assumed.
+        # Unreachable given run.py's startup order (install_extensions() runs first); guarded anyway.
         return JSONResponse({"error": "Extensions are not available yet"}, status_code=503)
 
     return JSONResponse(_status_json(status), status_code=201)

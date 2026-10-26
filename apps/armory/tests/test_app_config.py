@@ -1,9 +1,5 @@
 """Tests for services/app_config.py.
-
-The point of this module is that it fails loudly, so most of these assert
-on the *error*, not the happy path - a config loader that returns ``{}``
-on a missing file is exactly what this project avoids.
-"""
+It fails loudly, so most tests assert on the error, not the happy path."""
 
 from __future__ import annotations
 
@@ -37,9 +33,7 @@ def _write(tmp_path: Path, data: dict) -> Path:
 
 
 def _resolve(path: Path, name: str):
-    """Resolve one top-level key the way a caller resolving an arbitrary
-    subtree would - unrelated to which loader reads which file; these
-    tests exercise ``resolve_section`` itself, not a specific loader."""
+    """Resolve one top-level key as a caller resolving an arbitrary subtree would; tests ``resolve_section`` itself."""
     return resolve_section(load_config(path)[name], where=name, config_path=path)
 
 
@@ -67,12 +61,8 @@ VALID_EXTENSIONS = {
 }
 
 
-# --- ${VAR} resolution -------------------------------------------------
-# The point of this feature is that a config file names secrets instead
-# of holding them, so these cover both halves: the value arriving
-# correctly, and a clear failure when the environment doesn't supply it.
-# Exercised through load_email_config, but nothing here is email-specific
-# - every loader shares the same resolve_section machinery.
+# --- ${VAR} resolution ---
+# Config files name secrets instead of holding them: cover the value arriving and a clear failure when unset (via load_email_config; every loader shares resolve_section).
 
 
 def test_placeholder_is_replaced_with_the_environment_value(tmp_path: Path, monkeypatch):
@@ -111,9 +101,7 @@ def test_unset_variable_raises_naming_both_the_variable_and_the_key(tmp_path: Pa
 
 
 def test_empty_variable_raises_rather_than_yielding_a_blank_secret(tmp_path: Path, monkeypatch):
-    """An unset var and a blank one are the same mistake in practice
-    ("SMTP_PASSWORD=" in .env); failing here beats a confusing SMTP
-    login error later."""
+    """An unset and a blank var are the same mistake ("SMTP_PASSWORD=" in .env); fail here, not at SMTP login."""
     monkeypatch.setenv("SMTP_PASSWORD", "")
     path = _write(tmp_path, {**VALID_EMAIL, "password": "${SMTP_PASSWORD}"})
 
@@ -143,9 +131,7 @@ def test_bare_dollar_signs_are_not_treated_as_placeholders(tmp_path: Path):
 
 
 def test_double_dollar_escapes_a_literal_placeholder(tmp_path: Path, monkeypatch):
-    """Without an escape there'd be no way to store text that genuinely
-    contains ${...} - which is easy to hit by accident (a comment
-    describing this very syntax, for instance)."""
+    """Without an escape, text that genuinely contains ${...} could not be stored."""
     monkeypatch.delenv("SMTP_PASSWORD", raising=False)
     path = _write(tmp_path, {"email": VALID_EMAIL, "note": "write $${SMTP_PASSWORD} to refer to it"})
 
@@ -159,9 +145,7 @@ def test_double_dollar_outside_a_placeholder_becomes_one_dollar(tmp_path: Path):
 
 
 def test_placeholder_value_is_not_itself_expanded(tmp_path: Path, monkeypatch):
-    """No recursive expansion: whatever the environment holds is used
-    literally, so a value that happens to contain ${...} can't trigger
-    another lookup."""
+    """No recursive expansion: a value containing ${...} is used literally."""
     monkeypatch.setenv("WEIRD", "${NOT_A_VAR}")
     monkeypatch.delenv("NOT_A_VAR", raising=False)
     path = _write(tmp_path, {"email": VALID_EMAIL, "note": "${WEIRD}"})
@@ -170,9 +154,7 @@ def test_placeholder_value_is_not_itself_expanded(tmp_path: Path, monkeypatch):
 
 
 def test_load_config_leaves_placeholders_unresolved(tmp_path: Path, monkeypatch):
-    """load_config is parse-and-validate only. If it resolved anything it
-    would demand every secret in the file regardless of which loader
-    reads it - so the placeholder surviving verbatim is the property."""
+    """load_config only parses and validates; the placeholder must survive verbatim, or every secret would be demanded."""
     monkeypatch.delenv("DESKTOP_SSH_PASSWORD", raising=False)
     path = _write(tmp_path, {"desktop": {"password": "${DESKTOP_SSH_PASSWORD}"}})
 
@@ -231,10 +213,7 @@ def test_missing_required_key_names_the_key(tmp_path: Path):
 
 
 def test_to_may_be_omitted_entirely(tmp_path: Path):
-    """A deployment that only mails one-time codes to caller-supplied
-    addresses has no standing recipient list, and requiring one forces an
-    invented address into the config - which then also joins the OTP
-    allowlist, quietly widening exactly the thing it feeds."""
+    """A deployment mailing only caller-supplied addresses has no standing recipient list; requiring one would force an invented address."""
     no_to = {k: v for k, v in VALID_EMAIL.items() if k != "to"}
     path = _write(tmp_path, no_to)
 
@@ -244,10 +223,7 @@ def test_to_may_be_omitted_entirely(tmp_path: Path):
 
 
 def test_to_and_domains_may_be_absent(tmp_path: Path):
-    """Load time is the wrong place to reject this: send_email raises "No
-    recipients" and the OTP capability raises its own KeyError naming the
-    keys to add, both at the moment it matters. A load-time failure would
-    instead block a config that only ever sends where the caller says."""
+    """Load time is the wrong place to reject this: send_email raises "No recipients" at the moment it matters."""
     no_to = {k: v for k, v in VALID_EMAIL.items() if k != "to"}
     path = _write(tmp_path, {**no_to, "allowed_recipient_domains": ["example.com"]})
 
@@ -258,10 +234,7 @@ def test_to_and_domains_may_be_absent(tmp_path: Path):
 
 
 def test_password_may_be_omitted_entirely(tmp_path: Path):
-    """An unauthenticated send is a real configuration - a LAN relay that
-    authorizes by source address - not an oversight. Demanding the key
-    would force a dummy value that then gets offered to a server with no
-    AUTH extension, which fails the send."""
+    """An unauthenticated send is a real config (LAN relay); demanding the key would force a dummy password offered to a server without AUTH."""
     no_password = {k: v for k, v in VALID_EMAIL.items() if k != "password"}
     path = _write(tmp_path, no_password)
 
@@ -275,10 +248,7 @@ def test_security_defaults_to_starttls_on_a_submission_port(tmp_path: Path):
 
 
 def test_port_465_infers_implicit_tls(tmp_path: Path):
-    """465 is the registered implicit-TLS submission port and every
-    mainstream provider uses it as such, so the port is enough to know the
-    transport - saving a field that would otherwise be wrong-by-default
-    for the most common consumer setup."""
+    """465 is the implicit-TLS port every mainstream provider uses, so the port implies the transport."""
     path = _write(tmp_path, {**VALID_EMAIL, "smtp_port": 465})
 
     assert load_email_config(path).security == "ssl"
@@ -308,9 +278,7 @@ def test_unsupported_security_is_rejected_rather_than_falling_back(tmp_path: Pat
 
 
 def test_single_recipient_string_is_accepted_as_a_list(tmp_path: Path):
-    """A bare string is the obvious thing to write for one recipient, and
-    silently iterating it character-by-character would be a nasty way to
-    find out otherwise."""
+    """A bare string is the obvious way to write one recipient; iterating it per character would be a nasty surprise."""
     path = _write(tmp_path, {**VALID_EMAIL, "to": "solo@example.com"})
 
     assert load_email_config(path).to == ["solo@example.com"]
@@ -322,16 +290,12 @@ def test_string_port_is_coerced_to_int(tmp_path: Path):
     assert load_email_config(path).smtp_port == 587
 
 
-# --- allowed_recipient_domains -----------------------------------------
-# The OTP capability sends a passcode to any address at these domains, so
-# the loader's job is to produce exactly what the operator wrote - and,
-# above all, to produce *nothing* when they wrote nothing.
+# --- allowed_recipient_domains ---
+# The loader must produce exactly what the operator wrote, and nothing when they wrote nothing.
 
 
 def test_omitting_allowed_recipient_domains_allows_no_domains(tmp_path: Path):
-    """The dangerous default, tested directly. An absent key must mean "no
-    domains", never "any domain" - the inverted version still passes every
-    happy-path test while turning the OTP tool into an open mail relay."""
+    """The dangerous default, tested directly: an absent key must mean "no domains", never "any domain"."""
     path = _write(tmp_path, VALID_EMAIL)
 
     assert load_email_config(path).allowed_recipient_domains == []
@@ -344,10 +308,8 @@ def test_allowed_recipient_domains_are_loaded_in_order(tmp_path: Path):
 
 
 def test_domains_are_normalized_to_bare_lowercase(tmp_path: Path):
-    """Asked for a domain, people write "@example.com" or ".example.com"
-    as readily as the bare form, and mail domains are case-insensitive
-    anyway. A config that looks right and matches nothing is the worst
-    outcome available here: it reads as configured."""
+    """People write "@example.com" or ".example.com" as readily as the bare form, and domains are case-insensitive.
+    A config that looks right but matches nothing is the worst outcome."""
     path = _write(
         tmp_path,
         {
@@ -364,9 +326,7 @@ def test_domains_are_normalized_to_bare_lowercase(tmp_path: Path):
 
 
 def test_blank_domain_entries_are_dropped(tmp_path: Path):
-    """A leftover "" can only fail to match, so it widens nothing - but it
-    would show up in the refusal message a caller reads to work out what
-    it should have asked for."""
+    """A leftover "" can only fail to match, but would appear in refusal messages."""
     path = _write(tmp_path, {**VALID_EMAIL, "allowed_recipient_domains": ["", "  "]})
 
     assert load_email_config(path).allowed_recipient_domains == []
@@ -381,9 +341,7 @@ def test_a_single_domain_string_is_accepted_as_a_list(tmp_path: Path):
 
 
 def test_domains_resolve_placeholders_and_are_still_normalized(tmp_path: Path):
-    """${VAR} resolution happens before normalization, so a domain supplied
-    by the environment gets the same treatment as one typed into the file
-    - otherwise the two ways of configuring the same thing disagree."""
+    """${VAR} resolution runs before normalization, so environment-supplied domains are treated like file-typed ones."""
     data = {**VALID_EMAIL, "allowed_recipient_domains": ["${STAFF_DOMAIN}"]}
     path = _write(tmp_path, data)
 
@@ -393,10 +351,8 @@ def test_domains_resolve_placeholders_and_are_still_normalized(tmp_path: Path):
         assert load_email_config(path).allowed_recipient_domains == ["staff.example"]
 
 
-# --- extensions ----------------------------------------------------------
-# Per-entry resolution, and broken-sibling isolation: one unset variable
-# in one extension's args must not break every other extension sharing
-# this file.
+# --- extensions ---
+# Per-entry resolution and broken-sibling isolation: one unset variable must not break other extensions.
 
 
 def test_extensions_are_keyed_by_id(tmp_path: Path):
@@ -418,9 +374,7 @@ def test_args_default_to_empty_list(tmp_path: Path):
 
 
 def test_description_defaults_to_empty_string(tmp_path: Path):
-    """Unlike `label` (shown as the extension's name in a UI, so it must
-    be spelled out) or `command` (nothing works without it), a missing
-    description degrades gracefully - it's cosmetic, not load-bearing."""
+    """Unlike `label` or `command`, a missing description degrades gracefully; it's cosmetic."""
     no_description = {k: v for k, v in VALID_EXTENSIONS["reference"].items() if k != "description"}
     path = _write(tmp_path, {"reference": no_description})
 
@@ -428,13 +382,8 @@ def test_description_defaults_to_empty_string(tmp_path: Path):
 
 
 def test_missing_command_and_url_is_rejected(tmp_path: Path):
-    """Before the http transport existed, 'command' was unconditionally
-    required and its absence raised KeyError naming the key. Now
-    'command' xor 'url' is required - omitting 'command' alone is only an
-    error because 'url' isn't present either (see
-    test_extension_with_neither_command_nor_url_is_rejected), so this
-    raises the mutual-exclusion ValueError rather than a KeyError about
-    'command' specifically."""
+    """'command' xor 'url' is required, so omitting 'command' alone with no 'url' raises the mutual-exclusion ValueError, not a KeyError.
+    (see test_extension_with_neither_command_nor_url_is_rejected)"""
     no_command = {k: v for k, v in VALID_EXTENSIONS["reference"].items() if k != "command"}
     path = _write(tmp_path, {"reference": no_command})
 
@@ -463,10 +412,7 @@ def test_extension_args_resolve_placeholders(tmp_path: Path, monkeypatch):
 
 
 def test_a_broken_extension_does_not_break_a_sibling_extension(tmp_path: Path, monkeypatch):
-    """Same property as the equivalent host test: resolution is per
-    entry, so one extension's unset secret can't take a working sibling
-    down with it - which is exactly when you'd still want the working one
-    available."""
+    """Resolution is per entry: one extension's unset secret can't take a working sibling down."""
     monkeypatch.delenv("MISSING_TOKEN", raising=False)
     path = _write(
         tmp_path,
@@ -483,9 +429,7 @@ def test_a_broken_extension_does_not_break_a_sibling_extension(tmp_path: Path, m
 
 
 def test_loading_all_extensions_still_fails_when_any_is_broken(tmp_path: Path, monkeypatch):
-    """The one caller that legitimately needs every extension: it returns
-    the whole configured set, so skipping the broken one would hand back
-    a silently short list."""
+    """The one caller that needs every extension returns the whole set; skipping the broken one would silently shorten it."""
     monkeypatch.delenv("MISSING_TOKEN", raising=False)
     path = _write(
         tmp_path,
@@ -533,11 +477,8 @@ def test_load_extensions_config_returns_extension_config_instances(tmp_path: Pat
     )
 
 
-# --- extensions: http transport -----------------------------------------
-# A second way to reach an extension: connect to a URL instead of spawning
-# a subprocess. 'command' and 'url' are mutually exclusive - exactly one
-# is required - since together they'd say two different things about how
-# to reach the same extension, and neither says it unambiguously alone.
+# --- extensions: http transport ---
+# Connect to a URL instead of spawning a subprocess; 'command' and 'url' are mutually exclusive, exactly one required.
 
 
 def test_http_extension_entry_parses_correctly(tmp_path: Path):
@@ -630,11 +571,8 @@ def test_stdio_extension_with_headers_is_rejected(tmp_path: Path):
         load_extensions_config(path)
 
 
-# --- save_extension_config / delete_extension_config ----------------------
-# The runtime add/remove routes (extension_routes.py) persist through
-# these, so a successful HTTP response and config_extensions.json agreeing
-# about what extensions exist depends on them round-tripping correctly -
-# and, just as important, not disturbing any other entry in the file.
+# --- save_extension_config / delete_extension_config ---
+# The runtime add/remove routes persist through these, so they must round-trip and leave other entries untouched.
 
 
 def test_save_extension_config_adds_a_new_http_entry(tmp_path: Path):
@@ -719,11 +657,8 @@ def test_delete_extension_config_is_idempotent_for_an_unknown_id(tmp_path: Path)
     assert set(load_config(path)) == {"other"}
 
 
-# --- capabilities --------------------------------------------------------
-# config_capabilities.json toggles built-in capabilities on/off. Absence -
-# of the file, or of a capability's own entry within it - must mean
-# enabled, so a fresh or partial toggle file never silently disables
-# everything it doesn't mention.
+# --- capabilities ---
+# config_capabilities.json toggles capabilities; a missing file or entry must mean enabled.
 
 
 def test_capability_enabled_defaults_to_true_when_file_is_missing(tmp_path: Path):
@@ -751,9 +686,7 @@ def test_capability_explicitly_enabled_is_true(tmp_path: Path):
 
 
 def test_save_capabilities_config_creates_a_missing_file(tmp_path: Path):
-    """The one loader in this module that must not require the file to
-    already exist - it's the write path a fresh deployment's first
-    toggle goes through."""
+    """Must not require the file to exist: a fresh deployment's first toggle goes through this write path."""
     path = tmp_path / "config_capabilities.json"
 
     save_capabilities_config(path, "otp", False)

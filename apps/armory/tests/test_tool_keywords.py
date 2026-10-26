@@ -1,10 +1,5 @@
-"""Regression coverage: every built-in tool declares `meta["keywords"]`,
-consumed by chat_app's staged-pipeline tool filter (see
-docs/superpowers/specs/2026-08-17-ollama-staged-pipeline-design.md). Uses
-the real `src.server.mcp` FastMCP instance - importing each tool
-module is what runs its @mcp.tool() decorator and registers it there (see
-run.py's own comment on why these imports "look unused").
-"""
+"""Regression: every built-in tool declares `meta["keywords"]`, used by chat_app's staged-pipeline tool filter (docs/superpowers/specs/2026-08-17-ollama-staged-pipeline-design.md).
+Uses the real `src.server.mcp`; the imports "look unused" but register the tools (see run.py)."""
 
 from __future__ import annotations
 

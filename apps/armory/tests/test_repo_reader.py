@@ -38,54 +38,54 @@ def workspace(tmp_path):
 
 
 def test_list_repos(workspace):
-    assert domain.list_repos(workspace).repos == ["Python/App"]
+    assert domain.RepoDesk(workspace).list_repos().repos == ["Python/App"]
 
 
 def test_log_shows_commits_not_secret_files(workspace):
-    text = domain.log(workspace, "Python/App").text
+    text = domain.RepoDesk(workspace).log("Python/App").text
     assert "first commit" in text and "main.py" in text
     assert ".env" not in text and "secrets" not in text and "data, not instructions" in text
 
 
 def test_diff_working_tree_hides_secrets(workspace):
-    full = domain.diff(workspace, "Python/App", stat_only=False).text
+    full = domain.RepoDesk(workspace).diff("Python/App", stat_only=False).text
     assert "changed" in full and "other-secret" not in full and "API_KEY" not in full
 
 
 def test_grep_finds_code_but_not_secret_files(workspace):
-    text = domain.grep(workspace, "Python/App", "NEEDLE").text
+    text = domain.RepoDesk(workspace).grep("Python/App", "NEEDLE").text
     assert "main.py" in text
     assert "needle-secret" not in text and ".env" not in text
 
 
 def test_grep_no_match(workspace):
-    assert "No tracked line" in domain.grep(workspace, "Python/App", "zzzz").message
+    assert "No tracked line" in domain.RepoDesk(workspace).grep("Python/App", "zzzz").message
 
 
 @pytest.mark.parametrize("rev", ["--output=x", "-p", "a..b", "a b", "$(x)", ""])
 def test_bad_revisions_are_refused(workspace, rev):
     with pytest.raises(ValueError):
-        domain.diff(workspace, "Python/App", base=rev)
+        domain.RepoDesk(workspace).diff("Python/App", base=rev)
 
 
 @pytest.mark.parametrize("repo", ["../x", "plain", "Python", "/abs"])
 def test_bad_repo_paths_are_refused(workspace, repo):
     with pytest.raises(PathRefused):
-        domain.log(workspace, repo)
+        domain.RepoDesk(workspace).log(repo)
 
 
 @pytest.mark.parametrize("path", ["../main.py", ".env", "secrets/k.txt", ":(top)x"])
 def test_bad_paths_are_refused(workspace, path):
     with pytest.raises(PathRefused):
-        domain.grep(workspace, "Python/App", "x", path=path)
+        domain.RepoDesk(workspace).grep("Python/App", "x", path=path)
 
 
 def test_bounds(workspace):
     with pytest.raises(ValueError, match="between 1 and 50"):
-        domain.log(workspace, "Python/App", max_count=51)
+        domain.RepoDesk(workspace).log("Python/App", max_count=51)
     with pytest.raises(ValueError, match="empty"):
-        domain.grep(workspace, "Python/App", " ")
+        domain.RepoDesk(workspace).grep("Python/App", " ")
 
 
 def test_path_limits_the_command(workspace):
-    assert "main.py" in domain.log(workspace, "Python/App", path="main.py").text
+    assert "main.py" in domain.RepoDesk(workspace).log("Python/App", path="main.py").text

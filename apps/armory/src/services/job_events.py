@@ -1,9 +1,5 @@
 """A background job's replayable event log, shared by the pdf_merger and media_downloader queues.
-
-Events are kept in a list so a late subscriber (a browser opening the SSE stream after the
-POST returned) still sees everything. publish() runs on the event loop thread; worker threads
-hop to the loop with call_soon_threadsafe.
-"""
+publish() runs on the event loop thread; worker threads hop to it with call_soon_threadsafe."""
 
 from __future__ import annotations
 

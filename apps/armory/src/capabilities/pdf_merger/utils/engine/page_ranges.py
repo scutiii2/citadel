@@ -1,9 +1,5 @@
-"""Parse a human page selection like "1-3,7" into 0-based page indices.
-
-Order is kept as written ("7,1" gives [6, 0]) so a caller can reorder
-pages inside one segment. Duplicate detection is the planner's job, since
-it must also catch the same page used by two different segments.
-"""
+"""Parse a page selection like "1-3,7" into 0-based indices, keeping the written order.
+Duplicate detection is the planner's job, since it spans segments."""
 
 from __future__ import annotations
 

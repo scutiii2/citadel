@@ -9,7 +9,9 @@ from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
 from src import media_ui_routes
-from src.services import capability_registry, pdf_runtime, media_downloads
+from src.services import capability_registry
+from src.capabilities.pdf_merger.utils import pdf_runtime
+from src.capabilities.media_downloader.utils import media_downloads
 from src.capabilities.pdf_merger.utils.config import Settings as PdfSettings
 from src.capabilities.pdf_merger.utils.service import Caller as PdfCaller
 from src.capabilities.media_downloader.utils.config import Settings as MediaSettings
@@ -174,7 +176,7 @@ def test_pdf_cancel_preserves_queue_status(native):
         async def work(progress, cancel):
             while not cancel.is_set():
                 await asyncio.sleep(0.001)
-            from src.services.pdf_errors import MergerError, ErrorCode
+            from src.capabilities.pdf_merger.utils.pdf_errors import MergerError, ErrorCode
             raise MergerError(ErrorCode.MERGE_TIMEOUT, "Stopped")
         return pdf.service._jobs.submit("alice", 1, work).id
     job_id = pdf.call(submit())

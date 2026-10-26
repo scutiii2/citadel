@@ -1,5 +1,11 @@
 """Repo reader: read-only git history, diffs and code search over the workspace projects."""
 
-from src.services import capability_meta
+from src.services.capability_base import Capability
 
-META = capability_meta.register(folder="repo_reader", id="repo", label="Repo Reader")
+
+class RepoReader(Capability):
+    id = "repo"
+    label = "Repo Reader"
+
+
+CAPABILITY = RepoReader()

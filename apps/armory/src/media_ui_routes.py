@@ -1,8 +1,5 @@
 """Fixed, authenticated HTTP adapters for Ember's native media screens.
-
-The internal token authenticates the gateway; the UID still scopes every
-operation. Services and their process-owned loops remain the state owners.
-"""
+The internal token authenticates the gateway; the UID scopes every operation."""
 from __future__ import annotations
 
 import asyncio
@@ -40,7 +37,7 @@ async def media_ui(request):
     try:
         # Imports stay behind the toggle: an offline optional engine is inert.
         if kind == "pdf":
-            from src.services.pdf_errors import MergerError as ServiceError
+            from src.capabilities.pdf_merger.utils.pdf_errors import MergerError as ServiceError
         else:
             from src.capabilities.media_downloader.utils.errors import DownloaderError as ServiceError
         body = await request.json() if request.method == "POST" and not request.url.path.endswith("/cancel") else None
@@ -66,7 +63,7 @@ async def media_ui(request):
 def _pdf_operation(request, uid, body):
     from src.capabilities.pdf_merger.utils.models import FileInfo, MergePlan
     from src.capabilities.pdf_merger.utils.service import Caller
-    from src.services.pdf_runtime import get_runtime
+    from src.capabilities.pdf_merger.utils.pdf_runtime import get_runtime
 
     runtime = get_runtime(settings)
     caller = Caller(uid)
@@ -112,7 +109,7 @@ def _video_operation(request, uid, body):
     from src.capabilities.media_downloader.domain import _require_ffmpeg
     from src.capabilities.media_downloader.utils.models import DownloadRequest, ProbeRequest, PackageCreate, PackageAdd
     from src.capabilities.media_downloader.utils.service import Caller
-    from src.services.media_downloads import get_runtime
+    from src.capabilities.media_downloader.utils.media_downloads import get_runtime
 
     caller = Caller("uid:" + uid)
     path = request.url.path

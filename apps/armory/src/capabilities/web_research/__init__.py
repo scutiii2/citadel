@@ -1,5 +1,11 @@
 """Web research: search the web and read a page through Tavily."""
 
-from src.services import capability_meta
+from src.services.capability_base import Capability
 
-META = capability_meta.register(folder="web_research", id="web", label="Web Research")
+
+class WebResearch(Capability):
+    id = "web"
+    label = "Web Research"
+
+
+CAPABILITY = WebResearch()

@@ -1,16 +1,5 @@
 """Session-scoped files on disk with an in-memory index.
-
-Layout: <root>/<sha256(session)[:32]>/<file_id> plus a <file_id>.json sidecar
-holding the StoredFile record, so the index can be rebuilt after a restart.
-Session strings are hashed so "mcp:alice" or anything a caller sends can never
-become a raw path. The video title is metadata only.
-
-Downloads happen in scratch directories under <root>/_work (same volume as the
-store, so commit_file can move a finished file with an atomic rename).
-
-One instance per process. Index mutations happen on the event loop thread; disk
-I/O goes through asyncio.to_thread so the loop never blocks.
-"""
+Layout: <root>/<sha256(session)[:32]>/<file_id> plus a <file_id>.json sidecar; one instance per process, disk I/O off the loop."""
 
 from __future__ import annotations
 
@@ -71,10 +60,8 @@ class FileStore(SessionFileStore):
     async def commit_file(
         self, session: str, source: Path, *, name: str, mime: str, kind: str, duration: float | None
     ) -> StoredFile:
-        """Move a finished download into the store. Enforces the file cap and the session quota.
-
-        On a refusal the source file is deleted, so nothing is left behind.
-        """
+        """Move a finished download into the store, enforcing the file cap and session quota.
+        On refusal the source file is deleted."""
         size = (await asyncio.to_thread(source.stat)).st_size
         if size > self._max_file_bytes:
             await asyncio.to_thread(source.unlink, True)

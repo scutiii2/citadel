@@ -1,10 +1,5 @@
 """Tests for GET /extensions.
-
-The property that matters here is the JSON shape: another agent is
-building chat_app's sidebar against this contract concurrently, so a
-field renamed or a status value spelled differently breaks that work
-silently. Same Starlette TestClient pattern as test_command_routes.py.
-"""
+The JSON shape matters: chat_app's sidebar depends on it, so a renamed field or status value breaks it silently."""
 
 from __future__ import annotations
 
@@ -128,11 +123,8 @@ def test_nothing_configured_is_an_empty_list_not_an_error(client, monkeypatch):
     assert response.json() == []
 
 
-# --- POST /extensions -----------------------------------------------------
-# Runtime add: connects (or records a connect failure - still a 201, same
-# as a broken config.json entry today) and persists to config.json, all
-# through extensions.add_extension - mocked here so these tests are about
-# the route's own validation and id-generation, not the registry.
+# --- POST /extensions ---
+# Runtime add (a connect failure is still a 201); extensions.add_extension is mocked, so tests cover only validation and id generation.
 
 
 def test_post_creates_an_http_extension(client, monkeypatch):
@@ -174,9 +166,7 @@ def test_post_creates_an_http_extension(client, monkeypatch):
 
 
 def test_post_a_connect_failure_is_still_201(client, monkeypatch):
-    """Mirrors how a broken config.json entry behaves today: it's still
-    registered (and, here, persisted) - status/error in the body say it's
-    unreachable, nothing about the HTTP response itself signals failure."""
+    """Mirrors a broken config.json entry: still registered and persisted, with status/error reporting it unreachable."""
 
     async def fake_add_extension(config, config_path):
         return extensions.ExtensionStatus(

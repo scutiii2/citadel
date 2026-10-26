@@ -45,9 +45,8 @@ def test_upload_wrong_token_is_a_401(client, fake_settings):
 
 
 def test_upload_with_no_configured_token_never_validates(client, fake_settings):
-    """An unset expected token must never validate against an equally
-    empty header - same "forgot to configure this must not mean anyone
-    can call it" reasoning as chat_app's internal_routes.py."""
+    """An unset expected token must never validate against an empty header ("forgot to configure" must not mean "anyone can call it"),
+    as in chat_app's internal_routes.py."""
     fake_settings.internal_api_token = ""
 
     response = client.post(

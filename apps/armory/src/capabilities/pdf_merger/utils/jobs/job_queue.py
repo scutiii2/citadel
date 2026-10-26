@@ -1,15 +1,5 @@
-"""Merge jobs: a global concurrency limit, a timeout, and replayable progress events.
-
-A job's events are kept in a list so a late subscriber (the browser opening
-the SSE stream after POST /merge returned) still sees everything. All
-publish() calls happen on the event loop thread; worker threads report
-progress through loop.call_soon_threadsafe.
-
-Timeouts are cooperative: when the timeout passes, the job's ``cancel``
-event is set and the work is awaited until it really stops (Python cannot
-kill threads). The semaphore slot is held until then, so timed-out merges
-never exceed the concurrency limit and always clean up after themselves.
-"""
+"""Merge jobs: global concurrency limit, timeout, replayable progress events.
+Timeouts are cooperative and the semaphore slot is held until the work really stops."""
 
 from __future__ import annotations
 

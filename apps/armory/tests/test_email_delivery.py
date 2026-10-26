@@ -7,7 +7,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.services import capability_registry, email_delivery, email_audit
+from src.services import capability_registry
+from src.services.email import delivery as email_delivery
+from src.services.email import audit as email_audit
 from src.config import settings
 
 

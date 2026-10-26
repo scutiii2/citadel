@@ -1,9 +1,5 @@
 """Impersonated (curl_cffi) requests go through the socket guard too.
-
-libcurl resolves names and follows redirects itself, so these tests drive yt-dlp's
-curl_cffi handler against local servers and check that every hop is address-checked,
-pinned to the checked IP and that redirects are followed by us, not by libcurl.
-"""
+Tests drive yt-dlp's curl_cffi handler against local servers: every hop is address-checked and IP-pinned, and redirects are followed by us."""
 
 from __future__ import annotations
 

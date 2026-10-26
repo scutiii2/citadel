@@ -1,9 +1,5 @@
 """Tests for services/capability_registry.py.
-
-Uses a real FastMCP instance throughout, not a mock - the whole point of
-this module is manipulating that instance's actual tool/resource dicts,
-so a mock would prove nothing about whether the manipulation is correct.
-"""
+A real FastMCP instance, not a mock, since the module manipulates its actual dicts."""
 
 from __future__ import annotations
 
@@ -68,10 +64,7 @@ def test_tool_names_lists_only_this_capabilitys_tools(mcp):
 
 
 def test_tool_names_survives_disabling(mcp):
-    """A disabled capability's handle keeps its captured tools (see
-    set_enabled()) - tool_names() must keep reporting them, since
-    chat_app's Capabilities page groups a disabled capability's
-    (currently absent) tools by name too."""
+    """A disabled capability's handle keeps its captured tools, so tool_names() must keep reporting them."""
     with registry.capturing(mcp, "widgets"):
         @mcp.tool()
         def make_widget() -> str:
@@ -157,10 +150,7 @@ def test_disabling_removes_the_resource_template_from_the_live_server(mcp):
 
 
 def test_re_enabling_restores_the_tool_with_its_original_metadata(mcp):
-    """The re-added Tool is the exact object captured at import time, not
-    a rebuild from the bare function - so meta/description survive a
-    disable/enable round trip without the toggle route needing to know
-    what they were."""
+    """The re-added Tool is the exact object captured at import, so meta/description survive a disable/enable round trip."""
     with registry.capturing(mcp, "widgets"):
         @mcp.tool(meta={"keywords": ["widget", "make"]})
         def make_widget() -> str:
@@ -187,10 +177,8 @@ def test_re_enabling_restores_the_resource_template(mcp):
 
 
 def test_setting_the_same_state_twice_is_a_no_op(mcp):
-    """Enabling an already-enabled capability (or disabling an
-    already-disabled one) must not raise or double-remove/double-add -
-    the toggle route calls this on every request regardless of prior
-    state."""
+    """Enabling an enabled capability (or disabling a disabled one) must not raise or double-add/remove;
+    the toggle route calls this on every request."""
     with registry.capturing(mcp, "widgets"):
         @mcp.tool()
         def make_widget() -> str:
@@ -205,9 +193,7 @@ def test_setting_the_same_state_twice_is_a_no_op(mcp):
 
 
 def test_a_capability_with_no_tools_or_resources_is_still_registered(mcp):
-    """A capability whose import block registers nothing (shouldn't
-    happen in practice, but the registry must not choke on it) is still
-    a known, toggleable (trivially) name."""
+    """A capability whose import block registers nothing is still a known, trivially toggleable name."""
     with registry.capturing(mcp, "empty"):
         pass
 

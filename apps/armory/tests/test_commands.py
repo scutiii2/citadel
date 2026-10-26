@@ -1,10 +1,5 @@
-"""Tests for the @command decorator and its registry - see
-src/commands.py. Each test gets its own empty registry via
-monkeypatch (swapping the module's _COMMANDS dict for the duration of
-the test) rather than mutating the real one in place, so this file
-can't clobber registrations other test files rely on being real (e.g.
-test_otp_commands.py, which asserts against the actual otp
-capability's registrations)."""
+"""Tests for the @command decorator and its registry (src/commands.py).
+Each test monkeypatches an empty _COMMANDS so it can't clobber registrations other test files rely on."""
 
 from __future__ import annotations
 
@@ -24,7 +19,7 @@ def test_infer_capability_reads_the_segment_after_capabilities():
 
 def test_infer_capability_rejects_a_module_with_no_capabilities_segment():
     with pytest.raises(ValueError, match="Cannot infer a capability id"):
-        commands._infer_capability("src.services.email")
+        commands._infer_capability("src.services.email.send")
 
 
 def test_command_records_capability_name_description_and_tool_name():

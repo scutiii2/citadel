@@ -1,19 +1,5 @@
-"""A minimal, self-contained stdio MCP server - a reference fixture for
-testing services/extensions.py's proxy mechanism, not a real integration.
-
-Two trivial tools, ``echo`` and ``add``, exist only so a test can spawn
-this as a real subprocess, connect to it as a real MCP client, list its
-real tools, call one for real, and check the real result - proving the
-proxy mechanism against the actual SDK rather than a mock of it. See
-tests/test_extensions.py.
-
-Uses the same ``mcp`` SDK as the rest of this project (no Node/npx, so
-proving the mechanism needs nothing beyond this venv), and is invocable
-as a module so config_extensions.json's entries can name it the same
-way they'd name any real upstream server:
-
-    .venv_mcp\\Scripts\\python.exe -m src._fixtures.reference_extension_server
-"""
+"""Minimal stdio MCP server (tools ``echo`` and ``add``), a fixture for testing the extensions proxy.
+Run as a module: ``.venv_mcp\\Scripts\\python.exe -m src._fixtures.reference_extension_server``."""
 
 from __future__ import annotations
 

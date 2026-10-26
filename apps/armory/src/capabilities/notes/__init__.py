@@ -1,5 +1,11 @@
 """Notes: read the user's own notes that they allowed agents to read. Read-only."""
 
-from src.services import capability_meta
+from src.services.capability_base import Capability
 
-META = capability_meta.register(folder="notes", id="notes", label="Notes")
+
+class Notes(Capability):
+    id = "notes"
+    label = "Notes"
+
+
+CAPABILITY = Notes()

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Armory startup and layers</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #eb6c36;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+      letter-spacing: -0.02em; line-height: 1.15; color: var(--color-ink); margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · Startup and layers</p>
+    <h1>Armory startup and layers</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="armory-startup-layers-title armory-startup-layers-desc">
+        <title id="armory-startup-layers-title">Armory startup and layers</title>
+        <desc id="armory-startup-layers-desc">Armory starts in six steps from run.py and is built as four layers where each layer uses only the ones below it.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+        </defs>
+        <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+        <rect x="40" y="56" width="880" height="120" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/><rect x="52" y="60" width="120" height="12" rx="2" fill="#f5f5f5"/><text x="112.0" y="69" fill="rgba(45,49,66,0.40)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">STARTUP · RUN.PY</text>
+        <rect x="40" y="200" width="880" height="324" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/><rect x="52" y="204" width="260" height="12" rx="2" fill="#f5f5f5"/><text x="182.0" y="213" fill="rgba(45,49,66,0.40)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">LAYERS · EACH USES ONLY THE ONES BELOW</text>
+        <path d="M 180,124 L 204,124" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 324,124 L 348,124" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 468,124 L 492,124" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 612,124 L 636,124" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 756,124 L 780,124" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 480,280 L 480,304" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 480,356 L 480,380" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 480,432 L 480,456" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="60" y="88" width="120" height="72" rx="6" fill="#f5f5f5"/>
+        <rect x="60" y="88" width="120" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="68" y="96" width="44" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="90.0" y="105" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STEP 1</text>
+        <text x="120.0" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Load settings</text>
+        <text x="120.0" y="138" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">.env, config</text>
+        <text x="120.0" y="150" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">logging</text>
+        <rect x="204" y="88" width="120" height="72" rx="6" fill="#f5f5f5"/>
+        <rect x="204" y="88" width="120" height="72" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+        <rect x="212" y="96" width="44" height="12" rx="2" fill="transparent" stroke="#eb6c36" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="234.0" y="105" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STEP 2</text>
+        <text x="264.0" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Load capabilities</text>
+        <text x="264.0" y="138" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">CapabilityLoader</text>
+        <text x="264.0" y="150" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">config decides</text>
+        <rect x="348" y="88" width="120" height="72" rx="6" fill="#f5f5f5"/>
+        <rect x="348" y="88" width="120" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="356" y="96" width="44" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="378.0" y="105" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STEP 3</text>
+        <text x="408.0" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Join extensions</text>
+        <text x="408.0" y="138" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">install_extensions()</text>
+        <text x="408.0" y="150" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">namespaced tools</text>
+        <rect x="492" y="88" width="120" height="72" rx="6" fill="#f5f5f5"/>
+        <rect x="492" y="88" width="120" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="500" y="96" width="44" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="522.0" y="105" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STEP 4</text>
+        <text x="552.0" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Resume watchers</text>
+        <text x="552.0" y="138" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">ServerWatcher</text>
+        <text x="552.0" y="150" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">re-arms live ones</text>
+        <rect x="636" y="88" width="120" height="72" rx="6" fill="#f5f5f5"/>
+        <rect x="636" y="88" width="120" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="644" y="96" width="44" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="666.0" y="105" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STEP 5</text>
+        <text x="696.0" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Build the app</text>
+        <text x="696.0" y="138" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">token + identity</text>
+        <text x="696.0" y="150" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">middleware, routes</text>
+        <rect x="780" y="88" width="120" height="72" rx="6" fill="#f5f5f5"/>
+        <rect x="780" y="88" width="120" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <rect x="788" y="96" width="44" height="12" rx="2" fill="transparent" stroke="#2d3142" stroke-opacity="0.45" stroke-width="0.8"/>
+        <text x="810.0" y="105" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STEP 6</text>
+        <text x="840.0" y="124" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Serve</text>
+        <text x="840.0" y="138" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">uvicorn</text>
+        <text x="840.0" y="150" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">one asyncio loop</text>
+        <rect x="60" y="228" width="840" height="52" rx="6" fill="#f5f5f5"/>
+        <rect x="60" y="228" width="840" height="52" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="480.0" y="252" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Entry surfaces</text>
+        <text x="480.0" y="266" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">MCP at /mcp for tools and commands, plus plain HTTP routes for ember_api (not model-callable)</text>
+        <rect x="60" y="304" width="840" height="52" rx="6" fill="#f5f5f5"/>
+        <rect x="60" y="304" width="840" height="52" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+        <text x="480.0" y="328" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Capabilities</text>
+        <text x="480.0" y="342" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">one folder per feature: tool.py, domain.py, contract.py, plus routes.py and utils/ for its own stores</text>
+        <rect x="60" y="380" width="840" height="52" rx="6" fill="#f5f5f5"/>
+        <rect x="60" y="380" width="840" height="52" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="480.0" y="404" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Shared services</text>
+        <text x="480.0" y="418" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">loader, extensions, identity, internal token, jobs, file store, link signing, downloads, email, redaction</text>
+        <rect x="60" y="456" width="840" height="52" rx="6" fill="#f5f5f5"/>
+        <rect x="60" y="456" width="840" height="52" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="480.0" y="480" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">State and outside world</text>
+        <text x="480.0" y="494" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">specifics/&lt;name&gt;/ data, logs, cache · configs/*.json · treasury, Docker, SMTP, HTTP APIs, vault, repos</text>
+        <text x="908" y="215" fill="#4f5d75" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif', serif" text-anchor="end">Refactor in progress: routes, stores and runtimes move into each capability.</text>
+        <line x1="40" y1="540" x2="920" y2="540" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="40" y="556" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="110" y="548" width="14" height="10" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="130" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Component</text>
+        <rect x="195" y="548" width="14" height="10" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+        <text x="215" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Focal</text>
+        <rect x="260" y="548" width="14" height="10" rx="2" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="280" y="556" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Store / state</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

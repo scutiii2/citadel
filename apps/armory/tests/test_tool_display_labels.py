@@ -1,9 +1,5 @@
-"""Regression coverage: every tool declares `meta["display_label"]`,
-consumed by chat_app's live tool-call trace (see
-docs/superpowers/specs/2026-09-13-live-agent-trace-streaming-design.md). Uses
-the real `src.server.mcp` FastMCP instance - importing each tool
-module is what runs its @mcp.tool() decorator and registers it there.
-"""
+"""Regression: every tool declares `meta["display_label"]`, used by chat_app's live tool-call trace (docs/superpowers/specs/2026-09-13-live-agent-trace-streaming-design.md).
+Uses the real `src.server.mcp`; importing each tool module runs its @mcp.tool() decorator."""
 
 from __future__ import annotations
 

@@ -1,9 +1,5 @@
-"""Tests for services/ssh.py's security-relevant behavior.
-
-No network and no SSH server: these cover the two things that are pure
-logic - how a command gets quoted before it reaches a remote shell, and
-how the paramiko client is configured before it connects.
-"""
+"""Tests for services/ssh.py's security-relevant behavior; no network or SSH server.
+They cover pure logic: how a command is quoted for a remote shell, and how the paramiko client is configured before connecting."""
 
 from __future__ import annotations
 
@@ -16,11 +12,8 @@ import pytest
 from src.services.ssh import SSHClient, _new_client
 
 
-# --- shell quoting -----------------------------------------------------
-# run_login_shell() embeds a command inside `/bin/bash -lc ...`. Tool
-# arguments here come from an LLM that may be reading attacker-controlled
-# text, so "the caller will pass something sane" is not an assumption
-# available to us.
+# --- shell quoting ---
+# run_login_shell() embeds a command in `/bin/bash -lc ...`; arguments come from an LLM that may read attacker-controlled text.
 
 
 def _wrapped(command: str, shell: str = "bash") -> str:
@@ -58,10 +51,8 @@ def test_csh_variant_uses_csh():
     ],
 )
 def test_injection_payloads_stay_a_single_argument(payload):
-    """Each of these used to break out of the old f'...\"{command}\"'
-    wrapper. Quoted, the whole payload is one argument to -c, so the
-    remote shell runs it as a (failing) command name rather than as
-    several commands."""
+    """Each of these broke out of the old f'..."{command}"' wrapper; quoted, the payload is one argument to -c,
+    so the remote shell runs it as a (failing) command name."""
     wrapped = _wrapped(payload)
 
     assert wrapped.startswith("/bin/bash -lc '")
@@ -97,10 +88,8 @@ def test_auto_policy_is_opt_in(tmp_path: Path):
 
 
 def test_auto_policy_creates_the_file_so_accepted_keys_persist(tmp_path: Path):
-    """AutoAdd only writes keys back if the client knows which file to use,
-    and paramiko only learns that from load_host_keys() - which raises on
-    a missing file. Without this, trust-on-first-use would re-trust on
-    every connection and never actually record anything."""
+    """AutoAdd writes keys back only if the client knows the file, which paramiko learns from load_host_keys() (raises if missing).
+    Otherwise trust-on-first-use would re-trust every connection and record nothing."""
     known = tmp_path / "nested" / "known_hosts"
 
     client = _new_client(known_hosts=known, host_key_policy="auto")
@@ -120,9 +109,7 @@ def test_existing_known_hosts_entries_are_loaded(tmp_path: Path):
 
 
 def test_missing_known_hosts_under_reject_policy_is_not_an_error(tmp_path: Path):
-    """A missing file means "nothing is trusted yet", which the reject
-    policy handles correctly on its own. Creating it here would be
-    pointless since reject never writes to it."""
+    """A missing file means "nothing trusted yet", which the reject policy handles; creating it is pointless since reject never writes."""
     known = tmp_path / "does-not-exist"
 
     client = _new_client(known_hosts=known)
@@ -142,10 +129,8 @@ def test_unknown_policy_name_fails_loudly(tmp_path: Path):
 
 
 def test_configured_port_reaches_paramiko(tmp_path: Path):
-    """Regression: `port` was accepted in config.json, defaulted to 22, and
-    then dropped - SSHClient had no port parameter at all, so a host on a
-    non-standard sshd port silently connected to 22. Config that is
-    accepted and ignored is worse than config that is rejected."""
+    """Regression: `port` was accepted in config.json then dropped (SSHClient had no port parameter), so hosts on non-standard ports connected to 22.
+    Accepted-and-ignored config is worse than rejected."""
     known = tmp_path / "known_hosts"
     known.touch()
     client = SSHClient("h", "u", password="pw", port=2222, known_hosts=known)

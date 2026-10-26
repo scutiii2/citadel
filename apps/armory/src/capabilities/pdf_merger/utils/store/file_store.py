@@ -1,13 +1,5 @@
 """Session-scoped files on disk with an in-memory index.
-
-Layout: <root>/<sha256(session)[:32]>/<file_id> plus a <file_id>.json
-sidecar holding the StoredFile record, so the index can be rebuilt after a
-restart. Session strings are hashed so "mcp:alice" or anything a caller
-sends can never become a raw path. The user's file name is metadata only.
-
-One instance per process. Index mutations happen on the event loop thread;
-disk I/O goes through asyncio.to_thread so the loop never blocks.
-"""
+Layout: <root>/<sha256(session)[:32]>/<file_id> plus a <file_id>.json sidecar; one instance per process, disk I/O off the loop."""
 
 from __future__ import annotations
 
