@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
+import "../../components/layout/infoPage.css";
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { McpServerClient } from "../../api/tools/McpServerClient";
 import { onBeforeRouteLeave } from "vue-router";
@@ -209,7 +210,7 @@ onBeforeUnmount(() => {
 
 
 <template>
-  <PageLayout title="Generator" description="Passwords, passphrases, PINs and one-time codes." class="generator" wide fill>
+  <PageLayout title="Generator" description="Passwords, passphrases, PINs and one-time codes." class="generator info-content" wide fill>
     <WorkspaceLayout mobile="stack" as="form" class="generator-workspace" @submit.prevent="canRun && generate()">
       <div class="type-picker">
         <div class="desktop-types"><SegmentedControl :model-value="tab" aria-label="Generator type" :options="TABS" @update:model-value="requestTab" /></div>
@@ -343,12 +344,10 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .options-note { color: var(--muted); font-size: .75em; margin: 8px 0 0; }
 .generate-footer { grid-area: footer; margin: 0 24px 20px; padding-top: 18px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .generate-footer p { color: var(--muted); font-size: .75em; margin: 0; }
-.primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: inherit; font-size: .85em; font-weight: 600; padding: 10px 18px; min-height: 44px; border: 1px solid var(--accent); border-radius: var(--radius-full); background: var(--accent); color: var(--accent-contrast); cursor: pointer; }
-.primary:disabled { opacity: .5; cursor: not-allowed; }
+.generator .primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: .85em; padding: 10px 18px; min-height: 44px; }
 .primary[aria-busy=true]::before { content: ''; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); animation: generator-spin .7s linear infinite; }
 @keyframes generator-spin { to { transform: rotate(360deg); } }
-.muted { color: var(--muted); }
-.error { color: var(--danger); font-size: .85em; overflow-wrap: anywhere; }
+.error { font-size: .85em; overflow-wrap: anywhere; }
 :is(button,input,select):focus-visible, .result-buttons :deep(button.copy:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .field input[type="range"] {
   --fill: 0%;

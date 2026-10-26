@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
+import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
 import NotePromotionPanel from "./components/NotePromotionPanel.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, getCurrentInstance, onMounted, onUnmounted, reactive, ref, useId } from "vue";
@@ -319,8 +319,19 @@ function preview(note: Note): string {
       <p v-if="loadError" class="error" role="alert">Could not load your notes: {{ loadError }}</p>
       <p v-if="loading" class="muted">Loading …</p>
 
-      <WorkspaceLayout v-else-if="!loadError" :class="['layout', { editing: selected !== null }]">
-        <div class="list-pane">
+      <ListEditorLayout
+        v-else-if="!loadError"
+        class="layout"
+        :editing="selected !== null"
+        back-label="All notes"
+        :busy="saving || removing"
+        :saving="saving"
+        :dirty="dirty"
+        :can-save="canSave"
+        @back="go(null)"
+        @submit="save"
+      >
+        <template #list>
           <div class="list-heading"><span>All notes</span><span>{{ notes.length }}/{{ NOTES_MAX }} notes</span></div>
           <p v-if="notes.length === 0 && selected !== NEW" class="muted empty">You have no notes yet.</p>
           <ul v-else class="list" aria-label="Notes">
@@ -347,14 +358,13 @@ function preview(note: Note): string {
             <summary>Obsidian &amp; publishing <span aria-hidden="true">›</span></summary>
             <div :id="`${publicationTarget}-library`" />
           </details>
-        </div>
+        </template>
 
-        <form v-if="selected !== null" class="editor" @submit.prevent="save">
-          <div class="editor-head">
-            <button type="button" class="chip back" :disabled="saving || removing" @click="go(null)">‹ All notes</button>
+        <template #head>
             <span class="privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3" /></svg>{{ form.agentReadable ? "Agents can read" : "Private note" }}</span>
-          </div>
-          <div class="editor-scroll">
+        </template>
+
+        <template #editor>
           <div class="writing">
           <p v-if="savedEditor === 'agent'" class="agent-edit-note">
             An agent last changed this note. Saving your own changes removes this mark.
@@ -475,7 +485,7 @@ function preview(note: Note): string {
             </div>
           </details>
           </div>
-          <p v-if="formError" class="error" role="alert">{{ formError }}</p>
+          <p v-if="formError" class="error form-error" role="alert">{{ formError }}</p>
           <div v-if="conflict" class="conflict" role="alert">
             <p>
               {{ conflict.last_editor === "agent" ? "An agent" : "Another session" }} changed this note after you opened
@@ -486,18 +496,14 @@ function preview(note: Note): string {
               <button type="button" class="chip" @click="keepMine">Save mine anyway</button>
             </div>
           </div>
-          </div>
-          <div class="actions">
-            <span v-if="dirty" class="unsaved" role="status"><i aria-hidden="true" />Unsaved changes</span>
-            <button type="submit" class="primary" :disabled="!canSave" :aria-busy="saving">{{ saving ? "Saving…" : "Save" }}</button>
-          </div>
-        </form>
-        <div v-else class="placeholder">
+        </template>
+
+        <template #placeholder>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>
           <h3>A little room to think</h3><p>Pick a note, or start a new one.</p>
           <button type="button" class="chip" @click="startNew">Create a note</button>
-        </div>
-      </WorkspaceLayout>
+        </template>
+      </ListEditorLayout>
     </div>
 
     <Teleport v-if="!loading && !loadError" :to="`#${publicationTarget}-${selected === null ? 'library' : 'editor'}`">
@@ -537,11 +543,7 @@ function preview(note: Note): string {
 
 <style scoped>
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
-.notice { margin: 0 0 12px; color: var(--muted); font-size: .9em; }
 
-.list-pane { min-width: 0; overflow-y: auto; background: color-mix(in srgb, var(--surface) 50%, var(--bg)); border-right: 1px solid var(--border); padding: 20px 12px; }
-.list-heading { display: flex; justify-content: space-between; gap: 10px; padding: 0 10px 16px; font-size: .75em; color: var(--muted); }
-.list-heading > :first-child { text-transform: uppercase; letter-spacing: .08em; }
 .list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .empty { padding: 8px 10px; font-size: .9em; }
 .new-note { flex-shrink: 0; min-height: 40px; }
@@ -554,12 +556,9 @@ function preview(note: Note): string {
 .row-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font-size: .8em; overflow-wrap: anywhere; }
 .agent-mark { border-color: var(--warning); color: var(--warning); }
-.editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
-.editor-head { display: flex; align-items: center; gap: 16px; padding: 16px 28px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .privacy { display: inline-flex; gap: 7px; align-items: center; font-size: .8em; color: var(--muted); }
-.privacy svg, .placeholder svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.privacy svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .privacy svg { width: 15px; height: 15px; }
-.editor-scroll { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; scroll-padding: 20px; }
 .writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; min-height: 310px; padding: 30px 36px 20px; }
 .title-field, .body-field { display: flex; flex-direction: column; min-width: 0; }
 .notes .editor .title-field input { width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 1.65em; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; }
@@ -585,35 +584,19 @@ summary > [aria-hidden], .summary-hint { color: var(--muted); }
 .conflict-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .agent-edit-note, .agent-warning { margin: 0; padding: 10px 12px; border: 1px solid var(--warning); border-radius: var(--radius-md); font-size: .85em; }
 .agent-warning { background: color-mix(in srgb, var(--warning) 12%, var(--bg)); }
-.editor-scroll > .error { margin: 12px 20px; }
-.actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 14px 28px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg); }
-.actions .primary { min-width: 76px; min-height: 40px; }
-.actions .primary[aria-busy="true"]::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 7px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); vertical-align: -1px; animation: save-spin .7s linear infinite; }
-@keyframes save-spin { to { transform: rotate(360deg); } }
-.unsaved { display: inline-flex; align-items: center; gap: 7px; margin-right: auto; font-size: .8em; color: var(--muted); }
-.unsaved i { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--accent); flex-shrink: 0; }
-.danger-zone { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-lg); font-size: .85em; }
-.back, .mobile-tools-toggle { display: none; }
-.placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 28px; color: var(--muted); text-align: center; }
-.placeholder svg { width: 34px; height: 34px; color: var(--accent); }
-.placeholder h3 { color: var(--text); }
-.placeholder p { margin: 0 0 8px; font-size: .9em; }
+.mobile-tools-toggle { display: none; }
+.form-error { margin: 12px 20px; }
 .library-publishing { margin: 24px 10px 0; border-top: 1px solid var(--border); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
-.notes button:focus-visible, .notes summary:focus-visible, .editor input:focus-visible, .editor textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (min-width: 1200px) { .writing { padding-inline: max(36px, calc((100% - 760px) / 2)); } }
-@media (max-width: 900px) and (min-width: 768px) { .layout { --workspace-columns: 220px minmax(0, 1fr); } .writing { padding-inline: 22px; } .note-tools, .actions { padding-inline: 20px; } }
+@media (max-width: 900px) and (min-width: 768px) { .writing { padding-inline: 22px; } .note-tools { padding-inline: 20px; } }
 @media (max-width: 767px) {
   .notes :deep(.page-column) { padding: 18px 16px 12px; }
   .notes :deep(.page-head) { flex-direction: row; align-items: center; margin-bottom: 16px; gap: 10px; }
   .notes :deep(.page-title) { margin: 0; }
   .notes :deep(.page-description) { display: none; }
   .notes.note-open :deep(.page-head) { display: none; }
-  .layout.editing .list-pane, .layout:not(.editing) .placeholder { display: none; }
-  .list-pane { border-right: 0; padding: 16px 10px; }
   .note-row { min-height: 100px; }
-  .editor-head { padding: 12px 16px; justify-content: space-between; gap: 10px; }
-  .back { display: inline-block; min-height: 40px; }
   .writing { min-height: 310px; padding: 24px 20px 18px; }
   .notes .editor .title-field input { font-size: 1.45em; }
   .editor textarea { min-height: 250px; }
@@ -621,6 +604,5 @@ summary > [aria-hidden], .summary-hint { color: var(--muted); }
   .note-tools { display: none; padding-inline: 20px; }
   /* Keep an open publication dialog visible when resizing from desktop. */
   .note-tools.expanded, .note-tools:has(dialog[open]) { display: block; }
-  .actions { padding: 12px 16px; }
 }
 </style>
