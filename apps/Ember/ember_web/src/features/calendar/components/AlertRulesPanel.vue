@@ -5,6 +5,7 @@ import { errorMessage } from "../../../utils/errors";
 import type { AlarmChannel, AlarmRule } from "../api/CalendarClient";
 import { currentPushEndpoint, disablePush, enablePush, pushSupported } from "../composables/usePushSubscription";
 import { useCalendarStore } from "../stores/calendar";
+import CalendarPanel from "./CalendarPanel.vue";
 
 /** Alert rules: which way (in-app, email, push) and how long before. Each rule fires once per event. */
 const calendar = useCalendarStore();
@@ -66,8 +67,7 @@ async function turnPushOff(): Promise<void> {
 </script>
 
 <template>
-  <section class="panel" aria-labelledby="alerts-title">
-    <h3 id="alerts-title">Alerts</h3>
+  <CalendarPanel title="Alerts">
     <ul v-if="calendar.rules.length" class="rules" aria-label="Alert rules">
       <li v-for="rule in calendar.rules" :key="rule.id" class="rule">
         <ToggleSwitch small :checked="rule.enabled && available(rule.channel)" :disabled="!available(rule.channel)" :aria-label="`${label(rule.channel)}, ${leadText(rule.lead_minutes)}`" @change="toggle(rule)" />
@@ -103,12 +103,10 @@ async function turnPushOff(): Promise<void> {
       <button v-else type="button" class="chip" @click="turnPushOff">Turn off</button>
       <p v-if="pushMessage" class="problem" role="status">{{ pushMessage }}</p>
     </div>
-  </section>
+  </CalendarPanel>
 </template>
 
 <style scoped>
-.panel { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
-h3 { margin: 0; font-size: 1rem; }
 .rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .rule { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 .rule .muted { grid-column: 1 / -1; }

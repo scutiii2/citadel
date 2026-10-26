@@ -6,6 +6,7 @@ import { errorMessage } from "../../../utils/errors";
 import type { CalendarFeed } from "../api/CalendarClient";
 import { nextFeedColor } from "../utils/palette";
 import { useCalendarStore } from "../stores/calendar";
+import CalendarPanel from "./CalendarPanel.vue";
 
 /** Calendar links: add, show/hide, recolor, rename and remove. The link itself is never shown again after saving. */
 const emit = defineEmits<{ changed: [] }>();
@@ -63,8 +64,7 @@ async function remove(): Promise<void> {
 </script>
 
 <template>
-  <section class="panel" aria-labelledby="feeds-title">
-    <h3 id="feeds-title">My calendars</h3>
+  <CalendarPanel title="My calendars">
     <ul v-if="calendar.feeds.length" class="feeds" aria-label="Calendars">
       <li v-for="feed in calendar.feeds" :key="feed.id" class="feed">
         <ToggleSwitch small :checked="feed.enabled" :aria-label="`Show ${feed.name}`" @change="change(feed, { enabled: !feed.enabled })" />
@@ -97,12 +97,10 @@ async function remove(): Promise<void> {
       @confirm="remove"
       @close="removing = null"
     />
-  </section>
+  </CalendarPanel>
 </template>
 
 <style scoped>
-.panel { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
-h3 { margin: 0; font-size: 1rem; }
 .feeds { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .feed { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 .feed .problem { grid-column: 1 / -1; }
