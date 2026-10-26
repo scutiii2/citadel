@@ -17,7 +17,7 @@ class _Service:
 
 
 def test_readiness_distinguishes_a_running_laya_service_and_unavailable_fallback(monkeypatch):
-    spec = replace(agent_spec.current(), internal_role="router", decision=RouterPolicy())
+    spec = replace(agent_spec.current(), role="router", decision=RouterPolicy())
     monkeypatch.setattr(agent_spec, "current", lambda: spec)
     monkeypatch.setattr(router_service.laya_model, "agent", lambda: _Service(True))
     monkeypatch.setattr(router_service.laya_model, "configured", lambda: True)
@@ -29,7 +29,7 @@ def test_readiness_distinguishes_a_running_laya_service_and_unavailable_fallback
 
 
 def test_an_unreachable_or_missing_laya_service_publishes_degraded_state(monkeypatch):
-    spec = replace(agent_spec.current(), internal_role="router", decision=RouterPolicy())
+    spec = replace(agent_spec.current(), role="router", decision=RouterPolicy())
     monkeypatch.setattr(agent_spec, "current", lambda: spec)
     monkeypatch.setattr(router_service.laya_model, "configured", lambda: True)
     monkeypatch.setattr(router_service.laya_model, "agent", lambda: _Service(False))

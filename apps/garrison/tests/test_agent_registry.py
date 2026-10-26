@@ -264,7 +264,7 @@ def test_roster_and_specialists_survive_a_corrupt_registry_file(monkeypatch, tmp
         {"id": "calc", "label": "Calculator", "url": "u", "focus": "arithmetic"},
     ]
     config_path = _configure(monkeypatch, tmp_path, agents)
-    spec = AgentSpec(id="orchestrator", label="Ember", port=9100, llm=LlmSpec(provider="anthropic"), orchestrator=True)
+    spec = AgentSpec(id="orchestrator", label="Ember", port=9100, llm=LlmSpec(provider="anthropic"), role='orchestrator')
     monkeypatch.setattr(agent_spec, "_current", spec)
     config_path.write_text("{", encoding="utf-8")
 
@@ -285,7 +285,7 @@ def test_definitions_round_trip_and_include_disabled_agents(monkeypatch):
     monkeypatch.setattr(model_tiers, "effective_tiers", fake_effective_tiers)
     specs = [
         AgentSpec(
-            id="ember", label="Ember", port=9100, entry=True, orchestrator=True, focus="General.",
+            id="ember", label="Ember", port=9100, entry=True, role='orchestrator', focus="General.",
             llm=LlmSpec(provider="anthropic", gateway="openrouter", model="claude-sonnet-5-5", max_tier="standard"),
         ),
         AgentSpec(id="off", label="Off", port=9101, llm=LlmSpec(provider="anthropic"), enabled=False),

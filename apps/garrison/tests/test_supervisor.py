@@ -193,7 +193,7 @@ def test_watching_supervisor_starts_restarts_and_stops_children(tmp_path):
     lines = []
 
     def write(agent_id, port, **extra):
-        data = {"port": port, "llm": {"provider": "anthropic"}, **extra}
+        data = {"role": "specialist", "port": port, "llm": {"provider": "anthropic"}, **extra}
         (tmp_path / f"{agent_id}.json").write_text(json.dumps(data), encoding="utf-8")
 
     write("ember", 9301, entry=True)
@@ -239,7 +239,7 @@ def test_changing_a_shared_file_restarts_every_agent(tmp_path):
 
     from src.agents import agent_spec
 
-    (tmp_path / "ember.json").write_text(json.dumps({"port": 9401, "entry": True, "llm": {"provider": "anthropic"}}), encoding="utf-8")
+    (tmp_path / "ember.json").write_text(json.dumps({"role": "specialist", "port": 9401, "entry": True, "llm": {"provider": "anthropic"}}), encoding="utf-8")
     shared = tmp_path / "shared.txt"
     lines = []
 

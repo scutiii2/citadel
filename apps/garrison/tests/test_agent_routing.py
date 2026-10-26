@@ -29,7 +29,7 @@ def registry(monkeypatch):
 
 def _use(monkeypatch, orchestrator=True):
     spec = AgentSpec(id="orchestrator", label="Ember", port=9100, llm=LlmSpec(provider="anthropic"),
-                     orchestrator=orchestrator)
+                     role="orchestrator" if orchestrator else "specialist")
     monkeypatch.setattr(agent_spec, "_current", spec)
 
 
@@ -93,7 +93,7 @@ def test_roster_leaves_out_specialists_whose_tools_are_switched_off(registry, mo
         agent_spec.RosterEntry("poet", "Poet", ""),
     ])
     monkeypatch.setattr(agent_spec, "current", lambda: agent_spec.AgentSpec(
-        id="ember", label="E", port=1, llm=agent_spec.LlmSpec(provider="anthropic"), orchestrator=True))
+        id="ember", label="E", port=1, llm=agent_spec.LlmSpec(provider="anthropic"), role='orchestrator'))
     assert [r.id for r in asyncio.run(agent_routing.roster_for())] == ["poet"]
     monkeypatch.setattr(agent_routing, "_live_tool_names", lambda: None)
     assert [r.id for r in asyncio.run(agent_routing.roster_for())] == ["calc", "poet"]
@@ -108,7 +108,7 @@ def _roster_ids(monkeypatch, live, blocked=()):
         agent_spec.RosterEntry("poet", "Poet", ""),
     ])
     monkeypatch.setattr(agent_spec, "current", lambda: agent_spec.AgentSpec(
-        id="ember", label="E", port=1, llm=agent_spec.LlmSpec(provider="anthropic"), orchestrator=True))
+        id="ember", label="E", port=1, llm=agent_spec.LlmSpec(provider="anthropic"), role='orchestrator'))
     token = tool_filter.bind(blocked)
     try:
         return [r.id for r in asyncio.run(agent_routing.roster_for())]

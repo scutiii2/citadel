@@ -68,7 +68,7 @@ def test_provider_stops_before_executing_more_tools(monkeypatch, provider, reaso
 
 def test_agent_accepts_turn_caps(tmp_path):
     path = tmp_path / "bounded.json"
-    path.write_text(json.dumps({"port": 9103, "llm": {"provider": "openai", "max_turn_tokens": 1000, "max_turn_seconds": 2.5}}))
+    path.write_text(json.dumps({"role": "specialist", "port": 9103, "llm": {"provider": "openai", "max_turn_tokens": 1000, "max_turn_seconds": 2.5}}))
     spec = agent_spec.load_file(path)
     assert spec.llm.max_turn_tokens == 1000
     assert spec.llm.max_turn_seconds == 2.5
@@ -77,6 +77,6 @@ def test_agent_accepts_turn_caps(tmp_path):
 @pytest.mark.parametrize("key,value", [("max_turn_tokens", 0), ("max_turn_tokens", True), ("max_turn_tokens", 1.5), ("max_turn_seconds", 0), ("max_turn_seconds", True), ("max_turn_seconds", float("inf"))])
 def test_agent_rejects_invalid_turn_caps(tmp_path, key, value):
     path = tmp_path / "bounded.json"
-    path.write_text(json.dumps({"port": 9103, "llm": {"provider": "openai", key: value}}))
+    path.write_text(json.dumps({"role": "specialist", "port": 9103, "llm": {"provider": "openai", key: value}}))
     with pytest.raises(agent_spec.AgentSpecError, match=key):
         agent_spec.load_file(path)

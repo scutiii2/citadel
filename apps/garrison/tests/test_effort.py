@@ -22,22 +22,22 @@ def _write(directory, name, data):
 
 
 def test_llm_max_effort_is_read_and_defaults_to_unbounded(tmp_path):
-    capped = agent_spec.load_file(_write(tmp_path, "calc", {
+    capped = agent_spec.load_file(_write(tmp_path, "calc", {"role": "specialist",
         "port": 9103, "llm": {"provider": "anthropic", "max_effort": "medium"},
     }))
-    plain = agent_spec.load_file(_write(tmp_path, "plain", {"port": 9104, "llm": {"provider": "anthropic"}}))
+    plain = agent_spec.load_file(_write(tmp_path, "plain", {"role": "specialist", "port": 9104, "llm": {"provider": "anthropic"}}))
     assert capped.llm.max_effort == "medium"
     assert plain.llm.max_effort is None
 
 
 def test_unknown_max_effort_is_rejected(tmp_path):
-    path = _write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "anthropic", "max_effort": "extreme"}})
+    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic", "max_effort": "extreme"}})
     with pytest.raises(AgentSpecError, match="llm.max_effort must be one of: off, low, medium, high"):
         agent_spec.load_file(path)
 
 
 def test_default_effort_above_max_effort_is_rejected(tmp_path):
-    path = _write(tmp_path, "calc", {
+    path = _write(tmp_path, "calc", {"role": "specialist",
         "port": 9103, "llm": {"provider": "anthropic", "reasoning_effort": "high", "max_effort": "low"},
     })
     with pytest.raises(AgentSpecError, match="llm.reasoning_effort 'high' is above llm.max_effort 'low'"):
@@ -45,7 +45,7 @@ def test_default_effort_above_max_effort_is_rejected(tmp_path):
 
 
 def test_laya_rejects_max_effort(tmp_path):
-    path = _write(tmp_path, "triage", {"port": 9110, "llm": {"provider": "laya", "max_effort": "low"}})
+    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "laya", "max_effort": "low"}})
     with pytest.raises(AgentSpecError, match="Laya triage does not accept"):
         agent_spec.load_file(path)
 
@@ -287,7 +287,7 @@ def test_specialists_carry_their_published_efforts(monkeypatch):
     ]
     monkeypatch.setattr(agent_registry, "reload", lambda: None)
     monkeypatch.setattr(agent_registry, "_AGENTS", agents)
-    spec = AgentSpec(id="orchestrator", label="Ember", port=9100, llm=LlmSpec(provider="anthropic"), orchestrator=True)
+    spec = AgentSpec(id="orchestrator", label="Ember", port=9100, llm=LlmSpec(provider="anthropic"), role='orchestrator')
     monkeypatch.setattr(agent_spec, "_current", spec)
 
     calc, poet = agent_routing.specialists()

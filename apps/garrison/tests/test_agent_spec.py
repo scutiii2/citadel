@@ -22,7 +22,7 @@ def _write(directory, name, data):
 
 
 def test_load_file_applies_defaults(tmp_path):
-    spec = agent_spec.load_file(_write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "anthropic"}}))
+    spec = agent_spec.load_file(_write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}}))
 
     assert spec.id == "calc"
     assert spec.label == "calc"
@@ -40,7 +40,7 @@ def test_load_file_applies_defaults(tmp_path):
 
 
 def test_fallback_gateways_preserve_order_and_primary_environ(tmp_path, monkeypatch):
-    spec = agent_spec.load_file(_write(tmp_path, "calc", {"port": 9103, "llm": {
+    spec = agent_spec.load_file(_write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {
         "provider": "anthropic", "fallback_gateways": [
             {"gateway": "openrouter", "model": "mapped"}, "bedrock"],
     }}))
@@ -62,7 +62,7 @@ def test_fallback_gateways_preserve_order_and_primary_environ(tmp_path, monkeypa
     ("laya", ["backup"]),
 ])
 def test_invalid_fallback_gateways_name_file_and_field(tmp_path, provider, value):
-    path = _write(tmp_path, "calc", {"port": 9103, "llm": {
+    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {
         "provider": provider, "fallback_gateways": value}})
     with pytest.raises(AgentSpecError, match=r"calc.json: llm.fallback_gateways"):
         agent_spec.load_file(path)
@@ -71,7 +71,7 @@ def test_invalid_fallback_gateways_name_file_and_field(tmp_path, provider, value
 def test_laya_specialist_is_local_and_needs_no_generation_settings(tmp_path, monkeypatch):
     for key in ("AI_AGENT_PROVIDER", "AI_AGENT_GATEWAY", "AI_AGENT_MODEL", "AI_AGENT_PORT"):
         monkeypatch.setenv(key, os.getenv(key, ""))
-    spec = agent_spec.load_file(_write(tmp_path, "triage-assistant", {
+    spec = agent_spec.load_file(_write(tmp_path, "triage-assistant", {"role": "specialist",
         "port": 9110, "llm": {"provider": "laya"}, "tools": {"deny": ["*"]},
     }))
     agent_spec.apply_to_environ(spec)
@@ -81,14 +81,14 @@ def test_laya_specialist_is_local_and_needs_no_generation_settings(tmp_path, mon
 
 
 @pytest.mark.parametrize("extra", [
-    {"entry": True}, {"orchestrator": True},
-    {"llm": {"provider": "laya", "gateway": "openrouter"}},
-    {"llm": {"provider": "laya", "model": "gpt-x"}},
-    {"llm": {"provider": "laya", "max_tokens": 100}},
-    {"llm": {"provider": "laya", "reasoning_effort": "high"}},
+    {"entry": True}, {"role": 'orchestrator'},
+    {"role": "specialist", "llm": {"provider": "laya", "gateway": "openrouter"}},
+    {"role": "specialist", "llm": {"provider": "laya", "model": "gpt-x"}},
+    {"role": "specialist", "llm": {"provider": "laya", "max_tokens": 100}},
+    {"role": "specialist", "llm": {"provider": "laya", "reasoning_effort": "high"}},
 ])
 def test_laya_rejects_cloud_or_generation_configuration(tmp_path, extra):
-    data = {"port": 9110, "llm": {"provider": "laya"}, **extra}
+    data = {"role": "specialist", "port": 9110, "llm": {"provider": "laya"}, **extra}
     with pytest.raises(AgentSpecError, match="Laya triage"):
         agent_spec.load_file(_write(tmp_path, "triage-assistant", data))
 
@@ -106,7 +106,7 @@ def test_load_file_reads_every_field(tmp_path):
         "persona": "You coordinate.",
         "focus": "Everything.",
         "tools": {"allow": ["calc_*"], "deny": ["calc_secret"]},
-        "orchestrator": True,
+        "role": 'orchestrator',
     }
     spec = agent_spec.load_file(_write(tmp_path, "orchestrator", data))
 
@@ -120,25 +120,25 @@ def test_load_file_reads_every_field(tmp_path):
 @pytest.mark.parametrize(
     ("data", "message"),
     [
-        ({"llm": {"provider": "anthropic"}}, "port"),
-        ({"port": 9100}, "llm"),
-        ({"port": 9100, "llm": {}}, "llm.provider"),
-        ({"port": 9100, "llm": {"provider": "gemini"}}, "llm.provider"),
-        ({"port": 9100, "llm": {"provider": "anthropic"}, "colour": "red"}, "colour"),
-        ({"port": 9100, "llm": {"provider": "anthropic", "temp": 1}}, "llm.temp"),
-        ({"port": "9100", "llm": {"provider": "anthropic"}}, "port"),
-        ({"port": 0, "llm": {"provider": "anthropic"}}, "port"),
-        ({"port": 9100, "llm": {"provider": "anthropic", "temperature": 3}}, "llm.temperature"),
-        ({"port": 9100, "llm": {"provider": "anthropic", "reasoning_effort": "max"}}, "llm.reasoning_effort"),
-        ({"port": 9100, "llm": {"provider": "anthropic", "max_tokens": 0}}, "llm.max_tokens"),
-        ({"port": 9100, "llm": {"provider": "anthropic"}, "tools": {"allow": "calc_*"}}, "tools.allow"),
-        ({"port": 9100, "llm": {"provider": "anthropic"}, "orchestrator": True, "routing": {"laya": True}}, "routing"),
-        ({"port": 9100, "llm": {"provider": "anthropic"}, "entry": "yes"}, "entry"),
-        ({"port": None, "llm": {"provider": "anthropic"}}, "port"),
-        ({"port": 9100, "llm": {"provider": "anthropic"}, "enabled": None}, "enabled"),
-        ({"port": 9100, "llm": {"provider": "anthropic"}, "entry": None}, "entry"),
+        ({"role": "specialist", "llm": {"provider": "anthropic"}}, "port"),
+        ({"role": "specialist", "port": 9100}, "llm"),
+        ({"role": "specialist", "port": 9100, "llm": {}}, "llm.provider"),
+        ({"role": "specialist", "port": 9100, "llm": {"provider": "gemini"}}, "llm.provider"),
+        ({"role": "specialist", "port": 9100, "llm": {"provider": "anthropic"}, "colour": "red"}, "colour"),
+        ({"role": "specialist", "port": 9100, "llm": {"provider": "anthropic", "temp": 1}}, "llm.temp"),
+        ({"role": "specialist", "port": "9100", "llm": {"provider": "anthropic"}}, "port"),
+        ({"role": "specialist", "port": 0, "llm": {"provider": "anthropic"}}, "port"),
+        ({"role": "specialist", "port": 9100, "llm": {"provider": "anthropic", "temperature": 3}}, "llm.temperature"),
+        ({"role": "specialist", "port": 9100, "llm": {"provider": "anthropic", "reasoning_effort": "max"}}, "llm.reasoning_effort"),
+        ({"role": "specialist", "port": 9100, "llm": {"provider": "anthropic", "max_tokens": 0}}, "llm.max_tokens"),
+        ({"role": "specialist", "port": 9100, "llm": {"provider": "anthropic"}, "tools": {"allow": "calc_*"}}, "tools.allow"),
+        ({"port": 9100, "llm": {"provider": "anthropic"}, "role": 'orchestrator', "routing": {"laya": True}}, "routing"),
+        ({"role": "specialist", "port": 9100, "llm": {"provider": "anthropic"}, "entry": "yes"}, "entry"),
+        ({"role": "specialist", "port": None, "llm": {"provider": "anthropic"}}, "port"),
+        ({"role": "specialist", "port": 9100, "llm": {"provider": "anthropic"}, "enabled": None}, "enabled"),
+        ({"role": "specialist", "port": 9100, "llm": {"provider": "anthropic"}, "entry": None}, "entry"),
         ({"port": 9100, "llm": {"provider": "anthropic"}, "orchestrator": None}, "orchestrator"),
-        ({"port": 9100, "llm": {"provider": "anthropic", "reasoning_effort": None}}, "llm.reasoning_effort"),
+        ({"role": "specialist", "port": 9100, "llm": {"provider": "anthropic", "reasoning_effort": None}}, "llm.reasoning_effort"),
     ],
 )
 def test_load_file_rejects_bad_fields(tmp_path, data, message):
@@ -157,24 +157,24 @@ def test_load_file_rejects_bad_json(tmp_path):
 
 def test_load_file_rejects_a_bad_id(tmp_path):
     with pytest.raises(AgentSpecError, match="id"):
-        agent_spec.load_file(_write(tmp_path, "Calc_Agent", {"port": 9100, "llm": {"provider": "anthropic"}}))
+        agent_spec.load_file(_write(tmp_path, "Calc_Agent", {"role": "specialist", "port": 9100, "llm": {"provider": "anthropic"}}))
 
 
 def test_load_dir_requires_exactly_one_entry(tmp_path):
-    _write(tmp_path, "a", {"port": 9100, "llm": {"provider": "anthropic"}})
-    _write(tmp_path, "b", {"port": 9101, "llm": {"provider": "anthropic"}})
+    _write(tmp_path, "a", {"role": "specialist", "port": 9100, "llm": {"provider": "anthropic"}})
+    _write(tmp_path, "b", {"role": "specialist", "port": 9101, "llm": {"provider": "anthropic"}})
     with pytest.raises(AgentSpecError, match="entry"):
         agent_spec.load_dir(tmp_path)
 
-    _write(tmp_path, "a", {"port": 9100, "entry": True, "llm": {"provider": "anthropic"}})
-    _write(tmp_path, "b", {"port": 9101, "entry": True, "llm": {"provider": "anthropic"}})
+    _write(tmp_path, "a", {"role": "specialist", "port": 9100, "entry": True, "llm": {"provider": "anthropic"}})
+    _write(tmp_path, "b", {"role": "specialist", "port": 9101, "entry": True, "llm": {"provider": "anthropic"}})
     with pytest.raises(AgentSpecError, match="a.json, b.json"):
         agent_spec.load_dir(tmp_path)
 
 
 def test_load_dir_ignores_disabled_files_for_set_checks(tmp_path):
-    _write(tmp_path, "a", {"port": 9100, "entry": True, "llm": {"provider": "anthropic"}})
-    _write(tmp_path, "b", {"port": 9100, "entry": True, "enabled": False, "llm": {"provider": "anthropic"}})
+    _write(tmp_path, "a", {"role": "specialist", "port": 9100, "entry": True, "llm": {"provider": "anthropic"}})
+    _write(tmp_path, "b", {"role": "specialist", "port": 9100, "entry": True, "enabled": False, "llm": {"provider": "anthropic"}})
 
     specs = agent_spec.load_dir(tmp_path)
 
@@ -182,8 +182,8 @@ def test_load_dir_ignores_disabled_files_for_set_checks(tmp_path):
 
 
 def test_load_dir_rejects_duplicate_ports(tmp_path):
-    _write(tmp_path, "a", {"port": 9100, "entry": True, "llm": {"provider": "anthropic"}})
-    _write(tmp_path, "b", {"port": 9100, "llm": {"provider": "anthropic"}})
+    _write(tmp_path, "a", {"role": "specialist", "port": 9100, "entry": True, "llm": {"provider": "anthropic"}})
+    _write(tmp_path, "b", {"role": "specialist", "port": 9100, "llm": {"provider": "anthropic"}})
     with pytest.raises(AgentSpecError, match="9100"):
         agent_spec.load_dir(tmp_path)
 
@@ -213,12 +213,12 @@ def test_current_requires_ai_agent_file(monkeypatch):
 
 def test_effective_gateway_for_a_file_spec_ignores_the_env(tmp_path, monkeypatch):
     monkeypatch.setenv("AI_AGENT_GATEWAY", "openrouter")
-    spec = agent_spec.load_file(_write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "anthropic"}}))
+    spec = agent_spec.load_file(_write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}}))
     assert spec.effective_gateway() is None
 
 
 def test_current_reads_ai_agent_file_and_caches(tmp_path, monkeypatch):
-    path = _write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "anthropic"}})
+    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}})
     monkeypatch.setenv("AI_AGENT_FILE", str(path))
     monkeypatch.setattr(agent_spec, "_current", None)
 
@@ -232,7 +232,7 @@ def test_current_reads_ai_agent_file_and_caches(tmp_path, monkeypatch):
 def test_apply_to_environ_sets_provider_gateway_model_and_port(tmp_path, monkeypatch):
     for name in ("AI_AGENT_PROVIDER", "AI_AGENT_GATEWAY", "AI_AGENT_MODEL", "AI_AGENT_PORT"):
         monkeypatch.delenv(name, raising=False)
-    spec = agent_spec.load_file(_write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "openai"}}))
+    spec = agent_spec.load_file(_write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "openai"}}))
 
     agent_spec.apply_to_environ(spec)
 
@@ -245,26 +245,26 @@ def test_apply_to_environ_sets_provider_gateway_model_and_port(tmp_path, monkeyp
 
 
 def test_llm_min_and_max_tier_are_read(tmp_path):
-    spec = agent_spec.load_file(_write(tmp_path, "calc", {
+    spec = agent_spec.load_file(_write(tmp_path, "calc", {"role": "specialist",
         "port": 9103, "llm": {"provider": "anthropic", "min_tier": "light", "max_tier": "standard"},
     }))
     assert (spec.llm.min_tier, spec.llm.max_tier) == ("light", "standard")
 
 
 def test_llm_tiers_default_to_unbounded(tmp_path):
-    spec = agent_spec.load_file(_write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "anthropic"}}))
+    spec = agent_spec.load_file(_write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}}))
     assert (spec.llm.min_tier, spec.llm.max_tier) == (None, None)
 
 
 @pytest.mark.parametrize("key", ["min_tier", "max_tier"])
 def test_unknown_tier_name_is_rejected(tmp_path, key):
-    path = _write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "anthropic", key: "giant"}})
+    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic", key: "giant"}})
     with pytest.raises(AgentSpecError, match=f"llm.{key} must be one of: light, standard, heavy, extreme"):
         agent_spec.load_file(path)
 
 
 def test_min_tier_above_max_tier_is_rejected(tmp_path):
-    path = _write(tmp_path, "calc", {
+    path = _write(tmp_path, "calc", {"role": "specialist",
         "port": 9103, "llm": {"provider": "anthropic", "min_tier": "heavy", "max_tier": "light"},
     })
     with pytest.raises(AgentSpecError, match="llm.min_tier 'heavy' is stronger than llm.max_tier 'light'"):
@@ -273,7 +273,7 @@ def test_min_tier_above_max_tier_is_rejected(tmp_path):
 
 @pytest.mark.parametrize("key", ["min_tier", "max_tier"])
 def test_laya_rejects_tier_bounds(tmp_path, key):
-    path = _write(tmp_path, "triage", {"port": 9110, "llm": {"provider": "laya", key: "light"}})
+    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "laya", key: "light"}})
     with pytest.raises(AgentSpecError, match="Laya triage does not accept"):
         agent_spec.load_file(path)
 
@@ -300,7 +300,7 @@ def test_roster_entry_tiers_default_to_empty():
     ],
 )
 def test_url_is_normalised(tmp_path, given, expected):
-    data = {"port": 9103, "llm": {"provider": "anthropic"}}
+    data = {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}}
     if given is not None:
         data["url"] = given
     assert agent_spec.load_file(_write(tmp_path, "calc", data)).url == expected
@@ -309,7 +309,7 @@ def test_url_is_normalised(tmp_path, given, expected):
 @pytest.mark.parametrize("bad", ["10.0.0.5:9103", "ftp://host/mcp", "http://host/mcp?x=1", "http://host:99999/mcp"])
 def test_bad_url_is_refused(tmp_path, bad):
     with pytest.raises(AgentSpecError, match="url"):
-        agent_spec.load_file(_write(tmp_path, "calc", {"port": 9103, "url": bad, "llm": {"provider": "anthropic"}}))
+        agent_spec.load_file(_write(tmp_path, "calc", {"role": "specialist", "port": 9103, "url": bad, "llm": {"provider": "anthropic"}}))
 
 
 def test_repository_agent_roster_is_valid():
@@ -372,43 +372,43 @@ def test_reviewer_cannot_use_skill_tools_and_ember_can():
 
 
 def test_memory_recall_defaults_to_false_and_loads_true(tmp_path):
-    base = {"port": 9103, "llm": {"provider": "anthropic"}}
+    base = {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}}
     assert agent_spec.load_file(_write(tmp_path, "calc", base)).memory_recall is False
     assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "memory_recall": True})).memory_recall is True
 
 
 def test_memory_recall_must_be_a_boolean(tmp_path):
-    path = _write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "anthropic"}, "memory_recall": "yes"})
+    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}, "memory_recall": "yes"})
     with pytest.raises(AgentSpecError, match="memory_recall"):
         agent_spec.load_file(path)
 
 
 def test_laya_cannot_recall_memory(tmp_path):
-    path = _write(tmp_path, "triage", {"port": 9110, "llm": {"provider": "laya"}, "tools": {"deny": ["*"]}, "memory_recall": True})
+    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "laya"}, "tools": {"deny": ["*"]}, "memory_recall": True})
     with pytest.raises(AgentSpecError, match="memory_recall"):
         agent_spec.load_file(path)
 
 
 def test_skill_recall_defaults_to_false_and_loads_true(tmp_path):
-    base = {"port": 9103, "llm": {"provider": "anthropic"}}
+    base = {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}}
     assert agent_spec.load_file(_write(tmp_path, "calc", base)).skill_recall is False
     assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "skill_recall": True})).skill_recall is True
 
 
 def test_skill_recall_must_be_a_boolean(tmp_path):
-    path = _write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "anthropic"}, "skill_recall": "yes"})
+    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}, "skill_recall": "yes"})
     with pytest.raises(AgentSpecError, match="skill_recall"):
         agent_spec.load_file(path)
 
 
 def test_laya_cannot_recall_skills(tmp_path):
-    path = _write(tmp_path, "triage", {"port": 9110, "llm": {"provider": "laya"}, "tools": {"deny": ["*"]}, "skill_recall": True})
+    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "laya"}, "tools": {"deny": ["*"]}, "skill_recall": True})
     with pytest.raises(AgentSpecError, match="skill_recall"):
         agent_spec.load_file(path)
 
 
 def test_skill_learning_defaults_to_false_loads_true_and_must_be_a_boolean(tmp_path):
-    base = {"port": 9103, "llm": {"provider": "anthropic"}}
+    base = {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}}
     assert agent_spec.load_file(_write(tmp_path, "calc", base)).skill_learning is False
     assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "skill_learning": True})).skill_learning is True
     with pytest.raises(AgentSpecError, match="skill_learning"):
@@ -416,7 +416,7 @@ def test_skill_learning_defaults_to_false_loads_true_and_must_be_a_boolean(tmp_p
 
 
 def test_laya_cannot_learn_skills(tmp_path):
-    path = _write(tmp_path, "triage", {"port": 9110, "llm": {"provider": "laya"}, "tools": {"deny": ["*"]}, "skill_learning": True})
+    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "laya"}, "tools": {"deny": ["*"]}, "skill_learning": True})
     with pytest.raises(AgentSpecError, match="skill_learning"):
         agent_spec.load_file(path)
 
@@ -437,12 +437,12 @@ def test_only_the_entry_agent_has_memory_recall_on():
 
 def test_an_override_replaces_the_tracked_file_and_can_add_an_agent(tmp_path):
     (tmp_path / "ember.json").write_text(json.dumps(
-        {"port": 9100, "entry": True, "llm": {"provider": "anthropic"}}), encoding="utf-8")
+        {"role": "specialist", "port": 9100, "entry": True, "llm": {"provider": "anthropic"}}), encoding="utf-8")
     overrides = tmp_path / ".overrides"
     overrides.mkdir()
     (overrides / "agent_overrides.json").write_text(json.dumps({
-        "ember": {"port": 9100, "entry": True, "llm": {"provider": "anthropic", "max_tier": "light"}},
-        "calc": {"port": 9103, "llm": {"provider": "anthropic"}},
+        "ember": {"role": "specialist", "port": 9100, "entry": True, "llm": {"provider": "anthropic", "max_tier": "light"}},
+        "calc": {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}},
     }), encoding="utf-8")
     specs = {spec.id: spec for spec in agent_spec.load_dir(tmp_path)}
     assert specs["ember"].llm.max_tier == "light"
@@ -451,24 +451,24 @@ def test_an_override_replaces_the_tracked_file_and_can_add_an_agent(tmp_path):
 
 
 def test_delegable_defaults_to_true_and_loads_false(tmp_path):
-    base = {"port": 9103, "llm": {"provider": "anthropic"}}
+    base = {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}}
     assert agent_spec.load_file(_write(tmp_path, "calc", base)).delegable is True
     assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "delegable": False})).delegable is False
 
 
 def test_delegable_must_be_a_boolean(tmp_path):
-    path = _write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "anthropic"}, "delegable": "no"})
+    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}, "delegable": "no"})
     with pytest.raises(AgentSpecError, match="delegable"):
         agent_spec.load_file(path)
 
 
 def test_plan_tool_defaults_to_true_and_loads_false(tmp_path):
-    base = {"port": 9103, "llm": {"provider": "anthropic"}}
+    base = {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}}
     assert agent_spec.load_file(_write(tmp_path, "calc", base)).plan_tool is True
     assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "plan_tool": False})).plan_tool is False
 
 
 def test_plan_tool_must_be_a_boolean(tmp_path):
-    path = _write(tmp_path, "calc", {"port": 9103, "llm": {"provider": "anthropic"}, "plan_tool": "no"})
+    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}, "plan_tool": "no"})
     with pytest.raises(AgentSpecError, match="plan_tool"):
         agent_spec.load_file(path)

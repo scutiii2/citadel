@@ -20,5 +20,6 @@
       "tool_ticket_createTicket"
     ],
     "deny": []
-  }
+  },
+  "role": "specialist"
 }

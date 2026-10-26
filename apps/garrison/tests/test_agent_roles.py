@@ -23,7 +23,7 @@ def test_identity_uses_the_label_for_a_specialist():
 
 
 def test_identity_says_orchestrator_for_an_orchestrator():
-    prompt = agent_roles._compose_system_prompt(_spec(orchestrator=True))
+    prompt = agent_roles._compose_system_prompt(_spec(role='orchestrator'))
 
     assert prompt.startswith("Your name is Ember: Orchestrator, an AI Assistant.")
 
@@ -49,7 +49,7 @@ def test_system_prompt_for_appends_caveman_instructions_only_when_asked():
 
 
 def test_system_prompt_for_adds_the_roster_before_instructions(monkeypatch):
-    monkeypatch.setattr(agent_spec, "_current", _spec(orchestrator=True))
+    monkeypatch.setattr(agent_spec, "_current", _spec(role='orchestrator'))
     roster = [RosterEntry("calc", "Calculator", "Arithmetic."), RosterEntry("explainer", "Explainer", "")]
 
     prompt = agent_roles.system_prompt_for(roster=roster)
@@ -80,7 +80,7 @@ def test_custom_instructions_and_preview_keep_the_fixed_instruction_boundary(mon
 def test_specialist_gets_the_short_boundary_and_entry_or_orchestrator_the_full_one():
     specialist = agent_roles._compose_system_prompt(_spec())
     entry = agent_roles._compose_system_prompt(_spec(entry=True))
-    orchestrator = agent_roles._compose_system_prompt(_spec(orchestrator=True))
+    orchestrator = agent_roles._compose_system_prompt(_spec(role='orchestrator'))
 
     assert agent_roles.SPECIALIST_BOUNDARY in specialist
     assert agent_roles.INSTRUCTION_BOUNDARY not in specialist

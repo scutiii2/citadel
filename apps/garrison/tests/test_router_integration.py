@@ -15,7 +15,7 @@ from src.providers.base_provider import ChatCancelled
 
 def setup(monkeypatch, response):
     monkeypatch.setattr(agent_spec, "_current", AgentSpec(id="ember", label="Ember", port=9100,
-        llm=LlmSpec(provider="anthropic"), entry=True, orchestrator=True))
+        llm=LlmSpec(provider="anthropic"), entry=True, role='orchestrator'))
     monkeypatch.setattr(internal_auth, "TOKEN", "test")
     roster = [RosterEntry("ops", "Ops", "server", (TierInfo("standard", "model", "normal"),), tool_allow=("tool_srv_*",))]
     monkeypatch.setattr(agent_routing, "roster_for", AsyncMock(return_value=roster))

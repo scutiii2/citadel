@@ -54,7 +54,7 @@ def test_store_prompts_round_trip_and_type_check(tmp_path):
 
 
 def _agent(port, **extra):
-    return {"label": "Calc", "port": port, "llm": {"provider": "anthropic"}, **extra}
+    return {"role": "specialist", "label": "Calc", "port": port, "llm": {"provider": "anthropic"}, **extra}
 
 
 def test_preview_uses_shared_texts_roster_and_agent_identity(tmp_path):
@@ -64,7 +64,7 @@ def test_preview_uses_shared_texts_roster_and_agent_identity(tmp_path):
     prompts = tmp_path / "config_prompts.json"
     agent_store.set_prompts({"app_name": "Spark", "roster_intro": "Delegate wisely:"}, prompts)
 
-    draft = _agent(9100, entry=True, orchestrator=True, persona="Be kind.", instructions="Do it.")
+    draft = _agent(9100, entry=True, role='orchestrator', persona="Be kind.", instructions="Do it.")
     text = agent_store.preview_prompt("ember", draft, directory=folder, prompts_path=prompts)
     assert text.startswith("Your name is Spark: Orchestrator")
     assert "Delegate wisely:\n- calc - Calc: Maths" in text
@@ -77,4 +77,4 @@ def test_preview_uses_shared_texts_roster_and_agent_identity(tmp_path):
 
 def test_preview_refuses_an_invalid_draft(tmp_path):
     with pytest.raises(AgentStoreError, match="llm"):
-        agent_store.preview_prompt("x", {"port": 1}, directory=tmp_path, prompts_path=tmp_path / "p.json")
+        agent_store.preview_prompt("x", {"role": "specialist", "port": 1}, directory=tmp_path, prompts_path=tmp_path / "p.json")
