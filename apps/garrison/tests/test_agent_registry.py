@@ -297,18 +297,18 @@ def test_definitions_round_trip_and_include_disabled_agents(monkeypatch):
     assert seen[0] == ("anthropic", "openrouter", None, "standard")
     assert agent_registry.read_definitions() == [
         {
-            "id": "ember", "label": "Ember", "focus": "General.", "entry": True, "orchestrator": True, "enabled": True,
+            "id": "ember", "label": "Ember", "focus": "General.", "entry": True, "role": "orchestrator", "enabled": True,
             "llm": {
                 "provider": "anthropic", "gateway": "openrouter", "model": "claude-sonnet-5-5",
                 "tiers": [{"tier": "light", "id": "haiku", "use_for": "quick"}],
             },
         },
         {
-            "id": "off", "label": "Off", "focus": "", "entry": False, "orchestrator": False, "enabled": False,
+            "id": "off", "label": "Off", "focus": "", "entry": False, "role": "specialist", "enabled": False,
             "llm": {"provider": "anthropic", "gateway": None, "model": None, "tiers": []},
         },
         {
-            "id": "laya", "label": "Laya", "focus": "", "entry": False, "orchestrator": False, "enabled": True,
+            "id": "laya", "label": "Laya", "focus": "", "entry": False, "role": "specialist", "enabled": True,
             "llm": {"provider": "laya", "gateway": None, "model": None, "tiers": []},
         },
     ]

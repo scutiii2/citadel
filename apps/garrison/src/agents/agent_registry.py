@@ -247,9 +247,8 @@ def write_definitions(specs: Iterable[Any]) -> None:
     records = [
         {
             "id": spec.id, "label": spec.label, "focus": spec.focus,
-            "entry": spec.entry, "orchestrator": spec.orchestrator, "enabled": spec.enabled,
-            **({"internal_role": spec.internal_role, "decision": spec.decision.summary()}
-               if getattr(spec, "internal_role", None) == "router" else {}),
+            "entry": spec.entry, "role": spec.role, "enabled": spec.enabled,
+            **({"decision": spec.decision.summary()} if spec.role == "router" else {}),
             "llm": {
                 "provider": spec.llm.provider, "gateway": spec.llm.gateway, "model": spec.llm.model,
                 "tiers": _tiers_of(spec),
