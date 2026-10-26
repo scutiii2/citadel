@@ -31,6 +31,30 @@ Gate admin pages by permission in `ember_admin/src/router/pages.ts`; the guard i
 
 Before writing a component, grep both `components/` folders for an existing one.
 
+## Shared pieces: always use these, never re-style them per page
+
+These live in `ember_web` only (not copied to admin). A page that needs one of these patterns uses the component; it does not write its own markup or CSS for it. If the component lacks something, extend the component (a prop or slot) rather than forking it in the page. Pages add only layout tweaks through their own class (spacing, alignment).
+
+| Pattern | Use | Where |
+|---|---|---|
+| Selectable row in a list pane (notes, memories, tickets, documents) | `ListRow` (`active` prop sets the highlight and `aria-current`) | `components/ui/lists/` |
+| Search box with magnifier; a trailing button or sort menu goes in its slot | `SearchField` (`v-model`, `label`) | `components/ui/lists/` |
+| Loading, load-error with retry, empty state | `StateMessage` (`kind`: `loading`, `error`, `empty`) | `components/ui/status/` |
+| Red-outlined delete row at the end of an editor or dialog | `DangerZone` (the button still opens a `ConfirmModal`) | `components/ui/status/` |
+| "12/200" counter under a text field | `CharacterCount` | `components/ui/status/` |
+| "Files are kept for N hours" note | `RetentionNote` | `components/ui/status/` |
+| "‹ All X" back button shown below 768px | `BackButton` (`ghost` for the text look) | `components/ui/buttons/` |
+| Narrow-viewport (under 768px) flag in a page script | `useNarrow()` | `composables/` |
+| List pane plus editor with Save | `ListEditorLayout` | `components/layout/` |
+| Two panes or a stacked workspace | `WorkspaceLayout` | `components/layout/` |
+
+Rules:
+- Do not add a page-local `.empty`, `.load-error`, `.danger-zone`, `.character-count`, `.retention`, `.back` or search-box style. Do not call `window.matchMedia` for the narrow check.
+- The base styles of `ListRow` have no specificity, so a page restyles a row with its own class; do not use `!important`.
+- When reviewing or touching a page that still has a hand-written copy of one of these, replace it with the component in the same change.
+- A new pattern that appears on a second page becomes a component in `components/ui/` with a unit test, and gets a row in this table.
+
+
 ## Task-focused layouts
 
 These are the user's preferred Ember patterns. Choose the shape that fits the task; retain the page's supported actions and data contracts.
@@ -91,6 +115,7 @@ Distilled from `Brain/Maps/UI UX Frontend Rulesets.md` (consult it for rationale
 
 - [ ] Right app; admin-only page not in ember_web
 - [ ] Existing component reused; copies updated in both apps
+- [ ] Rows, search, loading/error/empty, danger zone, counters, retention and back buttons use the shared pieces table, no page-local copies
 - [ ] No hex or literal radius outside `style.css`
 - [ ] Nav entry follows section 3
 - [ ] Confirm modal / Danger zone for destructive actions
