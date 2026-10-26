@@ -7,6 +7,7 @@ import BrainConnectionForm from "./components/BrainConnectionForm.vue";
 import MarkdownContent from "../../components/content/MarkdownContent.vue";
 import ListRow from "../../components/ui/lists/ListRow.vue";
 import SearchField from "../../components/ui/lists/SearchField.vue";
+import BackButton from "../../components/ui/buttons/BackButton.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
 import { brainsClient, type BrainResult, type BrainScope } from "./api/BrainsClient";
@@ -174,7 +175,7 @@ onMounted(async () => {
       </aside>
       <section class="reader" aria-label="Brain document reader">
         <header class="reader-head">
-          <button type="button" class="back" :disabled="busy" @click="mobileReading = false">‹ All documents</button>
+          <BackButton ghost :disabled="busy" @click="mobileReading = false">All documents</BackButton>
           <span class="reader-path">{{ document?.path || 'Document reader' }}</span>
           <span v-if="document" class="reader-audience">{{ document.scope === 'personal' ? 'Only you' : 'Shared' }}</span>
         </header>
@@ -252,7 +253,6 @@ button.file-row { flex-direction: row; align-items: flex-start; gap: 10px; paddi
 .reader-placeholder h3 { margin: 0; font-size: 1.05em; color: var(--text); font-weight: 600; }
 .reader-placeholder p { margin: 0; font-size: .9em; }
 .empty-message { padding: 8px 10px; color: var(--muted); font-size: .9em; }
-.back { display: none; }
 .search-results { flex: 1; min-height: 0; overflow: auto; padding: 22px 28px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .results-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: .8em; }
 .results-head p { margin: 0; }
@@ -288,7 +288,6 @@ button.file-row { flex-direction: row; align-items: flex-start; gap: 10px; paddi
   .breadcrumbs button { min-width: 44px; min-height: 44px; }
   .reader-head { padding: 12px 16px; }
   .reader-head .reader-path { display: none; }
-  .back { display: inline-block; padding: 6px 0; border: 0; min-height: 44px; color: var(--muted); font-size: 1.1em; }
   .document-content { padding: 22px 20px; }
   .reader-footer { padding: 12px 16px; }
   .search-results { padding: 18px 20px; }

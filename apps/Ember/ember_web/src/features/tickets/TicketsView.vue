@@ -9,6 +9,7 @@ import ListRow from "../../components/ui/lists/ListRow.vue";
 import SearchField from "../../components/ui/lists/SearchField.vue";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
 import CharacterCount from "../../components/ui/status/CharacterCount.vue";
+import BackButton from "../../components/ui/buttons/BackButton.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import "../../components/layout/infoPage.css";
@@ -298,7 +299,7 @@ async function reopenTicket(): Promise<void> {
 <template>
   <PageLayout title="Tickets" description="Report an issue, share an idea, or follow a support reply." class="tickets info-content" :class="{ 'thread-open': detailOpen }" wide fill>
     <template #actions>
-      <button v-if="detailOpen" type="button" class="chip mobile-back" @click="dismiss">‹ All tickets</button>
+      <BackButton v-if="detailOpen" @click="dismiss">All tickets</BackButton>
       <button type="button" class="primary new-ticket" @click="startNew">New ticket</button>
     </template>
     <template #toolbar>
@@ -448,7 +449,6 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .reply .manage-ticket { border-color: transparent; padding-left: 0; }
 .send-reply { min-width: 76px; min-height: 40px; }
 .notice { max-height: 20%; overflow: auto; }
-.mobile-back { display: none; }
 .new-ticket { min-height: 40px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .tickets button:focus-visible, .tickets input:focus-visible, .tickets select:focus-visible, .tickets textarea:focus-visible, .conversation:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -462,7 +462,6 @@ button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12
   .tickets :deep(.page-description) { max-width: 210px; }
   .tickets.thread-open :deep(.page-head-copy), .tickets.thread-open :deep(.page-toolbar) { display: none; }
   .tickets.thread-open :deep(.page-actions) { flex: 1; justify-content: space-between; align-items: center; }
-  .mobile-back { display: inline-block; min-height: 44px; }
   .new-ticket { min-height: 44px; }
   .list-controls { gap: 8px; }
   .tickets .sort-control select { max-width: 135px; padding-inline: 7px; min-height: 44px; }
