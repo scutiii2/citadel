@@ -15,7 +15,8 @@ from dataclasses import dataclass
 
 import anyio.to_thread
 
-from src.providers.decision import decision
+from src.providers.decision import settings, strategy, questions
+from src.providers.decision.contract import DecisionError
 
 _log = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class AutoTier:
 
 
 def enabled() -> bool:
-    return decision.settings().auto_tier.enabled and decision.available("auto_tier")
+    return settings.settings().auto_tier.enabled and settings.available("auto_tier")
 
 
 async def pick(question: str, has_history: bool) -> AutoTier | None:
@@ -40,10 +41,13 @@ async def pick(question: str, has_history: bool) -> AutoTier | None:
     text = question.strip()
     if not text or (has_history and len(text) < _MIN_FOLLOW_UP_CHARS):
         return None
-    config = decision.settings()
+    config = settings.settings()
     try:
-        picked = await anyio.to_thread.run_sync(decision.classify_size, text[: config.max_input_chars])
-    except decision.ClassifierError as error:
+        picked = await anyio.to_thread.run_sync(
+            lambda: strategy.ask_choice(text[: config.max_input_chars], questions.SIZE_CRITERIA, questions.SIZE_QUESTION,
+                                        strategy=config.auto_tier.strategy, min_confidence=config.auto_tier.min_confidence,
+                                        timeout=config.timeout_seconds))
+    except DecisionError as error:
         _log.warning("auto tier skipped: %s", error)
         return None
     if picked.confidence < config.auto_tier.min_confidence:

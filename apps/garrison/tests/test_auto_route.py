@@ -12,7 +12,8 @@ from src.agents.roles.orchestrator import auto_route, delegation
 from src.agents.agent_spec import AgentSpec, LlmSpec, RosterEntry
 from src.runtime import approvals
 from src.providers import cancellation
-from src.providers.decision import decision
+from src.providers.decision import settings, strategy, questions
+from src.providers.decision.contract import DecisionError
 from src.providers.base_provider import ChatCancelled, ChatResult
 
 RESEARCHER = RosterEntry("researcher", "Researcher", "Web research: look up facts.", tool_allow=("tool_web_search", "tool_ticket_createTicket"))
@@ -24,27 +25,29 @@ HISTORY = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "
 
 @pytest.fixture(autouse=True)
 def fresh_settings():
-    decision.reset_cache()
+    settings.reset_cache()
     yield
-    decision.reset_cache()
+    settings.reset_cache()
 
 
 def switch_on(monkeypatch, *, enabled=True, key=True, pick=("researcher", 90), error=None, min_confidence=60):
     """Settings with auto route on and a fake classifier; returns the (subject, criteria) pairs it was asked."""
-    config = decision.ClassifierSettings(
-        auto_route=decision.AutoRouteSettings(enabled=enabled, min_confidence=min_confidence)
+    config = settings.ClassifierSettings(
+        auto_route=settings.AutoRouteSettings(enabled=enabled, min_confidence=min_confidence)
     )
-    monkeypatch.setattr(decision, "settings", lambda: config)
-    monkeypatch.setattr(decision, "available", lambda *a, **k: key)
+    monkeypatch.setattr(settings, "settings", lambda: config)
+    monkeypatch.setattr(settings, "available", lambda *a, **k: key)
     asked = []
 
-    def ask_choice(subject, criteria, question, feature, **kwargs):
+    def ask_choice(subject, criteria, question, **kwargs):
+        assert kwargs["strategy"] == config.auto_route.strategy
+        assert kwargs["min_confidence"] == config.auto_route.min_confidence
         asked.append((subject, dict(criteria)))
         if error:
             raise error
-        return decision.Choice(pick[0], pick[1], 25, "jev", "jev-latest")
+        return strategy.Choice(pick[0], pick[1], 25, "jev", "jev-latest")
 
-    monkeypatch.setattr(decision, "ask_choice", ask_choice)
+    monkeypatch.setattr(strategy, "ask_choice", ask_choice)
     return asked
 
 
@@ -94,7 +97,7 @@ def test_the_threshold_is_the_configured_one(monkeypatch):
 
 
 def test_a_failing_classifier_means_no_route(monkeypatch):
-    switch_on(monkeypatch, error=decision.ClassifierError("down"))
+    switch_on(monkeypatch, error=DecisionError("down"))
     assert run_pick() is None
 
 
@@ -114,24 +117,24 @@ def test_the_classifier_sees_the_end_of_the_last_assistant_message_and_the_quest
 # --- the settings ---------------------------------------------------------------------------
 
 def use_section(monkeypatch, section):
-    monkeypatch.setattr(decision, "read_section", lambda path, name, default=None: section)
+    monkeypatch.setattr(settings, "read_section", lambda path, name, default=None: section)
 
 
 def test_auto_route_is_off_by_default(monkeypatch):
     use_section(monkeypatch, {})
-    assert decision.settings().auto_route == decision.AutoRouteSettings(False, 60)
+    assert settings.settings().auto_route == settings.AutoRouteSettings(enabled=False, min_confidence=60)
 
 
 def test_auto_route_settings_are_read(monkeypatch):
     use_section(monkeypatch, {"auto_route": {"enabled": True, "min_confidence": 70}})
-    assert decision.settings().auto_route == decision.AutoRouteSettings(True, 70)
+    assert settings.settings().auto_route == settings.AutoRouteSettings(enabled=True, min_confidence=70)
 
 
 @pytest.mark.parametrize("auto", [[], {"nope": 1}, {"enabled": 1}, {"min_confidence": 101}, {"min_confidence": True}])
 def test_a_bad_auto_route_section_is_refused(monkeypatch, auto):
     use_section(monkeypatch, {"auto_route": auto})
     with pytest.raises(ValueError, match="auto_route"):
-        decision.settings()
+        settings.settings()
 
 
 # --- routing a turn -------------------------------------------------------------------------

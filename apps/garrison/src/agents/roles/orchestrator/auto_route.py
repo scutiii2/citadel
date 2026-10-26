@@ -29,7 +29,8 @@ from src.agents.roles.orchestrator import delegation
 from src.agents.agent_spec import RosterEntry
 from src.runtime import approvals
 from src.providers import cancellation
-from src.providers.decision import decision
+from src.providers.decision import settings, strategy
+from src.providers.decision.contract import DecisionError
 from src.providers.base_provider import ChatCancelled, ChatResult, OnEvent, ToolCallRecord, dispatch_with_progress, step_event
 
 _log = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ class Route:
 
 
 def enabled() -> bool:
-    return decision.settings().auto_route.enabled and decision.available("auto_route")
+    return settings.settings().auto_route.enabled and settings.available("auto_route")
 
 
 def routable(roster: list[RosterEntry]) -> list[RosterEntry]:
@@ -90,17 +91,17 @@ async def pick(question: str, history: list[dict[str, Any]], roster: list[Roster
     text = question.strip()
     if not candidates or not text:
         return None
-    config = decision.settings()
+    config = settings.settings()
     criteria = {entry.id: (entry.focus or entry.label)[:_FOCUS_CHARS] for entry in candidates}
     criteria[NONE] = "no specialist is needed: a general assistant should answer"
     try:
         picked = await anyio.to_thread.run_sync(
-            lambda: decision.ask_choice(
-                _subject(text, history, config.max_input_chars), criteria, QUESTION, "auto_route",
-                min_confidence=config.auto_route.min_confidence,
+            lambda: strategy.ask_choice(
+                _subject(text, history, config.max_input_chars), criteria, QUESTION, strategy=config.auto_route.strategy,
+                min_confidence=config.auto_route.min_confidence, timeout=config.timeout_seconds,
             )
         )
-    except decision.ClassifierError as error:
+    except DecisionError as error:
         _log.warning("auto route skipped: %s", error)
         return None
     if picked.choice == NONE or picked.confidence < config.auto_route.min_confidence:

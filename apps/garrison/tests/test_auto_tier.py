@@ -10,7 +10,8 @@ import pytest
 from src.agents import agent_config, agent_spec
 from src.agents.agent_spec import AgentSpec, LlmSpec, TierInfo
 from src.agents import auto_tier
-from src.providers.decision import decision
+from src.providers.decision import settings, strategy, questions
+from src.providers.decision.contract import DecisionError
 from src.providers import model_tiers
 from src.providers.base_provider import ChatResult
 
@@ -21,27 +22,30 @@ HEAVY = TierInfo("heavy", "opus", "hard")
 
 @pytest.fixture(autouse=True)
 def fresh_settings():
-    decision.reset_cache()
+    settings.reset_cache()
     yield
-    decision.reset_cache()
+    settings.reset_cache()
 
 
 def switch_on(monkeypatch, *, enabled=True, key=True, section=None, size=("everyday", 90), error=None):
     """Settings with auto tier on, a key, and a fake classifier; returns the list of messages it was asked."""
-    config = decision.ClassifierSettings(
-        auto_tier=decision.AutoTierSettings(enabled=enabled, **(section or {}))
+    config = settings.ClassifierSettings(
+        auto_tier=settings.AutoTierSettings(enabled=enabled, **(section or {}))
     )
-    monkeypatch.setattr(decision, "settings", lambda: config)
-    monkeypatch.setattr(decision, "available", lambda *a, **k: key)
+    monkeypatch.setattr(settings, "settings", lambda: config)
+    monkeypatch.setattr(settings, "available", lambda *a, **k: key)
     asked = []
 
-    def classify_size(message, timeout=None):
+    def classify_size(message, criteria, question, **kwargs):
+        assert kwargs["strategy"] == config.auto_tier.strategy
+        assert kwargs["min_confidence"] == config.auto_tier.min_confidence
+        assert criteria == questions.SIZE_CRITERIA and question == questions.SIZE_QUESTION
         asked.append(message)
         if error:
             raise error
-        return decision.Choice(size[0], size[1], 20)
+        return strategy.Choice(size[0], size[1], 20, "laya", "english-then-typed")
 
-    monkeypatch.setattr(decision, "classify_size", classify_size)
+    monkeypatch.setattr(strategy, "ask_choice", classify_size)
     return asked
 
 
@@ -82,7 +86,7 @@ def test_a_low_confidence_keeps_the_default_model(monkeypatch):
 
 
 def test_a_failing_classifier_keeps_the_default_model(monkeypatch):
-    switch_on(monkeypatch, error=decision.ClassifierError("down"))
+    switch_on(monkeypatch, error=DecisionError("down"))
     assert pick() is None
 
 
@@ -95,7 +99,7 @@ def test_a_short_follow_up_is_not_classified_but_a_first_message_is(monkeypatch)
 
 def test_the_classifier_gets_at_most_the_configured_characters(monkeypatch):
     asked = switch_on(monkeypatch)
-    cap = decision.settings().max_input_chars
+    cap = settings.settings().max_input_chars
     pick("x" * (cap + 500))
     assert len(asked[0]) == cap
 
@@ -103,19 +107,19 @@ def test_the_classifier_gets_at_most_the_configured_characters(monkeypatch):
 # --- the settings -----------------------------------------------------------------------------
 
 def use_section(monkeypatch, section):
-    monkeypatch.setattr(decision, "read_section", lambda path, name, default=None: section)
+    monkeypatch.setattr(settings, "read_section", lambda path, name, default=None: section)
 
 
 def test_auto_tier_is_off_by_default_with_the_documented_map(monkeypatch):
     use_section(monkeypatch, {})
-    config = decision.settings().auto_tier
+    config = settings.settings().auto_tier
     assert config.enabled is False and config.min_confidence == 60
     assert dict(config.tiers) == {"tiny": "light", "everyday": "light", "large": "standard", "hardest": "heavy"}
 
 
 def test_auto_tier_settings_are_read_and_a_partial_map_keeps_the_rest(monkeypatch):
     use_section(monkeypatch, {"auto_tier": {"enabled": True, "min_confidence": 75, "tiers": {"hardest": "extreme"}}})
-    config = decision.settings().auto_tier
+    config = settings.settings().auto_tier
     assert (config.enabled, config.min_confidence) == (True, 75)
     assert dict(config.tiers)["hardest"] == "extreme" and dict(config.tiers)["tiny"] == "light"
 
@@ -127,7 +131,7 @@ def test_auto_tier_settings_are_read_and_a_partial_map_keeps_the_rest(monkeypatc
 def test_a_bad_auto_tier_section_is_refused(monkeypatch, auto):
     use_section(monkeypatch, {"auto_tier": auto})
     with pytest.raises(ValueError, match="auto_tier"):
-        decision.settings()
+        settings.settings()
 
 
 # --- the turn --------------------------------------------------------------------------------

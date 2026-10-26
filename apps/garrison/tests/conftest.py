@@ -35,12 +35,15 @@ import pytest  # noqa: E402
 def _default_classifier_settings(monkeypatch):
     """Tests see the classifier defaults (everything off), never the developer's own `classifier`
     section in configs/config_tuning.json. Tests that need a section patch read_section themselves."""
-    from src.providers.decision import decision
+    from src.providers.decision import decision, settings
 
     monkeypatch.setattr(decision, "read_section", lambda path, name, default=None: {})
+    settings.reset_cache()
+    monkeypatch.setattr(settings, "read_section", lambda path, name, default=None: {})
     decision.reset_cache()
     yield
     decision.reset_cache()
+    settings.reset_cache()
 
 
 @pytest.fixture(autouse=True)
