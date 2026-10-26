@@ -7,9 +7,9 @@
   "memory_recall": false,
   "plan_tool": false,
   "llm": {
-    "provider": "laya",
-    "gateway": "local",
-    "model": "convaiinnovations/laya"
+    "provider": "decision",
+    "strategy": "both",
+    "min_confidence": 0.9
   },
   "focus": "Internal: chooses an available specialist and model tier using local triage with optional Jev fallback.",
   "tools": {

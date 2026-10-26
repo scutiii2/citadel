@@ -10,7 +10,7 @@ from src.agents.roles.router.router_contract import RouterPolicy, RouteRequest, 
 def definition(**changes):
     return {"port": 9117, "role": 'router', "delegable": False,
             "plan_tool": False, "tools": {"deny": ["*"]},
-            "llm": {"provider": "laya", "gateway": "local"}, **changes}
+            "llm": {"provider": "decision"}, **changes}
 
 
 def write(tmp_path, name="router", **changes):

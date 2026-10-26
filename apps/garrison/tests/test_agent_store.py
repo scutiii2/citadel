@@ -139,7 +139,7 @@ def test_reset_refuses_without_an_override_or_a_tracked_default(folder):
 
 def test_gateway_catalog_lists_providers_and_local_laya():
     catalog = agent_store.gateway_catalog()
-    assert {"anthropic", "openai", "laya"} <= set(catalog)
+    assert {"anthropic", "openai", "decision"} <= set(catalog)
     assert any(g["id"] == "openrouter" for g in catalog["anthropic"])
-    assert catalog["laya"][0]["id"] == "local"
+    assert {g["id"] for g in catalog["decision"]} == {"laya", "jev"}
     assert "api_key" not in json.dumps(catalog)

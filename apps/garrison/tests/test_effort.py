@@ -45,8 +45,8 @@ def test_default_effort_above_max_effort_is_rejected(tmp_path):
 
 
 def test_laya_rejects_max_effort(tmp_path):
-    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "laya", "max_effort": "low"}})
-    with pytest.raises(AgentSpecError, match="Laya triage does not accept"):
+    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "decision", "max_effort": "low"}})
+    with pytest.raises(AgentSpecError, match="the decision provider does not accept"):
         agent_spec.load_file(path)
 
 
@@ -109,7 +109,7 @@ def test_own_efforts_follow_this_agents_cap(monkeypatch):
 
 
 def test_own_efforts_of_a_laya_model_is_empty(monkeypatch):
-    _use_spec(monkeypatch, provider="laya")
+    _use_spec(monkeypatch, provider="decision")
     assert reasoning_effort.own_efforts() == ()
 
 

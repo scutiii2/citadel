@@ -69,7 +69,7 @@ def test_unknown_provider_fails_loudly(monkeypatch):
 
 def test_laya_resolves_without_cloud_keys_or_cloud_provider_imports(monkeypatch):
     _clear_env(monkeypatch)
-    monkeypatch.setenv("AI_AGENT_PROVIDER", "laya")
+    monkeypatch.setenv("AI_AGENT_PROVIDER", "decision")
     from src.agents import agent_config
 
     original_import = agent_config.importlib.import_module
@@ -81,9 +81,9 @@ def test_laya_resolves_without_cloud_keys_or_cloud_provider_imports(monkeypatch)
 
     monkeypatch.setattr(agent_config.importlib, "import_module", selected_import)
     provider, module = agent_config._resolve()
-    assert provider == "laya"
+    assert provider == "decision"
     assert module.has_api_key() is True
-    assert imports == ["src.providers.decision.laya_provider"]
+    assert imports == ["src.providers.decision.provider"]
 
 
 def test_provider_without_api_key_fails_loudly(monkeypatch):

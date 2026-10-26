@@ -40,7 +40,7 @@ class AgentStoreError(Exception):
 
 def gateway_catalog() -> dict[str, list[dict[str, Any]]]:
     """Providers and gateways from gateways/<provider>/<gateway>.json.
-    Laya runs locally, so it lists the single "local" gateway. Credentials
+    Decision presets list Laya and Jev without language tiers. Credentials
     are never returned: only id, label, default model and tier ids."""
     try:
         raw = llm_config.load_gateways()
@@ -48,9 +48,6 @@ def gateway_catalog() -> dict[str, list[dict[str, Any]]]:
         raise AgentStoreError(f"gateways/ cannot be read: {error}", 500) from error
     catalog: dict[str, list[dict[str, Any]]] = {}
     for provider in agent_spec.PROVIDERS:
-        if provider == "laya":
-            catalog[provider] = [{"id": "local", "label": "Local", "model": "convaiinnovations/laya", "tiers": []}]
-            continue
         block = raw.get(provider)
         gateways = []
         for gateway_id, entry in (block.items() if isinstance(block, dict) else []):
@@ -240,7 +237,7 @@ def _validate_change(agent_id: str, data: dict[str, Any], directory: Path) -> Ag
 
 
 def _check_gateway(spec: AgentSpec) -> None:
-    if spec.llm.provider == "laya":
+    if spec.llm.provider == "decision":
         return
     gateway = spec.llm.gateway
     if gateway is None and not spec.llm.fallback_gateways:

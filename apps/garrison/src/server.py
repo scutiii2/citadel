@@ -523,7 +523,7 @@ def status() -> dict[str, Any]:
         "exact_context": True,
         "user_limits": True,
         # laya answers typed questions locally and never lists tools through mcp_upstream.
-        "private_extensions": agent_config.PROVIDER_ID != "laya",
+        "private_extensions": agent_config.PROVIDER_ID != "decision",
     }
 
 
@@ -587,11 +587,11 @@ def main() -> None:
         from src.agents.roles.router import router_service
 
         role_info = {"decision": router_service.status_summary()}
-    if agent_config.PROVIDER_ID == "laya" and SPEC.internal_role != "router":
-        from src.providers.decision import laya_provider
+    if agent_config.PROVIDER_ID == "decision" and SPEC.internal_role != "router":
+        from src.providers.decision import provider
 
-        laya_provider.prepare()
-    elif agent_config.PROVIDER_ID != "laya":
+        provider.prepare()
+    elif agent_config.PROVIDER_ID != "decision":
         mcp_upstream.connect()
         mcp_upstream.warn_unmatched_tool_globs()
     agent_registry.register(
@@ -614,7 +614,7 @@ def main() -> None:
         uvicorn.run(app, host=HOST, port=PORT, log_level=mcp.settings.log_level.lower())
     finally:
         agent_registry.deregister(_AGENT_ID)
-        if agent_config.PROVIDER_ID != "laya":
+        if agent_config.PROVIDER_ID != "decision":
             mcp_upstream.close()
 
 

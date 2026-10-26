@@ -295,7 +295,7 @@ def test_definitions_round_trip_and_include_disabled_agents(monkeypatch):
             llm=LlmSpec(provider="anthropic", gateway="openrouter", model="claude-sonnet-5-5", max_tier="standard"),
         ),
         AgentSpec(id="off", label="Off", port=9101, llm=LlmSpec(provider="anthropic"), enabled=False),
-        AgentSpec(id="laya", label="Laya", port=9102, llm=LlmSpec(provider="laya")),
+        AgentSpec(id="laya", label="Laya", port=9102, llm=LlmSpec(provider="decision")),
     ]
 
     agent_registry.write_definitions(specs)
@@ -315,7 +315,7 @@ def test_definitions_round_trip_and_include_disabled_agents(monkeypatch):
         },
         {
             "id": "laya", "label": "Laya", "focus": "", "entry": False, "role": "specialist", "enabled": True,
-            "llm": {"provider": "laya", "gateway": None, "model": None, "tiers": []},
+            "llm": {"provider": "decision", "gateway": None, "model": None, "tiers": []},
         },
     ]
     # The registry itself is untouched: definitions live in their own file.

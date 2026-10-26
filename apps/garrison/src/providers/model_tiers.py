@@ -102,7 +102,7 @@ def own_tiers() -> list[TierInfo]:
     AI_AGENT_GATEWAY, which the supervisor pins - see agent_spec.apply_to_environ)."""
     spec = agent_spec.current()
     provider = spec.llm.provider
-    if provider == "laya":
+    if provider == "decision":
         return []
     gateway = os.getenv("AI_AGENT_GATEWAY") or agent_spec.default_gateway(provider)
     if not gateway:

@@ -25,7 +25,7 @@ def run_agents(tmp_path: Path, *, laya: bool = True, titles: bool = True) -> Non
     extra, defined = [], []
     if laya:
         extra.append({"id": "triage-assistant", "label": "Triage Assistant", "url": LAYA_URL})
-        defined.append({"id": "triage-assistant", "label": "Triage Assistant", "llm": {"provider": "laya"}})
+        defined.append({"id": "triage-assistant", "label": "Triage Assistant", "llm": {"provider": "decision"}})
     if titles:
         extra.append({"id": "title-writer", "label": "Title Writer", "url": TITLE_URL})
         defined.append({"id": "title-writer", "label": "Title Writer", "llm": {"provider": "anthropic"}})
@@ -39,7 +39,7 @@ def laya_answers(agent: FakeAgent, monkeypatch, answer: dict, calls: list | None
             calls.append({"url": url, "caller": caller, "request": json.loads(question), **kwargs})
         return {
             "response": json.dumps({"answers": {"q": answer}, "uncertain": answer["uncertain"]}),
-            "provider_id": "laya", "model": "convaiinnovations/laya", "total_tokens": 370, "input_tokens": 370,
+            "provider_id": "decision", "model": "both", "total_tokens": 370, "input_tokens": 370,
         }
 
     monkeypatch.setattr(agent, "ask", ask)
@@ -318,7 +318,7 @@ def test_a_question_is_counted_in_usage_and_logged_without_its_text(
 
     rows = client.get("/api/usage/records").json()
     assert [r["kind"] for r in rows] == ["triage", "triage"]
-    assert rows[0]["total_tokens"] == 370 and rows[0]["provider_id"] == "laya"
+    assert rows[0]["total_tokens"] == 370 and rows[0]["provider_id"] == "decision"
     lines = log_lines(client, "action")
     assert lines[:2] == ["Asked the Triage Assistant a yes or no question: no, uncertain"] * 2
     assert not any("SQLite" in line or "Which area" in line for line in lines)

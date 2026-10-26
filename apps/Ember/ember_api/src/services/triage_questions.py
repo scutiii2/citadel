@@ -21,7 +21,7 @@ from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
 
 logger = logging.getLogger(__name__)
 
-LAYA_PROVIDER = "laya"
+DECISION_PROVIDER = "decision"
 TITLE_AGENT_ID = "title-writer"
 QID = "q"
 TEXT_MAX = 4000  # Laya's own limit (laya_provider.MAX_INPUT_CHARS)
@@ -31,7 +31,7 @@ MIN_OPTIONS = 2
 MAX_OPTIONS = 10
 TITLE_MAX = 30
 _TOO_LONG = "complete input"  # part of ai_agent's "Laya could not read the complete input" error
-_INVALID = "Invalid Laya request"
+_INVALID = "Invalid decision request"
 
 Kind = Literal["choice", "yes_no", "score"]
 
@@ -194,7 +194,7 @@ class TriageQuestions:
         levels: list[str] | None = None, strategy: str | None = None,
     ) -> AskOutcome:
         """Asks the Triage Assistant directly (no orchestrator) and returns the readable answer."""
-        agent = await self._directory.find_by_provider(LAYA_PROVIDER)
+        agent = await self._directory.find_by_provider(DECISION_PROVIDER)
         if agent is None:
             raise TriageUnavailable("the Triage Assistant is not running")
         try:

@@ -26,7 +26,7 @@ from urllib.parse import urlsplit, urlunsplit
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 AGENTS_DIR = PROJECT_ROOT / "agents"
 
-PROVIDERS = ("anthropic", "openai", "laya")
+PROVIDERS = ("anthropic", "openai", "decision")
 ROLES = ("orchestrator", "router", "specialist")
 REASONING_EFFORTS = ("off", "low", "medium", "high")
 # Model strength, weakest to strongest. Fixed so min_tier/max_tier can be
@@ -34,11 +34,11 @@ REASONING_EFFORTS = ("off", "low", "medium", "high")
 TIERS = ("light", "standard", "heavy", "extreme")
 # The gateway each provider uses when a file names none - pinned in the env
 # so .env's AI_AGENT_GATEWAY cannot silently re-point the agent.
-_DEFAULT_GATEWAY = {"anthropic": "claude", "openai": "gpt", "laya": "local"}
+_DEFAULT_GATEWAY = {"anthropic": "claude", "openai": "gpt", "decision": "laya"}
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 _TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "role", "memory_recall", "skill_recall", "skill_learning", "plan_tool", "delegable", "decision"}
-_LLM_KEYS = {"provider", "gateway", "model", "temperature", "reasoning_effort", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort", "fallback_gateways"}
+_LLM_KEYS = {"strategy", "min_confidence", "provider", "gateway", "model", "temperature", "reasoning_effort", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort", "fallback_gateways"}
 _TOOLS_KEYS = {"allow", "deny"}
 
 
@@ -77,6 +77,8 @@ class LlmSpec:
     # agent; None = no cap. Its own reasoning_effort is never above it.
     max_effort: str | None = None
     fallback_gateways: tuple[GatewayChoice, ...] = ()
+    strategy: str | None = None
+    min_confidence: float | None = None
 
 
 @dataclass(frozen=True)
@@ -314,6 +316,21 @@ def load_file(path: Path) -> AgentSpec:
     provider = llm_data.get("provider")
     if provider not in PROVIDERS:
         raise check.fail("llm.provider", f"must be one of: {', '.join(PROVIDERS)}")
+    from src.providers.decision.strategy import STRATEGIES
+
+    strategy = llm_data.get("strategy")
+    min_confidence = llm_data.get("min_confidence")
+    if provider == "decision":
+        strategy = strategy or "both"
+        if strategy not in STRATEGIES:
+            raise check.fail("llm.strategy", f"must be one of: {', '.join(STRATEGIES)}")
+        min_confidence = 0.9 if min_confidence is None else check.number(llm_data, "min_confidence", 0.0001, 1.0, "llm.")
+        for key in ("gateway", "model", "fallback_gateways"):
+            if key in llm_data:
+                raise check.fail(f"llm.{key}", "the decision provider has no gateway, model or fallback_gateways; pick llm.strategy")
+    elif strategy is not None or min_confidence is not None:
+        raise check.fail("llm.strategy", "and llm.min_confidence are only for the decision provider")
+
     effort = llm_data.get("reasoning_effort", "off")
     if effort not in REASONING_EFFORTS:
         raise check.fail("llm.reasoning_effort", f"must be one of: {', '.join(REASONING_EFFORTS)}")
@@ -329,7 +346,7 @@ def load_file(path: Path) -> AgentSpec:
     fallback_data = llm_data.get("fallback_gateways", [])
     if not isinstance(fallback_data, list):
         raise check.fail("llm.fallback_gateways", "must be a list")
-    if provider == "laya" and fallback_data:
+    if provider == "decision" and fallback_data:
         raise check.fail("llm.fallback_gateways", "Laya does not support gateway failover")
     primary = check.text(llm_data, "gateway", None, "llm.") or _DEFAULT_GATEWAY[provider]
     choices: list[GatewayChoice] = []
@@ -362,6 +379,7 @@ def load_file(path: Path) -> AgentSpec:
         max_tier=max_tier,
         max_effort=max_effort,
         fallback_gateways=tuple(choices),
+        strategy=strategy, min_confidence=min_confidence,
     )
 
     tools_data = check.section(data, "tools")
@@ -372,30 +390,26 @@ def load_file(path: Path) -> AgentSpec:
     memory_recall = check.boolean(data, "memory_recall", False)
     skill_recall = check.boolean(data, "skill_recall", False)
     skill_learning = check.boolean(data, "skill_learning", False)
-    if provider == "laya":
+    if provider == "decision":
         if orchestrator or check.boolean(data, "entry", False):
-            raise check.fail("llm.provider", "Laya triage must be a specialist or router, not an entry agent or orchestrator")
+            raise check.fail("llm.provider", "the decision provider must be a specialist or router, not an entry agent or orchestrator")
         if memory_recall:
-            raise check.fail("memory_recall", "Laya triage has no tools, so it cannot recall memory")
+            raise check.fail("memory_recall", "the decision provider has no tools, so it cannot recall memory")
         if skill_recall:
-            raise check.fail("skill_recall", "Laya triage has no tools, so it cannot recall skills")
+            raise check.fail("skill_recall", "the decision provider has no tools, so it cannot recall skills")
         if skill_learning:
-            raise check.fail("skill_learning", "Laya triage has no tools, so it cannot learn skills")
-        if llm.gateway not in (None, "local"):
-            raise check.fail("llm.gateway", "Laya triage runs locally; cloud gateways are not supported")
-        if llm.model not in (None, "convaiinnovations/laya"):
-            raise check.fail("llm.model", "Laya triage only supports convaiinnovations/laya")
+            raise check.fail("skill_learning", "the decision provider has no tools, so it cannot learn skills")
         if any(key in llm_data for key in ("temperature", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort")) or effort != "off":
-            raise check.fail("llm", "Laya triage does not accept generation or tool-loop settings")
+            raise check.fail("llm", "the decision provider does not accept generation or tool-loop settings")
 
     policy = None
     if role == "router":
         from src.agents.roles.router.router_contract import RouterPolicy
 
-        if (provider != "laya" or check.boolean(data, "entry", False)
+        if (provider != "decision" or check.boolean(data, "entry", False)
                 or check.boolean(data, "delegable", True) or memory_recall or skill_recall or skill_learning
                 or check.boolean(data, "plan_tool", True) or "*" not in tools.deny):
-            raise check.fail("role", "router requires local Laya, no entry, no delegation, no tools, memory or plan")
+            raise check.fail("role", "router requires the decision provider, no entry, no delegation, no tools, memory or plan")
         try:
             policy = RouterPolicy.model_validate(data.get("decision", {}))
         except ValueError as error:

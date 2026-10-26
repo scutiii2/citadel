@@ -58,7 +58,7 @@ def test_status_reports_private_extension_support():
     fake = {"provider_id": "anthropic", "model": "m", "available": True, "reason": None, "cooldown_seconds_remaining": 0}
     with patch("src.server.agent_config.status", return_value=fake), patch.object(agent_config, "PROVIDER_ID", "anthropic"):
         assert server.status()["private_extensions"] is True
-    with patch("src.server.agent_config.status", return_value=fake), patch.object(agent_config, "PROVIDER_ID", "laya"):
+    with patch("src.server.agent_config.status", return_value=fake), patch.object(agent_config, "PROVIDER_ID", "decision"):
         assert server.status()["private_extensions"] is False
 
 

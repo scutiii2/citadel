@@ -46,7 +46,7 @@ def test_specialist_defaults(tmp_path):
 
 def test_router_needs_laya_provider_no_tools_no_entry(tmp_path):
     router = {"port": 9117, "role": "router", "entry": False, "delegable": False, "plan_tool": False,
-              "llm": {"provider": "laya", "gateway": "local"}, "tools": {"allow": [], "deny": ["*"]}}
+              "llm": {"provider": "decision"}, "tools": {"allow": [], "deny": ["*"]}}
     spec = load(tmp_path, router)
     assert spec.role == "router" and spec.internal_role == "router"
     with pytest.raises(AgentSpecError, match="router"):
@@ -61,5 +61,5 @@ def test_decision_block_only_for_router(tmp_path):
 
 
 def test_laya_provider_cannot_be_an_orchestrator(tmp_path):
-    with pytest.raises(AgentSpecError, match="Laya"):
-        load(tmp_path, {"port": 9111, "role": "orchestrator", "llm": {"provider": "laya", "gateway": "local"}})
+    with pytest.raises(AgentSpecError, match="decision"):
+        load(tmp_path, {"port": 9111, "role": "orchestrator", "llm": {"provider": "decision"}})

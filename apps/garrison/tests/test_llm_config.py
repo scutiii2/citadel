@@ -180,7 +180,7 @@ def test_admin_catalog_uses_gateway_files_and_excludes_credentials(gateway_files
     })
     catalog = agent_store.gateway_catalog()
     assert catalog["anthropic"] == [{"id": "custom", "label": "Custom", "model": "my-model", "tiers": [{"tier": "light", "id": "small"}]}]
-    assert catalog["laya"][0]["id"] == "local"
+    assert catalog["decision"] == []
     assert "api_key" not in json.dumps(catalog)
 
 

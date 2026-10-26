@@ -115,7 +115,7 @@ def test_own_tiers_falls_back_to_the_providers_default_gateway(monkeypatch):
 
 
 def test_own_tiers_of_a_laya_model_is_empty(monkeypatch):
-    _use_spec(monkeypatch, provider="laya")
+    _use_spec(monkeypatch, provider="decision")
     assert model_tiers.own_tiers() == []
 
 

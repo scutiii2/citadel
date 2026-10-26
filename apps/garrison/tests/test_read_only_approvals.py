@@ -205,7 +205,7 @@ def test_run_chat_binds_the_check_only_for_ask_mode_with_the_option_on():
 def test_a_laya_model_has_no_check(monkeypatch):
     from src.agents import agent_config
 
-    monkeypatch.setattr(agent_config, "PROVIDER_ID", "laya")
+    monkeypatch.setattr(agent_config, "PROVIDER_ID", "decision")
 
     assert agent_config._read_only_check() is None
 

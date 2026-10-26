@@ -50,7 +50,7 @@ def own_efforts() -> tuple[str, ...]:
     """The efforts this process's agent accepts from a delegator. A Laya
     triage agent has no reasoning control."""
     spec = agent_spec.current()
-    if spec.llm.provider == "laya":
+    if spec.llm.provider == "decision":
         return ()
     return allowed(spec.llm.max_effort)
 

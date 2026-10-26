@@ -17,6 +17,8 @@ export interface AgentGatewayChoice {
 
 export interface AgentLlm {
   provider: string;
+  strategy?: "laya-only" | "jev-only" | "both";
+  min_confidence?: number;
   gateway?: string;
   model?: string;
   fallback_gateways?: (string | AgentGatewayChoice)[];

@@ -146,7 +146,7 @@ def test_a_stale_account_choice_is_reported_as_422_without_silent_fallback(clien
     as_admin(client)
     run_agents(tmp_path)
     assert client.put("/api/account/triage-strategy", json={"value": "typed-only"}).status_code == 200
-    agent.fail = "Invalid Laya request: unknown strategy 'typed-only'; choose one of: auto"
+    agent.fail = "Invalid decision request: unknown strategy 'typed-only'; choose one of: auto"
     response = client.post(ASK, json=YES_NO)
     assert response.status_code == 422
     assert response.json()["detail"] == agent.fail

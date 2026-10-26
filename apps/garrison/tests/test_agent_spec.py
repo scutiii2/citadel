@@ -59,7 +59,7 @@ def test_fallback_gateways_preserve_order_and_primary_environ(tmp_path, monkeypa
     ("anthropic", [{"gateway": "backup", "typo": True}]),
     ("anthropic", ["backup", "backup"]), ("anthropic", ["claude"]),
     ("anthropic", [True]), ("anthropic", [{"gateway": "backup", "model": 3}]),
-    ("laya", ["backup"]),
+    ("decision", ["backup"]),
 ])
 def test_invalid_fallback_gateways_name_file_and_field(tmp_path, provider, value):
     path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {
@@ -72,24 +72,24 @@ def test_laya_specialist_is_local_and_needs_no_generation_settings(tmp_path, mon
     for key in ("AI_AGENT_PROVIDER", "AI_AGENT_GATEWAY", "AI_AGENT_MODEL", "AI_AGENT_PORT"):
         monkeypatch.setenv(key, os.getenv(key, ""))
     spec = agent_spec.load_file(_write(tmp_path, "triage-assistant", {"role": "specialist",
-        "port": 9110, "llm": {"provider": "laya"}, "tools": {"deny": ["*"]},
+        "port": 9110, "llm": {"provider": "decision"}, "tools": {"deny": ["*"]},
     }))
     agent_spec.apply_to_environ(spec)
-    assert os.environ["AI_AGENT_PROVIDER"] == "laya"
-    assert os.environ["AI_AGENT_GATEWAY"] == "local"
+    assert os.environ["AI_AGENT_PROVIDER"] == "decision"
+    assert os.environ["AI_AGENT_GATEWAY"] == "laya"
     assert not spec.tools.allows("any_tool")
 
 
 @pytest.mark.parametrize("extra", [
     {"entry": True}, {"role": 'orchestrator'},
-    {"role": "specialist", "llm": {"provider": "laya", "gateway": "openrouter"}},
-    {"role": "specialist", "llm": {"provider": "laya", "model": "gpt-x"}},
-    {"role": "specialist", "llm": {"provider": "laya", "max_tokens": 100}},
-    {"role": "specialist", "llm": {"provider": "laya", "reasoning_effort": "high"}},
+    {"role": "specialist", "llm": {"provider": "decision", "gateway": "openrouter"}},
+    {"role": "specialist", "llm": {"provider": "decision", "model": "gpt-x"}},
+    {"role": "specialist", "llm": {"provider": "decision", "max_tokens": 100}},
+    {"role": "specialist", "llm": {"provider": "decision", "reasoning_effort": "high"}},
 ])
 def test_laya_rejects_cloud_or_generation_configuration(tmp_path, extra):
-    data = {"role": "specialist", "port": 9110, "llm": {"provider": "laya"}, **extra}
-    with pytest.raises(AgentSpecError, match="Laya triage"):
+    data = {"role": "specialist", "port": 9110, "llm": {"provider": "decision"}, **extra}
+    with pytest.raises(AgentSpecError, match="decision"):
         agent_spec.load_file(_write(tmp_path, "triage-assistant", data))
 
 
@@ -273,15 +273,15 @@ def test_min_tier_above_max_tier_is_rejected(tmp_path):
 
 @pytest.mark.parametrize("key", ["min_tier", "max_tier"])
 def test_laya_rejects_tier_bounds(tmp_path, key):
-    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "laya", key: "light"}})
-    with pytest.raises(AgentSpecError, match="Laya triage does not accept"):
+    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "decision", key: "light"}})
+    with pytest.raises(AgentSpecError, match="the decision provider does not accept"):
         agent_spec.load_file(path)
 
 
 def test_default_gateway_per_provider():
     assert agent_spec.default_gateway("anthropic") == "claude"
     assert agent_spec.default_gateway("openai") == "gpt"
-    assert agent_spec.default_gateway("laya") == "local"
+    assert agent_spec.default_gateway("decision") == "laya"
     assert agent_spec.default_gateway("unknown") is None
 
 
@@ -384,7 +384,7 @@ def test_memory_recall_must_be_a_boolean(tmp_path):
 
 
 def test_laya_cannot_recall_memory(tmp_path):
-    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "laya"}, "tools": {"deny": ["*"]}, "memory_recall": True})
+    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "decision"}, "tools": {"deny": ["*"]}, "memory_recall": True})
     with pytest.raises(AgentSpecError, match="memory_recall"):
         agent_spec.load_file(path)
 
@@ -402,7 +402,7 @@ def test_skill_recall_must_be_a_boolean(tmp_path):
 
 
 def test_laya_cannot_recall_skills(tmp_path):
-    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "laya"}, "tools": {"deny": ["*"]}, "skill_recall": True})
+    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "decision"}, "tools": {"deny": ["*"]}, "skill_recall": True})
     with pytest.raises(AgentSpecError, match="skill_recall"):
         agent_spec.load_file(path)
 
@@ -416,7 +416,7 @@ def test_skill_learning_defaults_to_false_loads_true_and_must_be_a_boolean(tmp_p
 
 
 def test_laya_cannot_learn_skills(tmp_path):
-    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "laya"}, "tools": {"deny": ["*"]}, "skill_learning": True})
+    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "decision"}, "tools": {"deny": ["*"]}, "skill_learning": True})
     with pytest.raises(AgentSpecError, match="skill_learning"):
         agent_spec.load_file(path)
 

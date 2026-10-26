@@ -269,12 +269,12 @@ def test_main_registers_with_the_spec_flags(monkeypatch):
 
 
 def test_laya_main_warms_before_registration_without_an_upstream_connection(monkeypatch):
-    from src.providers.decision import laya_provider
+    from src.providers.decision import provider
 
     calls = []
-    monkeypatch.setattr(server.agent_config, "PROVIDER_ID", "laya")
+    monkeypatch.setattr(server.agent_config, "PROVIDER_ID", "decision")
     monkeypatch.setattr(server, "_OWN_TIERS", [])
-    monkeypatch.setattr(laya_provider, "prepare", lambda: calls.append("warm"))
+    monkeypatch.setattr(provider, "prepare", lambda: calls.append("warm"))
 
     def forbidden():
         raise AssertionError("Laya must not connect to tools")
@@ -290,14 +290,14 @@ def test_laya_main_warms_before_registration_without_an_upstream_connection(monk
 
 
 def test_laya_load_failure_does_not_register_an_unavailable_agent(monkeypatch):
-    from src.providers.decision import laya_provider
+    from src.providers.decision import provider
 
-    monkeypatch.setattr(server.agent_config, "PROVIDER_ID", "laya")
+    monkeypatch.setattr(server.agent_config, "PROVIDER_ID", "decision")
 
     def fail():
         raise RuntimeError("weights could not load")
 
-    monkeypatch.setattr(laya_provider, "prepare", fail)
+    monkeypatch.setattr(provider, "prepare", fail)
     with patch.object(server.agent_registry, "register") as register:
         with pytest.raises(RuntimeError, match="weights could not load"):
             server.main()

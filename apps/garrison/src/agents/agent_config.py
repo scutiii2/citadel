@@ -55,7 +55,7 @@ from src.providers.model_limits import context_window_for  # noqa: E402
 _PROVIDERS = {
     "anthropic": "src.providers.language.anthropic_provider",
     "openai": "src.providers.language.openai_provider",
-    "laya": "src.providers.decision.laya_provider",
+    "decision": "src.providers.decision.provider",
 }
 
 
@@ -101,7 +101,7 @@ MODEL = os.getenv("AI_AGENT_MODEL") or None
 
 def _read_only_check():
     """The check "Auto" approval uses, or None for an agent that lists no mcp_server tools (laya)."""
-    if PROVIDER_ID == "laya":
+    if PROVIDER_ID == "decision":
         return None
     # Imported here: laya agents never load mcp_upstream.
     from src.tools.mcp_client import mcp_upstream

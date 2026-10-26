@@ -223,7 +223,7 @@ def _tiers_of(spec: Any) -> list[dict[str, str]]:
     or a gateways file that cannot be read - publishing must not fail on it."""
     provider = spec.llm.provider
     gateway = spec.llm.gateway or agent_spec.default_gateway(provider)
-    if provider == "laya" or not gateway:
+    if provider == "decision" or not gateway:
         return []
     try:
         return model_tiers.as_records(
