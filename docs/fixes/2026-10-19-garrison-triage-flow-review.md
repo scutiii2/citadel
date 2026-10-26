@@ -10,7 +10,7 @@ Review of `apps/garrison` triage flow (`src/llm/triage_flow.py`, `src/llm/laya_p
 
 **Fix**: set `uncertain` to `True` for every step 5 result (the `decided` case keeps `also_check` and its note). Update the `final_answer` docstring and the README "Triage flow" section, which currently implies a decided final answer is settled.
 
-**Tests to add** (`tests/test_triage_flow_provider.py` or `tests/test_triage_three_way.py`): all voters under threshold, top option leads clearly, assert `uncertain is True`, `also_check` set, top-level `uncertain` true.
+**Tests to add** (`tests/test_triage_flow_provider.py` or `tests/test_decision_strategy.py`): all voters under threshold, top option leads clearly, assert `uncertain is True`, `also_check` set, top-level `uncertain` true.
 
 ## 2. `local_only` is enforced by one caller, not by the flow
 
@@ -35,3 +35,5 @@ Keep the `_asks_local_only` pre-check (it picks the 4000-char limit before parsi
 - `_restrict` keeps the original `choice`, so `disagreement` can name an eliminated option.
 - `parse_threshold` raises `SystemExit` from library code; move it to the script that uses it.
 - Doc drift: compact answer size (65 vs 75 tokens) between the `triage_flow.py` docstring and the README; "20/23 and 21/23 on the 47 cases" in the README.
+
+Historical diagnostic references updated for Legion v2: the retired voter-comparison diagnostic is covered by decision-strategy tests and router contract cases.

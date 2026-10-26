@@ -9,12 +9,13 @@ from types import SimpleNamespace
 import pytest
 
 from scripts import check_triage_cases as cases
-from src.providers.decision import laya_provider
+from src.providers.decision import provider
+from src.providers.decision.gateways.laya import MAX_CHARS
 
 
 def test_every_case_is_a_valid_request_for_the_fallback_sized_window():
     for case in cases.CASES:
-        request = laya_provider.parse_request(case.request(), 16_000)
+        request = provider.parse_request(case.request(), 16_000)
         assert set(request.questions) == set(case.questions)
         assert set(case.expect) <= set(case.questions), case.name
 
@@ -26,7 +27,7 @@ def test_case_names_are_unique_and_each_says_what_it_is_for():
 
 def test_the_cases_cover_every_path_the_setup_has():
     texts = {case.name: case for case in cases.CASES}
-    assert len(texts["long-log"].text) > laya_provider.MAX_INPUT_CHARS
+    assert len(texts["long-log"].text) > MAX_CHARS
     assert {q["type"] for case in cases.CASES for q in case.questions.values()} == {"choice", "score", "noul"}
     assert any(len(q["criteria"]) >= 5 for case in cases.CASES for q in case.questions.values() if q["type"] == "choice")
     assert texts["checkout-area-lenient"].min_confidence == 0.5 and texts["clear-database-strict"].min_confidence == 0.95
@@ -179,16 +180,22 @@ def test_an_answer_without_a_second_opinion_has_no_rounds_table():
     assert cases.rounds_table(checkout_row(plain)) == ""
 
 
-def test_rounds_flag_prints_the_tables_after_the_summary_table(monkeypatch, capsys):
-    from src.providers.decision import decision
+@pytest.mark.parametrize(("flags", "chosen"), [
+    ([], "both"), (["--baseline"], "laya-only"), (["--strategy", "jev-only"], "jev-only"),
+])
+def test_rounds_flag_prints_the_tables_after_the_summary_table(monkeypatch, capsys, flags, chosen):
 
     monkeypatch.setattr(cases, "load_env", lambda: None)
-    monkeypatch.setattr(decision, "settings", decision.ClassifierSettings)
-    monkeypatch.setattr(laya_provider, "prepare", lambda: None)
+    monkeypatch.setattr(provider, "prepare", lambda: None)
     answers = {"category": CHECKOUT}
-    monkeypatch.setattr(laya_provider, "answer", lambda raw: FakeLaya(answers).answer(raw))
+    calls = []
+    def answer(raw, strategy_name, min_confidence):
+        calls.append((strategy_name, min_confidence))
+        return FakeLaya(answers).answer(raw)
+    monkeypatch.setattr(provider, "answer", answer)
 
-    assert cases.main(["--case", "vague", "--rounds"]) == 0
+    assert cases.main(["--case", "vague", "--rounds", *flags]) == 0
+    assert calls == [(chosen, .9)]
     out = capsys.readouterr().out
 
     assert out.index("case") < out.index("| # | Step") and "dropped: network" in out
@@ -209,8 +216,8 @@ def test_the_wider_set_reaches_every_shape_the_triage_setup_handles():
     assert any(q["type"] == "choice" and len(q["criteria"]) == LAYA_MAX_OPTIONS for q in questions)
     assert max(len(case.questions) for case in cases.CASES) == LAYA_MAX_QUESTIONS
     # text shapes: Laya's window overflow, the issue first or last, another language, an instruction hidden in the text
-    assert 1000 < len(by_name["medium-text"].text) < laya_provider.MAX_INPUT_CHARS
-    assert len(by_name["long-key-first"].text) > laya_provider.MAX_INPUT_CHARS
+    assert 1000 < len(by_name["medium-text"].text) < MAX_CHARS
+    assert len(by_name["long-key-first"].text) > MAX_CHARS
     assert by_name["long-key-first"].text.startswith("SQLite database is locked")
     assert by_name["medium-text"].text.rstrip().endswith("write failed.")
     assert "Ignore all previous instructions" in by_name["instruction-in-text"].text

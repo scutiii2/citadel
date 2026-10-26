@@ -1,38 +1,9 @@
-"""Live test cases for the Triage Assistant's classifier setup (Laya, then the decision layer's fallback).
+"""Live decision-provider smoke cases; run from apps/garrison.
 
-Run from ai_agent:
-    python -m scripts.check_triage_cases                 # every case with your config_tuning.json
-    python -m scripts.check_triage_cases --list          # what each case is for
-    python -m scripts.check_triage_cases --case checkout-area --case clear-database
-    python -m scripts.check_triage_cases --case "escalate-*" --rounds   # a group by pattern
-    python -m scripts.check_triage_cases --baseline      # the same cases with the fallback off (Laya alone)
-    python -m scripts.check_triage_cases --prune-ratio 0.4 --json
-    python -m scripts.check_triage_cases --rounds        # a table of every model call for each reviewed question
-    python -m scripts.check_triage_cases --three-way --rounds   # Laya English, Laya typed-decisions and Jev as separate voters
-
-It calls the same code the Triage Assistant runs (laya_provider.answer), so the orchestrator is not
-involved. It asks the Laya service (LAYA_SERVICE_URL), reads the `classifier` section of configs/config_tuning.json and
-the keys in .env, and sends each case's text to the fallback backend when the section turns it on (a few
-cents of tokens in all). Each row shows how a question was settled:
-
-    laya       Laya was sure; nothing left the machine
-    deferred   Laya and the classifier differed a lot in confidence; the more confident one's answer stands
-    pair       two options were left and the models still disagreed; their confidence-weighted
-               probabilities were compared (narrowed->pair when options were dropped first)
-    fallback   the classifier answered alone (text too long for Laya, or Laya had no usable answer)
-    blend      Laya and the classifier were averaged, nothing dropped
-    narrowed   options far below the rest were dropped and the question asked again (then who decided)
-
-With --three-way the cases run through scripts/triage_three_way.py instead: Laya English is asked first, Laya
-typed only if English is not sure, Jev only when they cannot settle it, each against its own confidence
-threshold (--threshold changes one); see that file for the exact flow. It loads both checkpoints (--max-len
-sets the window, default 4096). --baseline then leaves out Jev, so the two Laya models decide alone.
-Path labels there: `local` (English, or typed agreeing with it, was sure; nothing left the machine),
-`narrowed->X` (X decided after options were dropped), `final` (nobody was sure: the pairwise comparison decided or
-called it unknown), plus `fallback` when Jev decided on the original options.
-
-Expected choices are a smoke check, not a benchmark: a case with no expectation is for watching the
-paths and numbers. Exit code 1 with --strict when a case with an expectation got a different answer.
+Use --list to inspect cases, --baseline for Laya alone, or --strategy to
+choose laya-only, jev-only or both. Live calls require a prepared deployment.
+--rounds prints model-call details when supplied by the service.
+Expected choices are smoke checks, not a calibration benchmark.
 """
 
 from __future__ import annotations
@@ -321,7 +292,7 @@ class Row:
 
 
 def run_case(laya: Any, case: Case) -> tuple[list[Row], str]:
-    """Ask Laya's provider code directly. Returns one row per question and an error text ('' on success)."""
+    """Ask the decision provider directly. Returns one row per question and an error text ('' on success)."""
     started = time.perf_counter()
     try:
         result = laya.answer(case.request())
@@ -440,34 +411,15 @@ def select(names: list[str]) -> list[Case]:
     return list(chosen.values())
 
 
-def apply_settings(baseline: bool, prune_ratio: float | None) -> None:
-    from src.providers.decision import decision
-
-    config = decision.ClassifierSettings() if baseline else decision.settings()
-    if prune_ratio is not None:
-        config = dataclasses.replace(config, triage_prune_ratio=prune_ratio)
-    decision.settings = lambda: config  # type: ignore[assignment]
-    print(
-        f"classifier: triage_fallback={config.triage_fallback}, chain={'+'.join(config.chain('triage'))}, "
-        f"prune_ratio={config.triage_prune_ratio}", flush=True,
-    )
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--list", action="store_true", help="list the cases and what each is for")
     parser.add_argument("--case", action="append", default=[], metavar="NAME", help="run only this case or pattern (repeatable)")
-    parser.add_argument("--baseline", action="store_true", help="ignore config_tuning.json: Laya alone, no fallback")
-    parser.add_argument("--prune-ratio", type=float, metavar="R", help="override classifier.triage_prune_ratio")
+    parser.add_argument("--baseline", action="store_true", help="Laya alone, no cloud fallback")
+    parser.add_argument("--strategy", choices=("laya-only", "jev-only", "both"), default="both")
     parser.add_argument("--json", action="store_true", help="also print each answer in full (with its rounds trace)")
     parser.add_argument("--rounds", action="store_true", help="print a table of every model call for each reviewed question")
     parser.add_argument("--strict", action="store_true", help="exit 1 when an expectation is missed or a case fails")
-    parser.add_argument("--three-way", action="store_true",
-                        help="Laya English, Laya typed-decisions and the fallback as three separate voters")
-    parser.add_argument("--threshold", action="append", default=[], metavar="MODEL:COUNT=VALUE",
-                        help="with --three-way, change one confidence threshold, e.g. laya-typed:3+=0.6 (repeatable)")
-    parser.add_argument("--max-len", type=int, default=4096, metavar="N",
-                        help="token window for the Laya models with --three-way (default 4096)")
     args = parser.parse_args(argv)
 
     if args.list:
@@ -479,25 +431,12 @@ def main(argv: list[str] | None = None) -> int:
     cases = select(args.case)
     load_env()
     sys.path.insert(0, str(PROJECT))
-    apply_settings(args.baseline, args.prune_ratio)
-    if args.three_way:
-        from scripts.triage_three_way import ThreeWayTriage
+    from types import SimpleNamespace
+    from src.providers.decision import provider
 
-        print("using the Laya service (English and typed-decisions)..", flush=True)
-        from scripts.triage_three_way import parse_threshold
-
-        thresholds: dict[str, dict[str, float]] = {}
-        for text in args.threshold:
-            name, count, value = parse_threshold(text)
-            thresholds.setdefault(count, {})[name] = value
-        laya = ThreeWayTriage.load(args.max_len, use_fallback=not args.baseline, thresholds=thresholds)
-    else:
-        from types import SimpleNamespace
-
-        from src.providers.decision import laya_provider
-
-        laya = SimpleNamespace(answer=laya_provider.answer, prepare=laya_provider.prepare)
-        print("using the Laya service...", flush=True)
+    chosen = "laya-only" if args.baseline else args.strategy
+    laya = SimpleNamespace(answer=lambda raw: provider.answer(raw, chosen, .9), prepare=provider.prepare)
+    print(f"using decision strategy {chosen}...", flush=True)
     laya.prepare()
     rows: list[Row] = []
     errors: dict[str, str] = {}

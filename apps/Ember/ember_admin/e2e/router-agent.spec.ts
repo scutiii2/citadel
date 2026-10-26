@@ -35,6 +35,8 @@ test("Router settings save explicitly, retain failed drafts and fit narrow scree
     await expect(dialog.locator('[data-test="routing-deadline"]')).toBeVisible();
   }
   await dialog.locator('[data-test="routing-deadline"]').fill("8");
+  await dialog.locator('[data-test="router-strategy"]').selectOption("laya-only");
+  await dialog.locator('[data-test="router-confidence"]').fill("0.8");
   expect(writes).toHaveLength(0);
   refuse = true;
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
@@ -43,7 +45,7 @@ test("Router settings save explicitly, retain failed drafts and fit narrow scree
   refuse = false;
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  expect(writes[0]).toMatchObject({ role: "router", decision: { deadline_seconds: 8 },
+  expect(writes[0]).toMatchObject({ role: "router", decision: { deadline_seconds: 8, strategy: "laya-only", min_confidence: .8 },
     tools: { deny: ["*"] }, delegable: false, llm: { provider: "decision", strategy: "both", min_confidence: 0.9 } });
   expect(state.unexpected).toEqual([]);
 });

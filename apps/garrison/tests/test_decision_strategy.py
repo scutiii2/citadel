@@ -2,23 +2,9 @@ import pytest
 
 from src.providers.decision import strategy
 from src.providers.decision.contract import DecisionError, DecisionRequest, GatewayResult
+from tests.decision_fakes import Fake
 
 Q = {"q": {"type": "choice", "instructions": "?", "criteria": {"a": "A", "b": "B"}}}
-
-
-class Fake:
-    def __init__(self, id, local, confidence=None, fail=False, available=True):
-        self.id, self.local, self.confidence, self.fail, self._available, self.asked = id, local, confidence, fail, available, []
-
-    def available(self):
-        return self._available
-
-    def ask(self, request, timeout=None):
-        self.asked.append(sorted(request.questions))
-        if self.fail:
-            raise DecisionError(f"{self.id} down")
-        return GatewayResult({q: {"choice": "a", "answer_confidence": self.confidence, "uncertain": self.confidence < request.min_confidence}
-                              for q in request.questions}, tokens=3, model=self.id)
 
 
 def gateways(laya, jev):

@@ -63,7 +63,7 @@
 
 ## Task 2: Request-local triage policy, deadline and voter accounting
 
-**Files:** Modify `apps/garrison/src/llm/triage_flow.py`, `laya_provider.py`, `decision.py`; create `apps/garrison/src/agents/router_engine.py`, `apps/garrison/tests/test_router_engine.py`; extend `tests/test_triage_three_way.py` and `test_triage_flow_provider.py`.
+**Files:** Modify `apps/garrison/src/llm/triage_flow.py`, `laya_provider.py`, `decision.py`; create `apps/garrison/src/agents/router_engine.py`, `apps/garrison/tests/test_router_engine.py`; extend `tests/test_decision_strategy.py` and `test_triage_flow_provider.py`.
 
 **Interfaces:**
 
@@ -78,7 +78,7 @@
 - Write deterministic clock tests for deadline including queued model locks, timeout clamped to remaining time, cancellation between voters, and no new calls after deadline.
 - Write accounting tests for every local/remote attempt, repeated narrowed rounds, classifier-chain failures and partial completion before cancellation. Freeze completed response accounting so a late worker cannot change it.
 - Run the new tests to confirm failures, then implement policy injection and the engine. Preserve current triage algorithm; use request-local inference window settings and model locks rather than changing shared voter settings during concurrent requests.
-- Run `python -m pytest -q tests/test_router_engine.py tests/test_triage_three_way.py tests/test_triage_flow_provider.py tests/test_laya_provider.py tests/test_decision.py` in `apps/garrison`.
+- Run `python -m pytest -q tests/test_router_engine.py tests/test_decision_strategy.py tests/test_triage_flow_provider.py tests/test_laya_provider.py tests/test_decision.py` in `apps/garrison`.
 
 ## Task 3: Internal route operation and bounded client
 
@@ -227,3 +227,5 @@ Limits and follow-up validation:
   lacks `rich`; no CLI environment or dependency installation was introduced.
   CLI source did not change. Web/API usage/progress regression groups passed.
 - The user subsequently authorized committing, rebasing onto `main` and local integration. No running deployment was changed.
+
+Historical diagnostic references updated for Legion v2: the retired voter-comparison diagnostic is covered by decision-strategy tests and router contract cases.

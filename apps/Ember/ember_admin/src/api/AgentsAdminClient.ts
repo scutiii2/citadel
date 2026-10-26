@@ -59,13 +59,9 @@ export interface AgentConfig {
 export interface RouterPolicy {
   choose_agent: boolean;
   choose_tier: boolean;
-  english: boolean;
-  typed: boolean;
-  fallback: boolean;
+  strategy: "laya-only" | "jev-only" | "both";
+  min_confidence: number;
   trace: boolean;
-  thresholds: Record<"2" | "3+", Record<"laya-english" | "laya-typed" | "jev", number>>;
-  prune_ratio: number;
-  pair_ratio: number;
   deadline_seconds: number;
   remote_timeout_seconds: number;
   size_tiers: Record<"tiny" | "everyday" | "large" | "hardest", string>;

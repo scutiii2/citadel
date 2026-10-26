@@ -393,7 +393,7 @@ Repository references (paths relative to Citadel):
   current typed prediction, policy and compatibility behavior.
 - `apps/garrison/src/agents/{router_engine,router_service,router_models}.py`:
   separate model ownership and readiness to migrate.
-- `apps/garrison/scripts/{check_triage_cases,triage_three_way}.py` and
+- `apps/garrison/scripts/{check_triage_cases,check_router_cases}.py` and
   `apps/garrison/docs/laya-triage-evaluation.md`: smoke checks, not an independent
   benchmark or calibrated accuracy claim.
 - `apps/armory/src/services/{ticket_laya,ticket_laya_transport}.py` and
@@ -405,3 +405,5 @@ Repository references (paths relative to Citadel):
   conventions, with self-contained implementation in Council.
 - `docker-compose.yml`, `docker-compose.zima.yml`, `apps/garrison/Dockerfile`,
   `tools/publish_live.py`, `docs/deployment.md`: CPU deployment and publication paths.
+
+Historical diagnostic references updated for Legion v2: the retired voter-comparison diagnostic is covered by decision-strategy tests and router contract cases.

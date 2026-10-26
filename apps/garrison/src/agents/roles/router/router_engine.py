@@ -1,18 +1,16 @@
 """Router's deterministic preparation and shared triage execution; no delegation."""
 from __future__ import annotations
 
-import json
 import time
-from dataclasses import replace
 
 from src.agents.roles.router.router_contract import DecisionOutcome, RouterPolicy, RouteRequest, RouteResponse, VoterUsage
-from src.providers.decision import decision
-from src.providers.decision.triage_flow import TriageFlow
+from src.providers.decision import questions as decision_questions, strategy
+from src.providers.decision.contract import DecisionRequest, DecisionError
 
 
 class RouterEngine:
-    def __init__(self, service=None):
-        self.service = service  # the LAYAModel that TriageFlow asks; None means the process-wide one
+    def __init__(self, gateways=None):
+        self.gateways = gateways
 
     def route(self, request: RouteRequest, policy: RouterPolicy, *, cancelled=lambda: False,
               clock=time.monotonic, on_usage=None) -> RouteResponse:
@@ -45,8 +43,8 @@ class RouterEngine:
         if request.explicit_tier:
             size = DecisionOutcome(reason="explicit_tier")
         elif request.choose_tier and policy.choose_tier:
-            questions["size"] = {"type": "choice", "instructions": decision.SIZE_QUESTION,
-                                 "criteria": decision.SIZE_CRITERIA}
+            questions["size"] = {"type": "choice", "instructions": decision_questions.SIZE_QUESTION,
+                                 "criteria": decision_questions.SIZE_CRITERIA}
 
         def response(trace=None):
             choice = agent.choice if not agent.uncertain else "none"
@@ -70,25 +68,16 @@ class RouterEngine:
 
         if not questions:
             return response()
-        if len(request.subject) > 16000:
-            return abstain("input_too_long")
-        base = decision.settings()
-        config = replace(base, triage_fallback=policy.fallback, triage_thresholds=policy.thresholds,
-                         triage_prune_ratio=policy.prune_ratio, triage_pair_ratio=policy.pair_ratio,
-                         triage_enabled={v: {kind: enabled for kind in decision.TRIAGE_TYPES}
-                                         for v, enabled in (("laya-english", policy.english and len(request.subject) <= 4000),
-                                                            ("laya-typed", policy.typed and len(request.subject) <= 4000),
-                                                            ("jev", policy.fallback))},
-                         triage_order=decision.DEFAULT_TRIAGE_ORDER, max_input_chars=16000,
-                         timeout_seconds=policy.remote_timeout_seconds)
         try:
             check()
-            if len(request.subject) > 4000 and not (policy.fallback and decision.available("triage", ("laya",))):
+            if len(request.subject) > 16000:
                 return abstain("input_too_long")
-            flow = TriageFlow(trace=True, service=self.service, settings_snapshot=config, check=check,
-                              on_usage=observed, partial_results=True)
-            answers = json.loads(flow.answer(json.dumps({"text": request.subject, "questions": questions})).response)["answers"]
+            result = strategy.run(
+                policy.strategy,
+                DecisionRequest(request.subject, questions, policy.min_confidence, local_only=False),
+                gateways=self.gateways, on_usage=observed, check=lambda: min(check(), policy.remote_timeout_seconds))
             check()
+            answers = result.answers
             outcomes = {}
             for key, answer in answers.items():
                 choices = questions[key]["criteria"]
@@ -97,11 +86,11 @@ class RouterEngine:
                     confidence=answer.get("answer_confidence", 0), uncertain=not settled,
                     answered_by=answer.get("answered_by", ""), reason="settled" if settled else "uncertain")
             agent, size = outcomes.get("agent", agent), outcomes.get("size", size)
-            trace = [{"question": qid, "rounds": a.get("rounds", [])} for qid, a in answers.items()] if policy.trace else None
+            trace = [{"question": qid, "answered_by": a.get("answered_by")} for qid, a in answers.items()] if policy.trace else None
             return response(trace)
         except InterruptedError:
             return abstain("cancelled")
         except TimeoutError:
             return abstain("timeout")
-        except (ValueError, RuntimeError, decision.ClassifierError):
+        except (ValueError, RuntimeError, DecisionError):
             return abstain("unavailable")

@@ -391,13 +391,12 @@ experimental review gate, **not a calibrated accuracy claim**. Run
 a triage question set, then evaluate representative local inputs before
 relying on the answers.
 
-To exercise the whole triage setup (both Laya models, the fallback, narrowing, the `rounds` trace) without the
-orchestrator, run `python -m scripts.check_triage_cases`: 47 cases that call the Triage Assistant's own
-code, with `--list`, `--case NAME` (or a pattern such as `"escalate-*"`), `--rounds`, `--baseline` (Laya alone, for comparison), `--prune-ratio R` and
-`--json` (full answers with their traces). It uses your `config_tuning.json` and `.env` and sends the
-cases' texts to the fallback backend when that is on.
-`--three-way` runs the flow over both checkpoints with `--threshold laya-typed:3+=0.6` to change one threshold; the exact flow is in `scripts/triage_three_way.py`;
-`--max-len` sets the Laya window (default 4096) and `--baseline` leaves Jev out.
+To exercise the decision provider without the orchestrator, run
+`python -m scripts.check_triage_cases`. Use `--list`, `--case NAME` (or a pattern
+such as `"escalate-*"`), `--rounds` (service-supplied call details), and `--json`
+(full answers). Use `--strategy both`, `--strategy jev-only`, or `--baseline`
+(Laya only) to compare gateway strategies. Live calls require a prepared deployment;
+Jev sends the cases' text to the cloud. Laya owns its internal decision rules.
 
 Usage reports the model's actual input-token work and zero generated output
 tokens. Laya is restricted to a specialist with the pinned checkpoint and

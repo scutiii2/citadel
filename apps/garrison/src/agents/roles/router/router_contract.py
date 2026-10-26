@@ -9,10 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 Tier = Literal["light", "standard", "heavy", "extreme"]
-DEFAULT_THRESHOLDS = {
-    "2": {"laya-english": .9, "laya-typed": .8, "jev": .9},
-    "3+": {"laya-english": .75, "laya-typed": .55, "jev": .9},
-}
 DEFAULT_SIZE_TIERS = {"tiny": "light", "everyday": "light", "large": "standard", "hardest": "heavy"}
 
 
@@ -23,12 +19,8 @@ class Message(BaseModel):
 class RouterPolicy(Message):
     choose_agent: bool = True
     choose_tier: bool = True
-    english: bool = True
-    typed: bool = True
-    fallback: bool = True
-    thresholds: dict[str, dict[str, float]] = Field(default_factory=lambda: {k: dict(v) for k, v in DEFAULT_THRESHOLDS.items()})
-    prune_ratio: float = Field(default=.25, ge=0, lt=1)
-    pair_ratio: float = Field(default=.5, gt=0, le=1)
+    strategy: Literal["laya-only", "jev-only", "both"] = "both"
+    min_confidence: float = Field(default=0.9, gt=0, le=1)
     deadline_seconds: float = Field(default=10, ge=1, le=30)
     remote_timeout_seconds: float = Field(default=3, gt=0, le=30)
     size_tiers: dict[str, Tier] = Field(default_factory=lambda: dict(DEFAULT_SIZE_TIERS))
@@ -36,17 +28,8 @@ class RouterPolicy(Message):
 
     @model_validator(mode="after")
     def valid_policy(self):
-        if not (self.english or self.typed or self.fallback):
-            raise ValueError("enable at least one local voter or fallback")
         if set(self.size_tiers) != set(DEFAULT_SIZE_TIERS):
             raise ValueError("size_tiers must name tiny, everyday, large and hardest")
-        if set(self.thresholds) != set(DEFAULT_THRESHOLDS):
-            raise ValueError("thresholds must contain 2 and 3+")
-        for row in self.thresholds.values():
-            if set(row) != {"laya-english", "laya-typed", "jev"}:
-                raise ValueError("thresholds must name all three voters")
-            if any(not 0 <= value <= 1 for value in row.values()):
-                raise ValueError("thresholds must be finite values from 0 to 1")
         return self
 
     def revision(self) -> str:
@@ -54,7 +37,7 @@ class RouterPolicy(Message):
 
     def summary(self) -> dict:
         return {"choose_agent": self.choose_agent, "choose_tier": self.choose_tier,
-                "english": self.english, "typed": self.typed, "fallback": self.fallback,
+                "strategy": self.strategy,
                 "deadline_seconds": self.deadline_seconds}
 
 

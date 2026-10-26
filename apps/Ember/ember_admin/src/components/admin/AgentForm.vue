@@ -316,7 +316,7 @@ function previewPrompt(): void {
         <small>Where ember and the other agents reach this agent. Leave empty to use this machine and the port above; set it for an agent behind another host or a proxy.</small>
       </label>
 
-      <fieldset>
+      <fieldset v-if="!isRouter">
         <legend>Model</legend>
         <div class="row">
           <label class="field grow"><span>Provider</span>

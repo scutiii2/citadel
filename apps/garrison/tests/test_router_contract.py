@@ -23,15 +23,17 @@ def test_policy_defaults():
     p = RouterPolicy()
     assert p.deadline_seconds == 10 and p.remote_timeout_seconds == 3
     assert p.size_tiers["hardest"] == "heavy"
-    assert p.thresholds["2"]["laya-typed"] == .8
+    assert p.strategy == "both" and p.min_confidence == .9
+    assert p.summary() == {"choose_agent": True, "choose_tier": True, "strategy": "both", "deadline_seconds": 10}
     assert RouterPolicy.model_validate(p.model_dump()) == p
 
 
 @pytest.mark.parametrize("value", [
     {"deadline_seconds": 0}, {"deadline_seconds": 31}, {"deadline_seconds": math.nan},
-    {"thresholds": {"2": {"jev": math.nan}}}, {"unknown": True},
+    {"min_confidence": math.nan}, {"min_confidence": 0}, {"strategy": "bogus"}, {"unknown": True},
+    {"english": True}, {"thresholds": {}},
     {"size_tiers": {"tiny": "imaginary"}},
-    {"english": False, "typed": False, "fallback": False},
+    {"min_confidence": 1.01},
 ])
 def test_policy_rejects_invalid_settings(value):
     with pytest.raises(ValueError):

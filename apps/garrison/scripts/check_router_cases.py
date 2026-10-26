@@ -12,7 +12,8 @@ import time
 
 from src.agents.roles.router.router_contract import RouterPolicy, RouteCandidate, RouteRequest, RouteTier
 from src.agents.roles.router.router_engine import RouterEngine
-from src.providers.decision import decision
+from src.providers.decision import strategy, questions
+from src.providers.decision.contract import DecisionError, GatewayResult
 
 CASES = [
     ("general", "What is a prime number?", "none", "tiny"),
@@ -26,27 +27,28 @@ CASES = [
 ]
 
 
-class FixtureService:
-    """Stands in for the Laya service: answers each question the way the case expects."""
+class FixtureGateway:
+    """Synthetic local gateway for contract checks, not model evaluation."""
+    id = "laya"
+    local = True
 
     def __init__(self, agent, size):
         self.expected = {"agent": agent, "size": size}
 
-    def validate(self, questions):
-        pass
+    def available(self):
+        return True
 
-    def ask(self, strategy, subject, questions, max_len, **tuning):
+    def ask(self, request, timeout=None):
         answers = {}
-        for qid, spec in questions.items():
+        for qid, spec in request.questions.items():
             choices = list(spec["criteria"])
             expected = self.expected[qid]
             chosen = expected if expected in choices else choices[0]
             confidence = .99 if expected is not None else .1
             answers[qid] = {"type": "choice", "choice": chosen, "answer_confidence": confidence,
-                "uncertain": confidence < .75, "answered_by": "laya-english",
+                "uncertain": confidence < request.min_confidence,
                 "probabilities": {c: .99 if c == chosen else .01/(len(choices)-1) for c in choices}}
-        return {"answers": answers, "uncertain": any(a["uncertain"] for a in answers.values()),
-                "calls": [{"model": "fixture", "input_tokens": 1, "duration_ms": 0, "ok": True}]}
+        return GatewayResult(answers, tokens=1, model="fixture")
 
 
 def evaluate(*, live=False):
@@ -60,8 +62,8 @@ def evaluate(*, live=False):
         if live:
             engine, policy = RouterEngine(), RouterPolicy()
         else:
-            engine = RouterEngine(FixtureService(expected_agent, expected_size))
-            policy = RouterPolicy(fallback=False, prune_ratio=0)
+            engine = RouterEngine(gateways={"laya": FixtureGateway(expected_agent, expected_size)})
+            policy = RouterPolicy(strategy="laya-only")
         started = time.monotonic()
         result = engine.route(request, policy)
         actual_agent = None if result.agent.uncertain else result.agent.choice
@@ -77,13 +79,12 @@ def evaluate(*, live=False):
                 # Match the Router input limits; this is a comparison, not the retired runtime path.
                 if len(subject) > 16000:
                     raise ValueError("input_too_long")
-                backend = decision._backend("jev")
                 choices = {c.id: c.focus for c in candidates} | {"none": "The general assistant should answer"}
-                agent = backend.ask_choice(subject, choices, "Which specialist fits?", 3)
-                size = backend.ask_choice(subject, decision.SIZE_CRITERIA, decision.SIZE_QUESTION, 3)
+                agent = strategy.ask_choice(subject, choices, "Which specialist fits?", strategy="jev-only", min_confidence=60, timeout=3)
+                size = strategy.ask_choice(subject, questions.SIZE_CRITERIA, questions.SIZE_QUESTION, strategy="jev-only", min_confidence=60, timeout=3)
                 direct = {"agent": agent.choice if agent.confidence >= 60 else None,
                           "size": size.choice if size.confidence >= 60 else None, "remote_calls": 2}
-            except (decision.ClassifierError, ValueError):
+            except (DecisionError, ValueError):
                 direct = {"agent": None, "size": None, "unavailable": True}
             row["direct_jev"] = {**direct, "elapsed_ms": round((time.monotonic()-direct_started)*1000)}
         rows.append(row)

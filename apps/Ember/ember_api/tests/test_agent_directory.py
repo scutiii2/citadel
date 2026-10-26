@@ -31,12 +31,12 @@ def test_router_metadata_is_sanitized_and_kept_for_disabled_definitions(tmp_path
     path = tmp_path / "agents.json"
     path.write_text('{"agents": []}')
     definitions = {"defined": [{"id": "router", "label": "Router", "enabled": False,
-        "role": "router", "decision": {"choose_agent": True, "fallback": True,
+        "role": "router", "decision": {"choose_agent": True, "choose_tier": False, "strategy": "both", "deadline_seconds": 8,
             "api_key": "not-public", "trace": ["private"]}, "llm": {"provider": "laya"}}]}
     path.with_name("agent_definitions.json").write_text(json.dumps(definitions))
     rows = asyncio.run(AgentDirectory(path).listing())
     assert rows[0].internal_role == "router" and rows[0].status == "disabled"
-    assert rows[0].decision == {"choose_agent": True, "fallback": True}
+    assert rows[0].decision == {"choose_agent": True, "choose_tier": False, "strategy": "both", "deadline_seconds": 8}
 
 
 def test_router_is_not_discovered_as_triage_assistant(tmp_path):
@@ -308,3 +308,11 @@ def test_the_url_source_lists_defined_agents_from_the_same_fetch() -> None:
 
     assert [(r.id, r.status) for r in rows] == [("main", "running"), ("down", "offline")]
     assert len(calls) == 1
+
+
+def test_router_summary_excludes_retired_policy_fields():
+    raw = {"choose_agent": True, "choose_tier": False, "strategy": "jev-only", "deadline_seconds": 9,
+           "english": True, "typed": False, "fallback": True, "thresholds": {}, "prune_ratio": .2,
+           "pair_ratio": .5, "min_confidence": .9}
+    assert agent_directory._decision_summary(raw) == {
+        "choose_agent": True, "choose_tier": False, "strategy": "jev-only", "deadline_seconds": 9}
