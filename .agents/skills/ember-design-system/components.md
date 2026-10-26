@@ -92,10 +92,6 @@ Flex row, `flex-wrap`, label and description left (`flex: 1 1 220px`), control r
 - Status alert (issues): same square, `--tone` is `--warning` or `--status-failed`, with a 16px count badge top-right.
 - `max-width: 767px`: the rail becomes a row, `width: 100%; height: var(--rail-height); border-top` instead of right border, active marker `inset 0 -2px 0 var(--accent)`, tooltips hidden, page icons scroll horizontally.
 
-## Tile (`IconTile.vue`)
-
-Centered column card, `--radius-lg`, `--surface`, soft shadow, lifts 2px on hover/focus. Above the label: a soft accent blob (`color-mix(in srgb, var(--accent) 16%, transparent)`) with outlined bubbles and a 40px stroked icon in `--accent`. Label 0.9em/500; optional `--mono` subtitle in `--muted`.
-
 ## Tables and code (info pages)
 
 `th`: weight 600, `--muted`; cells `8px 10px`, `border-bottom: 1px solid --border`; table 0.9em; wide tables scroll sideways inside `.table-wrap { overflow-x: auto }`. `pre`: `--bg` fill, `--radius-md`, `--mono` 0.85em, `max-height: 320px`, wraps with `overflow-wrap: anywhere`.

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { sharesClient, type ShareCreated, type ShareExpiry, type ShareInfo } from "../api/SharesClient";
 import { errorMessage, formatUtc } from "../../../utils/errors";
+import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 import CopyButton from "../../../components/ui/buttons/CopyButton.vue";
 
@@ -20,7 +21,6 @@ const EXPIRIES: { value: ShareExpiry; label: string }[] = [
   { value: null, label: "Never" },
 ];
 
-const dialog = ref<HTMLDialogElement | null>(null);
 const expiry = ref<ShareExpiry>(7);
 const links = ref<ShareInfo[]>([]);
 const loading = ref(false);
@@ -60,11 +60,8 @@ function reset(): void {
 
 watch(
   () => [props.open, props.chatId] as const,
-  async ([isOpen]) => {
+  ([isOpen]) => {
     reset();
-    await nextTick();
-    if (isOpen && !dialog.value?.open) dialog.value?.showModal();
-    else if (!isOpen && dialog.value?.open) dialog.value.close();
     if (isOpen) void loadLinks();
   },
 );
@@ -113,12 +110,7 @@ const hasLinks = computed(() => links.value.length > 0);
 </script>
 
 <template>
-  <dialog ref="dialog" class="share" aria-label="Share this chat" @close="emit('close')" @cancel.prevent="emit('close')">
-    <header>
-      <h3>Share this chat</h3>
-      <button type="button" class="close" aria-label="Close" @click="emit('close')">×</button>
-    </header>
-
+  <BaseModal :open="open" title="Share this chat" @close="emit('close')">
     <p class="intro">
       Anyone with the link can read a <strong>read-only copy</strong> of this chat as it is now, without logging in.
       Your questions and the answers are included; tool output, summaries and the text of attached files are not.
@@ -173,30 +165,10 @@ const hasLinks = computed(() => links.value.length > 0);
       @confirm="revoke(pendingRevoke)"
       @close="pendingRevoke = null"
     />
-  </dialog>
+  </BaseModal>
 </template>
 
 <style scoped>
-.share {
-  width: min(560px, calc(100vw - 32px));
-  max-height: calc(100vh - 64px);
-  padding: 18px 20px 20px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  color: var(--text);
-  background: var(--surface);
-}
-.share::backdrop {
-  background: rgb(0 0 0 / 45%);
-}
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-h3,
 h4 {
   margin: 0;
   font-size: 1em;
@@ -204,14 +176,6 @@ h4 {
 h4 {
   margin-top: 16px;
   font-size: 0.9em;
-  color: var(--muted);
-}
-.close {
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 1.4em;
-  line-height: 1;
   color: var(--muted);
 }
 .intro {

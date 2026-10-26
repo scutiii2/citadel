@@ -4,6 +4,7 @@ import { TEMPLATE_BODY_MAX, TEMPLATE_NAME_MAX, type PromptTemplate } from "../ap
 import { useTemplatesStore } from "../stores/templates";
 import { errorMessage } from "../../../utils/errors";
 import { preview } from "../utils/templates";
+import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 
 /** Create, edit and delete the account's saved prompts. Opened with
@@ -15,7 +16,6 @@ const emit = defineEmits<{ close: [] }>();
 
 const store = useTemplatesStore();
 
-const dialog = ref<HTMLDialogElement | null>(null);
 const nameInput = ref<HTMLInputElement | null>(null);
 
 // null: the list; otherwise the form, for a new template (id null) or an existing one.
@@ -60,16 +60,12 @@ function backToList(): void {
 watch(
   () => props.open,
   async (isOpen) => {
+    if (!isOpen) return;
     await nextTick();
-    if (isOpen && !dialog.value?.open) {
-      dialog.value?.showModal();
-      void store.ensureLoaded();
-      if (!editing.value) {
-        if (props.draft.trim()) startEdit(null, props.draft);
-        else backToList();
-      }
-    } else if (!isOpen && dialog.value?.open) {
-      dialog.value.close();
+    void store.ensureLoaded();
+    if (!editing.value) {
+      if (props.draft.trim()) startEdit(null, props.draft);
+      else backToList();
     }
   },
 );
@@ -104,19 +100,16 @@ async function remove(template: PromptTemplate): Promise<void> {
   }
 }
 
-// Esc steps back from the form to the list, then closes.
+const title = computed(() => (editing.value ? (editing.value.id === null ? "New prompt" : "Edit prompt") : "Saved prompts"));
+
+// Esc, the × and a click outside step back from the form to the list, then close.
 function onCancel(): void {
   requestDeparture(editing.value ? "back" : "close");
 }
 </script>
 
 <template>
-  <dialog ref="dialog" class="templates" aria-label="Saved prompts" @close="emit('close')" @cancel.prevent="onCancel">
-    <header>
-      <h3>{{ editing ? (editing.id === null ? "New prompt" : "Edit prompt") : "Saved prompts" }}</h3>
-      <button type="button" class="close" aria-label="Close" @click="requestDeparture('close')" :disabled="saving">×</button>
-    </header>
-
+  <BaseModal :open="open" :title="title" @close="onCancel">
     <form v-if="editing" class="form" @submit.prevent="save">
       <label>
         Name
@@ -168,42 +161,10 @@ function onCancel(): void {
       @confirm="remove(pendingDelete)"
       @close="pendingDelete = null"
     />
-  </dialog>
+  </BaseModal>
 </template>
 
 <style scoped>
-.templates {
-  width: min(560px, calc(100vw - 32px));
-  max-height: calc(100vh - 64px);
-  padding: 18px 20px 20px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  color: var(--text);
-  background: var(--surface);
-}
-.templates::backdrop {
-  background: rgb(0 0 0 / 45%);
-}
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-h3 {
-  margin: 0;
-  font-size: 1em;
-}
-.close {
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 1.4em;
-  line-height: 1;
-  color: var(--muted);
-}
 .list {
   margin: 0 0 12px;
   padding: 0;
