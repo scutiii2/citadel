@@ -22,6 +22,7 @@ class CalendarEvent:
     location: str
     description: str
     sources: tuple[str, ...] = ()
+    cancelled: bool = False
 
     @property
     def key(self) -> str:
@@ -38,12 +39,10 @@ def _utc(value: date | datetime, zone: ZoneInfo) -> datetime:
 
 
 def expand(ics: bytes | str, start: datetime, end: datetime, zone: ZoneInfo, source: str = "") -> list[CalendarEvent]:
-    """Events overlapping [start, end) (aware datetimes). Cancelled ones are dropped."""
+    """Events overlapping [start, end) (aware datetimes). Cancelled ones are kept, flagged."""
     calendar = icalendar.Calendar.from_ical(ics)
     events: list[CalendarEvent] = []
     for item in recurring_ical_events.of(calendar).between(start, end):
-        if str(item.get("STATUS", "")).upper() == "CANCELLED":
-            continue
         begin = item.start
         first = _utc(begin, zone)
         last = max(_utc(item.end, zone), first)
@@ -56,6 +55,7 @@ def expand(ics: bytes | str, start: datetime, end: datetime, zone: ZoneInfo, sou
             location=str(item.get("LOCATION", "") or "")[:MAX_TEXT],
             description=str(item.get("DESCRIPTION", "") or "")[:MAX_TEXT],
             sources=(source,) if source else (),
+            cancelled=str(item.get("STATUS", "")).upper() == "CANCELLED",
         ))
     return sorted(events, key=lambda e: (e.start, e.title))
 
