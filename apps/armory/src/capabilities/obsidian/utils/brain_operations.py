@@ -13,7 +13,7 @@ def text_search(scope: str, query: str, uid: str | None = None) -> SearchResult:
     for destination in scopes:
         try:
             snapshot = brain_resolver.resolve(destination, "search", uid)
-            result = domain.search(brain_resolver.gateway(snapshot), query)
+            result = domain.Vault(brain_resolver.gateway(snapshot)).search(query)
             batches.append([hit.model_copy(update={"scope": destination, "connection_label": snapshot["label"]})
                             for hit in result.hits[:limit]])
         except ObsidianGatewayError:
@@ -34,7 +34,7 @@ def search(scope: str, query: str, top_k: int = 5, uid: str | None = None) -> Se
         try:
             snapshot = brain_resolver.resolve(destination, "search", uid)
             with indexes.lease(snapshot, uid) as runtime:
-                result = domain.semantic_search(runtime, query, top_k)
+                result = domain.SemanticIndex(runtime).search(query, top_k)
                 refreshing |= result.refreshing
                 for rank, hit in enumerate(result.hits, 1):
                     hits.append(hit.model_copy(update={"scope": destination, "connection_label": snapshot["label"],

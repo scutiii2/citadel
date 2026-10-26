@@ -17,9 +17,9 @@ def calls(monkeypatch):
     def result(action):
         return lambda name: log.append((action, name)) or AppActionResult(name=name, action=action, status="x", message="m")
 
-    monkeypatch.setattr(tool.domain, "start_app", result("start"))
-    monkeypatch.setattr(tool.domain, "stop_app", result("stop"))
-    monkeypatch.setattr(tool.domain, "restart_app", result("restart"))
+    monkeypatch.setattr(tool.domain.host, "start_app", result("start"))
+    monkeypatch.setattr(tool.domain.host, "stop_app", result("stop"))
+    monkeypatch.setattr(tool.domain.host, "restart_app", result("restart"))
     monkeypatch.setattr(tool, "watch_app", lambda name: log.append(("watch", name)))
     monkeypatch.setattr(tool, "pause_watch", lambda name, action: (log.append(("pause", name)), action())[1])
     return log
@@ -47,7 +47,7 @@ def test_a_failed_start_starts_no_watcher(calls, monkeypatch):
     def failing(name):
         raise KeyError("no such app")
 
-    monkeypatch.setattr(tool.domain, "start_app", failing)
+    monkeypatch.setattr(tool.domain.host, "start_app", failing)
 
     with pytest.raises(KeyError):
         asyncio.run(tool.tool_srv_startApp("ghost"))

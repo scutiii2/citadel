@@ -44,7 +44,7 @@ def _client_with_logs(output: bytes):
 def test_read_returns_masked_text():
     client, container = _client_with_logs(b"a ok\nb password=x1\n")
     with patch("docker.from_env", return_value=client):
-        result = domain.read_app_logs("web", 50)
+        result = domain.host.read_app_logs("web", 50)
     container.logs.assert_called_once_with(tail=50, timestamps=True)
     assert result.lines == 2 and result.redactions == 1 and "x1" not in result.text
 
@@ -52,7 +52,7 @@ def test_read_returns_masked_text():
 def test_contains_filters_and_searches_the_wide_tail():
     client, container = _client_with_logs(b"ok 1\nERROR a\nok 2\nerror b\n")
     with patch("docker.from_env", return_value=client):
-        result = domain.read_app_logs("web", 1, contains="Error")
+        result = domain.host.read_app_logs("web", 1, contains="Error")
     assert container.logs.call_args.kwargs["tail"] == domain.MAX_LOG_LINES
     assert result.text.endswith("error b") and result.lines == 1
 
@@ -60,14 +60,14 @@ def test_contains_filters_and_searches_the_wide_tail():
 def test_empty_log_is_reported():
     client, _ = _client_with_logs(b"")
     with patch("docker.from_env", return_value=client):
-        assert domain.read_app_logs("web").lines == 0
+        assert domain.host.read_app_logs("web").lines == 0
 
 
 def test_text_is_capped_at_a_line_start():
     client, _ = _client_with_logs(("x" * 99 + "\n") * 300)
     client.containers.get.return_value.logs.return_value = ("x" * 99 + "\n").encode() * 300
     with patch("docker.from_env", return_value=client):
-        result = domain.read_app_logs("web", 300)
+        result = domain.host.read_app_logs("web", 300)
     assert result.truncated and len(result.text) <= domain.MAX_READ_CHARS
     assert set(result.text.split("\n")) == {"x" * 99}
 
@@ -75,4 +75,4 @@ def test_text_is_capped_at_a_line_start():
 @pytest.mark.parametrize("lines", [0, 301])
 def test_line_count_is_bounded(lines):
     with pytest.raises(ValueError, match="between 1 and 300"):
-        domain.read_app_logs("web", lines)
+        domain.host.read_app_logs("web", lines)

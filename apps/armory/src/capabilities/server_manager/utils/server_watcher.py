@@ -29,13 +29,13 @@ def _utcnow() -> datetime:
 def _list_apps():
     from src.capabilities.server_manager import domain  # late: domain imports this module
 
-    return domain.list_apps()
+    return domain.host.list_apps()
 
 
 def _read_logs(name: str, lines: int, contains: str | None = None):
     from src.capabilities.server_manager import domain
 
-    return domain.read_app_logs(name, lines, contains)
+    return domain.host.read_app_logs(name, lines, contains)
 
 
 def _line_time(line: str) -> datetime | None:
