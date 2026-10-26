@@ -2,7 +2,8 @@
 import ActionButton from "../../../components/ui/buttons/ActionButton.vue"
 import { useAuthStore } from '../../../stores/auth'
 import type { FileInfo } from '../api/MediaDownloaderTypes'
-import { formatBytes, formatDuration, formatExpiry } from '../utils/format'
+import { formatBytes } from '../../../utils/format'
+import { formatDuration, formatExpiry } from '../utils/format'
 
 defineProps<{ file: FileInfo; now: number; busy?: boolean }>()
 defineEmits<{ details: [] }>()

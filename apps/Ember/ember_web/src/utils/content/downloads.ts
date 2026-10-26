@@ -1,3 +1,5 @@
+import { formatBytes } from "../format";
+
 /** `[[DOWNLOAD ...]]` markers: how a tool offers a file for download (chat_app's
  * format). A reply or a command result carries them as text; the page turns
  * them into download cards. */
@@ -49,11 +51,9 @@ export function hideDownloadMarkers(text: string): string {
   return "[[DOWNLOAD".startsWith(tail) || tail.startsWith("[[DOWNLOAD") ? complete.slice(0, open).trimEnd() : complete;
 }
 
-/** "3 KB", "1.5 MB"; empty when the size is not known. */
+/** "3 KB", "1.5 MB"; empty when the size is not known. A file under 1 KB reads "1 KB". */
 export function formatFileSize(bytes: number): string {
-  if (!bytes) return "";
-  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return bytes ? formatBytes(Math.max(bytes, 1024)) : "";
 }
 
 const WHOLE_MARKER = new RegExp(`^${MARKER.source}$`);

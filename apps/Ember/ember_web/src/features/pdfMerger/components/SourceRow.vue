@@ -5,7 +5,7 @@ import CopyButton from '../../../components/ui/buttons/CopyButton.vue'
 import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
 import { ref, watch } from 'vue'
 import type { Fit } from '../api/pdfMergerTypes'
-import { formatBytes, plural } from '../lib/format'
+import { formatBytes, plural } from '../../../utils/format'
 import type { SourceState } from '../stores/files'
 
 const props = defineProps<{ source: SourceState; canMoveUp?: boolean; canMoveDown?: boolean }>()

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Every output page in order. Dragging a page switches the plan to manual order.
 import { computed, ref } from 'vue'
-import { plural } from '../lib/format'
+import { plural } from '../../../utils/format'
 import { useFilesStore } from '../stores/files'
 import { usePlanStore } from '../stores/plan'
 import PageThumb from './PageThumb.vue'

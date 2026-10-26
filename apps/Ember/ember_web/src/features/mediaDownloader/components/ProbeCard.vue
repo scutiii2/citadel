@@ -4,7 +4,8 @@ import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
 import CopyButton from '../../../components/ui/buttons/CopyButton.vue'
 import SegmentedControl from '../../../components/ui/forms/SegmentedControl.vue'
 import type { ProbeResult } from '../api/MediaDownloaderTypes'
-import { formatBytes, formatDuration } from '../utils/format'
+import { formatBytes } from '../../../utils/format'
+import { formatDuration } from '../utils/format'
 
 const props = defineProps<{ result: ProbeResult; selected: string | null; busy?: boolean }>()
 const emit = defineEmits<{ select: [id: string]; download: [] }>()
