@@ -6,6 +6,9 @@ registry entries for our own agents are cleared at start."""
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
+
+import pytest
 import sys
 
 from src import supervisor
@@ -271,3 +274,71 @@ def test_changing_a_shared_file_restarts_every_agent(tmp_path):
         await asyncio.wait_for(task, timeout=15)
 
     asyncio.run(scenario())
+
+
+# Startup validates Laya's configured service strategy before spawning agents.
+
+
+def test_unknown_laya_strategy_stops_the_start(monkeypatch):
+    from src.providers.decision import laya_model
+
+    class Service:
+        configured = True
+        def strategies(self):
+            return {"strategies": ["english-only", "english-then-typed"], "default": "auto"}
+
+    monkeypatch.setattr(laya_model, "agent", lambda: Service())
+    monkeypatch.setattr(supervisor.llm_config, "load_gateways", lambda: {"decision": {"laya": {"strategy": "nope"}}})
+    with pytest.raises(SystemExit, match="nope.*not offered.*english-only"):
+        supervisor.check_laya_strategy(uses_laya=True)
+
+
+def test_unreachable_service_only_warns(monkeypatch, caplog):
+    from src.providers.decision import laya_model
+
+    class Down:
+        configured = True
+        def strategies(self):
+            raise laya_model.LayaServiceError("down")
+
+    monkeypatch.setattr(laya_model, "agent", lambda: Down())
+    supervisor.check_laya_strategy(uses_laya=True)
+    assert "down" in caplog.text
+
+
+def test_offered_laya_strategy_allows_start(monkeypatch):
+    from src.providers.decision import laya_model
+
+    service = SimpleNamespace(configured=True, strategies=lambda: {"strategies": ["english-then-typed"]})
+    monkeypatch.setattr(laya_model, "agent", lambda: service)
+    monkeypatch.setattr(supervisor.llm_config, "load_gateways", lambda: {})
+    supervisor.check_laya_strategy(uses_laya=True)
+
+
+def test_no_laya_user_does_not_contact_service(monkeypatch):
+    from src.providers.decision import laya_model
+
+    def unexpected():
+        raise AssertionError("Laya should not be contacted")
+    monkeypatch.setattr(laya_model, "agent", unexpected)
+    supervisor.check_laya_strategy(uses_laya=False)
+
+
+@pytest.mark.parametrize(("provider", "strategy", "enabled", "expected"), [
+    ("decision", "both", True, True), ("decision", "laya-only", True, True),
+    ("decision", "jev-only", True, False), ("decision", "both", False, False),
+    ("anthropic", None, True, False),
+])
+def test_start_checks_only_enabled_agents_that_use_laya(monkeypatch, provider, strategy, enabled, expected):
+    spec = SimpleNamespace(enabled=enabled, llm=SimpleNamespace(provider=provider, strategy=strategy))
+    seen = []
+    class Runner:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def run(self):
+            seen.append("start")
+    monkeypatch.setattr(supervisor.agent_spec, "load_dir", lambda *args: [spec])
+    monkeypatch.setattr(supervisor, "check_laya_strategy", lambda uses_laya: seen.append(uses_laya))
+    monkeypatch.setattr(supervisor, "Supervisor", Runner)
+    supervisor.main()
+    assert seen == [expected, "start"]

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import os
 import sys
 import time
@@ -30,6 +31,8 @@ from typing import Awaitable, Callable, Sequence
 
 from src.agents import agent_registry, agent_spec, prompt_config
 from src.agents.agent_spec import AgentSpec
+from src.providers import llm_config
+from src.providers.decision import laya_model
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MAX_CRASHES = 5
@@ -338,12 +341,30 @@ class Supervisor:
             await asyncio.to_thread(self._deregister, child.spec.id)
 
 
+def check_laya_strategy(uses_laya: bool) -> None:
+    if not uses_laya:
+        return
+    service = laya_model.agent()
+    if not service.configured:
+        return
+    wanted = str(llm_config.load_gateways().get("decision", {}).get("laya", {}).get("strategy") or "english-then-typed")
+    try:
+        offered = service.strategies()["strategies"]
+    except laya_model.LayaServiceError as error:
+        logging.getLogger(__name__).warning("Laya strategy %r not checked: %s", wanted, error)
+        return
+    if wanted not in offered:
+        raise SystemExit(f"gateways/decision/laya.json: strategy {wanted!r} is not offered by the Laya service (offered: {', '.join(offered)})")
+
+
 def main() -> None:
     try:
         specs = agent_spec.load_dir(agent_spec.AGENTS_DIR)
     except agent_spec.AgentSpecError as error:
         sys.stderr.write(f"\nai_agent cannot start - agent file error:\n  {error}\n\n")
         sys.exit(1)
+    check_laya_strategy(uses_laya=any(
+        spec.enabled and spec.llm.provider == "decision" and spec.llm.strategy != "jev-only" for spec in specs))
     try:
         asyncio.run(Supervisor(specs, watch_dir=agent_spec.AGENTS_DIR, restart_on=[prompt_config.PATH]).run())
     except KeyboardInterrupt:
