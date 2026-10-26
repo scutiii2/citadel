@@ -8,7 +8,7 @@ from __future__ import annotations
 from src.llm.decision import TRIAGE_COUNTS, TRIAGE_VOTERS
 from dataclasses import replace
 
-from src.llm import decision, laya_agent, laya_provider
+from src.llm import decision, laya_model, laya_provider
 from src.llm.triage_flow import (
     CHECKPOINTS, DEFAULT_THRESHOLDS, ENGLISH, JEV, TYPED, TriageFlow,
 )
@@ -44,5 +44,5 @@ class ThreeWayTriage(TriageFlow):
 
     def prepare(self) -> None:
         laya_provider.prepare()
-        if not laya_agent.agent().health():
+        if not laya_model.agent().health():
             raise SystemExit("The Laya service does not answer: start it and set LAYA_SERVICE_URL")

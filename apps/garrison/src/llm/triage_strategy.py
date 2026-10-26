@@ -8,8 +8,8 @@ from __future__ import annotations
 from typing import Any
 
 from src.core import tuning_overrides
-from src.llm import laya_agent
-from src.llm.laya_agent import LayaServiceError
+from src.llm import laya_model
+from src.llm.laya_model import LayaServiceError
 
 
 class StrategyError(Exception):
@@ -22,7 +22,7 @@ class StrategyError(Exception):
 
 def describe(service: Any = None) -> dict[str, Any]:
     """`default` (None when unset) and the service's `strategies` (empty while the service cannot be reached)."""
-    service = service or laya_agent.agent()
+    service = service or laya_model.agent()
     try:
         names = service.strategies()["strategies"]
     except LayaServiceError:
@@ -32,7 +32,7 @@ def describe(service: Any = None) -> dict[str, Any]:
 
 def update(value: str | None, service: Any = None) -> dict[str, Any]:
     """Sets the default, or clears it with None, and returns `describe()`."""
-    service = service or laya_agent.agent()
+    service = service or laya_model.agent()
     if value is not None:
         try:
             names = service.strategies()["strategies"]

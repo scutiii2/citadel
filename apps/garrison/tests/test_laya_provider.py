@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from src.llm import laya_agent, laya_provider, triage_flow
+from src.llm import laya_model, laya_provider, triage_flow
 from src.llm.base_provider import ChatCancelled
 from tests.fake_laya import FakeService, choice, result
 
@@ -35,8 +35,8 @@ def answers():
 @pytest.fixture
 def service(monkeypatch):
     fake = FakeService(answers())
-    monkeypatch.setattr(laya_agent, "agent", lambda: fake)
-    monkeypatch.setattr(triage_flow.laya_agent, "agent", lambda: fake)
+    monkeypatch.setattr(laya_model, "agent", lambda: fake)
+    monkeypatch.setattr(triage_flow.laya_model, "agent", lambda: fake)
     return fake
 
 
@@ -116,7 +116,7 @@ def test_invalid_requests_are_rejected_before_the_service_is_asked(service, requ
 
 def test_the_question_rules_are_the_services_not_garrisons(monkeypatch):
     service = FakeService(answers(), invalid="question 'category' (choice) criteria must be an object of 2 to 10 option: description strings")
-    monkeypatch.setattr(triage_flow.laya_agent, "agent", lambda: service)
+    monkeypatch.setattr(triage_flow.laya_model, "agent", lambda: service)
     with pytest.raises(ValueError, match="Invalid Laya request: question 'category' .* criteria must be"):
         ask(request_with(questions={"q": question(type="multi")}))
     assert not service.asked
@@ -125,10 +125,10 @@ def test_the_question_rules_are_the_services_not_garrisons(monkeypatch):
 def test_questions_are_still_tried_when_the_service_cannot_be_reached_to_validate_them(monkeypatch):
     class Down(FakeService):
         def validate(self, questions):
-            raise laya_agent.LayaServiceError("The Laya service could not be reached: down")
+            raise laya_model.LayaServiceError("The Laya service could not be reached: down")
 
     service = Down(answers())
-    monkeypatch.setattr(triage_flow.laya_agent, "agent", lambda: service)
+    monkeypatch.setattr(triage_flow.laya_model, "agent", lambda: service)
     assert payload(ask())["answers"]["category"]["choice"] == "database"
 
 

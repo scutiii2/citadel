@@ -191,7 +191,7 @@ def test_one_tag_that_is_still_too_long_is_skipped_not_fatal(
     assert client.post(URL, json={"title": "x"}).json() == {"suggested": [], "checked": 0, "skipped": 1}
 
 
-def test_laya_agent_not_running_is_503(client: TestClient, tmp_path: Path) -> None:
+def test_laya_model_not_running_is_503(client: TestClient, tmp_path: Path) -> None:
     as_admin(client)
     tag_notes(client, ["work"])
 
@@ -201,7 +201,7 @@ def test_laya_agent_not_running_is_503(client: TestClient, tmp_path: Path) -> No
     assert "Laya agent is not running" in response.json()["detail"]
 
 
-def test_a_defined_but_stopped_laya_agent_is_not_running(client: TestClient, tmp_path: Path) -> None:
+def test_a_defined_but_stopped_laya_model_is_not_running(client: TestClient, tmp_path: Path) -> None:
     as_admin(client)
     tag_notes(client, ["work"])
     run_laya(tmp_path)

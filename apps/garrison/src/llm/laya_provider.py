@@ -2,7 +2,7 @@
 text. No generated text and no tool calls.
 
 `answer` hands every request to llm/triage_flow.py: the Laya service answers with a decision strategy
-(llm/laya_agent.py), then the fallback classifier (config_tuning.json's `classifier.triage_fallback`
+(llm/laya_model.py), then the fallback classifier (config_tuning.json's `classifier.triage_fallback`
 and a backend of the triage chain in llm/decision.py) is asked about what the Laya models could not settle.
 A `local_only` request never reaches the fallback. Without the fallback, nothing leaves the machine."""
 
@@ -16,7 +16,7 @@ from typing import Any
 
 import anyio.to_thread
 
-from src.llm import cancellation, decision, laya_agent
+from src.llm import cancellation, decision, laya_model
 from src.llm.base_provider import ChatCancelled, ChatResult, step_event
 
 PROVIDER_ID = "laya"
@@ -186,14 +186,14 @@ def has_api_key() -> bool:
 
 
 def is_available() -> bool:
-    return laya_agent.configured()
+    return laya_model.configured()
 
 
 def prepare() -> None:
     """Warn at start-up when the Laya service is not answering; requests then fail until it does."""
-    if not laya_agent.configured():
+    if not laya_model.configured():
         _log.warning("LAYA_SERVICE_URL is not set: no Laya model is available")
-    elif not laya_agent.agent().health():
+    elif not laya_model.agent().health():
         _log.warning("The Laya service does not answer yet; Laya questions fail until it does")
 
 

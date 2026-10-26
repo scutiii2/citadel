@@ -12,14 +12,14 @@ from src.agents.router_contract import DecisionOutcome, RouteRequest, RouteRespo
 from src.agents.router_engine import RouterEngine
 from src.core import internal_auth, usage_log
 from src.llm import cancellation
-from src.llm import decision, laya_agent
+from src.llm import decision, laya_model
 
 _engine = RouterEngine()
 
 
 def status_summary() -> dict:
     policy = agent_spec.current().decision
-    local_status = "loaded" if laya_agent.configured() and laya_agent.agent().health() else "unavailable"
+    local_status = "loaded" if laya_model.configured() and laya_model.agent().health() else "unavailable"
     return {**policy.summary(), "local_status": local_status,
             "fallback_available": bool(policy.fallback and decision.available("triage", ("laya",)))}
 

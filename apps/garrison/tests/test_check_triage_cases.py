@@ -196,7 +196,7 @@ def test_rounds_flag_prints_the_tables_after_the_summary_table(monkeypatch, caps
 
 # --- the wider case set -----------------------------------------------------------------------------
 
-# The Laya service's limits (LayaAgent/src/laya_service/answers.py); the cases should reach them.
+# The Laya service's limits (LayaModel/src/laya_service/answers.py); the cases should reach them.
 LAYA_MAX_OPTIONS = 10
 LAYA_MAX_QUESTIONS = 8
 

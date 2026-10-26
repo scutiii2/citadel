@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from typing import Mapping
 
-from src.llm import laya_agent, laya_provider
+from src.llm import laya_model, laya_provider
 from src.llm.decision import Choice, ClassifierError
 
 ID = "laya"
@@ -27,7 +27,7 @@ def ask_choice(subject: str, criteria: Mapping[str, str], question: str, timeout
     raw = json.dumps({"text": subject, "questions": {_QUESTION_ID: {"type": "choice", "instructions": question, "criteria": dict(criteria)}}})
     try:
         request = laya_provider.parse_request(raw)
-        result = laya_agent.agent().ask("english-only", request.text, request.questions, laya_provider.CONTEXT_WINDOW)
+        result = laya_model.agent().ask("english-only", request.text, request.questions, laya_provider.CONTEXT_WINDOW)
     except (ValueError, RuntimeError) as error:  # too long, too many options, service down, bad result
         raise ClassifierError(f"Laya could not answer: {error}") from error
     answer = result["answers"][_QUESTION_ID]
