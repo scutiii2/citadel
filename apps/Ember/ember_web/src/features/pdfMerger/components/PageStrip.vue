@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Every output page in order. Dragging a page switches the plan to manual order.
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
+import { useReorder } from '../../../composables/useReorder'
 import { plural } from '../../../utils/format'
 import { useFilesStore } from '../stores/files'
 import { usePlanStore } from '../stores/plan'
@@ -8,7 +9,11 @@ import PageThumb from './PageThumb.vue'
 
 const files = useFilesStore()
 const plan = usePlanStore()
-const dragFrom = ref<number | null>(null)
+const { dragFrom, onDragStart, onDragEnd, onDragOver, onDrop, onKey } = useReorder({
+  move: (from, to) => plan.movePage(from, to),
+  count: () => plan.pages.length,
+  keys: { back: 'ArrowLeft', forward: 'ArrowRight' },
+})
 const infoById = computed(() => new Map(files.sources.map((s) => [s.info.file_id, s.info])))
 
 function label(fileId: string, page: number): string {
@@ -18,30 +23,6 @@ function label(fileId: string, page: number): string {
   return info.kind === 'image' ? name : `${name} p${page + 1}`
 }
 
-function onDragStart(index: number, event: DragEvent): void {
-  dragFrom.value = index
-  if (event.dataTransfer) {
-    event.dataTransfer.setData('text/plain', String(index))
-    event.dataTransfer.effectAllowed = 'move'
-  }
-}
-
-function onDragOver(event: DragEvent): void {
-  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
-}
-
-function onKey(index: number, event: KeyboardEvent): void {
-  if (event.target !== event.currentTarget) return // typed inside a child, e.g. the range input
-  if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return
-  event.preventDefault()
-  const to = event.key === 'ArrowLeft' ? index - 1 : index + 1
-  if (to >= 0 && to < plan.pages.length) plan.movePage(index, to)
-}
-
-function onDrop(index: number): void {
-  if (dragFrom.value !== null) plan.movePage(dragFrom.value, index)
-  dragFrom.value = null
-}
 </script>
 
 <template>
@@ -59,7 +40,7 @@ function onDrop(index: number): void {
         tabindex="0"
         :class="{ dragging: dragFrom === index }"
         @dragstart="onDragStart(index, $event)"
-        @dragend="dragFrom = null"
+        @dragend="onDragEnd"
         @keydown="onKey(index, $event)"
         @dragover.prevent="onDragOver"
         @drop.prevent="onDrop(index)"
