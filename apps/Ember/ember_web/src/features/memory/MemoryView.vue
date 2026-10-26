@@ -7,6 +7,8 @@ import { MEMORY_MAX, MEMORY_TEXT_MAX, memoryClient, type MemoryNote } from "./ap
 import ListRow from "../../components/ui/lists/ListRow.vue";
 import SearchField from "../../components/ui/lists/SearchField.vue";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
+import DangerZone from "../../components/ui/status/DangerZone.vue";
+import CharacterCount from "../../components/ui/status/CharacterCount.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import "../../components/layout/infoPage.css";
 import { errorMessage } from "../../utils/errors";
@@ -174,12 +176,12 @@ async function remove(): Promise<void> {
             <div class="writing">
               <label class="body-field" for="memory-text"><span class="memory-label">{{ editing ? 'Memory' : 'New memory' }}</span></label>
               <textarea id="memory-text" v-model="text" aria-label="Memory" :maxlength="MEMORY_TEXT_MAX" :disabled="saving || removing" placeholder="One useful fact for Ember to remember…" autofocus />
-              <p class="character-count">{{ text.length }}/{{ MEMORY_TEXT_MAX }} characters</p>
+              <CharacterCount class="memory-count" :length="text.length" :max="MEMORY_TEXT_MAX" suffix=" characters" />
               <p v-if="editing" class="memory-created">Created <time :datetime="editing.created_at">{{ new Date(editing.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) }}</time></p>
               <p v-else class="memory-created">Not saved yet</p>
               <p class="writing-hint">Keep it short and specific. Edit this context when it no longer fits.</p>
             </div>
-            <details v-if="editing" :key="editing.id" class="manage-memory"><summary>Manage memory <span aria-hidden="true">›</span></summary><div class="danger-zone"><b>Danger zone</b><button type="button" class="danger" :aria-label="'Delete memory ' + editing.id" :disabled="saving || removing" @click="askDelete(editing)">Delete memory</button></div></details>
+            <details v-if="editing" :key="editing.id" class="manage-memory"><summary>Manage memory <span aria-hidden="true">›</span></summary><DangerZone class="memory-danger"><template #label><b>Danger zone</b></template><button type="button" class="danger" :aria-label="'Delete memory ' + editing.id" :disabled="saving || removing" @click="askDelete(editing)">Delete memory</button></DangerZone></details>
             <p v-if="formError" class="error form-error" role="alert">{{ formError }}</p>
         </template>
         <template #placeholder><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4c-5-5-10 2-6 5-6 2-2 9 2 7-1 6 4 6 4 2V4zm0 0c5-5 10 2 6 5 6 2 2 9-2 7 1 6-4 6-4 2" /></svg><h3>Keep the useful context</h3><p>Pick a memory, or add a new one.</p><button type="button" class="chip" :disabled="memories.length >= MEMORY_MAX" @click="openEditor()">Create a memory</button></template>
@@ -208,9 +210,10 @@ async function remove(): Promise<void> {
 .writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; min-height: 310px; padding: 30px 36px 20px; }
 .memory-label { font-size: 1.35em; font-weight: 600; letter-spacing: -.015em; }
 .writing textarea { flex: 1; width: 100%; min-width: 0; min-height: 200px; padding: 0; border: 0; border-radius: 0; color: var(--text); background: transparent; font: inherit; line-height: 1.9; resize: vertical; }
-.character-count { align-self: flex-end; font-size: .75em; color: var(--muted); margin: 0; }
 .memory-created { font-size: .75em; color: var(--muted); margin: 0; }
 .writing-hint { font-size: .8em; color: var(--muted); margin: 0; max-width: 450px; }
+.memory-danger { margin-bottom: 16px; }
+.memory-count { align-self: flex-end; }
 .manage-memory { border-top: 1px solid var(--border); padding: 0 28px; flex-shrink: 0; }
 summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 0; font-size: .85em; cursor: pointer; list-style: none; }
 summary::-webkit-details-marker { display: none; }

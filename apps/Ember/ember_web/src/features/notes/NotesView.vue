@@ -18,6 +18,7 @@ import {
 import { ApiError } from "../../api/http";
 import ListRow from "../../components/ui/lists/ListRow.vue";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
+import DangerZone from "../../components/ui/status/DangerZone.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import "../../components/layout/infoPage.css";
 import TagInput from "../../components/ui/forms/TagInput.vue";
@@ -481,10 +482,7 @@ function preview(note: Note): string {
           </details>
           <details v-if="selected !== NEW" class="manage-tools">
             <summary>Manage note <span aria-hidden="true">›</span></summary>
-            <div class="danger-zone">
-              <b>Danger zone</b>
-              <button type="button" class="danger" :disabled="saving || removing" @click="confirmDelete = true">Delete this note</button>
-            </div>
+            <DangerZone class="note-danger"><template #label><b>Danger zone</b></template><button type="button" class="danger" :disabled="saving || removing" @click="confirmDelete = true">Delete this note</button></DangerZone>
           </details>
           </div>
           <p v-if="formError" class="error form-error" role="alert">{{ formError }}</p>
@@ -557,6 +555,7 @@ function preview(note: Note): string {
 .privacy { display: inline-flex; gap: 7px; align-items: center; font-size: .8em; color: var(--muted); }
 .privacy svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .privacy svg { width: 15px; height: 15px; }
+.note-danger { margin-bottom: 16px; }
 .writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; min-height: 310px; padding: 30px 36px 20px; }
 .title-field, .body-field { display: flex; flex-direction: column; min-width: 0; }
 .notes .editor .title-field input { width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 1.65em; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; }

@@ -13,7 +13,7 @@
 .muted, :deep(.muted) { color: var(--muted); }
 .small, :deep(.small) { font-size: .8em; }
 :deep(.error) { color: var(--danger); overflow-wrap: anywhere; }
-.retention { font-size: .75em; margin: 20px 0 0; }
+.retention { margin: 20px 0 0; }
 .add-files { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit; font-size: .85em; padding: 8px 14px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-full); cursor: pointer; }
 .add-files svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .empty-pages { max-width: 340px; margin: 80px auto; text-align: center; }

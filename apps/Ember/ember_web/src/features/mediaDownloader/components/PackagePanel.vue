@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DangerZone from "../../../components/ui/status/DangerZone.vue";
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
@@ -92,10 +93,9 @@ async function confirmAction() {
         <p v-if="group.state === 'done' && group.items.some(item => item.state === 'error')" class="muted">ZIP ready with the successful files. Failed links are shown above.</p>
         <DownloadCards v-if="group.status?.file" :downloads="[{ filename: group.status.file.name, bytes: group.status.file.size, href: group.status.file.download_url, label: 'ZIP' }]" />
       </div>
-      <div class="danger-zone">
-        <span>{{ store.removable(group.package_id) ? 'Remove this group and its media list.' : 'Wait for the download to finish before removing this package.' }}</span>
+      <DangerZone class="package-danger" :label="store.removable(group.package_id) ? 'Remove this group and its media list.' : 'Wait for the download to finish before removing this package.'">
         <ActionButton icon="clear" class="danger" :disabled="store.busy || !store.removable(group.package_id)" @click="confirm = { kind: 'delete-package', id: group.package_id, name: group.name }">Remove package</ActionButton>
-      </div>
+      </DangerZone>
     </article>
     <Teleport to="body"><ConfirmModal v-if="confirm" :open="true" :title="confirmTitle" :message="confirmMessage" :confirm-label="confirmLabel" :danger="confirm.kind !== 'start'" :busy="store.busy" @confirm="confirmAction" @close="!store.busy && (confirm = null)" /></Teleport>
   </section>
@@ -120,7 +120,7 @@ small { display: block; }
 .muted, .state { color: var(--muted); font-size: .85em; }
 .error { color: var(--danger); white-space: pre-line; overflow-wrap: anywhere; }
 .result { display: flex; flex-direction: column; gap: 10px; }
-.danger-zone { margin-top: 14px; }
+.package-danger { margin-top: 14px; }
 .packages :deep(button.action) { border-radius: var(--radius-full); }
 .packages :deep(button.action .label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
 .packages { padding: 0; border: 0; border-radius: 0; background: transparent; }

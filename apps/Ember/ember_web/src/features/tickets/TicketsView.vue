@@ -8,6 +8,7 @@ import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
 import ListRow from "../../components/ui/lists/ListRow.vue";
 import SearchField from "../../components/ui/lists/SearchField.vue";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
+import CharacterCount from "../../components/ui/status/CharacterCount.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import "../../components/layout/infoPage.css";
@@ -370,11 +371,11 @@ async function reopenTicket(): Promise<void> {
     <BaseModal class="new-ticket-modal" :open="newOpen" title="New ticket" @close="newOpen = false">
       <form class="form" @submit.prevent="submit">
         <SegmentedControl v-model="draft.type" :options="TYPE_OPTIONS.map(option => ({ ...option, disabled: saving }))" label="Type" aria-label="Ticket type" />
-        <label>Title<input v-model="draft.title" type="text" maxlength="120" aria-label="Title" aria-describedby="ticket-title-count" :disabled="saving" /><span id="ticket-title-count" class="character-count">{{ draft.title.length }}/120</span></label>
+        <label>Title<input v-model="draft.title" type="text" maxlength="120" aria-label="Title" aria-describedby="ticket-title-count" :disabled="saving" /><CharacterCount id="ticket-title-count" class="ticket-count" :length="draft.title.length" :max="120" /></label>
         <label>
           Description
           <textarea v-model="draft.description" rows="6" maxlength="4000" aria-label="Description" aria-describedby="ticket-description-count" :disabled="saving" />
-          <span id="ticket-description-count" class="character-count">{{ draft.description.length }}/4000</span>
+          <CharacterCount id="ticket-description-count" class="ticket-count" :length="draft.description.length" :max="4000" />
         </label>
         <p v-if="formError" class="form-error error" role="alert">{{ formError }}</p>
         <div class="actions">
@@ -439,7 +440,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .form { display: flex; flex-direction: column; gap: 10px; }
 .form label { display: flex; flex-direction: column; gap: 5px; font-size: .9em; }
 .form textarea, .form input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; resize: vertical; }
-.character-count { color: var(--muted); font-size: .8em; text-align: right; }
+.ticket-count { text-align: right; }
 .reply { flex-shrink: 0; padding: 16px 24px; border-top: 1px solid var(--border); }
 .reply textarea { min-height: 64px; max-height: 140px; line-height: 1.6; font-size: .9em; }
 .actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
