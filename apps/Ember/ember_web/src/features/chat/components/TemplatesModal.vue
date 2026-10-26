@@ -122,8 +122,8 @@ function onCancel(): void {
       <small class="count">{{ body.length.toLocaleString() }} / {{ TEMPLATE_BODY_MAX.toLocaleString() }}</small>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
-        <button type="button" class="ghost" @click="requestDeparture('back')" :disabled="saving">Back</button>
-        <button type="submit" class="primary" :aria-busy="saving" :disabled="!canSave">{{ saving ? "Saving …" : "Save" }}</button>
+        <button type="button" class="pill-btn ghost" @click="requestDeparture('back')" :disabled="saving">Back</button>
+        <button type="submit" class="pill-btn primary" :aria-busy="saving" :disabled="!canSave">{{ saving ? "Saving …" : "Save" }}</button>
       </div>
     </form>
 
@@ -147,7 +147,7 @@ function onCancel(): void {
       </ul>
       <p v-if="error && !store.loadError" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
-        <button type="button" class="primary" @click="startEdit(null)">New prompt</button>
+        <button type="button" class="pill-btn primary" @click="startEdit(null)">New prompt</button>
       </div>
     </template>
     <ConfirmModal v-if="pendingDeparture" open title="Discard prompt changes?" message="Your prompt has unsaved changes." confirm-label="Discard" danger @confirm="discard" @close="pendingDeparture = null" />
@@ -233,26 +233,6 @@ function onCancel(): void {
   justify-content: flex-end;
   gap: 8px;
 }
-.ghost,
-.primary {
-  padding: 5px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-}
-.ghost {
-  color: var(--muted);
-  background: transparent;
-}
-.primary {
-  border-color: var(--accent);
-  color: var(--accent-contrast);
-  background: var(--accent);
-}
-.primary:disabled {
-  cursor: default;
-  opacity: 0.4;
-}
 .link {
   padding: 2px 8px;
   border: none;
@@ -270,17 +250,4 @@ function onCancel(): void {
   color: var(--danger);
 }
 
-button[aria-busy="true"]:not(.delete-button)::before {
-  content: "";
-  display: inline-block;
-  width: 0.85em;
-  height: 0.85em;
-  margin-right: 6px;
-  vertical-align: middle;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: var(--radius-full);
-  animation: pending-spin 0.75s linear infinite;
-}
-@keyframes pending-spin { to { transform: rotate(360deg); } }
 </style>

@@ -114,6 +114,30 @@ button[aria-busy="true"]::before {
 }
 @keyframes ember-busy { to { transform: rotate(360deg); } }
 
+/* Pill buttons for the Cancel / Save row of a dialog. `primary` is the accent one, `ghost` the quiet one. */
+.pill-btn {
+  padding: 5px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+.pill-btn:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+.pill-btn.primary {
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+.pill-btn.ghost {
+  color: var(--muted);
+  background: transparent;
+}
+.pill-btn.ghost:hover:not(:disabled) {
+  color: var(--text);
+}
+
 /* The visible viewport follows mobile browser chrome and the keyboard. */
 #app {
   position: fixed;

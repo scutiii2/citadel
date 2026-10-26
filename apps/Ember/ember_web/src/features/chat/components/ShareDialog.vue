@@ -124,7 +124,7 @@ const hasLinks = computed(() => links.value.length > 0);
           <option v-for="e in EXPIRIES" :key="String(e.value)" :value="e.value">{{ e.label }}</option>
         </select>
       </label>
-      <button type="submit" class="primary" :aria-busy="creating" :disabled="creating || !chatId">
+      <button type="submit" class="pill-btn primary" :aria-busy="creating" :disabled="creating || !chatId">
         {{ creating ? "Creating …" : "Create link" }}
       </button>
     </form>
@@ -204,18 +204,6 @@ h4 {
   background: var(--bg);
   font: inherit;
 }
-.primary {
-  padding: 6px 16px;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  color: var(--accent-contrast);
-  background: var(--accent);
-}
-.primary:disabled {
-  cursor: default;
-  opacity: 0.4;
-}
 .fresh {
   margin-top: 12px;
   padding: 10px 12px;
@@ -286,17 +274,4 @@ h4 {
   background: var(--bg);
 }
 
-button[aria-busy="true"]:not(.delete-button)::before {
-  content: "";
-  display: inline-block;
-  width: 0.85em;
-  height: 0.85em;
-  margin-right: 6px;
-  vertical-align: middle;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: var(--radius-full);
-  animation: pending-spin 0.75s linear infinite;
-}
-@keyframes pending-spin { to { transform: rotate(360deg); } }
 </style>

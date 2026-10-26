@@ -199,8 +199,8 @@ function close(): void {
           </button>
         </div>
         <div class="option-actions">
-          <button type="button" class="ghost" :disabled="rows.length >= TRIAGE_MAX_OPTIONS" @click="addRow">Add option</button>
-          <button type="button" class="ghost" :disabled="busy || !descriptionsFilled" :aria-busy="titling" @click="generateTitles">
+          <button type="button" class="pill-btn ghost" :disabled="rows.length >= TRIAGE_MAX_OPTIONS" @click="addRow">Add option</button>
+          <button type="button" class="pill-btn ghost" :disabled="busy || !descriptionsFilled" :aria-busy="titling" @click="generateTitles">
             {{ titling ? "Writing titles …" : "Generate titles" }}
           </button>
         </div>
@@ -229,7 +229,7 @@ function close(): void {
           </button>
         </div>
         <div class="option-actions">
-          <button type="button" class="ghost" :disabled="levelRows.length >= TRIAGE_MAX_OPTIONS" @click="addLevel">Add level</button>
+          <button type="button" class="pill-btn ghost" :disabled="levelRows.length >= TRIAGE_MAX_OPTIONS" @click="addLevel">Add level</button>
         </div>
       </fieldset>
 
@@ -240,8 +240,8 @@ function close(): void {
 
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
-        <button type="button" class="ghost" :disabled="asking" @click="close">Cancel</button>
-        <button type="submit" class="primary" :disabled="!canAsk" :aria-busy="asking">{{ asking ? "Asking …" : "Ask" }}</button>
+        <button type="button" class="pill-btn ghost" :disabled="asking" @click="close">Cancel</button>
+        <button type="submit" class="pill-btn primary" :disabled="!canAsk" :aria-busy="asking">{{ asking ? "Asking …" : "Ask" }}</button>
       </div>
     </form>
   </BaseModal>
@@ -332,30 +332,6 @@ function close(): void {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-}
-.ghost,
-.primary {
-  padding: 5px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-}
-.ghost {
-  color: var(--muted);
-  background: transparent;
-}
-.ghost:hover:not(:disabled) {
-  color: var(--text);
-}
-.primary {
-  border-color: var(--accent);
-  color: var(--accent-contrast);
-  background: var(--accent);
-}
-.ghost:disabled,
-.primary:disabled {
-  cursor: default;
-  opacity: 0.4;
 }
 .link {
   padding: 2px 8px;
