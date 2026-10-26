@@ -375,7 +375,7 @@ describe("the recent calls list", () => {
     const item = wrapper.find(".calls .call");
     expect(item.text()).toContain(new Date("2026-10-04T09:12:06Z").toLocaleString());
     expect(item.find(".call-agent").text()).toBe("unknown");
-    expect(item.find(".chip").exists()).toBe(false);
+    expect(item.find(".call-chip").exists()).toBe(false);
     expect(item.find(".call-tokens").text()).toBe("25");
   });
 

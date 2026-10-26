@@ -2,8 +2,9 @@
 // The chat page's settings behind a gear in the bar above the message box:
 // closed on every load, closed again by Escape or a click anywhere else. The
 // panel opens upward, since the bar is at the bottom of the page.
-import { nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef } from "vue";
+import { nextTick, ref, useTemplateRef } from "vue";
 import { RouterLink } from "vue-router";
+import { useOutsideClose } from "../../../composables/useOutsideClose";
 import { withTokenCost } from "../../usage/utils/tokenCosts";
 import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
 
@@ -49,18 +50,13 @@ function checked(event: Event): boolean {
   return (event.target as HTMLInputElement).checked;
 }
 
-function onDocumentClick(event: MouseEvent): void {
-  if (open.value && root.value && !root.value.contains(event.target as Node)) open.value = false;
-}
-
 async function closeWithEscape(): Promise<void> {
   open.value = false;
   await nextTick();
   gearButton.value?.focus();
 }
 
-onMounted(() => document.addEventListener("click", onDocumentClick));
-onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
+useOutsideClose(root, open, () => { open.value = false; }, "click");
 </script>
 
 <template>

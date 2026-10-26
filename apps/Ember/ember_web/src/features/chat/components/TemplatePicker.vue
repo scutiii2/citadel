@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, ref } from "vue";
+import { useOutsideClose } from "../../../composables/useOutsideClose";
 import type { PromptTemplate } from "../api/TemplatesClient";
 import { filterTemplates, preview } from "../utils/templates";
 
@@ -50,16 +51,7 @@ function choose(action: "manage" | "save"): void {
 }
 
 // Clicking anywhere else closes the popover.
-function onOutside(event: PointerEvent): void {
-  if (root.value && !root.value.contains(event.target as Node)) close();
-}
-
-watch(open, (isOpen) => {
-  if (isOpen) document.addEventListener("pointerdown", onOutside);
-  else document.removeEventListener("pointerdown", onOutside);
-});
-
-onBeforeUnmount(() => document.removeEventListener("pointerdown", onOutside));
+useOutsideClose(root, open, close);
 </script>
 
 <template>

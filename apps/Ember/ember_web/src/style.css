@@ -114,6 +114,16 @@ button[aria-busy="true"]::before {
 }
 @keyframes ember-busy { to { transform: rotate(360deg); } }
 
+/* A small grey label beside a usage row's name (provider, gateway, call count). */
+.call-chip {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.8em;
+  color: var(--muted);
+  background: var(--code-bg);
+}
+
 /* Pill buttons for the Cancel / Save row of a dialog. `primary` is the accent one, `ghost` the quiet one. */
 .pill-btn {
   padding: 5px 16px;
