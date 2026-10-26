@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BackButton from "../ui/buttons/BackButton.vue";
 import WorkspaceLayout from "./WorkspaceLayout.vue";
 
 /** A list on the left and an editor form on the right (Notes, Memory). On a
@@ -34,7 +35,7 @@ defineEmits<{ back: []; submit: [] }>();
     </aside>
     <form v-if="editing" class="editor" :aria-label="editorLabel" @submit.prevent="$emit('submit')">
       <header class="editor-head">
-        <button type="button" class="chip back" :disabled="busy" @click="$emit('back')">‹ {{ backLabel }}</button>
+        <BackButton class="back" :disabled="busy" @click="$emit('back')">{{ backLabel }}</BackButton>
         <slot name="head" />
       </header>
       <div class="editor-scroll"><slot name="editor" /></div>
@@ -57,14 +58,12 @@ defineEmits<{ back: []; submit: [] }>();
 .actions .primary { min-width: 76px; min-height: 40px; }
 .actions .primary[aria-busy="true"]::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 7px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); vertical-align: -1px; animation: save-spin .7s linear infinite; }
 @keyframes save-spin { to { transform: rotate(360deg); } }
-.back { display: none; }
 .list-editor :is(button, summary, input, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 900px) and (min-width: 768px) { .list-editor { --workspace-columns: 220px minmax(0, 1fr); } .actions { padding-inline: 20px; } }
 @media (max-width: 767px) {
   .list-editor.editing .list-pane, .list-editor:not(.editing) .placeholder { display: none; }
   .list-pane { border-right: 0; padding: 16px 10px; }
   .editor-head { padding: 12px 16px; justify-content: space-between; gap: 10px; }
-  .back { display: inline-block; min-height: 44px; }
   .actions { padding: 12px 16px; }
   .actions .primary { min-height: 44px; }
 }

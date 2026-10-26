@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import "../../components/layout/infoPage.css";
+import StateMessage from "../../components/ui/status/StateMessage.vue";
 import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import { errorMessage } from "../../utils/errors";
@@ -88,9 +89,9 @@ async function saveEdit(): Promise<void> {
   <PageLayout title="Skills" class="info-content" description="How-tos Ember proposed after solving a task. Nothing is used until you approve it.">
     <p v-if="notice" class="notice" role="status">{{ notice }}</p>
     <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
-    <p v-if="loading" class="muted" role="status">Loading skills…</p>
-    <div v-else-if="loadError" class="error" role="alert"><p>Could not load skills: {{ loadError }}</p><button type="button" class="chip" @click="load">Try again</button></div>
-    <div v-else-if="skills.length === 0" class="empty"><h3>No skills yet.</h3><p>When Ember solves a multi-step task it may propose a skill here for you to approve.</p></div>
+    <StateMessage v-if="loading" kind="loading">Loading skills…</StateMessage>
+    <StateMessage v-else-if="loadError" kind="error" @retry="load">Could not load skills: {{ loadError }}</StateMessage>
+    <StateMessage v-else-if="skills.length === 0" kind="empty" title="No skills yet.">When Ember solves a multi-step task it may propose a skill here for you to approve.</StateMessage>
     <template v-else>
       <section v-for="group in groups" v-show="group.items.length" :key="group.status" class="group" :aria-label="group.title">
         <header><h2>{{ group.title }} <span class="count">{{ group.items.length }}</span></h2><p class="muted">{{ group.hint }}</p></header>
@@ -151,7 +152,5 @@ async function saveEdit(): Promise<void> {
 .actions .danger { margin-left: auto; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.empty { padding: 20px 4px; color: var(--muted); }
-.empty h3 { font-size: 1em; font-weight: 500; margin: 0 0 8px; color: var(--text); }
 @media (max-width: 767px) { .actions button { min-height: 44px; } }
 </style>

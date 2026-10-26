@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DangerZone from "../../../components/ui/status/DangerZone.vue";
 // One uploaded file: page range (PDF) or fit (image), rotate, copy ID, remove.
 import CopyButton from '../../../components/ui/buttons/CopyButton.vue'
 import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
@@ -70,7 +71,7 @@ function onFit(event: Event): void {
     </div>
     <button type="button" class="rotate" aria-label="Rotate" title="Rotate 90°" @click="emit('rotate')">⟳ {{ source.rotate }}°</button></div>
     <div class="file-actions"><button type="button" :aria-label="`Move ${source.info.name} earlier`" :disabled="!canMoveUp" @click="emit('moveUp')">↑ Earlier</button><button type="button" :aria-label="`Move ${source.info.name} later`" :disabled="!canMoveDown" @click="emit('moveDown')">↓ Later</button><CopyButton :text="source.info.file_id" label="Copy file ID for chat" /></div>
-    <div class="danger-zone"><span>Remove this source</span><ActionButton icon="clear" class="danger" aria-label="Remove file" @click="emit('remove')">Remove</ActionButton></div>
+    <DangerZone class="source-danger" label="Remove this source"><ActionButton icon="clear" class="danger" aria-label="Remove file" @click="emit('remove')">Remove</ActionButton></DangerZone>
   </details></div>
 </template>
 <style scoped>
@@ -92,9 +93,8 @@ button { font: inherit; padding: 7px 10px; border: 1px solid var(--border); bord
 .rotate { min-height: 36px; }
 .error { color: var(--danger); }
 .file-actions { display: flex; align-items: center; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
-.danger-zone { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding: 10px; border: 1px solid var(--danger); border-radius: var(--radius-lg); }
+.source-danger { margin-top: 16px; }
 button.danger { color: var(--danger); border-color: var(--danger); }
-.danger-zone :deep(.label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
 :is(button, input, select, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 767px) { button, input, select, summary { min-height: 44px; } }

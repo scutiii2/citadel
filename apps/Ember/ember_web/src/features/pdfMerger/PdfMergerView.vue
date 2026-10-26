@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useNarrow } from "../../composables/useNarrow";
+import RetentionNote from "../../components/ui/status/RetentionNote.vue";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
@@ -16,11 +18,7 @@ import { usePlanStore } from './stores/plan'
 import { useAuthStore } from '../../stores/auth'
 const files = useFilesStore()
 const plan = usePlanStore()
-const narrow = ref(window.matchMedia?.('(max-width: 767px)').matches ?? false)
-const mediaQuery = window.matchMedia?.('(max-width: 767px)')
-function updateViewport(event: MediaQueryListEvent): void { narrow.value = event.matches }
-onMounted(() => mediaQuery?.addEventListener?.('change', updateViewport))
-onBeforeUnmount(() => mediaQuery?.removeEventListener?.('change', updateViewport))
+const narrow = useNarrow()
 const auth = useAuthStore()
 const mode = ref<'pages' | 'files'>('pages')
 const outputOpen = ref(false)
@@ -55,7 +53,7 @@ onBeforeRouteLeave(stop)
         <SourceList />
         <p v-if="!files.sources.length" class="muted small">Your source files will appear here.</p>
         <DropZone ref="dropZone" @files="files.upload($event)" />
-        <p class="retention muted">Files are kept for 6 hours.<br>Save your merged PDF before it expires.</p>
+        <RetentionNote class="retention">Files are kept for 6 hours.<br>Save your merged PDF before it expires.</RetentionNote>
       </aside>
       <footer class="output-area">
         <label class="output-label" for="pdf-output-name">Output file</label>

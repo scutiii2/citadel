@@ -4,6 +4,11 @@ import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
 import { MEMORY_MAX, MEMORY_TEXT_MAX, memoryClient, type MemoryNote } from "./api/MemoryClient";
+import ListRow from "../../components/ui/lists/ListRow.vue";
+import SearchField from "../../components/ui/lists/SearchField.vue";
+import StateMessage from "../../components/ui/status/StateMessage.vue";
+import DangerZone from "../../components/ui/status/DangerZone.vue";
+import CharacterCount from "../../components/ui/status/CharacterCount.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import "../../components/layout/infoPage.css";
 import { errorMessage } from "../../utils/errors";
@@ -130,8 +135,8 @@ async function remove(): Promise<void> {
     <template #actions><button type="button" class="primary" :disabled="loading || !!loadError || saving || removing || memories.length >= MEMORY_MAX" @click="openEditor()">Add memory</button></template>
     <div class="column">
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
-      <p v-if="loading" class="muted" role="status">Loading memories…</p>
-      <div v-else-if="loadError" class="load-error" role="alert"><p>Could not load memories: {{ loadError }}</p><button type="button" class="chip" @click="load">Try again</button></div>
+      <StateMessage v-if="loading" kind="loading">Loading memories…</StateMessage>
+      <StateMessage v-else-if="loadError" kind="error" @retry="load">Could not load memories: {{ loadError }}</StateMessage>
       <ListEditorLayout
         v-else
         class="layout"
@@ -149,18 +154,18 @@ async function remove(): Promise<void> {
       >
         <template #list>
           <div class="list-heading"><span>All memories</span><span>{{ memories.length }}/{{ MEMORY_MAX }}</span></div>
-          <label class="memory-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg><input v-model="query" type="search" aria-label="Search memories" placeholder="Search memories…" /></label>
+          <SearchField v-model="query" class="memory-search" label="Search memories" placeholder="Search memories…" />
           <div class="list-scroll">
             <div class="memory-list" aria-label="Saved memories">
-              <article v-if="editorOpen && !editing" class="draft-row"><button type="button" class="memory-row active" aria-current="true" :disabled="saving || removing" @click="openEditor()"><span class="memory-text">New memory</span><span class="memory-date">Not saved yet</span></button></article>
+              <article v-if="editorOpen && !editing" class="draft-row"><ListRow class="memory-row" active :disabled="saving || removing" @click="openEditor()"><span class="memory-text">New memory</span><span class="memory-date">Not saved yet</span></ListRow></article>
               <article v-for="memory in shown" :key="memory.id">
-                <button type="button" :class="['memory-row', { active: editorOpen && editing?.id === memory.id }]" :aria-current="editorOpen && editing?.id === memory.id" :aria-label="'Edit memory ' + memory.id" :aria-describedby="'memory-summary-' + memory.id" :disabled="saving || removing" @click="openEditor(memory)">
+                <ListRow class="memory-row" :active="editorOpen && editing?.id === memory.id" :aria-label="'Edit memory ' + memory.id" :aria-describedby="'memory-summary-' + memory.id" :disabled="saving || removing" @click="openEditor(memory)">
                   <span :id="'memory-summary-' + memory.id" class="memory-text">{{ memory.text }}</span><span class="memory-date">Created <time :datetime="memory.created_at">{{ new Date(memory.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) }}</time></span>
-                </button>
+                </ListRow>
               </article>
             </div>
-            <div v-if="memories.length === 0 && !(editorOpen && !editing)" class="empty"><h3>No saved memories yet.</h3><p>Add a useful fact, preference, or instruction for Ember to remember.</p></div>
-            <div v-else-if="memories.length && matches.length === 0" class="empty"><h3>No memories match your search.</h3><p>Try a different word or clear your search.</p><button type="button" class="chip" @click="query = ''">Clear search</button></div>
+            <StateMessage v-if="memories.length === 0 && !(editorOpen && !editing)" kind="empty" title="No saved memories yet.">Add a useful fact, preference, or instruction for Ember to remember.</StateMessage>
+            <StateMessage v-else-if="memories.length && matches.length === 0" kind="empty" title="No memories match your search.">Try a different word or clear your search.<template #action><button type="button" class="chip" @click="query = ''">Clear search</button></template></StateMessage>
             <footer v-if="matches.length" class="pagination"><p>Showing {{ shown.length }} of {{ matches.length }}</p><button v-if="shown.length < matches.length" type="button" class="chip" @click="visible += 20">Load more</button></footer>
             <p v-if="memories.length >= MEMORY_MAX" class="capacity-note">Memory is full. Delete a memory before adding another.</p>
           </div>
@@ -171,12 +176,12 @@ async function remove(): Promise<void> {
             <div class="writing">
               <label class="body-field" for="memory-text"><span class="memory-label">{{ editing ? 'Memory' : 'New memory' }}</span></label>
               <textarea id="memory-text" v-model="text" aria-label="Memory" :maxlength="MEMORY_TEXT_MAX" :disabled="saving || removing" placeholder="One useful fact for Ember to remember…" autofocus />
-              <p class="character-count">{{ text.length }}/{{ MEMORY_TEXT_MAX }} characters</p>
+              <CharacterCount class="memory-count" :length="text.length" :max="MEMORY_TEXT_MAX" suffix=" characters" />
               <p v-if="editing" class="memory-created">Created <time :datetime="editing.created_at">{{ new Date(editing.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) }}</time></p>
               <p v-else class="memory-created">Not saved yet</p>
               <p class="writing-hint">Keep it short and specific. Edit this context when it no longer fits.</p>
             </div>
-            <details v-if="editing" :key="editing.id" class="manage-memory"><summary>Manage memory <span aria-hidden="true">›</span></summary><div class="danger-zone"><b>Danger zone</b><button type="button" class="danger" :aria-label="'Delete memory ' + editing.id" :disabled="saving || removing" @click="askDelete(editing)">Delete memory</button></div></details>
+            <details v-if="editing" :key="editing.id" class="manage-memory"><summary>Manage memory <span aria-hidden="true">›</span></summary><DangerZone class="memory-danger"><template #label><b>Danger zone</b></template><button type="button" class="danger" :aria-label="'Delete memory ' + editing.id" :disabled="saving || removing" @click="askDelete(editing)">Delete memory</button></DangerZone></details>
             <p v-if="formError" class="error form-error" role="alert">{{ formError }}</p>
         </template>
         <template #placeholder><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4c-5-5-10 2-6 5-6 2-2 9 2 7-1 6 4 6 4 2V4zm0 0c5-5 10 2 6 5 6 2 2 9-2 7 1 6-4 6-4 2" /></svg><h3>Keep the useful context</h3><p>Pick a memory, or add a new one.</p><button type="button" class="chip" :disabled="memories.length >= MEMORY_MAX" @click="openEditor()">Create a memory</button></template>
@@ -190,33 +195,25 @@ async function remove(): Promise<void> {
 <style scoped>
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 
-.memory-search { display: flex; align-items: center; gap: 7px; padding: 8px 9px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); flex-shrink: 0; }
-.memory-search svg { width: 16px; height: 16px; color: var(--muted); }
-.memory-search input { min-width: 0; width: 100%; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: .8em; }
-.memory-search:focus-within { border-color: var(--accent); }
+.memory-search { margin-bottom: 12px; flex-shrink: 0; }
 .list-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 .memory-list { display: flex; flex-direction: column; gap: 6px; }
-button.memory-row { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 7px; width: 100%; padding: 14px 12px; border: 1px solid transparent; border-radius: var(--radius-md); color: var(--text); background: transparent; font: inherit; font-size: .9em; text-align: left; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
-button.memory-row:hover { background: var(--surface); }
-button.memory-row.active { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--bg); box-shadow: inset 3px 0 var(--accent); }
 .memory-text { font-weight: 500; overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .memory-date { color: var(--muted); font-size: .75em; }
 .pagination { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 16px 10px 0; font-size: .75em; color: var(--muted); }
 .pagination p { margin: 0; }
 .memory-help { color: var(--muted); font-size: .7em; margin: 14px 10px 0; padding-top: 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
 .capacity-note { font-size: .8em; color: var(--muted); margin: 16px 10px 0; }
-.empty { padding: 20px 10px; font-size: .85em; color: var(--muted); }
-.empty h3 { font-size: 1em; font-weight: 500; margin: 0 0 8px; color: var(--text); }
-.empty p { margin: 0 0 12px; }
 .context-label { display: inline-flex; align-items: center; gap: 7px; font-size: .8em; color: var(--muted); }
 .context-label svg { width: 15px; height: 15px; }
-.context-label svg, .memory-search svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.context-label svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; min-height: 310px; padding: 30px 36px 20px; }
 .memory-label { font-size: 1.35em; font-weight: 600; letter-spacing: -.015em; }
 .writing textarea { flex: 1; width: 100%; min-width: 0; min-height: 200px; padding: 0; border: 0; border-radius: 0; color: var(--text); background: transparent; font: inherit; line-height: 1.9; resize: vertical; }
-.character-count { align-self: flex-end; font-size: .75em; color: var(--muted); margin: 0; }
 .memory-created { font-size: .75em; color: var(--muted); margin: 0; }
 .writing-hint { font-size: .8em; color: var(--muted); margin: 0; max-width: 450px; }
+.memory-danger { margin-bottom: 16px; }
+.memory-count { align-self: flex-end; }
 .manage-memory { border-top: 1px solid var(--border); padding: 0 28px; flex-shrink: 0; }
 summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 0; font-size: .85em; cursor: pointer; list-style: none; }
 summary::-webkit-details-marker { display: none; }
@@ -231,7 +228,6 @@ summary span { color: var(--muted); }
   .memory :deep(.page-description) { display: none; }
   .memory.memory-open :deep(.page-head) { display: none; }
   .memory :deep(.page-actions button) { min-height: 44px; }
-  .memory-search { min-height: 44px; }
   button.memory-row { min-height: 100px; }
   .writing { min-height: 310px; padding: 24px 20px 18px; }
   .writing textarea { min-height: 250px; }

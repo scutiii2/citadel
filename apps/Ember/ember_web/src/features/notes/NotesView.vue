@@ -16,6 +16,9 @@ import {
   type TagSuggestions,
 } from "./api/NotesClient";
 import { ApiError } from "../../api/http";
+import ListRow from "../../components/ui/lists/ListRow.vue";
+import StateMessage from "../../components/ui/status/StateMessage.vue";
+import DangerZone from "../../components/ui/status/DangerZone.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import "../../components/layout/infoPage.css";
 import TagInput from "../../components/ui/forms/TagInput.vue";
@@ -317,7 +320,7 @@ function preview(note: Note): string {
 
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       <p v-if="loadError" class="error" role="alert">Could not load your notes: {{ loadError }}</p>
-      <p v-if="loading" class="muted">Loading …</p>
+      <StateMessage v-if="loading" kind="loading">Loading …</StateMessage>
 
       <ListEditorLayout
         v-else-if="!loadError"
@@ -333,16 +336,16 @@ function preview(note: Note): string {
       >
         <template #list>
           <div class="list-heading"><span>All notes</span><span>{{ notes.length }}/{{ NOTES_MAX }} notes</span></div>
-          <p v-if="notes.length === 0 && selected !== NEW" class="muted empty">You have no notes yet.</p>
+          <StateMessage v-if="notes.length === 0 && selected !== NEW" kind="empty">You have no notes yet.</StateMessage>
           <ul v-else class="list" aria-label="Notes">
             <li v-if="selected === NEW">
-              <button type="button" class="note-row active" aria-current="true">
+              <ListRow class="note-row" active>
                 <span class="title">{{ form.title.trim() || "New note" }}</span>
                 <span class="muted">Not saved yet</span>
-              </button>
+              </ListRow>
             </li>
             <li v-for="n in notes" :key="n.id">
-              <button type="button" :class="['note-row', { active: n.id === selected }]" :aria-current="n.id === selected" :disabled="saving || removing" @click="go(n.id)">
+              <ListRow class="note-row" :active="n.id === selected" :disabled="saving || removing" @click="go(n.id)">
                 <span class="title">{{ n.id === selected && form.title.trim() ? form.title.trim() : n.title }}</span>
                 <span v-if="preview(n)" class="snippet">{{ preview(n) }}</span>
                 <span v-if="n.tags.length || n.agent_readable || n.last_editor === 'agent'" class="row-tags">
@@ -351,7 +354,7 @@ function preview(note: Note): string {
                   <span v-if="n.last_editor === 'agent'" class="tag agent-mark">Agent edit</span>
                 </span>
                 <span class="muted">{{ formatUtc(n.updated_at) }}</span>
-              </button>
+              </ListRow>
             </li>
           </ul>
           <details v-if="selected === null" class="library-publishing">
@@ -479,10 +482,7 @@ function preview(note: Note): string {
           </details>
           <details v-if="selected !== NEW" class="manage-tools">
             <summary>Manage note <span aria-hidden="true">›</span></summary>
-            <div class="danger-zone">
-              <b>Danger zone</b>
-              <button type="button" class="danger" :disabled="saving || removing" @click="confirmDelete = true">Delete this note</button>
-            </div>
+            <DangerZone class="note-danger"><template #label><b>Danger zone</b></template><button type="button" class="danger" :disabled="saving || removing" @click="confirmDelete = true">Delete this note</button></DangerZone>
           </details>
           </div>
           <p v-if="formError" class="error form-error" role="alert">{{ formError }}</p>
@@ -545,11 +545,7 @@ function preview(note: Note): string {
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 
 .list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.empty { padding: 8px 10px; font-size: .9em; }
 .new-note { flex-shrink: 0; min-height: 40px; }
-.note-row { display: flex; flex-direction: column; gap: 7px; width: 100%; padding: 14px 12px; border: 1px solid transparent; border-radius: var(--radius-md); color: var(--text); background: transparent; font: inherit; font-size: .9em; text-align: left; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
-.note-row:hover { background: var(--surface); }
-.note-row.active { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--bg); box-shadow: inset 3px 0 var(--accent); }
 .title { font-weight: 600; overflow-wrap: anywhere; }
 .snippet { color: var(--muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .note-row .muted { font-size: .8em; }
@@ -559,6 +555,7 @@ function preview(note: Note): string {
 .privacy { display: inline-flex; gap: 7px; align-items: center; font-size: .8em; color: var(--muted); }
 .privacy svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .privacy svg { width: 15px; height: 15px; }
+.note-danger { margin-bottom: 16px; }
 .writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; min-height: 310px; padding: 30px 36px 20px; }
 .title-field, .body-field { display: flex; flex-direction: column; min-width: 0; }
 .notes .editor .title-field input { width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 1.65em; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; }

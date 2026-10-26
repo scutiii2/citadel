@@ -5,6 +5,9 @@ import { useRoute } from "vue-router";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import BrainConnectionForm from "./components/BrainConnectionForm.vue";
 import MarkdownContent from "../../components/content/MarkdownContent.vue";
+import ListRow from "../../components/ui/lists/ListRow.vue";
+import SearchField from "../../components/ui/lists/SearchField.vue";
+import BackButton from "../../components/ui/buttons/BackButton.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
 import { brainsClient, type BrainResult, type BrainScope } from "./api/BrainsClient";
@@ -112,9 +115,9 @@ onMounted(async () => {
           </span>
         </div>
         <form class="search-form" role="search" @submit.prevent="run('search', '')">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
-          <input v-model="query" type="search" :maxlength="2000" aria-label="Search brains" :placeholder="scope === 'both' ? 'Search across both brains…' : `Search the ${scopeLabel(scope)}…`" :disabled="busy" />
-          <button type="submit" :disabled="busy || !query.trim()" :aria-busy="busy && operation === 'search'">{{ busy && operation === 'search' ? 'Searching…' : 'Search' }}</button>
+          <SearchField v-model="query" label="Search brains" :maxlength="2000" :placeholder="scope === 'both' ? 'Search across both brains…' : `Search the ${scopeLabel(scope)}…`" :disabled="busy">
+            <button type="submit" :disabled="busy || !query.trim()" :aria-busy="busy && operation === 'search'">{{ busy && operation === 'search' ? 'Searching…' : 'Search' }}</button>
+          </SearchField>
         </form>
       </div>
     </template>
@@ -152,11 +155,11 @@ onMounted(async () => {
         <p v-if="busy && operation === 'list'" class="empty-message" role="status">Loading folder…</p>
         <ul v-else-if="entries.length" class="file-list" aria-label="Brain documents">
           <li v-for="entry in entries" :key="entry.path">
-            <button type="button" class="file-row" :class="{ active: entry.path === document?.path }" :aria-current="entry.path === document?.path ? 'true' : undefined" :disabled="busy" :aria-label="entry.path" @click="run(entry.kind === 'folder' ? 'list' : 'read', entry.path)">
+            <ListRow class="file-row" :active="entry.path === document?.path" :disabled="busy" :aria-label="entry.path" @click="run(entry.kind === 'folder' ? 'list' : 'read', entry.path)">
               <svg v-if="entry.kind === 'folder'" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h6l2 3h10v12H3z" /></svg>
               <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>
               <span><strong>{{ fileName(entry.path) }}</strong><small>{{ entry.kind === 'folder' ? 'Folder' : 'Document' }}</small></span>
-            </button>
+            </ListRow>
           </li>
         </ul>
         <p v-else class="empty-message">{{ listingAvailable ? 'This folder is empty.' : 'Choose a folder or check the connection.' }}</p>
@@ -172,7 +175,7 @@ onMounted(async () => {
       </aside>
       <section class="reader" aria-label="Brain document reader">
         <header class="reader-head">
-          <button type="button" class="back" :disabled="busy" @click="mobileReading = false">‹ All documents</button>
+          <BackButton ghost :disabled="busy" @click="mobileReading = false">All documents</BackButton>
           <span class="reader-path">{{ document?.path || 'Document reader' }}</span>
           <span v-if="document" class="reader-audience">{{ document.scope === 'personal' ? 'Only you' : 'Shared' }}</span>
         </header>
@@ -209,10 +212,6 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .scope-line { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .connection-status { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: .75em; overflow-wrap: anywhere; }
 .connection-status svg { width: 14px; height: 14px; }
-.search-form { display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
-.search-form > svg { color: var(--muted); }
-.search-form input { flex: 1; min-width: 0; width: 100%; border: 0; background: transparent; color: var(--text); font: inherit; font-size: .9em; }
-.search-form button { flex-shrink: 0; }
 .feedback { max-height: 25%; overflow: auto; padding: 0 0 12px; flex-shrink: 0; overflow-wrap: anywhere; font-size: .85em; }
 .feedback p { margin: 4px 0; }
 .feedback .error { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -224,13 +223,11 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .breadcrumbs button:hover { color: var(--accent); }
 .file-list { padding: 0; margin: 0; list-style: none; }
 .file-list li + li { margin-top: 4px; }
-button.file-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 13px 10px; border-color: transparent; border-radius: var(--radius-md); background: transparent; text-align: left; }
+button.file-row { flex-direction: row; align-items: flex-start; gap: 10px; padding: 13px 10px; font-size: 1em; }
 .file-row > span { min-width: 0; }
 .file-row svg { color: var(--muted); margin-top: 2px; }
 .file-row strong { display: block; font-size: 1em; font-weight: 500; overflow-wrap: anywhere; }
 .file-row small { display: block; margin-top: 5px; color: var(--muted); font-size: .8em; }
-button.file-row:hover:not(:disabled) { background: var(--surface); }
-button.file-row.active { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--bg); box-shadow: inset 3px 0 var(--accent); }
 .file-row.active svg { color: var(--accent); }
 .open-path { margin: 20px 10px 0; padding-top: 12px; border-top: 1px solid var(--border); font-size: .8em; }
 .open-path summary { cursor: pointer; color: var(--muted); }
@@ -256,7 +253,6 @@ button.file-row.active { border-color: color-mix(in srgb, var(--accent) 45%, var
 .reader-placeholder h3 { margin: 0; font-size: 1.05em; color: var(--text); font-weight: 600; }
 .reader-placeholder p { margin: 0; font-size: .9em; }
 .empty-message { padding: 8px 10px; color: var(--muted); font-size: .9em; }
-.back { display: none; }
 .search-results { flex: 1; min-height: 0; overflow: auto; padding: 22px 28px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .results-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: .8em; }
 .results-head p { margin: 0; }
@@ -285,8 +281,6 @@ button.file-row.active { border-color: color-mix(in srgb, var(--accent) 45%, var
   .scope-line :deep(.segmented-control), .scope-line :deep(.segmented) { width: 100%; }
   .scope-line :deep(button.segment) { flex: 1; min-height: 44px; padding-inline: 8px; }
   .connection-status { font-size: .7em; }
-  .search-form input { font-size: max(1em, 16px); }
-  .search-form button { min-height: 44px; padding-inline: 12px; }
   .browser { border-right: 0; padding: 16px 12px; }
   .brain-workspace:not(.reading) .reader, .brain-workspace.reading .browser { display: none; }
   .mobile-reading :deep(.page-toolbar) { display: none; }
@@ -294,7 +288,6 @@ button.file-row.active { border-color: color-mix(in srgb, var(--accent) 45%, var
   .breadcrumbs button { min-width: 44px; min-height: 44px; }
   .reader-head { padding: 12px 16px; }
   .reader-head .reader-path { display: none; }
-  .back { display: inline-block; padding: 6px 0; border: 0; min-height: 44px; color: var(--muted); font-size: 1.1em; }
   .document-content { padding: 22px 20px; }
   .reader-footer { padding: 12px 16px; }
   .search-results { padding: 18px 20px; }
