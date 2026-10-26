@@ -237,171 +237,36 @@ page can show an agent that is stopped or disabled. On the ai_agent machine:
 Then set `agents_registry_url` in `apps/Ember/ember_api/configs/config_app.json` (see
 `apps/Ember/ember_api/configs/README.md`).
 
-## Laya question agent
+## Decision question agents
 
-`agents/triage-assistant.json` defines a local specialist backed by Laya, a
-small model that answers typed questions about a short text. It is part of the
-tracked roster. The models run in the Laya service (see Laya models above);
-set `enabled: false` if this installation should not run it. Restart the
-supervisor after changing the roster. Its provider is `laya`, gateway `local`,
-model `convaiinnovations/laya`; no cloud model or API key is used.
+Agents with `llm.provider: "decision"` answer typed JSON questions without tools or
+text generation. Their `llm.strategy` is `laya-only`, `jev-only` or `both` (default),
+and their `llm.min_confidence` defaults to 0.90. With `both`, Laya answers first;
+Jev receives only questions that Laya fails to settle. `local_only: true` forces
+Laya only. An uncertain last answer stays marked `uncertain`.
 
-Laya never generates text. The caller supplies the questions as the `ask`
-question, a JSON string:
+Send `{"text": "...", "questions": {...}}`. Each question has a `type`, optional
+`instructions`, and `criteria`: a map of options for `choice`, an ordered list of
+levels for `score`, or false/true labels for `noul` (yes/no). Requests may override
+`min_confidence`. The wrapper accepts up to 16,000 characters; Laya's own window
+is 4,000, so longer requests need Jev or return unavailable with `laya-only`.
 
-```json
-{
-  "text": "SQLite database is locked",
-  "min_confidence": 0.7,
-  "questions": {
-    "category": {"type": "choice", "instructions": "Which category?",
-                 "criteria": {"database": "SQL and storage", "network": "Connections"}},
-    "severity": {"type": "score", "instructions": "How severe?",
-                 "criteria": ["none", "minor", "major"]},
-    "problem":  {"type": "noul", "instructions": "Is there a problem?"}
-  }
-}
-```
+Laya runs in the separate LayaModel service. Its internal strategy belongs in
+`gateways/decision/laya.json`, defaults to `english-then-typed`, and is read on
+every call: edit the file without restarting. Callers and account settings do
+not choose a Laya service strategy. Jev uses `gateways/decision/jev.json` and
+`TYPESAFE_API_KEY`; cloud requests send text off this machine.
 
-- `choice`: `criteria` is `{option: description}`, 2 to 10 options.
-- `score`: `criteria` is a list of 2 to 10 level descriptions, lowest first.
-  The answer is the expected level (0 to n-1) with a `legend`.
-- `noul` (yes/no): `criteria` is optional `{"false": "...", "true": "..."}`.
-  The answer is P(true).
-- `text` is at most 4,000 characters; 1 to 8 questions; `min_confidence` is
-  optional (default 0.70, `MIN_CONFIDENCE` in `src/llm/laya_provider.py`).
-  Text after the JSON object is ignored.
-- `local_only: true` (optional) keeps the request on Laya's own models: the English checkpoint, then the
-  typed-decisions checkpoint when English is unsure, and never the fallback classifier (Jev), whatever `classifier`
-  says. The service loads both models at its start-up. Unsure answers stay marked `uncertain`, and a text Laya cannot
-  read whole is an error. ember_api's tag suggestions and triage questions and mcp_server's ticket grouping use it,
-  so their text never leaves the machine.
+Answers contain per-question confidences, uncertainty and the gateway that
+answered. Confidence scores are not calibrated accuracy claims. Token usage
+reports actual input work and zero generated output tokens.
 
-The response is JSON: `{"answers": {id: {...}}, "uncertain": bool}`. Each
-answer has `type`, the result (`choice`/`score`/`noul`), `answer_confidence`
-and `uncertain` (confidence below `min_confidence`). A request with an unknown
-field, type, or out-of-range size is rejected before inference with an
-"Invalid Laya request" error. Garrison checks only the envelope (the JSON, `text`, `min_confidence`, `trace`,
-`local_only`); the question rules above (types, `criteria` shapes, option and question counts) are the Laya
-service's, checked with its `POST /v1/validate`, so there is one definition for every caller. If the service cannot
-be reached the questions go unchecked and Jev, where allowed, may still answer.
-
-The top-level `uncertain` is true if ANY answer is uncertain, so callers that
-mix question types should read the per-answer `uncertain` flags (score
-questions in particular tend to have lower confidence).
-
-The English checkpoint has a 512-token limit including the question heads, so
-keep texts and criteria short. Input Laya reports as truncated is rejected
-instead of answering from partial evidence. At start-up the agent only checks that the Laya service answers
-and logs a warning if not; the service downloads weights on its first start. Service errors
-propagate without an LLM fallback (Jev below is a classifier, not an LLM answer). History is deliberately excluded and
-`interpret`/summarization is unsupported. Cancellation is checked before and
-after the service call.
-
-### Triage flow (Laya English, Laya typed-decisions, Jev)
-
-A request may carry `"strategy"`, using any name offered by Laya's `GET /v1/strategies`.
-Resolution is the request value, then the admin default, then the existing voter settings.
-When an override resolves, all questions use it in one service call. Unknown names are
-invalid requests (422), including when `/v1/ask` rejects one after listing was unavailable;
-these refusals never trigger Jev fallback.
-
-The shared `src/core/tuning_overrides.py` reads the admin default from
-`.data/tuning_overrides.json` (the `agent_data` volume in Docker, so it survives a rebuild) on every request and writes it atomically.
-`GET /agents/triage-strategy` returns `{default, strategies}`; `PUT` takes
-`{strategy: string | null}` and returns the same shape. Both require the internal
-token. Null clears the override and restores voter-derived behavior, independently
-of the service's `auto` strategy. If Laya cannot list strategies, GET retains the
-stored default with `strategies: []`; setting a name requires the service, while
-clearing does not. The existing `config_tuning.json` remains authoritative for voters.
-
-Every request goes through `src/llm/triage_flow.py` (the whole flow is written at the top of that file). Without an override, for each
-question type Garrison reads the local voters that `classifier.triage_order` and `triage_enabled` allow and asks the
-Laya service for the matching strategy: English then typed = `english-then-typed` (the default), typed first =
-`typed-then-english`, one voter = `english-only` / `typed-only`. The service runs the local rules, each model against
-its own confidence threshold by number of options left (2 options: English 0.90, typed 0.80; 3 or more: 0.75, 0.55),
-changed with `classifier.triage_thresholds` (`{"3+": {"laya-typed": 0.6}}`) or, for one request, by sending
-`min_confidence`. Between the steps it drops options far below the best (`triage_prune_ratio`) and asks again, and
-when no model is ever sure it compares the models' confidence-weighted values pairwise (`triage_pair_ratio`): the
-answer then carries `also_check`, or `"unknown": true` with `candidates`, and is always `uncertain`. Garrison sends
-these settings and the window (`triage_window`) with every request. The rules and the other strategies
-(`most-confident`, `average`, `consensus`) are in `LayaModel/README.md`.
-
-Jev (gated by `triage_fallback`, a key and the triage chain, see below) is asked only about what the service could
-not settle, over the options it left, with a threshold of 0.90 (2 options and 3 or more alike, `triage_thresholds`
-changes it). An unsure Jev is asked again once over the options all the models' averaged probabilities narrow to;
-if nobody is sure, the service compares all the voters as above. Averaging and comparing are the service's
-`/v1/combine`. Score questions take the first model that meets its 3+ threshold. A noul question uses the 2-option
-thresholds, and Jev decides it only when typed is unsure and the fallback is on. If the service cannot be reached,
-Jev answers alone (when allowed). A `local_only` request never reaches Jev.
-
-Which models answer which question type, and in what order, is set per type in `configs/config_tuning.json`
-(`classifier`; the `.example` shows the defaults):
-
-```json
-"triage_enabled": {"laya-english": {"noul": false}, "jev": {"score": false}},
-"triage_order": {"noul": ["laya-typed", "jev"], "choice": ["laya-typed", "laya-english", "jev"]}
-```
-
-`triage_enabled` is voter -> type -> true/false (everything on by default). `triage_order` is type -> the voters asked,
-first to last; a voter left out is never asked. English is left out of `noul` by default, because its true/false
-labels can override the text (a confident "no" on clearly positive input). For a `choice` question the order is that of
-the Laya models, and `jev` must be listed last: it is asked after the Laya models are done, including their narrowed
-rounds. For `score` and `noul` the order is followed exactly. A type needs at least one voter that is both listed and
-enabled, or the config is refused at start-up. Jev is still asked only when `triage_fallback`, a key and the triage
-chain allow it.
-
-The answer is compact by default, because the orchestrator reads it on every turn: `type`, the pick (`choice`, `score`
-or `noul`), `answer_confidence`, `uncertain`, `answered_by`, `probabilities` (2 decimals) and, when they apply,
-`also_check`, `unknown` and `candidates` (about 75 tokens for a reviewed question). Send `"trace": true` in a request,
-or set `classifier.triage_trace`, for the full answer: also `resolved_by`, `eliminated`, `disagreement`, a `note` and a
-`rounds` trace of every model call (about 480 tokens). `check_triage_cases --rounds` always reads the full one.
-
-- Both checkpoints read `classifier.triage_window` tokens (default 4096). They live in the Laya service, which loads
-  both at its start (the second downloads on first start, about 2 minutes) and needs roughly 1.6-3.4 GB of RAM per
-  replica; Garrison itself needs none of it.
-- The checks measured so far: English 20/23 and typed 21/23 on the 47 cases in `scripts/check_triage_cases.py` with
-  Laya alone; both are confidently wrong on sarcasm and "the server room is on fire", where nothing asks Jev.
-- An old `config_tuning.json` may still hold `triage_flow` or `triage_confidence_gap` (settings of the removed
-  single-model flow); they are read and ignored.
-
-### Optional remote fallback (decision layer)
-
-With a `"classifier": {"triage_fallback": true}` section added to `configs/config_tuning.json` (it is not in the `.example` seed) and
-a key for a backend of the `triage` chain in `.env`, the remote classifier (`src/llm/decision.py`, see
-[Decision layer](#decision-layer-optional)) is the third voter of the flow above, asked about what both Laya models
-cannot settle:
-
-- a text Laya cannot read in full (over its window, or reported truncated) goes to the classifier for every
-  question. `classifier.max_input_chars` (default 16000) caps what is sent, since a remote window is larger than Laya's.
-
-The classifier only picks one option and reports a 0-100 confidence, which is no more calibrated
-than Laya's. Score questions are sent as levels `0`, `1`, ... (lowest first), and a
-noul question as `false` / `true`. If it fails, times out or has no key, Laya's
-answer is returned as it was (or, for unreadable input, the usual "could not read"
-error). Its prompt tokens are added to the turn's input tokens and the result's
-`model_note` says which models helped. It is **off by default**: the text
-sent to it leaves this machine and each call is billed by the backend. Laya is skipped in the
-triage chain here, since it is the provider asking.
-
-Escalating to a real LLM is otherwise the orchestrator's decision: when `uncertain` is
-true it can answer itself or delegate to another specialist. `0.70` is an
-experimental review gate, **not a calibrated accuracy claim**. Run
-`python -m scripts.check_laya_triage` for ten real-model smoke examples using
-a triage question set, then evaluate representative local inputs before
-relying on the answers.
-
-To exercise the decision provider without the orchestrator, run
-`python -m scripts.check_triage_cases`. Use `--list`, `--case NAME` (or a pattern
-such as `"escalate-*"`), `--rounds` (service-supplied call details), and `--json`
-(full answers). Use `--strategy both`, `--strategy jev-only`, or `--baseline`
-(Laya only) to compare gateway strategies. Live calls require a prepared deployment;
-Jev sends the cases' text to the cloud. Laya owns its internal decision rules.
-
-Usage reports the model's actual input-token work and zero generated output
-tokens. Laya is restricted to a specialist with the pinned checkpoint and
-local gateway; generation settings, an entry role, or an orchestrator role are
-rejected at startup.
+Run `python -m scripts.check_router_cases --offline` for synthetic contract
+checks. Live diagnostics require a prepared deployment:
+`python -m scripts.check_laya_triage` uses only Laya, and
+`python -m scripts.check_triage_cases` supports `--list`, `--case NAME`,
+`--strategy both|laya-only|jev-only`, `--baseline` (Laya only), `--rounds` and
+`--json`. These are smoke examples, not accuracy benchmarks.
 
 ## Orchestrator
 
@@ -502,30 +367,18 @@ recompression and summary usage accounting. They do not use the short routing
 brief as the chat's replacement memory. No helper means manual compaction
 reports unavailability; automatic compaction keeps the history and continues.
 
-### Classifier backend configuration
+### Decision gateway configuration
 
-The shared `classifier` section still configures Triage Assistant and the Jev
-backend chain Router uses for remote fallback. Router's own voting policy is the
-`decision` block of its agent definition and Admin override; it does not mutate
-Triage Assistant's cached settings.
+The `classifier` tuning section contains `timeout_seconds`, `max_input_chars`,
+and the `auto_tier` / `auto_route` helper settings (`enabled`, `strategy`,
+`min_confidence`; auto tier also has a size-to-tier mapping). Strategy values are
+`laya-only`, `jev-only`, and `both`; these helper confidence thresholds use
+percentages from 0 to 100. Admin Tuning edits strategy and confidence; enable
+flags and tier mappings stay in the file. Router uses its agent's separate
+`decision` policy and does not mutate these helper settings.
 
-| Backend | Transport | Deployment credential |
-| --- | --- | --- |
-| `jev` | TypeSafe Jev API, default model `jev-latest` | `TYPESAFE_API_KEY` |
-| `jev_vercel` | Vercel AI Gateway, default model `typesafe-ai/jev` | `VERCEL_GATEWAY_API_KEY` |
-| `laya` | Existing local classifier helper | none |
-
-`classifier.auto_route`, `classifier.auto_tier` and their feature-specific chains
-are accepted for compatibility but no longer control automatic entry-turn
-routing. Their reusable helper functions remain available for comparison tests.
-Configure Router in Agents instead. Remote fallback sends the routing subject to
-the selected provider and uses that provider's billing.
-
-Run `python -m scripts.check_router_cases --offline` for deterministic contract
-fixtures. It does not measure model accuracy. The explicit `--live` comparison
-uses installed local models and environment credentials, records outcomes,
-abstentions, elapsed time and remote calls, and never executes specialist work.
-See [router-evaluation.md](docs/router-evaluation.md) before deployment activation.
+Laya and Jev transport/model presets belong in `gateways/decision/`. Jev calls
+TypeSafe's API with `TYPESAFE_API_KEY`; Laya uses the configured local service.
 
 ## Usage log
 

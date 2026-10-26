@@ -2,7 +2,7 @@
 
 The user fills in a form (a yes/no question, a multiple choice question whose
 options have descriptions, or a score question whose levels have descriptions). This module turns that into the JSON question Laya
-reads (ai_agent/src/llm/laya_provider.py) and sends it to the Triage Assistant
+reads (garrison/src/providers/decision/provider.py) and sends it to the Triage Assistant
 without the orchestrator. Option titles are written by the `title-writer` agent:
 one plain model call that sees only the descriptions.
 """
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 DECISION_PROVIDER = "decision"
 TITLE_AGENT_ID = "title-writer"
 QID = "q"
-TEXT_MAX = 4000  # Laya's own limit (laya_provider.MAX_INPUT_CHARS)
+TEXT_MAX = 4000  # Laya's own gateway limit
 QUESTION_MAX = 300
 DESCRIPTION_MAX = 300
 MIN_OPTIONS = 2
@@ -104,7 +104,6 @@ def parse_titles(response: str, count: int) -> list[str]:
 
 def build_request(
     kind: Kind, text: str, question: str, options: list[Option], trace: bool = False, levels: list[str] | None = None,
-    strategy: str | None = None,
 ) -> str:
     """ai_agent's Laya question format: one question, id `q`. `levels` (score only) are the level
     descriptions, lowest first."""
@@ -117,12 +116,10 @@ def build_request(
         spec = {"type": "score", "instructions": question, "criteria": list(levels or [])}
     else:
         spec = {"type": "choice", "instructions": question, "criteria": {o.title: o.description for o in options}}
-    # local_only: Laya's own English model answers alone; the text never goes on to the fallback classifier (Jev).
+    # local_only: Laya's configured service strategy answers locally; the text never goes on to the fallback classifier (Jev).
     request: dict[str, Any] = {"text": text, "questions": {QID: spec}, "local_only": True}
     if trace:
         request["trace"] = True
-    if strategy:
-        request["strategy"] = strategy
     return json.dumps(request)
 
 
@@ -191,7 +188,7 @@ class TriageQuestions:
 
     async def ask(
         self, caller: Caller, kind: Kind, text: str, question: str, options: list[Option], trace: bool = False,
-        levels: list[str] | None = None, strategy: str | None = None,
+        levels: list[str] | None = None,
     ) -> AskOutcome:
         """Asks the Triage Assistant directly (no orchestrator) and returns the readable answer."""
         agent = await self._directory.find_by_provider(DECISION_PROVIDER)
@@ -199,7 +196,7 @@ class TriageQuestions:
             raise TriageUnavailable("the Triage Assistant is not running")
         try:
             result = await self._gateway.ask(
-                agent.url, caller, question=build_request(kind, text, question, options, trace, levels, strategy), history=[],
+                agent.url, caller, question=build_request(kind, text, question, options, trace, levels), history=[],
                 request_id=uuid.uuid4().hex, caveman=False, enabled_extensions=[], on_event=_ignore_event,
             )
         except AgentCallError as error:

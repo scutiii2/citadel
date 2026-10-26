@@ -44,7 +44,7 @@ def test_put_null_resets_a_path(client):
 
 
 def test_put_refuses_a_bad_change_and_saves_nothing(client):
-    response = client.put("/agents/tuning", json={"token_limits.default.max_tool_rounds": 500, "classifier.triage_trace": True})
+    response = client.put("/agents/tuning", json={"token_limits.default.max_tool_rounds": 500, "classifier.auto_tier.strategy": "both"})
     assert response.status_code == 400
     assert "max_tool_rounds" in response.json()["error"]
     assert client.get("/agents/tuning").json()["overrides"] == {}

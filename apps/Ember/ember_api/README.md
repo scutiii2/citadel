@@ -12,12 +12,10 @@ Speech gateways supply account identity and the internal token. Rejected audio/t
 
 ## Triage strategy
 
-Migration `0026` adds nullable `accounts.triage_strategy`. Null follows Garrison's
-admin default; a saved value is added only to this account's direct Triage Assistant
-requests. The browser's ask payload does not choose it. Strategy names come from
-Laya through Garrison. A retired stored choice returns 422 with Garrison's message,
-without silent fallback. Admin changes use `settings.manage` and record the old
-and new defaults in the activity log; no new permission or role grant is needed.
+Laya's internal strategy is configured in Garrison's `gateways/decision/laya.json`
+and read on every call. Direct triage requests stay local and do not pass account
+strategy preferences. The retired database preference and migration `0026` remain
+for schema/data history; the application no longer reads that preference.
 
 ## Conversation compaction
 
@@ -338,10 +336,6 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `POST` | `/api/account/email` | cookie | `{current_password, email}` -> `{account, verification_email_sent, email_error}`. The new email is unverified (permissions off) until its emailed code is entered. `400` wrong password, `409` email taken or bootstrap admin. |
 | `POST` | `/api/account/password` | cookie | `{current_password, new_password}` (8+ chars) -> the account. Logs out every other session. `400` wrong password, `409` bootstrap admin (change it in `.env`). |
 | `PATCH` | `/api/account/preferences` | logged in | `{prompt_suggestions: bool}`: whether chat suggests the next prompt. Returns the account. |
-| `GET` | `/api/account/triage-strategy` | logged in | `{value, default, strategies}`; retains the stored value with an empty list while Garrison is unavailable. |
-| `PUT` | `/api/account/triage-strategy` | logged in | Required `{value: string\|null}`; saves a service-listed name, or clears with null. Unknown names: 422; unavailable list: 503. Clearing works offline. |
-| `GET` | `/api/admin/triage-strategy` | `settings.manage` | Garrison's `{default, strategies}`; 502 when Garrison is unreachable. |
-| `PUT` | `/api/admin/triage-strategy` | `settings.manage` | Required `{value: string\|null}`; sets or clears the default for callers without their own strategy. Validation: 400; unreachable Garrison: 502. Audited as `triage_strategy.default`. |
 | `GET` | `/api/account/devices` | cookie | Devices this account logged in from, most recent first: `[{id, label, user_agent, ip_subnet, first_seen_at, last_seen_at, current}]`. |
 | `DELETE` | `/api/account/devices/{id}` | cookie | `204`; its next login counts as a new device again. `404` unknown or another account's. |
 | `POST` | `/api/admin/invites` | `invites.manage` | `{invitee_email?, delivery_method: "manual"\|"email"}` -> `201 {invite, code, email_sent, email_error}`. The code is shown only here. |

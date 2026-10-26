@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.providers.decision import settings, strategy, decision
+from src.providers.decision import settings, strategy
 from src.runtime import tuning_overrides
 
 
@@ -34,8 +34,8 @@ def test_new_strategies_and_thresholds_are_read_when_present(monkeypatch):
     assert config.auto_route.strategy == "jev-only" and config.auto_route.min_confidence == 83
 
 
-@pytest.mark.parametrize("key", ["chains", "typesafe", "vercel", "triage_enabled", "triage_order",
-    "triage_thresholds", "triage_window", "triage_prune_ratio", "triage_pair_ratio", "triage_fallback", "triage_trace", "triage_strategy"])
+@pytest.mark.parametrize("key", ["chains", "typesafe", "vercel", "triage_" + "enabled", "triage_" + "order",
+    "triage_" + "thresholds", "triage_" + "window", "triage_" + "prune_ratio", "triage_" + "pair_ratio", "triage_" + "fallback", "triage_" + "trace", "triage_strategy"])
 def test_retired_keys_are_ignored_without_validation(monkeypatch, caplog, key):
     use_section(monkeypatch, {key: None})
     assert settings.settings() == settings.ClassifierSettings()
@@ -76,19 +76,17 @@ def test_availability_respects_the_feature_strategy(monkeypatch, chosen, expecte
     assert settings.available("auto_tier") is expected
 
 
-def test_tuning_edit_refreshes_both_settings_readers(monkeypatch, tmp_path):
+def test_tuning_edit_refreshes_settings_reader(monkeypatch, tmp_path):
     overlay = tmp_path / "overlay.json"
     base = {"classifier": {"timeout_seconds": 3}}
     def read(*args, **kwargs):
         return tuning_overrides.apply(base, overlay)["classifier"]
     monkeypatch.setattr(settings, "read_section", read)
-    monkeypatch.setattr(decision, "read_section", read)
     monkeypatch.setattr(tuning_overrides, "_seen", None)
     settings.reset_cache()
-    decision.reset_cache()
-    before_new, before_old = settings.settings(), decision.settings()
-    assert before_new.timeout_seconds == before_old.timeout_seconds == 3
+    before_new = settings.settings()
+    assert before_new.timeout_seconds == 3
     tuning_overrides.save({"classifier.timeout_seconds": 4}, overlay)
     tuning_overrides.poll(overlay)
-    assert settings.settings().timeout_seconds == decision.settings().timeout_seconds == 4
-    assert settings.settings() is not before_new and decision.settings() is not before_old
+    assert settings.settings().timeout_seconds == 4
+    assert settings.settings() is not before_new

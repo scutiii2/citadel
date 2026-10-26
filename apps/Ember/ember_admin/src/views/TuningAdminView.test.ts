@@ -11,10 +11,9 @@ const view = (overrides: TuningView["overrides"] = {}): TuningView => {
     token_limits: { default: { max_output_tokens: 2048, max_context_tokens: 100000, max_tool_rounds: 15 } },
     gateway_failover: { quota_cooldown_seconds: 3600, auth_cooldown_seconds: 3600, unavailable_cooldown_seconds: 30 },
     classifier: {
-      timeout_seconds: 3, max_input_chars: 16000, triage_fallback: false, triage_trace: false, triage_window: 4096,
-      triage_prune_ratio: 0.25, triage_pair_ratio: 0.5,
-      triage_thresholds: { "2": { jev: 0.9 }, "3+": { jev: 0.9 } },
-      triage_enabled: { jev: { choice: true, noul: true, score: true } },
+      timeout_seconds: 3, max_input_chars: 16000,
+      auto_tier: { strategy: "both", min_confidence: 80 },
+      auto_route: { strategy: "both", min_confidence: 80 },
     },
   };
   return { defaults, overrides, effective: defaults };
@@ -59,13 +58,13 @@ it("marks a changed field and resets it with null", async () => {
   expect(tuningClient.save).toHaveBeenCalledWith({ "gateway_failover.quota_cooldown_seconds": null });
 });
 
-it("toggles a boolean and saves it", async () => {
+it("selects a decision strategy and saves it", async () => {
   const wrapper = await show(view());
-  vi.mocked(tuningClient.save).mockResolvedValue(view({ "classifier.triage_trace": true }));
-  await wrapper.get('[data-path="classifier.triage_trace"]').setValue(true);
+  vi.mocked(tuningClient.save).mockResolvedValue(view({ "classifier.auto_tier.strategy": "laya-only" }));
+  await wrapper.get('[data-path="classifier.auto_tier.strategy"]').setValue("laya-only");
   await wrapper.get('[data-test="save"]').trigger("click");
   await flushPromises();
-  expect(tuningClient.save).toHaveBeenCalledWith({ "classifier.triage_trace": true });
+  expect(tuningClient.save).toHaveBeenCalledWith({ "classifier.auto_tier.strategy": "laya-only" });
 });
 
 it("shows the refusal and keeps the draft", async () => {

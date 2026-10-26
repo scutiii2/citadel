@@ -17,7 +17,7 @@ from src.providers import cancellation
 def usage_row(row: VoterUsage, request_id: str, delegated_by: str | None = None) -> dict:
     finished = datetime.fromisoformat(row.started_at) + timedelta(milliseconds=row.duration_ms)
     return {"agent_id": "router", "agent_label": "Router", "provider_id": row.provider_id,
-        "gateway": "local" if row.provider_id == "laya" else ("typesafe" if row.provider_id == "jev" else "vercel"),
+        "gateway": "local" if row.provider_id == "laya" else "typesafe",
         "model": row.model, "input_tokens": row.input_tokens, "output_tokens": row.output_tokens,
         "total_tokens": None if row.input_tokens is None else row.input_tokens + (row.output_tokens or 0),
         "started_at": row.started_at, "finished_at": finished.isoformat(),

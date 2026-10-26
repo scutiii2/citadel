@@ -49,7 +49,6 @@ from src.routes import (
     templates,
     traffic as traffic_routes,
     triage,
-    triage_strategy,
     usage,
     user_extensions,
 )
@@ -234,8 +233,6 @@ def create_app(
     app.include_router(memory.router)
     app.include_router(skills.router)
     app.include_router(triage.router)
-    app.include_router(triage_strategy.admin_router)
-    app.include_router(triage_strategy.account_router)
     app.include_router(account_agents.router)
     app.include_router(user_extensions.router)
     app.include_router(shares.router)

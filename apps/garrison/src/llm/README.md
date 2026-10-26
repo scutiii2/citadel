@@ -15,19 +15,12 @@ Originally adapted from the retired chat_app's LLM layer.
   when the agent file's `llm.provider` is `anthropic`.
 - **`openai_provider.py`** - OpenAI Responses API provider, pinned when
   the provider is `openai`.
-- **`laya_provider.py`** - typed-question answerer: the caller sends JSON
-  `choice`, `score` and `noul` questions about a short text and gets JSON
-  answers with confidences. It validates the request and hands it to
-  `triage_flow.py`. No tools or text generation, and no API key.
-- **`laya_model.py`** - `LAYAModel`, the only connection to Laya: the shared Laya
-  service (`Python/LayaModel`) over HTTP. Garrison loads no Laya model itself.
-- **`triage_flow.py`** - resolves the request strategy, then the admin default,
-  then the per-type voter settings. A resolved override sends all questions under
-  one service strategy. The fallback classifier (Jev) settles uncertain results.
-- **`triage_strategy.py`** - describes and updates the admin default through
-  the internal-token `/agents/triage-strategy` routes; names come from the service.
-- **`laya_classifier.py`** - the `laya` backend of the decision layer: one `choice`
-  question answered by the service's `english-only` strategy.
+- **`../providers/decision/provider.py`** - validates typed question requests;
+  `strategy.py` runs the agent's selected strategy over the Laya/Jev gateways.
+  No tools or text generation. `settings.py` holds the automatic routing/tier
+  helper settings, and `laya_model.py` is the HTTP connection to LayaModel.
+  Laya owns its internal decision rules; its strategy is configured in the
+  gateway JSON file and read on each call.
 - **`llm_options.py`** - one agent's `llm` settings (temperature,
   reasoning effort, max tokens, tool rounds) as request kwargs; a
   parameter the API rejects with a 400 is dropped for the rest of the

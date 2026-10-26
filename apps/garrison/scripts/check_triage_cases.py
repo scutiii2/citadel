@@ -324,7 +324,7 @@ def table(rows: list[Row]) -> str:
 
 
 _STEP_NAMES = {
-    "laya": "Laya", "jev": "Jev", "jev_vercel": "Jev (Vercel)", "laya-english": "Laya (English)", "laya-typed": "Laya (typed)",
+    "laya": "Laya", "jev": "Jev", "laya-english": "Laya (English)", "laya-typed": "Laya (typed)",
 }
 
 
@@ -345,7 +345,7 @@ def rounds_table(row: Row) -> str:
     options = list(answer["probabilities"])
     body = []
     for number, step in enumerate(rounds, 1):
-        name = _STEP_NAMES.get(step["step"]) or step["step"].replace("jev_vercel", "Jev (Vercel)").replace("jev", "Jev").capitalize().replace("laya", "Laya")
+        name = _STEP_NAMES.get(step["step"]) or step["step"].replace("jev", "Jev").capitalize().replace("laya", "Laya")
         offered = step.get("options")
         if step["step"] == "gap":
             body.append([str(number), "Gap", "", f"defers to {_STEP_NAMES.get(step['deferred_to'], step['deferred_to'])}",

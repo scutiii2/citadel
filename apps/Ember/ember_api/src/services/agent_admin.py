@@ -122,15 +122,6 @@ class AgentAdmin:
         body = await self._request("PUT", "/agents/prompts", account, json=changes)
         return body if isinstance(body, dict) else {}
 
-    async def triage_strategy(self, account: Account) -> dict[str, Any]:
-        """Garrison's `{"default": str | None, "strategies": [names]}` for the Triage Assistant."""
-        body = await self._request("GET", "/agents/triage-strategy", account)
-        return body if isinstance(body, dict) else {"default": None, "strategies": []}
-
-    async def set_triage_strategy(self, account: Account, value: str | None) -> dict[str, Any]:
-        body = await self._request("PUT", "/agents/triage-strategy", account, json={"strategy": value})
-        return body if isinstance(body, dict) else {"default": None, "strategies": []}
-
     async def preview(self, account: Account, agent_id: str, config: dict[str, Any], caveman: bool) -> str:
         body = await self._request(
             "POST", "/agents/prompt-preview", account, json={"id": agent_id, "config": config, "caveman": caveman}

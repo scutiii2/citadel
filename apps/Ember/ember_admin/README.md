@@ -301,8 +301,7 @@ reads the candidate; Save applies a revision without restart; Disable revokes ne
 operations. `brain.instance.publish` separately permits publishing shared knowledge.
 See [brain operations](../../../docs/obsidian-brains.md).
 
-The Workspace settings **Triage strategy** panel lists Laya's service strategies
-and saves the administrator's default explicitly. "Not set (follows triage_order)"
-clears the override; `auto` is a separate service strategy. Save stays pending
-until confirmation, failed drafts remain available, and an unavailable list
-disables picking while keeping the stored default visible.
+Laya's internal strategy is configured in Garrison's `gateways/decision/laya.json`
+and read on each call. Admin Tuning edits the gateway strategy and confidence for
+automatic tier selection and specialist routing; no admin or account control
+selects Laya's internal service strategy.

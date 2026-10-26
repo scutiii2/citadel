@@ -4,7 +4,6 @@ import { createPinia, setActivePinia } from "pinia";
 import { reactive } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authClient } from "../../api/auth/AuthClient";
-import { triageStrategyClient, type TriageStrategyInfo } from "../../api/triage/TriageStrategyClient";
 import { tuningClient } from "../../api/navigation/TuningClient";
 import { navPreferencesClient } from "../../api/navigation/NavPreferencesClient";
 import { settingsClient } from "../../api/navigation/SettingsClient";
@@ -22,9 +21,7 @@ vi.mock("../../api/navigation/NavPreferencesClient", () => ({
   navPreferencesClient: { get: vi.fn(), save: vi.fn(), reset: vi.fn() },
 }));
 
-vi.mock("../../api/triage/TriageStrategyClient", () => ({
-  triageStrategyClient: { get: vi.fn(), save: vi.fn() },
-}));
+
 
 // The chat store is big and talks to ember_api; this page only reads and sets
 // four preferences on it, so a plain stand-in is enough.
@@ -89,7 +86,6 @@ const search = (w: Awaited<ReturnType<typeof mountView>>) => w.get("input.search
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(triageStrategyClient.get).mockResolvedValue(STRATEGY_INFO);
   localStorage.clear();
   document.body.innerHTML = "";
   chat.caveman = false;
@@ -163,10 +159,10 @@ describe("SettingsView", () => {
   it("lists the chat and appearance settings, grouped, and no administration for a member", async () => {
     const w = await mountView();
 
-    expect(w.findAll("h3").map((h) => h.text())).toEqual(["Chat", "Context display", "Appearance", "Sidebar", "Response limits", "Triage Assistant"]);
+    expect(w.findAll("h3").map((h) => h.text())).toEqual(["Chat", "Context display", "Appearance", "Sidebar", "Response limits"]);
     expect(rowIds(w)).toEqual([
       "chat-terse", "chat-independent", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions",
-      "context-live-tokens", "context-panel", "context-accuracy", "appearance-theme", "sidebar-pages", "max_output_tokens", "max_tool_rounds", "triage-strategy",
+      "context-live-tokens", "context-panel", "context-accuracy", "appearance-theme", "sidebar-pages", "max_output_tokens", "max_tool_rounds",
     ]);
     expect(w.text()).not.toContain("Tool approval");
   });
@@ -384,7 +380,7 @@ describe("group headers", () => {
     const w = await mountView();
 
     const scopes = w.findAll(".scope");
-    expect(scopes.map((c) => c.text())).toEqual(["This device", "This device", "This device", "Your account", "Your account", "Your account"]);
+    expect(scopes.map((c) => c.text())).toEqual(["This device", "This device", "This device", "Your account", "Your account"]);
     expect(scopes[0]!.attributes("title")).toBe("Applies instantly. Saved on this device.");
     expect(scopes[3]!.attributes("title")).toBe("Applied when you save. Stored on your account.");
     expect(w.text()).not.toContain("Applies instantly. Saved on this device.");
@@ -395,7 +391,7 @@ describe("modified filter", () => {
   it("is a pill that shows only the changed settings, and toggles back", async () => {
     chat.caveman = true;
     const w = await mountView();
-    expect(rowIds(w)).toHaveLength(16);
+    expect(rowIds(w)).toHaveLength(15);
     expect(w.get(".badge").attributes("aria-pressed")).toBe("false");
 
     await w.get(".badge").trigger("click");
@@ -405,7 +401,7 @@ describe("modified filter", () => {
     expect(w.get(".badge").attributes("aria-pressed")).toBe("true");
 
     await w.get(".badge").trigger("click");
-    expect(rowIds(w)).toHaveLength(16);
+    expect(rowIds(w)).toHaveLength(15);
   });
 
   it("drops the filter once nothing is modified any more", async () => {
@@ -416,7 +412,7 @@ describe("modified filter", () => {
     await row(w, "chat-terse").get("button.reset").trigger("click");
 
     expect(w.find(".badge").exists()).toBe(false);
-    expect(rowIds(w)).toHaveLength(16);
+    expect(rowIds(w)).toHaveLength(15);
   });
 });
 
@@ -447,7 +443,7 @@ describe("search", () => {
     expect(w.text()).toContain('No settings match "zzz"');
     expect(rowIds(w)).toEqual([]);
     await w.get("button.link").trigger("click");
-    expect(rowIds(w)).toHaveLength(16);
+    expect(rowIds(w)).toHaveLength(15);
     expect((search(w).element as HTMLInputElement).value).toBe("");
   });
 
@@ -460,7 +456,7 @@ describe("search", () => {
 
     await search(w).trigger("keydown", { key: "Escape" });
     expect((search(w).element as HTMLInputElement).value).toBe("");
-    expect(rowIds(w)).toHaveLength(16);
+    expect(rowIds(w)).toHaveLength(15);
   });
 });
 
@@ -468,7 +464,7 @@ it("keeps workspace tool approval in Ember Admin", async () => {
   const w = await mountView(ADMIN);
   expect(w.text()).not.toContain("Tool approval");
   expect(w.text()).not.toContain("Applies to all accounts");
-  expect(rowIds(w)).toHaveLength(16);
+  expect(rowIds(w)).toHaveLength(15);
 });
 
 it("reverts account drafts while retaining applied device preferences", async () => {
@@ -530,108 +526,6 @@ it("explains blocked notifications and leaves the setting off", async () => {
   expect(w.get('[role="status"]').text()).toBe("Notifications are blocked.");
   expect((row(w, "chat-notifications").get("input").element as HTMLInputElement).checked).toBe(false);
   expect(chat.setBrowserNotifications).not.toHaveBeenCalled();
-});
-
-
-const STRATEGY_INFO = { value: null, default: "auto", strategies: ["english-only", "typed-only", "auto"] };
-
-it("shows the triage strategy with 'Default (…)' first and saves a pick with the other account settings", async () => {
-  vi.mocked(triageStrategyClient.get).mockResolvedValue(STRATEGY_INFO);
-  vi.mocked(triageStrategyClient.save).mockResolvedValue({ ...STRATEGY_INFO, value: "typed-only" });
-  const w = await mountView();
-  await flushPromises();
-
-  const select = w.find('[data-setting-id="triage-strategy"] select');
-  expect(select.findAll("option").map((o) => o.text())).toEqual(["Default (auto)", "english-only", "typed-only", "auto"]);
-  await select.setValue("typed-only");
-  expect(w.find(".settings-save-bar").exists()).toBe(true);
-  await w.find(".settings-save-bar button.save").trigger("click");
-  await flushPromises();
-  expect(triageStrategyClient.save).toHaveBeenCalledWith("typed-only");
-  expect(w.find(".settings-save-bar").exists()).toBe(false);
-});
-
-it("says 'Default (not set)' when the administrator set none and sends null for the default", async () => {
-  vi.mocked(triageStrategyClient.get).mockResolvedValue({ value: "typed-only", default: null, strategies: ["typed-only"] });
-  vi.mocked(triageStrategyClient.save).mockResolvedValue({ value: null, default: null, strategies: ["typed-only"] });
-  const w = await mountView();
-  await flushPromises();
-
-  const select = w.find('[data-setting-id="triage-strategy"] select');
-  expect(select.findAll("option")[0].text()).toBe("Default (not set)");
-  await select.setValue("");
-  await w.find(".settings-save-bar button.save").trigger("click");
-  await flushPromises();
-  expect(triageStrategyClient.save).toHaveBeenCalledWith(null);
-});
-
-it("disables the triage strategy while the strategy list is unavailable", async () => {
-  vi.mocked(triageStrategyClient.get).mockResolvedValue({ value: null, default: null, strategies: [] });
-  const w = await mountView();
-  await flushPromises();
-  expect(w.find('[data-setting-id="triage-strategy"] select').attributes("disabled")).toBeDefined();
-});
-
-
-it("retains the strategy draft and reports a failed save", async () => {
-  vi.mocked(triageStrategyClient.save).mockRejectedValueOnce(new Error("Strategy service unavailable"));
-  const w = await mountView();
-  await row(w, "triage-strategy").get("select").setValue("typed-only");
-  await w.get("button.save").trigger("click");
-  await flushPromises();
-  expect(w.get('[role="alert"]').text()).toContain("Strategy service unavailable");
-  expect((row(w, "triage-strategy").get("select").element as HTMLSelectElement).value).toBe("typed-only");
-  expect(w.find(".settings-save-bar").exists()).toBe(true);
-});
-
-it("holds a strategy save pending until confirmed by the server", async () => {
-  let finish!: (info: TriageStrategyInfo) => void;
-  vi.mocked(triageStrategyClient.save).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
-  const w = await mountView();
-  await row(w, "triage-strategy").get("select").setValue("typed-only");
-  await w.get("button.save").trigger("click");
-  expect(w.get(".settings-save-bar").attributes("aria-busy")).toBe("true");
-  expect(w.get("button.save").attributes("disabled")).toBeDefined();
-  expect(w.find("fieldset:disabled").exists()).toBe(true);
-  finish({ ...STRATEGY_INFO, value: "typed-only" });
-  await flushPromises();
-  expect(w.find(".settings-save-bar").exists()).toBe(false);
-});
-
-it("reloads on account changes and ignores the previous account's late strategy", async () => {
-  let finish!: (info: TriageStrategyInfo) => void;
-  vi.mocked(triageStrategyClient.get).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
-  const w = await mountView();
-  vi.mocked(triageStrategyClient.get).mockResolvedValueOnce({ ...STRATEGY_INFO, value: "auto" });
-  const auth = useAuthStore();
-  auth.account = { ...auth.account!, id: 2, username: "bob" };
-  await flushPromises();
-  expect(triageStrategyClient.get).toHaveBeenCalledTimes(2);
-  finish({ ...STRATEGY_INFO, value: "typed-only" });
-  await flushPromises();
-  expect((row(w, "triage-strategy").get("select").element as HTMLSelectElement).value).toBe("auto");
-  expect(w.find(".settings-save-bar").exists()).toBe(false);
-});
-
-it("keeps an unavailable stored strategy visible while disabling picks", async () => {
-  vi.mocked(triageStrategyClient.get).mockResolvedValue({ value: "retired", default: null, strategies: [] });
-  const w = await mountView();
-  const select = row(w, "triage-strategy").get("select");
-  expect((select.element as HTMLSelectElement).value).toBe("retired");
-  expect(select.attributes("disabled")).toBeDefined();
-});
-
-it("focuses the strategy select when Enter follows a settings search", async () => {
-  const w = await mountView();
-  await search(w).setValue("triage");
-  await search(w).trigger("keydown.enter");
-  expect(document.activeElement).toBe(row(w, "triage-strategy").get("select").element);
-});
-
-it("explains the local model call cost of the selected strategy", async () => {
-  const w = await mountView();
-  await row(w, "triage-strategy").get("select").setValue("typed-only");
-  expect(row(w, "triage-strategy").text()).toContain("Costs 1 call");
 });
 
 

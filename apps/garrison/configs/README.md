@@ -14,17 +14,14 @@ Choose backups with each agent's `llm.fallback_gateways` list, documented in
 [`../README.md`](../README.md#gateway-failover); this tuning section only controls
 the cooldown durations, and enables no backups by itself.
 
-- **`config_tuning.json`** - `token_limits`: output/context/tool-round
-  caps, per provider and gateway (`src/llm/token_limits.py`). `classifier`
-  (the `.example` seeds every key at its default, so every feature is off until you switch it on; a key
-  you delete falls back to that default): the decision layer
-  (`src/llm/decision.py`) - `triage_fallback`, `triage_trace` (full instead of compact answers), `triage_window`, `triage_thresholds`, `triage_enabled` (voter -> question type -> on/off), `triage_order` (question type -> voters, first to last),
-  `triage_prune_ratio`, `triage_pair_ratio`, `chains` (feature: backends tried in
-  order; `jev`, `jev_vercel`, `laya`), `typesafe` and `vercel` (`url`, `model`),
-  `timeout_seconds`, `max_input_chars`, `auto_tier` (`enabled`,
-  `min_confidence`, `tiers`: the model tier chosen per request size) and `auto_route`
-  (`enabled`, `min_confidence`: send a question straight to a specialist). Needs
-  `TYPESAFE_API_KEY` or `VERCEL_GATEWAY_API_KEY` in `../.env`, per the chain.
+- **`config_tuning.json`** - `token_limits` supplies output/context/tool-round caps
+  per provider and gateway (`src/providers/token_limits.py`). `classifier` supplies
+  `timeout_seconds`, `max_input_chars`, and `auto_tier` / `auto_route` settings:
+  `enabled`, `strategy` (`laya-only`, `jev-only`, `both`), and `min_confidence`
+  (0-100). Auto tier also maps request sizes to model tiers. Features default off;
+  the example selects confidence 80. Gateway endpoints/models live in
+  `gateways/decision/`, and Laya's internal service strategy is read there on
+  every call. It has no account or admin override.
 - **`config_servers.json`** - `servers`: the MCP servers this agent
   connects to as a client (currently just `main`, this repo's
   `mcp_server`). Loaded by `src/mcp_client/config.py`'s `load_servers_config` into
@@ -71,8 +68,8 @@ Written by the admin Tuning page (ember_admin), not by hand. It holds only what 
 changed, as flat dotted paths such as `"token_limits.default.max_tool_rounds": 20`, and is
 merged over `config_tuning.json` when that file is read. Delete a line (or reset it on the page)
 to go back to the file's value. Gitignore it like the other local configs. Keys that are not
-listed in `src/core/tuning_overrides.py` (URLs, models, chains, `triage_order`) stay file-only.
+listed in `src/runtime/tuning_overrides.py` stay file-only, including feature enable flags and tier mappings.
 Each agent process notices a change at the start of its next turn; no restart is needed.
 
 In Docker, this path links to `.data/admin_tuning_overrides.json` in the existing `agent_data` volume.
-The numeric tuning overlay survives container recreation independently of the existing triage-strategy store.
+The tuning overlay survives container recreation.

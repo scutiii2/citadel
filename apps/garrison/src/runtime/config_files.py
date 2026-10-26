@@ -72,15 +72,18 @@ def seed_tuning(path: Path = TUNING_PATH) -> None:
             temporary.unlink(missing_ok=True)
 
 
-# classifier keys an admin edits only in the file: endpoints, models and routing.
-_FILE_ONLY_CLASSIFIER = ("typesafe", "vercel", "chains", "triage_order", "auto_tier", "auto_route")
-
-
 def _editable(raw: dict[str, Any]) -> dict[str, Any]:
     out = {name: raw[name] for name in ("token_limits", "gateway_failover") if name in raw}
-    classifier = raw.get("classifier")
+    classifier = raw.get("classifier", {})
     if isinstance(classifier, dict):
-        out["classifier"] = {k: v for k, v in classifier.items() if k not in _FILE_ONLY_CLASSIFIER}
+        section = {k: classifier[k] for k in ("timeout_seconds", "max_input_chars") if k in classifier}
+        from src.providers.decision.settings import AutoTierSettings, AutoRouteSettings
+
+        for feature, defaults in (("auto_tier", AutoTierSettings()), ("auto_route", AutoRouteSettings())):
+            value = classifier.get(feature, {})
+            if isinstance(value, dict):
+                section[feature] = {k: value.get(k, getattr(defaults, k)) for k in ("strategy", "min_confidence")}
+        out["classifier"] = section
     return out
 
 

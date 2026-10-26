@@ -3,7 +3,6 @@ import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import { getCurrentInstance } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
-import { triageStrategyClient, type TriageStrategyInfo } from "../../api/triage/TriageStrategyClient";
 import { navPreferencesClient } from "../../api/navigation/NavPreferencesClient";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import { errorMessage } from "../../utils/errors";
@@ -37,7 +36,7 @@ import { filterSettings, type SearchableSetting } from "./utils/settingsSearch";
 
 interface SettingDef extends SearchableSetting {
   id: string;
-  group: "chat" | "context" | "appearance" | "sidebar" | "limits" | "triage";
+  group: "chat" | "context" | "appearance" | "sidebar" | "limits";
 }
 
 // Icon paths are on a 16px grid, stroke only. The scope chip says where a group's
@@ -67,25 +66,13 @@ const GROUPS = [
   {
     id: "limits", title: "Response limits", icon: "M2 4h12M2 8h8M2 12h5", scope: "Your account", note: "Applied when you save. Stored on your account.",
   },
-  {
-    id: "triage",
-    title: "Triage Assistant",
-    icon: "M8 2l5 2v4c0 3-2 5-5 6-3-1-5-3-5-6V4z",
-    scope: "Your account",
-    note: "Applied when you save. Stored on your account.",
-  },
+
 ] as const;
 const SEARCH_ICON = "M7 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10M11 11l3.5 3.5";
 
 const DEFS: SettingDef[] = [
   { id: "response-limits", group: "limits", label: "Response limits", description: "Set lower limits for your answers.", keywords: ["tokens", "tool rounds", "length", "output"] },
-  {
-    id: "triage-strategy",
-    group: "triage",
-    label: "Triage strategy",
-    description: "How the Triage Assistant decides when you ask it a question directly.",
-    keywords: ["laya", "triage", "strategy", "classifier", "english", "typed", "consensus", "average"],
-  },
+
 
   {
     id: "chat-terse",
@@ -196,33 +183,6 @@ const chat = useChatStore();
 const { theme, setTheme } = useTheme();
 const navPrefs = useNavPrefsStore();
 
-const strategyInfo = ref<TriageStrategyInfo | null>(null);
-let strategyLoad = 0;
-async function loadStrategy(): Promise<void> {
-  const load = ++strategyLoad;
-  const accountId = auth.account?.id;
-  if (accountId === undefined) return;
-  try {
-    const result = await triageStrategyClient.get();
-    if (load === strategyLoad && accountId === auth.account?.id) strategyInfo.value = result;
-  } catch {
-    if (load === strategyLoad && accountId === auth.account?.id) strategyInfo.value = null;
-  }
-}
-const STRATEGY_COST: Record<string, string> = {
-  "english-only": "1 call", "typed-only": "1 call", "english-then-typed": "1-2+ calls",
-  "typed-then-english": "1-2+ calls", "most-confident": "2 calls", average: "2 calls", consensus: "2 calls", auto: "1-2+ calls",
-};
-const strategyNames = computed(() => {
-  const names = strategyInfo.value?.strategies ?? [];
-  const stored = strategyInfo.value?.value;
-  return stored && !names.includes(stored) ? [stored, ...names] : names;
-});
-const strategyOptions = computed(() => [
-  { value: "", label: `Default (${strategyInfo.value?.default ?? "not set"})` },
-  ...strategyNames.value.map((name) => ({ value: name, label: name, cost: STRATEGY_COST[name] ?? "" })),
-]);
-
 const limitsState = ref(emptyLimitsState());
 const responseDirty = computed(() => limitsDirty(limitsState.value));
 const responseSaving = computed(() => limitsState.value.pending && limitsState.value.stored !== null);
@@ -251,16 +211,9 @@ const saved = computed(() => ({
   browserNotifications: chat.browserNotifications,
   liveTokens: chat.liveTokens, contextPanel: chat.contextPanel, contextAccuracy: chat.contextAccuracy,
   suggestions: auth.promptSuggestions, theme: theme.value,
-  triageStrategy: strategyInfo.value?.value ?? "",
   sidebar: { order: [...navPrefs.prefs.order], pinned: [...navPrefs.prefs.pinned], hidden: [...navPrefs.prefs.hidden] },
 }));
 const draft = ref(structuredClone(saved.value));
-const strategyDescription = computed(() => {
-  const picked = strategyOptions.value.find((o) => o.value === draft.value.triageStrategy);
-  const cost = picked && "cost" in picked && picked.cost ? ` Costs ${picked.cost} to the local Laya models per question.` : "";
-  return `How the Triage Assistant decides when you ask it a question directly.${cost}`;
-});
-
 const saving = ref(false);
 const saveError = ref("");
 const notificationMessage = ref("");
@@ -321,7 +274,7 @@ watch(() => [draft.value.caveman, draft.value.plan, draft.value.planLean, draft.
 });
 const dirty = computed(() => draft.value.suggestions !== saved.value.suggestions
   || JSON.stringify(draft.value.sidebar) !== JSON.stringify(saved.value.sidebar)
-  || draft.value.triageStrategy !== saved.value.triageStrategy || responseDirty.value);
+  || responseDirty.value);
 watch(saved, (next, previous) => {
   if (saving.value) return;
   for (const key of Object.keys(next) as (keyof typeof next)[]) {
@@ -331,11 +284,9 @@ watch(saved, (next, previous) => {
   }
 });
 watch(() => auth.account?.id, () => {
-  strategyInfo.value = null;
   limitsState.value = emptyLimitsState();
   draft.value = structuredClone(saved.value);
   saveError.value = "";
-  void loadStrategy();
 });
 function revert(): void { draft.value = structuredClone(saved.value); if (limitsState.value.stored) limitsState.value = adoptLimits(limitsState.value.stored); saveError.value = ""; }
 async function save(): Promise<void> {
@@ -358,12 +309,7 @@ async function save(): Promise<void> {
       navPrefs.prefs = result;
       draft.value.sidebar = structuredClone(result);
     }
-    if (next.triageStrategy !== saved.value.triageStrategy) {
-      const result = await triageStrategyClient.save(next.triageStrategy || null);
-      if (accountId !== auth.account?.id) return;
-      strategyInfo.value = result;
-      draft.value.triageStrategy = result.value ?? "";
-    }
+
 
   } catch (err) { if (accountId === auth.account?.id) saveError.value = errorMessage(err); }
   finally { saving.value = false; }
@@ -403,7 +349,6 @@ const modified = computed(() => ({
   "context-accuracy": draft.value.contextAccuracy !== DEFAULT_CONTEXT_ACCURACY,
   "appearance-theme": draft.value.theme !== DEFAULT_THEME,
   "sidebar-pages": !isDefault(draft.value.sidebar),
-  "triage-strategy": draft.value.triageStrategy !== "",
   "response-limits": Object.values(limitsState.value.draft).some(value => value !== ""),
 }));
 const modifiedCount = computed(() => Object.values(modified.value).filter(Boolean).length);
@@ -428,7 +373,6 @@ function jumpToFirst(): void {
 onMounted(() => {
   // Whether an administrator forces tool approval decides if "Ask before tools" can change.
   void chat.refreshSettings();
-  void loadStrategy();
 });
 </script>
 
@@ -638,25 +582,7 @@ onMounted(() => {
         <div v-else-if="g.id === 'limits'" class="card">
           <ResponseLimits v-if="shown.has('response-limits')" :key="auth.account?.id" v-model="limitsState" />
         </div>
-        <div v-else-if="g.id === 'triage'" class="card">
-          <SettingRow
-            v-if="shown.has('triage-strategy')"
-            setting-id="triage-strategy"
-            label="Triage strategy"
-            :description="strategyDescription"
-            :modified="modified['triage-strategy']"
-            @reset="draft.triageStrategy = ''"
-          >
-            <select
-              v-model="draft.triageStrategy"
-              class="strategy-select"
-              aria-label="Triage strategy"
-              :disabled="!strategyInfo || strategyInfo.strategies.length === 0"
-            >
-              <option v-for="o in strategyOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-            </select>
-          </SettingRow>
-        </div>
+
       </fieldset></section>
 
     </div>
@@ -680,7 +606,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.strategy-select { max-width: 220px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; }
 
 .settings-controls:disabled { pointer-events: none; }
 .settings-controls { padding: 0; margin: 0; min-width: 0; border: none; }
