@@ -121,6 +121,7 @@ class EventOut(BaseModel):
     location: str
     description: str
     sources: list[SourceOut]
+    cancelled: bool
 
 
 class FeedProblem(BaseModel):
@@ -150,7 +151,7 @@ async def list_events(
     return EventsOut(
         events=[EventOut(
             uid=e.uid, title=e.title, start=e.start, end=e.end, all_day=e.all_day, location=e.location,
-            description=e.description, sources=[SourceOut(name=n, color=colors.get(n, "#808080")) for n in e.sources],
+            description=e.description, cancelled=e.cancelled, sources=[SourceOut(name=n, color=colors.get(n, "#808080")) for n in e.sources],
         ) for e in result.events],
         errors=[FeedProblem(feed=n, message=m) for n, m in result.errors],
     )

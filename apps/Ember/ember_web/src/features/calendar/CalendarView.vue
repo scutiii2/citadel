@@ -17,8 +17,15 @@ const grid = ref<InstanceType<typeof FullCalendar> | null>(null);
 const selected = ref<CalendarEvent | null>(null);
 
 function toInput(e: CalendarEvent): EventInput {
-  const color = e.sources[0]?.color;
-  return { id: `${e.uid}|${e.start}`, title: e.title, start: e.start, end: e.end, allDay: e.all_day, backgroundColor: color, borderColor: color, extendedProps: { source: e } };
+  const state = e.cancelled ? "cancelled" : new Date(e.end) < new Date() ? "done" : "upcoming";
+  return { id: `${e.uid}|${e.start}`, title: e.title, start: e.start, end: e.end, allDay: e.all_day, classNames: [`is-${state}`], extendedProps: { source: e } };
+}
+
+/** A left bar striped in each schedule's color, so a shared event shows every schedule it belongs to. */
+function bar(e: CalendarEvent): string {
+  const colors = e.sources.map((s) => s.color);
+  const stops = colors.map((c, i) => `${c} ${(i * 100) / colors.length}% ${((i + 1) * 100) / colors.length}%`);
+  return colors.length ? `linear-gradient(${stops.join(", ")})` : "var(--muted)";
 }
 
 const options: CalendarOptions = {
@@ -32,7 +39,6 @@ const options: CalendarOptions = {
   nowIndicator: true,
   slotDuration: "00:30:00",
   allDaySlot: true,
-  eventDidMount: (info) => info.el.style.setProperty("--event-color", info.event.backgroundColor || "var(--accent)"),
   events: (info, success, failure) => {
     calendar.loadEvents(info.start, info.end).then((list) => success(list.map(toInput)), failure);
   },
@@ -68,7 +74,16 @@ onBeforeUnmount(() => {
         <ul v-if="calendar.problems.length" class="issues" role="status">
           <li v-for="p in calendar.problems" :key="p.feed">⚠ {{ p.feed }}: {{ p.message }}</li>
         </ul>
-        <FullCalendar ref="grid" :options="options" class="fc-host" />
+        <FullCalendar ref="grid" :options="options" class="fc-host">
+          <template #eventContent="{ event, timeText }">
+            <div class="ev" :style="{ '--bar': bar(event.extendedProps.source) }">
+              <span class="ev-title">{{ timeText }} {{ event.title }}</span>
+              <span class="ev-sources">
+                <span v-for="s in event.extendedProps.source.sources" :key="s.name" class="ev-source"><i :style="{ background: s.color }" />{{ s.name }}</span>
+              </span>
+            </div>
+          </template>
+        </FullCalendar>
       </section>
     </div>
     <EventDialog :event="selected" @close="selected = null" />
@@ -83,8 +98,14 @@ onBeforeUnmount(() => {
 .issues { margin: 0 0 8px; padding: 8px 12px; list-style: none; color: var(--warning); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.85rem; }
 .problem { color: var(--danger); }
 @media (max-width: 767px) {
-  .workspace { grid-template-columns: minmax(0, 1fr); }
+  /* Stacked: size to the content and let the page scroll, so the grid cannot be squeezed over the panels above it. */
+  .workspace { grid-template-columns: minmax(0, 1fr); flex: none; }
   .side { overflow: visible; }
+  .grid { height: 36rem; }
+  .calendar :deep(.fc .fc-header-toolbar) { flex-wrap: wrap; justify-content: center; gap: 8px; }
+  /* Seven cells of 7.5rem so a month cell can show a title and its schedule names; the grid scrolls sideways, the toolbar stays. */
+  .calendar :deep(.fc .fc-view-harness) { overflow-x: auto; }
+  .calendar :deep(.fc .fc-dayGridMonth-view) { min-width: 52.5rem; }
 }
 .calendar :deep(.fc) {
   --fc-border-color: var(--border);
@@ -98,11 +119,19 @@ onBeforeUnmount(() => {
 .calendar :deep(.fc .fc-button) { color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: none; text-transform: none; }
 .calendar :deep(.fc .fc-button-active), .calendar :deep(.fc .fc-button:hover) { color: var(--accent-contrast); background: var(--accent); border-color: var(--accent); }
 .calendar :deep(.fc .fc-event) {
+  --event-color: var(--success);
   color: var(--text);
-  background: color-mix(in srgb, var(--event-color, var(--accent)) 18%, var(--bg));
+  background: color-mix(in srgb, var(--event-color) 22%, var(--bg));
   border: 0;
-  border-left: 4px solid var(--event-color, var(--accent));
   border-radius: var(--radius-sm);
 }
+.calendar :deep(.fc .fc-event.is-done), .calendar :deep(.fc .fc-event.is-cancelled) { --event-color: var(--muted); color: var(--muted); }
+.calendar :deep(.fc .fc-event.is-cancelled .ev-title) { text-decoration: line-through; }
+.calendar :deep(.ev) { display: grid; gap: 2px; min-width: 0; height: 100%; padding: 1px 4px 1px 10px; position: relative; overflow: hidden; font-size: 0.8rem; }
+.calendar :deep(.ev::before) { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--bar); }
+.calendar :deep(.ev-title) { overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.calendar :deep(.ev-sources) { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 0.72rem; color: var(--muted); }
+.calendar :deep(.ev-source) { display: inline-flex; align-items: center; gap: 4px; }
+.calendar :deep(.ev-source i) { width: 8px; height: 8px; border-radius: var(--radius-full); flex: none; }
 .calendar :deep(.fc .fc-col-header-cell-cushion), .calendar :deep(.fc .fc-daygrid-day-number), .calendar :deep(.fc .fc-timegrid-slot-label-cushion) { color: var(--muted); text-decoration: none; }
 </style>
