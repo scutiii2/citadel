@@ -28,10 +28,26 @@ def test_unknown_role_is_refused(tmp_path):
         load(tmp_path, {**BASE, "role": "boss"})
 
 
-def test_old_flags_are_unknown_keys(tmp_path):
-    for key, value in (("orchestrator", True), ("internal_role", "router")):
-        with pytest.raises(AgentSpecError, match=key):
-            load(tmp_path, {**BASE, "role": "specialist", key: value})
+def test_legacy_flags_in_stored_overrides_load(tmp_path):
+    overrides = tmp_path / ".overrides" / "agent_overrides.json"
+    overrides.parent.mkdir()
+    entry = {**BASE, "entry": True}
+    overrides.write_text(json.dumps({
+        "on": {**entry, "orchestrator": True},
+        "off": {**entry, "orchestrator": False},
+        "plain": dict(entry),
+        "kept": {**entry, "role": "specialist", "orchestrator": True},
+        "rtr": {"port": 9101, "llm": {"provider": "laya", "gateway": "local"}, "internal_role": "router",
+                "delegable": False, "plan_tool": False, "tools": {"deny": ["*"]}},
+    }), encoding="utf-8")
+    roles = {name: agent_spec.load_file(tmp_path / f"{name}.json").role for name in ("on", "off", "plain", "kept", "rtr")}
+    assert roles == {"on": "orchestrator", "off": "specialist", "plain": "specialist", "kept": "specialist", "rtr": "router"}
+
+
+def test_legacy_flags_in_a_tracked_file_still_need_a_role(tmp_path):
+    assert load(tmp_path, {**BASE, "orchestrator": True, "entry": True}).role == "orchestrator"
+    with pytest.raises(AgentSpecError, match="role"):
+        load(tmp_path, {**BASE, "orchestrator": False})
 
 
 def test_orchestrator_role_sets_the_property(tmp_path):
