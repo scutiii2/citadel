@@ -156,7 +156,9 @@ preference), `src/components/` (reusable pieces only), `src/router/`,
    `BaseModal` (every dialog: `AddExtensionModal`, `ToolRunModal`, ...),
    `SaveButton`, `CopyButton`. Dialog buttons use the global `pill-btn primary` /
    `pill-btn ghost` classes, and a dropdown that closes on an outside press uses
-   the `useOutsideClose` composable.
+   the `useOutsideClose` composable. A page with a draft asks before it is left through
+   `useUnsavedGuard`, and file sizes and counts use `formatBytes` / `plural` from
+   `utils/format.ts`.
    Look in `src/components/` before writing a new one.
 5. **Styling**: theme tokens from `src/style.css` (`--bg`, `--surface`,
    `--text`, `--muted`, `--border`, `--accent`, `--accent-contrast`,

@@ -2,8 +2,8 @@
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
 import NotePromotionPanel from "./components/NotePromotionPanel.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
-import { computed, getCurrentInstance, onMounted, onUnmounted, reactive, ref, useId } from "vue";
-import { onBeforeRouteLeave, routerKey } from "vue-router";
+import { computed, onMounted, reactive, ref, useId } from "vue";
+import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import {
   NOTE_BODY_MAX,
   NOTE_TAG_MAX,
@@ -188,34 +188,10 @@ function discard(): void {
   if (target !== undefined) show(target);
 }
 
-// Leaving the page with unsaved edits asks first, like the Settings page. The
-// router waits on this answer; a mount without a router (unit tests) skips it.
-const leaveOpen = ref(false);
-let leaveAnswer: ((leave: boolean) => void) | null = null;
-function answerLeave(leave: boolean): void {
-  leaveOpen.value = false;
-  leaveAnswer?.(leave);
-  leaveAnswer = null;
-}
-if (getCurrentInstance()?.appContext.provides[routerKey as symbol]) {
-  onBeforeRouteLeave(() => {
-    if (saving.value || removing.value) return false;
-    if (!dirty.value) return true;
-    leaveOpen.value = true;
-    return new Promise<boolean>((resolve) => (leaveAnswer = resolve));
-  });
-}
-// Closing or reloading the tab gets the browser's own warning.
-function beforeUnload(event: BeforeUnloadEvent): void {
-  if (dirty.value || saving.value) {
-    event.preventDefault();
-    event.returnValue = "";
-  }
-}
-onMounted(() => window.addEventListener("beforeunload", beforeUnload));
-onUnmounted(() => {
-  window.removeEventListener("beforeunload", beforeUnload);
-  answerLeave(false);
+// Leaving the page with unsaved edits asks first, like the Settings page.
+const { open: leaveOpen, answer: answerLeave } = useUnsavedGuard({
+  dirty: () => dirty.value,
+  busy: () => saving.value || removing.value,
 });
 
 function startNew(): void {

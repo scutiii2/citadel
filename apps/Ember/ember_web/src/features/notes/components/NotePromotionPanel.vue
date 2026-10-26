@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
-import { onBeforeRouteLeave, routerKey } from "vue-router";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useUnsavedGuard } from "../../../composables/useUnsavedGuard";
 import { brainsClient, promotionsClient, type BrainDestination, type BrainScope, type PublicationReview, type PromotionSuggestion, type Publication } from "../../brains/api/BrainsClient";
 import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
@@ -33,18 +33,8 @@ const hasDrafts = computed(() => edited.value || [...retained.values()].some(ite
 function retain(): void {
   if (review.value) retained.set(review.value.note_id, { review: review.value, draft: draft.value, path: path.value, scope: scope.value, initialDraft: initialDraft.value, initialPath: initialPath.value, requestKey: requestKey.value });
 }
-const discardOpen = ref(false);
-let leaveAnswer: ((value: boolean) => void) | null = null;
-function answerLeave(discard: boolean): void { discardOpen.value = false; leaveAnswer?.(discard); leaveAnswer = null; }
-if (getCurrentInstance()?.appContext.provides[routerKey as symbol]) onBeforeRouteLeave(() => {
-  if (busy.value) return false;
-  if (!hasDrafts.value) return true;
-  discardOpen.value = true;
-  return new Promise<boolean>(resolve => { leaveAnswer = resolve; });
-});
-function beforeUnload(event: BeforeUnloadEvent): void { if (hasDrafts.value) { event.preventDefault(); event.returnValue = ""; } }
-onMounted(() => window.addEventListener("beforeunload", beforeUnload));
-onUnmounted(() => { ++generation; ++refreshGeneration; window.removeEventListener("beforeunload", beforeUnload); });
+const { open: discardOpen, answer: answerLeave } = useUnsavedGuard({ dirty: () => hasDrafts.value, busy: () => busy.value });
+onUnmounted(() => { ++generation; ++refreshGeneration; });
 const writable = computed(() => destinations.value.filter(d => d.writable));
 const destination = computed(() => writable.value.find(d => d.scope === scope.value));
 const notePublications = computed(() => publications.value.filter(p => p.note_id === props.noteId));

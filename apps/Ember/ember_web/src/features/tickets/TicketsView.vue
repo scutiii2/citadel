@@ -2,7 +2,8 @@
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
-import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
+import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { ticketsClient, type NewTicket, type Ticket, type TicketStatus } from "./api/TicketsClient";
 import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
 import ListRow from "../../components/ui/lists/ListRow.vue";
@@ -137,26 +138,13 @@ const reply = computed({
   get: () => activeDetailId.value === null ? "" : replies[activeDetailId.value] ?? "",
   set: (value: string) => { if (activeDetailId.value !== null) replies[activeDetailId.value] = value; },
 });
-const discardDrafts = ref(false);
-let leaveAnswer: ((value: boolean) => void) | null = null;
 const hasDrafts = computed(() => !!draft.title.trim() || !!draft.description.trim() || Object.values(replies).some(value => !!value.trim()));
-function answerLeave(discard: boolean): void {
-  discardDrafts.value = false;
-  leaveAnswer?.(discard);
-  leaveAnswer = null;
-}
-onBeforeRouteLeave(to => {
-  if (to.path === '/tickets' || /^\/tickets\/\d+$/.test(to.path)) return true;
-  if (saving.value || replying.value) return false;
-  if (!hasDrafts.value) return true;
-  discardDrafts.value = true;
-  return new Promise<boolean>(resolve => { leaveAnswer = resolve; });
+const { open: discardDrafts, answer: answerLeave } = useUnsavedGuard({
+  dirty: () => hasDrafts.value,
+  busy: () => saving.value || replying.value,
+  // Moving between the list and a ticket keeps the drafts.
+  allow: to => to.path === '/tickets' || /^\/tickets\/\d+$/.test(to.path),
 });
-function beforeUnload(event: BeforeUnloadEvent): void {
-  if (hasDrafts.value) { event.preventDefault(); event.returnValue = ""; }
-}
-onMounted(() => window.addEventListener("beforeunload", beforeUnload));
-onUnmounted(() => window.removeEventListener("beforeunload", beforeUnload));
 const replying = ref(false);
 const confirmOpen = ref(false);
 const closing = ref(false);

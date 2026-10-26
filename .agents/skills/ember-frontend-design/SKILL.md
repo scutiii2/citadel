@@ -48,6 +48,8 @@ These live in `ember_web` only (not copied to admin). A page that needs one of t
 | Any dialog (never a hand-written `<dialog>`) | `BaseModal` (`open`, `title`, `@close`; Esc, × and backdrop all emit `close`) | `components/ui/dialogs/` |
 | Cancel / Save pills in a dialog | classes `pill-btn primary` and `pill-btn ghost` (global, in `style.css`) | `style.css` |
 | Dropdown or popover that closes on a press outside | `useOutsideClose(root, open, close, event?)` (Esc and focus stay in the component) | `composables/` |
+| Leaving a page with unsaved edits asks first (route change and tab close) | `useUnsavedGuard({ dirty, busy?, allow? })`; bind the page's `ConfirmModal` to its `open` and `answer` | `composables/` |
+| "2 KB" / "1 file" text | `formatBytes`, `plural` | `utils/format.ts` |
 | Busy spinner on a button | just set `aria-busy`; `style.css` draws the ring, so add no local `::before` or keyframes | `style.css` |
 | List pane plus editor with Save | `ListEditorLayout` | `components/layout/` |
 | Two panes or a stacked workspace | `WorkspaceLayout` | `components/layout/` |
