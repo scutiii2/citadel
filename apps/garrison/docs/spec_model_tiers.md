@@ -49,7 +49,7 @@ A model that matches no tier is kept as is.
 
 ## Changes
 
-### 1. Gateway config (`gateways/<provider>/<gateway>.json`, `src/llm/llm_config.py`)
+### 1. Gateway config (`gateways/<provider>/<gateway>.json`, `src/providers/llm_config.py`)
 
 Add an optional `models` object to a gateway block. `model` stays and remains
 the default model.
@@ -97,7 +97,7 @@ Two optional keys inside `llm`:
 - Whether the gateway defines a tier inside the range is checked at startup
   (section 3), not here.
 
-### 3. Resolution (`src/llm/model_tiers.py`, new)
+### 3. Resolution (`src/providers/model_tiers.py`, new)
 
 One small module, no provider imports:
 
@@ -164,7 +164,7 @@ another process's gateway config.
 - Context-window and token-limit checks keep using `PROVIDER_ID` and the
   resolved model through the existing `context_window_for`.
 
-### 7. Usage log (`src/core/usage_log.py`)
+### 7. Usage log (`src/runtime/usage_log.py`)
 
 `own_row` records `model_tier` (nullable) beside `model`, so usage per tier is
 visible with no schema break (new key, old rows lack it). Readers that do not
@@ -231,12 +231,12 @@ caps in the repo's agent files (starting point, adjustable):
 
 ## Files touched
 
-`gateways/<provider>/<gateway>.json`, `src/llm/llm_config.py`,
-`src/llm/model_tiers.py` (new), `src/agents/agent_spec.py`,
+`gateways/<provider>/<gateway>.json`, `src/providers/llm_config.py`,
+`src/providers/model_tiers.py` (new), `src/agents/agent_spec.py`,
 `src/agents/agent_registry.py`, `src/agents/agent_routing.py`,
-`src/agents/delegation.py`, `src/agents/agent_config.py`, `src/server.py`,
-`src/llm/anthropic_provider.py`, `src/llm/openai_provider.py` (dispatch only),
-`src/core/usage_log.py`, `agents/*.json` (caps, ember instructions),
+`src/agents/roles/orchestrator/delegation.py`, `src/agents/agent_config.py`, `src/server.py`,
+`src/providers/language/anthropic_provider.py`, `src/providers/language/openai_provider.py` (dispatch only),
+`src/runtime/usage_log.py`, `agents/*.json` (caps, ember instructions),
 `src/README.md` / `configs/README.md`, tests.
 
 ## Decisions

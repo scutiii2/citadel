@@ -1,5 +1,9 @@
 # Garrison Triage Assistant: two fixes from review (2026-10-19)
 
+> Historical evidence: this records the retired voter-based implementation.
+> Legion v2 uses one decision provider and Laya/Jev strategies; the examples and
+> thresholds below do not configure the current service.
+
 Review of `apps/garrison` triage flow (`src/llm/triage_flow.py`, `src/llm/laya_provider.py`, `src/llm/decision.py`). The 217 triage-related tests pass; both items below are gaps the tests do not cover.
 
 ## 1. A step 5 answer is marked `uncertain: false`

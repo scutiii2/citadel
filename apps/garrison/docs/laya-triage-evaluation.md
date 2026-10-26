@@ -1,5 +1,9 @@
 # Laya triage smoke evaluation — 2026-10-07
 
+> Historical evidence: this records the retired voter-based implementation.
+> Legion v2 uses one decision provider and Laya/Jev strategies; the examples and
+> thresholds below do not configure the current service.
+
 > Note: this evaluation predates the 2026-10-09 refactor to caller-supplied typed
 > questions. The output format, the "unknown forces review" rule and the
 > `check_laya_triage.py` question set described below no longer match the code.

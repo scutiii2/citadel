@@ -1,6 +1,6 @@
 # Legion (Garrison v2) design
 
-Status: draft for review. Replaces `apps/garrison` with `apps/legion`.
+Status: implemented through documentation/skill migration. The final `apps/garrison` to `apps/legion` rename remains a separate approval checkpoint.
 
 ## Goals
 
@@ -12,7 +12,7 @@ Status: draft for review. Replaces `apps/garrison` with `apps/legion`.
 
 ## Roles
 
-`role` is a required field in `agents/<id>.json`. It replaces `orchestrator`, `entry`, `delegable` and `internal_role`.
+`role` is a required field in `agents/<id>.json`. It replaces the `orchestrator` and `internal_role` definition flags. `entry` and `delegable` remain role-constrained options.
 
 | Role | Gets | Rules |
 |---|---|---|
@@ -31,10 +31,10 @@ Today's files map as: `ember` = orchestrator, `router` = router, all others = sp
 | language | `openai` | gpt, azure, groq, … (unchanged) |
 | decision | `decision` | `laya`, `jev` |
 
-Two interfaces, no shared `run_chat`:
+Language generation and typed decisions have separate model-facing interfaces:
 
 - `LanguageProvider.run_chat(...)`: tool loop, streaming, returns text. Unchanged behaviour.
-- `DecisionProvider.answer(DecisionRequest) -> DecisionAnswer`: `{text, questions}` in, per question `{answer, confidence}` out. No text generation, no tools.
+- `DecisionGateway.ask(DecisionRequest) -> GatewayResult`: typed questions and per-question answers/confidences. `strategy.run` walks the selected arrangement. The JSON provider adapter returns the existing `ChatResult` transport shape and supplies `run_chat`/`run_interpret` entrypoints without language generation or tools.
 
 ### Decision gateways
 
@@ -66,53 +66,60 @@ The wrapper (not the provider) walks the arrangement, the same way language agen
 ```
 src/
   server.py  supervisor.py
-  agents/                       # what an agent is
-    spec.py  config.py  registry.py  store.py  prompt.py  events.py
+  agents/
+    agent_spec.py  agent_config.py  agent_registry.py  agent_store.py
+    agent_roles.py  agent_events.py  auto_tier.py  prompt_config.py
     roles/
-      orchestrator/             # delegation, roster, plan, ask_user, memory/skill recall, summarizer
-      router/                   # client, contract, engine, service, routing, auto_route
-      specialist/               # scope + usability checks
-  providers/                    # what an agent runs on
-    base.py  failover.py  cooldown.py  cancellation.py  limits.py  tiers.py  reasoning.py
+      orchestrator/   # delegation, plan, ask_user, memory/skill recall, summarizer, auto_route
+      router/         # router_contract, router_engine, router_service, router_client, router_routing
+  providers/
+    base_provider.py  gateway_failover.py  cooldown.py  cancellation.py
+    token_limits.py  model_tiers.py  reasoning_effort.py  llm_config.py  llm_options.py
     language/
-      anthropic/  openai/
+      anthropic_provider.py  openai_provider.py  openai/
     decision/
-      provider.py  contract.py
-      gateways/  laya.py  jev.py
-  tools/                        # mcp_client + private_extensions
-  runtime/                      # approvals, questions, broker, internal_auth, usage_log, tuning, config_files
+      contract.py  questions.py  settings.py  strategy.py  provider.py  laya_model.py
+      gateways/       # laya.py, jev.py
+  tools/
+    mcp_client/  private_extensions/
+  runtime/            # approvals, questions, broker, internal_auth, usage_log, tuning_overrides, config_files
 ```
 
-Rules: `providers/` never imports `agents/`; `agents/roles/*` import `providers/` only through `base.py` types.
-File moves keep git history (`git mv`).
+Moves preserve existing basenames and history. Specialists use the shared agent
+logic and have no separate role package. Gateway contracts and the strategy runner
+answer typed requests; the decision provider adapter fits the existing agent
+transport methods and reads its agent configuration at that boundary. Existing
+language-provider integration with agent tools is retained.
 
 ## Config layout
 
-- `gateways/language/{anthropic,openai}/*.json` (moved), `gateways/decision/{laya,jev}.json` (new).
-- `agents/*.json`: add `role`; `provider: "laya"` becomes `provider: "decision", gateway: "laya"`; drop old flags.
+- `gateways/{anthropic,openai}/*.json` retain their provider-folder layout; `gateways/decision/{laya,jev}.json` adds the decision presets. The approved plan amends the proposed language subdirectory split.
+- `agents/*.json`: add `role`; the old Laya provider becomes `llm: {"provider": "decision", "strategy": "both", "min_confidence": 0.9}`; language-only gateway/model/generation fields are rejected for decision agents.
 - `configs/config_tuning.json`: remove `classifier.chains`, `triage_*` voter settings; keep per-feature enable/threshold under agent files or a slimmed section.
 
 ## Outside consumers to update
 
-`ember_api`: `services/agent_directory.py`, `services/agent_admin.py`, `routes/triage_strategy.py`, tuning routes, `config.py`, `configs/config_app.json*`.
+`ember_api`: `services/agent_directory.py`, `services/agent_admin.py`, `routes/triage.py`, retired strategy-route removal, tuning routes, `config.py`, `configs/config_app.json*`.
 `ember_admin`: `AgentsAdminClient.ts`, `AgentForm.vue`, `AgentAdminCard.vue`, `TuningAdminView.vue`, `TuningClient.ts`, `e2e/router-agent.spec.ts`.
-Also `docker-compose.yml`, `apps/armory` references, docs, the vault notes `Brain/Projects/MCPServer.md` and component notes, and `aiagent-scaffold` skill (both skill folders via `sync_skills.py`).
+Also `docker-compose.yml`, `apps/armory` references, docs, the vault notes `Brain/Projects/Citadel.md` and component notes, and `aiagent-scaffold` skill (both skill folders via `sync_skills.py`).
 
 ## Migration
 
-Hard break, no compat shim. All 20 `agents/*.json` migrate in the same change set as the admin UI form, so no mixed state. Unknown keys already error loudly at supervisor start.
+Hard break, no compat shim. All agent files found by the migration glob (19 in this checkout) migrate in the same change set as the admin UI form, so no mixed state. Unknown keys already error loudly at supervisor start.
 
-## Phases (each its own commit, tests green after each)
+## Phases (green task commits within each)
 
-1. **Move**: restructure `src/` and `tests/` with no behaviour change; imports only.
-2. **Role**: add `role`, remove four flags, migrate agent files, update ember_api/admin.
-3. **Decision provider**: `DecisionProvider` + `laya`/`jev` gateways, wrapper-level fallback, delete `jev_vercel`, `laya_classifier`, `triage_flow`, `classifier.chains`; migrate triage/router/auto-tier/auto-route callers.
-4. **Gateways folder**: split `gateways/` by kind.
-5. **Rename**: `apps/garrison` to `apps/legion` (folder, compose service, env, docs, vault, skills).
+1. [x] **Move**: restructure source directories without renaming basenames; imports only.
+2. [x] **Role**: required roles, migrated definitions and Ember role integration.
+3. [x] **Decision provider**: contract, Laya/Jev gateways and strategies; migrate callers,
+   remove retired classifiers/default strategy controls; validate Laya strategy at startup.
+4. [x] **Docs and skills**: current package names, provider-folder config shape, vault notes
+   and scaffold instructions, synced through `sync_skills.py`.
+5. [ ] **Rename**: `apps/garrison` to `apps/legion`, compose, consumers, docs and vault.
 
 ## Risks and open checks
 
-- Router and auto-tier callers use `decision.py` chains directly today; phase 3 must port each to the wrapper without changing their thresholds. Cases in `scripts/check_*` and `tests/test_router_*` are the regression net.
+- Router and automatic-feature callers now use decision strategies. The automatic-feature runtime confidence default remains 60; the new example explicitly selects 80. Router confidence defaults to 0.9. Offline cases and router tests cover abstention, fallback and usage, without proving model accuracy.
 - Jev's `score`/`noul` answers come from a choice reduction; keep that mapping tested.
 - Confirm the configured Laya strategy appears in `GET /v1/strategies` of the deployed service.
 - Rename touches the docker network name and port env; verify `dev_deploy.bat` and the ZimaOS overlay.

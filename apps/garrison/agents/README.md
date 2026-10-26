@@ -15,11 +15,24 @@ one enabled agent must set `entry: true`. Add an agent by creating a new file
 or copying a definition to a new id and adjusting its port and role. Disable
 an agent with `enabled: false`.
 
-An agent's `llm.provider` and `llm.gateway` refer to
-`../gateways/<provider>/<gateway>.json`; Laya's `local` gateway is built in.
-Keep credentials in `../.env`. Ports, URLs, persona text and instructions in
-these definitions are repository content, so review them before committing.
-See `../README.md` for the field descriptions and examples.
+Every file requires `role`: `orchestrator`, `router` or `specialist`. Only an
+orchestrator may be the entry agent or receive delegation/roster tools. Routers
+have no tools, cannot be entries or delegates, and use provider `decision`.
+Specialists are delegable by default; set `delegable: false` for direct-call helpers.
+The former orchestrator/internal-role flags are rejected in definitions.
+
+Language agents use `llm.provider` `anthropic` or `openai`, with gateway/model,
+generation options and ordered same-provider fallback gateways. Their presets
+are `../gateways/<provider>/<gateway>.json`.
+
+Decision agents use `llm: {"provider": "decision", "strategy": "both",
+"min_confidence": 0.9}`. Strategies are `laya-only`, `jev-only` or `both`.
+Gateway/model, generation and language fallback fields are rejected. Laya's
+internal service strategy is gateway config, read on each call. A router's
+`decision` policy selects its routing strategy/confidence separately.
+
+Keep deployment credentials outside tracked definitions. See `../README.md`
+for the field descriptions and examples.
 
 The supervisor watches this directory and the overrides file and reconciles
 validated changes.

@@ -1,5 +1,9 @@
 # Router evaluation and rollout
 
+> Historical evidence: this records the retired voter-based implementation.
+> Legion v2 uses one decision provider and Laya/Jev strategies; the examples and
+> thresholds below do not configure the current service.
+
 Implementation was developed and validated on `codex/internal-router-agent`.
 Local integration into `main` was subsequently authorized by the user. No running
 deployment was changed, no local model weights were downloaded and no live

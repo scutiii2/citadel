@@ -26,7 +26,7 @@ returned to the LLM without size/field pruning.
 
 ## Changes
 
-### 1. Anthropic prompt caching (ai_agent/src/llm/anthropic_provider.py)
+### 1. Anthropic prompt caching (apps/garrison/src/providers/language/anthropic_provider.py)
 
 - Add `cache_control: {"type": "ephemeral"}` to:
   - the system prompt block (~line 301)

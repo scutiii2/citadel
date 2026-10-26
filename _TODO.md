@@ -73,7 +73,7 @@ Optional follow-up features, not implemented:
 
 ## Context breakdown for delegated agents (added 2026-10-17)
 
-**Context**: The context panel (opened from the header's context meter) breaks the answering agent's prompt into system prompt, delegable agents, built-in tools, MCP tools and messages, estimated or counted by the provider (`apps/garrison/src/llm/context_breakdown.py`). When the orchestrator delegates, each specialist runs its own prompt, and none of that is broken down.
+**Context**: The context panel (opened from the header's context meter) breaks the answering agent's prompt into system prompt, delegable agents, built-in tools, MCP tools and messages, estimated or counted by the provider (`apps/garrison/src/providers/context_breakdown.py`). When the orchestrator delegates, each specialist runs its own prompt, and none of that is broken down.
 
 - Each agent would build its own breakdown; `ai_agent` already returns one usage row per agent in `agent_usage`.
 - `ember_api` would pass each agent's breakdown along with its usage row (`AgentUsageIn` in `routes/chats.py`), and the panel would add a per-agent section.
@@ -83,7 +83,7 @@ Optional follow-up features, not implemented:
 
 ## Make chat Stop (cancel) near-instant (added 2026-10-18)
 
-**Context**: Stop in the Ember chat page is cooperative. `ember_web` `chat.stop()` calls `POST /chats/{id}/cancel`, `TurnRegistry.cancel` (`apps/Ember/ember_api/src/services/turns.py`) sets `cancel_requested`, publishes `cancelling`, and forwards `cancel` to ai_agent. There the flag in `apps/garrison/src/llm/cancellation.py` is checked only between provider rounds (`anthropic_provider.py`, `openai_provider.py`), so an LLM call or tool call already running finishes first. Approval and question waits already poll the flag.
+**Context**: Stop in the Ember chat page is cooperative. `ember_web` `chat.stop()` calls `POST /chats/{id}/cancel`, `TurnRegistry.cancel` (`apps/Ember/ember_api/src/services/turns.py`) sets `cancel_requested`, publishes `cancelling`, and forwards `cancel` to ai_agent. There the flag in `apps/garrison/src/providers/cancellation.py` is checked only between provider rounds (`anthropic_provider.py`, `openai_provider.py`), so an LLM call or tool call already running finishes first. Approval and question waits already poll the flag.
 
 **Plan**, by payoff:
 1. **Abort the in-flight LLM call**: check the flag per streamed chunk and close the HTTP stream on cancel, then raise `ChatCancelled`. The partial text is already kept (`turns.py`). `bind_request` already carries a per-turn `threading.Event` into worker threads.

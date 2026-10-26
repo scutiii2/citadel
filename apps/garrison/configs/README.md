@@ -24,7 +24,7 @@ the cooldown durations, and enables no backups by itself.
   every call. It has no account or admin override.
 - **`config_servers.json`** - `servers`: the MCP servers this agent
   connects to as a client (currently just `main`, this repo's
-  `mcp_server`). Loaded by `src/mcp_client/config.py`'s `load_servers_config` into
+  `mcp_server`). Loaded by `src/tools/mcp_client/config.py`'s `load_servers_config` into
   typed `ServerConfig` entries; each entry is `{label, description,
   transport, url|command, auth?}`, symmetric for every configured server
   unlike `mcp_server`'s own `config_extensions.json`.
@@ -32,7 +32,7 @@ the cooldown durations, and enables no backups by itself.
   `app_description`, `identity_template` (placeholders `{app_name}`,
   `{app_description}`, `{role}`), `default_instructions`, `roster_intro`,
   `caveman_instructions` (`src/agents/prompt_config.py`, used by
-  `src/llm/agent_roles.py`). Holds only what differs from the built-in
+  `src/agents/agent_roles.py`). Holds only what differs from the built-in
   defaults, so a missing file means no change. Written by the admin UI
   (`PUT /agents/prompts`); the supervisor restarts every agent when it changes.
 - Gateway presets live in [`../gateways/`](../gateways/README.md), one

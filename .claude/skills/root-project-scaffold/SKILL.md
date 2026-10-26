@@ -61,7 +61,7 @@ changes the convention for every project after it.
    and a `.example` twin with placeholder values, matching how
    `apps/armory/configs/*.json.example` and the root `.env.example` do it.
    Loaders should auto-create a missing real file by copying its
-   `.example` (see `apps/garrison/src/core/seed.py`) rather than raising on first run.
+   `.example` (see `apps/garrison/src/runtime/seed.py`) rather than raising on first run.
 4. Write `README.md` covering: what the project does, requirements,
    setup steps, how to run it — model it on `apps/armory/README.md`.
 5. Add a service for it to the root `docker-compose.yml` if it is a

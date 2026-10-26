@@ -37,7 +37,8 @@ existing compacted summary is also available to subsequent routing briefs.
 
 ## Internal Router metadata and access
 
-`GET /api/agents` adds optional `internal_role` and a sanitized `decision` summary
+`GET /api/agents` adds derived `internal_role` status metadata (not an agent-file field)
+and a sanitized `decision` summary
 for Router; ordinary agent response fields remain compatible. Running definitions
 and disabled/offline definitions retain the internal role. Discovery of the Laya
 triage agent explicitly excludes internal roles. Router configuration passes

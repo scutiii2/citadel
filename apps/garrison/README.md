@@ -1,17 +1,17 @@
-# ai_agent
+# Garrison
 
-A standalone MCP agent, hard-pinned to one LLM provider+model, sitting
-between `chat_app` and `mcp_server`:
+Garrison hosts role-based language and decision agents between Ember and Armory.
+Each `agents/<id>.json` is one agent process managed by the supervisor.
 
 ```
-chat_app  --(MCP: ask/interpret/status/cancel/decide)-->  ai_agent  --(MCP, persistent)-->  mcp_server
+ember_api --(MCP)--> entry orchestrator --delegate_to_agent--> specialists
+                              |                                  |
+                              +--------------- Armory -----------+
 ```
 
-It is both an MCP *server* (to `chat_app`, exposing
-`ask`/`interpret`/`status`/`cancel`/`decide`)
-and an MCP *client* (to `mcp_server`, via a persistent connection - see
-`src/mcp_client/mcp_upstream.py`). Run one agent per provider (see Agents) to back
-`chat_app`'s Claude Agent / OpenAI Agent dropdown entries.
+Language agents use Anthropic or OpenAI protocols and may call tools. Decision
+agents use the Laya/Jev arrangement to answer typed questions without generation.
+The internal Router chooses specialists and model tiers through that arrangement.
 
 ## Setup
 
@@ -28,36 +28,26 @@ and an MCP *client* (to `mcp_server`, via a persistent connection - see
    project once (`py -m venv .venv_garrison`, then `.venv_garrison\Scripts\pip install -e ".[dev]"`),
    then run `.venv_garrison\Scripts\python -m src.supervisor`. See Agents below.
 
-### Laya models
+### Laya service
 
-Garrison does not install Laya, PyTorch or the model weights, and no Garrison code loads a Laya model.
-Both models and every local decision rule live in the shared Laya service (`Python/LayaModel`, behind a
-load balancer); Garrison reaches it over HTTP through one client, `LAYAModel` (`src/llm/laya_model.py`).
-Set `LAYA_SERVICE_URL` (the root `docker-compose.yml` sets it to `http://laya_lb:9120`) and `LAYA_TOKEN` if the
-service has one. Start the Citadel stack first (it creates the `citadel_core` network), then the service
-(`docker compose up -d --build` in `LayaModel/`); Garrison finds it by name when it first needs it. Without `LAYA_SERVICE_URL` no Laya model is available: the Triage Assistant, the Router's
-local voters and the `laya` classifier backend report that, and Jev (where allowed) answers alone.
-For local development run the service (`run.bat` in `LayaModel/`) and set `LAYA_SERVICE_URL=http://127.0.0.1:9120`
-in `apps/garrison/.env`.
+Laya is gateway `laya` of provider `decision`; Jev is gateway `jev`. Garrison
+loads no weights. `src/providers/decision/laya_model.py` is the HTTP connection
+to the separate LayaModel service (`LAYA_SERVICE_URL`, optional `LAYA_TOKEN`).
+Jev calls TypeSafe with `TYPESAFE_API_KEY`.
 
-Garrison sends the service a strategy name per question type and gets the answers back; what stays in Garrison is
-the cloud fallback (Jev) and its use. See [Triage flow](#triage-flow-laya-english-laya-typed-decisions-jev).
-
-An older image keeps its GPU packages until it is replaced. From the repo root,
-rebuild and recreate Garrison (`dev_deploy.bat` in this folder does the same on a dev machine). On the ZimaOS box
-`COMPOSE_FILE` in the root `.env` already selects the overlay, so no `-f` flags are needed:
-
-```sh
-docker compose build garrison
-docker compose up -d --no-deps garrison
-```
+Laya's internal strategy comes from `gateways/decision/laya.json` and is read on
+every call. Edit it without restarting; `english-then-typed` is the default.
+At supervisor startup, a reachable service must offer the configured strategy.
+An unreachable service warns, allowing `both` to fall through to Jev per request.
+Agent strategies are `laya-only`, `jev-only` and `both`; see
+[Decision question agents](#decision-question-agents).
 
 ## Agents
 
-Each ai_agent instance is defined by one file, `agents/<id>.json`. The file
+Each agent is defined by one file, `agents/<id>.json`. The file
 name stem is the agent id (`^[a-z0-9][a-z0-9-]{0,62}$`). `agents/` is
-tracked in Git, including edits made through the admin UI. Create or copy an
-agent file and edit it directly. Unknown keys are an error, so
+tracked in Git as shared defaults. Admin edits go to the local
+`.data/agent_overrides.json`; create or copy a tracked file for a shared change. Unknown keys are an error, so
 typos are caught at startup.
 
 Anthropic and OpenAI turns default to a 100,000-token budget and a 300-second
@@ -94,7 +84,7 @@ through linked internal request IDs and their MCP `cancel` tool.
   "instructions": "Use the calculator tools for every computation; never do arithmetic in your head.",
   "focus": "Arithmetic, algebra, percentages, unit conversion, compound interest.",
   "tools": { "allow": ["calc_*", "convert_*"], "deny": [] },
-  "orchestrator": false
+  "role": "specialist"
 }
 ```
 
@@ -103,8 +93,10 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `label` | no | id | Display name. |
 | `port` | yes | none | Port the child listens on. Unique across enabled files. |
 | `enabled` | no | `true` | `false`: not spawned, not registered. |
-| `entry` | no | `false` | The agent ember sends new turns to (Phase 2). Exactly one enabled file must set it. |
-| `llm.provider` | yes | none | `anthropic`, `openai`, or `laya` (local typed questions only). |
+| `entry` | no | `false` | The orchestrator Ember opens a chat with. Exactly one enabled agent must set it. |
+| `llm.provider` | yes | none | `anthropic` or `openai` for language; `decision` for typed questions. |
+| `llm.strategy` | decision only | `both` | `laya-only`, `jev-only`, or `both`. |
+| `llm.min_confidence` | decision only | `0.9` | Above 0 and at most 1. Per-request overrides are accepted. |
 | `llm.gateway` | no | provider default | A filename stem from `gateways/<provider>/<gateway>.json`. |
 | `llm.fallback_gateways` | no | `[]` | Ordered same-provider backup gateways, as names or `{gateway, model?}` objects. See Gateway failover below. |
 | `llm.model` | no | gateway's `model` | Model id. |
@@ -113,21 +105,21 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `llm.max_tokens` | no | today's hard-coded value | Output token cap per model call. |
 | `llm.max_tool_rounds` | no | `6` | Cap on the tool loop. |
 | `persona` | no | `""` | Persona text placed after the identity line in the system prompt. |
-| `instructions` | no | `""` (built-in default) | Tool-use instructions placed last in the system prompt. Empty uses `DEFAULT_INSTRUCTIONS` in `src/llm/agent_roles.py`. |
+| `instructions` | no | `""` (built-in default) | Tool-use instructions placed last in the system prompt. Empty uses `DEFAULT_INSTRUCTIONS` in `src/agents/agent_roles.py`. |
 | `focus` | no | `""` | One-line summary of what the agent is good at. Used for the orchestrator roster. Should be concrete. |
 | `tools.allow` | no | `[]` (all) | fnmatch globs on mcp_server tool names without the `main__` prefix. Empty means all tools. |
 | `tools.deny` | no | `[]` | Globs removed after `allow`. Deny wins. |
-| `orchestrator` | no | `false` | Gets `delegate_to_agent` and the roster. |
-| `memory_recall` | no | `false` | At the start of each top-level turn, load the user's newest saved notes (`tool_mem_search`, up to 10) and put them in front of the question. Needs the `memory` capability online and an agent that may call `tool_mem_*`. Not allowed for Laya. Only `ember` has it on. |
-| `skill_recall` | no | `false` | At the start of each top-level turn, search the user's **approved** skills with the question (`tool_skill_search`, up to 3) and put the matches in front of it, after any recalled notes. A proposal never loads before the user approves it on Ember's Skills page. Needs the armory `skills` capability online and an agent that may call `tool_skill_*`. Not allowed for Laya. Only `ember` has it on. |
-| `skill_learning` | no | `false` | After a top-level turn that made at least 3 real tool calls and none failed, draft a reusable skill in the background and propose it (`tool_skill_propose`) for the user's approval. One extra call to the tool-free `context-summarizer` agent per qualifying turn, so it is billed: switch it on per agent, no tracked agent has it. The drafting model sees only the user's request and the tool names with argument names, never results, values or the answer. A turn that used web, Firecrawl, email or a private extension tool never qualifies. Calls made by delegated specialists are not seen, so it fits agents that call tools themselves. Needs `tool_skill_*` allowed and `context-summarizer` running. Not allowed for Laya. |
+| `role` | yes | none | `orchestrator`, `router` or `specialist`. Orchestrators delegate; routers have no tools and use `decision`; specialists are delegable by default. |
+| `memory_recall` | no | `false` | At the start of each top-level turn, load the user's newest saved notes (`tool_mem_search`, up to 10) and put them in front of the question. Needs the `memory` capability online and an agent that may call `tool_mem_*`. Orchestrator role only. Only `ember` has it on. |
+| `skill_recall` | no | `false` | At the start of each top-level turn, search the user's **approved** skills with the question (`tool_skill_search`, up to 3) and put the matches in front of it, after any recalled notes. A proposal never loads before the user approves it on Ember's Skills page. Needs the armory `skills` capability online and an agent that may call `tool_skill_*`. Orchestrator role only. Only `ember` has it on. |
+| `skill_learning` | no | `false` | After a top-level turn that made at least 3 real tool calls and none failed, draft a reusable skill in the background and propose it (`tool_skill_propose`) for the user's approval. One extra call to the tool-free `context-summarizer` agent per qualifying turn, so it is billed: switch it on per agent, no tracked agent has it. The drafting model sees only the user's request and the tool names with argument names, never results, values or the answer. A turn that used web, Firecrawl, email or a private extension tool never qualifies. Calls made by delegated specialists are not seen, so it fits agents that call tools themselves. Needs `tool_skill_*` allowed and `context-summarizer` running. Orchestrator role only. |
 | `delegable` | no | `true` | `false` keeps the agent out of every orchestrator's roster: it is called directly (for example by ember_api), never delegated to. |
-| `plan_tool` | no | `true` | Offer the `update_plan` checklist tool (`src/agents/plan.py`) for tasks of three or more steps. A chat can also switch it off per turn (`ask(plan=False)`), and the tool is offered only when both allow it. Set `false` to never offer it from this agent. |
+| `plan_tool` | no | `true` | Offer the `update_plan` checklist tool (`src/agents/roles/orchestrator/plan.py`) for tasks of three or more steps. A chat can also switch it off per turn (`ask(plan=False)`), and the tool is offered only when both allow it. Only orchestrators can offer it. |
 
 An orchestrator file:
 
 ```json
-{ "port": 9100, "entry": true, "llm": { "provider": "anthropic" }, "orchestrator": true }
+{ "port": 9100, "entry": true, "llm": { "provider": "anthropic" }, "role": "orchestrator" }
 ```
 
 ### Gateway failover
@@ -270,10 +262,9 @@ checks. Live diagnostics require a prepared deployment:
 
 ## Orchestrator
 
-An agent with `orchestrator: true` gets the `delegate_to_agent` tool;
+An agent with `role: "orchestrator"` gets the `delegate_to_agent` tool;
 specialists never do. Each turn the orchestrator's roster is built from the
-registry: every registered agent that is not an orchestrator (and never the
-agent itself), as lines of `<id> - <label>: <focus>`. Because it is per turn,
+registry: eligible registered specialists (never the agent itself or an internal Router), as lines of `<id> - <label>: <focus>`. Because it is per turn,
 a specialist that starts or stops shows up without a restart. A specialist with
 tools of its own (`tools.allow`, apart from the ticket tools) is left out when
 none of them is offered right now: its capability is switched off on mcp_server,
@@ -402,7 +393,7 @@ the turn. `.data/usage/` is gitignored.
 ## Tools and agents the user switched off
 
 `ask` also takes `disabled_tools`: `agent:<id>` entries for specialists the asking user switched
-off for their own chats (the roster leaves them out and `delegate_to_agent` refuses them), plus mcp_server tool names (`src/core/tool_filter.py`). For that turn the agent does
+off for their own chats (the roster leaves them out and `delegate_to_agent` refuses them), plus mcp_server tool names (`src/runtime/tool_filter.py`). For that turn the agent does
 not offer them (`list_tools`) and refuses a call to one the model names anyway.
 A delegated agent is told the same list. `status()` reports `tool_filter: true`
 so ember_api can refuse an agent that would ignore the option.
@@ -471,7 +462,7 @@ private extensions.
 
 ## Asking before tools run
 
-`ask` takes `approval_mode` and `allowed_tools` (`src/core/approvals.py`):
+`ask` takes `approval_mode` and `allowed_tools` (`src/runtime/approvals.py`):
 
 - `off` (default): tools run as before. chat_app never sets a mode.
 - `ask`: before each tool that is not in `allowed_tools`, the agent emits an
@@ -501,7 +492,7 @@ keepalive events, and Stop cancels the turn. `status()` reports `user_questions:
 
 `ask(plan=False)` withholds the `update_plan` checklist tool for a turn, and `ask(plan_lean=False)` drops the instruction to update it only when an item changes status (with it on, an unchanged list is also skipped without an event). Both default on and are sent to specialists too; `status()` reports `plan_toggle: true`.
 
-`ask(exact_context=True)` counts what fills the context window with the provider's own token counter (`src/llm/context_breakdown.py`; Anthropic `count_tokens`, OpenAI `responses.input_tokens`) instead of estimating it at about four characters a token. The result's `context_breakdown` lists the parts (system prompt, delegable agents, built-in tools, MCP tools, messages) and `context_breakdown_exact` says whether the provider counted them. Counts are cached by model and content, so only the first turn after a change to the prompt, the tools or the model makes requests; any failure or a 3 second wait falls back to the estimate, so counting never fails a turn. `status()` reports `exact_context: true`.
+`ask(exact_context=True)` counts what fills the context window with the provider's own token counter (`src/providers/context_breakdown.py`; Anthropic `count_tokens`, OpenAI `responses.input_tokens`) instead of estimating it at about four characters a token. The result's `context_breakdown` lists the parts (system prompt, delegable agents, built-in tools, MCP tools, messages) and `context_breakdown_exact` says whether the provider counted them. Counts are cached by model and content, so only the first turn after a change to the prompt, the tools or the model makes requests; any failure or a 3 second wait falls back to the estimate, so counting never fails a turn. `status()` reports `exact_context: true`.
 
 ## Prompts
 
@@ -512,9 +503,12 @@ Each agent's system prompt comes from its own `agents/<id>.json`, in this order:
    `Ember: Reviewer`).
 2. `persona`.
 3. For an orchestrator, the roster of specialists, rebuilt each turn.
-4. `instructions`. Empty uses `DEFAULT_INSTRUCTIONS` in `src/llm/agent_roles.py`.
+4. `instructions`. Empty uses `DEFAULT_INSTRUCTIONS` in `src/agents/agent_roles.py`.
 
-There is no shared prompt file. Edit the agent's file and restart it.
+Shared defaults live in `configs/config_prompts.json`; agent files supply their
+own persona and instructions. The supervisor watches both definitions and shared
+prompts, restarting affected children after validated edits. The admin Shared
+prompts editor confirms changes that restart every agent.
 
 Agent files give each instance its own id, so any number of same-provider agents can run side by side.
 
@@ -524,7 +518,7 @@ Agent files give each instance its own id, so any number of same-provider agents
   `.env` (created from its `.example` on first
   run; same value as mcp_server's, chat_app's and ember_api's). Without it
   a request gets `401`. The agent sends the same token on its own calls to
-  mcp_server and to peer agents (`src/core/internal_auth.py`).
+  mcp_server and to peer agents (`src/runtime/internal_auth.py`).
 - **The asking user travels on**: `ask()` reads `X-Requester-Username` /
   `X-Requester-Email` from the request (ember_api and chat_app set them),
   and every mcp_server tool it calls during that turn gets the user in the
