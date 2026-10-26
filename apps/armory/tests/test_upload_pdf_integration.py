@@ -40,12 +40,12 @@ def native_client(monkeypatch, tmp_path):
     async def exercise(request):
         body = await request.json()
         if body["operation"] == "list":
-            result = await asyncio.to_thread(domain.list_files)
+            result = await asyncio.to_thread(domain.desk.list_files)
         elif body["operation"] == "inspect":
-            result = await asyncio.to_thread(domain.inspect_files, body["file_ids"])
+            result = await asyncio.to_thread(domain.desk.inspect_files, body["file_ids"])
         else:
             try:
-                result = await asyncio.to_thread(domain.merge, MergePlan.model_validate(body["plan"]))
+                result = await asyncio.to_thread(domain.desk.merge, MergePlan.model_validate(body["plan"]))
             except MergerError:
                 return JSONResponse({"error": "File is not available"}, status_code=400)
         return JSONResponse(result.model_dump(mode="json"))

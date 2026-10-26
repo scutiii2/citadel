@@ -62,7 +62,7 @@ async def download_pdf(request: Request) -> FileResponse | JSONResponse:
         return unavailable
     try:
         path, filename = await asyncio.to_thread(
-            domain.download, request.path_params["file_id"], exp, sig
+            domain.desk.download, request.path_params["file_id"], exp, sig
         )
         return FileResponse(
             path, filename=filename, media_type="application/octet-stream",

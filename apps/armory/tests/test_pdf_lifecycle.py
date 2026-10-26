@@ -39,7 +39,7 @@ def test_pdf_refresh_help_and_runtime_survive_reload(tmp_path, monkeypatch):
         def fail_merge(_):
             raise MergerError(ErrorCode.INVALID_RANGE, "Bad range")
         with monkeypatch.context() as patch:
-            patch.setattr(tool_module.domain, "merge", fail_merge)
+            patch.setattr(tool_module.domain.desk, "merge", fail_merge)
             with pytest.raises(ToolError, match="invalid_range: Bad range"):
                 await tool_module.tool_pdf_merge(tool_module.MergePlan.model_validate({"segments": [{"file_id": "x"}]}))
         help_body = capability_help.build_help("pdf")

@@ -140,7 +140,7 @@ async def upload_pdf(request: Request) -> JSONResponse:
             content = await upload.read(15 * 1024 * 1024 + 1)
         if len(content) > 15 * 1024 * 1024:
             return JSONResponse({"error": "The file is larger than 15 MB"}, status_code=413)
-        result = await asyncio.to_thread(domain.upload, filename, content)
+        result = await asyncio.to_thread(domain.desk.upload, filename, content)
         return JSONResponse(result.model_dump(mode="json"))
     except (HTTPException, MultiPartException):
         if received > 15 * 1024 * 1024 + 65536:

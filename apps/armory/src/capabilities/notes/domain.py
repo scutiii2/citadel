@@ -63,16 +63,6 @@ def _owner() -> str:
     return uid
 
 
-def _readable(gateway: NotesGateway, owner: str) -> list[dict[str, Any]]:
-    try:
-        docs = gateway.readable_by_agents(owner)
-    except NotesGatewayError as error:
-        logger.warning("notes: %s", error)
-        raise NotesError(f"Notes are unavailable right now: {error}") from error
-    # The gateway already filtered; check again so a backend that ignored a filter cannot leak a note.
-    return [d for d in docs if d.get("owner") == owner and d.get("agent_readable") is True]
-
-
 def _tags(doc: dict[str, Any]) -> list[str]:
     tags = doc.get("tags")
     return [t for t in tags if isinstance(t, str)] if isinstance(tags, list) else []
@@ -84,64 +74,6 @@ def _updated(doc: dict[str, Any]) -> str:
 
 def _preview(doc: dict[str, Any]) -> str:
     return " ".join(str(doc.get("body", "")).split())[:PREVIEW_CHARS]
-
-
-def list_notes(gateway: NotesGateway, tag: str = "") -> NoteListResult:
-    wanted = tag.strip().lower()
-    docs = _readable(gateway, _owner())
-    if wanted:
-        docs = [d for d in docs if wanted in _tags(d)]
-    notes = [
-        NoteSummary(
-            id=str(d["id"]), title=str(d.get("title", "")), tags=", ".join(_tags(d)),
-            updated=_updated(d), preview=_preview(d),
-        )
-        for d in docs
-    ]
-    if not notes:
-        what = f"tagged {wanted!r} " if wanted else ""
-        return NoteListResult(count=0, notes=[], message=f"No notes {what}are shared with agents.")
-    return NoteListResult(count=len(notes), notes=notes, message=f"{len(notes)} note(s) shared with agents.")
-
-
-def search(gateway: NotesGateway, query: str) -> NoteSearchResult:
-    needle = query.strip().lower()
-    if not needle:
-        raise NotesError("Say what to search for.")
-    hits: list[NoteHit] = []
-    for doc in _readable(gateway, _owner()):
-        title = str(doc.get("title", ""))
-        line = next((ln.strip() for ln in str(doc.get("body", "")).splitlines() if needle in ln.lower()), "")
-        if line or needle in title.lower():
-            hits.append(NoteHit(id=str(doc["id"]), title=title, line=line[:200] or title))
-        if len(hits) >= MAX_HITS:
-            break
-    if not hits:
-        return NoteSearchResult(query=query, count=0, hits=[], message="No shared note matches.")
-    return NoteSearchResult(query=query, count=len(hits), hits=hits, message=f"{len(hits)} shared note(s) match.")
-
-
-def read_note(gateway: NotesGateway, note_id: str) -> NoteResult:
-    owner = _owner()
-    key = note_id.strip().lower()
-    if not _NOTE_ID.fullmatch(key):
-        raise NotesError(_NOT_AVAILABLE)
-    try:
-        doc = gateway.get(key)
-    except NotesGatewayError as error:
-        logger.warning("notes: %s", error)
-        raise NotesError(f"Notes are unavailable right now: {error}") from error
-    if doc is None or doc.get("owner") != owner or doc.get("agent_readable") is not True:
-        raise NotesError(_NOT_AVAILABLE)
-    title = str(doc.get("title", ""))
-    body = untrusted.fenced_and_capped(str(doc.get("body", "")), source="your note")
-    return NoteResult(
-        id=key, title=title, tags=", ".join(_tags(doc)), updated=_updated(doc), content=body,
-        message=f"Read note {title!r}.",
-    )
-
-
-# ---- writing ----
 
 
 def _parse_tags(raw: str) -> list[str]:
@@ -183,17 +115,6 @@ def _now() -> str:
     return datetime.now(timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds")
 
 
-def _fetch_editable(gateway: NotesGateway, owner: str, note_id: str) -> tuple[str, dict[str, Any]]:
-    """(key, document) of a note the agent may change: the caller's own and shared with agents."""
-    key = note_id.strip().lower()
-    if not _NOTE_ID.fullmatch(key):
-        raise NotesError(_NOT_AVAILABLE)
-    doc = _call(gateway.get, key)
-    if doc is None or doc.get("owner") != owner or doc.get("agent_readable") is not True:
-        raise NotesError(_NOT_AVAILABLE)
-    return key, doc
-
-
 def _call(fn, *args):
     try:
         return fn(*args)
@@ -232,60 +153,142 @@ def _without_known_items(body: str, text: str) -> tuple[str, int]:
     return ("\n".join(kept).strip("\n"), skipped) if skipped else (text, 0)
 
 
-def create_note(gateway: NotesGateway, title: str, body: str, tags: str = "") -> NoteWriteResult:
-    owner = _owner()
-    doc_title, doc_body, doc_tags = _title(title), _body(body), _parse_tags(tags)
-    if _call(gateway.count_owned, owner) >= MAX_NOTES:
-        raise NotesError(f"The user already has {MAX_NOTES} notes, the most allowed. Ask them to delete one.")
-    now = _now()
-    doc = {
-        "id": uuid.uuid4().hex, "owner": owner, "title": doc_title, "body": doc_body, "tags": doc_tags,
-        # Shared from the start: the user asked an agent to write it, and agents can then keep working on it.
-        "agent_readable": True, "last_editor": "agent", "created_at": now, "updated_at": now,
-    }
-    _call(gateway.put, doc["id"], doc)
-    logger.info("notes: an agent created a note for account %s", owner)
-    return _written(doc["id"], doc, "Created")
+class NoteDesk:
+    """Typed operations on the notes a user shared with agents, over one gateway connection."""
 
+    def __init__(self, gateway: NotesGateway) -> None:
+        self._gateway = gateway
 
-def update_note(gateway: NotesGateway, note_id: str, title: str = "", body: str = "", tags: str = "") -> NoteWriteResult:
-    """Replaces the title, text or tags that are given; an empty argument leaves that part as it is."""
-    owner = _owner()
-    if not (title.strip() or body or tags.strip()):
-        raise NotesError("Nothing to change: give a new title, text or tags.")
-    key, doc = _fetch_editable(gateway, owner, note_id)
-    if title.strip():
-        doc["title"] = _title(title)
-    if body:
-        doc["body"] = _body(body)
-    if tags.strip():
-        doc["tags"] = _parse_tags(tags)
-    doc.update(last_editor="agent", updated_at=_now())
-    _call(gateway.put, key, doc)
-    logger.info("notes: an agent changed a note of account %s", owner)
-    return _written(key, doc, "Updated")
+    def _readable(self, owner: str) -> list[dict[str, Any]]:
+        try:
+            docs = self._gateway.readable_by_agents(owner)
+        except NotesGatewayError as error:
+            logger.warning("notes: %s", error)
+            raise NotesError(f"Notes are unavailable right now: {error}") from error
+        # The gateway already filtered; check again so a backend that ignored a filter cannot leak a note.
+        return [d for d in docs if d.get("owner") == owner and d.get("agent_readable") is True]
 
+    def list_notes(self, tag: str = "") -> NoteListResult:
+        wanted = tag.strip().lower()
+        docs = self._readable(_owner())
+        if wanted:
+            docs = [d for d in docs if wanted in _tags(d)]
+        notes = [
+            NoteSummary(
+                id=str(d["id"]), title=str(d.get("title", "")), tags=", ".join(_tags(d)),
+                updated=_updated(d), preview=_preview(d),
+            )
+            for d in docs
+        ]
+        if not notes:
+            what = f"tagged {wanted!r} " if wanted else ""
+            return NoteListResult(count=0, notes=[], message=f"No notes {what}are shared with agents.")
+        return NoteListResult(count=len(notes), notes=notes, message=f"{len(notes)} note(s) shared with agents.")
 
-def append_to_note(gateway: NotesGateway, note_id: str, text: str) -> NoteWriteResult:
-    owner = _owner()
-    if not text.strip():
-        raise NotesError("Nothing to add: the text is empty.")
-    key, doc = _fetch_editable(gateway, owner, note_id)
-    body = str(doc.get("body", ""))
-    text, skipped = _without_known_items(body, text)
-    if not text.strip():
+    def search(self, query: str) -> NoteSearchResult:
+        needle = query.strip().lower()
+        if not needle:
+            raise NotesError("Say what to search for.")
+        hits: list[NoteHit] = []
+        for doc in self._readable(_owner()):
+            title = str(doc.get("title", ""))
+            line = next((ln.strip() for ln in str(doc.get("body", "")).splitlines() if needle in ln.lower()), "")
+            if line or needle in title.lower():
+                hits.append(NoteHit(id=str(doc["id"]), title=title, line=line[:200] or title))
+            if len(hits) >= MAX_HITS:
+                break
+        if not hits:
+            return NoteSearchResult(query=query, count=0, hits=[], message="No shared note matches.")
+        return NoteSearchResult(query=query, count=len(hits), hits=hits, message=f"{len(hits)} shared note(s) match.")
+
+    def read_note(self, note_id: str) -> NoteResult:
+        owner = _owner()
+        key = note_id.strip().lower()
+        if not _NOTE_ID.fullmatch(key):
+            raise NotesError(_NOT_AVAILABLE)
+        try:
+            doc = self._gateway.get(key)
+        except NotesGatewayError as error:
+            logger.warning("notes: %s", error)
+            raise NotesError(f"Notes are unavailable right now: {error}") from error
+        if doc is None or doc.get("owner") != owner or doc.get("agent_readable") is not True:
+            raise NotesError(_NOT_AVAILABLE)
         title = str(doc.get("title", ""))
-        return NoteWriteResult(
-            id=key, title=title, tags=", ".join(_tags(doc)),
-            message=f"Nothing added to note {title!r} (id {key}): all {skipped} item(s) are already in it.",
+        body = untrusted.fenced_and_capped(str(doc.get("body", "")), source="your note")
+        return NoteResult(
+            id=key, title=title, tags=", ".join(_tags(doc)), updated=_updated(doc), content=body,
+            message=f"Read note {title!r}.",
         )
-    joined = body.rstrip("\n") + "\n" + text if body.strip() else text
-    if len(joined) > BODY_MAX:
-        raise NotesError(
-            f"The note would pass {BODY_MAX} characters ({BODY_MAX - len(body)} left; the text is {len(text)}). "
-            "Add less, or create a new note."
-        )
-    doc.update(body=joined, last_editor="agent", updated_at=_now())
-    _call(gateway.put, key, doc)
-    logger.info("notes: an agent added to a note of account %s", owner)
-    return _written(key, doc, "Added to", f"{skipped} item(s) already in it were left out." if skipped else "")
+
+
+    # ---- writing ----
+
+    def _fetch_editable(self, owner: str, note_id: str) -> tuple[str, dict[str, Any]]:
+        """(key, document) of a note the agent may change: the caller's own and shared with agents."""
+        key = note_id.strip().lower()
+        if not _NOTE_ID.fullmatch(key):
+            raise NotesError(_NOT_AVAILABLE)
+        doc = _call(self._gateway.get, key)
+        if doc is None or doc.get("owner") != owner or doc.get("agent_readable") is not True:
+            raise NotesError(_NOT_AVAILABLE)
+        return key, doc
+
+    def create_note(self, title: str, body: str, tags: str = "") -> NoteWriteResult:
+        owner = _owner()
+        doc_title, doc_body, doc_tags = _title(title), _body(body), _parse_tags(tags)
+        if _call(self._gateway.count_owned, owner) >= MAX_NOTES:
+            raise NotesError(f"The user already has {MAX_NOTES} notes, the most allowed. Ask them to delete one.")
+        now = _now()
+        doc = {
+            "id": uuid.uuid4().hex, "owner": owner, "title": doc_title, "body": doc_body, "tags": doc_tags,
+            # Shared from the start: the user asked an agent to write it, and agents can then keep working on it.
+            "agent_readable": True, "last_editor": "agent", "created_at": now, "updated_at": now,
+        }
+        _call(self._gateway.put, doc["id"], doc)
+        logger.info("notes: an agent created a note for account %s", owner)
+        return _written(doc["id"], doc, "Created")
+
+    def update_note(self, note_id: str, title: str = "", body: str = "", tags: str = "") -> NoteWriteResult:
+        """Replaces the title, text or tags that are given; an empty argument leaves that part as it is."""
+        owner = _owner()
+        if not (title.strip() or body or tags.strip()):
+            raise NotesError("Nothing to change: give a new title, text or tags.")
+        key, doc = self._fetch_editable(owner, note_id)
+        if title.strip():
+            doc["title"] = _title(title)
+        if body:
+            doc["body"] = _body(body)
+        if tags.strip():
+            doc["tags"] = _parse_tags(tags)
+        doc.update(last_editor="agent", updated_at=_now())
+        _call(self._gateway.put, key, doc)
+        logger.info("notes: an agent changed a note of account %s", owner)
+        return _written(key, doc, "Updated")
+
+    def append_to_note(self, note_id: str, text: str) -> NoteWriteResult:
+        owner = _owner()
+        if not text.strip():
+            raise NotesError("Nothing to add: the text is empty.")
+        key, doc = self._fetch_editable(owner, note_id)
+        body = str(doc.get("body", ""))
+        text, skipped = _without_known_items(body, text)
+        if not text.strip():
+            title = str(doc.get("title", ""))
+            return NoteWriteResult(
+                id=key, title=title, tags=", ".join(_tags(doc)),
+                message=f"Nothing added to note {title!r} (id {key}): all {skipped} item(s) are already in it.",
+            )
+        joined = body.rstrip("\n") + "\n" + text if body.strip() else text
+        if len(joined) > BODY_MAX:
+            raise NotesError(
+                f"The note would pass {BODY_MAX} characters ({BODY_MAX - len(body)} left; the text is {len(text)}). "
+                "Add less, or create a new note."
+            )
+        doc.update(body=joined, last_editor="agent", updated_at=_now())
+        _call(self._gateway.put, key, doc)
+        logger.info("notes: an agent added to a note of account %s", owner)
+        return _written(key, doc, "Added to", f"{skipped} item(s) already in it were left out." if skipped else "")
+
+
+def open_desk() -> NoteDesk:
+    return NoteDesk(open_gateway())
