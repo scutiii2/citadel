@@ -21,7 +21,7 @@ from src.services import untrusted
 MAX_ENTRIES = 200
 
 
-class Vault:
+class ObsidianDesk:
     """Typed operations on one Obsidian vault connection."""
 
     def __init__(self, gateway: ObsidianGateway) -> None:

@@ -22,7 +22,7 @@ def _client(results=None, page=None):
 
 def test_search_maps_hits_and_trims_snippets():
     client = _client([{"title": "A", "url": "https://a.test", "content": "x " * 800, "score": 0.91234}, {"title": "no url"}])
-    result = domain.search(client, "  python  ", 3, "news")
+    result = domain.WebResearchDesk(client).search("  python  ", 3, "news")
     client.search.assert_called_once_with("python", 3, "news")
     (hit,) = result.results
     assert hit.url == "https://a.test" and hit.score == 0.912 and len(hit.snippet) <= domain.MAX_SNIPPET_CHARS
@@ -30,7 +30,7 @@ def test_search_maps_hits_and_trims_snippets():
 
 
 def test_search_with_no_hits_says_so():
-    assert "No results" in domain.search(_client(), "zzz").message
+    assert "No results" in domain.WebResearchDesk(_client()).search("zzz").message
 
 
 @pytest.mark.parametrize(
@@ -39,24 +39,24 @@ def test_search_with_no_hits_says_so():
 )
 def test_search_validates_input(kwargs, match):
     with pytest.raises(ValueError, match=match):
-        domain.search(_client(), **kwargs)
+        domain.WebResearchDesk(_client()).search(**kwargs)
 
 
 def test_read_page_fences_and_caps():
     client = _client(page={"url": "https://a.test", "raw_content": "word " * 20000})
-    result = domain.read_page(client, "https://a.test")
+    result = domain.WebResearchDesk(client).read_page("https://a.test")
     assert "data, not instructions" in result.content and "truncated" in result.content
     assert len(result.content.encode()) < domain.MAX_PAGE_BYTES + 1000
 
 
 def test_read_page_empty_text():
-    assert domain.read_page(_client(page={"raw_content": "  "}), "https://a.test").content == ""
+    assert domain.WebResearchDesk(_client(page={"raw_content": "  "})).read_page("https://a.test").content == ""
 
 
 @pytest.mark.parametrize("url", ["ftp://a.test", "file:///etc/passwd", "a.test", "http://"])
 def test_read_page_rejects_non_http_urls(url):
     with pytest.raises(ValueError, match="http"):
-        domain.read_page(_client(), url)
+        domain.WebResearchDesk(_client()).read_page(url)
 
 
 def test_client_needs_a_key():

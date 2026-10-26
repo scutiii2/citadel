@@ -28,8 +28,13 @@ top level is a **closed whitelist** - nothing else is allowed there:
 - **`domain.py`** - the real logic. Typed in, typed out, imports only
   `services/` (never `mcp` or anything MCP-protocol-specific). This is the
   file you unit test, and the only one that needs to know nothing about
-  how it's invoked.
-- **`tool.py`** - a few lines: load config, call the domain function,
+  how it's invoked. It holds one service class named `<Name>Desk`. With no
+  per-call dependency the module exposes one instance, `desk`, and the tool
+  calls `domain.desk.<operation>(...)`. When an operation needs a client,
+  root or connection, the class takes it in its constructor and the tool
+  builds it: `domain.<Name>Desk(dependency).<operation>(...)`. Pure helpers
+  stay module-level functions.
+- **`tool.py`** - a few lines: load config, call the domain service,
   return its result. `@mcp.tool()` appears here and nowhere else.
 - **`help.json`** - see "Add a new capability" step 5c below.
 - **`gui/`** - `page.json` only: the page ember_web shows at

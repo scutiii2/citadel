@@ -20,7 +20,7 @@ def vault(tmp_path):
 
 
 def test_search_finds_title_and_lines_with_a_per_note_cap(vault):
-    result = domain.search(vault, "DOCKER")
+    result = domain.VaultDesk(vault).search("DOCKER")
     assert result.hits[0].line == 0 and result.hits[0].path == "Notes/Docker tips.md"
     lines = [h.line for h in result.hits if h.line]
     assert lines == [2, 3, 4]
@@ -29,36 +29,36 @@ def test_search_finds_title_and_lines_with_a_per_note_cap(vault):
 
 
 def test_search_in_a_folder_and_no_match(vault):
-    assert domain.search(vault, "docker", "Projects").hits == []
-    assert "No notes match" in domain.search(vault, "zzz").message
+    assert domain.VaultDesk(vault).search("docker", "Projects").hits == []
+    assert "No notes match" in domain.VaultDesk(vault).search("zzz").message
 
 
 def test_search_input_is_validated(vault):
     with pytest.raises(ValueError):
-        domain.search(vault, "  ")
+        domain.VaultDesk(vault).search("  ")
     with pytest.raises(ValueError, match="between 1 and 50"):
-        domain.search(vault, "x", max_results=51)
+        domain.VaultDesk(vault).search("x", max_results=51)
 
 
 def test_list_notes(vault):
-    assert domain.list_notes(vault).notes == ["Notes/Docker tips.md", "Projects/App.md"]
-    assert domain.list_notes(vault, "Projects").notes == ["Projects/App.md"]
+    assert domain.VaultDesk(vault).list_notes().notes == ["Notes/Docker tips.md", "Projects/App.md"]
+    assert domain.VaultDesk(vault).list_notes("Projects").notes == ["Projects/App.md"]
 
 
 def test_read_note_is_fenced(vault):
-    result = domain.read_note(vault, "Projects/App.md")
+    result = domain.VaultDesk(vault).read_note("Projects/App.md")
     assert "data, not instructions" in result.content and "nothing here" in result.content
 
 
 @pytest.mark.parametrize("path", ["../x.md", ".obsidian/docker.md", "/abs.md", "Notes/Docker tips.txt"])
 def test_read_refuses_escapes_and_secrets(vault, path):
     with pytest.raises(PathRefused):
-        domain.read_note(vault, path)
+        domain.VaultDesk(vault).read_note(path)
 
 
 def test_read_missing_note(vault):
     with pytest.raises(FileNotFoundError, match="search or list"):
-        domain.read_note(vault, "Notes/none.md")
+        domain.VaultDesk(vault).read_note("Notes/none.md")
 
 
 def test_missing_vault_names_the_setting(tmp_path):

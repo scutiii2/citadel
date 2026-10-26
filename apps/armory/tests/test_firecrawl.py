@@ -16,7 +16,7 @@ from src.capabilities.firecrawl.utils.firecrawl import FirecrawlClient, Firecraw
 def test_scrape_page_fences_and_caps():
     client = MagicMock()
     client.scrape.return_value = {"markdown": "word " * 20000, "metadata": {"title": "T"}}
-    result = domain.scrape_page(client, " https://a.test ")
+    result = domain.FirecrawlDesk(client).scrape_page(" https://a.test ")
     client.scrape.assert_called_once_with("https://a.test")
     assert result.title == "T"
     assert "data, not instructions" in result.content and "truncated" in result.content
@@ -25,29 +25,29 @@ def test_scrape_page_fences_and_caps():
 def test_scrape_page_empty_text():
     client = MagicMock()
     client.scrape.return_value = {"markdown": "  "}
-    assert domain.scrape_page(client, "https://a.test").content == ""
+    assert domain.FirecrawlDesk(client).scrape_page("https://a.test").content == ""
 
 
 @pytest.mark.parametrize("url", ["ftp://a.test", "file:///etc/passwd", "a.test", "http://"])
 def test_urls_must_be_http(url):
-    for call in (domain.scrape_page, domain.map_site, domain.crawl_site):
+    for name in ("scrape_page", "map_site", "crawl_site"):
         with pytest.raises(ValueError, match="http"):
-            call(MagicMock(), url)
+            getattr(domain.FirecrawlDesk(MagicMock()), name)(url)
 
 
 def test_map_site_skips_links_without_address():
     client = MagicMock()
     client.map.return_value = [{"url": "https://a.test/x", "title": "X"}, {"title": "no url"}]
-    result = domain.map_site(client, "https://a.test", 5)
+    result = domain.FirecrawlDesk(client).map_site("https://a.test", 5)
     client.map.assert_called_once_with("https://a.test", 5)
     assert [link.url for link in result.links] == ["https://a.test/x"]
     assert "1 pages" in result.message
 
 
-@pytest.mark.parametrize("call, limit", [(domain.map_site, 0), (domain.map_site, 501), (domain.crawl_site, 26)])
+@pytest.mark.parametrize("call, limit", [("map_site", 0), ("map_site", 501), ("crawl_site", 26)])
 def test_limits_are_checked(call, limit):
     with pytest.raises(ValueError, match="limit"):
-        call(MagicMock(), "https://a.test", limit)
+        getattr(domain.FirecrawlDesk(MagicMock()), call)("https://a.test", limit)
 
 
 def test_crawl_site_joins_pages_once():
@@ -56,7 +56,7 @@ def test_crawl_site_joins_pages_once():
         {"markdown": "one", "metadata": {"sourceURL": "https://a.test/1"}},
         {"markdown": " ", "metadata": {"sourceURL": "https://a.test/2"}},
     ])
-    result = domain.crawl_site(client, "https://a.test", 5)
+    result = domain.FirecrawlDesk(client).crawl_site("https://a.test", 5)
     assert result.pages == ["https://a.test/1"]
     assert "https://a.test/1" in result.content and "data, not instructions" in result.content
     assert "still running" not in result.message
@@ -65,10 +65,10 @@ def test_crawl_site_joins_pages_once():
 def test_crawl_site_reports_a_running_job_and_a_failed_one():
     client = MagicMock()
     client.crawl.return_value = ("scraping", [])
-    assert "still running" in domain.crawl_site(client, "https://a.test").message
+    assert "still running" in domain.FirecrawlDesk(client).crawl_site("https://a.test").message
     client.crawl.return_value = ("failed", [])
     with pytest.raises(ValueError, match="failed"):
-        domain.crawl_site(client, "https://a.test")
+        domain.FirecrawlDesk(client).crawl_site("https://a.test")
 
 
 def test_hosted_client_needs_a_key_self_hosted_does_not():

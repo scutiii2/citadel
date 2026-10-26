@@ -13,7 +13,7 @@ def text_search(scope: str, query: str, uid: str | None = None) -> SearchResult:
     for destination in scopes:
         try:
             snapshot = brain_resolver.resolve(destination, "search", uid)
-            result = domain.Vault(brain_resolver.gateway(snapshot)).search(query)
+            result = domain.ObsidianDesk(brain_resolver.gateway(snapshot)).search(query)
             batches.append([hit.model_copy(update={"scope": destination, "connection_label": snapshot["label"]})
                             for hit in result.hits[:limit]])
         except ObsidianGatewayError:

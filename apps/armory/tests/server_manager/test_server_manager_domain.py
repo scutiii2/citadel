@@ -44,7 +44,7 @@ def test_unreachable_daemon_gives_a_recoverable_message():
     """The reader can't inspect the socket themselves, so the message must say what to do."""
     with patch("docker.from_env", side_effect=DockerException("no such file")):
         with pytest.raises(RuntimeError, match="docker.sock"):
-            domain.host.list_apps()
+            domain.desk.list_apps()
 
 
 # --- start / stop / restart ----------------------------------------------
@@ -60,7 +60,7 @@ def test_start_app_starts_and_reports_new_status():
     client = _fake_client([jellyfin])
 
     with patch("docker.from_env", return_value=client):
-        result = domain.host.start_app("jellyfin")
+        result = domain.desk.start_app("jellyfin")
 
     jellyfin.start.assert_called_once()
     assert result.action == "start"
@@ -78,7 +78,7 @@ def test_stop_app_stops_and_reports_new_status():
     client = _fake_client([jellyfin])
 
     with patch("docker.from_env", return_value=client):
-        result = domain.host.stop_app("jellyfin")
+        result = domain.desk.stop_app("jellyfin")
 
     jellyfin.stop.assert_called_once()
     assert result.action == "stop"
@@ -90,7 +90,7 @@ def test_restart_app_calls_restart_not_stop_then_start():
     client = _fake_client([jellyfin])
 
     with patch("docker.from_env", return_value=client):
-        domain.host.restart_app("jellyfin")
+        domain.desk.restart_app("jellyfin")
 
     jellyfin.restart.assert_called_once()
     jellyfin.stop.assert_not_called()
@@ -103,7 +103,7 @@ def test_unknown_app_name_lists_the_names_that_exist():
 
     with patch("docker.from_env", return_value=client):
         with pytest.raises(KeyError) as error:
-            domain.host.start_app("jelyfin")
+            domain.desk.start_app("jelyfin")
 
     message = str(error.value)
     assert "jellyfin" in message and "plex" in message
@@ -114,7 +114,7 @@ def test_no_apps_at_all_says_so_rather_than_an_empty_list():
 
     with patch("docker.from_env", return_value=client):
         with pytest.raises(KeyError, match="No apps found at all"):
-            domain.host.stop_app("anything")
+            domain.desk.stop_app("anything")
 
 
 # --- list ------------------------------------------------------------------
@@ -125,7 +125,7 @@ def test_list_apps_includes_stopped_containers():
                             _fake_container("plex", status="exited")])
 
     with patch("docker.from_env", return_value=client):
-        result = domain.host.list_apps()
+        result = domain.desk.list_apps()
 
     client.containers.list.assert_called_once_with(all=True)
     assert {app.name for app in result.apps} == {"jellyfin", "plex"}
@@ -135,7 +135,7 @@ def test_list_apps_is_sorted_by_name():
     client = _fake_client([_fake_container("plex"), _fake_container("jellyfin")])
 
     with patch("docker.from_env", return_value=client):
-        result = domain.host.list_apps()
+        result = domain.desk.list_apps()
 
     assert [app.name for app in result.apps] == ["jellyfin", "plex"]
 
@@ -144,7 +144,7 @@ def test_list_apps_report_is_readable_text():
     client = _fake_client([_fake_container("jellyfin", status="running")])
 
     with patch("docker.from_env", return_value=client):
-        result = domain.host.list_apps()
+        result = domain.desk.list_apps()
 
     assert "jellyfin" in result.message
     assert "running" in result.message
@@ -156,7 +156,7 @@ def test_empty_host_reports_no_apps_rather_than_raising():
     client = _fake_client([])
 
     with patch("docker.from_env", return_value=client):
-        result = domain.host.list_apps()
+        result = domain.desk.list_apps()
 
     assert result.apps == []
     assert "No apps found" in result.message
@@ -169,7 +169,7 @@ def test_dangling_image_falls_back_to_the_short_id():
     client = _fake_client([container])
 
     with patch("docker.from_env", return_value=client):
-        result = domain.host.list_apps()
+        result = domain.desk.list_apps()
 
     assert result.apps[0].image == "sha256:abc123"
 
@@ -200,7 +200,7 @@ def test_the_log_is_offered_as_a_download_to_the_asker(requester):
     web = _logging_container("web", b"2026-01-01T00:00:00Z started\n2026-01-01T00:00:01Z ready\n")
 
     with patch("docker.from_env", return_value=_fake_client([web])):
-        result = domain.host.get_app_logs("web", 200)
+        result = domain.desk.get_app_logs("web", 200)
 
     web.logs.assert_called_once_with(tail=200, timestamps=True)
     assert result.lines == 2
@@ -217,7 +217,7 @@ def test_the_default_is_five_hundred_lines(requester):
     web = _logging_container("web", b"x\n")
 
     with patch("docker.from_env", return_value=_fake_client([web])):
-        domain.host.get_app_logs("web")
+        domain.desk.get_app_logs("web")
 
     assert web.logs.call_args.kwargs["tail"] == 500
 
@@ -225,14 +225,14 @@ def test_the_default_is_five_hundred_lines(requester):
 @pytest.mark.parametrize("lines", [0, -1, 5001])
 def test_the_line_count_is_bounded(requester, lines):
     with pytest.raises(ValueError, match="between 1 and 5000"):
-        domain.host.get_app_logs("web", lines)
+        domain.desk.get_app_logs("web", lines)
 
 
 def test_the_largest_line_count_is_allowed(requester):
     web = _logging_container("web", b"x\n")
 
     with patch("docker.from_env", return_value=_fake_client([web])):
-        domain.host.get_app_logs("web", 5000)
+        domain.desk.get_app_logs("web", 5000)
 
     assert web.logs.call_args.kwargs["tail"] == 5000
 
@@ -241,7 +241,7 @@ def test_an_empty_log_offers_no_file(requester):
     web = _logging_container("web", b"")
 
     with patch("docker.from_env", return_value=_fake_client([web])):
-        result = domain.host.get_app_logs("web")
+        result = domain.desk.get_app_logs("web")
 
     assert result.download_markers == [] and result.lines == 0
     assert "no log output" in result.message
@@ -253,7 +253,7 @@ def test_nobody_identified_means_no_file(requester):
     web = _logging_container("web", b"line\n")
 
     with patch("docker.from_env", return_value=_fake_client([web])):
-        result = domain.host.get_app_logs("web")
+        result = domain.desk.get_app_logs("web")
 
     assert result.download_markers == []
     assert "not identified" in result.message
@@ -263,7 +263,7 @@ def test_nobody_identified_means_no_file(requester):
 def test_an_unknown_app_lists_the_names_that_exist(requester):
     with patch("docker.from_env", return_value=_fake_client([_logging_container("web", b"x")])):
         with pytest.raises(KeyError, match="web"):
-            domain.host.get_app_logs("nope")
+            domain.desk.get_app_logs("nope")
 
 
 def test_a_log_over_the_limit_is_cut_to_its_newest_whole_lines(requester, monkeypatch):
@@ -271,7 +271,7 @@ def test_a_log_over_the_limit_is_cut_to_its_newest_whole_lines(requester, monkey
     web = _logging_container("web", b"aaaaaaaaaa\nbbbbbbbbbb\ncccccccccc\n")
 
     with patch("docker.from_env", return_value=_fake_client([web])):
-        result = domain.host.get_app_logs("web")
+        result = domain.desk.get_app_logs("web")
 
     (marker,) = result.download_markers
     got = requester.store.get(marker.split("path=")[1].split('"')[0], "alice")
@@ -283,7 +283,7 @@ def test_a_log_without_a_final_newline_counts_its_last_line(requester):
     web = _logging_container("web", b"one\ntwo")
 
     with patch("docker.from_env", return_value=_fake_client([web])):
-        assert domain.host.get_app_logs("web").lines == 2
+        assert domain.desk.get_app_logs("web").lines == 2
 
 
 def test_a_log_that_exactly_fits_is_not_cut(requester, monkeypatch):
@@ -291,7 +291,7 @@ def test_a_log_that_exactly_fits_is_not_cut(requester, monkeypatch):
     web = _logging_container("web", b"aaaaaaaaaa\n")  # 11 bytes
 
     with patch("docker.from_env", return_value=_fake_client([web])):
-        result = domain.host.get_app_logs("web")
+        result = domain.desk.get_app_logs("web")
 
     assert "cut" not in result.message
     assert result.lines == 1 and len(result.download_markers) == 1
@@ -304,7 +304,7 @@ def test_list_apps_marks_the_apps_that_have_a_watcher():
 
     with patch("docker.from_env", return_value=client), \
             patch.object(ServerWatcher, "is_active", classmethod(lambda cls, key: key == "jellyfin")):
-        result = domain.host.list_apps()
+        result = domain.desk.list_apps()
 
     assert {app.name: app.watched for app in result.apps} == {"jellyfin": True, "plex": False}
     lines = result.message.splitlines()

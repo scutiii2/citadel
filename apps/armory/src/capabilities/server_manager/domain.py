@@ -22,8 +22,8 @@ MAX_READ_LINES = 300
 MAX_READ_CHARS = 20_000
 
 
-class DockerHost:
-    """The Docker daemon this server manages; stateless, so one instance (``host``) serves every call."""
+class DockerDesk:
+    """The Docker daemon this server manages; stateless, so one instance (``desk``) serves every call."""
 
     def _client(self) -> docker.DockerClient:
         try:
@@ -172,4 +172,4 @@ class DockerHost:
         return AppListResult(apps=apps, message=report)
 
 
-host = DockerHost()
+desk = DockerDesk()

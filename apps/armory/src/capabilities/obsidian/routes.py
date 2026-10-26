@@ -53,7 +53,7 @@ def execute(body: Operation, uid: str):
                 "generation": snapshot["generation"], "index_status": indexes.status(snapshot),
                 "message": "Read-only connection test succeeded"}
     if body.operation == "list":
-        result = domain.Vault(gateway).list_folder(body.path)
+        result = domain.ObsidianDesk(gateway).list_folder(body.path)
     elif body.operation == "read":
         # Raw text is returned to the authenticated API for hash reconciliation;
         # the browser renders Markdown with its existing sanitizing component.

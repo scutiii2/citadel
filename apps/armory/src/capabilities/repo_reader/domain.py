@@ -32,58 +32,6 @@ def open_workspace(workspace_dir: Path) -> ConfinedRoot:
     return ConfinedRoot(workspace_dir)
 
 
-def list_repos(workspace: ConfinedRoot) -> RepoListResult:
-    repos: list[str] = []
-    base = len(workspace.root.parts)
-    for folder, dirs, _ in os.walk(workspace.root):
-        depth = len(Path(folder).parts) - base
-        if ".git" in dirs or (Path(folder) / ".git").is_file():
-            repos.append(Path(folder).relative_to(workspace.root).as_posix() or ".")
-            dirs[:] = []
-            continue
-        dirs[:] = sorted(d for d in dirs if not is_blocked_name(d)) if depth < MAX_REPO_DEPTH else []
-    message = f"{len(repos)} repos." if repos else "No git repos found in the workspace."
-    return RepoListResult(repos=repos, message=message)
-
-
-def log(workspace: ConfinedRoot, repo: str, max_count: int = 20, path: str = "", author: str = "", since: str = "") -> RepoTextResult:
-    _bounded("max_count", max_count, MAX_COMMITS)
-    args = ["log", f"--max-count={max_count}", "--date=short", "--pretty=format:%h %ad %an  %s", "--stat=100"]
-    if author.strip():
-        args.append(f"--author={_clean_option(author)}")
-    if since.strip():
-        args.append(f"--since={_clean_option(since)}")
-    root = _repo(workspace, repo)
-    args += ["--", *_pathspec(root, path)]
-    return _run(root, repo, args, f"Newest {max_count} commits of {repo}.")
-
-
-def diff(workspace: ConfinedRoot, repo: str, base: str = "HEAD", target: str = "", path: str = "", stat_only: bool = True) -> RepoTextResult:
-    args = ["diff", "--stat=100" if stat_only else "--unified=3", _rev(base)]
-    if target.strip():
-        args.append(_rev(target))
-    root = _repo(workspace, repo)
-    args += ["--", *_pathspec(root, path)]
-    what = f"{base}..{target}" if target.strip() else f"{base} against the working tree"
-    return _run(root, repo, args, f"{'Changed files' if stat_only else 'Diff'} for {what} in {repo}.")
-
-
-def grep(workspace: ConfinedRoot, repo: str, pattern: str, path: str = "", max_matches: int = 50) -> RepoTextResult:
-    if not pattern.strip():
-        raise ValueError("pattern must not be empty")
-    _bounded("max_matches", max_matches, MAX_MATCHES)
-    root = _repo(workspace, repo)
-    args = ["grep", "-n", "-I", "-i", "-F", f"--max-count={max_matches}", "-e", pattern, "--", *_pathspec(root, path)]
-    return _run(root, repo, args, f"Tracked lines in {repo} holding {pattern!r}.", empty=f"No tracked line in {repo} holds {pattern!r}.")
-
-
-def _repo(workspace: ConfinedRoot, repo: str) -> Path:
-    root = workspace.resolve(repo)
-    if not (root / ".git").exists():
-        raise PathRefused(f"{repo!r} is not a git repo. Use the repo list to find the exact path.")
-    return root
-
-
 def _pathspec(root: Path, path: str) -> list[str]:
     """The pathspecs for a command: the caller's path (checked inside the repo) plus the secret excludes."""
     if path.strip().startswith(":"):
@@ -131,3 +79,57 @@ def _run(root: Path, repo: str, args: list[str], message: str, empty: str = "") 
         return RepoTextResult(repo=repo, text="", message=empty or f"Nothing to show for {repo}.")
     text = untrusted.fenced_and_capped(output, source=f"git in {repo}", max_bytes=MAX_OUTPUT_BYTES)
     return RepoTextResult(repo=repo, text=text, message=message)
+
+
+class RepoDesk:
+    """Read-only git over the workspace projects."""
+
+    def __init__(self, workspace: ConfinedRoot) -> None:
+        self._workspace = workspace
+
+    def list_repos(self) -> RepoListResult:
+        repos: list[str] = []
+        base = len(self._workspace.root.parts)
+        for folder, dirs, _ in os.walk(self._workspace.root):
+            depth = len(Path(folder).parts) - base
+            if ".git" in dirs or (Path(folder) / ".git").is_file():
+                repos.append(Path(folder).relative_to(self._workspace.root).as_posix() or ".")
+                dirs[:] = []
+                continue
+            dirs[:] = sorted(d for d in dirs if not is_blocked_name(d)) if depth < MAX_REPO_DEPTH else []
+        message = f"{len(repos)} repos." if repos else "No git repos found in the workspace."
+        return RepoListResult(repos=repos, message=message)
+
+    def log(self, repo: str, max_count: int = 20, path: str = "", author: str = "", since: str = "") -> RepoTextResult:
+        _bounded("max_count", max_count, MAX_COMMITS)
+        args = ["log", f"--max-count={max_count}", "--date=short", "--pretty=format:%h %ad %an  %s", "--stat=100"]
+        if author.strip():
+            args.append(f"--author={_clean_option(author)}")
+        if since.strip():
+            args.append(f"--since={_clean_option(since)}")
+        root = self._repo(repo)
+        args += ["--", *_pathspec(root, path)]
+        return _run(root, repo, args, f"Newest {max_count} commits of {repo}.")
+
+    def diff(self, repo: str, base: str = "HEAD", target: str = "", path: str = "", stat_only: bool = True) -> RepoTextResult:
+        args = ["diff", "--stat=100" if stat_only else "--unified=3", _rev(base)]
+        if target.strip():
+            args.append(_rev(target))
+        root = self._repo(repo)
+        args += ["--", *_pathspec(root, path)]
+        what = f"{base}..{target}" if target.strip() else f"{base} against the working tree"
+        return _run(root, repo, args, f"{'Changed files' if stat_only else 'Diff'} for {what} in {repo}.")
+
+    def grep(self, repo: str, pattern: str, path: str = "", max_matches: int = 50) -> RepoTextResult:
+        if not pattern.strip():
+            raise ValueError("pattern must not be empty")
+        _bounded("max_matches", max_matches, MAX_MATCHES)
+        root = self._repo(repo)
+        args = ["grep", "-n", "-I", "-i", "-F", f"--max-count={max_matches}", "-e", pattern, "--", *_pathspec(root, path)]
+        return _run(root, repo, args, f"Tracked lines in {repo} holding {pattern!r}.", empty=f"No tracked line in {repo} holds {pattern!r}.")
+
+    def _repo(self, repo: str) -> Path:
+        root = self._workspace.resolve(repo)
+        if not (root / ".git").exists():
+            raise PathRefused(f"{repo!r} is not a git repo. Use the repo list to find the exact path.")
+        return root
