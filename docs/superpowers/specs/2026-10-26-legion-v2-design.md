@@ -38,21 +38,28 @@ Two interfaces, no shared `run_chat`:
 
 ### Decision gateways
 
-- **`laya`**: HTTP client for the `LayaModel` service (`LAYA_SERVICE_URL`, `LAYA_TOKEN`). The service owns weights, strategies and decision rules. Legion loads nothing. The agent's `model` field selects the service strategy (e.g. english, typed-decisions); names come from `GET /v1/strategies`.
-- **`jev`**: TypeSafe cloud API (`POST /v1/systemone`, `TYPESAFE_API_KEY`). Stays cloud. Today it takes one `choice` question per call. It raises `UnsupportedQuestion` for `score`/`noul`, and the wrapper then falls to the next gateway.
-- **Removed**: `jev_vercel`, `VERCEL_GATEWAY_API_KEY`, `laya_classifier` (the local 512-window backend), `triage_flow.py` voter mixing, `classifier.chains`.
+- **`laya`**: HTTP client for the `LayaModel` service (`LAYA_SERVICE_URL`, `LAYA_TOKEN`). The service owns weights, strategies and decision rules. Legion loads nothing. The gateway always asks the service for the `english-then-typed` strategy (English first, typed if unsure, then narrowing and comparing). Callers never pick a Laya strategy or model.
+- **`jev`**: TypeSafe cloud API (`POST /v1/systemone`, `TYPESAFE_API_KEY`). Stays cloud. It answers `choice`, `score` and `noul` questions: the client reduces `score` (levels) and `noul` (true/false labels) to a `choice` over those options, as today. That is a client-side reduction, not an API limit.
+- Both gateways accept every question type and return `{answer, confidence}` per question.
+- **Removed**: `jev_vercel`, `VERCEL_GATEWAY_API_KEY`, `laya_classifier` (local 512-window backend), `triage_flow.py` voter mixing, `classifier.chains`.
 
-### Fallback
+### Arrangement and strategies
 
-Same mechanism for both kinds: `llm.fallback_gateways` is an ordered list of `{gateway, model?}`; the agent wrapper retries the next entry on gateway error, cooldown or unsupported question. The old triage order becomes agent config:
+The decision provider has one **arrangement**: the ordered gateway list `[laya, jev]`. An agent picks a **strategy** over it:
+
+| Strategy | Behaviour |
+|---|---|
+| `laya-only` | ask `laya`; no cloud call |
+| `jev-only` | ask `jev` |
+| `both` | ask the first gateway in the arrangement (`laya`); ask the next (`jev`) only if the first fails or does not reach the confidence threshold |
+
+The wrapper (not the provider) walks the arrangement, the same way language agents walk `fallback_gateways`. A gateway error, cooldown or confidence below threshold hands over to the next. The last answer is returned with an `uncertain` flag if no gateway reached the threshold. `laya-only` never leaves the machine; a request marked `local_only` forces `laya-only`.
 
 ```json
-"llm": {"provider": "decision", "gateway": "laya", "model": "english",
-        "fallback_gateways": [{"gateway": "laya", "model": "typed-decisions"}, {"gateway": "jev"}]}
+"llm": {"provider": "decision", "strategy": "both"}
 ```
 
-A `local_only` request skips any cloud gateway (`jev`) in the list.
-Confidence thresholds (`min_confidence`) are checked by the wrapper: below threshold counts as "not settled" and moves on, as an error does.
+`gateway` and `fallback_gateways` stay for language providers only. Thresholds: one `min_confidence` per agent (default 0.90, overridable per request), replacing the per-voter table.
 
 ## Target `src/` layout
 
@@ -106,8 +113,9 @@ Hard break, no compat shim. All 20 `agents/*.json` migrate in the same change se
 ## Risks and open checks
 
 - Router and auto-tier callers use `decision.py` chains directly today; phase 3 must port each to the wrapper without changing their thresholds. Cases in `scripts/check_*` and `tests/test_router_*` are the regression net.
-- Jev supports only `choice` today; triage agents with `score`/`noul` questions depend on Laya gateways answering first.
-- Laya strategy names must be confirmed against the running service before the agent-file `model` values are fixed.
+- Jev's `score`/`noul` answers come from a choice reduction; keep that mapping tested.
+- `english-then-typed` does not skip English for `noul` questions (the service's `auto` does, because of an English yes/no label bug). Verify noul quality; if poor, the `laya` gateway may switch to `auto` for noul only.
+- Confirm `english-then-typed` appears in `GET /v1/strategies` of the deployed service.
 - Rename touches the docker network name and port env; verify `dev_deploy.bat` and the ZimaOS overlay.
 
 ## Testing
