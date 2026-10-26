@@ -17,9 +17,9 @@ import pytest
 import uvicorn
 from mcp.server.fastmcp import FastMCP
 
-from src.private_extensions import guard
-from src.private_extensions.pool import PrivateSessionPool
-from src.private_extensions.spec import PrivateSpec
+from src.tools.private_extensions import guard
+from src.tools.private_extensions.pool import PrivateSessionPool
+from src.tools.private_extensions.spec import PrivateSpec
 
 WAIT = 30
 

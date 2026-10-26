@@ -9,14 +9,14 @@ import pytest
 
 from src.agents import agent_registry, agent_routing, agent_spec
 from src.agents.agent_spec import AgentSpec, LlmSpec
-from src.core import tool_filter
+from src.runtime import tool_filter
 
 AGENTS = [
-    {"id": "orchestrator", "label": "Ember", "url": "u", "orchestrator": True, "focus": "coordination"},
-    {"id": "calc", "label": "Calculator", "url": "u", "focus": "arithmetic and units"},
-    {"id": "explainer", "label": "Explainer", "url": "u", "focus": "plain explanations"},
-    {"id": "poet", "label": "Poet", "url": "u", "focus": "poems"},
-    {"id": "blank", "label": "Blank", "url": "u"},
+    {"id": "orchestrator", "label": "Ember", "url": "u", "role": "orchestrator", "focus": "coordination"},
+    {"role": "specialist", "id": "calc", "label": "Calculator", "url": "u", "focus": "arithmetic and units"},
+    {"role": "specialist", "id": "explainer", "label": "Explainer", "url": "u", "focus": "plain explanations"},
+    {"role": "specialist", "id": "poet", "label": "Poet", "url": "u", "focus": "poems"},
+    {"role": "specialist", "id": "blank", "label": "Blank", "url": "u"},
 ]
 
 
@@ -29,7 +29,7 @@ def registry(monkeypatch):
 
 def _use(monkeypatch, orchestrator=True):
     spec = AgentSpec(id="orchestrator", label="Ember", port=9100, llm=LlmSpec(provider="anthropic"),
-                     orchestrator=orchestrator)
+                     role="orchestrator" if orchestrator else "specialist")
     monkeypatch.setattr(agent_spec, "_current", spec)
 
 
@@ -40,7 +40,7 @@ def test_specialists_exclude_self_and_orchestrators(registry, monkeypatch):
 
 def test_specialists_skip_an_agent_that_is_not_delegable(registry, monkeypatch):
     _use(monkeypatch)
-    hidden = [*AGENTS, {"id": "titles", "label": "Titles", "url": "u", "focus": "titles", "delegable": False}]
+    hidden = [*AGENTS, {"role": "specialist", "id": "titles", "label": "Titles", "url": "u", "focus": "titles", "delegable": False}]
     monkeypatch.setattr(agent_registry, "_AGENTS", hidden)
     assert "titles" not in [r.id for r in agent_routing.specialists()]
 
@@ -57,12 +57,12 @@ def test_orchestrator_roster_is_every_specialist(registry, monkeypatch):
 
 def test_specialists_carry_their_published_tiers(monkeypatch):
     agents = [
-        {"id": "orchestrator", "label": "Ember", "url": "u", "orchestrator": True},
-        {"id": "calc", "label": "Calculator", "url": "u", "focus": "math", "tiers": [
+        {"id": "orchestrator", "label": "Ember", "url": "u", "role": "orchestrator"},
+        {"role": "specialist", "id": "calc", "label": "Calculator", "url": "u", "focus": "math", "tiers": [
             {"tier": "light", "id": "haiku", "use_for": "quick"},
             {"tier": "bogus", "id": "x", "use_for": "y"},
         ]},
-        {"id": "poet", "label": "Poet", "url": "u", "focus": "poems"},
+        {"role": "specialist", "id": "poet", "label": "Poet", "url": "u", "focus": "poems"},
     ]
     monkeypatch.setattr(agent_registry, "reload", lambda: None)
     monkeypatch.setattr(agent_registry, "_AGENTS", agents)
@@ -93,7 +93,7 @@ def test_roster_leaves_out_specialists_whose_tools_are_switched_off(registry, mo
         agent_spec.RosterEntry("poet", "Poet", ""),
     ])
     monkeypatch.setattr(agent_spec, "current", lambda: agent_spec.AgentSpec(
-        id="ember", label="E", port=1, llm=agent_spec.LlmSpec(provider="anthropic"), orchestrator=True))
+        id="ember", label="E", port=1, llm=agent_spec.LlmSpec(provider="anthropic"), role='orchestrator'))
     assert [r.id for r in asyncio.run(agent_routing.roster_for())] == ["poet"]
     monkeypatch.setattr(agent_routing, "_live_tool_names", lambda: None)
     assert [r.id for r in asyncio.run(agent_routing.roster_for())] == ["calc", "poet"]
@@ -108,7 +108,7 @@ def _roster_ids(monkeypatch, live, blocked=()):
         agent_spec.RosterEntry("poet", "Poet", ""),
     ])
     monkeypatch.setattr(agent_spec, "current", lambda: agent_spec.AgentSpec(
-        id="ember", label="E", port=1, llm=agent_spec.LlmSpec(provider="anthropic"), orchestrator=True))
+        id="ember", label="E", port=1, llm=agent_spec.LlmSpec(provider="anthropic"), role='orchestrator'))
     token = tool_filter.bind(blocked)
     try:
         return [r.id for r in asyncio.run(agent_routing.roster_for())]

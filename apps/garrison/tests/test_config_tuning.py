@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from src.core import config_files
-from src.llm import token_limits
+from src.runtime import config_files
+from src.providers import token_limits
 
 
 @pytest.fixture

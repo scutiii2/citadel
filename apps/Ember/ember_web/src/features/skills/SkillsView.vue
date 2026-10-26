@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
+import "../../components/layout/infoPage.css";
 import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import { errorMessage } from "../../utils/errors";
@@ -84,7 +85,7 @@ async function saveEdit(): Promise<void> {
 </script>
 
 <template>
-  <PageLayout title="Skills" description="How-tos Ember proposed after solving a task. Nothing is used until you approve it.">
+  <PageLayout title="Skills" class="info-content" description="How-tos Ember proposed after solving a task. Nothing is used until you approve it.">
     <p v-if="notice" class="notice" role="status">{{ notice }}</p>
     <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
     <p v-if="loading" class="muted" role="status">Loading skills…</p>
@@ -130,7 +131,6 @@ async function saveEdit(): Promise<void> {
 </template>
 
 <style scoped>
-.notice { margin: 0 0 12px; color: var(--muted); font-size: .85em; }
 .group { margin-bottom: 28px; }
 .group h2 { font-size: 1em; font-weight: 600; margin: 0 0 4px; }
 .count { color: var(--muted); font-weight: 400; margin-left: 4px; }
@@ -148,15 +148,10 @@ async function saveEdit(): Promise<void> {
 .edit-form input:focus-visible, .edit-form textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .edit-form .actions { justify-content: flex-end; margin-top: 4px; }
 .hint { margin: 0; font-size: .8em; }
+.actions .danger { margin-left: auto; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.primary, .chip, .danger { font: inherit; font-size: .85em; padding: 8px 14px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-full); cursor: pointer; }
-.primary { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); font-weight: 600; }
-.danger { color: var(--danger); border-color: var(--danger); margin-left: auto; }
-button:disabled { opacity: .5; cursor: not-allowed; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .empty { padding: 20px 4px; color: var(--muted); }
 .empty h3 { font-size: 1em; font-weight: 500; margin: 0 0 8px; color: var(--text); }
-.muted { color: var(--muted); }
-.error { color: var(--danger); }
 @media (max-width: 767px) { .actions button { min-height: 44px; } }
 </style>

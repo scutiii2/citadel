@@ -9,17 +9,17 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from src import server
-from src.core import approvals
-from src.llm import anthropic_provider, openai_provider
-from src.llm.base_provider import ChatResult
+from src.runtime import approvals
+from src.providers.language import anthropic_provider, openai_provider
+from src.providers.base_provider import ChatResult
 
 
 import pytest
 
-from src.agents import ask_user
-from src.core import questions
-from src.llm import cancellation
-from src.llm.base_provider import ChatCancelled
+from src.agents.roles.orchestrator import ask_user
+from src.runtime import questions
+from src.providers import cancellation
+from src.providers.base_provider import ChatCancelled
 
 REQUEST = "req-q"
 QUESTIONS = [
@@ -369,7 +369,7 @@ def test_anthropic_stop_while_a_question_is_open_cancels_the_turn(monkeypatch) -
 
 
 def test_anthropic_offers_the_schema_only_when_enabled() -> None:
-    with patch("src.llm.anthropic_provider.list_tools", return_value=[]):
+    with patch("src.providers.language.anthropic_provider.list_tools", return_value=[]):
         off = anthropic_provider._tool_schemas([], ())
         token = questions.bind(questions.QuestionPolicy(True))
         try:
@@ -415,9 +415,9 @@ def openai_turn(monkeypatch, recorder, enabled=True):
     async def scenario():
         policy = questions.bind(questions.QuestionPolicy(enabled))
         try:
-            with patch("src.llm.openai_provider._get_client", return_value=_openai_client(ASK_ARGUMENTS)), \
-                 patch("src.llm.openai_provider._dispatch", dispatch), \
-                 patch("src.llm.openai_provider.list_tools", return_value=[]):
+            with patch("src.providers.language.openai_provider._get_client", return_value=_openai_client(ASK_ARGUMENTS)), \
+                 patch("src.providers.language.openai_provider._dispatch", dispatch), \
+                 patch("src.providers.language.openai_provider.list_tools", return_value=[]):
                 return await openai_provider.run_chat("which?", [], request_id=REQUEST, on_event=recorder)
         finally:
             questions.reset(policy)
@@ -447,7 +447,7 @@ def test_openai_refuses_the_tool_when_it_was_not_offered(monkeypatch) -> None:
 
 
 def test_openai_offers_the_schema_only_when_enabled() -> None:
-    with patch("src.llm.openai_provider.list_tools", return_value=[]):
+    with patch("src.providers.language.openai_provider.list_tools", return_value=[]):
         off = openai_provider._tool_schemas([], ())
         token = questions.bind(questions.QuestionPolicy(True))
         try:

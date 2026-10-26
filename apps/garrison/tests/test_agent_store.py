@@ -11,7 +11,7 @@ from src.agents.agent_store import AgentStoreError
 
 
 def _cfg(port, **extra):
-    return {"label": "X", "port": port, "llm": {"provider": "anthropic", "gateway": "claude"}, **extra}
+    return {"role": "specialist", "label": "X", "port": port, "llm": {"provider": "anthropic", "gateway": "claude"}, **extra}
 
 
 @pytest.fixture
@@ -41,9 +41,9 @@ def test_create_refuses_duplicate_bad_id_port_clash_and_unknown_gateway(folder):
     with pytest.raises(AgentStoreError, match="port 9100"):
         agent_store.create_agent("calc", _cfg(9100), folder)
     with pytest.raises(AgentStoreError, match="gateway"):
-        agent_store.create_agent("calc", {"port": 9103, "llm": {"provider": "anthropic", "gateway": "nope"}}, folder)
+        agent_store.create_agent("calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic", "gateway": "nope"}}, folder)
     with pytest.raises(AgentStoreError, match="llm.provider"):
-        agent_store.create_agent("calc", {"port": 9103, "llm": {"provider": "x"}}, folder)
+        agent_store.create_agent("calc", {"role": "specialist", "port": 9103, "llm": {"provider": "x"}}, folder)
     assert not (folder / ".overrides").exists()
 
 

@@ -20,7 +20,7 @@ from pathlib import Path
 # An anthropic orchestrator on port 9100, id "claude-agent".
 _AGENT_FILE = Path(tempfile.mkdtemp(prefix="ai_agent_spec_")) / "claude-agent.json"
 _AGENT_FILE.write_text(
-    json.dumps({"port": 9100, "entry": True, "llm": {"provider": "anthropic"}, "orchestrator": True}),
+    json.dumps({"port": 9100, "entry": True, "llm": {"provider": "anthropic"}, "role": "orchestrator"}),
     encoding="utf-8",
 )
 os.environ.setdefault("AI_AGENT_FILE", str(_AGENT_FILE))
@@ -35,7 +35,7 @@ import pytest  # noqa: E402
 def _default_classifier_settings(monkeypatch):
     """Tests see the classifier defaults (everything off), never the developer's own `classifier`
     section in configs/config_tuning.json. Tests that need a section patch read_section themselves."""
-    from src.llm import decision
+    from src.providers.decision import decision
 
     monkeypatch.setattr(decision, "read_section", lambda path, name, default=None: {})
     decision.reset_cache()

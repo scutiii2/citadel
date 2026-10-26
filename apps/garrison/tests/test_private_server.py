@@ -9,10 +9,11 @@ from unittest.mock import patch
 from mcp import types
 
 from src import server
-from src.agents import agent_config, delegation
-from src.core import approvals, internal_auth
-from src.llm.base_provider import ChatResult
-from src.private_extensions import turn as private_turn
+from src.agents import agent_config
+from src.agents.roles.orchestrator import delegation
+from src.runtime import approvals, internal_auth
+from src.providers.base_provider import ChatResult
+from src.tools.private_extensions import turn as private_turn
 
 RAW = [{"id": "notes", "label": "Notes", "url": "https://notes.example.com/mcp", "headers": {"X-Key": "s3cret"}}]
 
@@ -79,7 +80,7 @@ def run_with_provider(raw, *, account="a@x", prefetch=None, approval_mode="off")
         token = internal_auth.bind_requester(internal_auth.Requester(email=account))
         try:
             with patch.object(agent_config, "_PROVIDER_MODULE", SimpleNamespace(run_chat=fake_provider)), \
-                 patch("src.mcp_client.mcp_upstream.prefetch_private", new=fake_prefetch):
+                 patch("src.tools.mcp_client.mcp_upstream.prefetch_private", new=fake_prefetch):
                 return await agent_config.run_chat("q", [], [], approval_mode=approval_mode, private_extensions=raw)
         finally:
             internal_auth.reset_requester(token)
@@ -138,8 +139,8 @@ def test_a_delegate_is_never_given_private_extensions():
     turn = private_turn.PrivateTurn.from_raw(RAW, "a@x")
     token = private_turn.bind(turn)
     try:
-        with patch("src.agents.delegation._call_tool", side_effect=fake_call_tool), \
-             patch("src.agents.delegation.agent_registry") as registry:
+        with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=fake_call_tool), \
+             patch("src.agents.roles.orchestrator.delegation.agent_registry") as registry:
             registry.get_agent.return_value = {"url": "http://127.0.0.1:9101/mcp", "label": "Sub"}
             delegation.call("openai-agent", "sub-question", depth=0)
     finally:

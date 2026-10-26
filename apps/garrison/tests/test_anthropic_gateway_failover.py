@@ -10,8 +10,9 @@ import anthropic
 import pytest
 
 from src.agents import agent_spec
-from src.llm import anthropic_provider as provider, cooldown, gateway_failover, token_limits
-from src.llm.base_provider import ChatCancelled
+from src.providers.language import anthropic_provider as provider
+from src.providers import cooldown, gateway_failover, token_limits
+from src.providers.base_provider import ChatCancelled
 from tests.test_anthropic_provider import _stream_cm, _usage
 from tests.test_gateway_failover import sdk_error
 
@@ -205,7 +206,7 @@ def test_sse_json_retry_exhaustion_returns_visible_error(monkeypatch, with_backu
 
 
 def test_sse_retry_obeys_cancellation(monkeypatch):
-    from src.llm import cancellation
+    from src.providers import cancellation
 
     primary, backup = clients(monkeypatch, [_malformed_stream(["discard"]), _stream_cm(["answer"])], [])
     async def emit(event):
@@ -222,7 +223,7 @@ def test_sse_retry_obeys_cancellation(monkeypatch):
 
 def test_sse_retry_respects_token_budget(monkeypatch):
     from src.agents.agent_spec import LlmSpec
-    from src.llm.llm_options import LlmOptions
+    from src.providers.llm_options import LlmOptions
 
     primary, backup = clients(monkeypatch, [_malformed_stream(), _stream_cm(["answer"])], [])
     options = LlmOptions("anthropic", "test", LlmSpec(provider="anthropic", max_turn_tokens=1))
@@ -235,7 +236,7 @@ def test_sse_retry_respects_token_budget(monkeypatch):
 
 def test_sse_retry_respects_time_budget(monkeypatch):
     from src.agents.agent_spec import LlmSpec
-    from src.llm.llm_options import LlmOptions
+    from src.providers.llm_options import LlmOptions
 
     slow = _stream_cm([])
     async def delayed_pieces():

@@ -4,9 +4,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.agents import agent_registry, agent_spec, context_summarizer, delegation
-from src.core import internal_auth
-from src.llm import cancellation
+from src.agents import agent_registry, agent_spec
+from src.agents.roles.orchestrator import context_summarizer, delegation
+from src.runtime import internal_auth
+from src.providers import cancellation
 
 
 @pytest.fixture
@@ -14,7 +15,7 @@ def helper(monkeypatch):
     monkeypatch.setattr(internal_auth, "TOKEN", "test")
     monkeypatch.setattr(agent_registry, "reload", lambda: None)
     monkeypatch.setattr(agent_registry, "_AGENTS_BY_ID", {
-        "context-summarizer": {"id": "context-summarizer", "url": "http://helper/mcp"},
+        "context-summarizer": {"role": "specialist", "id": "context-summarizer", "url": "http://helper/mcp"},
     })
     call = AsyncMock(return_value={"response": "Investigate the failing server deployment.", "agent_usage": [
         {"agent_id": "context-summarizer", "total_tokens": 12},

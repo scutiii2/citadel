@@ -5,8 +5,8 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from src.private_extensions.guard import BlockedAddress, RedirectRefused
-from src.private_extensions.spec import InvalidSpec, PrivateSpec, describe_error
+from src.tools.private_extensions.guard import BlockedAddress, RedirectRefused
+from src.tools.private_extensions.spec import InvalidSpec, PrivateSpec, describe_error
 
 GOOD = {"id": "notes", "label": "My notes", "url": "https://notes.example.com/mcp", "headers": {"X-Api-Key": "abc123"}}
 

@@ -8,7 +8,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.agents import agent_spec
-from src.llm import anthropic_provider, openai_provider, llm_options
+from src.providers.language import anthropic_provider, openai_provider
+from src.providers import llm_options
 from tests.test_anthropic_provider_streaming import _round_cm
 from tests.test_openai_provider import _fake_stream
 
@@ -49,7 +50,7 @@ def test_provider_stops_before_executing_more_tools(monkeypatch, provider, reaso
     async def emit(event):
         events.append(event)
     if reason == "time":
-        from src.llm import cancellation
+        from src.providers import cancellation
         cancellation.link("budgeted-turn", "budgeted-child")
     try:
         result = asyncio.run(provider.run_chat("go", [], request_id="budgeted-turn", on_event=emit))
@@ -60,14 +61,14 @@ def test_provider_stops_before_executing_more_tools(monkeypatch, provider, reaso
             assert cancellation.is_cancelled("budgeted-child")
     finally:
         llm_options.reset_cache()
-        from src.llm import cancellation
+        from src.providers import cancellation
         cancellation.clear("budgeted-child")
         cancellation.clear("budgeted-turn")
 
 
 def test_agent_accepts_turn_caps(tmp_path):
     path = tmp_path / "bounded.json"
-    path.write_text(json.dumps({"port": 9103, "llm": {"provider": "openai", "max_turn_tokens": 1000, "max_turn_seconds": 2.5}}))
+    path.write_text(json.dumps({"role": "specialist", "port": 9103, "llm": {"provider": "openai", "max_turn_tokens": 1000, "max_turn_seconds": 2.5}}))
     spec = agent_spec.load_file(path)
     assert spec.llm.max_turn_tokens == 1000
     assert spec.llm.max_turn_seconds == 2.5
@@ -76,6 +77,6 @@ def test_agent_accepts_turn_caps(tmp_path):
 @pytest.mark.parametrize("key,value", [("max_turn_tokens", 0), ("max_turn_tokens", True), ("max_turn_tokens", 1.5), ("max_turn_seconds", 0), ("max_turn_seconds", True), ("max_turn_seconds", float("inf"))])
 def test_agent_rejects_invalid_turn_caps(tmp_path, key, value):
     path = tmp_path / "bounded.json"
-    path.write_text(json.dumps({"port": 9103, "llm": {"provider": "openai", key: value}}))
+    path.write_text(json.dumps({"role": "specialist", "port": 9103, "llm": {"provider": "openai", key: value}}))
     with pytest.raises(agent_spec.AgentSpecError, match=key):
         agent_spec.load_file(path)

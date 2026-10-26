@@ -6,8 +6,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 import pytest
 
-from src.agents import plan, agent_events
-from src.llm import anthropic_provider, openai_provider, llm_options
+from src.agents.roles.orchestrator import plan
+from src.agents import agent_events
+from src.providers.language import anthropic_provider, openai_provider
+from src.providers import llm_options
 from tests.test_anthropic_provider_streaming import _round_cm
 from tests.test_openai_provider import _fake_stream
 

@@ -31,7 +31,7 @@ def test_router_metadata_is_sanitized_and_kept_for_disabled_definitions(tmp_path
     path = tmp_path / "agents.json"
     path.write_text('{"agents": []}')
     definitions = {"defined": [{"id": "router", "label": "Router", "enabled": False,
-        "internal_role": "router", "decision": {"choose_agent": True, "fallback": True,
+        "role": "router", "decision": {"choose_agent": True, "fallback": True,
             "api_key": "not-public", "trace": ["private"]}, "llm": {"provider": "laya"}}]}
     path.with_name("agent_definitions.json").write_text(json.dumps(definitions))
     rows = asyncio.run(AgentDirectory(path).listing())
@@ -41,9 +41,9 @@ def test_router_metadata_is_sanitized_and_kept_for_disabled_definitions(tmp_path
 
 def test_router_is_not_discovered_as_triage_assistant(tmp_path):
     path = tmp_path / "agents.json"
-    path.write_text(json.dumps({"agents": [agent("router", internal_role="router"), agent("triage-assistant")]}))
+    path.write_text(json.dumps({"agents": [agent("router", role="router"), agent("triage-assistant")]}))
     path.with_name("agent_definitions.json").write_text(json.dumps({"defined": [
-        {"id": "router", "label": "Router", "internal_role": "router", "llm": {"provider": "laya"}},
+        {"id": "router", "label": "Router", "role": "router", "llm": {"provider": "laya"}},
         {"id": "triage-assistant", "label": "Triage", "llm": {"provider": "laya"}}]}))
     assert asyncio.run(AgentDirectory(path).find_by_provider("laya")).id == "triage-assistant"
 
@@ -58,26 +58,26 @@ def test_entries_without_the_new_keys_read_as_plain_agents(tmp_path: Path) -> No
 
 def test_new_keys_are_read(tmp_path: Path) -> None:
     found = asyncio.run(
-        directory(tmp_path, [agent("main", entry=True, orchestrator=True, focus="Coordinates.")]).all()
+        directory(tmp_path, [agent("main", entry=True, role="orchestrator", focus="Coordinates.")]).all()
     )
 
     assert (found[0].entry, found[0].orchestrator, found[0].focus) == (True, True, "Coordinates.")
 
 
 def test_bad_types_for_the_new_keys_fall_back_to_defaults(tmp_path: Path) -> None:
-    found = asyncio.run(directory(tmp_path, [agent("odd", entry="yes", orchestrator=1, focus=5)]).all())
+    found = asyncio.run(directory(tmp_path, [agent("odd", entry="yes", role=1, focus=5)]).all())
 
     assert (found[0].entry, found[0].orchestrator, found[0].focus) == (False, False, "")
 
 
 def test_entry_prefers_the_flagged_agent(tmp_path: Path) -> None:
-    d = directory(tmp_path, [agent("claude-agent"), agent("orch", orchestrator=True), agent("main", entry=True)])
+    d = directory(tmp_path, [agent("claude-agent"), agent("orch", role="orchestrator"), agent("main", entry=True)])
 
     assert asyncio.run(d.entry()).id == "main"
 
 
 def test_entry_falls_back_to_the_first_orchestrator(tmp_path: Path) -> None:
-    d = directory(tmp_path, [agent("claude-agent"), agent("orch", orchestrator=True)])
+    d = directory(tmp_path, [agent("claude-agent"), agent("orch", role="orchestrator")])
 
     assert asyncio.run(d.entry()).id == "orch"
 

@@ -14,17 +14,17 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
-from src.llm import cancellation, cooldown, token_limits
-from src.llm.base_provider import ChatCancelled
+from src.providers import cancellation, cooldown, token_limits
+from src.providers.base_provider import ChatCancelled
 from src.agents.agent_spec import RosterEntry
-from src.llm import openai_provider
+from src.providers.language import openai_provider
 
 ROSTER = [RosterEntry("openai-agent", "OpenAI Agent", "second opinion")]
 
 
 @pytest.fixture(autouse=True)
 def _no_roster():
-    with patch("src.llm.openai_provider.agent_routing.roster_for", new_callable=AsyncMock, return_value=[]):
+    with patch("src.providers.language.openai_provider.agent_routing.roster_for", new_callable=AsyncMock, return_value=[]):
         yield
 
 
@@ -36,7 +36,7 @@ def _reset_state(monkeypatch, tmp_path):
     # assume the default "gpt" gateway's GPT_API_KEY semantics.
     monkeypatch.delenv("AI_AGENT_GATEWAY", raising=False)
     cooldown.reset()
-    from src.llm import llm_options
+    from src.providers import llm_options
     llm_options.reset_cache()
     yield
     cooldown.reset()
@@ -76,13 +76,13 @@ def _fake_stream(delta_texts, final_response):
 @pytest.mark.parametrize("agent_limit,expected", [(None, 777), (2500, 2500)])
 def test_run_interpret_uses_agent_output_cap_or_shared_default(monkeypatch, agent_limit, expected):
     from src.agents.agent_spec import LlmSpec
-    from src.llm.llm_options import LlmOptions
+    from src.providers.llm_options import LlmOptions
     monkeypatch.setenv("GPT_API_KEY", "sk-test")
     response = SimpleNamespace(output_text="ok", usage=SimpleNamespace(total_tokens=1, input_tokens=1))
     client = SimpleNamespace(responses=SimpleNamespace(create=Mock(return_value=response)))
-    with patch("src.llm.openai_provider._get_sync_client", return_value=client), \
-         patch("src.llm.openai_provider.token_limits.max_output_tokens", return_value=777), \
-         patch("src.llm.openai_provider.llm_options.for_provider", return_value=LlmOptions(
+    with patch("src.providers.language.openai_provider._get_sync_client", return_value=client), \
+         patch("src.providers.language.openai_provider.token_limits.max_output_tokens", return_value=777), \
+         patch("src.providers.language.openai_provider.llm_options.for_provider", return_value=LlmOptions(
              "openai", "context-summarizer", LlmSpec(provider="openai", max_tokens=agent_limit))):
         openai_provider.run_interpret("hello")
 
@@ -92,8 +92,8 @@ def test_run_interpret_uses_agent_output_cap_or_shared_default(monkeypatch, agen
 def test_run_interpret_rejects_context_before_calling_openai(monkeypatch):
     monkeypatch.setenv("GPT_API_KEY", "sk-test")
     client = SimpleNamespace(responses=SimpleNamespace(create=Mock()))
-    with patch("src.llm.openai_provider._get_sync_client", return_value=client), \
-         patch("src.llm.openai_provider.token_limits.enforce_context_limit", side_effect=token_limits.ContextLimitError("too large")):
+    with patch("src.providers.language.openai_provider._get_sync_client", return_value=client), \
+         patch("src.providers.language.openai_provider.token_limits.enforce_context_limit", side_effect=token_limits.ContextLimitError("too large")):
         with pytest.raises(token_limits.ContextLimitError):
             openai_provider.run_interpret("hello")
 
@@ -101,7 +101,7 @@ def test_run_interpret_rejects_context_before_calling_openai(monkeypatch):
 
 
 def test_tool_schemas_use_function_parameters_shape():
-    with patch("src.llm.openai_provider.list_tools", return_value=[_fake_tool()]):
+    with patch("src.providers.language.openai_provider.list_tools", return_value=[_fake_tool()]):
         schemas = openai_provider._tool_schemas()
 
     schemas = [s for s in schemas if s["name"] != "update_plan"]
@@ -117,8 +117,8 @@ def test_tool_schemas_use_function_parameters_shape():
 
 
 def test_tool_schemas_includes_delegate_tool_when_available():
-    with patch("src.llm.openai_provider.list_tools", return_value=[]), \
-         patch("src.llm.openai_provider.delegation.tool_description", return_value="delegate away"):
+    with patch("src.providers.language.openai_provider.list_tools", return_value=[]), \
+         patch("src.providers.language.openai_provider.delegation.tool_description", return_value="delegate away"):
         schemas = openai_provider._tool_schemas(roster=ROSTER)
 
     schemas = [s for s in schemas if s["name"] != "update_plan"]
@@ -134,7 +134,7 @@ def test_tool_schemas_includes_delegate_tool_when_available():
 
 
 def test_tool_schemas_excludes_delegate_tool_when_unavailable():
-    with patch("src.llm.openai_provider.list_tools", return_value=[]):
+    with patch("src.providers.language.openai_provider.list_tools", return_value=[]):
         schemas = openai_provider._tool_schemas()
 
     schemas = [s for s in schemas if s["name"] != "update_plan"]
@@ -142,8 +142,8 @@ def test_tool_schemas_excludes_delegate_tool_when_unavailable():
 
 
 def test_dispatch_routes_delegate_calls_to_delegation_and_others_to_call_tool():
-    with patch("src.llm.openai_provider.delegation.call", return_value="delegated answer") as fake_delegate, \
-         patch("src.llm.openai_provider.call_tool", return_value="tool result") as fake_call_tool:
+    with patch("src.providers.language.openai_provider.delegation.call", return_value="delegated answer") as fake_delegate, \
+         patch("src.providers.language.openai_provider.call_tool", return_value="tool result") as fake_call_tool:
         delegate_result = openai_provider._dispatch(
             "delegate_to_agent", {"agent_id": "claude-agent", "question": "hi"}, depth=1
         )
@@ -156,7 +156,7 @@ def test_dispatch_routes_delegate_calls_to_delegation_and_others_to_call_tool():
 
 
 def test_dispatch_forwards_model_tier_to_delegation():
-    with patch("src.llm.openai_provider.delegation.call", return_value="ok") as fake_delegate:
+    with patch("src.providers.language.openai_provider.delegation.call", return_value="ok") as fake_delegate:
         openai_provider._dispatch(
             "delegate_to_agent", {"agent_id": "openai-agent", "question": "hi", "model_tier": "light"}, depth=1
         )
@@ -198,8 +198,8 @@ def test_rate_limit_error_starts_a_cooldown(monkeypatch):
     error = RateLimitError("rate limited", response=fake_response, body=None)
 
     fake_client = SimpleNamespace(responses=SimpleNamespace(stream=Mock(side_effect=error)))
-    with patch("src.llm.openai_provider._get_client", return_value=fake_client), \
-         patch("src.llm.openai_provider.list_tools", return_value=[]):
+    with patch("src.providers.language.openai_provider._get_client", return_value=fake_client), \
+         patch("src.providers.language.openai_provider.list_tools", return_value=[]):
         with pytest.raises(RateLimitError):
             asyncio.run(openai_provider.run_chat("hello", []))
 
@@ -223,10 +223,10 @@ def test_run_chat_dispatches_a_delegate_function_call_through_delegation(monkeyp
             stream=Mock(side_effect=[_fake_stream([], round_one), _fake_stream(["final answer"], final_response)]),
         )
     )
-    with patch("src.llm.openai_provider._get_client", return_value=fake_client), \
-         patch("src.llm.openai_provider.list_tools", return_value=[]), \
-         patch("src.llm.openai_provider.agent_routing.roster_for", new_callable=AsyncMock, return_value=ROSTER), \
-         patch("src.llm.openai_provider.delegation.call", return_value="the sub-agent's answer") as fake_delegate:
+    with patch("src.providers.language.openai_provider._get_client", return_value=fake_client), \
+         patch("src.providers.language.openai_provider.list_tools", return_value=[]), \
+         patch("src.providers.language.openai_provider.agent_routing.roster_for", new_callable=AsyncMock, return_value=ROSTER), \
+         patch("src.providers.language.openai_provider.delegation.call", return_value="the sub-agent's answer") as fake_delegate:
         result = asyncio.run(openai_provider.run_chat("hello", [], depth=1))
 
     fake_delegate.assert_called_once_with("claude-agent", "sub-question", 1)
@@ -251,10 +251,10 @@ def test_run_chat_shows_a_failed_delegation_the_same_way_as_a_failed_tool_call(m
             stream=Mock(side_effect=[_fake_stream([], round_one), _fake_stream(["ok I tried"], final_response)]),
         )
     )
-    with patch("src.llm.openai_provider._get_client", return_value=fake_client), \
-         patch("src.llm.openai_provider.list_tools", return_value=[]), \
-         patch("src.llm.openai_provider.agent_routing.roster_for", new_callable=AsyncMock, return_value=ROSTER), \
-         patch("src.llm.openai_provider.delegation.call", side_effect=ValueError("unknown agent_id 'nope'")):
+    with patch("src.providers.language.openai_provider._get_client", return_value=fake_client), \
+         patch("src.providers.language.openai_provider.list_tools", return_value=[]), \
+         patch("src.providers.language.openai_provider.agent_routing.roster_for", new_callable=AsyncMock, return_value=ROSTER), \
+         patch("src.providers.language.openai_provider.delegation.call", side_effect=ValueError("unknown agent_id 'nope'")):
         result = asyncio.run(openai_provider.run_chat("hello", [], depth=1))
 
     assert "Tool 'delegate_to_agent' failed: unknown agent_id 'nope'" in result.tool_calls[0].result
@@ -268,8 +268,8 @@ def test_run_chat_raises_chat_cancelled_before_any_api_call_when_already_cancell
         raise AssertionError("the API must not be called once cancellation is flagged")
 
     fake_client = SimpleNamespace(responses=SimpleNamespace(create=_fail_if_called))
-    with patch("src.llm.openai_provider._get_client", return_value=fake_client), \
-         patch("src.llm.openai_provider.list_tools", return_value=[]):
+    with patch("src.providers.language.openai_provider._get_client", return_value=fake_client), \
+         patch("src.providers.language.openai_provider.list_tools", return_value=[]):
         with pytest.raises(ChatCancelled):
             asyncio.run(openai_provider.run_chat("hello", [], request_id="req-1"))
 
@@ -297,9 +297,9 @@ def test_run_chat_emits_step_events_around_a_tool_call(monkeypatch):
                 stream=Mock(side_effect=[_fake_stream([], round_one), _fake_stream(["Hello", " world"], final_response)]),
             )
         )
-        with patch("src.llm.openai_provider._get_client", return_value=fake_client), \
-             patch("src.llm.openai_provider._dispatch", return_value="2 apps running"), \
-             patch("src.llm.openai_provider.list_tools", return_value=[]):
+        with patch("src.providers.language.openai_provider._get_client", return_value=fake_client), \
+             patch("src.providers.language.openai_provider._dispatch", return_value="2 apps running"), \
+             patch("src.providers.language.openai_provider.list_tools", return_value=[]):
             return await openai_provider.run_chat("status?", [], on_event=on_event), events
 
     result, events = asyncio.run(_run())
@@ -333,7 +333,7 @@ def test_run_chat_sends_agent_llm_options_and_retries_without_a_rejected_one(mon
     import openai
     from src.agents import agent_spec
     from src.agents.agent_spec import AgentSpec, LlmSpec
-    from src.llm import llm_options
+    from src.providers import llm_options
 
     monkeypatch.setenv("GPT_API_KEY", "sk-test")
     spec = AgentSpec(id="calc", label="Calculator", port=9103,
@@ -355,7 +355,7 @@ def test_run_chat_sends_agent_llm_options_and_retries_without_a_rejected_one(mon
     final_response = SimpleNamespace(usage=SimpleNamespace(total_tokens=2), output=[], output_text="ok")
     stream = Mock(side_effect=[_RejectingCM(), _fake_stream(["ok"], final_response)])
     fake_client = SimpleNamespace(responses=SimpleNamespace(stream=stream))
-    with patch("src.llm.openai_provider._get_client", return_value=fake_client),          patch("src.llm.openai_provider.list_tools", return_value=[]):
+    with patch("src.providers.language.openai_provider._get_client", return_value=fake_client),          patch("src.providers.language.openai_provider.list_tools", return_value=[]):
         result = asyncio.run(openai_provider.run_chat("hello", []))
 
     assert result.response == "ok"

@@ -6,7 +6,7 @@ import anthropic
 import openai
 import pytest
 
-from src.llm import cooldown, gateway_failover as failover
+from src.providers import cooldown, gateway_failover as failover
 
 
 def sdk_error(sdk, status, message="failure", headers=None):

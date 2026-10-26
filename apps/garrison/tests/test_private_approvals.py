@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from src.core import approvals
+from src.runtime import approvals
 
 REQUEST = "req-priv"
 

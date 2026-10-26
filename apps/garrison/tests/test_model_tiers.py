@@ -9,7 +9,7 @@ import pytest
 
 from src.agents import agent_spec
 from src.agents.agent_spec import AgentSpec, LlmSpec, TierInfo
-from src.llm import llm_config, model_tiers
+from src.providers import llm_config, model_tiers
 
 LIGHT = TierInfo("light", "haiku", "quick")
 STANDARD = TierInfo("standard", "sonnet", "most")
@@ -47,7 +47,7 @@ def test_effective_tiers_of_a_gateway_without_models_or_unknown_is_empty(monkeyp
 
 def test_a_cap_that_excludes_every_defined_tier_warns(monkeypatch, caplog):
     _gateway(monkeypatch, {"models": {"light": {"id": "haiku", "use_for": "quick"}}})
-    with caplog.at_level(logging.WARNING, logger="src.llm.model_tiers"):
+    with caplog.at_level(logging.WARNING, logger="src.providers.model_tiers"):
         assert model_tiers.effective_tiers("anthropic", "claude", "heavy", None) == []
     assert "no tier inside" in caplog.text
 

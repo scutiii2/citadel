@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from src.agents import agent_spec
-from src.llm import model_tiers
+from src.providers import model_tiers
 
 _CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / ".data" / "agent_registry.json"
 
@@ -141,25 +141,25 @@ def reload() -> None:
 
 
 def register(
-    agent_id: str, label: str, url: str, *, entry: bool = False, orchestrator: bool = False, focus: str = "",
+    agent_id: str, label: str, url: str, *, entry: bool = False, role: str = "specialist", focus: str = "",
     tiers: list[dict[str, str]] | None = None, efforts: list[str] | None = None,
     tool_allow: list[str] | None = None, delegable: bool = True,
-    internal_role: str | None = None, decision: dict | None = None,
+    decision: dict | None = None,
 ) -> None:
     """Upserts this instance's own entry into the registry file, so no
     manual edit is needed to learn about a newly-started instance. Call once at startup, before
     serving; see deregister() for the matching shutdown call.
 
-    entry/orchestrator/focus are optional for readers (a missing key reads
-    as False/False/""): ember_api picks the entry agent, and an
-    orchestrator builds its roster and Laya options from focus.
+    role identifies the orchestrator, internal router or specialist. ember_api
+    picks the entry agent, and an orchestrator builds its roster from role
+    and uses focus to choose specialists.
     tiers is this agent's allowed model tiers (model_tiers.as_records); an orchestrator offers them when delegating. It is stored only when non-empty.
     efforts is the reasoning efforts it accepts from a delegator (reasoning_effort.own_efforts); likewise stored only when non-empty.
     tool_allow is its tools.allow globs, so an orchestrator can leave it out of the roster while none of its tools exist; likewise stored only when non-empty.
     delegable False keeps it out of every orchestrator's roster; stored only when False."""
     record: dict[str, Any] = {
         "id": agent_id, "label": label, "url": url,
-        "entry": entry, "orchestrator": orchestrator, "focus": focus,
+        "entry": entry, "role": role, "focus": focus,
     }
     if tiers:
         record["tiers"] = tiers
@@ -169,8 +169,7 @@ def register(
         record["tool_allow"] = list(tool_allow)
     if not delegable:
         record["delegable"] = False
-    if internal_role:
-        record["internal_role"] = internal_role
+    if role == "router":
         record["decision"] = decision or {}
 
     def _upsert(agents: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -247,9 +246,8 @@ def write_definitions(specs: Iterable[Any]) -> None:
     records = [
         {
             "id": spec.id, "label": spec.label, "focus": spec.focus,
-            "entry": spec.entry, "orchestrator": spec.orchestrator, "enabled": spec.enabled,
-            **({"internal_role": spec.internal_role, "decision": spec.decision.summary()}
-               if getattr(spec, "internal_role", None) == "router" else {}),
+            "entry": spec.entry, "role": spec.role, "enabled": spec.enabled,
+            **({"decision": spec.decision.summary()} if spec.role == "router" else {}),
             "llm": {
                 "provider": spec.llm.provider, "gateway": spec.llm.gateway, "model": spec.llm.model,
                 "tiers": _tiers_of(spec),

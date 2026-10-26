@@ -24,7 +24,8 @@ from typing import Any
 
 from src.agents import agent_spec, prompt_config
 from src.agents.agent_spec import AgentSpec, AgentSpecError, RosterEntry
-from src.llm import agent_roles, llm_config
+from src.agents import agent_roles
+from src.providers import llm_config
 
 _LOCK = threading.Lock()
 

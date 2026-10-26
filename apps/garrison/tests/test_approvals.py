@@ -13,11 +13,12 @@ import pytest
 
 from src import server
 
-from src.agents import delegation
+from src.agents.roles.orchestrator import delegation
 
-from src.core import approvals
-from src.llm import anthropic_provider, cancellation, openai_provider
-from src.llm.base_provider import ChatCancelled, ChatResult
+from src.runtime import approvals
+from src.providers.language import anthropic_provider, openai_provider
+from src.providers import cancellation
+from src.providers.base_provider import ChatCancelled, ChatResult
 
 REQUEST = "req-1"
 
@@ -474,9 +475,9 @@ def openai_turn(monkeypatch, policy, recorder):
     async def scenario():
         token = approvals.bind(policy)
         try:
-            with patch("src.llm.openai_provider._get_client", return_value=_openai_client()), \
-                 patch("src.llm.openai_provider._dispatch", dispatch), \
-                 patch("src.llm.openai_provider.list_tools", return_value=[]):
+            with patch("src.providers.language.openai_provider._get_client", return_value=_openai_client()), \
+                 patch("src.providers.language.openai_provider._dispatch", dispatch), \
+                 patch("src.providers.language.openai_provider.list_tools", return_value=[]):
                 return await openai_provider.run_chat("stop it", [], request_id=REQUEST, on_event=recorder)
         finally:
             approvals.reset(token)
@@ -606,8 +607,8 @@ def _delegate_and_capture(mode: str) -> dict:
         finally:
             approvals.reset(token)
 
-    with patch("src.agents.delegation._call_tool", side_effect=fake_call_tool), \
-         patch("src.agents.delegation.agent_registry.get_agent", return_value={"url": "http://x/mcp"}):
+    with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=fake_call_tool), \
+         patch("src.agents.roles.orchestrator.delegation.agent_registry.get_agent", return_value={"url": "http://x/mcp"}):
         run(scenario())
     return captured
 

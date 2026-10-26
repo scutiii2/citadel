@@ -4,11 +4,11 @@ import math
 import pytest
 
 from src.agents import agent_spec, agent_store
-from src.agents.router_contract import RouterPolicy, RouteRequest, RouteResponse
+from src.agents.roles.router.router_contract import RouterPolicy, RouteRequest, RouteResponse
 
 
 def definition(**changes):
-    return {"port": 9117, "internal_role": "router", "delegable": False,
+    return {"port": 9117, "role": 'router', "delegable": False,
             "plan_tool": False, "tools": {"deny": ["*"]},
             "llm": {"provider": "laya", "gateway": "local"}, **changes}
 
@@ -46,9 +46,9 @@ def test_router_role_loads_and_persists_policy(tmp_path):
 
 
 @pytest.mark.parametrize("changes", [
-    {"entry": True}, {"orchestrator": True}, {"delegable": True},
+    {"entry": True}, {"role": 'orchestrator'}, {"delegable": True},
     {"plan_tool": True}, {"memory_recall": True}, {"tools": {"deny": []}},
-    {"llm": {"provider": "anthropic"}}, {"internal_role": "invented"},
+    {"llm": {"provider": "anthropic"}}, {"role": 'invented'},
 ])
 def test_router_role_cannot_gain_chat_privileges(tmp_path, changes):
     with pytest.raises(agent_spec.AgentSpecError):
@@ -58,7 +58,7 @@ def test_router_role_cannot_gain_chat_privileges(tmp_path, changes):
 def test_two_enabled_routers_rejected_by_directory_and_admin(tmp_path):
     write(tmp_path)
     entry = tmp_path / "ember.json"
-    entry.write_text(json.dumps({"port": 9100, "entry": True, "llm": {"provider": "anthropic"}}))
+    entry.write_text(json.dumps({"role": "specialist", "port": 9100, "entry": True, "llm": {"provider": "anthropic"}}))
     with pytest.raises(agent_store.AgentStoreError, match="router"):
         agent_store.create_agent("second", definition(port=9118), tmp_path)
     write(tmp_path, "second", port=9118)
@@ -68,7 +68,7 @@ def test_two_enabled_routers_rejected_by_directory_and_admin(tmp_path):
 
 def test_non_router_cannot_carry_policy(tmp_path):
     with pytest.raises(agent_spec.AgentSpecError, match="decision"):
-        agent_spec.load_file(write(tmp_path, internal_role=None, decision={}))
+        agent_spec.load_file(write(tmp_path, role="specialist", decision={}))
 
 
 def test_response_is_strict_and_uncertain_is_explicit():

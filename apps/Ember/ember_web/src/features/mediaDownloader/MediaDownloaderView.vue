@@ -121,6 +121,7 @@ async function confirmAction(): Promise<void> {
   </PageLayout>
 </template>
 
+<style scoped src="./components/mediaDownloader.css"></style>
 <style scoped>
 .media-workspace { --workspace-columns: minmax(0, 1fr) 300px; }
 .main-panel { padding: 22px 24px; min-width: 0; min-height: 0; overflow-y: auto; }
@@ -148,7 +149,7 @@ async function confirmAction(): Promise<void> {
 .rights-note { margin: 24px 0 0; font-size: .75em; }
 .file-details { overflow-wrap: anywhere; }
 .file-details-name { font-weight: 600; }
-.danger-zone { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 24px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-lg); font-size: .85em; }
+.danger-zone { margin-top: 24px; }
 .danger-zone :deep(button.action) { color: var(--danger); border-color: var(--danger); border-radius: var(--radius-full); }
 .danger-zone :deep(.action .label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
 .danger-zone :deep(.action .icon) { stroke: currentColor; }

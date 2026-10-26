@@ -7,8 +7,8 @@ import asyncio
 import json
 import logging
 
-from src.core import usage_log
-from src.llm.base_provider import ChatResult
+from src.runtime import usage_log
+from src.providers.base_provider import ChatResult
 
 
 def _row():
@@ -61,7 +61,7 @@ def test_own_row_keeps_its_prompt_parts_and_accuracy():
 def test_append_failure_only_warns(tmp_path, caplog):
     blocker = tmp_path / "not-a-dir"
     blocker.write_text("", encoding="utf-8")
-    with caplog.at_level(logging.WARNING, logger="src.core.usage_log"):
+    with caplog.at_level(logging.WARNING, logger="src.runtime.usage_log"):
         asyncio.run(usage_log.append(_row(), blocker))
     assert "usage log" in caplog.text
 

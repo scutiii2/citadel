@@ -3,7 +3,7 @@ clear, and the missing-id no-op behavior each caller relies on."""
 
 from __future__ import annotations
 
-from src.llm import cancellation
+from src.providers import cancellation
 
 
 def test_register_then_is_cancelled_is_false_until_cancelled():

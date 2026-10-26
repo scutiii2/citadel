@@ -1,6 +1,6 @@
 import asyncio
 
-from src.llm.base_provider import LiveUsage
+from src.providers.base_provider import LiveUsage
 
 
 def _run(coro):

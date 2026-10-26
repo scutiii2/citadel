@@ -16,7 +16,7 @@ import os
 import sys
 from uuid import uuid4
 from pathlib import Path
-from src.core import config_files, tuning_overrides
+from src.runtime import config_files, tuning_overrides
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -58,13 +58,13 @@ from starlette.responses import JSONResponse
 _CONFIG_ERROR_NAMES = {"AgentConfigError", "AgentRoleError", "ConfigError", "AgentSpecError"}
 try:
     from src.agents import agent_config, agent_events, agent_registry, agent_store
-    from src.llm import triage_strategy
-    from src.core import approvals, internal_auth, questions, usage_log
-    from src.mcp_client import mcp_upstream
-    from src.llm.base_provider import ChatCancelled
-    from src.llm import model_tiers
-    from src.llm import reasoning_effort as effort_limits
-    from src.llm.model_limits import context_window_for
+    from src.providers.decision import triage_strategy
+    from src.runtime import approvals, internal_auth, questions, usage_log
+    from src.tools.mcp_client import mcp_upstream
+    from src.providers.base_provider import ChatCancelled
+    from src.providers import model_tiers
+    from src.providers import reasoning_effort as effort_limits
+    from src.providers.model_limits import context_window_for
 
     # Parsed here so a malformed `models` block is a clean one-line exit.
     _OWN_TIERS = model_tiers.as_records(model_tiers.own_tiers())
@@ -508,7 +508,7 @@ def status() -> dict[str, Any]:
     `user_limits` says ask() understands limits."""
     role_info = {}
     if SPEC.internal_role == "router":
-        from src.agents import router_service
+        from src.agents.roles.router import router_service
 
         role_info = {"internal_role": "router", "decision": router_service.status_summary()}
     return {
@@ -572,7 +572,7 @@ def cancel(request_id: str) -> dict[str, Any]:
 
 async def route(request: dict[str, Any], ctx: Context | None = None) -> dict[str, Any]:
     """Internal routing contract; never exposed to assistant tool catalogs or browser proxy."""
-    from src.agents import router_service
+    from src.agents.roles.router import router_service
 
     return await router_service.route(request, _request_headers(ctx))
 
@@ -584,11 +584,11 @@ if SPEC.internal_role == "router":
 def main() -> None:
     role_info = {}
     if SPEC.internal_role == "router":
-        from src.agents import router_service
+        from src.agents.roles.router import router_service
 
-        role_info = {"internal_role": "router", "decision": router_service.status_summary()}
+        role_info = {"decision": router_service.status_summary()}
     if agent_config.PROVIDER_ID == "laya" and SPEC.internal_role != "router":
-        from src.llm import laya_provider
+        from src.providers.decision import laya_provider
 
         laya_provider.prepare()
     elif agent_config.PROVIDER_ID != "laya":
@@ -596,7 +596,7 @@ def main() -> None:
         mcp_upstream.warn_unmatched_tool_globs()
     agent_registry.register(
         _AGENT_ID, _AGENT_LABEL, _AGENT_URL,
-        entry=SPEC.entry, orchestrator=SPEC.orchestrator, focus=SPEC.focus,
+        entry=SPEC.entry, role=SPEC.role, focus=SPEC.focus,
         tiers=_OWN_TIERS, efforts=_OWN_EFFORTS, tool_allow=list(SPEC.tools.allow),
         delegable=SPEC.delegable,
         **role_info,

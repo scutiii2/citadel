@@ -6,8 +6,8 @@ import copy
 
 from mcp import types
 
-from src.mcp_client.registry import _namespace
-from src.mcp_client.schema import inline_refs
+from src.tools.mcp_client.registry import _namespace
+from src.tools.mcp_client.schema import inline_refs
 
 # What pydantic emits for tool_pdf_merge(plan: MergePlan): a nested model reached
 # through $ref, with its own nested $refs.

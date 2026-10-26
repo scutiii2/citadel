@@ -7,8 +7,8 @@ import asyncio
 
 from mcp import types
 
-from src.private_extensions import turn as private_turn
-from src.private_extensions.turn import MAX_TOOLS, PrivateTurn
+from src.tools.private_extensions import turn as private_turn
+from src.tools.private_extensions.turn import MAX_TOOLS, PrivateTurn
 
 RAW = [
     {"id": "notes", "label": "Notes", "url": "https://notes.example.com/mcp", "headers": {"X-Key": "s3cret"}},

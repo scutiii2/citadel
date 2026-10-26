@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from src.llm import anthropic_provider, openai_provider
-from src.core.chat_history import validate_history
+from src.providers.language import anthropic_provider, openai_provider
+from src.runtime.chat_history import validate_history
 
 
 @pytest.mark.parametrize("provider", [anthropic_provider, openai_provider])

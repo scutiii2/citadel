@@ -19,6 +19,9 @@
   "focus": "Internal: one-word titles for option descriptions. Called by ember_api, never delegated to.",
   "tools": {
     "allow": [],
-    "deny": ["*"]
-  }
+    "deny": [
+      "*"
+    ]
+  },
+  "role": "specialist"
 }

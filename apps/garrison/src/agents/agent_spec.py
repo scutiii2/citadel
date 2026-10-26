@@ -27,6 +27,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 AGENTS_DIR = PROJECT_ROOT / "agents"
 
 PROVIDERS = ("anthropic", "openai", "laya")
+ROLES = ("orchestrator", "router", "specialist")
 REASONING_EFFORTS = ("off", "low", "medium", "high")
 # Model strength, weakest to strongest. Fixed so min_tier/max_tier can be
 # compared and the orchestrator sees one vocabulary across every gateway.
@@ -36,7 +37,7 @@ TIERS = ("light", "standard", "heavy", "extreme")
 _DEFAULT_GATEWAY = {"anthropic": "claude", "openai": "gpt", "laya": "local"}
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
-_TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "orchestrator", "memory_recall", "skill_recall", "skill_learning", "plan_tool", "delegable", "internal_role", "decision"}
+_TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "role", "memory_recall", "skill_recall", "skill_learning", "plan_tool", "delegable", "decision"}
 _LLM_KEYS = {"provider", "gateway", "model", "temperature", "reasoning_effort", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort", "fallback_gateways"}
 _TOOLS_KEYS = {"allow", "deny"}
 
@@ -130,6 +131,7 @@ class AgentSpec:
     llm: LlmSpec
     enabled: bool = True
     entry: bool = False
+    role: str = "specialist"
     # "" = the shared identity template (prompt_config); else replaces the identity line.
     identity: str = ""
     persona: str = ""
@@ -137,7 +139,6 @@ class AgentSpec:
     instructions: str = ""
     focus: str = ""
     tools: ToolScope = field(default_factory=ToolScope)
-    orchestrator: bool = False
     # Load the user's newest saved notes at the start of each top-level turn (agents/memory_recall.py).
     memory_recall: bool = False
     # Load the user's approved skills that match the question at the start of each top-level turn (agents/skill_recall.py).
@@ -152,8 +153,15 @@ class AgentSpec:
     # None = derived from the host and port it listens on.
     url: str | None = None
     source: Path | None = None
-    internal_role: str | None = None
     decision: Any = None
+
+    @property
+    def orchestrator(self) -> bool:
+        return self.role == "orchestrator"
+
+    @property
+    def internal_role(self) -> str | None:
+        return "router" if self.role == "router" else None
 
     def effective_gateway(self) -> str | None:
         """The gateway to report in usage rows: the file's own gateway (None
@@ -290,6 +298,9 @@ def load_file(path: Path) -> AgentSpec:
     if not isinstance(data, dict):
         raise check.fail("file", "must contain a JSON object")
     check.keys(data, _TOP_KEYS)
+    role = data.get("role")
+    if role not in ROLES:
+        raise check.fail("role", f"is required and must be one of: {', '.join(ROLES)}")
 
     if "port" not in data:
         raise check.fail("port", "is required")
@@ -357,13 +368,13 @@ def load_file(path: Path) -> AgentSpec:
     check.keys(tools_data, _TOOLS_KEYS, "tools.")
     tools = ToolScope(allow=check.globs(tools_data, "allow"), deny=check.globs(tools_data, "deny"))
 
-    orchestrator = check.boolean(data, "orchestrator", False)
+    orchestrator = role == "orchestrator"
     memory_recall = check.boolean(data, "memory_recall", False)
     skill_recall = check.boolean(data, "skill_recall", False)
     skill_learning = check.boolean(data, "skill_learning", False)
     if provider == "laya":
         if orchestrator or check.boolean(data, "entry", False):
-            raise check.fail("llm.provider", "Laya triage must be a specialist, not an entry agent or orchestrator")
+            raise check.fail("llm.provider", "Laya triage must be a specialist or router, not an entry agent or orchestrator")
         if memory_recall:
             raise check.fail("memory_recall", "Laya triage has no tools, so it cannot recall memory")
         if skill_recall:
@@ -377,23 +388,20 @@ def load_file(path: Path) -> AgentSpec:
         if any(key in llm_data for key in ("temperature", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort")) or effort != "off":
             raise check.fail("llm", "Laya triage does not accept generation or tool-loop settings")
 
-    internal_role = data.get("internal_role")
     policy = None
-    if internal_role not in (None, "router"):
-        raise check.fail("internal_role", "must be router or null")
-    if internal_role == "router":
-        from src.agents.router_contract import RouterPolicy
+    if role == "router":
+        from src.agents.roles.router.router_contract import RouterPolicy
 
-        if (provider != "laya" or check.boolean(data, "entry", False) or orchestrator
+        if (provider != "laya" or check.boolean(data, "entry", False)
                 or check.boolean(data, "delegable", True) or memory_recall or skill_recall or skill_learning
                 or check.boolean(data, "plan_tool", True) or "*" not in tools.deny):
-            raise check.fail("internal_role", "router requires local Laya, no chat roles, no tools, memory or plan")
+            raise check.fail("role", "router requires local Laya, no entry, no delegation, no tools, memory or plan")
         try:
             policy = RouterPolicy.model_validate(data.get("decision", {}))
         except ValueError as error:
             raise check.fail("decision", str(error)) from error
     elif "decision" in data:
-        raise check.fail("decision", "is only supported for internal_role router")
+        raise check.fail("decision", "is only supported for role router")
 
     return AgentSpec(
         id=agent_id,
@@ -408,14 +416,13 @@ def load_file(path: Path) -> AgentSpec:
         instructions=check.text(data, "instructions", "") or "",
         focus=check.text(data, "focus", "") or "",
         tools=tools,
-        orchestrator=orchestrator,
+        role=role,
         memory_recall=memory_recall,
         skill_recall=skill_recall,
         skill_learning=skill_learning,
         plan_tool=check.boolean(data, "plan_tool", True),
         delegable=check.boolean(data, "delegable", True),
         source=path,
-        internal_role=internal_role,
         decision=policy,
     )
 

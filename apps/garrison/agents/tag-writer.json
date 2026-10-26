@@ -19,6 +19,9 @@
   "focus": "Internal: new tags for a note. Called by ember_api, never delegated to.",
   "tools": {
     "allow": [],
-    "deny": ["*"]
-  }
+    "deny": [
+      "*"
+    ]
+  },
+  "role": "specialist"
 }

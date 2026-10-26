@@ -13,7 +13,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.agents import agent_registry, delegation
+from src.agents import agent_registry
+from src.agents.roles.orchestrator import delegation
 from src.agents.agent_spec import RosterEntry
 
 ROSTER = [RosterEntry("calc", "Calculator", "Arithmetic."), RosterEntry("explainer", "Explainer", "Explanations.")]
@@ -21,9 +22,9 @@ ROSTER = [RosterEntry("calc", "Calculator", "Arithmetic."), RosterEntry("explain
 
 @pytest.mark.parametrize("exact,supported", [(False, True), (True, True), (True, False)])
 def test_exact_context_is_forwarded_only_when_requested_and_supported(monkeypatch, exact, supported):
-    from src.llm import context_breakdown
+    from src.providers import context_breakdown
 
-    _configure_agents(monkeypatch, [{"id": "calc", "url": "http://c/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "calc", "url": "http://c/mcp"}])
     calls = []
 
     async def peer(url, name, arguments, on_progress=None):
@@ -41,9 +42,9 @@ def test_exact_context_is_forwarded_only_when_requested_and_supported(monkeypatc
 
 
 def test_exact_capability_probe_failure_falls_back_without_failing_delegation(monkeypatch):
-    from src.llm import context_breakdown
+    from src.providers import context_breakdown
 
-    _configure_agents(monkeypatch, [{"id": "calc", "url": "http://c/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "calc", "url": "http://c/mcp"}])
 
     async def peer(url, name, arguments, on_progress=None):
         if name == "status":
@@ -78,15 +79,15 @@ def test_tool_description_names_the_specialists_and_leaves_what_they_do_to_the_s
     assert "is in your instructions" in description
     assert '"auto"' not in description
 
-    from src.llm.agent_roles import roster_block
+    from src.agents.agent_roles import roster_block
 
     assert "calc - Calculator: Arithmetic." in roster_block(ROSTER)
 
 
 def test_call_raises_at_the_depth_cap_without_any_network_call(monkeypatch):
-    _configure_agents(monkeypatch, [{"id": "claude-agent", "label": "Claude Agent", "url": "http://x/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "claude-agent", "label": "Claude Agent", "url": "http://x/mcp"}])
 
-    with patch("src.agents.delegation._call_tool") as fake_call_tool:
+    with patch("src.agents.roles.orchestrator.delegation._call_tool") as fake_call_tool:
         try:
             delegation.call("claude-agent", "hi", depth=delegation._MAX_DELEGATION_DEPTH)
             raise AssertionError("expected ValueError")
@@ -97,7 +98,7 @@ def test_call_raises_at_the_depth_cap_without_any_network_call(monkeypatch):
 
 
 def test_call_raises_for_an_unknown_agent_id(monkeypatch):
-    _configure_agents(monkeypatch, [{"id": "claude-agent", "label": "Claude Agent", "url": "http://x/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "claude-agent", "label": "Claude Agent", "url": "http://x/mcp"}])
 
     try:
         delegation.call("nope", "hi", depth=0)
@@ -107,9 +108,9 @@ def test_call_raises_for_an_unknown_agent_id(monkeypatch):
 
 
 def test_call_refuses_an_agent_the_user_switched_off(monkeypatch):
-    from src.core import tool_filter
+    from src.runtime import tool_filter
 
-    _configure_agents(monkeypatch, [{"id": "claude-agent", "label": "Claude Agent", "url": "http://x/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "claude-agent", "label": "Claude Agent", "url": "http://x/mcp"}])
     token = tool_filter.bind(["agent:claude-agent"])
     try:
         with pytest.raises(PermissionError, match="switched off"):
@@ -119,7 +120,7 @@ def test_call_refuses_an_agent_the_user_switched_off(monkeypatch):
 
 
 def test_call_returns_the_sub_agents_response_on_success(monkeypatch):
-    _configure_agents(monkeypatch, [{"id": "openai-agent", "label": "OpenAI Agent", "url": "http://127.0.0.1:9101/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "openai-agent", "label": "OpenAI Agent", "url": "http://127.0.0.1:9101/mcp"}])
 
     captured = {}
 
@@ -129,7 +130,7 @@ def test_call_returns_the_sub_agents_response_on_success(monkeypatch):
         captured["arguments"] = arguments
         return {"response": "the answer", "cancelled": False}
 
-    with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool):
+    with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=_fake_call_tool):
         result = delegation.call("openai-agent", "sub-question", depth=0)
 
     assert result == "the answer"
@@ -170,8 +171,8 @@ def _cm(value):
 def test_call_tool_raises_plain_exception_on_iserror_result():
     session = _fake_session(is_error=True, content=[SimpleNamespace(text="openai is rate-limited")], structured=None)
 
-    with patch("src.agents.delegation.streamablehttp_client", return_value=_cm((None, None, None))), \
-         patch("src.agents.delegation.ClientSession", return_value=_cm(session)):
+    with patch("src.agents.roles.orchestrator.delegation.streamablehttp_client", return_value=_cm((None, None, None))), \
+         patch("src.agents.roles.orchestrator.delegation.ClientSession", return_value=_cm(session)):
         try:
             asyncio.run(delegation._call_tool("http://127.0.0.1:9101/mcp", "ask", {}))
             raise AssertionError("expected RuntimeError")
@@ -201,7 +202,7 @@ def test_call_emits_start_and_end_and_forwards_specialist_progress(monkeypatch):
     import json as _json
     from src.agents import agent_events
 
-    _configure_agents(monkeypatch, [{"id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
     emitted = []
     token = agent_events.bind(emitted.append, "step-7")
 
@@ -213,7 +214,7 @@ def test_call_emits_start_and_end_and_forwards_specialist_progress(monkeypatch):
         return {"response": "4"}
 
     try:
-        with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool):
+        with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=_fake_call_tool):
             assert delegation.call("calc", "2+2?", depth=0) == "4"
     finally:
         agent_events.reset(token)
@@ -228,11 +229,11 @@ def test_call_emits_start_and_end_and_forwards_specialist_progress(monkeypatch):
 def test_call_emits_a_failed_end_when_the_specialist_errors(monkeypatch):
     from src.agents import agent_events
 
-    _configure_agents(monkeypatch, [{"id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
     emitted = []
     token = agent_events.bind(emitted.append, "step-7")
     try:
-        with patch("src.agents.delegation._call_tool", side_effect=RuntimeError("down")):
+        with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=RuntimeError("down")):
             try:
                 delegation.call("calc", "2+2?", depth=0)
                 raise AssertionError("expected RuntimeError")
@@ -274,33 +275,33 @@ def test_tool_description_lists_tiers_only_for_specialists_with_a_choice():
 
 
 def test_call_passes_model_tier_to_ask(monkeypatch):
-    _configure_agents(monkeypatch, [{"id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
     captured = {}
 
     async def _fake_call_tool(url, name, arguments, on_progress=None):
         captured["arguments"] = arguments
         return {"response": "4"}
 
-    with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool):
+    with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=_fake_call_tool):
         delegation.call("calc", "2+2?", depth=0, model_tier="light")
 
     assert captured["arguments"]["model_tier"] == "light"
 
 
 def test_call_shows_the_orchestrator_why_a_tier_was_changed(monkeypatch):
-    _configure_agents(monkeypatch, [{"id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
 
     async def _fake_call_tool(url, name, arguments, on_progress=None):
         return {"response": "4", "model_note": "heavy is not available for calc; ran on standard"}
 
-    with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool):
+    with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=_fake_call_tool):
         result = delegation.call("calc", "2+2?", depth=0, model_tier="heavy")
 
     assert result == "[heavy is not available for calc; ran on standard]\n\n4"
 
 
 def test_dispatch_reads_the_tool_arguments():
-    with patch("src.agents.delegation.call", return_value="answer") as fake_call:
+    with patch("src.agents.roles.orchestrator.delegation.call", return_value="answer") as fake_call:
         assert delegation.dispatch({"agent_id": "calc", "question": "q"}, 1) == "answer"
         delegation.dispatch({"agent_id": "calc", "question": "q", "model_tier": "heavy"}, 1)
 
@@ -311,7 +312,7 @@ def test_dispatch_reads_the_tool_arguments():
 
 
 def test_dispatch_ignores_a_non_string_model_tier():
-    with patch("src.agents.delegation.call", return_value="answer") as fake_call:
+    with patch("src.agents.roles.orchestrator.delegation.call", return_value="answer") as fake_call:
         delegation.dispatch({"agent_id": "calc", "question": "q", "model_tier": 1}, 1)
 
     assert fake_call.call_args.args == ("calc", "q", 1)
@@ -319,7 +320,7 @@ def test_dispatch_ignores_a_non_string_model_tier():
 
 
 def test_attachment_references_survive_rewritten_delegation_and_reset(monkeypatch):
-    _configure_agents(monkeypatch, [{"id": "pdf-assistant", "label": "PDF Assistant", "url": "http://pdf/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "pdf-assistant", "label": "PDF Assistant", "url": "http://pdf/mcp"}])
     question = 'Merge these\n[[ATTACHMENT filename="scan.pdf" chars="0" truncated="false"]]\n[PDFMerger file_id: f_scan | 2 pages]\nsecret preview text\n[[/ATTACHMENT]]'
     token = delegation.bind_attachments(question, [])
     captured = []
@@ -327,7 +328,7 @@ def test_attachment_references_survive_rewritten_delegation_and_reset(monkeypatc
         captured.append(arguments["question"])
         return {"response": "ok"}
     try:
-        with patch("src.agents.delegation._call_tool", side_effect=fake):
+        with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=fake):
             delegation.call("pdf-assistant", "Merge the uploaded files", 0)
         assert "f_scan" in captured[0] and "scan.pdf" in captured[0]
         assert "secret preview text" not in captured[0]
@@ -357,15 +358,15 @@ def test_image_references_survive_nested_delegation():
 
 
 def test_call_forwards_the_chats_plan_toggles_only_when_they_are_off(monkeypatch):
-    from src.agents import plan
-    _configure_agents(monkeypatch, [{"id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
+    from src.agents.roles.orchestrator import plan
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
     seen = []
 
     async def _fake_call_tool(url, name, arguments, on_progress=None):
         seen.append(arguments)
         return {"response": "4"}
 
-    with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool):
+    with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=_fake_call_tool):
         delegation.call("calc", "2+2?", depth=0)
         token = plan.bind(plan.PlanPolicy(chat=False, lean=False))
         try:
@@ -378,14 +379,14 @@ def test_call_forwards_the_chats_plan_toggles_only_when_they_are_off(monkeypatch
 
 
 def test_call_forwards_the_chats_caveman_toggle_only_when_it_is_on(monkeypatch):
-    _configure_agents(monkeypatch, [{"id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
     seen = []
 
     async def _fake_call_tool(url, name, arguments, on_progress=None):
         seen.append(arguments)
         return {"response": "4"}
 
-    with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool):
+    with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=_fake_call_tool):
         delegation.call("calc", "2+2?", depth=0)
         token = delegation.bind_caveman(True)
         try:
@@ -398,14 +399,14 @@ def test_call_forwards_the_chats_caveman_toggle_only_when_it_is_on(monkeypatch):
 
 
 def test_call_forwards_the_extensions_the_user_enabled_for_the_chat(monkeypatch):
-    _configure_agents(monkeypatch, [{"id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "calc", "label": "Calculator", "url": "http://c/mcp"}])
     seen = []
 
     async def _fake_call_tool(url, name, arguments, on_progress=None):
         seen.append(arguments)
         return {"response": "4"}
 
-    with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool):
+    with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=_fake_call_tool):
         delegation.call("calc", "2+2?", depth=0)
         token = delegation.bind_enabled_extensions(["bard"])
         try:

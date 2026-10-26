@@ -9,9 +9,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.agents import agent_registry, delegation
-from src.llm import cancellation
-from src.llm import anthropic_provider, openai_provider, llm_options
+from src.agents import agent_registry
+from src.agents.roles.orchestrator import delegation
+from src.providers import cancellation
+from src.providers.language import anthropic_provider, openai_provider
+from src.providers import llm_options
 from src.agents import agent_spec
 from tests.test_anthropic_provider_streaming import _round_cm
 from tests.test_openai_provider import _fake_stream
@@ -36,7 +38,7 @@ def test_linked_descendants_inherit_early_and_late_cancellation():
 
 
 def test_delegate_sends_child_id_and_remote_cancel(monkeypatch):
-    peer = {"id": "peer", "url": "http://peer/mcp"}
+    peer = {"role": "specialist", "id": "peer", "url": "http://peer/mcp"}
     monkeypatch.setattr(agent_registry, "reload", lambda: None)
     monkeypatch.setattr(agent_registry, "get_agent", lambda _: peer)
     received = []
@@ -72,7 +74,7 @@ def test_deadline_during_delegation_cancels_the_remote_peer(monkeypatch, provide
     monkeypatch.setattr(provider, "_tool_schemas", lambda *args: [])
     release_start = threading.Event()
     monkeypatch.setattr(agent_registry, "reload", lambda: release_start.wait(1) if late_start else None)
-    monkeypatch.setattr(agent_registry, "get_agent", lambda _: {"id": "peer", "url": "http://peer/mcp"})
+    monkeypatch.setattr(agent_registry, "get_agent", lambda _: {"role": "specialist", "id": "peer", "url": "http://peer/mcp"})
     arguments = {"agent_id": "peer", "question": "work"}
     if provider is anthropic_provider:
         call = SimpleNamespace(type="tool_use", name="delegate_to_agent", id="d", input=arguments)

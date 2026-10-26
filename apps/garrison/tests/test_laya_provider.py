@@ -7,8 +7,8 @@ import json
 
 import pytest
 
-from src.llm import laya_model, laya_provider, triage_flow
-from src.llm.base_provider import ChatCancelled
+from src.providers.decision import laya_model, laya_provider, triage_flow
+from src.providers.base_provider import ChatCancelled
 from tests.fake_laya import FakeService, choice, result
 
 REQUEST = {

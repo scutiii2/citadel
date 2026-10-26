@@ -10,10 +10,10 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src import server
-from src.core import approvals
-from src.llm import cancellation
-from src.llm.base_provider import ChatResult
-from src.mcp_client import mcp_upstream
+from src.runtime import approvals
+from src.providers import cancellation
+from src.providers.base_provider import ChatResult
+from src.tools.mcp_client import mcp_upstream
 
 REQUEST = "req-ro"
 READ = "main__tool_notes_listNotes"

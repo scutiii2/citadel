@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
+import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
 import { MEMORY_MAX, MEMORY_TEXT_MAX, memoryClient, type MemoryNote } from "./api/MemoryClient";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import "../../components/layout/infoPage.css";
 import { errorMessage } from "../../utils/errors";
 
 const memories = ref<MemoryNote[]>([]);
@@ -125,14 +126,28 @@ async function remove(): Promise<void> {
 
 
 <template>
-  <PageLayout title="Memory" description="Review what Ember remembers about you." class="memory" :class="{ 'memory-open': editorOpen }" wide fill>
+  <PageLayout title="Memory" description="Review what Ember remembers about you." class="memory info-content" :class="{ 'memory-open': editorOpen }" wide fill>
     <template #actions><button type="button" class="primary" :disabled="loading || !!loadError || saving || removing || memories.length >= MEMORY_MAX" @click="openEditor()">Add memory</button></template>
     <div class="column">
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       <p v-if="loading" class="muted" role="status">Loading memories…</p>
       <div v-else-if="loadError" class="load-error" role="alert"><p>Could not load memories: {{ loadError }}</p><button type="button" class="chip" @click="load">Try again</button></div>
-      <WorkspaceLayout v-else :class="['layout', { editing: editorOpen }]">
-        <aside class="list-pane" aria-label="Memory list">
+      <ListEditorLayout
+        v-else
+        class="layout"
+        :editing="editorOpen"
+        list-label="Memory list"
+        editor-label="Memory editor"
+        back-label="All memories"
+        :busy="saving || removing"
+        :saving="saving"
+        :dirty="dirty"
+        :can-save="canSave"
+        show-saved-state
+        @back="closeEditor"
+        @submit="save"
+      >
+        <template #list>
           <div class="list-heading"><span>All memories</span><span>{{ memories.length }}/{{ MEMORY_MAX }}</span></div>
           <label class="memory-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg><input v-model="query" type="search" aria-label="Search memories" placeholder="Search memories…" /></label>
           <div class="list-scroll">
@@ -150,10 +165,9 @@ async function remove(): Promise<void> {
             <p v-if="memories.length >= MEMORY_MAX" class="capacity-note">Memory is full. Delete a memory before adding another.</p>
           </div>
           <p class="memory-help">One useful fact, preference or instruction per memory.</p>
-        </aside>
-        <form v-if="editorOpen" class="memory-editor" aria-label="Memory editor" @submit.prevent="save">
-          <header class="editor-head"><button type="button" class="chip back" :disabled="saving || removing" @click="closeEditor">‹ All memories</button><span class="context-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18V5M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4M17.6 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.6 1.5 4 4 0 0 0-2.8 5.6 4 4 0 0 0 .6 6.9A4 4 0 0 0 12 20a4 4 0 0 0 7.8-1 4 4 0 0 0 .6-6.9 4 4 0 0 0-2.8-5.6" /></svg>Remembered context</span></header>
-          <div class="editor-scroll">
+        </template>
+        <template #head><span class="context-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18V5M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4M17.6 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.6 1.5 4 4 0 0 0-2.8 5.6 4 4 0 0 0 .6 6.9A4 4 0 0 0 12 20a4 4 0 0 0 7.8-1 4 4 0 0 0 .6-6.9 4 4 0 0 0-2.8-5.6" /></svg>Remembered context</span></template>
+        <template #editor>
             <div class="writing">
               <label class="body-field" for="memory-text"><span class="memory-label">{{ editing ? 'Memory' : 'New memory' }}</span></label>
               <textarea id="memory-text" v-model="text" aria-label="Memory" :maxlength="MEMORY_TEXT_MAX" :disabled="saving || removing" placeholder="One useful fact for Ember to remember…" autofocus />
@@ -164,11 +178,9 @@ async function remove(): Promise<void> {
             </div>
             <details v-if="editing" :key="editing.id" class="manage-memory"><summary>Manage memory <span aria-hidden="true">›</span></summary><div class="danger-zone"><b>Danger zone</b><button type="button" class="danger" :aria-label="'Delete memory ' + editing.id" :disabled="saving || removing" @click="askDelete(editing)">Delete memory</button></div></details>
             <p v-if="formError" class="error form-error" role="alert">{{ formError }}</p>
-          </div>
-          <footer class="form-actions"><span v-if="dirty" class="unsaved" role="status"><i aria-hidden="true" />Unsaved changes</span><span v-else class="saved-state">No unsaved changes</span><button type="submit" class="primary" :disabled="!canSave" :aria-busy="saving">{{ saving ? 'Saving…' : 'Save' }}</button></footer>
-        </form>
-        <div v-else class="placeholder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4c-5-5-10 2-6 5-6 2-2 9 2 7-1 6 4 6 4 2V4zm0 0c5-5 10 2 6 5 6 2 2 9-2 7 1 6-4 6-4 2" /></svg><h3>Keep the useful context</h3><p>Pick a memory, or add a new one.</p><button type="button" class="chip" :disabled="memories.length >= MEMORY_MAX" @click="openEditor()">Create a memory</button></div>
-      </WorkspaceLayout>
+        </template>
+        <template #placeholder><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4c-5-5-10 2-6 5-6 2-2 9 2 7-1 6 4 6 4 2V4zm0 0c5-5 10 2 6 5 6 2 2 9-2 7 1 6-4 6-4 2" /></svg><h3>Keep the useful context</h3><p>Pick a memory, or add a new one.</p><button type="button" class="chip" :disabled="memories.length >= MEMORY_MAX" @click="openEditor()">Create a memory</button></template>
+      </ListEditorLayout>
     </div>
     <ConfirmModal :open="deleting !== null" title="Delete this memory?" :message="removeError || 'Ember will no longer remember this. This cannot be undone.'" confirm-label="Delete memory" danger :busy="removing" @confirm="remove" @close="!removing && (deleting = null)" />
     <ConfirmModal :open="discardOpen" title="Discard your changes?" message="This memory has changes you have not saved." confirm-label="Discard" danger @confirm="answerDiscard(true)" @close="answerDiscard(false)" />
@@ -177,11 +189,7 @@ async function remove(): Promise<void> {
 
 <style scoped>
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
-.notice { margin: 0 0 12px; color: var(--muted); font-size: .85em; flex-shrink: 0; }
 
-.list-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: color-mix(in srgb, var(--surface) 50%, var(--bg)); border-right: 1px solid var(--border); padding: 20px 12px; }
-.list-heading { display: flex; justify-content: space-between; gap: 10px; padding: 0 10px 12px; font-size: .75em; color: var(--muted); flex-shrink: 0; }
-.list-heading > :first-child { text-transform: uppercase; letter-spacing: .08em; }
 .memory-search { display: flex; align-items: center; gap: 7px; padding: 8px 9px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); flex-shrink: 0; }
 .memory-search svg { width: 16px; height: 16px; color: var(--muted); }
 .memory-search input { min-width: 0; width: 100%; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: .8em; }
@@ -200,12 +208,9 @@ button.memory-row.active { border-color: color-mix(in srgb, var(--accent) 45%, v
 .empty { padding: 20px 10px; font-size: .85em; color: var(--muted); }
 .empty h3 { font-size: 1em; font-weight: 500; margin: 0 0 8px; color: var(--text); }
 .empty p { margin: 0 0 12px; }
-.memory-editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
-.editor-head { display: flex; align-items: center; gap: 16px; padding: 16px 28px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .context-label { display: inline-flex; align-items: center; gap: 7px; font-size: .8em; color: var(--muted); }
 .context-label svg { width: 15px; height: 15px; }
-svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.editor-scroll { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; scroll-padding: 20px; }
+.context-label svg, .memory-search svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; min-height: 310px; padding: 30px 36px 20px; }
 .memory-label { font-size: 1.35em; font-weight: 600; letter-spacing: -.015em; }
 .writing textarea { flex: 1; width: 100%; min-width: 0; min-height: 200px; padding: 0; border: 0; border-radius: 0; color: var(--text); background: transparent; font: inherit; line-height: 1.9; resize: vertical; }
@@ -216,28 +221,9 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 0; font-size: .85em; cursor: pointer; list-style: none; }
 summary::-webkit-details-marker { display: none; }
 summary span { color: var(--muted); }
-.danger-zone { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-lg); font-size: .85em; }
-.form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 14px 28px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg); }
-.form-actions .primary { min-width: 76px; min-height: 40px; }
-.unsaved, .saved-state { display: inline-flex; align-items: center; gap: 7px; margin-right: auto; font-size: .8em; color: var(--muted); }
-.unsaved i { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--accent); flex-shrink: 0; }
-.back { display: none; }
-.placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 28px; color: var(--muted); text-align: center; }
-.placeholder svg { width: 34px; height: 34px; color: var(--accent); }
-.placeholder h3 { font-size: 1em; color: var(--text); margin: 0; }
-.placeholder p { margin: 0 0 8px; font-size: .9em; }
-.primary, .chip, .danger { font: inherit; font-size: .85em; padding: 8px 14px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-full); cursor: pointer; }
-.primary { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); font-weight: 600; min-height: 40px; }
-.danger { color: var(--danger); border-color: var(--danger); }
-button:disabled { opacity: .5; cursor: not-allowed; }
-.form-actions button[aria-busy=true]::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 7px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); vertical-align: -1px; animation: memory-save-spin .7s linear infinite; }
-@keyframes memory-save-spin { to { transform: rotate(360deg); } }
-.muted { color: var(--muted); }
-.error, .load-error { color: var(--danger); }
 .form-error { margin: 12px 20px; font-size: .85em; }
-button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (min-width: 1200px) { .writing { padding-inline: max(36px, calc((100% - 760px) / 2)); } }
-@media (max-width: 900px) and (min-width: 768px) { .layout { --workspace-columns: 220px minmax(0, 1fr); } .writing { padding-inline: 22px; } .manage-memory, .form-actions { padding-inline: 20px; } }
+@media (max-width: 900px) and (min-width: 768px) { .writing { padding-inline: 22px; } .manage-memory { padding-inline: 20px; } }
 @media (max-width: 767px) {
   .memory :deep(.page-column) { padding: 18px 16px 12px; }
   .memory :deep(.page-head) { flex-direction: row; align-items: center; margin-bottom: 16px; gap: 10px; }
@@ -245,17 +231,11 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
   .memory :deep(.page-description) { display: none; }
   .memory.memory-open :deep(.page-head) { display: none; }
   .memory :deep(.page-actions button) { min-height: 44px; }
-  .layout.editing .list-pane, .layout:not(.editing) .placeholder { display: none; }
-  .list-pane { border-right: 0; padding: 16px 10px; }
   .memory-search { min-height: 44px; }
   button.memory-row { min-height: 100px; }
-  .editor-head { padding: 12px 16px; justify-content: space-between; gap: 10px; }
-  .back { display: inline-block; min-height: 44px; }
   .writing { min-height: 310px; padding: 24px 20px 18px; }
   .writing textarea { min-height: 250px; }
   .memory-label { font-size: 1.3em; }
   .manage-memory { padding-inline: 20px; }
-  .form-actions { padding: 12px 16px; }
-  .form-actions .primary { min-height: 44px; }
 }
 </style>

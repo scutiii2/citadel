@@ -10,12 +10,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 from mcp import types
 
-from src.core import approvals
-from src.mcp_client import mcp_upstream
-from src.mcp_client.sync_wrapper import SyncMcpClient
-from src.private_extensions import turn as private_turn
-from src.private_extensions.spec import PrivateSpec
-from src.private_extensions.turn import PrivateTurn
+from src.runtime import approvals
+from src.tools.mcp_client import mcp_upstream
+from src.tools.mcp_client.sync_wrapper import SyncMcpClient
+from src.tools.private_extensions import turn as private_turn
+from src.tools.private_extensions.spec import PrivateSpec
+from src.tools.private_extensions.turn import PrivateTurn
 
 RAW = [{"id": "notes", "label": "Notes", "url": "https://notes.example.com/mcp", "headers": {"X-Key": "s3cret"}}]
 

@@ -31,7 +31,7 @@ async def check() -> None:
         env["AI_AGENT_USAGE_DIR"] = directory
         params = StdioServerParameters(
             command=sys.executable,
-            args=["-c", "import faulthandler; faulthandler.dump_traceback_later(60); from src import server; from src.llm import laya_provider; laya_provider.prepare(); faulthandler.cancel_dump_traceback_later(); server.mcp.run(transport='stdio')"],
+            args=["-c", "import faulthandler; faulthandler.dump_traceback_later(60); from src import server; from src.providers.decision import laya_provider; laya_provider.prepare(); faulthandler.cancel_dump_traceback_later(); server.mcp.run(transport='stdio')"],
             cwd=str(PROJECT), env=env,
         )
         async with stdio_client(params) as (read, write):

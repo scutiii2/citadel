@@ -8,7 +8,7 @@ from __future__ import annotations
 import copy
 from typing import Any, Callable
 
-from src.llm.laya_model import LayaServiceError
+from src.providers.decision.laya_model import LayaServiceError
 
 
 def spread(choice: str, confidence: float, options: list[str]) -> dict[str, float]:

@@ -3,17 +3,19 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.agents import agent_spec, agent_routing, delegation, router_client, router_routing
+from src.agents import agent_spec, agent_routing
+from src.agents.roles.orchestrator import delegation
+from src.agents.roles.router import router_client, router_routing
 from src.agents.agent_spec import AgentSpec, LlmSpec, RosterEntry, TierInfo
-from src.agents.router_contract import DecisionOutcome, RouteResponse
-from src.core import approvals, internal_auth
-from src.llm import cancellation
-from src.llm.base_provider import ChatCancelled
+from src.agents.roles.router.router_contract import DecisionOutcome, RouteResponse
+from src.runtime import approvals, internal_auth
+from src.providers import cancellation
+from src.providers.base_provider import ChatCancelled
 
 
 def setup(monkeypatch, response):
     monkeypatch.setattr(agent_spec, "_current", AgentSpec(id="ember", label="Ember", port=9100,
-        llm=LlmSpec(provider="anthropic"), entry=True, orchestrator=True))
+        llm=LlmSpec(provider="anthropic"), entry=True, role='orchestrator'))
     monkeypatch.setattr(internal_auth, "TOKEN", "test")
     roster = [RosterEntry("ops", "Ops", "server", (TierInfo("standard", "model", "normal"),), tool_allow=("tool_srv_*",))]
     monkeypatch.setattr(agent_routing, "roster_for", AsyncMock(return_value=roster))

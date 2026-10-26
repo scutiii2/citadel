@@ -13,14 +13,14 @@ from starlette.testclient import TestClient
 
 from src import server
 
-from src.agents import delegation
+from src.agents.roles.orchestrator import delegation
 
-from src.core import internal_auth
+from src.runtime import internal_auth
 
-from src.mcp_client import mcp_upstream
-from src.core.internal_auth import InternalTokenMiddleware, Requester
-from src.llm.base_provider import ChatResult
-from src.mcp_client.registry import McpClientRegistry
+from src.tools.mcp_client import mcp_upstream
+from src.runtime.internal_auth import InternalTokenMiddleware, Requester
+from src.providers.base_provider import ChatResult
+from src.tools.mcp_client.registry import McpClientRegistry
 
 
 def _client(token: str) -> TestClient:

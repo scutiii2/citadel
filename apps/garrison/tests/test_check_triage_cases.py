@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from scripts import check_triage_cases as cases
-from src.llm import laya_provider
+from src.providers.decision import laya_provider
 
 
 def test_every_case_is_a_valid_request_for_the_fallback_sized_window():
@@ -180,7 +180,7 @@ def test_an_answer_without_a_second_opinion_has_no_rounds_table():
 
 
 def test_rounds_flag_prints_the_tables_after_the_summary_table(monkeypatch, capsys):
-    from src.llm import decision
+    from src.providers.decision import decision
 
     monkeypatch.setattr(cases, "load_env", lambda: None)
     monkeypatch.setattr(decision, "settings", decision.ClassifierSettings)

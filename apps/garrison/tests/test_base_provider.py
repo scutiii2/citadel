@@ -1,4 +1,4 @@
-from src.llm.base_provider import step_event
+from src.providers.base_provider import step_event
 
 
 def test_step_event_stamps_type():
