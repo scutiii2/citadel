@@ -1,4 +1,4 @@
-"""LAYAAgent: Garrison's only connection to Laya, the shared Laya service (Python/LayaAgent).
+"""LAYAModel: Garrison's only connection to Laya, the shared Laya service (Python/LayaModel).
 
 The service owns both Laya models and every local decision strategy; Garrison sends it typed questions and
 a strategy name (`ask`) and, when it adds the cloud fallback (Jev) as one more voter, asks it to mix that
@@ -25,13 +25,13 @@ class LayaServiceError(RuntimeError):
         self.status = status
 
 
-class LAYAAgent:
+class LAYAModel:
     def __init__(self, url: str, token: str = "") -> None:
         self._url = url.rstrip("/")
         self._token = token
 
     @classmethod
-    def from_env(cls) -> "LAYAAgent":
+    def from_env(cls) -> "LAYAModel":
         return cls(os.environ.get("LAYA_SERVICE_URL", ""), os.environ.get("LAYA_TOKEN", ""))
 
     @property
@@ -94,14 +94,14 @@ class LAYAAgent:
                                           "prune_ratio": prune_ratio, "pair_ratio": pair_ratio})
 
 
-_agent: LAYAAgent | None = None
+_agent: LAYAModel | None = None
 
 
-def agent() -> LAYAAgent:
+def agent() -> LAYAModel:
     """The process-wide client, built from the environment on first use."""
     global _agent
     if _agent is None or _agent._url != os.environ.get("LAYA_SERVICE_URL", "").rstrip("/"):
-        _agent = LAYAAgent.from_env()
+        _agent = LAYAModel.from_env()
     return _agent
 
 

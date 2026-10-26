@@ -18,8 +18,8 @@ class _Service:
 def test_readiness_distinguishes_a_running_laya_service_and_unavailable_fallback(monkeypatch):
     spec = replace(agent_spec.current(), internal_role="router", decision=RouterPolicy())
     monkeypatch.setattr(agent_spec, "current", lambda: spec)
-    monkeypatch.setattr(router_service.laya_agent, "agent", lambda: _Service(True))
-    monkeypatch.setattr(router_service.laya_agent, "configured", lambda: True)
+    monkeypatch.setattr(router_service.laya_model, "agent", lambda: _Service(True))
+    monkeypatch.setattr(router_service.laya_model, "configured", lambda: True)
     monkeypatch.setattr(decision, "available", lambda *args: False)
     summary = router_service.status_summary()
     assert summary["local_status"] == "loaded"
@@ -30,10 +30,10 @@ def test_readiness_distinguishes_a_running_laya_service_and_unavailable_fallback
 def test_an_unreachable_or_missing_laya_service_publishes_degraded_state(monkeypatch):
     spec = replace(agent_spec.current(), internal_role="router", decision=RouterPolicy())
     monkeypatch.setattr(agent_spec, "current", lambda: spec)
-    monkeypatch.setattr(router_service.laya_agent, "configured", lambda: True)
-    monkeypatch.setattr(router_service.laya_agent, "agent", lambda: _Service(False))
+    monkeypatch.setattr(router_service.laya_model, "configured", lambda: True)
+    monkeypatch.setattr(router_service.laya_model, "agent", lambda: _Service(False))
     assert router_service.status_summary()["local_status"] == "unavailable"
-    monkeypatch.setattr(router_service.laya_agent, "configured", lambda: False)
+    monkeypatch.setattr(router_service.laya_model, "configured", lambda: False)
     assert router_service.status_summary()["local_status"] == "unavailable"
 
 

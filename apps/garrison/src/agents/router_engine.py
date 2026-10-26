@@ -12,7 +12,7 @@ from src.llm.triage_flow import TriageFlow
 
 class RouterEngine:
     def __init__(self, service=None):
-        self.service = service  # the LAYAAgent that TriageFlow asks; None means the process-wide one
+        self.service = service  # the LAYAModel that TriageFlow asks; None means the process-wide one
 
     def route(self, request: RouteRequest, policy: RouterPolicy, *, cancelled=lambda: False,
               clock=time.monotonic, on_usage=None) -> RouteResponse:

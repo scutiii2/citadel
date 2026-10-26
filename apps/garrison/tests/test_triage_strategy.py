@@ -7,7 +7,7 @@ import pytest
 from src import server
 from src.core import tuning_overrides
 from src.llm import triage_strategy
-from src.llm.laya_agent import LayaServiceError
+from src.llm.laya_model import LayaServiceError
 from tests.fake_laya import STRATEGIES, FakeService
 
 
@@ -62,7 +62,7 @@ def test_put_route_checks_the_body_and_returns_the_result(monkeypatch, body, sta
     import json
     from unittest.mock import AsyncMock
 
-    monkeypatch.setattr(triage_strategy.laya_agent, "agent", lambda: FakeService())
+    monkeypatch.setattr(triage_strategy.laya_model, "agent", lambda: FakeService())
     response = asyncio.run(server.triage_strategy_put(AsyncMock(json=AsyncMock(return_value=body))))
     assert response.status_code == status
     result = json.loads(response.body)
@@ -76,7 +76,7 @@ def test_get_route_reports_the_default(monkeypatch):
     import asyncio
     import json
 
-    monkeypatch.setattr(triage_strategy.laya_agent, "agent", lambda: FakeService())
+    monkeypatch.setattr(triage_strategy.laya_model, "agent", lambda: FakeService())
     response = asyncio.run(server.triage_strategy_get(None))
     assert response.status_code == 200
     assert json.loads(response.body) == {"default": None, "strategies": list(STRATEGIES)}

@@ -108,7 +108,7 @@ def test_own_efforts_follow_this_agents_cap(monkeypatch):
     assert reasoning_effort.own_efforts() == ("off", "low", "medium", "high")
 
 
-def test_own_efforts_of_a_laya_agent_is_empty(monkeypatch):
+def test_own_efforts_of_a_laya_model_is_empty(monkeypatch):
     _use_spec(monkeypatch, provider="laya")
     assert reasoning_effort.own_efforts() == ()
 

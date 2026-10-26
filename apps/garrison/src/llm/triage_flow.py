@@ -2,9 +2,9 @@
 
 Every request runs here (llm/laya_provider.py hands it over). Per question type the flow reads the local
 voters that `classifier.triage_order` / `triage_enabled` allow (English then typed by default) and asks the
-Laya service for the matching strategy (llm/laya_agent.py: english-then-typed, typed-then-english,
+Laya service for the matching strategy (llm/laya_model.py: english-then-typed, typed-then-english,
 english-only or typed-only). The service owns the local rules: each model against its own confidence
-threshold, narrowing the options, comparing the models (see LayaAgent/README.md). What stays here is Jev:
+threshold, narrowing the options, comparing the models (see LayaModel/README.md). What stays here is Jev:
 
   1. The service settled the question: that is the answer. Nothing leaves the machine.
   2. Otherwise, with `triage_fallback` on, a backend available and Jev enabled for the type, Jev is asked over the
@@ -34,10 +34,10 @@ from typing import Any
 
 from src.core import tuning_overrides
 
-from src.llm import decision, laya_agent, laya_provider
+from src.llm import decision, laya_model, laya_provider
 from src.llm.base_provider import ChatResult
 from src.llm.decision import TRIAGE_VOTERS
-from src.llm.laya_agent import LayaServiceError
+from src.llm.laya_model import LayaServiceError
 from src.llm.laya_provider import Request
 
 _log = logging.getLogger(__name__)
@@ -87,9 +87,9 @@ class TriageFlow:
     def __init__(
         self, use_fallback: bool = True, thresholds: dict[str, dict[str, float]] | None = None,
         trace: bool | None = None, settings_snapshot=None, check=None, on_usage=None, partial_results=False,
-        service: laya_agent.LAYAAgent | None = None,
+        service: laya_model.LAYAModel | None = None,
     ) -> None:
-        self.service = service or laya_agent.agent()
+        self.service = service or laya_model.agent()
         self.config = settings_snapshot or decision.settings()
         self.check = check
         self.on_usage = on_usage

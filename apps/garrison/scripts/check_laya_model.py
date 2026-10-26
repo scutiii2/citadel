@@ -1,6 +1,6 @@
 """Real-model MCP smoke check with a temporary local specialist, no live services.
 
-Run from ai_agent: python -m scripts.check_laya_agent
+Run from ai_agent: python -m scripts.check_laya_model
 Exercises server.ask/status through the same MCP protocol Ember uses, using
 stdio so this check does not bind a port or alter the live agent registry.
 """

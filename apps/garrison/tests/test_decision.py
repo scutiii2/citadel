@@ -8,7 +8,7 @@ import pytest
 
 from types import SimpleNamespace
 
-from src.llm import decision, laya_agent, laya_classifier, laya_provider
+from src.llm import decision, laya_model, laya_classifier, laya_provider
 from src.llm.decision import Choice, ClassifierError, ClassifierSettings
 
 CRITERIA = {"database": "SQL and storage", "network": "Connections"}
@@ -237,7 +237,7 @@ def fake_laya(monkeypatch, *, answer=None, error=None):
                 raise error
             return {"answers": {"answer": answer}, "calls": [{"input_tokens": 77}]}
 
-    monkeypatch.setattr(laya_agent, "agent", lambda: Service())
+    monkeypatch.setattr(laya_model, "agent", lambda: Service())
     return sent
 
 
@@ -261,16 +261,16 @@ def test_laya_hands_over_a_text_that_does_not_fit(monkeypatch):
 
 
 def test_laya_hands_over_options_the_service_refuses(monkeypatch):
-    fake_laya(monkeypatch, error=laya_agent.LayaServiceError("question 'answer' (choice) criteria must be an object of 2 to 10", status=422))
+    fake_laya(monkeypatch, error=laya_model.LayaServiceError("question 'answer' (choice) criteria must be an object of 2 to 10", status=422))
     with pytest.raises(ClassifierError, match="Laya could not answer"):
         laya_classifier.ask_choice("text", {str(i): f"option {i}" for i in range(11)}, "Which?", 3.0)
 
 
 def test_laya_that_cannot_read_the_whole_text_is_a_classifier_error(monkeypatch):
-    fake_laya(monkeypatch, error=laya_agent.LayaServiceError("too long"))
+    fake_laya(monkeypatch, error=laya_model.LayaServiceError("too long"))
     with pytest.raises(ClassifierError, match="too long"):
         laya_classifier.ask_choice("text", CRITERIA, "Which?", 3.0)
-    fake_laya(monkeypatch, error=laya_agent.LayaServiceError("Laya is not configured"))
+    fake_laya(monkeypatch, error=laya_model.LayaServiceError("Laya is not configured"))
     with pytest.raises(ClassifierError, match="not configured"):
         laya_classifier.ask_choice("text", CRITERIA, "Which?", 3.0)
 

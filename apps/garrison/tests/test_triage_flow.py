@@ -7,8 +7,8 @@ import json
 
 import pytest
 
-from src.llm import decision, laya_agent, laya_provider, triage_flow
-from src.llm.laya_agent import LayaServiceError
+from src.llm import decision, laya_model, laya_provider, triage_flow
+from src.llm.laya_model import LayaServiceError
 from src.llm.triage_flow import TriageFlow
 from tests.fake_laya import FakeService, choice, result, unsure
 
@@ -327,7 +327,7 @@ def test_compact_keeps_what_the_caller_acts_on_for_every_question_type():
 def test_run_chat_goes_through_the_flow(monkeypatch):
     configure(monkeypatch, fallback=False)
     service = FakeService(result(("area", choice("a", 0.9, uncertain=False))))
-    monkeypatch.setattr(laya_agent, "agent", lambda: service)
+    monkeypatch.setattr(laya_model, "agent", lambda: service)
     import asyncio
 
     chat = asyncio.run(laya_provider.run_chat(request_json(), [], None, []))

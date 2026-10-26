@@ -21,12 +21,12 @@ The capability exists at `apps/armory/src/capabilities/firecrawl/`, but its test
 
 ## Verify the Docker deployment end to end (rewritten 2026-10-25)
 
-**Done**: Dockerfiles for every service, one root `docker-compose.yml` (`core` network, service-name URLs, `0.0.0.0` binds), the Zima overlay, container-only configs in `docker/configs/`, volumes for the data folders, the Docker socket mounted into `armory`, Laya (`laya` replicas behind `laya_lb`, built from `../LayaAgent`) in the stack, `dev_deploy.bat` per service and `tools/deploy.bat` (publish to `live`, push `.env` and `config_*.json`, set `COMPOSE_FILE` on the server). `server_launcher` and the per-app `run.bat` files are gone. See `docs/deployment.md`.
+**Done**: Dockerfiles for every service, one root `docker-compose.yml` (`core` network, service-name URLs, `0.0.0.0` binds), the Zima overlay, container-only configs in `docker/configs/`, volumes for the data folders, the Docker socket mounted into `armory`, Laya (`laya` replicas behind `laya_lb`, built from `../LayaModel`) in the stack, `dev_deploy.bat` per service and `tools/deploy.bat` (publish to `live`, push `.env` and `config_*.json`, set `COMPOSE_FILE` on the server). `server_launcher` and the per-app `run.bat` files are gone. See `docs/deployment.md`.
 
 **Still to verify** (none of it has been run on the box):
-- `tools/deploy.bat` against the real server: option 2 (one-session `tar` push as `lex`, `COMPOSE_FILE` line, the chown helper) and option 1 (publish to `origin/live`). Same for `LayaAgent/tools/deploy.bat` and `Bard/tools/deploy.bat` (Bard: publish creates `origin/live`; first start downloads the Piper voice).
+- `tools/deploy.bat` against the real server: option 2 (one-session `tar` push as `lex`, `COMPOSE_FILE` line, the chown helper) and option 1 (publish to `origin/live`). Same for `LayaModel/tools/deploy.bat` and `Bard/tools/deploy.bat` (Bard: publish creates `origin/live`; first start downloads the Piper voice).
 - Bard in the stack: start Citadel, then `Bard` (`docker compose up -d --build` there), restart armory, and check `bard__tool_bard_speak` plays in chat.
-- A full `docker compose up -d --build` on ZimaOS with `LayaAgent` next to `Citadel`, then `tool_srv_listApps` returning the `citadel-*` containers.
+- A full `docker compose up -d --build` on ZimaOS with `LayaModel` next to `Citadel`, then `tool_srv_listApps` returning the `citadel-*` containers.
 - `LAYA_URL=http://garrison:9111/mcp` in `apps/armory/.env`: confirm garrison listens on 9111 inside the container and tickets get grouped.
 - Self-stop: `/server stop armory` kills the server running the tool; expected, but it cannot be restarted from the same chat.
 
