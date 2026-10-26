@@ -17,6 +17,7 @@ import {
 } from "./api/NotesClient";
 import { ApiError } from "../../api/http";
 import ListRow from "../../components/ui/lists/ListRow.vue";
+import StateMessage from "../../components/ui/status/StateMessage.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import "../../components/layout/infoPage.css";
 import TagInput from "../../components/ui/forms/TagInput.vue";
@@ -318,7 +319,7 @@ function preview(note: Note): string {
 
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       <p v-if="loadError" class="error" role="alert">Could not load your notes: {{ loadError }}</p>
-      <p v-if="loading" class="muted">Loading …</p>
+      <StateMessage v-if="loading" kind="loading">Loading …</StateMessage>
 
       <ListEditorLayout
         v-else-if="!loadError"
@@ -334,7 +335,7 @@ function preview(note: Note): string {
       >
         <template #list>
           <div class="list-heading"><span>All notes</span><span>{{ notes.length }}/{{ NOTES_MAX }} notes</span></div>
-          <p v-if="notes.length === 0 && selected !== NEW" class="muted empty">You have no notes yet.</p>
+          <StateMessage v-if="notes.length === 0 && selected !== NEW" kind="empty">You have no notes yet.</StateMessage>
           <ul v-else class="list" aria-label="Notes">
             <li v-if="selected === NEW">
               <ListRow class="note-row" active>
@@ -546,7 +547,6 @@ function preview(note: Note): string {
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 
 .list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.empty { padding: 8px 10px; font-size: .9em; }
 .new-note { flex-shrink: 0; min-height: 40px; }
 .title { font-weight: 600; overflow-wrap: anywhere; }
 .snippet { color: var(--muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

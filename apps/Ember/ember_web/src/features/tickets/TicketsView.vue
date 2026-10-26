@@ -7,6 +7,7 @@ import { ticketsClient, type NewTicket, type Ticket, type TicketStatus } from ".
 import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
 import ListRow from "../../components/ui/lists/ListRow.vue";
 import SearchField from "../../components/ui/lists/SearchField.vue";
+import StateMessage from "../../components/ui/status/StateMessage.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import "../../components/layout/infoPage.css";
@@ -310,9 +311,9 @@ async function reopenTicket(): Promise<void> {
     <WorkspaceLayout class="ticket-workspace" :class="{ reading: detailOpen }">
       <aside class="ticket-browser" aria-label="Your tickets">
         <div class="list-heading"><span>Your tickets</span><span>{{ visibleTickets.length }} tickets</span></div>
-        <div v-if="loadError" class="load-error error" role="alert"><p>Could not load your tickets: {{ loadError }}</p><button type="button" class="chip" @click="load">Try again</button></div>
-        <p v-if="loading" class="muted empty-message" role="status">Loading …</p>
-        <p v-else-if="visibleTickets.length === 0 && !loadError" class="muted empty-message">{{ search.trim() ? "No tickets match your search." : filter === "all" ? "You have no tickets yet." : "No tickets with this status." }}</p>
+        <StateMessage v-if="loadError" class="ticket-state" kind="error" @retry="load">Could not load your tickets: {{ loadError }}</StateMessage>
+        <StateMessage v-if="loading" class="ticket-state" kind="loading">Loading …</StateMessage>
+        <StateMessage v-else-if="visibleTickets.length === 0 && !loadError" class="ticket-state" kind="empty">{{ search.trim() ? "No tickets match your search." : filter === "all" ? "You have no tickets yet." : "No tickets with this status." }}</StateMessage>
         <ul v-else class="list" aria-label="Your ticket list">
           <li v-for="t in visibleTickets" :key="t.id">
             <ListRow class="ticket-row" :class="{ unread: t.has_unread }" :active="current?.id === t.id && detailOpen" :disabled="replying || closing" @click="open(t)">
@@ -400,6 +401,7 @@ async function reopenTicket(): Promise<void> {
 .ticket-workspace { --workspace-columns: 300px minmax(0, 1fr); }
 .ticket-browser { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; padding: 18px 12px; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 45%, var(--bg)); }
 .list { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.ticket-state { padding: 0; margin: 8px 10px; }
 .ticket-row { gap: 8px; padding: 15px 12px; }
 .row-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: .7em; }
 .title { font-size: .9em; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
@@ -410,9 +412,6 @@ async function reopenTicket(): Promise<void> {
 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .status svg, .unread-label svg { width: 14px; height: 14px; }
 .list-footer { margin: auto 10px 0; padding-top: 24px; font-size: .75em; line-height: 1.8; }
-.empty-message { margin: 8px 10px; font-size: .9em; }
-.load-error { margin: 0 10px 12px; font-size: .85em; overflow-wrap: anywhere; }
-.load-error p { margin: 0 0 8px; }
 .ticket-thread { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
 .detail-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 24px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: .75em; flex-shrink: 0; }
 .detail-head > .status { font-size: 1em; margin-left: auto; }

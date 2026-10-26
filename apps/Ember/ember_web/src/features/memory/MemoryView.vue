@@ -6,6 +6,7 @@ import { onBeforeRouteLeave, routerKey } from "vue-router";
 import { MEMORY_MAX, MEMORY_TEXT_MAX, memoryClient, type MemoryNote } from "./api/MemoryClient";
 import ListRow from "../../components/ui/lists/ListRow.vue";
 import SearchField from "../../components/ui/lists/SearchField.vue";
+import StateMessage from "../../components/ui/status/StateMessage.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import "../../components/layout/infoPage.css";
 import { errorMessage } from "../../utils/errors";
@@ -132,8 +133,8 @@ async function remove(): Promise<void> {
     <template #actions><button type="button" class="primary" :disabled="loading || !!loadError || saving || removing || memories.length >= MEMORY_MAX" @click="openEditor()">Add memory</button></template>
     <div class="column">
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
-      <p v-if="loading" class="muted" role="status">Loading memories…</p>
-      <div v-else-if="loadError" class="load-error" role="alert"><p>Could not load memories: {{ loadError }}</p><button type="button" class="chip" @click="load">Try again</button></div>
+      <StateMessage v-if="loading" kind="loading">Loading memories…</StateMessage>
+      <StateMessage v-else-if="loadError" kind="error" @retry="load">Could not load memories: {{ loadError }}</StateMessage>
       <ListEditorLayout
         v-else
         class="layout"
@@ -161,8 +162,8 @@ async function remove(): Promise<void> {
                 </ListRow>
               </article>
             </div>
-            <div v-if="memories.length === 0 && !(editorOpen && !editing)" class="empty"><h3>No saved memories yet.</h3><p>Add a useful fact, preference, or instruction for Ember to remember.</p></div>
-            <div v-else-if="memories.length && matches.length === 0" class="empty"><h3>No memories match your search.</h3><p>Try a different word or clear your search.</p><button type="button" class="chip" @click="query = ''">Clear search</button></div>
+            <StateMessage v-if="memories.length === 0 && !(editorOpen && !editing)" kind="empty" title="No saved memories yet.">Add a useful fact, preference, or instruction for Ember to remember.</StateMessage>
+            <StateMessage v-else-if="memories.length && matches.length === 0" kind="empty" title="No memories match your search.">Try a different word or clear your search.<template #action><button type="button" class="chip" @click="query = ''">Clear search</button></template></StateMessage>
             <footer v-if="matches.length" class="pagination"><p>Showing {{ shown.length }} of {{ matches.length }}</p><button v-if="shown.length < matches.length" type="button" class="chip" @click="visible += 20">Load more</button></footer>
             <p v-if="memories.length >= MEMORY_MAX" class="capacity-note">Memory is full. Delete a memory before adding another.</p>
           </div>
@@ -201,9 +202,6 @@ async function remove(): Promise<void> {
 .pagination p { margin: 0; }
 .memory-help { color: var(--muted); font-size: .7em; margin: 14px 10px 0; padding-top: 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
 .capacity-note { font-size: .8em; color: var(--muted); margin: 16px 10px 0; }
-.empty { padding: 20px 10px; font-size: .85em; color: var(--muted); }
-.empty h3 { font-size: 1em; font-weight: 500; margin: 0 0 8px; color: var(--text); }
-.empty p { margin: 0 0 12px; }
 .context-label { display: inline-flex; align-items: center; gap: 7px; font-size: .8em; color: var(--muted); }
 .context-label svg { width: 15px; height: 15px; }
 .context-label svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
