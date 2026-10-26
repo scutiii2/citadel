@@ -143,6 +143,16 @@ class CapabilityLoader:
             if record.capability is not None:
                 record.capability.install_routes(app)
 
+    def run_startup_hooks(self) -> None:
+        """Call ``on_startup`` on every loaded, enabled capability; one failing hook is logged, not fatal."""
+        for record in self.records():
+            if record.capability is None or not record.loaded or not capability_registry.is_enabled(record.id):
+                continue
+            try:
+                record.capability.on_startup()
+            except Exception:  # noqa: BLE001 - one capability's startup must not stop the others
+                logger.exception("Startup hook of capability %r failed", record.id)
+
     async def refresh(self) -> None:
         async with self._lock:
             self.scan()

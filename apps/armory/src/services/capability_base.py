@@ -23,3 +23,6 @@ class Capability:
 
     def install_routes(self, app: Starlette) -> None:
         """Mount this capability's always-on HTTP routes; they stay up while its tools are switched off."""
+
+    def on_startup(self) -> None:
+        """Run once when the server starts, only if the capability is loaded and enabled (e.g. resume background work)."""

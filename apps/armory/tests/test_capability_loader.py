@@ -366,3 +366,33 @@ def test_concurrent_toggles_do_not_interleave(loader_for, package, mcp):
     run(hammer())
 
     assert len(commands.all_commands()) == 1
+
+
+def _hook_capability(root, folder, capability_id, fail=False):
+    write_capability(root, folder, capability_id, f"tool_{capability_id}_run")
+    init = root / folder / "__init__.py"
+    action = "raise RuntimeError('boom')" if fail else "STARTED.append(self.id)"
+    init.write_text(
+        "STARTED = []\n" + init.read_text()
+        + f"\n\ndef _start(self):\n    {action}\n\n\nFixture.on_startup = _start\n"
+    )
+
+
+def test_run_startup_hooks_calls_only_loaded_enabled_capabilities_and_survives_failures(loader_for, package, mcp):
+    name, root = package
+    _hook_capability(root, "bad", "bad", fail=True)
+    _hook_capability(root, "good", "good")
+    _hook_capability(root, "off", "off")
+    _hook_capability(root, "idle", "idle")
+    loader = loader_for()
+    loader.scan()
+    for capability_id in ("bad", "good", "off"):
+        run(loader.set_online(capability_id, True))
+    run(loader.set_online("off", False))
+
+    loader.run_startup_hooks()
+
+    started = sys.modules[f"{name}.capabilities.good"].STARTED
+    assert started == ["good"]
+    assert sys.modules[f"{name}.capabilities.off"].STARTED == []
+    assert f"{name}.capabilities.idle" in sys.modules and sys.modules[f"{name}.capabilities.idle"].STARTED == []

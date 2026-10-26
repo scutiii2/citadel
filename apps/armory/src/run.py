@@ -84,11 +84,8 @@ async def _serve() -> None:
         # so the banner and the no-authentication warning would lag uvicorn's stderr logs.
         print("\n".join(banner), flush=True)
 
-        # Restart the app watchers that were running when the server last stopped.
-        if "server" in capability_registry.names() and capability_registry.is_enabled("server"):
-            from src.capabilities.server_manager.utils.server_watcher import ServerWatcher
-
-            ServerWatcher.resume_all(settings.watchers_dir)
+        # Capabilities resume their background work (e.g. server_manager's app watchers).
+        capability_loader.run_startup_hooks()
 
         app = mcp.streamable_http_app()
         # Reads chat_app's X-Requester-Username/X-Requester-Email headers into per-request contextvars

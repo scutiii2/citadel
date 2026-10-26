@@ -334,6 +334,8 @@ adding or removing a declaration means changing that test too.
    `install_routes(app)` to mount always-on HTTP routes (they stay up while
    the tools are off; the loader mounts them once at startup, so a new
    folder's routes need a restart).
+   Override `on_startup()` to resume background work at server start; it runs
+   once, only for loaded, enabled capabilities (see `server_manager`).
 
    `<id>` is what chat users type as `/<id> ...` and what
    `PATCH /capabilities/{id}` toggles - pick something shorter than the

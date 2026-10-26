@@ -52,3 +52,9 @@ def test_install_routes_is_a_noop_by_default():
     Widgets().install_routes(app)
 
     assert app.routes == []
+
+
+def test_on_startup_is_a_noop_by_default():
+    Widgets.__module__ = "pkg.capabilities.widgets"
+
+    assert Widgets().on_startup() is None
