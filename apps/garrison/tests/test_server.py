@@ -14,7 +14,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import pytest
 
 from src import server
-from src.llm.base_provider import ChatCancelled, ChatResult, ToolCallRecord
+from src.providers.base_provider import ChatCancelled, ChatResult, ToolCallRecord
 
 
 def test_interpret_durably_logs_usage_without_prompt_before_returning(monkeypatch, tmp_path):
@@ -269,7 +269,7 @@ def test_main_registers_with_the_spec_flags(monkeypatch):
 
 
 def test_laya_main_warms_before_registration_without_an_upstream_connection(monkeypatch):
-    from src.llm import laya_provider
+    from src.providers.decision import laya_provider
 
     calls = []
     monkeypatch.setattr(server.agent_config, "PROVIDER_ID", "laya")
@@ -290,7 +290,7 @@ def test_laya_main_warms_before_registration_without_an_upstream_connection(monk
 
 
 def test_laya_load_failure_does_not_register_an_unavailable_agent(monkeypatch):
-    from src.llm import laya_provider
+    from src.providers.decision import laya_provider
 
     monkeypatch.setattr(server.agent_config, "PROVIDER_ID", "laya")
 

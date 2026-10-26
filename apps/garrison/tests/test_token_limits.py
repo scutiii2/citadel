@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from src.llm import token_limits
+from src.providers import token_limits
 
 
 @pytest.fixture

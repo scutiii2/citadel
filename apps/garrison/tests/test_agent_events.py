@@ -8,7 +8,7 @@ import asyncio
 import re
 
 from src.agents import agent_events
-from src.llm.base_provider import dispatch_with_progress
+from src.providers.base_provider import dispatch_with_progress
 
 
 def test_now_iso_is_utc_with_milliseconds():

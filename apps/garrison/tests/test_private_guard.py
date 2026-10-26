@@ -8,8 +8,8 @@ import asyncio
 import httpx
 import pytest
 
-from src.private_extensions import guard
-from src.private_extensions.guard import BlockedAddress, RedirectRefused
+from src.tools.private_extensions import guard
+from src.tools.private_extensions.guard import BlockedAddress, RedirectRefused
 
 HOSTS = {
     "example.com": ["93.184.216.34"],

@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.llm import cooldown
+from src.providers import cooldown
 
 
 @pytest.fixture(autouse=True)

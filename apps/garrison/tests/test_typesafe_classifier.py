@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-from src.llm import decision, typesafe_classifier
-from src.llm.decision import ClassifierError
+from src.providers.decision import decision, typesafe_classifier
+from src.providers.decision.decision import ClassifierError
 
 CRITERIA = {"database": "SQL and storage", "network": "Connections"}
 

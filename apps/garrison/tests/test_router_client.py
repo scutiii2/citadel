@@ -1,8 +1,9 @@
 import asyncio
 
-from src.agents import router_client, agent_registry
-from src.agents.router_contract import RouteRequest
-from src.core import internal_auth
+from src.agents.roles.router import router_client
+from src.agents import agent_registry
+from src.agents.roles.router.router_contract import RouteRequest
+from src.runtime import internal_auth
 
 
 def test_disabled_or_absent_router_returns_no_decision(monkeypatch):

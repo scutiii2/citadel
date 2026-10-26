@@ -8,9 +8,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.agents import agent_registry, delegation, skill_reflection
-from src.core import internal_auth
-from src.llm.base_provider import ChatResult, ToolCallRecord
+from src.agents import agent_registry
+from src.agents.roles.orchestrator import delegation, skill_reflection
+from src.runtime import internal_auth
+from src.providers.base_provider import ChatResult, ToolCallRecord
 
 DRAFT = {"save": True, "title": "Restart a hung app", "when_to_use": "an app stops responding",
          "steps": "Check its status, stop it, start it again.", "tools": "tool_srv_listApps, tool_srv_stopApp, tool_srv_startApp"}
@@ -150,7 +151,7 @@ def test_a_slow_summarizer_times_out_quietly(helper, monkeypatch):
 
 
 def test_the_default_propose_calls_the_skill_tool_through_the_upstream_client(monkeypatch):
-    from src.mcp_client import mcp_upstream
+    from src.tools.mcp_client import mcp_upstream
 
     calls = []
     monkeypatch.setattr(mcp_upstream, "call_tool", lambda name, arguments: calls.append((name, arguments)) or "ok")

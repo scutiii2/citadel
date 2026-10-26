@@ -7,7 +7,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from src import server
-from src.core import config_files, tuning_overrides
+from src.runtime import config_files, tuning_overrides
 
 
 @pytest.fixture

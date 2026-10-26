@@ -3,8 +3,8 @@
 import httpx
 import pytest
 
-from src.llm import laya_model
-from src.llm.laya_model import LAYAModel, LayaServiceError
+from src.providers.decision import laya_model
+from src.providers.decision.laya_model import LAYAModel, LayaServiceError
 
 QUESTIONS = {"q": {"type": "noul", "instructions": "Fine?"}}
 ANSWER = {"answers": {"q": {"noul": 0.9}}, "calls": []}

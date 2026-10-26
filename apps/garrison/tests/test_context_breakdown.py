@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from src.agents import ask_user, delegation, plan
-from src.llm.context_breakdown import EstimateCounter, build_breakdown
+from src.agents.roles.orchestrator import ask_user, delegation, plan
+from src.providers.context_breakdown import EstimateCounter, build_breakdown
 
 
 def _by_id(parts):
@@ -82,8 +82,8 @@ from unittest.mock import AsyncMock, MagicMock  # noqa: E402
 
 import pytest  # noqa: E402
 
-from src.llm import context_breakdown  # noqa: E402
-from src.llm.context_breakdown import ProviderCounter, breakdown_fields  # noqa: E402
+from src.providers import context_breakdown
+from src.providers.context_breakdown import ProviderCounter, breakdown_fields  # noqa: E402
 
 
 class FakeRequestCounter:
@@ -194,7 +194,7 @@ def test_the_flag_is_per_turn_and_resets():
 
 
 def test_anthropic_counter_sends_one_short_message_with_the_given_system_and_tools():
-    from src.llm.anthropic_provider import _AnthropicRequestCounter
+    from src.providers.language.anthropic_provider import _AnthropicRequestCounter
 
     client = MagicMock()
     client.messages.count_tokens = AsyncMock(return_value=MagicMock(input_tokens=42))
@@ -208,7 +208,7 @@ def test_anthropic_counter_sends_one_short_message_with_the_given_system_and_too
 
 
 def test_openai_counter_uses_the_responses_input_token_count():
-    from src.llm.openai_provider import _OpenAIRequestCounter
+    from src.providers.language.openai_provider import _OpenAIRequestCounter
 
     client = MagicMock()
     client.responses.input_tokens.count = AsyncMock(return_value=MagicMock(input_tokens=17))

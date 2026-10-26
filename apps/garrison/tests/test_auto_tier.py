@@ -9,8 +9,10 @@ import pytest
 
 from src.agents import agent_config, agent_spec
 from src.agents.agent_spec import AgentSpec, LlmSpec, TierInfo
-from src.llm import auto_tier, decision, model_tiers
-from src.llm.base_provider import ChatResult
+from src.agents import auto_tier
+from src.providers.decision import decision
+from src.providers import model_tiers
+from src.providers.base_provider import ChatResult
 
 LIGHT = TierInfo("light", "haiku", "quick")
 STANDARD = TierInfo("standard", "sonnet", "most")

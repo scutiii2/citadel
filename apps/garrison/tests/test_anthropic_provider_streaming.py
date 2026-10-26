@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from src.llm import anthropic_provider
+from src.providers.language import anthropic_provider
 
 
 def _fake_async_iter(items):
@@ -176,7 +176,7 @@ def test_run_chat_resets_streamed_text_from_a_tool_use_round(monkeypatch):
 
 
 def test_run_chat_counts_the_context_with_the_provider_when_the_turn_asks_for_it(monkeypatch):
-    from src.llm import context_breakdown
+    from src.providers import context_breakdown
 
     async def _run():
         response = MagicMock(stop_reason="end_turn", content=[])
@@ -197,7 +197,7 @@ def test_run_chat_counts_the_context_with_the_provider_when_the_turn_asks_for_it
         finally:
             context_breakdown.reset_exact(token)
 
-    from src.llm.context_breakdown import ProviderCounter
+    from src.providers.context_breakdown import ProviderCounter
 
     ProviderCounter._cache.clear()
     result = asyncio.run(_run())

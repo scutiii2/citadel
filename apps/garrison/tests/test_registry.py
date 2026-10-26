@@ -6,7 +6,7 @@ import asyncio
 from contextlib import AsyncExitStack
 from types import SimpleNamespace
 
-from src.mcp_client.registry import McpClientRegistry
+from src.tools.mcp_client.registry import McpClientRegistry
 
 
 class _Session:

@@ -1,7 +1,7 @@
 # src/llm/
 
 Claude and OpenAI providers (Ollama only through an OpenAI-compatible
-gateway). Each provider calls `src.mcp_client.mcp_upstream` for tools, and
+gateway). Each provider calls `src.tools.mcp_client.mcp_upstream` for tools, and
 each instance pins one provider+model (see `../agents/agent_config.py`)
 rather than routing between several per request. Under the supervisor the
 agent file's `llm` block sets `AI_AGENT_PROVIDER`/`AI_AGENT_GATEWAY`/

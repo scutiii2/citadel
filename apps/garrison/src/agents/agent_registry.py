@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from src.agents import agent_spec
-from src.llm import model_tiers
+from src.providers import model_tiers
 
 _CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / ".data" / "agent_registry.json"
 

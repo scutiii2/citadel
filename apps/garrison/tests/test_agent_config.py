@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from src.llm.base_provider import ChatResult
+from src.providers.base_provider import ChatResult
 
 
 @pytest.fixture(autouse=True)
@@ -83,7 +83,7 @@ def test_laya_resolves_without_cloud_keys_or_cloud_provider_imports(monkeypatch)
     provider, module = agent_config._resolve()
     assert provider == "laya"
     assert module.has_api_key() is True
-    assert imports == ["src.llm.laya_provider"]
+    assert imports == ["src.providers.decision.laya_provider"]
 
 
 def test_provider_without_api_key_fails_loudly(monkeypatch):
@@ -115,7 +115,7 @@ def test_valid_anthropic_config_resolves(monkeypatch):
 
 def test_status_reports_every_gateway_and_backup_availability(monkeypatch):
     from src.agents import agent_config, agent_spec
-    from src.llm import cooldown
+    from src.providers import cooldown
 
     cooldown.reset()
     try:
@@ -139,7 +139,7 @@ def test_status_reports_every_gateway_and_backup_availability(monkeypatch):
 
 def test_missing_fallback_file_is_startup_error(monkeypatch):
     from src.agents import agent_config, agent_spec
-    from src.llm import llm_config
+    from src.providers import llm_config
 
     monkeypatch.setenv("AI_AGENT_PROVIDER", "anthropic")
     spec = agent_spec.current()
@@ -153,7 +153,8 @@ def test_missing_fallback_file_is_startup_error(monkeypatch):
 
 def test_missing_fallback_credentials_warn_and_route_skips_it(monkeypatch, caplog):
     from src.agents import agent_config, agent_spec
-    from src.llm import anthropic_provider, cooldown, llm_config
+    from src.providers.language import anthropic_provider
+    from src.providers import cooldown, llm_config
 
     cooldown.reset()
     try:
@@ -333,7 +334,7 @@ def test_run_chat_falls_back_to_thread_for_sync_provider(monkeypatch):
     monkeypatch.setenv("CLAUDE_API_KEY", "test-key")
 
     from src.agents import agent_config
-    from src.llm.base_provider import ChatResult
+    from src.providers.base_provider import ChatResult
 
     reloaded = importlib.reload(agent_config)
 
@@ -369,7 +370,7 @@ def test_run_chat_still_registers_and_clears_cancellation_for_async_provider(mon
     monkeypatch.setenv("CLAUDE_API_KEY", "test-key")
 
     from src.agents import agent_config
-    from src.llm.base_provider import ChatResult
+    from src.providers.base_provider import ChatResult
 
     reloaded = importlib.reload(agent_config)
 
@@ -730,8 +731,9 @@ def test_a_turns_caveman_flag_is_visible_to_delegation_only_during_the_turn(monk
     import asyncio
     from unittest.mock import AsyncMock
 
-    from src.agents import agent_config, delegation
-    from src.llm.base_provider import ChatResult
+    from src.agents import agent_config
+    from src.agents.roles.orchestrator import delegation
+    from src.providers.base_provider import ChatResult
 
     seen = []
 

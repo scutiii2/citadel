@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 
 from src.agents.agent_spec import LlmSpec
-from src.llm.llm_options import LlmOptions
+from src.providers.llm_options import LlmOptions
 
 
 def test_defaults_send_nothing_extra():

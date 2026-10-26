@@ -3,9 +3,9 @@ from dataclasses import replace
 
 import pytest
 
-from src.agents.router_contract import RouteRequest, RouteCandidate, RouterPolicy
-from src.agents.router_engine import RouterEngine
-from src.llm import decision
+from src.agents.roles.router.router_contract import RouteRequest, RouteCandidate, RouterPolicy
+from src.agents.roles.router.router_engine import RouterEngine
+from src.providers.decision import decision
 from tests.fake_laya import FakeService, choice, result
 
 
@@ -100,7 +100,7 @@ def test_timeout_after_local_work_retains_usage_and_abstains():
 
 
 def test_agent_failure_does_not_discard_independent_size(monkeypatch):
-    from src.llm.triage_flow import TriageFlow
+    from src.providers.decision.triage_flow import TriageFlow
     original = TriageFlow._settle
     def settle(self, req, qid, spec, local):
         if qid == "agent":

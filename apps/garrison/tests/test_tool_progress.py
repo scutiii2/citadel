@@ -7,9 +7,9 @@ import asyncio
 import threading
 from unittest.mock import AsyncMock, patch
 
-from src.mcp_client import mcp_upstream, tool_progress
-from src.llm.base_provider import dispatch_with_progress
-from src.mcp_client.registry import McpClientRegistry
+from src.tools.mcp_client import mcp_upstream, tool_progress
+from src.providers.base_provider import dispatch_with_progress
+from src.tools.mcp_client.registry import McpClientRegistry
 from src.agents import agent_events
 
 

@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, Mock
 from anthropic.lib.streaming import AsyncMessageStream, InputJsonEvent, TextEvent
 from anthropic.lib.streaming._types import ThinkingEvent
 
-from src.llm.anthropic_provider import _stream_pieces
+from src.providers.language.anthropic_provider import _stream_pieces
 
 
 def _collect(stream):

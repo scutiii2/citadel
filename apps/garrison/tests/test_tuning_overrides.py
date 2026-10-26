@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from src.core import tuning_overrides
+from src.runtime import tuning_overrides
 
 
 def test_nothing_is_set_without_a_file(tmp_path):
@@ -58,8 +58,8 @@ from pathlib import Path
 
 import pytest
 
-from src.core import config_files, tuning_overrides
-from src.core.tuning_overrides import TuningError
+from src.runtime import config_files, tuning_overrides
+from src.runtime.tuning_overrides import TuningError
 
 
 @pytest.fixture
@@ -144,7 +144,8 @@ def test_tuning_view_hides_file_only_keys(tuning):
 
 def test_every_allowed_extreme_is_accepted_by_the_real_loaders(tuning, monkeypatch):
     """The allowlist must never admit a value token_limits or decision would refuse."""
-    from src.llm import decision, token_limits
+    from src.providers.decision import decision
+    from src.providers import token_limits
 
     path, overlay = tuning
     extremes = {
@@ -198,7 +199,7 @@ def test_a_failing_reset_does_not_stop_the_others_or_the_turn(tuning, monkeypatc
 
 
 def test_an_admin_edit_reaches_token_limits_after_poll(tuning, monkeypatch):
-    from src.llm import token_limits
+    from src.providers import token_limits
 
     path, overlay = tuning
     monkeypatch.setattr(token_limits, "_CONFIG_PATH", path)
@@ -222,7 +223,7 @@ def test_save_rejects_disabling_the_last_voter_in_the_file_order(tuning):
 
 
 def test_invalid_voter_combination_on_disk_falls_back_to_the_file(tuning, monkeypatch):
-    from src.llm import decision
+    from src.providers.decision import decision
     path, overlay = tuning
     overlay.write_text(json.dumps({
         "classifier.triage_enabled.laya-typed.noul": False,

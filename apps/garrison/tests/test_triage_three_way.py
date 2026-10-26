@@ -9,7 +9,7 @@ import pytest
 
 from scripts import check_triage_cases as cases
 from scripts import triage_three_way as three
-from src.llm import decision
+from src.providers.decision import decision
 
 
 # --- the script's wiring ---------------------------------------------------------------------------------------

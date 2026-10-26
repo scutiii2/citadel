@@ -5,8 +5,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from src import server
-from src.llm import token_limits
-from src.llm.llm_options import LlmOptions
+from src.providers import token_limits
+from src.providers.llm_options import LlmOptions
 
 
 def _options(max_tokens=None, max_tool_rounds=None):
@@ -67,7 +67,7 @@ def test_status_says_ask_understands_limits():
 def test_ask_forwards_limits_to_run_chat():
     import asyncio
     from unittest.mock import AsyncMock
-    from src.llm.base_provider import ChatResult
+    from src.providers.base_provider import ChatResult
 
     with patch.object(server.agent_config, "run_chat", new_callable=AsyncMock, return_value=ChatResult(response="hi")) as run_chat, patch.object(server.agent_config, "status", return_value={"model": "m", "context_window": 1}):
         asyncio.run(server.ask("hi", limits={"max_output_tokens": 500}))

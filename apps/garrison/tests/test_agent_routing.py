@@ -9,7 +9,7 @@ import pytest
 
 from src.agents import agent_registry, agent_routing, agent_spec
 from src.agents.agent_spec import AgentSpec, LlmSpec
-from src.core import tool_filter
+from src.runtime import tool_filter
 
 AGENTS = [
     {"id": "orchestrator", "label": "Ember", "url": "u", "orchestrator": True, "focus": "coordination"},

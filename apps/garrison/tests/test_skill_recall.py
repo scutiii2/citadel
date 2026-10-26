@@ -8,9 +8,9 @@ import time
 
 import pytest
 
-from src.agents import skill_recall
-from src.core import internal_auth
-from src.core.internal_auth import Requester
+from src.agents.roles.orchestrator import skill_recall
+from src.runtime import internal_auth
+from src.runtime.internal_auth import Requester
 
 FOUND = (
     "1 approved skill(s):\n"
@@ -108,7 +108,7 @@ def test_the_search_gets_the_question_and_the_turns_identity_in_its_worker_threa
 
 
 def test_the_default_search_calls_the_skill_tool_through_the_upstream_client(monkeypatch):
-    from src.mcp_client import mcp_upstream
+    from src.tools.mcp_client import mcp_upstream
 
     calls = []
     monkeypatch.setattr(mcp_upstream, "call_tool", lambda name, arguments: calls.append((name, arguments)) or FOUND)

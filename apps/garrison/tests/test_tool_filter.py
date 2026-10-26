@@ -11,10 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src import server
-from src.agents import agent_config, delegation
-from src.core import tool_filter
-from src.llm.base_provider import ChatResult
-from src.mcp_client import mcp_upstream
+from src.agents import agent_config
+from src.agents.roles.orchestrator import delegation
+from src.runtime import tool_filter
+from src.providers.base_provider import ChatResult
+from src.tools.mcp_client import mcp_upstream
 
 
 def _tool(name: str) -> SimpleNamespace:
@@ -105,8 +106,8 @@ def test_a_delegate_is_told_what_the_user_switched_off():
 
     token = tool_filter.bind(["tool_pdf_merge", "tool_calc"])
     try:
-        with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool), \
-             patch("src.agents.delegation.agent_registry") as registry:
+        with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=_fake_call_tool), \
+             patch("src.agents.roles.orchestrator.delegation.agent_registry") as registry:
             registry.get_agent.return_value = {"url": "http://127.0.0.1:9101/mcp", "label": "Sub"}
             delegation.call("openai-agent", "sub-question", depth=0)
     finally:
@@ -137,8 +138,8 @@ def test_wildcard_refuses_a_delegate_without_block_all_support():
 
     token = tool_filter.bind(["*"])
     try:
-        with patch("src.agents.delegation._call_tool", side_effect=fake_call), \
-             patch("src.agents.delegation.agent_registry") as registry:
+        with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=fake_call), \
+             patch("src.agents.roles.orchestrator.delegation.agent_registry") as registry:
             registry.get_agent.return_value = {"url": "http://127.0.0.1:9101/mcp", "label": "Sub"}
             with pytest.raises(PermissionError, match="block all tools"):
                 delegation.call("openai-agent", "sub-question", depth=0)

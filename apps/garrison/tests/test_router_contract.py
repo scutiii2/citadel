@@ -4,7 +4,7 @@ import math
 import pytest
 
 from src.agents import agent_spec, agent_store
-from src.agents.router_contract import RouterPolicy, RouteRequest, RouteResponse
+from src.agents.roles.router.router_contract import RouterPolicy, RouteRequest, RouteResponse
 
 
 def definition(**changes):

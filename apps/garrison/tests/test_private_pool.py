@@ -9,8 +9,8 @@ import pytest
 from mcp import types
 from mcp.shared.exceptions import McpError
 
-from src.private_extensions.pool import PrivateSessionPool
-from src.private_extensions.spec import PrivateSpec
+from src.tools.private_extensions.pool import PrivateSessionPool
+from src.tools.private_extensions.spec import PrivateSpec
 
 
 def spec(slug="notes", **headers) -> PrivateSpec:

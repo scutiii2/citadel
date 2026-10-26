@@ -9,8 +9,9 @@ import openai
 import pytest
 
 from src.agents import agent_spec
-from src.llm import openai_provider as provider, cooldown, gateway_failover, token_limits
-from src.llm.base_provider import ChatCancelled
+from src.providers.language import openai_provider as provider
+from src.providers import cooldown, gateway_failover, token_limits
+from src.providers.base_provider import ChatCancelled
 from tests.test_openai_provider import _fake_stream
 from tests.test_gateway_failover import sdk_error
 

@@ -7,9 +7,10 @@ from types import SimpleNamespace
 import uvicorn
 from mcp.server.fastmcp import Context, FastMCP
 
-from src.agents import agent_spec, router_client, router_service
-from src.agents.router_contract import RouteRequest, RouteResponse, RouterPolicy
-from src.core import internal_auth
+from src.agents import agent_spec
+from src.agents.roles.router import router_client, router_service
+from src.agents.roles.router.router_contract import RouteRequest, RouteResponse, RouterPolicy
+from src.runtime import internal_auth
 from tests.test_private_integration import free_port
 
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from src.agents import agent_spec
 from src.agents.agent_spec import AgentSpec, LlmSpec, RosterEntry
-from src.llm import agent_roles
+from src.agents import agent_roles
 
 
 def _spec(**kwargs) -> AgentSpec:

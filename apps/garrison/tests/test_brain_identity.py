@@ -1,4 +1,4 @@
-from src.core import internal_auth
+from src.runtime import internal_auth
 
 
 def test_auto_save_scope_propagates_to_tools_and_delegates():

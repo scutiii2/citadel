@@ -274,7 +274,7 @@ def test_roster_and_specialists_survive_a_corrupt_registry_file(monkeypatch, tmp
 
 def test_definitions_round_trip_and_include_disabled_agents(monkeypatch):
     from src.agents.agent_spec import TierInfo
-    from src.llm import model_tiers
+    from src.providers import model_tiers
 
     seen = []
 

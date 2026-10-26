@@ -17,8 +17,8 @@ import anyio.to_thread
 
 from src.agents import agent_registry, agent_spec
 from src.agents.agent_spec import RosterEntry
-from src.core import tool_filter
-from src.llm import model_tiers, reasoning_effort
+from src.runtime import tool_filter
+from src.providers import model_tiers, reasoning_effort
 
 
 _log = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ def _live_tool_names() -> list[str] | None:
     """Unprefixed names of the tools mcp_server offers right now; None when
     they cannot be read (then nothing is left out). Blocking."""
     try:
-        from src.mcp_client import mcp_upstream
+        from src.tools.mcp_client import mcp_upstream
 
         return [mcp_upstream.unprefixed(t.name) for t in mcp_upstream.client.list_tools() if t.name.startswith("main__")]
     except Exception:  # noqa: BLE001 - an unreadable catalog must not empty the roster

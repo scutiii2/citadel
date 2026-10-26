@@ -1,7 +1,7 @@
 import anyio
 import pytest
 
-from src.agents import delegation
+from src.agents.roles.orchestrator import delegation
 
 
 @pytest.mark.anyio

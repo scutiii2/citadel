@@ -3,12 +3,14 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.agents import agent_spec, agent_routing, delegation, router_client, router_routing
+from src.agents import agent_spec, agent_routing
+from src.agents.roles.orchestrator import delegation
+from src.agents.roles.router import router_client, router_routing
 from src.agents.agent_spec import AgentSpec, LlmSpec, RosterEntry, TierInfo
-from src.agents.router_contract import DecisionOutcome, RouteResponse
-from src.core import approvals, internal_auth
-from src.llm import cancellation
-from src.llm.base_provider import ChatCancelled
+from src.agents.roles.router.router_contract import DecisionOutcome, RouteResponse
+from src.runtime import approvals, internal_auth
+from src.providers import cancellation
+from src.providers.base_provider import ChatCancelled
 
 
 def setup(monkeypatch, response):

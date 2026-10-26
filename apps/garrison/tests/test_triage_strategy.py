@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 
 from src import server
-from src.core import tuning_overrides
-from src.llm import triage_strategy
-from src.llm.laya_model import LayaServiceError
+from src.runtime import tuning_overrides
+from src.providers.decision import triage_strategy
+from src.providers.decision.laya_model import LayaServiceError
 from tests.fake_laya import STRATEGIES, FakeService
 
 

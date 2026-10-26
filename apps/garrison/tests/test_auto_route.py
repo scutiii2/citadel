@@ -7,11 +7,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.agents import agent_config, agent_routing, agent_spec, auto_route, delegation
+from src.agents import agent_config, agent_routing, agent_spec
+from src.agents.roles.orchestrator import auto_route, delegation
 from src.agents.agent_spec import AgentSpec, LlmSpec, RosterEntry
-from src.core import approvals
-from src.llm import cancellation, decision
-from src.llm.base_provider import ChatCancelled, ChatResult
+from src.runtime import approvals
+from src.providers import cancellation
+from src.providers.decision import decision
+from src.providers.base_provider import ChatCancelled, ChatResult
 
 RESEARCHER = RosterEntry("researcher", "Researcher", "Web research: look up facts.", tool_allow=("tool_web_search", "tool_ticket_createTicket"))
 SERVER = RosterEntry("server-ops", "Server Ops", "x" * 400, tool_allow=("tool_srv_*",))

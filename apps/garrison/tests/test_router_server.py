@@ -7,10 +7,10 @@ from types import SimpleNamespace
 import pytest
 
 from src.agents import agent_spec
-from src.agents.router_contract import RouterPolicy, RouteResponse
-from src.agents.router_contract import VoterUsage
-from src.agents import router_service
-from src.core import internal_auth
+from src.agents.roles.router.router_contract import RouterPolicy, RouteResponse
+from src.agents.roles.router.router_contract import VoterUsage
+from src.agents.roles.router import router_service
+from src.runtime import internal_auth
 
 
 def test_route_fails_closed_without_configured_token(monkeypatch):

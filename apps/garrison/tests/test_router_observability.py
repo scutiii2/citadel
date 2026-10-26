@@ -1,10 +1,11 @@
 import asyncio
 from dataclasses import replace
 
-from src.agents import agent_spec, router_service
-from src.agents.router_contract import RouterPolicy
-from src.core import internal_auth
-from src.llm import decision
+from src.agents import agent_spec
+from src.agents.roles.router import router_service
+from src.agents.roles.router.router_contract import RouterPolicy
+from src.runtime import internal_auth
+from src.providers.decision import decision
 
 
 class _Service:
@@ -38,8 +39,8 @@ def test_an_unreachable_or_missing_laya_service_publishes_degraded_state(monkeyp
 
 
 def test_failed_attempts_remain_in_trace_without_becoming_billable_usage():
-    from src.agents.router_client import usage_row
-    from src.agents.router_contract import VoterUsage
+    from src.agents.roles.router.router_client import usage_row
+    from src.agents.roles.router.router_contract import VoterUsage
     row = usage_row(VoterUsage(provider_id="jev", model="jev-latest", started_at="2026-10-21T00:00:00+00:00",
         duration_ms=10, ok=False, reason="backend_failed"), "r")
     assert row["agent_id"] == "router" and row["total_tokens"] is None

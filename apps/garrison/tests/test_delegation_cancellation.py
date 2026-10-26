@@ -9,9 +9,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.agents import agent_registry, delegation
-from src.llm import cancellation
-from src.llm import anthropic_provider, openai_provider, llm_options
+from src.agents import agent_registry
+from src.agents.roles.orchestrator import delegation
+from src.providers import cancellation
+from src.providers.language import anthropic_provider, openai_provider
+from src.providers import llm_options
 from src.agents import agent_spec
 from tests.test_anthropic_provider_streaming import _round_cm
 from tests.test_openai_provider import _fake_stream

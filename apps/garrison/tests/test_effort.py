@@ -59,7 +59,7 @@ def test_roster_entry_efforts_default_to_empty():
 # --- reasoning_effort (pure resolution) -----------------------------------
 
 from src.agents.agent_spec import AgentSpec, LlmSpec  # noqa: E402
-from src.llm import llm_options, reasoning_effort  # noqa: E402
+from src.providers import llm_options, reasoning_effort
 
 
 def test_allowed_efforts_run_up_to_the_cap():
@@ -175,10 +175,11 @@ import asyncio  # noqa: E402
 from unittest.mock import AsyncMock, patch  # noqa: E402
 
 from src import server  # noqa: E402
-from src.agents import agent_config, agent_registry, agent_routing, delegation  # noqa: E402
+from src.agents import agent_config, agent_registry, agent_routing
+from src.agents.roles.orchestrator import delegation
 from src.agents.agent_spec import RosterEntry  # noqa: E402
-from src.core import usage_log  # noqa: E402
-from src.llm.base_provider import ChatResult  # noqa: E402
+from src.runtime import usage_log
+from src.providers.base_provider import ChatResult  # noqa: E402
 
 
 def _fake_provider(seen):
@@ -334,7 +335,7 @@ def test_call_passes_reasoning_effort_to_ask(monkeypatch):
         captured["arguments"] = arguments
         return {"response": "4"}
 
-    with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool):
+    with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=_fake_call_tool):
         delegation.call("calc", "2+2?", depth=0, reasoning_effort="low")
 
     assert captured["arguments"]["reasoning_effort"] == "low"
@@ -347,7 +348,7 @@ def test_call_joins_the_model_and_effort_notes(monkeypatch):
         return {"response": "4", "model_note": "heavy is not available for calc; ran on standard",
                 "effort_note": "high is above calc's reasoning_effort limit; ran on low"}
 
-    with patch("src.agents.delegation._call_tool", side_effect=_fake_call_tool):
+    with patch("src.agents.roles.orchestrator.delegation._call_tool", side_effect=_fake_call_tool):
         result = delegation.call("calc", "2+2?", depth=0, model_tier="heavy", reasoning_effort="high")
 
     assert result == (
@@ -357,7 +358,7 @@ def test_call_joins_the_model_and_effort_notes(monkeypatch):
 
 
 def test_dispatch_forwards_reasoning_effort_and_ignores_non_strings():
-    with patch("src.agents.delegation.call", return_value="answer") as fake_call:
+    with patch("src.agents.roles.orchestrator.delegation.call", return_value="answer") as fake_call:
         delegation.dispatch({"agent_id": "calc", "question": "q", "reasoning_effort": "low"}, 1)
         delegation.dispatch({"agent_id": "calc", "question": "q", "reasoning_effort": 3}, 1)
         delegation.dispatch({"agent_id": "calc", "question": "q", "model_tier": "light", "reasoning_effort": "off"}, 1)
@@ -372,7 +373,7 @@ def test_interpret_reports_its_own_agent_usage():
     from unittest.mock import patch
 
     from src import server
-    from src.llm.base_provider import ChatResult
+    from src.providers.base_provider import ChatResult
 
     fake = ChatResult(
         response="summary", provider_id="anthropic", model="m",

@@ -382,7 +382,7 @@ def load_file(path: Path) -> AgentSpec:
     if internal_role not in (None, "router"):
         raise check.fail("internal_role", "must be router or null")
     if internal_role == "router":
-        from src.agents.router_contract import RouterPolicy
+        from src.agents.roles.router.router_contract import RouterPolicy
 
         if (provider != "laya" or check.boolean(data, "entry", False) or orchestrator
                 or check.boolean(data, "delegable", True) or memory_recall or skill_recall or skill_learning

@@ -1,0 +1,358 @@
+"""delegate_to_agent - lets one ai_agent instance hand a focused
+sub-question to another configured specialist instance mid-loop.
+
+Not every "subagent" needs a new ai_agent process: delegating to a
+different already-running instance goes through this one generic tool.
+An agent never lists itself in its roster; orchestrators delegate to
+specialists only (see agent_routing.specialists()).
+A genuinely distinct specialized subagent (its own system prompt/tool
+scope/model) is still a new ai_agent instance - this module is what lets
+any orchestrator reach one once it exists.
+
+Isolated from both provider files so neither anthropic_provider.py nor
+openai_provider.py duplicates the tool-schema/dispatch logic - each just
+calls tool_description()/tool_parameters()/call() from here.
+
+Each delegated call receives a unique child request ID linked to its
+parent in cancellation.py. While the peer runs, this process forwards a
+parent cancellation to the peer's cancel tool; nested peers do the same.
+Cancellation remains cooperative, checked between provider rounds.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import re
+from collections.abc import Iterable
+from uuid import uuid4
+from contextvars import ContextVar, Token
+from typing import Any
+
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+
+from src.agents import agent_events, agent_registry, agent_spec
+from src.agents.roles.orchestrator import plan
+
+from src.runtime import approvals, internal_auth, tool_filter
+from src.agents.agent_spec import REASONING_EFFORTS, TIERS, RosterEntry
+from src.providers import cancellation
+
+TOOL_NAME = "delegate_to_agent"
+
+# Token usage of every agent this turn delegated to (including their own
+# nested delegations). agent_config.run_chat binds a fresh list per turn;
+# call() runs on a worker thread that inherits the context, so it appends
+# to that same list. None outside a bound turn (usage is then just dropped).
+_usage_sink: ContextVar[list[dict[str, Any]] | None] = ContextVar("delegation_usage_sink", default=None)
+
+
+def bind_usage() -> tuple[list[dict[str, Any]], Token]:
+    usage: list[dict[str, Any]] = []
+    return usage, _usage_sink.set(usage)
+
+
+def reset_usage(token: Token) -> None:
+    _usage_sink.reset(token)
+
+
+def record_usage(rows: list[dict[str, Any]]) -> None:
+    """Record internal-agent work once in the current turn's existing usage sink."""
+    if (sink := _usage_sink.get()) is not None:
+        sink.extend(rows)
+
+_attachments: ContextVar[str] = ContextVar("delegation_pdf_attachments", default="")
+
+
+def bind_attachments(question: str, history: list[dict[str, Any]]) -> Token:
+    # Carry only file metadata, never the extracted document text or unrelated history.
+    sources = [str(item.get("content", "")) for item in history if item.get("role") == "user"] + [question]
+    pattern = r'\[\[ATTACHMENT filename="([^"]*)" chars="\d+" truncated="(?:true|false)"\]\]\n(\[(?:PDFMerger|Image) file_id:[^\n]*\])'
+    references = list(dict.fromkeys(f"{name}: {header}" for source in sources for name, header in re.findall(pattern, source)))
+    # Nested delegates inherit the references appended by the preceding hop.
+    references += [f"{name}: {header}" for source in sources for name, header in re.findall(r'^([^\n]+): (\[(?:PDFMerger|Image) file_id:[^\n]*\])$', source, re.MULTILINE)]
+    return _attachments.set("\n".join(dict.fromkeys(references)))
+
+
+def reset_attachments(token: Token) -> None:
+    _attachments.reset(token)
+
+
+_caveman: ContextVar[bool] = ContextVar("delegation_caveman", default=False)
+
+
+def bind_caveman(on: bool) -> Token:
+    """The chat's caveman toggle, so a specialist answers as tersely as the agent asked."""
+    return _caveman.set(on)
+
+
+def reset_caveman(token: Token) -> None:
+    _caveman.reset(token)
+
+
+_enabled_extensions: ContextVar[tuple[str, ...]] = ContextVar("delegation_enabled_extensions", default=())
+
+
+def bind_enabled_extensions(ids: Iterable[str]) -> Token:
+    """The extensions the user enabled for this chat; a specialist's tools from any other extension stay hidden."""
+    return _enabled_extensions.set(tuple(ids))
+
+
+def reset_enabled_extensions(token: Token) -> None:
+    _enabled_extensions.reset(token)
+
+
+# Each hop is itself a full up-to-6-round ask() call, so this bounds a
+# worst case that's real but not tiny. 2 hops makes a genuine multi-step
+# handoff possible (A -> B -> C, or A -> B -> A) without allowing
+# unbounded fan-out or a delegation cycle running forever.
+_MAX_DELEGATION_DEPTH = 2
+
+def _offers_choice(roster: list[RosterEntry]) -> bool:
+    return any(len(r.tiers) > 1 for r in roster)
+
+
+def _offers_effort(roster: list[RosterEntry]) -> bool:
+    return any(len(r.efforts) > 1 for r in roster)
+
+
+def tool_parameters(roster: list[RosterEntry]) -> dict[str, Any]:
+    """The delegate tool's input schema: agent_id limited to this turn's
+    roster, and model_tier when at least one specialist offers a choice of
+    model strength."""
+    ids = [r.id for r in roster]
+    properties: dict[str, Any] = {
+        "agent_id": {"type": "string", "enum": ids, "description": "Which specialist to delegate to."},
+        "question": {"type": "string", "description": "The focused sub-question to ask it. Include exact attachment file_id/table_id values, filenames and requested file order from the user question; specialists do not receive the chat history."},
+    }
+    if _offers_choice(roster):
+        properties["model_tier"] = {
+            "type": "string",
+            "enum": list(TIERS),
+            "description": "Strength of the model the specialist runs on. Omit for its default.",
+        }
+    if _offers_effort(roster):
+        properties["reasoning_effort"] = {
+            "type": "string",
+            "enum": list(REASONING_EFFORTS),
+            "description": (
+                "How hard the specialist reasons: off = none, low = a quick check, medium = normal analysis, "
+                "high = hard multi-step problems. Omit for its default."
+            ),
+        }
+    return {"type": "object", "properties": properties, "required": ["agent_id", "question"]}
+
+
+def _roster_ref(entry: RosterEntry) -> str:
+    """One specialist as the tool names it: its id plus the model choices only the tool
+    can describe. What it is for stays in the system prompt's roster (agent_roles.roster_block)."""
+    line = entry.id
+    if len(entry.tiers) > 1:
+        line += " [model_tier: " + ", ".join(f"{t.tier} = {t.use_for}" for t in entry.tiers) + "]"
+    if 1 < len(entry.efforts) < len(REASONING_EFFORTS):
+        line += f" [reasoning_effort: up to {entry.efforts[-1]}]"
+    return line
+
+
+def tool_description(roster: list[RosterEntry]) -> str:
+    listing = "; ".join(_roster_ref(r) for r in roster)
+    choice = (
+        " Pick the lightest model_tier whose description fits the task; omit it when unsure."
+        if _offers_choice(roster) else ""
+    )
+    effort = (
+        " Pick the lowest reasoning_effort that fits the task; omit it when unsure."
+        if _offers_effort(roster) else ""
+    )
+    return (
+        "Hand a focused sub-question to a specialist agent and get its answer back. "
+        f"What each specialist is for is in your instructions. Specialists: {listing}.{choice}{effort} "
+        "Sequential: each call adds latency, so delegate only what a specialist does better."
+    )
+
+
+async def _call_tool(url: str, name: str, arguments: dict[str, Any], on_progress: Any = None) -> dict[str, Any]:
+    # Same shape as chat_app/src/services/ai_agent_client.py's _call_tool,
+    # including its fix: raise only AFTER both async with blocks exit,
+    # never inside them - an exception raised while either is still open
+    # gets wrapped in a BaseExceptionGroup by anyio on unwind, which the
+    # caller's plain `except Exception` would then fail to stringify
+    # usefully.
+    # The shared token (peers require it) and the asking user, so the
+    # delegate's own mcp_server calls carry them on too.
+    async with streamablehttp_client(url, headers=internal_auth.outbound_headers() or None) as (read, write, _):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(name, arguments, progress_callback=on_progress)
+
+    if result.isError:
+        parts = [getattr(block, "text", str(block)) for block in result.content]
+        raise RuntimeError("\n".join(parts) if parts else f"{name} failed")
+    return result.structuredContent or {}
+
+
+async def _ask_linked(url: str, arguments: dict[str, Any], on_progress: Any) -> dict[str, Any]:
+    """Forward Stop across processes while keeping the ask connection alive."""
+    request_id = arguments["request_id"]
+    if not request_id:
+        return await _call_tool(url, "ask", arguments, on_progress=on_progress)
+    task = asyncio.create_task(_call_tool(url, "ask", arguments, on_progress=on_progress))
+    try:
+        while not task.done():
+            if cancellation.is_cancelled(request_id):
+                await _call_tool(url, "cancel", {"request_id": request_id})
+                break
+            await asyncio.wait({task}, timeout=0.1)
+        return await task
+    finally:
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+def _progress_forwarder(sink: agent_events.Sink | None, step_id: str | None) -> Any:
+    """An MCP progress callback that re-emits the specialist's live events
+    (JSON in each progress message - see server.ask) into this agent's
+    stream. The sink is captured here, not looked up per message: the
+    callback runs on the MCP client's own task inside asyncio.run below."""
+    if sink is None:
+        return None
+
+    async def on_progress(progress: float, total: float | None, message: str | None) -> None:
+        if not message:
+            return
+        try:
+            event = json.loads(message)
+        except ValueError:
+            return
+        if isinstance(event, dict):
+            out = agent_events.forwarded(event, step_id)
+            if out is not None:
+                sink(out)
+
+    return on_progress
+
+
+def call(
+    agent_id: str, question: str, depth: int, model_tier: str | None = None, reasoning_effort: str | None = None,
+) -> str:
+    """Blocking. Must run in a worker thread (the providers dispatch it via
+    anyio.to_thread.run_sync): asyncio.run() below fails inside a running
+    event loop, and delegating to this same instance needs its event loop
+    free to serve the nested ask() rather than blocked waiting on it."""
+    if depth >= _MAX_DELEGATION_DEPTH:
+        raise ValueError(f"max delegation depth ({_MAX_DELEGATION_DEPTH}) reached")
+
+    references = _attachments.get()
+    if references and references not in question:
+        question += "\n\nUploaded file references (original attachment order):\n" + references
+
+    # Specialists start and stop on their own - read the current registry.
+    agent_registry.reload()
+    agent = agent_registry.get_agent(agent_id)
+    if agent is None:
+        configured = ", ".join(agent_registry.list_agent_ids()) or "(none configured)"
+        raise ValueError(f"unknown agent_id {agent_id!r} - configured agents: {configured}")
+
+    if tool_filter.agent_blocked(agent_id):
+        # The roster omits it, but the model may still name it.
+        raise PermissionError(f"agent {agent_id!r} is switched off for this user")
+
+    # A delegate has no way to ask the user, so when this turn asks before
+    # tools run, the delegate's tools that would need asking are refused.
+    approval_mode = "off" if approvals.current().mode == "off" else "deny"
+    me = agent_spec.current().id
+    label = agent.get("label") or agent_id
+    step_id = agent_events.current_step_id()
+    sink = agent_events.emitter()
+    agent_events.emit({
+        "type": "agent_start", "agent_id": agent_id, "agent_label": label, "delegated_by": me,
+        "question": question, "step_id": step_id, "at": agent_events.now_iso(),
+    })
+    ok = False
+    parent_id = cancellation.current_request_id()
+    child_id = uuid4().hex if parent_id else None
+    if parent_id and child_id:
+        cancellation.link(parent_id, child_id)
+    try:
+        arguments: dict[str, Any] = {
+            "question": question,
+            "history": [],
+            "enabled_extensions": list(_enabled_extensions.get()),
+            "request_id": child_id,
+            "depth": depth + 1,
+            "approval_mode": approval_mode,
+            "delegated_by": me,
+            # What the user switched off holds for the specialist too.
+            "disabled_tools": sorted(tool_filter.blocked()),
+        }
+        # The chat's checklist toggles hold for the specialist too; sent only
+        # when off, so an agent that predates them is not handed new arguments.
+        policy = plan.current()
+        if not policy.chat:
+            arguments["plan"] = False
+        if not policy.lean:
+            arguments["plan_lean"] = False
+        if _caveman.get():
+            arguments["caveman"] = True
+        if model_tier:
+            arguments["model_tier"] = model_tier
+        if reasoning_effort:
+            arguments["reasoning_effort"] = reasoning_effort
+        # Imported here because context_breakdown also describes this tool.
+        from src.providers import context_breakdown
+
+        exact = context_breakdown.exact_requested()
+        if exact or "*" in tool_filter.blocked():
+            try:
+                status = asyncio.run(asyncio.wait_for(
+                    _call_tool(agent["url"], "status", {}),
+                    timeout=context_breakdown.EXACT_TIMEOUT_SECONDS,
+                ))
+            except Exception:
+                if "*" in tool_filter.blocked():
+                    raise
+                # Counting is optional; old or unavailable status tools must
+                # not prevent an otherwise supported ask from completing.
+                status = {}
+            if exact and status.get("exact_context"):
+                arguments["exact_context"] = True
+            if "*" in tool_filter.blocked() and not status.get("tool_filter_all"):
+                raise PermissionError("The delegated agent cannot block all tools; update and restart it")
+        result = asyncio.run(
+            _ask_linked(
+                agent["url"],
+                arguments,
+                on_progress=_progress_forwarder(sink, step_id),
+            )
+        )
+        ok = True
+    finally:
+        cancellation.clear(child_id)
+        agent_events.emit({
+            "type": "agent_end", "agent_id": agent_id, "agent_label": label,
+            "ok": ok, "step_id": step_id, "at": agent_events.now_iso(),
+        })
+    usage_sink = _usage_sink.get()
+    if usage_sink is not None:
+        # The delegate's own entries already include anything it delegated on.
+        usage_sink.extend(result.get("agent_usage") or [])
+    notes = [n for n in (result.get("model_note"), result.get("effort_note")) if n]
+    note_prefix = f"[{'; '.join(notes)}]\n\n" if notes else ""
+    return note_prefix + result.get("response", "")
+
+
+def dispatch(arguments: dict[str, Any], depth: int) -> str:
+    """Run a delegate_to_agent tool call from its model-supplied arguments.
+    Shared by both providers so neither re-reads the argument names."""
+    extra = {
+        key: value
+        for key in ("model_tier", "reasoning_effort")
+        if isinstance(value := arguments.get(key), str) and value
+    }
+    question = arguments["question"]
+    if isinstance(question, (dict, list)):
+        # Some models send a structured question as an object; the specialist's ask tool takes text.
+        question = json.dumps(question, ensure_ascii=False)
+    return call(arguments["agent_id"], question, depth, **extra)

@@ -9,7 +9,7 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
-from src.llm import anthropic_provider
+from src.providers.language import anthropic_provider
 
 _EPHEMERAL = {"type": "ephemeral"}
 

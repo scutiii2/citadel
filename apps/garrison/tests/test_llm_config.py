@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from src.llm import llm_config
+from src.providers import llm_config
 
 
 @pytest.mark.parametrize("requested,explicit,backup,want", [

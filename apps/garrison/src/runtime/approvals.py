@@ -1,0 +1,177 @@
+"""Asking the user before a tool runs.
+
+A provider's tool loop calls `review()` between announcing a step
+(`step_start`) and running it. What happens depends on the turn's
+`ApprovalPolicy`, which ember_api sets per `ask()` call:
+
+* ``off``   - nothing is asked (the default; chat_app never sets a policy).
+* ``ask``   - an ``approval_request`` event goes to the caller, and the tool
+  runs only after the user answers through the ``decide`` MCP tool. No answer
+  in time, a refusal, or a Stop all mean the tool does not run.
+* ``deny``  - a tool needing approval is refused outright. A delegated agent
+  gets this: it has no channel back to the user, so it cannot ask.
+
+With `read_only_check` set (mode ``ask`` only), a tool the check calls read-only runs
+without asking: "Auto" in ember. The check is mcp_upstream's, which says yes only for a
+built-in mcp_server tool that declares `readOnlyHint`; an extension's tool, a private tool and
+every tool once the turn is tainted still ask.
+
+A tool named in the policy's `ask_prefixes` asks even when the mode is
+``off`` (and is refused under ``deny``). Once a private tool has run in a
+turn the policy is `tainted`: from then on every tool asks, because the
+private server's output is untrusted text that could steer the model (a tool
+the user already allowed for the chat still runs without asking).
+
+The policy travels in a ContextVar, like tool_progress.py's sink, so the two
+providers' signatures stay as they are and the worker thread that runs
+``delegate_to_agent`` (which copies the context) can read it.
+
+The wait polls for cancellation, so Stop ends it within `POLL_SECONDS`.
+Every failure path is a refusal, never a run: the tool starts only on an
+explicit "allow" or "always" for that exact request and step.
+"""
+
+from __future__ import annotations
+
+from contextvars import ContextVar, Token
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Any
+
+from src.runtime.broker import Broker
+from src.providers.base_provider import ChatCancelled, OnEvent, step_event
+
+APPROVAL_MODES = ("off", "ask", "deny")
+DECISIONS = ("allow", "always", "deny")
+
+# Under ember_api's 5-minute read timeout on a streaming ask() call, with room to spare.
+DECISION_TIMEOUT_SECONDS = 240.0
+POLL_SECONDS = 0.5
+
+DECLINED = "The user declined to run this tool, so it was not run. Do not retry it; say what you could not do."
+TIMED_OUT = "The user did not answer in time, so this tool was not run."
+NO_CHANNEL = "This tool needs the user's approval, but there is no way to ask them from here, so it was not run."
+DELEGATED = "This tool needs the user's approval, which a delegated agent cannot ask for, so it was not run."
+
+
+@dataclass
+class ApprovalPolicy:
+    mode: str = "off"
+    # Tools the user already allowed for this chat, and any they allow with
+    # "always" during this turn.
+    allowed_tools: set[str] = field(default_factory=set)
+    # Tools whose name starts with one of these always need approval, even in
+    # mode "off" (the user's own MCP servers - see private_extensions/turn.py).
+    ask_prefixes: tuple[str, ...] = ()
+    # Set once a private tool has run this turn: its output is text from a server
+    # we do not control and could steer the model, so from then on every tool
+    # asks (see mcp_upstream._call_private).
+    tainted: bool = False
+    # Says whether a tool only reads (see the module docstring). None: every tool needing approval asks.
+    read_only_check: Callable[[str], bool] | None = None
+
+    def __post_init__(self) -> None:
+        if self.mode not in APPROVAL_MODES:
+            raise ValueError(f"approval_mode must be one of {', '.join(APPROVAL_MODES)}, not {self.mode!r}")
+
+    def needs_approval(self, tool: str) -> bool:
+        if tool in self.allowed_tools:
+            return False
+        if not (self.mode != "off" or self.tainted or tool.startswith(self.ask_prefixes)):
+            return False
+        # "Auto": a read-only built-in tool runs unasked, unless a private tool already ran this
+        # turn (its output could steer the model) or the tool is a private one.
+        if (
+            self.mode == "ask" and self.read_only_check is not None and not self.tainted
+            and not tool.startswith(self.ask_prefixes) and self.read_only_check(tool)
+        ):
+            return False
+        return True
+
+_DEFAULT = ApprovalPolicy()
+_policy: ContextVar[ApprovalPolicy] = ContextVar("approval_policy", default=_DEFAULT)
+
+
+def bind(policy: ApprovalPolicy) -> Token:
+    return _policy.set(policy)
+
+
+def reset(token: Token) -> None:
+    _policy.reset(token)
+
+
+def current() -> ApprovalPolicy:
+    return _policy.get()
+
+
+def mark_tainted() -> None:
+    """Every later tool this turn asks (see ApprovalPolicy.tainted). A turn
+    without its own policy shares the default one with every caller, which is
+    never changed."""
+    policy = _policy.get()
+    if policy is not _DEFAULT:
+        policy.tainted = True
+
+
+class ApprovalBroker(Broker[str]):
+    """The approvals waiting on a user, keyed by (request_id, step_id).
+
+    `decide()` and `wait()` both run on the server's event loop (the `decide`
+    MCP tool is async), so futures are set and awaited on the same loop.
+    """
+
+    def __init__(self, timeout: float = DECISION_TIMEOUT_SECONDS, poll: float = POLL_SECONDS) -> None:
+        super().__init__(timeout, poll)
+
+    def pending(self, request_id: str) -> list[str]:
+        return [step for (request, step) in self._pending if request == request_id]
+
+    async def wait(self, request_id: str, step_id: str) -> str:
+        """The user's decision (`allow`, `always` or `deny`), or `timeout` /
+        `cancelled`. A second wait on the same step replaces the first,
+        which then reads as denied."""
+        return await self._wait(request_id, step_id, replaced="deny", cancelled="cancelled", timed_out="timeout")
+
+    def decide(self, request_id: str, step_id: str, decision: str) -> bool:
+        """Answers a pending approval. False when there is none: unknown
+        step, already answered, or the turn moved on. Each is answered once."""
+        if decision not in DECISIONS:
+            raise ValueError(f"decision must be one of {', '.join(DECISIONS)}")
+        return self._resolve(request_id, step_id, decision)
+
+
+BROKER = ApprovalBroker()
+
+
+async def review(
+    request_id: str | None,
+    step_id: str,
+    tool: str,
+    label: str | None,
+    arguments: dict[str, Any],
+    on_event: OnEvent | None,
+) -> str | None:
+    """None when the tool may run; otherwise the text to give the model in
+    place of a result (the tool is not run). Raises ChatCancelled if the user
+    stops the turn while it waits."""
+    policy = current()
+    if not policy.needs_approval(tool):
+        return None
+    if policy.mode == "deny":
+        return DELEGATED
+    if on_event is None or not request_id:
+        return NO_CHANNEL
+
+    await on_event(step_event("approval_request", id=step_id, tool=tool, label=label, arguments=arguments))
+    outcome = await BROKER.wait(request_id, step_id)
+    await on_event(step_event("approval_resolved", id=step_id, outcome=outcome))
+
+    if outcome == "always":
+        policy.allowed_tools.add(tool)
+        return None
+    if outcome == "allow":
+        return None
+    if outcome == "cancelled":
+        await on_event(step_event("step_end", id=step_id, ok=False, result="Stopped before it ran."))
+        raise ChatCancelled()
+    return TIMED_OUT if outcome == "timeout" else DECLINED

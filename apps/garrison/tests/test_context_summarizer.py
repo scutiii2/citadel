@@ -4,9 +4,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.agents import agent_registry, agent_spec, context_summarizer, delegation
-from src.core import internal_auth
-from src.llm import cancellation
+from src.agents import agent_registry, agent_spec
+from src.agents.roles.orchestrator import context_summarizer, delegation
+from src.runtime import internal_auth
+from src.providers import cancellation
 
 
 @pytest.fixture

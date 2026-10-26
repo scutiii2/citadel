@@ -7,9 +7,9 @@ import json
 
 import pytest
 
-from src.llm import decision, laya_model, laya_provider, triage_flow
-from src.llm.laya_model import LayaServiceError
-from src.llm.triage_flow import TriageFlow
+from src.providers.decision import decision, laya_model, laya_provider, triage_flow
+from src.providers.decision.laya_model import LayaServiceError
+from src.providers.decision.triage_flow import TriageFlow
 from tests.fake_laya import FakeService, choice, result, unsure
 
 OPTIONS = {"a": "A", "b": "B", "c": "C"}
