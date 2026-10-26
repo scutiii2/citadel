@@ -5,6 +5,8 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { ticketsClient, type NewTicket, type Ticket, type TicketStatus } from "./api/TicketsClient";
 import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
+import ListRow from "../../components/ui/lists/ListRow.vue";
+import SearchField from "../../components/ui/lists/SearchField.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import "../../components/layout/infoPage.css";
@@ -299,7 +301,7 @@ async function reopenTicket(): Promise<void> {
     </template>
     <template #toolbar>
       <div class="list-controls">
-        <label class="search-control"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg><input v-model="search" type="search" aria-label="Search ticket titles" placeholder="Search your ticket titles…" /></label>
+        <SearchField v-model="search" class="search-control" label="Search ticket titles" placeholder="Search your ticket titles…" />
         <label class="sort-control"><span class="sr-only">Sort</span><select v-model="sort" aria-label="Sort tickets"><option value="newest">Recently updated</option><option value="oldest">Oldest update first</option></select></label>
       </div>
       <SegmentedControl class="status-filters" v-model="filter" :options="filterOptions" aria-label="Ticket status" />
@@ -313,13 +315,13 @@ async function reopenTicket(): Promise<void> {
         <p v-else-if="visibleTickets.length === 0 && !loadError" class="muted empty-message">{{ search.trim() ? "No tickets match your search." : filter === "all" ? "You have no tickets yet." : "No tickets with this status." }}</p>
         <ul v-else class="list" aria-label="Your ticket list">
           <li v-for="t in visibleTickets" :key="t.id">
-            <button type="button" class="ticket-row" :class="{ unread: t.has_unread, active: current?.id === t.id && detailOpen }" :aria-current="current?.id === t.id && detailOpen ? 'true' : undefined" :disabled="replying || closing" @click="open(t)">
+            <ListRow class="ticket-row" :class="{ unread: t.has_unread }" :active="current?.id === t.id && detailOpen" :disabled="replying || closing" @click="open(t)">
               <span class="row-top"><span>#{{ t.id }}</span><span class="badge">{{ TYPE_LABELS[t.type] }}</span></span>
               <span class="title">{{ t.title }}</span>
               <span v-if="t.has_unread" class="unread-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4zM8 8h8M8 12h5" /></svg>Support replied</span>
               <span class="status"><svg viewBox="0 0 24 24" aria-hidden="true"><path :d="STATUS_ICONS[t.status]" /></svg>{{ STATUS_LABELS[t.status] }}</span>
               <span class="row-time muted">Updated {{ formatTicketTime(t.updated_at) }}</span>
-            </button>
+            </ListRow>
           </li>
         </ul>
         <p class="list-footer muted">Your reports and support conversations.<br>Only your own tickets appear here.</p>
@@ -389,9 +391,7 @@ async function reopenTicket(): Promise<void> {
 
 <style scoped>
 .list-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.search-control { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
-.search-control svg { color: var(--muted); }
-.tickets .search-control input { flex: 1; min-width: 0; width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: .9em; }
+.search-control { flex: 1; }
 .sort-control { min-width: 0; }
 .tickets .sort-control select { max-width: 180px; padding: 10px; font-size: .8em; color: var(--muted); }
 .status-filters :deep(.segmented) { flex-wrap: wrap; gap: 6px; border: 0; padding: 0; border-radius: 0; background: transparent; overflow: visible; }
@@ -400,10 +400,7 @@ async function reopenTicket(): Promise<void> {
 .ticket-workspace { --workspace-columns: 300px minmax(0, 1fr); }
 .ticket-browser { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; padding: 18px 12px; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 45%, var(--bg)); }
 .list { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 0; list-style: none; }
-.ticket-row { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 15px 12px; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
-.ticket-row:hover:not(:disabled) { background: var(--surface); }
-.ticket-row.active { background: var(--bg); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); box-shadow: inset 3px 0 var(--accent); }
-.ticket-row:disabled { opacity: .65; cursor: default; }
+.ticket-row { gap: 8px; padding: 15px 12px; }
 .row-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: .7em; }
 .title { font-size: .9em; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
 .badge { padding: 1px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: .9em; color: var(--muted); }
@@ -469,7 +466,6 @@ button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12
   .new-ticket { min-height: 44px; }
   .list-controls { gap: 8px; }
   .tickets .sort-control select { max-width: 135px; padding-inline: 7px; min-height: 44px; }
-  .tickets .search-control input { font-size: max(1em, 16px); }
   .status-filters :deep(button.segment) { min-height: 44px; padding-inline: 9px; }
   .ticket-browser { border-right: 0; padding: 16px 12px; }
   .ticket-workspace.reading .ticket-browser, .ticket-workspace:not(.reading) .placeholder { display: none; }

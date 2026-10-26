@@ -16,6 +16,7 @@ import {
   type TagSuggestions,
 } from "./api/NotesClient";
 import { ApiError } from "../../api/http";
+import ListRow from "../../components/ui/lists/ListRow.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import "../../components/layout/infoPage.css";
 import TagInput from "../../components/ui/forms/TagInput.vue";
@@ -336,13 +337,13 @@ function preview(note: Note): string {
           <p v-if="notes.length === 0 && selected !== NEW" class="muted empty">You have no notes yet.</p>
           <ul v-else class="list" aria-label="Notes">
             <li v-if="selected === NEW">
-              <button type="button" class="note-row active" aria-current="true">
+              <ListRow class="note-row" active>
                 <span class="title">{{ form.title.trim() || "New note" }}</span>
                 <span class="muted">Not saved yet</span>
-              </button>
+              </ListRow>
             </li>
             <li v-for="n in notes" :key="n.id">
-              <button type="button" :class="['note-row', { active: n.id === selected }]" :aria-current="n.id === selected" :disabled="saving || removing" @click="go(n.id)">
+              <ListRow class="note-row" :active="n.id === selected" :disabled="saving || removing" @click="go(n.id)">
                 <span class="title">{{ n.id === selected && form.title.trim() ? form.title.trim() : n.title }}</span>
                 <span v-if="preview(n)" class="snippet">{{ preview(n) }}</span>
                 <span v-if="n.tags.length || n.agent_readable || n.last_editor === 'agent'" class="row-tags">
@@ -351,7 +352,7 @@ function preview(note: Note): string {
                   <span v-if="n.last_editor === 'agent'" class="tag agent-mark">Agent edit</span>
                 </span>
                 <span class="muted">{{ formatUtc(n.updated_at) }}</span>
-              </button>
+              </ListRow>
             </li>
           </ul>
           <details v-if="selected === null" class="library-publishing">
@@ -547,9 +548,6 @@ function preview(note: Note): string {
 .list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .empty { padding: 8px 10px; font-size: .9em; }
 .new-note { flex-shrink: 0; min-height: 40px; }
-.note-row { display: flex; flex-direction: column; gap: 7px; width: 100%; padding: 14px 12px; border: 1px solid transparent; border-radius: var(--radius-md); color: var(--text); background: transparent; font: inherit; font-size: .9em; text-align: left; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
-.note-row:hover { background: var(--surface); }
-.note-row.active { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--bg); box-shadow: inset 3px 0 var(--accent); }
 .title { font-weight: 600; overflow-wrap: anywhere; }
 .snippet { color: var(--muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .note-row .muted { font-size: .8em; }

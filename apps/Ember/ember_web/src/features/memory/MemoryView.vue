@@ -4,6 +4,8 @@ import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBeforeRouteLeave, routerKey } from "vue-router";
 import { MEMORY_MAX, MEMORY_TEXT_MAX, memoryClient, type MemoryNote } from "./api/MemoryClient";
+import ListRow from "../../components/ui/lists/ListRow.vue";
+import SearchField from "../../components/ui/lists/SearchField.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import "../../components/layout/infoPage.css";
 import { errorMessage } from "../../utils/errors";
@@ -149,14 +151,14 @@ async function remove(): Promise<void> {
       >
         <template #list>
           <div class="list-heading"><span>All memories</span><span>{{ memories.length }}/{{ MEMORY_MAX }}</span></div>
-          <label class="memory-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg><input v-model="query" type="search" aria-label="Search memories" placeholder="Search memories…" /></label>
+          <SearchField v-model="query" class="memory-search" label="Search memories" placeholder="Search memories…" />
           <div class="list-scroll">
             <div class="memory-list" aria-label="Saved memories">
-              <article v-if="editorOpen && !editing" class="draft-row"><button type="button" class="memory-row active" aria-current="true" :disabled="saving || removing" @click="openEditor()"><span class="memory-text">New memory</span><span class="memory-date">Not saved yet</span></button></article>
+              <article v-if="editorOpen && !editing" class="draft-row"><ListRow class="memory-row" active :disabled="saving || removing" @click="openEditor()"><span class="memory-text">New memory</span><span class="memory-date">Not saved yet</span></ListRow></article>
               <article v-for="memory in shown" :key="memory.id">
-                <button type="button" :class="['memory-row', { active: editorOpen && editing?.id === memory.id }]" :aria-current="editorOpen && editing?.id === memory.id" :aria-label="'Edit memory ' + memory.id" :aria-describedby="'memory-summary-' + memory.id" :disabled="saving || removing" @click="openEditor(memory)">
+                <ListRow class="memory-row" :active="editorOpen && editing?.id === memory.id" :aria-label="'Edit memory ' + memory.id" :aria-describedby="'memory-summary-' + memory.id" :disabled="saving || removing" @click="openEditor(memory)">
                   <span :id="'memory-summary-' + memory.id" class="memory-text">{{ memory.text }}</span><span class="memory-date">Created <time :datetime="memory.created_at">{{ new Date(memory.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) }}</time></span>
-                </button>
+                </ListRow>
               </article>
             </div>
             <div v-if="memories.length === 0 && !(editorOpen && !editing)" class="empty"><h3>No saved memories yet.</h3><p>Add a useful fact, preference, or instruction for Ember to remember.</p></div>
@@ -190,15 +192,9 @@ async function remove(): Promise<void> {
 <style scoped>
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 
-.memory-search { display: flex; align-items: center; gap: 7px; padding: 8px 9px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); flex-shrink: 0; }
-.memory-search svg { width: 16px; height: 16px; color: var(--muted); }
-.memory-search input { min-width: 0; width: 100%; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: .8em; }
-.memory-search:focus-within { border-color: var(--accent); }
+.memory-search { margin-bottom: 12px; flex-shrink: 0; }
 .list-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 .memory-list { display: flex; flex-direction: column; gap: 6px; }
-button.memory-row { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 7px; width: 100%; padding: 14px 12px; border: 1px solid transparent; border-radius: var(--radius-md); color: var(--text); background: transparent; font: inherit; font-size: .9em; text-align: left; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
-button.memory-row:hover { background: var(--surface); }
-button.memory-row.active { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--bg); box-shadow: inset 3px 0 var(--accent); }
 .memory-text { font-weight: 500; overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .memory-date { color: var(--muted); font-size: .75em; }
 .pagination { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 16px 10px 0; font-size: .75em; color: var(--muted); }
@@ -210,7 +206,7 @@ button.memory-row.active { border-color: color-mix(in srgb, var(--accent) 45%, v
 .empty p { margin: 0 0 12px; }
 .context-label { display: inline-flex; align-items: center; gap: 7px; font-size: .8em; color: var(--muted); }
 .context-label svg { width: 15px; height: 15px; }
-.context-label svg, .memory-search svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.context-label svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; min-height: 310px; padding: 30px 36px 20px; }
 .memory-label { font-size: 1.35em; font-weight: 600; letter-spacing: -.015em; }
 .writing textarea { flex: 1; width: 100%; min-width: 0; min-height: 200px; padding: 0; border: 0; border-radius: 0; color: var(--text); background: transparent; font: inherit; line-height: 1.9; resize: vertical; }
@@ -231,7 +227,6 @@ summary span { color: var(--muted); }
   .memory :deep(.page-description) { display: none; }
   .memory.memory-open :deep(.page-head) { display: none; }
   .memory :deep(.page-actions button) { min-height: 44px; }
-  .memory-search { min-height: 44px; }
   button.memory-row { min-height: 100px; }
   .writing { min-height: 310px; padding: 24px 20px 18px; }
   .writing textarea { min-height: 250px; }
