@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useNarrow } from "../../composables/useNarrow";
 import RetentionNote from "../../components/ui/status/RetentionNote.vue";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
@@ -17,11 +18,7 @@ import { usePlanStore } from './stores/plan'
 import { useAuthStore } from '../../stores/auth'
 const files = useFilesStore()
 const plan = usePlanStore()
-const narrow = ref(window.matchMedia?.('(max-width: 767px)').matches ?? false)
-const mediaQuery = window.matchMedia?.('(max-width: 767px)')
-function updateViewport(event: MediaQueryListEvent): void { narrow.value = event.matches }
-onMounted(() => mediaQuery?.addEventListener?.('change', updateViewport))
-onBeforeUnmount(() => mediaQuery?.removeEventListener?.('change', updateViewport))
+const narrow = useNarrow()
 const auth = useAuthStore()
 const mode = ref<'pages' | 'files'>('pages')
 const outputOpen = ref(false)

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useNarrow } from "../../composables/useNarrow";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
@@ -20,11 +21,7 @@ import { formatBytes, formatExpiry } from './utils/format'
 import type { FileInfo } from './api/MediaDownloaderTypes'
 
 const store = useMediaDownloaderStore()
-const narrow = ref(window.matchMedia?.('(max-width: 767px)').matches ?? false)
-const mediaQuery = window.matchMedia?.('(max-width: 767px)')
-function updateViewport(event: MediaQueryListEvent): void { narrow.value = event.matches }
-onMounted(() => mediaQuery?.addEventListener?.('change', updateViewport))
-onBeforeUnmount(() => mediaQuery?.removeEventListener?.('change', updateViewport))
+const narrow = useNarrow()
 const auth = useAuthStore()
 const now = ref(Date.now() / 1000)
 const tab = ref<'download' | 'groups' | 'files'>('download')
