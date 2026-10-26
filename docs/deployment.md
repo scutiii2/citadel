@@ -12,7 +12,7 @@ Citadel runs as containers from one `docker-compose.yml`:
 | `treasury` | database gateway | internal 8071 |
 
 Only the two web apps publish ports. The rest talk over the internal `core` network. Laya is not in this stack: it runs
-from the separate `LayaAgent` project (see "Laya" below) and garrison reaches it as `http://laya_lb:9120`.
+from the separate `LayaModel` project (see "Laya" below) and garrison reaches it as `http://laya_lb:9120`.
 
 ## 1. Local (Windows, macOS, Linux with Docker Desktop or Engine)
 
@@ -78,10 +78,10 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    Already cloned `main`? Switch in place; the containers keep running:
    `git fetch origin live && git switch -c live --track origin/live`.
 
-2. **Deploy `LayaAgent` separately** (it is its own project and Citadel's compose does not start it). Start the Citadel
-   stack first: it creates the `citadel_core` network. Then run `docker compose up -d --build` in the `LayaAgent`
-   folder (`/media/ZimaOS-HD/Apps/LayaAgent`). Its `laya_lb` joins `citadel_core`, so garrison reaches it as
-   `http://laya_lb:9120`. See `LayaAgent/deployment.md` for replicas, port and weights.
+2. **Deploy `LayaModel` separately** (it is its own project and Citadel's compose does not start it). Start the Citadel
+   stack first: it creates the `citadel_core` network. Then run `docker compose up -d --build` in the `LayaModel`
+   folder (`/media/ZimaOS-HD/Apps/LayaModel`). Its `laya_lb` joins `citadel_core`, so garrison reaches it as
+   `http://laya_lb:9120`. See `LayaModel/deployment.md` for replicas, port and weights.
 
 3. **Create the `.env` files.** They are gitignored, so `live` does not hold them and `git pull` never touches them.
    The simplest way is deploy option 2, which copies yours from the PC. To create them by hand, run from the Citadel
@@ -106,14 +106,14 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | File | Keys to fill in |
    |---|---|
    | `apps/armory/.env` | Only the capability keys you use: `SMTP_PASSWORD`, `TEAMS_WEBHOOK_URL`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://garrison:9111/mcp` to group tickets with the triage agent) |
-   | `apps/garrison/.env` | `CLAUDE_API_KEY`, or the keys of the gateway your agents use; `HF_TOKEN` if used; `LAYA_TOKEN` (must equal the one in `LayaAgent`'s `.env`) |
+   | `apps/garrison/.env` | `CLAUDE_API_KEY`, or the keys of the gateway your agents use; `HF_TOKEN` if used; `LAYA_TOKEN` (must equal the one in `LayaModel`'s `.env`) |
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
    | `apps/Ember/ember_api/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
 
    - The root token reaches every service and overrides any `INTERNAL_API_TOKEN` in a per-app file.
    - Skip `MCP_HOST`, `MCP_PORT`, `LAYA_SERVICE_URL` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. Do
      not use `localhost` for another service.
-   - **Laya settings** (`LAYA_TOKEN`, `LAYA_REPLICAS`, `LAYA_PORT`) belong in `LayaAgent`'s own `.env`, not here. Each
+   - **Laya settings** (`LAYA_TOKEN`, `LAYA_REPLICAS`, `LAYA_PORT`) belong in `LayaModel`'s own `.env`, not here. Each
      replica loads its own copy of the models in RAM, so keep `LAYA_REPLICAS` low on a small box.
    - `apps/Ember/ember_api/.env` must exist before the first start. Compose bind-mounts it, and if it is missing Docker
      creates a directory in its place and ember_api fails. ember_api writes `EMBER_SECRETS_KEY` into it, so keep it
@@ -227,7 +227,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 | Symptom | Cause and fix |
 |---|---|
 | `set INTERNAL_API_TOKEN in .env` | The root `.env` is missing or empty. |
-| garrison cannot reach Laya | LayaAgent is not running, or it started before Citadel and could not join `citadel_core`. Start Citadel, then run `docker compose up -d` in `LayaAgent`. |
+| garrison cannot reach Laya | LayaModel is not running, or it started before Citadel and could not join `citadel_core`. Start Citadel, then run `docker compose up -d` in `LayaModel`. |
 | `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
 | `scp` will not log in | Check `DEPLOY_HOST` and that the folder exists. Run `ssh <host>` by hand to test. |
 | `openssl: command not found` | Use the `/dev/urandom` command in first-time setup, step 3. A failed `echo` leaves an empty `.env`, so run it again. |

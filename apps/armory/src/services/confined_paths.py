@@ -1,11 +1,5 @@
 """Read files only inside one folder, and never a secret.
-
-A caller hands a tool a relative path. `ConfinedRoot` turns it into a real
-path or refuses: no absolute paths, no `..`, no symlink that leads outside
-the root, and nothing whose name marks a secret or a build folder (the
-workspace rule: never read `secrets/`, `.secrets/`, `.env*` or key files).
-Used by every capability that reads a folder it does not own.
-"""
+`ConfinedRoot` refuses absolute paths, `..`, symlinks leaving the root, and names marking a secret or build folder."""
 
 from __future__ import annotations
 

@@ -1,10 +1,5 @@
-"""Which URLs the service may fetch: public http(s) hosts only.
-
-yt-dlp fetches whatever it is given, and an LLM agent can call the MCP tool,
-so private and loopback targets must be refused (SSRF). The host is resolved
-here and every resulting address must be public. Redirects and DNS answers
-that change later are covered by socket_guard.py.
-"""
+"""Which URLs the service may fetch: public http(s) hosts only (SSRF guard).
+The host is resolved here and every address must be public; redirects are covered by socket_guard.py."""
 
 from __future__ import annotations
 
@@ -36,10 +31,7 @@ def _embedded_ipv4(address: ipaddress.IPv6Address) -> ipaddress.IPv4Address | No
 
 
 def is_public_ip(ip: str) -> bool:
-    """True only for globally routable unicast addresses.
-
-    IPv4 embedded in IPv6 (mapped ::ffff:0:0/96, NAT64 64:ff9b::/96, compatible ::/96) is unwrapped first.
-    """
+    """True only for globally routable unicast addresses; IPv4 embedded in IPv6 is unwrapped first."""
     try:
         address = ipaddress.ip_address(ip.split("%", 1)[0])
     except ValueError:

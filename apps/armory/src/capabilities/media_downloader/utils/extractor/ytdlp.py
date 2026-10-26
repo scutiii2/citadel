@@ -1,17 +1,5 @@
-"""yt-dlp behind the Extractor protocol.
-
-Every network call runs inside ``guard.active()`` so redirects and DNS answers
-to private addresses are refused. yt-dlp's exceptions are mapped to stable
-error codes; their raw text goes to the log only.
-
-External downloaders (ffmpeg, rtmpdump, aria2c, curl, ...) open their own
-sockets, which the guard can't see, and report no byte progress, so the byte
-cap and cancel would not apply either. yt-dlp uses ffmpeg to fetch live
-streams and HLS manifests its native downloader can't handle. Live streams are
-refused up front (``live_stream``); anything else that would reach an external
-downloader fails closed (``blocked_host``). Merging and audio conversion run
-ffmpeg on local files as post-processors and are unaffected.
-"""
+"""yt-dlp behind the Extractor protocol; every network call runs inside ``guard.active()``.
+External downloaders open unguarded sockets, so live streams are refused (``live_stream``) and the rest fail closed (``blocked_host``)."""
 
 from __future__ import annotations
 
@@ -79,10 +67,7 @@ def _refusing(original: Callable) -> Callable:
 
 def _install_external_refusal() -> None:
     """Wrap real_download of every downloader that runs its own network client (idempotent).
-
-    ExternalFD covers FFmpegFD and its subclasses plus aria2c/curl/wget/httpie; RtmpFD runs rtmpdump.
-    Threads outside ``refuse_external_downloaders()`` are unaffected.
-    """
+    Threads outside ``refuse_external_downloaders()`` are unaffected."""
     for cls in (ExternalFD, RtmpFD):
         current = cls.__dict__["real_download"]
         if not getattr(current, "_vd_refusing", False):
@@ -94,10 +79,7 @@ _install_external_refusal()
 
 def _match_filter(max_duration_seconds: float | None) -> Callable:
     """yt-dlp match_filter: refuse live streams and over-long media on the download's own extraction.
-
-    Raising (instead of returning a skip reason) aborts extract_info with a clear error; a skip
-    would return an info dict with no file and surface as extractor_failed.
-    """
+    Raises instead of skipping, which would surface as extractor_failed."""
 
     def check(info: dict, incomplete: bool = False) -> None:
         if info.get("is_live") or info.get("live_status") in LIVE_STATUSES:
@@ -166,10 +148,7 @@ def map_error(exc: Exception, *, blocked: bool) -> DownloaderError:
 
 
 def _final_path(info: dict, work_dir: Path) -> Path:
-    """The finished file: yt-dlp reports it, else the single non-temporary file in work_dir.
-
-    A reported path is used only if it resolves inside work_dir.
-    """
+    """The finished file: yt-dlp's reported path (if inside work_dir), else the single non-temporary file there."""
     root = work_dir.resolve()
     for item in info.get("requested_downloads") or []:
         path = item.get("filepath")
@@ -286,9 +265,8 @@ class YtDlpExtractor:
             "postprocessor_hooks": [postprocessor_hook],
             "match_filter": _match_filter(max_duration_seconds),
             "noprogress": True,
-            # No "max_filesize": yt-dlp's HTTP downloader then quietly skips an oversized file
-            # (returns False, no exception), which would surface as extractor_failed. The hook
-            # above enforces the cap instead and raises a clear too_large.
+            # No "max_filesize": yt-dlp would silently skip an oversized file (extractor_failed).
+            # The hook above enforces the cap and raises too_large instead.
             **_format_options(preset),
         }
         with self._guarded():

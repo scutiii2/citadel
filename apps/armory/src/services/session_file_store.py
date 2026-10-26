@@ -1,13 +1,5 @@
 """Session-scoped files on disk with an in-memory index, shared by pdf_merger and media_downloader.
-
-Layout: <root>/<sha256(session)[:32]>/<file_id> plus a <file_id>.json sidecar holding the stored-file
-record, so the index can be rebuilt after a restart. Session strings are hashed so "mcp:alice" or
-anything a caller sends can never become a raw path. The user's file name is metadata only.
-
-One instance per process. Index mutations happen on the event loop thread; disk I/O goes through
-asyncio.to_thread so the loop never blocks. A capability subclasses this with its own stored-file
-dataclass (``file_class``), its own way of writing a file in, and its own errors.
-"""
+Layout: <root>/<sha256(session)[:32]>/<file_id> plus a .json sidecar; one instance per process, disk I/O off the loop; capabilities subclass it via ``file_class``."""
 
 from __future__ import annotations
 

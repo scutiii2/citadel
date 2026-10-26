@@ -1,10 +1,5 @@
-"""Reads and writes ember's notes in db_gateway (one instance and connection, over HTTP).
-
-ember_api owns the notes and its Notes page; this is the agents' side door. The record shape
-is ember_api's (`apps/Ember/ember_api/src/services/notes.py`): collection "notes", key a
-32-hex id, fields id, owner, title, body, tags, agent_readable, created_at, updated_at. A note
-an agent wrote also carries `last_editor: "agent"`, which ember_api keeps as it is.
-"""
+"""Reads and writes ember's notes in db_gateway over HTTP.
+Record shape is ember_api's (`apps/Ember/ember_api/src/services/notes.py`); agent-written notes carry `last_editor: "agent"`."""
 
 from __future__ import annotations
 

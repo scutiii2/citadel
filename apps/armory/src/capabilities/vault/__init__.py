@@ -1,5 +1,11 @@
 """Vault: search and read the Obsidian vault, read-only."""
 
-from src.services import capability_meta
+from src.services.capability_base import Capability
 
-META = capability_meta.register(folder="vault", id="vault", label="Vault")
+
+class Vault(Capability):
+    id = "vault"
+    label = "Vault"
+
+
+CAPABILITY = Vault()

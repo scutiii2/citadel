@@ -1,9 +1,5 @@
-"""The converter contract. Every input type becomes a PDF before assembly.
-
-Adding a type (for example Word documents via LibreOffice) means one new
-class implementing SourceConverter plus one line in registry.py. Nothing
-else changes.
-"""
+"""The converter contract: every input type becomes a PDF before assembly.
+A new type is one SourceConverter class plus one line in registry.py."""
 
 from __future__ import annotations
 

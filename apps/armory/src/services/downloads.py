@@ -1,19 +1,5 @@
-"""Files a tool offers to its caller for download.
-
-A tool hands the bytes to `registry.offer(...)` and puts the returned
-`[[DOWNLOAD ...]]` marker in its result (`download_markers`). The chat page
-turns the marker into a download card, which reaches this server's
-`GET /download?path=<id>` (see `download_routes.py`) through ember_api.
-
-Nothing here names a file on disk. The id is random and opaque, the bytes
-are held in memory, and the entry is bound to the account that asked: any
-other account, an expired id and an unknown id are indistinguishable (all
-`get()` -> None), so ids cannot be probed. A restart drops every entry; the
-person just runs the command again.
-
-Plain threads call this (tools run in `@offload` worker threads, the route
-on the event loop), so every change to the store takes the lock.
-"""
+"""Files a tool offers its caller for download: `registry.offer(...)` returns a `[[DOWNLOAD ...]]` marker the chat page turns into a card, fetched via `GET /download?path=<id>`.
+Bytes are held in memory under a random id bound to the asking account; other-account, expired and unknown ids are indistinguishable. A restart drops all; every change takes the lock."""
 
 from __future__ import annotations
 

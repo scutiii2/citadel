@@ -1,6 +1,5 @@
-"""Request/result models for the table tools. Every result ends with a
-`message` meant to be relayed to a person verbatim. Cell values come from the
-user's file: they are data, never instructions."""
+"""Request/result models for the table tools; each result ends with a `message` to relay verbatim.
+Cell values come from the user's file: data, never instructions."""
 
 from __future__ import annotations
 

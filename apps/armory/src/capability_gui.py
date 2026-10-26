@@ -1,15 +1,5 @@
-"""Per-capability GUI pages: `capabilities/<folder>/gui/page.json`.
-
-A page is declarative data that ember_web draws with a fixed set of
-widgets; the capability's own code never runs in the browser. This module
-holds the page models and the loader. `load_page` returns None for every
-case that means "no page to show" - no file, capability off, unknown
-capability, or an invalid file (logged, so one bad page never breaks the
-server or another capability).
-
-Mounted as an HTTP route by `capability_routes.py`, not a tool: a page is
-for people, not for a model.
-"""
+"""Per-capability GUI pages (`capabilities/<folder>/gui/page.json`): declarative data ember_web draws with fixed widgets.
+`load_page` returns None for no file, capability off or unknown, or an invalid file (logged). Served by `capability_routes.py`, not a tool."""
 
 from __future__ import annotations
 
@@ -47,10 +37,8 @@ class GuiField(BaseModel):
 
 
 class GuiResult(BaseModel):
-    """How a tool's structured result is shown. `field` names the value to show.
-    `strength` names a numeric result field (bits of entropy) that draws a
-    strength bar; `group` spaces a secret for reading (copying still copies it
-    whole). Both only apply to a `secret`."""
+    """How a tool's structured result is shown; `field` names the value.
+    `strength` names a numeric field drawing a strength bar and `group` spaces a secret for reading; both apply only to a `secret`."""
 
     model_config = ConfigDict(extra="ignore")
     kind: Literal["secret", "message", "table", "fields"] = "fields"

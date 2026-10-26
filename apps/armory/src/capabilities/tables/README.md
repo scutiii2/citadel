@@ -6,8 +6,8 @@ Chat id `data`, label "Data Tables".
 ## How a file gets here
 
 `ember_web` uploads an attached `.csv` / `.xlsx` through `ember_api` to `POST /upload/table` (`upload_routes.py`,
-internal token required). `services/table_loader.py` parses the whole file once into typed columns;
-`services/tables.py` keeps it in memory under a random id, bound to the requesting account. Nothing is written to disk.
+internal token required). `utils/table_loader.py` parses the whole file once into typed columns;
+`utils/tables.py` keeps it in memory under a random id, bound to the requesting account. Nothing is written to disk.
 A restart, or 30 minutes, drops the table: attach the file again.
 
 ## Tools

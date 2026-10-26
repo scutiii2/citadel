@@ -26,14 +26,14 @@ where that logic lives instead.
 - **`ssh.py`** - `SSHClient`, the one paramiko-connecting code path in
   this server. Host-key verification, auth fallback (key then
   password), and command execution all go through here.
-- **`email.py`** - `send_email()`, stdlib `smtplib` wrapper supporting
+- **`email/send.py`** - `send_email()`, stdlib `smtplib` wrapper supporting
   the three transports `config_email.json`'s `"security"` can name
   (`starttls` / `ssl` / `none`). Subjects go out as
   `[EMBER] <subject>` and every message ends with an
   auto-generated notice.
-- **`email_render.py`** + **`email_templates/`** - HTML body templates
+- **`email/render.py`** + **`email/templates/`** - HTML body templates
   (`notification`, `approval`) for `send_email()`; see
-  `email_templates/README.md` for placeholders and how to add one.
+  `email/templates/README.md` for placeholders and how to add one.
 - **`downloads.py`** - `DownloadRegistry`: files a tool offers its caller
   for download, held in memory for 10 minutes under a random id and bound
   to the asking account (never a path on disk). A tool calls
@@ -56,14 +56,19 @@ where that logic lives instead.
 - **`link_signing.py`**, **`file_sweeper.py`** - HMAC-signed expiring
   download links (`LinkSigner`) and the background sweep loop
   (`run_sweeper`), used by both capabilities.
-- **`media_downloads.py`**, **`pdf_runtime.py`** - the process-wide
-  runtime each of the two file capabilities owns on a dedicated event loop.
+- **`email/delivery.py`**, **`email/audit.py`**, **`email/recipients.py`** -
+  the delivery path, send audit log and watcher recipient list the email,
+  generator and server_manager capabilities share.
+
+Code only one capability uses does not live here: its stores, runtimes and
+HTTP routes sit in that capability's folder (`utils/`, `routes.py`), e.g.
+`capabilities/tickets/` or `capabilities/pdf_merger/utils/pdf_runtime.py`.
 
 ## Adding a new services client
 
 Only add a module here if more than one capability needs it, or if it's
 a new kind of external connection (a new protocol, a new kind of
 credential) - a client only one capability uses belongs in that
-capability's own `domain.py` instead. Follow `ssh.py`'s or `email.py`'s
+capability's own `domain.py` instead. Follow `ssh.py`'s or `email/send.py`'s
 shape: a small, typed surface that raises rather than swallowing errors,
 so a capability's `domain.py` can decide what a failure means for it.

@@ -32,7 +32,7 @@ def tool_email_sendEmail(to: Recipients, subject: Subject, body_text: Text = Non
     thread. SMTP acceptance does not guarantee inbox delivery. Never retry automatically
     after an ambiguous failure. Bodies are not kept in this capability's audit log.
     """
-    return domain.send(to, subject, body_text, body_html, capability_alias, prefix_subject)
+    return domain.desk.send(to, subject, body_text, body_html, capability_alias, prefix_subject)
 
 
 @command(name="reply", description="Send a reply in an email thread")
@@ -47,7 +47,7 @@ def tool_email_replyEmail(to: Recipients, subject: Subject, in_reply_to: Parent,
     Use the same recipients, subject and prefix choice as the original email.
     Uses MCP SMTP configuration; never ask for credentials or automatically retry.
     """
-    return domain.reply(to, subject, in_reply_to, body_text, body_html,
+    return domain.desk.reply(to, subject, in_reply_to, body_text, body_html,
                         capability_alias, prefix_subject, references)
 
 
@@ -57,4 +57,4 @@ def tool_email_replyEmail(to: Recipients, subject: Subject, in_reply_to: Parent,
 @offload
 def tool_email_getAuditLog(limit: Annotated[int, Field(description="Newest delivery records to return.", ge=1, le=200)] = 50) -> AuditResult:
     """Return only the authenticated requester's delivery metadata; never bodies or codes."""
-    return domain.audit(limit)
+    return domain.desk.audit(limit)

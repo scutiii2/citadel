@@ -30,4 +30,4 @@ def tool_usage_summary(
     Counts every answer an agent gave, including work delegated to it. The
     log folder comes from config; do not ask the user for it. Report tokens
     only - there is no price data here."""
-    return domain.summarize(settings.usage_dir, days, group_by)
+    return domain.desk.summarize(settings.usage_dir, days, group_by)

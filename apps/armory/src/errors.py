@@ -1,17 +1,5 @@
-"""Turning an unexpected exception into something safe to show.
-
-Mirrors chat_app/src/errors.py - see that module's docstring
-for the full reasoning. Short version: ``str(exc)`` is written for a
-traceback reader, not for whoever ends up looking at a page built from
-it, and routinely contains filesystem paths, hostnames, or credentials.
-Here that matters for HTTP failure pages in particular -
-reachable by clicking a link in an email, so not necessarily read by
-whoever wrote the code that raised.
-
-Two places hold the detail: the combined server.log (via the logger
-below, once utils.logging_setup.configure_logging() has wired it to
-disk) and a standalone file per reference under log_dir/errors/.
-"""
+"""Turn an unexpected exception into something safe to show; mirrors chat_app/src/errors.py.
+`str(exc)` can leak paths, hostnames or credentials, so detail goes only to server.log and a per-reference file under log_dir/errors/."""
 
 from __future__ import annotations
 

@@ -1,16 +1,12 @@
-"""The one kind of email a ServerWatcher sends, to its owner only.
-
-Returns an outcome string instead of raising, because a watcher thread must keep
-going whether or not mail works: "sent", "skipped: <reason>" or "failed: <reason>".
-The shared Email capability owns the enabled check, configuration and SMTP delivery.
-"""
+"""The one email a ServerWatcher sends, to its owner only.
+Returns "sent", "skipped: <reason>" or "failed: <reason>" instead of raising, so the watcher keeps going."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from src.services.email_delivery import EmailUnavailable, deliver_email
-from src.services.email_render import render_email_template
+from src.services.email.delivery import EmailUnavailable, deliver_email
+from src.services.email.render import render_email_template
 
 
 def send_owner_email(

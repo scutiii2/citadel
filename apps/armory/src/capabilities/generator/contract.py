@@ -1,8 +1,5 @@
-"""Result models for the generator tools. Every result ends with a
-`message` meant to be relayed to a person verbatim.
-
-When a tool is given `email_to`, the generated value is emailed and left out
-of the result: its fields are None and `emailed_to` names the recipients."""
+"""Result models for the generator tools; each ends with a `message` to relay verbatim.
+With `email_to`, the value is emailed and its fields are None."""
 
 from __future__ import annotations
 

@@ -1,30 +1,5 @@
-"""Per-request caller identity for audit trails - read out-of-band (HTTP
-headers) rather than as a declared tool parameter.
-
-Why not a tool parameter: a value the tool schema declares is something
-any MCP caller can set, including an LLM deciding its own tool-call
-arguments - which defeats the point of an audit trail meant to say who
-actually asked. chat_app is the only caller expected to send these headers
-today (see chat_app/src/services/commands.py's _IDENTITY_INJECTED_TOOLS),
-attached on the underlying MCP HTTP call, never typed by the end user or
-exposed in any tool's inputSchema. A caller that doesn't send them (a
-different MCP client, or the LLM Q&A/ai_agent path, which doesn't thread
-end-user identity today) just gets "" back from the getters below - never
-an error.
-
-IdentityContextMiddleware sets the contextvars for the lifetime of each
-HTTP request; a domain function anywhere downstream reads them with
-current_username()/current_email()/current_uid() instead of accepting the identity as an
-argument.
-
-ai_agent calls this server over ONE long-lived MCP session shared by every
-user, so it can't use per-session headers. It puts the asking user in each
-tools/call request's `_meta` instead (`{"requester": {"username", "email", "uid"}}`),
-set by ai_agent's own code, never by the model. The getters fall back to
-that when no header was sent. Both paths are only as trustworthy as the
-caller, which is why /mcp requires the internal token once one is
-configured (see internal_token.py).
-"""
+"""Per-request caller identity for audit trails, read from HTTP headers rather than a tool parameter, which an LLM could set.
+IdentityContextMiddleware sets contextvars read via current_username()/current_email()/current_uid(); ai_agent's shared session sends it in each call's `_meta` instead. Both are only as trustworthy as the caller (see internal_token.py)."""
 
 from __future__ import annotations
 
@@ -69,13 +44,8 @@ def current_uid() -> str:
 
 
 class IdentityContextMiddleware:
-    """Plain ASGI middleware (not Starlette's BaseHTTPMiddleware, which
-    runs the downstream app in a separate task and would need its own
-    context-propagation care) - reads the identity headers straight off
-    the incoming ASGI scope and sets the contextvars for exactly this
-    request's task before calling through, resetting them again on the
-    way out.
-    """
+    """Plain ASGI middleware (not BaseHTTPMiddleware, which runs the app in a separate task).
+    Reads the identity headers off the scope, sets the contextvars for this request and resets them on exit."""
 
     def __init__(self, app):
         self.app = app

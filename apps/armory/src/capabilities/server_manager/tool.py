@@ -1,6 +1,5 @@
-"""MCP tool wrappers for the server_manager capability - thin on purpose.
-The start, stop and restart tools also manage the app's ServerWatcher.
-No config: call the domain function, return its result."""
+"""MCP tool wrappers for the server_manager capability; thin, no config.
+Start, stop and restart also manage the app's ServerWatcher."""
 
 from __future__ import annotations
 
@@ -30,7 +29,7 @@ def tool_srv_startApp(name: AppName) -> AppActionResult:
     shows them all up front. Starting an app also starts a watcher that
     emails the person who started it if the app stops, disappears or logs
     errors."""
-    result = domain.start_app(name)
+    result = domain.desk.start_app(name)
     watch_app(name)
     return result
 
@@ -41,7 +40,7 @@ def tool_srv_stopApp(name: AppName) -> AppActionResult:
     """Stop a running Docker app hosted on this box. The app stays stopped
     until started again; the container and its data are not removed. Its
     watcher ends too, so a deliberate stop sends no email."""
-    return pause_watch(name, lambda: domain.stop_app(name))
+    return pause_watch(name, lambda: domain.desk.stop_app(name))
 
 @command(name="restart", description="Restart an app")
 @mcp.tool(meta={"keywords": ["server", "app", "container", "docker", "restart"], "display_label": "Restarting app"})
@@ -50,7 +49,7 @@ def tool_srv_restartApp(name: AppName) -> AppActionResult:
     """Restart a Docker app hosted on this box - stop, then start. Works
     whether the app is running or already stopped. The app is watched again
     afterwards (see `tool_srv_startApp`)."""
-    result = pause_watch(name, lambda: domain.restart_app(name))
+    result = pause_watch(name, lambda: domain.desk.restart_app(name))
     watch_app(name)
     return result
 
@@ -68,7 +67,7 @@ def tool_srv_getAppLogs(
     link works for 10 minutes and only for the person who asked). The log is
     not shown here - say the file is ready. `tool_srv_listApps` shows the
     exact `name`."""
-    return domain.get_app_logs(name, lines)
+    return domain.desk.get_app_logs(name, lines)
 
 
 # MCP-only (no @command): the log text is meant for the assistant to analyse.
@@ -91,7 +90,7 @@ def tool_srv_readAppLogs(
     only matching lines come back (searched in the newest 5000 lines). Read-only.
     `tool_srv_listApps` shows the exact `name`. To give the person a file
     instead, use `tool_srv_getAppLogs`."""
-    return domain.read_app_logs(name, lines, contains)
+    return domain.desk.read_app_logs(name, lines, contains)
 
 
 @command(name="list", description="List apps")
@@ -102,4 +101,4 @@ def tool_srv_listApps() -> AppListResult:
     `name` to pass to the start/stop/restart tools, its status, image and
     whether it is watched (a watcher emails its owner if the app stops,
     disappears or logs errors; one starts whenever an app is started here)."""
-    return domain.list_apps()
+    return domain.desk.list_apps()

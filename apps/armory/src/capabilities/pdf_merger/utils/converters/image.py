@@ -1,10 +1,5 @@
 """Images become one-page PDFs through img2pdf.
-
-JPEGs are embedded byte for byte (lossless); their EXIF orientation is
-applied as the page's /Rotate, not by re-encoding. Every other format is
-flattened to RGB (alpha onto white) and handed over as PNG, which img2pdf
-also embeds without loss. Multi-frame GIF/TIFF use the first frame.
-"""
+JPEGs embed losslessly with EXIF orientation as /Rotate; other formats are flattened to RGB and sent as PNG."""
 
 from __future__ import annotations
 

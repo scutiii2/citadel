@@ -12,4 +12,4 @@ The reusable gateway and path guard are catalog-tagged. No runtime state is stor
 defines the local embedder boundary and Ollama implementation. `index_store.py`
 defines the store boundary with SQLite FTS5/sqlite-vec persistence. `index.py`
 owns incremental scanning and hybrid ranking. The process-owned periodic worker
-lives in `src/services/obsidian_index.py` so capability reloads do not duplicate it.
+lives in `src/capabilities/obsidian/utils/obsidian_index.py` so capability reloads do not duplicate it.

@@ -1,9 +1,5 @@
 """Public single-post photos, with gallery-dl used only for URL discovery.
-
-All HTTP stays in requests on the guarded thread. No gallery jobs, subprocesses,
-user config, login cookies or gallery downloaders are used. Multi-photo posts
-become a numbered ZIP so they fit the existing one-job/one-file contract.
-"""
+All HTTP stays in requests on the guarded thread; multi-photo posts become a numbered ZIP."""
 from __future__ import annotations
 
 import zipfile

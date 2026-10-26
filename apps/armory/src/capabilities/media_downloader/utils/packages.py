@@ -1,8 +1,5 @@
-"""Owned draft packages. All mutations run on the download runtime's event loop.
-
-One package is one bounded queue job; members run sequentially under that slot.
-Drafts and job history are process-local, like the existing queue. Only ZIPs persist.
-"""
+"""Owned draft packages; one package is one queue job, members run sequentially.
+Mutations run on the download runtime's event loop; only ZIPs persist."""
 from __future__ import annotations
 
 import asyncio

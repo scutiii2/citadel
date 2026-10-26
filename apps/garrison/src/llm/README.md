@@ -19,8 +19,8 @@ Originally adapted from the retired chat_app's LLM layer.
   `choice`, `score` and `noul` questions about a short text and gets JSON
   answers with confidences. It validates the request and hands it to
   `triage_flow.py`. No tools or text generation, and no API key.
-- **`laya_agent.py`** - `LAYAAgent`, the only connection to Laya: the shared Laya
-  service (`Python/LayaAgent`) over HTTP. Garrison loads no Laya model itself.
+- **`laya_model.py`** - `LAYAModel`, the only connection to Laya: the shared Laya
+  service (`Python/LayaModel`) over HTTP. Garrison loads no Laya model itself.
 - **`triage_flow.py`** - resolves the request strategy, then the admin default,
   then the per-type voter settings. A resolved override sends all questions under
   one service strategy. The fallback classifier (Jev) settles uncertain results.

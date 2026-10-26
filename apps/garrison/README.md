@@ -31,13 +31,13 @@ and an MCP *client* (to `mcp_server`, via a persistent connection - see
 ### Laya models
 
 Garrison does not install Laya, PyTorch or the model weights, and no Garrison code loads a Laya model.
-Both models and every local decision rule live in the shared Laya service (`Python/LayaAgent`, behind a
-load balancer); Garrison reaches it over HTTP through one client, `LAYAAgent` (`src/llm/laya_agent.py`).
+Both models and every local decision rule live in the shared Laya service (`Python/LayaModel`, behind a
+load balancer); Garrison reaches it over HTTP through one client, `LAYAModel` (`src/llm/laya_model.py`).
 Set `LAYA_SERVICE_URL` (the root `docker-compose.yml` sets it to `http://laya_lb:9120`) and `LAYA_TOKEN` if the
 service has one. Start the Citadel stack first (it creates the `citadel_core` network), then the service
-(`docker compose up -d --build` in `LayaAgent/`); Garrison finds it by name when it first needs it. Without `LAYA_SERVICE_URL` no Laya model is available: the Triage Assistant, the Router's
+(`docker compose up -d --build` in `LayaModel/`); Garrison finds it by name when it first needs it. Without `LAYA_SERVICE_URL` no Laya model is available: the Triage Assistant, the Router's
 local voters and the `laya` classifier backend report that, and Jev (where allowed) answers alone.
-For local development run the service (`run.bat` in `LayaAgent/`) and set `LAYA_SERVICE_URL=http://127.0.0.1:9120`
+For local development run the service (`run.bat` in `LayaModel/`) and set `LAYA_SERVICE_URL=http://127.0.0.1:9120`
 in `apps/garrison/.env`.
 
 Garrison sends the service a strategy name per question type and gets the answers back; what stays in Garrison is
@@ -325,7 +325,7 @@ changed with `classifier.triage_thresholds` (`{"3+": {"laya-typed": 0.6}}`) or, 
 when no model is ever sure it compares the models' confidence-weighted values pairwise (`triage_pair_ratio`): the
 answer then carries `also_check`, or `"unknown": true` with `candidates`, and is always `uncertain`. Garrison sends
 these settings and the window (`triage_window`) with every request. The rules and the other strategies
-(`most-confident`, `average`, `consensus`) are in `LayaAgent/README.md`.
+(`most-confident`, `average`, `consensus`) are in `LayaModel/README.md`.
 
 Jev (gated by `triage_fallback`, a key and the triage chain, see below) is asked only about what the service could
 not settle, over the options it left, with a threshold of 0.90 (2 options and 3 or more alike, `triage_thresholds`

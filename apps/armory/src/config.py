@@ -1,8 +1,4 @@
-"""Server-wide settings.
-
-Deliberately plain (no external settings library required) - swap for
-pydantic-settings later if the number of tunables grows.
-"""
+"""Server-wide settings; plain on purpose, swap for pydantic-settings if the tunables grow."""
 
 from __future__ import annotations
 
@@ -13,66 +9,35 @@ from pathlib import Path
 
 def _env(name: str, default: str) -> str:
     """os.getenv, but an empty value counts as unset.
-
-    ``os.getenv`` returns "" for a variable that's present but blank, so a
-    commented-out-by-emptying line in .env (``SSH_KNOWN_HOSTS=``) would
-    override the default with an empty string rather than leave it alone -
-    which for a path means Path(""), i.e. the current directory. Blank
-    almost always means "I didn't set this".
-    """
+    A blank line like ``SSH_KNOWN_HOSTS=`` would otherwise override a default with Path("")."""
     value = os.getenv(name)
     return value if value else default
 
 
 @dataclass(frozen=True)
 class Settings:
-    # Where the four config_*.json files (see services/app_config.py) live.
-    # Relative to CWD by default, same fragile-by-default convention as
-    # every path below - mcp_server is always run from its own directory
-    # (run_mcp_server.bat cd's there first), so "configs" resolves.
+    # Where the config_*.json files (see services/app_config.py) live.
+    # Relative to CWD like the paths below; mcp_server always runs from its own directory.
     configs_dir: Path = Path(_env("MCP_CONFIGS_DIR", "configs"))
-    # Loopback by default, deliberately. This server has no authentication
-    # of its own: anything that can reach the port can call every
-    # registered tool with arbitrary arguments, and the Flask app is not
-    # in that path, so no amount of auth over there protects this. Binding
-    # to 0.0.0.0 exposes that to the whole network, which should be a
-    # decision someone makes on purpose rather than a default they
-    # inherit. Override MCP_HOST only once something in front of it
-    # (reverse proxy, VPN, firewall) is doing the authenticating.
+    # Loopback by default: this server has no auth, so anything reaching the port can call every tool.
+    # Set MCP_HOST to expose it only behind a reverse proxy, VPN or firewall that authenticates.
     host: str = _env("MCP_HOST", "127.0.0.1")
     port: int = int(_env("MCP_PORT", "8010"))
-    # known_hosts file used to verify SSH host keys. Defaults to the same
-    # one the ssh command-line client uses, so hosts you've already
-    # connected to from this machine are trusted without extra setup.
+    # known_hosts file used to verify SSH host keys; defaults to the ssh client's own.
     ssh_known_hosts: Path = Path(
         _env("SSH_KNOWN_HOSTS", str(Path.home() / ".ssh" / "known_hosts"))
     )
-    # "reject" (default) or "auto". Rejecting an unknown host key is the
-    # point of having known_hosts at all: it's what makes a
-    # machine-in-the-middle visible, and - more importantly in practice -
-    # what makes a host key that *changed* an error instead of a silent
-    # accept. "auto" trusts whatever key answers first and records it,
-    # which is fine for a throwaway lab and wrong everywhere else.
+    # "reject" (default) or "auto". Rejecting unknown host keys keeps man-in-the-middle and changed keys visible.
+    # "auto" trusts and records the first key, fine only for a throwaway lab.
     ssh_host_key_policy: str = _env("SSH_HOST_KEY_POLICY", "reject")
-    # Where logging_setup.configure_logging() writes server.log and
-    # errors.report() writes per-reference error files. Relative to CWD by
-    # default, same convention as the paths above.
+    # Where logging_setup.configure_logging() writes server.log and errors.report() writes per-reference files.
+    # Relative to CWD like the paths above.
     log_dir: Path = Path(_env("MCP_LOG_DIR", ".logs"))
-    # Shared secret, same value both directions. Most chat_app -> mcp_server
-    # calls (fetch_capabilities, ...)
-    # carry no credential of their own because they're all read/administrative
-    # actions a trusting deployment accepts from its own chat_app. One call
-    # needs real auth, though: this server's own POST /upload (see upload_routes.py) checks the
-    # same token on the way IN, since chat_app's Chat/api/upload proxies a
-    # user's dropped file here and the receiving end shouldn't accept that
-    # from anything else reachable on the network. Blank by default (from
-    # .env, unset until someone configures it) so it
-    # fails loudly rather than silently accepting an unauthenticated request.
+    # Shared secret, same value both directions; blank by default so it fails loudly.
+    # POST /upload (upload_routes.py) checks it inbound because chat_app proxies user files here.
     internal_api_token: str = _env("INTERNAL_API_TOKEN", "")
-    # Where POST /upload (upload_routes.py) writes files a chat_app user
-    # dropped into a command-form modal, before a tool param
-    # that expects a real server-side path gets one.
-    # Relative to CWD by default, same convention as every path above.
+    # Where POST /upload (upload_routes.py) writes files dropped into a command-form modal.
+    # Relative to CWD like the paths above.
     uploads_dir: Path = Path(_env("MCP_UPLOADS_DIR", ".data/uploads"))
     pdf_merger_store_dir: Path = Path(_env("MCP_PDF_MERGER_STORE_DIR", "specifics/pdf_merger/.data/store"))
     pdf_merger_config_path: Path = Path(_env("MCP_PDF_MERGER_CONFIG_PATH", "specifics/pdf_merger/configs/config_pdf_merger.json"))
@@ -86,14 +51,12 @@ class Settings:
     memory_db_path: Path = Path(_env("MCP_MEMORY_DB_PATH", "specifics/memory/.data/memory.db"))
     # Per-user learned skills (capabilities/skills). Runtime state: gitignored.
     skills_db_path: Path = Path(_env("MCP_SKILLS_DB_PATH", "specifics/skills/.data/skills.db"))
-    # Support tickets (services/tickets.py): SQLite file, and the optional Laya
-    # agent's MCP address (http://host:9111/mcp) used to group and tag tickets.
+    # Support tickets (capabilities/tickets/utils/service.py): SQLite file and the optional Laya MCP address (http://host:9111/mcp).
     # Blank LAYA_URL skips Laya; tickets still work.
     tickets_db_path: Path = Path(_env("MCP_TICKETS_DB_PATH", "specifics/tickets/.data/tickets.db"))
     laya_url: str = _env("LAYA_URL", "")
-    # db_gateway, where ember_api keeps per-account notes; the notes capability reads the ones an
-    # account shared with agents. The instance must list the connection (db_gateway's
-    # configs/config_connections.json). The request carries INTERNAL_API_TOKEN.
+    # db_gateway, where ember_api keeps per-account notes; the notes capability reads those shared with agents.
+    # The instance must list the connection (db_gateway's configs/config_connections.json); requests carry INTERNAL_API_TOKEN.
     db_gateway_url: str = _env("DB_GATEWAY_URL", "http://127.0.0.1:8071")
     db_gateway_instance: str = _env("DB_GATEWAY_INSTANCE", "mcp_server")
     db_gateway_connection: str = _env("DB_GATEWAY_CONNECTION", "data")
@@ -125,8 +88,7 @@ class Settings:
     media_signing_key: str = _env("MCP_MEDIA_SIGNING_KEY", "")
 
     # Folders the read-only capabilities look at, relative to apps/armory/.
-    # usage_report: ai_agent's usage log. vault: the Obsidian vault.
-    # repo_reader: the folder that holds the project repos.
+    # usage_report: ai_agent's usage log. vault: the Obsidian vault. repo_reader: the folder holding project repos.
     usage_dir: Path = Path(_env("MCP_USAGE_DIR", "../garrison/.data/usage"))
     vault_dir: Path = Path(_env("MCP_VAULT_DIR", "../../../../Brain"))
     workspace_dir: Path = Path(_env("MCP_WORKSPACE_DIR", "../../../.."))

@@ -1,15 +1,5 @@
-"""Download jobs: a concurrency limit, a bounded wait queue, a timeout, replayable events.
-
-A job's events are kept in a list so a late subscriber (the browser opening the
-SSE stream after POST /downloads returned) still sees everything. publish() runs
-on the event loop thread; worker threads report through ``emit``, which hops to
-the loop with call_soon_threadsafe.
-
-Timeouts and cancels are cooperative: the job's ``cancel`` event is set and the
-work is awaited until it really stops (Python cannot kill threads). The
-semaphore slot is held until then, so stopped downloads never exceed the
-concurrency limit and always clean up after themselves.
-"""
+"""Download jobs: concurrency limit, bounded wait queue, timeout, replayable events.
+Cancels are cooperative and the semaphore slot is held until the work really stops."""
 
 from __future__ import annotations
 

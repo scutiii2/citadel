@@ -1,5 +1,11 @@
 """Web scraping: scrape a page, map a site and crawl it through Firecrawl."""
 
-from src.services import capability_meta
+from src.services.capability_base import Capability
 
-META = capability_meta.register(folder="firecrawl", id="scrape", label="Web Scraping")
+
+class Firecrawl(Capability):
+    id = "scrape"
+    label = "Web Scraping"
+
+
+CAPABILITY = Firecrawl()
