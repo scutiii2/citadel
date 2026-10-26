@@ -38,7 +38,7 @@ Two interfaces, no shared `run_chat`:
 
 ### Decision gateways
 
-- **`laya`**: HTTP client for the `LayaModel` service (`LAYA_SERVICE_URL`, `LAYA_TOKEN`). The service owns weights, strategies and decision rules. Legion loads nothing. The gateway always asks the service for the `english-then-typed` strategy (English first, typed if unsure, then narrowing and comparing). Callers never pick a Laya strategy or model.
+- **`laya`**: HTTP client for the `LayaModel` service (`LAYA_SERVICE_URL`, `LAYA_TOKEN`). The service owns weights, strategies and decision rules. Legion loads nothing. The service strategy is gateway config: `strategy` in `gateways/decision/laya.json`, default `english-then-typed` (English first, typed if unsure, then narrowing and comparing). Change it there to any name from `GET /v1/strategies`; agents and callers never pick a Laya strategy. An unknown name fails at supervisor start, which checks it against the service when reachable.
 - **`jev`**: TypeSafe cloud API (`POST /v1/systemone`, `TYPESAFE_API_KEY`). Stays cloud. It answers `choice`, `score` and `noul` questions: the client reduces `score` (levels) and `noul` (true/false labels) to a `choice` over those options, as today. That is a client-side reduction, not an API limit.
 - Both gateways accept every question type and return `{answer, confidence}` per question.
 - **Removed**: `jev_vercel`, `VERCEL_GATEWAY_API_KEY`, `laya_classifier` (local 512-window backend), `triage_flow.py` voter mixing, `classifier.chains`.
@@ -114,7 +114,7 @@ Hard break, no compat shim. All 20 `agents/*.json` migrate in the same change se
 
 - Router and auto-tier callers use `decision.py` chains directly today; phase 3 must port each to the wrapper without changing their thresholds. Cases in `scripts/check_*` and `tests/test_router_*` are the regression net.
 - Jev's `score`/`noul` answers come from a choice reduction; keep that mapping tested.
-- Confirm `english-then-typed` appears in `GET /v1/strategies` of the deployed service.
+- Confirm the configured Laya strategy appears in `GET /v1/strategies` of the deployed service.
 - Rename touches the docker network name and port env; verify `dev_deploy.bat` and the ZimaOS overlay.
 
 ## Testing
