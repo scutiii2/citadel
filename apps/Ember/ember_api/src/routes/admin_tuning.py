@@ -1,7 +1,7 @@
 # apps/Ember/ember_api/src/routes/admin_tuning.py
-"""/api/admin/tuning: garrison's runtime tuning (token limits, failover, classifier).
+"""/api/admin/tuning: legion's runtime tuning (token limits, failover, classifier).
 
-Needs tuning.manage. garrison validates and stores the edit in its overlay file; each
+Needs tuning.manage. legion validates and stores the edit in its overlay file; each
 agent applies it at the start of its next turn. Every change is written to the activity log."""
 
 from __future__ import annotations

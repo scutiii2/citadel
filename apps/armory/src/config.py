@@ -89,7 +89,7 @@ class Settings:
 
     # Folders the read-only capabilities look at, relative to apps/armory/.
     # usage_report: ai_agent's usage log. vault: the Obsidian vault. repo_reader: the folder holding project repos.
-    usage_dir: Path = Path(_env("MCP_USAGE_DIR", "../garrison/.data/usage"))
+    usage_dir: Path = Path(_env("MCP_USAGE_DIR", "../legion/.data/usage"))
     vault_dir: Path = Path(_env("MCP_VAULT_DIR", "../../../../Brain"))
     workspace_dir: Path = Path(_env("MCP_WORKSPACE_DIR", "../../../.."))
 

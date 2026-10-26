@@ -1,14 +1,14 @@
-# Garrison Triage Assistant: two fixes from review (2026-10-19)
+# Legion Triage Assistant: two fixes from review (2026-10-19)
 
 > Historical evidence: this records the retired voter-based implementation.
 > Legion v2 uses one decision provider and Laya/Jev strategies; the examples and
 > thresholds below do not configure the current service.
 
-Review of `apps/garrison` triage flow (`src/llm/triage_flow.py`, `src/llm/laya_provider.py`, `src/llm/decision.py`). The 217 triage-related tests pass; both items below are gaps the tests do not cover.
+Review of `apps/legion` triage flow (`src/llm/triage_flow.py`, `src/llm/laya_provider.py`, `src/llm/decision.py`). The 217 triage-related tests pass; both items below are gaps the tests do not cover.
 
 ## 1. A step 5 answer is marked `uncertain: false`
 
-**Where**: `apps/garrison/src/llm/triage_flow.py`, `final_answer`, line 135 (`"uncertain": not decided`).
+**Where**: `apps/legion/src/llm/triage_flow.py`, `final_answer`, line 135 (`"uncertain": not decided`).
 
 **Problem**: `decided` only means the top option clearly leads in the pairwise comparison (`triage_pair_ratio`). No voter met its own threshold when step 5 runs. So English, typed and Jev can all be unsure and the answer still returns `uncertain: false`. `answer_confidence` is then the top option's share of the difference score, not a model confidence. The agent's `focus` text (`agents/triage-assistant.json`) tells callers to treat uncertain answers as provisional, so callers skip `also_check` on exactly these answers.
 

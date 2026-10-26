@@ -1,7 +1,7 @@
 // apps/Ember/ember_admin/src/api/TuningClient.ts
 import { apiRequest } from "./http";
 
-/** garrison's editable tuning as ember_api returns it (/api/admin/tuning). */
+/** legion's editable tuning as ember_api returns it (/api/admin/tuning). */
 export interface TuningView {
   /** What config_tuning.json says (editable sections only). */
   defaults: Record<string, unknown>;

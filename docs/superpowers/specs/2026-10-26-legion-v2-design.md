@@ -1,6 +1,6 @@
 # Legion (Garrison v2) design
 
-Status: implemented through documentation/skill migration. The final `apps/garrison` to `apps/legion` rename remains a separate approval checkpoint.
+Status: implemented on `refactor/legion-v2`, including the Legion rename. Offline verification is green; Docker deployment checks are unverified because the engine is unavailable.
 
 ## Goals
 
@@ -115,7 +115,7 @@ Hard break, no compat shim. All agent files found by the migration glob (19 in t
    remove retired classifiers/default strategy controls; validate Laya strategy at startup.
 4. [x] **Docs and skills**: current package names, provider-folder config shape, vault notes
    and scaffold instructions, synced through `sync_skills.py`.
-5. [ ] **Rename**: `apps/garrison` to `apps/legion`, compose, consumers, docs and vault.
+5. [x] **Rename**: `apps/garrison` to `apps/legion`, compose, consumers, docs and vault.
 
 ## Risks and open checks
 

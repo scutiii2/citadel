@@ -6,7 +6,7 @@
 The Agents page edits the internal Router using `agents.manage`. Its form exposes
 agent/tier selection, local voters, Jev fallback, thresholds, narrowing, timeouts,
 size-to-tier mapping and trace metadata. Chat roles and tools are fixed read-only
-invariants. Saving is explicit and uses Garrison's deployment override; failed
+invariants. Saving is explicit and uses Legion's deployment override; failed
 saves retain drafts. Cards show running/offline/disabled state and unavailable
 local/fallback readiness. Reset and disable use the existing agent lifecycle.
 
@@ -301,7 +301,7 @@ reads the candidate; Save applies a revision without restart; Disable revokes ne
 operations. `brain.instance.publish` separately permits publishing shared knowledge.
 See [brain operations](../../../docs/obsidian-brains.md).
 
-Laya's internal strategy is configured in Garrison's `gateways/decision/laya.json`
+Laya's internal strategy is configured in Legion's `gateways/decision/laya.json`
 and read on each call. Admin Tuning edits the gateway strategy and confidence for
 automatic tier selection and specialist routing; no admin or account control
 selects Laya's internal service strategy.

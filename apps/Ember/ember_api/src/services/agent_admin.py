@@ -90,7 +90,7 @@ class AgentAdmin:
         return providers if isinstance(providers, dict) else {}
 
     async def tuning(self, account: Account) -> dict[str, Any]:
-        """garrison's editable tuning: {defaults, overrides, effective}."""
+        """legion's editable tuning: {defaults, overrides, effective}."""
         return await self._request("GET", "/agents/tuning", account)
 
     async def set_tuning(self, account: Account, changes: dict[str, Any]) -> dict[str, Any]:

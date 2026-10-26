@@ -27,7 +27,7 @@ The capability exists at `apps/armory/src/capabilities/firecrawl/`, but its test
 - `tools/deploy.bat` against the real server: option 2 (one-session `tar` push as `lex`, `COMPOSE_FILE` line, the chown helper) and option 1 (publish to `origin/live`). Same for `LayaModel/tools/deploy.bat` and `Bard/tools/deploy.bat` (Bard: publish creates `origin/live`; first start downloads the Piper voice).
 - Bard in the stack: start Citadel, then `Bard` (`docker compose up -d --build` there), restart armory, and check `bard__tool_bard_speak` plays in chat.
 - A full `docker compose up -d --build` on ZimaOS with `LayaModel` next to `Citadel`, then `tool_srv_listApps` returning the `citadel-*` containers.
-- `LAYA_URL=http://garrison:9111/mcp` in `apps/armory/.env`: confirm garrison listens on 9111 inside the container and tickets get grouped.
+- `LAYA_URL=http://legion:9111/mcp` in `apps/armory/.env`: confirm legion listens on 9111 inside the container and tickets get grouped.
 - Self-stop: `/server stop armory` kills the server running the tool; expected, but it cannot be restarted from the same chat.
 
 **SMTP credential rotation (repository cleaned 2026-10-09)**: `zima_host.yaml` is deleted (2026-10-25), but its old inline password remains in Git history. Still required: revoke the exposed password at the mail provider, put a replacement `SMTP_PASSWORD` in the deployment `.env`, recreate the container and verify email delivery.
@@ -63,7 +63,7 @@ Optional follow-up features, not implemented:
 
 **Context**: `Python/chess` is its own project, not part of Citadel or Ember. A conventional engine proposes and scores moves and its own local Laya picks among the top candidates, with the engine's best move as fallback. Laya is required, not optional. Port 8070, renamed from `mini_games` 2026-10-16. Spec 1 (backend, 144 tests, Laya eval in `docs/laya-eval.md`) merged as `8c4dc28e`.
 
-**Dropped 2026-10-19**: the `ember_api` proxy with an `ember_web` page (old spec 2) and the mcp_server/armory chat tools (old spec 3). Chess does not use garrison; it has its own Laya client.
+**Dropped 2026-10-19**: the `ember_api` proxy with an `ember_web` page (old spec 2) and the mcp_server/armory chat tools (old spec 3). Chess does not use legion; it has its own Laya client.
 
 **To do** (tracked in `Brain/Projects/chess.md`; chess has no git repo yet): (run.bat and 103 tests pass 2026-10-19; Tetris removed, chess only) `git init`; own UI; an autonomous brain; decide the auth headers and the folder name; session persistence.
 
@@ -73,7 +73,7 @@ Optional follow-up features, not implemented:
 
 ## Context breakdown for delegated agents (added 2026-10-17)
 
-**Context**: The context panel (opened from the header's context meter) breaks the answering agent's prompt into system prompt, delegable agents, built-in tools, MCP tools and messages, estimated or counted by the provider (`apps/garrison/src/providers/context_breakdown.py`). When the orchestrator delegates, each specialist runs its own prompt, and none of that is broken down.
+**Context**: The context panel (opened from the header's context meter) breaks the answering agent's prompt into system prompt, delegable agents, built-in tools, MCP tools and messages, estimated or counted by the provider (`apps/legion/src/providers/context_breakdown.py`). When the orchestrator delegates, each specialist runs its own prompt, and none of that is broken down.
 
 - Each agent would build its own breakdown; `ai_agent` already returns one usage row per agent in `agent_usage`.
 - `ember_api` would pass each agent's breakdown along with its usage row (`AgentUsageIn` in `routes/chats.py`), and the panel would add a per-agent section.
@@ -83,7 +83,7 @@ Optional follow-up features, not implemented:
 
 ## Make chat Stop (cancel) near-instant (added 2026-10-18)
 
-**Context**: Stop in the Ember chat page is cooperative. `ember_web` `chat.stop()` calls `POST /chats/{id}/cancel`, `TurnRegistry.cancel` (`apps/Ember/ember_api/src/services/turns.py`) sets `cancel_requested`, publishes `cancelling`, and forwards `cancel` to ai_agent. There the flag in `apps/garrison/src/providers/cancellation.py` is checked only between provider rounds (`anthropic_provider.py`, `openai_provider.py`), so an LLM call or tool call already running finishes first. Approval and question waits already poll the flag.
+**Context**: Stop in the Ember chat page is cooperative. `ember_web` `chat.stop()` calls `POST /chats/{id}/cancel`, `TurnRegistry.cancel` (`apps/Ember/ember_api/src/services/turns.py`) sets `cancel_requested`, publishes `cancelling`, and forwards `cancel` to ai_agent. There the flag in `apps/legion/src/providers/cancellation.py` is checked only between provider rounds (`anthropic_provider.py`, `openai_provider.py`), so an LLM call or tool call already running finishes first. Approval and question waits already poll the flag.
 
 **Plan**, by payoff:
 1. **Abort the in-flight LLM call**: check the flag per streamed chunk and close the HTTP stream on cancel, then raise `ChatCancelled`. The partial text is already kept (`turns.py`). `bind_request` already carries a per-turn `threading.Event` into worker threads.
@@ -105,7 +105,7 @@ Optional follow-up features, not implemented:
 
 ## Full cross-provider gateway fallback (added 2026-10-19)
 
-**Context**: An agent's gateway list (primary plus `llm.fallback_gateways`) is limited to one provider. `AgentForm.vue` shows only the selected provider's gateways and resets the list when the provider changes. In garrison, `fallback_gateways` entries accept only `gateway` and `model` (`apps/garrison/src/agents/agent_spec.py`), and failover lives inside each provider module (`openai_provider.py`, `anthropic_provider.py`), which each read only their own gateway files. Anthropic and OpenAI use different message and tool-call formats, so a mid-turn switch needs the history converted.
+**Context**: An agent's gateway list (primary plus `llm.fallback_gateways`) is limited to one provider. `AgentForm.vue` shows only the selected provider's gateways and resets the list when the provider changes. In legion, `fallback_gateways` entries accept only `gateway` and `model` (`apps/legion/src/agents/agent_spec.py`), and failover lives inside each provider module (`openai_provider.py`, `anthropic_provider.py`), which each read only their own gateway files. Anthropic and OpenAI use different message and tool-call formats, so a mid-turn switch needs the history converted.
 
 **Plan**:
 - **Spec**: add an optional `provider` to each fallback entry (default: the agent's provider). Validate it in `agent_spec.py`, `agent_config.py` and `agent_store.py`.

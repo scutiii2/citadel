@@ -13,7 +13,7 @@ URL = "/api/account/tuning"
 VIEW = {"defaults": {}, "overrides": {}, "effective": {"token_limits": {"default": {"max_output_tokens": 2048, "max_tool_rounds": 15}}}}
 
 
-def garrison_up(request: httpx.Request) -> httpx.Response:
+def legion_up(request: httpx.Request) -> httpx.Response:
     return httpx.Response(200, json=VIEW)
 
 
@@ -23,7 +23,7 @@ def test_needs_login(client: TestClient) -> None:
 
 
 def test_default_is_unset_with_the_admin_values_as_ceiling(client: TestClient, upstream: FakeUpstream) -> None:
-    upstream.handler = garrison_up
+    upstream.handler = legion_up
     as_admin(client)
     assert client.get(URL).json() == {
         "limits": {"max_output_tokens": None, "max_tool_rounds": None},
@@ -32,7 +32,7 @@ def test_default_is_unset_with_the_admin_values_as_ceiling(client: TestClient, u
 
 
 def test_save_read_back_and_clear_one(client: TestClient, upstream: FakeUpstream) -> None:
-    upstream.handler = garrison_up
+    upstream.handler = legion_up
     as_admin(client)
     saved = client.put(URL, json={"max_output_tokens": 500, "max_tool_rounds": 4})
     assert saved.status_code == 200
@@ -42,7 +42,7 @@ def test_save_read_back_and_clear_one(client: TestClient, upstream: FakeUpstream
 
 
 def test_value_above_the_admin_ceiling_is_refused(client: TestClient, upstream: FakeUpstream) -> None:
-    upstream.handler = garrison_up
+    upstream.handler = legion_up
     as_admin(client)
     over = client.put(URL, json={"max_output_tokens": 5000, "max_tool_rounds": 4})
     assert over.status_code == 400
@@ -51,14 +51,14 @@ def test_value_above_the_admin_ceiling_is_refused(client: TestClient, upstream: 
 
 
 def test_out_of_range_is_a_422(client: TestClient, upstream: FakeUpstream) -> None:
-    upstream.handler = garrison_up
+    upstream.handler = legion_up
     as_admin(client)
     assert client.put(URL, json={"max_tool_rounds": 0}).status_code == 422
     assert client.put(URL, json={"max_tool_rounds": 101}).status_code == 422
 
 
-def test_garrison_down_still_reads_but_cannot_save(client: TestClient, upstream: FakeUpstream) -> None:
-    upstream.handler = garrison_up
+def test_legion_down_still_reads_but_cannot_save(client: TestClient, upstream: FakeUpstream) -> None:
+    upstream.handler = legion_up
     as_admin(client)
     client.put(URL, json={"max_tool_rounds": 4})
     upstream.handler = lambda request: httpx.Response(503, json={"error": "down"})
@@ -69,7 +69,7 @@ def test_garrison_down_still_reads_but_cannot_save(client: TestClient, upstream:
 
 
 def test_delete_clears_everything(client: TestClient, upstream: FakeUpstream) -> None:
-    upstream.handler = garrison_up
+    upstream.handler = legion_up
     as_admin(client)
     client.put(URL, json={"max_tool_rounds": 4})
     assert client.delete(URL).status_code == 204
@@ -78,7 +78,7 @@ def test_delete_clears_everything(client: TestClient, upstream: FakeUpstream) ->
 
 def test_saved_limits_reach_the_chat_turn(client, upstream, agent):
     from tests.test_turns import events, new_id, start
-    upstream.handler = garrison_up
+    upstream.handler = legion_up
     as_admin(client)
     assert client.put(URL, json={"max_tool_rounds": 4}).status_code == 200
     chat_id = new_id()

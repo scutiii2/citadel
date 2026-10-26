@@ -12,7 +12,7 @@ Speech gateways supply account identity and the internal token. Rejected audio/t
 
 ## Triage strategy
 
-Laya's internal strategy is configured in Garrison's `gateways/decision/laya.json`
+Laya's internal strategy is configured in Legion's `gateways/decision/laya.json`
 and read on every call. Direct triage requests stay local and do not pass account
 strategy preferences. The retired database preference and migration `0026` remain
 for schema/data history; the application no longer reads that preference.
@@ -22,7 +22,7 @@ for schema/data history; the application no longer reads that preference.
 Manual `/compact` (the existing `POST /api/chats/{id}/summarize`) and automatic
 compaction discover the dedicated `context-summarizer` agent. They use its
 tool-free `interpret` operation with a `compact` prompt, independently of the
-entry agent answering the chat. Garrison uses the same helper with a shorter
+entry agent answering the chat. Legion uses the same helper with a shorter
 `routing` prompt before Router decisions. The helper uses the existing light
 model tier, and usage is attributed to `context-summarizer`.
 

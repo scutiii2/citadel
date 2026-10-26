@@ -10,7 +10,7 @@ import { errorMessage } from "../utils/errors";
 import "../components/admin/admin.css";
 
 /** One editable value: where it lives in config_tuning.json, how to label it, and its bounds
- * (the same ones garrison enforces; garrison's answer is what the page shows on a refusal). */
+ * (the same ones legion enforces; legion's answer is what the page shows on a refusal). */
 interface Field {
   path: string;
   label: string;

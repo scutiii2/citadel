@@ -69,8 +69,8 @@ staff routes, even when the chat capability is offline. SQLite storage defaults
 to `specifics/tickets/.data/tickets.db`, configurable with `MCP_TICKETS_DB_PATH`.
 See `configs/config_tickets.json.example` for tags, automatic-report caps,
 priority thresholds and classifier limits. Optional `LAYA_URL` points at the
-Triage Assistant's MCP address (a Garrison agent on port 9111, which asks the shared Laya service; in Docker use
-`http://garrison:9111/mcp`, because 127.0.0.1 is the container itself) for advisory grouping and
+Triage Assistant's MCP address (a Legion agent on port 9111, which asks the shared Laya service; in Docker use
+`http://legion:9111/mcp`, because 127.0.0.1 is the container itself) for advisory grouping and
 tagging; blank skips Laya. Armory holds no Laya model.
 Ember permissions and triage interfaces are planned separately.
 

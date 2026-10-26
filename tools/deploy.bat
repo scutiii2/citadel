@@ -9,7 +9,7 @@ if not defined DEPLOY_HOST set "DEPLOY_HOST=lex@scutiserver1.local"
 if not defined DEPLOY_DIR set "DEPLOY_DIR=/media/ZimaOS-HD/Apps/Citadel"
 if not defined DEPLOY_WEB_PORT set "DEPLOY_WEB_PORT=7681"
 set "ROOT=%~dp0.."
-set "APPS=apps/armory apps/garrison apps/treasury apps/Ember/ember_api"
+set "APPS=apps/armory apps/legion apps/treasury apps/Ember/ember_api"
 
 :menu
 echo.

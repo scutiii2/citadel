@@ -1,12 +1,12 @@
 ---
 name: aiagent-scaffold
-description: Use when adding or changing a Garrison agent persona, specialist, orchestrator, internal router, language provider, model or gateway, or making an agent available for Ember delegation.
+description: Use when adding or changing a Legion agent persona, specialist, orchestrator, internal router, language provider, model or gateway, or making an agent available for Ember delegation.
 ---
 
-# Garrison agent scaffolding
+# Legion agent scaffolding
 
 Since multi-agent phase 1 (2026-10-04) **one file per agent**:
-`apps/garrison/agents/<id>.json`. `python -m src.supervisor` (run from `apps/garrison/`) starts all agents:
+`apps/legion/agents/<id>.json`. `python -m src.supervisor` (run from `apps/legion/`) starts all agents:
 it spawns one `python -m src.server` child per enabled file (env
 `AI_AGENT_FILE`), registers it under its file-name id, prefixes its output
 `[<id>] ` and restarts a crashed child with backoff. An agent file is required
@@ -25,14 +25,14 @@ are not how agents are added now; every agent is an `agents/<id>.json`. Don't
 hand-edit `.data/agent_registry.json` - it is the runtime registry the children
 write (atomic temp file + `os.replace`); ember_api reads it.
 
-`apps/garrison/README.md` ("Agents", "Orchestrator", "Decision layer", "Usage log") is
+`apps/legion/README.md` ("Agents", "Orchestrator", "Decision layer", "Usage log") is
 the source of truth this skill compresses; read it first. Running shape:
-`ember_api --MCP--> garrison (entry) --delegate_to_agent--> specialists`, each
+`ember_api --MCP--> legion (entry) --delegate_to_agent--> specialists`, each
 agent one provider+model, all `--MCP-->` mcp_server.
 
 ## Path 1 - New agent (file only)
 
-1. Create `apps/garrison/agents/<id>.json`. The stem is the id
+1. Create `apps/legion/agents/<id>.json`. The stem is the id
    (`^[a-z0-9][a-z0-9-]{0,62}$`); it is what ember_api, stored chat turns and
    the usage log name, so pick it once. Unknown keys are an error. Minimal
    specialist:
@@ -196,7 +196,7 @@ Google's native SDK rather than an OpenAI-compatible endpoint):
      `mcp_server` tool's result — see `server.py`'s `interpret` tool).
    - Report token spend, never enforce it: return the response's
      `total_tokens` (and `context_tokens`) on the `ChatResult`, nothing
-     more. garrison keeps no usage store and applies no rolling
+     more. legion keeps no usage store and applies no rolling
      6-hour/weekly cap — ember_api records each answer's
      `agent_usage` per account and owns the caps (chat_app, now retired,
      did the same with its `usage.db`).
@@ -207,7 +207,7 @@ Google's native SDK rather than an OpenAI-compatible endpoint):
      `src/runtime/config_files.py`'s `read_section`. On first read, tuning
      preserves sections from the legacy `config_limits.json`; the retained
      legacy file is a backup. Laya tool shortlisting (`tool_selection`) is gone.
-     Credentials live in a single `apps/garrison/.env`, seeded from `.env.example`;
+     Credentials live in a single `apps/legion/.env`, seeded from `.env.example`;
      there is no `secrets/` folder.)
    - Wrap rate-limit errors into `cooldown.start_cooldown(PROVIDER_ID, seconds)`
      and re-raise, same pattern as the existing providers, so `is_available()`
@@ -246,7 +246,7 @@ Google's native SDK rather than an OpenAI-compatible endpoint):
 
 ## Logging and usage
 
-garrison has no logging module and no `logs/` folder, and no usage *store*.
+legion has no logging module and no `logs/` folder, and no usage *store*.
 Don't import another project's `logging_setup` (separate venvs, no shared
 deps) or bolt a one-off logger onto one agent. The one durable output is the
 usage log: each completed `ask` appends its `agent_usage` row (agent id and
@@ -268,8 +268,8 @@ ember_api owns usage limits and the usage reports.
   confirm no child is left running and the entry leaves the registry.
 - **Orchestrator**: ask the entry agent something that fits a
   specialist's `focus`; ember_web shows "Ember -> <Specialist>" while it works
-  and the usage chip lists both agents. Tests: `garrison`
-  `.venv_garrison\Scripts\python -m pytest` (the registry is isolated per
+  and the usage chip lists both agents. Tests: `legion`
+  `.venv_legion\Scripts\python -m pytest` (the registry is isolated per
   test, keep it that way).
 - **Provider**: start an agent file naming the new `provider` - a missing/bad
   API key should fail loudly at import time (`AgentConfigError`), not on the

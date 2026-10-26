@@ -22,7 +22,7 @@ Mandatory in every root project:
 |---|---|
 | `README.md` | What the project does, setup steps, requirements — see apps/armory/README.md as the fullest example |
 | `pyproject.toml` | Its own dependencies — each root project is a separate Python environment, never a shared venv |
-| `Dockerfile` | Builds the image the root `docker-compose.yml` runs. Local dev: create `.venv_<project>`, `pip install -e ".[dev]"`, then `python -m src.run` (garrison runs `python -m src.supervisor`, one child per `agents/<id>.json`) |
+| `Dockerfile` | Builds the image the root `docker-compose.yml` runs. Local dev: create `.venv_<project>`, `pip install -e ".[dev]"`, then `python -m src.run` (legion runs `python -m src.supervisor`, one child per `agents/<id>.json`) |
 | `shell.bat` | Opens a terminal with the project's venv active, in the project folder (`cmd /k "call .venv_<project>\Scripts\activate.bat"`); prints a hint and exits if the venv is missing. Copy `apps/Ember/ember_cli/shell.bat` and change the venv name |
 | `configs/` | JSON config, each real file gitignored with a committed `.example` twin (`config_x.json` + `config_x.json.example`) |
 | `.env`, `.env.example` | The project's one credentials file, in the project root beside `configs/` (no `secrets/` folder). The real `.env` is gitignored; `.env.example` is committed. `mcp_server`, `ai_agent` and `db_gateway` follow this |
@@ -61,7 +61,7 @@ changes the convention for every project after it.
    and a `.example` twin with placeholder values, matching how
    `apps/armory/configs/*.json.example` and the root `.env.example` do it.
    Loaders should auto-create a missing real file by copying its
-   `.example` (see `apps/garrison/src/runtime/seed.py`) rather than raising on first run.
+   `.example` (see `apps/legion/src/runtime/seed.py`) rather than raising on first run.
 4. Write `README.md` covering: what the project does, requirements,
    setup steps, how to run it — model it on `apps/armory/README.md`.
 5. Add a service for it to the root `docker-compose.yml` if it is a

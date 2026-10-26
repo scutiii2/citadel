@@ -2,7 +2,7 @@
 
 The user fills in a form (a yes/no question, a multiple choice question whose
 options have descriptions, or a score question whose levels have descriptions). This module turns that into the JSON question Laya
-reads (garrison/src/providers/decision/provider.py) and sends it to the Triage Assistant
+reads (legion/src/providers/decision/provider.py) and sends it to the Triage Assistant
 without the orchestrator. Option titles are written by the `title-writer` agent:
 one plain model call that sees only the descriptions.
 """

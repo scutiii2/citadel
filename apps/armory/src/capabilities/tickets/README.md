@@ -2,7 +2,7 @@
 Report bugs and failures, suggest features, and follow your own support tickets with `/ticket`.
 Tools: `tool_ticket_createTicket` (`create`), `tool_ticket_listMyTickets` (`list`), `tool_ticket_getTicket` (`show`), `tool_ticket_addComment` (`reply`).
 The core store in `utils/service.py` and HTTP routes in `routes.py` stay available when this capability is off; toggle the chat tools with `PATCH /capabilities/ticket`.
-Staff triage is planned for Ember Admin via ember_api; configuration is `configs/config_tickets.json`, optional `LAYA_URL` (the Triage Assistant's MCP address; `http://garrison:9111/mcp` in Docker), and `MCP_TICKETS_DB_PATH` for core SQLite storage.
+Staff triage is planned for Ember Admin via ember_api; configuration is `configs/config_tickets.json`, optional `LAYA_URL` (the Triage Assistant's MCP address; `http://legion:9111/mcp` in Docker), and `MCP_TICKETS_DB_PATH` for core SQLite storage.
 
 The create form uses `input=tags` with `options_url=/tickets/tags` and a five-tag limit.
 `GET /tickets/tags` returns the configured tag vocabulary and descriptions; it requires

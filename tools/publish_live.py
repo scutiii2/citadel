@@ -25,7 +25,7 @@ DEPLOY_PATHS = [
     ".env.example",
     "docker",
     "apps/armory",
-    "apps/garrison",
+    "apps/legion",
     "apps/treasury",
     "apps/Ember",
     "docs/deployment.md",

@@ -20,17 +20,17 @@ __pycache__/
 
 # ai_agent's real API keys / pinned-provider selection, same treatment
 # as mcp_server's secret_*.env above - only .env.example is committed.
-/apps/garrison/.env
-/apps/garrison/configs/*
-!/apps/garrison/configs/*.example
-!/apps/garrison/configs/README.md
+/apps/legion/.env
+/apps/legion/configs/*
+!/apps/legion/configs/*.example
+!/apps/legion/configs/README.md
 # Agent definitions and gateway presets are tracked; runtime state is not.
-/apps/garrison/.data/
+/apps/legion/.data/
 # Temporary agent writes and gateway migration state remain local.
-/apps/garrison/agents/*.tmp
-/apps/garrison/gateways/.initialized
-/apps/garrison/gateways/*/*.tmp
-/apps/garrison/gateways/*.tmp
+/apps/legion/agents/*.tmp
+/apps/legion/gateways/.initialized
+/apps/legion/gateways/*/*.tmp
+/apps/legion/gateways/*.tmp
 
 # mcp_server's real SMTP-account addresses. The equivalent data lived in the old root-level config.json,
 # which was gitignored outright - these carry the same real deployment
@@ -99,4 +99,4 @@ node_modules/
 /.env
 
 # Admin runtime tuning overlay
-apps/garrison/configs/tuning_overrides.json
+apps/legion/configs/tuning_overrides.json
