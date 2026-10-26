@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onDeactivated, ref, useId, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onDeactivated, ref, useId, watch } from "vue";
 import { useAuthStore } from "../../../stores/auth";
 import type { CommandInfo } from "../../../api/tools/CommandsClient";
 import { EXTENSION_SEPARATOR } from "../../../api/contracts/extensions";
@@ -11,6 +11,7 @@ import { paramSuggestions } from "../utils/commandParams";
 import { appendToDraft, filterTemplates, preview, templateQuery } from "../utils/templates";
 import { fieldsFromSchema, type ToolField } from "../../../utils/tools/toolSchema";
 import TemplatePicker from "./TemplatePicker.vue";
+import { useOutsideClose } from "../../../composables/useOutsideClose";
 import { useDictation } from "../composables/useDictation";
 import { useComposerAttachments } from "../composables/useComposerAttachments";
 import type ListComposerInstance from "./ListComposer.vue";
@@ -66,14 +67,7 @@ const extraToolsId = useId();
 const messageLabelId = useId();
 const toolbox = ref<HTMLElement | null>(null);
 const moreToolsButton = ref<HTMLButtonElement | null>(null);
-function closeExtraTools(event: PointerEvent): void {
-  if (!toolbox.value?.contains(event.target as Node)) extraToolsOpen.value = false;
-}
-watch(extraToolsOpen, (open) => {
-  if (open) document.addEventListener("pointerdown", closeExtraTools);
-  else document.removeEventListener("pointerdown", closeExtraTools);
-});
-onBeforeUnmount(() => document.removeEventListener("pointerdown", closeExtraTools));
+useOutsideClose(toolbox, extraToolsOpen, () => { extraToolsOpen.value = false; });
 /** Counts sends; non-zero while the paper plane is in the air (also its :key, so each send restarts it). */
 const flights = ref(0);
 // Browsing past questions: which one is shown (null = not browsing). It
