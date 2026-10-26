@@ -110,7 +110,7 @@ function onCancel(): void {
 
 <template>
   <BaseModal :open="open" :title="title" @close="onCancel">
-    <form v-if="editing" class="form" @submit.prevent="save">
+    <form v-if="editing" class="dialog-form" @submit.prevent="save">
       <label>
         Name
         <input ref="nameInput" v-model="name" :disabled="saving" type="text" :maxlength="TEMPLATE_NAME_MAX" autocomplete="off" />
@@ -129,7 +129,7 @@ function onCancel(): void {
 
     <template v-else>
       <p v-if="store.loadError" class="error" role="alert">
-        {{ store.loadError }} <button type="button" class="link" @click="store.reload()">Retry</button>
+        {{ store.loadError }} <button type="button" class="link-btn" @click="store.reload()">Retry</button>
       </p>
       <p v-else-if="store.loading && store.templates.length === 0" class="muted">Loading …</p>
       <p v-else-if="store.templates.length === 0" class="muted">
@@ -141,8 +141,8 @@ function onCancel(): void {
             <strong>{{ t.name }}</strong>
             <span class="muted">{{ preview(t.body, 70) }}</span>
           </div>
-          <button type="button" class="link" @click="startEdit(t)">Edit</button>
-          <button type="button" class="link danger" @click="pendingDelete = t">Delete</button>
+          <button type="button" class="link-btn" @click="startEdit(t)">Edit</button>
+          <button type="button" class="link-btn danger" @click="pendingDelete = t">Delete</button>
         </li>
       </ul>
       <p v-if="error && !store.loadError" class="error" role="alert">{{ error }}</p>
@@ -192,33 +192,6 @@ function onCancel(): void {
 .muted {
   color: var(--muted);
 }
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.form label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.85em;
-  color: var(--muted);
-}
-.form input,
-.form textarea {
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  outline: none;
-  resize: vertical;
-  color: var(--text);
-  background: var(--bg);
-  font: inherit;
-}
-.form input:focus,
-.form textarea:focus {
-  border-color: var(--accent);
-}
 .count {
   align-self: flex-end;
   color: var(--muted);
@@ -232,22 +205,6 @@ function onCancel(): void {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-}
-.link {
-  padding: 2px 8px;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 0.85em;
-  color: var(--muted);
-  background: transparent;
-}
-.link:hover {
-  color: var(--text);
-  background: var(--bg);
-}
-.link.danger:hover {
-  color: var(--danger);
 }
 
 </style>

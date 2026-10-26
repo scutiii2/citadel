@@ -110,6 +110,4 @@ async function remove(): Promise<void> {
 .add label { display: grid; gap: 4px; font-size: 0.85rem; color: var(--muted); }
 .problem { margin: 0; min-height: 1em; font-size: 0.85rem; color: var(--danger); }
 .muted { margin: 0; color: var(--muted); font-size: 0.9rem; }
-.primary { min-height: 40px; color: var(--accent-contrast); background: var(--accent); border: 0; border-radius: var(--radius-md); font: inherit; font-weight: 600; cursor: pointer; }
-.chip { min-height: 32px; padding: 0 10px; color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: var(--radius-md); font: inherit; cursor: pointer; }
 </style>

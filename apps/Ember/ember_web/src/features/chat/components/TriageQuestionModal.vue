@@ -150,7 +150,7 @@ function close(): void {
 
 <template>
   <BaseModal :open="open" title="Ask the Triage Assistant" @close="close">
-    <form class="form" @submit.prevent="ask">
+    <form class="form dialog-form" @submit.prevent="ask">
       <SegmentedControl v-model="kind" :options="KINDS" aria-label="Kind of question" />
       <label>
         Text to read
@@ -249,31 +249,7 @@ function close(): void {
 
 <style scoped>
 .form {
-  display: flex;
-  flex-direction: column;
   gap: 12px;
-}
-.form label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.85em;
-  color: var(--muted);
-}
-.form input,
-.form textarea {
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  outline: none;
-  resize: vertical;
-  color: var(--text);
-  background: var(--bg);
-  font: inherit;
-}
-.form input:focus,
-.form textarea:focus {
-  border-color: var(--accent);
 }
 .count {
   align-self: flex-end;

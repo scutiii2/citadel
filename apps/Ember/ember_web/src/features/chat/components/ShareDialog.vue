@@ -151,7 +151,7 @@ const hasLinks = computed(() => links.value.length > 0);
           <span>Created {{ formatUtc(l.created_at) }}<template v-if="l.id === fresh?.id"> (new)</template></span>
           <span class="muted">{{ expiryText(l) }} · {{ l.message_count }} messages</span>
         </div>
-        <button type="button" class="link danger" @click="pendingRevoke = l">Turn off</button>
+        <button type="button" class="link-btn danger" @click="pendingRevoke = l">Turn off</button>
       </li>
     </ul>
     <p class="muted small">Deleting the chat also turns its links off.</p>
@@ -259,19 +259,6 @@ h4 {
   display: flex;
   flex-direction: column;
   font-size: 0.85em;
-}
-.link {
-  padding: 2px 8px;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 0.85em;
-  color: var(--muted);
-  background: transparent;
-}
-.link.danger:hover {
-  color: var(--danger);
-  background: var(--bg);
 }
 
 </style>

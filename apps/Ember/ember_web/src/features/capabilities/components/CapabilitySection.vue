@@ -67,7 +67,7 @@ const emit = defineEmits<{ toggle: []; switch: [] }>();
         />
         <small v-if="scope" class="scope">{{ scope }}</small>
       </span>
-      <span v-else-if="control === 'badge'" class="badge">{{ checked ? "On" : "Off" }}</span>
+      <span v-else-if="control === 'badge'" class="status-badge">{{ checked ? "On" : "Off" }}</span>
     </header>
     <div v-if="open" class="body">
       <slot />
@@ -127,13 +127,6 @@ const emit = defineEmits<{ toggle: []; switch: [] }>();
 }
 .scope {
   font-size: 0.7em;
-  color: var(--muted);
-}
-.badge {
-  padding: 1px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  font-size: 0.75em;
   color: var(--muted);
 }
 .body {

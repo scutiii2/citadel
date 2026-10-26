@@ -35,7 +35,7 @@ describe("SupermarketItem", () => {
   it("offers no Add for a capability that is off for everyone", () => {
     const w = mount(SupermarketItem, { props: { ...base, locked: true } });
 
-    expect(w.get(".badge").text()).toBe("Off for everyone");
+    expect(w.get(".status-badge").text()).toBe("Off for everyone");
     expect(w.find("button.add").exists()).toBe(false);
   });
 

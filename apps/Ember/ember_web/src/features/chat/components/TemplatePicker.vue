@@ -78,7 +78,7 @@ useOutsideClose(root, open, close);
     <div v-if="open" class="popover" role="dialog" aria-label="Saved prompts">
       <input ref="filter" v-model="query" type="search" placeholder="Filter prompts" aria-label="Filter prompts" />
       <p v-if="error" class="note error" role="alert">
-        {{ error }} <button type="button" class="link" @click="emit('open')">Retry</button>
+        {{ error }} <button type="button" class="link-btn" @click="emit('open')">Retry</button>
       </p>
       <p v-else-if="loading && templates.length === 0" class="note">Loading …</p>
       <p v-else-if="templates.length === 0" class="note">No saved prompts yet.</p>
@@ -92,10 +92,10 @@ useOutsideClose(root, open, close);
         </li>
       </ul>
       <div class="foot">
-        <button type="button" class="link" :disabled="!canSave" title="Save what is typed as a new prompt" @click="choose('save')">
+        <button type="button" class="link-btn" :disabled="!canSave" title="Save what is typed as a new prompt" @click="choose('save')">
           Save current text …
         </button>
-        <button type="button" class="link" @click="choose('manage')">Manage …</button>
+        <button type="button" class="link-btn" @click="choose('manage')">Manage …</button>
       </div>
     </div>
   </div>
@@ -197,22 +197,5 @@ useOutsideClose(root, open, close);
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid var(--border);
-}
-.link {
-  padding: 2px 6px;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 0.8em;
-  color: var(--muted);
-  background: transparent;
-}
-.link:hover:not(:disabled) {
-  color: var(--text);
-  background: var(--bg);
-}
-.link:disabled {
-  cursor: default;
-  opacity: 0.4;
 }
 </style>

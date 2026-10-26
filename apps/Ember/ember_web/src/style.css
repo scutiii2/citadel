@@ -114,6 +114,66 @@ button[aria-busy="true"]::before {
 }
 @keyframes ember-busy { to { transform: rotate(360deg); } }
 
+/* A quiet text button inside a dialog or popover ("Edit", "Retry"); add `danger` for a destructive one. */
+.link-btn {
+  padding: 2px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85em;
+  color: var(--muted);
+  background: transparent;
+}
+.link-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--bg);
+}
+.link-btn.danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+.link-btn:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* A form in a dialog: labelled fields stacked, with the shared input look. */
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dialog-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85em;
+  color: var(--muted);
+}
+.dialog-form input,
+.dialog-form textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+  resize: vertical;
+  color: var(--text);
+  background: var(--bg);
+  font: inherit;
+}
+.dialog-form input:focus,
+.dialog-form textarea:focus {
+  border-color: var(--accent);
+}
+
+/* A small outlined pill that states something ("Off for everyone", "On"). */
+.status-badge {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  font-size: 0.75em;
+  color: var(--muted);
+}
+
 /* Text for screen readers only. */
 .sr-only {
   position: absolute;

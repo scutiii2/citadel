@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import type { MenuPoint } from "../../../components/ui/menus/menuPoint";
+import { pointAt, pointBelow, type MenuPoint } from "../../../components/ui/menus/menuPoint";
 
 // One block of the chat list: a header (title, count, a "..." menu button) and
 // the rows in the default slot. A folder can fold; Pinned and "Chats" cannot.
@@ -63,14 +63,13 @@ function onDrop(event: DragEvent): void {
 const moreButton = ref<HTMLButtonElement | null>(null);
 
 function openFromButton(): void {
-  const box = moreButton.value?.getBoundingClientRect();
-  emit("openMenu", { x: box?.left ?? 0, y: box?.bottom ?? 0, trigger: moreButton.value });
+  emit("openMenu", pointBelow(moreButton.value));
 }
 
 function openFromContext(event: MouseEvent): void {
   if (!props.menu) return;
   event.preventDefault();
-  emit("openMenu", { x: event.clientX, y: event.clientY, trigger: moreButton.value });
+  emit("openMenu", pointAt(event, moreButton.value));
 }
 </script>
 

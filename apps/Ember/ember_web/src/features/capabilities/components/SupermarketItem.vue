@@ -38,7 +38,7 @@ const emit = defineEmits<{ add: []; disable: [] }>();
         </span>
         <button type="button" class="secondary" :aria-label="`Disable ${label}`" @click="emit('disable')">Disable</button>
       </template>
-      <span v-else-if="locked" class="badge">Off for everyone</span>
+      <span v-else-if="locked" class="status-badge">Off for everyone</span>
       <button v-else type="button" class="add" :aria-label="`${addLabel} ${label}`" @click="emit('add')">{{ addLabel }}</button>
     </span>
   </article>
@@ -79,13 +79,6 @@ const emit = defineEmits<{ add: []; disable: [] }>();
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-.badge {
-  padding: 1px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  font-size: 0.75em;
-  color: var(--muted);
 }
 button {
   padding: 4px 14px;

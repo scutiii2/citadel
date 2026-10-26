@@ -11,6 +11,7 @@ import { paramSuggestions } from "../utils/commandParams";
 import { appendToDraft, filterTemplates, preview, templateQuery } from "../utils/templates";
 import { fieldsFromSchema, type ToolField } from "../../../utils/tools/toolSchema";
 import TemplatePicker from "./TemplatePicker.vue";
+import { growToContent } from "../../../utils/browser/autoGrow";
 import { useOutsideClose } from "../../../composables/useOutsideClose";
 import { useDictation } from "../composables/useDictation";
 import { useComposerAttachments } from "../composables/useComposerAttachments";
@@ -329,11 +330,8 @@ watch(
 
 /** Grow with the content; CSS max-height caps it, then it scrolls. */
 function autoGrow(): void {
-  if (listMode.value) return;
-  const el = textarea.value;
-  if (!el) return;
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
+  if (listMode.value || !textarea.value) return;
+  growToContent(textarea.value);
 }
 
 function submit(): void {

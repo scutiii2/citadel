@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { readStored, writeStored } from "../utils/browser/storage";
 
 export type Theme = "system" | "light" | "dark";
 
@@ -12,21 +13,9 @@ function isTheme(value: unknown): value is Theme {
 
 // Per-browser convenience (the login page is themed too): blocked storage
 // just means "system".
-function readStored(): Theme {
-  try {
-    const value = localStorage.getItem(STORAGE_KEY);
-    return isTheme(value) ? value : "system";
-  } catch {
-    return "system";
-  }
-}
-
-function writeStored(theme: Theme): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, theme);
-  } catch {
-    // ignore - see readStored
-  }
+function loadTheme(): Theme {
+  const value = readStored(STORAGE_KEY);
+  return isTheme(value) ? value : "system";
 }
 
 /** The colors are `light-dark()` tokens (style.css), so the theme is only the
@@ -39,7 +28,7 @@ const theme = ref<Theme>("system");
 
 /** Applies the saved theme; call once before the app mounts. */
 export function initTheme(): void {
-  theme.value = readStored();
+  theme.value = loadTheme();
   apply(theme.value);
 }
 
@@ -57,7 +46,7 @@ export function useTheme(): {
   function setTheme(value: Theme): void {
     theme.value = value;
     apply(value);
-    writeStored(value);
+    writeStored(STORAGE_KEY, value);
   }
   function cycle(): void {
     setTheme(next());
