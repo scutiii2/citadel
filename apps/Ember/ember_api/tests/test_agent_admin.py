@@ -10,7 +10,7 @@ from tests.conftest import FakeEmailSender, FakeUpstream
 from tests.test_admin import login, make_member
 from tests.test_registration import as_admin
 
-CONFIG = {"label": "Calc", "port": 9103, "llm": {"provider": "anthropic", "gateway": "claude"}}
+CONFIG = {"role": "specialist", "label": "Calc", "port": 9103, "llm": {"provider": "anthropic", "gateway": "claude"}}
 
 
 def ai_agent(request: httpx.Request) -> httpx.Response:
@@ -21,6 +21,9 @@ def ai_agent(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"agents": [{"id": "ember", "port": 9100}]})
     if path == "/agents/files" and method == "POST":
         body = json.loads(request.content)
+        for key in ("orchestrator", "internal_role"):
+            if key in body["config"]:
+                return httpx.Response(400, json={"error": f"calc.json: {key} is not a known field"})
         if body["id"] == "ember":
             return httpx.Response(409, json={"error": "agent 'ember' already exists"})
         return httpx.Response(201, json={"id": body["id"], **body["config"]})
@@ -137,3 +140,14 @@ def test_shared_prompts_need_agents_manage(client_factory, email: FakeEmailSende
     assert member.put("/api/admin/agent-prompts", json={"app_name": "x"}).status_code == 403
     assert member.post("/api/admin/agent-prompt-preview", json={"id": "calc", "config": CONFIG}).status_code == 403
     assert upstream.requests == []
+
+
+def test_role_config_is_forwarded_and_retired_key_refusal_is_preserved(client, upstream):
+    upstream.handler = ai_agent
+    as_admin(client)
+    response = client.post("/api/admin/agents", json={"id": "calc", "config": CONFIG})
+    assert response.status_code == 201 and response.json()["role"] == "specialist"
+    assert json.loads(upstream.requests[-1].content)["config"] == CONFIG
+    response = client.post("/api/admin/agents", json={"id": "calc", "config": {**CONFIG, "orchestrator": True}})
+    assert response.status_code == 400
+    assert "orchestrator is not a known field" in response.json()["detail"]

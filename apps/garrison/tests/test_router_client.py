@@ -20,7 +20,7 @@ def test_missing_token_never_contacts_router(monkeypatch):
 def test_unknown_target_abstains(monkeypatch):
     monkeypatch.setattr(internal_auth, "TOKEN", "token")
     monkeypatch.setattr(agent_registry, "reload", lambda: None)
-    monkeypatch.setattr(agent_registry, "all_agents", lambda: [{"id": "router", "internal_role": "router",
+    monkeypatch.setattr(agent_registry, "all_agents", lambda: [{"id": "router", "role": "router",
         "url": "http://local/mcp", "decision": {"deadline_seconds": 1}}])
     async def call(*args):
         return {"policy_revision": "r", "agent": {"choice": "unknown", "uncertain": False}}

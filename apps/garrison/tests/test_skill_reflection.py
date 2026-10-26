@@ -93,7 +93,7 @@ def test_tools_may_be_empty():
 def helper(monkeypatch):
     monkeypatch.setattr(internal_auth, "TOKEN", "test")
     monkeypatch.setattr(agent_registry, "reload", lambda: None)
-    monkeypatch.setattr(agent_registry, "_AGENTS_BY_ID", {"context-summarizer": {"id": "context-summarizer", "url": "http://helper/mcp"}})
+    monkeypatch.setattr(agent_registry, "_AGENTS_BY_ID", {"context-summarizer": {"role": "specialist", "id": "context-summarizer", "url": "http://helper/mcp"}})
     ask = AsyncMock(return_value={"response": json.dumps(DRAFT)})
     monkeypatch.setattr(delegation, "_call_tool", ask)
     sent = []

@@ -55,7 +55,7 @@ async def decide(request: RouteRequest) -> RouteResponse | None:
         return None
     try:
         await anyio.to_thread.run_sync(agent_registry.reload)
-        routers = [a for a in agent_registry.all_agents() if a.get("internal_role") == "router"]
+        routers = [a for a in agent_registry.all_agents() if a.get("role") == "router"]
         if len(routers) != 1:
             return None
         router = routers[0]

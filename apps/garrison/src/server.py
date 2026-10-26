@@ -586,7 +586,7 @@ def main() -> None:
     if SPEC.internal_role == "router":
         from src.agents.roles.router import router_service
 
-        role_info = {"internal_role": "router", "decision": router_service.status_summary()}
+        role_info = {"decision": router_service.status_summary()}
     if agent_config.PROVIDER_ID == "laya" and SPEC.internal_role != "router":
         from src.providers.decision import laya_provider
 
@@ -596,7 +596,7 @@ def main() -> None:
         mcp_upstream.warn_unmatched_tool_globs()
     agent_registry.register(
         _AGENT_ID, _AGENT_LABEL, _AGENT_URL,
-        entry=SPEC.entry, orchestrator=SPEC.orchestrator, focus=SPEC.focus,
+        entry=SPEC.entry, role=SPEC.role, focus=SPEC.focus,
         tiers=_OWN_TIERS, efforts=_OWN_EFFORTS, tool_allow=list(SPEC.tools.allow),
         delegable=SPEC.delegable,
         **role_info,

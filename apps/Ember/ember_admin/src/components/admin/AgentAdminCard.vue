@@ -41,15 +41,15 @@ const rows = computed(() =>
       <span v-if="shownStatus" class="status" data-test="status"><span aria-hidden="true">{{ STATUS_ICON[shownStatus] }}</span> {{ STATUS_TEXT[shownStatus] }}</span>
     </div>
     <code class="agent-id">{{ agent.id }}</code>
-    <div v-if="agent.entry || agent.orchestrator || agent.internal_role" class="tags">
-      <span v-if="agent.internal_role === 'router'" class="tag">Internal / Router</span>
+    <div v-if="agent.entry || agent.role === 'orchestrator' || agent.role === 'router'" class="tags">
+      <span v-if="agent.role === 'router'" class="tag">Internal / Router</span>
       <span v-if="agent.entry" class="tag entry-tag">Entry</span>
-      <span v-if="agent.orchestrator" class="tag">Orchestrator</span>
+      <span v-if="agent.role === 'orchestrator'" class="tag">Orchestrator</span>
     </div>
     <p v-if="agent.error" class="problem" role="alert">{{ agent.error }}</p>
     <template v-else>
       <p class="focus">{{ agent.focus || "No description." }}</p>
-      <p v-if="agent.internal_role === 'router'" class="focus">
+      <p v-if="agent.role === 'router'" class="focus">
         Local Laya triage<span v-if="agent.decision?.fallback !== false"> → Jev fallback</span>.
         Agent and model decisions are configured in Edit.
         <template v-if="decision?.fallback_available === false">Jev fallback unavailable: check the deployment credentials.</template>

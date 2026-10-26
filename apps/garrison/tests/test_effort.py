@@ -281,9 +281,9 @@ def test_register_publishes_efforts_only_when_there_are_some(monkeypatch, tmp_pa
 
 def test_specialists_carry_their_published_efforts(monkeypatch):
     agents = [
-        {"id": "orchestrator", "label": "Ember", "url": "u", "orchestrator": True},
-        {"id": "calc", "label": "Calc", "url": "u", "focus": "math", "efforts": ["off", "low", "bogus"]},
-        {"id": "poet", "label": "Poet", "url": "u", "focus": "poems"},
+        {"id": "orchestrator", "label": "Ember", "url": "u", "role": "orchestrator"},
+        {"role": "specialist", "id": "calc", "label": "Calc", "url": "u", "focus": "math", "efforts": ["off", "low", "bogus"]},
+        {"role": "specialist", "id": "poet", "label": "Poet", "url": "u", "focus": "poems"},
     ]
     monkeypatch.setattr(agent_registry, "reload", lambda: None)
     monkeypatch.setattr(agent_registry, "_AGENTS", agents)
@@ -328,7 +328,7 @@ def test_tool_description_names_each_specialists_effort_limit():
 
 
 def test_call_passes_reasoning_effort_to_ask(monkeypatch):
-    _configure_agents(monkeypatch, [{"id": "calc", "label": "Calc", "url": "http://c/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "calc", "label": "Calc", "url": "http://c/mcp"}])
     captured = {}
 
     async def _fake_call_tool(url, name, arguments, on_progress=None):
@@ -342,7 +342,7 @@ def test_call_passes_reasoning_effort_to_ask(monkeypatch):
 
 
 def test_call_joins_the_model_and_effort_notes(monkeypatch):
-    _configure_agents(monkeypatch, [{"id": "calc", "label": "Calc", "url": "http://c/mcp"}])
+    _configure_agents(monkeypatch, [{"role": "specialist", "id": "calc", "label": "Calc", "url": "http://c/mcp"}])
 
     async def _fake_call_tool(url, name, arguments, on_progress=None):
         return {"response": "4", "model_note": "heavy is not available for calc; ran on standard",

@@ -259,7 +259,7 @@ def test_main_registers_with_the_spec_flags(monkeypatch):
     args, kwargs = calls["register"]
     assert args[0] == server._AGENT_ID
     assert kwargs == {
-        "entry": server.SPEC.entry, "orchestrator": server.SPEC.orchestrator, "focus": server.SPEC.focus,
+        "entry": server.SPEC.entry, "role": server.SPEC.role, "focus": server.SPEC.focus,
         "tiers": [{"tier": "light", "id": "haiku", "use_for": "quick"}],
         "efforts": ["off", "low"],
         "tool_allow": list(server.SPEC.tools.allow),
@@ -307,7 +307,7 @@ def test_laya_load_failure_does_not_register_an_unavailable_agent(monkeypatch):
 def test_registry_route_serves_the_registry_as_json():
     from starlette.testclient import TestClient
 
-    agents = [{"id": "main", "label": "Main", "url": "http://10.0.0.5:9100/mcp", "entry": True}]
+    agents = [{"role": "specialist", "id": "main", "label": "Main", "url": "http://10.0.0.5:9100/mcp", "entry": True}]
     defined = [{"id": "main", "label": "Main", "enabled": True}, {"id": "off", "label": "Off", "enabled": False}]
     with (
         patch("src.server.agent_registry.reload"),
