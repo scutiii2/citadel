@@ -31,6 +31,7 @@ export interface CalendarEvent {
   location: string;
   description: string;
   sources: EventSource[];
+  cancelled: boolean;
 }
 
 export interface FeedProblem {

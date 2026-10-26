@@ -5,11 +5,11 @@ and re-exports what the script and its tests use.
 
 from __future__ import annotations
 
-from src.llm.decision import TRIAGE_COUNTS, TRIAGE_VOTERS
+from src.providers.decision.decision import TRIAGE_COUNTS, TRIAGE_VOTERS
 from dataclasses import replace
 
-from src.llm import decision, laya_model, laya_provider
-from src.llm.triage_flow import (
+from src.providers.decision import decision, laya_model, laya_provider
+from src.providers.decision.triage_flow import (
     CHECKPOINTS, DEFAULT_THRESHOLDS, ENGLISH, JEV, TYPED, TriageFlow,
 )
 

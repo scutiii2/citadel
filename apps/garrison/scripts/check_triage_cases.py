@@ -441,7 +441,7 @@ def select(names: list[str]) -> list[Case]:
 
 
 def apply_settings(baseline: bool, prune_ratio: float | None) -> None:
-    from src.llm import decision
+    from src.providers.decision import decision
 
     config = decision.ClassifierSettings() if baseline else decision.settings()
     if prune_ratio is not None:
@@ -494,7 +494,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         from types import SimpleNamespace
 
-        from src.llm import laya_provider
+        from src.providers.decision import laya_provider
 
         laya = SimpleNamespace(answer=laya_provider.answer, prepare=laya_provider.prepare)
         print("using the Laya service...", flush=True)

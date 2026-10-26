@@ -2,7 +2,6 @@
   "label": "Ember",
   "port": 9100,
   "entry": true,
-  "orchestrator": true,
   "memory_recall": true,
   "skill_recall": true,
   "llm": {
@@ -21,5 +20,6 @@
       "u_*"
     ],
     "deny": []
-  }
+  },
+  "role": "orchestrator"
 }

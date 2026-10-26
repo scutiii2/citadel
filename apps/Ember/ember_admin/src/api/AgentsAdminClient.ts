@@ -34,7 +34,7 @@ export interface AgentLlm {
 
 /** An agent file's content. Fields the form does not edit are kept as they are. */
 export interface AgentConfig {
-  internal_role?: "router";
+  role: "orchestrator" | "router" | "specialist";
   decision?: Partial<RouterPolicy>;
   label?: string;
   port: number;
@@ -42,7 +42,6 @@ export interface AgentConfig {
   url?: string;
   enabled?: boolean;
   entry?: boolean;
-  orchestrator?: boolean;
   /** Offer the update_plan checklist tool; on when unset. */
   plan_tool?: boolean;
   llm: AgentLlm;

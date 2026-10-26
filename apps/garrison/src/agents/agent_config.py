@@ -17,16 +17,18 @@ from typing import Any
 import anyio
 from dotenv import dotenv_values
 
-from src.agents import agent_spec, auto_route, delegation, memory_recall, skill_recall, skill_reflection
-from src.agents import router_routing
-from src.agents import plan as plan_policy
+from src.agents import agent_spec
+from src.agents.roles.orchestrator import auto_route, delegation, memory_recall, skill_recall, skill_reflection
+from src.agents.roles.router import router_routing
+from src.agents.roles.orchestrator import plan as plan_policy
 
-from src.core import approvals, internal_auth, questions, tool_filter, tuning_overrides
-from src.private_extensions import turn as private_turn
-from src.llm import auto_tier, context_breakdown, llm_config, llm_options, model_tiers, token_limits
-from src.llm import reasoning_effort as effort_limits
-from src.core.seed import seed_from_example
-from src.core.chat_history import validate_history
+from src.runtime import approvals, internal_auth, questions, tool_filter, tuning_overrides
+from src.tools.private_extensions import turn as private_turn
+from src.agents import auto_tier
+from src.providers import context_breakdown, llm_config, llm_options, model_tiers, token_limits
+from src.providers import reasoning_effort as effort_limits
+from src.runtime.seed import seed_from_example
+from src.runtime.chat_history import validate_history
 
 _SECRETS_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
 _log = logging.getLogger(__name__)
@@ -46,14 +48,14 @@ def _load_secrets_into_environ() -> None:
 # module is imported; .env only fills in what is still unset (setdefault).
 _load_secrets_into_environ()
 
-from src.llm import cancellation, cooldown  # noqa: E402
-from src.llm.base_provider import ChatCancelled, ChatResult  # noqa: E402
-from src.llm.model_limits import context_window_for  # noqa: E402
+from src.providers import cancellation, cooldown
+from src.providers.base_provider import ChatCancelled, ChatResult  # noqa: E402
+from src.providers.model_limits import context_window_for  # noqa: E402
 
 _PROVIDERS = {
-    "anthropic": "src.llm.anthropic_provider",
-    "openai": "src.llm.openai_provider",
-    "laya": "src.llm.laya_provider",
+    "anthropic": "src.providers.language.anthropic_provider",
+    "openai": "src.providers.language.openai_provider",
+    "laya": "src.providers.decision.laya_provider",
 }
 
 
@@ -102,7 +104,7 @@ def _read_only_check():
     if PROVIDER_ID == "laya":
         return None
     # Imported here: laya agents never load mcp_upstream.
-    from src.mcp_client import mcp_upstream
+    from src.tools.mcp_client import mcp_upstream
 
     return mcp_upstream.is_read_only_builtin
 
@@ -205,7 +207,7 @@ async def run_chat(
             raise ChatCancelled()
         if private:
             # Imported here: laya agents never load mcp_upstream.
-            from src.mcp_client import mcp_upstream
+            from src.tools.mcp_client import mcp_upstream
 
             await mcp_upstream.prefetch_private(private)
         # A confident classifier pick sends the question straight to a specialist, and this

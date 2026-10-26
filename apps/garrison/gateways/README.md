@@ -49,3 +49,13 @@ The gateway loader and admin catalog share these definitions and cache them
 for the process lifetime. Restart the agent processes and supervisor after
 editing gateway files. For rollback, use the previous code with the retained
 legacy file; copy any subsequent gateway changes back into that file first.
+
+## decision
+
+Provider folder `decision/` holds `laya.json` and `jev.json`. Laya is the
+local LayaModel service; its `strategy` selects any name offered by the
+service's `GET /v1/strategies` endpoint (default `english-then-typed`). The
+service URL is configured through `LAYA_SERVICE_URL`.
+
+Jev calls the TypeSafe API; its URL and model are preset in `jev.json`, and
+its credential is resolved from `TYPESAFE_API_KEY`.

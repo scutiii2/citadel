@@ -6,7 +6,7 @@ test("Router settings save explicitly, retain failed drafts and fit narrow scree
   state.permissions = [...ADMIN_ACCOUNT.permissions, "agents.manage"];
   await installFakeApi(page, state);
   let router: Record<string, unknown> = { id: "router", label: "Router", port: 9117,
-    internal_role: "router", enabled: true, entry: false, orchestrator: false, delegable: false,
+    role: "router", enabled: true, entry: false, delegable: false,
     plan_tool: false, tools: { deny: ["*"] }, llm: { provider: "laya", gateway: "local" }, decision: {} };
   let refuse = false;
   const writes: Record<string, unknown>[] = [];
@@ -43,7 +43,7 @@ test("Router settings save explicitly, retain failed drafts and fit narrow scree
   refuse = false;
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  expect(writes[0]).toMatchObject({ internal_role: "router", decision: { deadline_seconds: 8 },
+  expect(writes[0]).toMatchObject({ role: "router", decision: { deadline_seconds: 8 },
     tools: { deny: ["*"] }, delegable: false });
   expect(state.unexpected).toEqual([]);
 });

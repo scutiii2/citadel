@@ -1,0 +1,6 @@
+{
+  "label": "Jev (TypeSafe cloud)",
+  "url": "https://api.typesafe.ai/v1/systemone",
+  "model": "jev-latest",
+  "api_key": "{TYPESAFE_API_KEY}"
+}

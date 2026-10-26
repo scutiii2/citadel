@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { agentsAdminClient, type AgentFile } from "../api/AgentsAdminClient";
 import AgentsAdminView from "./AgentsAdminView.vue";
 
-const EMBER: AgentFile = { id: "ember", label: "Ember", port: 9100, entry: true, orchestrator: true, llm: { provider: "anthropic", gateway: "openrouter" } };
+const EMBER: AgentFile = { id: "ember", label: "Ember", port: 9100, entry: true, role: "orchestrator", llm: { provider: "anthropic", gateway: "openrouter" } };
 const CALC: AgentFile = {
   id: "calc", label: "Calc", port: 9103, focus: "Maths", temperature: 0.2,
   llm: { provider: "anthropic", gateway: "claude", temperature: 0.1 },
@@ -151,8 +151,25 @@ describe("per-agent gateway order", () => {
 });
 
 describe("AgentsAdminView", () => {
+  it("lets a router become a specialist without carrying its router policy", async () => {
+    const router: AgentFile = { id: "router", label: "Router", role: "router", port: 9117,
+      llm: { provider: "laya" }, decision: {}, delegable: false, plan_tool: false, tools: { deny: ["*"] } };
+    vi.mocked(agentsAdminClient.list).mockResolvedValue([router]);
+    const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(router);
+    const wrapper = await mounted();
+    await wrapper.find("[data-id=router] [data-test=edit]").trigger("click");
+    await wrapper.find("[data-test=role]").setValue("specialist");
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    const config = update.mock.calls[0]![1];
+    expect(config.role).toBe("specialist");
+    expect(config).not.toHaveProperty("decision");
+    expect(config).not.toHaveProperty("orchestrator");
+    expect(config).not.toHaveProperty("internal_role");
+    wrapper.unmount();
+  });
   it("edits Router policy while keeping its internal role and denied tools", async () => {
-    const router: AgentFile = { id: "router", label: "Router", port: 9117, internal_role: "router",
+    const router: AgentFile = { id: "router", label: "Router", port: 9117, role: "router",
       llm: { provider: "laya", gateway: "local" }, decision: {}, delegable: false,
       plan_tool: false, tools: { deny: ["*"] } };
     vi.mocked(agentsAdminClient.list).mockResolvedValue([EMBER, router]);
@@ -165,7 +182,7 @@ describe("AgentsAdminView", () => {
     expect(wrapper.find("[data-test=preview]").exists()).toBe(false);
     await wrapper.find("form").trigger("submit");
     await flushPromises();
-    expect(update.mock.calls[0]![1]).toMatchObject({ internal_role: "router", delegable: false,
+    expect(update.mock.calls[0]![1]).toMatchObject({ role: "router", delegable: false,
       decision: { deadline_seconds: 7 }, tools: { deny: ["*"] } });
     wrapper.unmount();
   });
@@ -204,7 +221,7 @@ describe("AgentsAdminView", () => {
     const [id, config] = create.mock.calls[0]!;
     expect(id).toBe("docs");
     expect(config).toMatchObject({
-      label: "Docs", port: 9104, url: "http://10.0.0.5:9104/mcp", enabled: true, entry: false,
+      label: "Docs", port: 9104, url: "http://10.0.0.5:9104/mcp", enabled: true, entry: false, role: "specialist",
       llm: { provider: "openai", gateway: "gpt" },
       persona: "Be brief.", tools: { allow: ["docs_*", "wiki_*"], deny: [] },
     });

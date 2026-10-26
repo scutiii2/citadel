@@ -31,7 +31,7 @@ describe("MemoryView", () => {
     client.list.mockResolvedValue([note(2, "Likes tea"), note(1, "Likes coffee")]);
     await setup();
     await wrapper.get('button[aria-label="Edit memory 1"]').trigger('click');
-    expect(wrapper.find('form.memory-editor').exists()).toBe(true);
+    expect(wrapper.find('form.editor').exists()).toBe(true);
     await wrapper.get('textarea').setValue('An unsaved correction');
     await wrapper.get('button[aria-label="Edit memory 2"]').trigger('click');
     await flushPromises();
@@ -57,7 +57,7 @@ describe("MemoryView", () => {
     client.update.mockResolvedValue(note(1, 'A correction'));
     await wrapper.get('form').trigger('submit');
     await flushPromises();
-    expect(wrapper.get<HTMLTextAreaElement>('form.memory-editor textarea').element.value).toBe('A correction');
+    expect(wrapper.get<HTMLTextAreaElement>('form.editor textarea').element.value).toBe('A correction');
     expect(wrapper.get('button[aria-label="Edit memory 1"]').attributes('aria-current')).toBe('true');
     expect(button('Save').attributes('disabled')).toBeDefined();
   });
@@ -110,7 +110,7 @@ describe("MemoryView", () => {
     confirm.click(); await flushPromises();
     expect(client.remove).toHaveBeenCalledWith(1);
     expect(wrapper.text()).toContain("No saved memories yet.");
-    expect(wrapper.find("form.memory-editor").exists()).toBe(false);
+    expect(wrapper.find("form.editor").exists()).toBe(false);
   });
   it("keeps the editor draft when deletion is cancelled", async () => {
     await setup();
@@ -120,7 +120,7 @@ describe("MemoryView", () => {
     document.body.querySelector<HTMLButtonElement>("dialog[aria-label='Delete this memory?'] .cancel")!.click();
     await flushPromises();
     expect(wrapper.get("textarea").element.value).toBe("A corrected preference");
-    expect(wrapper.find("form.memory-editor").exists()).toBe(true);
+    expect(wrapper.find("form.editor").exists()).toBe(true);
     expect(client.remove).not.toHaveBeenCalled();
   });
   it("shows a recoverable loading failure", async () => {

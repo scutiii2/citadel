@@ -10,9 +10,9 @@ import argparse
 import json
 import time
 
-from src.agents.router_contract import RouterPolicy, RouteCandidate, RouteRequest, RouteTier
-from src.agents.router_engine import RouterEngine
-from src.llm import decision
+from src.agents.roles.router.router_contract import RouterPolicy, RouteCandidate, RouteRequest, RouteTier
+from src.agents.roles.router.router_engine import RouterEngine
+from src.providers.decision import decision
 
 CASES = [
     ("general", "What is a prime number?", "none", "tiny"),

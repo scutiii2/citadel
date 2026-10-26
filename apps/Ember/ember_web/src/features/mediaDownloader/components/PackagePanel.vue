@@ -120,7 +120,7 @@ small { display: block; }
 .muted, .state { color: var(--muted); font-size: .85em; }
 .error { color: var(--danger); white-space: pre-line; overflow-wrap: anywhere; }
 .result { display: flex; flex-direction: column; gap: 10px; }
-.danger-zone { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 14px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-lg); font-size: .85em; }
+.danger-zone { margin-top: 14px; }
 .packages :deep(button.action) { border-radius: var(--radius-full); }
 .packages :deep(button.action .label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
 .packages { padding: 0; border: 0; border-radius: 0; background: transparent; }

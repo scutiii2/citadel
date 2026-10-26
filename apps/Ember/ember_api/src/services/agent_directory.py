@@ -144,15 +144,15 @@ def parse_definitions(raw: Any) -> list[AgentDefinition]:
                     id=item["id"],
                     label=item["label"],
                     entry=item.get("entry") is True,
-                    orchestrator=item.get("orchestrator") is True,
+                    orchestrator=item.get("role") == "orchestrator",
                     focus=focus if isinstance(focus, str) else "",
                     enabled=item.get("enabled") is not False,
                     provider=_text_or_none(llm.get("provider")),
                     gateway=_text_or_none(llm.get("gateway")),
                     model=_text_or_none(llm.get("model")),
                     tiers=_parse_tiers(llm.get("tiers")),
-                    internal_role="router" if item.get("internal_role") == "router" else None,
-                    decision=_decision_summary(item.get("decision")) if item.get("internal_role") == "router" else None,
+                    internal_role="router" if item.get("role") == "router" else None,
+                    decision=_decision_summary(item.get("decision")) if item.get("role") == "router" else None,
                 )
             )
     return found
@@ -170,10 +170,10 @@ def parse_registry(raw: Any) -> list[AgentEntry]:
                     label=item["label"],
                     url=item["url"],
                     entry=item.get("entry") is True,
-                    orchestrator=item.get("orchestrator") is True,
+                    orchestrator=item.get("role") == "orchestrator",
                     focus=focus if isinstance(focus, str) else "",
-                    internal_role="router" if item.get("internal_role") == "router" else None,
-                    decision=_decision_summary(item.get("decision")) if item.get("internal_role") == "router" else None,
+                    internal_role="router" if item.get("role") == "router" else None,
+                    decision=_decision_summary(item.get("decision")) if item.get("role") == "router" else None,
                 )
             )
     return entries

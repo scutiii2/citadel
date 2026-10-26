@@ -8,7 +8,7 @@ Sends the triage example schema below through the same provider path agents use.
 import json
 
 from scripts.check_triage_cases import CATEGORY, NEEDS_INVESTIGATION, SEVERITY
-from src.llm import laya_provider
+from src.providers.decision import laya_provider
 
 TRIAGE_QUESTIONS = {"category": CATEGORY, "severity": SEVERITY, "needs_investigation": NEEDS_INVESTIGATION}
 

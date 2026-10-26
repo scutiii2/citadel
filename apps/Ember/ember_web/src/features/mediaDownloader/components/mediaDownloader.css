@@ -9,6 +9,7 @@
 .error { color: var(--danger); overflow-wrap: anywhere; }
 button.primary { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); border-radius: var(--radius-full); }
 button.primary :deep(.icon) { stroke: currentColor; }
+.danger-zone { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-lg); font-size: .85em; }
 button.danger { border-color: var(--danger); color: var(--danger); border-radius: var(--radius-full); }
 button.danger :deep(.icon) { stroke: currentColor; }
 .kind { color: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 2px 5px; font-size: .75em; text-transform: uppercase; }

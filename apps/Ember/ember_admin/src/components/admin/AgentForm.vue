@@ -32,7 +32,7 @@ const EFFORTS = ["off", "low", "medium", "high"];
 const TIERS = ["light", "standard", "heavy", "extreme"];
 
 const editing = computed(() => props.initial !== null);
-const isRouter = computed(() => props.initial?.internal_role === "router");
+const isRouter = computed(() => role.value === "router");
 const decision = ref(routerPolicyDefaults());
 const id = ref("");
 const label = ref("");
@@ -40,7 +40,7 @@ const port = ref("");
 const url = ref("");
 const enabled = ref(true);
 const entry = ref(false);
-const orchestrator = ref(false);
+const role = ref<"orchestrator" | "router" | "specialist">("specialist");
 const planTool = ref(true);
 const provider = ref("anthropic");
 const gatewayRows = ref<GatewayRow[]>([{ key: 0, gateway: "", model: "" }]);
@@ -96,7 +96,7 @@ const initialDraft = ref("");
 function draftSignature(): string {
   return JSON.stringify([
     id.value, label.value, port.value, url.value, enabled.value, entry.value,
-    orchestrator.value, planTool.value, provider.value,
+    role.value, planTool.value, provider.value,
     gatewayRows.value.map(({ gateway, model }) => [gateway, model]),
     effort.value, minTier.value, maxTier.value, identity.value, temperature.value,
     maxTokens.value, maxToolRounds.value, maxTurnTokens.value, maxTurnSeconds.value, maxEffort.value, persona.value,
@@ -119,7 +119,7 @@ watch(
     url.value = a?.url ?? "";
     enabled.value = a?.enabled ?? true;
     entry.value = a?.entry ?? false;
-    orchestrator.value = a?.orchestrator ?? false;
+    role.value = a?.role ?? "specialist";
     planTool.value = a?.plan_tool !== false;
     provider.value = a?.llm?.provider ?? providerIds.value[0] ?? "anthropic";
     gatewayRows.value = [
@@ -157,7 +157,7 @@ watch(provider, () => {
   gatewayRows.value = [{ key: 0, gateway: "", model: "" }];
   if (isLaya.value) {
     entry.value = false;
-    orchestrator.value = false;
+    if (role.value === "orchestrator") role.value = "specialist";
   }
 }, { flush: "sync" });
 
@@ -242,7 +242,7 @@ function buildConfig(): AgentConfig | null {
     url: url.value.trim(),
     enabled: enabled.value,
     entry: entry.value,
-    orchestrator: orchestrator.value,
+    role: role.value,
     llm,
     identity: identity.value,
     persona: persona.value,
@@ -254,15 +254,15 @@ function buildConfig(): AgentConfig | null {
   if (planTool.value) delete config.plan_tool;
   else config.plan_tool = false;
   if (isRouter.value) {
-    config.internal_role = "router";
     config.decision = decision.value;
     config.entry = false;
-    config.orchestrator = false;
     config.delegable = false;
     config.memory_recall = false;
     config.plan_tool = false;
     config.tools = { allow: [], deny: ["*"] };
     config.llm = { provider: "laya", gateway: "local", model: "convaiinnovations/laya" };
+  } else {
+    delete config.decision;
   }
   delete config.routing; // ai_agent rejects the retired routing option, also in files saved earlier
   for (const key of ["label", "url", "identity", "persona", "instructions", "focus"]) if (!config[key]) delete config[key];
@@ -378,7 +378,13 @@ function previewPrompt(): void {
 
       <div class="switches">
         <ToggleSwitch :checked="enabled" data-test="enabled" @change="enabled = ($event.target as HTMLInputElement).checked">Enabled</ToggleSwitch>
-        <ToggleSwitch v-if="!isRouter" :checked="orchestrator" :disabled="isLaya" data-test="orchestrator" @change="orchestrator = ($event.target as HTMLInputElement).checked">Orchestrator (can hand work to other agents)</ToggleSwitch>
+        <label class="field"><span>Role</span>
+          <select v-model="role" data-test="role" :disabled="busy">
+            <option value="orchestrator" :disabled="isLaya">Orchestrator</option>
+            <option value="router">Router</option>
+            <option value="specialist">Specialist</option>
+          </select>
+        </label>
         <ToggleSwitch v-if="!isRouter" :checked="planTool" :disabled="isLaya" data-test="plan-tool" @change="planTool = ($event.target as HTMLInputElement).checked">Task checklist (can show a step-by-step plan; chats can also turn it off)</ToggleSwitch>
         <ToggleSwitch v-if="!isRouter" :checked="entry" :disabled="isLaya" data-test="entry" @change="entry = ($event.target as HTMLInputElement).checked">Entry agent (receives every new question)</ToggleSwitch>
       </div>
