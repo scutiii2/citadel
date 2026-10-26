@@ -154,7 +154,9 @@ preference), `src/components/` (reusable pieces only), `src/router/`,
    of a checkbox), `LockSwitch` (ember_admin only: a setting an admin can force on),
    `SegmentedControl` (period/tab pickers; Admin, Logs and Usage use it),
    `BaseModal` (every dialog: `AddExtensionModal`, `ToolRunModal`, ...),
-   `SaveButton`, `CopyButton`.
+   `SaveButton`, `CopyButton`. Dialog buttons use the global `pill-btn primary` /
+   `pill-btn ghost` classes, and a dropdown that closes on an outside press uses
+   the `useOutsideClose` composable.
    Look in `src/components/` before writing a new one.
 5. **Styling**: theme tokens from `src/style.css` (`--bg`, `--surface`,
    `--text`, `--muted`, `--border`, `--accent`, `--accent-contrast`,

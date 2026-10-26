@@ -24,6 +24,8 @@ Copy-ready CSS for the recurring pieces. All values are tokens from [tokens.css]
 button:disabled { cursor: default; opacity: 0.5; }
 ```
 
+In ember_web the Cancel / Save pills of a dialog are not copied per component: `style.css` has `.pill-btn` with `.primary` and `.ghost` variants and its disabled state, and the busy ring on `button[aria-busy="true"]`. Use those; keep the CSS above for a new app.
+
 Card-style action button (`SaveButton.vue`): `--radius-md`, `1px solid --border`, `--surface` fill, `box-shadow: 0 1px 4px rgba(0,0,0,.15)`; toggled state inverts to `--text` on `--bg`.
 
 `DeleteButton.vue`: red pill with bin icon; while `busy` the label letters fall into the bin, the button shrinks to a circle and a ring spins. Pattern to reuse: a busy state shown on the control itself.
