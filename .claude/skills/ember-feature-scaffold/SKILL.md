@@ -148,6 +148,7 @@ preference), `src/components/` (reusable pieces only), `src/router/`,
    (`components/NavRail.vue`) and the Overview tiles. Don't
    add a page that duplicates one: Tools was merged into Capabilities
    (`/tools` redirects), so put tool UI there (`CapabilitySection`
+   and `SupermarketItem` share `CapabilityHeading`, the icon tile, name and summary;
    rows that open `ToolRunModal`). To keep its state across tab switches, add it
    to the `KeepAlive include` list (cache is keyed per account already).
 4. **Shared controls - reuse, don't hand-roll**: `ToggleSwitch` (pill, instead

@@ -560,7 +560,6 @@ summary > [aria-hidden], .summary-hint { color: var(--muted); }
 .mobile-tools-toggle { display: none; }
 .form-error { margin: 12px 20px; }
 .library-publishing { margin: 24px 10px 0; border-top: 1px solid var(--border); }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 @media (min-width: 1200px) { .writing { padding-inline: max(36px, calc((100% - 760px) / 2)); } }
 @media (max-width: 900px) and (min-width: 768px) { .writing { padding-inline: 22px; } .note-tools { padding-inline: 20px; } }
 @media (max-width: 767px) {

@@ -51,6 +51,7 @@ These live in `ember_web` only (not copied to admin). A page that needs one of t
 | Leaving a page with unsaved edits asks first (route change and tab close) | `useUnsavedGuard({ dirty, busy?, allow? })`; bind the page's `ConfirmModal` to its `open` and `answer` | `composables/` |
 | Reorder a list by drag and Alt + arrow keys | `useReorder({ move, count, keys })`; bind its handlers to each item | `composables/` |
 | "2 KB" / "1 file" text | `formatBytes`, `plural` | `utils/format.ts` |
+| Text only for screen readers | class `sr-only` (global, in `style.css`); never a local copy | `style.css` |
 | Busy spinner on a button | just set `aria-busy`; `style.css` draws the ring, so add no local `::before` or keyframes | `style.css` |
 | List pane plus editor with Save | `ListEditorLayout` | `components/layout/` |
 | Two panes or a stacked workspace | `WorkspaceLayout` | `components/layout/` |
