@@ -86,8 +86,8 @@ def _auto_route_settings(raw: Any) -> AutoRouteSettings:
     if not isinstance(raw.get("enabled", False), bool):
         raise ValueError(f"{where}.enabled must be true or false")
     confidence = raw.get("min_confidence", AutoRouteSettings.min_confidence)
-    if isinstance(confidence, bool) or not isinstance(confidence, int) or not 0 <= confidence <= 100:
-        raise ValueError(f"{where}.min_confidence must be an integer from 0 to 100")
+    if isinstance(confidence, bool) or not isinstance(confidence, int) or not 1 <= confidence <= 100:
+        raise ValueError(f"{where}.min_confidence must be a percentage from 1 to 100")
     return AutoRouteSettings(enabled=raw.get("enabled", False), strategy=_feature_strategy(raw, where), min_confidence=confidence)
 
 
@@ -103,8 +103,8 @@ def _auto_tier_settings(raw: Any) -> AutoTierSettings:
     if not isinstance(raw.get("enabled", False), bool):
         raise ValueError(f"{where}.enabled must be true or false")
     confidence = raw.get("min_confidence", AutoTierSettings.min_confidence)
-    if isinstance(confidence, bool) or not isinstance(confidence, int) or not 0 <= confidence <= 100:
-        raise ValueError(f"{where}.min_confidence must be an integer from 0 to 100")
+    if isinstance(confidence, bool) or not isinstance(confidence, int) or not 1 <= confidence <= 100:
+        raise ValueError(f"{where}.min_confidence must be a percentage from 1 to 100")
     mapping = dict(DEFAULT_SIZE_TIERS)
     given = raw.get("tiers", {})
     if not isinstance(given, dict):

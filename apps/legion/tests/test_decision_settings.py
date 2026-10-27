@@ -90,3 +90,12 @@ def test_tuning_edit_refreshes_settings_reader(monkeypatch, tmp_path):
     tuning_overrides.poll(overlay)
     assert settings.settings().timeout_seconds == 4
     assert settings.settings() is not before_new
+
+
+def test_feature_min_confidence_must_be_at_least_one(monkeypatch):
+    for feature in ("auto_tier", "auto_route"):
+        monkeypatch.setattr(settings, "read_section", lambda path, name, default=None, f=feature: {f: {"min_confidence": 0}})
+        settings.reset_cache()
+        with pytest.raises(ValueError, match="1 to 100"):
+            settings.settings()
+    settings.reset_cache()

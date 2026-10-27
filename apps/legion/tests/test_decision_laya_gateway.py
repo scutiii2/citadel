@@ -76,3 +76,12 @@ def test_not_available_when_not_configured():
     service = FakeService()
     service.configured = False
     assert LayaGateway(service).available() is False
+
+
+def test_invalid_gateway_file_is_a_decision_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(llm_config, "GATEWAYS_DIR", tmp_path)
+    path = tmp_path / "decision" / "laya.json"
+    path.parent.mkdir()
+    path.write_text("{not json", encoding="utf-8")
+    with pytest.raises(DecisionError, match="laya.json"):
+        LayaGateway(FakeService({"answers": {}})).ask(DecisionRequest("hi", QUESTION))

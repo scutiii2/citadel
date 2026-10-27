@@ -42,7 +42,8 @@ def test_save_none_resets_a_path(tuning):
     ("token_limits.default.max_tool_rounds", True),        # bool is not a number
     ("token_limits.default.max_tool_rounds", 2.5),         # int field
     ("classifier.timeout_seconds", 0),                     # open lower bound
-    ("classifier.auto_tier.min_confidence", 101),          # confidence range
+    ("classifier.auto_tier.min_confidence", 101),
+    ("classifier.auto_tier.min_confidence", 0),            # Laya needs a floor above zero          # confidence range
     ("classifier.auto_route.min_confidence", True),        # bool is not confidence
     ("nonsense", 1),
 ])
@@ -102,7 +103,7 @@ def test_every_allowed_extreme_is_accepted_by_the_real_loaders(tuning, monkeypat
         "gateway_failover.unavailable_cooldown_seconds": 0, "classifier.timeout_seconds": 60,
         "classifier.max_input_chars": 1, "classifier.auto_tier.strategy": "laya-only",
         "classifier.auto_tier.min_confidence": 100, "classifier.auto_route.strategy": "jev-only",
-        "classifier.auto_route.min_confidence": 0,
+        "classifier.auto_route.min_confidence": 1,
     }
     tuning_overrides.save(extremes, overlay)
     monkeypatch.setattr(token_limits, "_CONFIG_PATH", path)
@@ -113,7 +114,7 @@ def test_every_allowed_extreme_is_accepted_by_the_real_loaders(tuning, monkeypat
     try:
         assert token_limits.limits_for("openai", "ollama")["max_context_tokens"] == 2_000_000
         assert settings.settings().auto_tier.strategy == "laya-only"
-        assert settings.settings().auto_route.min_confidence == 0
+        assert settings.settings().auto_route.min_confidence == 1
     finally:
         token_limits.reset_cache()
         settings.reset_cache()

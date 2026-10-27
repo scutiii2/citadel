@@ -426,7 +426,9 @@ def load_file(path: Path) -> AgentSpec:
                 or check.boolean(data, "plan_tool", True) or "*" not in tools.deny):
             raise check.fail("role", "router requires the decision provider, no entry, no delegation, no tools, memory or plan")
         try:
-            policy = RouterPolicy.model_validate(data.get("decision", {}))
+            # llm.strategy/min_confidence are the defaults; an explicit `decision` entry overrides them.
+            policy = RouterPolicy.model_validate(
+                {"strategy": llm.strategy, "min_confidence": llm.min_confidence, **data.get("decision", {})})
         except ValueError as error:
             raise check.fail("decision", str(error)) from error
     elif "decision" in data:

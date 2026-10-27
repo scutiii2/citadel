@@ -50,7 +50,7 @@ _add(r"gateway_failover\.(?:quota|auth|unavailable)_cooldown_seconds", Rule("num
 _add(r"classifier\.timeout_seconds", Rule("number", 0, 60, low_open=True))
 _add(r"classifier\.max_input_chars", Rule("int", 1, 1_000_000))
 _add(r"classifier\.auto_(?:tier|route)\.strategy", Rule("enum"))
-_add(r"classifier\.auto_(?:tier|route)\.min_confidence", Rule("int", 0, 100))
+_add(r"classifier\.auto_(?:tier|route)\.min_confidence", Rule("int", 1, 100))
 
 
 def _rule_for(path: str) -> Rule:

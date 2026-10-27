@@ -390,3 +390,15 @@ def test_start_loads_laya_environment_before_validation(monkeypatch):
         supervisor.main()
     assert seen == [("http://laya.test", "process-token")]
     assert "UNRELATED_STARTUP_TEST_KEY" not in supervisor.os.environ
+
+
+@pytest.mark.parametrize(("auto_route", "expected"), [
+    (SimpleNamespace(enabled=True, strategy="both"), True),
+    (SimpleNamespace(enabled=True, strategy="jev-only"), False),
+    (SimpleNamespace(enabled=False, strategy="both"), False),
+])
+def test_features_using_laya_count_for_the_start_check(monkeypatch, auto_route, expected):
+    off = SimpleNamespace(enabled=False, strategy="both")
+    monkeypatch.setattr(supervisor.classifier_settings, "settings",
+                        lambda: SimpleNamespace(auto_tier=off, auto_route=auto_route))
+    assert supervisor._uses_laya([SimpleNamespace(role="specialist", enabled=True, llm=SimpleNamespace(provider="anthropic", strategy=None))]) is expected

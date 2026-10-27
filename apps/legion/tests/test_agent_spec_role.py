@@ -71,3 +71,12 @@ def test_decision_block_only_for_router(tmp_path):
 def test_decision_provider_cannot_be_an_orchestrator(tmp_path):
     with pytest.raises(AgentSpecError, match="decision"):
         load(tmp_path, {"port": 9111, "role": "orchestrator", "llm": {"provider": "decision"}})
+
+
+def test_router_inherits_llm_strategy_unless_decision_overrides(tmp_path):
+    router = {"port": 9117, "role": "router", "entry": False, "delegable": False, "plan_tool": False,
+              "tools": {"allow": [], "deny": ["*"]}}
+    inherited = load(tmp_path, {**router, "llm": {"provider": "decision", "strategy": "laya-only", "min_confidence": 0.8}})
+    assert (inherited.decision.strategy, inherited.decision.min_confidence) == ("laya-only", 0.8)
+    overridden = load(tmp_path, {**router, "llm": {"provider": "decision", "strategy": "laya-only"}, "decision": {"strategy": "jev-only"}})
+    assert overridden.decision.strategy == "jev-only"

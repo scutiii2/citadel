@@ -34,7 +34,7 @@ from dotenv import dotenv_values
 from src.agents import agent_registry, agent_spec, prompt_config
 from src.agents.agent_spec import AgentSpec
 from src.providers import llm_config
-from src.providers.decision import laya_model
+from src.providers.decision import laya_model, settings as classifier_settings
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MAX_CRASHES = 5
@@ -343,6 +343,19 @@ class Supervisor:
             await asyncio.to_thread(self._deregister, child.spec.id)
 
 
+def _uses_laya(specs) -> bool:
+    """True when a decision agent, or an enabled auto_tier/auto_route feature, may ask the Laya gateway."""
+    if any(spec.enabled and spec.llm.provider == "decision"
+           and (spec.decision.strategy if spec.role == "router" else spec.llm.strategy) != "jev-only"
+           for spec in specs):
+        return True
+    try:
+        features = classifier_settings.settings()
+    except ValueError:  # an invalid classifier section is reported by the agents that read it
+        return False
+    return any(f.enabled and f.strategy != "jev-only" for f in (features.auto_tier, features.auto_route))
+
+
 def check_laya_strategy(uses_laya: bool) -> None:
     if not uses_laya:
         return
@@ -370,10 +383,7 @@ def main() -> None:
     for key, value in dotenv_values(PROJECT_ROOT / ".env").items():
         if key in {"LAYA_SERVICE_URL", "LAYA_TOKEN"} and value:
             os.environ.setdefault(key, value)
-    check_laya_strategy(uses_laya=any(
-        spec.enabled and spec.llm.provider == "decision"
-        and (spec.decision.strategy if spec.role == "router" else spec.llm.strategy) != "jev-only"
-        for spec in specs))
+    check_laya_strategy(uses_laya=_uses_laya(specs))
     try:
         asyncio.run(Supervisor(specs, watch_dir=agent_spec.AGENTS_DIR, restart_on=[prompt_config.PATH]).run())
     except KeyboardInterrupt:

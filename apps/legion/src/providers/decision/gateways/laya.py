@@ -4,6 +4,7 @@ Which service strategy answers is gateway config (gateways/decision/laya.json `s
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from src.providers import llm_config
@@ -29,11 +30,16 @@ class LayaGateway:
 
     @property
     def strategy(self) -> str:
+        """Read from disk on every call, so editing laya.json needs no restart."""
         path = llm_config.GATEWAYS_DIR / "decision" / "laya.json"
         try:
-            block = llm_config._read_block(path)
+            block = json.loads(path.read_text(encoding="utf-8"))
         except FileNotFoundError:
             return DEFAULT_STRATEGY
+        except (OSError, ValueError) as error:
+            raise DecisionError(f"{path.name} cannot be read as JSON: {error}") from error
+        if not isinstance(block, dict):
+            raise DecisionError(f"{path.name} must contain a JSON object")
         return str(block.get("strategy") or DEFAULT_STRATEGY)
 
     def available(self) -> bool:
@@ -42,10 +48,11 @@ class LayaGateway:
     def ask(self, request: DecisionRequest, timeout: float | None = None) -> GatewayResult:
         if len(request.text) > MAX_CHARS:
             raise DecisionError(f"Laya takes at most {MAX_CHARS} characters of text")
+        strategy = self.strategy
         try:
-            body = self._client().ask(self.strategy, request.text, request.questions, WINDOW,
+            body = self._client().ask(strategy, request.text, request.questions, WINDOW,
                                       min_confidence=request.min_confidence, timeout=timeout)
         except LayaServiceError as error:
             raise DecisionError(str(error)) from error
         tokens = sum(call.get("input_tokens") or 0 for call in body.get("calls", []))
-        return GatewayResult(body["answers"], tokens, self.strategy)
+        return GatewayResult(body["answers"], tokens, strategy)
