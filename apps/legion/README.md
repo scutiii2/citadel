@@ -208,6 +208,21 @@ stopped after 5 crashes within 5 minutes, the others keep running).
 To run one agent alone, set `AI_AGENT_FILE` to its file and run
 `python -m src.server`.
 
+## Upgrading from Garrison
+
+`git` moves only tracked files when `apps/garrison` becomes `apps/legion`. Copy the untracked
+local state yourself, with the services stopped:
+
+```powershell
+Copy-Item apps\garrison\.env apps\legion\.env
+Copy-Item -Recurse apps\garrison\.data apps\legion\.data
+Copy-Item apps\garrison\configs\config_*.json apps\legion\configs```
+
+Then recreate the virtual environment as `.venv_legion` (see Setup) and point any local
+`ember_api` `config_app.json` `agents_registry_path` at `../../legion/.data/agent_registry.json`.
+Stored agent overrides in `.data/agent_overrides.json` that still use `orchestrator` or
+`internal_role` are upgraded to `role` when loaded.
+
 ## Running on another machine
 
 ember_api finds agents through the registry. On the same machine it reads
@@ -235,7 +250,15 @@ Agents with `llm.provider: "decision"` answer typed JSON questions without tools
 text generation. Their `llm.strategy` is `laya-only`, `jev-only` or `both` (default),
 and their `llm.min_confidence` defaults to 0.90. With `both`, Laya answers first;
 Jev receives only questions that Laya fails to settle. `local_only: true` forces
-Laya only. An uncertain last answer stays marked `uncertain`.
+Laya only. An uncertain last answer stays marked `uncertain`. A later gateway's answer
+replaces an earlier one only when it settles the question or is at least as confident.
+Without `"trace": true` the answers leave out the service's `rounds`, `voters` and
+`options` detail.
+
+Confidence scales differ on purpose: agents and the router use a fraction (0.01 to 1,
+default 0.90); `classifier.auto_tier` and `classifier.auto_route` use a whole percentage
+(1 to 100). Zero is refused because the Laya service needs a value above zero. A router
+takes its `strategy` and `min_confidence` from `llm` unless its `decision` block sets them.
 
 Send `{"text": "...", "questions": {...}}`. Each question has a `type`, optional
 `instructions`, and `criteria`: a map of options for `choice`, an ordered list of
