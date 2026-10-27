@@ -419,6 +419,9 @@ function onKeydown(event: KeyboardEvent): void {
       <p v-else-if="paramContext" class="hint" aria-hidden="true">Tab picks · Enter runs</p>
       <p v-else class="hint" aria-hidden="true">Tab picks (a command opens its form) · Enter runs</p>
     </div>
+    <p v-if="independent" class="independent-note" role="note">
+      Independent prompts is on: each request and response is standalone and does not include the earlier messages of this chat.
+    </p>
     <ul v-if="attachments.length" class="attachments">
       <li v-for="a in attachments" :key="a.id" :class="a.state" :title="a.error || a.filename">
         <span class="name">
@@ -695,6 +698,15 @@ function onKeydown(event: KeyboardEvent): void {
   margin: 0 0 4px 12px;
   font-size: 0.75em;
   color: var(--muted);
+}
+.independent-note {
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+  color: var(--warning);
+  font-size: 0.8rem;
 }
 .attachments {
   display: flex;

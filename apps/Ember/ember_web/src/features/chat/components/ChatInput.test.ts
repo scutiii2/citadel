@@ -966,3 +966,10 @@ it("toggles independent prompts from the button beside Send", async () => {
   await wrapper.setProps({ independent: true });
   expect(wrapper.get("button.independent").attributes("aria-pressed")).toBe("true");
 });
+
+it("warns that requests are standalone only while independent prompts is on", async () => {
+  const wrapper = mountInput({ independent: false });
+  expect(wrapper.find(".independent-note").exists()).toBe(false);
+  await wrapper.setProps({ independent: true });
+  expect(wrapper.get(".independent-note").text()).toContain("does not include the earlier messages");
+});
