@@ -15,8 +15,6 @@ defineProps<{
   status?: "ok" | "bad" | "off";
   /** The summary is a problem (an extension that is not connected). */
   problem?: boolean;
-  /** A line under the name (why an extension cannot be reached). */
-  detail?: string;
 }>();
 </script>
 
@@ -29,7 +27,6 @@ defineProps<{
   <span class="heading">
     <h3>{{ label }}</h3>
     <code class="name">{{ name }}</code>
-    <span v-if="detail" class="detail">{{ detail }}</span>
   </span>
   <span :class="['summary', problem ? 'bad' : 'muted']">{{ summary }}</span>
 </template>
@@ -88,11 +85,6 @@ h3 {
   font-family: var(--mono);
   font-size: 0.8em;
   color: var(--muted);
-  overflow-wrap: anywhere;
-}
-.detail {
-  font-size: 0.8em;
-  color: var(--danger);
   overflow-wrap: anywhere;
 }
 .summary {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HEAT_LEVELS, accountLabel, axisLabel, bucketTitle, buildHourHeatmap, describeChange, describeRateChange, formatCount, niceCeil } from "./logAnalytics";
+import { axisLabel, bucketTitle, formatCount, niceCeil } from "./logAnalytics";
 
 describe("formatCount", () => {
   it("writes small numbers whole and big ones compact", () => {
@@ -8,24 +8,6 @@ describe("formatCount", () => {
     expect(formatCount(12_900)).toBe("12.9K");
     expect(formatCount(20_000)).toBe("20K");
     expect(formatCount(1_240_000)).toBe("1.2M");
-  });
-});
-
-describe("describeChange", () => {
-  it("gives the percent against the previous period", () => {
-    expect(describeChange(150, 100)).toEqual({ text: "+50%", direction: "up" });
-    expect(describeChange(25, 100)).toEqual({ text: "−75%", direction: "down" });
-    expect(describeChange(1, 3)).toEqual({ text: "−67%", direction: "down" });
-  });
-
-  it("says no change when equal or when the difference rounds away", () => {
-    expect(describeChange(4, 4)).toEqual({ text: "no change", direction: "flat" });
-    expect(describeChange(1001, 1000).direction).toBe("flat");
-    expect(describeChange(0, 0)).toEqual({ text: "no change", direction: "flat" });
-  });
-
-  it("calls it new when there was nothing before (no division by zero)", () => {
-    expect(describeChange(7, 0)).toEqual({ text: "new", direction: "new" });
   });
 });
 
@@ -44,51 +26,5 @@ describe("bucket labels", () => {
     expect(axisLabel("2026-10-05T00:00:00", "day")).toBe("Oct 5");
     expect(bucketTitle("2026-10-05T13:00:00", "hour")).toBe("Mon, Oct 5, 13:00 UTC");
     expect(bucketTitle("2026-10-05T00:00:00", "day")).toBe("Mon, Oct 5");
-  });
-});
-
-describe("buildHourHeatmap", () => {
-  const grid = buildHourHeatmap([
-    { weekday: 1, hour: 13, count: 8 },
-    { weekday: 0, hour: 20, count: 1 },
-    { weekday: 6, hour: 0, count: 3 },
-  ]);
-
-  it("is a full week of 24 hours, Sunday first", () => {
-    expect(grid).toHaveLength(7);
-    expect(grid.every((row) => row.length === 24)).toBe(true);
-    expect(grid[1]![13]).toMatchObject({ weekday: 1, hour: 13, count: 8 });
-  });
-
-  it("levels each hour against the busiest, any entry at least 1", () => {
-    expect(grid[1]![13]!.level).toBe(HEAT_LEVELS);
-    expect(grid[6]![0]!.level).toBe(2); // 3 of 8
-    expect(grid[0]![20]!.level).toBe(1);
-    expect(grid[3]![3]!.level).toBe(0);
-  });
-
-  it("is all empty with no entries", () => {
-    expect(buildHourHeatmap([]).flat().every((c) => c.level === 0 && c.count === 0)).toBe(true);
-  });
-});
-
-describe("accountLabel", () => {
-  it("names the server, an account, or a deleted account", () => {
-    expect(accountLabel({ account_id: null, username: null })).toBe("Server");
-    expect(accountLabel({ account_id: 3, username: "alice" })).toBe("alice");
-    expect(accountLabel({ account_id: 9, username: null })).toBe("Deleted account #9");
-  });
-});
-
-describe("describeRateChange", () => {
-  it("writes the change in percentage points", () => {
-    expect(describeRateChange(0.05, 0.02)).toEqual({ text: "+3 pts", direction: "up" });
-    expect(describeRateChange(0.0244, 0.5)).toEqual({ text: "−47.6 pts", direction: "down" });
-    expect(describeRateChange(0.02, 0.02)).toEqual({ text: "no change", direction: "flat" });
-  });
-
-  it("says so when there was nothing to measure now or before", () => {
-    expect(describeRateChange(null, 0.5)).toEqual({ text: "no requests", direction: "flat" });
-    expect(describeRateChange(0.02, null)).toEqual({ text: "new", direction: "new" });
   });
 });

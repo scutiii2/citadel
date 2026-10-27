@@ -3,6 +3,7 @@ import PasswordInput from "../../../components/ui/forms/PasswordInput.vue";
 import { ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AuthCard from "../../../components/auth/AuthCard.vue";
+import { errorMessage } from "../../../utils/errors";
 import { safeRedirect } from "../../../router/redirect";
 import { useAuthStore } from "../../../stores/auth";
 
@@ -24,7 +25,7 @@ async function submit(): Promise<void> {
     password.value = "";
     await router.replace(safeRedirect(route.query.redirect));
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorMessage(err);
   } finally {
     busy.value = false;
   }
