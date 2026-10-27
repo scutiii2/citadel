@@ -17,9 +17,9 @@ const tokens = (n: number): string => n.toLocaleString();
       <div>
         <span class="call-agent">{{ record.agent_id ?? record.agent ?? "unknown" }}</span>
         <span v-if="record.delegated_by" class="muted"> ← {{ record.delegated_by }}</span>
-        <span v-if="record.kind === 'summary'" class="chip">summary</span>
-        <span v-if="record.provider_id" class="chip">{{ record.provider_id }}</span>
-        <span v-if="record.gateway" class="chip">{{ record.gateway }}</span>
+        <span v-if="record.kind === 'summary'" class="call-chip">summary</span>
+        <span v-if="record.provider_id" class="call-chip">{{ record.provider_id }}</span>
+        <span v-if="record.gateway" class="call-chip">{{ record.gateway }}</span>
       </div>
       <div class="muted small">{{ localTime(record.started_at ?? record.created_at) }}<template v-if="record.model"> · {{ record.model }}</template></div>
     </div>
@@ -63,14 +63,6 @@ const tokens = (n: number): string => n.toLocaleString();
   flex-direction: column;
   align-items: flex-end;
   font-variant-numeric: tabular-nums;
-}
-.chip {
-  margin-left: 6px;
-  padding: 1px 8px;
-  border-radius: var(--radius-full);
-  font-size: 0.8em;
-  color: var(--muted);
-  background: var(--code-bg);
 }
 .muted {
   color: var(--muted);

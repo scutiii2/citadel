@@ -220,17 +220,4 @@ button:disabled {
   background: transparent;
 }
 
-button[aria-busy="true"]:not(.delete-button)::before {
-  content: "";
-  display: inline-block;
-  width: 0.85em;
-  height: 0.85em;
-  margin-right: 6px;
-  vertical-align: middle;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: var(--radius-full);
-  animation: pending-spin 0.75s linear infinite;
-}
-@keyframes pending-spin { to { transform: rotate(360deg); } }
 </style>

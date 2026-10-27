@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { formatBytes, formatDuration, formatEta, formatExpiry, formatSpeed, plural } from './format'
+import { formatDuration, formatEta, formatExpiry, formatSpeed } from './format'
 
 describe('format', () => {
-  it('formats bytes', () => {
-    expect(formatBytes(512)).toBe('512 B')
-    expect(formatBytes(2048)).toBe('2 KB')
-    expect(formatBytes(5 * 1024 * 1024)).toBe('5.0 MB')
-    expect(formatBytes(3 * 1024 ** 3)).toBe('3.00 GB')
-  })
-
   it('formats durations', () => {
     expect(formatDuration(null)).toBe('')
     expect(formatDuration(65)).toBe('1:05')
@@ -30,8 +23,4 @@ describe('format', () => {
     expect(formatExpiry(1000 + 5 * 3600 + 12 * 60, 1000)).toBe('5 h 12 min')
   })
 
-  it('pluralizes', () => {
-    expect(plural(1, 'file')).toBe('1 file')
-    expect(plural(2, 'file')).toBe('2 files')
-  })
 })

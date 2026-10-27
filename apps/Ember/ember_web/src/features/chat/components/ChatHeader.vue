@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from "vue";
 import type { AgentUsage, ContextPart } from "../../../api/types";
+import { useOutsideClose } from "../../../composables/useOutsideClose";
 import type { MenuItem } from "../../../components/ui/menus/menuTypes";
 import type { ContextAccuracy } from "../utils/contextAccuracy";
 import { useAuthStore } from "../../../stores/auth";
@@ -43,10 +44,6 @@ const MENU_WIDTH = 210;
 const panelOpen = ref(false);
 const contextBox = useTemplateRef<HTMLElement>("contextBox");
 
-function closePanelOnOutside(event: PointerEvent): void {
-  if (!contextBox.value?.contains(event.target as Node)) panelOpen.value = false;
-}
-
 function closePanelOnEscape(event: KeyboardEvent): void {
   if (event.key !== "Escape") return;
   panelOpen.value = false;
@@ -54,20 +51,15 @@ function closePanelOnEscape(event: KeyboardEvent): void {
 }
 
 watch(panelOpen, (open) => {
-  if (open) {
-    document.addEventListener("pointerdown", closePanelOnOutside);
-    document.addEventListener("keydown", closePanelOnEscape);
-  } else {
-    document.removeEventListener("pointerdown", closePanelOnOutside);
-    document.removeEventListener("keydown", closePanelOnEscape);
-  }
+  if (open) document.addEventListener("keydown", closePanelOnEscape);
+  else document.removeEventListener("keydown", closePanelOnEscape);
 });
+useOutsideClose(contextBox, panelOpen, () => { panelOpen.value = false; });
 // No breakdown any more (another chat, the setting off): nothing to show.
 watch(() => props.breakdown, (breakdown) => {
   if (!breakdown) panelOpen.value = false;
 });
 onBeforeUnmount(() => {
-  document.removeEventListener("pointerdown", closePanelOnOutside);
   document.removeEventListener("keydown", closePanelOnEscape);
 });
 

@@ -36,7 +36,7 @@ class TicketLaya:
         self._timeout = timeout
 
     async def _ask(self, text: str, questions: dict[str, Any]) -> dict[str, Any]:
-        # local_only: Laya's own models answer (English and typed-decisions, as ai_agent's triage_enabled allows); a ticket never goes on to the fallback classifier (Jev).
+        # local_only: Laya's configured service strategy answers locally; a ticket never goes on to the fallback classifier (Jev).
         payload = {"text": text, "questions": questions, "min_confidence": self._min_confidence, "local_only": True}
         reply = await asyncio.wait_for(self._transport.ask(payload), self._timeout)
         return reply["answers"]

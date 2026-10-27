@@ -2,7 +2,8 @@
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
-import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
+import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { ticketsClient, type NewTicket, type Ticket, type TicketStatus } from "./api/TicketsClient";
 import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
 import ListRow from "../../components/ui/lists/ListRow.vue";
@@ -137,26 +138,13 @@ const reply = computed({
   get: () => activeDetailId.value === null ? "" : replies[activeDetailId.value] ?? "",
   set: (value: string) => { if (activeDetailId.value !== null) replies[activeDetailId.value] = value; },
 });
-const discardDrafts = ref(false);
-let leaveAnswer: ((value: boolean) => void) | null = null;
 const hasDrafts = computed(() => !!draft.title.trim() || !!draft.description.trim() || Object.values(replies).some(value => !!value.trim()));
-function answerLeave(discard: boolean): void {
-  discardDrafts.value = false;
-  leaveAnswer?.(discard);
-  leaveAnswer = null;
-}
-onBeforeRouteLeave(to => {
-  if (to.path === '/tickets' || /^\/tickets\/\d+$/.test(to.path)) return true;
-  if (saving.value || replying.value) return false;
-  if (!hasDrafts.value) return true;
-  discardDrafts.value = true;
-  return new Promise<boolean>(resolve => { leaveAnswer = resolve; });
+const { open: discardDrafts, answer: answerLeave } = useUnsavedGuard({
+  dirty: () => hasDrafts.value,
+  busy: () => saving.value || replying.value,
+  // Moving between the list and a ticket keeps the drafts.
+  allow: to => to.path === '/tickets' || /^\/tickets\/\d+$/.test(to.path),
 });
-function beforeUnload(event: BeforeUnloadEvent): void {
-  if (hasDrafts.value) { event.preventDefault(); event.returnValue = ""; }
-}
-onMounted(() => window.addEventListener("beforeunload", beforeUnload));
-onUnmounted(() => window.removeEventListener("beforeunload", beforeUnload));
 const replying = ref(false);
 const confirmOpen = ref(false);
 const closing = ref(false);
@@ -450,7 +438,6 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .send-reply { min-width: 76px; min-height: 40px; }
 .notice { max-height: 20%; overflow: auto; }
 .new-ticket { min-height: 40px; }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .tickets button:focus-visible, .tickets input:focus-visible, .tickets select:focus-visible, .tickets textarea:focus-visible, .conversation:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); vertical-align: -1px; animation: ticket-spin .7s linear infinite; }
 @keyframes ticket-spin { to { transform: rotate(360deg); } }

@@ -258,7 +258,7 @@ it("keeps a pending prompt editor owned across close and reopen", async () => {
   expect(wrapper.find("form").exists()).toBe(false);
 });
 
-it("Close asks to discard and Cancel retains the prompt", async () => {
+it("Close asks to discard and Cancel retains the prompt; confirming steps back to the list", async () => {
   const wrapper = await openModal();
   await wrapper.find("button.primary").trigger("click");
   await wrapper.find("textarea").setValue("Unfinished");
@@ -268,5 +268,6 @@ it("Close asks to discard and Cancel retains the prompt", async () => {
   expect((wrapper.find("textarea").element as HTMLTextAreaElement).value).toBe("Unfinished");
   await wrapper.find("button.close").trigger("click");
   await wrapper.getComponent(ConfirmModal).get(".confirm").trigger("click");
-  expect(wrapper.emitted("close")).toHaveLength(1);
+  expect(wrapper.find("form").exists()).toBe(false);
+  expect(wrapper.emitted("close")).toBeUndefined();
 });

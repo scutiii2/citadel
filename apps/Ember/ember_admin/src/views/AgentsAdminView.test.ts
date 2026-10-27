@@ -12,7 +12,7 @@ const CALC: AgentFile = {
 const PROVIDERS = {
   anthropic: [{ id: "claude", label: "Claude", model: "m", tiers: [{ tier: "light", id: "haiku" }, { tier: "standard", id: "sonnet" }, { tier: "heavy", id: "opus" }, { tier: "extreme", id: "fable" }] }, { id: "openrouter", label: "OpenRouter", model: "m", tiers: [] }],
   openai: [{ id: "gpt", label: "GPT", model: "m", tiers: [] }],
-  laya: [{ id: "local", label: "Local", model: "m", tiers: [] }],
+  decision: [{ id: "laya", label: "Laya", model: "", tiers: [] }, { id: "jev", label: "Jev", model: "jev-latest", tiers: [] }],
 };
 
 // jsdom has no <dialog> methods.
@@ -140,11 +140,13 @@ describe("per-agent gateway order", () => {
     expect(wrapper.findAll("[data-test=gateway-row]")).toHaveLength(1);
     expect(wrapper.find<HTMLSelectElement>("[data-test=gateway]").element.value).toBe("");
     expect(wrapper.find<HTMLInputElement>("[data-test=model]").element.value).toBe("");
-    await wrapper.find("[data-test=provider]").setValue("laya");
+    await wrapper.find("[data-test=provider]").setValue("decision");
     expect(wrapper.find("[data-test=add-gateway]").exists()).toBe(false);
+    await wrapper.find("[data-test=decision-strategy]").setValue("jev-only");
+    await wrapper.find("[data-test=min-confidence]").setValue("0.85");
     await wrapper.find("form").trigger("submit");
     await flushPromises();
-    expect(update.mock.calls[0]![1].llm.provider).toBe("laya");
+    expect(update.mock.calls[0]![1].llm).toEqual({ provider: "decision", strategy: "jev-only", min_confidence: 0.85 });
     expect(update.mock.calls[0]![1].llm).not.toHaveProperty("fallback_gateways");
     wrapper.unmount();
   });
@@ -153,7 +155,7 @@ describe("per-agent gateway order", () => {
 describe("AgentsAdminView", () => {
   it("lets a router become a specialist without carrying its router policy", async () => {
     const router: AgentFile = { id: "router", label: "Router", role: "router", port: 9117,
-      llm: { provider: "laya" }, decision: {}, delegable: false, plan_tool: false, tools: { deny: ["*"] } };
+      llm: { provider: "decision" }, decision: {}, delegable: false, plan_tool: false, tools: { deny: ["*"] } };
     vi.mocked(agentsAdminClient.list).mockResolvedValue([router]);
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(router);
     const wrapper = await mounted();
@@ -170,20 +172,22 @@ describe("AgentsAdminView", () => {
   });
   it("edits Router policy while keeping its internal role and denied tools", async () => {
     const router: AgentFile = { id: "router", label: "Router", port: 9117, role: "router",
-      llm: { provider: "laya", gateway: "local" }, decision: {}, delegable: false,
+      llm: { provider: "decision", strategy: "both", min_confidence: 0.9 }, decision: { strategy: "laya-only" }, delegable: false,
       plan_tool: false, tools: { deny: ["*"] } };
     vi.mocked(agentsAdminClient.list).mockResolvedValue([EMBER, router]);
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(router);
     const wrapper = await mounted();
     expect(wrapper.find("[data-id=router]").text()).toContain("Internal / Router");
+    expect(wrapper.find("[data-id=router]").text()).toContain("Local Laya only");
     await wrapper.find("[data-id=router] [data-test=edit]").trigger("click");
     await wrapper.find("[data-test=routing-deadline]").setValue("7");
     expect(wrapper.find("[data-test=allow]").exists()).toBe(false);
     expect(wrapper.find("[data-test=preview]").exists()).toBe(false);
+    expect(wrapper.find("[data-test=decision-strategy]").exists()).toBe(false);
     await wrapper.find("form").trigger("submit");
     await flushPromises();
     expect(update.mock.calls[0]![1]).toMatchObject({ role: "router", delegable: false,
-      decision: { deadline_seconds: 7 }, tools: { deny: ["*"] } });
+      decision: { deadline_seconds: 7, strategy: "laya-only", min_confidence: 0.9 }, tools: { deny: ["*"] } });
     wrapper.unmount();
   });
   it("lists agents with model, port and live status", async () => {
@@ -436,7 +440,7 @@ describe("AgentsAdminView", () => {
     const wrapper = await mounted();
     await wrapper.find("[data-id=calc] [data-test=edit]").trigger("click");
     await wrapper.find("[data-test=max-turn-tokens]").setValue("invalid");
-    await wrapper.find("[data-test=provider]").setValue("laya");
+    await wrapper.find("[data-test=provider]").setValue("decision");
     expect(wrapper.find("[data-test=run-limits]").exists()).toBe(false);
     await wrapper.find("form").trigger("submit");
     await flushPromises();

@@ -107,14 +107,6 @@ const emit = defineEmits<{ reset: [] }>();
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
 @media (pointer: coarse), (max-width: 767px) {
   button.reset { min-width: 44px; min-height: 44px; }
 }

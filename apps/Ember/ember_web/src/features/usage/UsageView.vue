@@ -300,7 +300,7 @@ onMounted(() => {
                   <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m6 3 5 5-5 5" /></svg>
                   <span class="turn-main">
                     <span class="call-agent">{{ t.lead }}</span>
-                    <span class="chip">{{ t.rows.length }} calls</span>
+                    <span class="call-chip">{{ t.rows.length }} calls</span>
                     <span class="muted small turn-time">{{ localTime(t.at) }}</span>
                   </span>
                   <strong class="turn-total">{{ tokens(t.total) }}<template v-if="t.cost !== null"> · {{ formatCost(t.cost, usage.report.currency) }}</template></strong>
@@ -540,14 +540,6 @@ th {
 }
 .turn-calls :deep(.call:first-child) {
   padding-top: 4px;
-}
-.chip {
-  margin-left: 6px;
-  padding: 1px 8px;
-  border-radius: var(--radius-full);
-  font-size: 0.8em;
-  color: var(--muted);
-  background: var(--code-bg);
 }
 .muted {
   color: var(--muted);

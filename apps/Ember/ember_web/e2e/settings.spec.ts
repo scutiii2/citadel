@@ -125,24 +125,3 @@ test("account settings stay unsaved, can be reverted, and protect navigation", a
   await expect(page).toHaveURL(/capabilities$/);
   expect(api.unexpected).toEqual([]);
 });
-
-
-test("the account triage strategy is a draft until Save and Default clears it", async ({ page }) => {
-  const api = await installFakeApi(page);
-  await logIn(page);
-  await page.goto("/settings");
-  const select = page.getByRole("combobox", { name: "Triage strategy", exact: true });
-  await expect(select).toHaveValue("");
-  await select.selectOption("typed-only");
-  expect(api.triageStrategy).toBeNull();
-  await page.getByRole("group", { name: "Unsaved settings", exact: true }).getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.locator(".settings-save-bar")).toHaveCount(0);
-  expect(api.triageStrategy).toBe("typed-only");
-  await page.reload();
-  await expect(select).toHaveValue("typed-only");
-  await select.selectOption("");
-  await page.getByRole("group", { name: "Unsaved settings", exact: true }).getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.locator(".settings-save-bar")).toHaveCount(0);
-  expect(api.triageStrategy).toBeNull();
-  expect(api.unexpected).toEqual([]);
-});

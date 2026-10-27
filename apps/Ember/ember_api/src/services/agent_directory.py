@@ -106,8 +106,10 @@ class AgentListing:
 def _decision_summary(raw: Any) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
-    fields = ("choose_agent", "choose_tier", "english", "typed", "fallback", "fallback_available")
+    fields = ("choose_agent", "choose_tier", "fallback_available")
     safe = {k: raw[k] for k in fields if isinstance(raw.get(k), bool)}
+    if raw.get("strategy") in ("laya-only", "jev-only", "both"):
+        safe["strategy"] = raw["strategy"]
     seconds = raw.get("deadline_seconds")
     if isinstance(seconds, (int, float)) and not isinstance(seconds, bool) and 1 <= seconds <= 30:
         safe["deadline_seconds"] = seconds

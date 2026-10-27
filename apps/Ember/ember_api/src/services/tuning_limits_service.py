@@ -2,7 +2,7 @@
 """Per-account response limits: how many tokens an answer may use and how many tool rounds it may take.
 
 One document per account in treasury (collection "tuning_limits", key the account uid), like
-nav_preferences. A missing field means "use the admin's value". garrison applies them as
+nav_preferences. A missing field means "use the admin's value". legion applies them as
 min(user, admin), so they can only lower what the admin allows."""
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from src.services.db_gateway import DocumentStore
 
 COLLECTION = "tuning_limits"
 FIELDS = ("max_output_tokens", "max_tool_rounds")
-# Same outer bounds garrison's allowlist uses for these two keys.
+# Same outer bounds legion's allowlist uses for these two keys.
 BOUNDS = {"max_output_tokens": (1, 200_000), "max_tool_rounds": (1, 100)}
 
 

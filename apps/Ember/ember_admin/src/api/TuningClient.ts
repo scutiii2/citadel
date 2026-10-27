@@ -1,17 +1,17 @@
 // apps/Ember/ember_admin/src/api/TuningClient.ts
 import { apiRequest } from "./http";
 
-/** garrison's editable tuning as ember_api returns it (/api/admin/tuning). */
+/** legion's editable tuning as ember_api returns it (/api/admin/tuning). */
 export interface TuningView {
   /** What config_tuning.json says (editable sections only). */
   defaults: Record<string, unknown>;
   /** What an admin changed: dotted path -> value. */
-  overrides: Record<string, number | boolean>;
+  overrides: Record<string, number | boolean | string>;
   /** The two merged; what the agents use. */
   effective: Record<string, unknown>;
 }
 
-export type TuningChanges = Record<string, number | boolean | null>;
+export type TuningChanges = Record<string, number | boolean | string | null>;
 
 export const tuningClient = {
   /** tuning.manage only. */

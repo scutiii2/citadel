@@ -18,7 +18,7 @@ const shownStatus = computed<AgentStatus | undefined>(() => props.status ?? (pro
 const gatewayOrder = computed(() => {
   const llm = props.agent.llm;
   if (!llm) return "";
-  const defaults: Record<string, string> = { anthropic: "claude", openai: "gpt", laya: "local" };
+  const defaults: Record<string, string> = { anthropic: "claude", openai: "gpt" };
   const primary = llm.gateway || defaults[llm.provider];
   return [primary, ...(llm.fallback_gateways ?? []).map((choice) =>
     typeof choice === "string" ? choice : choice.gateway)].filter(Boolean).join(" → ");
@@ -26,7 +26,8 @@ const gatewayOrder = computed(() => {
 const rows = computed(() =>
   [
     { label: "Provider", value: props.agent.llm?.provider },
-    { label: props.agent.llm?.fallback_gateways?.length ? "Gateway order" : "Gateway", value: gatewayOrder.value },
+    { label: props.agent.llm?.provider === "decision" ? "Strategy" : props.agent.llm?.fallback_gateways?.length ? "Gateway order" : "Gateway",
+      value: props.agent.llm?.provider === "decision" ? props.agent.decision?.strategy ?? props.agent.llm.strategy ?? "both" : gatewayOrder.value },
     { label: "Model", value: props.agent.llm?.model },
     { label: "Port", value: props.agent.port === undefined ? "" : String(props.agent.port) },
     { label: "URL", value: props.agent.url },
@@ -50,7 +51,7 @@ const rows = computed(() =>
     <template v-else>
       <p class="focus">{{ agent.focus || "No description." }}</p>
       <p v-if="agent.role === 'router'" class="focus">
-        Local Laya triage<span v-if="agent.decision?.fallback !== false"> → Jev fallback</span>.
+        {{ agent.decision?.strategy === "jev-only" ? "Jev only" : agent.decision?.strategy === "laya-only" ? "Local Laya only" : "Local Laya → Jev fallback" }}.
         Agent and model decisions are configured in Edit.
         <template v-if="decision?.fallback_available === false">Jev fallback unavailable: check the deployment credentials.</template>
         <template v-if="decision?.local_status === 'unavailable'">Local checkpoints unavailable: prepare the cached models.</template>

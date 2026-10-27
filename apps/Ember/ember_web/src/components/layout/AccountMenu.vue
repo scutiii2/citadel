@@ -3,8 +3,9 @@
 // Usage, Settings, Profile, the theme switch, Ember Admin (for admins) and Log out.
 // It closes on Esc, a press outside, a route change or a choice; arrow keys move
 // between the rows.
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { nextTick, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
+import { useOutsideClose } from "../../composables/useOutsideClose";
 import { useTheme } from "../../composables/useTheme";
 import { PROFILE_ICON, type NavPage } from "../../router/pages";
 
@@ -71,10 +72,6 @@ function onKey(event: KeyboardEvent): void {
   }
 }
 
-function onPointerDown(event: Event): void {
-  if (open.value && root.value && !root.value.contains(event.target as Node)) close();
-}
-
 /** A capability's own page keeps Capabilities marked. */
 const isCurrent = (to: string): boolean => to === "/capabilities" && route.name === "capability-page";
 
@@ -84,8 +81,7 @@ function logout(): void {
 }
 
 watch(() => route.fullPath, () => close());
-onMounted(() => document.addEventListener("pointerdown", onPointerDown));
-onBeforeUnmount(() => document.removeEventListener("pointerdown", onPointerDown));
+useOutsideClose(root, open, () => close());
 </script>
 
 <template>

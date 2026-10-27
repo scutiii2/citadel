@@ -173,7 +173,6 @@ export interface FakeApi {
   memories: Map<number, { id: number; text: string; created_at: string }>;
   /** What the Settings tab saves: the administrator's "require approval for every tool". */
   settings: { forceToolApproval: boolean };
-  triageStrategy: string | null;
   /** The accounts the Admin page lists (an administrator login only). */
   accounts: Map<number, StoredAccount>;
   /** Requests that no handler knew, as "METHOD /path". */
@@ -265,7 +264,6 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     disabledAgents: new Set(),
     userExtensions: new Map(),
     settings: { forceToolApproval: false },
-    triageStrategy: null,
     accounts: new Map(),
     capabilities: new Map(),
     roles: new Map(),
@@ -445,10 +443,6 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       }
       if (method === "DELETE") { responseLimits = { max_output_tokens: null, max_tool_rounds: null }; return route.fulfill({ status: 204 }); }
       return json(route, { limits: responseLimits, ceiling: { max_output_tokens: 2048, max_tool_rounds: 15 } });
-    }
-    if (path === "/api/account/triage-strategy" && ["GET", "PUT"].includes(method)) {
-      if (method === "PUT") api.triageStrategy = request.postDataJSON().value;
-      return json(route, { value: api.triageStrategy, default: "auto", strategies: ["english-only", "typed-only", "auto"] });
     }
     if (method === "GET" && path === "/api/settings") {
       return json(route, { force_tool_approval: api.settings.forceToolApproval, calendar_inapp: true, calendar_email: true, calendar_push: false });

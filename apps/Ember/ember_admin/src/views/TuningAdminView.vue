@@ -10,19 +10,19 @@ import { errorMessage } from "../utils/errors";
 import "../components/admin/admin.css";
 
 /** One editable value: where it lives in config_tuning.json, how to label it, and its bounds
- * (the same ones garrison enforces; garrison's answer is what the page shows on a refusal). */
+ * (the same ones legion enforces; legion's answer is what the page shows on a refusal). */
 interface Field {
   path: string;
   label: string;
-  kind: "int" | "number" | "bool";
+  kind: "int" | "number" | "bool" | "enum";
+  options?: string[];
   unit?: string;
   min?: number;
   max?: number;
 }
 interface Group { id: string; title: string; note: string; fields: Field[] }
 
-const VOTERS = ["laya-english", "laya-typed", "jev"];
-const KINDS = ["choice", "noul", "score"];
+const STRATEGIES = ["laya-only", "jev-only", "both"];
 
 const GROUPS: Group[] = [
   {
@@ -42,58 +42,49 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    id: "classifier", title: "Classifier", note: "Changes how questions are routed. Nothing checks the result of an edit, so change one value at a time.",
+    id: "classifier", title: "Classifier", note: "Timeout and input limits for automatic routing and tier decisions.",
     fields: [
       { path: "classifier.timeout_seconds", label: "Timeout", kind: "number", unit: "s", min: 0.1, max: 60 },
       { path: "classifier.max_input_chars", label: "Max input characters", kind: "int", min: 1, max: 1000000 },
-      { path: "classifier.triage_window", label: "Triage window", kind: "int", min: 512, max: 32768 },
-      { path: "classifier.triage_prune_ratio", label: "Prune ratio", kind: "number", min: 0, max: 0.99 },
-      { path: "classifier.triage_pair_ratio", label: "Pair ratio", kind: "number", min: 0.01, max: 1 },
-      { path: "classifier.triage_fallback", label: "Use the fallback classifier", kind: "bool" },
-      { path: "classifier.triage_trace", label: "Trace decisions", kind: "bool" },
     ],
   },
-  {
-    id: "thresholds", title: "Confidence thresholds", note: "A voter's answer counts only above this confidence. 2 = two options, 3+ = three or more.",
-    fields: ["2", "3+"].flatMap((count) => VOTERS.map((voter): Field => ({
-      path: `classifier.triage_thresholds.${count}.${voter}`, label: `${voter}, ${count} options`, kind: "number", min: 0.01, max: 1,
-    }))),
-  },
-  {
-    id: "voters", title: "Voters", note: "Which voter may answer which kind of question.",
-    fields: VOTERS.flatMap((voter) => KINDS.map((kind): Field => ({
-      path: `classifier.triage_enabled.${voter}.${kind}`, label: `${voter}, ${kind}`, kind: "bool",
-    }))),
-  },
+  ...(["auto_tier", "auto_route"] as const).map((feature): Group => ({
+    id: feature, title: feature === "auto_tier" ? "Automatic model tier" : "Automatic specialist routing",
+    note: "Gateway strategy and confidence for this feature. Enable the feature in its configuration file.",
+    fields: [
+      { path: `classifier.${feature}.strategy`, label: "Decision strategy", kind: "enum", options: STRATEGIES },
+      { path: `classifier.${feature}.min_confidence`, label: "Minimum confidence", kind: "int", min: 0, max: 100, unit: "%" },
+    ],
+  })),
 ];
 
 const view = ref<TuningView | null>(null);
-const draft = ref<Record<string, number | boolean | null>>({});
+const draft = ref<Record<string, number | boolean | string | null>>({});
 const loadError = ref("");
 const saveError = ref("");
 const saving = ref(false);
 
 /** Reads `a.b.c` out of a nested object. */
-function at(source: Record<string, unknown> | undefined, path: string): number | boolean | undefined {
+function at(source: Record<string, unknown> | undefined, path: string): number | boolean | string | undefined {
   let node: unknown = source;
   for (const part of path.split(".")) {
     if (typeof node !== "object" || node === null) return undefined;
     node = (node as Record<string, unknown>)[part];
   }
-  return typeof node === "number" || typeof node === "boolean" ? node : undefined;
+  return typeof node === "number" || typeof node === "boolean" || typeof node === "string" ? node : undefined;
 }
 
 const dirty = computed(() => Object.keys(draft.value).length > 0);
 const isChanged = (path: string): boolean => path in (view.value?.overrides ?? {});
 /** What the field shows: the draft when edited, else the value the agents use now. */
-function shown(field: Field): number | boolean | "" {
+function shown(field: Field): number | boolean | string {
   if (field.path in draft.value) return draft.value[field.path] ?? at(view.value?.defaults, field.path) ?? "";
   return at(view.value?.effective, field.path) ?? "";
 }
 
 function edit(field: Field, raw: string | boolean): void {
   saveError.value = "";
-  const next = field.kind === "bool" ? raw === true : raw === "" ? NaN : Number(raw);
+  const next = field.kind === "enum" ? String(raw) : field.kind === "bool" ? raw === true : raw === "" ? NaN : Number(raw);
   const current = at(view.value?.effective, field.path);
   if (Number.isNaN(next) || next === current) delete draft.value[field.path];
   else draft.value[field.path] = next;
@@ -166,6 +157,8 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
           <button v-if="isChanged(field.path) && draft[field.path] !== null" type="button" class="small" data-test="reset" :disabled="saving" :aria-label="`Reset ${field.label}`" @click="reset(field)">Reset</button>
           <ToggleSwitch v-if="field.kind === 'bool'" :id="field.path" :data-path="field.path" :aria-label="field.label" :checked="shown(field) === true" :disabled="saving"
             @change="edit(field, ($event.target as HTMLInputElement).checked)" />
+          <select v-else-if="field.kind === 'enum'" :id="field.path" :data-path="field.path" :aria-label="field.label" :value="shown(field)" :disabled="saving"
+            @change="edit(field, ($event.target as HTMLSelectElement).value)"><option v-for="option in field.options" :key="option" :value="option">{{ option }}</option></select>
           <input v-else :id="field.path" :data-path="field.path" :aria-label="field.label" type="number" :min="field.min" :max="field.max" :step="field.kind === 'int' ? 1 : 'any'" :value="shown(field)" :disabled="saving"
             @input="edit(field, ($event.target as HTMLInputElement).value)" />
           <span v-if="field.unit" class="muted">{{ field.unit }}</span>
@@ -185,7 +178,7 @@ onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); an
 </template>
 
 <style scoped>
-input[type="number"] { width: 10em; min-width: 0; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; }
+input[type="number"], select { width: 10em; min-width: 0; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; }
 .save-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); }
 .save-bar .msg { flex: 1 1 200px; font-size: 0.9em; }
 .dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--accent); }

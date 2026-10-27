@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, useId, useTemplateRef } from "vue";
+import { nextTick, ref, useId, useTemplateRef } from "vue";
+import { useOutsideClose } from "../../../composables/useOutsideClose";
 import { ALLOW_ALL_CONFIRM, APPROVAL_MODES, approvalLabel, type ApprovalMode } from "../utils/approvalMode";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 
@@ -89,11 +90,7 @@ function onMenuKey(event: KeyboardEvent): void {
   }
 }
 
-function onDocumentClick(event: MouseEvent): void {
-  if (open.value && root.value && !root.value.contains(event.target as Node)) open.value = false;
-}
-onMounted(() => document.addEventListener("click", onDocumentClick));
-onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
+useOutsideClose(root, open, () => { open.value = false; }, "click");
 </script>
 
 <template>

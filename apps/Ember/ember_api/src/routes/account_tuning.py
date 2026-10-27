@@ -33,7 +33,7 @@ class LimitsOut(BaseModel):
 
 
 async def _ceiling(admin: AgentAdmin, account: Account) -> LimitsBody:
-    """The admin's current values (what the user's own can not exceed); empty when garrison is unreachable."""
+    """The admin's current values (what the user's own can not exceed); empty when legion is unreachable."""
     try:
         default = (await admin.tuning(account))["effective"]["token_limits"]["default"]
     except (AgentAdminUnavailable, AgentAdminRefused, KeyError, TypeError):
@@ -61,7 +61,7 @@ async def save_limits(
     service: TuningLimitsService = Depends(get_limits_service),
     admin: AgentAdmin = Depends(get_agent_admin),
 ) -> LimitsOut:
-    """Saves both values (null clears one). Refused while garrison is unreachable, because
+    """Saves both values (null clears one). Refused while legion is unreachable, because
     the admin's current value is the cap."""
     try:
         admin_values = (await admin.tuning(account))["effective"]["token_limits"]["default"]

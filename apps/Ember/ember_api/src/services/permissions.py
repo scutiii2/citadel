@@ -65,7 +65,7 @@ ALL_PERMISSIONS = MappingProxyType({
     LOGS_CHAT_PROMPTS_VIEW: "Read the prompts each agent received in the chat-turn log (needs logs.chat.view)",
     CONFIG_ISSUES_VIEW: "See problems in ember_api's config and secret files",
     TRAFFIC_VIEW: "See network traffic charts (requests, latency, upstream calls)",
-    TUNING_MANAGE: "Change garrison's runtime tuning (token limits, failover, classifier)",
+    TUNING_MANAGE: "Change legion's runtime tuning (token limits, failover, classifier)",
     AGENTS_MANAGE: "Create, edit and remove ai_agent agents (provider, gateway, persona, tools)",
     TICKETS_CREATE: "Report bugs, suggest features and follow your own tickets",
     TICKETS_MANAGE: "See every ticket, triage them and set status, priority and assignee",

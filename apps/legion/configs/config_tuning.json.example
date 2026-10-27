@@ -1,0 +1,42 @@
+{
+  "gateway_failover": {
+    "quota_cooldown_seconds": 3600,
+    "auth_cooldown_seconds": 3600,
+    "unavailable_cooldown_seconds": 30
+  },
+  "token_limits": {
+    "default": {
+      "max_output_tokens": 2048,
+      "max_context_tokens": 100000,
+      "max_tool_rounds": 15
+    },
+    "anthropic": {},
+    "openai": {
+      "gateways": {
+        "ollama": {
+          "max_context_tokens": 16384
+        }
+      }
+    }
+  },
+  "classifier": {
+    "timeout_seconds": 3.0,
+    "max_input_chars": 16000,
+    "auto_tier": {
+      "enabled": false,
+      "strategy": "both",
+      "min_confidence": 80,
+      "tiers": {
+        "tiny": "light",
+        "everyday": "light",
+        "large": "standard",
+        "hardest": "heavy"
+      }
+    },
+    "auto_route": {
+      "enabled": false,
+      "strategy": "both",
+      "min_confidence": 80
+    }
+  }
+}

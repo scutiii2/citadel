@@ -1,8 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
-import { formatDuration } from "../../utils/analytics/trafficAnalytics";
 import LineChart from "./LineChart.vue";
 
+/** 80 ms / 1.2 s / 5 s. */
+const formatDuration = (ms: number): string =>
+  ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1).replace(/\.0$/, "")} s`;
 const lines = [
   { id: "p50", label: "Median", color: "blue" },
   { id: "p95", label: "Slowest 5%", color: "purple" },

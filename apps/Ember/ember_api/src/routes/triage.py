@@ -132,7 +132,7 @@ async def ask(
         raise limit_reached(block)
     options = [Option(o.title.lower(), o.description) for o in body.options]
     try:
-        outcome = await triage.ask(_caller(account), body.kind, body.text, body.question, options, body.trace, body.levels, account.triage_strategy)
+        outcome = await triage.ask(_caller(account), body.kind, body.text, body.question, options, body.trace, body.levels)
     except TriageRejected as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
     except TriageUnavailable as error:

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
-import { computed, getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
-import { onBeforeRouteLeave, routerKey } from "vue-router";
+import { computed, onMounted, ref, watch } from "vue";
+import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { MEMORY_MAX, MEMORY_TEXT_MAX, memoryClient, type MemoryNote } from "./api/MemoryClient";
 import ListRow from "../../components/ui/lists/ListRow.vue";
 import SearchField from "../../components/ui/lists/SearchField.vue";
@@ -42,10 +42,14 @@ const formError = ref("");
 const saving = ref(false);
 const dirty = computed(() => editorOpen.value && text.value !== (editing.value?.text ?? ""));
 const canSave = computed(() => dirty.value && text.value.trim() !== "" && text.value.length <= MEMORY_TEXT_MAX && !saving.value && !removing.value && (editing.value !== null || memories.value.length < MEMORY_MAX));
-const discardOpen = ref(false);
+const guard = useUnsavedGuard({
+  dirty: () => dirty.value,
+  busy: () => saving.value || removing.value,
+  onAsk: () => { discardTarget.value = null; },
+});
+const discardOpen = guard.open;
 type EditorTarget = MemoryNote | "new" | "close";
 const discardTarget = ref<EditorTarget | null>(null);
-let leaveAnswer: ((leave: boolean) => void) | null = null;
 
 function showEditor(target: EditorTarget): void {
   const memory = typeof target === "object" ? target : null;
@@ -69,26 +73,10 @@ function closeEditor(): void {
   go("close");
 }
 function answerDiscard(discard: boolean): void {
-  discardOpen.value = false;
   if (discard) showEditor(discardTarget.value ?? "close");
   discardTarget.value = null;
-  leaveAnswer?.(discard);
-  leaveAnswer = null;
+  guard.answer(discard);
 }
-if (getCurrentInstance()?.appContext.provides[routerKey as symbol]) {
-  onBeforeRouteLeave(() => {
-    if (saving.value || removing.value) return false;
-    if (!dirty.value) return true;
-    discardTarget.value = null;
-    discardOpen.value = true;
-    return new Promise<boolean>((resolve) => { leaveAnswer = resolve; });
-  });
-}
-function beforeUnload(event: BeforeUnloadEvent): void {
-  if (dirty.value || saving.value || removing.value) { event.preventDefault(); event.returnValue = ""; }
-}
-onMounted(() => window.addEventListener("beforeunload", beforeUnload));
-onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); leaveAnswer?.(false); });
 
 async function save(): Promise<void> {
   if (!canSave.value) return;

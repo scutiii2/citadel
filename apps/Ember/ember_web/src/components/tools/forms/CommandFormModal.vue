@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { nextTick, ref, useId, watch } from "vue";
+import { computed } from "vue";
 import type { CommandInfo } from "../../../api/tools/CommandsClient";
 import type { JsonSchema } from "../../../api/types";
 import { commandText } from "../../../utils/tools/toolSchema";
+import BaseModal from "../../ui/dialogs/BaseModal.vue";
 import ToolRunForm from "./ToolRunForm.vue";
 
 /** Fills a slash command's parameters from a form (port of chat_app's
@@ -13,17 +14,7 @@ import ToolRunForm from "./ToolRunForm.vue";
 const props = defineProps<{ command: CommandInfo | null; schema: JsonSchema | null }>();
 const emit = defineEmits<{ submit: [text: string]; close: [] }>();
 
-const titleId = useId();
-const dialog = ref<HTMLDialogElement | null>(null);
-
-watch(
-  () => props.command && props.schema,
-  async (open) => {
-    await nextTick();
-    if (open && !dialog.value?.open) dialog.value?.showModal();
-    else if (!open && dialog.value?.open) dialog.value.close();
-  },
-);
+const title = computed(() => (props.command ? `/${props.command.capability} ${props.command.name}` : ""));
 
 function run(args: Record<string, unknown>): void {
   if (!props.command) return;
@@ -32,59 +23,18 @@ function run(args: Record<string, unknown>): void {
 </script>
 
 <template>
-  <dialog ref="dialog" class="command-form" :aria-labelledby="titleId" @close="emit('close')" @cancel.prevent="emit('close')">
+  <BaseModal :open="!!(command && schema)" :title="title" @close="emit('close')">
     <template v-if="command && schema">
-      <header>
-        <h3 :id="titleId"><code>/{{ command.capability }} {{ command.name }}</code></h3>
-        <button type="button" class="close" aria-label="Close" @click="emit('close')">×</button>
-      </header>
       <p v-if="command.description" class="description">{{ command.description }}</p>
       <ToolRunForm :key="command.tool_name" :schema="schema" :running="false" submit-label="Run command" @run="run" />
     </template>
-  </dialog>
+  </BaseModal>
 </template>
 
 <style scoped>
-.command-form {
-  width: min(560px, calc(100vw - 32px));
-  max-height: calc(100vh - 64px);
-  padding: 18px 20px 20px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  color: var(--text);
-  background: var(--surface);
-}
-.command-form::backdrop {
-  background: rgb(0 0 0 / 45%);
-}
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-h3 {
-  margin: 0;
-  font-size: 1em;
-}
-h3 code {
-  font-family: var(--mono);
-}
-.close {
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 1.4em;
-  line-height: 1;
-  color: var(--muted);
-}
 .description {
   margin: 6px 0 14px;
   font-size: 0.9em;
   color: var(--muted);
-}
-@media (pointer: coarse), (max-width: 767px) {
-  button.close { min-width: 44px; min-height: 44px; }
 }
 </style>

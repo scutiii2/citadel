@@ -8,11 +8,11 @@ Citadel runs as containers from one `docker-compose.yml`:
 | `ember_admin` | admin web app | 5176 |
 | `ember_api` | backend for both web apps | internal |
 | `armory` | MCP server (capabilities, including Server Manager) | internal 8010 |
-| `garrison` | AI agent | internal |
+| `legion` | AI agent | internal |
 | `treasury` | database gateway | internal 8071 |
 
 Only the two web apps publish ports. The rest talk over the internal `core` network. Laya is not in this stack: it runs
-from the separate `LayaModel` project (see "Laya" below) and garrison reaches it as `http://laya_lb:9120`.
+from the separate `LayaModel` project (see "Laya" below) and legion reaches it as `http://laya_lb:9120`.
 
 ## 1. Local (Windows, macOS, Linux with Docker Desktop or Engine)
 
@@ -27,7 +27,7 @@ from the separate `LayaModel` project (see "Laya" below) and garrison reaches it
 3. Open http://localhost:5173 (ember_web) and http://localhost:5176 (ember_admin). Both bind to `127.0.0.1`.
 
 To rebuild one service, run `docker compose up -d --build <service>`, or double-click the `dev_deploy.bat` in that
-service's folder (`apps/armory`, `apps/garrison`, `apps/treasury`, `apps/Ember/ember_api`, `ember_web`, `ember_admin`).
+service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/Ember/ember_api`, `ember_web`, `ember_admin`).
 
 ```bash
 docker compose ps              # state of every service
@@ -80,7 +80,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
 2. **Deploy `LayaModel` separately** (it is its own project and Citadel's compose does not start it). Start the Citadel
    stack first: it creates the `citadel_core` network. Then run `docker compose up -d --build` in the `LayaModel`
-   folder (`/media/ZimaOS-HD/Apps/LayaModel`). Its `laya_lb` joins `citadel_core`, so garrison reaches it as
+   folder (`/media/ZimaOS-HD/Apps/LayaModel`). Its `laya_lb` joins `citadel_core`, so legion reaches it as
    `http://laya_lb:9120`. See `LayaModel/deployment.md` for replicas, port and weights.
 
 3. **Create the `.env` files.** They are gitignored, so `live` does not hold them and `git pull` never touches them.
@@ -97,7 +97,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
    ```bash
    cp apps/armory/.env.example apps/armory/.env
-   cp apps/garrison/.env.example apps/garrison/.env
+   cp apps/legion/.env.example apps/legion/.env
    cp apps/treasury/.env.example apps/treasury/.env
    cp apps/Ember/ember_api/.env.example apps/Ember/ember_api/.env
    chmod 600 .env apps/*/.env apps/Ember/ember_api/.env
@@ -105,8 +105,8 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
    | File | Keys to fill in |
    |---|---|
-   | `apps/armory/.env` | Only the capability keys you use: `SMTP_PASSWORD`, `TEAMS_WEBHOOK_URL`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://garrison:9111/mcp` to group tickets with the triage agent) |
-   | `apps/garrison/.env` | `CLAUDE_API_KEY`, or the keys of the gateway your agents use; `HF_TOKEN` if used; `LAYA_TOKEN` (must equal the one in `LayaModel`'s `.env`) |
+   | `apps/armory/.env` | Only the capability keys you use: `SMTP_PASSWORD`, `TEAMS_WEBHOOK_URL`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://legion:9111/mcp` to group tickets with the triage agent) |
+   | `apps/legion/.env` | `CLAUDE_API_KEY`, or the keys of the gateway your agents use; `HF_TOKEN` if used; `LAYA_TOKEN` (must equal the one in `LayaModel`'s `.env`) |
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
    | `apps/Ember/ember_api/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
 
@@ -125,7 +125,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
    | File | On a fresh clone |
    |---|---|
-   | `apps/garrison/configs/config_tuning.json` | Created from its `.example` automatically |
+   | `apps/legion/configs/config_tuning.json` | Created from its `.example` automatically |
    | `apps/Ember/ember_api/configs/config_pricing.json` | Created from its `.example` automatically |
    | `apps/armory/configs/config_capabilities.json`, `config_email.json`, `config_tickets.json` | Copy each `.example` and fill in `config_email.json` |
 
@@ -159,7 +159,7 @@ The box needs only what the stack builds from, not the whole repo. `tools/publis
 `main` with just these paths:
 
 - `docker-compose.yml`, `docker-compose.zima.yml`, `.env.example`, `docker/`
-- `apps/armory`, `apps/garrison`, `apps/treasury`, `apps/Ember`
+- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/Ember`
 - `docs/deployment.md`
 
 It leaves out other docs, skills, `tools/`, the Python `tests/` folders and `apps/Ember/ember_cli`. `e2e/` and the
@@ -227,7 +227,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 | Symptom | Cause and fix |
 |---|---|
 | `set INTERNAL_API_TOKEN in .env` | The root `.env` is missing or empty. |
-| garrison cannot reach Laya | LayaModel is not running, or it started before Citadel and could not join `citadel_core`. Start Citadel, then run `docker compose up -d` in `LayaModel`. |
+| legion cannot reach Laya | LayaModel is not running, or it started before Citadel and could not join `citadel_core`. Start Citadel, then run `docker compose up -d` in `LayaModel`. |
 | `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
 | `scp` will not log in | Check `DEPLOY_HOST` and that the folder exists. Run `ssh <host>` by hand to test. |
 | `openssl: command not found` | Use the `/dev/urandom` command in first-time setup, step 3. A failed `echo` leaves an empty `.env`, so run it again. |

@@ -123,7 +123,7 @@ async function save(): Promise<void> {
             <template v-else>No headers saved.</template>
             Their values are never shown.
           </p>
-          <button type="button" class="ghost replace-headers" @click="startReplacing">Replace headers</button>
+          <button type="button" class="pill-btn ghost replace-headers" @click="startReplacing">Replace headers</button>
         </template>
         <template v-else>
           <p v-if="editing" class="muted">These replace every saved header. Leave none to remove them all.</p>
@@ -151,7 +151,7 @@ async function save(): Promise<void> {
               &times;
             </button>
           </div>
-          <button type="button" class="ghost add-header" :disabled="rows.length >= 20" @click="addRow">Add header</button>
+          <button type="button" class="pill-btn ghost add-header" :disabled="rows.length >= 20" @click="addRow">Add header</button>
         </template>
         <p v-if="hostWarning" class="host-warning">
           The address is on another host, so the saved headers will be removed. Use Replace headers to set new ones.
@@ -160,8 +160,8 @@ async function save(): Promise<void> {
 
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
-        <button type="button" class="ghost"  :disabled="saving" @click="emit('close')">Cancel</button>
-        <button type="submit" class="primary" :disabled="saving" :aria-busy="saving">{{ saving ? "Saving ..." : editing ? "Save" : "Add" }}</button>
+        <button type="button" class="pill-btn ghost"  :disabled="saving" @click="emit('close')">Cancel</button>
+        <button type="submit" class="pill-btn primary" :disabled="saving" :aria-busy="saving">{{ saving ? "Saving ..." : editing ? "Save" : "Add" }}</button>
       </div>
     </form>
   </BaseModal>
@@ -224,35 +224,16 @@ input:focus {
   justify-content: flex-end;
   gap: 8px;
 }
-.ghost,
-.primary,
 .remove-header {
-  padding: 5px 16px;
+  padding: 5px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
   cursor: pointer;
-}
-.ghost,
-.remove-header {
   color: var(--muted);
   background: transparent;
 }
 .ghost {
   justify-self: start;
-}
-.remove-header {
-  padding: 5px 12px;
-}
-.primary {
-  border-color: var(--accent);
-  font-weight: 600;
-  color: var(--accent-contrast);
-  background: var(--accent);
-}
-.primary:disabled,
-.ghost:disabled {
-  cursor: default;
-  opacity: 0.5;
 }
 button:focus-visible {
   outline: 2px solid var(--accent);

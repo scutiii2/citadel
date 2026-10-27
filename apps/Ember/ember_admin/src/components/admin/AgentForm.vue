@@ -43,6 +43,8 @@ const entry = ref(false);
 const role = ref<"orchestrator" | "router" | "specialist">("specialist");
 const planTool = ref(true);
 const provider = ref("anthropic");
+const decisionStrategy = ref<"laya-only" | "jev-only" | "both">("both");
+const minConfidence = ref("0.9");
 const gatewayRows = ref<GatewayRow[]>([{ key: 0, gateway: "", model: "" }]);
 const gateway = computed({
   get: () => gatewayRows.value[0]?.gateway ?? "",
@@ -70,10 +72,10 @@ const allow = ref("");
 const deny = ref("");
 const localError = ref("");
 
-const isLaya = computed(() => provider.value === "laya");
+const isDecision = computed(() => provider.value === "decision");
 const gateways = computed(() => props.providers[provider.value] ?? []);
 // What a provider uses when the agent names no gateway (ai_agent: agent_spec._DEFAULT_GATEWAY).
-const DEFAULT_GATEWAY: Record<string, string> = { anthropic: "claude", openai: "gpt", laya: "local" };
+const DEFAULT_GATEWAY: Record<string, string> = { anthropic: "claude", openai: "gpt" };
 /** The model each tier resolves to on the chosen gateway, and whether the range allows it. */
 const tierPreview = computed(() => {
   const gatewayId = gateway.value || DEFAULT_GATEWAY[provider.value];
@@ -96,7 +98,7 @@ const initialDraft = ref("");
 function draftSignature(): string {
   return JSON.stringify([
     id.value, label.value, port.value, url.value, enabled.value, entry.value,
-    role.value, planTool.value, provider.value,
+    role.value, planTool.value, provider.value, decisionStrategy.value, minConfidence.value,
     gatewayRows.value.map(({ gateway, model }) => [gateway, model]),
     effort.value, minTier.value, maxTier.value, identity.value, temperature.value,
     maxTokens.value, maxToolRounds.value, maxTurnTokens.value, maxTurnSeconds.value, maxEffort.value, persona.value,
@@ -122,6 +124,8 @@ watch(
     role.value = a?.role ?? "specialist";
     planTool.value = a?.plan_tool !== false;
     provider.value = a?.llm?.provider ?? providerIds.value[0] ?? "anthropic";
+    decisionStrategy.value = a?.llm?.strategy ?? "both";
+    minConfidence.value = String(a?.llm?.min_confidence ?? 0.9);
     gatewayRows.value = [
       { key: 0, gateway: a?.llm?.gateway ?? "", model: a?.llm?.model ?? "" },
       ...(a?.llm?.fallback_gateways ?? []).map((choice, index) => ({
@@ -151,11 +155,15 @@ watch(
   { immediate: true },
 );
 
+watch(role, (value) => {
+  if (value === "router") provider.value = "decision";
+}, { flush: "sync" });
+
 // Synchronous so loading another agent can set its provider before hydrating
 // that agent's own rows, without a queued watcher clearing the new draft.
 watch(provider, () => {
   gatewayRows.value = [{ key: 0, gateway: "", model: "" }];
-  if (isLaya.value) {
+  if (isDecision.value) {
     entry.value = false;
     if (role.value === "orchestrator") role.value = "specialist";
   }
@@ -189,7 +197,7 @@ function buildConfig(): AgentConfig | null {
     localError.value = "The weakest tier cannot be stronger than the strongest tier.";
     return null;
   }
-  if (!isLaya.value) {
+  if (!isDecision.value) {
     const names = gatewayRows.value.map((row) => row.gateway || DEFAULT_GATEWAY[provider.value]);
     if (!names.length || names.some((name) => !gateways.value.some((g) => g.id === name))) {
       localError.value = "Choose at least one available gateway for this provider.";
@@ -212,9 +220,9 @@ function buildConfig(): AgentConfig | null {
     gateway: row.gateway || DEFAULT_GATEWAY[provider.value]!,
     ...(row.model.trim() ? { model: row.model.trim() } : {}),
   }));
-  if (!isLaya.value && backups.length) llm.fallback_gateways = backups;
+  if (!isDecision.value && backups.length) llm.fallback_gateways = backups;
   else delete llm.fallback_gateways;
-  const numbers = isLaya.value ? {} : {
+  const numbers = isDecision.value ? {} : {
     temperature: optionalNumber(temperature.value, "Temperature", 0, 2, false),
     max_tokens: optionalNumber(maxTokens.value, "Output tokens per model call", 1, 1_000_000, true),
     max_tool_rounds: optionalNumber(maxToolRounds.value, "Model/tool rounds", 1, 100, true),
@@ -222,10 +230,16 @@ function buildConfig(): AgentConfig | null {
     max_turn_seconds: optionalNumber(maxTurnSeconds.value, "Time per turn", 0.001, 86_400, false),
   };
   if (Object.values(numbers).includes(null as never)) return null;
-  if (isLaya.value) {
-    // Laya triage runs locally and takes no generation or tier settings.
-    for (const key of ["reasoning_effort", "max_tier", "min_tier", "max_effort", "temperature", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds"]) delete llm[key];
+  const confidence = isDecision.value ? optionalNumber(minConfidence.value, "Minimum confidence", 0.0001, 1, false) : undefined;
+  if (confidence === null) return null;
+  if (isDecision.value) {
+    // Decision agents choose a strategy instead of language model settings.
+    for (const key of ["gateway", "model", "fallback_gateways", "reasoning_effort", "max_tier", "min_tier", "max_effort", "temperature", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds"]) delete llm[key];
+    llm.strategy = decisionStrategy.value;
+    llm.min_confidence = confidence ?? 0.9;
   } else {
+    delete llm.strategy;
+    delete llm.min_confidence;
     setOrDrop("reasoning_effort", effort.value === "off" ? "" : effort.value);
     setOrDrop("min_tier", minTier.value);
     setOrDrop("max_tier", maxTier.value);
@@ -258,9 +272,11 @@ function buildConfig(): AgentConfig | null {
     config.entry = false;
     config.delegable = false;
     config.memory_recall = false;
+    config.skill_recall = false;
+    config.skill_learning = false;
     config.plan_tool = false;
     config.tools = { allow: [], deny: ["*"] };
-    config.llm = { provider: "laya", gateway: "local", model: "convaiinnovations/laya" };
+    config.llm = { provider: "decision", strategy: decisionStrategy.value, min_confidence: confidence ?? 0.9 };
   } else {
     delete config.decision;
   }
@@ -300,19 +316,32 @@ function previewPrompt(): void {
         <small>Where ember and the other agents reach this agent. Leave empty to use this machine and the port above; set it for an agent behind another host or a proxy.</small>
       </label>
 
-      <fieldset>
+      <fieldset v-if="!isRouter">
         <legend>Model</legend>
         <div class="row">
           <label class="field grow"><span>Provider</span>
             <select v-model="provider" :disabled="isRouter" data-test="provider"><option v-for="p in providerIds" :key="p" :value="p">{{ p }}</option></select>
           </label>
         </div>
-        <AgentGatewayList v-if="!isLaya" v-model="gatewayRows" :gateways="gateways" :default-gateway="DEFAULT_GATEWAY[provider] ?? ''" :busy="busy" />
+        <div v-if="isDecision" class="row">
+          <label class="field grow"><span>Decision strategy</span>
+            <select v-model="decisionStrategy" data-test="decision-strategy" :disabled="busy">
+              <option value="laya-only">Laya only</option>
+              <option value="jev-only">Jev only</option>
+              <option value="both">Laya, then Jev if needed</option>
+            </select>
+          </label>
+          <label class="field grow"><span>Minimum confidence</span>
+            <input v-model="minConfidence" data-test="min-confidence" type="text" inputmode="decimal" autocomplete="off" :disabled="busy" />
+            <small>Above 0 and at most 1. Defaults to 0.9.</small>
+          </label>
+        </div>
+        <AgentGatewayList v-if="!isDecision" v-model="gatewayRows" :gateways="gateways" :default-gateway="DEFAULT_GATEWAY[provider] ?? ''" :busy="busy" />
         <template v-else>
           <label class="field"><span>Gateway</span><select v-model="gateway" data-test="gateway" disabled><option value="">Local</option><option value="local">Local</option></select></label>
           <label class="field"><span>Model</span><input v-model="model" data-test="model" type="text" disabled placeholder="convaiinnovations/laya" /></label>
         </template>
-        <div v-if="!isLaya" class="row">
+        <div v-if="!isDecision" class="row">
           <label class="field grow"><span>Reasoning effort</span>
             <select v-model="effort" data-test="effort"><option v-for="e in EFFORTS" :key="e" :value="e">{{ e }}</option></select>
           </label>
@@ -328,16 +357,16 @@ function previewPrompt(): void {
             <span>{{ row.tier }}</span><code>{{ row.model }}</code><span class="where">{{ row.allowed ? "available" : "not available" }}</span>
           </li>
         </ul>
-        <div v-if="!isLaya" class="row">
+        <div v-if="!isDecision" class="row">
           <label class="field grow"><span>Temperature</span><input v-model="temperature" data-test="temperature" type="text" inputmode="decimal" autocomplete="off" placeholder="Model default" /></label>
         </div>
-        <label v-if="!isLaya" class="field"><span>Highest effort a delegating agent may request</span>
+        <label v-if="!isDecision" class="field"><span>Highest effort a delegating agent may request</span>
           <select v-model="maxEffort" data-test="max-effort"><option value="">No limit</option><option v-for="e in EFFORTS" :key="e" :value="e">{{ e }}</option></select>
         </label>
-        <small v-if="!isLaya">The orchestrator picks the lightest tier in this range that fits each task. Tier models are set per gateway in ai_agent's gateways directory.</small>
+        <small v-if="!isDecision">The orchestrator picks the lightest tier in this range that fits each task. Tier models are set per gateway in ai_agent's gateways directory.</small>
       </fieldset>
 
-      <fieldset v-if="!isLaya" :disabled="busy" :aria-busy="busy" data-test="run-limits">
+      <fieldset v-if="!isDecision" :disabled="busy" :aria-busy="busy" data-test="run-limits">
         <legend>Run limits</legend>
         <p class="hint">Limits apply to each turn this agent runs. Leave a field blank to use its default. Changes apply after Save.</p>
         <SettingRow setting-id="max-turn-tokens" label="Total tokens per turn"
@@ -380,15 +409,15 @@ function previewPrompt(): void {
         <ToggleSwitch :checked="enabled" data-test="enabled" @change="enabled = ($event.target as HTMLInputElement).checked">Enabled</ToggleSwitch>
         <label class="field"><span>Role</span>
           <select v-model="role" data-test="role" :disabled="busy">
-            <option value="orchestrator" :disabled="isLaya">Orchestrator</option>
+            <option value="orchestrator" :disabled="isDecision">Orchestrator</option>
             <option value="router">Router</option>
             <option value="specialist">Specialist</option>
           </select>
         </label>
-        <ToggleSwitch v-if="!isRouter" :checked="planTool" :disabled="isLaya" data-test="plan-tool" @change="planTool = ($event.target as HTMLInputElement).checked">Task checklist (can show a step-by-step plan; chats can also turn it off)</ToggleSwitch>
-        <ToggleSwitch v-if="!isRouter" :checked="entry" :disabled="isLaya" data-test="entry" @change="entry = ($event.target as HTMLInputElement).checked">Entry agent (receives every new question)</ToggleSwitch>
+        <ToggleSwitch v-if="!isRouter" :checked="planTool" :disabled="isDecision" data-test="plan-tool" @change="planTool = ($event.target as HTMLInputElement).checked">Task checklist (can show a step-by-step plan; chats can also turn it off)</ToggleSwitch>
+        <ToggleSwitch v-if="!isRouter" :checked="entry" :disabled="isDecision" data-test="entry" @change="entry = ($event.target as HTMLInputElement).checked">Entry agent (receives every new question)</ToggleSwitch>
       </div>
-      <p v-if="planTool && !isLaya" class="hint" data-test="plan-tool-cost">Task checklist costs about 200 input tokens on every model call of this agent, plus about 15-25 output tokens per item each time it updates the list. Turn it off for agents that only do short tasks.</p>
+      <p v-if="planTool && !isDecision" class="hint" data-test="plan-tool-cost">Task checklist costs about 200 input tokens on every model call of this agent, plus about 15-25 output tokens per item each time it updates the list. Turn it off for agents that only do short tasks.</p>
       <p v-if="entry" class="hint">Only one enabled agent can be the entry agent. To move it, unset it on the current one first.</p>
 
       <fieldset v-if="!isRouter" class="preview">

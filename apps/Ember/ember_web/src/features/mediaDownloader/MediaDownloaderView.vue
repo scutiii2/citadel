@@ -17,7 +17,8 @@ import FileRow from './components/FileRow.vue'
 import PackagePanel from './components/PackagePanel.vue'
 import { useMediaDownloaderStore } from './stores/mediaDownloader'
 import { useAuthStore } from '../../stores/auth'
-import { formatBytes, formatExpiry } from './utils/format'
+import { formatBytes } from '../../utils/format'
+import { formatExpiry } from './utils/format'
 import type { FileInfo } from './api/MediaDownloaderTypes'
 
 const store = useMediaDownloaderStore()
