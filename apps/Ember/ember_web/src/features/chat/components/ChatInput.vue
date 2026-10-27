@@ -94,7 +94,21 @@ watch(draft, async (value) => {
 });
 const auth = useAuthStore();
 const { state: dictationState, error: dictationError, supported: dictationSupported,
-  requesting: requestingMic, toggle: toggleDictation, cancel: cancelDictation } = useDictation(insertText);
+  requesting: requestingMic, levels: dictationLevels, elapsedMs: dictationElapsed,
+  toggle: toggleDictation, cancel: cancelDictation } = useDictation(insertText);
+const dictationActive = computed(() => dictationState.value === "recording" || dictationState.value === "transcribing");
+const dictationTime = computed(() => {
+  const seconds = Math.floor(dictationElapsed.value / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+});
+const dictationAnnouncement = ref("");
+watch(dictationState, (state, previous) => {
+  if (state === "recording") extraToolsOpen.value = false;
+  if (state === "recording") dictationAnnouncement.value = "Recording started. Press Stop dictation to finish. Maximum 2 minutes 30 seconds.";
+  else if (state === "transcribing") dictationAnnouncement.value = "Recording stopped. Transcribing…";
+  else if (previous === "recording") dictationAnnouncement.value = "Recording cancelled.";
+  else if (previous === "transcribing") dictationAnnouncement.value = state === "idle" ? "Dictation finished." : "Dictation stopped.";
+});
 watch(() => auth.account?.id, cancelDictation);
 watch(() => props.conversationId, cancelDictation);
 onDeactivated(cancelDictation);
@@ -462,12 +476,12 @@ function onKeydown(event: KeyboardEvent): void {
         @keydown="onKeydown"
         @paste="onPaste"
       />
-      <div class="tools">
+      <div class="tools" :class="{ dictating: dictationActive }">
         <div ref="toolbox" class="toolbox" @keydown.esc.stop.prevent="extraToolsOpen = false; moreToolsButton?.focus()">
-        <button ref="moreToolsButton" type="button" class="attach more-tools" aria-label="More message tools" :aria-expanded="extraToolsOpen" :aria-controls="extraToolsId" @click="extraToolsOpen = !extraToolsOpen">
+        <button ref="moreToolsButton" type="button" class="attach more-tools" :aria-label="dictationActive ? 'Attach files' : 'More message tools'" :aria-expanded="dictationActive ? undefined : extraToolsOpen" :aria-controls="dictationActive ? undefined : extraToolsId" @click="dictationActive ? fileInput?.click() : extraToolsOpen = !extraToolsOpen">
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
         </button>
-        <div :id="extraToolsId" class="extra-tools" :class="{ open: extraToolsOpen }">
+        <div :id="extraToolsId" class="extra-tools" :class="{ open: extraToolsOpen, dictating: dictationActive }">
         <button v-if="auth.hasPermission('files.upload')" type="button" class="attach" title="Attach files (text, code, PDF, Word, Excel)" @click="fileInput?.click(); extraToolsOpen = false">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <path
@@ -481,12 +495,21 @@ function onKeydown(event: KeyboardEvent): void {
           </svg>
         </button>
         <button v-if="auth.hasPermission('files.upload') && dictationSupported" type="button" class="attach dictation"
-          :class="{ recording: dictationState === 'recording' }"
-          :aria-label="dictationState === 'recording' ? 'Stop dictation' : 'Dictate message'"
-          :title="dictationState === 'recording' ? 'Stop dictation' : 'Dictate message'"
+          :class="{ active: dictationActive, recording: dictationState === 'recording', ending: dictationState === 'recording' && dictationElapsed >= 140000 }"
+          :aria-label="dictationState === 'recording' ? 'Stop dictation' : dictationState === 'transcribing' ? 'Transcribing…' : 'Dictate message'"
+          :title="dictationState === 'recording' ? 'Stop dictation' : dictationState === 'transcribing' ? 'Transcribing…' : 'Dictate message'"
           :aria-pressed="dictationState === 'recording'" :aria-busy="requestingMic || dictationState === 'transcribing'"
           :disabled="requestingMic || dictationState === 'transcribing'" @click="toggleDictation">
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0zM5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+          <template v-if="dictationState === 'recording'">
+            <span class="dictation-waveform" aria-hidden="true">
+              <span v-for="(level, index) in dictationLevels" :key="index" :style="{ height: `${2 + level * 22}px` }" />
+            </span>
+            <span class="dictation-timer" aria-hidden="true">{{ dictationTime }} / 2:30</span>
+            <span class="dictation-stop-target" aria-hidden="true"><span class="dictation-stop" /></span>
+            <span v-if="dictationElapsed >= 140000" class="sr-only">Less than 10 seconds remaining</span>
+          </template>
+          <span v-else-if="dictationState === 'transcribing'" class="dictation-transcribing">Transcribing…</span>
+          <svg v-else viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0zM5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
         </button>
         <button type="button" class="attach" title="Ask a multiple choice or yes or no question" aria-label="Ask a multiple choice or yes or no question" @click="extraToolsOpen = false; emit('triage')">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -548,9 +571,7 @@ function onKeydown(event: KeyboardEvent): void {
       </div>
     </div>
     <p v-if="dictationError" class="dictation-error" role="alert">{{ dictationError }}</p>
-    <p v-else-if="dictationState === 'recording' || dictationState === 'transcribing'" class="dictation-status" role="status">
-      {{ dictationState === 'recording' ? 'Recording · tap the microphone to stop (150 s maximum)' : 'Transcribing …' }}
-    </p>
+    <p class="dictation-status sr-only" role="status">{{ dictationAnnouncement }}</p>
     <p class="keys">Enter to send · Shift+Enter for a new line or next list item</p>
   </form>
 </template>
@@ -558,14 +579,39 @@ function onKeydown(event: KeyboardEvent): void {
 <style scoped>
 .independent.on { color: var(--accent); }
 .independent:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.dictation.recording { color: var(--danger); }
-.dictation.recording svg { animation: mic-pulse 1s ease-in-out infinite alternate; }
-.dictation:disabled { opacity: 0.5; cursor: wait; }
+button.dictation { min-width: 44px; min-height: 44px; }
+button.dictation.active {
+  position: absolute;
+  inset: 0 46px 0 46px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--accent);
+  visibility: visible;
+}
+button.dictation.ending { color: var(--danger); }
+.dictation-stop-target { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: var(--radius-full); background: color-mix(in srgb, var(--danger) 10%, var(--surface)); }
+.dictation-stop { width: 12px; height: 12px; border-radius: var(--radius-sm); background: var(--danger); }
+.dictation-waveform { display: flex; flex: 1; min-width: 0; height: 24px; align-items: center; justify-content: space-between; gap: 2px; overflow: hidden; }
+.dictation-waveform span { flex: 1; min-width: 1px; max-width: 3px; border-radius: var(--radius-full); background: currentColor; transition: height 80ms linear; }
+.dictation-timer { flex: none; color: var(--text); font-size: 0.85em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ending .dictation-timer { color: var(--danger); font-weight: 600; }
+.dictation-transcribing { color: var(--muted); font-size: 0.9em; }
+.dictation:disabled { cursor: wait; }
 .dictation:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.dictation-error, .dictation-status { margin: 6px 0 0; font-size: 0.85em; overflow-wrap: anywhere; }
+.dictation-error { margin: 6px 0 0; font-size: 0.85em; overflow-wrap: anywhere; }
 .dictation-error { color: var(--danger); }
-.dictation-status { color: var(--muted); }
-@keyframes mic-pulse { to { opacity: 0.45; transform: scale(1.12); } }
+.tools.dictating .toolbox,
+.tools.dictating > :not(.toolbox):not(.send-slot) { visibility: hidden; }
+.tools.dictating .more-tools { display: grid; width: 44px; min-height: 44px; visibility: visible; }
+.tools.dictating { position: relative; }
 
 .message-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .composer {
@@ -657,6 +703,7 @@ function onKeydown(event: KeyboardEvent): void {
   background: color-mix(in srgb, var(--accent) 8%, var(--surface));
 }
 .tools {
+  min-height: 44px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -814,6 +861,9 @@ textarea {
     background: var(--surface);
   }
   .extra-tools :deep(.picker) { position: static; }
+  .extra-tools.dictating { display: contents; }
+  .extra-tools.dictating > :not(.dictation) { display: none; }
+  button.dictation.active { background: var(--bg); }
   .extra-tools :deep(.popover) {
     left: 0;
     max-height: min(400px, calc(100dvh - var(--rail-height) - 220px));

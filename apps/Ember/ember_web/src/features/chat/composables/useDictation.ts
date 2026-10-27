@@ -11,6 +11,8 @@ export function useDictation(
   const state = ref<DictationState>("idle");
   const error = ref("");
   const requesting = ref(false);
+  const levels = ref<number[]>(Array(24).fill(0));
+  const elapsedMs = ref(0);
   const supported = computed(() => typeof MediaRecorder !== "undefined"
     && !!navigator.mediaDevices?.getUserMedia && MediaRecorder.isTypeSupported("audio/webm"));
   let recorder: MediaRecorder | undefined;
@@ -18,9 +20,63 @@ export function useDictation(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let request: AbortController | undefined;
   let generation = 0;
+  let audioContext: AudioContext | undefined;
+  let source: MediaStreamAudioSourceNode | undefined;
+  let analyser: AnalyserNode | undefined;
+  let frame: number | undefined;
+  let startedAt: number | undefined;
+
+  function releaseMeter(): void {
+    if (frame !== undefined) cancelAnimationFrame(frame);
+    frame = undefined;
+    source?.disconnect();
+    analyser?.disconnect();
+    source = undefined;
+    analyser = undefined;
+    if (audioContext) void audioContext.close().catch(() => {});
+    audioContext = undefined;
+  }
+
+  function startMeter(granted: MediaStream): void {
+    levels.value = Array(24).fill(0);
+    elapsedMs.value = 0;
+    startedAt = performance.now();
+    // Metering is optional: a browser audio-graph failure must not break dictation.
+    try {
+      audioContext = new AudioContext();
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source = audioContext.createMediaStreamSource(granted);
+      source.connect(analyser); // No destination: never play the microphone back.
+      if (audioContext.state === "suspended") void audioContext.resume().catch(() => {});
+    } catch { releaseMeter(); }
+    const samples = new Uint8Array(256);
+    let lastSample = startedAt;
+    const sample = () => {
+      const now = performance.now();
+      elapsedMs.value = Math.min(150_000, now - startedAt!);
+      if (now - lastSample >= 80) {
+        let sum = 0;
+        if (analyser) {
+          analyser.getByteTimeDomainData(samples);
+          for (const value of samples) sum += ((value - 128) / 128) ** 2;
+        }
+        // Compress the RMS range so quiet speech is readable; silence stays flat.
+        const rms = Math.sqrt(sum / samples.length);
+        const level = Math.min(1, Math.sqrt(rms) * 2);
+        levels.value = [...levels.value.slice(1), level];
+        lastSample = now;
+      }
+      frame = requestAnimationFrame(sample);
+    };
+    frame = requestAnimationFrame(sample);
+  }
 
   function release(): void {
     clearTimeout(timer);
+    if (startedAt !== undefined) elapsedMs.value = Math.min(150_000, performance.now() - startedAt);
+    startedAt = undefined;
+    releaseMeter();
     stream?.getTracks().forEach((track) => track.stop());
     stream = undefined;
   }
@@ -39,6 +95,8 @@ export function useDictation(
     requesting.value = false;
     state.value = "idle";
     error.value = "";
+    elapsedMs.value = 0;
+    levels.value = Array(24).fill(0);
   }
 
   function fail(message: string): void {
@@ -85,6 +143,7 @@ export function useDictation(
       };
       recorder.start();
       state.value = "recording";
+      startMeter(granted);
       timer = setTimeout(stop, 150_000);
     } catch (cause) {
       if (run !== generation) return;
@@ -97,5 +156,5 @@ export function useDictation(
   }
 
   onScopeDispose(cancel);
-  return { state, error, supported, requesting, toggle, cancel };
+  return { state, error, supported, requesting, levels, elapsedMs, toggle, cancel };
 }

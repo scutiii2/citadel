@@ -20,12 +20,80 @@ class Recorder {
 const stopTrack = vi.fn();
 const stream = { getTracks: () => [{ stop: stopTrack }] };
 const getUserMedia = vi.fn();
+let amplitude = 128;
+class AudioContextMock {
+  static last: AudioContextMock;
+  state = "running";
+  source = { connect: vi.fn(), disconnect: vi.fn() };
+  analyser = { fftSize: 0, disconnect: vi.fn(), getByteTimeDomainData: (data: Uint8Array) => data.fill(amplitude) };
+  createMediaStreamSource = vi.fn(() => this.source);
+  createAnalyser = () => this.analyser;
+  resume = vi.fn().mockResolvedValue(undefined);
+  close = vi.fn().mockResolvedValue(undefined);
+  constructor() { AudioContextMock.last = this; }
+}
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal("MediaRecorder", Recorder);
+  vi.stubGlobal("AudioContext", AudioContextMock);
+  amplitude = 128;
   Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
   getUserMedia.mockResolvedValue(stream);
   stopTrack.mockClear();
+});
+
+it("scrolls real microphone levels to the right and measures elapsed time", async () => {
+  const scope = effectScope();
+  const d = scope.run(() => useDictation(vi.fn(), vi.fn()))!;
+  await d.toggle();
+  await vi.advanceTimersByTimeAsync(100);
+  expect(d.levels.value.every((level) => level === 0)).toBe(true);
+  amplitude = 160;
+  await vi.advanceTimersByTimeAsync(100);
+  expect(d.levels.value.at(-1)).toBeGreaterThan(0);
+  expect(d.levels.value[0]).toBe(0);
+  expect(AudioContextMock.last.createMediaStreamSource).toHaveBeenCalledWith(stream);
+  await vi.advanceTimersByTimeAsync(1200);
+  expect(d.elapsedMs.value).toBeGreaterThanOrEqual(1300);
+  scope.stop();
+});
+
+it.each(["stop", "cancel", "dispose", "error"])("releases the audio graph and frame loop on %s", async (action) => {
+  const scope = effectScope();
+  const d = scope.run(() => useDictation(vi.fn(), () => new Promise(() => {})))!;
+  await d.toggle();
+  await vi.advanceTimersByTimeAsync(100);
+  const context = AudioContextMock.last;
+  if (action === "stop") await d.toggle();
+  if (action === "cancel") d.cancel();
+  if (action === "dispose") scope.stop();
+  if (action === "error") Recorder.last.onerror?.();
+  expect(context.close).toHaveBeenCalledTimes(1);
+  expect(context.source.disconnect).toHaveBeenCalledTimes(1);
+  expect(context.analyser.disconnect).toHaveBeenCalledTimes(1);
+  expect(stopTrack).toHaveBeenCalledTimes(1);
+  const elapsed = d.elapsedMs.value;
+  const levels = [...d.levels.value];
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(d.elapsedMs.value).toBe(elapsed);
+  expect(d.levels.value).toEqual(levels);
+  expect(vi.getTimerCount()).toBe(0);
+  scope.stop();
+});
+
+it("keeps recording and timing if the browser cannot create an audio graph", async () => {
+  vi.stubGlobal("AudioContext", class { constructor() { throw new Error("Audio unavailable"); } });
+  const scope = effectScope();
+  const d = scope.run(() => useDictation(vi.fn(), () => new Promise(() => {})))!;
+  await d.toggle();
+  await vi.advanceTimersByTimeAsync(1200);
+  expect(d.state.value).toBe("recording");
+  expect(d.elapsedMs.value).toBeGreaterThanOrEqual(1100);
+  expect(d.levels.value.every((level) => level === 0)).toBe(true);
+  await d.toggle();
+  expect(d.state.value).toBe("transcribing");
+  expect(stopTrack).toHaveBeenCalledTimes(1);
+  scope.stop();
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 

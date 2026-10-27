@@ -7,18 +7,51 @@ test.use({ launchOptions: { args: ["--use-fake-device-for-media-stream"] }, perm
 for (const width of [1280, 768, 375]) {
   test(`dictation captures WebM and appends editable draft text at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
+    await page.addInitScript(() => {
+      localStorage.clear();
+      const contexts: AudioContext[] = [];
+      const Original = window.AudioContext;
+      window.AudioContext = class extends Original {
+        constructor(options?: AudioContextOptions) { super(options); contexts.push(this); }
+      };
+      Object.assign(window, { dictationAudioContexts: contexts });
+    });
     const api = await installFakeApi(page);
     await logIn(page);
     const input = page.getByRole("textbox", { name: "Message", exact: true });
     await input.fill("Existing draft");
     if (width < 768) await page.getByRole("button", { name: "More message tools" }).click();
+    const composerBefore = await page.locator(".composer").boundingBox();
     await page.getByRole("button", { name: "Dictate message", exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: "Recording" })).toBeVisible();
+    await expect(page.locator(".dictation-waveform span")).toHaveCount(24);
+    await expect(page.locator(".dictation-timer")).toHaveText("0:01 / 2:30", { timeout: 5000 });
+    // The browser's fake microphone still goes through the real AudioContext graph.
+    await expect.poll(() => page.locator(".dictation-waveform span").evaluateAll((bars) =>
+      bars.some((bar) => Number.parseFloat((bar as HTMLElement).style.height) > 2))).toBe(true);
+    const stop = page.getByRole("button", { name: "Stop dictation", exact: true });
+    const bounds = await stop.boundingBox();
+    expect(bounds!.height).toBeGreaterThanOrEqual(44);
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    expect((await page.locator(".composer").boundingBox())!.height).toBe(composerBefore!.height);
+    for (const theme of ["light", "dark"]) {
+      await page.evaluate((theme) => { document.documentElement.style.colorScheme = theme; }, theme);
+      await page.locator(".composer").screenshot({ path: `test-results/dictation-${width}-${theme}.png` });
+    }
+    let finishTranscribing!: () => void;
+    const pending = new Promise<void>((resolve) => { finishTranscribing = resolve; });
+    await page.route("**/api/attachments/dictate", async (route) => { await pending; await route.fallback(); });
     const recorded = page.waitForRequest("**/api/attachments/dictate");
     await page.getByRole("button", { name: "Stop dictation", exact: true }).click();
     const request = (await recorded).postDataJSON() as { filename: string; data: string };
     expect(request.filename).toBe("dictation.webm");
     expect(Buffer.from(request.data, "base64").length).toBeGreaterThan(20);
+    await expect(page.getByRole("button", { name: "Transcribing…", exact: true })).toBeDisabled();
+    await expect.poll(() => page.evaluate(() =>
+      (window as unknown as { dictationAudioContexts: AudioContext[] }).dictationAudioContexts.every((context) => context.state === "closed"))).toBe(true);
+    await page.locator(".composer").screenshot({ path: `test-results/dictation-${width}-transcribing.png` });
+    finishTranscribing();
     await expect(input).toHaveValue("Existing draft\nDictated words ready to edit.");
     await input.fill("Edited transcript");
     expect(api.turns).toHaveLength(0);

@@ -9,7 +9,7 @@ import ChatInput from "./ChatInput.vue";
 import inputSource from "./ChatInput.vue?raw";
 import menuSource from "./ChatSettingsMenu.vue?raw";
 
-vi.mock("../../../api/files/AttachmentsClient", () => ({ attachmentsClient: { text: vi.fn(), table: vi.fn(), pdf: vi.fn() } }));
+vi.mock("../../../api/files/AttachmentsClient", () => ({ attachmentsClient: { text: vi.fn(), table: vi.fn(), pdf: vi.fn(), dictate: vi.fn() } }));
 
 const text = vi.mocked(attachmentsClient.text);
 const pdf = vi.mocked(attachmentsClient.pdf);
@@ -59,6 +59,83 @@ describe("compact composer tools", () => {
     document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     await wrapper.vm.$nextTick();
     expect(trigger.attributes("aria-expanded")).toBe("false");
+    wrapper.unmount();
+  });
+});
+
+describe("dictation feedback", () => {
+  const close = vi.fn().mockResolvedValue(undefined);
+  const stopTrack = vi.fn();
+  beforeEach(() => {
+    vi.useFakeTimers();
+    close.mockClear();
+    stopTrack.mockClear();
+    vi.stubGlobal("AudioContext", class {
+      state = "running";
+      close = close;
+      createMediaStreamSource = () => ({ connect() {}, disconnect() {} });
+      createAnalyser = () => ({ fftSize: 0, disconnect() {}, getByteTimeDomainData: (data: Uint8Array) => data.fill(160) });
+    });
+    vi.stubGlobal("MediaRecorder", class {
+      static isTypeSupported = () => true;
+      state = "inactive";
+      onstop?: () => void;
+      start() { this.state = "recording"; }
+      stop() { this.state = "inactive"; this.onstop?.(); }
+    });
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: {
+      getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: stopTrack }] }),
+    } });
+    vi.mocked(attachmentsClient.dictate).mockImplementation(() => new Promise(() => {}));
+  });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+  it("keeps the stop button mounted with a live waveform, timer and a quiet status announcement", async () => {
+    const wrapper = mountInput();
+    const button = wrapper.get("button.dictation");
+    const element = button.element;
+    await button.trigger("click");
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(wrapper.get("button.dictation").element).toBe(element);
+    expect(button.attributes("aria-label")).toBe("Stop dictation");
+    expect(button.attributes("aria-pressed")).toBe("true");
+    expect(wrapper.findAll(".dictation-waveform span")).toHaveLength(24);
+    expect(wrapper.get(".dictation-timer").text()).toBe("0:01 / 2:30");
+    expect(wrapper.get(".dictation-status").text()).toContain("Recording");
+    vi.spyOn(performance, "now").mockReturnValue(performance.now() + 139000);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(button.classes()).toContain("ending");
+    expect(wrapper.get(".dictation-timer").text()).toBe("2:20 / 2:30");
+    await button.trigger("click");
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(button.attributes("disabled")).toBeDefined();
+    expect(button.attributes("aria-busy")).toBe("true");
+    expect(button.text()).toContain("Transcribing…");
+    expect(wrapper.get(".dictation-status").text()).toContain("Recording stopped");
+    wrapper.unmount();
+  });
+
+  it.each(["conversation", "account", "unmount"])("releases recording when the %s changes", async (change) => {
+    const wrapper = mountInput({ conversationId: "first" });
+    await wrapper.get("button.dictation").trigger("click");
+    if (change === "conversation") await wrapper.setProps({ conversationId: "second" });
+    if (change === "account") { useAuthStore().account = null; await wrapper.vm.$nextTick(); }
+    if (change === "unmount") wrapper.unmount();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(stopTrack).toHaveBeenCalledTimes(1);
+    if (change !== "unmount") wrapper.unmount();
+  });
+
+  it("releases recording when a cached composer is deactivated", async () => {
+    const wrapper = mount({
+      components: { ChatInput },
+      data: () => ({ show: true }),
+      template: '<KeepAlive><ChatInput v-if="show" :busy="false" /></KeepAlive>',
+    });
+    await wrapper.get("button.dictation").trigger("click");
+    await wrapper.setData({ show: false });
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(stopTrack).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });
 });
