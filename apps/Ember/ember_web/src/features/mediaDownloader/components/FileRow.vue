@@ -3,7 +3,7 @@ import ActionButton from "../../../components/ui/buttons/ActionButton.vue"
 import { useAuthStore } from '../../../stores/auth'
 import type { FileInfo } from '../api/MediaDownloaderTypes'
 import { formatBytes } from '../../../utils/format'
-import { formatDuration, formatExpiry } from '../utils/format'
+import { formatMediaLength, formatExpiry } from '../utils/format'
 
 defineProps<{ file: FileInfo; now: number; busy?: boolean }>()
 defineEmits<{ details: [] }>()
@@ -16,7 +16,7 @@ const auth = useAuthStore()
       <span class="kind" :class="file.kind">{{ file.kind === 'package' ? 'ZIP' : file.mime === 'application/zip' ? 'ZIP' : file.kind === 'audio' ? 'music' : file.kind }}</span>
       <div class="file-copy">
         <div class="name" :title="file.name">{{ file.name }}</div>
-        <div class="muted small">{{ formatBytes(file.size) }}<span v-if="file.duration !== null"> &middot; {{ formatDuration(file.duration) }}</span></div>
+        <div class="muted small">{{ formatBytes(file.size) }}<span v-if="file.duration !== null"> &middot; {{ formatMediaLength(file.duration) }}</span></div>
       </div>
     </div>
     <div class="file-actions">

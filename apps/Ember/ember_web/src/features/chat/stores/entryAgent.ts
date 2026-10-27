@@ -1,9 +1,10 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { AiAgentClient } from "../api/AiAgentClient";
-import { apiRequest, ApiError } from "../../../api/http";
+import { apiRequest } from "../../../api/http";
 import type { AgentInfo } from "../../../api/types";
 import { useAuthStore } from "../../../stores/auth";
+import { errorMessage } from "../../../utils/errors";
 
 /** The agent ember_api sends every question to (the main agent), for the
  * header and for naming answers. The browser never chooses an agent. */
@@ -34,7 +35,7 @@ export const useEntryAgentStore = defineStore("entryAgent", () => {
     } catch (err) {
       entry.value = null;
       available.value = null;
-      loadError.value = err instanceof ApiError || err instanceof Error ? err.message : String(err);
+      loadError.value = errorMessage(err);
     } finally {
       loading.value = false;
     }
