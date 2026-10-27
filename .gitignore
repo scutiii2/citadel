@@ -8,6 +8,7 @@ __pycache__/
 .pytest_cache/
 .secret
 .vscode
+.vs
 
 # mcp_server's real config/secrets/runtime-state. config_*.json holds
 # structure (committed) with ${VAR} placeholders for anything sensitive;
