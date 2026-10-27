@@ -32,7 +32,7 @@ const AGENTS = [
 
 type Wrapper = ReturnType<typeof mount>;
 
-const chip = (wrapper: Wrapper, text: string) => wrapper.findAll("button.chip").find((b) => b.text() === text)!;
+const chip = (wrapper: Wrapper, text: string) => wrapper.findAll("button").find((b) => b.text() === text)!;
 
 async function mountView() {
   const wrapper = mount(AgentsView);
@@ -69,7 +69,7 @@ describe("AgentsView", () => {
 
     const found = cards(wrapper);
     expect(found).toHaveLength(4);
-    expect(wrapper.findAll("button.chip").map((button) => button.text())).toEqual(["Refresh"]);
+    expect(chip(wrapper, "Refresh").exists()).toBe(true);
     expect(found[1].find("h3").text()).toBe("REVIEWER");
     expect(found[1].find(".agent-id").text()).toBe("reviewer");
     expect(found[1].find(".focus").text()).toBe("reviewer does things.");
@@ -103,6 +103,8 @@ describe("AgentsView", () => {
     const found = cards(wrapper);
     expect(found[0].findAll("dt").map((t) => t.text())).toEqual(["Provider", "Gateway", "Model"]);
     expect(found[0].findAll("dd").map((t) => t.text())).toEqual(["anthropic", "openrouter", "claude-sonnet-5-5"]);
+    expect(found[0].find('.llm').element.closest('button')).toBeNull();
+    expect(found[0].find('.status').element.closest('button')).toBeNull();
     expect(found[1].findAll("dt").map((t) => t.text())).toEqual(["Provider"]);
     expect(found[2].find(".llm").exists()).toBe(false);
   });
@@ -190,10 +192,89 @@ describe("AgentsView", () => {
     expect(setUse).toHaveBeenCalledWith("reviewer", false);
     expect(reviewer.attributes("aria-busy")).toBe("true");
     expect(reviewer.find<HTMLInputElement>("input").element.disabled).toBe(true);
+    expect(reviewer.find<HTMLInputElement>("input").element.checked).toBe(true);
 
     answer({ disabled: ["pdf", "reviewer"] });
     await flushPromises();
     expect(reviewer.find<HTMLInputElement>("input").element.checked).toBe(false);
     expect(reviewer.attributes("aria-busy")).toBe("false");
+    wrapper.unmount();
+  });
+
+  it("groups entry and Router at the front, keeping an entry orchestrator in only one group", async () => {
+    list.mockResolvedValue([...AGENTS, agent("router", { internal_role: "router" }), agent("coordinator", { orchestrator: true })]);
+    const wrapper = await mountView();
+    const groups = wrapper.findAll(".agent-group");
+    expect(groups).toHaveLength(2);
+    expect(groups[0].findAll(".agent-id").map(id => id.text())).toEqual(["ember", "router"]);
+    expect(groups[1].findAll(".agent-id").map(id => id.text())).toEqual(["coordinator", "reviewer", "pdf", "old"]);
+    expect(cards(wrapper)).toHaveLength(6);
+    wrapper.unmount();
+  });
+
+  it("combines status and model search, clears filters and preserves choices through refresh", async () => {
+    list.mockResolvedValue([...AGENTS, agent("research", { status: "offline", tiers: [{ tier: "deep", id: "opus", use_for: "research" }] })]);
+    const wrapper = await mountView();
+    await chip(wrapper, "Offline").trigger("click");
+    await wrapper.find('input[type="search"]').setValue("opus");
+    expect(cards(wrapper).map(card => card.find('.agent-id').text())).toEqual(["research"]);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(cards(wrapper)).toHaveLength(1);
+    expect(wrapper.find('input[type="search"]').element).toHaveProperty('value', 'opus');
+    await wrapper.find('input[type="search"]').setValue("missing");
+    expect(wrapper.text()).toContain("No matching agents");
+    await chip(wrapper, "Clear filters").trigger("click");
+    expect(cards(wrapper)).toHaveLength(5);
+    wrapper.unmount();
+  });
+
+  it("restores the confirmed switch value on failure and retains the roster", async () => {
+    setUse.mockRejectedValue(new Error("Could not save preference"));
+    const wrapper = await mountView();
+    const reviewer = cards(wrapper)[1];
+    await reviewer.find("input").setValue(false);
+    await flushPromises();
+    expect(reviewer.find<HTMLInputElement>("input").element.checked).toBe(true);
+    expect(wrapper.text()).toContain("Could not save preference");
+    expect(cards(wrapper)).toHaveLength(4);
+    wrapper.unmount();
+  });
+
+  it("offers retry after an initial failure", async () => {
+    list.mockRejectedValueOnce(new Error("offline"));
+    const wrapper = await mountView();
+    expect(wrapper.find('[role="alert"]').text()).toContain("offline");
+    await chip(wrapper, "Try again").trigger("click");
+    await flushPromises();
+    expect(cards(wrapper)).toHaveLength(4);
+    wrapper.unmount();
+  });
+
+  it("keeps the full description outside filters that remove its card", async () => {
+    const realShow = HTMLDialogElement.prototype.showModal;
+    HTMLDialogElement.prototype.showModal = vi.fn();
+    const wrapper = await mountView();
+    await cards(wrapper)[1].find('button').trigger('click');
+    expect(wrapper.find('dialog').attributes('aria-label')).toBe('REVIEWER');
+    await chip(wrapper, 'Offline').trigger('click');
+    expect(cards(wrapper)).toHaveLength(1);
+    expect(wrapper.find('dialog').text()).toContain('reviewer does things.');
+    expect(wrapper.find('dialog').element.closest('.agent-group')).toBeNull();
+    wrapper.unmount();
+    HTMLDialogElement.prototype.showModal = realShow;
+  });
+
+  it("does not let an older refresh overwrite a newly confirmed preference", async () => {
+    const wrapper = await mountView();
+    let finishRead!: (value: { disabled: string[] }) => void;
+    mine.mockReturnValueOnce(new Promise(resolve => { finishRead = resolve; }));
+    await chip(wrapper, 'Refresh').trigger('click');
+    setUse.mockResolvedValue({ disabled: ['reviewer'] });
+    await cards(wrapper)[1].find('input').setValue(false);
+    await flushPromises();
+    finishRead({ disabled: [] });
+    await flushPromises();
+    expect(cards(wrapper)[1].find<HTMLInputElement>('input').element.checked).toBe(false);
+    wrapper.unmount();
   });
 });
