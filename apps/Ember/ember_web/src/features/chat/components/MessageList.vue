@@ -48,6 +48,8 @@ const props = defineProps<{
   steps: ToolStep[];
   plans?: TurnPlan[];
   busy: boolean;
+  /** A command, branch or triage question is running (not an agent turn): shows its label as a live line. */
+  working?: string;
   /** Messages may be edited or the last answer redone (nothing is running). */
   canChange?: boolean;
   /** Index of the question whose answer Regenerate redoes; -1 for none. */
@@ -414,6 +416,10 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
         <span v-if="liveTokens && liveTokens.total > 0" class="elapsed live-tokens" data-test="live-tokens">
           {{ liveTokens.estimated ? "~" : "" }}{{ compactNumber(liveTokens.total) }} tokens
         </span>
+      </div>
+      <div v-else-if="working" class="assistant live" role="status" data-test="working">
+        <span class="activity"><span class="dot" />{{ working }}</span>
+        <ElapsedTime v-if="since" :since="since" class="elapsed" />
       </div>
     </div>
   </div>
