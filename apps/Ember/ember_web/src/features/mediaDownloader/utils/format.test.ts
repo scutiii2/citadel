@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { formatDuration, formatEta, formatExpiry, formatSpeed } from './format'
+import { formatMediaLength, formatEta, formatExpiry, formatSpeed } from './format'
 
 describe('format', () => {
   it('formats durations', () => {
-    expect(formatDuration(null)).toBe('')
-    expect(formatDuration(65)).toBe('1:05')
-    expect(formatDuration(3725)).toBe('1:02:05')
+    expect(formatMediaLength(null)).toBe('')
+    expect(formatMediaLength(65)).toBe('1:05')
+    expect(formatMediaLength(3725)).toBe('1:02:05')
   })
 
   it('formats speed and eta', () => {

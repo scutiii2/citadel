@@ -3,6 +3,7 @@ import PasswordInput from "../../../components/ui/forms/PasswordInput.vue";
 import { reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import AuthCard from "../../../components/auth/AuthCard.vue";
+import { errorMessage } from "../../../utils/errors";
 import { useAuthStore } from "../../../stores/auth";
 
 const auth = useAuthStore();
@@ -31,7 +32,7 @@ async function submit(): Promise<void> {
     // The verify page offers "resend" when the first email didn't go out.
     await router.replace({ name: "verify-email", query: result.verification_email_sent ? {} : { unsent: "1" } });
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorMessage(err);
   } finally {
     busy.value = false;
   }

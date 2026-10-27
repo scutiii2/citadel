@@ -1,7 +1,7 @@
 const MB = 1024 * 1024
 
 /** m:ss, or h:mm:ss from one hour up. Empty when unknown. */
-export function formatDuration(seconds: number | null): string {
+export function formatMediaLength(seconds: number | null): string {
   if (seconds === null) return ''
   const total = Math.round(seconds)
   const h = Math.floor(total / 3600)
@@ -29,6 +29,6 @@ export function formatExpiry(expiresAt: number, now: number): string {
   const left = Math.floor(expiresAt - now)
   if (left <= 0) return 'expired'
   const hours = Math.floor(left / 3600)
-  const minutes = Math.max(1, Math.floor((left % 3600) / 60))
-  return hours > 0 ? `${hours} h ${Math.floor((left % 3600) / 60)} min` : `${minutes} min`
+  const minutes = Math.floor((left % 3600) / 60)
+  return hours > 0 ? `${hours} h ${minutes} min` : `${Math.max(1, minutes)} min`
 }

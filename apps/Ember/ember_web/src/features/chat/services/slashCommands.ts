@@ -3,6 +3,7 @@ import { EXTENSION_SEPARATOR } from "../../../api/contracts/extensions";
 import { McpServerClient } from "../../../api/tools/McpServerClient";
 import type { JsonSchema, ToolInfo } from "../../../api/types";
 import { downloadMarkersOf } from "../../../utils/content/downloads";
+import { errorMessage } from "../../../utils/errors";
 import { formatToolResult } from "../../../utils/tools/toolResultFormat";
 
 /** "/<capability> <command> key=value ..." runs an mcp_server tool directly,
@@ -247,7 +248,7 @@ export class SlashCommandRunner {
       const shown = markers.length ? `${markers.join("\n")}\n\n${body}` : body;
       return result.isError ? `❌ ${shown}` : shown;
     } catch (err) {
-      return `❌ ${err instanceof Error ? err.message : String(err)}`;
+      return `❌ ${errorMessage(err)}`;
     }
   }
 

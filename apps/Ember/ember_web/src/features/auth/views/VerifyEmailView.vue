@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AuthCard from "../../../components/auth/AuthCard.vue";
+import { errorMessage } from "../../../utils/errors";
 import { useAuthStore } from "../../../stores/auth";
 
 const auth = useAuthStore();
@@ -28,7 +29,7 @@ async function submit(): Promise<void> {
     await router.replace({ name: "chat" });
   } catch (err) {
     codeError.value = true;
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorMessage(err);
   } finally {
     busy.value = false; action.value = null;
   }
@@ -43,7 +44,7 @@ async function resend(): Promise<void> {
     await auth.resendVerification();
     notice.value = "A new code is on its way.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = errorMessage(err);
   } finally {
     busy.value = false; action.value = null;
   }
