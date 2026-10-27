@@ -17,7 +17,6 @@ PROVIDER_ID = "decision"
 DEFAULT_MODEL = "both"
 VENDOR_LABEL = "Decision (Laya, Jev)"
 SUPPORTS_STREAMING = True
-MIN_CONFIDENCE = 0.9
 MAX_INPUT_CHARS = 16000
 _REQUEST_KEYS = {"text", "questions", "min_confidence", "trace", "local_only"}
 _log = logging.getLogger(__name__)
@@ -27,7 +26,7 @@ _log = logging.getLogger(__name__)
 class Request:
     text: str
     questions: dict[str, dict[str, Any]]
-    min_confidence: float
+    min_confidence: float | None
     # Keep the caller's request for gateway trace details.
     trace: bool = False
     # Restrict the request to local decision gateways.
@@ -46,7 +45,7 @@ def _is_number(value: Any) -> bool:
     return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
 
 
-def parse_request(raw: str, max_chars: int = MAX_INPUT_CHARS, default_confidence: float = MIN_CONFIDENCE) -> Request:
+def parse_request(raw: str, max_chars: int = MAX_INPUT_CHARS, default_confidence: float | None = None) -> Request:
     """Validate the JSON question. Text after the first JSON object is ignored:
     delegation appends attachment references to the question string. `max_chars`
     bounds the complete input accepted by the decision wrapper."""
@@ -65,7 +64,7 @@ def parse_request(raw: str, max_chars: int = MAX_INPUT_CHARS, default_confidence
     if len(text) > max_chars:
         raise _fail(f"text must be at most {max_chars} characters; send a shorter excerpt")
     min_confidence = data.get("min_confidence", default_confidence)
-    if not _is_number(min_confidence) or not 0 < min_confidence <= 1:
+    if min_confidence is not None and (not _is_number(min_confidence) or not 0 < min_confidence <= 1):
         raise _fail("min_confidence must be a number above 0 and at most 1")
     questions = data.get("questions")
     if not isinstance(questions, dict) or not questions:
@@ -95,7 +94,7 @@ def parse_request(raw: str, max_chars: int = MAX_INPUT_CHARS, default_confidence
     local_only = data.get("local_only", False)
     if not isinstance(local_only, bool):
         raise _fail("local_only must be true or false")
-    return Request(text, questions, float(min_confidence), trace, local_only)
+    return Request(text, questions, None if min_confidence is None else float(min_confidence), trace, local_only)
 
 
 # Per-question detail the Laya service reports; only a `trace` request carries it back to the caller.
@@ -106,7 +105,7 @@ def _compact(answer: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in answer.items() if key not in _TRACE_KEYS}
 
 
-def answer(raw: str, strategy_name: str, min_confidence: float) -> ChatResult:
+def answer(raw: str, strategy_name: str, min_confidence: float | None = None) -> ChatResult:
     request = parse_request(raw, default_confidence=min_confidence)
     try:
         result = strategy.run(strategy_name, DecisionRequest(request.text, request.questions,
@@ -149,8 +148,7 @@ async def run_chat(
     if cancellation.is_cancelled(request_id):
         raise ChatCancelled()
     llm = agent_spec.current().llm
-    result = await anyio.to_thread.run_sync(answer, question, llm.strategy or "both",
-                                           llm.min_confidence if llm.min_confidence is not None else MIN_CONFIDENCE)
+    result = await anyio.to_thread.run_sync(answer, question, llm.strategy or "both", llm.min_confidence)
     if cancellation.is_cancelled(request_id):
         raise ChatCancelled()
     if on_event is not None:

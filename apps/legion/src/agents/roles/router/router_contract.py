@@ -20,7 +20,7 @@ class RouterPolicy(Message):
     choose_agent: bool = True
     choose_tier: bool = True
     strategy: Literal["laya-only", "jev-only", "both"] = "both"
-    min_confidence: float = Field(default=0.9, gt=0, le=1)
+    min_confidence: float | None = Field(default=None, gt=0, le=1)
     deadline_seconds: float = Field(default=10, ge=1, le=30)
     remote_timeout_seconds: float = Field(default=3, gt=0, le=30)
     size_tiers: dict[str, Tier] = Field(default_factory=lambda: dict(DEFAULT_SIZE_TIERS))

@@ -26,7 +26,8 @@ generation options and ordered same-provider fallback gateways. Their presets
 are `../gateways/<provider>/<gateway>.json`.
 
 Decision agents use `llm: {"provider": "decision", "strategy": "both",
-"min_confidence": 0.9}`. Strategies are `laya-only`, `jev-only` or `both`.
+"min_confidence": 0.9}` (`min_confidence` is optional: leave it out to use each model's own
+thresholds). Strategies are `laya-only`, `jev-only` or `both`.
 Gateway/model, generation and language fallback fields are rejected. Laya's
 internal service strategy is gateway config, read on each call. A router's
 `decision` policy selects its routing strategy/confidence separately.

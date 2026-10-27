@@ -339,7 +339,8 @@ def load_file(path: Path) -> AgentSpec:
         strategy = strategy or "both"
         if strategy not in STRATEGIES:
             raise check.fail("llm.strategy", f"must be one of: {', '.join(STRATEGIES)}")
-        min_confidence = 0.9 if min_confidence is None else check.number(llm_data, "min_confidence", 0.0001, 1.0, "llm.")
+        # Unset: each gateway applies its own thresholds.
+        min_confidence = check.number(llm_data, "min_confidence", 0.0001, 1.0, "llm.")
         for key in ("gateway", "model", "fallback_gateways"):
             if key in llm_data:
                 raise check.fail(f"llm.{key}", "the decision provider has no gateway, model or fallback_gateways; pick llm.strategy")

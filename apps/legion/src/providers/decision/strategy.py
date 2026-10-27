@@ -45,9 +45,11 @@ def default_gateways() -> dict[str, DecisionGateway]:
     return {"laya": LayaGateway(), "jev": JevGateway()}
 
 
-def _settled(answer: Mapping[str, Any] | None, minimum: float) -> bool:
-    return (answer is not None and not answer.get("uncertain", True) and not answer.get("unknown")
-            and answer.get("answer_confidence", 0) >= minimum - _EPSILON)
+def _settled(answer: Mapping[str, Any] | None, minimum: float | None) -> bool:
+    """Settled by the gateway's own verdict and, when the request names a minimum, that bar too."""
+    if answer is None or answer.get("uncertain", True) or answer.get("unknown"):
+        return False
+    return minimum is None or answer.get("answer_confidence", 0) >= minimum - _EPSILON
 
 
 def run(strategy: str, request: DecisionRequest, *, gateways: Mapping[str, DecisionGateway] | None = None,

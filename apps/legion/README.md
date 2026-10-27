@@ -96,7 +96,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `entry` | no | `false` | The orchestrator Ember opens a chat with. Exactly one enabled agent must set it. |
 | `llm.provider` | yes | none | `anthropic` or `openai` for language; `decision` for typed questions. |
 | `llm.strategy` | decision only | `both` | `laya-only`, `jev-only`, or `both`. |
-| `llm.min_confidence` | decision only | `0.9` | Above 0 and at most 1. Per-request overrides are accepted. |
+| `llm.min_confidence` | decision only | unset | Above 0 and at most 1. Unset: each model applies its own thresholds. Per-request overrides are accepted. |
 | `llm.gateway` | no | provider default | A filename stem from `gateways/<provider>/<gateway>.json`. |
 | `llm.fallback_gateways` | no | `[]` | Ordered same-provider backup gateways, as names or `{gateway, model?}` objects. See Gateway failover below. |
 | `llm.model` | no | gateway's `model` | Model id. |
@@ -249,15 +249,17 @@ Then set `agents_registry_url` in `apps/Ember/ember_api/configs/config_app.json`
 
 Agents with `llm.provider: "decision"` answer typed JSON questions without tools or
 text generation. Their `llm.strategy` is `laya-only`, `jev-only` or `both` (default),
-and their `llm.min_confidence` defaults to 0.90. With `both`, Laya answers first;
+and their `llm.min_confidence` is unset by default, so each gateway uses its own
+thresholds: Laya per model and option count (English 0.90 / typed 0.80 for two options,
+0.75 / 0.55 for three or more), Jev 0.90. A number sets one bar for every gateway. With `both`, Laya answers first;
 Jev receives only questions that Laya fails to settle. `local_only: true` forces
 Laya only. An uncertain last answer stays marked `uncertain`. A later gateway's answer
 replaces an earlier one only when it settles the question or is at least as confident.
 Without `"trace": true` the answers leave out the service's `rounds`, `voters` and
 `options` detail.
 
-Confidence scales differ on purpose: agents and the router use a fraction (0.01 to 1,
-default 0.90); `classifier.auto_tier` and `classifier.auto_route` use a whole percentage
+Confidence scales differ on purpose: agents and the router use a fraction (above 0, up to 1,
+unset by default); `classifier.auto_tier` and `classifier.auto_route` use a whole percentage
 (1 to 100). Zero is refused because the Laya service needs a value above zero. A router
 takes its `strategy` and `min_confidence` from `llm` unless its `decision` block sets them.
 
