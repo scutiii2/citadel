@@ -56,8 +56,10 @@ legacy file; copy any subsequent gateway changes back into that file first.
 
 Provider folder `decision/` holds `laya.json` and `jev.json`. Laya is the
 local LayaModel service; its `strategy` selects any name offered by the
-service's `GET /v1/strategies` endpoint (default `english-then-typed`). The
-service URL is configured through `LAYA_SERVICE_URL`.
+service's `GET /v1/strategies` endpoint (default `english-then-typed`), and its
+`window` is the token window sent as `max_len` (default 4096, allowed 16 to 8192;
+the service refuses text that does not fit it with a 413). The service URL is
+configured through `LAYA_SERVICE_URL`.
 
 Jev calls the TypeSafe API; its URL and model are preset in `jev.json`, and
 its credential is resolved from `TYPESAFE_API_KEY`.

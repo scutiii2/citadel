@@ -1,4 +1,5 @@
 {
   "label": "Laya (LayaModel service)",
-  "strategy": "english-then-typed"
+  "strategy": "english-then-typed",
+  "window": 4096
 }

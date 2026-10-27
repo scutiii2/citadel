@@ -1,7 +1,7 @@
 import pytest
 
 from src.providers.decision.contract import DecisionError, DecisionRequest
-from src.providers.decision.gateways.laya import DEFAULT_STRATEGY, LayaGateway
+from src.providers.decision.gateways.laya import DEFAULT_STRATEGY, DEFAULT_WINDOW, LayaGateway
 from src.providers import llm_config
 from src.providers.decision.laya_model import LayaServiceError
 
@@ -27,7 +27,7 @@ def test_uses_configured_strategy_and_passes_min_confidence():
                            "calls": [{"model": "m", "input_tokens": 5, "duration_ms": 1, "ok": True}]})
     result = LayaGateway(service).ask(DecisionRequest("hi", QUESTION, min_confidence=0.8))
     strategy, text, _, max_len, tuning = service.calls[0]
-    assert strategy == "english-then-typed" and text == "hi" and max_len == 512
+    assert strategy == "english-then-typed" and text == "hi" and max_len == 4096
     assert tuning["min_confidence"] == 0.8
     assert result.answers["q"]["choice"] == "a" and result.tokens == 5
 
@@ -84,4 +84,32 @@ def test_invalid_gateway_file_is_a_decision_error(tmp_path, monkeypatch):
     path.parent.mkdir()
     path.write_text("{not json", encoding="utf-8")
     with pytest.raises(DecisionError, match="laya.json"):
+        LayaGateway(FakeService({"answers": {}})).ask(DecisionRequest("hi", QUESTION))
+
+
+def test_window_defaults_to_the_old_triage_window(tmp_path, monkeypatch):
+    monkeypatch.setattr(llm_config, "GATEWAYS_DIR", tmp_path)
+    assert DEFAULT_WINDOW == 4096 and LayaGateway(FakeService()).window == 4096
+
+
+def test_window_follows_the_gateway_file_and_is_sent_as_max_len(tmp_path, monkeypatch):
+    monkeypatch.setattr(llm_config, "GATEWAYS_DIR", tmp_path)
+    path = tmp_path / "decision" / "laya.json"
+    path.parent.mkdir()
+    path.write_text('{"window": 1024}', encoding="utf-8")
+    service = FakeService({"answers": {}, "calls": []})
+    LayaGateway(service).ask(DecisionRequest("hi", QUESTION))
+    assert service.calls[0][3] == 1024
+    path.write_text('{"window": 2048}', encoding="utf-8")
+    LayaGateway(service).ask(DecisionRequest("hi", QUESTION))
+    assert service.calls[1][3] == 2048
+
+
+@pytest.mark.parametrize("raw", ['"4096"', "8", "9000", "true", "null"])
+def test_invalid_window_is_a_decision_error(tmp_path, monkeypatch, raw):
+    monkeypatch.setattr(llm_config, "GATEWAYS_DIR", tmp_path)
+    path = tmp_path / "decision" / "laya.json"
+    path.parent.mkdir()
+    path.write_text('{"window": ' + raw + "}", encoding="utf-8")
+    with pytest.raises(DecisionError, match="window"):
         LayaGateway(FakeService({"answers": {}})).ask(DecisionRequest("hi", QUESTION))
