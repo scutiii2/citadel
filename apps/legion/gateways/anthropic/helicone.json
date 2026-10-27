@@ -2,7 +2,7 @@
   "label": "Helicone",
   "base_url": "https://anthropic.helicone.ai",
   "api_key": "{CLAUDE_API_KEY}",
-  "model": "claude-sonnet-5",
+  "model": "claude-sonnet-5-5",
   "models": {
     "light": {
       "id": "claude-haiku-5-5",
