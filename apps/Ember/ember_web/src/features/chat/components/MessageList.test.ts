@@ -813,3 +813,26 @@ it("clears cached editing drafts when the account scope changes", async () => {
   expect(wrapper.find("textarea").exists()).toBe(false);
   expect(wrapper.emitted("edit")).toBeUndefined();
 });
+
+describe("working line", () => {
+  it("shows a live line with the label and a clock while a command or triage question runs", () => {
+    const wrapper = mountList({ working: "Asking the Triage Assistant ...", since: Date.now() });
+    const live = wrapper.find('[data-test="working"]');
+    expect(live.exists()).toBe(true);
+    expect(live.classes()).toContain("live");
+    expect(live.text()).toContain("Asking the Triage Assistant ...");
+    expect(live.attributes("role")).toBe("status");
+    expect(live.find(".elapsed").exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("shows nothing when idle, and leaves the agent's thinking line to a running turn", () => {
+    const idle = mountList({ working: "" });
+    expect(idle.find('[data-test="working"]').exists()).toBe(false);
+    idle.unmount();
+    const turn = mountList({ busy: true, working: "Asking the Triage Assistant ..." });
+    expect(turn.find('[data-test="working"]').exists()).toBe(false);
+    expect(turn.text()).toContain("thinking ...");
+    turn.unmount();
+  });
+});

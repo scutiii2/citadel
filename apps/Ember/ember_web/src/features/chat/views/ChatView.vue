@@ -433,6 +433,7 @@ useChatShortcuts({
         :steps="liveSteps"
         :plans="livePlans"
         :busy="busy"
+        :working="working"
         :can-change="!busy && !working"
         :approvals="pendingApprovals"
         :since="clockStart"
