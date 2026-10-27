@@ -24,6 +24,8 @@ Copy-ready CSS for the recurring pieces. All values are tokens from [tokens.css]
 button:disabled { cursor: default; opacity: 0.5; }
 ```
 
+In ember_web the Cancel / Save pills of a dialog are not copied per component: `style.css` has `.pill-btn` with `.primary` and `.ghost` variants and its disabled state, and the busy ring on `button[aria-busy="true"]`. Use those; keep the CSS above for a new app.
+
 Card-style action button (`SaveButton.vue`): `--radius-md`, `1px solid --border`, `--surface` fill, `box-shadow: 0 1px 4px rgba(0,0,0,.15)`; toggled state inverts to `--text` on `--bg`.
 
 `DeleteButton.vue`: red pill with bin icon; while `busy` the label letters fall into the bin, the button shrinks to a circle and a ring spins. Pattern to reuse: a busy state shown on the control itself.
@@ -91,10 +93,6 @@ Flex row, `flex-wrap`, label and description left (`flex: 1 1 220px`), control r
 - Name tooltip via `[data-label]:hover::after` / `:focus-visible::after`: `left: calc(100% + 8px)`, `--surface`, `1px solid --border`, `--radius-md`, small shadow.
 - Status alert (issues): same square, `--tone` is `--warning` or `--status-failed`, with a 16px count badge top-right.
 - `max-width: 767px`: the rail becomes a row, `width: 100%; height: var(--rail-height); border-top` instead of right border, active marker `inset 0 -2px 0 var(--accent)`, tooltips hidden, page icons scroll horizontally.
-
-## Tile (`IconTile.vue`)
-
-Centered column card, `--radius-lg`, `--surface`, soft shadow, lifts 2px on hover/focus. Above the label: a soft accent blob (`color-mix(in srgb, var(--accent) 16%, transparent)`) with outlined bubbles and a 40px stroked icon in `--accent`. Label 0.9em/500; optional `--mono` subtitle in `--muted`.
 
 ## Tables and code (info pages)
 

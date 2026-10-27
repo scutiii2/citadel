@@ -123,7 +123,6 @@
 .info-page:where(:not(.page), .info-content) .list-heading > :first-child { text-transform: uppercase; letter-spacing: .08em; }
 .info-page:where(:not(.page), .info-content) .unsaved, .info-page:where(:not(.page), .info-content) .saved-state { display: inline-flex; align-items: center; gap: 7px; margin-right: auto; font-size: .8em; color: var(--muted); }
 .info-page:where(:not(.page), .info-content) .unsaved i { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--accent); flex-shrink: 0; }
-.info-page:where(:not(.page), .info-content) .danger-zone { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-lg); font-size: .85em; }
 .info-page:where(:not(.page), .info-content) .placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 28px; color: var(--muted); text-align: center; }
 .info-page:where(:not(.page), .info-content) .placeholder svg { width: 34px; height: 34px; color: var(--accent); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .info-page:where(:not(.page), .info-content) .placeholder h3 { font-size: 1em; margin: 0; color: var(--text); }

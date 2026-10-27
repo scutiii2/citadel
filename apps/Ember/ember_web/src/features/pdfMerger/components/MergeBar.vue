@@ -7,7 +7,7 @@ import DownloadCards from '../../../components/content/DownloadCards.vue'
 import ElapsedTime from '../../../components/ui/status/ElapsedTime.vue'
 import ActionButton from '../../../components/ui/buttons/ActionButton.vue'
 import { downloadUrl } from '../api/PdfMergerClient'
-import { formatBytes, plural } from '../lib/format'
+import { formatBytes, plural } from '../../../utils/format'
 import { usePlanStore } from '../stores/plan'
 
 const plan = usePlanStore()

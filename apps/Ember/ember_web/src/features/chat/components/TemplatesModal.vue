@@ -4,6 +4,7 @@ import { TEMPLATE_BODY_MAX, TEMPLATE_NAME_MAX, type PromptTemplate } from "../ap
 import { useTemplatesStore } from "../stores/templates";
 import { errorMessage } from "../../../utils/errors";
 import { preview } from "../utils/templates";
+import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 
 /** Create, edit and delete the account's saved prompts. Opened with
@@ -15,7 +16,6 @@ const emit = defineEmits<{ close: [] }>();
 
 const store = useTemplatesStore();
 
-const dialog = ref<HTMLDialogElement | null>(null);
 const nameInput = ref<HTMLInputElement | null>(null);
 
 // null: the list; otherwise the form, for a new template (id null) or an existing one.
@@ -60,16 +60,12 @@ function backToList(): void {
 watch(
   () => props.open,
   async (isOpen) => {
+    if (!isOpen) return;
     await nextTick();
-    if (isOpen && !dialog.value?.open) {
-      dialog.value?.showModal();
-      void store.ensureLoaded();
-      if (!editing.value) {
-        if (props.draft.trim()) startEdit(null, props.draft);
-        else backToList();
-      }
-    } else if (!isOpen && dialog.value?.open) {
-      dialog.value.close();
+    void store.ensureLoaded();
+    if (!editing.value) {
+      if (props.draft.trim()) startEdit(null, props.draft);
+      else backToList();
     }
   },
 );
@@ -104,20 +100,17 @@ async function remove(template: PromptTemplate): Promise<void> {
   }
 }
 
-// Esc steps back from the form to the list, then closes.
+const title = computed(() => (editing.value ? (editing.value.id === null ? "New prompt" : "Edit prompt") : "Saved prompts"));
+
+// Esc, the × and a click outside step back from the form to the list, then close.
 function onCancel(): void {
   requestDeparture(editing.value ? "back" : "close");
 }
 </script>
 
 <template>
-  <dialog ref="dialog" class="templates" aria-label="Saved prompts" @close="emit('close')" @cancel.prevent="onCancel">
-    <header>
-      <h3>{{ editing ? (editing.id === null ? "New prompt" : "Edit prompt") : "Saved prompts" }}</h3>
-      <button type="button" class="close" aria-label="Close" @click="requestDeparture('close')" :disabled="saving">×</button>
-    </header>
-
-    <form v-if="editing" class="form" @submit.prevent="save">
+  <BaseModal :open="open" :title="title" @close="onCancel">
+    <form v-if="editing" class="dialog-form" @submit.prevent="save">
       <label>
         Name
         <input ref="nameInput" v-model="name" :disabled="saving" type="text" :maxlength="TEMPLATE_NAME_MAX" autocomplete="off" />
@@ -129,14 +122,14 @@ function onCancel(): void {
       <small class="count">{{ body.length.toLocaleString() }} / {{ TEMPLATE_BODY_MAX.toLocaleString() }}</small>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
-        <button type="button" class="ghost" @click="requestDeparture('back')" :disabled="saving">Back</button>
-        <button type="submit" class="primary" :aria-busy="saving" :disabled="!canSave">{{ saving ? "Saving …" : "Save" }}</button>
+        <button type="button" class="pill-btn ghost" @click="requestDeparture('back')" :disabled="saving">Back</button>
+        <button type="submit" class="pill-btn primary" :aria-busy="saving" :disabled="!canSave">{{ saving ? "Saving …" : "Save" }}</button>
       </div>
     </form>
 
     <template v-else>
       <p v-if="store.loadError" class="error" role="alert">
-        {{ store.loadError }} <button type="button" class="link" @click="store.reload()">Retry</button>
+        {{ store.loadError }} <button type="button" class="link-btn" @click="store.reload()">Retry</button>
       </p>
       <p v-else-if="store.loading && store.templates.length === 0" class="muted">Loading …</p>
       <p v-else-if="store.templates.length === 0" class="muted">
@@ -148,13 +141,13 @@ function onCancel(): void {
             <strong>{{ t.name }}</strong>
             <span class="muted">{{ preview(t.body, 70) }}</span>
           </div>
-          <button type="button" class="link" @click="startEdit(t)">Edit</button>
-          <button type="button" class="link danger" @click="pendingDelete = t">Delete</button>
+          <button type="button" class="link-btn" @click="startEdit(t)">Edit</button>
+          <button type="button" class="link-btn danger" @click="pendingDelete = t">Delete</button>
         </li>
       </ul>
       <p v-if="error && !store.loadError" class="error" role="alert">{{ error }}</p>
       <div class="buttons">
-        <button type="button" class="primary" @click="startEdit(null)">New prompt</button>
+        <button type="button" class="pill-btn primary" @click="startEdit(null)">New prompt</button>
       </div>
     </template>
     <ConfirmModal v-if="pendingDeparture" open title="Discard prompt changes?" message="Your prompt has unsaved changes." confirm-label="Discard" danger @confirm="discard" @close="pendingDeparture = null" />
@@ -168,42 +161,10 @@ function onCancel(): void {
       @confirm="remove(pendingDelete)"
       @close="pendingDelete = null"
     />
-  </dialog>
+  </BaseModal>
 </template>
 
 <style scoped>
-.templates {
-  width: min(560px, calc(100vw - 32px));
-  max-height: calc(100vh - 64px);
-  padding: 18px 20px 20px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  color: var(--text);
-  background: var(--surface);
-}
-.templates::backdrop {
-  background: rgb(0 0 0 / 45%);
-}
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-h3 {
-  margin: 0;
-  font-size: 1em;
-}
-.close {
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 1.4em;
-  line-height: 1;
-  color: var(--muted);
-}
 .list {
   margin: 0 0 12px;
   padding: 0;
@@ -231,33 +192,6 @@ h3 {
 .muted {
   color: var(--muted);
 }
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.form label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.85em;
-  color: var(--muted);
-}
-.form input,
-.form textarea {
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  outline: none;
-  resize: vertical;
-  color: var(--text);
-  background: var(--bg);
-  font: inherit;
-}
-.form input:focus,
-.form textarea:focus {
-  border-color: var(--accent);
-}
 .count {
   align-self: flex-end;
   color: var(--muted);
@@ -272,54 +206,5 @@ h3 {
   justify-content: flex-end;
   gap: 8px;
 }
-.ghost,
-.primary {
-  padding: 5px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-}
-.ghost {
-  color: var(--muted);
-  background: transparent;
-}
-.primary {
-  border-color: var(--accent);
-  color: var(--accent-contrast);
-  background: var(--accent);
-}
-.primary:disabled {
-  cursor: default;
-  opacity: 0.4;
-}
-.link {
-  padding: 2px 8px;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 0.85em;
-  color: var(--muted);
-  background: transparent;
-}
-.link:hover {
-  color: var(--text);
-  background: var(--bg);
-}
-.link.danger:hover {
-  color: var(--danger);
-}
 
-button[aria-busy="true"]:not(.delete-button)::before {
-  content: "";
-  display: inline-block;
-  width: 0.85em;
-  height: 0.85em;
-  margin-right: 6px;
-  vertical-align: middle;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: var(--radius-full);
-  animation: pending-spin 0.75s linear infinite;
-}
-@keyframes pending-spin { to { transform: rotate(360deg); } }
 </style>

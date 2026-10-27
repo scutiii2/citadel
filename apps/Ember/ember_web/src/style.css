@@ -114,6 +114,113 @@ button[aria-busy="true"]::before {
 }
 @keyframes ember-busy { to { transform: rotate(360deg); } }
 
+/* A quiet text button inside a dialog or popover ("Edit", "Retry"); add `danger` for a destructive one. */
+.link-btn {
+  padding: 2px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85em;
+  color: var(--muted);
+  background: transparent;
+}
+.link-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--bg);
+}
+.link-btn.danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+.link-btn:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* A form in a dialog: labelled fields stacked, with the shared input look. */
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dialog-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85em;
+  color: var(--muted);
+}
+.dialog-form input,
+.dialog-form textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+  resize: vertical;
+  color: var(--text);
+  background: var(--bg);
+  font: inherit;
+}
+.dialog-form input:focus,
+.dialog-form textarea:focus {
+  border-color: var(--accent);
+}
+
+/* A small outlined pill that states something ("Off for everyone", "On"). */
+.status-badge {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  font-size: 0.75em;
+  color: var(--muted);
+}
+
+/* Text for screen readers only. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* A small grey label beside a usage row's name (provider, gateway, call count). */
+.call-chip {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.8em;
+  color: var(--muted);
+  background: var(--code-bg);
+}
+
+/* Pill buttons for the Cancel / Save row of a dialog. `primary` is the accent one, `ghost` the quiet one. */
+.pill-btn {
+  padding: 5px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+.pill-btn:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+.pill-btn.primary {
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+.pill-btn.ghost {
+  color: var(--muted);
+  background: transparent;
+}
+.pill-btn.ghost:hover:not(:disabled) {
+  color: var(--text);
+}
+
 /* The visible viewport follows mobile browser chrome and the keyboard. */
 #app {
   position: fixed;

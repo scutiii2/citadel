@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { useNarrow } from "../../composables/useNarrow";
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import PageLayout from '../../components/layout/PageLayout.vue'
 import ActionButton from '../../components/ui/buttons/ActionButton.vue'
+import DangerZone from "../../components/ui/status/DangerZone.vue";
+import RetentionNote from "../../components/ui/status/RetentionNote.vue";
 import ConfirmModal from '../../components/ui/dialogs/ConfirmModal.vue'
 import BaseModal from '../../components/ui/dialogs/BaseModal.vue'
 import SegmentedControl from '../../components/ui/forms/SegmentedControl.vue'
@@ -14,15 +17,12 @@ import FileRow from './components/FileRow.vue'
 import PackagePanel from './components/PackagePanel.vue'
 import { useMediaDownloaderStore } from './stores/mediaDownloader'
 import { useAuthStore } from '../../stores/auth'
-import { formatBytes, formatExpiry } from './utils/format'
+import { formatBytes } from '../../utils/format'
+import { formatExpiry } from './utils/format'
 import type { FileInfo } from './api/MediaDownloaderTypes'
 
 const store = useMediaDownloaderStore()
-const narrow = ref(window.matchMedia?.('(max-width: 767px)').matches ?? false)
-const mediaQuery = window.matchMedia?.('(max-width: 767px)')
-function updateViewport(event: MediaQueryListEvent): void { narrow.value = event.matches }
-onMounted(() => mediaQuery?.addEventListener?.('change', updateViewport))
-onBeforeUnmount(() => mediaQuery?.removeEventListener?.('change', updateViewport))
+const narrow = useNarrow()
 const auth = useAuthStore()
 const now = ref(Date.now() / 1000)
 const tab = ref<'download' | 'groups' | 'files'>('download')
@@ -107,14 +107,14 @@ async function confirmAction(): Promise<void> {
         <ul v-else class="file-list">
           <FileRow v-for="file in store.files" :key="file.file_id" :file="file" :now="now" :busy="store.removing.includes(file.file_id)" @details="fileDetails = file" />
         </ul>
-        <p class="muted retention"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v6l4 2" /></svg>Save files to your device before they expire.</p>
+        <RetentionNote class="retention">Save files to your device before they expire.</RetentionNote>
       </aside>
     </WorkspaceLayout>
     <BaseModal :open="fileDetails !== null" title="File details" @close="!confirming && (fileDetails = null)">
       <div v-if="fileDetails" class="file-details">
         <p class="file-details-name">{{ fileDetails.name }}</p>
         <p class="muted">{{ formatBytes(fileDetails.size) }} · {{ fileDetails.expires_at > now ? `Expires in ${formatExpiry(fileDetails.expires_at, now)}` : 'Expired' }}</p>
-        <div class="danger-zone"><span>Remove this file</span><ActionButton icon="clear" class="danger" :disabled="store.removing.includes(fileDetails.file_id)" @click="confirm = { kind: 'delete', id: fileDetails.file_id, name: fileDetails.name }">Delete file</ActionButton></div>
+        <DangerZone class="file-danger" label="Remove this file"><ActionButton icon="clear" class="danger" :disabled="store.removing.includes(fileDetails.file_id)" @click="confirm = { kind: 'delete', id: fileDetails.file_id, name: fileDetails.name }">Delete file</ActionButton></DangerZone>
       </div>
     </BaseModal>
     <ConfirmModal :open="confirm !== null" :title="confirm?.kind === 'delete' ? 'Delete file?' : 'Cancel download?'" :message="confirmationMessage" :confirm-label="confirm?.kind === 'delete' ? 'Delete file' : 'Cancel download'" danger :busy="confirming" @confirm="confirmAction" @close="!confirming && (confirm = null)" />
@@ -144,15 +144,11 @@ async function confirmAction(): Promise<void> {
 .empty-files { padding: 16px 0; }
 .files-panel :deep(button.action) { border-radius: var(--radius-full); }
 .files-heading :deep(.action .label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.retention { display: flex; align-items: flex-start; gap: 8px; margin-top: 20px; font-size: .75em; }
-.retention svg { width: 15px; height: 15px; margin-top: 2px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.retention { margin-top: 20px; }
 .rights-note { margin: 24px 0 0; font-size: .75em; }
 .file-details { overflow-wrap: anywhere; }
 .file-details-name { font-weight: 600; }
-.danger-zone { margin-top: 24px; }
-.danger-zone :deep(button.action) { color: var(--danger); border-color: var(--danger); border-radius: var(--radius-full); }
-.danger-zone :deep(.action .label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
-.danger-zone :deep(.action .icon) { stroke: currentColor; }
+.file-danger { margin-top: 24px; }
 h3 { font-size: 1em; margin: 0 0 12px; }
 .error { color: var(--danger); overflow-wrap: anywhere; }
 .muted { color: var(--muted); font-size: .85em; }

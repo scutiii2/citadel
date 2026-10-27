@@ -11,6 +11,7 @@ import type {
 } from "../../../api/types";
 import type { CommandInfo } from "../../../api/tools/CommandsClient";
 import { agentLabelFor } from "../utils/agentLabels";
+import { growToContent } from "../../../utils/browser/autoGrow";
 import { FILE_ONLY_QUESTION, splitAttachments } from "../../../utils/content/attachments";
 import { hideDownloadMarkers, parseDownloads } from "../../../utils/content/downloads";
 import { clockTime, dayDividers, fullTime } from "../utils/messageTime";
@@ -127,15 +128,10 @@ async function startEdit(index: number): Promise<void> {
   await nextTick();
   const area = editArea.value[0];
   if (area) {
-    autoGrow(area);
+    growToContent(area);
     area.focus();
     area.setSelectionRange(area.value.length, area.value.length);
   }
-}
-
-function autoGrow(area: HTMLTextAreaElement): void {
-  area.style.height = "auto";
-  area.style.height = `${area.scrollHeight}px`;
 }
 
 function cancelEdit(): void {
@@ -262,7 +258,7 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
             class="edit-area"
             rows="2"
             aria-label="Edit your question"
-            @input="autoGrow($event.target as HTMLTextAreaElement)"
+            @input="growToContent($event.target as HTMLTextAreaElement)"
             @keydown.esc.prevent="cancelEdit"
             @keydown="editKeydown"
           />
@@ -818,17 +814,4 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
   }
 }
 
-button[aria-busy="true"]:not(.delete-button)::before {
-  content: "";
-  display: inline-block;
-  width: 0.85em;
-  height: 0.85em;
-  margin-right: 6px;
-  vertical-align: middle;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: var(--radius-full);
-  animation: pending-spin 0.75s linear infinite;
-}
-@keyframes pending-spin { to { transform: rotate(360deg); } }
 </style>

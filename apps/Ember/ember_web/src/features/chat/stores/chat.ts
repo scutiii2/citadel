@@ -36,6 +36,7 @@ import { splitAttachments, withAttachments } from "../../../utils/content/attach
 import { errorMessage } from "../../../utils/errors";
 import { toolTitle } from "../../../utils/tools/toolTitles";
 import { triageAnswerText, triageQuestionText } from "../utils/triageMessage";
+import { readStored, writeStored } from "../../../utils/browser/storage";
 import { useAuthStore } from "../../../stores/auth";
 import { extensionsClient } from "../../capabilities/api/ExtensionsClient";
 
@@ -107,9 +108,9 @@ function askBeforeToolsKey(accountId: number): string {
 
 /** The saved mode; an account that only ever had the old switch keeps what it chose (on asks, off allows all). */
 function readApprovalMode(accountId: number): ApprovalMode {
-  const saved = readPreference(approvalModeKey(accountId));
+  const saved = readStored(approvalModeKey(accountId));
   if (isApprovalMode(saved)) return saved;
-  return readPreference(askBeforeToolsKey(accountId)) === "1" ? "ask" : DEFAULT_APPROVAL_MODE;
+  return readStored(askBeforeToolsKey(accountId)) === "1" ? "ask" : DEFAULT_APPROVAL_MODE;
 }
 
 function allowedToolsKey(accountId: number): string {
@@ -123,7 +124,7 @@ const MAX_ALLOWED_TOOLS = 200;
  * Anything malformed is dropped rather than trusted. */
 function readAllowedTools(accountId: number): Record<string, string[]> {
   try {
-    const parsed: unknown = JSON.parse(readPreference(allowedToolsKey(accountId)) ?? "{}");
+    const parsed: unknown = JSON.parse(readStored(allowedToolsKey(accountId)) ?? "{}");
     if (!isRecord(parsed)) return {};
     const result: Record<string, string[]> = {};
     for (const [chatId, tools] of Object.entries(parsed)) {
@@ -135,23 +136,6 @@ function readAllowedTools(accountId: number): Record<string, string[]> {
     return result;
   } catch {
     return {};
-  }
-}
-
-// Per-viewer convenience: blocked storage just means the default (off).
-function readPreference(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writePreference(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // ignore - see readPreference
   }
 }
 
@@ -571,16 +555,16 @@ export const useChatStore = defineStore("chat", () => {
       conversations.value = [];
       listReady.value = false;
       setSearch("");
-      caveman.value = accountId !== null && readPreference(cavemanKey(accountId)) === "1";
-      independent.value = accountId !== null && readPreference(independentKey(accountId)) === "1";
-      plan.value = accountId === null || readPreference(planKey(accountId)) !== "0";
-      planLean.value = accountId === null || readPreference(planLeanKey(accountId)) !== "0";
+      caveman.value = accountId !== null && readStored(cavemanKey(accountId)) === "1";
+      independent.value = accountId !== null && readStored(independentKey(accountId)) === "1";
+      plan.value = accountId === null || readStored(planKey(accountId)) !== "0";
+      planLean.value = accountId === null || readStored(planLeanKey(accountId)) !== "0";
       approvalMode.value = accountId !== null ? readApprovalMode(accountId) : DEFAULT_APPROVAL_MODE;
-      chime.value = accountId === null || readPreference(chimeKey(accountId)) !== "0";
-      browserNotifications.value = accountId !== null && readPreference(`ember_web.notifications.${accountId}`) === "1";
-      liveTokens.value = accountId === null || readPreference(liveTokensKey(accountId)) !== "0";
-      contextPanel.value = accountId === null || readPreference(contextPanelKey(accountId)) !== "0";
-      const savedAccuracy = accountId !== null ? readPreference(contextAccuracyKey(accountId)) : null;
+      chime.value = accountId === null || readStored(chimeKey(accountId)) !== "0";
+      browserNotifications.value = accountId !== null && readStored(`ember_web.notifications.${accountId}`) === "1";
+      liveTokens.value = accountId === null || readStored(liveTokensKey(accountId)) !== "0";
+      contextPanel.value = accountId === null || readStored(contextPanelKey(accountId)) !== "0";
+      const savedAccuracy = accountId !== null ? readStored(contextAccuracyKey(accountId)) : null;
       contextAccuracy.value = isContextAccuracy(savedAccuracy) ? savedAccuracy : DEFAULT_CONTEXT_ACCURACY;
       allowedTools.value = accountId !== null ? readAllowedTools(accountId) : {};
       forceToolApproval.value = false;
@@ -1183,42 +1167,42 @@ export const useChatStore = defineStore("chat", () => {
   function setApprovalMode(mode: ApprovalMode): void {
     approvalMode.value = mode;
     const accountId = auth.account?.id;
-    if (accountId !== undefined) writePreference(approvalModeKey(accountId), mode);
+    if (accountId !== undefined) writeStored(approvalModeKey(accountId), mode);
   }
 
   function setChime(on: boolean): void {
     chime.value = on;
     const accountId = auth.account?.id;
-    if (accountId !== undefined) writePreference(chimeKey(accountId), on ? "1" : "0");
+    if (accountId !== undefined) writeStored(chimeKey(accountId), on ? "1" : "0");
   }
 
   function setLiveTokens(on: boolean): void {
     liveTokens.value = on;
     const accountId = auth.account?.id;
-    if (accountId !== undefined) writePreference(liveTokensKey(accountId), on ? "1" : "0");
+    if (accountId !== undefined) writeStored(liveTokensKey(accountId), on ? "1" : "0");
   }
 
   function setContextPanel(on: boolean): void {
     contextPanel.value = on;
     const accountId = auth.account?.id;
-    if (accountId !== undefined) writePreference(contextPanelKey(accountId), on ? "1" : "0");
+    if (accountId !== undefined) writeStored(contextPanelKey(accountId), on ? "1" : "0");
   }
 
   function setContextAccuracy(mode: ContextAccuracy): void {
     contextAccuracy.value = mode;
     const accountId = auth.account?.id;
-    if (accountId !== undefined) writePreference(contextAccuracyKey(accountId), mode);
+    if (accountId !== undefined) writeStored(contextAccuracyKey(accountId), mode);
   }
 
   function setBrowserNotifications(on: boolean): void {
     browserNotifications.value = on;
     const accountId = auth.account?.id;
-    if (accountId !== undefined) writePreference(`ember_web.notifications.${accountId}`, on ? "1" : "0");
+    if (accountId !== undefined) writeStored(`ember_web.notifications.${accountId}`, on ? "1" : "0");
   }
 
   function persistAllowedTools(): void {
     const accountId = auth.account?.id;
-    if (accountId !== undefined) writePreference(allowedToolsKey(accountId), JSON.stringify(allowedTools.value));
+    if (accountId !== undefined) writeStored(allowedToolsKey(accountId), JSON.stringify(allowedTools.value));
   }
 
   /** Stops asking about `tool` in chat `chatId`. */
@@ -1297,25 +1281,25 @@ export const useChatStore = defineStore("chat", () => {
   function setPlan(on: boolean): void {
     plan.value = on;
     const accountId = auth.account?.id;
-    if (accountId !== undefined) writePreference(planKey(accountId), on ? "1" : "0");
+    if (accountId !== undefined) writeStored(planKey(accountId), on ? "1" : "0");
   }
 
   function setPlanLean(on: boolean): void {
     planLean.value = on;
     const accountId = auth.account?.id;
-    if (accountId !== undefined) writePreference(planLeanKey(accountId), on ? "1" : "0");
+    if (accountId !== undefined) writeStored(planLeanKey(accountId), on ? "1" : "0");
   }
 
   function setCaveman(on: boolean): void {
     caveman.value = on;
     const accountId = auth.account?.id;
-    if (accountId !== undefined) writePreference(cavemanKey(accountId), on ? "1" : "0");
+    if (accountId !== undefined) writeStored(cavemanKey(accountId), on ? "1" : "0");
   }
 
   function setIndependent(on: boolean): void {
     independent.value = on;
     const accountId = auth.account?.id;
-    if (accountId !== undefined) writePreference(independentKey(accountId), on ? "1" : "0");
+    if (accountId !== undefined) writeStored(independentKey(accountId), on ? "1" : "0");
   }
 
   /** After extensions were added or removed: re-read tools and commands. */

@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import PageLayout from "../../components/layout/PageLayout.vue";
-import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
-import { getCurrentInstance } from "vue";
-import { onBeforeRouteLeave, routerKey } from "vue-router";
+import { computed, onMounted, ref, useTemplateRef, watch } from "vue";
+import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { navPreferencesClient } from "../../api/navigation/NavPreferencesClient";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import { errorMessage } from "../../utils/errors";
@@ -314,26 +313,15 @@ async function save(): Promise<void> {
   } catch (err) { if (accountId === auth.account?.id) saveError.value = errorMessage(err); }
   finally { saving.value = false; }
 }
-const discardOpen = ref(false);
-let discardAnswer: ((value: boolean) => void) | null = null;
+const guard = useUnsavedGuard({
+  dirty: () => dirty.value,
+  busy: () => saving.value || responseSaving.value,
+});
+const discardOpen = guard.open;
 function answerDiscard(discard: boolean): void {
   if (discard) revert();
-  discardOpen.value = false;
-  discardAnswer?.(discard);
-  discardAnswer = null;
+  guard.answer(discard);
 }
-// Unit mounts without a router still exercise draft/save behavior.
-if (getCurrentInstance()?.appContext.provides[routerKey as symbol]) onBeforeRouteLeave(() => {
-  if (saving.value || responseSaving.value) return false;
-  if (!dirty.value) return true;
-  discardOpen.value = true;
-  return new Promise<boolean>(resolve => { discardAnswer = resolve; });
-});
-function beforeUnload(event: BeforeUnloadEvent): void {
-  if (dirty.value || saving.value || responseSaving.value) { event.preventDefault(); event.returnValue = ""; }
-}
-onMounted(() => window.addEventListener("beforeunload", beforeUnload));
-onUnmounted(() => { window.removeEventListener("beforeunload", beforeUnload); answerDiscard(false); });
 
 const modified = computed(() => ({
   "chat-terse": draft.value.caveman !== false,

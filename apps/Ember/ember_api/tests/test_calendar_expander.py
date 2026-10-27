@@ -36,9 +36,10 @@ END:VEVENT
     assert [(e.title, e.start.hour) for e in got] == [("Standup", 9), ("Standup moved", 11), ("Standup", 9)]
 
 
-def test_cancelled_events_are_dropped() -> None:
+def test_cancelled_events_are_flagged() -> None:
     ics = cal("BEGIN:VEVENT\nUID:d\nDTSTART:20261028T130000Z\nDTEND:20261028T140000Z\nSTATUS:CANCELLED\nSUMMARY:x\nEND:VEVENT\n")
-    assert expand(ics, utc(2026, 10, 26), utc(2026, 10, 30), NY) == []
+    (event,) = expand(ics, utc(2026, 10, 26), utc(2026, 10, 30), NY)
+    assert event.cancelled
 
 
 def test_all_day_and_floating_events_use_the_account_zone() -> None:

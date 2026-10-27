@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { sharesClient, type ShareCreated, type ShareExpiry, type ShareInfo } from "../api/SharesClient";
 import { errorMessage, formatUtc } from "../../../utils/errors";
+import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 import CopyButton from "../../../components/ui/buttons/CopyButton.vue";
 
@@ -20,7 +21,6 @@ const EXPIRIES: { value: ShareExpiry; label: string }[] = [
   { value: null, label: "Never" },
 ];
 
-const dialog = ref<HTMLDialogElement | null>(null);
 const expiry = ref<ShareExpiry>(7);
 const links = ref<ShareInfo[]>([]);
 const loading = ref(false);
@@ -60,11 +60,8 @@ function reset(): void {
 
 watch(
   () => [props.open, props.chatId] as const,
-  async ([isOpen]) => {
+  ([isOpen]) => {
     reset();
-    await nextTick();
-    if (isOpen && !dialog.value?.open) dialog.value?.showModal();
-    else if (!isOpen && dialog.value?.open) dialog.value.close();
     if (isOpen) void loadLinks();
   },
 );
@@ -113,12 +110,7 @@ const hasLinks = computed(() => links.value.length > 0);
 </script>
 
 <template>
-  <dialog ref="dialog" class="share" aria-label="Share this chat" @close="emit('close')" @cancel.prevent="emit('close')">
-    <header>
-      <h3>Share this chat</h3>
-      <button type="button" class="close" aria-label="Close" @click="emit('close')">×</button>
-    </header>
-
+  <BaseModal :open="open" title="Share this chat" @close="emit('close')">
     <p class="intro">
       Anyone with the link can read a <strong>read-only copy</strong> of this chat as it is now, without logging in.
       Your questions and the answers are included; tool output, summaries and the text of attached files are not.
@@ -132,7 +124,7 @@ const hasLinks = computed(() => links.value.length > 0);
           <option v-for="e in EXPIRIES" :key="String(e.value)" :value="e.value">{{ e.label }}</option>
         </select>
       </label>
-      <button type="submit" class="primary" :aria-busy="creating" :disabled="creating || !chatId">
+      <button type="submit" class="pill-btn primary" :aria-busy="creating" :disabled="creating || !chatId">
         {{ creating ? "Creating …" : "Create link" }}
       </button>
     </form>
@@ -159,7 +151,7 @@ const hasLinks = computed(() => links.value.length > 0);
           <span>Created {{ formatUtc(l.created_at) }}<template v-if="l.id === fresh?.id"> (new)</template></span>
           <span class="muted">{{ expiryText(l) }} · {{ l.message_count }} messages</span>
         </div>
-        <button type="button" class="link danger" @click="pendingRevoke = l">Turn off</button>
+        <button type="button" class="link-btn danger" @click="pendingRevoke = l">Turn off</button>
       </li>
     </ul>
     <p class="muted small">Deleting the chat also turns its links off.</p>
@@ -173,30 +165,10 @@ const hasLinks = computed(() => links.value.length > 0);
       @confirm="revoke(pendingRevoke)"
       @close="pendingRevoke = null"
     />
-  </dialog>
+  </BaseModal>
 </template>
 
 <style scoped>
-.share {
-  width: min(560px, calc(100vw - 32px));
-  max-height: calc(100vh - 64px);
-  padding: 18px 20px 20px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  color: var(--text);
-  background: var(--surface);
-}
-.share::backdrop {
-  background: rgb(0 0 0 / 45%);
-}
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-h3,
 h4 {
   margin: 0;
   font-size: 1em;
@@ -204,14 +176,6 @@ h4 {
 h4 {
   margin-top: 16px;
   font-size: 0.9em;
-  color: var(--muted);
-}
-.close {
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 1.4em;
-  line-height: 1;
   color: var(--muted);
 }
 .intro {
@@ -239,18 +203,6 @@ h4 {
   color: var(--text);
   background: var(--bg);
   font: inherit;
-}
-.primary {
-  padding: 6px 16px;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  color: var(--accent-contrast);
-  background: var(--accent);
-}
-.primary:disabled {
-  cursor: default;
-  opacity: 0.4;
 }
 .fresh {
   margin-top: 12px;
@@ -308,31 +260,5 @@ h4 {
   flex-direction: column;
   font-size: 0.85em;
 }
-.link {
-  padding: 2px 8px;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 0.85em;
-  color: var(--muted);
-  background: transparent;
-}
-.link.danger:hover {
-  color: var(--danger);
-  background: var(--bg);
-}
 
-button[aria-busy="true"]:not(.delete-button)::before {
-  content: "";
-  display: inline-block;
-  width: 0.85em;
-  height: 0.85em;
-  margin-right: 6px;
-  vertical-align: middle;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: var(--radius-full);
-  animation: pending-spin 0.75s linear infinite;
-}
-@keyframes pending-spin { to { transform: rotate(360deg); } }
 </style>

@@ -2,7 +2,7 @@
 import { nextTick, ref, watch } from "vue";
 import type { Conversation } from "../../../api/types";
 import { liftDragImage } from "../../../utils/browser/dragImage";
-import type { MenuPoint } from "../../../components/ui/menus/menuPoint";
+import { pointAt, pointBelow, type MenuPoint } from "../../../components/ui/menus/menuPoint";
 
 // One row of the chat list. The sidebar owns which row is being renamed and
 // which are ticked; this row owns only the text being typed.
@@ -65,14 +65,13 @@ function onClick(): void {
 const moreButton = ref<HTMLButtonElement | null>(null);
 
 function openFromButton(): void {
-  const box = moreButton.value?.getBoundingClientRect();
-  emit("openMenu", { x: box?.left ?? 0, y: box?.bottom ?? 0, trigger: moreButton.value });
+  emit("openMenu", pointBelow(moreButton.value));
 }
 
 function openFromContext(event: MouseEvent): void {
   if (props.selecting || props.renaming) return; // the browser's own menu, as before
   event.preventDefault();
-  emit("openMenu", { x: event.clientX, y: event.clientY, trigger: moreButton.value });
+  emit("openMenu", pointAt(event, moreButton.value));
 }
 
 const dragging = ref(false);

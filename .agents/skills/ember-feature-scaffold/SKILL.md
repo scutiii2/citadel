@@ -145,16 +145,21 @@ preference), `src/components/` (reusable pieces only), `src/router/`,
    add it to `HOME_PAGES`. Add it to `NAV_PAGES` in `src/router/pages.ts`
    (label, **`icon`** = stroked 24x24 SVG path data, one-line description,
    permission): that list drives both the icon-only left rail
-   (`components/NavRail.vue`) and the Overview tiles (`IconTile.vue`). Don't
+   (`components/NavRail.vue`) and the Overview tiles. Don't
    add a page that duplicates one: Tools was merged into Capabilities
-   (`/tools` redirects), so put tool UI there (`CapabilitySection`, `ToolCard`
+   (`/tools` redirects), so put tool UI there (`CapabilitySection`
+   and `SupermarketItem` share `CapabilityHeading`, the icon tile, name and summary;
    rows that open `ToolRunModal`). To keep its state across tab switches, add it
    to the `KeepAlive include` list (cache is keyed per account already).
 4. **Shared controls - reuse, don't hand-roll**: `ToggleSwitch` (pill, instead
-   of a checkbox), `LockSwitch` (a setting an admin can force on),
+   of a checkbox), `LockSwitch` (ember_admin only: a setting an admin can force on),
    `SegmentedControl` (period/tab pickers; Admin, Logs and Usage use it),
    `BaseModal` (every dialog: `AddExtensionModal`, `ToolRunModal`, ...),
-   `IconTile` (Overview tiles and extension tiles), `SaveButton`, `CopyButton`.
+   `SaveButton`, `CopyButton`. Dialog buttons use the global `pill-btn primary` /
+   `pill-btn ghost` classes, and a dropdown that closes on an outside press uses
+   the `useOutsideClose` composable. A page with a draft asks before it is left through
+   `useUnsavedGuard`, and file sizes and counts use `formatBytes` / `plural` from
+   `utils/format.ts`.
    Look in `src/components/` before writing a new one.
 5. **Styling**: theme tokens from `src/style.css` (`--bg`, `--surface`,
    `--text`, `--muted`, `--border`, `--accent`, `--accent-contrast`,

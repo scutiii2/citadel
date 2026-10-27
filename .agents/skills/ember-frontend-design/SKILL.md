@@ -25,11 +25,49 @@ Gate admin pages by permission in `ember_admin/src/router/pages.ts`; the guard i
 - Both `style.css` files hold the same tokens (admin's also sets `:focus-visible`). Change a token in **both** or the apps drift.
 - Every page view uses `PageLayout`; chat and auth screens are exempt. The enforced exemption list is `ChatView`, `LoginView`, `RegisterView`, `VerifyEmailView`, `NoAccessView`, `SharedChatView`, `ConfigIssuesView`, and the headerless `AdminView` route shell. Each routed child of `AdminView` owns its layout; the shell adds no column padding.
 - `PageLayout` owns the title, optional description, `actions` and `toolbar` slots, and view scrolling. Use `wide` for full-width pages and `fill` for workspace panels that scroll their own lists. Header geometry and typography live only in `ember_web/src/components/layout/pageLayout.css` (admin imports it by relative path). Admin panel content styles stay in `adminPages.css` and `admin.css`. Existing information pages retain `info-content` to opt into `infoPage.css` body decorations; adding PageLayout alone must not restyle page content.
-- Components exist in **both** apps as copies: `PageLayout`, `BaseModal`, `ConfirmModal`, `ToggleSwitch`, `SegmentedControl`, `SettingRow`, `LockSwitch`, `ActionButton`, `CopyButton`, `DeleteButton`, `AuthCard`, `EmberLogo`, `AccountMenu`, `UsageHeatmap`, `ToolRunForm`, `IntegrationToolsModal`, `SidebarEditor`. A fix to one needs the same fix in the other; say so in the proposal.
+- Components exist in **both** apps as copies: `PageLayout`, `BaseModal`, `ConfirmModal`, `ToggleSwitch`, `SegmentedControl`, `SettingRow`, `ActionButton`, `CopyButton`, `DeleteButton`, `AuthCard`, `EmberLogo`, `AccountMenu`, `UsageHeatmap`, `ToolRunForm`, `IntegrationToolsModal`, `SidebarEditor`. A fix to one needs the same fix in the other; say so in the proposal.
 - `ConfirmModal` lives in `components/ui/dialogs/` (web) and `components/admin/` (admin). Never call native `confirm()`.
 - Admin extras: `StatTile`, `*Panel`, `*Drawer`, `TicketBoard`, `RoleEditor`.
 
 Before writing a component, grep both `components/` folders for an existing one.
+
+## Shared pieces: always use these, never re-style them per page
+
+These live in `ember_web` only (not copied to admin). A page that needs one of these patterns uses the component; it does not write its own markup or CSS for it. If the component lacks something, extend the component (a prop or slot) rather than forking it in the page. Pages add only layout tweaks through their own class (spacing, alignment).
+
+| Pattern | Use | Where |
+|---|---|---|
+| Selectable row in a list pane (notes, memories, tickets, documents) | `ListRow` (`active` prop sets the highlight and `aria-current`) | `components/ui/lists/` |
+| Search box with magnifier; a trailing button or sort menu goes in its slot | `SearchField` (`v-model`, `label`) | `components/ui/lists/` |
+| Loading, load-error with retry, empty state | `StateMessage` (`kind`: `loading`, `error`, `empty`) | `components/ui/status/` |
+| Red-outlined delete row at the end of an editor or dialog | `DangerZone` (the button still opens a `ConfirmModal`) | `components/ui/status/` |
+| "12/200" counter under a text field | `CharacterCount` | `components/ui/status/` |
+| "Files are kept for N hours" note | `RetentionNote` | `components/ui/status/` |
+| "‹ All X" back button shown below 768px | `BackButton` (`ghost` for the text look) | `components/ui/buttons/` |
+| Narrow-viewport (under 768px) flag in a page script | `useNarrow()` | `composables/` |
+| Any dialog (never a hand-written `<dialog>`) | `BaseModal` (`open`, `title`, `@close`; Esc, × and backdrop all emit `close`) | `components/ui/dialogs/` |
+| Cancel / Save pills in a dialog | classes `pill-btn primary` and `pill-btn ghost` (global, in `style.css`) | `style.css` |
+| Dropdown or popover that closes on a press outside | `useOutsideClose(root, open, close, event?)` (Esc and focus stay in the component) | `composables/` |
+| Leaving a page with unsaved edits asks first (route change and tab close) | `useUnsavedGuard({ dirty, busy?, allow? })`; bind the page's `ConfirmModal` to its `open` and `answer` | `composables/` |
+| Reorder a list by drag and Alt + arrow keys | `useReorder({ move, count, keys })`; bind its handlers to each item | `composables/` |
+| "2 KB" / "1 file" text | `formatBytes`, `plural` | `utils/format.ts` |
+| Quiet text button in a dialog or popover ("Edit", "Retry") | classes `link-btn` (+ `danger`), global in `style.css` | `style.css` |
+| Stacked labelled fields in a dialog | class `dialog-form` on the `<form>`, global in `style.css` | `style.css` |
+| Small outlined "Off for everyone" / "On" pill | class `status-badge`, global in `style.css` | `style.css` |
+| Per-browser setting that survives blocked storage | `readStored(key)` / `writeStored(key, value)` | `utils/browser/storage.ts` |
+| Textarea that grows with its text | `growToContent(textarea)` | `utils/browser/autoGrow.ts` |
+| Where a menu opens: under a button or at the pointer | `pointBelow(button)` / `pointAt(event, button)` | `components/ui/menus/menuPoint.ts` |
+| Text only for screen readers | class `sr-only` (global, in `style.css`); never a local copy | `style.css` |
+| Busy spinner on a button | just set `aria-busy`; `style.css` draws the ring, so add no local `::before` or keyframes | `style.css` |
+| List pane plus editor with Save | `ListEditorLayout` | `components/layout/` |
+| Two panes or a stacked workspace | `WorkspaceLayout` | `components/layout/` |
+
+Rules:
+- Do not add a page-local `.empty`, `.load-error`, `.danger-zone`, `.character-count`, `.retention`, `.back` or search-box style. Do not call `window.matchMedia` for the narrow check.
+- The base styles of `ListRow` have no specificity, so a page restyles a row with its own class; do not use `!important`.
+- When reviewing or touching a page that still has a hand-written copy of one of these, replace it with the component in the same change.
+- A new pattern that appears on a second page becomes a component in `components/ui/` with a unit test, and gets a row in this table.
+
 
 ## Task-focused layouts
 
@@ -91,6 +129,7 @@ Distilled from `Brain/Maps/UI UX Frontend Rulesets.md` (consult it for rationale
 
 - [ ] Right app; admin-only page not in ember_web
 - [ ] Existing component reused; copies updated in both apps
+- [ ] Rows, search, loading/error/empty, danger zone, counters, retention and back buttons use the shared pieces table, no page-local copies
 - [ ] No hex or literal radius outside `style.css`
 - [ ] Nav entry follows section 3
 - [ ] Confirm modal / Danger zone for destructive actions

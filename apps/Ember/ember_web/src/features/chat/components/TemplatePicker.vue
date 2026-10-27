@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, ref } from "vue";
+import { useOutsideClose } from "../../../composables/useOutsideClose";
 import type { PromptTemplate } from "../api/TemplatesClient";
 import { filterTemplates, preview } from "../utils/templates";
 
@@ -50,16 +51,7 @@ function choose(action: "manage" | "save"): void {
 }
 
 // Clicking anywhere else closes the popover.
-function onOutside(event: PointerEvent): void {
-  if (root.value && !root.value.contains(event.target as Node)) close();
-}
-
-watch(open, (isOpen) => {
-  if (isOpen) document.addEventListener("pointerdown", onOutside);
-  else document.removeEventListener("pointerdown", onOutside);
-});
-
-onBeforeUnmount(() => document.removeEventListener("pointerdown", onOutside));
+useOutsideClose(root, open, close);
 </script>
 
 <template>
@@ -86,7 +78,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onOutside));
     <div v-if="open" class="popover" role="dialog" aria-label="Saved prompts">
       <input ref="filter" v-model="query" type="search" placeholder="Filter prompts" aria-label="Filter prompts" />
       <p v-if="error" class="note error" role="alert">
-        {{ error }} <button type="button" class="link" @click="emit('open')">Retry</button>
+        {{ error }} <button type="button" class="link-btn" @click="emit('open')">Retry</button>
       </p>
       <p v-else-if="loading && templates.length === 0" class="note">Loading …</p>
       <p v-else-if="templates.length === 0" class="note">No saved prompts yet.</p>
@@ -100,10 +92,10 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onOutside));
         </li>
       </ul>
       <div class="foot">
-        <button type="button" class="link" :disabled="!canSave" title="Save what is typed as a new prompt" @click="choose('save')">
+        <button type="button" class="link-btn" :disabled="!canSave" title="Save what is typed as a new prompt" @click="choose('save')">
           Save current text …
         </button>
-        <button type="button" class="link" @click="choose('manage')">Manage …</button>
+        <button type="button" class="link-btn" @click="choose('manage')">Manage …</button>
       </div>
     </div>
   </div>
@@ -205,22 +197,5 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onOutside));
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid var(--border);
-}
-.link {
-  padding: 2px 6px;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 0.8em;
-  color: var(--muted);
-  background: transparent;
-}
-.link:hover:not(:disabled) {
-  color: var(--text);
-  background: var(--bg);
-}
-.link:disabled {
-  cursor: default;
-  opacity: 0.4;
 }
 </style>

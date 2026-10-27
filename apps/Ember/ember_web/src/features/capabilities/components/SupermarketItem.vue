@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CAPABILITY_ICONS } from "../utils/capabilityIcons";
+import CapabilityHeading from "./CapabilityHeading.vue";
 
 /** One row of the Supermarket: a built-in capability or an extension, what it
  * brings, and whether it is added to the account. The parent decides what Add
@@ -28,15 +28,7 @@ const emit = defineEmits<{ add: []; disable: [] }>();
 
 <template>
   <article :class="['item', { off: locked && !added }]">
-    <span class="tile" aria-hidden="true">
-      <svg viewBox="0 0 16 16" width="18" height="18"><path :d="CAPABILITY_ICONS[icon]" /></svg>
-    </span>
-    <span class="heading">
-      <h3>{{ label }}</h3>
-      <code class="name">{{ name }}</code>
-      <span v-if="detail" class="detail">{{ detail }}</span>
-    </span>
-    <span :class="['summary', failed ? 'bad' : 'muted']">{{ summary }}</span>
+    <CapabilityHeading :label="label" :name="name" :summary="summary" :icon="icon" :problem="failed" :detail="detail" />
     <span class="actions">
       <slot name="actions" />
       <template v-if="added">
@@ -46,7 +38,7 @@ const emit = defineEmits<{ add: []; disable: [] }>();
         </span>
         <button type="button" class="secondary" :aria-label="`Disable ${label}`" @click="emit('disable')">Disable</button>
       </template>
-      <span v-else-if="locked" class="badge">Off for everyone</span>
+      <span v-else-if="locked" class="status-badge">Off for everyone</span>
       <button v-else type="button" class="add" :aria-label="`${addLabel} ${label}`" @click="emit('add')">{{ addLabel }}</button>
     </span>
   </article>
@@ -66,56 +58,6 @@ const emit = defineEmits<{ add: []; disable: [] }>();
 }
 .item.off {
   opacity: 0.75;
-}
-.tile {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-md);
-  background: var(--bg);
-}
-.tile svg {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.heading {
-  display: flex;
-  flex: 1 1 140px;
-  flex-direction: column;
-  min-width: 0;
-}
-h3 {
-  margin: 0;
-  font-size: 1em;
-}
-.name {
-  font-family: var(--mono);
-  font-size: 0.8em;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-.summary {
-  padding: 1px 8px;
-  border-radius: var(--radius-full);
-  font-size: 0.75em;
-  white-space: nowrap;
-  background: var(--bg);
-}
-.detail {
-  font-size: 0.8em;
-  color: var(--danger);
-  overflow-wrap: anywhere;
-}
-.muted {
-  color: var(--muted);
-}
-.bad {
-  color: var(--danger);
 }
 .actions {
   display: flex;
@@ -137,13 +79,6 @@ h3 {
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-.badge {
-  padding: 1px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  font-size: 0.75em;
-  color: var(--muted);
 }
 button {
   padding: 4px 14px;

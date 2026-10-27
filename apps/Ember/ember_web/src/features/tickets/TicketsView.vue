@@ -2,9 +2,15 @@
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
-import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
+import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { ticketsClient, type NewTicket, type Ticket, type TicketStatus } from "./api/TicketsClient";
 import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
+import ListRow from "../../components/ui/lists/ListRow.vue";
+import SearchField from "../../components/ui/lists/SearchField.vue";
+import StateMessage from "../../components/ui/status/StateMessage.vue";
+import CharacterCount from "../../components/ui/status/CharacterCount.vue";
+import BackButton from "../../components/ui/buttons/BackButton.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import "../../components/layout/infoPage.css";
@@ -132,26 +138,13 @@ const reply = computed({
   get: () => activeDetailId.value === null ? "" : replies[activeDetailId.value] ?? "",
   set: (value: string) => { if (activeDetailId.value !== null) replies[activeDetailId.value] = value; },
 });
-const discardDrafts = ref(false);
-let leaveAnswer: ((value: boolean) => void) | null = null;
 const hasDrafts = computed(() => !!draft.title.trim() || !!draft.description.trim() || Object.values(replies).some(value => !!value.trim()));
-function answerLeave(discard: boolean): void {
-  discardDrafts.value = false;
-  leaveAnswer?.(discard);
-  leaveAnswer = null;
-}
-onBeforeRouteLeave(to => {
-  if (to.path === '/tickets' || /^\/tickets\/\d+$/.test(to.path)) return true;
-  if (saving.value || replying.value) return false;
-  if (!hasDrafts.value) return true;
-  discardDrafts.value = true;
-  return new Promise<boolean>(resolve => { leaveAnswer = resolve; });
+const { open: discardDrafts, answer: answerLeave } = useUnsavedGuard({
+  dirty: () => hasDrafts.value,
+  busy: () => saving.value || replying.value,
+  // Moving between the list and a ticket keeps the drafts.
+  allow: to => to.path === '/tickets' || /^\/tickets\/\d+$/.test(to.path),
 });
-function beforeUnload(event: BeforeUnloadEvent): void {
-  if (hasDrafts.value) { event.preventDefault(); event.returnValue = ""; }
-}
-onMounted(() => window.addEventListener("beforeunload", beforeUnload));
-onUnmounted(() => window.removeEventListener("beforeunload", beforeUnload));
 const replying = ref(false);
 const confirmOpen = ref(false);
 const closing = ref(false);
@@ -294,12 +287,12 @@ async function reopenTicket(): Promise<void> {
 <template>
   <PageLayout title="Tickets" description="Report an issue, share an idea, or follow a support reply." class="tickets info-content" :class="{ 'thread-open': detailOpen }" wide fill>
     <template #actions>
-      <button v-if="detailOpen" type="button" class="chip mobile-back" @click="dismiss">‹ All tickets</button>
+      <BackButton v-if="detailOpen" @click="dismiss">All tickets</BackButton>
       <button type="button" class="primary new-ticket" @click="startNew">New ticket</button>
     </template>
     <template #toolbar>
       <div class="list-controls">
-        <label class="search-control"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg><input v-model="search" type="search" aria-label="Search ticket titles" placeholder="Search your ticket titles…" /></label>
+        <SearchField v-model="search" class="search-control" label="Search ticket titles" placeholder="Search your ticket titles…" />
         <label class="sort-control"><span class="sr-only">Sort</span><select v-model="sort" aria-label="Sort tickets"><option value="newest">Recently updated</option><option value="oldest">Oldest update first</option></select></label>
       </div>
       <SegmentedControl class="status-filters" v-model="filter" :options="filterOptions" aria-label="Ticket status" />
@@ -308,18 +301,18 @@ async function reopenTicket(): Promise<void> {
     <WorkspaceLayout class="ticket-workspace" :class="{ reading: detailOpen }">
       <aside class="ticket-browser" aria-label="Your tickets">
         <div class="list-heading"><span>Your tickets</span><span>{{ visibleTickets.length }} tickets</span></div>
-        <div v-if="loadError" class="load-error error" role="alert"><p>Could not load your tickets: {{ loadError }}</p><button type="button" class="chip" @click="load">Try again</button></div>
-        <p v-if="loading" class="muted empty-message" role="status">Loading …</p>
-        <p v-else-if="visibleTickets.length === 0 && !loadError" class="muted empty-message">{{ search.trim() ? "No tickets match your search." : filter === "all" ? "You have no tickets yet." : "No tickets with this status." }}</p>
+        <StateMessage v-if="loadError" class="ticket-state" kind="error" @retry="load">Could not load your tickets: {{ loadError }}</StateMessage>
+        <StateMessage v-if="loading" class="ticket-state" kind="loading">Loading …</StateMessage>
+        <StateMessage v-else-if="visibleTickets.length === 0 && !loadError" class="ticket-state" kind="empty">{{ search.trim() ? "No tickets match your search." : filter === "all" ? "You have no tickets yet." : "No tickets with this status." }}</StateMessage>
         <ul v-else class="list" aria-label="Your ticket list">
           <li v-for="t in visibleTickets" :key="t.id">
-            <button type="button" class="ticket-row" :class="{ unread: t.has_unread, active: current?.id === t.id && detailOpen }" :aria-current="current?.id === t.id && detailOpen ? 'true' : undefined" :disabled="replying || closing" @click="open(t)">
+            <ListRow class="ticket-row" :class="{ unread: t.has_unread }" :active="current?.id === t.id && detailOpen" :disabled="replying || closing" @click="open(t)">
               <span class="row-top"><span>#{{ t.id }}</span><span class="badge">{{ TYPE_LABELS[t.type] }}</span></span>
               <span class="title">{{ t.title }}</span>
               <span v-if="t.has_unread" class="unread-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4zM8 8h8M8 12h5" /></svg>Support replied</span>
               <span class="status"><svg viewBox="0 0 24 24" aria-hidden="true"><path :d="STATUS_ICONS[t.status]" /></svg>{{ STATUS_LABELS[t.status] }}</span>
               <span class="row-time muted">Updated {{ formatTicketTime(t.updated_at) }}</span>
-            </button>
+            </ListRow>
           </li>
         </ul>
         <p class="list-footer muted">Your reports and support conversations.<br>Only your own tickets appear here.</p>
@@ -367,11 +360,11 @@ async function reopenTicket(): Promise<void> {
     <BaseModal class="new-ticket-modal" :open="newOpen" title="New ticket" @close="newOpen = false">
       <form class="form" @submit.prevent="submit">
         <SegmentedControl v-model="draft.type" :options="TYPE_OPTIONS.map(option => ({ ...option, disabled: saving }))" label="Type" aria-label="Ticket type" />
-        <label>Title<input v-model="draft.title" type="text" maxlength="120" aria-label="Title" aria-describedby="ticket-title-count" :disabled="saving" /><span id="ticket-title-count" class="character-count">{{ draft.title.length }}/120</span></label>
+        <label>Title<input v-model="draft.title" type="text" maxlength="120" aria-label="Title" aria-describedby="ticket-title-count" :disabled="saving" /><CharacterCount id="ticket-title-count" class="ticket-count" :length="draft.title.length" :max="120" /></label>
         <label>
           Description
           <textarea v-model="draft.description" rows="6" maxlength="4000" aria-label="Description" aria-describedby="ticket-description-count" :disabled="saving" />
-          <span id="ticket-description-count" class="character-count">{{ draft.description.length }}/4000</span>
+          <CharacterCount id="ticket-description-count" class="ticket-count" :length="draft.description.length" :max="4000" />
         </label>
         <p v-if="formError" class="form-error error" role="alert">{{ formError }}</p>
         <div class="actions">
@@ -389,9 +382,7 @@ async function reopenTicket(): Promise<void> {
 
 <style scoped>
 .list-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.search-control { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
-.search-control svg { color: var(--muted); }
-.tickets .search-control input { flex: 1; min-width: 0; width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: .9em; }
+.search-control { flex: 1; }
 .sort-control { min-width: 0; }
 .tickets .sort-control select { max-width: 180px; padding: 10px; font-size: .8em; color: var(--muted); }
 .status-filters :deep(.segmented) { flex-wrap: wrap; gap: 6px; border: 0; padding: 0; border-radius: 0; background: transparent; overflow: visible; }
@@ -400,10 +391,8 @@ async function reopenTicket(): Promise<void> {
 .ticket-workspace { --workspace-columns: 300px minmax(0, 1fr); }
 .ticket-browser { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; padding: 18px 12px; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 45%, var(--bg)); }
 .list { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 0; list-style: none; }
-.ticket-row { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 15px 12px; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
-.ticket-row:hover:not(:disabled) { background: var(--surface); }
-.ticket-row.active { background: var(--bg); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); box-shadow: inset 3px 0 var(--accent); }
-.ticket-row:disabled { opacity: .65; cursor: default; }
+.ticket-state { padding: 0; margin: 8px 10px; }
+.ticket-row { gap: 8px; padding: 15px 12px; }
 .row-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: .7em; }
 .title { font-size: .9em; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
 .badge { padding: 1px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: .9em; color: var(--muted); }
@@ -413,9 +402,6 @@ async function reopenTicket(): Promise<void> {
 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .status svg, .unread-label svg { width: 14px; height: 14px; }
 .list-footer { margin: auto 10px 0; padding-top: 24px; font-size: .75em; line-height: 1.8; }
-.empty-message { margin: 8px 10px; font-size: .9em; }
-.load-error { margin: 0 10px 12px; font-size: .85em; overflow-wrap: anywhere; }
-.load-error p { margin: 0 0 8px; }
 .ticket-thread { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
 .detail-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 24px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: .75em; flex-shrink: 0; }
 .detail-head > .status { font-size: 1em; margin-left: auto; }
@@ -443,7 +429,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .form { display: flex; flex-direction: column; gap: 10px; }
 .form label { display: flex; flex-direction: column; gap: 5px; font-size: .9em; }
 .form textarea, .form input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; resize: vertical; }
-.character-count { color: var(--muted); font-size: .8em; text-align: right; }
+.ticket-count { text-align: right; }
 .reply { flex-shrink: 0; padding: 16px 24px; border-top: 1px solid var(--border); }
 .reply textarea { min-height: 64px; max-height: 140px; line-height: 1.6; font-size: .9em; }
 .actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
@@ -451,9 +437,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .reply .manage-ticket { border-color: transparent; padding-left: 0; }
 .send-reply { min-width: 76px; min-height: 40px; }
 .notice { max-height: 20%; overflow: auto; }
-.mobile-back { display: none; }
 .new-ticket { min-height: 40px; }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .tickets button:focus-visible, .tickets input:focus-visible, .tickets select:focus-visible, .tickets textarea:focus-visible, .conversation:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); vertical-align: -1px; animation: ticket-spin .7s linear infinite; }
 @keyframes ticket-spin { to { transform: rotate(360deg); } }
@@ -465,11 +449,9 @@ button[aria-busy="true"]::before { content: ""; display: inline-block; width: 12
   .tickets :deep(.page-description) { max-width: 210px; }
   .tickets.thread-open :deep(.page-head-copy), .tickets.thread-open :deep(.page-toolbar) { display: none; }
   .tickets.thread-open :deep(.page-actions) { flex: 1; justify-content: space-between; align-items: center; }
-  .mobile-back { display: inline-block; min-height: 44px; }
   .new-ticket { min-height: 44px; }
   .list-controls { gap: 8px; }
   .tickets .sort-control select { max-width: 135px; padding-inline: 7px; min-height: 44px; }
-  .tickets .search-control input { font-size: max(1em, 16px); }
   .status-filters :deep(button.segment) { min-height: 44px; padding-inline: 9px; }
   .ticket-browser { border-right: 0; padding: 16px 12px; }
   .ticket-workspace.reading .ticket-browser, .ticket-workspace:not(.reading) .placeholder { display: none; }

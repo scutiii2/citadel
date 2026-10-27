@@ -102,7 +102,7 @@ class AlertScheduler:
             self._upcoming[owner] = cached
             await cal.prune_alerts(now)
         for event in cached[1]:
-            if event.all_day:
+            if event.all_day or event.cancelled:
                 continue
             for rule in rules:
                 if is_due(event.start, rule.lead_minutes, now, self._settings.late_grace_minutes):
