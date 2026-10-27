@@ -98,6 +98,14 @@ def parse_request(raw: str, max_chars: int = MAX_INPUT_CHARS, default_confidence
     return Request(text, questions, float(min_confidence), trace, local_only)
 
 
+# Per-question detail the Laya service reports; only a `trace` request carries it back to the caller.
+_TRACE_KEYS = ("rounds", "voters", "options", "disagreement", "resolved_by", "eliminated")
+
+
+def _compact(answer: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in answer.items() if key not in _TRACE_KEYS}
+
+
 def answer(raw: str, strategy_name: str, min_confidence: float) -> ChatResult:
     request = parse_request(raw, default_confidence=min_confidence)
     try:
@@ -105,7 +113,8 @@ def answer(raw: str, strategy_name: str, min_confidence: float) -> ChatResult:
                                                            request.min_confidence, request.local_only))
     except DecisionError as error:
         raise ValueError(f"The decision models could not answer: {error}") from error
-    body = {"answers": result.answers, "tokens": result.tokens}
+    answers = result.answers if request.trace else {qid: _compact(a) for qid, a in result.answers.items()}
+    body = {"answers": answers, "tokens": result.tokens}
     return ChatResult(response=json.dumps(body), tools_used=[], tool_calls=[], provider_id=PROVIDER_ID,
                       model=strategy_name, total_tokens=result.tokens, input_tokens=result.tokens, output_tokens=0)
 

@@ -264,6 +264,19 @@ def overrides_path_for(directory: Path) -> Path:
     return directory / ".overrides" / "agent_overrides.json"
 
 
+def upgrade_legacy(data: dict[str, Any]) -> dict[str, Any]:
+    """Rewrite fields removed by 'require a role' into `role`: `orchestrator:
+    true` and `internal_role: "router"` become the role (unless one is already
+    set), `false`/null are dropped. Other values are left for load_file to reject."""
+    data = dict(data)
+    for key, role in (("orchestrator", "orchestrator"), ("internal_role", "router")):
+        if key in data:
+            value = data.pop(key)
+            if value in (True, role):
+                data.setdefault("role", role)
+    return data
+
+
 def read_overrides(directory: Path) -> dict[str, dict[str, Any]]:
     """The overrides for `directory`; {} when there is no file."""
     path = overrides_path_for(directory)
@@ -275,7 +288,8 @@ def read_overrides(directory: Path) -> dict[str, dict[str, Any]]:
         raise AgentSpecError(f"{path}: cannot be read as JSON ({error})") from error
     if not isinstance(data, dict) or not all(isinstance(entry, dict) for entry in data.values()):
         raise AgentSpecError(f"{path}: must be an object of agent objects")
-    return data
+    # Overrides predate required roles: no legacy field meant a specialist.
+    return {key: {"role": "specialist", **upgrade_legacy(entry)} for key, entry in data.items()}
 
 
 def agent_ids(directory: Path) -> list[str]:
@@ -299,6 +313,7 @@ def load_file(path: Path) -> AgentSpec:
             raise check.fail("file", f"cannot be read as JSON ({error})") from error
     if not isinstance(data, dict):
         raise check.fail("file", "must contain a JSON object")
+    data = upgrade_legacy(data)
     check.keys(data, _TOP_KEYS)
     role = data.get("role")
     if role not in ROLES:

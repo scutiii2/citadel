@@ -98,3 +98,18 @@ def test_malformed_questions_fail_before_gateway_dispatch(monkeypatch, question)
 def test_valid_questions_need_no_live_laya_validation(question):
     request = provider.parse_request(json.dumps({"text": "hi", "questions": {"q": question}}))
     assert request.questions == {"q": question}
+
+
+def _detailed(monkeypatch):
+    answer = {"choice": "a", "answer_confidence": 0.95, "uncertain": False, "answered_by": "laya",
+              "rounds": [{"step": "laya-english"}], "voters": {"laya-english": {}}, "resolved_by": "english"}
+    monkeypatch.setattr(strategy, "run", lambda *a, **k: strategy.DecisionResult({"q": dict(answer)}, 1, ()))
+
+
+def test_answer_drops_service_detail_unless_trace_is_requested(monkeypatch):
+    _detailed(monkeypatch)
+    question = {"q": {"type": "choice", "instructions": "?", "criteria": {"a": "A", "b": "B"}}}
+    compact = json.loads(provider.answer(json.dumps({"text": "hi", "questions": question}), "both", 0.9).response)
+    full = json.loads(provider.answer(json.dumps({"text": "hi", "questions": question, "trace": True}), "both", 0.9).response)
+    assert "rounds" not in compact["answers"]["q"] and compact["answers"]["q"]["choice"] == "a"
+    assert full["answers"]["q"]["rounds"] and full["answers"]["q"]["resolved_by"] == "english"

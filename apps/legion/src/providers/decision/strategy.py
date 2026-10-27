@@ -52,7 +52,8 @@ def _settled(answer: Mapping[str, Any] | None, minimum: float) -> bool:
 
 def run(strategy: str, request: DecisionRequest, *, gateways: Mapping[str, DecisionGateway] | None = None,
         on_usage: Callable[[dict[str, Any]], None] | None = None,
-        check: Callable[[], float] | None = None) -> DecisionResult:
+        check: Callable[[], float] | None = None, remote_timeout: float | None = None) -> DecisionResult:
+    """`remote_timeout` caps each call to a gateway that is not local; local gateways only follow `check`."""
     if strategy not in STRATEGIES:
         raise ValueError(f"unknown decision strategy {strategy!r}; choose one of: {', '.join(STRATEGIES)}")
     gateways = gateways if gateways is not None else default_gateways()
@@ -70,6 +71,8 @@ def run(strategy: str, request: DecisionRequest, *, gateways: Mapping[str, Decis
             problems.append(f"{name} is not available")
             continue
         limit = check() if check else None
+        if remote_timeout is not None and not gateway.local:
+            limit = remote_timeout if limit is None else min(limit, remote_timeout)
         started, started_at = time.monotonic(), datetime.now(timezone.utc).isoformat()
         result = None
         try:
@@ -87,7 +90,11 @@ def run(strategy: str, request: DecisionRequest, *, gateways: Mapping[str, Decis
             continue
         tokens += result.tokens
         for qid, answer in result.answers.items():
-            answers[qid] = {**answer, "answered_by": name}
+            previous = answers.get(qid)
+            # A later gateway only replaces an earlier answer when it settles the question or is at least as sure.
+            if (previous is None or _settled(answer, request.min_confidence)
+                    or answer.get("answer_confidence", 0) >= previous.get("answer_confidence", 0)):
+                answers[qid] = {**answer, "answered_by": name}
         pending = {q: s for q, s in pending.items() if not _settled(answers.get(q), request.min_confidence)}
     if not answers:
         raise DecisionError("; ".join(problems) or "no decision gateway could be asked")

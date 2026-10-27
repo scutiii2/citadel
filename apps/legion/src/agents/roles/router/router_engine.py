@@ -75,7 +75,7 @@ class RouterEngine:
             result = strategy.run(
                 policy.strategy,
                 DecisionRequest(request.subject, questions, policy.min_confidence, local_only=False),
-                gateways=self.gateways, on_usage=observed, check=lambda: min(check(), policy.remote_timeout_seconds))
+                gateways=self.gateways, on_usage=observed, check=check, remote_timeout=policy.remote_timeout_seconds)
             check()
             answers = result.answers
             outcomes = {}

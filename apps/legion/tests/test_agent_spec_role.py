@@ -28,10 +28,18 @@ def test_unknown_role_is_refused(tmp_path):
         load(tmp_path, {**BASE, "role": "boss"})
 
 
-def test_old_flags_are_unknown_keys(tmp_path):
-    for key, value in (("orchestrator", True), ("internal_role", "router")):
-        with pytest.raises(AgentSpecError, match=key):
-            load(tmp_path, {**BASE, "role": "specialist", key: value})
+def test_legacy_flags_upgrade_to_a_role(tmp_path):
+    assert load(tmp_path, {**BASE, "orchestrator": True, "entry": True}).role == "orchestrator"
+    assert load(tmp_path, {**BASE, "role": "specialist", "orchestrator": False}).role == "specialist"
+
+
+def test_stored_override_without_role_is_a_specialist(tmp_path):
+    (tmp_path / "a.json").write_text(json.dumps({**BASE, "role": "specialist"}), encoding="utf-8")
+    overrides = agent_spec.overrides_path_for(tmp_path)
+    overrides.parent.mkdir(parents=True)
+    overrides.write_text(json.dumps({"a": {**BASE, "orchestrator": True, "entry": True}, "b": dict(BASE)}), encoding="utf-8")
+    assert agent_spec.load_file(tmp_path / "a.json").role == "orchestrator"
+    assert agent_spec.read_overrides(tmp_path)["b"]["role"] == "specialist"
 
 
 def test_orchestrator_role_sets_the_property(tmp_path):

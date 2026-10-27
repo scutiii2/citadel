@@ -86,3 +86,23 @@ def test_ask_choice_returns_percent_confidence():
     picked = strategy.ask_choice("t", {"a": "A", "b": "B"}, "?", strategy="laya-only", min_confidence=80,
                                  gateways=gateways(Fake("laya", True, 0.9), Fake("jev", False, 0.9)))
     assert (picked.choice, picked.confidence, picked.backend) == ("a", 90, "laya")
+
+
+def test_later_gateway_does_not_replace_a_more_confident_answer():
+    laya = Fake("laya", True, 0.85)
+    jev = Fake("jev", False, 0.6)
+    result = strategy.run("both", DecisionRequest("t", Q, min_confidence=0.9), gateways=gateways(laya, jev))
+    assert result.answers["q"]["answered_by"] == "laya" and result.answers["q"]["uncertain"] is True
+
+
+def test_remote_timeout_caps_only_non_local_gateways():
+    limits = {}
+
+    class Timed(Fake):
+        def ask(self, request, timeout=None):
+            limits[self.id] = timeout
+            return super().ask(request, timeout)
+
+    strategy.run("both", DecisionRequest("t", Q), gateways=gateways(Timed("laya", True, 0.5), Timed("jev", False, 0.97)),
+                 check=lambda: 10.0, remote_timeout=3.0)
+    assert limits == {"laya": 10.0, "jev": 3.0}
