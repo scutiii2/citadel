@@ -12,7 +12,7 @@ Citadel runs as containers from one `docker-compose.yml`:
 | `treasury` | database gateway | internal 8071 |
 
 Only the two web apps publish ports. The rest talk over the internal `core` network. Laya is not in this stack: it runs
-from the separate `LayaModel` project (see "Laya" below) and legion reaches it as `http://laya_lb:9120`.
+from the separate `LayaModel` project (see "Laya" below) and legion reaches it through the host's published port, `http://host.docker.internal:9120`.
 
 ## 1. Local (Windows, macOS, Linux with Docker Desktop or Engine)
 
@@ -78,10 +78,12 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    Already cloned `main`? Switch in place; the containers keep running:
    `git fetch origin live && git switch -c live --track origin/live`.
 
-2. **Deploy `LayaModel` separately** (it is its own project and Citadel's compose does not start it). Start the Citadel
-   stack first: it creates the `citadel_core` network. Then run `docker compose up -d --build` in the `LayaModel`
-   folder (`/media/ZimaOS-HD/Apps/LayaModel`). Its `laya_lb` joins `citadel_core`, so legion reaches it as
-   `http://laya_lb:9120`. See `LayaModel/deployment.md` for replicas, port and weights.
+2. **Deploy `LayaModel` separately** (it is its own project and Citadel's compose does not start it). Run
+   `docker compose up -d --build` in the `LayaModel` folder (`/media/ZimaOS-HD/Apps/LayaModel`), in any order relative
+   to Citadel. It publishes port 9120 on the host and legion reaches it at `http://host.docker.internal:9120`
+   (Compose maps that name to the host with `extra_hosts`), so the two stacks share no Docker network. If you change
+   `LAYA_PORT` in `LayaModel`, change the port in the `legion` service's `LAYA_SERVICE_URL` to match. See
+   `LayaModel/deployment.md` for replicas, port and weights.
 
 3. **Create the `.env` files.** They are gitignored, so `live` does not hold them and `git pull` never touches them.
    The simplest way is deploy option 2, which copies yours from the PC. To create them by hand, run from the Citadel
@@ -227,7 +229,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 | Symptom | Cause and fix |
 |---|---|
 | `set INTERNAL_API_TOKEN in .env` | The root `.env` is missing or empty. |
-| legion cannot reach Laya | LayaModel is not running, or it started before Citadel and could not join `citadel_core`. Start Citadel, then run `docker compose up -d` in `LayaModel`. |
+| legion cannot reach Laya | LayaModel is not running, or its published port is not 9120. Run `docker compose ps` in `LayaModel`, then `docker compose exec legion python -c "import urllib.request as u; print(u.urlopen('http://host.docker.internal:9120/health').status)"`. Expect 200. |
 | `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
 | `scp` will not log in | Check `DEPLOY_HOST` and that the folder exists. Run `ssh <host>` by hand to test. |
 | `openssl: command not found` | Use the `/dev/urandom` command in first-time setup, step 3. A failed `echo` leaves an empty `.env`, so run it again. |

@@ -1,4 +1,4 @@
-# Stack: ember_web / ember_admin -> ember_api -> armory / legion / treasury; legion -> laya_lb (LayaModel's own stack, not started here).
+# Stack: ember_web / ember_admin -> ember_api -> armory / legion / treasury; legion -> LayaModel (its own stack, reached through the host's published port 9120, not started here).
 # Start:  docker compose up -d --build
 # Needs a root .env with INTERNAL_API_TOKEN (see .env.example). Per-app
 # secrets stay in apps/<app>/.env and are loaded when the file exists.
@@ -42,8 +42,11 @@ services:
       AI_AGENT_HOST: 0.0.0.0
       AI_AGENT_ADVERTISE_URL: http://legion
       MCP_SERVER_URL: http://armory:8010/mcp
-      # Laya runs from Python/LayaModel, a separate stack whose laya_lb joins this network (core) under this name.
-      LAYA_SERVICE_URL: http://laya_lb:9120
+      # Laya runs from Python/LayaModel, a separate stack that publishes port 9120 on the host. Reaching it through the
+      # host keeps the two stacks independent: either can restart without the other losing the link.
+      LAYA_SERVICE_URL: http://host.docker.internal:9120
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./docker/configs/legion/servers.json:/app/configs/config_servers.json:ro
       - agent_data:/app/.data
