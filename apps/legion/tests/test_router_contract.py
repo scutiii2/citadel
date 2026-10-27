@@ -23,7 +23,7 @@ def test_policy_defaults():
     p = RouterPolicy()
     assert p.deadline_seconds == 10 and p.remote_timeout_seconds == 3
     assert p.size_tiers["hardest"] == "heavy"
-    assert p.strategy == "both" and p.min_confidence == .9
+    assert p.strategy == "both" and p.min_confidence is None
     assert p.summary() == {"choose_agent": True, "choose_tier": True, "strategy": "both", "deadline_seconds": 10}
     assert RouterPolicy.model_validate(p.model_dump()) == p
 

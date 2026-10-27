@@ -58,3 +58,10 @@ def test_unavailable_without_key(monkeypatch):
     assert jev.available() is False
     with pytest.raises(DecisionError):
         jev.ask(DecisionRequest("t", {"q": {"type": "noul", "instructions": "?"}}))
+
+
+def test_jev_uses_its_default_bar_without_a_minimum(monkeypatch):
+    jev, _ = gateway(monkeypatch, [reply("a", 0.85), reply("a", 0.95)])
+    request = DecisionRequest("t", {"q": {"type": "choice", "instructions": "?", "criteria": {"a": "A", "b": "B"}}})
+    assert jev.ask(request).answers["q"]["uncertain"] is True
+    assert jev.ask(request).answers["q"]["uncertain"] is False

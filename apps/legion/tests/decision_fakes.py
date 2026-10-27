@@ -25,5 +25,5 @@ class Fake:
             pick = self.pick.get(qid) if isinstance(self.pick, dict) else self.pick
             picked = pick if pick in options else next(iter(options))
             answers[qid] = {"type": "choice", "choice": picked, "answer_confidence": self.confidence,
-                            "uncertain": self.confidence < request.min_confidence}
+                            "uncertain": self.confidence < (0.9 if request.min_confidence is None else request.min_confidence)}
         return GatewayResult(answers, self.tokens, self.model)

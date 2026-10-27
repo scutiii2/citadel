@@ -17,7 +17,7 @@ def load(tmp_path, llm, **extra):
 
 def test_decision_provider_defaults(tmp_path):
     spec = load(tmp_path, {"provider": "decision"})
-    assert spec.llm.provider == "decision" and spec.llm.strategy == "both" and spec.llm.min_confidence == 0.9
+    assert spec.llm.provider == "decision" and spec.llm.strategy == "both" and spec.llm.min_confidence is None
 
 
 def test_decision_strategy_validated(tmp_path):

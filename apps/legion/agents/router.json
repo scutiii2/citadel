@@ -8,8 +8,7 @@
   "plan_tool": false,
   "llm": {
     "provider": "decision",
-    "strategy": "both",
-    "min_confidence": 0.9
+    "strategy": "both"
   },
   "focus": "Internal: chooses an available specialist and model tier using local triage with optional Jev fallback.",
   "tools": {

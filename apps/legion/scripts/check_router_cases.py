@@ -46,7 +46,7 @@ class FixtureGateway:
             chosen = expected if expected in choices else choices[0]
             confidence = .99 if expected is not None else .1
             answers[qid] = {"type": "choice", "choice": chosen, "answer_confidence": confidence,
-                "uncertain": confidence < request.min_confidence,
+                "uncertain": confidence < (.9 if request.min_confidence is None else request.min_confidence),
                 "probabilities": {c: .99 if c == chosen else .01/(len(choices)-1) for c in choices}}
         return GatewayResult(answers, tokens=1, model="fixture")
 

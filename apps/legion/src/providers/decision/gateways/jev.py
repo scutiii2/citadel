@@ -19,6 +19,8 @@ KEY_ENV = "TYPESAFE_API_KEY"
 _QUESTION_ID = "answer"
 _NOUL_DEFAULTS = {"false": "No: the statement is false.", "true": "Yes: the statement is true."}
 _DEFAULT_TIMEOUT = 3.0
+# Jev reports one confidence and has no thresholds of its own, so a request without a minimum uses this one.
+DEFAULT_THRESHOLD = 0.9
 
 Post = Callable[[str, dict[str, Any], str, float], dict[str, Any]]
 
@@ -130,5 +132,6 @@ class JevGateway:
             choice, confidence, real, used, reported = _parse(body, options)
             tokens += used
             model = reported or model
-            answers[qid] = _answer(spec, choice, confidence, real, request.min_confidence)
+            answers[qid] = _answer(spec, choice, confidence, real,
+                                   DEFAULT_THRESHOLD if request.min_confidence is None else request.min_confidence)
         return GatewayResult(answers, tokens, model)

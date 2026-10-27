@@ -106,3 +106,25 @@ def test_remote_timeout_caps_only_non_local_gateways():
     strategy.run("both", DecisionRequest("t", Q), gateways=gateways(Timed("laya", True, 0.5), Timed("jev", False, 0.97)),
                  check=lambda: 10.0, remote_timeout=3.0)
     assert limits == {"laya": 10.0, "jev": 3.0}
+
+
+def test_without_a_minimum_the_gateways_own_verdict_decides():
+    class Verdict(Fake):
+        def ask(self, request, timeout=None):
+            self.requests.append(request)
+            return GatewayResult({"q": {"choice": "a", "answer_confidence": 0.78, "uncertain": False}}, 1, self.id)
+
+    laya, jev = Verdict("laya", True, 0.78), Fake("jev", False, 0.99)
+    result = strategy.run("both", DecisionRequest("t", Q), gateways=gateways(laya, jev))
+    assert laya.requests[0].min_confidence is None
+    assert jev.asked == [] and result.unsettled == () and result.answers["q"]["answered_by"] == "laya"
+
+
+def test_a_stated_minimum_still_applies_on_top_of_the_verdict():
+    class Verdict(Fake):
+        def ask(self, request, timeout=None):
+            return GatewayResult({"q": {"choice": "a", "answer_confidence": 0.78, "uncertain": False}}, 1, self.id)
+
+    jev = Fake("jev", False, 0.99)
+    strategy.run("both", DecisionRequest("t", Q, min_confidence=0.9), gateways=gateways(Verdict("laya", True), jev))
+    assert jev.asked == [["q"]]

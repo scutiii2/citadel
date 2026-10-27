@@ -60,7 +60,7 @@ export interface RouterPolicy {
   choose_agent: boolean;
   choose_tier: boolean;
   strategy: "laya-only" | "jev-only" | "both";
-  min_confidence: number;
+  min_confidence?: number;
   trace: boolean;
   deadline_seconds: number;
   remote_timeout_seconds: number;

@@ -113,3 +113,9 @@ def test_invalid_window_is_a_decision_error(tmp_path, monkeypatch, raw):
     path.write_text('{"window": ' + raw + "}", encoding="utf-8")
     with pytest.raises(DecisionError, match="window"):
         LayaGateway(FakeService({"answers": {}})).ask(DecisionRequest("hi", QUESTION))
+
+
+def test_service_gets_no_min_confidence_unless_the_request_names_one():
+    service = FakeService({"answers": {}, "calls": []})
+    LayaGateway(service).ask(DecisionRequest("hi", QUESTION))
+    assert service.calls[0][4].get("min_confidence") is None

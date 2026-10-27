@@ -187,7 +187,8 @@ describe("AgentsAdminView", () => {
     await wrapper.find("form").trigger("submit");
     await flushPromises();
     expect(update.mock.calls[0]![1]).toMatchObject({ role: "router", delegable: false,
-      decision: { deadline_seconds: 7, strategy: "laya-only", min_confidence: 0.9 }, tools: { deny: ["*"] } });
+      decision: { deadline_seconds: 7, strategy: "laya-only" }, tools: { deny: ["*"] } });
+    expect(update.mock.calls[0]![1].decision).not.toHaveProperty("min_confidence");
     wrapper.unmount();
   });
   it("lists agents with model, port and live status", async () => {

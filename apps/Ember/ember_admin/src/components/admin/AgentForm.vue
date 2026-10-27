@@ -44,7 +44,7 @@ const role = ref<"orchestrator" | "router" | "specialist">("specialist");
 const planTool = ref(true);
 const provider = ref("anthropic");
 const decisionStrategy = ref<"laya-only" | "jev-only" | "both">("both");
-const minConfidence = ref("0.9");
+const minConfidence = ref("");
 const gatewayRows = ref<GatewayRow[]>([{ key: 0, gateway: "", model: "" }]);
 const gateway = computed({
   get: () => gatewayRows.value[0]?.gateway ?? "",
@@ -125,7 +125,7 @@ watch(
     planTool.value = a?.plan_tool !== false;
     provider.value = a?.llm?.provider ?? providerIds.value[0] ?? "anthropic";
     decisionStrategy.value = a?.llm?.strategy ?? "both";
-    minConfidence.value = String(a?.llm?.min_confidence ?? 0.9);
+    minConfidence.value = a?.llm?.min_confidence === undefined ? "" : String(a.llm.min_confidence);
     gatewayRows.value = [
       { key: 0, gateway: a?.llm?.gateway ?? "", model: a?.llm?.model ?? "" },
       ...(a?.llm?.fallback_gateways ?? []).map((choice, index) => ({
@@ -236,7 +236,8 @@ function buildConfig(): AgentConfig | null {
     // Decision agents choose a strategy instead of language model settings.
     for (const key of ["gateway", "model", "fallback_gateways", "reasoning_effort", "max_tier", "min_tier", "max_effort", "temperature", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds"]) delete llm[key];
     llm.strategy = decisionStrategy.value;
-    llm.min_confidence = confidence ?? 0.9;
+    if (confidence === undefined) delete llm.min_confidence;
+    else llm.min_confidence = confidence;
   } else {
     delete llm.strategy;
     delete llm.min_confidence;
@@ -276,7 +277,7 @@ function buildConfig(): AgentConfig | null {
     config.skill_learning = false;
     config.plan_tool = false;
     config.tools = { allow: [], deny: ["*"] };
-    config.llm = { provider: "decision", strategy: decisionStrategy.value, min_confidence: confidence ?? 0.9 };
+    config.llm = { provider: "decision", strategy: decisionStrategy.value, ...(confidence === undefined ? {} : { min_confidence: confidence }) };
   } else {
     delete config.decision;
   }
@@ -332,8 +333,8 @@ function previewPrompt(): void {
             </select>
           </label>
           <label class="field grow"><span>Minimum confidence</span>
-            <input v-model="minConfidence" data-test="min-confidence" type="text" inputmode="decimal" autocomplete="off" :disabled="busy" />
-            <small>Above 0 and at most 1. Defaults to 0.9.</small>
+            <input v-model="minConfidence" data-test="min-confidence" type="text" inputmode="decimal" autocomplete="off" placeholder="Each model's own" :disabled="busy" />
+            <small>Leave blank to use each model's own thresholds (Laya per model, Jev 0.9). Or enter a number above 0 and at most 1.</small>
           </label>
         </div>
         <AgentGatewayList v-if="!isDecision" v-model="gatewayRows" :gateways="gateways" :default-gateway="DEFAULT_GATEWAY[provider] ?? ''" :busy="busy" />

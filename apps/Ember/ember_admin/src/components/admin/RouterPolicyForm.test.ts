@@ -12,7 +12,15 @@ describe("Router policy", () => {
     expect(changed.deadline_seconds).toBe(8);
     expect(changed.choose_agent).toBe(true);
     expect(changed.strategy).toBe("both");
-    expect(changed.min_confidence).toBe(.9);
+    expect(changed.min_confidence).toBeUndefined();
+  });
+
+  it("drops the minimum when the field is cleared, so each model keeps its own thresholds", async () => {
+    const value = routerPolicyDefaults({ min_confidence: .8 });
+    const wrapper = mount(RouterPolicyForm, { props: { modelValue: value, busy: false } });
+    await wrapper.get('[data-test="router-confidence"]').setValue("");
+    const changed = wrapper.emitted("update:modelValue")![0]![0] as typeof value;
+    expect(changed.min_confidence).toBeUndefined();
   });
 
   it("rejects invalid strategies, confidence and deadlines", () => {
