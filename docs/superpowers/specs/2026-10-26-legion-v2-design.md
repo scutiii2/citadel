@@ -119,8 +119,7 @@ Hard break, no compat shim. All agent files found by the migration glob (19 in t
 
 ## Risks and open checks
 
-- Final review identified scope gaps beyond the task code: language specialists can still be entry agents, and decision gateways do not yet honor the shared cooldown policy. These remain deferred pending a scope decision; the role and cooldown requirements above are not fully enforced.
-- The existing Laya client does not forward caller timeouts to its HTTP request, which can outlive router or automatic-feature deadlines. Timeout forwarding remains deferred pending a scope decision.
+- Final review identified scope gaps beyond the task code: language specialists can still be entry agents, and decision gateways do not yet honor the shared cooldown policy. Both are deferred by user decision; the role and cooldown requirements above are not fully enforced.
 - Router and automatic-feature callers now use decision strategies. The automatic-feature runtime confidence default remains 60; the new example explicitly selects 80. Router confidence defaults to 0.9. Offline cases and router tests cover abstention, fallback and usage, without proving model accuracy.
 - Jev's `score`/`noul` answers come from a choice reduction; keep that mapping tested.
 - Confirm the configured Laya strategy appears in `GET /v1/strategies` of the deployed service.

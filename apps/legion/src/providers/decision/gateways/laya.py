@@ -44,7 +44,7 @@ class LayaGateway:
             raise DecisionError(f"Laya takes at most {MAX_CHARS} characters of text")
         try:
             body = self._client().ask(self.strategy, request.text, request.questions, WINDOW,
-                                      min_confidence=request.min_confidence)
+                                      min_confidence=request.min_confidence, timeout=timeout)
         except LayaServiceError as error:
             raise DecisionError(str(error)) from error
         tokens = sum(call.get("input_tokens") or 0 for call in body.get("calls", []))

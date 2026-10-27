@@ -33,6 +33,19 @@ def test_ask_sends_the_strategy_token_and_tuning_and_asks_for_the_trace(monkeypa
                               "trace": True, "min_confidence": 0.6}
 
 
+@pytest.mark.parametrize(("options", "expected"), [
+    ({"timeout": 2}, 2), ({}, 60), ({"timeout": 120}, 60),
+])
+def test_ask_uses_capped_http_timeout_without_changing_payload(monkeypatch, options, expected):
+    sent = []
+    post_returning(monkeypatch, ok, sent)
+    assert LAYAModel("http://laya:9120").ask("auto", "text", QUESTIONS, 512, **options) == ANSWER
+    assert sent[0][1]["timeout"] == expected
+    assert sent[0][1]["json"] == {
+        "strategy": "auto", "text": "text", "questions": QUESTIONS, "max_len": 512, "trace": True,
+    }
+
+
 def test_combine_posts_the_voters(monkeypatch):
     sent = []
     post_returning(monkeypatch, lambda url: ok(url, {"kept": ["a", "b"]}), sent)

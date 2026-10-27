@@ -32,6 +32,12 @@ def test_uses_configured_strategy_and_passes_min_confidence():
     assert result.answers["q"]["choice"] == "a" and result.tokens == 5
 
 
+def test_passes_runner_timeout_to_laya_client():
+    service = FakeService({"answers": {}})
+    LayaGateway(service).ask(DecisionRequest("hi", QUESTION), timeout=2)
+    assert service.calls[0][4]["timeout"] == 2
+
+
 def test_strategy_follows_the_gateway_file_without_restart(tmp_path, monkeypatch):
     monkeypatch.setattr(llm_config, "GATEWAYS_DIR", tmp_path)
     path = tmp_path / "decision" / "laya.json"

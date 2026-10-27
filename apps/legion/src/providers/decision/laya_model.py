@@ -60,11 +60,12 @@ class LAYAModel:
         body = response.json()
         return {"strategies": list(body["strategies"]), "default": body.get("default")}
 
-    def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
+    def _post(self, path: str, body: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
         if not self.configured:
             raise LayaServiceError("Laya is not configured: set LAYA_SERVICE_URL")
         try:
-            response = httpx.post(f"{self._url}{path}", headers=self._headers(), json=body, timeout=TIMEOUT_SECONDS)
+            response = httpx.post(f"{self._url}{path}", headers=self._headers(), json=body,
+                                  timeout=TIMEOUT_SECONDS if timeout is None else min(timeout, TIMEOUT_SECONDS))
         except httpx.HTTPError as error:
             raise LayaServiceError(f"The Laya service could not be reached: {error}") from error
         if response.is_success:
@@ -81,12 +82,13 @@ class LAYAModel:
         """Raises LayaServiceError (status 422, `str(error)` says what is wrong) unless the service accepts the questions."""
         self._post("/v1/validate", {"questions": questions})
 
-    def ask(self, strategy: str, text: str, questions: dict[str, Any], max_len: int, **tuning: Any) -> dict[str, Any]:
+    def ask(self, strategy: str, text: str, questions: dict[str, Any], max_len: int,
+            *, timeout: float | None = None, **tuning: Any) -> dict[str, Any]:
         """The service's answer: `answers` by question id (full, with `rounds`, `options` and `voters`), `uncertain`
         and `calls`. `tuning` may hold min_confidence, thresholds, prune_ratio and pair_ratio."""
         body = {"strategy": strategy, "text": text, "questions": questions, "max_len": max_len, "trace": True,
                 **{key: value for key, value in tuning.items() if value is not None}}
-        return self._post("/v1/ask", body)
+        return self._post("/v1/ask", body, timeout=timeout)
 
     def combine(self, voters: dict[str, Any], options: list[str], prune_ratio: float, pair_ratio: float) -> dict[str, Any]:
         """`voters` over `options` (renormalised), their `average`, the `kept` options and, with two voters or more, `final`."""
