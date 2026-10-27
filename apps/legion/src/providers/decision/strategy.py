@@ -56,7 +56,8 @@ def run(strategy: str, request: DecisionRequest, *, gateways: Mapping[str, Decis
     if strategy not in STRATEGIES:
         raise ValueError(f"unknown decision strategy {strategy!r}; choose one of: {', '.join(STRATEGIES)}")
     gateways = gateways if gateways is not None else default_gateways()
-    names = [n for n in _ORDER[strategy] if not (request.local_only and not gateways[n].local)]
+    effective_strategy = "laya-only" if request.local_only else strategy
+    names = [n for n in _ORDER[effective_strategy] if not (request.local_only and not gateways[n].local)]
     pending = dict(request.questions)
     answers: dict[str, dict[str, Any]] = {}
     tokens = 0

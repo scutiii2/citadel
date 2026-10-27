@@ -29,6 +29,8 @@ import time
 from pathlib import Path
 from typing import Awaitable, Callable, Sequence
 
+from dotenv import dotenv_values
+
 from src.agents import agent_registry, agent_spec, prompt_config
 from src.agents.agent_spec import AgentSpec
 from src.providers import llm_config
@@ -363,8 +365,15 @@ def main() -> None:
     except agent_spec.AgentSpecError as error:
         sys.stderr.write(f"\nai_agent cannot start - agent file error:\n  {error}\n\n")
         sys.exit(1)
+    # Match the child's environment precedence without importing agent_config,
+    # which resolves an individual agent's provider at import time.
+    for key, value in dotenv_values(PROJECT_ROOT / ".env").items():
+        if key in {"LAYA_SERVICE_URL", "LAYA_TOKEN"} and value:
+            os.environ.setdefault(key, value)
     check_laya_strategy(uses_laya=any(
-        spec.enabled and spec.llm.provider == "decision" and spec.llm.strategy != "jev-only" for spec in specs))
+        spec.enabled and spec.llm.provider == "decision"
+        and (spec.decision.strategy if spec.role == "router" else spec.llm.strategy) != "jev-only"
+        for spec in specs))
     try:
         asyncio.run(Supervisor(specs, watch_dir=agent_spec.AGENTS_DIR, restart_on=[prompt_config.PATH]).run())
     except KeyboardInterrupt:

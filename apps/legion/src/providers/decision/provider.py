@@ -70,6 +70,25 @@ def parse_request(raw: str, max_chars: int = MAX_INPUT_CHARS, default_confidence
     questions = data.get("questions")
     if not isinstance(questions, dict) or not questions:
         raise _fail("questions must be a non-empty object")
+    for qid, question in questions.items():
+        where = f"questions.{qid}"
+        if not _is_text(qid) or not isinstance(question, dict):
+            raise _fail(f"{where} must have a non-empty id and an object definition")
+        kind = question.get("type")
+        if kind not in ("choice", "score", "noul"):
+            raise _fail(f"{where}.type must be choice, score or noul")
+        if not _is_text(question.get("instructions")):
+            raise _fail(f"{where}.instructions must be a non-empty string")
+        criteria = question.get("criteria")
+        if kind == "score":
+            if not isinstance(criteria, list) or not criteria or not all(_is_text(level) for level in criteria):
+                raise _fail(f"{where}.criteria must be a non-empty list of level descriptions")
+        elif kind == "choice" or "criteria" in question:
+            if not isinstance(criteria, dict) or not criteria or not all(
+                    _is_text(key) and _is_text(value) for key, value in criteria.items()):
+                raise _fail(f"{where}.criteria must be a non-empty object of option descriptions")
+            if kind == "noul" and set(criteria) != {"false", "true"}:
+                raise _fail(f"{where}.criteria must contain false and true labels")
     trace = data.get("trace", False)
     if not isinstance(trace, bool):
         raise _fail("trace must be true or false")

@@ -330,7 +330,7 @@ def test_no_laya_user_does_not_contact_service(monkeypatch):
     ("anthropic", None, True, False),
 ])
 def test_start_checks_only_enabled_agents_that_use_laya(monkeypatch, provider, strategy, enabled, expected):
-    spec = SimpleNamespace(enabled=enabled, llm=SimpleNamespace(provider=provider, strategy=strategy))
+    spec = SimpleNamespace(role="specialist", enabled=enabled, llm=SimpleNamespace(provider=provider, strategy=strategy))
     seen = []
     class Runner:
         def __init__(self, *args, **kwargs):
@@ -340,5 +340,53 @@ def test_start_checks_only_enabled_agents_that_use_laya(monkeypatch, provider, s
     monkeypatch.setattr(supervisor.agent_spec, "load_dir", lambda *args: [spec])
     monkeypatch.setattr(supervisor, "check_laya_strategy", lambda uses_laya: seen.append(uses_laya))
     monkeypatch.setattr(supervisor, "Supervisor", Runner)
+    monkeypatch.setattr(supervisor, "dotenv_values", lambda path: {}, raising=False)
     supervisor.main()
     assert seen == [expected, "start"]
+
+
+@pytest.mark.parametrize(("llm_strategy", "policy_strategy", "expected"), [
+    ("jev-only", "laya-only", True), ("laya-only", "jev-only", False),
+])
+def test_start_uses_router_policy_strategy(monkeypatch, llm_strategy, policy_strategy, expected):
+    spec = SimpleNamespace(role="router", enabled=True,
+                           llm=SimpleNamespace(provider="decision", strategy=llm_strategy),
+                           decision=SimpleNamespace(strategy=policy_strategy))
+    seen = []
+    class Runner:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def run(self):
+            pass
+    monkeypatch.setattr(supervisor.agent_spec, "load_dir", lambda *args: [spec])
+    monkeypatch.setattr(supervisor, "check_laya_strategy", lambda uses_laya: seen.append(uses_laya))
+    monkeypatch.setattr(supervisor, "dotenv_values", lambda path: {}, raising=False)
+    monkeypatch.setattr(supervisor, "Supervisor", Runner)
+    supervisor.main()
+    assert seen == [expected]
+
+
+def test_start_loads_laya_environment_before_validation(monkeypatch):
+    monkeypatch.delenv("LAYA_SERVICE_URL", raising=False)
+    monkeypatch.setenv("LAYA_TOKEN", "process-token")
+    monkeypatch.delenv("UNRELATED_STARTUP_TEST_KEY", raising=False)
+    monkeypatch.setattr(supervisor, "dotenv_values", lambda path: {
+        "LAYA_SERVICE_URL": "http://laya.test", "LAYA_TOKEN": "file-token",
+        "UNRELATED_STARTUP_TEST_KEY": "ignore",
+    }, raising=False)
+    monkeypatch.setattr(supervisor.agent_spec, "load_dir", lambda *args: [
+        SimpleNamespace(role="specialist", enabled=True, llm=SimpleNamespace(provider="decision", strategy="both"))])
+    monkeypatch.setattr(supervisor.llm_config, "load_gateways", lambda: {"decision": {"laya": {"strategy": "bad"}}})
+    seen = []
+    def strategies(service):
+        seen.append((service._url, service._token))
+        return {"strategies": ["english-only"]}
+    monkeypatch.setattr(supervisor.laya_model, "_agent", None)
+    monkeypatch.setattr(supervisor.laya_model.LAYAModel, "strategies", strategies)
+    def unexpected_start(*args, **kwargs):
+        raise AssertionError("invalid Laya strategy must stop startup before children are created")
+    monkeypatch.setattr(supervisor, "Supervisor", unexpected_start)
+    with pytest.raises(SystemExit, match="bad.*not offered"):
+        supervisor.main()
+    assert seen == [("http://laya.test", "process-token")]
+    assert "UNRELATED_STARTUP_TEST_KEY" not in supervisor.os.environ

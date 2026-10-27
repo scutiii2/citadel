@@ -67,3 +67,34 @@ def test_answer_reports_decision_error(monkeypatch):
         assert "nothing answered" in str(error)
     else:
         raise AssertionError("expected an error")
+
+
+@pytest.mark.parametrize("question", [
+    None, [], {}, {"type": "unknown", "instructions": "?"},
+    {"type": "noul"}, {"type": "noul", "instructions": " "},
+    {"type": "choice", "instructions": "?"},
+    {"type": "choice", "instructions": "?", "criteria": []},
+    {"type": "choice", "instructions": "?", "criteria": {}},
+    {"type": "choice", "instructions": "?", "criteria": {"a": 3}},
+    {"type": "score", "instructions": "?", "criteria": {"low": "Low"}},
+    {"type": "score", "instructions": "?", "criteria": []},
+    {"type": "score", "instructions": "?", "criteria": ["low", None]},
+    {"type": "noul", "instructions": "?", "criteria": {"maybe": "Maybe"}},
+])
+def test_malformed_questions_fail_before_gateway_dispatch(monkeypatch, question):
+    calls = []
+    monkeypatch.setattr(strategy, "run", lambda *a, **k: calls.append(a))
+    with pytest.raises(ValueError, match="Invalid decision request:.*questions.q"):
+        provider.answer(json.dumps({"text": "hi", "questions": {"q": question}}), "jev-only", 0.9)
+    assert calls == []
+
+
+@pytest.mark.parametrize("question", [
+    {"type": "choice", "instructions": "?", "criteria": {"a": "A", "b": "B"}},
+    {"type": "score", "instructions": "?", "criteria": ["low", "high"]},
+    {"type": "noul", "instructions": "?"},
+    {"type": "noul", "instructions": "?", "criteria": {"false": "No", "true": "Yes"}},
+])
+def test_valid_questions_need_no_live_laya_validation(question):
+    request = provider.parse_request(json.dumps({"text": "hi", "questions": {"q": question}}))
+    assert request.questions == {"q": question}

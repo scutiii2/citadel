@@ -53,6 +53,13 @@ def test_local_only_skips_jev():
     assert jev.asked == []
 
 
+def test_local_only_forces_laya_on_jev_only_agent():
+    laya, jev = Fake("laya", True, 0.95), Fake("jev", False, 0.99)
+    result = strategy.run("jev-only", DecisionRequest("t", Q, local_only=True), gateways=gateways(laya, jev))
+    assert laya.asked == [["q"]] and jev.asked == []
+    assert result.answers["q"]["answered_by"] == "laya"
+
+
 def test_nothing_answered_raises():
     with pytest.raises(DecisionError, match="laya down"):
         strategy.run("laya-only", DecisionRequest("t", Q), gateways=gateways(Fake("laya", True, fail=True), Fake("jev", False, 0.9)))
