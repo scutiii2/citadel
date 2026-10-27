@@ -216,7 +216,7 @@ local state yourself, with the services stopped:
 ```powershell
 Copy-Item apps\garrison\.env apps\legion\.env
 Copy-Item -Recurse apps\garrison\.data apps\legion\.data
-Copy-Item apps\garrison\configs\config_*.json apps\legion\configs```
+Copy-Item apps\garrison\configs\config_*.json apps\legion\configs\n```
 
 Then recreate the virtual environment as `.venv_legion` (see Setup) and point any local
 `ember_api` `config_app.json` `agents_registry_path` at `../../legion/.data/agent_registry.json`.
