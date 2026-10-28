@@ -101,3 +101,6 @@ node_modules/
 
 # Admin runtime tuning overlay
 apps/legion/configs/tuning_overrides.json
+
+# Ember API run cache (regenerated, not source).
+/apps/Ember/ember_api/.cache/
