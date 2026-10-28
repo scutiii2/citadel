@@ -56,6 +56,13 @@ class ClientIpResolver:
         last_hop = forwarded.split(",")[-1].strip()
         return last_hop if last_hop and _is_ip(last_hop) else peer
 
+    def is_https(self, scope: Scope) -> bool:
+        """True when a trusted proxy reports the client connection used TLS."""
+        client = scope.get("client")
+        if not client or not _in(client[0], self._trusted):
+            return False
+        return dict(scope.get("headers", [])).get(b"x-forwarded-proto", b"") == b"https"
+
 
 def _is_ip(value: str) -> bool:
     try:
@@ -112,7 +119,9 @@ class SecurityMiddleware:
             return
 
         client_ip = self._resolver.resolve(scope)
-        scope.setdefault("state", {})["client_ip"] = client_ip
+        state = scope.setdefault("state", {})
+        state["client_ip"] = client_ip
+        state["https"] = self._resolver.is_https(scope)
 
         if self._filter.active and not self._filter.allows(client_ip):
             await self._send_json(send, 403, {"detail": "Access from this address is not allowed"})
@@ -146,3 +155,8 @@ class SecurityMiddleware:
 def client_ip(request) -> str:
     """The address SecurityMiddleware resolved for this request."""
     return getattr(request.state, "client_ip", None) or (request.client.host if request.client else "unknown")
+
+
+def request_is_https(request) -> bool:
+    """Whether a trusted proxy said this request arrived over HTTPS."""
+    return bool(getattr(request.state, "https", False))
