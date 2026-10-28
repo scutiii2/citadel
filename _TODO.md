@@ -118,3 +118,15 @@ Optional follow-up features, not implemented:
 **Cheaper first step**: fail over to the other provider between turns only (the next turn starts fresh on the backup), which skips the converter.
 
 **Revisit when**: user wants it built. Brainstorm the failover design first.
+
+## Move Treasury out of Citadel into its own stack (added 2026-10-28)
+
+**Context**: `apps/treasury` (the db_gateway) lives inside Citadel and ships in the root `docker-compose.yml`. It should deploy as its own stack, because other services will use it too, not just Citadel.
+
+- Move it to its own project folder with its own repo, `docker-compose.yml`, `.env` and `tools/deploy.bat` (like `LayaModel` and `Bard`).
+- Citadel services that call it (`ember_api` notes, `NotesClient.ts` path) reach it by URL on a shared Docker network, not by service name inside the `core` network.
+- Remove it from Citadel's root compose, `docker/configs/`, `tools/deploy.bat`, `docs/deployment.md` and the Citadel docs and vault note.
+- Check auth: other services need their own tokens or clients in `auth.py` and `registry.py`.
+- Update the "Frontend for db_gateway" item above, since the gateway frontend then lives with Treasury.
+
+**Revisit when**: user wants it built. Brainstorm the split first.
