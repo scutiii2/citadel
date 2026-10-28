@@ -117,6 +117,19 @@ def test_forwarded_for_is_trusted_only_from_a_trusted_proxy(client_factory) -> N
     assert login(direct, "wrong", username="nobody", **{"X-Forwarded-For": "203.0.113.7"}).status_code == 401
 
 
+def test_session_cookie_is_secure_only_when_a_trusted_proxy_says_https(client_factory) -> None:
+    def set_cookie(client: TestClient, **headers) -> str:
+        return login(client, ADMIN_PASSWORD, **headers).headers["set-cookie"].lower()
+
+    proxy = client_factory(address="127.0.0.1")
+    assert "secure" in set_cookie(proxy, **{"X-Forwarded-Proto": "https"})
+    assert "secure" not in set_cookie(proxy)  # LAN over plain http
+
+    # A forged header from an untrusted peer is ignored.
+    direct = client_factory(address="198.51.100.9")
+    assert "secure" not in set_cookie(direct, **{"X-Forwarded-Proto": "https"})
+
+
 def test_login_attempts_record_the_resolved_ip(client_factory) -> None:
     proxy = client_factory(address="127.0.0.1")
     login(proxy, "wrong", **{"X-Forwarded-For": "spoofed, 203.0.113.7"})
