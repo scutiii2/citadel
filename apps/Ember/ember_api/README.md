@@ -5,10 +5,27 @@
 | Route | Permission | Behavior |
 | --- | --- | --- |
 | `POST /api/attachments/dictate` | `files.upload` | `AudioIn` base64 JSON, supported audio suffix, 20 MB cap; returns `{text, duration_s}` from Scribe. Logs `attachments.dictate` without transcript text. |
+| `POST /api/attachments/dictate/partial` | `files.upload` | Same audio validation; transient cumulative preview through Scribe `/api/transcribe-partial`, returning `{text, duration_s}` without retaining audio or logging transcript text. |
+| `WS /api/attachments/dictate/stream` | session cookie + `files.upload` | Same-origin binary mono 16 kHz PCM16 and JSON `{"type":"stop"}`; returns `{type:"partial"|"final", text}` events. Scribe capacity closes with 1013 so the browser can use HTTP previews. |
 | `POST /api/bard/speak` | `tools.execute` + `files.download` | JSON `{text, voice?}`; returns `{file_id, duration_s, voice}`. Logs `bard.speak` without spoken text. |
 | `GET /api/bard/voices` | `tools.execute` + `files.download` | Returns `{voices: string[]}` for installed voices only. |
 
 Speech gateways supply account identity and the internal token. Rejected audio/text remains 400, quota/size 413 and unreachable services or refused internal credentials become 502. Existing audio upload and Bard streaming routes retain their contracts.
+
+Live dictation allows one stream per account per ember_api process, with at most
+64,000 bytes per PCM frame, 150 seconds of audio, 15 seconds idle while recording,
+120 seconds awaiting the final result and 270 seconds total connection lifetime.
+Completed streams log `attachments.dictate` with the byte count, before delivering
+the final transcript. Upstream error details, close reasons and credentials stay
+private. Scribe applies its own shared stream capacity and account quota.
+
+Reverse proxies must preserve the original `Host` and browser `Origin`, forward
+WebSocket `Upgrade` and `Connection` headers, and allow at least 270 seconds for
+the connection. Configure Uvicorn to trust forwarded protocol headers only from
+the deployed reverse proxy so the WebSocket scope correctly reports `wss` for an
+HTTPS browser origin. Ember compares both origin scheme and authority; rewriting
+the host or losing the HTTPS scheme causes the handshake to be refused. Keep the
+internal Scribe URL and token on ember_api; the browser connects only to Ember.
 
 ## Triage strategy
 
@@ -506,7 +523,8 @@ automatic reports. Add manual limits later if abuse appears.
 ## Security model
 
 - **Sessions:** a random 256-bit token in an `HttpOnly`, `SameSite=Strict`
-  cookie (`Secure` when `cookie_secure` is on). The database stores only its
+  cookie (`Secure` when `cookie_secure` is on, or when a `trusted_proxies` peer
+  sends `X-Forwarded-Proto: https`, as Tailscale Funnel does). The database stores only its
   SHA-256, with an expiry (`session_hours`); logout deletes the row.
 - **Passwords:** werkzeug hashes, checked on a worker thread so hashing
   never blocks the event loop. Unknown usernames are checked against a dummy
@@ -656,6 +674,10 @@ calls (in each call's `_meta`), so mcp_server sees who asked either way.
 - **Client IP** (`src/security.py`): the socket address, or the last
   `X-Forwarded-For` hop when the peer is a `trusted_proxies` entry (Vite's
   loopback proxy, which sets it). Used for the audit, rate limit and IP filter.
+  `X-Forwarded-Proto` is honoured under the same rule and sets the cookie's
+  `Secure` flag. Behind a proxy that hides client addresses (the Docker
+  deployment behind Funnel), set `security.rate_limit.scope` to `"account"` so
+  one shared address cannot lock every user out.
 - **IP filter:** optional allow/deny lists, `403` on every route.
 - **Headers:** nosniff, `X-Frame-Options: DENY`, `Referrer-Policy:
   no-referrer`, `default-src 'none'` CSP on every response; HSTS when

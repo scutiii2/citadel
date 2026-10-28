@@ -56,6 +56,14 @@ export function toBase64(file: Blob): Promise<string> {
 }
 
 export const attachmentsClient = {
+  async dictatePartial(blob: Blob, signal?: AbortSignal): Promise<DictationResult> {
+    if (blob.size > MAX_AUDIO_BYTES) throw new Error("Too large - the limit is 20 MB");
+    const data = await toBase64(blob);
+    signal?.throwIfAborted();
+    return apiRequest("POST", "/api/attachments/dictate/partial", {
+      filename: "dictation.webm", data,
+    }, undefined, signal);
+  },
   /** Transcribe a recording into editable draft text through the session API. */
   async dictate(blob: Blob, signal?: AbortSignal): Promise<DictationResult> {
     if (blob.size > MAX_AUDIO_BYTES) throw new Error("Too large - the limit is 20 MB");
