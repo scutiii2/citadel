@@ -53,7 +53,7 @@ from src.agents.agent_roles import SYSTEM_PROMPT, roster_block, system_prompt_fo
 from src.providers.context_breakdown import ProviderCounter, breakdown_fields
 from src.runtime.chat_history import validate_history
 from src.providers.base_provider import (
-    BaseProvider, ChatCancelled, ChatResult, LiveUsage, OnEvent, ToolCallRecord, dispatch_with_progress, step_event,
+    BaseProvider, ChatCancelled, ChatResult, LiveUsage, OnEvent, ToolCallRecord, cancel_on_stop, dispatch_with_progress, step_event,
 )
 from src.tools.mcp_client.mcp_upstream import call_tool, list_tools, tool_description
 
@@ -371,7 +371,7 @@ async def run_chat(
         )
 
     try:
-        async with guard.timeout():
+        async with cancel_on_stop(request_id), guard.timeout():
             for _ in range(options.max_tool_rounds(token_limits.max_tool_rounds(PROVIDER_ID, route.current))):
                 if cancellation.is_cancelled(request_id):
                     raise ChatCancelled()
