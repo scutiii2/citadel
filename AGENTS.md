@@ -6,7 +6,7 @@ Project note: `Brain/Projects/Citadel.md` in the Obsidian vault (`../../Brain/` 
 This file is the one instruction file for every coding agent. Codex reads it directly; `CLAUDE.md` only imports it (`@AGENTS.md`) for Claude Code. Edit this file, never `CLAUDE.md`.
 
 ## Skills
-Edit skills only in `.agents/skills/` (Codex reads it). Then run `python sync_skills.py` to copy them into `.claude/skills/` for Claude Code. `python sync_skills.py --check` reports drift. Never edit `.claude/skills/` directly; the next sync overwrites it. A pre-commit hook (`.githooks/pre-commit`) blocks a commit that touches either skills folder while they differ or have unstaged changes. After a fresh clone, enable it once with `git config core.hooksPath .githooks`.
+Skills live only in `.agents/skills/` (Codex reads it). `.claude/skills` is a git symlink to `../.agents/skills`, so Claude Code reads the same files; there is nothing to sync. Edit through either path. On Windows a fresh clone needs Developer Mode and `git config core.symlinks true`, or `.claude/skills` becomes a plain text file.
 
 ## Frontend UI instructions
 For UI work in `apps/Ember/ember_web` or `ember_admin`, read `.agents/skills/ember-frontend-design/SKILL.md` and the existing `ember-design-system` skill. For mobile or responsive layouts, touch controls, virtual-keyboard issues, sheets or narrow-screen reviews, also read `.agents/skills/ember-frontend-design/mobile-ui.md`. The mobile guide supplements the shared design; keep desktop behavior and the existing tokens and components coherent with it.

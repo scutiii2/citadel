@@ -4,7 +4,7 @@ __pycache__/
 .venv_*/
 *.egg-info/
 .claude/*
-!.claude/skills/
+!.claude/skills
 .pytest_cache/
 .secret
 .vscode
