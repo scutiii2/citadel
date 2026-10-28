@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
@@ -23,7 +24,7 @@ import anyio.to_thread
 from src.agents import agent_events
 
 from src.tools.mcp_client import tool_progress
-from src.providers import cooldown
+from src.providers import cancellation, cooldown
 
 
 OnEvent = Callable[[dict[str, Any]], Awaitable[None]]
@@ -122,6 +123,32 @@ class ChatCancelled(Exception):
     cancelled this turn. Caught in server.py's ask() tool, which turns it
     into a clean {"cancelled": True} result rather than an MCP tool
     error - this is an expected user action, not a failure."""
+
+
+@asynccontextmanager
+async def cancel_on_stop(request_id: str | None):
+    """Turns a user Stop into ChatCancelled even while the body awaits a slow
+    model stream, which the between-rounds checks alone cannot interrupt."""
+    task = asyncio.current_task()
+    fired = False
+
+    async def watch() -> None:
+        nonlocal fired
+        while not cancellation.is_cancelled(request_id):
+            await asyncio.sleep(0.1)
+        fired = True
+        task.cancel()
+
+    watcher = asyncio.create_task(watch())
+    try:
+        yield
+    except asyncio.CancelledError:
+        if not fired:
+            raise
+        task.uncancel()
+        raise ChatCancelled() from None
+    finally:
+        watcher.cancel()
 
 
 @dataclass

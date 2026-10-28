@@ -17,6 +17,13 @@ def candidate(entry):
         tiers=[RouteTier(tier=t.tier, id=t.id, use_for=t.use_for) for t in entry.tiers])
 
 
+def _summary(result, chosen, tier, roster, spec):
+    """One-line routing outcome for the step card: chosen agent and, when picked, model tier."""
+    delegated = not result.agent.uncertain and chosen not in (None, "none")
+    label = next((e.label for e in roster if e.id == chosen), chosen) if delegated else spec.label
+    return f"Agent: {label}" + (f" · Model: {tier}" if tier else "")
+
+
 async def route_turn(question, history, on_event, request_id, depth, explicit_tier=None):
     spec = agent_spec.current()
     if depth or not spec.entry or not spec.orchestrator or spec.internal_role or not internal_auth.TOKEN:
@@ -55,16 +62,16 @@ async def route_turn(question, history, on_event, request_id, depth, explicit_ti
             if result.trace is not None:
                 rows[0]["routing"]["trace"] = result.trace
         delegation.record_usage(rows)
+    tier = result.model_tier if result and request.choose_tier and not result.size.uncertain else None
+    chosen = result.agent.choice if result else None
     if on_event:
         await on_event(step_event("step_end", id=step_id, ok=True,
-            result="Routing decision received" if result else "Using default routing"))
+            result=_summary(result, chosen, tier, roster, spec) if result else "Using default routing"))
     if cancellation.is_cancelled(request_id):
         raise ChatCancelled()
     if result is None:
         return None, None, ""
-    tier = result.model_tier if request.choose_tier and not result.size.uncertain else None
     note = f"router tier: {result.size.choice} -> {tier}" if tier else ""
-    chosen = result.agent.choice
     if (not request.choose_agent or result.agent.uncertain or chosen in (None, "none")):
         return None, tier, note
     # Rebuild the authorized roster before dispatch: tool switches and running peers may have changed.
