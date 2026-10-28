@@ -190,3 +190,29 @@ def test_hsts_and_disabling_headers(client_factory) -> None:
 def test_config_rejects_unknown_scope() -> None:
     with pytest.raises(ValueError, match="scope"):
         SecuritySettings.from_config({"rate_limit": {"scope": "everyone"}})
+
+
+def test_websocket_scope_gets_https_state_and_ip_filter():
+    import asyncio
+
+    from src.security import SecurityMiddleware
+
+    async def run(peer: str, settings: SecuritySettings):
+        seen, sent = {}, []
+
+        async def app(scope, receive, send):
+            seen.update(scope["state"])
+
+        async def send(message):
+            sent.append(message)
+
+        scope = {"type": "websocket", "client": (peer, 1), "headers": [(b"x-forwarded-proto", b"https")]}
+        await SecurityMiddleware(app, settings)(scope, None, send)
+        return seen, sent
+
+    seen, _ = asyncio.run(run("127.0.0.1", SecuritySettings()))
+    assert seen["https"] is True
+    seen, _ = asyncio.run(run("203.0.113.7", SecuritySettings()))
+    assert seen["https"] is False
+    seen, sent = asyncio.run(run("203.0.113.7", SecuritySettings(ip_deny_list=("203.0.113.0/24",))))
+    assert not seen and sent == [{"type": "websocket.close", "code": 1008}]

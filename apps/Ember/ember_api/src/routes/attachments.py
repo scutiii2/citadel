@@ -272,7 +272,7 @@ async def dictate_stream(websocket: WebSocket):
     """Cookie-authenticated same-origin PCM stream; Scribe stays private."""
     try:
         origin = urlsplit(websocket.headers.get("origin", ""))
-        same_origin = (origin.scheme == ("https" if websocket.url.scheme == "wss" else "http") and origin.netloc
+        same_origin = (origin.scheme == ("https" if websocket.url.scheme == "wss" or getattr(websocket.state, "https", False) else "http") and origin.netloc
                        and origin.netloc.lower() == websocket.headers.get("host", "").lower()
                        and not origin.path and not origin.query and not origin.fragment
                        and not origin.username and not origin.password)
