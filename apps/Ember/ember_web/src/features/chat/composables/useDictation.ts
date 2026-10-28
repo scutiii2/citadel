@@ -1,5 +1,6 @@
 import { computed, onScopeDispose, ref } from "vue";
 import { attachmentsClient, type DictationResult } from "../../../api/files/AttachmentsClient";
+import { LiveDictation, type DictationOptions } from "./liveDictation";
 
 type DictationState = "idle" | "recording" | "transcribing" | "error";
 
@@ -7,10 +8,14 @@ type DictationState = "idle" | "recording" | "transcribing" | "error";
 export function useDictation(
   insert: (text: string) => void,
   transcribe: (blob: Blob, signal?: AbortSignal) => Promise<DictationResult> = attachmentsClient.dictate,
+  options: DictationOptions = {},
 ) {
   const state = ref<DictationState>("idle");
   const error = ref("");
   const requesting = ref(false);
+  const liveStatus = ref("");
+  let live: LiveDictation | undefined;
+  let ownsDraft = false;
   const levels = ref<number[]>(Array(24).fill(0));
   const elapsedMs = ref(0);
   const supported = computed(() => typeof MediaRecorder !== "undefined"
@@ -84,6 +89,11 @@ export function useDictation(
   function cancel(): void {
     generation++;
     request?.abort();
+    live?.close();
+    live = undefined;
+    if (ownsDraft) options.onCancel?.();
+    ownsDraft = false;
+    liveStatus.value = "";
     if (recorder) {
       recorder.onstop = null;
       recorder.ondataavailable = null;
@@ -105,19 +115,26 @@ export function useDictation(
     error.value = message;
   }
 
-  function stop(): void {
+  async function stop(): Promise<void> {
     if (recorder?.state === "recording") {
+      clearTimeout(timer);
       state.value = "transcribing";
-      recorder.stop();
+      const run = generation;
+      await live?.seal();
+      if (run !== generation) return;
+      recorder?.stop();
       release();
     }
   }
 
   async function toggle(): Promise<void> {
-    if (state.value === "recording") { stop(); return; }
+    if (state.value === "recording") { await stop(); return; }
     if (requesting.value || state.value === "transcribing") return;
     if (!supported.value) { fail("This browser cannot record WebM audio."); return; }
     const run = ++generation;
+    ownsDraft = true;
+    options.onStart?.();
+    liveStatus.value = "";
     requesting.value = true;
     error.value = "";
     try {
@@ -133,17 +150,36 @@ export function useDictation(
         if (run !== generation) return;
         state.value = "transcribing";
         request = new AbortController();
-        void transcribe(new Blob(chunks, { type: "audio/webm" }), request.signal).then((result) => {
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        const signal = request.signal;
+        const transport = live;
+        void (async () => {
+          const text = await transport?.finish();
+          if (run !== generation) return;
+          const result = text == null ? await transcribe(blob, signal) : { text };
           if (run !== generation) return;
           insert(result.text);
+          ownsDraft = false;
+          live = undefined;
+          liveStatus.value = "";
           state.value = "idle";
-        }).catch((cause: unknown) => {
+        })().catch((cause: unknown) => {
           if (run === generation) fail(cause instanceof Error ? cause.message : "Scribe could not transcribe the recording.");
         });
       };
-      recorder.start();
-      state.value = "recording";
       startMeter(granted);
+      live = new LiveDictation(options, (text) => { liveStatus.value = text; }, () => {
+        if (recorder?.state === "recording") recorder.requestData();
+        return new Blob(chunks, { type: "audio/webm" });
+      });
+      // Do not advertise recording until PCM capture is connected. Otherwise a
+      // successful stream would miss words spoken while the worklet downloads.
+      await live.start(audioContext, source);
+      if (run !== generation) return;
+      startedAt = performance.now();
+      elapsedMs.value = 0;
+      recorder.start(250);
+      state.value = "recording";
       timer = setTimeout(stop, 150_000);
     } catch (cause) {
       if (run !== generation) return;
@@ -156,5 +192,5 @@ export function useDictation(
   }
 
   onScopeDispose(cancel);
-  return { state, error, supported, requesting, levels, elapsedMs, toggle, cancel };
+  return { state, error, supported, requesting, liveStatus, levels, elapsedMs, toggle, cancel };
 }

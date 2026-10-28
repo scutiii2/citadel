@@ -564,6 +564,8 @@ def test_truncate_to_is_refused_while_answering(client: TestClient, agent: FakeA
     as_admin(client)
     chat_id = new_id()
     start(client, chat_id, "q1")
+    # release() needs the fake agent's gate; the 202 response can precede ask().
+    wait_until(lambda: agent.gate is not None)
 
     try:
         assert start(client, chat_id, "again", truncate_to=0).status_code == 409

@@ -11,6 +11,15 @@ import menuSource from "./ChatSettingsMenu.vue?raw";
 
 vi.mock("../../../api/files/AttachmentsClient", () => ({ attachmentsClient: { text: vi.fn(), table: vi.fn(), pdf: vi.fn(), dictate: vi.fn() } }));
 
+const dictationHooks = vi.hoisted(() => ({ current: undefined as undefined | { onPartial?: (text: string) => void } }));
+vi.mock("../composables/useDictation", async (original) => {
+  const actual = await original<typeof import("../composables/useDictation")>();
+  return { ...actual, useDictation: (...args: Parameters<typeof actual.useDictation>) => {
+    dictationHooks.current = args[2];
+    return actual.useDictation(...args);
+  } };
+});
+
 const text = vi.mocked(attachmentsClient.text);
 const pdf = vi.mocked(attachmentsClient.pdf);
 const table = vi.mocked(attachmentsClient.table);
@@ -80,6 +89,8 @@ describe("dictation feedback", () => {
       static isTypeSupported = () => true;
       state = "inactive";
       onstop?: () => void;
+      ondataavailable?: (event: { data: Blob }) => void;
+      requestData() { this.ondataavailable?.({ data: new Blob(["recording"]) }); }
       start() { this.state = "recording"; }
       stop() { this.state = "inactive"; this.onstop?.(); }
     });
@@ -89,6 +100,88 @@ describe("dictation feedback", () => {
     vi.mocked(attachmentsClient.dictate).mockImplementation(() => new Promise(() => {}));
   });
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+  it("locks the snapshot before microphone permission, replaces partials and restores on cancel", async () => {
+    let grant!: (stream: MediaStream) => void;
+    vi.mocked(navigator.mediaDevices.getUserMedia).mockReturnValue(new Promise((resolve) => { grant = resolve; }));
+    const wrapper = mountInput({ suggestion: "Suggested change", history: ["Old question"] });
+    const input = wrapper.get("textarea");
+    await input.setValue("Original draft");
+    await wrapper.get("button.dictation").trigger("click");
+    expect(input.attributes("readonly")).toBeDefined();
+    expect(input.attributes("aria-readonly")).toBe("true");
+    expect(wrapper.get(".locked-hint").text()).toContain("Draft locked");
+    await input.trigger("keydown", { key: "Enter" });
+    (wrapper.vm as unknown as { insertText: (text: string) => void }).insertText("Saved prompt");
+    expect(wrapper.emitted("send")).toBeUndefined();
+    expect((input.element as HTMLTextAreaElement).value).toBe("Original draft");
+    grant({ getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream);
+    await flushPromises();
+    dictationHooks.current?.onPartial?.("First hypothesis");
+    await wrapper.vm.$nextTick();
+    expect((input.element as HTMLTextAreaElement).value).toBe("Original draft\nFirst hypothesis");
+    dictationHooks.current?.onPartial?.("Corrected hypothesis");
+    await wrapper.vm.$nextTick();
+    expect((input.element as HTMLTextAreaElement).value).toBe("Original draft\nCorrected hypothesis");
+    await wrapper.get('button[aria-label="Cancel dictation"]').trigger("click");
+    expect((input.element as HTMLTextAreaElement).value).toBe("Original draft");
+    expect(input.attributes("readonly")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("blocks suggestion, history and programmatic draft edits while locked", async () => {
+    const wrapper = mountInput({ suggestion: "Predicted question", history: ["Previous question"] });
+    const input = wrapper.get("textarea");
+    await wrapper.get("button.dictation").trigger("click");
+    await input.trigger("keydown", { key: "Tab" });
+    await input.trigger("keydown", { key: "ArrowUp" });
+    (wrapper.vm as unknown as { setDraft: (text: string) => void }).setDraft("Command form changed the draft");
+    await wrapper.vm.$nextTick();
+    expect((input.element as HTMLTextAreaElement).value).toBe("");
+    expect(wrapper.emitted("suggestionUsed")).toBeUndefined();
+    await input.trigger("keydown", { key: "Escape" });
+    expect(input.attributes("readonly")).toBeUndefined();
+    await input.trigger("keydown", { key: "Tab" });
+    expect((input.element as HTMLTextAreaElement).value).toBe("Predicted question");
+    wrapper.unmount();
+  });
+
+  it("preserves the exact base whitespace in partial and final text", async () => {
+    const wrapper = mountInput();
+    const input = wrapper.get("textarea");
+    const base = "Original draft  \n";
+    await input.setValue(base);
+    await wrapper.get("button.dictation").trigger("click");
+    dictationHooks.current?.onPartial?.("Live words");
+    await wrapper.vm.$nextTick();
+    expect((input.element as HTMLTextAreaElement).value).toBe(`${base}\nLive words`);
+    dictationHooks.current?.onPartial?.("");
+    await wrapper.vm.$nextTick();
+    expect((input.element as HTMLTextAreaElement).value).toBe(base);
+    vi.mocked(attachmentsClient.dictate).mockResolvedValue({ text: "Final words" } as never);
+    await wrapper.get("button.dictation").trigger("click");
+    await flushPromises();
+    expect((input.element as HTMLTextAreaElement).value).toBe(`${base}\nFinal words`);
+    expect(input.attributes("readonly")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("keeps list drafts visible and unlocks a final transcript without sending", async () => {
+    const wrapper = mountInput();
+    (wrapper.vm as unknown as { setDraft: (text: string) => void }).setDraft("- Keep this list");
+    await flushPromises();
+    await wrapper.get("button.dictation").trigger("click");
+    const input = wrapper.get("textarea");
+    expect((input.element as HTMLTextAreaElement).value).toBe("- Keep this list");
+    dictationHooks.current?.onPartial?.("Live words");
+    vi.mocked(attachmentsClient.dictate).mockResolvedValue({ text: "Final words" } as never);
+    await wrapper.get("button.dictation").trigger("click");
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("Draft locked");
+    expect(wrapper.emitted("send")).toBeUndefined();
+    expect(wrapper.find("textarea").exists() ? (wrapper.get("textarea").element as HTMLTextAreaElement).value : wrapper.get(".list-composer").text()).toContain("Final words");
+    wrapper.unmount();
+  });
 
   it("keeps the stop button mounted with a live waveform, timer and a quiet status announcement", async () => {
     const wrapper = mountInput();
@@ -102,6 +195,8 @@ describe("dictation feedback", () => {
     expect(wrapper.findAll(".dictation-waveform span")).toHaveLength(24);
     expect(wrapper.get(".dictation-timer").text()).toBe("0:01 / 2:30");
     expect(wrapper.get(".dictation-status").text()).toContain("Recording");
+    expect(wrapper.get(".dictation-status").text()).toContain("periodic");
+    expect(wrapper.get(".locked-hint").text()).toContain("periodic");
     vi.spyOn(performance, "now").mockReturnValue(performance.now() + 139000);
     await vi.advanceTimersByTimeAsync(100);
     expect(button.classes()).toContain("ending");
@@ -111,19 +206,42 @@ describe("dictation feedback", () => {
     expect(button.attributes("disabled")).toBeDefined();
     expect(button.attributes("aria-busy")).toBe("true");
     expect(button.text()).toContain("Transcribing…");
+    expect(wrapper.get("textarea").attributes("readonly")).toBeDefined();
     expect(wrapper.get(".dictation-status").text()).toContain("Recording stopped");
     wrapper.unmount();
   });
 
   it.each(["conversation", "account", "unmount"])("releases recording when the %s changes", async (change) => {
     const wrapper = mountInput({ conversationId: "first" });
+    await wrapper.get("textarea").setValue("Scoped draft");
     await wrapper.get("button.dictation").trigger("click");
+    dictationHooks.current?.onPartial?.("Private partial");
+    await wrapper.vm.$nextTick();
     if (change === "conversation") await wrapper.setProps({ conversationId: "second" });
     if (change === "account") { useAuthStore().account = null; await wrapper.vm.$nextTick(); }
     if (change === "unmount") wrapper.unmount();
     expect(close).toHaveBeenCalledTimes(1);
     expect(stopTrack).toHaveBeenCalledTimes(1);
-    if (change !== "unmount") wrapper.unmount();
+    if (change !== "unmount") {
+      expect((wrapper.get("textarea").element as HTMLTextAreaElement).value).toBe("Scoped draft");
+      expect(wrapper.get("textarea").attributes("readonly")).toBeUndefined();
+      wrapper.unmount();
+    }
+  });
+
+  it("restores the original draft and unlocks when final transcription fails", async () => {
+    const wrapper = mountInput();
+    await wrapper.get("textarea").setValue("Keep my text");
+    await wrapper.get("button.dictation").trigger("click");
+    dictationHooks.current?.onPartial?.("Discard these live words");
+    vi.mocked(attachmentsClient.dictate).mockRejectedValue(new Error("Speech unavailable"));
+    await wrapper.get("button.dictation").trigger("click");
+    await flushPromises();
+    expect((wrapper.get("textarea").element as HTMLTextAreaElement).value).toBe("Keep my text");
+    expect(wrapper.get("textarea").attributes("readonly")).toBeUndefined();
+    expect(wrapper.get('[role="alert"]').text()).toBe("Speech unavailable");
+    expect(wrapper.emitted("send")).toBeUndefined();
+    wrapper.unmount();
   });
 
   it("releases recording when a cached composer is deactivated", async () => {

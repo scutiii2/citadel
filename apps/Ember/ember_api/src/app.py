@@ -149,6 +149,7 @@ def create_app(
         app.state.email_sender = email_sender or McpEmailSender(settings.mcp_server_url, internal_token or None, recorder)
         app.state.upstream = upstream
         app.state.internal_token = internal_token or None
+        app.state.dictation_accounts = set()
         app.state.secret_box = secret_box
         app.state.agent_directory = AgentDirectory(
             HttpRegistrySource(settings.agents_registry_url, upstream, internal_token or None)

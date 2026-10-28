@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import base64
 import binascii
+import asyncio
+from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, WebSocket, status
 from pydantic import BaseModel, Field
 
 from src.deps import get_log_writer, require_permission
@@ -21,6 +23,7 @@ from src.services.log_service import LogWriter
 from src.services.mcp_server_info import McpServerInfo, McpServerRefused, McpServerUnavailable
 from src.services.permissions import FILES_UPLOAD
 from src.services.scribe import ScribeGateway
+from src.services.session_service import SessionService
 from src.services.capability_files import CapabilityFilesGateway
 from src.services.text_extraction import MAX_FILE_BYTES, ExtractionError, extract_text_async
 
@@ -248,3 +251,65 @@ async def dictate(
     result = await gateway.transcribe(account, filename, content)
     await logs.action(account, "attachments.dictate", f"Transcribed {len(content):,} bytes of dictated audio")
     return DictationOut(text=result["text"], duration_s=float(result["duration_s"]))
+
+
+@router.post("/dictate/partial")
+async def dictate_partial(
+    body: AudioIn,
+    request: Request,
+    account: Account = Depends(require_chat),
+) -> DictationOut:
+    """Transient cumulative recording preview: no uploaded file or transcript log."""
+    filename, content = _audio_content(body)
+    gateway = ScribeGateway(request.app.state.upstream, request.app.state.settings.scribe_url,
+                            request.app.state.internal_token)
+    result = await gateway.transcribe_partial(account, filename, content)
+    return DictationOut(text=result["text"], duration_s=float(result["duration_s"]))
+
+
+@router.websocket("/dictate/stream")
+async def dictate_stream(websocket: WebSocket):
+    """Cookie-authenticated same-origin PCM stream; Scribe stays private."""
+    try:
+        origin = urlsplit(websocket.headers.get("origin", ""))
+        same_origin = (origin.scheme == ("https" if websocket.url.scheme == "wss" else "http") and origin.netloc
+                       and origin.netloc.lower() == websocket.headers.get("host", "").lower()
+                       and not origin.path and not origin.query and not origin.fragment
+                       and not origin.username and not origin.password)
+    except ValueError:
+        same_origin = False
+    if not same_origin:
+        await websocket.close(4403, "Origin refused")
+        return
+    state = websocket.app.state
+    settings = state.settings
+    token = websocket.cookies.get(settings.session_cookie_name)
+    async with state.database.sessions() as session:
+        account = await SessionService(session, settings.session_hours).resolve(token) if token else None
+        if account is None:
+            await websocket.close(4401, "Not logged in")
+            return
+        if ((settings.require_email_verification and not account.email_verified)
+                or FILES_UPLOAD not in account.permission_names):
+            await websocket.close(4403, "Missing upload permission")
+            return
+    # No await between checking and claiming: all streams run on this app's loop.
+    if account.id in state.dictation_accounts:
+        await websocket.accept()
+        await websocket.close(1013, "A dictation stream is already active")
+        return
+    state.dictation_accounts.add(account.id)
+    try:
+        await websocket.accept()
+        gateway = ScribeGateway(state.upstream, settings.scribe_url, state.internal_token)
+
+        async def log_final(byte_count):
+            await state.logs.action(account, "attachments.dictate", f"Transcribed {byte_count:,} bytes of dictated audio")
+
+        await gateway.stream(account, websocket, on_final=log_final)
+    except asyncio.CancelledError:
+        # The connection task can be cancelled while its relay tasks drain.
+        # Closing a socket ends this route; always release its account claim.
+        pass
+    finally:
+        state.dictation_accounts.discard(account.id)

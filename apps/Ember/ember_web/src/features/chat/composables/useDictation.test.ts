@@ -11,6 +11,7 @@ class Recorder {
   onerror?: () => void;
   constructor() { Recorder.last = this; }
   start() { this.state = "recording"; }
+  requestData() { this.ondataavailable?.({ data: new Blob(["partial speech"]) }); }
   stop() {
     this.state = "inactive";
     this.ondataavailable?.({ data: new Blob(["speech"]) });
@@ -162,4 +163,175 @@ it("cancels transcription and ignores late responses", async () => {
   await Promise.resolve();
   expect(signal?.aborted).toBe(true);
   expect(insert).not.toHaveBeenCalled();
+});
+
+it("snapshots before requesting the microphone and restores on cancellation", async () => {
+  const scope = effectScope();
+  const onStart = vi.fn();
+  const onCancel = vi.fn();
+  const d = scope.run(() => useDictation(vi.fn(), vi.fn(), { onStart, onCancel }))!;
+  await d.toggle();
+  expect(onStart).toHaveBeenCalledOnce();
+  d.cancel();
+  expect(onCancel).toHaveBeenCalledOnce();
+  scope.stop();
+  expect(onCancel).toHaveBeenCalledOnce();
+});
+
+it("falls back to rolling HTTP without overlapping requests and preserves upload on stop", async () => {
+  const scope = effectScope();
+  const onPartial = vi.fn();
+  const partial = vi.fn().mockResolvedValue({ text: "live", duration_s: 1 });
+  const insert = vi.fn();
+  const transcribe = vi.fn().mockResolvedValue({ text: "final", duration_s: 3 });
+  const d = scope.run(() => useDictation(insert, transcribe, { onPartial, partial }))!;
+  await d.toggle();
+  await vi.advanceTimersByTimeAsync(2500);
+  expect(onPartial).toHaveBeenCalledWith("live");
+  partial.mockRejectedValueOnce(new Error("unavailable"));
+  await vi.advanceTimersByTimeAsync(2500);
+  expect(d.liveStatus.value).toContain("unavailable");
+  expect(d.state.value).toBe("recording");
+  await d.toggle();
+  await vi.waitFor(() => expect(insert).toHaveBeenCalledWith("final"));
+  expect(transcribe.mock.calls[0]![0].size).toBeGreaterThan(0);
+  scope.stop();
+});
+
+class SocketMock {
+  static OPEN = 1;
+  static last: SocketMock;
+  readyState = 0;
+  bufferedAmount = 0;
+  onopen?: () => void;
+  onclose?: () => void;
+  onerror?: () => void;
+  onmessage?: (event: { data: string }) => void;
+  send = vi.fn();
+  close = vi.fn();
+  constructor() { SocketMock.last = this; }
+  open() { this.readyState = 1; this.onopen?.(); }
+  message(type: string, text: string) { this.onmessage?.({ data: JSON.stringify({ type, text }) }); }
+}
+class WorkletMock {
+  static last: WorkletMock;
+  port = { onmessage: null as ((event: { data: unknown }) => void) | null,
+    close: vi.fn(), postMessage: vi.fn(() => this.port.onmessage?.({ data: { type: "flushed" } })) };
+  connect = vi.fn();
+  disconnect = vi.fn();
+  constructor() { WorkletMock.last = this; }
+}
+function streaming() {
+  vi.stubGlobal("WebSocket", SocketMock);
+  vi.stubGlobal("AudioWorkletNode", WorkletMock);
+  vi.stubGlobal("AudioContext", class extends AudioContextMock {
+    audioWorklet = { addModule: vi.fn().mockResolvedValue(undefined) };
+    destination = {};
+  });
+}
+
+it("streams PCM, replaces partials, waits for final and never uploads on successful streaming", async () => {
+  streaming();
+  const scope = effectScope();
+  const insert = vi.fn(), onPartial = vi.fn(), transcribe = vi.fn(), onCancel = vi.fn();
+  const d = scope.run(() => useDictation(insert, transcribe, { onPartial, onCancel }))!;
+  await d.toggle();
+  const socket = SocketMock.last;
+  socket.open();
+  const pcm = new ArrayBuffer(3200);
+  WorkletMock.last.port.onmessage?.({ data: pcm });
+  expect(socket.send).toHaveBeenCalledWith(pcm);
+  socket.message("partial", "hello");
+  expect(onPartial).toHaveBeenLastCalledWith("hello");
+  await d.toggle();
+  expect(d.state.value).toBe("transcribing");
+  expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: "stop" }));
+  socket.message("final", "hello world");
+  await vi.waitFor(() => expect(insert).toHaveBeenCalledWith("hello world"));
+  expect(transcribe).not.toHaveBeenCalled();
+  expect(onCancel).not.toHaveBeenCalled();
+  expect(WorkletMock.last.port.close).toHaveBeenCalledOnce();
+  expect(socket.close).toHaveBeenCalledOnce();
+  scope.stop();
+});
+
+it("falls back after a stream closes and ignores pending HTTP results after cancellation", async () => {
+  streaming();
+  const scope = effectScope();
+  const onPartial = vi.fn();
+  let resolve!: (value: { text: string; duration_s: number }) => void;
+  const partial = vi.fn(() => new Promise<{ text: string; duration_s: number }>((r) => { resolve = r; }));
+  const d = scope.run(() => useDictation(vi.fn(), vi.fn(), { onPartial, partial }))!;
+  await d.toggle();
+  SocketMock.last.open();
+  SocketMock.last.onclose?.();
+  await vi.advanceTimersByTimeAsync(7500);
+  expect(partial).toHaveBeenCalledOnce();
+  d.cancel();
+  resolve({ text: "late", duration_s: 2 });
+  await Promise.resolve();
+  expect(onPartial).not.toHaveBeenCalled();
+  expect(vi.getTimerCount()).toBe(0);
+  scope.stop();
+});
+
+it("flushes the last worklet samples before sending stop", async () => {
+  streaming();
+  const scope = effectScope();
+  const d = scope.run(() => useDictation(vi.fn(), vi.fn()))!;
+  await d.toggle();
+  SocketMock.last.open();
+  await d.toggle();
+  expect(WorkletMock.last.port.postMessage).toHaveBeenCalledWith({ type: "flush" });
+  scope.stop();
+});
+
+it("prepares the worklet before recording starts and ignores a cancelled late module", async () => {
+  streaming();
+  let ready!: () => void;
+  vi.stubGlobal("AudioContext", class extends AudioContextMock {
+    audioWorklet = { addModule: () => new Promise<void>((resolve) => { ready = resolve; }) };
+    destination = {};
+  });
+  const scope = effectScope();
+  const d = scope.run(() => useDictation(vi.fn(), vi.fn()))!;
+  const starting = d.toggle();
+  await Promise.resolve();
+  expect(Recorder.last.state).toBe("inactive");
+  expect(d.state.value).toBe("idle");
+  d.cancel();
+  ready();
+  await starting;
+  expect(Recorder.last.state).toBe("inactive");
+  expect(vi.getTimerCount()).toBe(0);
+  scope.stop();
+});
+
+it("clears HTTP deadlines on disposal even if an aborted request never settles", async () => {
+  const scope = effectScope();
+  const d = scope.run(() => useDictation(vi.fn(), vi.fn(), { partial: () => new Promise(() => {}) }))!;
+  await d.toggle();
+  await vi.advanceTimersByTimeAsync(2500);
+  scope.stop();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("starts the elapsed clock when capture is ready instead of including setup delay", async () => {
+  streaming();
+  let ready!: () => void;
+  vi.stubGlobal("AudioContext", class extends AudioContextMock {
+    audioWorklet = { addModule: () => new Promise<void>((resolve) => { ready = resolve; }) };
+    destination = {};
+  });
+  const scope = effectScope();
+  const d = scope.run(() => useDictation(vi.fn(), vi.fn()))!;
+  const starting = d.toggle();
+  await Promise.resolve();
+  await vi.advanceTimersByTimeAsync(1000);
+  ready();
+  await starting;
+  expect(d.elapsedMs.value).toBe(0);
+  await vi.advanceTimersByTimeAsync(100);
+  expect(d.elapsedMs.value).toBeLessThan(150);
+  scope.stop();
 });

@@ -93,10 +93,36 @@ watch(draft, async (value) => {
   }
 });
 const auth = useAuthStore();
+const dictationBase = ref<string | null>(null);
+let dictationCompleted = false;
+const draftLocked = computed(() => dictationBase.value !== null);
+function applyDictation(text: string): void {
+  if (dictationBase.value === null) return;
+  const base = dictationBase.value;
+  draft.value = !text ? base : base ? `${base}\n${text}` : text;
+  void nextTick(autoGrow);
+}
+function finishDictation(text: string): void {
+  applyDictation(text);
+  dictationCompleted = true;
+  dictationBase.value = null;
+  void nextTick(autoGrow);
+}
+function restoreDictationDraft(): void {
+  if (dictationBase.value === null) return;
+  draft.value = dictationBase.value;
+  dictationBase.value = null;
+  dictationAnnouncement.value = "Dictation cancelled. Original draft restored.";
+  void nextTick(autoGrow);
+}
 const { state: dictationState, error: dictationError, supported: dictationSupported,
-  requesting: requestingMic, levels: dictationLevels, elapsedMs: dictationElapsed,
-  toggle: toggleDictation, cancel: cancelDictation } = useDictation(insertText);
-const dictationActive = computed(() => dictationState.value === "recording" || dictationState.value === "transcribing");
+  requesting: requestingMic, liveStatus, levels: dictationLevels, elapsedMs: dictationElapsed,
+  toggle: toggleDictation, cancel: cancelDictation } = useDictation(finishDictation, undefined, {
+    onStart: () => { dictationBase.value = draft.value; dictationCompleted = false; extraToolsOpen.value = false; void nextTick(autoGrow); },
+    onPartial: applyDictation,
+    onCancel: restoreDictationDraft,
+  });
+const dictationActive = computed(() => draftLocked.value);
 const dictationTime = computed(() => {
   const seconds = Math.floor(dictationElapsed.value / 1000);
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -104,11 +130,12 @@ const dictationTime = computed(() => {
 const dictationAnnouncement = ref("");
 watch(dictationState, (state, previous) => {
   if (state === "recording") extraToolsOpen.value = false;
-  if (state === "recording") dictationAnnouncement.value = "Recording started. Press Stop dictation to finish. Maximum 2 minutes 30 seconds.";
+  if (state === "recording") dictationAnnouncement.value = `Recording started. Press Stop dictation to finish. Maximum 2 minutes 30 seconds.${liveStatus.value ? ` ${liveStatus.value}` : ""}`;
   else if (state === "transcribing") dictationAnnouncement.value = "Recording stopped. Transcribing…";
   else if (previous === "recording") dictationAnnouncement.value = "Recording cancelled.";
-  else if (previous === "transcribing") dictationAnnouncement.value = state === "idle" ? "Dictation finished." : "Dictation stopped.";
+  else if (previous === "transcribing") dictationAnnouncement.value = state === "idle" && dictationCompleted ? "Dictation finished." : "Dictation stopped.";
 });
+watch(liveStatus, (status) => { if (status) dictationAnnouncement.value = `${dictationState.value === "recording" ? "Recording. " : ""}${status}`; });
 watch(() => auth.account?.id, cancelDictation);
 watch(() => props.conversationId, cancelDictation);
 onDeactivated(cancelDictation);
@@ -121,7 +148,7 @@ const {
 
 const isCommand = computed(() => draft.value.trimStart().startsWith("/"));
 const canSend = computed(
-  () => !reading.value && (draft.value.trim() !== "" || (ready.value.length > 0 && !isCommand.value)),
+  () => !draftLocked.value && !reading.value && (draft.value.trim() !== "" || (ready.value.length > 0 && !isCommand.value)),
 );
 const placeholder = computed(() => {
   if (draft.value === "" && props.suggestion) return props.suggestion;
@@ -187,6 +214,7 @@ watch(lookingUpTemplate, (on) => {
 /** Commands matching what's typed, while still on "/<capability> <command>"
  * (suggestions stop once parameters are being typed). */
 const suggestions = computed<Suggestion[]>(() => {
+  if (draftLocked.value) return [];
   const typed = draft.value;
   if (paramContext.value) {
     const { fields, prefix } = paramContext.value;
@@ -246,6 +274,7 @@ watch(highlighted, () => {
 });
 
 function complete(suggestion: Suggestion): void {
+  if (draftLocked.value) return;
   if (suggestion.replaceFrom !== undefined) {
     // "key=" stays open for its value; a finished "key=value" is followed by a space.
     draft.value = `${draft.value.slice(0, suggestion.replaceFrom)}${suggestion.text}${suggestion.text.endsWith("=") ? "" : " "}`;
@@ -269,6 +298,7 @@ function complete(suggestion: Suggestion): void {
 
 /** The command form was submitted or closed: its text replaces the draft. */
 function setDraft(text: string): void {
+  if (draftLocked.value) return;
   draft.value = text;
   void nextTick(() => {
     focus();
@@ -277,7 +307,7 @@ function setDraft(text: string): void {
 }
 
 function focus(): void {
-  if (listMode.value) listEditor.value?.focus();
+  if (listMode.value && !draftLocked.value) listEditor.value?.focus();
   else textarea.value?.focus();
 }
 
@@ -344,7 +374,7 @@ watch(
 
 /** Grow with the content; CSS max-height caps it, then it scrolls. */
 function autoGrow(): void {
-  if (listMode.value || !textarea.value) return;
+  if ((listMode.value && !draftLocked.value) || !textarea.value) return;
   growToContent(textarea.value);
 }
 
@@ -365,6 +395,11 @@ function submit(): void {
 /** Enter sends, Shift+Enter is a newline. isComposing: never send while an
  * IME (Japanese/Chinese input) is still composing a character. */
 function onKeydown(event: KeyboardEvent): void {
+  if (draftLocked.value) {
+    if (event.key === "Escape") { event.preventDefault(); cancelDictation(); }
+    else if (event.key === "Enter") event.preventDefault();
+    return;
+  }
   const open = suggestions.value.length > 0;
   // The predicted next question: Tab on an empty box takes it.
   if (
@@ -452,10 +487,10 @@ function onKeydown(event: KeyboardEvent): void {
       Earlier question {{ recallIndex + 1 }} of {{ history.length }} · ↑ older · ↓ newer
     </p>
     <span :id="messageLabelId" class="message-label">Message</span>
-    <div :class="['box', { dragging }]">
+    <div :class="['box', { dragging, 'draft-locked': draftLocked }]">
       <input ref="fileInput" type="file" multiple hidden @change="onPick" />
       <ListComposer
-        v-if="listMode"
+        v-if="listMode && !draftLocked"
         ref="listEditor"
         v-model="draft"
         :aria-labelledby="messageLabelId"
@@ -470,16 +505,18 @@ function onKeydown(event: KeyboardEvent): void {
         ref="textarea"
         :aria-labelledby="messageLabelId"
         v-model="draft"
+        :readonly="draftLocked"
+        :aria-readonly="draftLocked"
         rows="1"
         :placeholder="placeholder"
         @input="onInput"
         @keydown="onKeydown"
-        @paste="onPaste"
+        @paste="draftLocked ? $event.preventDefault() : onPaste($event)"
       />
       <div class="tools" :class="{ dictating: dictationActive }">
         <div ref="toolbox" class="toolbox" @keydown.esc.stop.prevent="extraToolsOpen = false; moreToolsButton?.focus()">
-        <button ref="moreToolsButton" type="button" class="attach more-tools" :aria-label="dictationActive ? 'Attach files' : 'More message tools'" :aria-expanded="dictationActive ? undefined : extraToolsOpen" :aria-controls="dictationActive ? undefined : extraToolsId" @click="dictationActive ? fileInput?.click() : extraToolsOpen = !extraToolsOpen">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+        <button ref="moreToolsButton" type="button" class="attach more-tools" :aria-label="dictationActive ? 'Cancel dictation' : 'More message tools'" :aria-expanded="dictationActive ? undefined : extraToolsOpen" :aria-controls="dictationActive ? undefined : extraToolsId" @click="dictationActive ? cancelDictation() : extraToolsOpen = !extraToolsOpen">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path :d="dictationActive ? 'M6 6l12 12M18 6 6 18' : 'M12 5v14M5 12h14'" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
         </button>
         <div :id="extraToolsId" class="extra-tools" :class="{ open: extraToolsOpen, dictating: dictationActive }">
         <button v-if="auth.hasPermission('files.upload')" type="button" class="attach" title="Attach files (text, code, PDF, Word, Excel)" @click="fileInput?.click(); extraToolsOpen = false">
@@ -572,11 +609,13 @@ function onKeydown(event: KeyboardEvent): void {
     </div>
     <p v-if="dictationError" class="dictation-error" role="alert">{{ dictationError }}</p>
     <p class="dictation-status sr-only" role="status">{{ dictationAnnouncement }}</p>
-    <p class="keys">Enter to send · Shift+Enter for a new line or next list item</p>
+    <p class="keys" :class="{ 'locked-hint': draftLocked }">{{ draftLocked ? (liveStatus || 'Draft locked during dictation · Cancel to restore') : 'Enter to send · Shift+Enter for a new line or next list item' }}</p>
   </form>
 </template>
 
 <style scoped>
+.draft-locked textarea { color: var(--muted); cursor: default; }
+.keys.locked-hint { display: block; color: var(--muted); }
 .independent.on { color: var(--accent); }
 .independent:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button.dictation { min-width: 44px; min-height: 44px; }
@@ -872,6 +911,7 @@ textarea {
   .round { width: 44px; height: 44px; }
   .attach { width: 44px; min-height: 44px; border-radius: var(--radius-md); }
   .keys, .recall { display: none; }
+  .keys.locked-hint { position: absolute; bottom: 100%; left: 12px; right: 12px; margin: 0; font-size: 0.75em; }
   .tools :deep(.trigger), .tools :deep(.gear) { width: 44px; min-height: 44px; }
   .tools :deep(.mode-chip) { min-height: 44px; }
   .tools :deep(.mode-chip) { max-width: 140px; }
