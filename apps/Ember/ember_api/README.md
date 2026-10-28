@@ -21,9 +21,9 @@ private. Scribe applies its own shared stream capacity and account quota.
 
 Reverse proxies must preserve the original `Host` and browser `Origin`, forward
 WebSocket `Upgrade` and `Connection` headers, and allow at least 270 seconds for
-the connection. Configure Uvicorn to trust forwarded protocol headers only from
-the deployed reverse proxy so the WebSocket scope correctly reports `wss` for an
-HTTPS browser origin. Ember compares both origin scheme and authority; rewriting
+the connection. The security middleware reads `X-Forwarded-Proto` only from a
+`trusted_proxies` peer (as for HTTP) and applies the IP allow/deny lists to
+WebSocket handshakes, so an HTTPS browser origin behind the proxy is accepted. Ember compares both origin scheme and authority; rewriting
 the host or losing the HTTPS scheme causes the handshake to be refused. Keep the
 internal Scribe URL and token on ember_api; the browser connects only to Ember.
 

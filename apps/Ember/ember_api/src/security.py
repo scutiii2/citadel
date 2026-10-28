@@ -114,7 +114,7 @@ class SecurityMiddleware:
         self._headers = security_headers(settings)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
+        if scope["type"] not in ("http", "websocket"):
             await self.app(scope, receive, send)
             return
 
@@ -124,7 +124,14 @@ class SecurityMiddleware:
         state["https"] = self._resolver.is_https(scope)
 
         if self._filter.active and not self._filter.allows(client_ip):
+            if scope["type"] == "websocket":
+                await send({"type": "websocket.close", "code": 1008})
+                return
             await self._send_json(send, 403, {"detail": "Access from this address is not allowed"})
+            return
+
+        if scope["type"] == "websocket":
+            await self.app(scope, receive, send)
             return
 
         async def send_with_headers(message: Message) -> None:
