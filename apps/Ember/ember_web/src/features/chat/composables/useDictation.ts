@@ -1,6 +1,6 @@
 import { computed, onScopeDispose, ref } from "vue";
 import { attachmentsClient, type DictationResult } from "../../../api/files/AttachmentsClient";
-import { LiveDictation, type DictationOptions } from "./liveDictation";
+import { LiveDictation, type DictationOptions, type LiveMode } from "./liveDictation";
 
 type DictationState = "idle" | "recording" | "transcribing" | "error";
 
@@ -14,6 +14,7 @@ export function useDictation(
   const error = ref("");
   const requesting = ref(false);
   const liveStatus = ref("");
+  const liveMode = ref<LiveMode | "">("");
   let live: LiveDictation | undefined;
   let ownsDraft = false;
   const levels = ref<number[]>(Array(24).fill(0));
@@ -94,6 +95,7 @@ export function useDictation(
     if (ownsDraft) options.onCancel?.();
     ownsDraft = false;
     liveStatus.value = "";
+    liveMode.value = "";
     if (recorder) {
       recorder.onstop = null;
       recorder.ondataavailable = null;
@@ -135,6 +137,7 @@ export function useDictation(
     ownsDraft = true;
     options.onStart?.();
     liveStatus.value = "";
+    liveMode.value = "";
     requesting.value = true;
     error.value = "";
     try {
@@ -162,6 +165,7 @@ export function useDictation(
           ownsDraft = false;
           live = undefined;
           liveStatus.value = "";
+    liveMode.value = "";
           state.value = "idle";
         })().catch((cause: unknown) => {
           if (run === generation) fail(cause instanceof Error ? cause.message : "Scribe could not transcribe the recording.");
@@ -171,7 +175,7 @@ export function useDictation(
       live = new LiveDictation(options, (text) => { liveStatus.value = text; }, () => {
         if (recorder?.state === "recording") recorder.requestData();
         return new Blob(chunks, { type: "audio/webm" });
-      });
+      }, (mode) => { liveMode.value = mode; });
       // Do not advertise recording until PCM capture is connected. Otherwise a
       // successful stream would miss words spoken while the worklet downloads.
       await live.start(audioContext, source);
@@ -192,5 +196,5 @@ export function useDictation(
   }
 
   onScopeDispose(cancel);
-  return { state, error, supported, requesting, liveStatus, levels, elapsedMs, toggle, cancel };
+  return { state, error, supported, requesting, liveStatus, liveMode, levels, elapsedMs, toggle, cancel };
 }
