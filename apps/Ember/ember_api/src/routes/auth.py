@@ -19,7 +19,7 @@ from src.deps import (
     get_settings,
 )
 from src.models import Account
-from src.security import client_ip
+from src.security import client_ip, request_is_https
 from src.services.auth_service import AuthService
 from src.services.device_service import DeviceService, DeviceSignals, describe
 from src.services.email_service import EmailDeliveryError, EmailSender
@@ -88,7 +88,9 @@ class EmailSentOut(BaseModel):
     sent: bool
 
 
-async def _start_session(response: Response, account: Account, sessions: SessionService, settings: Settings) -> None:
+async def _start_session(
+    request: Request, response: Response, account: Account, sessions: SessionService, settings: Settings
+) -> None:
     token = await sessions.create(account)
     response.set_cookie(
         settings.session_cookie_name,
@@ -96,7 +98,7 @@ async def _start_session(response: Response, account: Account, sessions: Session
         max_age=settings.session_hours * 3600,
         httponly=True,  # page JavaScript can never read it
         samesite="strict",  # never sent on requests started by other sites
-        secure=settings.cookie_secure,
+        secure=settings.cookie_secure or request_is_https(request),
         path="/",
     )
 
@@ -158,7 +160,7 @@ async def login(
         # One message for every failure reason, so usernames can't be probed.
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid username or password")
 
-    await _start_session(response, account, sessions, settings)
+    await _start_session(request, response, account, sessions, settings)
     await logs.action(account, "auth.login", f"Logged in from {ip_address}")
     if settings.security.fingerprint_enabled:
         device = device_signals(request)
@@ -193,7 +195,9 @@ async def logout(
         await sessions.revoke(token)
         if account is not None:
             await logs.action(account, "auth.logout", "Logged out")
-    response.delete_cookie(settings.session_cookie_name, path="/")
+    response.delete_cookie(
+        settings.session_cookie_name, path="/", secure=settings.cookie_secure or request_is_https(request)
+    )
 
 
 @router.get("/me")
@@ -204,6 +208,7 @@ async def me(account: Account = Depends(current_account), settings: Settings = D
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     body: RegisterRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db_session),
     otp: OtpService = Depends(get_otp_service),
@@ -225,7 +230,7 @@ async def register(
 
     # Logged in even if the email fails: the account is committed, and
     # resend lets the user retry once SMTP works (same as chat_app).
-    await _start_session(response, account, sessions, settings)
+    await _start_session(request, response, account, sessions, settings)
     await logs.action(account, "auth.register", "Registered with an invite code")
     if not settings.require_email_verification:
         return RegisterOut(account=AccountOut.of(account, settings), verification_email_sent=False)
