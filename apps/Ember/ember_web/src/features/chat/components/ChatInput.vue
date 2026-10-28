@@ -116,7 +116,7 @@ function restoreDictationDraft(): void {
   void nextTick(autoGrow);
 }
 const { state: dictationState, error: dictationError, supported: dictationSupported,
-  requesting: requestingMic, liveStatus, levels: dictationLevels, elapsedMs: dictationElapsed,
+  requesting: requestingMic, liveStatus, liveMode, levels: dictationLevels, elapsedMs: dictationElapsed,
   toggle: toggleDictation, cancel: cancelDictation } = useDictation(finishDictation, undefined, {
     onStart: () => { dictationBase.value = draft.value; dictationCompleted = false; extraToolsOpen.value = false; void nextTick(autoGrow); },
     onPartial: applyDictation,
@@ -609,13 +609,15 @@ function onKeydown(event: KeyboardEvent): void {
     </div>
     <p v-if="dictationError" class="dictation-error" role="alert">{{ dictationError }}</p>
     <p class="dictation-status sr-only" role="status">{{ dictationAnnouncement }}</p>
-    <p class="keys" :class="{ 'locked-hint': draftLocked }">{{ draftLocked ? (liveStatus || 'Draft locked during dictation · Cancel to restore') : 'Enter to send · Shift+Enter for a new line or next list item' }}</p>
+    <p class="keys" :class="{ 'locked-hint': draftLocked }"><span v-if="draftLocked && liveMode" class="live-badge" :class="liveMode" data-testid="live-mode">{{ liveMode === 'live' ? 'Live' : liveMode === 'periodic' ? 'Updating every few seconds' : 'Transcribes on stop' }}</span> {{ draftLocked ? (liveStatus || 'Draft locked during dictation · Cancel to restore') : 'Enter to send · Shift+Enter for a new line or next list item' }}</p>
   </form>
 </template>
 
 <style scoped>
 .draft-locked textarea { color: var(--muted); cursor: default; }
 .keys.locked-hint { display: block; color: var(--muted); }
+.live-badge { display: inline-block; padding: 0 8px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--border); font-weight: 600; color: var(--text); }
+.live-badge.live { box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent); }
 .independent.on { color: var(--accent); }
 .independent:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button.dictation { min-width: 44px; min-height: 44px; }

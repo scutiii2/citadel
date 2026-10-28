@@ -186,11 +186,13 @@ it("falls back to rolling HTTP without overlapping requests and preserves upload
   const transcribe = vi.fn().mockResolvedValue({ text: "final", duration_s: 3 });
   const d = scope.run(() => useDictation(insert, transcribe, { onPartial, partial }))!;
   await d.toggle();
+  expect(d.liveMode.value).toBe("periodic");
   await vi.advanceTimersByTimeAsync(2500);
   expect(onPartial).toHaveBeenCalledWith("live");
   partial.mockRejectedValueOnce(new Error("unavailable"));
   await vi.advanceTimersByTimeAsync(2500);
   expect(d.liveStatus.value).toContain("unavailable");
+  expect(d.liveMode.value).toBe("stop");
   expect(d.state.value).toBe("recording");
   await d.toggle();
   await vi.waitFor(() => expect(insert).toHaveBeenCalledWith("final"));

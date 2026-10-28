@@ -44,6 +44,7 @@ for (const width of [1280, 768, 375]) {
     await expect(page.locator(".dictation-status")).toContainText("Live text is unavailable", { timeout: 10000 });
     await expect(page.locator(".locked-hint")).toBeVisible();
     await expect(page.locator(".locked-hint")).toContainText("Live text is unavailable");
+    await expect(page.getByTestId("live-mode")).toHaveText("Transcribes on stop");
     let finishTranscribing!: () => void;
     const pending = new Promise<void>((resolve) => { finishTranscribing = resolve; });
     await page.route("**/api/attachments/dictate", async (route) => { await pending; await route.fallback(); });
@@ -105,6 +106,7 @@ for (const width of [1280, 768, 375]) {
         expect(partialCalls).toBeGreaterThan(0);
         await expect(page.locator(".dictation-status")).toContainText(/periodic|live|stream/i);
         await expect(page.locator(".locked-hint")).toBeVisible();
+        await expect(page.getByTestId("live-mode")).toHaveText("Updating every few seconds");
         await expect(page.locator(".locked-hint")).toContainText("periodic");
       }
       // No extra status row changes the composer geometry; the transcript may grow its field.

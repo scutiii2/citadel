@@ -197,6 +197,7 @@ describe("dictation feedback", () => {
     expect(wrapper.get(".dictation-status").text()).toContain("Recording");
     expect(wrapper.get(".dictation-status").text()).toContain("periodic");
     expect(wrapper.get(".locked-hint").text()).toContain("periodic");
+    expect(wrapper.get("[data-testid=live-mode]").text()).toBe("Updating every few seconds");
     vi.spyOn(performance, "now").mockReturnValue(performance.now() + 139000);
     await vi.advanceTimersByTimeAsync(100);
     expect(button.classes()).toContain("ending");

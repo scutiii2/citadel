@@ -1,5 +1,7 @@
 import { attachmentsClient, type DictationResult } from "../../../api/files/AttachmentsClient";
 
+export type LiveMode = "live" | "periodic" | "stop";
+
 export interface DictationOptions {
   onStart?: () => void;
   onPartial?: (text: string) => void;
@@ -26,12 +28,14 @@ export class LiveDictation {
   private options: DictationOptions;
   private status: (text: string) => void;
   private snapshot: () => Blob;
+  private onMode: (mode: LiveMode) => void;
 
   constructor(
     options: DictationOptions,
     status: (text: string) => void,
     snapshot: () => Blob,
-  ) { this.options = options; this.status = status; this.snapshot = snapshot; }
+    onMode: (mode: LiveMode) => void = () => {},
+  ) { this.options = options; this.status = status; this.snapshot = snapshot; this.onMode = onMode; }
 
   start(context?: AudioContext, source?: MediaStreamAudioSourceNode): Promise<void> {
     if (!context?.audioWorklet || !source || typeof AudioWorkletNode === "undefined") {
@@ -45,7 +49,7 @@ export class LiveDictation {
       this.socket = new WebSocket(url);
       this.deadline = setTimeout(() => this.fallback(), 5000);
       this.setupDeadline = setTimeout(() => this.fallback(), 5000);
-      this.socket.onopen = () => { clearTimeout(this.deadline); this.flush(); };
+      this.socket.onopen = () => { clearTimeout(this.deadline); this.onMode("live"); this.flush(); };
       this.socket.onclose = this.socket.onerror = () => this.fallback();
       this.socket.onmessage = (event) => {
         if (!this.active || this.mode !== "socket") return;
@@ -125,6 +129,7 @@ export class LiveDictation {
     this.mode = "http";
     this.releaseSocket();
     if (this.finishing) { this.resolveFinal?.(null); return; }
+    this.onMode("periodic");
     this.status("Live text uses periodic updates.");
     this.interval = setInterval(() => { void this.tick(); }, 2500);
   }
@@ -144,6 +149,7 @@ export class LiveDictation {
       if (!this.active || this.finishing) return;
       this.mode = "upload";
       clearInterval(this.interval);
+      this.onMode("stop");
       this.status("Live text is unavailable. Transcribes on stop.");
     } finally {
       clearTimeout(this.requestDeadline);
