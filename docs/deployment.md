@@ -192,6 +192,32 @@ under compose.
 Give the box a fixed IP (a DHCP reservation in the router) so the links keep working. If your version has no external
 link option, use a browser bookmark.
 
+### Public access with Tailscale Funnel
+
+Funnel publishes Ember on `https://<box>.<tailnet>.ts.net/` without a Tailscale client on the viewing device. Only
+`ember_web` (5173) goes public; keep `ember_admin` (5176) on the LAN. Public signup must stay off, because anyone with
+the URL can reach the login page.
+
+1. In the Tailscale admin console, give the box the `funnel` attribute (`nodeAttrs` in the access controls) and turn on
+   MagicDNS and HTTPS. The first `funnel` command prints an approval link if something is missing.
+2. Set `"security": {"rate_limit": {"scope": "account"}}` in the ember_api config (`docker/configs/ember_api/app.json`).
+   Behind Funnel every client reaches nginx through the Docker bridge, so the IP-based lockout would count all users as
+   one address. With the default `"both"`, five wrong passwords from anyone would lock everyone out.
+3. Rebuild and start Funnel. The `docker exec tailscale` prefix is for the ZimaOS Tailscale app; drop it if Tailscale
+   runs on the host:
+
+   ```bash
+   docker compose up -d --build ember_api ember_web
+   docker exec tailscale tailscale funnel --bg 5173
+   docker exec tailscale tailscale funnel status
+   ```
+
+   Turn it off with `docker exec tailscale tailscale funnel --https=443 off`.
+
+Funnel sends `X-Forwarded-Proto: https` for TLS requests. nginx passes it on, and ember_api adds `Secure` to the session
+cookie when the request came through a `trusted_proxies` peer with that header. Plain-HTTP LAN access at
+`http://<zima-ip>:5173` keeps working, with no `Secure` flag, so leave `cookie_secure` at `false`.
+
 ## 3. Server Manager
 
 The Server Manager capability (chat id `server`) lists, starts, stops and restarts Docker containers and reads their
@@ -239,3 +265,4 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 | Port already in use | Another app uses 5173 or 5176. Change the left side of the port mapping. |
 | `permission denied` on the Docker socket | The container cannot read `/var/run/docker.sock`. Check its owner and mode on the host. |
 | Capability toggle reverted after a rebuild | It was changed inside the container. Edit `config_capabilities.json` in the repo. |
+| Funnel page loads but big files stall or time out | Check `docker inspect tailscale --format "{{.RestartCount}}"`. The ZimaOS Tailscale app's entrypoint (`tailscaled ... & sleep 10; tailscale web --listen 0.0.0.0:5252`) can exit after 10 s and restart the container in a loop. Append `; wait` to that entrypoint line in `/var/lib/casaos/apps/tailscale/docker-compose.yml` and run `docker compose up -d` there. A CasaOS app update may overwrite it. |

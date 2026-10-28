@@ -506,7 +506,8 @@ automatic reports. Add manual limits later if abuse appears.
 ## Security model
 
 - **Sessions:** a random 256-bit token in an `HttpOnly`, `SameSite=Strict`
-  cookie (`Secure` when `cookie_secure` is on). The database stores only its
+  cookie (`Secure` when `cookie_secure` is on, or when a `trusted_proxies` peer
+  sends `X-Forwarded-Proto: https`, as Tailscale Funnel does). The database stores only its
   SHA-256, with an expiry (`session_hours`); logout deletes the row.
 - **Passwords:** werkzeug hashes, checked on a worker thread so hashing
   never blocks the event loop. Unknown usernames are checked against a dummy
@@ -656,6 +657,10 @@ calls (in each call's `_meta`), so mcp_server sees who asked either way.
 - **Client IP** (`src/security.py`): the socket address, or the last
   `X-Forwarded-For` hop when the peer is a `trusted_proxies` entry (Vite's
   loopback proxy, which sets it). Used for the audit, rate limit and IP filter.
+  `X-Forwarded-Proto` is honoured under the same rule and sets the cookie's
+  `Secure` flag. Behind a proxy that hides client addresses (the Docker
+  deployment behind Funnel), set `security.rate_limit.scope` to `"account"` so
+  one shared address cannot lock every user out.
 - **IP filter:** optional allow/deny lists, `403` on every route.
 - **Headers:** nosniff, `X-Frame-Options: DENY`, `Referrer-Policy:
   no-referrer`, `default-src 'none'` CSP on every response; HSTS when
