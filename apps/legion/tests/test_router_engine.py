@@ -1,5 +1,5 @@
 from src.agents.roles.router.router_contract import RouteRequest, RouteCandidate, RouterPolicy
-from src.agents.roles.router.router_engine import RouterEngine
+from src.agents.roles.router.router_engine import RouterEngine, _batches
 from src.providers.decision import settings
 from src.providers.decision.contract import DecisionError, GatewayResult
 from tests.decision_fakes import Fake as FakeGateway
@@ -38,12 +38,87 @@ def test_policy_isolated_and_uncertainty_never_becomes_execution():
     assert settings.settings() is before
 
 
-def test_large_roster_abstains_only_agent():
-    engine, _ = router()
-    req = request().model_copy(update={"candidates": [RouteCandidate(id=f"a{i}", label="A") for i in range(10)]})
-    response = engine.route(req, RouterPolicy())
-    assert response.agent.uncertain and response.agent.reason == "too_many_candidates"
-    assert not response.size.uncertain
+class Weighted:
+    """Remote gateway whose answers come from fixed per-option probabilities (unlisted: .01, `none`: .5)."""
+    id, local = "jev", False
+
+    def __init__(self, weights):
+        self.weights, self.requests = weights, []
+
+    def available(self):
+        return True
+
+    def ask(self, request, timeout=None):
+        self.requests.append(request)
+        answers = {}
+        for qid, spec in request.questions.items():
+            odds = {o: self.weights.get(o, .5 if o == "none" else .01) for o in spec["criteria"]}
+            pick = max(odds, key=odds.get)
+            answers[qid] = {"type": "choice", "choice": pick, "probabilities": odds,
+                            "answer_confidence": odds[pick], "uncertain": odds[pick] < .25}
+        return GatewayResult(answers, 5, "jev-fixture")
+
+    def agent_questions(self):
+        return [set(r.questions["agent"]["criteria"]) for r in self.requests if "agent" in r.questions]
+
+
+def roster(count):
+    return request().model_copy(update={"candidates": [RouteCandidate(id=f"a{i}", label="A") for i in range(count)]})
+
+
+def route_weighted(weights, count):
+    jev = Weighted(weights)
+    engine = RouterEngine(gateways={"laya": FakeGateway("laya", True, .9, available=False), "jev": jev})
+    return engine.route(roster(count), RouterPolicy(strategy="jev-only")), jev
+
+
+def test_batches_are_equal_or_differ_by_one():
+    assert [len(b) for b in _batches(list(range(9)))] == [9]
+    assert [len(b) for b in _batches(list(range(10)))] == [5, 5]
+    assert [len(b) for b in _batches(list(range(11)))] == [6, 5]
+    assert [len(b) for b in _batches(list(range(19)))] == [7, 6, 6]
+
+
+def test_long_roster_prunes_batches_then_picks_among_survivors_and_reports_near_tie():
+    response, jev = route_weighted({"a3": .8, "a8": .7, "a7": .2}, 11)
+    rounds = jev.agent_questions()
+    assert sorted(len(q) for q in rounds[:2]) == [6, 7] and len(rounds) == 3
+    assert rounds[-1] == {"a3", "a7", "a8", "none"}
+    assert response.agent.choice == "a3" and not response.agent.uncertain
+    assert response.alternatives == ["a8"]
+    assert response.size.answered_by == "jev"
+
+
+def test_clear_winner_has_no_alternatives():
+    response, _ = route_weighted({"a3": .9, "a8": .1}, 11)
+    assert response.agent.choice == "a3" and response.alternatives == []
+
+
+def test_batches_that_all_pick_none_leave_the_agent_to_the_general_assistant():
+    response, jev = route_weighted({"none": .9}, 11)
+    assert response.agent.reason == "no_specialist" and response.agent.uncertain and response.agent.choice is None
+    assert len(jev.agent_questions()) == 2 and response.size.answered_by == "jev"
+
+
+def test_round_that_prunes_nothing_keeps_only_each_batch_pick():
+    response, jev = route_weighted({**{f"a{i}": .3 for i in range(10)}, "none": .1}, 10)
+    assert jev.agent_questions()[-1] == {"a0", "a5", "none"}
+    assert response.agent.choice == "a0" and response.alternatives == ["a5"]
+
+
+def test_rounds_repeat_while_more_than_nine_remain():
+    flat = {**{f"a{i}": .3 for i in range(14)}, "none": .1}
+    response, jev = route_weighted(flat, 28)
+    rounds = jev.agent_questions()
+    assert [len(q) for q in rounds] == [8, 8, 8, 8, 8, 8, 3]
+    assert response.agent.choice == "a0" and response.alternatives == ["a7"]
+
+
+def test_short_roster_is_one_round_and_reports_a_near_tie():
+    jev = Weighted({"a1": .9, "a2": .8})
+    engine = RouterEngine(gateways={"laya": FakeGateway("laya", True, .9, available=False), "jev": jev})
+    response = engine.route(roster(3), RouterPolicy(strategy="jev-only"))
+    assert len(jev.requests) == 1 and response.agent.choice == "a1" and response.alternatives == ["a2"]
 
 
 def test_subject_over_remote_limit_does_not_call_any_gateway():

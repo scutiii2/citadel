@@ -317,26 +317,14 @@ def test_repository_agent_roster_is_valid():
     assert any(spec.entry and spec.enabled for spec in specs)
 
 
-def test_app_monitor_has_existing_tools_without_stop_or_restart_access():
+def test_retired_agents_are_gone_and_merged_tools_are_covered():
     app_dir = Path(__file__).resolve().parents[1]
-    spec = agent_spec.load_file(app_dir / "agents" / "scheduler.json")
-    tool_path = app_dir.parent / "armory" / "src" / "capabilities" / "server_manager" / "tool.py"
-    names = [
-        node.name for node in ast.parse(tool_path.read_text(encoding="utf-8")).body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("tool_")
-    ]
-    ticket_tool_path = app_dir.parent / "armory" / "src" / "capabilities" / "tickets" / "tool.py"
-    names.extend(
-        node.name for node in ast.parse(ticket_tool_path.read_text(encoding="utf-8")).body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("tool_")
-    )
-
-    assert spec.tools.unmatched(names) == []
-    assert {name for name in names if spec.tools.allows(name)} == {
-        "tool_srv_listApps", "tool_srv_startApp", "tool_ticket_createTicket",
-    }
-    assert not spec.tools.allows("tool_srv_stopApp")
-    assert not spec.tools.allows("tool_srv_restartApp")
+    for retired in ("scheduler", "planner", "usage-analyst"):
+        assert not (app_dir / "agents" / f"{retired}.json").exists()
+    analyst = agent_spec.load_file(app_dir / "agents" / "data-analyst.json")
+    ops = agent_spec.load_file(app_dir / "agents" / "server-ops.json")
+    assert analyst.tools.allows("tool_usage_summary")
+    assert ops.tools.allows("tool_srv_startApp") and ops.tools.allows("tool_srv_listApps")
 
 
 def test_reviewer_cannot_use_memory_tools_but_keeps_everything_else():

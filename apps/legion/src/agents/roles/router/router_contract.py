@@ -94,6 +94,7 @@ class RouteResponse(Message):
     agent: DecisionOutcome = Field(default_factory=DecisionOutcome)
     size: DecisionOutcome = Field(default_factory=DecisionOutcome)
     model_tier: Tier | None = None
+    alternatives: list[str] = Field(default_factory=list, max_length=9)
     policy_revision: str
     usage: list[VoterUsage] = Field(default_factory=list)
     trace: list[dict] | None = None

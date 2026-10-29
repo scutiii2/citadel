@@ -184,10 +184,12 @@ not its model (`ember`, `server-ops`, `reviewer`). Exactly one enabled file
 sets `entry: true`. Add
 more specialists as extra files.
 
-`scheduler.json` now defines **App Monitor** (same `scheduler` id and port 9114). It can list managed Docker apps
-and start an app when explicitly requested, which also starts its owner notifications through ServerWatcher.
-It reports watched status; URL/port monitoring and recurring schedules are unavailable. Stop/restart requests
-go to `server-ops`. Restart the supervisor to load the updated agent definition.
+`server-ops` also covers app monitoring (the former `scheduler` / App Monitor agent, port 9114, now removed). It reports
+watched status, and starting an app also starts its owner notifications through ServerWatcher. URL/port monitoring and
+recurring schedules are unavailable. `data-analyst` (label "Analyst") also answers token-usage questions through
+`tool_usage_summary` (the former `usage-analyst`, port 9108). The `planner` agent is retired: Ember plans with its own
+`update_plan` tool. An `agent:scheduler`, `agent:planner` or `agent:usage-analyst` entry in a user's saved agent switches no longer matches
+any agent. Restart the supervisor to load the updated definitions.
 
 The gateway for an agent comes from `llm.gateway` in `agents/<id>.json`.
 Omitted, it is the provider's default gateway (`claude` for anthropic, `gpt`
@@ -320,8 +322,10 @@ that brief, the latest user message verbatim, and the authorized specialist rost
 If the helper is unavailable, times out, or returns an unusable brief, routing uses
 up to 600 characters of the previous assistant message instead. First messages
 need no summary call. Memory injection and full history are excluded from Router.
-Router runs the same flow as Triage Assistant: Laya English, typed-decisions,
-option narrowing and optional Jev. It returns independent agent and size decisions.
+The tracked `router.json` uses strategy `jev-only`, so the routing brief and the latest
+user message go to TypeSafe on every routed turn; set `llm.strategy` back to `both` or
+`laya-only` (through the Agents editor or the file) to keep routing text on this machine. It returns
+independent agent and size decisions.
 An uncertain agent choice stays with Ember; uncertain size uses the selected
 agent's default model. Explicit tiers and target limits still apply. Delegation
 requiring approval remains Ember's responsibility.
@@ -338,9 +342,25 @@ fallback. Readiness summaries report `local_status` `loaded` when the service an
 `unavailable` when it is missing or unreachable, and flag missing fallback credentials.
 
 Defaults: 10-second overall deadline (1-30 configurable), 3-second remote timeout,
-4,000 local subject characters, 16,000 remote subject characters, and at most nine
-specialists plus `none`. Oversized rosters leave agent selection to Ember while
-size selection may continue. Inputs are not silently truncated to fit. Short
+4,000 local subject characters and 16,000 remote subject characters. Inputs are not
+silently truncated to fit.
+
+One agent question carries at most nine specialists plus `none`. A longer roster is
+narrowed in rounds (`RouterEngine._narrow`): the candidates are split into the fewest
+batches of equal size (sizes differ by at most one) and each batch is asked in parallel
+with its own `none` option. A batch whose pick is `none` drops out whole. Otherwise it
+keeps every option whose probability is at least a quarter of its pick's. The survivors
+are pooled and, while more than nine remain, split and asked again; a round that prunes
+nothing keeps only each batch's pick, so rounds always shrink. The last round asks the
+survivors (at most nine) plus `none`, and the highest wins if settled. If every batch
+picked `none`, the agent choice stays with Ember (`no_specialist`). The size question runs
+alongside the first round. Pruning needs per-option probabilities; a gateway that reports
+only the pick's confidence gets an even split of the rest, which prunes little. Rounds share
+the overall deadline, so a timeout falls back to Ember.
+
+When the final round settles on an agent and a runner-up has at least 80% of the winner's
+probability, the response lists it in `alternatives`. The winner still receives the
+question; the routing step reads "Also close: ..." and the Router usage row carries the ids. Short
 follow-ups with history skip tier selection unless the summarizer supplies context.
 Tier mapping is tiny/everyday to
 light, large to standard, hardest to heavy. Thresholds remain the triage defaults,
