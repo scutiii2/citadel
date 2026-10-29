@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi.testclient import TestClient
+
+from src.services.account_agent_service import COLLECTION, AccountAgentService
 
 from tests.conftest import FakeAgent
 from tests.test_registration import as_admin
@@ -61,3 +65,32 @@ def test_an_agent_id_must_look_like_one(client: TestClient) -> None:
 
 def test_login_is_required(client: TestClient) -> None:
     assert client.get(URL).status_code == 401
+
+
+def stored(db_gateway, disabled: list[str]) -> AccountAgentService:
+    db_gateway.records[(COLLECTION, "u1")] = {"owner": "u1", "disabled": disabled}
+    return AccountAgentService(db_gateway, "u1")
+
+
+def test_retired_agents_are_left_out_of_the_read_and_dropped_on_the_next_write(db_gateway) -> None:
+    service = stored(db_gateway, ["planner", "reviewer", "scheduler"])
+    known = {"reviewer", "server-ops"}
+
+    assert asyncio.run(service.disabled(known)) == ["reviewer"]
+    assert asyncio.run(service.set_enabled("server-ops", False, known)) == ["reviewer", "server-ops"]
+    assert db_gateway.records[(COLLECTION, "u1")]["disabled"] == ["reviewer", "server-ops"]
+
+
+def test_a_no_op_toggle_still_cleans_retired_ids(db_gateway) -> None:
+    service = stored(db_gateway, ["planner", "reviewer"])
+
+    assert asyncio.run(service.set_enabled("reviewer", False, {"reviewer"})) == ["reviewer"]
+    assert db_gateway.records[(COLLECTION, "u1")]["disabled"] == ["reviewer"]
+
+
+def test_nothing_is_pruned_when_the_roster_is_unknown(db_gateway) -> None:
+    service = stored(db_gateway, ["planner", "reviewer"])
+
+    assert asyncio.run(service.disabled(set())) == ["planner", "reviewer"]
+    assert asyncio.run(service.set_enabled("reviewer", False, set())) == ["planner", "reviewer"]
+    assert asyncio.run(service.disabled()) == ["planner", "reviewer"]

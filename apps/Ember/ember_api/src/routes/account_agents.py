@@ -9,6 +9,8 @@ from pydantic import BaseModel
 
 from src.deps import current_account, get_db_gateway, get_log_writer
 from src.models import Account
+from src.routes.mcp import get_agent_directory
+from src.services.agent_directory import AgentDirectory
 from src.services.account_agent_service import AccountAgentService, TooManyItems
 from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.log_service import LogWriter
@@ -38,9 +40,12 @@ class AccountAgentsOut(BaseModel):
 
 
 @router.get("")
-async def read_account_agents(service: AccountAgentService = Depends(get_service)) -> AccountAgentsOut:
+async def read_account_agents(
+    service: AccountAgentService = Depends(get_service),
+    directory: AgentDirectory = Depends(get_agent_directory),
+) -> AccountAgentsOut:
     try:
-        return AccountAgentsOut(disabled=await service.disabled())
+        return AccountAgentsOut(disabled=await service.disabled(await directory.known_ids()))
     except DbGatewayError as error:
         raise _unavailable() from error
 
@@ -51,11 +56,12 @@ async def set_account_agent(
     agent_id: str = Path(pattern=KEY_PATTERN),
     account: Account = Depends(current_account),
     service: AccountAgentService = Depends(get_service),
+    directory: AgentDirectory = Depends(get_agent_directory),
     logs: LogWriter = Depends(get_log_writer),
 ) -> AccountAgentsOut:
-    """Switches one agent on or off; returns the whole disabled list as stored."""
+    """Switches one agent on or off; returns the whole disabled list as stored. Retired agents' ids are dropped."""
     try:
-        disabled = await service.set_enabled(agent_id, body.enabled)
+        disabled = await service.set_enabled(agent_id, body.enabled, await directory.known_ids())
     except TooManyItems as error:
         raise HTTPException(status.HTTP_409_CONFLICT, "Too many agents switched off on this account") from error
     except DbGatewayError as error:

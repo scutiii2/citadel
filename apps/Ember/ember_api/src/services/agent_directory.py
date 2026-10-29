@@ -274,6 +274,12 @@ class AgentDirectory:
             or next((a for a in agents if a.id == LEGACY_ENTRY_ID), None)
         )
 
+    async def known_ids(self) -> set[str]:
+        """Ids of every agent ai_agent defines or runs. Empty when the definitions are not published
+        (or could not be fetched), so a caller never treats an agent as retired on a guess."""
+        defined = {d.id for d in await self._source.definitions()}
+        return defined | {a.id for a in await self.all()} if defined else set()
+
     async def find_by_provider(self, provider: str) -> AgentEntry | None:
         """A running agent whose agent file uses this LLM provider (e.g. "laya").
         None when none is running, or when the definitions are not published."""
