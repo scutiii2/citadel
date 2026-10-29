@@ -7,7 +7,7 @@
   "delegable": false,
   "llm": {
     "provider": "anthropic",
-    "gateway": "openrouter",
+    "gateway": "claude",
     "temperature": 0,
     "max_tokens": 100,
     "max_tool_rounds": 1,

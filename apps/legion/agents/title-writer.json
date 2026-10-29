@@ -7,11 +7,14 @@
   "delegable": false,
   "llm": {
     "provider": "anthropic",
-    "gateway": "openrouter",
+    "gateway": "omniroute",
     "temperature": 0,
     "max_tokens": 200,
     "max_tool_rounds": 1,
-    "max_tier": "light"
+    "max_tier": "light",
+    "fallback_gateways": [
+      "openrouter"
+    ]
   },
   "identity": "You write titles.",
   "persona": "",
