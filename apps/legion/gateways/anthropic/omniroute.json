@@ -2,19 +2,23 @@
   "label": "OmniRoute",
   "base_url": "{OMNIROUTE_BASE_URL}",
   "api_key": "{OMNIROUTE_API_KEY}",
-  "model": "free",
+  "model": "combo/standard",
   "models": {
     "light": {
-      "id": "free",
+      "id": "combo/light",
       "use_for": "lookups, extraction, short rewrites, simple formatting"
     },
     "standard": {
-      "id": "free",
+      "id": "combo/standard",
       "use_for": "most tasks"
     },
     "heavy": {
-      "id": "free",
+      "id": "combo/heavy",
       "use_for": "multi-step reasoning, hard code or data analysis"
+    },
+    "extreme": {
+      "id": "combo/extreme",
+      "use_for": "the hardest problems: deep research, large-scale refactors, long-horizon planning"
     }
   }
 }
