@@ -8,7 +8,7 @@ same usage rows) and its answer becomes the turn's answer, so the orchestrator's
 model never runs. No pick means the orchestrator answers as usual.
 
 Only specialists with tools of their own are offered (a tool-less one such as the
-planner is a helper the orchestrator chooses itself), and only when the turn needs
+reviewer is a helper the orchestrator chooses itself), and only when the turn needs
 no approval to delegate: with "ask" the orchestrator asks the user the usual way.
 A specialist that fails is reported, not retried: it may already have acted.
 The text sent to the classifier is the question and the last assistant message

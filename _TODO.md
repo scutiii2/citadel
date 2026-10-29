@@ -39,8 +39,8 @@ The capability exists at `apps/armory/src/capabilities/firecrawl/`, but its test
 The agents are implemented. These manual checks remain unverified:
 
 - **Email Assistant** (`email-assistant`, port 9112): paste an email and check its summary, triage and draft reply.
-- **Data Analyst** (`data-analyst`, port 9113): attach a CSV, ask for a total and a top 5, and check the results.
-- **App Monitor** (`scheduler`, port 9114): verify an explicitly requested app start shows `watched`, and a crash sends the original owner an email. URL/port checks and recurring schedules are unavailable.
+- **Analyst** (`data-analyst`, port 9113): attach a CSV, ask for a total and a top 5, and check the results. Also ask which agent used the most tokens this week (usage merged in).
+- **App monitoring** (now in `server-ops`): verify an explicitly requested app start shows `watched`, and a crash sends the original owner an email. URL/port checks and recurring schedules are unavailable.
 - **Ember routing**: check delegation across the specialist roster with Laya routing enabled.
 
 Optional follow-up features, not implemented:

@@ -180,9 +180,9 @@ caps in the repo's agent files (starting point, adjustable):
 
 | Agent | min_tier | max_tier |
 |-------|----------|----------|
-| pdf-assistant, scheduler, server-ops | none | `standard` |
-| researcher, data-analyst, repo-helper, log-analyst, vault-librarian, usage-analyst, email-assistant, triage-assistant | none | none |
-| reviewer, planner | `standard` | none |
+| pdf-assistant, server-ops | none | `standard` |
+| researcher, data-analyst, repo-helper, log-analyst, vault-librarian, email-assistant, triage-assistant | none | none |
+| reviewer | `standard` | none |
 
 (`ember` itself and Laya triage get no caps.)
 
