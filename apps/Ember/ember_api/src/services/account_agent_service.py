@@ -26,21 +26,29 @@ class AccountAgentService:
         self._store = store
         self._owner = owner_uid
 
-    async def disabled(self) -> list[str]:
+    async def _stored(self) -> set[str]:
         doc = await self._store.get(COLLECTION, self._owner) or {}
-        return sorted(set(doc.get("disabled", [])))
+        return set(doc.get("disabled", []))
 
-    async def set_enabled(self, agent_id: str, enabled: bool) -> list[str]:
-        """Switches one agent on or off and returns the whole disabled list. Read then
-        write, not atomic: one account toggling from two tabs at the same instant can lose a change."""
-        ids = set(await self.disabled())
+    async def disabled(self, known: set[str] | None = None) -> list[str]:
+        """The switched-off ids. `known` is every agent that exists; ids outside it (an agent that was
+        retired) are left out. Empty or None means the roster is unknown, so nothing is left out."""
+        ids = await self._stored()
+        return sorted(ids & known if known else ids)
+
+    async def set_enabled(self, agent_id: str, enabled: bool, known: set[str] | None = None) -> list[str]:
+        """Switches one agent on or off and returns the whole disabled list. Ids of retired agents
+        (see `disabled`) are dropped from what is stored. Read then write, not atomic: one account
+        toggling from two tabs at the same instant can lose a change."""
+        stored = await self._stored()
+        ids = set(await self.disabled(known))
         if not enabled and agent_id not in ids:
             if len(ids) >= MAX_ITEMS:
                 raise TooManyItems
             ids.add(agent_id)
         elif enabled and agent_id in ids:
             ids.remove(agent_id)
-        else:
+        if ids == stored:
             return sorted(ids)
         doc = {"owner": self._owner, "disabled": sorted(ids), "updated_at": utcnow().isoformat(timespec="seconds")}
         await self._store.put(COLLECTION, self._owner, doc)

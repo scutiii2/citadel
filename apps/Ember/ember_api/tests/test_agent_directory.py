@@ -316,3 +316,13 @@ def test_router_summary_excludes_retired_policy_fields():
            "pair_ratio": .5, "min_confidence": .9}
     assert agent_directory._decision_summary(raw) == {
         "choose_agent": True, "choose_tier": False, "strategy": "jev-only", "deadline_seconds": 9}
+
+
+def test_known_ids_are_the_defined_and_running_agents(tmp_path: Path) -> None:
+    d = with_definitions(tmp_path, [agent("main"), agent("extra")], [defn("main"), defn("down")])
+
+    assert asyncio.run(d.known_ids()) == {"main", "extra", "down"}
+
+
+def test_known_ids_are_empty_without_published_definitions(tmp_path: Path) -> None:
+    assert asyncio.run(directory(tmp_path, [agent("main")]).known_ids()) == set()
