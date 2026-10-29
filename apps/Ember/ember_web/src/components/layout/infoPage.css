@@ -37,7 +37,7 @@
   color: var(--muted);
   overflow-wrap: anywhere;
 }
-.info-page:where(:not(.page), .info-content) input:not([type="checkbox"]),
+.info-page:where(:not(.page), .info-content) input:not([type="checkbox"]):not(.search-field input),
 .info-page:where(:not(.page), .info-content) select {
   padding: 6px 10px;
   border: 1px solid var(--border);
@@ -55,7 +55,7 @@
   color: var(--accent-contrast);
   background: var(--accent);
 }
-.info-page:where(:not(.page), .info-content) .danger,
+.info-page:where(:not(.page), .info-content) .danger:not(.link-btn),
 .info-page:where(:not(.page), .info-content) .chip {
   padding: 3px 12px;
   border: 1px solid var(--border);
@@ -65,7 +65,7 @@
   color: var(--muted);
   background: transparent;
 }
-.info-page:where(:not(.page), .info-content) .danger {
+.info-page:where(:not(.page), .info-content) .danger:not(.link-btn) {
   border-color: var(--danger);
   color: var(--danger);
 }

@@ -616,7 +616,7 @@ function onKeydown(event: KeyboardEvent): void {
 <style scoped>
 .draft-locked textarea { color: var(--muted); cursor: default; }
 .keys.locked-hint { display: block; color: var(--muted); }
-.live-badge { display: inline-block; padding: 0 8px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--border); font-weight: 600; color: var(--text); }
+.live-badge { display: inline-block; padding: 0 8px; border-radius: var(--radius-full); box-shadow: inset 0 0 0 1px var(--border); font-weight: 600; color: var(--text); }
 .live-badge.live { box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent); }
 .independent.on { color: var(--accent); }
 .independent:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
