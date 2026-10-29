@@ -8,7 +8,7 @@
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",
-    "gateway": "openrouter",
+    "gateway": "claude",
     "temperature": 0,
     "min_tier": "light",
     "max_tier": "light",
