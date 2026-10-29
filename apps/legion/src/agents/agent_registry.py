@@ -14,10 +14,12 @@ import json
 import logging
 import os
 import shutil
+import socket
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
+from urllib.parse import urlparse
 
 from src.agents import agent_spec
 from src.providers import model_tiers
@@ -30,6 +32,7 @@ _LOCK_TIMEOUT_SECONDS = 5.0
 _LOCK_POLL_SECONDS = 0.05
 _REPLACE_ATTEMPTS = 10
 _REPLACE_POLL_SECONDS = 0.05
+_PROBE_TIMEOUT_SECONDS = 0.5
 
 
 def _read(path: Path) -> list[dict[str, Any]]:
@@ -197,6 +200,39 @@ def deregister(agent_id: str) -> None:
 
     _update(_CONFIG_PATH, _remove)
     reload()
+
+
+def _port_open(url: str) -> bool:
+    """True when something accepts a connection at the entry's host:port.
+    An entry whose url cannot be parsed is not provably dead, so it counts as open."""
+    parsed = urlparse(url)
+    try:
+        host, port = parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80)
+    except ValueError:
+        return True
+    if not host:
+        return True
+    try:
+        with socket.create_connection((host, port), timeout=_PROBE_TIMEOUT_SECONDS):
+            return True
+    except OSError:
+        return False
+
+
+def prune_unreachable(keep_ids: Iterable[str], reachable: Callable[[str], bool] = _port_open) -> list[str]:
+    """Removes entries a killed run left behind for agents that no longer
+    exist: ids outside `keep_ids` (the agents this supervisor defines) whose
+    url nothing answers. A sibling instance's live entry stays, since its
+    port is open. Returns the removed ids."""
+    keep = set(keep_ids)
+    try:
+        dead = {a["id"] for a in _read(_CONFIG_PATH) if a["id"] not in keep and not reachable(a.get("url", ""))}
+    except (ValueError, OSError):
+        return []
+    if dead:
+        _update(_CONFIG_PATH, lambda agents: [a for a in agents if a["id"] not in dead])
+        reload()
+    return sorted(dead)
 
 
 def list_agent_ids() -> list[str]:

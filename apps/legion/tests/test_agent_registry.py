@@ -71,6 +71,31 @@ def test_register_leaves_other_agents_untouched(monkeypatch, tmp_path):
     assert agent_registry.get_agent("openai-agent") == other
 
 
+def test_prune_unreachable_drops_only_unknown_ids_nothing_answers_for(monkeypatch, tmp_path):
+    def entry(agent_id, port):
+        return {"role": "specialist", "id": agent_id, "label": agent_id, "url": f"http://127.0.0.1:{port}/mcp"}
+
+    agents = [entry("ours", 1), entry("retired", 2), entry("sibling", 3)]
+    config_path = _configure(monkeypatch, tmp_path, agents)
+
+    removed = agent_registry.prune_unreachable(["ours"], reachable=lambda url: url.endswith(":3/mcp"))
+
+    assert removed == ["retired"]
+    assert [a["id"] for a in json.loads(config_path.read_text(encoding="utf-8"))["agents"]] == ["ours", "sibling"]
+
+
+def test_port_open_is_true_for_a_listener_false_for_a_closed_port_and_for_a_bad_url():
+    import socket
+
+    with socket.socket() as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen()
+        port = server.getsockname()[1]
+        assert agent_registry._port_open(f"http://127.0.0.1:{port}/mcp")
+    assert not agent_registry._port_open(f"http://127.0.0.1:{port}/mcp")
+    assert agent_registry._port_open("not a url")
+
+
 def test_deregister_removes_only_the_matching_id(monkeypatch, tmp_path):
     agents = [
         {"role": "specialist", "id": "claude-agent", "label": "Claude Agent", "url": "http://127.0.0.1:9100/mcp"},
