@@ -66,6 +66,8 @@ async def decide(request: RouteRequest) -> RouteResponse | None:
             return None
         if result.agent.choice not in {None, "none", *(c.id for c in request.candidates)}:
             return None
+        if not set(result.alternatives) <= {c.id for c in request.candidates}:
+            return None
         if result.size.choice not in {None, "tiny", "everyday", "large", "hardest"}:
             return None
         return result

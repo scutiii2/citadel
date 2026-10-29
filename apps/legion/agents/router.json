@@ -8,9 +8,9 @@
   "plan_tool": false,
   "llm": {
     "provider": "decision",
-    "strategy": "both"
+    "strategy": "jev-only"
   },
-  "focus": "Internal: chooses an available specialist and model tier using local triage with optional Jev fallback.",
+  "focus": "Internal: chooses an available specialist and model tier using Jev. Rosters over nine are narrowed in elimination rounds of equal batches.",
   "tools": {
     "allow": [],
     "deny": [

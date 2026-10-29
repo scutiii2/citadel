@@ -21,7 +21,11 @@ def _summary(result, chosen, tier, roster, spec):
     """One-line routing outcome for the step card: chosen agent and, when picked, model tier."""
     delegated = not result.agent.uncertain and chosen not in (None, "none")
     label = next((e.label for e in roster if e.id == chosen), chosen) if delegated else spec.label
-    return f"Agent: {label}" + (f" · Model: {tier}" if tier else "")
+    text = f"Agent: {label}" + (f" · Model: {tier}" if tier else "")
+    if delegated and result.alternatives:
+        near = [next((e.label for e in roster if e.id == i), i) for i in result.alternatives]
+        text += " · Also close: " + ", ".join(near)
+    return text
 
 
 async def route_turn(question, history, on_event, request_id, depth, explicit_tier=None):
@@ -57,7 +61,7 @@ async def route_turn(question, history, on_event, request_id, depth, explicit_ti
         rows = [router_client.usage_row(row, request.request_id) for row in result.usage]
         if rows:
             rows[0]["routing"].update({"agent_choice": result.agent.choice,
-                "agent_uncertain": result.agent.uncertain, "size_choice": result.size.choice,
+                "agent_uncertain": result.agent.uncertain, "alternatives": result.alternatives, "size_choice": result.size.choice,
                 "size_uncertain": result.size.uncertain, "policy_revision": result.policy_revision})
             if result.trace is not None:
                 rows[0]["routing"]["trace"] = result.trace
