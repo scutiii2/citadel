@@ -49,6 +49,7 @@ Deregister = Callable[[str], None]
 Out = Callable[[str], None]
 Sleep = Callable[[float], Awaitable[None]]
 Publish = Callable[[Sequence[AgentSpec]], None]
+Prune = Callable[[Sequence[str]], list[str]]
 
 
 def _print(line: str) -> None:
@@ -220,8 +221,10 @@ class Supervisor:
         watch_dir: Path | None = None,
         poll_seconds: float = WATCH_POLL_SECONDS,
         restart_on: Sequence[Path] = (),
+        prune: Prune = agent_registry.prune_unreachable,
     ) -> None:
         self._specs = specs
+        self._prune = prune
         self._command_for = command_for
         self._deregister = deregister
         self._publish = publish
@@ -254,6 +257,10 @@ class Supervisor:
         # Entries a crashed earlier run left behind for OUR agents only.
         for spec in self._specs:
             await asyncio.to_thread(self._deregister, spec.id)
+        # Entries for agents whose file is gone (a retired agent) that nothing answers for.
+        gone = await asyncio.to_thread(self._prune, [spec.id for spec in self._specs])
+        if gone:
+            self._out(f"[supervisor] dropped dead registry entries: {', '.join(gone)}")
         await asyncio.to_thread(self._publish, self._specs)
         self._out(f"[supervisor] starting {', '.join(c.spec.id for c in self._children) or 'no agents'}")
         self._stopped = asyncio.Event()
