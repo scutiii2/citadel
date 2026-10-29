@@ -80,6 +80,7 @@ These are the user's preferred Ember patterns. Choose the shape that fits the ta
 - **Lists:** use readable rows with light separators, short secondary metadata, and one clear contextual action. Use an editor/details dialog for occasional management and place deletion in its final Danger zone with confirmation.
 - **List/editor workspaces:** match Memory and Notes structurally: compact searchable list, readable titles, document-style editor, collapsed tools and management, persistent Save, and mobile Back. Move focus into the editor on entry and restore it to the originating row (or search) on return. Keep group explanations once beneath headings and usage counts secondary. Use the shared scrollbar opt-in when requested, with search and Save outside scrolling bodies.
 - **Row actions:** use `ListRow`'s `actions` slot for Approve: the selection outline encloses both content and action, with separate buttons. Put occasional status actions and the final Danger zone in a labeled management disclosure, as Skills does.
+- **Browser/reader workspaces:** keep the scope switch and search inside the browsing sidebar, above breadcrumbs or search results, as Brains does. Use the same pane spacing, row selection and scrollbar utility as Skills. Keep source setup and path controls in labeled disclosures; the main pane is for reading, with its audience and read-only state visible. Search and status checks preserve the current reader. Mobile Back restores focus to the originating row or search. Keep connection dialogs mounted outside the sidebar so drafts and open dialogs survive a viewport change.
 - **State:** keep draft-bearing panels and job watchers mounted when changing modes. Place dialogs outside hidden tab ancestors. Refreshing status must preserve the current document/result. Clear private content before changing scopes, and open search hits in their originating scope.
 - **Real data:** render the formats, sizes, expiry, scope, and status returned by the API. Clearly label sample data in mockups; keep production previews honest when thumbnails or estimates are unavailable.
 
@@ -90,7 +91,7 @@ Use these existing pages as implementation references:
 | Writing with secondary tools | `features/notes/NotesView.vue`: list/editor, collapsed tools, persistent Save |
 | Reviewing short facts | `features/memory/MemoryView.vue`: searchable list/editor workspace, mobile Back, guarded drafts and management disclosure |
 | Reviewing proposed how-tos | `features/skills/SkillsView.vue`: grouped list/editor workspace, approval inside the selected row, document fields, visible pane scrollbars |
-| Reading durable documents | `features/brains/BrainsView.vue`: scoped search, browser/reader, secondary connection settings |
+| Reading durable documents | `features/brains/BrainsView.vue`: sidebar-owned scope/search, persistent reader, visible pane scrollbars, collapsed source settings |
 | Downloading and collecting media | `features/mediaDownloader/MediaDownloaderView.vue`, `features/mediaDownloader/components/`: single-link flow, ZIP groups, temporary files |
 
 ## 3. Navigation placement
