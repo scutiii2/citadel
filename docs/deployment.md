@@ -81,8 +81,9 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 2. **Deploy `LayaModel` separately** (it is its own project and Citadel's compose does not start it). Run
    `docker compose up -d --build` in the `LayaModel` folder (`/media/ZimaOS-HD/Apps/LayaModel`), in any order relative
    to Citadel. It publishes port 9120 on the host and legion reaches it at `http://host.docker.internal:9120`
-   (Compose maps that name to the host with `extra_hosts`), so the two stacks share no Docker network. If you change
-   `LAYA_PORT` in `LayaModel`, change the port in the `legion` service's `LAYA_SERVICE_URL` to match. See
+   (Compose maps that name to the host with `extra_hosts`), so the two stacks share no Docker network. Set
+   `LAYA_SERVICE_URL=http://host.docker.internal:9120` in `apps/legion/.env`; if you change `LAYA_PORT` in `LayaModel`,
+   change the port there to match. A container cannot resolve the server's own hostname (`scutiserver1`). See
    `LayaModel/deployment.md` for replicas, port and weights.
 
 3. **Create the `.env` files.** They are gitignored, so `live` does not hold them and `git pull` never touches them.
@@ -113,8 +114,9 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | `apps/Ember/ember_api/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
 
    - The root token reaches every service and overrides any `INTERNAL_API_TOKEN` in a per-app file.
-   - Skip `MCP_HOST`, `MCP_PORT`, `LAYA_SERVICE_URL` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. Do
-     not use `localhost` for another service.
+   - Skip `MCP_HOST`, `MCP_PORT` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. Set `LAYA_SERVICE_URL`
+     and `OMNIROUTE_BASE_URL` in `apps/legion/.env` to `http://host.docker.internal:<port>`. Do not use `localhost` or
+     the server's hostname for another service.
    - **Laya settings** (`LAYA_TOKEN`, `LAYA_REPLICAS`, `LAYA_PORT`) belong in `LayaModel`'s own `.env`, not here. Each
      replica loads its own copy of the models in RAM, so keep `LAYA_REPLICAS` low on a small box.
    - `apps/Ember/ember_api/.env` must exist before the first start. Compose bind-mounts it, and if it is missing Docker
