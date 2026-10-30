@@ -327,6 +327,9 @@ def call(
                 on_progress=_progress_forwarder(sink, step_id),
             )
         )
+        record_usage(result.get("agent_usage") or [])
+        if result.get("status") == "failed":
+            raise RuntimeError(result.get("response") or "Architect failed")
         ok = True
     finally:
         cancellation.clear(child_id)
@@ -334,10 +337,6 @@ def call(
             "type": "agent_end", "agent_id": agent_id, "agent_label": label,
             "ok": ok, "step_id": step_id, "at": agent_events.now_iso(),
         })
-    usage_sink = _usage_sink.get()
-    if usage_sink is not None:
-        # The delegate's own entries already include anything it delegated on.
-        usage_sink.extend(result.get("agent_usage") or [])
     notes = [n for n in (result.get("model_note"), result.get("effort_note")) if n]
     note_prefix = f"[{'; '.join(notes)}]\n\n" if notes else ""
     return note_prefix + result.get("response", "")

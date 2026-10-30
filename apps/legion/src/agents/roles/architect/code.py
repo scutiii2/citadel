@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import inspect
 import json
 import re
 from dataclasses import asdict
@@ -29,6 +30,78 @@ def _text(value, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field} must be a non-empty string")
     return value.strip()
+
+
+def _contracts(plan: UnitPlan, brief: str) -> tuple[dict, set[str]]:
+    contracts, classes = {}, set()
+
+    def collect(body, prefix=""):
+        for node in body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                contracts[prefix + node.name] = node.args
+            elif isinstance(node, ast.ClassDef):
+                classes.add(prefix + node.name)
+                contracts[prefix + node.name] = None
+                collect(node.body, prefix + node.name + ".")
+
+    for source in [extract_code(brief), *(unit.signature for unit in plan.units)]:
+        try:
+            collect(ast.parse(source + ("\n    pass" if source.rstrip().endswith(":") else "")).body)
+        except SyntaxError:
+            continue
+    return contracts, classes
+
+
+def _matches_call(arguments: ast.arguments | None, call: ast.Call, bound: bool) -> bool:
+    if arguments is None:
+        return True
+    if any(isinstance(arg, ast.Starred) for arg in call.args) or any(key.arg is None for key in call.keywords):
+        return False
+    positional = [*arguments.posonlyargs, *arguments.args]
+    default_start = len(positional) - len(arguments.defaults)
+    parameters = []
+    for index, arg in enumerate(positional):
+        if bound and index == 0 and arg.arg in ("self", "cls"):
+            continue
+        kind = inspect.Parameter.POSITIONAL_ONLY if index < len(arguments.posonlyargs) else inspect.Parameter.POSITIONAL_OR_KEYWORD
+        parameters.append(inspect.Parameter(arg.arg, kind, default=None if index >= default_start else inspect.Parameter.empty))
+    if arguments.vararg:
+        parameters.append(inspect.Parameter(arguments.vararg.arg, inspect.Parameter.VAR_POSITIONAL))
+    for arg, default in zip(arguments.kwonlyargs, arguments.kw_defaults):
+        parameters.append(inspect.Parameter(arg.arg, inspect.Parameter.KEYWORD_ONLY,
+                                            default=None if default is not None else inspect.Parameter.empty))
+    if arguments.kwarg:
+        parameters.append(inspect.Parameter(arguments.kwarg.arg, inspect.Parameter.VAR_KEYWORD))
+    try:
+        inspect.Signature(parameters).bind(*[None for _ in call.args], **{key.arg: None for key in call.keywords})
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _unmatched_calls(merged: ast.Module, plan: UnitPlan, brief: str) -> set[str]:
+    contracts, classes = _contracts(plan, brief)
+    receivers = {}
+    for node in ast.walk(merged):
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name):
+            if node.value.func.id in classes:
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        receivers[target.id] = node.value.func.id
+    unmatched = set()
+    for call in ast.walk(merged):
+        if not isinstance(call, ast.Call):
+            continue
+        name = ast.unparse(call.func)
+        bound = False
+        if isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name):
+            receiver = receivers.get(call.func.value.id)
+            if receiver:
+                name = receiver + "." + call.func.attr
+                bound = True
+        if name not in contracts or not _matches_call(contracts[name], call, bound):
+            unmatched.add(ast.unparse(call))
+    return unmatched
 
 
 class CodeArchitect:
@@ -122,12 +195,7 @@ class CodeArchitect:
                 merged = ast.parse(extract_code(response))
             except SyntaxError as error:
                 return response + f"\n\nFinal Python syntax check failed: {error}", False
-            definitions = "\n".join(unit.signature for unit in plan.units) + "\n" + extract_code(brief)
-            known = set(re.findall(r"\b(?:def|class)\s+(\w+)", definitions))
-            calls = {node.func.id if isinstance(node.func, ast.Name) else node.func.attr
-                     for node in ast.walk(merged) if isinstance(node, ast.Call)
-                     and isinstance(node.func, (ast.Name, ast.Attribute))}
-            unmatched = calls - known
+            unmatched = _unmatched_calls(merged, plan, brief)
             if unmatched:
                 response += "\n\nCalls not matched to planned signatures or pasted definitions (possible invented API): " + ", ".join(sorted(unmatched)) + "."
         return response, True

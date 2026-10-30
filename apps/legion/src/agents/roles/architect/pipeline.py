@@ -23,6 +23,20 @@ _log = logging.getLogger(__name__)
 PREFETCH_MAX_CHARS = 8000
 
 
+class ArchitectError(RuntimeError):
+    """A failed pipeline carries completed usage back through the ask response."""
+
+    def __init__(self, message: str, agent_usage: list[dict]) -> None:
+        super().__init__(message)
+        self.agent_usage = agent_usage
+
+
+class ArchitectCancelled(ChatCancelled):
+    def __init__(self, agent_usage: list[dict]) -> None:
+        super().__init__()
+        self.agent_usage = agent_usage
+
+
 def _check(request_id: str) -> None:
     if cancellation.is_cancelled(request_id):
         raise ChatCancelled()
@@ -47,7 +61,7 @@ async def run(spec: AgentSpec, brief: str, complete: Callable[[str], ChatResult]
             result = complete(prompt)
             row = {**usage_log.own_row(result, agent_id=spec.id, agent_label=spec.label,
                      gateway=spec.effective_gateway(), started_at=started, finished_at=agent_events.now_iso(),
-                     delegated_by=delegated_by, model_tier="heavy"), "request_id": request_id, "depth": depth}
+                     delegated_by=delegated_by, model_tier=result.model_tier), "request_id": request_id, "depth": depth}
             delegation.record_usage([{**row, "prompt": usage_log.prompt_messages([], prompt)}])
             usage_log.append_sync(row)
             return result
@@ -114,6 +128,10 @@ async def run(spec: AgentSpec, brief: str, complete: Callable[[str], ChatResult]
                               output_tokens=total("output_tokens"), context_tokens=assembled.context_tokens,
                               # Per-completion rows are already recorded; server.ask must not add an aggregate row.
                               model_executed=False, delegated_usage=list(usage))
+    except ChatCancelled as error:
+        raise ArchitectCancelled(list(usage)) from error
+    except Exception as error:
+        raise ArchitectError(str(error), list(usage)) from error
     finally:
         delegation.reset_usage(usage_token)
         cancellation.reset_request(request_token)
