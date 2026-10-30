@@ -54,6 +54,27 @@ afterEach(() => {
 });
 
 describe("AgentsView", () => {
+  it("groups architects separately and keeps search and status filters working", async () => {
+    list.mockResolvedValue([...AGENTS, agent("code-architect", { status: "disabled",
+      architect: { kind: "code", workers: ["code-writer"] } })]);
+    const wrapper = await mountView();
+    const groups = wrapper.findAll(".agent-group");
+    expect(groups.map(group => group.find("h3").text())).toEqual([
+      "The front of your conversation", "Architects", "The team behind your chats",
+    ]);
+    expect(groups[1].text()).toContain("Plan the work, then hand it to specialists.");
+    expect(groups[1].findAll(".agent-id").map(id => id.text())).toEqual(["code-architect"]);
+    expect(groups[2].text()).not.toContain("code-architect");
+    for (const query of ["code-architect", "code-writer", "architect"] ) {
+      await wrapper.find('input[type="search"]').setValue(query);
+      expect(cards(wrapper).map(card => card.find(".agent-id").text())).toEqual(["code-architect"]);
+    }
+    await chip(wrapper, "Running").trigger("click");
+    expect(cards(wrapper)).toHaveLength(0);
+    await chip(wrapper, "Disabled").trigger("click");
+    expect(cards(wrapper)).toHaveLength(1);
+    wrapper.unmount();
+  });
   it("shows the internal Router even while disabled without offering it as a chat target", async () => {
     list.mockResolvedValue([agent("router", { internal_role: "router", status: "disabled",
       decision: { choose_agent: true, choose_tier: true, english: true, typed: true, fallback: true } })]);

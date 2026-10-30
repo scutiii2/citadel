@@ -60,6 +60,11 @@ class ModelTierOut(BaseModel):
     use_for: str
 
 
+class ArchitectOut(BaseModel):
+    kind: str
+    workers: list[str]
+
+
 class AgentListItem(AgentOut):
     entry: bool
     orchestrator: bool
@@ -71,6 +76,7 @@ class AgentListItem(AgentOut):
     tiers: list[ModelTierOut]
     internal_role: Literal["router"] | None = None
     decision: dict[str, Any] | None = None
+    architect: ArchitectOut | None = None
 
 
 @router.get("/agents", response_model_exclude_unset=True)
@@ -87,6 +93,8 @@ async def list_agents(
             provider=a.provider, gateway=a.gateway, model=a.model,
             tiers=[ModelTierOut(tier=t.tier, id=t.id, use_for=t.use_for) for t in a.tiers],
             **({"internal_role": a.internal_role, "decision": a.decision} if a.internal_role else {}),
+            **({"architect": ArchitectOut(kind=a.architect_kind, workers=list(a.architect_workers))}
+               if a.architect_kind is not None else {}),
         )
         for a in await directory.listing()
     ]
