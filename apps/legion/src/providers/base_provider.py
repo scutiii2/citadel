@@ -197,6 +197,8 @@ class ChatResult:
     private_extension_errors: list[dict[str, str]] = field(default_factory=list)
     # False for an entry turn answered entirely by a delegated specialist.
     model_executed: bool = True
+    status: str | None = None
+    units: list[dict[str, Any]] = field(default_factory=list)
 
 
 class BaseProvider:

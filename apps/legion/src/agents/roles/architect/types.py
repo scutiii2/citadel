@@ -44,6 +44,12 @@ class Plan:
     steps: tuple[Step, ...]
 
 
+@dataclass(frozen=True)
+class UnitPlan:
+    language: str
+    units: tuple[Unit, ...]
+
+
 @dataclass
 class NodeResult:
     status: Status

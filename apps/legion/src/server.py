@@ -239,6 +239,8 @@ async def ask(
             tier_args["reasoning_effort"] = reasoning_effort
         private_args = {"private_extensions": private_extensions} if private_extensions else {}
         limit_args = {"limits": limits} if limits else {}
+        if SPEC.role == "architect":
+            tier_args["delegated_by"] = delegated_by
         result = await agent_config.run_chat(
             question, history or [], enabled_extensions or [], request_id, depth,
             on_event=on_event, caveman=caveman, approval_mode=approval_mode, allowed_tools=allowed_tools,
@@ -254,7 +256,8 @@ async def ask(
         started_at=started_at, finished_at=agent_events.now_iso(), delegated_by=delegated_by,
         model_tier=result.model_tier, reasoning_effort=result.reasoning_effort,
     )
-    own_rows = [{**own_usage, "prompt": usage_log.prompt_messages(history or [], question)}] if result.model_executed else []
+    own_rows = [{**own_usage, "request_id": request_id, "depth": depth,
+                 "prompt": usage_log.prompt_messages(history or [], question)}] if result.model_executed else []
     if result.model_executed:
         await usage_log.append({**own_usage, "request_id": request_id, "depth": depth})
     reply = {
@@ -290,6 +293,8 @@ async def ask(
     errors = getattr(result, "private_extension_errors", None)
     if errors:
         reply["private_extension_errors"] = errors
+    if result.status is not None:
+        reply.update(status=result.status, units=result.units)
     return reply
 
 

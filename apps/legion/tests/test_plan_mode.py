@@ -152,9 +152,18 @@ def test_plan_mode_keeps_runtime_recall_and_bypasses_entry_routing(monkeypatch, 
 
 
 def test_architect_does_not_enter_generic_provider_loop(monkeypatch, plan_spec):
+    from src.agents.roles.architect import pipeline, registry
     monkeypatch.setattr(agent_spec, "_current", replace(plan_spec, role="architect", entry=False, kind="code"))
-    with pytest.raises(NotImplementedError, match="phase"):
-        asyncio.run(agent_config.run_chat("brief", [], []))
+    assert "code" in registry.KINDS
+    run = AsyncMock(return_value=ChatResult(response="assembled", model_executed=False))
+    monkeypatch.setattr(pipeline, "run", run)
+    monkeypatch.setattr(agent_config._PROVIDER_MODULE, "run_chat",
+                        AsyncMock(side_effect=AssertionError("architect entered generic provider loop")))
+    result = asyncio.run(agent_config.run_chat("brief", [], []))
+    assert result.response == "assembled"
+    run.assert_awaited_once()
+    assert run.call_args.args[0].kind == "code" and run.call_args.args[1] == "brief"
+    agent_config._PROVIDER_MODULE.run_chat.assert_not_awaited()
 
 
 @pytest.mark.parametrize("provider", [anthropic_provider, openai_provider])
