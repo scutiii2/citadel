@@ -15,6 +15,7 @@ export interface ModelTier {
 /** One agent as ember_api's GET /api/agents returns it. No URL: where the
  * agents live stays server-side. */
 export interface AgentListing {
+  architect?: { kind: string; workers: string[] } | null;
   internal_role?: "router" | null;
   decision?: { choose_agent?: boolean; choose_tier?: boolean; english?: boolean; typed?: boolean;
     fallback?: boolean; fallback_available?: boolean; deadline_seconds?: number; local_status?: string } | null;

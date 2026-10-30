@@ -52,6 +52,8 @@ class AgentEntry:
     focus: str = ""
     internal_role: str | None = None
     decision: dict[str, Any] | None = None
+    architect_kind: str | None = None
+    architect_workers: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -83,6 +85,8 @@ class AgentDefinition:
     tiers: tuple[ModelTier, ...] = ()
     internal_role: str | None = None
     decision: dict[str, Any] | None = None
+    architect_kind: str | None = None
+    architect_workers: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -101,6 +105,8 @@ class AgentListing:
     tiers: tuple[ModelTier, ...] = ()
     internal_role: str | None = None
     decision: dict[str, Any] | None = None
+    architect_kind: str | None = None
+    architect_workers: tuple[str, ...] = ()
 
 
 def _decision_summary(raw: Any) -> dict[str, Any] | None:
@@ -120,6 +126,10 @@ def _decision_summary(raw: Any) -> dict[str, Any] | None:
 
 def _text_or_none(value: Any) -> str | None:
     return value if isinstance(value, str) and value else None
+
+
+def _parse_workers(raw: Any) -> tuple[str, ...]:
+    return tuple(worker for worker in raw if isinstance(worker, str) and worker) if isinstance(raw, list) else ()
 
 
 def _parse_tiers(raw: Any) -> tuple[ModelTier, ...]:
@@ -155,6 +165,8 @@ def parse_definitions(raw: Any) -> list[AgentDefinition]:
                     tiers=_parse_tiers(llm.get("tiers")),
                     internal_role="router" if item.get("role") == "router" else None,
                     decision=_decision_summary(item.get("decision")) if item.get("role") == "router" else None,
+                    architect_kind=_text_or_none(item.get("kind")) if item.get("role") == "architect" else None,
+                    architect_workers=_parse_workers(item.get("workers")) if item.get("role") == "architect" else (),
                 )
             )
     return found
@@ -176,6 +188,8 @@ def parse_registry(raw: Any) -> list[AgentEntry]:
                     focus=focus if isinstance(focus, str) else "",
                     internal_role="router" if item.get("role") == "router" else None,
                     decision=_decision_summary(item.get("decision")) if item.get("role") == "router" else None,
+                    architect_kind=_text_or_none(item.get("kind")) if item.get("role") == "architect" else None,
+                    architect_workers=_parse_workers(item.get("workers")) if item.get("role") == "architect" else (),
                 )
             )
     return entries
@@ -305,13 +319,15 @@ class AgentDirectory:
                 d.tiers if d else (),
                 a.internal_role or (d.internal_role if d else None),
                 a.decision if a.decision is not None else (d.decision if d else None),
+                a.architect_kind or (d.architect_kind if d else None),
+                a.architect_workers or (d.architect_workers if d else ()),
             )
         for d in defined:
             if d.id not in rows:
                 status = "offline" if d.enabled else "disabled"
                 rows[d.id] = AgentListing(
                     d.id, d.label, d.entry, d.orchestrator, d.focus, status, d.provider, d.gateway, d.model, d.tiers,
-                    d.internal_role, d.decision,
+                    d.internal_role, d.decision, d.architect_kind, d.architect_workers,
                 )
         order = {"running": 0, "offline": 1, "disabled": 2}
         return sorted(rows.values(), key=lambda r: (order[r.status], not r.entry))

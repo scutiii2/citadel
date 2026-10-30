@@ -326,3 +326,37 @@ def test_known_ids_are_the_defined_and_running_agents(tmp_path: Path) -> None:
 
 def test_known_ids_are_empty_without_published_definitions(tmp_path: Path) -> None:
     assert asyncio.run(directory(tmp_path, [agent("main")]).known_ids()) == set()
+
+
+def test_architect_metadata_from_registry_and_definitions(tmp_path: Path) -> None:
+    d = with_definitions(tmp_path, [
+        agent("live", role="architect", kind="code", workers=["code-writer"]),
+        agent("merged"),
+    ], [
+        defn("merged", role="architect", kind="code", workers=["code-writer"]),
+        defn("off", role="architect", kind="code", workers=["code-writer"], enabled=False),
+        defn("specialist", kind="code", workers=["ignored"]),
+        defn("orchestrator", role="orchestrator", kind="code", workers=["ignored"]),
+    ])
+    rows = {r.id: r for r in asyncio.run(d.listing())}
+    for name in ("live", "merged", "off"):
+        assert rows[name].architect_kind == "code"
+        assert rows[name].architect_workers == ("code-writer",)
+    assert rows["off"].status == "disabled"
+    for name in ("specialist", "orchestrator"):
+        assert rows[name].architect_kind is None
+        assert rows[name].architect_workers == ()
+
+
+def test_architect_is_never_an_entry_or_fallback(tmp_path: Path) -> None:
+    architect = agent("code-architect", role="architect", kind="code", workers=["code-writer"])
+    assert asyncio.run(directory(tmp_path, [architect]).entry()) is None
+    for candidate in (agent("entry", entry=True), agent("orch", role="orchestrator"), agent(LEGACY_ENTRY_ID)):
+        assert asyncio.run(directory(tmp_path, [architect, candidate]).entry()).id == candidate["id"]
+
+
+def test_architect_metadata_ignores_malformed_values() -> None:
+    for parser, key in ((agent_directory.parse_registry, "agents"), (agent_directory.parse_definitions, "defined")):
+        row = parser({key: [agent("architect", role="architect", kind=3, workers="code-writer")]})[0]
+        assert row.architect_kind is None
+        assert row.architect_workers == ()
