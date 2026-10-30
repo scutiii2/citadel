@@ -60,7 +60,7 @@ try:
     from src.agents import agent_config, agent_events, agent_registry, agent_store
     from src.runtime import approvals, internal_auth, questions, usage_log
     from src.tools.mcp_client import mcp_upstream
-    from src.providers.base_provider import ChatCancelled
+    from src.providers.base_provider import ChatCancelled, ChatResult
     from src.providers import model_tiers
     from src.providers import reasoning_effort as effort_limits
     from src.providers.model_limits import context_window_for
@@ -233,20 +233,30 @@ async def ask(
     # mcp_server tool this turn calls carries it on (see internal_auth.py).
     started_at = agent_events.now_iso()
     requester_token = internal_auth.bind_requester(internal_auth.Requester.from_headers(_request_headers(ctx)))
+    from src.agents.roles.architect.pipeline import ArchitectError
+
     try:
         tier_args = {"model_tier": model_tier} if model_tier else {}
         if reasoning_effort:
             tier_args["reasoning_effort"] = reasoning_effort
         private_args = {"private_extensions": private_extensions} if private_extensions else {}
         limit_args = {"limits": limits} if limits else {}
+        if SPEC.role == "architect":
+            tier_args["delegated_by"] = delegated_by
         result = await agent_config.run_chat(
             question, history or [], enabled_extensions or [], request_id, depth,
             on_event=on_event, caveman=caveman, approval_mode=approval_mode, allowed_tools=allowed_tools,
             disabled_tools=disabled_tools, ask_user=ask_user, plan=plan, plan_lean=plan_lean,
             allow_read_only=allow_read_only, exact_context=exact_context, **tier_args, **private_args, **limit_args,
         )
-    except ChatCancelled:
-        return _cancelled_result()
+    except ChatCancelled as error:
+        reply = _cancelled_result()
+        if SPEC.role == "architect":
+            reply["agent_usage"] = getattr(error, "agent_usage", [])
+        return reply
+    except ArchitectError as error:
+        result = ChatResult(response=str(error), status="failed", model_executed=False,
+                            delegated_usage=error.agent_usage, provider_id=SPEC.llm.provider)
     finally:
         internal_auth.reset_requester(requester_token)
     own_usage = usage_log.own_row(
@@ -254,7 +264,8 @@ async def ask(
         started_at=started_at, finished_at=agent_events.now_iso(), delegated_by=delegated_by,
         model_tier=result.model_tier, reasoning_effort=result.reasoning_effort,
     )
-    own_rows = [{**own_usage, "prompt": usage_log.prompt_messages(history or [], question)}] if result.model_executed else []
+    own_rows = [{**own_usage, "request_id": request_id, "depth": depth,
+                 "prompt": usage_log.prompt_messages(history or [], question)}] if result.model_executed else []
     if result.model_executed:
         await usage_log.append({**own_usage, "request_id": request_id, "depth": depth})
     reply = {
@@ -290,6 +301,8 @@ async def ask(
     errors = getattr(result, "private_extension_errors", None)
     if errors:
         reply["private_extension_errors"] = errors
+    if result.status is not None:
+        reply.update(status=result.status, units=result.units)
     return reply
 
 
@@ -492,6 +505,8 @@ def status() -> dict[str, Any]:
     `exact_context` says ask() understands exact_context.
     `user_limits` says ask() understands limits."""
     role_info = {}
+    if SPEC.role == "architect":
+        role_info = {"kind": SPEC.kind, "workers": list(SPEC.workers)}
     if SPEC.internal_role == "router":
         from src.agents.roles.router import router_service
 
@@ -568,6 +583,8 @@ if SPEC.internal_role == "router":
 
 def main() -> None:
     role_info = {}
+    if SPEC.role == "architect":
+        role_info = {"kind": SPEC.kind, "workers": list(SPEC.workers)}
     if SPEC.internal_role == "router":
         from src.agents.roles.router import router_service
 

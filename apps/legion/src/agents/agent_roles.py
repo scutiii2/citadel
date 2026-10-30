@@ -82,10 +82,14 @@ def _compose_system_prompt(spec: AgentSpec, roster_text: str = "", prompts: Mapp
 SYSTEM_PROMPT = _compose_system_prompt(agent_spec.current())
 
 
-def system_prompt_for(caveman: bool = False, roster: Sequence[RosterEntry] = ()) -> str:
+def system_prompt_for(caveman: bool = False, roster: Sequence[RosterEntry] = (), *, catalog_text: str | None = None) -> str:
     """SYSTEM_PROMPT, with this turn's orchestrator roster (if any) placed
     before the tool-use instructions, and caveman instructions appended."""
     prompt = _compose_system_prompt(agent_spec.current(), roster_block(roster)) if roster else SYSTEM_PROMPT
+    if catalog_text is not None:
+        prompt = _compose_system_prompt(agent_spec.current(), "Architect catalog:\n" + (catalog_text or "(none running)"))
+        prompt += ("\n\nPlan mode: use only ask_user and submit_plan. Answer directly when no architect is needed. "
+                   "Every submitted brief must stand alone. After results arrive, write the final reply.")
     return f"{prompt}\n\n{CAVEMAN_INSTRUCTIONS}" if caveman else prompt
 
 

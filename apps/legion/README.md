@@ -109,12 +109,17 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `focus` | no | `""` | One-line summary of what the agent is good at. Used for the orchestrator roster. Should be concrete. |
 | `tools.allow` | no | `[]` (all) | fnmatch globs on mcp_server tool names without the `main__` prefix. Empty means all tools. |
 | `tools.deny` | no | `[]` | Globs removed after `allow`. Deny wins. |
-| `role` | yes | none | `orchestrator`, `router` or `specialist`. Orchestrators delegate; routers have no tools and use `decision`; specialists are delegable by default. |
+| `role` | yes | none | `orchestrator`, `router`, `specialist` or `architect`. Architects use a language provider, never entry, and require `tools.deny: ["*"]`; recall, learning and the plan tool must be off. The code pipeline is implemented; operations is reserved for a later phase. |
+| `mode` | orchestrator only | `legacy` | `legacy` preserves delegation and direct tools; `plan` offers only `ask_user` and `submit_plan`, with a live architect catalog. Automatic memory and skill recall remain runtime calls. |
+| `kind` | architect only, required | none | Registered kind: `code` or `operations`. At most one enabled architect per kind. |
+| `workers` | architect only, required | none | Non-empty list of existing specialist ids. |
+| `prefetch` | architect only | `[]` | Specialist ids allowed for pre-planning reads. Code uses the first only when a brief names a code file or conservative path. |
+| `limits` | architect only | see meaning | `max_units: 12`, `max_parallel: 3`, `unit_timeout_seconds: 120`, `max_retries: 1`. Counts are positive integers; retries may be zero; timeout is a finite positive number. Unknown fields are errors. |
 | `memory_recall` | no | `false` | At the start of each top-level turn, load the user's newest saved notes (`tool_mem_search`, up to 10) and put them in front of the question. Needs the `memory` capability online and an agent that may call `tool_mem_*`. Orchestrator role only. Only `ember` has it on. |
 | `skill_recall` | no | `false` | At the start of each top-level turn, search the user's **approved** skills with the question (`tool_skill_search`, up to 3) and put the matches in front of it, after any recalled notes. A proposal never loads before the user approves it on Ember's Skills page. Needs the armory `skills` capability online and an agent that may call `tool_skill_*`. Orchestrator role only. Only `ember` has it on. |
 | `skill_learning` | no | `false` | After a top-level turn that made at least 3 real tool calls and none failed, draft a reusable skill in the background and propose it (`tool_skill_propose`) for the user's approval. One extra call to the tool-free `context-summarizer` agent per qualifying turn, so it is billed: switch it on per agent, no tracked agent has it. The drafting model sees only the user's request and the tool names with argument names, never results, values or the answer. A turn that used web, Firecrawl, email or a private extension tool never qualifies. Calls made by delegated specialists are not seen, so it fits agents that call tools themselves. Needs `tool_skill_*` allowed and `context-summarizer` running. Orchestrator role only. |
 | `delegable` | no | `true` | `false` keeps the agent out of every orchestrator's roster: it is called directly (for example by ember_api), never delegated to. |
-| `plan_tool` | no | `true` | Offer the `update_plan` checklist tool (`src/agents/roles/orchestrator/plan.py`) for tasks of three or more steps. A chat can also switch it off per turn (`ask(plan=False)`), and the tool is offered only when both allow it. Only orchestrators can offer it. |
+| `plan_tool` | no | `true` (`false` for architects) | Offer the `update_plan` checklist tool (`src/agents/roles/orchestrator/plan.py`) for tasks of three or more steps. A chat can also switch it off per turn (`ask(plan=False)`), and the tool is offered only when both allow it. Plan mode fills the checklist at runtime instead of offering this tool to the model. |
 
 An orchestrator file:
 
@@ -183,6 +188,9 @@ Name an agent for its job,
 not its model (`ember`, `server-ops`, `reviewer`). Exactly one enabled file
 sets `entry: true`. Add
 more specialists as extra files.
+
+`code-architect` (port 9130, disabled) plans multi-function code and assembles
+`code-writer` outputs, with optional read-only context from `repo-helper`.
 
 `server-ops` also covers app monitoring (the former `scheduler` / App Monitor agent, port 9114, now removed). It reports
 watched status, and starting an app also starts its owner notifications through ServerWatcher. URL/port monitoring and
@@ -290,7 +298,7 @@ checks. Live diagnostics require a prepared deployment:
 
 ## Orchestrator
 
-An agent with `role: "orchestrator"` gets the `delegate_to_agent` tool;
+In the default `mode: "legacy"`, an agent with `role: "orchestrator"` gets the `delegate_to_agent` tool;
 specialists never do. Each turn the orchestrator's roster is built from the
 registry: eligible registered specialists (never the agent itself or an internal Router), as lines of `<id> - <label>: <focus>`. Because it is per turn,
 a specialist that starts or stops shows up without a restart. A specialist with
@@ -302,10 +310,58 @@ empty, nobody is left out. The
 `agent_id` argument of `delegate_to_agent` is an enum of the roster ids. An
 orchestrator may still answer directly when no specialist fits.
 
+With `mode: "plan"`, the model sees only `ask_user` (when the caller supports
+questions) and `submit_plan`. The catalog is rebuilt from the live registry,
+capped at 8,192 characters; worker lines are dropped before architect lines.
+Only architects included in that snapshot may be named by a plan. A submission
+has 1–8 steps, unique ids, known dependencies, no cycles and self-contained
+briefs of 20–16,000 characters. The first rejection returns the exact validation
+error for one repair; a second rejection asks for a direct answer. Accepted
+plans execute through the shared DAG executor, then the model receives the
+results with no tools offered and writes the final reply. Architect-level code
+steps are read and may retry; operations and unknown kinds remain write. Unit-level read retries
+escalate light to standard to heavy; writes are never retried automatically.
+
+Automatic memory and skill searches still run before the model. Skill recall
+omits its `tool_skill_mark` instruction only in plan mode; the runtime does not
+mark skills. The runtime fills the existing checklist when its agent/chat
+toggles allow it. Plan mode bypasses legacy entry routing. The code architect
+ships disabled; Ember remains in legacy mode. Operations has no pipeline yet.
+
 Specialist activity streams to the orchestrator's caller as `agent_start`,
 `agent_end` and `agent_token` events, and a specialist's own `step_*`
 events pass through stamped with its `agent_id`. A specialist's step ids can
 collide with the orchestrator's, so consumers key on `(agent_id, id)`.
+
+## Architects
+
+`agents/code-architect.json` defines the code pipeline, using OmniRoute's
+`combo/heavy` for planning and assembly. It is disabled by default and has no
+model-offered tools. Enabling it does not switch Ember to plan mode.
+
+The pipeline optionally calls the first configured prefetch specialist when the
+brief names a code file or conservative path, caps its output at 8,000 characters,
+and continues on prefetch failure. One tool-free completion plans a bounded DAG
+of functions or methods, fixing signatures and dependency contracts. A rejected
+JSON plan gets one repair with the exact validation error; a second rejection
+fails the architect call. The kind registry selects the handler; code prompts
+and validation live separately from the shared pipeline.
+
+Workers use `workers[0]`; decision-router selection is deferred. A unit receives
+its own signature and every dependency's signature, plus finished bodies only
+for `needs_body_of`. All code units are read-only text generation. Python unit
+outputs must parse with `ast`, with retries and tier escalation under the
+architect's limits. Other languages rely on the assembly review.
+
+Assembly receives the brief, plan, outputs and every missing unit. It must check
+calls against planned signatures or definitions in pasted code, flag possible
+invented APIs and state incomplete work. Python also receives a final syntax
+check and a conservative call-contract audit. No generated code is executed.
+Each planner, repair and assembler completion has its own durable usage row;
+worker usage is retained through the normal delegation path. Cancellation is
+cooperative, and an already-running one-shot completion may finish upstream.
+
+Operations, approvals, runtime skill marking and the Ember rollout remain deferred.
 
 ## Internal Router agent
 

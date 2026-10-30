@@ -129,6 +129,7 @@ async def run_chat(
     allow_read_only: bool = False,
     exact_context: bool = False,
     limits: dict[str, int] | None = None,
+    delegated_by: str | None = None,
 ) -> ChatResult:
     """Run a chat completion request through the configured provider.
 
@@ -179,6 +180,8 @@ async def run_chat(
     provider has nowhere to await it from.
     """
     history = validate_history(history)
+    spec = agent_spec.current()
+    plan_mode = getattr(spec, "mode", "legacy") == "plan" and spec.orchestrator
     requester = internal_auth.current_requester()
     private = private_turn.PrivateTurn.from_raw(private_extensions, requester.email or requester.username)
     # Validated before anything is registered: a bad mode must not start a turn.
@@ -205,14 +208,23 @@ async def run_chat(
     try:
         if cancellation.is_cancelled(request_id):
             raise ChatCancelled()
-        if private:
+        if getattr(spec, "role", None) == "architect":
+            from src.agents.roles.architect import pipeline
+
+            model = model_tiers.resolve("heavy", model_tiers.own_tiers(), MODEL, spec.id).model
+            result = await pipeline.run(spec, question, lambda text: _PROVIDER_MODULE.run_interpret(text, model),
+                                        request_id=request_id, depth=depth, delegated_by=delegated_by, on_event=on_event)
+            delegation.record_usage(result.delegated_usage)
+            result.delegated_usage = delegated_usage
+            return result
+        if private and not plan_mode:
             # Imported here: laya agents never load mcp_upstream.
             from src.tools.mcp_client import mcp_upstream
 
             await mcp_upstream.prefetch_private(private)
         # A confident classifier pick sends the question straight to a specialist, and this
         # agent's own model never runs (agents/auto_route.py; off unless configured).
-        routed, routed_tier, auto_note = await router_routing.route_turn(
+        routed, routed_tier, auto_note = (None, None, "") if plan_mode else await router_routing.route_turn(
             question, history, on_event, request_id, depth, model_tier)
         if routed is not None:
             routed.delegated_usage = delegated_usage
