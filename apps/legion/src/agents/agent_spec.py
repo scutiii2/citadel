@@ -14,6 +14,7 @@ it starts any child, so a typo fails once, loudly, naming the file.
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 from dataclasses import dataclass, field
@@ -27,7 +28,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 AGENTS_DIR = PROJECT_ROOT / "agents"
 
 PROVIDERS = ("anthropic", "openai", "decision")
-ROLES = ("orchestrator", "router", "specialist")
+ROLES = ("orchestrator", "router", "specialist", "architect")
+ARCHITECT_KINDS = ("code", "operations")
 REASONING_EFFORTS = ("off", "low", "medium", "high")
 # Model strength, weakest to strongest. Fixed so min_tier/max_tier can be
 # compared and the orchestrator sees one vocabulary across every gateway.
@@ -37,7 +39,7 @@ TIERS = ("light", "standard", "heavy", "extreme")
 _DEFAULT_GATEWAY = {"anthropic": "claude", "openai": "gpt", "decision": "laya"}
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
-_TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "role", "memory_recall", "skill_recall", "skill_learning", "plan_tool", "delegable", "decision"}
+_TOP_KEYS = {"label", "port", "url", "enabled", "entry", "llm", "identity", "persona", "instructions", "focus", "tools", "role", "memory_recall", "skill_recall", "skill_learning", "plan_tool", "delegable", "decision", "mode", "kind", "workers", "prefetch", "limits"}
 _LLM_KEYS = {"strategy", "min_confidence", "provider", "gateway", "model", "temperature", "reasoning_effort", "max_tokens", "max_tool_rounds", "max_turn_tokens", "max_turn_seconds", "min_tier", "max_tier", "max_effort", "fallback_gateways"}
 _TOOLS_KEYS = {"allow", "deny"}
 
@@ -126,6 +128,14 @@ class RosterEntry:
 
 
 @dataclass(frozen=True)
+class ArchitectLimits:
+    max_units: int = 12
+    max_parallel: int = 3
+    unit_timeout_seconds: float = 120
+    max_retries: int = 1
+
+
+@dataclass(frozen=True)
 class AgentSpec:
     id: str
     label: str
@@ -156,6 +166,11 @@ class AgentSpec:
     url: str | None = None
     source: Path | None = None
     decision: Any = None
+    mode: str = "legacy"
+    kind: str | None = None
+    workers: tuple[str, ...] = ()
+    prefetch: tuple[str, ...] = ()
+    limits: ArchitectLimits = field(default_factory=ArchitectLimits)
 
     @property
     def orchestrator(self) -> bool:
@@ -318,6 +333,47 @@ def load_file(path: Path) -> AgentSpec:
     role = data.get("role")
     if role not in ROLES:
         raise check.fail("role", f"is required and must be one of: {', '.join(ROLES)}")
+    mode = data.get("mode", "legacy")
+    if "mode" in data and role != "orchestrator":
+        raise check.fail("mode", "is only supported for role orchestrator")
+    if mode not in ("legacy", "plan"):
+        raise check.fail("mode", "must be legacy or plan")
+    kind = None
+    workers: tuple[str, ...] = ()
+    prefetch: tuple[str, ...] = ()
+    limits = ArchitectLimits()
+    if role == "architect":
+        kind = data.get("kind")
+        if kind not in ARCHITECT_KINDS:
+            raise check.fail("kind", f"is required and must be one of: {', '.join(ARCHITECT_KINDS)}")
+        for key in ("workers", "prefetch"):
+            value = data.get(key, [])
+            if (not isinstance(value, list) or (key == "workers" and not value)
+                    or not all(isinstance(v, str) and _ID_RE.fullmatch(v) for v in value)):
+                raise check.fail(key, "must be a " + ("non-empty " if key == "workers" else "") + "list of specialist ids")
+            if key == "workers":
+                workers = tuple(value)
+            else:
+                prefetch = tuple(value)
+        raw_limits = check.section(data, "limits")
+        check.keys(raw_limits, set(ArchitectLimits.__dataclass_fields__), "limits.")
+        values = {}
+        for key in ArchitectLimits.__dataclass_fields__:
+            value = raw_limits.get(key, getattr(limits, key))
+            if key == "unit_timeout_seconds":
+                valid = (not isinstance(value, bool) and isinstance(value, (int, float))
+                         and math.isfinite(value) and value > 0)
+            else:
+                valid = type(value) is int and value >= (0 if key == "max_retries" else 1)
+            if not valid:
+                raise check.fail(f"limits.{key}", "must be a finite positive number" if key == "unit_timeout_seconds"
+                                 else "must be a non-negative integer" if key == "max_retries" else "must be a positive integer")
+            values[key] = value
+        limits = ArchitectLimits(**values)
+    else:
+        for key in ("kind", "workers", "prefetch", "limits"):
+            if key in data:
+                raise check.fail(key, "is only supported for role architect")
 
     if "port" not in data:
         raise check.fail("port", "is required")
@@ -406,6 +462,16 @@ def load_file(path: Path) -> AgentSpec:
     memory_recall = check.boolean(data, "memory_recall", False)
     skill_recall = check.boolean(data, "skill_recall", False)
     skill_learning = check.boolean(data, "skill_learning", False)
+    if role == "architect":
+        if provider == "decision":
+            raise check.fail("llm.provider", "architect requires a language provider")
+        if check.boolean(data, "entry", False):
+            raise check.fail("entry", "must be false for role architect")
+        if "*" not in tools.deny:
+            raise check.fail("tools.deny", "must contain * for role architect")
+        for key in ("memory_recall", "skill_recall", "skill_learning", "plan_tool"):
+            if check.boolean(data, key, False):
+                raise check.fail(key, "must be false for role architect")
     if provider == "decision":
         if orchestrator or check.boolean(data, "entry", False):
             raise check.fail("llm.provider", "the decision provider must be a specialist or router, not an entry agent or orchestrator")
@@ -452,10 +518,11 @@ def load_file(path: Path) -> AgentSpec:
         memory_recall=memory_recall,
         skill_recall=skill_recall,
         skill_learning=skill_learning,
-        plan_tool=check.boolean(data, "plan_tool", True),
+        plan_tool=check.boolean(data, "plan_tool", role != "architect"),
         delegable=check.boolean(data, "delegable", True),
         source=path,
         decision=policy,
+        mode=mode, kind=kind, workers=workers, prefetch=prefetch, limits=limits,
     )
 
 
@@ -467,6 +534,20 @@ def load_dir(directory: Path) -> list[AgentSpec]:
         raise AgentSpecError(f"{directory}: no agent files found (create <id>.json)")
     specs = [load_file(directory / f"{agent_id}.json") for agent_id in ids]
     enabled = [s for s in specs if s.enabled]
+    by_id = {s.id: s for s in specs}
+    kinds: dict[str, str] = {}
+    for spec in specs:
+        if spec.role != "architect":
+            continue
+        check = _Checker(spec.source)
+        for key in ("workers", "prefetch"):
+            for target in getattr(spec, key):
+                if target not in by_id or by_id[target].role != "specialist":
+                    raise check.fail(key, f"{target!r} must name an existing specialist")
+        if spec.enabled:
+            if spec.kind in kinds:
+                raise check.fail("kind", f"{spec.kind!r} already has an enabled architect ({kinds[spec.kind]}.json)")
+            kinds[spec.kind] = spec.id
     if sum(s.internal_role == "router" for s in enabled) > 1:
         raise AgentSpecError("at most one enabled internal router is allowed")
 
