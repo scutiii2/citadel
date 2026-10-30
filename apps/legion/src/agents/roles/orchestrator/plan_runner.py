@@ -14,6 +14,10 @@ from src.providers.base_provider import OnEvent
 from src.runtime import questions
 
 
+# Leave room under ember_api's five-minute streaming ask read timeout.
+PLAN_STEP_TIMEOUT_SECONDS = 270
+
+
 class PlanSession:
     def __init__(self, snapshot: catalog.Catalog) -> None:
         self.catalog = snapshot
@@ -65,7 +69,8 @@ class PlanSession:
                 item["status"] = "done"
                 await update()
 
-        results = await DagExecutor(ArchitectLimits(max_retries=0), emit_agent_events=False).run(submitted.steps, run, request_id)
+        limits = ArchitectLimits(max_retries=0, unit_timeout_seconds=PLAN_STEP_TIMEOUT_SECONDS)
+        results = await DagExecutor(limits, emit_agent_events=False).run(submitted.steps, run, request_id)
         for step, item in zip(submitted.steps, items):
             result = results[step.id]
             item["status"] = "done"
