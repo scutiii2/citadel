@@ -8,8 +8,7 @@
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",
-    "gateway": "omniroute",
-    "model": "combo/heavy"
+    "gateway": "omniroute"
   },
   "workers": ["code-writer"],
   "prefetch": ["repo-helper"],

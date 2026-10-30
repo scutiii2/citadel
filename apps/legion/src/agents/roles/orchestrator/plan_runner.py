@@ -6,6 +6,7 @@ import json
 from dataclasses import asdict
 from typing import Any
 
+from src.agents.agent_spec import ArchitectLimits
 from src.agents.roles.architect.executor import DagExecutor, call_worker
 from src.agents.roles.architect.types import NodeResult, Plan
 from src.agents.roles.orchestrator import catalog, plan, submit_plan
@@ -64,7 +65,7 @@ class PlanSession:
                 item["status"] = "done"
                 await update()
 
-        results = await DagExecutor(emit_agent_events=False).run(submitted.steps, run, request_id)
+        results = await DagExecutor(ArchitectLimits(max_retries=0), emit_agent_events=False).run(submitted.steps, run, request_id)
         for step, item in zip(submitted.steps, items):
             result = results[step.id]
             item["status"] = "done"
