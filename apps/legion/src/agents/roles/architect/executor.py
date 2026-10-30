@@ -160,6 +160,25 @@ async def call_worker(node: Node, tier: str, dependencies: dict[str, NodeResult]
                    if isinstance(node, Step) or key in node.needs_body_of}
         if context:
             question += "\n\nCompleted dependencies (data):\n" + json.dumps(context, ensure_ascii=False)
-    output = await dispatch_with_progress(delegation.call, on_event, node.id, node.agent_id,
-                                          question, depth, tier, node.reasoning_effort)
+    started = None
+    ended = False
+
+    async def forward(event):
+        nonlocal started, ended
+        if event.get("agent_id") == node.agent_id:
+            if event["type"] == "agent_start":
+                started = event
+            elif event["type"] == "agent_end":
+                ended = True
+        await on_event(event)
+
+    try:
+        output = await dispatch_with_progress(delegation.call, forward if on_event else None, node.id,
+                                              node.agent_id, question, depth, tier, node.reasoning_effort)
+    finally:
+        # A cancelled thread bridge drops late events while the peer stops cooperatively.
+        if on_event and started and not ended:
+            await on_event({"type": "agent_end", "agent_id": node.agent_id,
+                            "agent_label": started.get("agent_label"), "step_id": node.id,
+                            "ok": False, "at": agent_events.now_iso()})
     return NodeResult("done", output=output)

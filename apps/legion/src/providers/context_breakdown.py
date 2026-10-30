@@ -49,7 +49,7 @@ class RequestCounter(Protocol):
     async def count(self, *, system: str = "", tools: Sequence[Mapping[str, Any]] = ()) -> int: ...
 
 
-_BUILTIN_TOOLS = frozenset({delegation.TOOL_NAME, ask_user.TOOL_NAME, plan.TOOL_NAME})
+_BUILTIN_TOOLS = frozenset({delegation.TOOL_NAME, ask_user.TOOL_NAME, plan.TOOL_NAME, "submit_plan"})
 
 SYSTEM_PROMPT = "system_prompt"
 AGENTS = "agents"

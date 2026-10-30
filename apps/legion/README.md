@@ -119,7 +119,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `skill_recall` | no | `false` | At the start of each top-level turn, search the user's **approved** skills with the question (`tool_skill_search`, up to 3) and put the matches in front of it, after any recalled notes. A proposal never loads before the user approves it on Ember's Skills page. Needs the armory `skills` capability online and an agent that may call `tool_skill_*`. Orchestrator role only. Only `ember` has it on. |
 | `skill_learning` | no | `false` | After a top-level turn that made at least 3 real tool calls and none failed, draft a reusable skill in the background and propose it (`tool_skill_propose`) for the user's approval. One extra call to the tool-free `context-summarizer` agent per qualifying turn, so it is billed: switch it on per agent, no tracked agent has it. The drafting model sees only the user's request and the tool names with argument names, never results, values or the answer. A turn that used web, Firecrawl, email or a private extension tool never qualifies. Calls made by delegated specialists are not seen, so it fits agents that call tools themselves. Needs `tool_skill_*` allowed and `context-summarizer` running. Orchestrator role only. |
 | `delegable` | no | `true` | `false` keeps the agent out of every orchestrator's roster: it is called directly (for example by ember_api), never delegated to. |
-| `plan_tool` | no | `true` | Offer the `update_plan` checklist tool (`src/agents/roles/orchestrator/plan.py`) for tasks of three or more steps. A chat can also switch it off per turn (`ask(plan=False)`), and the tool is offered only when both allow it. Only orchestrators can offer it. |
+| `plan_tool` | no | `true` (`false` for architects) | Offer the `update_plan` checklist tool (`src/agents/roles/orchestrator/plan.py`) for tasks of three or more steps. A chat can also switch it off per turn (`ask(plan=False)`), and the tool is offered only when both allow it. Plan mode fills the checklist at runtime instead of offering this tool to the model. |
 
 An orchestrator file:
 
@@ -295,7 +295,7 @@ checks. Live diagnostics require a prepared deployment:
 
 ## Orchestrator
 
-An agent with `role: "orchestrator"` gets the `delegate_to_agent` tool;
+In the default `mode: "legacy"`, an agent with `role: "orchestrator"` gets the `delegate_to_agent` tool;
 specialists never do. Each turn the orchestrator's roster is built from the
 registry: eligible registered specialists (never the agent itself or an internal Router), as lines of `<id> - <label>: <focus>`. Because it is per turn,
 a specialist that starts or stops shows up without a restart. A specialist with
@@ -306,6 +306,25 @@ no tools of its own always stays. If mcp_server's tool list cannot be read, or i
 empty, nobody is left out. The
 `agent_id` argument of `delegate_to_agent` is an enum of the roster ids. An
 orchestrator may still answer directly when no specialist fits.
+
+With `mode: "plan"`, the model sees only `ask_user` (when the caller supports
+questions) and `submit_plan`. The catalog is rebuilt from the live registry,
+capped at 8,192 characters; worker lines are dropped before architect lines.
+Only architects included in that snapshot may be named by a plan. A submission
+has 1–8 steps, unique ids, known dependencies, no cycles and self-contained
+briefs of 20–16,000 characters. The first rejection returns the exact validation
+error for one repair; a second rejection asks for a direct answer. Accepted
+plans execute through the shared DAG executor, then the model receives the
+results with no tools offered and writes the final reply. Architect-level
+steps are not retried because they may contain writes. Unit-level read retries
+escalate light to standard to heavy; writes are never retried automatically.
+
+Automatic memory and skill searches still run before the model. Skill recall
+omits its `tool_skill_mark` instruction only in plan mode; the runtime does not
+mark skills. The runtime fills the existing checklist when its agent/chat
+toggles allow it. Plan mode bypasses legacy entry routing. Phase 1 ships no
+architect definitions or kind-specific pipelines: architect processes can start
+and register, but `ask` fails explicitly until their later-phase pipelines exist.
 
 Specialist activity streams to the orchestrator's caller as `agent_start`,
 `agent_end` and `agent_token` events, and a specialist's own `step_*`

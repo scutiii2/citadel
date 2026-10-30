@@ -179,3 +179,57 @@ def test_real_worker_runs_in_thread_with_dependency_context_and_no_duplicate_usa
             cancellation.clear("parent")
             cancellation.reset_request(token)
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("stop", ["cancel", "timeout"])
+def test_real_delegate_receives_stop_and_records_one_lifecycle(monkeypatch, stop):
+    from src.agents import agent_registry
+    from functools import partial
+
+    agent_registry.register("peer", "Peer", "http://peer/mcp")
+    asked, remote_cancel, finished = threading.Event(), threading.Event(), threading.Event()
+    async def remote(url, name, arguments, on_progress=None):
+        if name == "cancel":
+            remote_cancel.set()
+            return {"cancelled": True}
+        asked.set()
+        try:
+            for _ in range(200):
+                if remote_cancel.is_set():
+                    return {"response": "Stopped", "agent_usage": [{"agent_id": "peer"}]}
+                await asyncio.sleep(0.005)
+            raise AssertionError("delegate never received Stop")
+        finally:
+            finished.set()
+    monkeypatch.setattr(delegation, "_call_tool", remote)
+    async def exercise():
+        events = []
+        async def emit(event):
+            events.append(event)
+        usage, token = delegation.bind_usage()
+        try:
+            executor = DagExecutor(ArchitectLimits(unit_timeout_seconds=0.1 if stop == "timeout" else 10,
+                                                   max_retries=0), emit_agent_events=False)
+            task = asyncio.create_task(executor.run([Unit("a", "work", agent_id="peer")],
+                                      partial(call_worker, on_event=emit), "real-parent"))
+            if stop == "cancel":
+                for _ in range(200):
+                    if asked.is_set():
+                        break
+                    await asyncio.sleep(0.005)
+                assert asked.is_set()
+                cancellation.cancel("real-parent")
+            rows = await asyncio.wait_for(task, 2)
+            for _ in range(200):
+                if finished.is_set() and usage:
+                    break
+                await asyncio.sleep(0.005)
+            assert remote_cancel.is_set() and finished.is_set()
+            assert rows["a"].status == ("cancelled" if stop == "cancel" else "failed")
+            assert usage == [{"agent_id": "peer"}]
+            assert sum(e["type"] == "agent_start" for e in events) == 1
+            assert sum(e["type"] == "agent_end" for e in events) == 1
+        finally:
+            cancellation.clear("real-parent")
+            delegation.reset_usage(token)
+    asyncio.run(exercise())

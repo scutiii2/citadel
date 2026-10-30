@@ -15,6 +15,7 @@ import uuid
 
 import anyio
 
+from src.agents import agent_spec
 from src.agents.roles.orchestrator.memory_recall import envelope_message
 from src.providers.base_provider import OnEvent, step_event
 
@@ -67,4 +68,7 @@ async def with_skills(question: str, prompt: str, on_event: OnEvent | None = Non
         await on_event(step_event("step_end", id=step_id, ok=True, result=f"{found.group(1)} skill(s)"))
     # With no notes in front, the prompt is the bare question and needs the marker memory recall would add.
     body = f"[User message]\n{prompt}" if prompt == question else prompt
-    return f"{LABEL}\n{text}\n\n{body}"
+    label = LABEL
+    if agent_spec.current().orchestrator and agent_spec.current().mode == "plan":
+        label = label.replace(" After following one, call tool_skill_mark with its id.", "")
+    return f"{label}\n{text}\n\n{body}"
