@@ -1,0 +1,24 @@
+{
+  "label": "Code Architect",
+  "role": "architect",
+  "kind": "code",
+  "port": 9130,
+  "enabled": false,
+  "entry": false,
+  "plan_tool": false,
+  "llm": {
+    "provider": "anthropic",
+    "gateway": "omniroute",
+    "model": "combo/heavy"
+  },
+  "workers": ["code-writer"],
+  "prefetch": ["repo-helper"],
+  "limits": {
+    "max_units": 12,
+    "max_parallel": 3,
+    "unit_timeout_seconds": 120,
+    "max_retries": 1
+  },
+  "focus": "Planning and assembling multi-function code, fixing function signatures and dependencies, and checking calls against existing APIs.",
+  "tools": {"allow": [], "deny": ["*"]}
+}
