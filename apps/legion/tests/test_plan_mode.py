@@ -175,7 +175,7 @@ def test_failed_architect_skips_dependents_and_is_in_final_prompt(monkeypatch, p
         raise RuntimeError("architect unavailable")
     monkeypatch.setattr(delegation, "call", fail)
     result = asyncio.run(provider.run_chat("build", []))
-    assert len(calls) == 1
+    assert len(calls) == agent_spec.ArchitectLimits().max_retries + 1
     rows = json.loads(result.tool_calls[0].result)["steps"]
     assert rows["s1"]["status"] == "failed" and rows["s1"]["error"] == "architect unavailable"
     assert rows["s2"]["status"] == "skipped"

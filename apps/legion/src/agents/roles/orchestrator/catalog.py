@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import anyio.to_thread
@@ -17,6 +17,7 @@ MAX_CHARS = 8192
 class Catalog:
     text: str
     architect_ids: frozenset[str]
+    architect_kinds: dict[str, str | None] = field(default_factory=dict)
 
 
 def _line(value: Any) -> str:
@@ -41,7 +42,8 @@ def build(agents: list[dict[str, Any]], max_chars: int = MAX_CHARS) -> Catalog:
             line = f"  {_line(agent['id'])} worker {_line(worker_id)}: {_line(worker.get('focus'))}"
             if len("\n".join([*lines, line])) <= max_chars:
                 lines.append(line)
-    return Catalog("\n".join(lines), frozenset(agent["id"] for agent in included))
+    return Catalog("\n".join(lines), frozenset(agent["id"] for agent in included),
+                   {agent["id"]: agent.get("kind") for agent in included})
 
 
 def _live() -> Catalog:

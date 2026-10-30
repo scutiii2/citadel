@@ -27,7 +27,8 @@ class PlanSession:
             return f"Tool {name!r} is not offered in this plan-mode round.", False
         if self.closed:
             return "submit_plan is not offered again. Answer directly from the available results.", False
-        submitted, error = submit_plan.validate(arguments, self.catalog.architect_ids)
+        submitted, error = submit_plan.validate(arguments, self.catalog.architect_ids,
+                                                architect_kinds=self.catalog.architect_kinds)
         if submitted is None:
             self.failures += 1
             if self.failures >= 2:

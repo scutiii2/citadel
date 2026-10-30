@@ -29,7 +29,7 @@ class Step:
     architect: str
     brief: str
     depends_on: tuple[str, ...] = ()
-    # An architect brief may include writes; only its later pipeline can classify units.
+    # Unknown kinds may include writes; submit_plan derives read for code architects.
     effect: Literal["read", "write"] = "write"
     tier_hint: str = "standard"
     reasoning_effort: str | None = None

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from typing import Any
 
 from src.agents import agent_spec
@@ -47,7 +47,8 @@ def tool_parameters() -> dict[str, Any]:
     }
 
 
-def validate(arguments: Any, architect_ids: Collection[str], max_steps: int = MAX_STEPS) -> tuple[Plan | None, str | None]:
+def validate(arguments: Any, architect_ids: Collection[str], max_steps: int = MAX_STEPS, *,
+             architect_kinds: Mapping[str, str | None] | None = None) -> tuple[Plan | None, str | None]:
     if not isinstance(arguments, dict) or not isinstance(arguments.get("steps"), list):
         return None, "submit_plan needs a steps list."
     unknown = set(arguments) - {"steps"}
@@ -77,7 +78,8 @@ def validate(arguments: Any, architect_ids: Collection[str], max_steps: int = MA
                 or not all(isinstance(key, str) and 1 <= len(key.strip()) <= 64 for key in dependencies)):
             return None, f"{prefix}.depends_on must be a list of step ids."
         steps.append(Step(item["id"].strip(), architect, item["brief"].strip(),
-                          tuple(key.strip() for key in dependencies)))
+                          tuple(key.strip() for key in dependencies),
+                          effect="read" if (architect_kinds or {}).get(architect) == "code" else "write"))
     try:
         validate_dag(steps)
     except ValueError as error:
