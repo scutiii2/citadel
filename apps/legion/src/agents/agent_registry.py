@@ -148,6 +148,7 @@ def register(
     tiers: list[dict[str, str]] | None = None, efforts: list[str] | None = None,
     tool_allow: list[str] | None = None, delegable: bool = True,
     decision: dict | None = None,
+    kind: str | None = None, workers: list[str] | None = None,
 ) -> None:
     """Upserts this instance's own entry into the registry file, so no
     manual edit is needed to learn about a newly-started instance. Call once at startup, before
@@ -174,6 +175,8 @@ def register(
         record["delegable"] = False
     if role == "router":
         record["decision"] = decision or {}
+    if role == "architect":
+        record.update(kind=kind, workers=list(workers or ()))
 
     def _upsert(agents: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [a for a in agents if a["id"] != agent_id] + [record]
@@ -284,6 +287,7 @@ def write_definitions(specs: Iterable[Any]) -> None:
             "id": spec.id, "label": spec.label, "focus": spec.focus,
             "entry": spec.entry, "role": spec.role, "enabled": spec.enabled,
             **({"decision": spec.decision.summary()} if spec.role == "router" else {}),
+            **({"kind": spec.kind, "workers": list(spec.workers)} if spec.role == "architect" else {}),
             "llm": {
                 "provider": spec.llm.provider, "gateway": spec.llm.gateway, "model": spec.llm.model,
                 "tiers": _tiers_of(spec),

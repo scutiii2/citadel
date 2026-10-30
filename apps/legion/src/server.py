@@ -492,6 +492,8 @@ def status() -> dict[str, Any]:
     `exact_context` says ask() understands exact_context.
     `user_limits` says ask() understands limits."""
     role_info = {}
+    if SPEC.role == "architect":
+        role_info = {"kind": SPEC.kind, "workers": list(SPEC.workers)}
     if SPEC.internal_role == "router":
         from src.agents.roles.router import router_service
 
@@ -568,6 +570,8 @@ if SPEC.internal_role == "router":
 
 def main() -> None:
     role_info = {}
+    if SPEC.role == "architect":
+        role_info = {"kind": SPEC.kind, "workers": list(SPEC.workers)}
     if SPEC.internal_role == "router":
         from src.agents.roles.router import router_service
 

@@ -42,7 +42,7 @@ from openai import APIStatusError, AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, B
 
 from src.providers.turn_guard import TurnStopped
 from src.agents import agent_routing, agent_spec
-from src.agents.roles.orchestrator import ask_user, delegation, plan
+from src.agents.roles.orchestrator import ask_user, delegation, plan, plan_runner, submit_plan
 from src.providers.gateway_failover import GatewayRoute, classify
 
 from src.runtime import approvals, questions
@@ -181,6 +181,7 @@ def _tool_schemas(
     # display_label rides along on every schema dict returned here, same as
     # anthropic_provider._tool_schemas - NOT a real Responses API tools=
     # field, so run_chat pops it back off before sending schemas to the API.
+    plan_mode = submit_plan.enabled()
     schemas = [
         {
             "type": "function",
@@ -189,10 +190,10 @@ def _tool_schemas(
             "parameters": tool.inputSchema or {"type": "object", "properties": {}},
             "display_label": (tool.meta or {}).get("display_label") if hasattr(tool, "meta") else None,
         }
-        for tool in list_tools(enabled_extensions)
+        for tool in ([] if plan_mode else list_tools(enabled_extensions))
     ]
     # Only an orchestrator has a roster, so only it can delegate.
-    if roster:
+    if roster and not plan_mode:
         schemas.append(
             {
                 "type": "function",
@@ -214,7 +215,7 @@ def _tool_schemas(
             }
         )
     policy = plan.current()
-    if policy.offered:
+    if policy.offered and not plan_mode:
         schemas.append({
             "type": "function",
             "name": plan.TOOL_NAME,
@@ -222,6 +223,10 @@ def _tool_schemas(
             "parameters": plan.tool_parameters(),
             "display_label": "Plan",
         })
+    if plan_mode:
+        schemas.append({"type": "function", "name": submit_plan.TOOL_NAME,
+                        "description": submit_plan.tool_description(),
+                        "parameters": submit_plan.tool_parameters(), "display_label": "Plan"})
     return schemas
 
 
@@ -319,8 +324,10 @@ async def run_chat(
     client = _get_client() if route.current == _OpenAI._gateway_name() else _get_client(route.current)
     model_name = _model_for_route(route, model)
     history = token_limits.trim_history_to_fit(history, PROVIDER_ID, route.current)
-    roster = await agent_routing.roster_for()
-    system_prompt = system_prompt_for(caveman, roster)
+    planning = await plan_runner.for_turn()
+    roster = [] if planning else await agent_routing.roster_for()
+    system_prompt = (system_prompt_for(caveman, catalog_text=planning.catalog.text)
+                     if planning else system_prompt_for(caveman, roster))
     messages: list[Any] = [{"role": "system", "content": system_prompt}, *history]
     messages.append({"role": "user", "content": question})
     tools_used: list[str] = []
@@ -346,7 +353,7 @@ async def run_chat(
     # rounds like total_tokens - overwritten each round rather than
     # accumulated, same reasoning as anthropic_provider.run_chat.
     context_tokens: int | None = None
-    roster_text = roster_block(roster)
+    roster_text = planning.catalog.text if planning else roster_block(roster)
 
     async def breakdown() -> dict[str, Any]:
         return await breakdown_fields(
@@ -463,11 +470,14 @@ async def run_chat(
                             "step_start", id=step_id, tool=call.name, label=labels.get(call.name), arguments=arguments,
                         ))
                     # Local planning and questions do not run external tools or need approval.
-                    asked = await checklist.handle(call.name, arguments, on_event)
+                    asked = (await planning.handle(call.name, arguments, depth, request_id, on_event)
+                             if planning else await checklist.handle(call.name, arguments, on_event))
                     if asked is None:
                         asked = await questions.handle(call.name, request_id, step_id, arguments, on_event)
                     if asked is not None:
                         result_text, ok = asked
+                        if planning and planning.closed:
+                            schemas = []
                     else:
                         # With approvals on, the user answers before anything runs; a
                         # refusal is handed to the model as this step's result.

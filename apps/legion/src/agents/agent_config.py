@@ -179,6 +179,10 @@ async def run_chat(
     provider has nowhere to await it from.
     """
     history = validate_history(history)
+    spec = agent_spec.current()
+    if getattr(spec, "role", None) == "architect":
+        raise NotImplementedError("Architect pipelines are not available in phase 1")
+    plan_mode = getattr(spec, "mode", "legacy") == "plan" and spec.orchestrator
     requester = internal_auth.current_requester()
     private = private_turn.PrivateTurn.from_raw(private_extensions, requester.email or requester.username)
     # Validated before anything is registered: a bad mode must not start a turn.
@@ -205,14 +209,14 @@ async def run_chat(
     try:
         if cancellation.is_cancelled(request_id):
             raise ChatCancelled()
-        if private:
+        if private and not plan_mode:
             # Imported here: laya agents never load mcp_upstream.
             from src.tools.mcp_client import mcp_upstream
 
             await mcp_upstream.prefetch_private(private)
         # A confident classifier pick sends the question straight to a specialist, and this
         # agent's own model never runs (agents/auto_route.py; off unless configured).
-        routed, routed_tier, auto_note = await router_routing.route_turn(
+        routed, routed_tier, auto_note = (None, None, "") if plan_mode else await router_routing.route_turn(
             question, history, on_event, request_id, depth, model_tier)
         if routed is not None:
             routed.delegated_usage = delegated_usage

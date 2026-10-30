@@ -47,7 +47,7 @@ from anthropic.lib.streaming import AsyncMessageStream
 
 from src.providers.turn_guard import TurnStopped
 from src.agents import agent_routing, agent_spec
-from src.agents.roles.orchestrator import ask_user, delegation, plan
+from src.agents.roles.orchestrator import ask_user, delegation, plan, plan_runner, submit_plan
 from src.providers.gateway_failover import GatewayRoute, classify
 
 from src.runtime import approvals, questions
@@ -208,6 +208,7 @@ def _tool_schemas(
     # list it already has - it is NOT a real Anthropic tools= schema
     # field, so run_chat pops it back off before sending schemas to the
     # API (see the `labels = {...pop...}` line below).
+    plan_mode = submit_plan.enabled()
     schemas = [
         {
             "name": tool.name,
@@ -215,10 +216,10 @@ def _tool_schemas(
             "input_schema": tool.inputSchema or {"type": "object", "properties": {}},
             "display_label": (tool.meta or {}).get("display_label") if hasattr(tool, "meta") else None,
         }
-        for tool in list_tools(enabled_extensions)
+        for tool in ([] if plan_mode else list_tools(enabled_extensions))
     ]
     # Only an orchestrator has a roster, so only it can delegate.
-    if roster:
+    if roster and not plan_mode:
         schemas.append(
             {
                 "name": delegation.TOOL_NAME,
@@ -238,13 +239,16 @@ def _tool_schemas(
             }
         )
     policy = plan.current()
-    if policy.offered:
+    if policy.offered and not plan_mode:
         schemas.append({
             "name": plan.TOOL_NAME,
             "description": plan.tool_description(policy.lean),
             "input_schema": plan.tool_parameters(),
             "display_label": "Plan",
         })
+    if plan_mode:
+        schemas.append({"name": submit_plan.TOOL_NAME, "description": submit_plan.tool_description(),
+                        "input_schema": submit_plan.tool_parameters(), "display_label": "Plan"})
     return schemas
 
 
@@ -387,8 +391,10 @@ async def run_chat(
     history = validate_history(history)
     route = _route_for_turn()
     client = _get_client() if route.current == _Anthropic._gateway_name() else _get_client(route.current)
-    roster = await agent_routing.roster_for()
-    system_prompt = system_prompt_for(caveman, roster)
+    planning = await plan_runner.for_turn()
+    roster = [] if planning else await agent_routing.roster_for()
+    system_prompt = (system_prompt_for(caveman, catalog_text=planning.catalog.text)
+                     if planning else system_prompt_for(caveman, roster))
     model_name = _model_for_route(route, model)
     history = token_limits.trim_history_to_fit(history, PROVIDER_ID, route.current)
     messages: list[dict[str, Any]] = [*history, {"role": "user", "content": question}]
@@ -425,7 +431,7 @@ async def run_chat(
     # the *next* call is to the model's context window, so it's
     # overwritten each round rather than accumulated.
     context_tokens = 0
-    roster_text = roster_block(roster)
+    roster_text = planning.catalog.text if planning else roster_block(roster)
 
     async def breakdown() -> dict[str, Any]:
         return await breakdown_fields(
@@ -598,11 +604,15 @@ async def run_chat(
                             "step_start", id=step_id, tool=block.name, label=labels.get(block.name), arguments=block.input,
                         ))
                     # Local planning and questions do not run external tools or need approval.
-                    asked = await checklist.handle(block.name, block.input, on_event)
+                    asked = (await planning.handle(block.name, block.input, depth, request_id, on_event)
+                             if planning else await checklist.handle(block.name, block.input, on_event))
                     if asked is None:
                         asked = await questions.handle(block.name, request_id, step_id, block.input, on_event)
                     if asked is not None:
                         result_text, ok = asked
+                        if planning and planning.closed:
+                            schemas = []
+                            system, tools = _cached_request(system_prompt, schemas) if use_cache else (system_prompt, schemas)
                     else:
                         # With approvals on, the user answers before anything runs; a
                         # refusal is handed to the model as this step's result.
