@@ -29,14 +29,16 @@ const STATUS_ICON: Record<AgentStatus, string> = { running: "●", offline: "○
         <span class="status status-badge"><span aria-hidden="true">{{ STATUS_ICON[agent.status] }}</span> {{ STATUS_TEXT[agent.status] }}</span>
       </span>
       <span class="roles">
-        <span v-if="agent.entry || agent.orchestrator || agent.internal_role" class="tags">
+        <span v-if="agent.entry || agent.orchestrator || agent.internal_role || agent.architect" class="tags">
           <span v-if="agent.internal_role === 'router'" class="tag call-chip">Internal / Router</span>
+          <span v-if="agent.architect" class="tag call-chip">Architect · {{ agent.architect.kind }}</span>
           <span v-if="agent.entry" class="tag call-chip">Entry</span>
           <span v-if="agent.orchestrator" class="tag call-chip">Orchestrator</span>
         </span>
         <span v-else class="call-chip">Specialist</span>
       </span>
       <span class="focus">{{ agent.focus || "No description." }}</span>
+      <span v-if="agent.architect?.workers.length" class="architect-workers">Builds with: {{ agent.architect.workers.join(", ") }}</span>
       <AgentLlm :agent="agent" />
       <span v-if="agent.internal_role === 'router'" class="decision-chain">
       Laya English → typed-decisions<span v-if="agent.decision?.fallback"> → Jev fallback</span>.
@@ -48,7 +50,7 @@ const STATUS_ICON: Record<AgentStatus, string> = { running: "●", offline: "○
     </div>
     <div class="agent-controls">
     <ToggleSwitch
-      v-if="!agent.entry && !agent.orchestrator && !agent.internal_role"
+      v-if="!agent.entry && !agent.orchestrator && !agent.internal_role && !agent.architect"
       :aria-label="`Use ${agent.label}`"
       :checked="!off"
       :disabled="pending"
@@ -56,7 +58,7 @@ const STATUS_ICON: Record<AgentStatus, string> = { running: "●", offline: "○
       title="Let Ember hand work to this agent in your chats."
       @change="requestToggle"
     >{{ pending ? "Saving…" : off ? "Off for your chats" : "On for your chats" }}</ToggleSwitch>
-    <span v-else class="managed">{{ agent.entry ? 'Every new chat starts here' : agent.internal_role ? 'Internal · does not answer chats' : 'Available to the entry agent' }}</span>
+    <span v-else class="managed">{{ agent.architect ? 'Used by the orchestrator in plan mode' : agent.entry ? 'Every new chat starts here' : agent.internal_role ? 'Internal · does not answer chats' : 'Available to the entry agent' }}</span>
     </div>
   </article>
 </template>
@@ -139,6 +141,7 @@ h3 {
   overflow: hidden;
 }
 .card-content :deep(.llm) { width: 100%; }
+.architect-workers { font-size: .85em; color: var(--muted); overflow-wrap: anywhere; }
 .decision-chain { font-size: .85em; overflow-wrap: anywhere; }
 .fallback { display: block; color: var(--warning); }
 .agent-controls { position: relative; z-index: 1; display: flex; align-items: center; min-height: 60px; margin-top: auto; padding: 8px 12px; border-top: 1px solid var(--border); }

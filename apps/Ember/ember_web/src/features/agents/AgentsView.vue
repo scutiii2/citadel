@@ -38,15 +38,18 @@ const visible = computed(() => {
   const search = query.value.trim().toLowerCase();
   return agents.value.filter(agent => (status.value === "all" || agent.status === status.value)
     && [agent.label, agent.id, agent.focus, agent.provider, agent.gateway, agent.model,
+      agent.architect ? "architect" : "", agent.architect?.kind, ...(agent.architect?.workers ?? []),
       ...agent.tiers.flatMap(tier => [tier.tier, tier.id, tier.use_for])].join(" ").toLowerCase().includes(search));
 });
 const groups = computed(() => [
   { id: "front", title: "The front of your conversation", note: hasRouter.value
     ? "The entry agent receives your message. The internal Router helps choose a specialist and model."
     : "The entry agent receives your message and brings in the right help.", agents: visible.value.filter(agent => agent.entry || agent.internal_role) },
+  { id: "architects", title: "Architects", note: "Plan the work, then hand it to specialists.",
+    agents: visible.value.filter(agent => agent.architect) },
   { id: "team", title: "The team behind your chats", note: "Orchestrators coordinate larger tasks. Specialists take focused work from the entry agent.", agents: [
-    ...visible.value.filter(agent => !agent.entry && !agent.internal_role && agent.orchestrator),
-    ...visible.value.filter(agent => !agent.entry && !agent.internal_role && !agent.orchestrator),
+    ...visible.value.filter(agent => !agent.entry && !agent.internal_role && !agent.architect && agent.orchestrator),
+    ...visible.value.filter(agent => !agent.entry && !agent.internal_role && !agent.architect && !agent.orchestrator),
   ] },
 ]);
 let preferenceRevision = 0;
