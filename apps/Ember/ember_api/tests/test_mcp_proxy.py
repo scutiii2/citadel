@@ -92,6 +92,24 @@ def test_agent_list_requires_login(client: TestClient) -> None:
     assert client.get("/api/agents").status_code == 401
 
 
+def test_agent_list_only_exposes_architect_metadata_for_architects(client: TestClient, tmp_path) -> None:
+    as_admin(client)
+    defined = [
+        {"id": "code-architect", "label": "Code architect", "role": "architect",
+         "kind": "code", "workers": ["code-writer"], "enabled": False},
+        {"id": "specialist", "label": "Specialist", "kind": "code", "workers": ["ignored"]},
+        {"id": "orchestrator", "label": "Orchestrator", "role": "orchestrator",
+         "kind": "code", "workers": ["ignored"]},
+    ]
+    (tmp_path / "agent_definitions.json").write_text(json.dumps({"defined": defined}), encoding="utf-8")
+    response = client.get("/api/agents")
+    assert response.status_code == 200
+    rows = {a["id"]: a for a in response.json()}
+    assert rows["code-architect"]["architect"] == {"kind": "code", "workers": ["code-writer"]}
+    assert rows["code-architect"]["status"] == "disabled"
+    assert all("architect" not in row for name, row in rows.items() if name != "code-architect")
+
+
 def test_agent_list_is_empty_when_none_is_running(client: TestClient, tmp_path) -> None:
     as_admin(client)
     (tmp_path / "config_agents.json").write_text('{"agents": []}', encoding="utf-8")
