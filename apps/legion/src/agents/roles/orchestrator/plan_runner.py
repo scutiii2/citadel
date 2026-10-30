@@ -6,11 +6,16 @@ import json
 from dataclasses import asdict
 from typing import Any
 
+from src.agents.agent_spec import ArchitectLimits
 from src.agents.roles.architect.executor import DagExecutor, call_worker
 from src.agents.roles.architect.types import NodeResult, Plan
 from src.agents.roles.orchestrator import catalog, plan, submit_plan
 from src.providers.base_provider import OnEvent
 from src.runtime import questions
+
+
+# Leave room under ember_api's five-minute streaming ask read timeout.
+PLAN_STEP_TIMEOUT_SECONDS = 270
 
 
 class PlanSession:
@@ -27,7 +32,8 @@ class PlanSession:
             return f"Tool {name!r} is not offered in this plan-mode round.", False
         if self.closed:
             return "submit_plan is not offered again. Answer directly from the available results.", False
-        submitted, error = submit_plan.validate(arguments, self.catalog.architect_ids)
+        submitted, error = submit_plan.validate(arguments, self.catalog.architect_ids,
+                                                architect_kinds=self.catalog.architect_kinds)
         if submitted is None:
             self.failures += 1
             if self.failures >= 2:
@@ -63,7 +69,8 @@ class PlanSession:
                 item["status"] = "done"
                 await update()
 
-        results = await DagExecutor(emit_agent_events=False).run(submitted.steps, run, request_id)
+        limits = ArchitectLimits(max_retries=0, unit_timeout_seconds=PLAN_STEP_TIMEOUT_SECONDS)
+        results = await DagExecutor(limits, emit_agent_events=False).run(submitted.steps, run, request_id)
         for step, item in zip(submitted.steps, items):
             result = results[step.id]
             item["status"] = "done"

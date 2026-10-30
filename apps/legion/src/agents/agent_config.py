@@ -129,6 +129,7 @@ async def run_chat(
     allow_read_only: bool = False,
     exact_context: bool = False,
     limits: dict[str, int] | None = None,
+    delegated_by: str | None = None,
 ) -> ChatResult:
     """Run a chat completion request through the configured provider.
 
@@ -180,8 +181,6 @@ async def run_chat(
     """
     history = validate_history(history)
     spec = agent_spec.current()
-    if getattr(spec, "role", None) == "architect":
-        raise NotImplementedError("Architect pipelines are not available in phase 1")
     plan_mode = getattr(spec, "mode", "legacy") == "plan" and spec.orchestrator
     requester = internal_auth.current_requester()
     private = private_turn.PrivateTurn.from_raw(private_extensions, requester.email or requester.username)
@@ -209,6 +208,15 @@ async def run_chat(
     try:
         if cancellation.is_cancelled(request_id):
             raise ChatCancelled()
+        if getattr(spec, "role", None) == "architect":
+            from src.agents.roles.architect import pipeline
+
+            model = model_tiers.resolve("heavy", model_tiers.own_tiers(), MODEL, spec.id).model
+            result = await pipeline.run(spec, question, lambda text: _PROVIDER_MODULE.run_interpret(text, model),
+                                        request_id=request_id, depth=depth, delegated_by=delegated_by, on_event=on_event)
+            delegation.record_usage(result.delegated_usage)
+            result.delegated_usage = delegated_usage
+            return result
         if private and not plan_mode:
             # Imported here: laya agents never load mcp_upstream.
             from src.tools.mcp_client import mcp_upstream
