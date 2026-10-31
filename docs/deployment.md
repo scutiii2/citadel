@@ -174,6 +174,12 @@ Commit `main` first: the script reads committed `main` without touching your wor
 commit is built on top of the remote tip, so pushes are normal fast-forwards with no force-push. A run with no changes
 prints "already up to date". To run it without the menu: `py tools\publish_live.py [--dry-run]`.
 
+### Releasing
+
+A plain publish (`tools\deploy.bat` option 1) only updates the `live` branch, so it is fine for test deploys. A release is a separate step: set `VERSION` (and `pyproject.toml` where it has a version, to the same number), commit, then run `tools\deploy.bat` option R or `py tools\publish_live.py --release`. That publishes to `live` and tags the `main` commit `vX.Y.Z` and the live commit `live-vX.Y.Z`. A version already released with different live files is refused, so bump `VERSION`. While a version is not officially released yet, add `--replace` to move its tags.
+
+`tools\make_zip.bat` then builds `zip_versions\Citadel-<VERSION>.zip` (no `tools/`, no git-ignored files, no older ZIPs; `.env.example` is included) and opens GitHub's new-release page for the tag.
+
 ### Dashboard tiles
 
 Containers started from the CLI may not show in the ZimaOS dashboard (v1.8.0), and the "import Docker CLI" option in
