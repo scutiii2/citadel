@@ -287,3 +287,16 @@ def test_delete_unknown_id_is_404(client, monkeypatch):
 
     assert response.status_code == 404
     assert "nope" in response.json()["error"]
+
+
+def test_post_an_unwritable_config_is_a_409_naming_the_cause(client, monkeypatch):
+    async def fail(config, config_path):
+        raise OSError(30, "Read-only file system")
+
+    monkeypatch.setattr(extensions, "current_statuses", lambda: [])
+    monkeypatch.setattr(extensions, "add_extension", fail)
+
+    response = client.post("/extensions", json={"label": "X", "url": "http://127.0.0.1:9000/mcp"})
+
+    assert response.status_code == 409
+    assert "Read-only file system" in response.json()["error"]
