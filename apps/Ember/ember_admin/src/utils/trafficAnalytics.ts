@@ -2,7 +2,6 @@ import type { ChartPart } from "../components/analytics/useBucketCursor";
 
 /** Status classes in stacking order, bottom to top. */
 export const STATUS_CLASSES = ["2xx", "3xx", "4xx", "5xx"] as const;
-export type StatusClass = (typeof STATUS_CLASSES)[number];
 
 export const STATUS_PARTS: ChartPart[] = [
   { id: "2xx", label: "2xx success", color: "var(--http-2xx)" },

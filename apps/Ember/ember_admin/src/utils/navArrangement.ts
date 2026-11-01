@@ -6,8 +6,6 @@ import type { NavPrefs } from "../stores/navPrefs";
  * (new, or newly permitted) follow the known ones in their default order, and
  * ids it holds for pages the account can't open are ignored. */
 
-export const EMPTY_PREFS: NavPrefs = { order: [], pinned: [], hidden: [] };
-
 type Page = { to: string };
 
 export interface Arranged<T> {

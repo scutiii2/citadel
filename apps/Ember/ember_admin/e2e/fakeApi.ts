@@ -13,7 +13,7 @@ export const ADMIN_ACCOUNT = {
   permissions: ["chat.use", "tools.view", "tools.execute", "files.upload", "files.download", "accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage", "settings.manage", "capabilities.manage", "usage.all.view", "extensions.manage", "logs.view", "traffic.view"],
 };
 
-export interface FakeCapability {
+interface FakeCapability {
   name: string;
   enabled: boolean;
   label: string;

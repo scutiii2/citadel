@@ -4,13 +4,13 @@ import type { AnalyticsRange } from "./LogsClient";
 export type { AnalyticsRange };
 
 /** The same window now and just before it. A rate or latency is null with nothing to measure. */
-export interface Compared<T> {
+interface Compared<T> {
   current: T;
   /** The same length of time just before. */
   previous: T;
 }
 
-export interface RouteStat {
+interface RouteStat {
   /** "GET /api/chats/{chat_id}": the route template, never a raw path. */
   name: string;
   count: number;
@@ -19,14 +19,14 @@ export interface RouteStat {
   p95_ms: number | null;
 }
 
-export interface ToolStat {
+interface ToolStat {
   name: string;
   calls: number;
   failures: number;
   p95_ms: number | null;
 }
 
-export interface UpstreamStat {
+interface UpstreamStat {
   /** "ai_agent" or "mcp_server". */
   target: string;
   calls: number;

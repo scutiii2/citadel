@@ -12,7 +12,7 @@ export const ACCOUNT = {
 };
 
 /** The same person with the Administrator role, for the pages that need `admin.manage`. */
-export const ADMIN_ACCOUNT = {
+const ADMIN_ACCOUNT = {
   ...ACCOUNT,
   roles: ["Administrator"],
   permissions: [...ACCOUNT.permissions, "tools.view", "tools.execute", "files.upload", "files.download", "accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage", "settings.manage", "capabilities.manage", "usage.all.view", "extensions.manage"],
@@ -20,7 +20,7 @@ export const ADMIN_ACCOUNT = {
 
 export const PASSWORD = "correct horse battery";
 
-export interface StoredAccount {
+interface StoredAccount {
   id: number;
   username: string;
   email: string;
@@ -29,15 +29,6 @@ export interface StoredAccount {
   is_protected: boolean;
   created_at: string;
   roles: { id: number; name: string }[];
-}
-
-export interface StoredRole {
-  id: number;
-  name: string;
-  description: string | null;
-  is_protected: boolean;
-  permissions: string[];
-  account_count: number;
 }
 
 const ADMIN_ACCOUNTS: StoredAccount[] = [

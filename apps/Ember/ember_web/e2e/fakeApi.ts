@@ -16,7 +16,7 @@ export const ACCOUNT = {
 };
 
 /** The same person with the Administrator role, for the pages that need `admin.manage`. */
-export const ADMIN_ACCOUNT = {
+const ADMIN_ACCOUNT = {
   ...ACCOUNT,
   roles: ["Administrator"],
   permissions: [...ACCOUNT.permissions, "tools.view", "tools.execute", "files.upload", "files.download", "accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage", "settings.manage", "capabilities.manage", "usage.all.view", "extensions.manage"],
@@ -30,7 +30,7 @@ const DELEGATE = { id: "calc", label: "Calculator", step_id: "d1" };
 
 export const PASSWORD = "correct horse battery";
 
-export interface StoredChat {
+interface StoredChat {
   id: string;
   title: string;
   agent_id: string;
@@ -41,13 +41,13 @@ export interface StoredChat {
   save_to_second_brain?: boolean;
 }
 
-export interface StoredFolder {
+interface StoredFolder {
   id: number;
   name: string;
   position: number;
 }
 
-export interface StoredNote {
+interface StoredNote {
   id: string;
   title: string;
   body: string;
@@ -80,7 +80,7 @@ interface NoteBody {
   expected_updated_at?: string;
 }
 
-export interface StoredAccount {
+interface StoredAccount {
   id: number;
   username: string;
   email: string;
@@ -91,7 +91,7 @@ export interface StoredAccount {
   roles: { id: number; name: string }[];
 }
 
-export interface StoredUserExtension {
+interface StoredUserExtension {
   id: string;
   label: string;
   description: string;
@@ -103,7 +103,7 @@ export interface StoredUserExtension {
   tools: string[];
 }
 
-export interface StoredCapability {
+interface StoredCapability {
   name: string;
   enabled: boolean;
   label: string | null;
@@ -112,7 +112,7 @@ export interface StoredCapability {
   resources: string[];
 }
 
-export interface StoredRole {
+interface StoredRole {
   id: number;
   name: string;
   description: string | null;
@@ -121,7 +121,7 @@ export interface StoredRole {
   account_count: number;
 }
 
-export interface StoredTemplate {
+interface StoredTemplate {
   id: number;
   name: string;
   body: string;
@@ -129,7 +129,7 @@ export interface StoredTemplate {
   updated_at: string;
 }
 
-export interface StoredShare {
+interface StoredShare {
   id: number;
   chat_id: string;
   title: string;
@@ -138,7 +138,7 @@ export interface StoredShare {
   expires_at: string | null;
 }
 
-export interface StoredTicket {
+interface StoredTicket {
   id: number;
   type: "bug" | "feature" | "other";
   title: string;
@@ -255,7 +255,7 @@ const event = (sequence: number, body: Record<string, unknown>) =>
   `id: ${sequence}\ndata: ${JSON.stringify({ sequence, ...body })}\n\n`;
 
 /** What the fake agent answers, in the pieces ember_api would stream it. */
-export const ANSWER_PIECES = ["The capital ", "of France ", "is Paris."];
+const ANSWER_PIECES = ["The capital ", "of France ", "is Paris."];
 export const ANSWER = ANSWER_PIECES.join("");
 
 export async function installFakeApi(page: Page, options: { admin?: boolean; tickets?: boolean; media?: boolean } = {}): Promise<FakeApi> {
@@ -916,7 +916,7 @@ async function mcpAgent(route: Route) {
 
 /** Small valid PDF with byte-accurate xref offsets, used for real PDF.js worker previews. */
 /** Short PCM audio so Chrome exercises real media events in speech tests. */
-export function sampleSpeechAudio(): Buffer {
+function sampleSpeechAudio(): Buffer {
   const samples = 6400;
   const wav = Buffer.alloc(44 + samples * 2);
   wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write("WAVEfmt ", 8);
