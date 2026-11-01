@@ -92,6 +92,7 @@ onBeforeUnmount(() => {
   </section>
 </template>
 
+<style scoped src="../components/chatShared.css"></style>
 <style scoped>
 .shared {
   flex: 1;
@@ -133,14 +134,5 @@ header h2 {
 }
 .user-bubble {
   align-self: flex-end;
-  max-width: 80%;
-  padding: 10px 14px;
-  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-sm) var(--radius-xl);
-  background: var(--user-bubble);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.assistant {
-  overflow-wrap: anywhere;
 }
 </style>

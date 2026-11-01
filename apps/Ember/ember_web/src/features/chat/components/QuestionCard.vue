@@ -107,6 +107,7 @@ function submit(): void {
   </form>
 </template>
 
+<style scoped src="./chatShared.css"></style>
 <style scoped>
 .question-card {
   display: grid;
@@ -184,20 +185,6 @@ header {
 .other:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
-}
-.buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.buttons button {
-  padding: 5px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  font-size: 0.85em;
-  color: var(--text);
-  background: transparent;
 }
 .buttons .submit {
   border-color: var(--accent);
