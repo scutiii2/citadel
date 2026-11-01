@@ -9,7 +9,7 @@ interface CapabilityPage {
   route?: RouteRecordRaw;
 }
 
-export const CAPABILITY_PAGES: Record<string, CapabilityPage> = {
+const CAPABILITY_PAGES: Record<string, CapabilityPage> = {
   notes: { to: "/notes", permission: "chat.use" },
   memory: { to: "/memory", permission: "chat.use" },
   gen: { to: "/generator", permission: "tools.execute" },

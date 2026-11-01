@@ -97,7 +97,7 @@ export const NAV_PAGES: NavPage[] = [
 ];
 
 /** Pages an administrator cannot hide from the sidebar: Chat is home and Settings holds the account's own preferences. */
-export const PROTECTED_PAGES: readonly string[] = ["/", "/settings"];
+const PROTECTED_PAGES: readonly string[] = ["/", "/settings"];
 
 /** The pages an account with these permissions may open, less the ones an administrator hid
  * for everyone (`hidden`; nav only, the pages still open by URL). */

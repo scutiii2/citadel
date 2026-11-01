@@ -54,7 +54,7 @@ export function splitWords(text: string): string[] {
   return words;
 }
 
-export function parseCommand(text: string): ParsedCommand {
+function parseCommand(text: string): ParsedCommand {
   const words = splitWords(text.replace(/^\//, ""));
   if (words.length < 2) {
     throw new CommandError("A command needs a capability and a command: /<capability> <command> [key=value ...]");
@@ -105,7 +105,7 @@ function coerce(name: string, value: string, schema: JsonSchema): unknown {
 }
 
 /** Tool arguments from typed params, checked against the tool's schema. */
-export function buildArguments(parsed: ParsedCommand, schema: JsonSchema): Record<string, unknown> {
+function buildArguments(parsed: ParsedCommand, schema: JsonSchema): Record<string, unknown> {
   const properties = schema.properties ?? {};
   const unknown = Object.keys(parsed.params).filter((k) => !(k in properties));
   if (unknown.length) throw new CommandError(`Unknown param(s): ${unknown.join(", ")}`);

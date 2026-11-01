@@ -40,7 +40,7 @@ export interface DictationResult {
 export const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 
 /** ember_api's limit for audio (base64 must fit its request cap). */
-export const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 
 /** The file's bytes as base64 (ember_api takes JSON only). */
 export function toBase64(file: Blob): Promise<string> {
