@@ -9,9 +9,10 @@ import UsageCall from "./components/UsageCall.vue";
 import UsageHeatmap from "../../components/analytics/UsageHeatmap.vue";
 import { useAuthStore } from "../../stores/auth";
 import { downloadText, exportFileName } from "../../utils/browser/textDownload";
-import { errorMessage, formatUtc } from "../../utils/errors";
+import { errorMessage } from "../../utils/errors";
+import { formatUtc } from "../../utils/time";
 import { usageToMarkdown } from "./utils/usageExport";
-import { formatCost, parseServerTime, usagePercent as percent } from "../../utils/analytics/usageFormat";
+import { formatCost, usagePercent as percent } from "../../utils/analytics/usageFormat";
 import { favoriteAgent, hourLabel, monthStart, peakHour, utcDay } from "./utils/usageStats";
 
 const auth = useAuthStore();
@@ -88,11 +89,6 @@ const GROUP_OPTIONS: { value: UsageGroupBy; label: string }[] = [
 const GROUP_HEADINGS = Object.fromEntries(GROUP_OPTIONS.map((o) => [o.value, o.label])) as Record<UsageGroupBy, string>;
 // The heading follows the loaded report, not the selector, which may already show the next choice.
 const groupHeading = computed(() => GROUP_HEADINGS[usage.value?.report.group_by ?? groupBy.value]);
-
-/** A naive-UTC API time as the viewer's local date and time. */
-function localTime(value: string): string {
-  return new Date(parseServerTime(value)).toLocaleString();
-}
 
 function tokens(n: number): string {
   return n.toLocaleString();
@@ -301,7 +297,7 @@ onMounted(() => {
                   <span class="turn-main">
                     <span class="call-agent">{{ t.lead }}</span>
                     <span class="call-chip">{{ t.rows.length }} calls</span>
-                    <span class="muted small turn-time">{{ localTime(t.at) }}</span>
+                    <span class="muted small turn-time">{{ formatUtc(t.at) }}</span>
                   </span>
                   <strong class="turn-total">{{ tokens(t.total) }}<template v-if="t.cost !== null"> · {{ formatCost(t.cost, usage.report.currency) }}</template></strong>
                 </button>

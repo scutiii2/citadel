@@ -1,3 +1,5 @@
+import { plural } from "../format";
+import { parseServerTime } from "../time";
 import type { AgentUsage, ChatMessage } from "../../api/types";
 import type { UsageWindow } from "../../api/contracts/usage";
 
@@ -49,12 +51,6 @@ export function agentUsageText(a: AgentUsage): string {
     .join(" · ");
 }
 
-/** An ISO time from the server as a timestamp; one without a zone is UTC. */
-export function parseServerTime(value: string | undefined): number {
-  if (!value) return NaN;
-  return Date.parse(/(Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`);
-}
-
 /** How long an agent's call took, "1.3 s", or "" when the times are missing. */
 export function agentDuration(a: AgentUsage): string {
   const start = parseServerTime(a.started_at);
@@ -99,7 +95,7 @@ export function usageSummary(m: ChatMessage, agentLabel?: string): string {
     m.total_tokens ? `${compactNumber(m.total_tokens)} tokens` : "",
     m.cost !== undefined ? formatCost(m.cost) : "",
     m.duration_s !== undefined ? formatDuration(m.duration_s) : "",
-    m.steps?.length ? `${m.steps.length} ${m.steps.length === 1 ? "tool" : "tools"}` : "",
+    m.steps?.length ? plural(m.steps.length, "tool") : "",
   ]
     .filter(Boolean)
     .join(" · ");

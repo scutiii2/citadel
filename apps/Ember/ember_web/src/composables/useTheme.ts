@@ -3,6 +3,8 @@ import { readStored, writeStored } from "../utils/browser/storage";
 
 export type Theme = "system" | "light" | "dark";
 
+export const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" } as const;
+
 const STORAGE_KEY = "ember_web.theme";
 // Order the toggle cycles through.
 const CYCLE: readonly Theme[] = ["system", "light", "dark"];

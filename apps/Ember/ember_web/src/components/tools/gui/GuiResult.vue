@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from "vue";
-import { copyText } from "../../../utils/browser/clipboard";
+import { computed, ref } from "vue";
+import { useCopyFeedback } from "../../../composables/useCopyFeedback";
 import type { GuiResultSpec } from "../../../api/tools/CapabilityPagesClient";
 import type { ToolRunResult } from "../../../api/types";
 import { resultValue } from "../../../utils/tools/guiPage";
@@ -22,11 +22,7 @@ const message = computed(() => {
 });
 
 const revealed = ref(true);
-const copied = ref(false);
-const copyFailed = ref(false);
-let copyTimer: ReturnType<typeof setTimeout> | undefined;
-let disposed = false;
-onBeforeUnmount(() => { disposed = true; clearTimeout(copyTimer); });
+const { copied, copyFailed, copy: copyToClipboard } = useCopyFeedback();
 const secretText = computed(() => (value.value === undefined || value.value === null ? "" : String(value.value)));
 
 // What the person reads: spaced when the page asks for groups. Copy uses secretText.
@@ -38,13 +34,8 @@ const strength = computed(() => {
   return typeof bits === "number" ? { bits, ...strengthOf(bits) } : null;
 });
 
-async function copy(): Promise<void> {
-  const ok = await copyText(secretText.value);
-  if (disposed) return;
-  clearTimeout(copyTimer);
-  copied.value = ok;
-  copyFailed.value = !ok;
-  if (ok) copyTimer = setTimeout(() => (copied.value = false), 1500);
+function copy(): Promise<void> {
+  return copyToClipboard(secretText.value);
 }
 
 const rows = computed<Record<string, unknown>[]>(() =>
@@ -123,7 +114,6 @@ const scalars = computed(() =>
 .fill.fair { background: var(--warning); }
 .fill.strong, .fill.excellent { background: var(--success); }
 .strength-meta { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.8em; color: var(--muted); }
-.error { color: var(--danger); }
 .fields { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; }
 .table-scroll { max-width: 100%; overflow-x: auto; }
 th, td { overflow-wrap: anywhere; max-width: 28ch; }

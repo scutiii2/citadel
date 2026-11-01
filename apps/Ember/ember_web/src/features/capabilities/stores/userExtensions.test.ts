@@ -6,6 +6,7 @@ import { ApiError } from "../../../api/http";
 import { userExtensionsClient, type UserExtension } from "../api/UserExtensionsClient";
 import { useAuthStore } from "../../../stores/auth";
 import { useUserExtensionsStore } from "./userExtensions";
+import { makeAccount } from "../../../testing/account";
 
 vi.mock("../api/UserExtensionsClient", () => ({
   userExtensionsClient: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
@@ -26,7 +27,7 @@ const ext = (id: string, extra: Partial<UserExtension> = {}): UserExtension => (
   ...extra,
 });
 
-const ACCOUNT: Account = { id: 1, username: "lex", email: "l@e.com", email_verified: true, roles: [], permissions: ["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] };
+const ACCOUNT = makeAccount({ username: "lex", email: "l@e.com" });
 
 function setup(account: Account | null = ACCOUNT) {
   setActivePinia(createPinia());

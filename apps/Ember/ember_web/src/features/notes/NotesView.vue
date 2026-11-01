@@ -23,7 +23,8 @@ import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import "../../components/layout/infoPage.css";
 import TagInput from "../../components/ui/forms/TagInput.vue";
 import ToggleSwitch from "../../components/ui/forms/ToggleSwitch.vue";
-import { errorMessage, formatUtc } from "../../utils/errors";
+import { errorMessage } from "../../utils/errors";
+import { formatUtc } from "../../utils/time";
 
 /** The signed-in account's private notes (ember_api's /api/notes, kept in
  * db_gateway). A list on the left and an editor on the right; on a narrow

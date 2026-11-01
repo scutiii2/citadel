@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, type Ref } from "vue";
 import { chatsClient, type ChatSearchHit } from "../api/ChatsClient";
 import { settingsClient } from "../../../api/navigation/SettingsClient";
 import { triageClient, type TriageForm } from "../api/TriageClient";
@@ -79,6 +79,10 @@ function planKey(accountId: number): string {
 
 function planLeanKey(accountId: number): string {
   return `ember_web.planLean.${accountId}`;
+}
+
+function notificationsKey(accountId: number): string {
+  return `ember_web.notifications.${accountId}`;
 }
 
 function chimeKey(accountId: number): string {
@@ -561,7 +565,7 @@ export const useChatStore = defineStore("chat", () => {
       planLean.value = accountId === null || readStored(planLeanKey(accountId)) !== "0";
       approvalMode.value = accountId !== null ? readApprovalMode(accountId) : DEFAULT_APPROVAL_MODE;
       chime.value = accountId === null || readStored(chimeKey(accountId)) !== "0";
-      browserNotifications.value = accountId !== null && readStored(`ember_web.notifications.${accountId}`) === "1";
+      browserNotifications.value = accountId !== null && readStored(notificationsKey(accountId)) === "1";
       liveTokens.value = accountId === null || readStored(liveTokensKey(accountId)) !== "0";
       contextPanel.value = accountId === null || readStored(contextPanelKey(accountId)) !== "0";
       const savedAccuracy = accountId !== null ? readStored(contextAccuracyKey(accountId)) : null;
@@ -1164,40 +1168,41 @@ export const useChatStore = defineStore("chat", () => {
     return find(id) !== undefined;
   }
 
+  /** Saves `value` under the current account's `key`, if signed in. */
+  function persist(key: (accountId: number) => string, value: string): void {
+    const accountId = auth.account?.id;
+    if (accountId !== undefined) writeStored(key(accountId), value);
+  }
+
+  function setFlag(target: Ref<boolean>, key: (accountId: number) => string, on: boolean): void {
+    target.value = on;
+    persist(key, on ? "1" : "0");
+  }
+
   function setApprovalMode(mode: ApprovalMode): void {
     approvalMode.value = mode;
-    const accountId = auth.account?.id;
-    if (accountId !== undefined) writeStored(approvalModeKey(accountId), mode);
+    persist(approvalModeKey, mode);
   }
 
   function setChime(on: boolean): void {
-    chime.value = on;
-    const accountId = auth.account?.id;
-    if (accountId !== undefined) writeStored(chimeKey(accountId), on ? "1" : "0");
+    setFlag(chime, chimeKey, on);
   }
 
   function setLiveTokens(on: boolean): void {
-    liveTokens.value = on;
-    const accountId = auth.account?.id;
-    if (accountId !== undefined) writeStored(liveTokensKey(accountId), on ? "1" : "0");
+    setFlag(liveTokens, liveTokensKey, on);
   }
 
   function setContextPanel(on: boolean): void {
-    contextPanel.value = on;
-    const accountId = auth.account?.id;
-    if (accountId !== undefined) writeStored(contextPanelKey(accountId), on ? "1" : "0");
+    setFlag(contextPanel, contextPanelKey, on);
   }
 
   function setContextAccuracy(mode: ContextAccuracy): void {
     contextAccuracy.value = mode;
-    const accountId = auth.account?.id;
-    if (accountId !== undefined) writeStored(contextAccuracyKey(accountId), mode);
+    persist(contextAccuracyKey, mode);
   }
 
   function setBrowserNotifications(on: boolean): void {
-    browserNotifications.value = on;
-    const accountId = auth.account?.id;
-    if (accountId !== undefined) writeStored(`ember_web.notifications.${accountId}`, on ? "1" : "0");
+    setFlag(browserNotifications, notificationsKey, on);
   }
 
   function persistAllowedTools(): void {
@@ -1221,6 +1226,31 @@ export const useChatStore = defineStore("chat", () => {
     persistAllowedTools();
   }
 
+  /** Sends one answer for a step the running answer waits on. `inFlight` holds the
+   * step while the request runs. A 404/409 means nothing waits any more (already
+   * answered, maybe in another tab, or the answer ended), so the card is dropped. */
+  async function resolveStep(
+    inFlight: Ref<string[]>,
+    drop: (id: string) => void,
+    stepId: string,
+    send: () => Promise<unknown>,
+  ): Promise<void> {
+    const started = generation;
+    inFlight.value = [...inFlight.value, stepId];
+    sendError.value = "";
+    try {
+      await send();
+    } catch (err) {
+      if (started !== generation) return;
+      if (err instanceof ApiError && (err.status === 404 || err.status === 409)) {
+        drop(stepId);
+      } else {
+        inFlight.value = inFlight.value.filter((d) => d !== stepId);
+        sendError.value = errorMessage(err);
+      }
+    }
+  }
+
   /** Answers a tool the running answer waits to run. The card stays (its
    * buttons off) until the agent confirms with an approval_resolved event. */
   async function decideApproval(stepId: string, decision: ApprovalDecision): Promise<void> {
@@ -1228,23 +1258,11 @@ export const useChatStore = defineStore("chat", () => {
     const approval = pendingApprovals.value.find((a) => a.id === stepId);
     if (!conversation || !approval || deciding.value.includes(stepId)) return;
     const chatId = conversation.id;
-    const started = generation;
-    deciding.value = [...deciding.value, stepId];
-    sendError.value = "";
-    try {
+    await resolveStep(deciding, dropApproval, stepId, async () => {
       await chatsClient.decide(chatId, stepId, decision);
       // Only once ember_api accepted the answer does "always" become a rule.
       if (decision === "always" && !forceToolApproval.value) allowTool(chatId, approval.tool);
-    } catch (err) {
-      if (started !== generation) return;
-      if (err instanceof ApiError && (err.status === 404 || err.status === 409)) {
-        // Already answered, or the answer ended: nothing is waiting any more.
-        dropApproval(stepId);
-      } else {
-        deciding.value = deciding.value.filter((d) => d !== stepId);
-        sendError.value = errorMessage(err);
-      }
-    }
+    });
   }
 
   /** Answers (or skips) the questions the running answer waits on. The card
@@ -1253,21 +1271,9 @@ export const useChatStore = defineStore("chat", () => {
     const conversation = active.value;
     const waiting = pendingQuestions.value.find((q) => q.id === stepId);
     if (!conversation || !waiting || answeringQuestions.value.includes(stepId)) return;
-    const started = generation;
-    answeringQuestions.value = [...answeringQuestions.value, stepId];
-    sendError.value = "";
-    try {
-      await chatsClient.answerQuestion(conversation.id, stepId, { answers, skipped });
-    } catch (err) {
-      if (started !== generation) return;
-      if (err instanceof ApiError && (err.status === 404 || err.status === 409)) {
-        // Already answered (maybe in another tab), or the answer ended: nothing is waiting.
-        dropQuestion(stepId);
-      } else {
-        answeringQuestions.value = answeringQuestions.value.filter((a) => a !== stepId);
-        sendError.value = errorMessage(err);
-      }
-    }
+    await resolveStep(answeringQuestions, dropQuestion, stepId, () =>
+      chatsClient.answerQuestion(conversation.id, stepId, { answers, skipped }),
+    );
   }
 
   function answerQuestion(stepId: string, answers: QuestionAnswer[]): Promise<void> {
@@ -1279,27 +1285,19 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   function setPlan(on: boolean): void {
-    plan.value = on;
-    const accountId = auth.account?.id;
-    if (accountId !== undefined) writeStored(planKey(accountId), on ? "1" : "0");
+    setFlag(plan, planKey, on);
   }
 
   function setPlanLean(on: boolean): void {
-    planLean.value = on;
-    const accountId = auth.account?.id;
-    if (accountId !== undefined) writeStored(planLeanKey(accountId), on ? "1" : "0");
+    setFlag(planLean, planLeanKey, on);
   }
 
   function setCaveman(on: boolean): void {
-    caveman.value = on;
-    const accountId = auth.account?.id;
-    if (accountId !== undefined) writeStored(cavemanKey(accountId), on ? "1" : "0");
+    setFlag(caveman, cavemanKey, on);
   }
 
   function setIndependent(on: boolean): void {
-    independent.value = on;
-    const accountId = auth.account?.id;
-    if (accountId !== undefined) writeStored(independentKey(accountId), on ? "1" : "0");
+    setFlag(independent, independentKey, on);
   }
 
   /** After extensions were added or removed: re-read tools and commands. */

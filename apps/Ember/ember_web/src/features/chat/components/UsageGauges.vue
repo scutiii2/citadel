@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { usageClient, type MyUsage } from "../../usage/api/UsageClient";
-import { formatUtc } from "../../../utils/errors";
+import { formatUtc } from "../../../utils/time";
 import { compactNumber, usagePercent } from "../../../utils/analytics/usageFormat";
 
 // The 6-hour and weekly token limits, small, so they stay in view while

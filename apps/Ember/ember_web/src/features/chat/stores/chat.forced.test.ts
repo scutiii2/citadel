@@ -8,6 +8,7 @@ import type { ChatMessage, TurnEvent } from "../../../api/types";
 import { watchTurn } from "../services/turnStream";
 import { useAuthStore } from "../../../stores/auth";
 import { useChatStore } from "./chat";
+import { makeAccount } from "../../../testing/account";
 
 vi.mock("../../capabilities/api/ExtensionsClient", () => ({ extensionsClient: { list: vi.fn() } }));
 vi.mock("../api/ChatsClient", () => ({
@@ -28,7 +29,7 @@ const client = vi.mocked(chatsClient);
 const settings = vi.mocked(settingsClient);
 const watch = vi.mocked(watchTurn);
 
-const ACCOUNT = { id: 1, username: "root", email: "root@example.com", email_verified: true, roles: [], permissions: ["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] };
+const ACCOUNT = makeAccount();
 const ALLOWED_KEY = "ember_web.allowedTools.1";
 
 const FOUR: ChatMessage[] = [

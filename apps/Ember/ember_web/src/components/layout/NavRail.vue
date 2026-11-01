@@ -8,7 +8,8 @@ import { ticketsClient } from "../../features/tickets/api/TicketsClient";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AccountMenu from "./AccountMenu.vue";
 import EmberLogo from "./EmberLogo.vue";
-import { useTheme } from "../../composables/useTheme";
+import { usePolling } from "../../composables/time/usePolling";
+import { THEME_LABELS, useTheme } from "../../composables/useTheme";
 import { OVERVIEW_ICON, PROFILE_ICON, visiblePages } from "../../router/pages";
 import { usePageVisibilityStore } from "../../stores/navigation/pageVisibility";
 import { useAuthStore } from "../../stores/auth";
@@ -17,8 +18,6 @@ import { ADMIN_ACCESS_PERMISSIONS, emberAdminUrl } from "../../utils/navigation/
 import { railPages } from "../../utils/navigation/navArrangement";
 
 const { theme, next, cycle } = useTheme();
-const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" } as const;
-
 const auth = useAuthStore();
 const ticketUnread = ref(0);
 let unreadSeq = 0;
@@ -39,16 +38,10 @@ watch(() => [auth.account?.id, auth.needsVerification, auth.hasPermission("ticke
   ticketUnread.value = 0;
   void refreshUnread();
 }, { immediate: true });
-let unreadTimer: ReturnType<typeof setInterval> | undefined;
-onMounted(() => {
-  unreadTimer = setInterval(() => void refreshUnread(), 30_000);
-  document.addEventListener("visibilitychange", refreshUnread);
-  window.addEventListener("tickets-seen", refreshUnread);
-});
+usePolling(refreshUnread, 30_000);
+onMounted(() => window.addEventListener("tickets-seen", refreshUnread));
 onUnmounted(() => {
   ++unreadSeq;
-  clearInterval(unreadTimer);
-  document.removeEventListener("visibilitychange", refreshUnread);
   window.removeEventListener("tickets-seen", refreshUnread);
 });
 const pageVisibility = usePageVisibilityStore();
@@ -61,7 +54,7 @@ const canBrowse = computed(() => auth.account !== null && !auth.needsVerificatio
 const navPrefs = useNavPrefsStore();
 // These pages live in the account menu, in two groups, outside the account's
 // pin/reorder/hide arrangement; an administrator's hide list still removes them.
-const MENU_GROUPS = [["/capabilities", "/agents"], ["/calendar", "/usage", "/settings"]];
+const MENU_GROUPS = [["/capabilities", "/agents"], ["/usage", "/settings"]];
 // Chat sits in the header under the wordmark, not in the arrangement either.
 const HEADER_PAGE = "/";
 const MENU_PAGES = [...MENU_GROUPS.flat(), HEADER_PAGE];

@@ -5,6 +5,7 @@ import { ApiError } from "../../../api/http";
 import { templatesClient, type PromptTemplate } from "../api/TemplatesClient";
 import { useAuthStore } from "../../../stores/auth";
 import { useTemplatesStore } from "./templates";
+import { makeAccount } from "../../../testing/account";
 
 vi.mock("../api/TemplatesClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/TemplatesClient")>()),
@@ -13,7 +14,7 @@ vi.mock("../api/TemplatesClient", async (importOriginal) => ({
 
 const client = vi.mocked(templatesClient);
 
-const ACCOUNT = { id: 1, username: "u", email: "u@example.com", email_verified: true, roles: [], permissions: ["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] };
+const ACCOUNT = makeAccount({ username: "u", email: "u@example.com" });
 
 const tpl = (id: number, name = `T${id}`, body = "body"): PromptTemplate => ({
   id: String(id),

@@ -2,7 +2,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import * as api from '../api/PdfMergerClient'
-import { ApiError, type FileInfo, type JobEvent } from '../api/pdfMergerTypes'
+import { ApiError } from '../../../api/http'
+import { type FileInfo, type JobEvent } from '../api/pdfMergerTypes'
 import type { PageItem } from '../lib/segments'
 import { useAuthStore } from '../../../stores/auth'
 import { useFilesStore } from './files'
@@ -100,7 +101,7 @@ describe('plan store', () => {
   })
 
   it('shows the server message when the merge is refused', async () => {
-    vi.mocked(api.startMerge).mockRejectedValue(new ApiError('invalid_range', 'Segment 1 (a.pdf): bad.', 422))
+    vi.mocked(api.startMerge).mockRejectedValue(new ApiError(422, 'Segment 1 (a.pdf): bad.', 'invalid_range'))
     const files = useFilesStore()
     const plan = usePlanStore()
     files.add(info('f_a', 2))

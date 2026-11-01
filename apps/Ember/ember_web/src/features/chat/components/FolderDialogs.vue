@@ -3,6 +3,7 @@ import { computed, nextTick, ref } from "vue";
 import { FOLDER_NAME_MAX, type ChatFolder } from "../api/FoldersClient";
 import { useFoldersStore } from "../stores/folders";
 import { errorMessage } from "../../../utils/errors";
+import { plural } from "../../../utils/format";
 import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
 import DeleteButton from "../../../components/ui/buttons/DeleteButton.vue";
 
@@ -42,7 +43,7 @@ const canSave = computed(() => name.value.trim() !== "" && !busy.value);
 const deleteText = computed(() => {
   const m = mode.value;
   if (m?.kind !== "delete") return "";
-  return `Delete folder "${m.folder.name}" and its ${m.chatCount} ${m.chatCount === 1 ? "chat" : "chats"}? This can't be undone.`;
+  return `Delete folder "${m.folder.name}" and its ${plural(m.chatCount, "chat")}? This can't be undone.`;
 });
 
 function begin(next: Mode, initialName = ""): void {

@@ -92,7 +92,4 @@ watch(name, load);
 .muted {
   color: var(--muted);
 }
-.error {
-  color: var(--danger);
-}
 </style>

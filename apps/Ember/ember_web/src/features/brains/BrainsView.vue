@@ -268,7 +268,6 @@ button.file-row { flex-direction: row; align-items: flex-start; gap: 10px; paddi
 .connection-modal :deep(p) { overflow-wrap: anywhere; }
 [aria-busy="true"]:is(.search-form button, .browser-footer button)::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); vertical-align: -1px; animation: brain-spin .7s linear infinite; }
 @keyframes brain-spin { to { transform: rotate(360deg); } }
-.error { color: var(--danger); }
 @media (max-width: 900px) and (min-width: 768px) {
   .brain-workspace { --workspace-columns: 220px minmax(0, 1fr); }
   .document-content { padding: 24px; }

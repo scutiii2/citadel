@@ -56,5 +56,4 @@ const emit = defineEmits<{ 'update:uri': [value: string]; read: [uri: string] }>
   color: var(--accent-contrast);
   background: var(--accent);
 }
-.error { color: var(--danger); }
 </style>

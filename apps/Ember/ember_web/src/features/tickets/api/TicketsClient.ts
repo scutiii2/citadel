@@ -40,16 +40,16 @@ export interface CreatedTicket {
   group_size: number;
 }
 
+const ticketOf = async (...args: [method: "GET" | "POST", path: string, body?: unknown]): Promise<Ticket> =>
+  (await apiRequest<{ ticket: Ticket }>(...args)).ticket;
+
 export const ticketsClient = {
   unreadCount: async (): Promise<number> => (await apiRequest<{ count: number }>("GET", "/api/tickets/unread-count")).count,
   list: async (status?: TicketStatus): Promise<Ticket[]> =>
     (await apiRequest<{ tickets: Ticket[] }>("GET", status ? `/api/tickets?status=${status}` : "/api/tickets")).tickets,
-  get: async (id: number): Promise<Ticket> => (await apiRequest<{ ticket: Ticket }>("GET", `/api/tickets/${id}`)).ticket,
+  get: (id: number): Promise<Ticket> => ticketOf("GET", `/api/tickets/${id}`),
   create: (body: NewTicket) => apiRequest<CreatedTicket>("POST", "/api/tickets", body),
-  comment: async (id: number, body: string): Promise<Ticket> =>
-    (await apiRequest<{ ticket: Ticket }>("POST", `/api/tickets/${id}/comments`, { body })).ticket,
-  close: async (id: number): Promise<Ticket> =>
-    (await apiRequest<{ ticket: Ticket }>("POST", `/api/tickets/${id}/close`)).ticket,
-  reopen: async (id: number): Promise<Ticket> =>
-    (await apiRequest<{ ticket: Ticket }>("POST", `/api/tickets/${id}/reopen`)).ticket,
+  comment: (id: number, body: string): Promise<Ticket> => ticketOf("POST", `/api/tickets/${id}/comments`, { body }),
+  close: (id: number): Promise<Ticket> => ticketOf("POST", `/api/tickets/${id}/close`),
+  reopen: (id: number): Promise<Ticket> => ticketOf("POST", `/api/tickets/${id}/reopen`),
 };

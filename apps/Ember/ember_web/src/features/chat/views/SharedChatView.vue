@@ -4,7 +4,8 @@ import { useRoute } from "vue-router";
 import MarkdownContent from "../../../components/content/MarkdownContent.vue";
 import { ApiError } from "../../../api/http";
 import { sharesClient, type SharedChatView } from "../api/SharesClient";
-import { errorMessage, formatUtc } from "../../../utils/errors";
+import { errorMessage } from "../../../utils/errors";
+import { formatUtc } from "../../../utils/time";
 
 /** A chat someone shared by link: a read-only copy of its questions and
  * answers. Open to anyone (no login); everything shown comes from

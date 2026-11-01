@@ -50,16 +50,3 @@ export type JobEvent =
   | { type: 'progress'; done: number; total: number }
   | ({ type: 'done' } & MergeResult)
   | { type: 'error'; code: string; message: string }
-
-/** A failed request, with the server's error code and user-facing message. */
-export class ApiError extends Error {
-  readonly code: string
-  readonly status: number
-
-  constructor(code: string, message: string, status: number) {
-    super(message)
-    this.name = 'ApiError'
-    this.code = code
-    this.status = status
-  }
-}

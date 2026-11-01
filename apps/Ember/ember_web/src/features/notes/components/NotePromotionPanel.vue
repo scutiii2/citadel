@@ -6,6 +6,7 @@ import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 import MarkdownContent from "../../../components/content/MarkdownContent.vue";
 import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
+import { newId } from "../../../utils/browser/uuid";
 import { errorMessage } from "../../../utils/errors";
 
 const props = defineProps<{ noteId: string | null; dirty: boolean; sourceVersion?: string }>();
@@ -50,7 +51,7 @@ watch(() => [props.noteId, props.sourceVersion], () => { ++generation; retain();
 watch(scope, () => { audience.value = false; });
 function newPath(title: string, folder: string) {
   const slug = title.replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-|-$/g, "").slice(0, 80) || "Note";
-  return `${folder ? folder + "/" : ""}${slug}-${crypto.randomUUID().slice(0, 12)}.md`;
+  return `${folder ? folder + "/" : ""}${slug}-${newId().slice(0, 12)}.md`;
 }
 async function open(id: string, suggestion?: PromotionSuggestion) {
   if (busy.value) return;
@@ -78,7 +79,7 @@ async function open(id: string, suggestion?: PromotionSuggestion) {
       draft.value = previous.draft; path.value = previous.path;
       notice.value = "Your publication draft was retained. Review it against the latest saved Note before publishing.";
     }
-    requestKey.value = crypto.randomUUID();
+    requestKey.value = newId();
     review.value = note; dialogOpen.value = true;
   } catch (e) { if (ownsRequest()) error.value = errorMessage(e); }
   finally { if (ownsRequest()) busy.value = false; }
@@ -174,5 +175,4 @@ button { padding: 7px 12px; border: 1px solid var(--border); border-radius: var(
 button:disabled { opacity: .55; cursor: default; }
 article { margin-top: 12px; border-top: 1px solid var(--border); }
 .muted { color: var(--muted); font-size: .9em; }
-.error { color: var(--danger); }
 </style>

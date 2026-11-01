@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import type { UsageRecordRow } from "../api/UsageClient";
-import { formatCost, parseServerTime } from "../../../utils/analytics/usageFormat";
+import { formatCost } from "../../../utils/analytics/usageFormat";
+import { formatUtc } from "../../../utils/time";
 
 /** One model call in the Usage page's Recent calls list: the agent (and who handed it
  * the question), provider and gateway chips, when and with which model, and its tokens. */
 defineProps<{ record: UsageRecordRow; currency?: string }>();
 
-/** A naive-UTC API time as the viewer's local date and time. */
-const localTime = (value: string): string => new Date(parseServerTime(value)).toLocaleString();
 const tokens = (n: number): string => n.toLocaleString();
 </script>
 
@@ -21,7 +20,7 @@ const tokens = (n: number): string => n.toLocaleString();
         <span v-if="record.provider_id" class="call-chip">{{ record.provider_id }}</span>
         <span v-if="record.gateway" class="call-chip">{{ record.gateway }}</span>
       </div>
-      <div class="muted small">{{ localTime(record.started_at ?? record.created_at) }}<template v-if="record.model"> · {{ record.model }}</template></div>
+      <div class="muted small">{{ formatUtc(record.started_at ?? record.created_at) }}<template v-if="record.model"> · {{ record.model }}</template></div>
     </div>
     <div class="call-tokens">
       <strong>{{ tokens(record.total_tokens) }}<template v-if="record.cost != null"> · {{ formatCost(record.cost, currency) }}</template></strong>

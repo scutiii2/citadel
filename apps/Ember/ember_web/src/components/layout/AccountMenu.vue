@@ -6,7 +6,7 @@
 import { nextTick, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { useOutsideClose } from "../../composables/useOutsideClose";
-import { useTheme } from "../../composables/useTheme";
+import { THEME_LABELS, useTheme } from "../../composables/useTheme";
 import { PROFILE_ICON, type NavPage } from "../../router/pages";
 
 defineProps<{
@@ -19,7 +19,6 @@ defineProps<{
 }>();
 const emit = defineEmits<{ logout: [] }>();
 
-const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" } as const;
 const { theme, cycle } = useTheme();
 
 const route = useRoute();
