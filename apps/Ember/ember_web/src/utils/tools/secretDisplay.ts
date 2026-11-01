@@ -4,7 +4,7 @@
 export type StrengthLevel = "weak" | "fair" | "strong" | "excellent";
 
 /** The strength bar is full at this many bits of entropy. */
-export const STRENGTH_FULL_BITS = 128;
+const STRENGTH_FULL_BITS = 128;
 
 const LABELS: Record<StrengthLevel, string> = { weak: "Weak", fair: "Fair", strong: "Strong", excellent: "Excellent" };
 

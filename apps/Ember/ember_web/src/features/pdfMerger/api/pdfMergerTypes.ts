@@ -2,7 +2,7 @@
 
 export type Rotation = 0 | 90 | 180 | 270
 export type Fit = 'fit' | 'fill' | 'original'
-export type PageSize = 'A4' | 'Letter' | 'match'
+type PageSize = 'A4' | 'Letter' | 'match'
 export type FileKind = 'pdf' | 'image'
 
 export interface FileInfo {

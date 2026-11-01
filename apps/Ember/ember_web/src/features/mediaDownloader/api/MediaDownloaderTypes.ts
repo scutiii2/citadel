@@ -1,6 +1,6 @@
 // Mirrors media_downloader/src/models.py and the job events in src/service.py. Keep both in step.
 
-export type FileKind = 'video' | 'audio' | 'photo' | 'package'
+type FileKind = 'video' | 'audio' | 'photo' | 'package'
 export type JobState = 'queued' | 'downloading' | 'processing' | 'done' | 'error'
 
 export interface FileInfo {
@@ -14,7 +14,7 @@ export interface FileInfo {
   download_url: string
 }
 
-export interface PresetOption {
+interface PresetOption {
   id: string
   label: string
   kind: FileKind
@@ -34,13 +34,6 @@ export interface ProbeResult {
   photo_count?: number
 }
 
-export type JobEvent =
-  | { type: 'queued' }
-  | { type: 'progress'; percent: number | null; speed: number | null; eta: number | null }
-  | { type: 'processing' }
-  | { type: 'done'; file_id: string; file: FileInfo }
-  | { type: 'error'; code: string; message: string }
-
 /** GET /api/jobs/{id}: a snapshot of one job (src/models.py JobStatus). */
 export interface JobStatus {
   job_id: string
@@ -52,7 +45,7 @@ export interface JobStatus {
   error: { code: string; message: string } | null
 }
 
-export interface PackageItem {
+interface PackageItem {
   item_id: string
   url: string
   preset: string

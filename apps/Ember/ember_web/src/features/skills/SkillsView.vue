@@ -62,7 +62,7 @@ const searchField = ref<InstanceType<typeof SearchField> | null>(null);
 const draft = ref<SkillText>({ title: "", when_to_use: "", steps: "", tools: "" });
 const saving = ref(false);
 const editError = ref("");
-const busy = computed(() => saving.value || removing.value || busyId.value !== null);
+const busy = computed((): boolean => saving.value || removing.value || busyId.value !== null);
 const filled = computed(() => draft.value.title.trim() !== "" && draft.value.when_to_use.trim() !== "" && draft.value.steps.trim() !== "");
 const dirty = computed(() => editing.value !== null && (Object.keys(draft.value) as (keyof SkillText)[]).some((key) => draft.value[key] !== editing.value![key]));
 const discardTarget = ref<Skill | null>(null);

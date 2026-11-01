@@ -2,7 +2,7 @@ import type { ChatFolder } from "../api/FoldersClient";
 import type { Conversation } from "../../../api/types";
 
 /** One block of the chat list: the pinned chats, one folder, or the chats in no folder. */
-export interface ChatSection {
+interface ChatSection {
   kind: "pinned" | "folder" | "unfiled";
   key: string;
   /** Set for a folder section. */

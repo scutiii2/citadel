@@ -17,7 +17,7 @@ export async function uploadFile(file: File): Promise<FileInfo> {
 export function deleteFile(id: string): Promise<void> { return apiRequest('DELETE', fileUrl(id)) }
 export function startMerge(plan: MergePlan): Promise<{job_id: string}> { return apiRequest('POST', `${BASE}/merge`, plan) }
 export function cancelJob(id: string): Promise<void> { return apiRequest('POST', `${BASE}/jobs/${encodeURIComponent(id)}/cancel`, {}) }
-export interface JobStatus {
+interface JobStatus {
   job_id: string
   state: 'queued' | 'progress' | 'done' | 'error'
   done: number

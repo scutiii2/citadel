@@ -10,7 +10,7 @@ export const TRIAGE_MAX_OPTIONS = 10;
 
 export type TriageKind = "choice" | "yes_no" | "score";
 
-export interface TriageOption {
+interface TriageOption {
   /** One word; the answer names it. */
   title: string;
   description: string;
@@ -55,14 +55,14 @@ interface Common {
   rounds?: TriageRound[];
 }
 
-export interface YesNoAnswer extends Common {
+interface YesNoAnswer extends Common {
   kind: "yes_no";
   answer: "yes" | "no";
   /** Probability of yes. */
   yes: number;
 }
 
-export interface ChoiceAnswer extends Common {
+interface ChoiceAnswer extends Common {
   kind: "choice";
   choice: string;
   probabilities: Record<string, number>;
@@ -72,7 +72,7 @@ export interface ChoiceAnswer extends Common {
   unknown?: true;
 }
 
-export interface ScoreAnswer extends Common {
+interface ScoreAnswer extends Common {
   kind: "score";
   /** 0 is the lowest level, `levels.length - 1` the highest; anything in between is a blend. */
   score: number;

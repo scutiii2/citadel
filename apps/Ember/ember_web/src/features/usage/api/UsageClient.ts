@@ -3,7 +3,7 @@ import type { UsageWindow } from "../../../api/contracts/usage";
 
 export type UsageGroupBy = "agent" | "provider" | "gateway" | "model";
 
-export interface UsageGroup {
+interface UsageGroup {
   cost: number | null;
   key: string;
   tokens: number;

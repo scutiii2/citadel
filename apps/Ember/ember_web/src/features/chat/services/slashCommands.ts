@@ -15,7 +15,7 @@ import { formatToolResult } from "../../../utils/tools/toolResultFormat";
  * for tool "<extension id>__<tool>", with the tool's own description and
  * schema. A built-in capability wins over an extension with the same id. */
 
-export class CommandError extends Error {}
+class CommandError extends Error {}
 
 export interface ParsedCommand {
   capability: string;
@@ -26,7 +26,7 @@ export interface ParsedCommand {
 const HELP_TARGETS: HelpTarget[] = ["all", "tools", "commands", "workflow"];
 
 /** Shell-like split: spaces separate words, quotes group them. */
-export function splitWords(text: string): string[] {
+function splitWords(text: string): string[] {
   const words: string[] = [];
   let current = "";
   let quote: '"' | "'" | null = null;

@@ -3,13 +3,13 @@ import { EXTENSION_SEPARATOR, type ExtensionInfo } from "../../../api/contracts/
 import type { ToolInfo } from "../../../api/types";
 
 /** One capability and the tools of it that are shown. */
-export interface CapabilityGroup {
+interface CapabilityGroup {
   capability: CapabilityInfo;
   tools: ToolInfo[];
 }
 
 /** One extension and the tools of it that are shown. */
-export interface ExtensionGroup {
+interface ExtensionGroup {
   extension: ExtensionInfo;
   tools: ToolInfo[];
 }

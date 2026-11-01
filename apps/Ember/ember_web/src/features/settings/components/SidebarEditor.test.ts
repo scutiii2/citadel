@@ -1,7 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Account } from "../../../api/auth/AuthClient";
 import { navPreferencesClient, type NavPrefs } from "../../../api/navigation/NavPreferencesClient";
 import { settingsClient } from "../../../api/navigation/SettingsClient";
 import { useAuthStore } from "../../../stores/auth";

@@ -1,13 +1,13 @@
 import type { JsonSchema } from "../../api/types";
 
 /** How a value is parsed into a tool argument. */
-export type FieldKind = "string" | "number" | "integer" | "boolean" | "enum" | "json";
+type FieldKind = "string" | "number" | "integer" | "boolean" | "enum" | "json";
 
 /** How a field is drawn. A tool can ask for one with a schema hint
  * (`input`, chat_app's command-form convention); otherwise it follows the
  * kind. "select" with an `optionsUrl` gets its options from mcp_server; a
  * "file" field uploads the dropped file and holds its server-side path. */
-export type FieldWidget =
+type FieldWidget =
   | "text"
   | "textarea"
   | "password"
