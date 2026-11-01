@@ -1148,6 +1148,13 @@ export const useChatStore = defineStore("chat", () => {
    * told one chat at a time, in order. */
   function deleteChats(ids: string[]): void {
     const doomed = new Set(ids);
+    dropChats(doomed);
+    for (const id of doomed) enqueue(() => storage.remove(id));
+  }
+
+  /** Removes chats from the screen only: leaves the active one, filters the
+   * lists and forgets their allowed tools. */
+  function dropChats(doomed: Set<string>): void {
     if (activeId.value !== null && doomed.has(activeId.value)) {
       unfollow();
       clearCompletionNotifications();
@@ -1157,10 +1164,7 @@ export const useChatStore = defineStore("chat", () => {
     }
     conversations.value = conversations.value.filter((c) => !doomed.has(c.id));
     searchHits.value = searchHits.value.filter((h) => !doomed.has(h.id));
-    for (const id of doomed) {
-      clearAllowedTools(id);
-      enqueue(() => storage.remove(id));
-    }
+    for (const id of doomed) clearAllowedTools(id);
   }
 
   /** Whether chat `id` is in this account's list. */
@@ -1333,16 +1337,7 @@ export const useChatStore = defineStore("chat", () => {
     listSeq += 1;
     const doomed = new Set(conversations.value.filter((c) => c.folderId === folderId).map((c) => c.id));
     if (doomed.size === 0) return;
-    if (activeId.value !== null && doomed.has(activeId.value)) {
-      unfollow();
-      clearCompletionNotifications();
-      clearSuggestion();
-      jumpIndex.value = null;
-      activeId.value = null;
-    }
-    conversations.value = conversations.value.filter((c) => !doomed.has(c.id));
-    searchHits.value = searchHits.value.filter((h) => !doomed.has(h.id));
-    for (const id of doomed) clearAllowedTools(id);
+    dropChats(doomed);
   }
 
   function deleteAllChats(): void {
