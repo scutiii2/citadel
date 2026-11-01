@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
 import ListRow from "../../components/ui/lists/ListRow.vue";
@@ -8,15 +8,15 @@ import StateMessage from "../../components/ui/status/StateMessage.vue";
 import DangerZone from "../../components/ui/status/DangerZone.vue";
 import CharacterCount from "../../components/ui/status/CharacterCount.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import { useDeleteConfirm } from "../../composables/useDeleteConfirm";
+import { useListLoad } from "../../composables/useListLoad";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { growToContent } from "../../utils/browser/autoGrow";
 import "../../components/layout/infoPage.css";
 import { errorMessage } from "../../utils/errors";
 import { SKILL_LIMITS, skillsClient, type Skill, type SkillStatus, type SkillText } from "./api/SkillsClient";
 
-const skills = ref<Skill[]>([]);
-const loading = ref(true);
-const loadError = ref("");
+const { items: skills, loading, loadError, load } = useListLoad(() => skillsClient.list());
 const notice = ref("");
 const actionError = ref("");
 const busyId = ref<number | null>(null);
@@ -30,15 +30,6 @@ const groups = computed(() => [
   { status: "active" as const, title: "Active", hint: "Ember may follow these when a task matches.", items: matches.value.filter((s) => s.status === "active") },
   { status: "retired" as const, title: "Retired", hint: "Never used. Delete them or send them back for review.", items: matches.value.filter((s) => s.status === "retired") },
 ]);
-
-async function load(): Promise<void> {
-  loading.value = true;
-  loadError.value = "";
-  try { skills.value = await skillsClient.list(); }
-  catch (error) { loadError.value = errorMessage(error); }
-  finally { loading.value = false; }
-}
-onMounted(load);
 
 async function move(skill: Skill, status: SkillStatus, done: string): Promise<void> {
   if (busy.value) return;
@@ -55,28 +46,15 @@ async function move(skill: Skill, status: SkillStatus, done: string): Promise<vo
   finally { busyId.value = null; }
 }
 
-const deleting = ref<Skill | null>(null);
-const removing = ref(false);
-const removeError = ref("");
-function askDelete(skill: Skill): void {
-  if (busy.value) return;
-  deleting.value = skill;
-  removeError.value = "";
-}
-async function remove(): Promise<void> {
-  if (!deleting.value || busy.value) return;
-  removing.value = true;
-  removeError.value = "";
-  try {
-    await skillsClient.remove(deleting.value.id);
-    const gone = deleting.value.id;
-    skills.value = skills.value.filter((s) => s.id !== gone);
-    if (editing.value?.id === gone) showEditor(null);
-    deleting.value = null;
+const { deleting, removing, removeError, ask: askDelete, confirm: remove } = useDeleteConfirm<Skill>(
+  (skill) => skillsClient.remove(skill.id),
+  (skill) => {
+    skills.value = skills.value.filter((s) => s.id !== skill.id);
+    if (editing.value?.id === skill.id) showEditor(null);
     notice.value = "Skill deleted.";
-  } catch (error) { removeError.value = errorMessage(error); }
-  finally { removing.value = false; }
-}
+  },
+  () => busy.value,
+);
 
 const editing = ref<Skill | null>(null);
 const listScroll = ref<HTMLElement | null>(null);

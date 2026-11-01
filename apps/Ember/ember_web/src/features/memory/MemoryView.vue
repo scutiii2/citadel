@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { MEMORY_MAX, MEMORY_TEXT_MAX, memoryClient, type MemoryNote } from "./api/MemoryClient";
 import ListRow from "../../components/ui/lists/ListRow.vue";
@@ -11,11 +11,11 @@ import DangerZone from "../../components/ui/status/DangerZone.vue";
 import CharacterCount from "../../components/ui/status/CharacterCount.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import "../../components/layout/infoPage.css";
+import { useDeleteConfirm } from "../../composables/useDeleteConfirm";
+import { useListLoad } from "../../composables/useListLoad";
 import { errorMessage } from "../../utils/errors";
 
-const memories = ref<MemoryNote[]>([]);
-const loading = ref(true);
-const loadError = ref("");
+const { items: memories, loading, loadError, load } = useListLoad(() => memoryClient.list());
 const notice = ref("");
 const query = ref("");
 const visible = ref(20);
@@ -25,15 +25,6 @@ const matches = computed(() => {
 });
 const shown = computed(() => matches.value.slice(0, visible.value));
 watch(query, () => { visible.value = 20; }, { flush: "sync" });
-
-async function load(): Promise<void> {
-  if (!loading.value) loading.value = true;
-  loadError.value = "";
-  try { memories.value = await memoryClient.list(); }
-  catch (error) { loadError.value = errorMessage(error); }
-  finally { loading.value = false; }
-}
-onMounted(load);
 
 const editorOpen = ref(false);
 const editing = ref<MemoryNote | null>(null);
@@ -98,23 +89,14 @@ async function save(): Promise<void> {
   finally { saving.value = false; }
 }
 
-const deleting = ref<MemoryNote | null>(null);
-const removing = ref(false);
-const removeError = ref("");
-function askDelete(memory: MemoryNote): void { deleting.value = memory; removeError.value = ""; }
-async function remove(): Promise<void> {
-  if (!deleting.value || removing.value) return;
-  removing.value = true;
-  removeError.value = "";
-  try {
-    await memoryClient.remove(deleting.value.id);
-    memories.value = memories.value.filter((memory) => memory.id !== deleting.value!.id);
-    if (editing.value?.id === deleting.value.id) showEditor("close");
-    deleting.value = null;
+const { deleting, removing, removeError, ask: askDelete, confirm: remove } = useDeleteConfirm<MemoryNote>(
+  (memory) => memoryClient.remove(memory.id),
+  (memory) => {
+    memories.value = memories.value.filter((m) => m.id !== memory.id);
+    if (editing.value?.id === memory.id) showEditor("close");
     notice.value = "Memory deleted.";
-  } catch (error) { removeError.value = errorMessage(error); }
-  finally { removing.value = false; }
-}
+  },
+);
 </script>
 
 
