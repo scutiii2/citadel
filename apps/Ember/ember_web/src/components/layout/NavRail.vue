@@ -5,13 +5,14 @@
 // arrangement applies: pinned pages first, a divider, the rest, hidden ones left out.
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { ticketsClient } from "../../features/tickets/api/TicketsClient";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 import AccountMenu from "./AccountMenu.vue";
 import EmberLogo from "./EmberLogo.vue";
 import { usePolling } from "../../composables/time/usePolling";
 import { THEME_LABELS, useTheme } from "../../composables/useTheme";
 import { OVERVIEW_ICON, PROFILE_ICON, visiblePages } from "../../router/pages";
 import { usePageVisibilityStore } from "../../stores/navigation/pageVisibility";
+import { useLogout } from "../../composables/useLogout";
 import { useAuthStore } from "../../stores/auth";
 import { useNavPrefsStore } from "../../stores/navigation/navPrefs";
 import { ADMIN_ACCESS_PERMISSIONS, emberAdminUrl } from "../../utils/navigation/adminLink";
@@ -46,7 +47,6 @@ onUnmounted(() => {
 });
 const pageVisibility = usePageVisibilityStore();
 const route = useRoute();
-const router = useRouter();
 
 const adminUrl = emberAdminUrl();
 const canAdmin = computed(() => ADMIN_ACCESS_PERMISSIONS.some(auth.hasPermission));
@@ -108,10 +108,7 @@ function isOpenedFromHere(to: string): boolean {
   );
 }
 
-async function logout(): Promise<void> {
-  await auth.logout();
-  await router.replace({ name: "login" });
-}
+const logout = useLogout();
 </script>
 
 <template>

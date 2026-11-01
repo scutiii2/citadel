@@ -39,7 +39,7 @@ function messageOf(data: unknown, fallback: string): string {
   return fallback;
 }
 
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export async function apiRequest<T>(
   method: HttpMethod,

@@ -1,6 +1,6 @@
 import { ApiError } from "./http";
 
-export interface PollJobOptions<S> {
+interface PollJobOptions<S> {
   fetch: () => Promise<S>;
   /** Handles a status; returns true once the job is finished. */
   onStatus: (status: S) => boolean;

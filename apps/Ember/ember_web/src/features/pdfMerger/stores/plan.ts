@@ -8,7 +8,7 @@ import { moveItem, pageKey, reconcile, toSegments, type PageItem } from '../lib/
 import { useAuthStore } from '../../../stores/auth'
 import { useFilesStore } from './files'
 
-export type MergeStatus = 'idle' | 'running' | 'done' | 'error'
+type MergeStatus = 'idle' | 'running' | 'done' | 'error'
 
 export const usePlanStore = defineStore('pdfMergerPlan', () => {
   const files = useFilesStore()

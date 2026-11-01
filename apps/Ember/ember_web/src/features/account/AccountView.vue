@@ -9,6 +9,7 @@ import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import { THEME_LABELS, useTheme } from "../../composables/useTheme";
 import { visiblePages } from "../../router/pages";
 import { usePageVisibilityStore } from "../../stores/navigation/pageVisibility";
+import { useLogout } from "../../composables/useLogout";
 import { useAuthStore } from "../../stores/auth";
 import { errorMessage } from "../../utils/errors";
 import { formatUtc } from "../../utils/time";
@@ -30,10 +31,7 @@ const morePages = computed(() =>
   ),
 );
 
-async function logout(): Promise<void> {
-  await auth.logout();
-  await router.replace({ name: "login" });
-}
+const logout = useLogout();
 
 // The router only opens this page with an account.
 const account = computed(() => auth.account!);

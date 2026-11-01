@@ -4,7 +4,7 @@ import type { Conversation } from "../../../api/types";
 export type DropTarget = { kind: "pinned" } | { kind: "folder"; folderId: number } | { kind: "unfiled" };
 
 /** One change a drop makes; `move` always comes before `pin`. */
-export type DropOp = { op: "move"; folderId: number | null } | { op: "pin"; pinned: boolean };
+type DropOp = { op: "move"; folderId: number | null } | { op: "pin"; pinned: boolean };
 
 /** What dropping `chat` on `target` changes (nothing: an empty list, and the
  * target does not accept the drop). The target decides the placement, so the

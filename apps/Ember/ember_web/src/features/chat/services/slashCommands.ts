@@ -17,7 +17,7 @@ import { formatToolResult } from "../../../utils/tools/toolResultFormat";
 
 class CommandError extends Error {}
 
-export interface ParsedCommand {
+interface ParsedCommand {
   capability: string;
   command: string;
   params: Record<string, string>;

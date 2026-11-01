@@ -1,7 +1,7 @@
 import { quoteWord, type ToolField } from "../../../utils/tools/toolSchema";
 
 /** One completion of the word being typed after "/<capability> <command> ". */
-export interface ParamSuggestion {
+interface ParamSuggestion {
   /** What the word becomes: "key=" or "key=value". */
   text: string;
   description: string;

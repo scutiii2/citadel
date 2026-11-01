@@ -14,7 +14,7 @@ interface ExtensionGroup {
   tools: ToolInfo[];
 }
 
-export interface GroupedTools {
+interface GroupedTools {
   groups: CapabilityGroup[];
   /** Tools no capability lists that an extension brings. */
   extensionGroups: ExtensionGroup[];

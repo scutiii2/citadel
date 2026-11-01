@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AuthCard from "../../../components/auth/AuthCard.vue";
 import { errorMessage } from "../../../utils/errors";
+import { useLogout } from "../../../composables/useLogout";
 import { useAuthStore } from "../../../stores/auth";
 
 const auth = useAuthStore();
@@ -50,10 +51,7 @@ async function resend(): Promise<void> {
   }
 }
 
-async function logout(): Promise<void> {
-  await auth.logout();
-  await router.replace({ name: "login" });
-}
+const logout = useLogout();
 </script>
 
 <template>

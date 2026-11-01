@@ -34,7 +34,7 @@ export interface NewTicket {
   description: string;
 }
 
-export interface CreatedTicket {
+interface CreatedTicket {
   ticket: Ticket;
   duplicate: boolean;
   group_size: number;

@@ -15,7 +15,7 @@ export interface Note {
 }
 
 /** What a note's editor holds: everything a save replaces. */
-export interface NoteDraft {
+interface NoteDraft {
   title: string;
   body: string;
   tags: string[];
@@ -38,7 +38,7 @@ export interface TagSuggestions {
 }
 
 /** Up to three new tags the tag-writer agent proposes for a note. None are applied. */
-export interface GeneratedTags {
+interface GeneratedTags {
   tags: string[];
 }
 

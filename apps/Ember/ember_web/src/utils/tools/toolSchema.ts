@@ -149,7 +149,7 @@ export function initialValues(fields: ToolField[]): FieldValues {
   return Object.fromEntries(fields.map((f) => [f.name, f.initial]));
 }
 
-export type BuildResult =
+type BuildResult =
   | { ok: true; args: Record<string, unknown> }
   | { ok: false; errors: Record<string, string> };
 

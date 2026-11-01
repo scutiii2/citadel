@@ -1,6 +1,6 @@
 import { apiRequest } from "../http";
 
-export interface AttachmentText {
+interface AttachmentText {
   filename: string;
   text: string;
   char_count: number;
@@ -17,14 +17,14 @@ export interface AttachmentTable {
   notes: string[];
 }
 
-export interface AttachmentPdf extends AttachmentText {
+interface AttachmentPdf extends AttachmentText {
   file_id: string;
   pages: number;
   kind: string;
   expires_at: number;
 }
 
-export interface AttachmentAudio {
+interface AttachmentAudio {
   filename: string;
   file_id: string;
   duration_s: number;

@@ -10,7 +10,7 @@ interface ChatSection {
   chats: Conversation[];
 }
 
-export interface ChatLayout {
+interface ChatLayout {
   /** False with no pins and no folders: one flat list, shown without headers. */
   grouped: boolean;
   sections: ChatSection[];

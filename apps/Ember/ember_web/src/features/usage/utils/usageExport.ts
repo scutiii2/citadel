@@ -3,7 +3,7 @@ import { favoriteAgent, hourLabel, peakHour } from "./usageStats";
 import { formatCost } from "../../../utils/analytics/usageFormat";
 import { markdownCell, pad2 } from "../../../utils/format";
 
-export interface UsageExportOptions {
+interface UsageExportOptions {
   username: string;
   /** "30 days", "This month" ... */
   rangeLabel: string;

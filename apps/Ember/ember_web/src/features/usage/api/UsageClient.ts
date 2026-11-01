@@ -33,7 +33,7 @@ export interface UsageRecordRow {
   created_at: string;
 }
 
-export interface UsageFilters {
+interface UsageFilters {
   agent?: string;
   provider?: string;
 }
