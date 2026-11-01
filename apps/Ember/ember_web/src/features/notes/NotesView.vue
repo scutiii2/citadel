@@ -20,7 +20,7 @@ import { ApiError } from "../../api/http";
 import ListRow from "../../components/ui/lists/ListRow.vue";
 import SearchField from "../../components/ui/lists/SearchField.vue";
 import CharacterCount from "../../components/ui/status/CharacterCount.vue";
-import { growToContent } from "../../utils/browser/autoGrow";
+import { growOnResize, growToContent } from "../../utils/browser/autoGrow";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
 import DangerZone from "../../components/ui/status/DangerZone.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
@@ -58,17 +58,7 @@ watch([() => form.body, bodyField], async () => {
   await nextTick();
   if (bodyField.value) growToContent(bodyField.value);
 });
-watch(bodyField, (field, _previous, onCleanup) => {
-  if (!field || typeof ResizeObserver === "undefined") return;
-  let width = 0;
-  const observer = new ResizeObserver(([entry]) => {
-    if (!entry || entry.contentRect.width === width) return;
-    width = entry.contentRect.width;
-    growToContent(field);
-  });
-  observer.observe(field);
-  onCleanup(() => observer.disconnect());
-});
+growOnResize(bodyField);
 // What is typed in the tag box but not added yet (TagInput's v-model:text) and the component itself.
 const tagInput = ref("");
 const tagField = ref<InstanceType<typeof TagInput> | null>(null);

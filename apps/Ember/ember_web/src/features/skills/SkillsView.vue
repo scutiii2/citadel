@@ -12,7 +12,7 @@ import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import { useDeleteConfirm } from "../../composables/useDeleteConfirm";
 import { useListLoad } from "../../composables/useListLoad";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
-import { growToContent } from "../../utils/browser/autoGrow";
+import { growOnResize, growToContent } from "../../utils/browser/autoGrow";
 import "../../components/layout/infoPage.css";
 import { errorMessage } from "../../utils/errors";
 import { SKILL_LIMITS, skillsClient, type Skill, type SkillStatus, type SkillText } from "./api/SkillsClient";
@@ -98,17 +98,7 @@ function answerDiscard(discard: boolean): void {
   guard.answer(discard);
 }
 const titleField = ref<HTMLTextAreaElement | null>(null);
-watch(titleField, (field, _previous, onCleanup) => {
-  if (!field || typeof ResizeObserver === "undefined") return;
-  let width = 0;
-  const observer = new ResizeObserver(([entry]) => {
-    if (!entry || entry.contentRect.width === width) return;
-    width = entry.contentRect.width;
-    growToContent(field);
-  });
-  observer.observe(field);
-  onCleanup(() => observer.disconnect());
-});
+growOnResize(titleField);
 watch([() => draft.value.title, () => editing.value?.id], async () => {
   await nextTick();
   if (titleField.value) growToContent(titleField.value);

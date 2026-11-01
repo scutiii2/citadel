@@ -24,13 +24,6 @@
   border-radius: var(--radius-lg);
   background: var(--surface);
 }
-.info-page:where(:not(.page), .info-content) .card-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px 12px;
-}
 .info-page:where(:not(.page), .info-content) .name {
   font-family: var(--mono);
   font-size: 0.8em;
