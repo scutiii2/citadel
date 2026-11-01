@@ -58,6 +58,19 @@ export interface StoredNote {
   updated_at: string;
 }
 
+export interface StoredSkill {
+  id: number;
+  title: string;
+  when_to_use: string;
+  steps: string;
+  tools: string;
+  status: "proposed" | "active" | "retired";
+  successes: number;
+  failures: number;
+  failing: boolean;
+  created_at: string;
+}
+
 /** What the page sends when it saves a note. */
 interface NoteBody {
   title: string;
@@ -159,6 +172,7 @@ export interface FakeApi {
   /** The member's private notes (/api/notes). */
   notes: Map<string, StoredNote>;
   memories: Map<number, { id: number; text: string; created_at: string }>;
+  skills: Map<number, StoredSkill>;
   /** What the Settings tab saves: the administrator's "require approval for every tool". */
   settings: { forceToolApproval: boolean };
   /** The accounts the Admin page lists (an administrator login only). */
@@ -258,6 +272,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     shares: new Map(),
     notes: new Map(),
     memories: new Map(),
+    skills: new Map(),
     unexpected: [],
     turns: [],
     chats: new Map(),
@@ -601,6 +616,22 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       const text = `${title ?? ""} ${body ?? ""}`.toLowerCase();
       const suggested = [...used].filter((tag) => !have.has(tag) && text.includes(tag)).sort();
       return json(route, { suggested, checked: [...used].filter((tag) => !have.has(tag)).length, skipped: 0 });
+    }
+
+    if (path === "/api/skills" && method === "GET") return json(route, [...api.skills.values()]);
+    const skillPath = /^\/api\/skills\/(\d+)(\/status)?$/.exec(path);
+    if (skillPath && (method === "PUT" || method === "DELETE")) {
+      const id = Number(skillPath[1]);
+      const skill = api.skills.get(id);
+      if (!skill) return json(route, { detail: "Skill not found" }, 404);
+      if (method === "DELETE" && !skillPath[2]) { api.skills.delete(id); return route.fulfill({ status: 204 }); }
+      if (method === "PUT") {
+        const updated = skillPath[2]
+          ? { ...skill, status: (request.postDataJSON() as { status: StoredSkill["status"] }).status }
+          : { ...skill, ...request.postDataJSON() as Pick<StoredSkill, "title" | "when_to_use" | "steps" | "tools">, successes: 0, failures: 0, failing: false };
+        api.skills.set(id, updated);
+        return json(route, updated);
+      }
     }
 
     if (path === "/api/memory" && method === "GET") return json(route, [...api.memories.values()].sort((a, b) => b.id - a.id));

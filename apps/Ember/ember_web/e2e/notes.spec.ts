@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { installFakeApi } from "./fakeApi.ts";
 import { flipSwitch, logIn } from "./helpers.ts";
 
-test("notes: focused editor keeps Save reachable at desktop, tablet and mobile widths", async ({ page }) => {
+test("notes: focused editor keeps Save reachable at desktop, tablet and mobile widths", async ({ page }, info) => {
   const api = await installFakeApi(page);
   await logIn(page);
   await page.goto("/notes");
@@ -12,16 +12,20 @@ test("notes: focused editor keeps Save reachable at desktop, tablet and mobile w
   await expect(page.getByLabel("Add a tag")).toBeHidden();
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
-    for (const width of [1440, 768, 375]) {
+    for (const width of [1440, 768, 767, 375, 320]) {
       await page.setViewportSize({ width, height: 812 });
       const save = page.getByRole("button", { name: "Save", exact: true });
       await expect(save).toBeInViewport();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await expect(page.getByRole("list", { name: "Notes", exact: true })).toBeVisible({ visible: width >= 768 });
       await expect(page.getByRole("button", { name: "All notes" })).toBeVisible({ visible: width < 768 });
+      const box = await save.boundingBox();
+      expect(box!.y + box!.height).toBeLessThanOrEqual(812 - (width < 768 ? 52 : 0));
+      expect(await page.locator(".editor-scroll").evaluate(e => getComputedStyle(e).overflowY)).toBe("scroll");
+      await expect.poll(() => page.getByLabel("Note text").evaluate(e => e.scrollHeight <= e.clientHeight + 1)).toBe(true);
+      await page.screenshot({ path: info.outputPath("notes-" + colorScheme + "-" + width + ".png") });
     }
   }
-  await page.getByRole("button", { name: "Note details & tools" }).click();
   await page.locator("summary").filter({ hasText: "Tags" }).click();
   await page.getByLabel("Add a tag").fill("reflection");
   await page.getByRole("button", { name: "Save", exact: true }).click();

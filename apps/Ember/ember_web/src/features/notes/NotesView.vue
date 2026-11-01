@@ -2,7 +2,7 @@
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
 import NotePromotionPanel from "./components/NotePromotionPanel.vue";
 import PageLayout from "../../components/layout/PageLayout.vue";
-import { computed, onMounted, reactive, ref, useId } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, useId, watch } from "vue";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import {
   NOTE_BODY_MAX,
@@ -17,6 +17,9 @@ import {
 } from "./api/NotesClient";
 import { ApiError } from "../../api/http";
 import ListRow from "../../components/ui/lists/ListRow.vue";
+import SearchField from "../../components/ui/lists/SearchField.vue";
+import CharacterCount from "../../components/ui/status/CharacterCount.vue";
+import { growToContent } from "../../utils/browser/autoGrow";
 import StateMessage from "../../components/ui/status/StateMessage.vue";
 import DangerZone from "../../components/ui/status/DangerZone.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
@@ -32,18 +35,45 @@ import { formatUtc } from "../../utils/time";
  * switch that says whether agents may read it. */
 
 const NEW = "new";
-const mobileToolsOpen = ref(false);
 
 const notes = ref<Note[]>([]);
 const loading = ref(true);
 const loadError = ref("");
 const notice = ref("");
+const query = ref("");
+const matches = computed(() => {
+  const words = query.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  return notes.value.filter(note => {
+    const text = [note.title, note.body, ...note.tags].join(" ").toLocaleLowerCase();
+    return words.every(word => text.includes(word));
+  });
+});
+const searchField = ref<InstanceType<typeof SearchField> | null>(null);
+const listScroll = ref<HTMLElement | null>(null);
+const titleField = ref<HTMLInputElement | null>(null);
+const bodyField = ref<HTMLTextAreaElement | null>(null);
 
 // The open note: a note id, NEW for one not saved yet, or null for none.
 const selected = ref<string | null>(null);
 const publicationTarget = useId();
 const form = reactive({ title: "", body: "", tags: [] as string[], agentReadable: false });
 const saved = reactive({ title: "", body: "", tags: [] as string[], agentReadable: false });
+// Grow the note within the editor scroller, including after a viewport resize.
+watch([() => form.body, bodyField], async () => {
+  await nextTick();
+  if (bodyField.value) growToContent(bodyField.value);
+});
+watch(bodyField, (field, _previous, onCleanup) => {
+  if (!field || typeof ResizeObserver === "undefined") return;
+  let width = 0;
+  const observer = new ResizeObserver(([entry]) => {
+    if (!entry || entry.contentRect.width === width) return;
+    width = entry.contentRect.width;
+    growToContent(field);
+  });
+  observer.observe(field);
+  onCleanup(() => observer.disconnect());
+});
 // What is typed in the tag box but not added yet (TagInput's v-model:text) and the component itself.
 const tagInput = ref("");
 const tagField = ref<InstanceType<typeof TagInput> | null>(null);
@@ -136,6 +166,7 @@ async function generate(): Promise<void> {
   }
 }
 async function load(): Promise<void> {
+  loading.value = true;
   try {
     notes.value = await notesClient.list();
     loadError.value = "";
@@ -148,12 +179,24 @@ async function load(): Promise<void> {
 onMounted(load);
 
 function show(target: string | null): void {
+  const previous = selected.value;
   selected.value = target;
-  mobileToolsOpen.value = false;
   formError.value = "";
   notice.value = "";
   const note = target === null || target === NEW ? undefined : notes.value.find((n) => n.id === target);
   fillEditor(note);
+  void nextTick(async () => {
+    // A discard dialog closes on its own render tick before focus returns.
+    await nextTick();
+    if (selected.value !== target) return;
+    if (target !== null) titleField.value?.focus();
+    else {
+      const row = Array.from(listScroll.value?.querySelectorAll<HTMLButtonElement>("button[data-note-id]") ?? [])
+        .find(button => button.dataset.noteId === previous);
+      if (row) row.focus();
+      else searchField.value?.$el.querySelector("input")?.focus();
+    }
+  });
 }
 /** Fills the editor, and what counts as saved, from a note (or empty). */
 function fillEditor(note: Note | undefined): void {
@@ -179,7 +222,7 @@ function fillEditor(note: Note | undefined): void {
 // Leaving unsaved edits asks first; the target waits here meanwhile.
 const discardTarget = ref<string | null | undefined>(undefined);
 function go(target: string | null): void {
-  if (target === selected.value) return;
+  if (saving.value || removing.value || target === selected.value) return;
   if (dirty.value) discardTarget.value = target;
   else show(target);
 }
@@ -296,14 +339,17 @@ function preview(note: Note): string {
     <div class="column">
 
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
-      <p v-if="loadError" class="error" role="alert">Could not load your notes: {{ loadError }}</p>
       <StateMessage v-if="loading" kind="loading">Loading …</StateMessage>
+      <StateMessage v-else-if="loadError" kind="error" @retry="load">Could not load your notes: {{ loadError }}</StateMessage>
 
       <ListEditorLayout
-        v-else-if="!loadError"
+        v-else
         class="layout"
         :editing="selected !== null"
+        list-label="Notes list"
+        editor-label="Note editor"
         back-label="All notes"
+        visible-scrollbars
         :busy="saving || removing"
         :saving="saving"
         :dirty="dirty"
@@ -312,32 +358,37 @@ function preview(note: Note): string {
         @submit="save"
       >
         <template #list>
-          <div class="list-heading"><span>All notes</span><span>{{ notes.length }}/{{ NOTES_MAX }} notes</span></div>
-          <StateMessage v-if="notes.length === 0 && selected !== NEW" kind="empty">You have no notes yet.</StateMessage>
-          <ul v-else class="list" aria-label="Notes">
-            <li v-if="selected === NEW">
-              <ListRow class="note-row" active>
-                <span class="title">{{ form.title.trim() || "New note" }}</span>
-                <span class="muted">Not saved yet</span>
-              </ListRow>
-            </li>
-            <li v-for="n in notes" :key="n.id">
-              <ListRow class="note-row" :active="n.id === selected" :disabled="saving || removing" @click="go(n.id)">
-                <span class="title">{{ n.id === selected && form.title.trim() ? form.title.trim() : n.title }}</span>
-                <span v-if="preview(n)" class="snippet">{{ preview(n) }}</span>
-                <span v-if="n.tags.length || n.agent_readable || n.last_editor === 'agent'" class="row-tags">
-                  <span v-for="tag in n.tags" :key="tag" class="tag">{{ tag }}</span>
-                  <span v-if="n.agent_readable" class="tag agent-mark">Agents can read</span>
-                  <span v-if="n.last_editor === 'agent'" class="tag agent-mark">Agent edit</span>
-                </span>
-                <span class="muted">{{ formatUtc(n.updated_at) }}</span>
-              </ListRow>
-            </li>
-          </ul>
+          <div class="list-heading"><span>{{ query.trim() ? 'Search results' : 'All notes' }}</span><span>{{ query.trim() ? matches.length + ' of ' + notes.length : notes.length + '/' + NOTES_MAX + ' notes' }}</span></div>
+          <SearchField ref="searchField" v-model="query" class="notes-search" label="Search notes" placeholder="Search notes…" />
+          <div ref="listScroll" class="list-scroll pane-scroll">
+            <StateMessage v-if="notes.length === 0 && selected !== NEW" kind="empty">You have no notes yet.</StateMessage>
+            <ul v-else class="list" aria-label="Notes">
+              <li v-if="selected === NEW">
+                <ListRow class="note-row" active>
+                  <span class="title">{{ form.title.trim() || "New note" }}</span>
+                  <span class="muted">Not saved yet</span>
+                </ListRow>
+              </li>
+              <li v-for="n in matches" :key="n.id">
+                <ListRow class="note-row" :active="n.id === selected" :data-note-id="n.id" :disabled="saving || removing" @click="go(n.id)">
+                  <span class="title">{{ n.id === selected && form.title.trim() ? form.title.trim() : n.title }}</span>
+                  <span v-if="preview(n)" class="snippet">{{ preview(n) }}</span>
+                  <span v-if="n.tags.length || n.agent_readable || n.last_editor === 'agent'" class="row-tags">
+                    <span v-for="tag in n.tags" :key="tag" class="tag status-badge">{{ tag }}</span>
+                    <span v-if="n.agent_readable" class="tag status-badge agent-mark">Agents can read</span>
+                    <span v-if="n.last_editor === 'agent'" class="tag status-badge agent-mark">Agent edit</span>
+                  </span>
+                  <span class="muted">{{ formatUtc(n.updated_at) }}</span>
+                </ListRow>
+              </li>
+            </ul>
+            <StateMessage v-if="notes.length && matches.length === 0 && selected !== NEW" kind="empty" title="No notes match your search.">Try another title, phrase, or tag.<template #action><button type="button" class="link-btn" @click="query = ''">Clear search</button></template></StateMessage>
+          </div>
           <details v-if="selected === null" class="library-publishing">
             <summary>Obsidian &amp; publishing <span aria-hidden="true">›</span></summary>
-            <div :id="`${publicationTarget}-library`" />
+            <div :id="publicationTarget + '-library'" />
           </details>
+          <p class="list-help">Search titles, note text, and tags.</p>
         </template>
 
         <template #head>
@@ -351,16 +402,16 @@ function preview(note: Note): string {
           </p>
           <label class="title-field">
             <span class="sr-only">Title</span>
-            <input v-model="form.title" type="text" :maxlength="NOTE_TITLE_MAX" aria-label="Title" placeholder="Untitled note" :disabled="saving || removing" />
+            <input ref="titleField" v-model="form.title" type="text" :maxlength="NOTE_TITLE_MAX" aria-label="Title" aria-describedby="note-title-count" placeholder="Untitled note" :disabled="saving || removing" />
+            <CharacterCount id="note-title-count" class="note-count" :length="form.title.length" :max="NOTE_TITLE_MAX" />
           </label>
           <label class="body-field">
             <span class="sr-only">Note</span>
-            <textarea v-model="form.body" rows="10" placeholder="Start writing…" :maxlength="NOTE_BODY_MAX" aria-label="Note text" :disabled="saving || removing" />
-            <span class="muted count">{{ form.body.length }}/{{ NOTE_BODY_MAX }}</span>
+            <textarea ref="bodyField" v-model="form.body" rows="10" placeholder="Start writing…" :maxlength="NOTE_BODY_MAX" aria-label="Note text" aria-describedby="note-body-count" :disabled="saving || removing" />
+            <CharacterCount id="note-body-count" class="note-count" :length="form.body.length" :max="NOTE_BODY_MAX" />
           </label>
           </div>
-          <button type="button" class="mobile-tools-toggle" :aria-expanded="mobileToolsOpen" aria-controls="note-tools" @click="mobileToolsOpen = !mobileToolsOpen">Note details &amp; tools <span aria-hidden="true">{{ mobileToolsOpen ? "⌃" : "⌄" }}</span></button>
-          <div id="note-tools" :class="['note-tools', { expanded: mobileToolsOpen }]">
+          <div id="note-tools" class="note-tools">
           <details class="tag-tools">
             <summary><span>Tags</span><span class="summary-hint">{{ form.tags.join(", ") || "Add tags" }} <span aria-hidden="true">›</span></span></summary>
           <div class="field">
@@ -519,26 +570,31 @@ function preview(note: Note): string {
 </template>
 
 <style scoped>
+.layout { --workspace-columns: 360px minmax(0, 1fr); }
+.layout :deep(.list-pane) { overflow: hidden; }
+.notes-search { margin-bottom: 12px; flex-shrink: 0; }
+.list-scroll { flex: 1; min-height: 0; }
+.list-help { color: var(--muted); font-size: .7em; margin: 14px 10px 0; padding-top: 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 
+.list li { border-bottom: 1px solid var(--border); }
 .list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .new-note { flex-shrink: 0; min-height: 40px; }
 .title { font-weight: 600; overflow-wrap: anywhere; }
 .snippet { color: var(--muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .note-row .muted { font-size: .8em; }
 .row-tags { display: flex; flex-wrap: wrap; gap: 4px; }
-.tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font-size: .8em; overflow-wrap: anywhere; }
 .agent-mark { border-color: var(--warning); color: var(--warning); }
 .privacy { display: inline-flex; gap: 7px; align-items: center; font-size: .8em; color: var(--muted); }
 .privacy svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .privacy svg { width: 15px; height: 15px; }
 .note-danger { margin-bottom: 16px; }
 .writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; min-height: 310px; padding: 30px 36px 20px; }
-.title-field, .body-field { display: flex; flex-direction: column; min-width: 0; }
-.notes .editor .title-field input { width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 1.65em; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; }
+.title-field, .body-field { display: flex; flex-direction: column; min-width: 0; gap: 10px; }
+.notes .editor .title-field input { width: 100%; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; font-size: 1.65em; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; }
 .body-field { flex: 1; gap: 12px; }
-.editor textarea { width: 100%; min-height: 230px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--text); font: inherit; line-height: 1.9; resize: vertical; }
-.count { align-self: flex-end; font-size: .75em; color: var(--muted); }
+.editor textarea { width: 100%; min-height: 230px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); font: inherit; line-height: 1.9; resize: none; overflow-y: hidden; }
+.note-count { align-self: flex-end; }
 .note-tools { flex-shrink: 0; border-top: 1px solid var(--border); padding: 0 28px; }
 .note-tools > details + details { border-top: 1px solid var(--border); }
 summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 0; font-size: .85em; cursor: pointer; list-style: none; }
@@ -551,31 +607,29 @@ summary > [aria-hidden], .summary-hint { color: var(--muted); }
 .field-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .field-label { margin-right: auto; font-size: .85em; color: var(--muted); }
 .suggestions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.tag.pick { font: inherit; font-size: .8em; cursor: pointer; }
+.tag.pick { font: inherit; font-size: .8em; padding: 1px 7px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); cursor: pointer; }
 .tag.pick:hover { border-color: var(--accent); }
 .conflict { display: flex; flex-direction: column; gap: 8px; margin: 12px 20px; padding: 12px; border: 1px solid var(--warning); border-radius: var(--radius-md); font-size: .9em; }
 .conflict p { margin: 0; }
 .conflict-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .agent-edit-note, .agent-warning { margin: 0; padding: 10px 12px; border: 1px solid var(--warning); border-radius: var(--radius-md); font-size: .85em; }
 .agent-warning { background: color-mix(in srgb, var(--warning) 12%, var(--bg)); }
-.mobile-tools-toggle { display: none; }
 .form-error { margin: 12px 20px; }
-.library-publishing { margin: 24px 10px 0; border-top: 1px solid var(--border); }
+.library-publishing { margin: 14px 10px 0; border-top: 1px solid var(--border); flex-shrink: 0; max-height: 40%; overflow-y: auto; }
 @media (min-width: 1200px) { .writing { padding-inline: max(36px, calc((100% - 760px) / 2)); } }
-@media (max-width: 900px) and (min-width: 768px) { .writing { padding-inline: 22px; } .note-tools { padding-inline: 20px; } }
+@media (max-width: 900px) and (min-width: 768px) { .notes .layout { --workspace-columns: 280px minmax(0, 1fr); } .writing { padding-inline: 22px; } .note-tools { padding-inline: 20px; } }
 @media (max-width: 767px) {
   .notes :deep(.page-column) { padding: 18px 16px 12px; }
   .notes :deep(.page-head) { flex-direction: row; align-items: center; margin-bottom: 16px; gap: 10px; }
   .notes :deep(.page-title) { margin: 0; }
   .notes :deep(.page-description) { display: none; }
+  .notes :deep(.page-actions button), .list-scroll :deep(button) { min-width: 44px; min-height: 44px; }
   .notes.note-open :deep(.page-head) { display: none; }
   .note-row { min-height: 100px; }
   .writing { min-height: 310px; padding: 24px 20px 18px; }
   .notes .editor .title-field input { font-size: 1.45em; }
   .editor textarea { min-height: 250px; }
-  .mobile-tools-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 15px 20px; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: var(--bg); font: inherit; font-size: .85em; cursor: pointer; }
-  .note-tools { display: none; padding-inline: 20px; }
-  /* Keep an open publication dialog visible when resizing from desktop. */
-  .note-tools.expanded, .note-tools:has(dialog[open]) { display: block; }
+  .note-tools { padding-inline: 20px; }
+  summary, .note-tools button { min-width: 44px; min-height: 44px; }
 }
 </style>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import WorkspaceLayout from "../../components/layout/WorkspaceLayout.vue";
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import BrainConnectionForm from "./components/BrainConnectionForm.vue";
@@ -10,9 +10,16 @@ import SearchField from "../../components/ui/lists/SearchField.vue";
 import BackButton from "../../components/ui/buttons/BackButton.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
+import StateMessage from "../../components/ui/status/StateMessage.vue";
+import { useNarrow } from "../../composables/useNarrow";
+import "../../components/layout/infoPage.css";
 import { brainsClient, type BrainResult, type BrainScope } from "./api/BrainsClient";
 import { errorMessage } from "../../utils/errors";
 const route = useRoute();
+const narrow = useNarrow();
+const readerContent = ref<HTMLElement | null>(null);
+const documentList = ref<HTMLElement | null>(null);
+const searchField = ref<InstanceType<typeof SearchField> | null>(null);
 type Scope = BrainScope | "both";
 type Operation = "list" | "read" | "search" | "status";
 type SearchHit = NonNullable<BrainResult["hits"]>[number];
@@ -66,6 +73,8 @@ async function run(action: Operation, nextPath = path.value, targetScope = scope
       document.value = { scope: targetScope, path: nextPath, content: result.content };
       path.value = nextPath;
       mode.value = "browse"; mobileReading.value = true;
+      await nextTick();
+      readerContent.value?.focus();
     } else if (action === "search") hits.value = result.hits ?? [];
   }
   catch (e) { error.value = errorMessage(e); }
@@ -88,6 +97,22 @@ async function openHit(hit: SearchHit): Promise<void> {
   await run("list", parentPath(hit.path), hit.scope);
   await run("read", hit.path, hit.scope);
 }
+function showBrowser(): void {
+  mobileReading.value = false;
+  void nextTick(() => {
+    const row = Array.from(documentList.value?.querySelectorAll<HTMLButtonElement>("button[data-path]") ?? [])
+      .find(button => button.dataset.path === document.value?.path);
+    if (row) row.focus();
+    else searchField.value?.$el.querySelector("input")?.focus();
+  });
+}
+async function closeConnection(): Promise<void> {
+  connectionOpen.value = false;
+  // BaseModal closes its native dialog after a render tick; restore focus after it.
+  await nextTick();
+  await nextTick();
+  if (!connectionOpen.value && narrow.value && mobileReading.value) readerContent.value?.focus();
+}
 function retry(): void { if (lastRequest) void run(lastRequest.operation, lastRequest.path, lastRequest.scope); }
 onMounted(async () => {
   if (scope.value === "both") return;
@@ -97,199 +122,174 @@ onMounted(async () => {
 });
 </script>
 <template>
-  <PageLayout class="brains" :class="{ 'mobile-reading': mobileReading && mode === 'browse' }" title="Brains" description="Durable knowledge, shared and personal." wide fill>
-    <template #actions>
-      <button type="button" class="connection-button" @click="connectionOpen = true">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="3" /><circle cx="15" cy="17" r="3" /></svg>
-        <span>Personal connection</span>
-      </button>
-    </template>
-    <template #toolbar>
-      <div class="brain-toolbar">
-        <div class="scope-line">
-          <SegmentedControl :model-value="scope" :options="scopeOptions" aria-label="Brain scope" @update:model-value="selectScope" />
-          <span class="connection-status" role="status">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7v.2" /></svg>
-            <template v-if="connectionStatus">Connection: {{ connectionStatus.status?.replaceAll('_', ' ') ?? 'unknown' }} · Index: {{ connectionStatus.index_status?.replaceAll('_', ' ') ?? 'not checked' }}</template>
-            <template v-else>{{ scope === 'both' ? 'Search across shared and personal knowledge' : 'Connection not checked' }}</template>
-          </span>
-        </div>
-        <form class="search-form" role="search" @submit.prevent="run('search', '')">
-          <SearchField v-model="query" label="Search brains" :maxlength="2000" :placeholder="scope === 'both' ? 'Search across both brains…' : `Search the ${scopeLabel(scope)}…`" :disabled="busy">
-            <button type="submit" :disabled="busy || !query.trim()" :aria-busy="busy && operation === 'search'">{{ busy && operation === 'search' ? 'Searching…' : 'Search' }}</button>
-          </SearchField>
-        </form>
-      </div>
-    </template>
-
+  <PageLayout class="brains info-content" :class="{ 'mobile-reading': mobileReading }" title="Brains" description="Durable knowledge, shared and personal." wide fill>
     <div v-if="error || feedback?.message || feedback?.refreshing || feedback?.failures?.length" class="feedback">
-      <div v-if="error" class="error" role="alert"><span>{{ error }}</span><button type="button" :disabled="busy" @click="retry">Try again</button></div>
+      <StateMessage v-if="error" kind="error" @retry="retry">{{ error }}</StateMessage>
       <p v-if="feedback?.message" role="status">{{ feedback.message }}</p>
       <p v-if="feedback?.refreshing" role="status">Indexing is in progress. Results use completed documents.</p>
       <p v-for="failure in feedback?.failures" :key="failure.scope" role="status">{{ scopeLabel(failure.scope as Scope) }}: {{ failure.message }}</p>
     </div>
-
-    <section v-if="mode === 'search'" class="search-results" aria-label="Brain search results" :aria-busy="busy">
-      <div class="results-head">
-        <p>{{ busy ? 'Searching…' : searched ? `${hits.length} results` : 'Search both brains' }}</p>
-        <button v-if="scope !== 'both'" type="button" :disabled="busy" @click="mode = 'browse'">Back to browsing</button>
-      </div>
-      <p v-if="!searched" class="empty-message">Find documents across your Personal Brain and the shared Instance Brain.</p>
-      <p v-else-if="!busy && !error && hits.length === 0" class="empty-message">No documents match your search. Try a different word.</p>
-      <article v-for="hit in hits" :key="`${hit.scope}:${hit.path}:${hit.heading}`" class="search-hit">
-        <span class="scope-badge">{{ scopeLabel(hit.scope) }} · {{ hit.scope === 'personal' ? 'Only you' : 'Shared' }}</span>
-        <h3><button type="button" :disabled="busy" @click="openHit(hit)">{{ hit.heading || fileName(hit.path) }}</button></h3>
-        <p class="hit-path">{{ hit.connection_label }} · {{ hit.path }} · {{ hit.refresh_status.replaceAll('_', ' ') }}</p>
-        <MarkdownContent :text="hit.content" />
-      </article>
-    </section>
-
-    <WorkspaceLayout v-else class="brain-workspace" :class="{ reading: mobileReading }" :aria-busy="busy">
+    <WorkspaceLayout class="brain-workspace" :class="{ reading: mobileReading }" :aria-busy="busy">
       <aside class="browser" aria-label="Brain folders and documents">
-        <nav class="breadcrumbs" aria-label="Vault folders">
-          <template v-for="(crumb, index) in breadcrumbs" :key="crumb.path">
-            <span v-if="index" aria-hidden="true">/</span>
-            <button type="button" :disabled="busy" :aria-current="index === breadcrumbs.length - 1 ? 'location' : undefined" @click="run('list', crumb.path)">{{ crumb.label }}</button>
+        <div class="list-heading"><span>Knowledge</span><span>{{ scope === 'both' ? 'Both brains' : scope === 'personal' ? 'Personal' : 'Instance' }}</span></div>
+        <div class="scope-line"><SegmentedControl :model-value="scope" :options="scopeOptions" aria-label="Brain scope" @update:model-value="selectScope" /></div>
+        <form class="search-form" role="search" @submit.prevent="run('search', '')">
+          <SearchField ref="searchField" v-model="query" label="Search brains" :maxlength="2000" :placeholder="scope === 'both' ? 'Search across both brains…' : 'Search this brain…'" :disabled="busy">
+            <button type="submit" class="link-btn" :disabled="busy || !query.trim()" :aria-busy="busy && operation === 'search'">{{ busy && operation === 'search' ? 'Searching…' : 'Search' }}</button>
+          </SearchField>
+        </form>
+        <div class="browser-head">
+          <div v-if="mode === 'search'" class="results-head">
+            <span>{{ busy && operation === 'search' ? 'Searching…' : searched ? `${hits.length} results` : 'Search both brains' }}</span>
+            <button v-if="scope !== 'both'" type="button" class="link-btn" :disabled="busy" @click="mode = 'browse'">Back to browsing</button>
+          </div>
+          <nav v-else class="breadcrumbs" aria-label="Vault folders">
+            <template v-for="(crumb, index) in breadcrumbs" :key="crumb.path"><span v-if="index" aria-hidden="true">/</span><button type="button" class="link-btn" :disabled="busy" :aria-current="index === breadcrumbs.length - 1 ? 'location' : undefined" @click="run('list', crumb.path)">{{ crumb.label }}</button></template>
+          </nav>
+        </div>
+        <div ref="documentList" class="document-list pane-scroll">
+          <section v-if="mode === 'search'" class="search-results" aria-label="Brain search results">
+            <StateMessage v-if="busy && operation === 'search'" kind="loading">Searching…</StateMessage>
+            <StateMessage v-else-if="!searched" kind="empty" title="Search both brains">Find documents across your Personal Brain and the shared Instance Brain.</StateMessage>
+            <StateMessage v-else-if="!error && hits.length === 0" kind="empty">No documents match your search. Try a different word.</StateMessage>
+            <article v-for="hit in hits" :key="`${hit.scope}:${hit.path}:${hit.heading}`" class="search-hit">
+              <ListRow class="hit-row" :active="document?.scope === hit.scope && document?.path === hit.path" :disabled="busy" :aria-label="hit.heading || fileName(hit.path)" @click="openHit(hit)">
+                <span class="hit-title">{{ hit.heading || fileName(hit.path) }}</span>
+                <span class="scope-badge status-badge">{{ scopeLabel(hit.scope) }} · {{ hit.scope === 'personal' ? 'Only you' : 'Shared' }}</span>
+                <span class="hit-path">{{ hit.connection_label }} · {{ hit.path }} · {{ hit.refresh_status.replaceAll('_', ' ') }}</span>
+              </ListRow>
+              <MarkdownContent class="hit-preview" :text="hit.content" />
+            </article>
+          </section>
+          <template v-else>
+            <StateMessage v-if="busy && operation === 'list'" kind="loading">Loading folder…</StateMessage>
+            <ul v-else-if="entries.length" class="file-list" aria-label="Brain documents">
+              <li v-for="entry in entries" :key="entry.path">
+                <ListRow class="file-row" :active="entry.path === document?.path" :disabled="busy" :aria-label="entry.path" :data-path="entry.path" @click="run(entry.kind === 'folder' ? 'list' : 'read', entry.path)">
+                  <svg v-if="entry.kind === 'folder'" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h6l2 3h10v12H3z" /></svg>
+                  <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>
+                  <span class="file-copy"><strong>{{ fileName(entry.path) }}</strong><small>{{ entry.kind === 'folder' ? 'Folder' : 'Document' }}</small></span>
+                  <span v-if="entry.kind === 'folder'" class="folder-arrow" aria-hidden="true">›</span>
+                </ListRow>
+              </li>
+            </ul>
+            <StateMessage v-else kind="empty">{{ listingAvailable ? 'This folder is empty.' : 'Choose a folder or check the connection.' }}</StateMessage>
           </template>
-        </nav>
-        <p v-if="busy && operation === 'list'" class="empty-message" role="status">Loading folder…</p>
-        <ul v-else-if="entries.length" class="file-list" aria-label="Brain documents">
-          <li v-for="entry in entries" :key="entry.path">
-            <ListRow class="file-row" :active="entry.path === document?.path" :disabled="busy" :aria-label="entry.path" @click="run(entry.kind === 'folder' ? 'list' : 'read', entry.path)">
-              <svg v-if="entry.kind === 'folder'" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h6l2 3h10v12H3z" /></svg>
-              <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>
-              <span><strong>{{ fileName(entry.path) }}</strong><small>{{ entry.kind === 'folder' ? 'Folder' : 'Document' }}</small></span>
-            </ListRow>
-          </li>
-        </ul>
-        <p v-else class="empty-message">{{ listingAvailable ? 'This folder is empty.' : 'Choose a folder or check the connection.' }}</p>
-        <details class="open-path">
-          <summary>Open a specific path</summary>
-          <label>Vault-relative path<input v-model="path" maxlength="500" placeholder="Inbox/Example.md" :disabled="busy" /></label>
-          <div class="path-actions"><button type="button" :disabled="busy" @click="run('list')">Browse folder</button><button type="button" :disabled="busy || !path.trim()" @click="run('read')">Read document</button></div>
-        </details>
-        <div class="browser-footer">
-          <p>{{ scopeLabel(scope) }}<br>{{ scope === 'personal' ? 'Available only to your account.' : 'Readable by all signed-in users.' }}</p>
-          <button type="button" :disabled="busy" :aria-busy="busy && operation === 'status'" @click="run('status', '')">{{ busy && operation === 'status' ? 'Checking…' : 'Check connection' }}</button>
+        </div>
+        <div class="browser-tools">
+          <details v-if="scope !== 'both'" class="open-path">
+            <summary>Open a specific path <span aria-hidden="true">›</span></summary>
+            <div class="dialog-form"><label>Vault-relative path<input v-model="path" maxlength="500" placeholder="Inbox/Example.md" :disabled="busy" /></label>
+              <div class="path-actions"><button type="button" class="pill-btn ghost" :disabled="busy" @click="run('list')">Browse folder</button><button type="button" class="pill-btn ghost" :disabled="busy || !path.trim()" @click="run('read')">Read document</button></div>
+            </div>
+          </details>
+          <details class="connection-tools">
+            <summary>Connection &amp; settings <span aria-hidden="true">›</span></summary>
+            <div class="connection-actions"><button type="button" class="link-btn" @click="connectionOpen = true">Personal connection</button><button type="button" class="link-btn" :disabled="busy || scope === 'both'" :aria-busy="busy && operation === 'status'" @click="run('status', '')">{{ busy && operation === 'status' ? 'Checking…' : 'Check connection' }}</button></div>
+          </details>
+          <div class="browser-footer">
+            <span class="connection-status" role="status">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7v.2" /></svg>
+              <template v-if="connectionStatus">Connection: {{ connectionStatus.status?.replaceAll('_', ' ') ?? 'unknown' }} · Index: {{ connectionStatus.index_status?.replaceAll('_', ' ') ?? 'not checked' }}</template>
+              <template v-else>{{ scope === 'both' ? 'Search across shared and personal knowledge' : 'Connection not checked' }}</template>
+            </span>
+            <p>{{ scope === 'both' ? 'Results keep their original brain.' : scope === 'personal' ? 'Available only to your account.' : 'Readable by all signed-in users.' }}</p>
+          </div>
         </div>
       </aside>
       <section class="reader" aria-label="Brain document reader">
-        <header class="reader-head">
-          <BackButton ghost :disabled="busy" @click="mobileReading = false">All documents</BackButton>
-          <span class="reader-path">{{ document?.path || 'Document reader' }}</span>
-          <span v-if="document" class="reader-audience">{{ document.scope === 'personal' ? 'Only you' : 'Shared' }}</span>
-        </header>
-        <div v-if="document" class="document-content" tabindex="0" aria-label="Document content">
-          <p class="document-scope">{{ scopeLabel(document.scope) }}</p>
-          <p v-if="busy && operation === 'read'" role="status">Opening document…</p>
-          <MarkdownContent v-if="document.content" :text="document.content" />
-          <p v-else class="empty-message">This document is empty.</p>
+        <header class="reader-head"><BackButton :disabled="busy" @click="showBrowser">All documents</BackButton><span class="reader-path">{{ document?.path || 'Document reader' }}</span><span v-if="document" class="reader-audience status-badge">{{ document.scope === 'personal' ? 'Only you' : 'Shared' }}</span></header>
+        <div v-if="document" ref="readerContent" class="document-content pane-scroll" tabindex="0" aria-label="Document content">
+          <div class="document-body"><p class="document-scope">{{ scopeLabel(document.scope) }}</p>
+            <StateMessage v-if="busy && operation === 'read'" kind="loading">Opening document…</StateMessage>
+            <MarkdownContent v-if="document.content" :text="document.content" />
+            <StateMessage v-else kind="empty">This document is empty.</StateMessage>
+          </div>
         </div>
-        <div v-else class="reader-placeholder">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v15c-3-1-6-1-9 1-3-2-6-2-9-1zM12 6v15" /></svg>
-          <h3>{{ busy && operation === 'read' ? 'Opening document…' : 'Knowledge, within reach' }}</h3>
-          <p>Choose a document to read, or search this brain.</p>
-        </div>
-        <footer v-if="document" class="reader-footer">Reading from the {{ scopeLabel(document.scope) }}</footer>
+        <div v-else class="reader-placeholder"><StateMessage v-if="busy && operation === 'read'" kind="loading">Opening document…</StateMessage><StateMessage v-else kind="empty" title="Knowledge, within reach">Choose a document to read, or search this brain.</StateMessage></div>
+        <footer v-if="document" class="reader-footer"><span>Reading from the {{ scopeLabel(document.scope) }}</span><span>Read-only</span></footer>
       </section>
     </WorkspaceLayout>
-
-    <BaseModal class="connection-modal" :open="connectionOpen" title="Personal connection" @close="connectionOpen = false">
-      <BrainConnectionForm scope="personal" />
-    </BaseModal>
+    <BaseModal class="connection-modal" :open="connectionOpen" title="Personal connection" @close="closeConnection"><BrainConnectionForm scope="personal" /></BaseModal>
   </PageLayout>
 </template>
 <style scoped>
-button { color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-full); padding: 7px 14px; font: inherit; font-size: .85em; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
-button:hover:not(:disabled) { border-color: var(--accent); }
-button:disabled { opacity: .5; cursor: default; }
-button:focus-visible, input:focus-visible, summary:focus-visible, .document-content:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
-.connection-button { display: flex; align-items: center; gap: 8px; }
-.connection-button svg { width: 16px; height: 16px; }
-.connection-button circle { fill: var(--bg); }
-.brain-toolbar { display: flex; flex-direction: column; gap: 16px; }
-.scope-line { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.brain-workspace { --workspace-columns: 360px minmax(0, 1fr); }
+.browser { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 20px 12px; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 50%, var(--bg)); }
+.scope-line { margin-bottom: 12px; flex-shrink: 0; }
+.scope-line :deep(.segmented-control), .scope-line :deep(.segmented) { width: 100%; }
+.scope-line :deep(button.segment) { flex: 1; padding-inline: 8px; }
+.search-form { margin: 0 0 12px; flex-shrink: 0; }
+.browser-head { padding-bottom: 12px; flex-shrink: 0; }
+.breadcrumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 0 10px; font-size: .8em; color: var(--muted); }
+.breadcrumbs button { min-width: 0; max-width: 100%; padding: 0; font-size: 1em; overflow-wrap: anywhere; }
+.document-list { flex: 1; min-height: 0; }
+.file-list { padding: 0; margin: 0; list-style: none; }
+.file-list li { margin-bottom: 6px; border-bottom: 1px solid var(--border); }
+button.file-row { flex-direction: row; align-items: flex-start; gap: 10px; }
+.file-copy { min-width: 0; }
+.file-row svg { color: var(--muted); margin-top: 2px; }
+.file-copy strong { display: block; font-weight: 500; overflow-wrap: anywhere; }
+.file-copy small { display: block; margin-top: 4px; color: var(--muted); font-size: .85em; }
+.file-row.active svg { color: var(--accent); }
+.folder-arrow { margin-left: auto; color: var(--muted); }
+.browser-tools { padding: 14px 10px 0; flex-shrink: 0; max-height: 40%; overflow-y: auto; }
+.browser-tools details { border-top: 1px solid var(--border); }
+summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 0; cursor: pointer; font-size: .8em; color: var(--muted); list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary > span { flex-shrink: 0; }
+.dialog-form { padding-bottom: 14px; }
+.path-actions, .connection-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.connection-actions { padding-bottom: 12px; }
+.browser-footer { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--border); }
 .connection-status { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: .75em; overflow-wrap: anywhere; }
 .connection-status svg { width: 14px; height: 14px; }
-.feedback { max-height: 25%; overflow: auto; padding: 0 0 12px; flex-shrink: 0; overflow-wrap: anywhere; font-size: .85em; }
-.feedback p { margin: 4px 0; }
-.feedback .error { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.feedback .error button { flex-shrink: 0; }
-.brain-workspace { --workspace-columns: 260px minmax(0, 1fr); }
-.browser { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow-y: auto; padding: 18px 12px; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 50%, var(--bg)); }
-.breadcrumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 0 10px 15px; font-size: .8em; color: var(--muted); }
-.breadcrumbs button { min-width: 0; max-width: 100%; padding: 2px 0; border: 0; border-radius: var(--radius-sm); color: var(--muted); background: transparent; font-size: 1em; overflow-wrap: anywhere; }
-.breadcrumbs button:hover { color: var(--accent); }
-.file-list { padding: 0; margin: 0; list-style: none; }
-.file-list li + li { margin-top: 4px; }
-button.file-row { flex-direction: row; align-items: flex-start; gap: 10px; padding: 13px 10px; font-size: 1em; }
-.file-row > span { min-width: 0; }
-.file-row svg { color: var(--muted); margin-top: 2px; }
-.file-row strong { display: block; font-size: 1em; font-weight: 500; overflow-wrap: anywhere; }
-.file-row small { display: block; margin-top: 5px; color: var(--muted); font-size: .8em; }
-.file-row.active svg { color: var(--accent); }
-.open-path { margin: 20px 10px 0; padding-top: 12px; border-top: 1px solid var(--border); font-size: .8em; }
-.open-path summary { cursor: pointer; color: var(--muted); }
-.open-path label { display: grid; gap: 6px; margin-top: 12px; }
-.open-path input { min-width: 0; width: 100%; padding: 8px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md); font: inherit; }
-.path-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.browser-footer { margin-top: auto; padding: 20px 10px 0; color: var(--muted); font-size: .75em; }
-.browser-footer p { margin: 0 0 12px; line-height: 1.8; }
-.browser-footer button { font-size: 1em; }
+.browser-footer p { margin: 0; color: var(--muted); font-size: .7em; }
 .reader { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--bg); }
-.reader-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 26px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: .75em; }
+.reader-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 28px; border-bottom: 1px solid var(--border); font-size: .8em; color: var(--muted); flex-shrink: 0; }
 .reader-path { min-width: 0; overflow-wrap: anywhere; }
 .reader-audience { flex-shrink: 0; }
-.document-content { flex: 1; min-height: 0; overflow: auto; padding: 28px 32px; overflow-wrap: anywhere; line-height: 1.8; }
-.document-content :deep(.markdown) { max-width: 780px; margin-inline: auto; }
-.document-content :deep(h1) { font-size: 1.7em; font-weight: 600; line-height: 1.35; letter-spacing: -.025em; }
-.document-content :deep(h2) { font-size: 1.25em; }
-.document-content :deep(h3) { font-size: 1.05em; }
-.document-scope { max-width: 780px; margin: 0 auto 16px; color: var(--accent); text-transform: uppercase; letter-spacing: .08em; font-size: .7em; }
-.reader-footer { padding: 12px 26px; border-top: 1px solid var(--border); color: var(--muted); font-size: .75em; }
-.reader-placeholder { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 28px; text-align: center; color: var(--muted); }
-.reader-placeholder svg { width: 34px; height: 34px; color: var(--accent); }
-.reader-placeholder h3 { margin: 0; font-size: 1.05em; color: var(--text); font-weight: 600; }
-.reader-placeholder p { margin: 0; font-size: .9em; }
-.empty-message { padding: 8px 10px; color: var(--muted); font-size: .9em; }
-.search-results { flex: 1; min-height: 0; overflow: auto; padding: 22px 28px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.results-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: .8em; }
-.results-head p { margin: 0; }
-.search-hit { padding: 24px 0; overflow-wrap: anywhere; }
-.search-hit + .search-hit { border-top: 1px solid var(--border); }
-.scope-badge { display: inline-block; padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--muted); font-size: .75em; }
-.search-hit h3 { margin: 10px 0; font-size: 1.05em; }
-.search-hit h3 button { max-width: 100%; border: 0; border-radius: var(--radius-sm); padding: 0; text-align: left; font: inherit; color: var(--text); overflow-wrap: anywhere; }
-.hit-path { margin: 0 0 14px; color: var(--muted); font-size: .75em; }
-.search-hit :deep(.markdown) { font-size: .9em; }
-.connection-modal :deep(.brain-connection) { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.document-content { flex: 1; min-height: 0; overflow-wrap: anywhere; line-height: 1.8; }
+.document-body { max-width: 820px; padding: 30px 36px; margin-inline: auto; }
+.document-body :deep(h1) { font-size: 1.7em; font-weight: 600; line-height: 1.35; letter-spacing: -.025em; }
+.document-body :deep(h2) { font-size: 1.15em; font-weight: 600; margin-top: 26px; }
+.document-body :deep(h3) { font-size: 1.05em; }
+.document-body :deep(blockquote) { border-left: 3px solid var(--border); padding-left: 16px; margin-left: 0; color: var(--muted); }
+.document-scope { margin: 0 0 16px; color: var(--accent); text-transform: uppercase; letter-spacing: .08em; font-size: .7em; }
+.reader-footer { display: flex; justify-content: space-between; gap: 12px; padding: 14px 28px; border-top: 1px solid var(--border); color: var(--muted); font-size: .75em; flex-shrink: 0; }
+.reader-placeholder { display: flex; flex: 1; align-items: center; justify-content: center; padding: 28px; text-align: center; }
+.results-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 0 10px; color: var(--muted); font-size: .8em; }
+.results-head button { font-size: 1em; }
+.search-hit { padding-bottom: 16px; margin-bottom: 6px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.hit-title { font-weight: 500; }
+.scope-badge { align-self: flex-start; }
+.hit-path { color: var(--muted); font-size: .8em; overflow-wrap: anywhere; }
+.hit-preview { padding: 0 12px; font-size: .85em; overflow-wrap: anywhere; }
+.feedback { max-height: 25%; min-height: 0; overflow: auto; padding-bottom: 12px; flex-shrink: 0; overflow-wrap: anywhere; font-size: .85em; }
+.feedback p { margin: 4px 0; }
+.connection-modal :deep(.brain-connection) { margin: 0; padding: 0; border: 0; background: transparent; }
 .connection-modal :deep(h3) { font-size: 1em; }
 .connection-modal :deep(p) { overflow-wrap: anywhere; }
-[aria-busy="true"]:is(.search-form button, .browser-footer button)::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-full); vertical-align: -1px; animation: brain-spin .7s linear infinite; }
-@keyframes brain-spin { to { transform: rotate(360deg); } }
 @media (max-width: 900px) and (min-width: 768px) {
-  .brain-workspace { --workspace-columns: 220px minmax(0, 1fr); }
-  .document-content { padding: 24px; }
+  .brain-workspace { --workspace-columns: 280px minmax(0, 1fr); }
+  .document-body { padding: 24px; }
 }
 @media (max-width: 767px) {
-  .brains :deep(.page-column) { padding: 20px 16px 12px; }
-  .brains :deep(.page-head) { flex-direction: row; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
-  .connection-button { min-height: 44px; }
-  .connection-button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .scope-line :deep(.segmented-control), .scope-line :deep(.segmented) { width: 100%; }
-  .scope-line :deep(button.segment) { flex: 1; min-height: 44px; padding-inline: 8px; }
-  .connection-status { font-size: .7em; }
-  .browser { border-right: 0; padding: 16px 12px; }
+  .brains :deep(.page-column) { padding: 18px 16px 12px; }
+  .brains :deep(.page-head) { margin-bottom: 16px; }
+  .brains :deep(.page-title) { margin: 0; }
+  .brains :deep(.page-description) { display: none; }
+  .brains.mobile-reading :deep(.page-head) { display: none; }
+  .scope-line :deep(button.segment) { min-height: 44px; }
+  .browser { border-right: 0; padding: 16px 10px; }
   .brain-workspace:not(.reading) .reader, .brain-workspace.reading .browser { display: none; }
-  .mobile-reading :deep(.page-toolbar) { display: none; }
-  button.file-row { min-height: 76px; padding: 16px 10px; }
-  .breadcrumbs button { min-width: 44px; min-height: 44px; }
+  button.file-row { min-height: 76px; }
+  .breadcrumbs button, summary, .browser-tools button { min-width: 44px; min-height: 44px; }
   .reader-head { padding: 12px 16px; }
   .reader-head .reader-path { display: none; }
-  .document-content { padding: 22px 20px; }
-  .reader-footer { padding: 12px 16px; }
-  .search-results { padding: 18px 20px; }
-  dialog.connection-modal { position: fixed; inset: auto 0 var(--rail-height); width: 100%; max-width: none; max-height: calc(100dvh - var(--rail-height) - env(safe-area-inset-top, 0px) - 16px); margin: 0; border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
+  .document-body { padding: 24px 20px; }
+  .reader-footer { padding: 12px 16px; font-size: .7em; }
+  dialog.connection-modal { position: fixed; inset: auto 0 var(--rail-height); width: 100%; max-width: none; max-height: calc(100dvh - var(--rail-height) - env(safe-area-inset-top, 0px) - 16px); margin: 0; border-radius: var(--radius-xl); }
 }
 </style>

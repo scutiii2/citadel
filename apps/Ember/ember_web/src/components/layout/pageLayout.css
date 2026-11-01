@@ -31,6 +31,12 @@
 .page.info-page.page-layout-fill { display: flex; flex-direction: column; overflow: hidden; }
 .page-layout-fill > .page-column { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .page-layout-fill .page-head, .page-layout-fill .page-toolbar { flex-shrink: 0; }
+
+/* Opt-in independent workspace scrollers. Search and editor actions stay outside. */
+.pane-scroll { overflow-y: scroll; scrollbar-gutter: stable; scrollbar-width: auto; scrollbar-color: var(--muted) var(--surface); }
+.pane-scroll::-webkit-scrollbar { width: 10px; }
+.pane-scroll::-webkit-scrollbar-track { background: var(--surface); }
+.pane-scroll::-webkit-scrollbar-thumb { background: var(--muted); border: 2px solid var(--surface); border-radius: var(--radius-full); }
 @media (max-width: 767px) {
   .page-head { flex-direction: column; align-items: stretch; gap: 12px; }
   .page-actions { flex-shrink: 1; }
