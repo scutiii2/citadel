@@ -1,5 +1,5 @@
 import { chatsClient, type ChatChanges, type ChatSummary } from "../api/ChatsClient";
-import { ApiError } from "../../../api/http";
+import { isApiStatus } from "../../../api/http";
 import type { ChatMessage, Conversation } from "../../../api/types";
 
 /** Where conversations are kept. The chat store depends only on this. One
@@ -51,7 +51,7 @@ async function ignoreMissing(request: Promise<unknown>): Promise<void> {
   try {
     await request;
   } catch (err) {
-    if (!(err instanceof ApiError && err.status === 404)) throw err;
+    if (!isApiStatus(err, 404)) throw err;
   }
 }
 

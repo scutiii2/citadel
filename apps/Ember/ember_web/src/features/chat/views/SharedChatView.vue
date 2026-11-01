@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import MarkdownContent from "../../../components/content/MarkdownContent.vue";
-import { ApiError } from "../../../api/http";
+import { isApiStatus } from "../../../api/http";
 import { sharesClient, type SharedChatView } from "../api/SharesClient";
 import { errorMessage } from "../../../utils/errors";
 import { formatUtc } from "../../../utils/time";
@@ -34,8 +34,8 @@ async function load(): Promise<void> {
     document.title = `${view.title} - Ember`;
   } catch (err) {
     if (requested !== token.value) return;
-    if (err instanceof ApiError && err.status === 404) problem.value = "gone";
-    else if (err instanceof ApiError && err.status === 429) problem.value = "busy";
+    if (isApiStatus(err, 404)) problem.value = "gone";
+    else if (isApiStatus(err, 429)) problem.value = "busy";
     else {
       problem.value = "error";
       problemText.value = errorMessage(err);

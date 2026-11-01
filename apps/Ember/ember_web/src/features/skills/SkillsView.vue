@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import { matchesWords } from "../../utils/search";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
 import ListRow from "../../components/ui/lists/ListRow.vue";
@@ -21,10 +22,7 @@ const notice = ref("");
 const actionError = ref("");
 const busyId = ref<number | null>(null);
 const query = ref("");
-const matches = computed(() => {
-  const words = query.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  return skills.value.filter((skill) => words.every((word) => `${skill.title} ${skill.when_to_use}`.toLocaleLowerCase().includes(word)));
-});
+const matches = computed(() => skills.value.filter((skill) => matchesWords(query.value, skill.title, skill.when_to_use)));
 const groups = computed(() => [
   { status: "proposed" as const, title: "Waiting for approval", hint: "Ember proposed these. Nothing here is used until you approve it.", items: matches.value.filter((s) => s.status === "proposed") },
   { status: "active" as const, title: "Active", hint: "Ember may follow these when a task matches.", items: matches.value.filter((s) => s.status === "active") },

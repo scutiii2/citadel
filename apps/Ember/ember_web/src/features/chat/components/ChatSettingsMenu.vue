@@ -5,6 +5,7 @@
 import { nextTick, ref, useTemplateRef } from "vue";
 import { RouterLink } from "vue-router";
 import { useOutsideClose } from "../../../composables/useOutsideClose";
+import { checked } from "../../../utils/browser/dom";
 import { withTokenCost } from "../../usage/utils/tokenCosts";
 import ToggleSwitch from "../../../components/ui/forms/ToggleSwitch.vue";
 
@@ -45,10 +46,6 @@ const emit = defineEmits<{
 const open = ref(false);
 const root = useTemplateRef<HTMLElement>("root");
 const gearButton = useTemplateRef<HTMLButtonElement>("gearButton");
-
-function checked(event: Event): boolean {
-  return (event.target as HTMLInputElement).checked;
-}
 
 async function closeWithEscape(): Promise<void> {
   open.value = false;

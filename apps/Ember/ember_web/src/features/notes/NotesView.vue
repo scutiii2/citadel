@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
 import NotePromotionPanel from "./components/NotePromotionPanel.vue";
+import { matchesWords } from "../../utils/search";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, nextTick, onMounted, reactive, ref, useId, watch } from "vue";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
@@ -41,13 +42,7 @@ const loading = ref(true);
 const loadError = ref("");
 const notice = ref("");
 const query = ref("");
-const matches = computed(() => {
-  const words = query.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  return notes.value.filter(note => {
-    const text = [note.title, note.body, ...note.tags].join(" ").toLocaleLowerCase();
-    return words.every(word => text.includes(word));
-  });
-});
+const matches = computed(() => notes.value.filter(note => matchesWords(query.value, note.title, note.body, ...note.tags)));
 const searchField = ref<InstanceType<typeof SearchField> | null>(null);
 const listScroll = ref<HTMLElement | null>(null);
 const titleField = ref<HTMLInputElement | null>(null);

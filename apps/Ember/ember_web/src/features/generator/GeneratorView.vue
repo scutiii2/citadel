@@ -9,6 +9,7 @@ import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import CopyButton from "../../components/ui/buttons/CopyButton.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import ToggleSwitch from "../../components/ui/forms/ToggleSwitch.vue";
+import { checked } from "../../utils/browser/dom";
 import { errorMessage } from "../../utils/errors";
 
 /** Random passwords, passphrases, PINs and TOTP secrets and codes, made by
@@ -41,7 +42,6 @@ const TOOLS: Record<Tab, { tool: string; field: string }> = {
 /** Strength bar scale: 128 bits and above counts as full. */
 const FULL_BITS = 128;
 
-const checked = (event: Event): boolean => (event.target as HTMLInputElement).checked;
 
 const server = new McpServerClient();
 const tab = ref<Tab>("password");

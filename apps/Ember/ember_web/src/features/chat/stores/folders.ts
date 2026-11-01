@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { foldersClient, type ChatFolder } from "../api/FoldersClient";
-import { ApiError } from "../../../api/http";
+import { isApiStatus } from "../../../api/http";
 import { errorMessage } from "../../../utils/errors";
 import { useAuthStore } from "../../../stores/auth";
 import { useChatStore } from "./chat";
@@ -119,7 +119,7 @@ export const useFoldersStore = defineStore("folders", () => {
     try {
       await foldersClient.remove(id);
     } catch (err) {
-      if (!(err instanceof ApiError && err.status === 404)) throw err;
+      if (!isApiStatus(err, 404)) throw err;
     }
     if (started !== generation) return;
     items.value = items.value.filter((f) => f.id !== id);

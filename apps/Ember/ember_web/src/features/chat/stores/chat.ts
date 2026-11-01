@@ -4,7 +4,7 @@ import { chatsClient, type ChatSearchHit } from "../api/ChatsClient";
 import { settingsClient } from "../../../api/navigation/SettingsClient";
 import { triageClient, type TriageForm } from "../api/TriageClient";
 import type { CommandInfo } from "../../../api/tools/CommandsClient";
-import { ApiError } from "../../../api/http";
+import { isApiStatus } from "../../../api/http";
 import type {
   ActiveAgent,
   ApprovalDecision,
@@ -1242,7 +1242,7 @@ export const useChatStore = defineStore("chat", () => {
       await send();
     } catch (err) {
       if (started !== generation) return;
-      if (err instanceof ApiError && (err.status === 404 || err.status === 409)) {
+      if (isApiStatus(err, 404, 409)) {
         drop(stepId);
       } else {
         inFlight.value = inFlight.value.filter((d) => d !== stepId);
@@ -1298,12 +1298,6 @@ export const useChatStore = defineStore("chat", () => {
 
   function setIndependent(on: boolean): void {
     setFlag(independent, independentKey, on);
-  }
-
-  /** After extensions were added or removed: re-read tools and commands. */
-  function refreshCommands(): void {
-    commandRunner.invalidate();
-    void loadCommands();
   }
 
   /** Blank titles are ignored; the chat keeps its old one. */
@@ -1519,7 +1513,6 @@ secondBrainScope,
     answerQuestion,
     skipQuestion,
     enabledExtensions,
-    refreshCommands,
     clearChat,
     summarizeChat,
     deleteAllChats,

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
+import { matchesWords } from "../../utils/search";
+import { shortDate } from "../../utils/time";
 import PageLayout from "../../components/layout/PageLayout.vue";
 import { computed, ref, watch } from "vue";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
@@ -19,10 +21,7 @@ const { items: memories, loading, loadError, load } = useListLoad(() => memoryCl
 const notice = ref("");
 const query = ref("");
 const visible = ref(20);
-const matches = computed(() => {
-  const words = query.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  return memories.value.filter((memory) => words.every((word) => memory.text.toLocaleLowerCase().includes(word)));
-});
+const matches = computed(() => memories.value.filter((memory) => matchesWords(query.value, memory.text)));
 const shown = computed(() => matches.value.slice(0, visible.value));
 watch(query, () => { visible.value = 20; }, { flush: "sync" });
 
@@ -130,7 +129,7 @@ const { deleting, removing, removeError, ask: askDelete, confirm: remove } = use
               <article v-if="editorOpen && !editing" class="draft-row"><ListRow class="memory-row" active :disabled="saving || removing" @click="openEditor()"><span class="memory-text">New memory</span><span class="memory-date">Not saved yet</span></ListRow></article>
               <article v-for="memory in shown" :key="memory.id">
                 <ListRow class="memory-row" :active="editorOpen && editing?.id === memory.id" :aria-label="'Edit memory ' + memory.id" :aria-describedby="'memory-summary-' + memory.id" :disabled="saving || removing" @click="openEditor(memory)">
-                  <span :id="'memory-summary-' + memory.id" class="memory-text">{{ memory.text }}</span><span class="memory-date">Created <time :datetime="memory.created_at">{{ new Date(memory.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) }}</time></span>
+                  <span :id="'memory-summary-' + memory.id" class="memory-text">{{ memory.text }}</span><span class="memory-date">Created <time :datetime="memory.created_at">{{ shortDate(memory.created_at) }}</time></span>
                 </ListRow>
               </article>
             </div>
@@ -147,7 +146,7 @@ const { deleting, removing, removeError, ask: askDelete, confirm: remove } = use
               <label class="body-field" for="memory-text"><span class="memory-label">{{ editing ? 'Memory' : 'New memory' }}</span></label>
               <textarea id="memory-text" v-model="text" aria-label="Memory" :maxlength="MEMORY_TEXT_MAX" :disabled="saving || removing" placeholder="One useful fact for Ember to remember…" autofocus />
               <CharacterCount class="memory-count" :length="text.length" :max="MEMORY_TEXT_MAX" suffix=" characters" />
-              <p v-if="editing" class="memory-created">Created <time :datetime="editing.created_at">{{ new Date(editing.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) }}</time></p>
+              <p v-if="editing" class="memory-created">Created <time :datetime="editing.created_at">{{ shortDate(editing.created_at) }}</time></p>
               <p v-else class="memory-created">Not saved yet</p>
               <p class="writing-hint">Keep it short and specific. Edit this context when it no longer fits.</p>
             </div>

@@ -4,6 +4,7 @@ import { computed, onMounted, ref, useTemplateRef, watch } from "vue";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { navPreferencesClient } from "../../api/navigation/NavPreferencesClient";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import { checked } from "../../utils/browser/dom";
 import { errorMessage } from "../../utils/errors";
 import SettingRow from "../../components/ui/forms/SettingRow.vue";
 import {
@@ -345,10 +346,6 @@ const modifiedCount = computed(() => Object.values(modified.value).filter(Boolea
 watch(modifiedCount, (count) => {
   if (count === 0) onlyModified.value = false;
 });
-
-function checked(event: Event): boolean {
-  return (event.target as HTMLInputElement).checked;
-}
 
 /** Enter in the search box moves to the first setting that is left. */
 function jumpToFirst(): void {

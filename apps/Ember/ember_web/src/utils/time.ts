@@ -8,3 +8,8 @@ export function parseServerTime(value: string | undefined): number {
 export function formatUtc(iso: string): string {
   return new Date(parseServerTime(iso)).toLocaleString();
 }
+
+/** A server time as a short local date, e.g. "Nov 1, 2026". */
+export function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}

@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, watch } from "vue";
-import { ApiError } from "../../../api/http";
+import { isApiStatus } from "../../../api/http";
 import { templatesClient, type PromptTemplate } from "../api/TemplatesClient";
 import { errorMessage } from "../../../utils/errors";
 import { useAuthStore } from "../../../stores/auth";
@@ -78,7 +78,7 @@ export const useTemplatesStore = defineStore("templates", () => {
       await templatesClient.remove(id);
     } catch (err) {
       // Already gone (another tab): the list should agree with the server.
-      if (!(err instanceof ApiError && err.status === 404)) throw err;
+      if (!isApiStatus(err, 404)) throw err;
     }
     if (started === generation) templates.value = templates.value.filter((t) => t.id !== id);
   }
