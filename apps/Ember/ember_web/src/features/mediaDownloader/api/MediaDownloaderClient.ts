@@ -1,4 +1,5 @@
-import { apiRequest, ApiError } from '../../../api/http'
+import { apiRequest } from '../../../api/http'
+import { pollJob } from '../../../api/pollJob'
 import type { FileInfo, JobStatus, ProbeResult, MediaPackage } from './MediaDownloaderTypes'
 
 const BASE = '/api/media-downloader'
@@ -21,31 +22,14 @@ export const mediaDownloaderClient = {
 
 /** Poll without overlapping requests. Stopping also discards a response already in flight. */
 export function watchVideoJob(jobId: string, update: (status: JobStatus) => void, fail: (error: unknown) => void): () => void {
-  let stopped = false
-  let failures = 0
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const stop = () => {
-    stopped = true
-    clearTimeout(timer)
-  }
-  const poll = async () => {
-    try {
-      const status = await mediaDownloaderClient.getJobStatus(jobId)
-      if (stopped) return
-      failures = 0
+  return pollJob({
+    fetch: () => mediaDownloaderClient.getJobStatus(jobId),
+    onStatus: (status) => {
       update(status)
-      if (status.state === 'done' || status.state === 'error') return stop()
-    } catch (error) {
-      if (stopped) return
-      failures++
-      if ((error instanceof ApiError && error.status < 500) || failures >= 10) {
-        stop()
-        fail(error)
-        return
-      }
-    }
-    if (!stopped) timer = setTimeout(() => void poll(), 2000)
-  }
-  void poll()
-  return stop
+      return status.state === 'done' || status.state === 'error'
+    },
+    onFail: fail,
+    intervalMs: 2000,
+    maxFailures: 10,
+  })
 }

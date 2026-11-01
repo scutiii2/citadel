@@ -18,24 +18,24 @@ export interface ChatSummary {
   second_brain_scope?: "instance" | "personal";
 }
 
-export interface ChatDetail extends ChatSummary {
+interface ChatDetail extends ChatSummary {
   messages: ChatMessage[];
 }
 
-export interface ChatWrite {
+interface ChatWrite {
   title: string;
   agent_id: string | null;
   messages: ChatMessage[];
 }
 
-export interface ChatImportItem extends ChatWrite {
+interface ChatImportItem extends ChatWrite {
   id: string;
   /** Milliseconds since the epoch. */
   created_at: number;
   updated_at: number;
 }
 
-export interface TurnStart {
+interface TurnStart {
   question: string;
   caveman: boolean;
   /** Sent only when on: the agent gets no earlier messages of this chat. */
@@ -63,7 +63,7 @@ export interface TurnStart {
   can_ask?: boolean;
 }
 
-export interface TurnStarted {
+interface TurnStarted {
   chat: ChatSummary;
   /** Watch /events with after=this for only newer events. */
   sequence: number;

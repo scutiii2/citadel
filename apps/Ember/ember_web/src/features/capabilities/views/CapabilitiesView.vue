@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
+import { matchesWords } from "../../../utils/search";
 import { commandsClient, type CapabilityInfo } from "../../../api/tools/CommandsClient";
 import { extensionsClient } from "../api/ExtensionsClient";
 import { type ExtensionInfo } from "../../../api/contracts/extensions";
@@ -13,7 +14,6 @@ import ToolRunModal from "../../../components/tools/forms/ToolRunModal.vue";
 import ResourceReader from "../components/ResourceReader.vue";
 import UserExtensionModal from "../components/UserExtensionModal.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
-import type { SectionPage } from "../components/CapabilitySection.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { useUserExtensionsStore } from "../stores/userExtensions";
 import { groupTools, inExtensionNamespace } from "../utils/capabilityGroups";
@@ -54,6 +54,14 @@ const pending = ref<Record<string, boolean>>({});
 const confirmed = (key: string, enabled: boolean): boolean => pending.value[key] ?? enabled;
 const connection = (status: string): boolean | null => status === "connected" ? true : status === "unknown" ? null : false;
 const toolCount = (n: number): string => `${n} tool${n === 1 ? "" : "s"}`;
+
+/** Where an item's "Open ..." button leads. */
+interface SectionPage {
+  to: string;
+  /** A web app in a new tab rather than a page of this app. */
+  external: boolean;
+  label?: string;
+}
 
 function capabilityPage(c: CapabilityInfo): SectionPage | null {
   const page = dedicatedCapabilityPage(c.name);
@@ -100,10 +108,7 @@ const items = computed<Item[]>(() => {
   return rows.sort((a, b) => Number(b.enabled) - Number(a.enabled) || Number(b.online !== false) - Number(a.online !== false) || a.label.localeCompare(b.label));
 });
 const tabItems = computed(() => items.value.filter(i => i.tab === tab.value));
-const shown = computed(() => {
-  const words = query.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  return tabItems.value.filter(i => words.every(word => [i.id, i.label, i.description, ...i.names, ...i.tools.flatMap(t => [t.title, t.description]), ...i.resources.flatMap(r => [r.name, r.description ?? ""])].join(" ").toLowerCase().includes(word)));
-});
+const shown = computed(() => tabItems.value.filter(i => matchesWords(query.value, i.id, i.label, i.description, ...i.names, ...i.tools.flatMap(t => [t.title, t.description]), ...i.resources.flatMap(r => [r.name, r.description ?? ""]))));
 const selected = computed(() => tabItems.value.find(i => i.key === selection.value[tab.value]) ?? shown.value[0] ?? tabItems.value[0] ?? null);
 watch(() => selected.value?.key, key => { if (key && !selection.value[tab.value]) selection.value[tab.value] = key; });
 const enabledCount = computed(() => tabItems.value.filter(i => i.kind !== "other" && i.enabled).length);

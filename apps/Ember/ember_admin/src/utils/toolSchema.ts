@@ -1,13 +1,13 @@
 import type { JsonSchema } from "../api/types";
 
 /** How a value is parsed into a tool argument. */
-export type FieldKind = "string" | "number" | "integer" | "boolean" | "enum" | "json";
+type FieldKind = "string" | "number" | "integer" | "boolean" | "enum" | "json";
 
 /** How a field is drawn. A tool can ask for one with a schema hint
  * (`input`, chat_app's command-form convention); otherwise it follows the
  * kind. "select" with an `optionsUrl` gets its options from mcp_server; a
  * "file" field uploads the dropped file and holds its server-side path. */
-export type FieldWidget =
+type FieldWidget =
   | "text"
   | "textarea"
   | "password"
@@ -203,21 +203,4 @@ export function buildArgs(fields: ToolField[], values: FieldValues): BuildResult
   }
 
   return Object.keys(errors).length > 0 ? { ok: false, errors } : { ok: true, args };
-}
-
-/** Quotes a value so "/cap cmd key=value" parsing (splitWords) keeps it
- * one word: spaces, quotes and backslashes (Windows paths) survive. */
-export function quoteWord(value: string): string {
-  if (value !== "" && !/[\s"'\\]/.test(value)) return value;
-  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-}
-
-/** Tool arguments as the "/<capability> <command> key=value ..." text a
- * user could have typed. */
-export function commandText(capability: string, command: string, args: Record<string, unknown>): string {
-  const params = Object.entries(args).map(([key, value]) => {
-    const text = typeof value === "string" ? value : typeof value === "object" ? JSON.stringify(value) : String(value);
-    return `${key}=${quoteWord(text)}`;
-  });
-  return [`/${capability}`, command, ...params].join(" ");
 }

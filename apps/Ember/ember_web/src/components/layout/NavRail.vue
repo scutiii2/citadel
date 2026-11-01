@@ -5,20 +5,21 @@
 // arrangement applies: pinned pages first, a divider, the rest, hidden ones left out.
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { ticketsClient } from "../../features/tickets/api/TicketsClient";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 import AccountMenu from "./AccountMenu.vue";
 import EmberLogo from "./EmberLogo.vue";
-import { useTheme } from "../../composables/useTheme";
+import { usePolling } from "../../composables/time/usePolling";
+import { THEME_LABELS, useTheme } from "../../composables/useTheme";
+import ThemeIcon from "./ThemeIcon.vue";
 import { OVERVIEW_ICON, PROFILE_ICON, visiblePages } from "../../router/pages";
 import { usePageVisibilityStore } from "../../stores/navigation/pageVisibility";
+import { useLogout } from "../../composables/useLogout";
 import { useAuthStore } from "../../stores/auth";
 import { useNavPrefsStore } from "../../stores/navigation/navPrefs";
 import { ADMIN_ACCESS_PERMISSIONS, emberAdminUrl } from "../../utils/navigation/adminLink";
 import { railPages } from "../../utils/navigation/navArrangement";
 
 const { theme, next, cycle } = useTheme();
-const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" } as const;
-
 const auth = useAuthStore();
 const ticketUnread = ref(0);
 let unreadSeq = 0;
@@ -39,21 +40,14 @@ watch(() => [auth.account?.id, auth.needsVerification, auth.hasPermission("ticke
   ticketUnread.value = 0;
   void refreshUnread();
 }, { immediate: true });
-let unreadTimer: ReturnType<typeof setInterval> | undefined;
-onMounted(() => {
-  unreadTimer = setInterval(() => void refreshUnread(), 30_000);
-  document.addEventListener("visibilitychange", refreshUnread);
-  window.addEventListener("tickets-seen", refreshUnread);
-});
+usePolling(refreshUnread, 30_000);
+onMounted(() => window.addEventListener("tickets-seen", refreshUnread));
 onUnmounted(() => {
   ++unreadSeq;
-  clearInterval(unreadTimer);
-  document.removeEventListener("visibilitychange", refreshUnread);
   window.removeEventListener("tickets-seen", refreshUnread);
 });
 const pageVisibility = usePageVisibilityStore();
 const route = useRoute();
-const router = useRouter();
 
 const adminUrl = emberAdminUrl();
 const canAdmin = computed(() => ADMIN_ACCESS_PERMISSIONS.some(auth.hasPermission));
@@ -61,7 +55,7 @@ const canBrowse = computed(() => auth.account !== null && !auth.needsVerificatio
 const navPrefs = useNavPrefsStore();
 // These pages live in the account menu, in two groups, outside the account's
 // pin/reorder/hide arrangement; an administrator's hide list still removes them.
-const MENU_GROUPS = [["/capabilities", "/agents"], ["/calendar", "/usage", "/settings"]];
+const MENU_GROUPS = [["/capabilities", "/agents"], ["/usage", "/settings"]];
 // Chat sits in the header under the wordmark, not in the arrangement either.
 const HEADER_PAGE = "/";
 const MENU_PAGES = [...MENU_GROUPS.flat(), HEADER_PAGE];
@@ -115,10 +109,7 @@ function isOpenedFromHere(to: string): boolean {
   );
 }
 
-async function logout(): Promise<void> {
-  await auth.logout();
-  await router.replace({ name: "login" });
-}
+const logout = useLogout();
 </script>
 
 <template>
@@ -187,17 +178,7 @@ async function logout(): Promise<void> {
         :aria-label="`Theme: ${THEME_LABELS[theme]}. Switch to ${THEME_LABELS[next()]}`"
         @click="cycle"
       >
-        <svg v-if="theme === 'light'" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4" />
-        </svg>
-        <svg v-else-if="theme === 'dark'" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-          <path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" />
-        </svg>
-        <svg v-else viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-          <rect x="3" y="4" width="18" height="12" rx="2" />
-          <path d="M8 20h8M12 16v4" />
-        </svg>
+        <ThemeIcon :theme="theme" />
       </button>
     </div>
   </aside>

@@ -105,13 +105,13 @@ export interface PendingApproval {
 export type ApprovalDecision = "allow" | "always" | "deny";
 
 /** One choice of a question the agent asks. */
-export interface QuestionOption {
+interface QuestionOption {
   label: string;
   description?: string;
 }
 
 /** One question the agent asks. The page always adds an "Other" typed answer. */
-export interface Question {
+interface Question {
   /** A very short label (a chip). */
   header: string;
   question: string;

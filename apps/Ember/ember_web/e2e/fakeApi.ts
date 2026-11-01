@@ -16,7 +16,7 @@ export const ACCOUNT = {
 };
 
 /** The same person with the Administrator role, for the pages that need `admin.manage`. */
-export const ADMIN_ACCOUNT = {
+const ADMIN_ACCOUNT = {
   ...ACCOUNT,
   roles: ["Administrator"],
   permissions: [...ACCOUNT.permissions, "tools.view", "tools.execute", "files.upload", "files.download", "accounts.view", "accounts.manage", "accounts.delete", "roles.view", "roles.manage", "roles.assign", "invites.manage", "settings.manage", "capabilities.manage", "usage.all.view", "extensions.manage"],
@@ -30,7 +30,7 @@ const DELEGATE = { id: "calc", label: "Calculator", step_id: "d1" };
 
 export const PASSWORD = "correct horse battery";
 
-export interface StoredChat {
+interface StoredChat {
   id: string;
   title: string;
   agent_id: string;
@@ -41,13 +41,13 @@ export interface StoredChat {
   save_to_second_brain?: boolean;
 }
 
-export interface StoredFolder {
+interface StoredFolder {
   id: number;
   name: string;
   position: number;
 }
 
-export interface StoredNote {
+interface StoredNote {
   id: string;
   title: string;
   body: string;
@@ -56,6 +56,19 @@ export interface StoredNote {
   last_editor: "user" | "agent";
   created_at: string;
   updated_at: string;
+}
+
+export interface StoredSkill {
+  id: number;
+  title: string;
+  when_to_use: string;
+  steps: string;
+  tools: string;
+  status: "proposed" | "active" | "retired";
+  successes: number;
+  failures: number;
+  failing: boolean;
+  created_at: string;
 }
 
 /** What the page sends when it saves a note. */
@@ -67,7 +80,7 @@ interface NoteBody {
   expected_updated_at?: string;
 }
 
-export interface StoredAccount {
+interface StoredAccount {
   id: number;
   username: string;
   email: string;
@@ -78,7 +91,7 @@ export interface StoredAccount {
   roles: { id: number; name: string }[];
 }
 
-export interface StoredUserExtension {
+interface StoredUserExtension {
   id: string;
   label: string;
   description: string;
@@ -90,7 +103,7 @@ export interface StoredUserExtension {
   tools: string[];
 }
 
-export interface StoredCapability {
+interface StoredCapability {
   name: string;
   enabled: boolean;
   label: string | null;
@@ -99,7 +112,7 @@ export interface StoredCapability {
   resources: string[];
 }
 
-export interface StoredRole {
+interface StoredRole {
   id: number;
   name: string;
   description: string | null;
@@ -108,7 +121,7 @@ export interface StoredRole {
   account_count: number;
 }
 
-export interface StoredTemplate {
+interface StoredTemplate {
   id: number;
   name: string;
   body: string;
@@ -116,7 +129,7 @@ export interface StoredTemplate {
   updated_at: string;
 }
 
-export interface StoredShare {
+interface StoredShare {
   id: number;
   chat_id: string;
   title: string;
@@ -125,7 +138,7 @@ export interface StoredShare {
   expires_at: string | null;
 }
 
-export interface StoredTicket {
+interface StoredTicket {
   id: number;
   type: "bug" | "feature" | "other";
   title: string;
@@ -138,19 +151,7 @@ export interface StoredTicket {
   comments?: { id: number; ticket_id: number; author: string; author_role: "reporter" | "staff" | "ai" | "system"; body: string; created_at: string }[];
 }
 
-interface CalendarFeedStub {
-  id: string;
-  name: string;
-  color: string;
-  enabled: boolean;
-  last_fetch_at: string | null;
-  last_error: string | null;
-}
-interface RuleStub { id: string; channel: string; lead_minutes: number; enabled: boolean }
-interface AlertStub { id: string; title: string; start_utc: string; channel: string; created_at: string }
-
 export interface FakeApi {
-  calendar: { feeds: CalendarFeedStub[]; rules: RuleStub[]; alerts: AlertStub[] };
   /** Requests captured only by the opt-in native media workspace fake. */
   media: { uploads: { filename: string; data: string }[]; merges: Record<string, unknown>[]; downloads: { url: string; preset: string }[] };
   tickets: Map<number, StoredTicket>;
@@ -171,6 +172,7 @@ export interface FakeApi {
   /** The member's private notes (/api/notes). */
   notes: Map<string, StoredNote>;
   memories: Map<number, { id: number; text: string; created_at: string }>;
+  skills: Map<number, StoredSkill>;
   /** What the Settings tab saves: the administrator's "require approval for every tool". */
   settings: { forceToolApproval: boolean };
   /** The accounts the Admin page lists (an administrator login only). */
@@ -253,12 +255,11 @@ const event = (sequence: number, body: Record<string, unknown>) =>
   `id: ${sequence}\ndata: ${JSON.stringify({ sequence, ...body })}\n\n`;
 
 /** What the fake agent answers, in the pieces ember_api would stream it. */
-export const ANSWER_PIECES = ["The capital ", "of France ", "is Paris."];
+const ANSWER_PIECES = ["The capital ", "of France ", "is Paris."];
 export const ANSWER = ANSWER_PIECES.join("");
 
-export async function installFakeApi(page: Page, options: { admin?: boolean; tickets?: boolean; media?: boolean; calendar?: boolean } = {}): Promise<FakeApi> {
+export async function installFakeApi(page: Page, options: { admin?: boolean; tickets?: boolean; media?: boolean } = {}): Promise<FakeApi> {
   const api: FakeApi = {
-    calendar: { feeds: [], rules: [{ id: "r1", channel: "inapp", lead_minutes: 15, enabled: true }], alerts: [] },
     media: { uploads: [], merges: [], downloads: [] },
     tickets: new Map(),
     disabledAgents: new Set(),
@@ -271,13 +272,14 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
     shares: new Map(),
     notes: new Map(),
     memories: new Map(),
+    skills: new Map(),
     unexpected: [],
     turns: [],
     chats: new Map(),
     folders: new Map(),
   };
   const baseAccount = options.admin ? ADMIN_ACCOUNT : ACCOUNT;
-  const account = { ...baseAccount, permissions: [...baseAccount.permissions, ...(options.tickets ? ["tickets.create"] : []), ...(options.calendar ? ["calendar.use"] : []), ...(options.media ? ["tools.view", "tools.execute", "files.download"] : [])] };
+  const account = { ...baseAccount, permissions: [...baseAccount.permissions, ...(options.tickets ? ["tickets.create"] : []), ...(options.media ? ["tools.view", "tools.execute", "files.download"] : [])] };
   if (options.admin) {
     for (const a of ADMIN_ACCOUNTS) api.accounts.set(a.id, { ...a });
     for (const r of ADMIN_ROLES) api.roles.set(r.id, { ...r });
@@ -445,7 +447,7 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       return json(route, { limits: responseLimits, ceiling: { max_output_tokens: 2048, max_tool_rounds: 15 } });
     }
     if (method === "GET" && path === "/api/settings") {
-      return json(route, { force_tool_approval: api.settings.forceToolApproval, calendar_inapp: true, calendar_email: true, calendar_push: false });
+      return json(route, { force_tool_approval: api.settings.forceToolApproval });
     }
     if (method === "PUT" && path === "/api/admin/settings/force_tool_approval") {
       const { value } = request.postDataJSON() as { value: boolean };
@@ -616,6 +618,22 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       return json(route, { suggested, checked: [...used].filter((tag) => !have.has(tag)).length, skipped: 0 });
     }
 
+    if (path === "/api/skills" && method === "GET") return json(route, [...api.skills.values()]);
+    const skillPath = /^\/api\/skills\/(\d+)(\/status)?$/.exec(path);
+    if (skillPath && (method === "PUT" || method === "DELETE")) {
+      const id = Number(skillPath[1]);
+      const skill = api.skills.get(id);
+      if (!skill) return json(route, { detail: "Skill not found" }, 404);
+      if (method === "DELETE" && !skillPath[2]) { api.skills.delete(id); return route.fulfill({ status: 204 }); }
+      if (method === "PUT") {
+        const updated = skillPath[2]
+          ? { ...skill, status: (request.postDataJSON() as { status: StoredSkill["status"] }).status }
+          : { ...skill, ...request.postDataJSON() as Pick<StoredSkill, "title" | "when_to_use" | "steps" | "tools">, successes: 0, failures: 0, failing: false };
+        api.skills.set(id, updated);
+        return json(route, updated);
+      }
+    }
+
     if (path === "/api/memory" && method === "GET") return json(route, [...api.memories.values()].sort((a, b) => b.id - a.id));
     if (path === "/api/memory" && method === "POST") {
       const { text } = route.request().postDataJSON() as { text: string };
@@ -774,71 +792,6 @@ export async function installFakeApi(page: Page, options: { admin?: boolean; tic
       if (method === "GET" && tail === "/events") return streamTurn(route, api, id!);
     }
 
-    if (path.startsWith("/api/calendar")) {
-      const cal = api.calendar;
-      if (path === "/api/calendar/feeds" && method === "GET") return json(route, cal.feeds);
-      if (path === "/api/calendar/feeds" && method === "POST") {
-        const body = request.postDataJSON() as { name: string; color: string };
-        const feed = { id: `f${cal.feeds.length + 1}`, name: body.name, color: body.color, enabled: true, last_fetch_at: null, last_error: null };
-        cal.feeds.push(feed);
-        return json(route, feed, 201);
-      }
-      const feedMatch = path.match(/^\/api\/calendar\/feeds\/([a-z0-9]+)$/);
-      if (feedMatch && method === "PATCH") {
-        const feed = cal.feeds.find((f) => f.id === feedMatch[1]);
-        if (!feed) return json(route, { detail: "No such calendar" }, 404);
-        const body = request.postDataJSON() as Partial<CalendarFeedStub> & { url?: string };
-        for (const key of ["name", "color", "enabled"] as const) {
-          if (body[key] !== undefined) Object.assign(feed, { [key]: body[key] });
-        }
-        return json(route, feed);
-      }
-      if (feedMatch && method === "DELETE") {
-        cal.feeds = cal.feeds.filter((f) => f.id !== feedMatch[1]);
-        return route.fulfill({ status: 204 });
-      }
-      if (path === "/api/calendar/events" && method === "GET") {
-        // The initial Work week view hides weekends; keep the fixture inside its requested weekdays.
-        const start = new Date(url.searchParams.get("from")!);
-        while (start.getDay() === 0 || start.getDay() === 6) start.setDate(start.getDate() + 1);
-        start.setHours(10, 0, 0, 0);
-        const end = new Date(start.getTime() + 3600_000);
-        return json(route, {
-          events: cal.feeds.length ? [{ uid: "e1", title: "Standup", start: start.toISOString(), end: end.toISOString(), all_day: false, location: "Room 1", description: "Agenda", sources: [{ name: cal.feeds[0]!.name, color: cal.feeds[0]!.color }] }] : [],
-          errors: [],
-        });
-      }
-      if (path === "/api/calendar/alarms" && method === "GET") return json(route, cal.rules);
-      if (path === "/api/calendar/alarms" && method === "POST") {
-        const body = request.postDataJSON() as { channel: string; lead_minutes: number };
-        const rule = { id: `r${cal.rules.length + 1}`, channel: body.channel, lead_minutes: body.lead_minutes, enabled: true };
-        cal.rules.push(rule);
-        return json(route, rule, 201);
-      }
-      const ruleMatch = path.match(/^\/api\/calendar\/alarms\/([a-z0-9]+)$/);
-      if (ruleMatch && method === "PATCH") {
-        const rule = cal.rules.find((r) => r.id === ruleMatch[1]);
-        if (!rule) return json(route, { detail: "No such alert" }, 404);
-        Object.assign(rule, request.postDataJSON() as Partial<Omit<RuleStub, "id">>);
-        return json(route, rule);
-      }
-      if (ruleMatch && method === "DELETE") {
-        cal.rules = cal.rules.filter((r) => r.id !== ruleMatch[1]);
-        return route.fulfill({ status: 204 });
-      }
-      if (path === "/api/calendar/push/key" && method === "GET") return json(route, { key: "A".repeat(87) });
-      if (["/api/calendar/push/subscribe", "/api/calendar/push/unsubscribe"].includes(path) && method === "POST") {
-        return route.fulfill({ status: 204 });
-      }
-      if (path === "/api/calendar/prefs") return json(route, { timezone: "UTC", saved: true });
-      if (path === "/api/calendar/alerts" && method === "GET") return json(route, cal.alerts);
-      const seenMatch = path.match(/^\/api\/calendar\/alerts\/([a-z0-9-]+)\/seen$/);
-      if (seenMatch && method === "POST") {
-        cal.alerts = cal.alerts.filter((a) => a.id !== seenMatch[1]);
-        return route.fulfill({ status: 204 });
-      }
-    }
-
     api.unexpected.push(`${method} ${path}`);
     return json(route, { detail: "not part of the fake" }, 404);
   });
@@ -963,7 +916,7 @@ async function mcpAgent(route: Route) {
 
 /** Small valid PDF with byte-accurate xref offsets, used for real PDF.js worker previews. */
 /** Short PCM audio so Chrome exercises real media events in speech tests. */
-export function sampleSpeechAudio(): Buffer {
+function sampleSpeechAudio(): Buffer {
   const samples = 6400;
   const wav = Buffer.alloc(44 + samples * 2);
   wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write("WAVEfmt ", 8);

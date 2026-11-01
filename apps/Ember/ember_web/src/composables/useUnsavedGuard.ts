@@ -1,7 +1,7 @@
 import { getCurrentInstance, onMounted, onUnmounted, ref, type Ref } from "vue";
 import { onBeforeRouteLeave, routerKey, type RouteLocationNormalized } from "vue-router";
 
-export interface UnsavedGuardOptions {
+interface UnsavedGuardOptions {
   /** There are edits to lose: leaving asks first. */
   dirty: () => boolean;
   /** A save or delete is running: leaving the route is refused, and closing the tab warns. */
@@ -12,7 +12,7 @@ export interface UnsavedGuardOptions {
   onAsk?: () => void;
 }
 
-export interface UnsavedGuard {
+interface UnsavedGuard {
   /** True while the discard dialog is up; the page binds its ConfirmModal to it. */
   open: Ref<boolean>;
   /** The dialog's answer: true discards and lets the route change go on. */

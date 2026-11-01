@@ -4,7 +4,7 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 
 /** What Client.callTool resolves to. */
-export type RawToolResult = Awaited<ReturnType<Client["callTool"]>>;
+type RawToolResult = Awaited<ReturnType<Client["callTool"]>>;
 
 /** One lazily-opened MCP session to one server, reached through ember_api's
  * same-origin proxy (the session cookie rides along automatically);

@@ -6,7 +6,7 @@ export type AgentStatus = "running" | "offline" | "disabled";
 
 /** One model an agent may run on: its strength tier, model id, and what that
  * tier is meant for. */
-export interface ModelTier {
+interface ModelTier {
   tier: string;
   id: string;
   use_for: string;

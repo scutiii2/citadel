@@ -14,3 +14,13 @@ export function formatBytes(bytes: number): string {
 export function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
+
+/** 5 -> "05". */
+export function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** A Markdown table cell must not contain the column separator or a line break. */
+export function markdownCell(text: string): string {
+  return text.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}

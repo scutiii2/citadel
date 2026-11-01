@@ -1,18 +1,18 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Account } from "../../../api/auth/AuthClient";
 import { navPreferencesClient, type NavPrefs } from "../../../api/navigation/NavPreferencesClient";
 import { settingsClient } from "../../../api/navigation/SettingsClient";
 import { useAuthStore } from "../../../stores/auth";
 import SidebarEditor from "./SidebarEditor.vue";
+import { makeAccount } from "../../../testing/account";
 
 vi.mock("../../../api/navigation/SettingsClient", () => ({ settingsClient: { get: vi.fn(), pages: vi.fn() } }));
 vi.mock("../../../api/navigation/NavPreferencesClient", () => ({
   navPreferencesClient: { get: vi.fn(), save: vi.fn(), reset: vi.fn() },
 }));
 
-const ACCOUNT: Account = { id: 1, username: "lex", email: "l@e.com", email_verified: true, roles: [], permissions: ["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] };
+const ACCOUNT = makeAccount({ username: "lex", email: "l@e.com" });
 // chat.use opens: Chat, Capabilities, Agents, Usage, Settings (in that default order).
 const DEFAULT_ORDER = ["Chat", "Capabilities", "Agents", "Usage", "Notes", "Memory", "Skills", "Brains", "Generator", "PDF merger", "Media downloader", "Settings"];
 const EMPTY: NavPrefs = { order: [], pinned: [], hidden: [] };

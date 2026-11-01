@@ -1,7 +1,7 @@
 /** Small readings of a usage report: the favorite agent, the busiest hour and
  * the start of the month. Pure, so they are easy to check. */
 
-export interface AgentTokens {
+interface AgentTokens {
   agent: string;
   model: string;
   tokens: number;

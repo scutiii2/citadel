@@ -91,7 +91,6 @@ input, select { min-width: 0; width: 100%; font: inherit; background: var(--bg);
 input.invalid { border-color: var(--danger); }
 button { font: inherit; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-full); color: var(--text); background: var(--bg); cursor: pointer; }
 .rotate { min-height: 36px; }
-.error { color: var(--danger); }
 .file-actions { display: flex; align-items: center; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
 .source-danger { margin-top: 16px; }
 button.danger { color: var(--danger); border-color: var(--danger); }

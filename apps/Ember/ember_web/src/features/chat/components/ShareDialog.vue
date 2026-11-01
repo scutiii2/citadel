@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { sharesClient, type ShareCreated, type ShareExpiry, type ShareInfo } from "../api/SharesClient";
-import { errorMessage, formatUtc } from "../../../utils/errors";
+import { errorMessage } from "../../../utils/errors";
+import { formatUtc } from "../../../utils/time";
 import BaseModal from "../../../components/ui/dialogs/BaseModal.vue";
 import ConfirmModal from "../../../components/ui/dialogs/ConfirmModal.vue";
 import CopyButton from "../../../components/ui/buttons/CopyButton.vue";

@@ -4,7 +4,7 @@ import { computed, ref, toValue, type MaybeRefOrGetter, type Ref, watch } from "
 export interface ChartPart {
   id: string;
   label: string;
-  /** A CSS colour, normally a theme token such as `var(--kind-action)`. */
+  /** A CSS colour, normally a theme token such as `var(--context-agents)`. */
   color: string;
 }
 

@@ -12,6 +12,7 @@ import { usePageVisibilityStore } from "../../../stores/navigation/pageVisibilit
 import { useAuthStore } from "../../../stores/auth";
 import { useNavPrefsStore } from "../../../stores/navigation/navPrefs";
 import type { NavPrefs } from "../../../api/navigation/NavPreferencesClient";
+import { checked } from "../../../utils/browser/dom";
 import { liftDragImage } from "../../../utils/browser/dragImage";
 import { arrange, dropPage, isDefault, setHidden, setPinned } from "../../../utils/navigation/navArrangement";
 
@@ -70,10 +71,6 @@ function onDragOver(id: string): void {
 /** The list is left only when the pointer goes outside it; moving onto the slot must not drop the slot. */
 function onListDragLeave(event: DragEvent): void {
   if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) over.value = null;
-}
-
-function checked(event: Event): boolean {
-  return (event.target as HTMLInputElement).checked;
 }
 
 /** The neighbour a row would swap with, if it is in the same group. */

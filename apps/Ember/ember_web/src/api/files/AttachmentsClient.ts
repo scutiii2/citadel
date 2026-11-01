@@ -1,6 +1,6 @@
 import { apiRequest } from "../http";
 
-export interface AttachmentText {
+interface AttachmentText {
   filename: string;
   text: string;
   char_count: number;
@@ -17,14 +17,14 @@ export interface AttachmentTable {
   notes: string[];
 }
 
-export interface AttachmentPdf extends AttachmentText {
+interface AttachmentPdf extends AttachmentText {
   file_id: string;
   pages: number;
   kind: string;
   expires_at: number;
 }
 
-export interface AttachmentAudio {
+interface AttachmentAudio {
   filename: string;
   file_id: string;
   duration_s: number;
@@ -40,7 +40,7 @@ export interface DictationResult {
 export const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 
 /** ember_api's limit for audio (base64 must fit its request cap). */
-export const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 
 /** The file's bytes as base64 (ember_api takes JSON only). */
 export function toBase64(file: Blob): Promise<string> {

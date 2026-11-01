@@ -1,13 +1,14 @@
 import type { JsonSchema } from "../../api/types";
+import { pad2 } from "../format";
 
 /** How a value is parsed into a tool argument. */
-export type FieldKind = "string" | "number" | "integer" | "boolean" | "enum" | "json";
+type FieldKind = "string" | "number" | "integer" | "boolean" | "enum" | "json";
 
 /** How a field is drawn. A tool can ask for one with a schema hint
  * (`input`, chat_app's command-form convention); otherwise it follows the
  * kind. "select" with an `optionsUrl` gets its options from mcp_server; a
  * "file" field uploads the dropped file and holds its server-side path. */
-export type FieldWidget =
+type FieldWidget =
   | "text"
   | "textarea"
   | "password"
@@ -96,8 +97,7 @@ function widgetOf(kind: FieldKind, schema: JsonSchema): FieldWidget {
 /** "{timestamp}" in an `initial` hint: the current local time, as chat_app fills it. */
 function expandInitial(template: string): string {
   const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const stamp = `${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`;
   return template.replaceAll("{timestamp}", stamp);
 }
 
@@ -149,7 +149,7 @@ export function initialValues(fields: ToolField[]): FieldValues {
   return Object.fromEntries(fields.map((f) => [f.name, f.initial]));
 }
 
-export type BuildResult =
+type BuildResult =
   | { ok: true; args: Record<string, unknown> }
   | { ok: false; errors: Record<string, string> };
 

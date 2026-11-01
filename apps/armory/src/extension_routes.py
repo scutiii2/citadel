@@ -24,6 +24,11 @@ def _slugify(label: str) -> str:
     return slug or "extension"
 
 
+def _unsaved(error: OSError) -> JSONResponse:
+    """A 4xx on purpose: ember_api shows a 4xx's message but reports any 5xx as "unreachable"."""
+    return JSONResponse({"error": f"Could not save the extensions config ({error.strerror or error})"}, status_code=409)
+
+
 def _unique_extension_id(label: str) -> str:
     """A slug of `label`, made unique among known extension ids by appending _2, _3, ... on collision."""
     base = _slugify(label)
@@ -84,7 +89,10 @@ async def create_extension(request: Request) -> JSONResponse:
         transport="http",
         url=url,
     )
-    status = await extensions.add_extension(config, settings.extensions_config_path)
+    try:
+        status = await extensions.add_extension(config, settings.extensions_config_path)
+    except OSError as error:
+        return _unsaved(error)
     if status is None:
         # Unreachable given run.py's startup order (install_extensions() runs first); guarded anyway.
         return JSONResponse({"error": "Extensions are not available yet"}, status_code=503)
@@ -96,7 +104,10 @@ async def delete_extension(request: Request) -> Response:
     """Disconnect and forget a runtime extension - see
     extensions.remove_extension. 404 for an unknown id, 204 on success."""
     extension_id = request.path_params["extension_id"]
-    removed = await extensions.remove_extension(extension_id, settings.extensions_config_path)
+    try:
+        removed = await extensions.remove_extension(extension_id, settings.extensions_config_path)
+    except OSError as error:
+        return _unsaved(error)
     if not removed:
         return JSONResponse({"error": f"Unknown extension {extension_id!r}"}, status_code=404)
     return Response(status_code=204)

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
+import { matchesWords } from "../../utils/search";
+import { shortDate } from "../../utils/time";
 import PageLayout from "../../components/layout/PageLayout.vue";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { MEMORY_MAX, MEMORY_TEXT_MAX, memoryClient, type MemoryNote } from "./api/MemoryClient";
 import ListRow from "../../components/ui/lists/ListRow.vue";
@@ -11,29 +13,17 @@ import DangerZone from "../../components/ui/status/DangerZone.vue";
 import CharacterCount from "../../components/ui/status/CharacterCount.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import "../../components/layout/infoPage.css";
+import { useDeleteConfirm } from "../../composables/useDeleteConfirm";
+import { useListLoad } from "../../composables/useListLoad";
 import { errorMessage } from "../../utils/errors";
 
-const memories = ref<MemoryNote[]>([]);
-const loading = ref(true);
-const loadError = ref("");
+const { items: memories, loading, loadError, load } = useListLoad(() => memoryClient.list());
 const notice = ref("");
 const query = ref("");
 const visible = ref(20);
-const matches = computed(() => {
-  const words = query.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  return memories.value.filter((memory) => words.every((word) => memory.text.toLocaleLowerCase().includes(word)));
-});
+const matches = computed(() => memories.value.filter((memory) => matchesWords(query.value, memory.text)));
 const shown = computed(() => matches.value.slice(0, visible.value));
 watch(query, () => { visible.value = 20; }, { flush: "sync" });
-
-async function load(): Promise<void> {
-  if (!loading.value) loading.value = true;
-  loadError.value = "";
-  try { memories.value = await memoryClient.list(); }
-  catch (error) { loadError.value = errorMessage(error); }
-  finally { loading.value = false; }
-}
-onMounted(load);
 
 const editorOpen = ref(false);
 const editing = ref<MemoryNote | null>(null);
@@ -98,23 +88,14 @@ async function save(): Promise<void> {
   finally { saving.value = false; }
 }
 
-const deleting = ref<MemoryNote | null>(null);
-const removing = ref(false);
-const removeError = ref("");
-function askDelete(memory: MemoryNote): void { deleting.value = memory; removeError.value = ""; }
-async function remove(): Promise<void> {
-  if (!deleting.value || removing.value) return;
-  removing.value = true;
-  removeError.value = "";
-  try {
-    await memoryClient.remove(deleting.value.id);
-    memories.value = memories.value.filter((memory) => memory.id !== deleting.value!.id);
-    if (editing.value?.id === deleting.value.id) showEditor("close");
-    deleting.value = null;
+const { deleting, removing, removeError, ask: askDelete, confirm: remove } = useDeleteConfirm<MemoryNote>(
+  (memory) => memoryClient.remove(memory.id),
+  (memory) => {
+    memories.value = memories.value.filter((m) => m.id !== memory.id);
+    if (editing.value?.id === memory.id) showEditor("close");
     notice.value = "Memory deleted.";
-  } catch (error) { removeError.value = errorMessage(error); }
-  finally { removing.value = false; }
-}
+  },
+);
 </script>
 
 
@@ -148,7 +129,7 @@ async function remove(): Promise<void> {
               <article v-if="editorOpen && !editing" class="draft-row"><ListRow class="memory-row" active :disabled="saving || removing" @click="openEditor()"><span class="memory-text">New memory</span><span class="memory-date">Not saved yet</span></ListRow></article>
               <article v-for="memory in shown" :key="memory.id">
                 <ListRow class="memory-row" :active="editorOpen && editing?.id === memory.id" :aria-label="'Edit memory ' + memory.id" :aria-describedby="'memory-summary-' + memory.id" :disabled="saving || removing" @click="openEditor(memory)">
-                  <span :id="'memory-summary-' + memory.id" class="memory-text">{{ memory.text }}</span><span class="memory-date">Created <time :datetime="memory.created_at">{{ new Date(memory.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) }}</time></span>
+                  <span :id="'memory-summary-' + memory.id" class="memory-text">{{ memory.text }}</span><span class="memory-date">Created <time :datetime="memory.created_at">{{ shortDate(memory.created_at) }}</time></span>
                 </ListRow>
               </article>
             </div>
@@ -165,7 +146,7 @@ async function remove(): Promise<void> {
               <label class="body-field" for="memory-text"><span class="memory-label">{{ editing ? 'Memory' : 'New memory' }}</span></label>
               <textarea id="memory-text" v-model="text" aria-label="Memory" :maxlength="MEMORY_TEXT_MAX" :disabled="saving || removing" placeholder="One useful fact for Ember to remember…" autofocus />
               <CharacterCount class="memory-count" :length="text.length" :max="MEMORY_TEXT_MAX" suffix=" characters" />
-              <p v-if="editing" class="memory-created">Created <time :datetime="editing.created_at">{{ new Date(editing.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) }}</time></p>
+              <p v-if="editing" class="memory-created">Created <time :datetime="editing.created_at">{{ shortDate(editing.created_at) }}</time></p>
               <p v-else class="memory-created">Not saved yet</p>
               <p class="writing-hint">Keep it short and specific. Edit this context when it no longer fits.</p>
             </div>

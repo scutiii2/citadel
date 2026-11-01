@@ -105,7 +105,4 @@ function onKeydown(event: KeyboardEvent): void {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-.error {
-  color: var(--danger);
-}
 </style>

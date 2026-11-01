@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, watch } from "vue";
+import { plural } from "../../../utils/format";
 
 /** Tag chips with a text box and a list of tags to pick from (a combobox, not the browser's
  * <datalist>). Enter or a comma adds what is typed; ArrowUp and ArrowDown walk the list and
@@ -172,7 +173,7 @@ defineExpose({ commit, add });
           @mousemove="highlighted = i"
         >
           <span class="name">{{ option.tag }}</span>
-          <span class="count">{{ option.count }} {{ option.count === 1 ? "note" : "notes" }}</span>
+          <span class="count">{{ plural(option.count, "note") }}</span>
         </li>
       </ul>
     </div>

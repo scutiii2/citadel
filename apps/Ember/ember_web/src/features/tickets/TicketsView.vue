@@ -5,6 +5,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
 import { ticketsClient, type NewTicket, type Ticket, type TicketStatus } from "./api/TicketsClient";
+import { usePolling } from "../../composables/time/usePolling";
 import BaseModal from "../../components/ui/dialogs/BaseModal.vue";
 import ListRow from "../../components/ui/lists/ListRow.vue";
 import SearchField from "../../components/ui/lists/SearchField.vue";
@@ -15,7 +16,8 @@ import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
 import SegmentedControl from "../../components/ui/forms/SegmentedControl.vue";
 import "../../components/layout/infoPage.css";
 import { errorMessage } from "../../utils/errors";
-import { COMMENT_ROLE_LABELS, STATUS_ICONS, STATUS_LABELS, TYPE_LABELS, formatTicketTime } from "./utils/tickets";
+import { COMMENT_ROLE_LABELS, STATUS_ICONS, STATUS_LABELS, TYPE_LABELS } from "./utils/tickets";
+import { formatUtc } from "../../utils/time";
 
 /** The signed-in account's own tickets (ember_api's /api/tickets): report a
  * bug or suggest a feature, follow what support answers, add details, close. */
@@ -78,22 +80,8 @@ async function load(): Promise<void> {
     }
   }
 }
-let pollTimer: ReturnType<typeof setInterval> | undefined;
-function stopPolling(): void {
-  clearInterval(pollTimer);
-  pollTimer = undefined;
-}
-function updatePolling(): void {
-  stopPolling();
-  if (document.hidden) return;
-  if (!listPending) void load();
-  pollTimer = setInterval(() => { if (!listPending) void load(); }, 30_000);
-}
-onMounted(() => {
-  document.addEventListener("visibilitychange", updatePolling);
-  if (document.hidden) void load();
-  else updatePolling();
-});
+usePolling(() => { if (!listPending) void load(); }, 30_000);
+onMounted(() => void load());
 
 // ---- new ticket ----
 const newOpen = ref(false);
@@ -223,8 +211,6 @@ watch(() => route.params.id, value => {
 onUnmounted(() => {
   ++detailSeq;
   ++loadSeq;
-  stopPolling();
-  document.removeEventListener("visibilitychange", updatePolling);
 });
 
 async function sendReply(): Promise<void> {
@@ -311,7 +297,7 @@ async function reopenTicket(): Promise<void> {
               <span class="title">{{ t.title }}</span>
               <span v-if="t.has_unread" class="unread-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4zM8 8h8M8 12h5" /></svg>Support replied</span>
               <span class="status"><svg viewBox="0 0 24 24" aria-hidden="true"><path :d="STATUS_ICONS[t.status]" /></svg>{{ STATUS_LABELS[t.status] }}</span>
-              <span class="row-time muted">Updated {{ formatTicketTime(t.updated_at) }}</span>
+              <span class="row-time muted">Updated {{ formatUtc(t.updated_at) }}</span>
             </ListRow>
           </li>
         </ul>
@@ -329,17 +315,17 @@ async function reopenTicket(): Promise<void> {
           <p v-if="detailLoading" class="muted" role="status">Loading …</p>
           <template v-if="current">
             <h3 class="detail-title">{{ current.title }}</h3>
-            <p class="filed muted">Filed {{ formatTicketTime(current.created_at) }}</p>
+            <p class="filed muted">Filed {{ formatUtc(current.created_at) }}</p>
             <ol class="timeline" aria-label="Ticket status timeline">
               <li v-for="(step, index) in timeline" :key="step.label" :class="{ reached: index <= timelineStage }" :aria-current="index === timelineStage ? 'step' : undefined">
-                <span>{{ step.label }}</span><time v-if="step.at" :datetime="step.at">{{ formatTicketTime(step.at) }}</time>
+                <span>{{ step.label }}</span><time v-if="step.at" :datetime="step.at">{{ formatUtc(step.at) }}</time>
               </li>
             </ol>
             <section class="original-report"><div class="who"><b>You</b></div><p class="text">{{ current.description }}</p></section>
             <p v-if="current.comments?.length" class="conversation-label muted">Conversation</p>
             <ul v-if="current.comments?.length" class="thread" aria-label="Comments">
               <li v-for="c in current.comments" :key="c.id" :class="{ own: c.author_role === 'reporter' || c.author_role === 'ai', support: c.author_role === 'staff', system: c.author_role === 'system' }">
-                <div class="who"><b>{{ COMMENT_ROLE_LABELS[c.author_role] }}</b><span class="muted">{{ formatTicketTime(c.created_at) }}</span></div>
+                <div class="who"><b>{{ COMMENT_ROLE_LABELS[c.author_role] }}</b><span class="muted">{{ formatUtc(c.created_at) }}</span></div>
                 <p class="text">{{ c.body }}</p>
               </li>
             </ul>

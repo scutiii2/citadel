@@ -438,6 +438,7 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
   </div>
 </template>
 
+<style scoped src="./chatShared.css"></style>
 <style scoped>
 .list {
   position: relative;
@@ -629,17 +630,6 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
   color: var(--accent-contrast);
   background: var(--accent);
 }
-.user-bubble {
-  max-width: 80%;
-  padding: 10px 14px;
-  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-sm) var(--radius-xl);
-  background: var(--user-bubble);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.assistant {
-  overflow-wrap: anywhere;
-}
 /* An answer sits beside a small round mark; everything in it goes in the second
    column. A command's result (a tool's output, not the agent's words) looks the
    same, with a plain "/" mark instead of the accent-colored spark. */
@@ -753,20 +743,6 @@ const { hasNew, stickToBottom, flashIndex, onScroll, jumpToNew } = useMessageScr
   overflow-wrap: anywhere;
   font-family: var(--mono);
   background: var(--code-bg);
-}
-.approval .buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.approval .buttons button {
-  padding: 5px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  font-size: 0.85em;
-  color: var(--text);
-  background: transparent;
 }
 .approval .buttons button:hover:not(:disabled) {
   border-color: var(--accent);

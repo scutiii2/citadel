@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from "vue";
-import { copyText } from "../../utils/browser/clipboard";
+import { computed, ref } from "vue";
+import { useCopyFeedback } from "../../composables/useCopyFeedback";
 import type { ToolRunResult } from "../../api/types";
 import { formatToolResult } from "../../utils/tools/toolResultFormat";
 import MarkdownContent from "../content/MarkdownContent.vue";
@@ -23,19 +23,10 @@ const formatted = computed(() => formatToolResult(props.result.text));
 // Formatted by default; the raw JSON is one click away.
 const showRaw = ref(false);
 
-const copied = ref(false);
-const copyFailed = ref(false);
-let copyTimer: ReturnType<typeof setTimeout> | undefined;
-let disposed = false;
-onBeforeUnmount(() => { disposed = true; clearTimeout(copyTimer); });
+const { copied, copyFailed, copy: copyToClipboard } = useCopyFeedback();
 
-async function copy(): Promise<void> {
-  const ok = await copyText(prettyJson.value ?? props.result.text);
-  if (disposed) return;
-  clearTimeout(copyTimer);
-  copied.value = ok;
-  copyFailed.value = !ok;
-  if (ok) copyTimer = setTimeout(() => (copied.value = false), 1500);
+function copy(): Promise<void> {
+  return copyToClipboard(prettyJson.value ?? props.result.text);
 }
 </script>
 

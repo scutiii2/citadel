@@ -11,6 +11,11 @@ export class ApiError extends Error {
   }
 }
 
+/** True when `err` is an ApiError with one of `statuses`. */
+export function isApiStatus(err: unknown, ...statuses: number[]): boolean {
+  return err instanceof ApiError && statuses.includes(err.status);
+}
+
 /** 401: no session, or it expired. */
 export class UnauthorizedError extends ApiError {}
 
@@ -39,7 +44,7 @@ function messageOf(data: unknown, fallback: string): string {
   return fallback;
 }
 
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export async function apiRequest<T>(
   method: HttpMethod,

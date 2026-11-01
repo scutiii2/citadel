@@ -3,7 +3,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import * as api from '../api/PdfMergerClient'
-import { ApiError, type JobEvent } from '../api/pdfMergerTypes'
+import { ApiError } from '../../../api/http'
+import { type JobEvent } from '../api/pdfMergerTypes'
 import { useAuthStore } from '../../../stores/auth'
 import { useFilesStore } from '../stores/files'
 import MergeBar from './MergeBar.vue'
@@ -56,7 +57,7 @@ describe('MergeBar', () => {
   })
 
   it('shows server errors', async () => {
-    vi.mocked(api.startMerge).mockRejectedValue(new ApiError('limit_exceeded', 'Too many pages.', 413))
+    vi.mocked(api.startMerge).mockRejectedValue(new ApiError(413, 'Too many pages.', 'limit_exceeded'))
     const { wrapper } = await setup()
 
     await wrapper.get('button.primary').trigger('click')

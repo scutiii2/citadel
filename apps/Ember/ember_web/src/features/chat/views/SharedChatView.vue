@@ -2,9 +2,10 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import MarkdownContent from "../../../components/content/MarkdownContent.vue";
-import { ApiError } from "../../../api/http";
+import { isApiStatus } from "../../../api/http";
 import { sharesClient, type SharedChatView } from "../api/SharesClient";
-import { errorMessage, formatUtc } from "../../../utils/errors";
+import { errorMessage } from "../../../utils/errors";
+import { formatUtc } from "../../../utils/time";
 
 /** A chat someone shared by link: a read-only copy of its questions and
  * answers. Open to anyone (no login); everything shown comes from
@@ -33,8 +34,8 @@ async function load(): Promise<void> {
     document.title = `${view.title} - Ember`;
   } catch (err) {
     if (requested !== token.value) return;
-    if (err instanceof ApiError && err.status === 404) problem.value = "gone";
-    else if (err instanceof ApiError && err.status === 429) problem.value = "busy";
+    if (isApiStatus(err, 404)) problem.value = "gone";
+    else if (isApiStatus(err, 429)) problem.value = "busy";
     else {
       problem.value = "error";
       problemText.value = errorMessage(err);
@@ -91,6 +92,7 @@ onBeforeUnmount(() => {
   </section>
 </template>
 
+<style scoped src="../components/chatShared.css"></style>
 <style scoped>
 .shared {
   flex: 1;
@@ -132,14 +134,5 @@ header h2 {
 }
 .user-bubble {
   align-self: flex-end;
-  max-width: 80%;
-  padding: 10px 14px;
-  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-sm) var(--radius-xl);
-  background: var(--user-bubble);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.assistant {
-  overflow-wrap: anywhere;
 }
 </style>

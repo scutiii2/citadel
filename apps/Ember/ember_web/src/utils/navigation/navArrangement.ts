@@ -10,7 +10,7 @@ export const EMPTY_PREFS: NavPrefs = { order: [], pinned: [], hidden: [] };
 
 type Page = { to: string };
 
-export interface Arranged<T> {
+interface Arranged<T> {
   pinned: T[];
   /** Everything not pinned, hidden pages included. */
   rest: T[];

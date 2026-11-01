@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { isTouchOnly } from "../../../utils/browser/touch";
+import { MENU_WIDTH } from "./menuPoint";
 import type { MenuItem } from "./menuTypes";
 
 // A small popup menu at a point of the page, with an optional flyout for items
@@ -7,7 +9,6 @@ import type { MenuItem } from "./menuTypes";
 // parent (the sidebar) can cut it off. It reports what was chosen (`select`) or
 // that it should go away (`close`: Esc, a press outside, Tab, a resize); the
 // owner removes it, and puts focus back where it came from after a `close`.
-const MENU_WIDTH = 210;
 const FLYOUT_WIDTH = 220;
 const MARGIN = 8;
 
@@ -55,17 +56,13 @@ watch(
   { flush: "post" },
 );
 
-function touchOnly(): boolean {
-  return typeof window.matchMedia === "function" && window.matchMedia("(hover: none)").matches;
-}
-
 function place(): void {
   const box = root.value?.getBoundingClientRect();
   const width = box?.width || MENU_WIDTH;
   const height = box?.height || 0;
   left.value = Math.max(MARGIN, Math.min(props.x, window.innerWidth - width - MARGIN));
   top.value = Math.max(MARGIN, Math.min(props.y, window.innerHeight - height - MARGIN));
-  overlay.value = touchOnly() || left.value + width + FLYOUT_WIDTH > window.innerWidth;
+  overlay.value = isTouchOnly() || left.value + width + FLYOUT_WIDTH > window.innerWidth;
 }
 
 /** The enabled buttons of the level (main menu or flyout) that holds `from`. */
@@ -130,7 +127,7 @@ function activate(item: MenuItem): void {
 function hover(item: MenuItem, event: MouseEvent): void {
   // An overlay flyout would cover the menu the pointer is on, so it opens by
   // click or keyboard only.
-  if (touchOnly() || overlay.value) return;
+  if (isTouchOnly() || overlay.value) return;
   // Focus follows the pointer, so focus is never left on a flyout item that
   // this hover removes (keys would then go to <body>, not the menu).
   if (!item.disabled) (event.currentTarget as HTMLButtonElement).focus();

@@ -6,6 +6,7 @@ import { foldersClient, type ChatFolder } from "../api/FoldersClient";
 import { useAuthStore } from "../../../stores/auth";
 import { useChatStore } from "./chat";
 import { useFoldersStore } from "./folders";
+import { makeAccount } from "../../../testing/account";
 
 vi.mock("../api/FoldersClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/FoldersClient")>()),
@@ -17,7 +18,7 @@ vi.mock("./chat", () => ({ useChatStore: vi.fn() }));
 const client = vi.mocked(foldersClient);
 const forgetFolder = vi.fn();
 
-const ACCOUNT = { id: 1, username: "u", email: "u@example.com", email_verified: true, roles: [], permissions: ["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] };
+const ACCOUNT = makeAccount({ username: "u", email: "u@example.com" });
 
 const folder = (id: number, position = id, name = `F${id}`): ChatFolder => ({ id, name, position, chat_count: 0 });
 

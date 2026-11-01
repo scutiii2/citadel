@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { copyText } from "../../utils/browser/clipboard";
+import { COPY_FEEDBACK_MS, copyText } from "../../utils/browser/clipboard";
 import { renderMarkdown } from "../../utils/content/markdown";
-
-const FEEDBACK_MS = 1500;
 
 const props = defineProps<{ text: string }>();
 
@@ -20,7 +18,7 @@ async function onClick(event: MouseEvent): Promise<void> {
   button.textContent = ok ? "Copied" : "Copy failed";
   setTimeout(() => {
     if (button.isConnected) button.textContent = "Copy";
-  }, FEEDBACK_MS);
+  }, COPY_FEEDBACK_MS);
 }
 </script>
 

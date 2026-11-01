@@ -10,12 +10,12 @@ export interface GatewayInfo {
 /** Provider id -> the gateways it can run through (from ai_agent's gateways/<provider>/<gateway>.json files). */
 export type ProviderCatalog = Record<string, GatewayInfo[]>;
 
-export interface AgentGatewayChoice {
+interface AgentGatewayChoice {
   gateway: string;
   model?: string;
 }
 
-export interface AgentLlm {
+interface AgentLlm {
   provider: string;
   strategy?: "laya-only" | "jev-only" | "both";
   min_confidence?: number;

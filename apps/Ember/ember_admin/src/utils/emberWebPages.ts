@@ -9,4 +9,3 @@ export const EMBER_WEB_PAGES = [
   { id: "/tickets", label: "Tickets" },
 ] as const;
 
-export type HideablePageId = (typeof EMBER_WEB_PAGES)[number]["id"];

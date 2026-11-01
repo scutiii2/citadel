@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import PageLayout from "../../components/layout/PageLayout.vue";
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
+import { usePolling } from "../../composables/time/usePolling";
 import { accountAgentsClient, agentsClient, type AgentListing } from "./api/AgentsClient";
 import AgentCard from "./components/AgentCard.vue";
 import AgentLlm from "./components/AgentLlm.vue";
@@ -95,14 +96,8 @@ async function refresh(): Promise<void> {
   }
 }
 
-let timer: ReturnType<typeof setInterval> | null = null;
-onMounted(() => {
-  void refresh();
-  timer = setInterval(() => void refresh(), REFRESH_MS);
-});
-onUnmounted(() => {
-  if (timer !== null) clearInterval(timer);
-});
+usePolling(refresh, REFRESH_MS);
+onMounted(() => void refresh());
 </script>
 
 <template>

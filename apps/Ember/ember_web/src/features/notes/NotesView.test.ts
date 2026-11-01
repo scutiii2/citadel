@@ -57,6 +57,81 @@ const dialogButton = (text: string) =>
 const rows = (w: VueWrapper) => w.findAll("ul[aria-label='Notes'] li");
 
 describe("NotesView", () => {
+  it("searches saved titles, complete note text and tags without changing their order", async () => {
+    const w = await setup([
+      note("a", "Ember layout", "opening " + "x".repeat(100) + " sidebar", undefined, ["design"]),
+      note("b", "Weekly review", "Plan the week", undefined, ["planning"]),
+      note("c", "Other", "A sidebar idea", undefined, ["design"]),
+    ]);
+    const search = w.get('input[aria-label="Search notes"]');
+    await search.setValue("  DESIGN sidebar  ");
+    expect(rows(w)).toHaveLength(2);
+    expect(rows(w)[0]!.text()).toContain("Ember layout");
+    expect(rows(w)[1]!.text()).toContain("Other");
+    await search.setValue("PLANNING");
+    expect(rows(w)).toHaveLength(1);
+    expect(rows(w)[0]!.text()).toContain("Weekly review");
+    await search.setValue("ember");
+    expect(rows(w)).toHaveLength(1);
+    expect(rows(w)[0]!.text()).toContain("Ember layout");
+    await search.setValue("  ");
+    expect(rows(w)).toHaveLength(3);
+    expect(client.list).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the open draft mounted when search has no results and clearing restores rows", async () => {
+    const w = await setup([note("a", "First", "Saved body"), note("b", "Second")]);
+    await rows(w)[0]!.get("button").trigger("click");
+    await w.get('textarea[aria-label="Note text"]').setValue("Unsaved body");
+    const editor = w.get('textarea[aria-label="Note text"]').element;
+    await w.get('input[aria-label="Search notes"]').setValue("no matches");
+    expect(w.text()).toContain("No notes match your search.");
+    expect(w.get('textarea[aria-label="Note text"]').element).toBe(editor);
+    expect((editor as HTMLTextAreaElement).value).toBe("Unsaved body");
+    expect(w.get('.actions').text()).toContain("Unsaved changes");
+    await buttonByText(w, "Clear search")!.trigger("click");
+    expect(rows(w)).toHaveLength(2);
+    expect(document.body.querySelector("dialog[open]")).toBeNull();
+    expect(client.update).not.toHaveBeenCalled();
+  });
+
+  it("retains a new-note draft even when no saved notes match the query", async () => {
+    const w = await setup([note("a", "First")]);
+    await w.get('input[aria-label="Search notes"]').setValue("missing");
+    await buttonByText(w, "New note")!.trigger("click");
+    await w.get('input[aria-label="Title"]').setValue("Draft title");
+    expect(rows(w)).toHaveLength(1);
+    expect(rows(w)[0]!.text()).toContain("Draft title");
+    expect(rows(w)[0]!.text()).toContain("Not saved yet");
+    expect(w.text()).not.toContain("No notes match your search.");
+  });
+
+  it("moves keyboard focus into the editor and back to the originating row or search", async () => {
+    const w = await setup([note("a", "First")]);
+    await rows(w)[0]!.get("button").trigger("click"); await flushPromises();
+    expect(document.activeElement).toBe(w.get('input[aria-label="Title"]').element);
+    await w.get('.back-button').trigger("click"); await flushPromises();
+    expect(document.activeElement).toBe(rows(w)[0]!.get("button").element);
+    await rows(w)[0]!.get("button").trigger("click");
+    await w.get('input[aria-label="Search notes"]').setValue("missing");
+    await w.get('.back-button').trigger("click"); await flushPromises();
+    expect(document.activeElement).toBe(w.get('input[aria-label="Search notes"]').element);
+  });
+
+  it("retries a failed load through the shared error state", async () => {
+    client.list.mockRejectedValueOnce(new Error("Notes temporarily offline"));
+    wrapper = mount(NotesView, { attachTo: document.body });
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain("Notes temporarily offline");
+    expect(wrapper.find('.layout').exists()).toBe(false);
+    client.list.mockResolvedValue([note("a", "Recovered note")]);
+    await buttonByText(wrapper, "Try again")!.trigger("click");
+    await flushPromises();
+    expect(rows(wrapper)).toHaveLength(1);
+    expect(rows(wrapper)[0]!.text()).toContain("Recovered note");
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+  });
+
   it("keeps secondary tools collapsed while the title and note stay in the writing area", async () => {
     const w = await setup([note("a", "First", "one")]);
     await rows(w)[0]!.get("button").trigger("click");

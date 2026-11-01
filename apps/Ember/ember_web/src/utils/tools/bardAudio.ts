@@ -3,7 +3,7 @@ import type { ToolStep } from "../../api/types";
 // Matched by suffix: an extension's tools arrive namespaced (`bard__tool_bard_speak`).
 const SPEAK_TOOL = "tool_bard_speak";
 
-export interface BardClip {
+interface BardClip {
   fileId: string;
   voice: string;
   durationS: number | null;

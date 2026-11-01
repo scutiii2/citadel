@@ -9,7 +9,7 @@ export interface UsageWindow {
 
 export type UsageGroupBy = "agent" | "provider" | "gateway" | "model";
 
-export interface UsageGroup {
+interface UsageGroup {
   key: string;
   tokens: number;
   input_tokens: number;

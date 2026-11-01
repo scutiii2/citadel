@@ -1,6 +1,6 @@
 import { ref, type Ref } from "vue";
 
-export interface ReorderOptions {
+interface ReorderOptions {
   /** Moves the item at `from` so it ends up at `to`. */
   move: (from: number, to: number) => void;
   /** How many items the list has now. */
@@ -9,7 +9,7 @@ export interface ReorderOptions {
   keys: { back: string; forward: string };
 }
 
-export interface Reorder {
+interface Reorder {
   /** The index being dragged, for the `dragging` class; null when no drag is on. */
   dragFrom: Readonly<Ref<number | null>>;
   onDragStart: (index: number, event: DragEvent) => void;

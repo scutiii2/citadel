@@ -136,6 +136,10 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    These files are baked into the image at build time, so a change made on the Capabilities page of ember_admin is lost
    when armory is rebuilt. Edit the file instead.
 
+   `docker/configs/armory/extensions.json` is the exception: it is mounted writable, so extensions added on the
+   Extensions page of ember_admin are saved into that file and survive restarts and rebuilds. On the device that file
+   differs from git after the first add; keep it when you update (`git stash` or `git update-index --skip-worktree`).
+
 5. **Start:**
 
    ```bash

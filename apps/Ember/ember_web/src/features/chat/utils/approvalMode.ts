@@ -2,7 +2,7 @@
 
 export type ApprovalMode = "ask" | "auto" | "allow_all";
 
-export interface ApprovalModeInfo {
+interface ApprovalModeInfo {
   id: ApprovalMode;
   label: string;
   description: string;

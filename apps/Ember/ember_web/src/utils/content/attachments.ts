@@ -15,7 +15,7 @@ export interface AttachmentBlock {
 
 const BLOCK = /\[\[ATTACHMENT filename="([^"]*)" chars="(\d+)" truncated="(true|false)"\]\]\n([\s\S]*?)\n\[\[\/ATTACHMENT\]\]/g;
 
-export function attachmentBlock(a: AttachmentBlock): string {
+function attachmentBlock(a: AttachmentBlock): string {
   const name = a.filename.replace(/"/g, "'");
   return `[[ATTACHMENT filename="${name}" chars="${a.chars}" truncated="${a.truncated}"]]\n${a.text}\n[[/ATTACHMENT]]`;
 }

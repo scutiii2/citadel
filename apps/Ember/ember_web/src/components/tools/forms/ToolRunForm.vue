@@ -399,9 +399,6 @@ textarea:focus {
 .muted {
   color: var(--muted);
 }
-.error {
-  color: var(--danger);
-}
 .run {
   align-self: flex-start;
   padding: 7px 18px;

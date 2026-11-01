@@ -75,5 +75,4 @@ button { border: 1px solid var(--border); border-radius: var(--radius-full); pad
 button:first-child { background: var(--accent); color: var(--accent-contrast); }
 button:disabled { opacity: .55; cursor: default; }
 .muted { color: var(--muted); font-size: .9em; }
-.error { color: var(--danger); }
 </style>

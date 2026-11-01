@@ -68,5 +68,4 @@ button { padding: 6px 16px; border: 1px solid var(--border); border-radius: var(
 button.primary { border-color: var(--accent); background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
 button:disabled { opacity: 0.5; cursor: default; }
 .muted { color: var(--muted); }
-.error { color: var(--danger); }
 </style>

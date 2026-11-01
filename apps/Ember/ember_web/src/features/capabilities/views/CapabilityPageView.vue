@@ -4,7 +4,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { capabilityPagesClient, type GuiPageSpec } from "../../../api/tools/CapabilityPagesClient";
 import { commandsClient } from "../../../api/tools/CommandsClient";
-import { ApiError } from "../../../api/http";
+import { isApiStatus } from "../../../api/http";
 import { McpServerClient } from "../../../api/tools/McpServerClient";
 import type { ToolInfo } from "../../../api/types";
 import GuiFormSection from "../../../components/tools/gui/GuiFormSection.vue";
@@ -53,7 +53,7 @@ async function load(): Promise<void> {
   } catch (err) {
     if (seq !== current) return;
     if (err instanceof GuiPageError) problem.value = `This page's layout is invalid: ${err.message}`;
-    else if (err instanceof ApiError && err.status === 404) problem.value = `${label.value || name.value} has no page.`;
+    else if (isApiStatus(err, 404)) problem.value = `${label.value || name.value} has no page.`;
     else problem.value = errorMessage(err);
   } finally {
     if (seq === current) loading.value = false;
@@ -91,8 +91,5 @@ watch(name, load);
 
 .muted {
   color: var(--muted);
-}
-.error {
-  color: var(--danger);
 }
 </style>

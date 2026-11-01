@@ -15,9 +15,9 @@ import { formatToolResult } from "../../../utils/tools/toolResultFormat";
  * for tool "<extension id>__<tool>", with the tool's own description and
  * schema. A built-in capability wins over an extension with the same id. */
 
-export class CommandError extends Error {}
+class CommandError extends Error {}
 
-export interface ParsedCommand {
+interface ParsedCommand {
   capability: string;
   command: string;
   params: Record<string, string>;
@@ -26,7 +26,7 @@ export interface ParsedCommand {
 const HELP_TARGETS: HelpTarget[] = ["all", "tools", "commands", "workflow"];
 
 /** Shell-like split: spaces separate words, quotes group them. */
-export function splitWords(text: string): string[] {
+function splitWords(text: string): string[] {
   const words: string[] = [];
   let current = "";
   let quote: '"' | "'" | null = null;
@@ -54,7 +54,7 @@ export function splitWords(text: string): string[] {
   return words;
 }
 
-export function parseCommand(text: string): ParsedCommand {
+function parseCommand(text: string): ParsedCommand {
   const words = splitWords(text.replace(/^\//, ""));
   if (words.length < 2) {
     throw new CommandError("A command needs a capability and a command: /<capability> <command> [key=value ...]");
@@ -105,7 +105,7 @@ function coerce(name: string, value: string, schema: JsonSchema): unknown {
 }
 
 /** Tool arguments from typed params, checked against the tool's schema. */
-export function buildArguments(parsed: ParsedCommand, schema: JsonSchema): Record<string, unknown> {
+function buildArguments(parsed: ParsedCommand, schema: JsonSchema): Record<string, unknown> {
   const properties = schema.properties ?? {};
   const unknown = Object.keys(parsed.params).filter((k) => !(k in properties));
   if (unknown.length) throw new CommandError(`Unknown param(s): ${unknown.join(", ")}`);

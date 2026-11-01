@@ -1,10 +1,10 @@
 // Pure helpers for drawing a generated secret: how strong it is, how it is
 // spaced for reading, and which characters get a colour.
 
-export type StrengthLevel = "weak" | "fair" | "strong" | "excellent";
+type StrengthLevel = "weak" | "fair" | "strong" | "excellent";
 
 /** The strength bar is full at this many bits of entropy. */
-export const STRENGTH_FULL_BITS = 128;
+const STRENGTH_FULL_BITS = 128;
 
 const LABELS: Record<StrengthLevel, string> = { weak: "Weak", fair: "Fair", strong: "Strong", excellent: "Excellent" };
 

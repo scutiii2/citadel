@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { isTouchOnly } from "../../../utils/browser/touch";
 import type { ChatSearchHit, MatchSpan } from "../api/ChatsClient";
 import { MAX_FOLDERS, type ChatFolder } from "../api/FoldersClient";
 import type { Conversation } from "../../../api/types";
@@ -130,13 +131,9 @@ const layout = computed(() => buildLayout(props.conversations, props.folders, dr
 
 type SectionRef = { kind: "pinned" | "folder" | "unfiled"; folder: ChatFolder | null };
 
-function touchOnly(): boolean {
-  return typeof window.matchMedia === "function" && window.matchMedia("(hover: none)").matches;
-}
-
 /** A row may be dragged unless something else owns it right now. */
 function canDrag(c: Conversation): boolean {
-  return !selecting.value && renamingId.value !== c.id && !answering(c) && !touchOnly();
+  return !selecting.value && renamingId.value !== c.id && !answering(c) && !isTouchOnly();
 }
 
 function startDrag(c: Conversation): void {

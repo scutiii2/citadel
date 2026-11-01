@@ -32,6 +32,42 @@ async function setup() {
 function button(w: VueWrapper, label: string) { return w.findAll("button").find(b => b.text() === label || b.attributes("aria-label") === label)!; }
 
 describe("Brains workspace", () => {
+  it("owns scope, search and collapsed source controls inside the browser", async () => {
+    const w = await setup();
+    const browser = w.get('aside[aria-label="Brain folders and documents"]');
+    expect(browser.find('form[role="search"]').exists()).toBe(true);
+    expect(browser.find('[aria-label="Brain scope"]').exists()).toBe(true);
+    expect(w.find('.page-toolbar').exists()).toBe(false);
+    const settings = browser.findAll('details').find(detail => detail.text().includes('Personal connection'))!;
+    expect(settings.attributes('open')).toBeUndefined();
+    expect(browser.get('.pane-scroll').find('.file-list').exists()).toBe(true);
+  });
+
+  it("keeps the existing reader mounted while searching the same brain", async () => {
+    const w = await setup();
+    client.browse.mockResolvedValueOnce({ content: '# Keep reading this document' });
+    await button(w, 'Guide.md').trigger('click'); await flushPromises();
+    const reader = w.get('.document-content').element;
+    await w.get('input[type=search]').setValue('guide');
+    client.browse.mockResolvedValueOnce({ hits: [{ scope: 'instance', path: 'Guide.md', heading: 'Useful guide', content: 'Search excerpt', connection_label: 'Shared vault', refresh_status: 'ready' }] });
+    await w.get('form.search-form').trigger('submit'); await flushPromises();
+    expect(w.get('.document-content').element).toBe(reader);
+    expect(w.get('.document-content').text()).toContain('Keep reading this document');
+    expect(w.get('aside').text()).toContain('Useful guide');
+    expect(w.get('aside').text()).toContain('Search excerpt');
+  });
+
+  it("moves focus into the reader and restores its originating document row", async () => {
+    const w = await setup();
+    const row = button(w, 'Guide.md');
+    client.browse.mockResolvedValueOnce({ content: '# Focused document' });
+    (row.element as HTMLButtonElement).focus();
+    await row.trigger('click'); await flushPromises();
+    expect(document.activeElement).toBe(w.get('.document-content').element);
+    await w.get('.back-button').trigger('click'); await flushPromises();
+    expect(document.activeElement).toBe(row.element);
+  });
+
   it("browses on entry and retains folders and the document after checking status", async () => {
     const w = await setup();
     expect(client.browse).toHaveBeenCalledWith("instance", "list", "", "");

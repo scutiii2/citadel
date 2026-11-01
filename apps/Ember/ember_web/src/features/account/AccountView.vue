@@ -6,11 +6,14 @@ import { RouterLink, useRouter } from "vue-router";
 import { authClient, type KnownDevice } from "../../api/auth/AuthClient";
 import ActionButton from "../../components/ui/buttons/ActionButton.vue";
 import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
-import { useTheme } from "../../composables/useTheme";
+import { THEME_LABELS, useTheme } from "../../composables/useTheme";
 import { visiblePages } from "../../router/pages";
 import { usePageVisibilityStore } from "../../stores/navigation/pageVisibility";
+import { useLogout } from "../../composables/useLogout";
 import { useAuthStore } from "../../stores/auth";
-import { errorMessage, formatUtc } from "../../utils/errors";
+import { errorMessage } from "../../utils/errors";
+import { formatUtc } from "../../utils/time";
+import { plural } from "../../utils/format";
 
 const auth = useAuthStore();
 const pageVisibility = usePageVisibilityStore();
@@ -18,11 +21,6 @@ const router = useRouter();
 
 // Theme and log out live here too: the narrow-screen nav bar has no room for them.
 const { theme, cycle } = useTheme();
-const THEME_LABELS = {
-  system: "System",
-  light: "Light",
-  dark: "Dark",
-} as const;
 
 // The narrow-screen bar holds only five pages; the rest are listed here, on
 // narrow screens only (the wide rail already shows them).
@@ -33,10 +31,7 @@ const morePages = computed(() =>
   ),
 );
 
-async function logout(): Promise<void> {
-  await auth.logout();
-  await router.replace({ name: "login" });
-}
+const logout = useLogout();
 
 // The router only opens this page with an account.
 const account = computed(() => auth.account!);
@@ -495,8 +490,7 @@ async function changePassword(): Promise<void> {
             </div>
           </div>
           <span v-if="!devicesError" class="device-count"
-            >{{ devices.length }}
-            {{ devices.length === 1 ? "device" : "devices" }}</span
+            >{{ plural(devices.length, "device") }}</span
           >
         </header>
         <p v-if="devicesError" class="device-message error" role="alert">
@@ -1084,9 +1078,6 @@ button.forget {
   opacity: 0.5;
 }
 
-.error {
-  color: var(--danger);
-}
 
 .notice {
   color: var(--success);

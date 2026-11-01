@@ -2,7 +2,7 @@
 
 export type Rotation = 0 | 90 | 180 | 270
 export type Fit = 'fit' | 'fill' | 'original'
-export type PageSize = 'A4' | 'Letter' | 'match'
+type PageSize = 'A4' | 'Letter' | 'match'
 export type FileKind = 'pdf' | 'image'
 
 export interface FileInfo {
@@ -50,16 +50,3 @@ export type JobEvent =
   | { type: 'progress'; done: number; total: number }
   | ({ type: 'done' } & MergeResult)
   | { type: 'error'; code: string; message: string }
-
-/** A failed request, with the server's error code and user-facing message. */
-export class ApiError extends Error {
-  readonly code: string
-  readonly status: number
-
-  constructor(code: string, message: string, status: number) {
-    super(message)
-    this.name = 'ApiError'
-    this.code = code
-    this.status = status
-  }
-}

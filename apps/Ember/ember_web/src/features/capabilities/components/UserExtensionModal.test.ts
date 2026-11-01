@@ -1,11 +1,11 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Account } from "../../../api/auth/AuthClient";
 import { ApiError } from "../../../api/http";
 import { userExtensionsClient, type UserExtension } from "../api/UserExtensionsClient";
 import { useAuthStore } from "../../../stores/auth";
 import UserExtensionModal from "./UserExtensionModal.vue";
+import { makeAccount } from "../../../testing/account";
 
 vi.mock("../api/UserExtensionsClient", () => ({
   userExtensionsClient: { list: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
@@ -24,7 +24,7 @@ const SAVED: UserExtension = {
   error: null,
   tools: ["search"],
 };
-const ACCOUNT: Account = { id: 1, username: "lex", email: "l@e.com", email_verified: true, roles: [], permissions: ["chat.use", "tools.execute", "files.upload", "files.download", "chat.share", "extensions.personal.manage"] };
+const ACCOUNT = makeAccount({ username: "lex", email: "l@e.com" });
 
 function open(extension: UserExtension | null = null) {
   const pinia = createPinia();

@@ -9,6 +9,8 @@
  * display order).
  */
 
+import { markdownCell } from "../format";
+
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type JsonObject = { [key: string]: Json };
 
@@ -63,7 +65,7 @@ function formatTable(rows: JsonObject[]): string {
   const columns: string[] = [];
   for (const row of rows) for (const key of Object.keys(row)) if (!columns.includes(key)) columns.push(key);
   const cell = (row: JsonObject, column: string) =>
-    formatScalar(row[column]).replace(/\|/g, "\\|").replace(/\n/g, " ");
+    markdownCell(formatScalar(row[column]));
   return [
     `| ${columns.map(formatKey).join(" | ")} |`,
     `| ${columns.map(() => "---").join(" | ")} |`,

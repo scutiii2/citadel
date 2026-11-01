@@ -36,7 +36,7 @@ export function folderMenuItems(deleteDisabled: boolean, index = 0, count = 1, m
   ];
 }
 
-export type ChatChoice =
+type ChatChoice =
   | { action: "pin" | "unpin" | "rename" | "delete" }
   | { action: "move"; folderId: number | null }
   | { action: "moveNew" };
