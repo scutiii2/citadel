@@ -70,6 +70,9 @@ async def create_extension(request: Request) -> JSONResponse:
     label = str(body.get("label") or "").strip()
     url = str(body.get("url") or "").strip()
     description = str(body.get("description") or "")
+    internal = body.get("internal", False)
+    if not isinstance(internal, bool):
+        return JSONResponse({"error": "'internal' must be true or false"}, status_code=400)
 
     if not label:
         return JSONResponse({"error": "'label' is required"}, status_code=400)
@@ -88,6 +91,7 @@ async def create_extension(request: Request) -> JSONResponse:
         description=description,
         transport="http",
         url=url,
+        internal=internal,
     )
     try:
         status = await extensions.add_extension(config, settings.extensions_config_path)

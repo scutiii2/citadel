@@ -21,6 +21,7 @@ const error = ref("");
 const label = ref("");
 const url = ref("");
 const description = ref("");
+const internal = ref(false);
 const adding = ref(false);
 const addError = ref("");
 
@@ -43,9 +44,10 @@ async function add(): Promise<void> {
   adding.value = true;
   addError.value = "";
   try {
-    const created = await extensionsClient.add({ label: label.value, url: url.value, description: description.value });
+    const created = await extensionsClient.add({ label: label.value, url: url.value, description: description.value, internal: internal.value });
     extensions.value = [...extensions.value, created];
     label.value = url.value = description.value = "";
+    internal.value = false;
   } catch (err) {
     addError.value = errorMessage(err);
   } finally {
@@ -105,6 +107,7 @@ onMounted(load);
         <input v-model="label" data-test="label" type="text" placeholder="Name" aria-label="Name" required maxlength="80" autocomplete="off" />
         <input v-model="url" data-test="url" type="text" placeholder="http://host:port/mcp" aria-label="URL" required maxlength="500" autocomplete="off" />
         <input v-model="description" type="text" placeholder="What it is for (optional)" aria-label="Description" maxlength="500" autocomplete="off" />
+        <label class="internal"><input v-model="internal" data-test="internal" type="checkbox" /> Runs in this stack (send the internal token)</label>
         <button type="submit" class="primary" :disabled="adding">{{ adding ? "Adding…" : "Add" }}</button>
       </form>
       <p v-if="addError" class="error" role="alert" data-test="add-error">{{ addError }}</p>
@@ -179,7 +182,13 @@ button.open-card:focus-visible { outline: none; }
   flex-wrap: wrap;
   gap: 8px;
 }
-.add input {
+.internal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 100%;
+}
+.add input:not([type="checkbox"]) {
   flex: 1 1 200px;
   min-width: 0;
   padding: 6px 10px;

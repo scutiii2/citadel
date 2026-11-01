@@ -19,6 +19,7 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.server.fastmcp import FastMCP
 
+from src.config import settings
 from src.services.app_config import (
     ExtensionConfig,
     delete_extension_config,
@@ -57,6 +58,13 @@ async def _check_tcp_reachable(url: str) -> None:
         await writer.wait_closed()
     except Exception:  # noqa: BLE001 - this was only ever a reachability probe
         pass
+
+
+def _request_headers(config: ExtensionConfig) -> dict[str, str]:
+    """The configured headers, plus the stack's internal token for an ``internal`` extension."""
+    if not config.internal:
+        return config.headers
+    return {**config.headers, "X-Internal-Token": settings.internal_api_token}
 
 
 async def _check_handshake_accepted(url: str, headers: dict[str, str] | None) -> None:
@@ -203,7 +211,7 @@ class ExtensionRegistry:
             tool_names.append(namespaced)
 
         self._sessions[extension_id] = session
-        if config.forward_requester:
+        if config.forward_requester or config.internal:
             self._forward_requester.add(extension_id)
         status = ExtensionStatus(
             id=extension_id,
@@ -260,9 +268,10 @@ class ExtensionRegistry:
         if config.transport == "http":
             assert config.url is not None  # guaranteed by _build_extension/the POST route
             await _check_tcp_reachable(config.url)
-            await _check_handshake_accepted(config.url, config.headers)
+            headers = _request_headers(config)
+            await _check_handshake_accepted(config.url, headers)
             read_stream, write_stream, _get_session_id = await local_stack.enter_async_context(
-                streamablehttp_client(config.url, headers=config.headers or None)
+                streamablehttp_client(config.url, headers=headers or None)
             )
         else:
             params = StdioServerParameters(command=config.command, args=config.args)

@@ -44,6 +44,9 @@ mechanics); paths come from `Settings.email_config_path` /
   tools from (see `services/extensions.py`). Also written to at runtime by
   `POST`/`DELETE /extensions` (see `extension_routes.py`) - hand-edit it
   or add an extension live through that route, both end up here.
+  Set `"internal": true` on an http entry for a server of this stack (Bard,
+  Scribe): armory then sends it `INTERNAL_API_TOKEN` and forwards the requester,
+  so no `headers` are needed. Never set it for a server you do not run.
 - **`config_capabilities.json`** - which built-in capabilities
   (`server` - the toggle
   id, shorter than its folder name `server_manager` on purpose) are enabled.

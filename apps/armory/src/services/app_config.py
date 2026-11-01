@@ -59,6 +59,9 @@ class ExtensionConfig:
     # Opt-in: send the asking user's username/email upstream as ``_meta.requester`` on each proxied call.
     # Off by default so an extension never receives identity data it did not ask for.
     forward_requester: bool = False
+    # http transport only: a server inside this stack. Armory sends it INTERNAL_API_TOKEN and forwards the requester,
+    # so no hand-written ``headers`` are needed. Never set it for a server you do not run: it would receive the token.
+    internal: bool = False
     # The extension's own web app, if any (an http(s) address the browser can reach, not necessarily the MCP url).
     # ember's Extensions page links to it; nothing here requests it.
     web_url: str | None = None
@@ -257,6 +260,12 @@ def _build_extension(id_: str, entry: Any, *, config_path: Path) -> ExtensionCon
     if not isinstance(forward_requester, bool):
         raise ValueError(f"Config file {config_path}: '{id_}.forward_requester' must be true or false")
 
+    internal = entry.get("internal", False)
+    if not isinstance(internal, bool):
+        raise ValueError(f"Config file {config_path}: '{id_}.internal' must be true or false")
+    if internal and not has_url:
+        raise ValueError(f"Config file {config_path}: '{id_}.internal' only applies to an http extension (one with 'url').")
+
     web_url = _web_url(entry, id_=id_, config_path=config_path)
 
     if has_url:
@@ -265,7 +274,7 @@ def _build_extension(id_: str, entry: Any, *, config_path: Path) -> ExtensionCon
             raise ValueError(f"Config file {config_path}: '{id_}.url' must not be empty")
         return ExtensionConfig(
             id=id_, label=label, description=description, transport="http", url=url, headers=dict(headers),
-            forward_requester=forward_requester, web_url=web_url,
+            forward_requester=forward_requester, internal=internal, web_url=web_url,
         )
 
     args = entry.get("args", [])
@@ -315,6 +324,8 @@ def save_extension_config(config_path: Path, config: ExtensionConfig) -> None:
     entry: dict[str, Any] = {"label": config.label, "description": config.description}
     if config.transport == "http":
         entry["url"] = config.url
+        if config.internal:
+            entry["internal"] = True
     else:
         entry["command"] = config.command
         entry["args"] = config.args
