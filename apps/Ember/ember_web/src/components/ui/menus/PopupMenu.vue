@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { isTouchOnly } from "../../../utils/browser/touch";
+import { MENU_WIDTH } from "./menuPoint";
 import type { MenuItem } from "./menuTypes";
 
 // A small popup menu at a point of the page, with an optional flyout for items
@@ -8,7 +9,6 @@ import type { MenuItem } from "./menuTypes";
 // parent (the sidebar) can cut it off. It reports what was chosen (`select`) or
 // that it should go away (`close`: Esc, a press outside, Tab, a resize); the
 // owner removes it, and puts focus back where it came from after a `close`.
-const MENU_WIDTH = 210;
 const FLYOUT_WIDTH = 220;
 const MARGIN = 8;
 

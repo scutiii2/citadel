@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from "vue";
-import { copyText } from "../../../utils/browser/clipboard";
-
-const FEEDBACK_MS = 1500;
+import { COPY_FEEDBACK_MS, copyText } from "../../../utils/browser/clipboard";
 
 const props = defineProps<{ text: string; label?: string }>();
 
@@ -12,7 +10,7 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 async function copy(): Promise<void> {
   state.value = (await copyText(props.text)) ? "copied" : "failed";
   if (timer !== null) clearTimeout(timer);
-  timer = setTimeout(() => (state.value = "idle"), FEEDBACK_MS);
+  timer = setTimeout(() => (state.value = "idle"), COPY_FEEDBACK_MS);
 }
 
 onBeforeUnmount(() => {

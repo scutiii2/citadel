@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from "vue";
 import type { AgentUsage, ContextPart } from "../../../api/types";
 import { useOutsideClose } from "../../../composables/useOutsideClose";
+import { MENU_WIDTH } from "../../../components/ui/menus/menuPoint";
 import type { MenuItem } from "../../../components/ui/menus/menuTypes";
 import type { ContextAccuracy } from "../utils/contextAccuracy";
 import { useAuthStore } from "../../../stores/auth";
@@ -37,8 +38,6 @@ const contextTitle = computed(() =>
   props.contextPercent === null && props.breakdown ? "Prompt cost for each agent that ran this answer."
     : props.breakdown ? `How full the agent's memory of this chat is. Click for what fills it. At 60% the chat is summarized automatically.` : CONTEXT_HINT,
 );
-
-const MENU_WIDTH = 210;
 
 // The context panel opens from the meter and closes on Esc or a press outside it.
 const panelOpen = ref(false);

@@ -1,3 +1,6 @@
+/** How long a copy button shows "Copied" / "Copy failed" before it resets. */
+export const COPY_FEEDBACK_MS = 1500;
+
 /** Copies `text` to the clipboard. Resolves false when the browser refuses
  * (blocked permission, insecure origin without the async API). */
 export async function copyText(text: string): Promise<boolean> {

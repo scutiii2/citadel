@@ -5,6 +5,9 @@ export interface MenuPoint {
   trigger: HTMLElement | null;
 }
 
+/** Width the context menus assume before they are measured. */
+export const MENU_WIDTH = 210;
+
 /** Opens just under a button, with focus going back to it. */
 export function pointBelow(button: HTMLElement | null): MenuPoint {
   const box = button?.getBoundingClientRect();
