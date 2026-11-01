@@ -2,7 +2,8 @@
 import { nextTick, ref, watch } from "vue";
 import type { Conversation } from "../../../api/types";
 import { liftDragImage } from "../../../utils/browser/dragImage";
-import { pointAt, pointBelow, type MenuPoint } from "../../../components/ui/menus/menuPoint";
+import MoreButton from "./MoreButton.vue";
+import { pointAt, type MenuPoint } from "../../../components/ui/menus/menuPoint";
 
 // One row of the chat list. The sidebar owns which row is being renamed and
 // which are ticked; this row owns only the text being typed.
@@ -62,16 +63,12 @@ function onClick(): void {
   else if (!props.renaming) emit("select");
 }
 
-const moreButton = ref<HTMLButtonElement | null>(null);
-
-function openFromButton(): void {
-  emit("openMenu", pointBelow(moreButton.value));
-}
+const moreButton = ref<InstanceType<typeof MoreButton> | null>(null);
 
 function openFromContext(event: MouseEvent): void {
   if (props.selecting || props.renaming) return; // the browser's own menu, as before
   event.preventDefault();
-  emit("openMenu", pointAt(event, moreButton.value));
+  emit("openMenu", pointAt(event, moreButton.value?.button ?? null));
 }
 
 const dragging = ref(false);
@@ -131,25 +128,7 @@ function onDragEnd(): void {
     <template v-else>
       <span v-if="chat.running" class="running" title="An answer is being written" />
       <button type="button" class="title select-chat" :aria-current="active ? 'page' : undefined" @click.stop="onClick" @dblclick.stop="emit('startRename')">{{ chat.title }}</button>
-      <!-- pointerdown.stop: an open menu closes on any press outside it, so a
-           press on this button must not reach it; the sidebar toggles instead. -->
-      <button
-        ref="moreButton"
-        type="button"
-        :class="['icon', 'more', { expanded }]"
-        title="Chat actions"
-        aria-label="Chat actions"
-        aria-haspopup="menu"
-        :aria-expanded="expanded"
-        @pointerdown.stop
-        @click.stop="openFromButton"
-      >
-        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-          <circle cx="5" cy="12" r="1.8" fill="currentColor" />
-          <circle cx="12" cy="12" r="1.8" fill="currentColor" />
-          <circle cx="19" cy="12" r="1.8" fill="currentColor" />
-        </svg>
-      </button>
+      <MoreButton ref="moreButton" class="icon" label="Chat actions" :expanded="expanded" @open="emit('openMenu', $event)" />
     </template>
   </li>
 </template>

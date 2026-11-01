@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { pointAt, pointBelow, type MenuPoint } from "../../../components/ui/menus/menuPoint";
+import MoreButton from "./MoreButton.vue";
+import { pointAt, type MenuPoint } from "../../../components/ui/menus/menuPoint";
 
 // One block of the chat list: a header (title, count, a "..." menu button) and
 // the rows in the default slot. A folder can fold; Pinned and "Chats" cannot.
@@ -60,16 +61,12 @@ function onDrop(event: DragEvent): void {
   emit("drop");
 }
 
-const moreButton = ref<HTMLButtonElement | null>(null);
-
-function openFromButton(): void {
-  emit("openMenu", pointBelow(moreButton.value));
-}
+const moreButton = ref<InstanceType<typeof MoreButton> | null>(null);
 
 function openFromContext(event: MouseEvent): void {
   if (!props.menu) return;
   event.preventDefault();
-  emit("openMenu", pointAt(event, moreButton.value));
+  emit("openMenu", pointAt(event, moreButton.value?.button ?? null));
 }
 </script>
 
@@ -102,24 +99,7 @@ function openFromContext(event: MouseEvent): void {
         <span class="name">{{ title }}</span>
         <span class="count">{{ count }}</span>
       </h4>
-      <button
-        v-if="menu"
-        ref="moreButton"
-        type="button"
-        :class="['more', { expanded }]"
-        title="Folder actions"
-        aria-label="Folder actions"
-        aria-haspopup="menu"
-        :aria-expanded="expanded"
-        @pointerdown.stop
-        @click="openFromButton"
-      >
-        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-          <circle cx="5" cy="12" r="1.8" fill="currentColor" />
-          <circle cx="12" cy="12" r="1.8" fill="currentColor" />
-          <circle cx="19" cy="12" r="1.8" fill="currentColor" />
-        </svg>
-      </button>
+      <MoreButton v-if="menu" ref="moreButton" label="Folder actions" :expanded="expanded" @open="emit('openMenu', $event)" />
     </header>
     <ul v-if="!collapsed" class="list">
       <slot />
