@@ -17,6 +17,8 @@ export interface ExtensionCreate {
   label: string;
   url: string;
   description: string;
+  /** A server of this stack: mcp_server sends it the internal token. */
+  internal?: boolean;
 }
 
 /** Separates an extension tool's id from its own name. */

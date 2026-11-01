@@ -187,7 +187,7 @@ def test_extensions_listed_for_chat_users_and_managed_by_admins(
     assert added.status_code == 201, added.text
     assert (added.json()["id"], added.json()["status"]) == ("wiki", "error")
     assert json.loads(upstream.requests[-1].content) == {
-        "label": "Wiki", "url": "http://wiki.internal/mcp", "description": "team wiki"
+        "label": "Wiki", "url": "http://wiki.internal/mcp", "description": "team wiki", "internal": False
     }
     assert admin.post("/api/extensions", json={"label": "X", "url": "file:///etc/passwd"}).status_code == 422
     assert admin.delete("/api/extensions/notes").status_code == 204

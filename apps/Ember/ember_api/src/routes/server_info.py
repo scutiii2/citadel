@@ -136,6 +136,8 @@ class ExtensionCreate(BaseModel):
     label: str = Field(min_length=1, max_length=80)
     url: str = Field(min_length=1, max_length=500)
     description: str = Field(default="", max_length=500)
+    # A server of this stack: mcp_server sends it the internal token. Off for anything else.
+    internal: bool = False
 
     @field_validator("label", "url", "description")
     @classmethod
@@ -345,7 +347,7 @@ async def add_extension(
 ) -> ExtensionOut:
     """mcp_server connects to the MCP server at `url` and offers its tools
     to every client, requiring extensions.manage. Added even if unreachable right now."""
-    extension = ExtensionOut(**await _call(info.add_extension(account, body.label, body.url, body.description)))
+    extension = ExtensionOut(**await _call(info.add_extension(account, body.label, body.url, body.description, body.internal)))
     await logs.action(account, "mcp.extension_add", f"Added extension '{extension.id}' ({body.url})")
     return extension
 

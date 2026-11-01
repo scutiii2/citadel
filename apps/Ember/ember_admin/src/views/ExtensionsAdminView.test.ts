@@ -44,8 +44,21 @@ describe("ExtensionsAdminView", () => {
     await wrapper.find("form").trigger("submit");
     await flushPromises();
 
-    expect(add).toHaveBeenCalledWith({ label: "Docs", url: "http://docs.internal/mcp", description: "" });
+    expect(add).toHaveBeenCalledWith({ label: "Docs", url: "http://docs.internal/mcp", description: "", internal: false });
     expect(wrapper.find("[data-id=docs]").exists()).toBe(true);
+  });
+
+  it("sends internal when the stack checkbox is ticked", async () => {
+    const add = vi.spyOn(extensionsClient, "add").mockResolvedValue({ ...WIKI, id: "bard", label: "Bard" });
+    const wrapper = await mounted();
+
+    await wrapper.find("[data-test=label]").setValue("Bard");
+    await wrapper.find("[data-test=url]").setValue("http://bard:8090/mcp");
+    await wrapper.find("[data-test=internal]").setValue(true);
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(add).toHaveBeenCalledWith({ label: "Bard", url: "http://bard:8090/mcp", description: "", internal: true });
   });
 
   it("removes an extension only after the confirm", async () => {

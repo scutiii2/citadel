@@ -300,3 +300,30 @@ def test_post_an_unwritable_config_is_a_409_naming_the_cause(client, monkeypatch
 
     assert response.status_code == 409
     assert "Read-only file system" in response.json()["error"]
+
+
+def test_post_internal_is_passed_to_the_config(client, monkeypatch):
+    captured = {}
+
+    async def fake_add_extension(config, config_path):
+        captured["internal"] = config.internal
+        return extensions.ExtensionStatus(id=config.id, label=config.label, description="", status="connected")
+
+    monkeypatch.setattr(extensions, "current_statuses", lambda: [])
+    monkeypatch.setattr(extensions, "add_extension", fake_add_extension)
+
+    assert client.post("/extensions", json={"label": "X", "url": "http://bard:8090/mcp", "internal": True}).status_code == 201
+    assert captured["internal"] is True
+    assert client.post("/extensions", json={"label": "X", "url": "http://bard:8090/mcp", "internal": "yes"}).status_code == 400
+
+
+def test_an_internal_extension_sends_the_token_and_others_do_not(monkeypatch):
+    from src.config import settings
+    from src.services.app_config import ExtensionConfig
+
+    monkeypatch.setattr(extensions, "settings", type("S", (), {"internal_api_token": "tok"})())
+    plain = ExtensionConfig(id="a", label="A", description="", transport="http", url="http://a/mcp", headers={"K": "v"})
+    inside = ExtensionConfig(id="b", label="B", description="", transport="http", url="http://b/mcp", internal=True)
+
+    assert extensions._request_headers(plain) == {"K": "v"}
+    assert extensions._request_headers(inside) == {"X-Internal-Token": "tok"}
