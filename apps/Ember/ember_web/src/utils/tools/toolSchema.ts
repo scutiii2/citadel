@@ -1,4 +1,5 @@
 import type { JsonSchema } from "../../api/types";
+import { pad2 } from "../format";
 
 /** How a value is parsed into a tool argument. */
 type FieldKind = "string" | "number" | "integer" | "boolean" | "enum" | "json";
@@ -96,8 +97,7 @@ function widgetOf(kind: FieldKind, schema: JsonSchema): FieldWidget {
 /** "{timestamp}" in an `initial` hint: the current local time, as chat_app fills it. */
 function expandInitial(template: string): string {
   const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const stamp = `${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`;
   return template.replaceAll("{timestamp}", stamp);
 }
 

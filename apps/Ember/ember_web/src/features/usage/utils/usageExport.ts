@@ -1,6 +1,7 @@
 import type { UsageReport } from "../api/UsageClient";
 import { favoriteAgent, hourLabel, peakHour } from "./usageStats";
 import { formatCost } from "../../../utils/analytics/usageFormat";
+import { markdownCell, pad2 } from "../../../utils/format";
 
 export interface UsageExportOptions {
   username: string;
@@ -11,17 +12,8 @@ export interface UsageExportOptions {
   utcOffsetMinutes?: number;
 }
 
-/** A table cell must not contain the column separator. */
-function cell(text: string): string {
-  return text.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
-}
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
 function local(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 }
 
 /** The report as a Markdown document, like chat_app's usage export: a summary
@@ -42,14 +34,14 @@ export function usageToMarkdown(report: UsageReport, options: UsageExportOptions
     "| Metric | Value |",
     "|---|---|",
     `| Total tokens | ${n(report.total_tokens)} |`,
-    `| Total cost (${cell(report.currency)}) | ${cost(report.total_cost)} |`,
+    `| Total cost (${markdownCell(report.currency)}) | ${cost(report.total_cost)} |`,
     `| Input tokens | ${n(report.input_tokens)} |`,
     `| Output tokens | ${n(report.output_tokens)} |`,
     `| Tokens on summaries | ${n(report.summary_tokens)} |`,
     `| Chats | ${n(report.chats)} |`,
     `| Answers | ${n(report.turns)} |`,
     `| Peak hour | ${peak === null ? "-" : hourLabel(peak)} |`,
-    `| Favorite agent | ${favorite === null ? "-" : cell(favorite)} |`,
+    `| Favorite agent | ${favorite === null ? "-" : markdownCell(favorite)} |`,
     "",
     "## By agent",
     "",
@@ -58,7 +50,7 @@ export function usageToMarkdown(report: UsageReport, options: UsageExportOptions
     lines.push("None.");
   } else {
     lines.push("| Agent | Model | Tokens | Cost |", "|---|---|---|---|");
-    for (const row of report.by_agent) lines.push(`| ${cell(row.agent)} | ${cell(row.model || "-")} | ${n(row.tokens)} | ${cost(row.cost)} |`);
+    for (const row of report.by_agent) lines.push(`| ${markdownCell(row.agent)} | ${markdownCell(row.model || "-")} | ${n(row.tokens)} | ${cost(row.cost)} |`);
   }
   if (report.group_by !== "agent") {
     const heading = report.group_by[0]!.toUpperCase() + report.group_by.slice(1);
@@ -67,7 +59,7 @@ export function usageToMarkdown(report: UsageReport, options: UsageExportOptions
       lines.push("None.");
     } else {
       lines.push(`| ${heading} | Tokens | Turns | Cost |`, "|---|---|---|---|");
-      for (const g of report.groups) lines.push(`| ${cell(g.key)} | ${n(g.tokens)} | ${n(g.turns)} | ${cost(g.cost)} |`);
+      for (const g of report.groups) lines.push(`| ${markdownCell(g.key)} | ${n(g.tokens)} | ${n(g.turns)} | ${cost(g.cost)} |`);
     }
   }
   lines.push("", "## Per day (UTC)", "");

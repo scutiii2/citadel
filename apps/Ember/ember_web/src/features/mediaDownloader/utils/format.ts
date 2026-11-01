@@ -1,3 +1,5 @@
+import { pad2 } from '../../../utils/format'
+
 const MB = 1024 * 1024
 
 /** m:ss, or h:mm:ss from one hour up. Empty when unknown. */
@@ -7,8 +9,7 @@ export function formatMediaLength(seconds: number | null): string {
   const h = Math.floor(total / 3600)
   const m = Math.floor((total % 3600) / 60)
   const s = total % 60
-  const pad = (n: number): string => String(n).padStart(2, '0')
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
+  return h > 0 ? `${h}:${pad2(m)}:${pad2(s)}` : `${m}:${pad2(s)}`
 }
 
 export function formatSpeed(bytesPerSecond: number | null): string {
