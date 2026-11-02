@@ -28,13 +28,6 @@ interface ChatWrite {
   messages: ChatMessage[];
 }
 
-interface ChatImportItem extends ChatWrite {
-  id: string;
-  /** Milliseconds since the epoch. */
-  created_at: number;
-  updated_at: number;
-}
-
 interface TurnStart {
   question: string;
   caveman: boolean;
@@ -117,8 +110,6 @@ export const chatsClient = {
   update: (id: string, changes: ChatChanges) => apiRequest<ChatSummary>("PATCH", path(id), changes),
   remove: (id: string) => apiRequest<void>("DELETE", path(id)),
   removeAll: () => apiRequest<void>("DELETE", "/api/chats"),
-  importChats: (chats: ChatImportItem[]) =>
-    apiRequest<{ imported: number; skipped: number }>("POST", "/api/chats/import", { chats }),
   /** Saves the question and starts the answer in ember_api. */
   startTurn: (id: string, turn: TurnStart) => apiRequest<TurnStarted>("POST", `${path(id)}/turns`, turn),
   /** Answers a tool the running answer waits to run (an approval_request's id). */

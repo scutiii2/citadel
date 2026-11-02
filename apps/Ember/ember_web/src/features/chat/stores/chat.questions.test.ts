@@ -20,7 +20,6 @@ vi.mock("../api/ChatsClient", () => ({
     remove: vi.fn(),
     removeAll: vi.fn(),
     rename: vi.fn(),
-    importChats: vi.fn(),
     append: vi.fn(),
     branch: vi.fn(),
     suggestion: vi.fn(),

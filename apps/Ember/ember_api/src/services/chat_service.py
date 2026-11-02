@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import uuid
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -53,16 +52,6 @@ def message_time() -> str:
     """Now as the "at" of a message: ISO 8601 UTC with milliseconds, e.g.
     2026-10-06T14:03:09.123Z. Messages saved before this existed have none."""
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-
-
-@dataclass(frozen=True)
-class ImportedChat:
-    chat_id: str
-    title: str
-    agent_id: str | None
-    messages: list[ChatMessage]
-    created_at: datetime
-    updated_at: datetime
 
 
 def _encode(messages: list[ChatMessage]) -> str:
@@ -196,38 +185,6 @@ class ChatService:
         result = await self._session.execute(delete(Chat).where(Chat.account_id == self._account_id))
         await self._session.commit()
         return result.rowcount or 0
-
-    async def import_chats(self, chats: list[ImportedChat]) -> tuple[int, int]:
-        """Adds chats whose ids this account doesn't have yet, keeping their
-        own timestamps; existing ones are never overwritten. Returns
-        (imported, skipped). All or nothing: a chat over the size limit, or
-        too many in total, rejects the whole import."""
-        existing = set(
-            await self._session.scalars(select(Chat.chat_id).where(Chat.account_id == self._account_id))
-        )
-        seen: set[str] = set()
-        fresh: list[Chat] = []
-        for item in chats:
-            if item.chat_id in existing or item.chat_id in seen:
-                continue
-            seen.add(item.chat_id)
-            fresh.append(
-                Chat(
-                    account_id=self._account_id,
-                    chat_id=item.chat_id,
-                    title=item.title,
-                    agent_id=item.agent_id,
-                    messages=_encode(item.messages),
-                    message_count=len(item.messages),
-                    created_at=item.created_at,
-                    updated_at=item.updated_at,
-                )
-            )
-        if fresh:
-            await self._ensure_room(len(fresh))
-            self._session.add_all(fresh)
-            await self._session.commit()
-        return len(fresh), len(chats) - len(fresh)
 
     async def _find(self, chat_id: str) -> Chat | None:
         return await self._session.scalar(

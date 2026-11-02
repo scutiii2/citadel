@@ -40,9 +40,9 @@ const stateText = computed(() => {
         </div>
         <div v-else class="error small" role="alert">{{ job.error?.message }}</div>
       </div>
-      <ActionButton v-if="running && job.state !== 'processing'" icon="close" class="cancel danger" :disabled="busy" :aria-busy="busy" @click="$emit('cancel')">Cancel</ActionButton>
+      <ActionButton labelled v-if="running && job.state !== 'processing'" icon="close" class="cancel danger" :disabled="busy" :aria-busy="busy" @click="$emit('cancel')">Cancel</ActionButton>
 
-      <ActionButton v-if="!running" icon="close" quiet @click="$emit('dismiss')">Dismiss</ActionButton>
+      <ActionButton labelled v-if="!running" icon="close" quiet @click="$emit('dismiss')">Dismiss</ActionButton>
     </div>
     <DownloadCards v-if="job.state === 'done' && job.file" :downloads="[{ filename: job.file.name, bytes: job.file.size, href: job.file.download_url, label: 'DOWNLOAD' }]" />
     <p v-if="job.state === 'done' && !job.file" class="muted small">The download finished, but the file is no longer available.</p>
@@ -60,5 +60,4 @@ const stateText = computed(() => {
 .grow > .small { margin-top: 6px; font-size: .75em; }
 progress { height: 4px; border-radius: var(--radius-full); }
 .panel :deep(button.action) { border-radius: var(--radius-full); }
-.panel :deep(.action .label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
 </style>

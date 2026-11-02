@@ -157,47 +157,6 @@ def test_oversized_request_body_is_refused_before_parsing(client: TestClient) ->
     assert response.status_code == 413
 
 
-# --- import -------------------------------------------------------------------
-
-
-def import_item(chat_id: str, title: str = "Old chat", updated: int = 1_700_000_000_000) -> dict:
-    return {
-        "id": chat_id,
-        "title": title,
-        "agent_id": "claude-agent",
-        "messages": [{"role": "user", "content": "from the browser"}],
-        "created_at": updated - 60_000,
-        "updated_at": updated,
-    }
-
-
-def test_import_keeps_timestamps_and_skips_existing(client: TestClient) -> None:
-    as_admin(client)
-    existing = new_id()
-    put(client, existing, title="On the server")
-    fresh = new_id()
-
-    response = client.post(
-        "/api/chats/import",
-        json={"chats": [import_item(fresh), import_item(existing, title="Local copy"), import_item(fresh)]},
-    )
-
-    assert response.json() == {"imported": 1, "skipped": 2}
-    imported = client.get(f"/api/chats/{fresh}").json()
-    assert imported["updated_at"].startswith("2023-11-14T22:13:20")
-    assert client.get(f"/api/chats/{existing}").json()["title"] == "On the server"
-
-
-def test_import_respects_count_limit(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(chat_service, "MAX_CHATS_PER_ACCOUNT", 1)
-    as_admin(client)
-
-    response = client.post("/api/chats/import", json={"chats": [import_item(new_id()), import_item(new_id())]})
-
-    assert response.status_code == 413
-    assert client.get("/api/chats").json() == []
-
-
 # --- account deletion ---------------------------------------------------------
 
 

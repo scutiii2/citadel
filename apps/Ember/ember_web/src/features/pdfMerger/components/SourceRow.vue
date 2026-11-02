@@ -71,7 +71,7 @@ function onFit(event: Event): void {
     </div>
     <button type="button" class="rotate" aria-label="Rotate" title="Rotate 90°" @click="emit('rotate')">⟳ {{ source.rotate }}°</button></div>
     <div class="file-actions"><button type="button" :aria-label="`Move ${source.info.name} earlier`" :disabled="!canMoveUp" @click="emit('moveUp')">↑ Earlier</button><button type="button" :aria-label="`Move ${source.info.name} later`" :disabled="!canMoveDown" @click="emit('moveDown')">↓ Later</button><CopyButton :text="source.info.file_id" label="Copy file ID for chat" /></div>
-    <DangerZone class="source-danger" label="Remove this source"><ActionButton icon="clear" class="danger" aria-label="Remove file" @click="emit('remove')">Remove</ActionButton></DangerZone>
+    <DangerZone class="source-danger" label="Remove this source"><ActionButton labelled icon="clear" class="danger" aria-label="Remove file" @click="emit('remove')">Remove</ActionButton></DangerZone>
   </details></div>
 </template>
 <style scoped>
