@@ -30,7 +30,7 @@ class FirestoreBackend(DatabaseBackend):
         try:
             from google.cloud import firestore
         except ImportError as error:
-            raise RuntimeError("Firestore connections need google-cloud-firestore: pip install -e \".[firestore]\"") from error
+            raise RuntimeError("Firestore connections need google-cloud-firestore: uv sync --extra firestore") from error
         options = {k: v for k, v in (("project", self._project), ("database", self._database)) if v}
         if self._credentials_file:
             self._client = firestore.AsyncClient.from_service_account_json(self._credentials_file, **options)

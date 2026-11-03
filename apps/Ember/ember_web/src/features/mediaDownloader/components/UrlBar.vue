@@ -14,7 +14,7 @@ defineEmits<{ 'update:modelValue': [value: string]; check: [] }>()
       autofocus
       @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
     />
-    <ActionButton icon="verify" type="submit" :aria-busy="loading" :disabled="!canCheck">{{ loading ? 'Checking...' : 'Check' }}</ActionButton>
+    <ActionButton labelled icon="verify" type="submit" :aria-busy="loading" :disabled="!canCheck">{{ loading ? 'Checking...' : 'Check' }}</ActionButton>
   </form>
 </template>
 
@@ -23,6 +23,5 @@ defineEmits<{ 'update:modelValue': [value: string]; check: [] }>()
 .url-bar { flex-wrap: nowrap; gap: 8px; padding: 7px 8px 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .url-bar input { min-width: 0; padding: 4px 0; border: 0; border-radius: 0; background: transparent; font-size: .9em; }
 .url-bar :deep(button.action) { border-radius: var(--radius-full); flex-shrink: 0; padding: 7px 12px; }
-.url-bar :deep(.action .label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
 @media (max-width: 767px) { .url-bar input { font-size: max(1em, 16px); } .url-bar :deep(button.action) { min-height: 40px; } }
 </style>

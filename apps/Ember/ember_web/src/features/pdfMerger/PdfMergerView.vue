@@ -57,7 +57,7 @@ onBeforeRouteLeave(stop)
       </aside>
       <footer class="output-area">
         <label class="output-label" for="pdf-output-name">Output file</label>
-        <div class="output-row"><input id="pdf-output-name" v-model="plan.output.filename" aria-label="Output file" placeholder="merged.pdf" /><ActionButton icon="summarize" class="options-button" @click="outputOpen = true">Output options</ActionButton></div>
+        <div class="output-row"><input id="pdf-output-name" v-model="plan.output.filename" aria-label="Output file" placeholder="merged.pdf" /><ActionButton labelled icon="summarize" class="options-button" @click="outputOpen = true">Output options</ActionButton></div>
         <MergeBar />
       </footer>
     </WorkspaceLayout>

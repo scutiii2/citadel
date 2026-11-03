@@ -61,11 +61,11 @@ async function confirmAction() {
 
 <template>
   <section class="packages" aria-label="Download groups">
-    <div class="heading"><h3>Download groups</h3><ActionButton icon="summarize" :disabled="store.loading || store.busy" :aria-busy="store.loading" @click="store.refresh()">Refresh groups</ActionButton></div>
+    <div class="heading"><h3>Download groups</h3><ActionButton labelled icon="summarize" :disabled="store.loading || store.busy" :aria-busy="store.loading" @click="store.refresh()">Refresh groups</ActionButton></div>
     <p class="muted">Build a group, then download it as one ZIP. Starting locks its media list.</p>
     <form class="create-group" @submit.prevent="create">
       <label class="grow">Group name<input v-model="name" maxlength="150" placeholder="My collection" :disabled="store.busy" /></label>
-      <ActionButton icon="verify" type="submit" :disabled="!name.trim() || store.busy" :aria-busy="store.busy">Create group</ActionButton>
+      <ActionButton labelled icon="verify" type="submit" :disabled="!name.trim() || store.busy" :aria-busy="store.busy">Create group</ActionButton>
     </form>
     <p v-if="store.error" class="error" role="alert">{{ store.error }}</p>
     <p v-if="!store.packages.length" class="muted">Create a group to collect multiple media links.</p>
@@ -74,16 +74,16 @@ async function confirmAction() {
       <ul class="items">
         <li v-for="item in group.items" :key="item.item_id">
           <div class="grow"><span>{{ item.title || item.url }}</span><small class="muted">{{ item.preset }} · {{ item.state }}</small><small v-if="item.error" class="error">{{ item.error.message }}</small></div>
-          <ActionButton v-if="store.editable(group.package_id)" icon="clear" class="danger" :disabled="store.busy" @click="confirm = { kind: 'remove', id: group.package_id, itemId: item.item_id, name: item.title || item.url }">Remove</ActionButton>
+          <ActionButton labelled v-if="store.editable(group.package_id)" icon="clear" class="danger" :disabled="store.busy" @click="confirm = { kind: 'remove', id: group.package_id, itemId: item.item_id, name: item.title || item.url }">Remove</ActionButton>
         </li>
       </ul>
       <div v-if="store.editable(group.package_id)" class="editor">
-        <ActionButton v-if="source && preset" icon="verify" :disabled="store.busy" :aria-busy="store.busy" @click="store.add(group.package_id, source.url, preset)">Add checked media</ActionButton>
+        <ActionButton labelled v-if="source && preset" icon="verify" :disabled="store.busy" :aria-busy="store.busy" @click="store.add(group.package_id, source.url, preset)">Add checked media</ActionButton>
         <label>Media links, one per line<textarea v-model="drafts[group.package_id]" rows="3" placeholder="https://…" :disabled="store.busy" /></label>
         <label>Download format<select v-model="presets[group.package_id]" :disabled="store.busy"><option :value="undefined" disabled>Best video (default)</option><option v-for="choice in choices" :key="choice[0]" :value="choice[0]">{{ choice[1] }}</option></select></label>
         <div class="actions">
-          <ActionButton icon="verify" :disabled="!drafts[group.package_id]?.trim() || store.busy" :aria-busy="store.busy" @click="add(group.package_id)">Add links</ActionButton>
-          <ActionButton icon="export" class="primary" :disabled="!group.items.length || store.busy" :aria-busy="store.busy" @click="confirm = { kind: 'start', id: group.package_id, name: group.name }">Download package</ActionButton>
+          <ActionButton labelled icon="verify" :disabled="!drafts[group.package_id]?.trim() || store.busy" :aria-busy="store.busy" @click="add(group.package_id)">Add links</ActionButton>
+          <ActionButton labelled icon="export" class="primary" :disabled="!group.items.length || store.busy" :aria-busy="store.busy" @click="confirm = { kind: 'start', id: group.package_id, name: group.name }">Download package</ActionButton>
         </div>
       </div>
       <div v-else class="result">
@@ -94,7 +94,7 @@ async function confirmAction() {
         <DownloadCards v-if="group.status?.file" :downloads="[{ filename: group.status.file.name, bytes: group.status.file.size, href: group.status.file.download_url, label: 'ZIP' }]" />
       </div>
       <DangerZone class="package-danger" :label="store.removable(group.package_id) ? 'Remove this group and its media list.' : 'Wait for the download to finish before removing this package.'">
-        <ActionButton icon="clear" class="danger" :disabled="store.busy || !store.removable(group.package_id)" @click="confirm = { kind: 'delete-package', id: group.package_id, name: group.name }">Remove package</ActionButton>
+        <ActionButton labelled icon="clear" class="danger" :disabled="store.busy || !store.removable(group.package_id)" @click="confirm = { kind: 'delete-package', id: group.package_id, name: group.name }">Remove package</ActionButton>
       </DangerZone>
     </article>
     <Teleport to="body"><ConfirmModal v-if="confirm" :open="true" :title="confirmTitle" :message="confirmMessage" :confirm-label="confirmLabel" :danger="confirm.kind !== 'start'" :busy="store.busy" @confirm="confirmAction" @close="!store.busy && (confirm = null)" /></Teleport>
@@ -122,7 +122,6 @@ small { display: block; }
 .result { display: flex; flex-direction: column; gap: 10px; }
 .package-danger { margin-top: 14px; }
 .packages :deep(button.action) { border-radius: var(--radius-full); }
-.packages :deep(button.action .label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
 .packages { padding: 0; border: 0; border-radius: 0; background: transparent; }
 .group { background: var(--bg); padding: 18px; }
 .items li { padding: 12px 0; border-bottom: 1px solid var(--border); }

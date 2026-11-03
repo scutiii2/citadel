@@ -53,13 +53,11 @@ from src.services.chat_search import (
     SearchHit,
 )
 from src.services.chat_service import (
-    MAX_CHATS_PER_ACCOUNT,
     TITLE_MAX,
     ChatLimitError,
     ChatMessage,
     ChatNotFound,
     ChatService,
-    ImportedChat,
     NotABranchPoint,
     decode_messages,
     message_time,
@@ -242,17 +240,6 @@ class PutChatRequest(RenameRequest):
     messages: list[MessageIn]
 
 
-class ImportItem(PutChatRequest):
-    id: str = Field(pattern=_CHAT_ID_PATTERN)
-    # Milliseconds since the epoch, as the browser stored them.
-    created_at: int = Field(ge=0)
-    updated_at: int = Field(ge=0)
-
-
-class ImportRequest(BaseModel):
-    chats: list[ImportItem] = Field(max_length=MAX_CHATS_PER_ACCOUNT)
-
-
 class TurnRequest(BaseModel):
     question: str = Field(min_length=1, max_length=QUESTION_MAX)
     # Ignored: every question goes to the entry agent. Kept so older browsers still validate.
@@ -423,11 +410,6 @@ class SearchHitOut(BaseModel):
         )
 
 
-class ImportOut(BaseModel):
-    imported: int
-    skipped: int
-
-
 class TurnOut(BaseModel):
     chat: ChatSummaryOut
     # Subscribe to /events with after=this to get only newer events.
@@ -441,10 +423,6 @@ class SuggestionOut(BaseModel):
 
 def _messages(items: list[MessageIn]) -> list[ChatMessage]:
     return [m.model_dump(exclude_none=True) for m in items]
-
-
-def _from_ms(ms: int) -> datetime:
-    return datetime.fromtimestamp(ms / 1000, tz=UTC).replace(tzinfo=None)
 
 
 def _not_found() -> HTTPException:
@@ -504,28 +482,6 @@ async def delete_all_chats(
     await turns.discard_account(account.id)
     await chats.delete_all()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.post("/import")
-async def import_chats(body: ImportRequest, chats: ChatService = Depends(get_chat_service)) -> ImportOut:
-    """One-time upload of chats this browser kept locally before chat
-    history moved to the server. Existing ids are skipped, never replaced."""
-    items = [
-        ImportedChat(
-            chat_id=c.id,
-            title=c.title,
-            agent_id=c.agent_id,
-            messages=_messages(c.messages),
-            created_at=_from_ms(c.created_at),
-            updated_at=_from_ms(c.updated_at),
-        )
-        for c in body.chats
-    ]
-    try:
-        imported, skipped = await chats.import_chats(items)
-    except ChatLimitError as error:
-        raise _too_large(error) from error
-    return ImportOut(imported=imported, skipped=skipped)
 
 
 @router.get("/search")

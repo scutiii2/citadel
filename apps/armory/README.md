@@ -20,12 +20,11 @@ starting/stopping/restarting/listing managed apps. Built to be called by
 
    ```
    cd apps/armory
-   py -m venv .venv_mcp
-   .venv_mcp\Scripts\pip install -e ".[dev]"
-   .venv_mcp\Scripts\python -m src.run
+   uv sync
+   uv run python -m src.run
    ```
 
-   (Create the venv and install once; afterwards only the last line.)
+   (Needs [uv](https://docs.astral.sh/uv/). Sync once; afterwards only the last line.)
 
 ## Configuration
 

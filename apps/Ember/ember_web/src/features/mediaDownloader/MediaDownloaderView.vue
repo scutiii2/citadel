@@ -99,7 +99,7 @@ async function confirmAction(): Promise<void> {
         <div v-show="tab === 'groups'" :id="`media-${narrow ? 'mobile' : 'desktop'}-panel-groups`" role="tabpanel" :aria-labelledby="`media-${narrow ? 'mobile' : 'desktop'}-tab-groups`" class="groups-panel"><PackagePanel :source="store.result" :preset="store.selectedOption?.id ?? null" @completed="store.refreshFiles()" /></div>
       </div>
       <aside id="media-mobile-panel-files" :role="narrow ? 'tabpanel' : undefined" :aria-labelledby="narrow ? 'media-mobile-tab-files' : undefined" class="files-panel" aria-label="My files">
-        <div class="files-heading"><h3>My files <span class="muted">{{ store.files.length }}</span></h3><ActionButton icon="summarize" :disabled="store.loadingFiles" :aria-busy="store.loadingFiles" @click="store.refreshFiles()">Refresh files</ActionButton></div>
+        <div class="files-heading"><h3>My files <span class="muted">{{ store.files.length }}</span></h3><ActionButton icon="summarize" icon-only :disabled="store.loadingFiles" :aria-busy="store.loadingFiles" @click="store.refreshFiles()">Refresh files</ActionButton></div>
         <p class="muted file-hint">Finished downloads are kept temporarily.</p>
         <p v-if="store.filesError" class="error" role="alert">{{ store.filesError }}</p>
         <p v-if="store.loadingFiles && !store.files.length" role="status">Loading files...</p>
@@ -114,7 +114,7 @@ async function confirmAction(): Promise<void> {
       <div v-if="fileDetails" class="file-details">
         <p class="file-details-name">{{ fileDetails.name }}</p>
         <p class="muted">{{ formatBytes(fileDetails.size) }} · {{ fileDetails.expires_at > now ? `Expires in ${formatExpiry(fileDetails.expires_at, now)}` : 'Expired' }}</p>
-        <DangerZone class="file-danger" label="Remove this file"><ActionButton icon="clear" class="danger" :disabled="store.removing.includes(fileDetails.file_id)" @click="confirm = { kind: 'delete', id: fileDetails.file_id, name: fileDetails.name }">Delete file</ActionButton></DangerZone>
+        <DangerZone class="file-danger" label="Remove this file"><ActionButton labelled icon="clear" class="danger" :disabled="store.removing.includes(fileDetails.file_id)" @click="confirm = { kind: 'delete', id: fileDetails.file_id, name: fileDetails.name }">Delete file</ActionButton></DangerZone>
       </div>
     </BaseModal>
     <ConfirmModal :open="confirm !== null" :title="confirm?.kind === 'delete' ? 'Delete file?' : 'Cancel download?'" :message="confirmationMessage" :confirm-label="confirm?.kind === 'delete' ? 'Delete file' : 'Cancel download'" danger :busy="confirming" @confirm="confirmAction" @close="!confirming && (confirm = null)" />
@@ -143,7 +143,6 @@ async function confirmAction(): Promise<void> {
 .file-hint { margin: 10px 0 4px; font-size: .75em; }
 .empty-files { padding: 16px 0; }
 .files-panel :deep(button.action) { border-radius: var(--radius-full); }
-.files-heading :deep(.action .label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .retention { margin-top: 20px; }
 .rights-note { margin: 24px 0 0; font-size: .75em; }
 .file-details { overflow-wrap: anywhere; }

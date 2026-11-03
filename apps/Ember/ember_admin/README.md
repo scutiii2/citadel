@@ -21,7 +21,7 @@ over the same origin, like [ember_web](../ember_web): its Vite server forwards
 Needs `ember_api` and `mcp_server` running (ember_api proxies the capability
 and extension calls to mcp_server).
 
-- `npm install` once, then `npm run dev` starts Vite (port `EMBER_ADMIN_PORT`, default 5176).
+- `pnpm install` once, then `pnpm run dev` starts Vite (port `EMBER_ADMIN_PORT`, default 5176).
   Extra arguments go to Vite after `--`.
 - `dev_deploy.bat` rebuilds and restarts the `ember_admin` container from the root `docker-compose.yml`
   (see [docs/deployment.md](../../../docs/deployment.md)).
@@ -215,13 +215,13 @@ All calls require `tickets.manage`:
 ## Tests
 
 ```bash
-npm test
-npx vue-tsc -b
-npm run test:e2e
+pnpm test
+pnpm exec vue-tsc -b
+pnpm run test:e2e
 ```
 
-`npm test` runs Vitest with jsdom (`*.test.ts` beside the source).
-`npx vue-tsc -b` type-checks the app and its tests. `npm run test:e2e` runs
+`pnpm test` runs Vitest with jsdom (`*.test.ts` beside the source).
+`pnpm exec vue-tsc -b` type-checks the app and its tests. `pnpm run test:e2e` runs
 Playwright against the built app on port 5198 (`EMBER_E2E_PORT`) in the
 Chrome installed on this machine. `e2e/fakeApi.ts` answers every `/api` call,
 so ember_api is not needed.
@@ -262,13 +262,13 @@ Phone layouts use bottom navigation, touch controls, safe-area padding for notch
 and the home indicator, and the dynamic viewport for browser chrome and keyboards.
 Ember and Ember Admin install separately, each from its own origin.
 
-Build with `npm run build`, then serve `dist/` over HTTPS (localhost also works).
-For phone layout testing on the same Wi-Fi, run `npm run preview -- --host 0.0.0.0`
+Build with `pnpm run build`, then serve `dist/` over HTTPS (localhost also works).
+For phone layout testing on the same Wi-Fi, run `pnpm run preview -- --host 0.0.0.0`
 and open this computer's LAN address and preview port; use an HTTPS reverse proxy
 for installation and offline testing on a phone.
 The browser can install the app from its menu; when an install prompt is available,
 an **Install app** button appears. On iPhone/iPad, use Safari → Share → Add to Home Screen.
-The PWA service worker is enabled in production builds, including `npm run preview`,
+The PWA service worker is enabled in production builds, including `pnpm run preview`,
 and is disabled in the Vite development server so it does not interfere with HMR.
 An HTTP LAN address can serve the mobile layout, but installation/offline support
 requires HTTPS. Keep the existing same-origin `/api` proxy and SPA route fallback.

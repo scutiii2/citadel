@@ -164,6 +164,7 @@ async function changePassword(): Promise<void> {
             : "Your email isn't verified. Verifying it is optional."
         }}</span>
         <ActionButton
+          labelled
           icon="verify"
           class="account-action verify"
           @click="router.push('/verify-email')"
@@ -250,6 +251,7 @@ async function changePassword(): Promise<void> {
               <div class="muted small">{{ THEME_LABELS[theme] }}</div>
             </div>
             <ActionButton
+              labelled
               icon="theme"
               class="account-action theme"
               @click="cycle"
@@ -262,6 +264,7 @@ async function changePassword(): Promise<void> {
               <div class="muted small">End your session on this device.</div>
             </div>
             <ActionButton
+              labelled
               icon="logout"
               class="account-action logout"
               @click="logout"
@@ -292,6 +295,7 @@ async function changePassword(): Promise<void> {
                 <div class="muted small">{{ account.email }}</div>
               </div>
               <ActionButton
+                labelled
                 :icon="openForm === 'email' ? 'close' : 'mail'"
                 class="account-action toggle-email"
                 :aria-expanded="openForm === 'email'"
@@ -352,6 +356,7 @@ async function changePassword(): Promise<void> {
                 <div class="muted small">Use a strong, unique password.</div>
               </div>
               <ActionButton
+                labelled
                 :icon="openForm === 'password' ? 'close' : 'lock'"
                 class="account-action toggle-password"
                 :aria-expanded="openForm === 'password'"
@@ -525,6 +530,7 @@ async function changePassword(): Promise<void> {
               </div>
             </div>
             <ActionButton
+              labelled
               v-if="!d.current"
               icon="close"
               quiet
@@ -777,14 +783,6 @@ button.account-action {
   font-size: 0.8em;
   font-weight: 550;
   flex: none;
-}
-
-.account-action :deep(.label) {
-  position: static;
-  width: auto;
-  height: auto;
-  overflow: visible;
-  clip-path: none;
 }
 
 .helper {

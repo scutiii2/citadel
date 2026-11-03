@@ -24,7 +24,7 @@ components, and where to place new Vue files and their tests.
 - Dictate from the microphone beside Attach (`files.upload`, WebM recording support). Click again to stop, or recording stops at 150 seconds. Live words replace the current hypothesis beside the original draft; the field stays read-only until the final transcript arrives. Cancel (or Escape) restores the original draft. Leaving the chat or changing accounts also cancels. Streaming falls back to periodic transcription, then a full recording upload when needed; a quiet status announces fallback. The final draft is editable and nothing is sent automatically.
 - Read aloud from an assistant message's action row (`tools.execute` and `files.download`). Choose an installed Bard voice on every run; no choice is remembered. Markdown is stripped, text is batched at 3,500 characters and the next batch is synthesized during playback. Stop cancels requests and hidden audio. Existing agent-created audio cards still work.
 
-Speech checks: `npm test -- --maxWorkers=2`, `npx vue-tsc -b --noEmit` and `npm run test:e2e -- speech.spec.ts`. Chrome uses its fake microphone device and API fixtures for these browser tests. There is no separate lint script configured; TypeScript unused-variable/parameter checks and the suite's structural/style rules apply.
+Speech checks: `pnpm test -- --maxWorkers=2`, `pnpm exec vue-tsc -b --noEmit` and `pnpm run test:e2e -- speech.spec.ts`. Chrome uses its fake microphone device and API fixtures for these browser tests. There is no separate lint script configured; TypeScript unused-variable/parameter checks and the suite's structural/style rules apply.
 
 Live dictation uses the same-origin `/api/attachments/dictate/stream` WebSocket with an AudioWorklet producing 16 kHz mono PCM16. MediaRecorder keeps WebM in parallel. If streaming fails, cumulative WebM snapshots go to `/api/attachments/dictate/partial` every 2.5 seconds, with one request at a time; final upload uses `/api/attachments/dictate`. Vite forwards WebSocket upgrades in development and preview. Capture requires a secure browser context (HTTPS or localhost); device microphone and mobile Safari behavior still need manual checks.
 
@@ -420,22 +420,22 @@ All calls use the same-origin session and require `tickets.create`:
 
 ## Requirements
 
-- Node.js 24 (npm on `PATH`)
+- Node.js 24 with pnpm (`corepack enable pnpm`)
 - A running **ember_api** (default `127.0.0.1:8030`), plus the `ai_agent`
   and `mcp_server` it proxies to.
 
 ## Setup and running
 
 ```bash
-npm install
+pnpm install
 ```
 
 No `.env` is needed: nothing server-specific is compiled into the bundle.
 
 Run with any of:
 
-- `npm install` once, then `npm run dev` starts Vite (port `EMBER_WEB_PORT`, default 5173).
-  Extra arguments go to Vite after `--` (e.g. `npm run dev -- --open`).
+- `pnpm install` once, then `pnpm run dev` starts Vite (port `EMBER_WEB_PORT`, default 5173).
+  Extra arguments go to Vite after `--` (e.g. `pnpm run dev -- --open`).
 - `dev_deploy.bat` - rebuilds and restarts the `ember_web` container from the root `docker-compose.yml`
   (see [docs/deployment.md](../../../docs/deployment.md)).
 
@@ -450,12 +450,12 @@ bootstrap admin - see ember_api's README).
 ## Tests
 
 ```bash
-npm test
+pnpm test
 ```
 
 Vitest with jsdom, `@vue/test-utils` for components. Test files sit beside
 their source as `*.test.ts` and are type-checked by `vue-tsc -b` (so
-`npm run build` covers them) but never bundled. They need no running server:
+`pnpm run build` covers them) but never bundled. They need no running server:
 ember_api calls are mocked. Covered so far: the chat store (regenerate, edit
 and resend, search, jump to a result, delete several, deep-link readiness),
 the templates store (including the chime and the clocks), the message list (welcome card, running clock,
@@ -474,7 +474,7 @@ token (five 2 px chart marks are allow-listed).
 ### End-to-end test
 
 ```bash
-npm run test:e2e
+pnpm run test:e2e
 ```
 
 Playwright runs the built app in the Chrome installed on this machine (no browser download) on port
@@ -494,8 +494,8 @@ Both suites use a fake `/api`. `SMOKE_TEST.md` is a checklist for trying the
 same screens by hand against the real ember_api (throwaway accounts, real saves
 and deletes).
 
-Other scripts: `npm run build` (type-check + production build into `dist/`),
-`npm run preview` (serves `dist/`, with the same `/api` forwarding).
+Other scripts: `pnpm run build` (type-check + production build into `dist/`),
+`pnpm run preview` (serves `dist/`, with the same `/api` forwarding).
 
 ## How it connects
 
@@ -583,13 +583,13 @@ and the home indicator. Ember's shell follows the Visual Viewport API for keyboa
 height and focus panning, with a dynamic viewport fallback when the API is unavailable.
 Ember and Ember Admin install separately, each from its own origin.
 
-Build with `npm run build`, then serve `dist/` over HTTPS (localhost also works).
-For phone layout testing on the same Wi-Fi, run `npm run preview -- --host 0.0.0.0`
+Build with `pnpm run build`, then serve `dist/` over HTTPS (localhost also works).
+For phone layout testing on the same Wi-Fi, run `pnpm run preview -- --host 0.0.0.0`
 and open this computer's LAN address and preview port; use an HTTPS reverse proxy
 for installation and offline testing on a phone.
 The browser can install the app from its menu; when an install prompt is available,
 an **Install app** button appears. On iPhone/iPad, use Safari → Share → Add to Home Screen.
-The PWA service worker is enabled in production builds, including `npm run preview`,
+The PWA service worker is enabled in production builds, including `pnpm run preview`,
 and is disabled in the Vite development server so it does not interfere with HMR.
 An HTTP LAN address can serve the mobile layout, but installation/offline support
 requires HTTPS. Keep the existing same-origin `/api` proxy and SPA route fallback.

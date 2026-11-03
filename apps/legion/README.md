@@ -24,9 +24,8 @@ The internal Router chooses specialists and model tiers through that arrangement
    `apps/legion/configs/config_servers.json` points at its default
    `http://127.0.0.1:8010/mcp`.
 
-3. Start the agents from `apps/legion/`: create `.venv_legion` and install the
-   project once (`py -m venv .venv_legion`, then `.venv_legion\Scripts\pip install -e ".[dev]"`),
-   then run `.venv_legion\Scripts\python -m src.supervisor`. See Agents below.
+3. Start the agents from `apps/legion/`: install the project once with `uv sync`
+   (creates `.venv`), then run `uv run python -m src.supervisor`. See Agents below.
 
 ### Laya service
 
@@ -229,7 +228,7 @@ Copy-Item -Recurse apps\garrison\.data apps\legion\.data
 Copy-Item apps\garrison\configs\config_*.json apps\legion\configs\
 ```
 
-Then recreate the virtual environment as `.venv_legion` (see Setup) and point any local
+Then recreate the virtual environment with `uv sync` (see Setup) and point any local
 `ember_api` `config_app.json` `agents_registry_path` at `../../legion/.data/agent_registry.json`.
 Stored agent overrides in `.data/agent_overrides.json` that still use `orchestrator` or
 `internal_role` are upgraded to `role` when loaded.

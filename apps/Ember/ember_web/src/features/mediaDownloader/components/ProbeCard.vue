@@ -39,7 +39,7 @@ const blockedOptions = computed(() => props.result.options.filter(o => o.blocked
       </ul>
       <div class="download-line">
         <p class="selected-format muted small"><template v-if="selectedOption">{{ selectedOption.label }}<span v-if="selectedOption.estimated_bytes !== null"> · ~{{ formatBytes(selectedOption.estimated_bytes) }}</span></template><template v-else>Choose an available format.</template></p>
-        <ActionButton icon="export" class="primary" :aria-busy="busy" :disabled="!selectedOption || busy" @click="$emit('download')">{{ busy ? 'Starting...' : 'Download' }}</ActionButton>
+        <ActionButton labelled icon="export" class="primary" :aria-busy="busy" :disabled="!selectedOption || busy" @click="$emit('download')">{{ busy ? 'Starting...' : 'Download' }}</ActionButton>
       </div>
     </div>
   </section>
@@ -65,7 +65,6 @@ const blockedOptions = computed(() => props.result.options.filter(o => o.blocked
 .download-line { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
 .selected-format { margin: 0; }
 .download-line :deep(button.action) { padding: 9px 16px; min-height: 40px; }
-.download-line :deep(.action .label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
 @media (max-width: 767px) {
   .preview-row { padding: 15px; gap: 12px; }
   .preview { width: 70px; height: 70px; font-size: .55em; }

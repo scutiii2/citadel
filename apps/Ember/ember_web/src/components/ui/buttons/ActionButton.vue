@@ -2,7 +2,8 @@
 /** An outlined action button with an icon, shared by the chat toolbar and the
  * Usage page. The icon takes the accent colour; `quiet` mutes it for the
  * secondary maintenance actions. Below 480px, or always with `iconOnly`, only
- * the icon stays; the label remains for screen readers. */
+ * the icon stays; the label remains for screen readers. `labelled` keeps the
+ * label visible at every width. */
 type ActionIcon = "export" | "share" | "summarize" | "clear" | "mail" | "lock" | "close" | "verify" | "more" | "theme" | "logout";
 
 // 16px viewBox, stroke only.
@@ -20,11 +21,11 @@ const PATHS: Record<ActionIcon, string> = {
   logout: "M6 14H3V2h3M10 11l3-3-3-3M13 8H6",
 };
 
-defineProps<{ icon: ActionIcon; quiet?: boolean; iconOnly?: boolean }>();
+defineProps<{ icon: ActionIcon; quiet?: boolean; iconOnly?: boolean; labelled?: boolean }>();
 </script>
 
 <template>
-  <button type="button" :class="['action', { quiet, 'icon-only': iconOnly }]">
+  <button type="button" :class="['action', { quiet, 'icon-only': iconOnly, labelled }]">
     <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path :d="PATHS[icon]" /></svg>
     <span class="label"><slot /></span>
   </button>
@@ -82,14 +83,14 @@ defineProps<{ icon: ActionIcon; quiet?: boolean; iconOnly?: boolean }>();
   padding: 6px;
 }
 @media (max-width: 480px) {
-  .label {
+  .action:not(.labelled) .label {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
   }
-  .action {
+  .action:not(.labelled) {
     padding: 6px;
   }
 }

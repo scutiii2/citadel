@@ -120,7 +120,7 @@ async function changePassword(): Promise<void> {
         <span>{{ auth.needsVerification
           ? "Your email isn't verified. Permissions are paused until you enter the code."
           : "Your email isn't verified. Verifying it is optional." }}</span>
-        <ActionButton icon="verify" class="account-action verify" @click="router.push('/verify-email')">Verify now</ActionButton>
+        <ActionButton labelled icon="verify" class="account-action verify" @click="router.push('/verify-email')">Verify now</ActionButton>
       </div>
 
       <div class="card profile">
@@ -151,11 +151,11 @@ async function changePassword(): Promise<void> {
         <div class="security-body">
           <div class="row">
             <div class="row-copy"><div class="row-title">Theme</div><div class="muted small">{{ THEME_LABELS[theme] }}</div></div>
-            <ActionButton icon="theme" class="account-action theme" @click="cycle">Switch theme</ActionButton>
+            <ActionButton labelled icon="theme" class="account-action theme" @click="cycle">Switch theme</ActionButton>
           </div>
           <div class="row">
             <div class="row-copy"><div class="row-title">Log out</div><div class="muted small">End your session on this device.</div></div>
-            <ActionButton icon="logout" class="account-action logout" @click="logout">Log out</ActionButton>
+            <ActionButton labelled icon="logout" class="account-action logout" @click="logout">Log out</ActionButton>
           </div>
         </div>
       </section>
@@ -169,7 +169,7 @@ async function changePassword(): Promise<void> {
           <div class="security-body">
             <div class="row">
               <div class="row-copy"><div class="row-title">Email address</div><div class="muted small">{{ account.email }}</div></div>
-              <ActionButton :icon="openForm === 'email' ? 'close' : 'mail'" class="account-action toggle-email" :aria-expanded="openForm === 'email'" aria-controls="account-email-form" @click="toggle('email')">
+              <ActionButton labelled :icon="openForm === 'email' ? 'close' : 'mail'" class="account-action toggle-email" :aria-expanded="openForm === 'email'" aria-controls="account-email-form" @click="toggle('email')">
                 {{ openForm === 'email' ? 'Close' : 'Change email' }}
               </ActionButton>
             </div>
@@ -185,7 +185,7 @@ async function changePassword(): Promise<void> {
             </form>
             <div class="row">
               <div class="row-copy"><div class="row-title">Password</div><div class="muted small">Use a strong, unique password.</div></div>
-              <ActionButton :icon="openForm === 'password' ? 'close' : 'lock'" class="account-action toggle-password" :aria-expanded="openForm === 'password'" aria-controls="account-password-form" @click="toggle('password')">
+              <ActionButton labelled :icon="openForm === 'password' ? 'close' : 'lock'" class="account-action toggle-password" :aria-expanded="openForm === 'password'" aria-controls="account-password-form" @click="toggle('password')">
                 {{ openForm === 'password' ? 'Close' : 'Change password' }}
               </ActionButton>
             </div>
@@ -234,7 +234,7 @@ async function changePassword(): Promise<void> {
               <div class="device-name"><strong>{{ d.label }}</strong><span v-if="d.current" class="chip ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>This device</span></div>
               <div class="device-meta"><span>Last used · {{ formatUtc(d.last_seen_at) }}</span><span>{{ d.ip_subnet }}</span><span>First seen · {{ formatUtc(d.first_seen_at) }}</span></div>
             </div>
-            <ActionButton v-if="!d.current" icon="close" quiet class="account-action forget" @click="pendingForget = d">Forget</ActionButton>
+            <ActionButton labelled v-if="!d.current" icon="close" quiet class="account-action forget" @click="pendingForget = d">Forget</ActionButton>
           </li>
         </ul>
         <p class="device-footer">Forgetting a device makes its next sign-in appear as a new device in your activity log.</p>
@@ -489,13 +489,6 @@ button.account-action  {
   flex: none;
 }
 
-.account-action :deep(.label)  {
-  position: static;
-  width: auto;
-  height: auto;
-  overflow: visible;
-  clip-path: none;
-}
 
 .helper  {
   border-top: 1px solid var(--border);

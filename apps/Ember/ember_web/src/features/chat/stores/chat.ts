@@ -21,7 +21,6 @@ import type {
   TurnPlan,
 } from "../../../api/types";
 import {
-  LegacyLocalChats,
   ServerConversationStorage,
   type ConversationStorage,
 } from "../services/ConversationStorage";
@@ -34,6 +33,7 @@ import { type ApprovalMode, DEFAULT_APPROVAL_MODE, isApprovalMode } from "../uti
 import { type ContextAccuracy, DEFAULT_CONTEXT_ACCURACY, isContextAccuracy } from "../utils/contextAccuracy";
 import { splitAttachments, withAttachments } from "../../../utils/content/attachments";
 import { errorMessage } from "../../../utils/errors";
+import { parseServerTime } from "../../../utils/time";
 import { toolTitle } from "../../../utils/tools/toolTitles";
 import { triageAnswerText, triageQuestionText } from "../utils/triageMessage";
 import { readStored, writeStored } from "../../../utils/browser/storage";
@@ -396,30 +396,6 @@ export const useChatStore = defineStore("chat", () => {
 
   // --- loading --------------------------------------------------------------
 
-  /** Uploads chats this browser kept locally (before history moved to the
-   * server) once; the local copy goes only after ember_api confirms. */
-  async function importLegacy(accountId: number): Promise<void> {
-    const legacy = new LegacyLocalChats(accountId);
-    const local = legacy.read();
-    if (local.length === 0) return;
-    try {
-      await chatsClient.importChats(
-        local.map((c) => ({
-          id: c.id,
-          title: c.title.trim() || "Untitled chat",
-          agent_id: c.agentId ?? null,
-          messages: c.messages,
-          created_at: c.createdAt,
-          updated_at: c.updatedAt,
-        })),
-      );
-      legacy.clear();
-    } catch (err) {
-      // Kept locally; the next login tries again.
-      console.warn("ember_web: importing locally saved chats failed", err);
-    }
-  }
-
   /** Re-reads the list, keeping loaded transcripts of chats that didn't
    * change. A chat whose answer finished in the background is re-fetched
    * when next opened. */
@@ -445,7 +421,6 @@ export const useChatStore = defineStore("chat", () => {
     // folder deleted): it is thrown away and fetched again.
     let stale = false;
     try {
-      await importLegacy(accountId);
       const fresh = await storage.list();
       if (started !== generation) return;
       if (seq !== listSeq) {
@@ -949,7 +924,7 @@ export const useChatStore = defineStore("chat", () => {
       conversation.saveToSecondBrain = turn.chat.save_to_second_brain ?? false;
       conversation.secondBrainScope = turn.chat.second_brain_scope ?? "instance";
       conversation.running = true;
-      conversation.updatedAt = Date.parse(`${turn.chat.updated_at}Z`);
+      conversation.updatedAt = parseServerTime(turn.chat.updated_at);
       if (activeId.value === id) follow(id, turn.sequence, began);
       return true;
     } catch (err) {
@@ -1036,8 +1011,8 @@ export const useChatStore = defineStore("chat", () => {
         folderId: chat.folder_id ?? null,
         pinned: chat.pinned ?? false,
         agentId: chat.agent_id ?? undefined,
-        createdAt: Date.parse(`${chat.created_at}Z`),
-        updatedAt: Date.parse(`${chat.updated_at}Z`),
+        createdAt: parseServerTime(chat.created_at),
+        updatedAt: parseServerTime(chat.updated_at),
       });
       unfollow();
       jumpIndex.value = null;

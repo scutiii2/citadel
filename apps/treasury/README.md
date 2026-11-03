@@ -14,21 +14,20 @@ instance "default" ───> connection "scratch" ─> SQLite file (cache off)
 
 ## Requirements
 - Python 3.11+
-- Runs standalone with its own `.venv_treasury`. It imports no other project.
+- Runs standalone with its own `.venv`. It imports no other project.
 
 ## Setup and run
 ```
-py -m venv .venv_treasury
-.venv_treasury\Scripts\pip install -e ".[dev]"
-.venv_treasury\Scripts\python -m src.run
+uv sync
+uv run python -m src.run
 ```
-Create the venv and install once. The first start seeds `.env`,
+Sync once. The first start seeds `.env`,
 `configs/config_app.json` and `configs/config_connections.json` from their `.example` twins.
 Default port is 8071 (`DB_GATEWAY_PORT` overrides it).
 
 In Docker: `dev_deploy.bat` in this folder rebuilds and restarts the `treasury` container from the root `docker-compose.yml` (see [docs/deployment.md](../../docs/deployment.md)).
 
-Tests: `.venv_treasury\Scripts\python.exe -m pytest`
+Tests: `uv run pytest`
 
 ## Configuration
 - `configs/config_app.json`: host, port, `default_cache`.
@@ -67,7 +66,7 @@ is returned to its caller but not cached, so it cannot overwrite fresher data.
 Limit: a change made outside the gateway shows up only after the TTL expires.
 
 ## Postgres
-Install the driver once: `.venv_treasury\Scripts\pip install -e ".[postgres]"`. Put the DSN in
+Install the driver with `uv sync --extra postgres` (add the flag to later `uv sync` runs too, or it is removed). Put the DSN in
 `.env` (`PG_DSN=postgresql://user:pass@host/db`) and add a connection:
 
 ```json
@@ -80,7 +79,7 @@ Status: unit-tested against a fake pool, and the backend contract test passes ag
 Postgres 16 server.
 
 ## Firestore
-Install the driver once: `.venv_treasury\Scripts\pip install -e ".[firestore]"`. Add a connection:
+Install the driver with `uv sync --extra firestore` (add the flag to later `uv sync` runs too, or it is removed). Add a connection:
 
 ```json
 "cloud": {"type": "firestore", "project": "my-project", "credentials_file": "${FIRESTORE_KEY_FILE}"}
@@ -104,7 +103,7 @@ own server to run the others; each run uses a collection of its own and cleans u
 set DB_GATEWAY_TEST_POSTGRES_DSN=postgresql://user:pass@localhost/testdb
 set FIRESTORE_EMULATOR_HOST=localhost:8080
 set GOOGLE_CLOUD_PROJECT=demo-test
-.venv_treasury\Scripts\python.exe -m pytest tests/test_backend_contract.py -rs
+uv run pytest tests/test_backend_contract.py -rs
 ```
 
 Use a throwaway Postgres database and the Firestore emulator, never a real project.

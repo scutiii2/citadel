@@ -16,6 +16,5 @@ defineProps<{ label?: string }>();
 <style scoped>
 .danger-panel { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-lg); font-size: .85em; }
 .danger-panel :deep(button.action) { color: var(--danger); border-color: var(--danger); border-radius: var(--radius-full); }
-.danger-panel :deep(.action .label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
 .danger-panel :deep(.action .icon) { stroke: currentColor; }
 </style>

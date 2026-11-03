@@ -1,5 +1,5 @@
 """Minimal stdio MCP server (tools ``echo`` and ``add``), a fixture for testing the extensions proxy.
-Run as a module: ``.venv_mcp\\Scripts\\python.exe -m src._fixtures.reference_extension_server``."""
+Run as a module: ``uv run python -m src._fixtures.reference_extension_server``."""
 
 from __future__ import annotations
 
