@@ -5,6 +5,7 @@ import PopupMenu from "../../../components/ui/menus/PopupMenu.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { speechBatches } from "../../../utils/content/speechBatches";
 import { useReadAloud } from "../composables/useReadAloud";
+import { useReadAloudVoice } from "../composables/useReadAloudVoice";
 import { createSpeechHighlight } from "../composables/useSpeechHighlight";
 
 const props = defineProps<{ text: string; scope?: string | number | null }>();
@@ -14,6 +15,7 @@ const audio = ref<HTMLAudioElement | null>(null);
 const button = ref<HTMLButtonElement | null>(null);
 const { state, error, position, start, stop } = useReadAloud(audio);
 const highlight = createSpeechHighlight();
+const { voice: preferred } = useReadAloudVoice();
 // Short opening batches so audio starts after one sentence, not after the whole message is synthesized.
 const RAMP = [300, 1200];
 const loading = ref(false);
@@ -50,6 +52,8 @@ async function toggle(): Promise<void> {
     const result = await bardClient.voices(run.signal);
     if (run.signal.aborted) return;
     if (!result.voices.length) { menuError.value = "No voices are installed in Bard."; return; }
+    // A voice chosen in Settings skips the menu, unless Bard no longer has it.
+    if (preferred.value && result.voices.includes(preferred.value)) { play(preferred.value); return; }
     const box = button.value!.getBoundingClientRect();
     menu.value = { x: box.left, y: box.bottom, voices: result.voices };
   } catch (cause) {
@@ -60,8 +64,13 @@ async function toggle(): Promise<void> {
 }
 
 function choose(voice: string): void {
-  if (!menu.value?.voices.includes(voice) || !allowed.value) return;
+  if (!menu.value?.voices.includes(voice)) return;
   closeMenu();
+  play(voice);
+}
+
+function play(voice: string): void {
+  if (!allowed.value) return;
   const batches = speechBatches(props.text, undefined, RAMP);
   highlight.begin(button.value?.closest<HTMLElement>(".assistant") ?? null, batches);
   void start(batches, voice);

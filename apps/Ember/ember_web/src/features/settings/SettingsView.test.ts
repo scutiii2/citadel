@@ -161,7 +161,7 @@ describe("SettingsView", () => {
 
     expect(w.findAll("h3").map((h) => h.text())).toEqual(["Chat", "Context display", "Appearance", "Sidebar", "Response limits"]);
     expect(rowIds(w)).toEqual([
-      "chat-terse", "chat-independent", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-chime", "chat-notifications", "chat-suggestions",
+      "chat-terse", "chat-independent", "chat-plan", "chat-plan-lean", "chat-ask-tools", "chat-read-aloud-voice", "chat-chime", "chat-notifications", "chat-suggestions",
       "context-live-tokens", "context-panel", "context-accuracy", "appearance-theme", "sidebar-pages", "max_output_tokens", "max_tool_rounds",
     ]);
     expect(w.text()).not.toContain("Tool approval");
@@ -391,7 +391,7 @@ describe("modified filter", () => {
   it("is a pill that shows only the changed settings, and toggles back", async () => {
     chat.caveman = true;
     const w = await mountView();
-    expect(rowIds(w)).toHaveLength(15);
+    expect(rowIds(w)).toHaveLength(16);
     expect(w.get(".badge").attributes("aria-pressed")).toBe("false");
 
     await w.get(".badge").trigger("click");
@@ -401,7 +401,7 @@ describe("modified filter", () => {
     expect(w.get(".badge").attributes("aria-pressed")).toBe("true");
 
     await w.get(".badge").trigger("click");
-    expect(rowIds(w)).toHaveLength(15);
+    expect(rowIds(w)).toHaveLength(16);
   });
 
   it("drops the filter once nothing is modified any more", async () => {
@@ -412,7 +412,7 @@ describe("modified filter", () => {
     await row(w, "chat-terse").get("button.reset").trigger("click");
 
     expect(w.find(".badge").exists()).toBe(false);
-    expect(rowIds(w)).toHaveLength(15);
+    expect(rowIds(w)).toHaveLength(16);
   });
 });
 
@@ -443,7 +443,7 @@ describe("search", () => {
     expect(w.text()).toContain('No settings match "zzz"');
     expect(rowIds(w)).toEqual([]);
     await w.get("button.link").trigger("click");
-    expect(rowIds(w)).toHaveLength(15);
+    expect(rowIds(w)).toHaveLength(16);
     expect((search(w).element as HTMLInputElement).value).toBe("");
   });
 
@@ -456,7 +456,7 @@ describe("search", () => {
 
     await search(w).trigger("keydown", { key: "Escape" });
     expect((search(w).element as HTMLInputElement).value).toBe("");
-    expect(rowIds(w)).toHaveLength(15);
+    expect(rowIds(w)).toHaveLength(16);
   });
 });
 
@@ -464,7 +464,7 @@ it("keeps workspace tool approval in Ember Admin", async () => {
   const w = await mountView(ADMIN);
   expect(w.text()).not.toContain("Tool approval");
   expect(w.text()).not.toContain("Applies to all accounts");
-  expect(rowIds(w)).toHaveLength(15);
+  expect(rowIds(w)).toHaveLength(16);
 });
 
 it("reverts account drafts while retaining applied device preferences", async () => {

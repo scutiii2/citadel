@@ -3,6 +3,9 @@ const SKIP = "pre, code, button, time, .actions, details, [aria-hidden='true']";
 
 interface Word { node: Text; start: number; end: number }
 
+/** Relative speaking time of a word: its letters plus the pause a following punctuation mark adds. */
+const weight = (word: string) => word.length + 1 + (/[.!?…]["'”’)]*$/.test(word) ? 5 : /[,;:—–]$/.test(word) ? 2 : 0);
+
 const norm = (word: string) => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 
 /** Visible prose words under `root`; code blocks and controls are never spoken. */
@@ -55,11 +58,11 @@ export function createSpeechHighlight() {
   function update(position: { batch: number; fraction: number } | null): void {
     const words = position && batchWords[position.batch];
     if (!supported || !position || !words?.length) return;
-    const total = words.reduce((sum, w) => sum + w.length + 1, 0);
+    const total = words.reduce((sum, w) => sum + weight(w), 0);
     let seen = 0;
     let local = 0;
-    while (local < words.length - 1 && seen + words[local]!.length + 1 <= position.fraction * total) {
-      seen += words[local]!.length + 1;
+    while (local < words.length - 1 && seen + weight(words[local]!) <= position.fraction * total) {
+      seen += weight(words[local]!);
       local++;
     }
     const target = pageMap[spokenToPage[offsets[position.batch]! + local]!];

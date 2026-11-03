@@ -219,13 +219,27 @@ const route = useChatRoute(
   shown,
 );
 const { notFound } = route;
+/** Keep the cursor in the message box when the page opens or the window regains focus, but never take it
+ * from a field or dialog the person is using, and never on touch screens, where it would raise the keyboard. */
+function refocusInput(): void {
+  if (!shown.value || document.visibilityState !== "visible" || matchMedia("(pointer: coarse)").matches) return;
+  const active = document.activeElement;
+  const typing = active instanceof HTMLElement && active !== document.body
+    && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.closest("[role=dialog], [aria-modal=true]"));
+  if (!typing) input.value?.focus();
+}
 onActivated(() => {
   shown.value = true;
   route.activate();
+  window.addEventListener("focus", refocusInput);
+  document.addEventListener("visibilitychange", refocusInput);
+  void nextTick(refocusInput);
 });
 onDeactivated(() => {
   shown.value = false;
   drawerOpen.value = false;
+  window.removeEventListener("focus", refocusInput);
+  document.removeEventListener("visibilitychange", refocusInput);
 });
 
 function onNew(): void {
