@@ -230,7 +230,7 @@ onBeforeUnmount(() => {
               <div class="result-actions">
                 <span class="result-meta">{{ resultMeta }}<template v-if="result.bits !== null"> · {{ Math.round(result.bits) }} bits</template></span>
                 <div class="result-buttons">
-                  <button type="button" class="reveal" :aria-pressed="revealed" @click="revealed = !revealed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>{{ revealed ? "Hide" : "Reveal" }}</button>
+                  <button type="button" class="reveal" :aria-pressed="revealed" @click="revealed = !revealed"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>{{ revealed ? "Hide" : "Reveal" }}</button>
                   <CopyButton :key="result.value" :text="result.value" label="Copy value" />
                 </div>
               </div>
@@ -247,7 +247,7 @@ onBeforeUnmount(() => {
         </section>
         <section :class="['options-panel', { expanded: optionsOpen }]" aria-label="Generator options">
           <div class="desktop-options-heading"><h3>{{ typeLabel }} options</h3><p class="options-description">Adjust your next generated value.</p></div>
-          <button type="button" class="options-disclosure" :aria-expanded="optionsOpen" aria-controls="generator-options" @click="optionsOpen = !optionsOpen"><span>Options</span><span class="options-summary">{{ optionSummary }}<svg viewBox="0 0 24 24" aria-hidden="true"><path :d="optionsOpen ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'" /></svg></span></button>
+          <button type="button" class="options-disclosure" :aria-expanded="optionsOpen" aria-controls="generator-options" @click="optionsOpen = !optionsOpen"><span>Options</span><span class="options-summary">{{ optionSummary }}<svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path :d="optionsOpen ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'" /></svg></span></button>
           <div id="generator-options" class="options-body">
             <template v-if="tab === 'password'">
             <label class="field">Length: {{ options.password.length }}
@@ -302,7 +302,7 @@ onBeforeUnmount(() => {
           </div>
         </section>
       </div>
-      <footer class="generate-footer"><p>Generated values aren't saved.</p><button type="submit" class="primary" :disabled="!canRun" :aria-busy="busy"><svg v-if="!busy" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 13-2l2 7M4 12l2 7a8 8 0 0 0 13-2" /></svg>{{ generateLabel }}</button></footer>
+      <footer class="generate-footer"><p>Generated values aren't saved.</p><button type="submit" class="primary" :disabled="!canRun" :aria-busy="busy"><svg class="line-icon" v-if="!busy" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 13-2l2 7M4 12l2 7a8 8 0 0 0 13-2" /></svg>{{ generateLabel }}</button></footer>
     </WorkspaceLayout>
     <ConfirmModal :open="leaving !== null" title="Discard the generated value?" :message="`Generated values are not stored. Leaving this ${leaving?.page ? 'page' : 'tab'} removes the one you made, so copy it first if you still need it.`" confirm-label="Discard and leave" @confirm="answerLeave(true)" @close="answerLeave(false)" />
   </PageLayout>
@@ -325,7 +325,7 @@ h3 { margin: 0; font-size: 1em; font-weight: 600; }
 .result-buttons { display: flex; gap: 8px; }
 .reveal, .result-buttons :deep(button.copy) { display: inline-flex; align-items: center; justify-content: center; gap: 7px; font: inherit; font-size: .8em; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--bg); color: var(--text); cursor: pointer; }
 .result-buttons :deep(button.copy.idle)::after { content: 'Copy'; }
-svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+svg { width: 18px; height: 18px; flex-shrink: 0; }
 .strength { display: flex; align-items: center; gap: 10px; margin-top: 18px; font-size: .75em; color: var(--muted); }
 .bar { flex: 1; height: 4px; border-radius: var(--radius-full); background: var(--border); overflow: hidden; }
 .fill { display: block; height: 100%; background: var(--accent); transition: width .2s ease; }

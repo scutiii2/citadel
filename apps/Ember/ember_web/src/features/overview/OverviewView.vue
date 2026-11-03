@@ -56,14 +56,14 @@ const groups = computed(() => {
     <div class="column">
       <section v-if="chat" class="hero" aria-labelledby="chat-heading">
         <div class="hero-copy">
-          <div class="eyebrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z" /></svg>Your AI workspace</div>
+          <div class="eyebrow"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z" /></svg>Your AI workspace</div>
           <h3 id="chat-heading">Turn a thought into a next step.</h3>
           <p>Ask a question, explore an idea, or let an agent help you get something done.</p>
-          <RouterLink :to="chat.to" class="primary">Start a chat <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></RouterLink>
+          <RouterLink :to="chat.to" class="primary">Start a chat <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></RouterLink>
         </div>
         <div class="hero-art" aria-hidden="true">
           <span class="orbit" /><span class="orbit inner" /><span class="spark" /><span class="spark small" />
-          <svg class="flame" viewBox="0 0 64 64"><path d="M35 5c4 15-13 18-10 29 3-2 5-6 6-9 9 6 16 12 14 21-1 10-9 15-18 13C12 56 10 43 17 32c-1 9 3 11 5 12-6-17 17-22 13-39z" /></svg>
+          <svg class="line-icon flame" viewBox="0 0 64 64"><path d="M35 5c4 15-13 18-10 29 3-2 5-6 6-9 9 6 16 12 14 21-1 10-9 15-18 13C12 56 10 43 17 32c-1 9 3 11 5 12-6-17 17-22 13-39z" /></svg>
         </div>
       </section>
       <p v-if="pages.length === 0" class="empty">Your role gives you no pages yet - ask an administrator.</p>
@@ -71,25 +71,25 @@ const groups = computed(() => {
         <div class="section-head"><h3 :id="`${group.id}-heading`">{{ group.title }}</h3><span>{{ group.subtitle }}</span></div>
         <div class="grid" :class="{ work: group.id === 'work' }">
           <RouterLink v-for="p in group.pages" :key="p.to" :to="p.to" class="card">
-            <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path v-for="d in p.icon" :key="d" :d="d" /></svg></span>
+            <span class="icon" aria-hidden="true"><svg class="line-icon" viewBox="0 0 24 24"><path v-for="d in p.icon" :key="d" :d="d" /></svg></span>
             <div class="copy"><h4>{{ p.label }}</h4><p>{{ descriptions[p.to] ?? p.description }}</p></div>
-            <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+            <svg class="line-icon arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
           </RouterLink>
         </div>
       </section>
       <a v-if="canAdmin" :href="adminUrl" target="_blank" rel="noopener noreferrer" class="card admin-shortcut" aria-label="Open Ember Admin">
-        <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 3 7v5c0 5 5 8 9 10 4-2 9-5 9-10V7zM8 12l3 3 5-6" /></svg></span>
+        <span class="icon" aria-hidden="true"><svg class="line-icon" viewBox="0 0 24 24"><path d="M12 3 3 7v5c0 5 5 8 9 10 4-2 9-5 9-10V7zM8 12l3 3 5-6" /></svg></span>
         <div class="copy"><h4>Ember Admin</h4><p>Manage your workspace, access, capabilities, and extensions.</p></div>
-        <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v7H3V3h7" /></svg>
+        <svg class="line-icon arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v7H3V3h7" /></svg>
       </a>
-      <footer class="footer"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z" /><path d="m8 12 3 3 5-6" /></svg>Your access determines what appears here.</span><span>ember · Your AI workspace</span></footer>
+      <footer class="footer"><span><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z" /><path d="m8 12 3 3 5-6" /></svg>Your access determines what appears here.</span><span>ember · Your AI workspace</span></footer>
     </div>
   </PageLayout>
 </template>
 
 <style scoped>
 a { color: inherit; text-decoration: none; }
-svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+svg { width: 24px; height: 24px; flex-shrink: 0; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 

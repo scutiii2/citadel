@@ -105,12 +105,12 @@ useOutsideClose(root, open, () => { open.value = false; }, "click");
       :title="forced ? 'Your administrator requires approval before every tool' : 'Choose when the agent asks before running a tool'"
       @click="open ? closeMenu(false) : openMenu()"
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="line-icon icon">
         <path d="M12 3 5 6v5c0 4.5 3 8.2 7 10 4-1.8 7-5.5 7-10V6l-7-3Z" />
         <path v-if="shown() !== 'allow_all'" d="m9 12 2 2 4-4" />
       </svg>
       <span class="label">{{ approvalLabel(shown()) }}</span>
-      <svg viewBox="0 0 24 24" aria-hidden="true" class="lock-icon"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="line-icon lock-icon"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
     </button>
 
     <div v-if="open" :id="menuId" class="menu" role="menu" aria-label="Tool approval" @keydown="onMenuKey">
@@ -129,7 +129,7 @@ useOutsideClose(root, open, () => { open.value = false; }, "click");
         <span class="head">
           <span class="name">{{ m.label }}</span>
           <span v-if="m.id === shown()" class="check" aria-hidden="true">✓</span>
-          <svg v-else-if="locked(m.id)" viewBox="0 0 24 24" aria-hidden="true" class="lock-icon check"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+          <svg v-else-if="locked(m.id)" viewBox="0 0 24 24" aria-hidden="true" class="line-icon lock-icon check"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
           <kbd aria-hidden="true">{{ i + 1 }}</kbd>
         </span>
         <span class="desc">{{ m.description }}</span>
@@ -175,20 +175,12 @@ useOutsideClose(root, open, () => { open.value = false; }, "click");
 .icon {
   width: 14px;
   height: 14px;
-  fill: none;
-  stroke: currentColor;
   stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .lock-icon {
   width: 12px;
   height: 12px;
-  fill: none;
-  stroke: currentColor;
   stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .menu {
   position: absolute;

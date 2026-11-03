@@ -366,7 +366,7 @@ onMounted(() => {
     <template #toolbar>
       <div class="top">
         <label class="search-box">
-          <svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true"><path :d="SEARCH_ICON" /></svg>
+          <svg class="line-icon search-icon" viewBox="0 0 16 16" aria-hidden="true"><path :d="SEARCH_ICON" /></svg>
           <input
             v-model="query"
             class="search"
@@ -399,7 +399,7 @@ onMounted(() => {
       <section v-for="g in groups" :key="g.id" class="group" :aria-label="g.title"><fieldset :disabled="saving" class="settings-controls">
         <div class="group-head">
           <span class="group-icon" aria-hidden="true">
-            <svg viewBox="0 0 16 16"><path :d="g.icon" /></svg>
+            <svg class="line-icon" viewBox="0 0 16 16"><path :d="g.icon" /></svg>
           </span>
           <h3>{{ g.title }}</h3>
           <span v-if="g.scope" class="scope" :title="'note' in g ? g.note : SCOPE_NOTE">{{ g.scope }}</span>
@@ -623,11 +623,7 @@ onMounted(() => {
 }
 .search-icon,
 .group-icon svg {
-  fill: none;
-  stroke: currentColor;
   stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .search-icon {
   position: absolute;

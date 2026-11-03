@@ -97,7 +97,7 @@ Shared `api/`, `stores/`, `composables/`, `utils/`, and reusable components must
 not import from `features/`, including type-only imports and re-exports. Put
 contracts used by both layers in `api/contracts/`. The router, bootstrap code,
 and `components/layout/` compose the application and may import features.
-`architecture.test.ts` enforces this rule as part of `npm test`.
+`architecture.test.ts` enforces this rule as part of `pnpm test`.
 
 Chat transcript exports live in `features/chat/utils/chatExport.ts`; reusable
 text downloads and filename handling live in `utils/browser/textDownload.ts`.
@@ -115,7 +115,7 @@ Ember Admin imports `components/layout/PwaStatus.vue` and
 when moving either file. Other shared components have copies in Admin; keep
 behavior and design fixes consistent between the apps.
 
-Run `npm run build`, `npm test`, and `npm run test:e2e` from `ember_web` after
+Run `pnpm run build`, `pnpm test`, and `pnpm run test:e2e` from `ember_web` after
 restructuring. Check Admin too when changing its shared imports.
 
 The Laya strategy is no longer a per-account setting: it comes from

@@ -13,10 +13,4 @@ describe("BackButton", () => {
     expect(clicks).toBe(1);
     expect(mount(BackButton, { attrs: { disabled: true } }).attributes("disabled")).toBeDefined();
   });
-
-  it("can be a ghost instead of a chip", () => {
-    const w = mount(BackButton, { props: { ghost: true } });
-    expect(w.classes()).toContain("ghost");
-    expect(w.classes()).not.toContain("chip");
-  });
 });

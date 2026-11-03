@@ -427,14 +427,14 @@ watch(
         :title="folders.length >= MAX_FOLDERS ? `${MAX_FOLDERS} folders is the limit` : 'New folder'"
         @click="emit('newFolder')"
       >
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+        <svg class="line-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
           <path d="M2 4h4l1.5 1.5H14V12H2zM8 7.5v3M6.5 9h3" />
         </svg>
       </button>
     </div>
 
     <div v-if="conversations.length > 0 || query" class="search">
-      <svg class="search-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <svg class="line-icon search-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
         <path d="M7 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10M11 11l3.5 3.5" />
       </svg>
       <input
@@ -624,10 +624,7 @@ watch(
   padding: 0;
 }
 .new-folder svg {
-  fill: none;
   stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .new-chat:hover:not(:disabled),
 .new-folder:hover:not(:disabled) {
@@ -654,11 +651,8 @@ watch(
   top: 50%;
   left: 10px;
   transform: translateY(-50%);
-  fill: none;
   stroke: var(--muted);
   stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
   pointer-events: none;
 }
 .search input {

@@ -1,6 +1,6 @@
 # ember_web smoke test against the real ember_api
 
-The unit and e2e tests (`npm test`, `npm run test:e2e`) answer every `/api` call
+The unit and e2e tests (`pnpm test`, `pnpm run test:e2e`) answer every `/api` call
 with a fake. This checklist is what they cannot prove: the same screens working
 against the real ember_api, with real saves, real deletes and the real
 permissions. Run it by hand after a change to the Settings page, the Danger zone,
@@ -12,7 +12,7 @@ Use a throwaway setup, not your own account. Several steps delete things.
 
 1. Start the stack, one by one:
    `mcp_server`, `ai_agent`, `ember_api` (port 8030) and `ember_web`
-   (`npm run dev`, port 5173). Open `http://127.0.0.1:5173`.
+   (`pnpm run dev`, port 5173). Open `http://127.0.0.1:5173`.
 2. Log in as the bootstrap admin. If `BOOTSTRAP_ADMIN_PASSWORD` is empty, the
    random password was printed in ember_api's console on its first start.
 3. Make two throwaway members. For each: Admin > Invites > create an invite

@@ -8,23 +8,17 @@ import { useBucketCursor, type ChartPart } from "./useBucketCursor";
  * a point with no neighbour is drawn as a dot. Hover, or the arrow keys once it
  * has focus, reads one bucket for every line; the table twin shows the same
  * numbers. Buckets are UTC. Share the frame and reading controls with ActivityChart. */
-const props = withDefaults(
-  defineProps<{
-    series: { bucket: string; values: Partial<Record<string, number | null>> }[];
-    lines: ChartPart[];
-    bucket: BucketSize;
-    /** What the values are ("Response time"): names the chart for screen readers and the table. */
-    label: string;
-    /** How a value is written on the axis, in the tooltip and in the table. */
-    format?: (value: number) => string;
-    emptyText?: string;
-    /** Refetching: keep the last render, dimmed. */
-    loading?: boolean;
-    /** Add a faint area under each line without changing its values. */
-    fill?: boolean;
-  }>(),
-  { format: formatCount, emptyText: "Nothing in this range." },
-);
+const props = defineProps<{
+  series: { bucket: string; values: Partial<Record<string, number | null>> }[];
+  lines: ChartPart[];
+  bucket: BucketSize;
+  /** What the values are ("Response time"): names the chart for screen readers and the table. */
+  label: string;
+  /** Refetching: keep the last render, dimmed. */
+  loading?: boolean;
+  /** Add a faint area under each line without changing its values. */
+  fill?: boolean;
+}>();
 
 const plot = useTemplateRef<HTMLElement>("plot");
 const { active, labelEvery, tooltipStyle, select, onKey } = useBucketCursor(plot, () => props.series.length);
@@ -76,7 +70,7 @@ const reading = computed(() =>
         return value === null ? [] : [{ line, x: xShare(active.value!), value }];
       }),
 );
-const shown = (value: number | null) => (value === null ? "–" : props.format(value));
+const shown = (value: number | null) => (value === null ? "–" : formatCount(value));
 </script>
 
 <template>
@@ -92,7 +86,7 @@ const shown = (value: number | null) => (value === null ? "–" : props.format(v
 
     <div v-if="!asTable" class="frame">
       <div class="yaxis" aria-hidden="true">
-        <span v-for="t in ticks" :key="t" class="ytick" :style="{ bottom: `${(t / top) * 100}%` }">{{ format(t) }}</span>
+        <span v-for="t in ticks" :key="t" class="ytick" :style="{ bottom: `${(t / top) * 100}%` }">{{ formatCount(t) }}</span>
       </div>
       <div class="area">
         <div class="gridlines" aria-hidden="true">
@@ -141,7 +135,7 @@ const shown = (value: number | null) => (value === null ? "–" : props.format(v
             :style="{ left: `${point.x}%`, bottom: `${yShare(point.value)}%`, background: point.line.color }"
           />
         </div>
-        <p v-if="empty" class="none">{{ emptyText }}</p>
+        <p v-if="empty" class="none">Nothing in this range.</p>
         <div v-if="active !== null && series[active]" class="tooltip" role="status" :style="tooltipStyle">
           <strong class="when">{{ bucketTitle(series[active]!.bucket, bucket) }}</strong>
           <span v-for="line in lines" :key="line.id" class="line">

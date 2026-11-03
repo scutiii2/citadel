@@ -47,8 +47,8 @@ function label(fileId: string, page: number): string {
       >
         <PageThumb :item="item" :kind="infoById.get(item.fileId)?.kind ?? 'pdf'" :label="label(item.fileId, item.page)" />
         <div class="page-moves">
-          <button type="button" :aria-label="`Move ${label(item.fileId, item.page)} earlier`" :disabled="index === 0" @click="plan.movePage(index, index - 1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg></button>
-          <button type="button" :aria-label="`Move ${label(item.fileId, item.page)} later`" :disabled="index === plan.pages.length - 1" @click="plan.movePage(index, index + 1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6" /></svg></button>
+          <button type="button" :aria-label="`Move ${label(item.fileId, item.page)} earlier`" :disabled="index === 0" @click="plan.movePage(index, index - 1)"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg></button>
+          <button type="button" :aria-label="`Move ${label(item.fileId, item.page)} later`" :disabled="index === plan.pages.length - 1" @click="plan.movePage(index, index + 1)"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6" /></svg></button>
         </div>
       </li>
     </ol>

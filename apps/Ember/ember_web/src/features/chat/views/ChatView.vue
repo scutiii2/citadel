@@ -356,7 +356,7 @@ useChatShortcuts({
         <div class="sheet-heading">
           <h2>Conversations</h2>
           <button ref="closeHistoryButton" type="button" aria-label="Close conversations" @click="drawerOpen = false">
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg>
+            <svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg>
           </button>
         </div>
       </template>
@@ -371,7 +371,7 @@ useChatShortcuts({
       :aria-expanded="!sidebarCollapsed"
       @click="toggleSidebar"
     >
-      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+      <svg class="line-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
         <path :d="sidebarCollapsed ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'" />
       </svg>
     </button>
@@ -385,7 +385,7 @@ useChatShortcuts({
       </button>
       <span class="mobile-brand"><EmberLogo /> <strong>ember</strong></span>
       <button type="button" class="new-mobile-chat" aria-label="New chat" title="New chat" @click="onNew">
-        <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M12 5H5v14h14v-7M14 4l6 6M10 14l2-6 6-6 4 4-6 6z" /></svg>
+        <svg class="line-icon" viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M12 5H5v14h14v-7M14 4l6 6M10 14l2-6 6-6 4 4-6 6z" /></svg>
       </button>
       </div>
       <ChatHeader
@@ -617,11 +617,7 @@ useChatShortcuts({
   left: 0;
 }
 .collapse svg {
-  fill: none;
-  stroke: currentColor;
   stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 @media (min-width: 768px) {
   .sidebar {
@@ -727,13 +723,6 @@ useChatShortcuts({
   .mobile-header button:focus-visible, .sheet-heading button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
-  }
-  .new-mobile-chat svg, .sheet-heading svg {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
   .backdrop {
     display: block;

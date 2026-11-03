@@ -200,7 +200,6 @@ async function saveEdit(): Promise<void> {
 .row-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 500; line-height: 1.6; overflow-wrap: anywhere; }
 .row-description { color: var(--muted); line-height: 1.6; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .row-meta { color: var(--muted); font-size: .85em; }
-.list-help { color: var(--muted); font-size: .7em; margin: 14px 10px 0; padding-top: 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
 .editor-context { font-size: .8em; color: var(--muted); margin-right: auto; }
 .writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; padding: 30px 36px 20px; }
 .title-field, .document-field, .tools-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }

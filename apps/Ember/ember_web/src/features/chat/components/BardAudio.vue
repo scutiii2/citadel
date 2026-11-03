@@ -68,7 +68,7 @@ function onDuration(): void {
       <span class="clock">{{ clock(current) }} / {{ clock(total) }}</span>
     </div>
     <a v-if="auth.hasPermission('files.download')" class="save-audio" :href="url" download="bard.mp3">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M5 7l3 3 3-3M3 13h10" /></svg>
+      <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M5 7l3 3 3-3M3 13h10" /></svg>
       Download MP3
     </a>
     <audio
@@ -177,11 +177,8 @@ function onDuration(): void {
 .save-audio svg {
   width: 14px;
   height: 14px;
-  fill: none;
   stroke: var(--accent);
   stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .save-audio:hover {
   border-color: var(--accent);

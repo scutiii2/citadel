@@ -295,8 +295,8 @@ async function reopenTicket(): Promise<void> {
             <ListRow class="ticket-row" :class="{ unread: t.has_unread }" :active="current?.id === t.id && detailOpen" :disabled="replying || closing" @click="open(t)">
               <span class="row-top"><span>#{{ t.id }}</span><span class="badge">{{ TYPE_LABELS[t.type] }}</span></span>
               <span class="title">{{ t.title }}</span>
-              <span v-if="t.has_unread" class="unread-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4zM8 8h8M8 12h5" /></svg>Support replied</span>
-              <span class="status"><svg viewBox="0 0 24 24" aria-hidden="true"><path :d="STATUS_ICONS[t.status]" /></svg>{{ STATUS_LABELS[t.status] }}</span>
+              <span v-if="t.has_unread" class="unread-label"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4zM8 8h8M8 12h5" /></svg>Support replied</span>
+              <span class="status"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path :d="STATUS_ICONS[t.status]" /></svg>{{ STATUS_LABELS[t.status] }}</span>
               <span class="row-time muted">Updated {{ formatUtc(t.updated_at) }}</span>
             </ListRow>
           </li>
@@ -307,7 +307,7 @@ async function reopenTicket(): Promise<void> {
       <section v-if="detailOpen" class="ticket-thread" role="region" :aria-label="current ? `Ticket #${current.id}` : route.params.id ? `Ticket #${route.params.id}` : 'Ticket'">
         <header class="detail-head">
           <span>{{ current ? `#${current.id}` : route.params.id ? `#${route.params.id}` : 'Ticket' }}<span v-if="current"> · {{ TYPE_LABELS[current.type] }}</span></span>
-          <span v-if="current" class="status"><svg viewBox="0 0 24 24" aria-hidden="true"><path :d="STATUS_ICONS[current.status]" /></svg>{{ STATUS_LABELS[current.status] }}</span>
+          <span v-if="current" class="status"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path :d="STATUS_ICONS[current.status]" /></svg>{{ STATUS_LABELS[current.status] }}</span>
           <button type="button" class="close" aria-label="Close" title="Back to all tickets" @click="dismiss">×</button>
         </header>
         <p v-if="detailError" class="detail-error error" role="alert">{{ detailError }}</p>
@@ -340,7 +340,7 @@ async function reopenTicket(): Promise<void> {
           </div>
         </form>
       </section>
-      <div v-else class="placeholder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v5a2 2 0 0 0 0 4v5H3v-5a2 2 0 0 0 0-4zM15 5v3m0 3v2m0 3v3" /></svg><h3>Your support conversation</h3><p>Choose a ticket to read replies, or start a new report.</p></div>
+      <div v-else class="placeholder"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v5a2 2 0 0 0 0 4v5H3v-5a2 2 0 0 0 0-4zM15 5v3m0 3v2m0 3v3" /></svg><h3>Your support conversation</h3><p>Choose a ticket to read replies, or start a new report.</p></div>
     </WorkspaceLayout>
 
     <BaseModal class="new-ticket-modal" :open="newOpen" title="New ticket" @close="newOpen = false">
@@ -385,7 +385,7 @@ async function reopenTicket(): Promise<void> {
 .unread-label { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: .75em; font-weight: 500; }
 .status { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .75em; }
 .row-time { font-size: .7em; overflow-wrap: anywhere; }
-svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+svg { width: 18px; height: 18px; flex-shrink: 0; }
 .status svg, .unread-label svg { width: 14px; height: 14px; }
 .list-footer { margin: auto 10px 0; padding-top: 24px; font-size: .75em; line-height: 1.8; }
 .ticket-thread { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }

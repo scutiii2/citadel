@@ -166,8 +166,8 @@ onMounted(async () => {
             <ul v-else-if="entries.length" class="file-list" aria-label="Brain documents">
               <li v-for="entry in entries" :key="entry.path">
                 <ListRow class="file-row" :active="entry.path === document?.path" :disabled="busy" :aria-label="entry.path" :data-path="entry.path" @click="run(entry.kind === 'folder' ? 'list' : 'read', entry.path)">
-                  <svg v-if="entry.kind === 'folder'" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h6l2 3h10v12H3z" /></svg>
-                  <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>
+                  <svg class="line-icon" v-if="entry.kind === 'folder'" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h6l2 3h10v12H3z" /></svg>
+                  <svg class="line-icon" v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>
                   <span class="file-copy"><strong>{{ fileName(entry.path) }}</strong><small>{{ entry.kind === 'folder' ? 'Folder' : 'Document' }}</small></span>
                   <span v-if="entry.kind === 'folder'" class="folder-arrow" aria-hidden="true">›</span>
                 </ListRow>
@@ -189,7 +189,7 @@ onMounted(async () => {
           </details>
           <div class="browser-footer">
             <span class="connection-status" role="status">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7v.2" /></svg>
+              <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7v.2" /></svg>
               <template v-if="connectionStatus">Connection: {{ connectionStatus.status?.replaceAll('_', ' ') ?? 'unknown' }} · Index: {{ connectionStatus.index_status?.replaceAll('_', ' ') ?? 'not checked' }}</template>
               <template v-else>{{ scope === 'both' ? 'Search across shared and personal knowledge' : 'Connection not checked' }}</template>
             </span>
@@ -214,7 +214,7 @@ onMounted(async () => {
   </PageLayout>
 </template>
 <style scoped>
-svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+svg { width: 18px; height: 18px; flex-shrink: 0; }
 .brain-workspace { --workspace-columns: 360px minmax(0, 1fr); }
 .browser { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 20px 12px; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 50%, var(--bg)); }
 .scope-line { margin-bottom: 12px; flex-shrink: 0; }

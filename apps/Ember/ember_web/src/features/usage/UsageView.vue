@@ -293,7 +293,7 @@ onMounted(() => {
                   :aria-label="`${t.lead} and ${t.rows.length - 1} more calls for one response`"
                   @click="toggleTurn(t.id)"
                 >
-                  <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m6 3 5 5-5 5" /></svg>
+                  <svg class="line-icon chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m6 3 5 5-5 5" /></svg>
                   <span class="turn-main">
                     <span class="call-agent">{{ t.lead }}</span>
                     <span class="call-chip">{{ t.rows.length }} calls</span>
@@ -502,11 +502,7 @@ th {
 }
 .chevron {
   flex: none;
-  fill: none;
   stroke: var(--muted);
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
   transition: transform 0.15s ease;
 }
 .turn-head[aria-expanded='true'] .chevron {

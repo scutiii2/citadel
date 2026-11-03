@@ -1,0 +1,9 @@
+/* Styles shared by the Notes and Memory editor pages (imported by each as a scoped style). */
+.context-label { display: inline-flex; align-items: center; gap: 7px; font-size: .8em; color: var(--muted); }
+.context-label svg { width: 15px; height: 15px; }
+.writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; min-height: 310px; padding: 30px 36px 20px; }
+summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 0; font-size: .85em; cursor: pointer; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+@media (min-width: 1200px) { .writing { padding-inline: max(36px, calc((100% - 760px) / 2)); } }
+@media (max-width: 900px) and (min-width: 768px) { .writing { padding-inline: 22px; } }
+@media (max-width: 767px) { .writing { min-height: 310px; padding: 24px 20px 18px; } }
