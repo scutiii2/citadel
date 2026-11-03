@@ -1,6 +1,8 @@
 import { onScopeDispose, ref, type Ref } from "vue";
 import { bardClient, type SpeechClip } from "../../../api/files/BardClient";
 
+// Speech is heard slightly after the audio clock reports it, so run the highlight a little ahead.
+const LEAD_S = 0.15;
 let stopActive: (() => void) | undefined;
 type Prepared = { clip: SpeechClip; error?: never } | { error: unknown; clip?: never };
 
@@ -77,7 +79,7 @@ export function useReadAloud(
         const el = audio.value;
         let frame = 0;
         const track = () => {
-          if (el.duration > 0) position.value = { batch: index, fraction: Math.min(1, el.currentTime / el.duration) };
+          if (el.duration > 0) position.value = { batch: index, fraction: Math.min(1, (el.currentTime + LEAD_S) / el.duration) };
           frame = requestAnimationFrame(track);
         };
         try {

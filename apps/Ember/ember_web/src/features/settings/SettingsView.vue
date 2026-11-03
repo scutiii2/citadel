@@ -24,6 +24,8 @@ import ToggleSwitch from "../../components/ui/forms/ToggleSwitch.vue";
 import { requestCompletionPermission } from "../chat/composables/useCompletionNotify";
 import { DEFAULT_THEME, useTheme, type Theme } from "../../composables/useTheme";
 import { useAuthStore } from "../../stores/auth";
+import { bardClient } from "../../api/files/BardClient";
+import { useReadAloudVoice } from "../chat/composables/useReadAloudVoice";
 import { useChatStore } from "../chat/stores/chat";
 import { useNavPrefsStore } from "../../stores/navigation/navPrefs";
 import { isDefault } from "../../utils/navigation/navArrangement";
@@ -110,6 +112,13 @@ const DEFS: SettingDef[] = [
     keywords: ["approval", "allow", "permission", "ask", "auto", "allow all", "read-only", "tools"],
   },
   {
+    id: "chat-read-aloud-voice",
+    group: "chat",
+    label: "Read aloud voice",
+    description: "The voice used when you read a message aloud. Ask every time shows the list of voices instead.",
+    keywords: ["speech", "tts", "bard", "speak", "listen", "voice"],
+  },
+  {
     id: "chat-chime",
     group: "chat",
     label: "Chime when done",
@@ -183,6 +192,11 @@ const chat = useChatStore();
 const { theme, setTheme } = useTheme();
 const navPrefs = useNavPrefsStore();
 
+const { voice: readAloudVoice } = useReadAloudVoice();
+const voices = ref<string[]>([]);
+const canReadAloud = computed(() => auth.hasPermission("tools.execute") && auth.hasPermission("files.download"));
+const voiceOptions = computed(() => [...new Set([readAloudVoice.value, ...voices.value].filter(Boolean))]);
+
 const limitsState = ref(emptyLimitsState());
 const responseDirty = computed(() => limitsDirty(limitsState.value));
 const responseSaving = computed(() => limitsState.value.pending && limitsState.value.stored !== null);
@@ -190,7 +204,7 @@ const query = ref("");
 const onlyModified = ref(false);
 const root = useTemplateRef<HTMLElement>("root");
 
-const available = computed(() => DEFS);
+const available = computed(() => DEFS.filter((d) => d.id !== "chat-read-aloud-voice" || canReadAloud.value));
 const shown = computed(
   () =>
     new Set(
@@ -330,6 +344,7 @@ const modified = computed(() => ({
   "chat-plan": draft.value.plan !== true,
   "chat-plan-lean": draft.value.planLean !== true,
   "chat-ask-tools": draft.value.approvalMode !== DEFAULT_APPROVAL_MODE,
+  "chat-read-aloud-voice": readAloudVoice.value !== "",
   "chat-chime": draft.value.chime !== true,
   "chat-notifications": draft.value.browserNotifications === true,
   "chat-suggestions": !draft.value.suggestions,
@@ -358,6 +373,7 @@ function jumpToFirst(): void {
 onMounted(() => {
   // Whether an administrator forces tool approval decides if "Ask before tools" can change.
   void chat.refreshSettings();
+  if (canReadAloud.value) bardClient.voices().then((r) => { voices.value = r.voices; }, () => { /* the saved voice still lists */ });
 });
 </script>
 
@@ -466,6 +482,19 @@ onMounted(() => {
             @reset="draft.approvalMode = DEFAULT_APPROVAL_MODE"
           >
             <SegmentedControl v-model="approvalChoice" :options="APPROVAL_OPTIONS" aria-label="Ask before tools" />
+          </SettingRow>
+          <SettingRow
+            v-if="shown.has('chat-read-aloud-voice')"
+            setting-id="chat-read-aloud-voice"
+            label="Read aloud voice"
+            description="The voice used when you read a message aloud. Ask every time shows the list of voices instead."
+            :modified="modified['chat-read-aloud-voice']"
+            @reset="readAloudVoice = ''"
+          >
+            <select v-model="readAloudVoice" class="voice-select" aria-label="Read aloud voice">
+              <option value="">Ask every time</option>
+              <option v-for="name in voiceOptions" :key="name" :value="name">{{ name }}</option>
+            </select>
           </SettingRow>
           <SettingRow
             v-if="shown.has('chat-chime')"
@@ -592,6 +621,8 @@ onMounted(() => {
 
 <style scoped>
 
+.voice-select { max-width: 220px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); background: var(--bg); font: inherit; }
+.voice-select:focus { outline: none; border-color: var(--accent); }
 .settings-controls:disabled { pointer-events: none; }
 .settings-controls { padding: 0; margin: 0; min-width: 0; border: none; }
 .settings-view.dirty .column { padding-bottom: 110px; }

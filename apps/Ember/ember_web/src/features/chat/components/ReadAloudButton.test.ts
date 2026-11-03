@@ -63,3 +63,13 @@ it("ignores late voice lists after scope changes", async () => {
   expect(wrapper.get("button").attributes("aria-busy")).toBe("false");
   wrapper.unmount();
 });
+
+it("skips the voice menu when a voice is saved in settings", async () => {
+  localStorage.setItem("ember_web.readAloudVoice.1", "v1");
+  const wrapper = mount(ReadAloudButton, { props: { text: "Hello world." }, attachTo: document.body });
+  await wrapper.get("button").trigger("click"); await flushPromises();
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+  expect(bardClient.speak).toHaveBeenCalledWith("Hello world.", "v1", expect.any(AbortSignal));
+  localStorage.clear();
+  wrapper.unmount();
+});
