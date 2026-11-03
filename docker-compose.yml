@@ -26,6 +26,8 @@ services:
     volumes:
       # Writable: the Extensions page in ember_admin saves added extensions into this tracked file.
       - ./docker/configs/armory/extensions.json:/app/configs/config_extensions.json
+      # Writable: the Capabilities page in ember_admin saves its on/off toggles into this tracked file.
+      - ./docker/configs/armory/capabilities.json:/app/configs/config_capabilities.json
       - armory_data:/app/.data
       # server_manager (Docker apps list/start/stop/logs) talks to the host daemon.
       - /var/run/docker.sock:/var/run/docker.sock
