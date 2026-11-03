@@ -260,9 +260,8 @@ In Docker: `dev_deploy.bat` in this folder rebuilds and restarts the `ember_api`
 Manually:
 
 ```bash
-py -m venv .venv_ember_api
-.venv_ember_api\Scripts\pip install -e ".[dev]"
-.venv_ember_api\Scripts\python -m src.run
+uv sync
+uv run python -m src.run
 ```
 
 On first start, a missing `configs/config_app.json` is copied from its
@@ -275,7 +274,7 @@ console once - save it.
 Tests:
 
 ```bash
-.venv_ember_api\Scripts\python -m pytest
+uv run pytest
 ```
 
 ## Moving from chat_app
@@ -285,9 +284,9 @@ activity log and known devices into ember_api, so chat_app can be retired. Run i
 ember_api stopped:
 
 ```bash
-.venv_ember_api\Scripts\python -m scripts.import_chat_app --chat-app ..\chat_app
-.venv_ember_api\Scripts\python -m scripts.import_chat_app --chat-app ..\chat_app --apply
-.venv_ember_api\Scripts\python -m scripts.import_chat_app --chat-app ..\chat_app --apply --agent-map anthropic=claude-agent
+uv run python -m scripts.import_chat_app --chat-app ..\chat_app
+uv run python -m scripts.import_chat_app --chat-app ..\chat_app --apply
+uv run python -m scripts.import_chat_app --chat-app ..\chat_app --apply --agent-map anthropic=claude-agent
 ```
 
 The first command is a dry run: it prints what would happen and writes nothing.

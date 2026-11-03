@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM python:3.12-slim
-ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /usr/local/bin/uv
+ENV PYTHONUNBUFFERED=1 UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/opt/venv PATH="/opt/venv/bin:$PATH"
 WORKDIR /app
 
 # Video/audio downloads use FFmpeg and FFprobe for local post-processing.
@@ -8,11 +9,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Dependencies first so source edits do not reinstall them: install the
-# project from a stub package, then drop the stub (the real src/ is copied
-# below and wins on sys.path because the app runs from /app).
-COPY pyproject.toml ./
-RUN mkdir src && touch src/__init__.py     && pip install .     && pip uninstall -y mcp_server     && rm -rf src build
+# Dependencies first so source edits do not reinstall them. Only the locked
+# dependencies go into /opt/venv; the app runs from the /app source below.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
 EXPOSE 8010

@@ -177,11 +177,11 @@ preference), `src/components/` (reusable pieces only), `src/router/`,
    enums - declare fields explicitly.
 7. **Markdown/HTML from the server or a model** only via
    `components/MarkdownContent.vue` (DOMPurify-sanitized) - never raw `v-html`.
-8. Verify from `apps/Ember/ember_web/`: `npx vue-tsc -b --noEmit` (must print
-   nothing) and `npx vite build`, then delete `dist/`. Tests sit beside the source
-   (`*.test.ts`, Vitest + jsdom, ember_api mocked): `npm test`. If a page now
+8. Verify from `apps/Ember/ember_web/`: `pnpm exec vue-tsc -b --noEmit` (must print
+   nothing) and `pnpm exec vite build`, then delete `dist/`. Tests sit beside the source
+   (`*.test.ts`, Vitest + jsdom, ember_api mocked): `pnpm test`. If a page now
    calls a new `/api` route, add it to `e2e/fakeApi.ts` - the Playwright test
-   (`npm run test:e2e`) fails on any call the fake does not know.
+   (`pnpm run test:e2e`) fails on any call the fake does not know.
 
 ## 4. Reaching ai_agent / mcp_server
 

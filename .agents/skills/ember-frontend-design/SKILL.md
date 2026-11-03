@@ -127,7 +127,7 @@ Distilled from `Brain/Maps/UI UX Frontend Rulesets.md` (consult it for rationale
 
 1. Use the approved design and scope already in the conversation. Implement an approved mockup when asked to proceed. When the layout is undecided, propose a concrete design with the files, reused components, and any dependencies before implementation.
 2. Implement with existing components; copy shared-component changes to both apps.
-3. Check: `npx vue-tsc -b`, `npm test` (includes `radiusScale.test.ts`), `npm run test:e2e` in the touched app. Web e2e uses `e2e/fakeApi.ts`; click a switch's label, not its hidden checkbox.
+3. Check: `pnpm exec vue-tsc -b`, `pnpm test` (includes `radiusScale.test.ts`), `pnpm run test:e2e` in the touched app. Web e2e uses `e2e/fakeApi.ts`; click a switch's label, not its hidden checkbox.
 4. Do not spawn browser-verification agents; the user tests manually. If a visual check is needed, use a throwaway Vite config with a fake `/api` and clear `localStorage` first (theme persists per origin).
 5. Test widths: desktop, 768, 375, light and dark.
 
@@ -147,4 +147,4 @@ Distilled from `Brain/Maps/UI UX Frontend Rulesets.md` (consult it for rationale
 - [ ] Form asks only what is needed; errors beside fields, values kept
 - [ ] Links vs buttons vs tabs semantics correct; popovers not trapped as modals
 - [ ] Decoration non-blocking with a readable fallback; auto-moving content has pause/stop
-- [ ] `vue-tsc`, `npm test` pass
+- [ ] `vue-tsc`, `pnpm test` pass

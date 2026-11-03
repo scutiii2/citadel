@@ -37,9 +37,9 @@ dependencies = [
     "tzdata>=2024.1",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 # httpx2: what starlette.testclient wants now (plain httpx is deprecated there).
-dev = ["pytest>=8.0", "httpx2"]
+dev =["pytest>=8.0", "httpx2"]
 
 [tool.setuptools.packages.find]
 include = ["src*"]

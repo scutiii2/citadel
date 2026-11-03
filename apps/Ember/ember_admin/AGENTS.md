@@ -8,4 +8,4 @@ Vue 3 + TypeScript admin app for ember. It talks only to `ember_api` through the
 - Admin and Analytics are owned by ember_admin; ember_web no longer has copies of these pages. The Usage line chart remains shared in style and behavior, with a copy in ember_web.
 - Radius only through the `--radius-*` tokens, colors only through `style.css` tokens. `radiusScale.test.ts` enforces it.
 - A switch that calls the server stays pending until the server answers; never show a state it did not confirm.
-- Checks: `npx vue-tsc -b`, `npm test`, `npm run test:e2e`.
+- Checks: `pnpm exec vue-tsc -b`, `pnpm test`, `pnpm run test:e2e`.

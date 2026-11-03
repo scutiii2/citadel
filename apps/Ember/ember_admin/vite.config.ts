@@ -63,7 +63,7 @@ export default defineConfig({
     // a prefers-color-scheme query, which the toggle can't override.
     cssTarget: ['chrome123', 'firefox120', 'safari17.5'],
   },
-  // `npm test`: unit tests sit beside their source as *.test.ts. jsdom gives
+  // `pnpm test`: unit tests sit beside their source as *.test.ts. jsdom gives
   // the stores and components a browser-like document and localStorage.
   test: {
     environment: 'jsdom',
