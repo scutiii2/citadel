@@ -21,7 +21,7 @@ const auth = useAuthStore()
     </div>
     <div class="file-actions">
       <span class="expiry muted">{{ file.expires_at > now ? `Expires in ${formatExpiry(file.expires_at, now)}` : 'Expired' }}</span>
-      <a v-if="file.expires_at > now && auth.hasPermission('files.download')" class="save-file" :href="file.download_url" :aria-label="`Download ${file.name}`" download><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" /></svg>Save file</a>
+      <a v-if="file.expires_at > now && auth.hasPermission('files.download')" class="save-file" :href="file.download_url" :aria-label="`Download ${file.name}`" download><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" /></svg>Save file</a>
       <span v-else class="unavailable muted">{{ file.expires_at > now ? 'Download unavailable' : 'Expired' }}</span>
       <ActionButton icon="more" icon-only :disabled="busy" :aria-busy="busy" :aria-label="`File options for ${file.name}`" :title="`File options for ${file.name}`" @click="$emit('details')">File options</ActionButton>
     </div>
@@ -39,7 +39,7 @@ const auth = useAuthStore()
 .file-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .expiry { margin-right: auto; font-size: .7em; }
 .save-file { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--bg); color: var(--text); font-size: .75em; text-decoration: none; }
-.save-file svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.save-file svg { width: 13px; height: 13px; }
 .save-file:hover { border-color: var(--accent); }
 .save-file:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .unavailable { font-size: .7em; }

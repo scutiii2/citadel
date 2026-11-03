@@ -130,8 +130,8 @@ function onDragStart(event: DragEvent, id: string): void {
         @dragover.prevent="onDragOver(row.page.to)"
         @drop.prevent="onDrop(row.page.to)"
       >
-        <svg class="grip" viewBox="0 0 24 24" aria-hidden="true"><path :d="GRIP_ICON" /></svg>
-        <svg class="page-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <svg class="line-icon grip" viewBox="0 0 24 24" aria-hidden="true"><path :d="GRIP_ICON" /></svg>
+        <svg class="line-icon page-icon" viewBox="0 0 24 24" aria-hidden="true">
           <path v-for="d in row.page.icon" :key="d" :d="d" />
         </svg>
         <span class="name">{{ row.page.label }}</span>
@@ -144,7 +144,7 @@ function onDragStart(event: DragEvent, id: string): void {
             :disabled="!neighbour(i, -1)"
             @click="move(i, -1)"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>
+            <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>
           </button>
           <button
             type="button"
@@ -153,7 +153,7 @@ function onDragStart(event: DragEvent, id: string): void {
             :disabled="!neighbour(i, 1)"
             @click="move(i, 1)"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+            <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
           </button>
           <button
             type="button"
@@ -163,7 +163,7 @@ function onDragStart(event: DragEvent, id: string): void {
             :title="row.pinned ? 'Unpin' : 'Pin to the top'"
             @click="update(setPinned(pages, prefs, row.page.to, !row.pinned))"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="PIN_ICON" /></svg>
+            <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path :d="PIN_ICON" /></svg>
           </button>
           <ToggleSwitch
             small
@@ -220,13 +220,6 @@ function onDragStart(event: DragEvent, id: string): void {
   border: 1px dashed var(--accent);
   border-radius: var(--radius-md);
   background: var(--code-bg);
-}
-svg {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .grip {
   flex: none;

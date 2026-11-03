@@ -223,6 +223,25 @@ button[aria-busy="true"]::before {
   button { min-height: 44px; }
 }
 
+/* A 24px outline icon: no fill, 1.8 round stroke in the current text colour. Size it per use. */
+.line-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The quiet hint under a list-and-editor page's list (Notes, Memory, Skills). */
+.list-help {
+  color: var(--muted);
+  font-size: 0.7em;
+  margin: 14px 10px 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
 /* Error text: shared by every page; a page adds its own spacing or wrapping. */
 .error {
   color: var(--danger);

@@ -2,9 +2,6 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 import LineChart from "./LineChart.vue";
 
-/** 80 ms / 1.2 s / 5 s. */
-const formatDuration = (ms: number): string =>
-  ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1).replace(/\.0$/, "")} s`;
 const lines = [
   { id: "p50", label: "Median", color: "blue" },
   { id: "p95", label: "Slowest 5%", color: "purple" },
@@ -16,16 +13,16 @@ const series = [
 ];
 
 function chart(props: Partial<InstanceType<typeof LineChart>["$props"]> = {}) {
-  return mount(LineChart, { props: { series, lines, bucket: "day", label: "Response time", format: formatDuration, ...props } });
+  return mount(LineChart, { props: { series, lines, bucket: "day", label: "Response time", ...props } });
 }
 
 const points = (wrapper: ReturnType<typeof chart>) => wrapper.findAll("polyline").map((p) => p.attributes("points"));
 
 describe("LineChart", () => {
-  it("scales to a clean axis top and writes the ticks with its formatter", () => {
-    // the slowest value is 250 ms: a clean top whose half is whole too
-    expect(chart().findAll(".ytick").map((t) => t.text())).toEqual(["400 ms", "200 ms", "0 ms"]);
-    expect(chart({ series: [{ bucket: series[0]!.bucket, values: { p50: 1500 } }] }).findAll(".ytick")[0]!.text()).toBe("2 s");
+  it("scales to a clean axis top and writes the ticks as counts", () => {
+    // the slowest value is 250: a clean top whose half is whole too
+    expect(chart().findAll(".ytick").map((t) => t.text())).toEqual(["400", "200", "0"]);
+    expect(chart({ series: [{ bucket: series[0]!.bucket, values: { p50: 1500 } }] }).findAll(".ytick")[0]!.text()).toBe("2,000");
   });
 
   it("leaves a gap at a bucket without a value instead of drawing a zero", () => {
@@ -44,7 +41,7 @@ describe("LineChart", () => {
       ],
     });
 
-    // x is the middle of each of the two buckets; y runs from the top of the 0-100 box (400 ms)
+    // x is the middle of each of the two buckets; y runs from the top of the 0-100 box (400)
     expect(points(wrapper)).toEqual(["25.00,75.00 75.00,50.00", "25.00,50.00 75.00,0.00"]);
     expect(wrapper.findAll("polyline").map((p) => p.attributes("stroke"))).toEqual(["blue", "purple"]);
   });
@@ -55,7 +52,7 @@ describe("LineChart", () => {
 
     await plot.trigger("keydown", { key: "Home" });
     expect(wrapper.find(".tooltip .when").text()).toBe("Sat, Oct 3");
-    expect(wrapper.findAll(".tooltip .line").map((l) => l.text())).toEqual(["50 ms Median", "100 ms Slowest 5%"]);
+    expect(wrapper.findAll(".tooltip .line").map((l) => l.text())).toEqual(["50 Median", "100 Slowest 5%"]);
     expect(wrapper.findAll(".dot.ringed")).toHaveLength(2);
 
     await plot.trigger("keydown", { key: "ArrowRight" });
@@ -73,17 +70,17 @@ describe("LineChart", () => {
 
     expect(wrapper.find(".plot").exists()).toBe(false);
     expect(wrapper.findAll("tbody tr").map((r) => r.findAll("th, td").map((c) => c.text()))).toEqual([
-      ["Sat, Oct 3", "50 ms", "100 ms"],
+      ["Sat, Oct 3", "50", "100"],
       ["Sun, Oct 4", "–", "–"],
-      ["Mon, Oct 5", "100 ms", "250 ms"],
+      ["Mon, Oct 5", "100", "250"],
     ]);
     expect(wrapper.find("caption").text()).toBe("Response time per day, UTC");
   });
 
   it("says so when no bucket has a value, and dims while refetching", () => {
-    const wrapper = chart({ series: [series[1]!], emptyText: "No requests in this range.", loading: true });
+    const wrapper = chart({ series: [series[1]!], loading: true });
 
-    expect(wrapper.find(".none").text()).toBe("No requests in this range.");
+    expect(wrapper.find(".none").text()).toBe("Nothing in this range.");
     expect(wrapper.find(".chart").classes()).toContain("dim");
   });
 

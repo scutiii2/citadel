@@ -138,9 +138,9 @@ const { deleting, removing, removeError, ask: askDelete, confirm: remove } = use
             <footer v-if="matches.length" class="pagination"><p>Showing {{ shown.length }} of {{ matches.length }}</p><button v-if="shown.length < matches.length" type="button" class="chip" @click="visible += 20">Load more</button></footer>
             <p v-if="memories.length >= MEMORY_MAX" class="capacity-note">Memory is full. Delete a memory before adding another.</p>
           </div>
-          <p class="memory-help">One useful fact, preference or instruction per memory.</p>
+          <p class="list-help">One useful fact, preference or instruction per memory.</p>
         </template>
-        <template #head><span class="context-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18V5M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4M17.6 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.6 1.5 4 4 0 0 0-2.8 5.6 4 4 0 0 0 .6 6.9A4 4 0 0 0 12 20a4 4 0 0 0 7.8-1 4 4 0 0 0 .6-6.9 4 4 0 0 0-2.8-5.6" /></svg>Remembered context</span></template>
+        <template #head><span class="context-label"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18V5M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4M17.6 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.6 1.5 4 4 0 0 0-2.8 5.6 4 4 0 0 0 .6 6.9A4 4 0 0 0 12 20a4 4 0 0 0 7.8-1 4 4 0 0 0 .6-6.9 4 4 0 0 0-2.8-5.6" /></svg>Remembered context</span></template>
         <template #editor>
             <div class="writing">
               <label class="body-field" for="memory-text"><span class="memory-label">{{ editing ? 'Memory' : 'New memory' }}</span></label>
@@ -153,7 +153,7 @@ const { deleting, removing, removeError, ask: askDelete, confirm: remove } = use
             <details v-if="editing" :key="editing.id" class="manage-memory"><summary>Manage memory <span aria-hidden="true">›</span></summary><DangerZone class="memory-danger"><template #label><b>Danger zone</b></template><button type="button" class="danger" :aria-label="'Delete memory ' + editing.id" :disabled="saving || removing" @click="askDelete(editing)">Delete memory</button></DangerZone></details>
             <p v-if="formError" class="error form-error" role="alert">{{ formError }}</p>
         </template>
-        <template #placeholder><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4c-5-5-10 2-6 5-6 2-2 9 2 7-1 6 4 6 4 2V4zm0 0c5-5 10 2 6 5 6 2 2 9-2 7 1 6-4 6-4 2" /></svg><h3>Keep the useful context</h3><p>Pick a memory, or add a new one.</p><button type="button" class="chip" :disabled="memories.length >= MEMORY_MAX" @click="openEditor()">Create a memory</button></template>
+        <template #placeholder><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4c-5-5-10 2-6 5-6 2-2 9 2 7-1 6 4 6 4 2V4zm0 0c5-5 10 2 6 5 6 2 2 9-2 7 1 6-4 6-4 2" /></svg><h3>Keep the useful context</h3><p>Pick a memory, or add a new one.</p><button type="button" class="chip" :disabled="memories.length >= MEMORY_MAX" @click="openEditor()">Create a memory</button></template>
       </ListEditorLayout>
     </div>
     <ConfirmModal :open="deleting !== null" title="Delete this memory?" :message="removeError || 'Ember will no longer remember this. This cannot be undone.'" confirm-label="Delete memory" danger :busy="removing" @confirm="remove" @close="!removing && (deleting = null)" />
@@ -161,6 +161,7 @@ const { deleting, removing, removeError, ask: askDelete, confirm: remove } = use
   </PageLayout>
 </template>
 
+<style scoped src="../../components/layout/editorPage.css"></style>
 <style scoped>
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 
@@ -171,12 +172,7 @@ const { deleting, removing, removeError, ask: askDelete, confirm: remove } = use
 .memory-date { color: var(--muted); font-size: .75em; }
 .pagination { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 16px 10px 0; font-size: .75em; color: var(--muted); }
 .pagination p { margin: 0; }
-.memory-help { color: var(--muted); font-size: .7em; margin: 14px 10px 0; padding-top: 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
 .capacity-note { font-size: .8em; color: var(--muted); margin: 16px 10px 0; }
-.context-label { display: inline-flex; align-items: center; gap: 7px; font-size: .8em; color: var(--muted); }
-.context-label svg { width: 15px; height: 15px; }
-.context-label svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; min-height: 310px; padding: 30px 36px 20px; }
 .memory-label { font-size: 1.35em; font-weight: 600; letter-spacing: -.015em; }
 .writing textarea { flex: 1; width: 100%; min-width: 0; min-height: 200px; padding: 0; border: 0; border-radius: 0; color: var(--text); background: transparent; font: inherit; line-height: 1.9; resize: vertical; }
 .memory-created { font-size: .75em; color: var(--muted); margin: 0; }
@@ -184,12 +180,10 @@ const { deleting, removing, removeError, ask: askDelete, confirm: remove } = use
 .memory-danger { margin-bottom: 16px; }
 .memory-count { align-self: flex-end; }
 .manage-memory { border-top: 1px solid var(--border); padding: 0 28px; flex-shrink: 0; }
-summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 0; font-size: .85em; cursor: pointer; list-style: none; }
-summary::-webkit-details-marker { display: none; }
 summary span { color: var(--muted); }
 .form-error { margin: 12px 20px; font-size: .85em; }
-@media (min-width: 1200px) { .writing { padding-inline: max(36px, calc((100% - 760px) / 2)); } }
-@media (max-width: 900px) and (min-width: 768px) { .writing { padding-inline: 22px; } .manage-memory { padding-inline: 20px; } }
+
+@media (max-width: 900px) and (min-width: 768px) { .manage-memory { padding-inline: 20px; } }
 @media (max-width: 767px) {
   .memory :deep(.page-column) { padding: 18px 16px 12px; }
   .memory :deep(.page-head) { flex-direction: row; align-items: center; margin-bottom: 16px; gap: 10px; }
@@ -198,7 +192,6 @@ summary span { color: var(--muted); }
   .memory.memory-open :deep(.page-head) { display: none; }
   .memory :deep(.page-actions button) { min-height: 44px; }
   button.memory-row { min-height: 100px; }
-  .writing { min-height: 310px; padding: 24px 20px 18px; }
   .writing textarea { min-height: 250px; }
   .memory-label { font-size: 1.3em; }
   .manage-memory { padding-inline: 20px; }

@@ -179,7 +179,7 @@ async function changePassword(): Promise<void> {
             <div class="name">{{ account.username }}</div>
             <div class="email">{{ account.email }}</div>
             <span v-if="account.email_verified" class="chip ok">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
+              <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m5 12 4 4L19 6" /></svg
               >Email verified
             </span>
@@ -188,7 +188,7 @@ async function changePassword(): Promise<void> {
         <div class="profile-status">
           <p class="eyebrow">Email status</p>
           <p class="state" :class="{ verified: account.email_verified }">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
+            <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z" />
               <path v-if="account.email_verified" d="m8.5 12 2.5 2.5 4.5-5" />
               <path v-else d="M12 8v5m0 3v.1" />
@@ -211,7 +211,7 @@ async function changePassword(): Promise<void> {
       >
         <header class="section-header">
           <span class="section-icon"
-            ><svg viewBox="0 0 24 24" aria-hidden="true">
+            ><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 6h18M3 12h18M3 18h18" /></svg
           ></span>
           <div>
@@ -222,7 +222,7 @@ async function changePassword(): Promise<void> {
         <ul class="more-list">
           <li v-for="p in morePages" :key="p.to">
             <RouterLink :to="p.to">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
+              <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path v-for="d in p.icon" :key="d" :d="d" />
               </svg>
               <span>{{ p.label }}</span>
@@ -234,7 +234,7 @@ async function changePassword(): Promise<void> {
       <section class="card session" aria-labelledby="account-session">
         <header class="section-header">
           <span class="section-icon"
-            ><svg viewBox="0 0 24 24" aria-hidden="true">
+            ><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"
               /></svg
@@ -278,7 +278,7 @@ async function changePassword(): Promise<void> {
         <section class="card security" aria-labelledby="account-security">
           <header class="section-header">
             <span class="section-icon"
-              ><svg viewBox="0 0 24 24" aria-hidden="true">
+              ><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6zM8.5 12l2.5 2.5 4.5-5"
                 /></svg
@@ -422,7 +422,7 @@ async function changePassword(): Promise<void> {
             </form>
           </div>
           <p class="helper">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
+            <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="9" />
               <path d="M12 11v6m0-10v.1" /></svg
             >Password changes sign out your other devices.
@@ -432,7 +432,7 @@ async function changePassword(): Promise<void> {
         <section class="card access" aria-labelledby="account-access">
           <header class="section-header">
             <span class="section-icon"
-              ><svg viewBox="0 0 24 24" aria-hidden="true">
+              ><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="8" cy="9" r="4" />
                 <path d="m11 12 9 9m-3-3 3-3m-6 0 3-3" /></svg
             ></span>
@@ -460,7 +460,7 @@ async function changePassword(): Promise<void> {
                       ? "permission"
                       : "permissions"
                   }}</span
-                ><svg viewBox="0 0 24 24" aria-hidden="true">
+                ><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="m9 5 7 7-7 7" />
                 </svg>
               </summary>
@@ -485,7 +485,7 @@ async function changePassword(): Promise<void> {
         <header class="section-header device-header">
           <div class="section-heading">
             <span class="section-icon"
-              ><svg viewBox="0 0 24 24" aria-hidden="true">
+              ><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <rect x="3" y="4" width="18" height="12" rx="2" />
                 <path d="M8 20h8M12 16v4" /></svg
             ></span>
@@ -510,7 +510,7 @@ async function changePassword(): Promise<void> {
             :key="d.id"
             :title="d.user_agent || '(no browser name)'"
           >
-            <svg class="device-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <svg class="line-icon device-icon" viewBox="0 0 24 24" aria-hidden="true">
               <rect x="3" y="4" width="18" height="12" rx="2" />
               <path d="M8 20h8M12 16v4" />
             </svg>
@@ -518,7 +518,7 @@ async function changePassword(): Promise<void> {
               <div class="device-name">
                 <strong>{{ d.label }}</strong
                 ><span v-if="d.current" class="chip ok"
-                  ><svg viewBox="0 0 24 24" aria-hidden="true">
+                  ><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="m5 12 4 4L19 6" /></svg
                   >This device</span
                 >
@@ -736,11 +736,6 @@ h3 {
 }
 
 svg {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
   flex: none;
 }
 

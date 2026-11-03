@@ -126,7 +126,7 @@ const logout = useLogout();
           :class="{ chat: t.to === '/', current: isOpenedFromHere(t.to) }"
         >
           <EmberLogo v-if="t.logo" class="tab-logo" />
-          <svg v-else viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+          <svg class="line-icon" v-else viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
             <path v-for="d in t.icon" :key="d" :d="d" />
           </svg>
           <span class="tab-label">{{ t.label }}</span>
@@ -135,7 +135,7 @@ const logout = useLogout();
 
     <nav v-if="chatPage" class="header" aria-label="Chat">
       <RouterLink :to="chatPage.to" :data-label="chatPage.label" :aria-label="chatPage.label" :class="{ current: isOpenedFromHere(chatPage.to) }">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
           <path v-for="d in chatPage.icon" :key="d" :d="d" />
         </svg>
       </RouterLink>
@@ -153,7 +153,7 @@ const logout = useLogout();
           :aria-label="p.to === '/tickets' && ticketUnread ? `${p.label}, ${ticketUnread} unread` : p.label"
           :class="{ current: isOpenedFromHere(p.to) }"
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
             <path v-for="d in p.icon" :key="d" :d="d" />
           </svg>
           <span v-if="p.to === '/tickets' && ticketUnread" class="ticket-count">{{ ticketUnread }}</span>
@@ -261,13 +261,6 @@ nav a.current {
   color: var(--text);
   background: var(--bg);
   box-shadow: inset 2px 0 0 var(--accent);
-}
-svg {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 :focus-visible {
   outline: 2px solid var(--accent);

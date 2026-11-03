@@ -26,7 +26,7 @@ defineProps<{ icon: ActionIcon; quiet?: boolean; iconOnly?: boolean; labelled?: 
 
 <template>
   <button type="button" :class="['action', { quiet, 'icon-only': iconOnly, labelled }]">
-    <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path :d="PATHS[icon]" /></svg>
+    <svg class="line-icon icon" viewBox="0 0 16 16" aria-hidden="true"><path :d="PATHS[icon]" /></svg>
     <span class="label"><slot /></span>
   </button>
 </template>
@@ -63,11 +63,8 @@ defineProps<{ icon: ActionIcon; quiet?: boolean; iconOnly?: boolean; labelled?: 
 .icon {
   width: 14px;
   height: 14px;
-  fill: none;
   stroke: var(--accent);
   stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .quiet .icon {
   stroke: currentColor;

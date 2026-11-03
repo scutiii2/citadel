@@ -28,7 +28,7 @@ const emit = defineEmits<{ reset: [] }>();
         :aria-label="`Reset ${label} to its default`"
         @click="emit('reset')"
       >
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <svg class="line-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
           <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
           <path d="M3 3v5h5" />
         </svg>
@@ -101,11 +101,7 @@ const emit = defineEmits<{ reset: [] }>();
   border-color: var(--accent);
 }
 .reset svg {
-  fill: none;
-  stroke: currentColor;
   stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 @media (pointer: coarse), (max-width: 767px) {
   button.reset { min-width: 44px; min-height: 44px; }

@@ -377,7 +377,7 @@ function preview(note: Note): string {
         </template>
 
         <template #head>
-            <span class="privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3" /></svg>{{ form.agentReadable ? "Agents can read" : "Private note" }}</span>
+            <span class="context-label"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3" /></svg>{{ form.agentReadable ? "Agents can read" : "Private note" }}</span>
         </template>
 
         <template #editor>
@@ -512,7 +512,7 @@ function preview(note: Note): string {
         </template>
 
         <template #placeholder>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>
+          <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6" /></svg>
           <h3>A little room to think</h3><p>Pick a note, or start a new one.</p>
           <button type="button" class="chip" @click="startNew">Create a note</button>
         </template>
@@ -554,12 +554,12 @@ function preview(note: Note): string {
   </PageLayout>
 </template>
 
+<style scoped src="../../components/layout/editorPage.css"></style>
 <style scoped>
 .layout { --workspace-columns: 360px minmax(0, 1fr); }
 .layout :deep(.list-pane) { overflow: hidden; }
 .notes-search { margin-bottom: 12px; flex-shrink: 0; }
 .list-scroll { flex: 1; min-height: 0; }
-.list-help { color: var(--muted); font-size: .7em; margin: 14px 10px 0; padding-top: 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
 .column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 
 .list li { border-bottom: 1px solid var(--border); }
@@ -570,11 +570,7 @@ function preview(note: Note): string {
 .note-row .muted { font-size: .8em; }
 .row-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .agent-mark { border-color: var(--warning); color: var(--warning); }
-.privacy { display: inline-flex; gap: 7px; align-items: center; font-size: .8em; color: var(--muted); }
-.privacy svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.privacy svg { width: 15px; height: 15px; }
 .note-danger { margin-bottom: 16px; }
-.writing { display: flex; flex-direction: column; flex: 1 0 auto; gap: 18px; min-height: 310px; padding: 30px 36px 20px; }
 .title-field, .body-field { display: flex; flex-direction: column; min-width: 0; gap: 10px; }
 .notes .editor .title-field input { width: 100%; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; font-size: 1.65em; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; }
 .body-field { flex: 1; gap: 12px; }
@@ -582,8 +578,6 @@ function preview(note: Note): string {
 .note-count { align-self: flex-end; }
 .note-tools { flex-shrink: 0; border-top: 1px solid var(--border); padding: 0 28px; }
 .note-tools > details + details { border-top: 1px solid var(--border); }
-summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 0; font-size: .85em; cursor: pointer; list-style: none; }
-summary::-webkit-details-marker { display: none; }
 summary > [aria-hidden], .summary-hint { color: var(--muted); }
 .summary-hint { font-size: .9em; min-width: 0; text-align: right; overflow-wrap: anywhere; }
 .summary-hint > span { margin-left: 12px; }
@@ -601,8 +595,7 @@ summary > [aria-hidden], .summary-hint { color: var(--muted); }
 .agent-warning { background: color-mix(in srgb, var(--warning) 12%, var(--bg)); }
 .form-error { margin: 12px 20px; }
 .library-publishing { margin: 14px 10px 0; border-top: 1px solid var(--border); flex-shrink: 0; max-height: 40%; overflow-y: auto; }
-@media (min-width: 1200px) { .writing { padding-inline: max(36px, calc((100% - 760px) / 2)); } }
-@media (max-width: 900px) and (min-width: 768px) { .notes .layout { --workspace-columns: 280px minmax(0, 1fr); } .writing { padding-inline: 22px; } .note-tools { padding-inline: 20px; } }
+@media (max-width: 900px) and (min-width: 768px) { .notes .layout { --workspace-columns: 280px minmax(0, 1fr); } .note-tools { padding-inline: 20px; } }
 @media (max-width: 767px) {
   .notes :deep(.page-column) { padding: 18px 16px 12px; }
   .notes :deep(.page-head) { flex-direction: row; align-items: center; margin-bottom: 16px; gap: 10px; }
@@ -611,7 +604,6 @@ summary > [aria-hidden], .summary-hint { color: var(--muted); }
   .notes :deep(.page-actions button), .list-scroll :deep(button) { min-width: 44px; min-height: 44px; }
   .notes.note-open :deep(.page-head) { display: none; }
   .note-row { min-height: 100px; }
-  .writing { min-height: 310px; padding: 24px 20px 18px; }
   .notes .editor .title-field input { font-size: 1.45em; }
   .editor textarea { min-height: 250px; }
   .note-tools { padding-inline: 20px; }

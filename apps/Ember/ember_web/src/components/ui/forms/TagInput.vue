@@ -18,10 +18,8 @@ const props = withDefaults(
     max: number;
     maxLength: number;
     disabled?: boolean;
-    /** Names the chip list; the text box is "Add a tag". */
-    label?: string;
   }>(),
-  { known: () => [], disabled: false, label: "Tags" },
+  { known: () => [], disabled: false },
 );
 
 const tags = defineModel<string[]>({ required: true });
@@ -134,7 +132,7 @@ defineExpose({ commit, add });
 
 <template>
   <div ref="root" class="tag-input">
-    <ul v-if="tags.length" class="tag-list" :aria-label="label">
+    <ul v-if="tags.length" class="tag-list" aria-label="Tags">
       <li v-for="tag in tags" :key="tag" class="tag">
         {{ tag }}
         <button type="button" :aria-label="`Remove tag ${tag}`" :disabled="disabled" @click="remove(tag)">×</button>

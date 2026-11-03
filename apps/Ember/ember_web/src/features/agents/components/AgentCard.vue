@@ -24,7 +24,7 @@ const STATUS_ICON: Record<AgentStatus, string> = { running: "●", offline: "○
   <article :class="['agent-card', agent.status, { entry: agent.entry, front: agent.entry || agent.internal_role, off }]" :aria-busy="!!pending">
     <div class="card-content">
       <span class="head">
-        <span class="icon-tile" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 4H5a1 1 0 0 0-1 1v3m12-4h3a1 1 0 0 1 1 1v3M4 16v3a1 1 0 0 0 1 1h3m12-4v3a1 1 0 0 1-1 1h-3M8 12h8m-4-4v8" /></svg></span>
+        <span class="icon-tile" aria-hidden="true"><svg class="line-icon" viewBox="0 0 24 24"><path d="M8 4H5a1 1 0 0 0-1 1v3m12-4h3a1 1 0 0 1 1 1v3M4 16v3a1 1 0 0 0 1 1h3m12-4v3a1 1 0 0 1-1 1h-3M8 12h8m-4-4v8" /></svg></span>
         <span class="identity"><h3><button type="button" class="open-card" aria-haspopup="dialog" :aria-label="`Open ${agent.label}`" @click="$emit('open', agent.id)">{{ agent.label }}</button></h3><code class="agent-id">{{ agent.id }}</code></span>
         <span class="status status-badge"><span aria-hidden="true">{{ STATUS_ICON[agent.status] }}</span> {{ STATUS_TEXT[agent.status] }}</span>
       </span>
@@ -104,7 +104,7 @@ const STATUS_ICON: Record<AgentStatus, string> = { running: "●", offline: "○
 }
 .identity { display: flex; flex: 1; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .icon-tile { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: var(--radius-md); background: var(--bg); color: var(--accent); }
-.icon-tile svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon-tile svg { width: 20px; height: 20px; }
 h3 {
   margin: 0;
   font-size: 1em;

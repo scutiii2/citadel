@@ -105,13 +105,13 @@ useOutsideClose(root, open, () => close());
       <template v-for="(group, i) in groups" :key="i">
         <hr v-if="i > 0" role="separator" />
         <RouterLink v-for="p in group" :key="p.to" :to="p.to" class="row" :class="{ current: isCurrent(p.to) }" role="menuitem">
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path v-for="d in p.icon" :key="d" :d="d" /></svg>
+          <svg class="line-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path v-for="d in p.icon" :key="d" :d="d" /></svg>
           <span>{{ p.label }}</span>
         </RouterLink>
       </template>
       <hr v-if="groups.length" role="separator" />
       <RouterLink to="/account" class="row" role="menuitem">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path v-for="d in PROFILE_ICON" :key="d" :d="d" /></svg>
+        <svg class="line-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path v-for="d in PROFILE_ICON" :key="d" :d="d" /></svg>
         <span>Profile</span>
       </RouterLink>
       <button type="button" class="row theme-row" role="menuitem" @click="cycle">
@@ -120,14 +120,14 @@ useOutsideClose(root, open, () => close());
         <span class="value">{{ THEME_LABELS[theme] }}</span>
       </button>
       <a v-if="adminUrl" :href="adminUrl" target="_blank" rel="noopener noreferrer" class="row admin-link" role="menuitem" @click="close()">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3 3 7v5c0 5 5 8 9 10 4-2 9-5 9-10V7zM8 12l3 3 5-6" /></svg>
+        <svg class="line-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3 3 7v5c0 5 5 8 9 10 4-2 9-5 9-10V7zM8 12l3 3 5-6" /></svg>
         <span>Ember Admin</span>
-        <svg class="value" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+        <svg class="line-icon value" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
       </a>
 
       <hr role="separator" />
       <button type="button" class="row logout" role="menuitem" @click="logout">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <svg class="line-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
         </svg>
         <span>Log out</span>
@@ -216,11 +216,6 @@ hr {
 }
 svg {
   flex-shrink: 0;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 :focus-visible {
   outline: 2px solid var(--accent);

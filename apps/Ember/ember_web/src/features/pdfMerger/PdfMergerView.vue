@@ -35,7 +35,7 @@ onBeforeRouteLeave(stop)
 </script>
 <template>
   <PageLayout class="pdf-page" title="PDF merger" description="Combine PDFs and images. Put every page in place." wide fill>
-    <template #actions><button type="button" class="add-files" @click="dropZone?.openPicker()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Add files</button></template>
+    <template #actions><button type="button" class="add-files" @click="dropZone?.openPicker()"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Add files</button></template>
     <div v-if="files.uploading || files.errors.length" class="notices">
       <p v-if="files.uploading" class="muted small" role="status">Uploading {{ files.uploading }} file(s)...</p>
       <ul v-if="files.errors.length" class="errors"><li v-for="(message,index) in files.errors" :key="index" role="alert">{{ message }} <button type="button" class="link" @click="files.dismissError(index)">Dismiss</button></li></ul>
