@@ -5,13 +5,17 @@ import PopupMenu from "../../../components/ui/menus/PopupMenu.vue";
 import { useAuthStore } from "../../../stores/auth";
 import { speechBatches } from "../../../utils/content/speechBatches";
 import { useReadAloud } from "../composables/useReadAloud";
+import { createSpeechHighlight } from "../composables/useSpeechHighlight";
 
 const props = defineProps<{ text: string; scope?: string | number | null }>();
 const auth = useAuthStore();
 const allowed = computed(() => auth.hasPermission("tools.execute") && auth.hasPermission("files.download"));
 const audio = ref<HTMLAudioElement | null>(null);
 const button = ref<HTMLButtonElement | null>(null);
-const { state, error, start, stop } = useReadAloud(audio);
+const { state, error, position, start, stop } = useReadAloud(audio);
+const highlight = createSpeechHighlight();
+// Short opening batches so audio starts after one sentence, not after the whole message is synthesized.
+const RAMP = [300, 1200];
 const loading = ref(false);
 const menu = ref<{ x: number; y: number; voices: string[] } | null>(null);
 const menuError = ref("");
@@ -26,6 +30,7 @@ function reset(): void {
   loading.value = false;
   menuError.value = "";
   stop();
+  highlight.clear();
 }
 
 function closeMenu(): void {
@@ -57,9 +62,13 @@ async function toggle(): Promise<void> {
 function choose(voice: string): void {
   if (!menu.value?.voices.includes(voice) || !allowed.value) return;
   closeMenu();
-  void start(speechBatches(props.text), voice);
+  const batches = speechBatches(props.text, undefined, RAMP);
+  highlight.begin(button.value?.closest<HTMLElement>(".assistant") ?? null, batches);
+  void start(batches, voice);
 }
 
+watch(position, (at) => highlight.update(at));
+watch(state, (now) => { if (now === "idle" || now === "error") highlight.clear(); });
 watch(() => [props.scope, props.text, auth.account?.id, allowed.value], reset);
 onBeforeUnmount(reset);
 onDeactivated(reset);
@@ -85,6 +94,7 @@ onDeactivated(reset);
 <style scoped>
 .read-aloud { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 button.read-aloud-button { position: relative; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: var(--radius-sm); color: var(--muted); background: transparent; cursor: pointer; }
+button.read-aloud-button[aria-busy="true"]::before { content: none; } /* .busy-ring is the spinner; skip the global one */
 button.read-aloud-button:hover { color: var(--text); background: var(--code-bg); }
 button.read-aloud-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .speech-error { max-width: 260px; color: var(--danger); font-size: 0.85em; overflow-wrap: anywhere; }

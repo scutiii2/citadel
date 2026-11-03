@@ -44,7 +44,8 @@ function confirm(): void {
       <span>
         Type <code>{{ requireText }}</code> to confirm
       </span>
-      <!-- autofocus: showModal() focuses it, so typing starts at once. -->
+      <!-- autofocus: showModal() focuses it, so typing starts at once. Without it, a plain confirm
+           focuses its button (Enter confirms); a danger one focuses Cancel. -->
       <input
         v-model="typed"
         type="text"
@@ -57,7 +58,7 @@ function confirm(): void {
       <span class="count" aria-hidden="true">{{ typed.length }}/{{ requireText.length }}</span>
     </label>
     <div class="actions">
-      <button type="button" class="cancel" :disabled="busy" @click="emit('close')">Cancel</button>
+      <button type="button" class="cancel" :autofocus="danger && !requireText" :disabled="busy" @click="emit('close')">Cancel</button>
       <DeleteButton
         v-if="danger"
         class="confirm danger"
@@ -66,7 +67,7 @@ function confirm(): void {
         :disabled="!matches"
         @click="confirm"
       />
-      <button v-else type="button" class="confirm" :disabled="busy || !matches" @click="confirm">
+      <button v-else type="button" class="confirm" :autofocus="!requireText" :disabled="busy || !matches" @click="confirm">
         {{ confirmLabel }}
       </button>
     </div>

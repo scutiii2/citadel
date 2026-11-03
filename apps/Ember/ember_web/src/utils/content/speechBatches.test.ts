@@ -28,3 +28,7 @@ it("keeps sentence boundaries when the next sentence would overflow", () => {
 it("handles fenced variants, HTML and reference links as plain text", () => {
   expect(speechBatches("~~~js\nhidden()\n~~~\n<b>Hello</b> [world][w].\n\n[w]: https://example.com")).toEqual(["Hello world."]);
 });
+
+it("caps the first batches with a ramp so playback can start early", () => {
+  expect(speechBatches("One two. Three four. Five six. Seven eight.", 100, [8, 21])).toEqual(["One two.", "Three four. Five six.", "Seven eight."]);
+});

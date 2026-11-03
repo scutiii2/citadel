@@ -30,20 +30,24 @@ function sentences(text: string): string[] {
   return result;
 }
 
-/** Batch cleaned sentences below Bard's 5,000-character limit with ample headroom. */
-export function speechBatches(source: string, limit = 3500): string[] {
+/**
+ * Batch cleaned sentences below Bard's 5,000-character limit with ample headroom.
+ * `ramp` caps the first batches (e.g. [300, 1200]) so audio starts after a short synthesis.
+ */
+export function speechBatches(source: string, limit = 3500, ramp: number[] = []): string[] {
   if (!Number.isInteger(limit) || limit < 1) throw new RangeError("Batch size must be positive");
   const batches: string[] = [];
   let current = "";
+  const cap = () => Math.min(limit, ramp[batches.length] ?? limit);
   for (const sentence of sentences(spokenText(source))) {
     let rest = sentence;
-    if (current && current.length + rest.length + 1 > limit) {
+    if (current && current.length + rest.length + 1 > cap()) {
       batches.push(current);
       current = "";
     }
-    while (rest.length > limit) {
-      const space = rest.lastIndexOf(" ", limit);
-      const split = space > 0 ? space : limit;
+    while (rest.length > cap()) {
+      const space = rest.lastIndexOf(" ", cap());
+      const split = space > 0 ? space : cap();
       batches.push(rest.slice(0, split));
       rest = rest.slice(split).trimStart();
     }
