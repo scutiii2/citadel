@@ -1,0 +1,47 @@
+{
+  "server": {
+    "enabled": true
+  },
+  "gen": {
+    "enabled": true
+  },
+  "web": {
+    "enabled": true
+  },
+  "scrape": {
+    "enabled": false
+  },
+  "usage": {
+    "enabled": false
+  },
+  "vault": {
+    "enabled": false
+  },
+  "repo": {
+    "enabled": false
+  },
+  "data": {
+    "enabled": false
+  },
+  "watch": {
+    "enabled": false
+  },
+  "_scanner": {
+    "migrated": true
+  },
+  "email": {
+    "enabled": true
+  },
+  "memory": {
+    "enabled": true
+  },
+  "ticket": {
+    "enabled": true
+  },
+  "notes": {
+    "enabled": true
+  },
+  "skills": {
+    "enabled": true
+  }
+}

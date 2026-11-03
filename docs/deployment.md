@@ -131,14 +131,15 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    |---|---|
    | `apps/legion/configs/config_tuning.json` | Created from its `.example` automatically |
    | `apps/Ember/ember_api/configs/config_pricing.json` | Created from its `.example` automatically |
-   | `apps/armory/configs/config_capabilities.json`, `config_email.json`, `config_tickets.json` | Copy each `.example` and fill in `config_email.json` |
+   | `apps/armory/configs/config_email.json`, `config_tickets.json` | Copy each `.example` and fill in `config_email.json` |
 
-   These files are baked into the image at build time, so a change made on the Capabilities page of ember_admin is lost
-   when armory is rebuilt. Edit the file instead.
+   These files are baked into the image at build time, so a change made to them inside the container is lost when
+   armory is rebuilt. Edit the file instead.
 
-   `docker/configs/armory/extensions.json` is the exception: it is mounted writable, so extensions added on the
-   Extensions page of ember_admin are saved into that file and survive restarts and rebuilds. On the device that file
-   differs from git after the first add; keep it when you update (`git stash` or `git update-index --skip-worktree`).
+   `docker/configs/armory/extensions.json` and `docker/configs/armory/capabilities.json` are the exception: they are
+   mounted writable, so extensions added on the Extensions page and capability toggles set on the Capabilities page of
+   ember_admin are saved into those files and survive restarts and rebuilds. On the device they differ from git after
+   the first change; keep them when you update (`git stash` or `git update-index --skip-worktree`).
 
 5. **Start:**
 
@@ -236,7 +237,7 @@ The Server Manager capability (chat id `server`) lists, starts, stops and restar
 logs. It works through the host Docker socket, which `docker-compose.yml` mounts into `armory`
 (`/var/run/docker.sock`).
 
-Enable it in `apps/armory/configs/config_capabilities.json`:
+Enable it on the Capabilities page of ember_admin, or in `docker/configs/armory/capabilities.json`:
 
 ```json
 "server": { "enabled": true }
@@ -276,5 +277,5 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 | Overlay still binds `127.0.0.1` | Compose older than 2.24 ignores `!override`. Update Compose, or edit the `ports` lines in the main file. |
 | Port already in use | Another app uses 5173 or 5176. Change the left side of the port mapping. |
 | `permission denied` on the Docker socket | The container cannot read `/var/run/docker.sock`. Check its owner and mode on the host. |
-| Capability toggle reverted after a rebuild | It was changed inside the container. Edit `config_capabilities.json` in the repo. |
+| Capability toggle reverted after a rebuild | `docker/configs/armory/capabilities.json` was reset (for example by `git checkout` or `git stash`) or is not mounted. Check `docker-compose.yml` mounts it, then set the toggle again. |
 | Funnel page loads but big files stall or time out | Check `docker inspect tailscale --format "{{.RestartCount}}"`. The ZimaOS Tailscale app's entrypoint (`tailscaled ... & sleep 10; tailscale web --listen 0.0.0.0:5252`) can exit after 10 s and restart the container in a loop. Append `; wait` to that entrypoint line in `/var/lib/casaos/apps/tailscale/docker-compose.yml` and run `docker compose up -d` there. A CasaOS app update may overwrite it. |
