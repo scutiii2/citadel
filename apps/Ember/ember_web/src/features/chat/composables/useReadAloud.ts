@@ -33,6 +33,8 @@ export function useReadAloud(
 ) {
   const state = ref<"idle" | "busy" | "playing" | "error">("idle");
   const error = ref("");
+  /** Where playback is now: which batch and how far through its audio. Null when not playing. */
+  const position = ref<{ batch: number; fraction: number } | null>(null);
   let controller: AbortController | undefined;
 
   function clearAudio(): void {
@@ -50,6 +52,7 @@ export function useReadAloud(
     clearAudio();
     state.value = "idle";
     error.value = "";
+    position.value = null;
     if (stopActive === stop) stopActive = undefined;
   }
 
@@ -71,15 +74,27 @@ export function useReadAloud(
         if (!result.clip) throw result.error;
         const next = batches[index + 1];
         if (next !== undefined) pending = prepare(next);
-        await playClip(audio.value, result.clip, run.signal, () => { state.value = "playing"; });
+        const el = audio.value;
+        let frame = 0;
+        const track = () => {
+          if (el.duration > 0) position.value = { batch: index, fraction: Math.min(1, el.currentTime / el.duration) };
+          frame = requestAnimationFrame(track);
+        };
+        try {
+          await playClip(el, result.clip, run.signal, () => { state.value = "playing"; track(); });
+        } finally {
+          cancelAnimationFrame(frame);
+        }
         if (run.signal.aborted) return;
         state.value = "busy";
       }
       state.value = "idle";
+      position.value = null;
     } catch (cause) {
       if (!run.signal.aborted) {
         run.abort();
         state.value = "error";
+        position.value = null;
         error.value = cause instanceof Error ? cause.message : "Bard could not read this message aloud.";
       }
     } finally {
@@ -92,5 +107,5 @@ export function useReadAloud(
   }
 
   onScopeDispose(stop);
-  return { state, error, start, stop };
+  return { state, error, position, start, stop };
 }

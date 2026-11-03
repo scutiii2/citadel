@@ -246,3 +246,9 @@ button[aria-busy="true"]::before {
 .error {
   color: var(--danger);
 }
+
+/* Word being read aloud (CSS Custom Highlight API; no DOM changes). */
+::highlight(read-aloud) {
+  background-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: inherit;
+}
