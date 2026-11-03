@@ -119,7 +119,7 @@ in routes), `src/models/` (SQLAlchemy 2 typed models), `src/deps.py`
    has `as_admin`, `new_invite`, `register` helpers. Cover: happy path,
    401 when logged out, 403 without the permission / unverified, and
    validation errors. Run:
-   `Ember\ember_api\.venv_ember_api\Scripts\python -m pytest -q` (from `apps/Ember/ember_api/`).
+   `uv run pytest -q` (from `apps/Ember/ember_api/`).
 7. Update the API table in `apps/Ember/ember_api/README.md`.
 
 ## 3. ember_web side

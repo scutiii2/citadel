@@ -22,8 +22,8 @@ Mandatory in every root project:
 |---|---|
 | `README.md` | What the project does, setup steps, requirements — see apps/armory/README.md as the fullest example |
 | `pyproject.toml` | Its own dependencies — each root project is a separate Python environment, never a shared venv |
-| `Dockerfile` | Builds the image the root `docker-compose.yml` runs. Local dev: create `.venv_<project>`, `pip install -e ".[dev]"`, then `python -m src.run` (legion runs `python -m src.supervisor`, one child per `agents/<id>.json`) |
-| `shell.bat` | Opens a terminal with the project's venv active, in the project folder (`cmd /k "call .venv_<project>\Scripts\activate.bat"`); prints a hint and exits if the venv is missing. Copy `apps/Ember/ember_cli/shell.bat` and change the venv name |
+| `Dockerfile` | Builds the image the root `docker-compose.yml` runs. Local dev: `uv sync`, then `uv run python -m src.run` (legion runs `uv run python -m src.supervisor`, one child per `agents/<id>.json`) |
+| `shell.bat` | Opens a terminal with the project's venv active, in the project folder (`cmd /k "call .venv\Scripts\activate.bat"`); prints `uv sync` as the hint and exits if the venv is missing. Copy `apps/Ember/ember_cli/shell.bat` |
 | `configs/` | JSON config, each real file gitignored with a committed `.example` twin (`config_x.json` + `config_x.json.example`) |
 | `.env`, `.env.example` | The project's one credentials file, in the project root beside `configs/` (no `secrets/` folder). The real `.env` is gitignored; `.env.example` is committed. `mcp_server`, `ai_agent` and `db_gateway` follow this |
 | `src/` | The actual code |

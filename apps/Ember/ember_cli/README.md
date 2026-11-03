@@ -8,20 +8,19 @@ not a server, so it has no compose service.
 
 ## Requirements
 
-- Python 3.11+ (Windows: the `py` launcher).
+- Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 - ember_api running (and ai_agent behind it), and an ember account whose email is verified.
 
 ## Run
 
 ```bat
-py -m venv .venv_ember_cli
-.venv_ember_cli\Scripts\pip install -e ".[dev]"
-.venv_ember_cli\Scripts\python -m src.main
-.venv_ember_cli\Scripts\python -m src.main --user ada
-.venv_ember_cli\Scripts\python -m src.main --url http://127.0.0.1:8030 --ask
+uv sync
+uv run python -m src.main
+uv run python -m src.main --user ada
+uv run python -m src.main --url http://127.0.0.1:8030 --ask
 ```
 
-Create the venv and install once; afterwards only the `python -m src.main` lines.
+`uv sync` creates `.venv` and installs once; afterwards only the `uv run` lines.
 
 | Option | Meaning |
 |---|---|
@@ -92,7 +91,7 @@ tests/          pytest; no network (fake ember_api through httpx's MockTransport
 ## Tests
 
 ```bat
-.venv_ember_cli\Scripts\python -m pytest
+uv run pytest
 ```
 
 The tests use a fake ember_api and a scripted prompt. The client was also run once against a real

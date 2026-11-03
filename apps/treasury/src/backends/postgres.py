@@ -36,7 +36,7 @@ class PostgresBackend(DatabaseBackend):
         try:
             import asyncpg
         except ImportError as error:
-            raise RuntimeError("Postgres connections need asyncpg: pip install -e \".[postgres]\"") from error
+            raise RuntimeError("Postgres connections need asyncpg: uv sync --extra postgres") from error
         self._pool = await asyncpg.create_pool(self._dsn, min_size=1, max_size=self._max)
         await self._pool.execute(_SCHEMA)
 

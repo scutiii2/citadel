@@ -269,7 +269,7 @@ ember_api owns usage limits and the usage reports.
 - **Orchestrator**: ask the entry agent something that fits a
   specialist's `focus`; ember_web shows "Ember -> <Specialist>" while it works
   and the usage chip lists both agents. Tests: `legion`
-  `.venv_legion\Scripts\python -m pytest` (the registry is isolated per
+  `uv run pytest` (the registry is isolated per
   test, keep it that way).
 - **Provider**: start an agent file naming the new `provider` - a missing/bad
   API key should fail loudly at import time (`AgentConfigError`), not on the
