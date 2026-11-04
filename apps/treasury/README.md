@@ -91,7 +91,7 @@ Collections and documents map one to one (key = document id, no `/`). Filters ar
 document fields, results are ordered by document id, and raw SQL is unsupported. Set
 `FIRESTORE_EMULATOR_HOST` to use the local emulator. Each read is billed, so keep the cache on.
 Status: unit-tested against a fake client, and the backend contract test passes against the local
-emulator (needs Java 21+; `npx firebase-tools emulators:exec --only firestore --project demo-test "<pytest command>"`
+emulator (needs Java 21+; `pnpm dlx firebase-tools emulators:exec --only firestore --project demo-test "<pytest command>"`
 starts it, sets `FIRESTORE_EMULATOR_HOST` and stops it). Not yet run against a real Firebase project.
 
 ## Testing against real databases
