@@ -112,3 +112,21 @@ def test_strategies_errors_become_service_errors(monkeypatch):
     monkeypatch.setattr(httpx, "get", down)
     with pytest.raises(LayaServiceError, match="could not be reached"):
         LAYAModel("http://laya:9120").strategies()
+
+
+def test_a_busy_service_is_retried_after_its_retry_after_and_then_answers(monkeypatch):
+    waits, sent = [], []
+    monkeypatch.setattr(laya_model.time, "sleep", waits.append)
+    replies = iter([httpx.Response(429, headers={"Retry-After": "5"}), httpx.Response(429, headers={"Retry-After": "99"}), None])
+    post_returning(monkeypatch, lambda url: next(replies) or ok(url), sent)
+    assert LAYAModel("http://laya:9120").ask("auto", "text", QUESTIONS, 512) == ANSWER
+    assert len(sent) == 3 and waits == [5.0, laya_model.MAX_WAIT_SECONDS]
+
+
+def test_a_service_that_stays_busy_gives_the_429_after_the_retries(monkeypatch):
+    sent = []
+    monkeypatch.setattr(laya_model.time, "sleep", lambda seconds: None)
+    post_returning(monkeypatch, httpx.Response(429, json={"detail": "busy"}), sent)
+    with pytest.raises(LayaServiceError) as error:
+        LAYAModel("http://laya:9120").ask("auto", "text", QUESTIONS, 512)
+    assert error.value.status == 429 and len(sent) == laya_model.BUSY_RETRIES + 1

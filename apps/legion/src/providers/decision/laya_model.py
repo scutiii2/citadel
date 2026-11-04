@@ -8,11 +8,14 @@ Laya model is available."""
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 import httpx
 
 TIMEOUT_SECONDS = 60.0
+BUSY_RETRIES = 2  # a full service answers 429 with Retry-After; wait that long (at most MAX_WAIT_SECONDS) and try again
+MAX_WAIT_SECONDS = 10.0
 
 
 class LayaServiceError(RuntimeError):
@@ -63,11 +66,19 @@ class LAYAModel:
     def _post(self, path: str, body: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
         if not self.configured:
             raise LayaServiceError("Laya is not configured: set LAYA_SERVICE_URL")
-        try:
-            response = httpx.post(f"{self._url}{path}", headers=self._headers(), json=body,
-                                  timeout=TIMEOUT_SECONDS if timeout is None else min(timeout, TIMEOUT_SECONDS))
-        except httpx.HTTPError as error:
-            raise LayaServiceError(f"The Laya service could not be reached: {error}") from error
+        for attempt in range(BUSY_RETRIES + 1):
+            try:
+                response = httpx.post(f"{self._url}{path}", headers=self._headers(), json=body,
+                                      timeout=TIMEOUT_SECONDS if timeout is None else min(timeout, TIMEOUT_SECONDS))
+            except httpx.HTTPError as error:
+                raise LayaServiceError(f"The Laya service could not be reached: {error}") from error
+            if response.status_code != 429 or attempt == BUSY_RETRIES:
+                break
+            try:
+                wait = float(response.headers.get("retry-after", ""))
+            except ValueError:
+                wait = 1.0
+            time.sleep(min(max(wait, 0.0), MAX_WAIT_SECONDS))
         if response.is_success:
             return response.json()
         detail = response.json().get("detail") if response.headers.get("content-type", "").startswith("application/json") else None
