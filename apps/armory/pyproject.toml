@@ -31,6 +31,7 @@ dependencies = [
     "pillow-heif>=0.18",
     "sqlite-vec>=0.1.6,<0.2",
     "PyYAML>=6.0.2,<7",
+    "sympy==1.14.0",
 ]
 
 [dependency-groups]

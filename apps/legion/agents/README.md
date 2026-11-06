@@ -38,6 +38,12 @@ for the field descriptions and examples.
 The supervisor watches this directory and the overrides file and reconciles
 validated changes.
 
+`mathematician.json` defines the delegable mathematics specialist on port 9121.
+It permits only `tool_math_*` and the standard ticket support tool. Analyst also
+permits math tools for attached-table formulas. Ember routes using the live
+roster; Reviewer independently checks math through its existing permitted tools.
+Armory's Mathematics capability must be enabled for math tools to be offered.
+
 `context-summarizer.json` is a tool-free, non-delegable light-tier helper for
 Router context briefs and Ember's manual/automatic conversation compaction.
 It is called directly through `interpret`; it does not choose agents or tiers.
