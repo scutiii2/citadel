@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "source": "Representative engineering and arithmetic workloads; synthetic inputs with independently specified expected values.",
+  "cases": [
+    {"id":"velocity", "equation":"v=d/t", "data":[{"type":"constant","name":"d","value":100},{"type":"constant","name":"t","value":4}], "expected":{"v":"25"}},
+    {"id":"force", "equation":"F=m*a", "data":[{"type":"constant","name":"m","value":12},{"type":"constant","name":"a","value":"9.81"}], "expected":{"F":"2943/25"}},
+    {"id":"kinetic_energy", "equation":"K=m*v^2/2", "data":[{"type":"constant","name":"m","value":3},{"type":"constant","name":"v","value":4}], "expected":{"K":"24"}},
+    {"id":"density", "equation":"rho=m/V", "data":[{"type":"constant","name":"m","value":270},{"type":"constant","name":"V","value":100}], "expected":{"rho":"27/10"}},
+    {"id":"circle_area", "equation":"A=pi*r^2", "data":[{"type":"constant","name":"r","value":3}], "expected":{"A":"9*pi"}},
+    {"id":"compound_growth", "equation":"B=P*(1+r)^n", "data":[{"type":"constant","name":"P","value":1000},{"type":"constant","name":"r","value":"1/20"},{"type":"constant","name":"n","value":2}], "expected":{"B":"2205/2"}},
+    {"id":"weighted_mean", "equation":"w=(2*x+3*y)/5", "data":[{"type":"constant","name":"x","value":10},{"type":"constant","name":"y","value":20}], "expected":{"w":"16"}},
+    {"id":"linear_system", "equation":{"expression":["x+y=7","2*x-y=2"]}, "data":[], "expected":{"x":"3","y":"4"}},
+    {"id":"unit_velocity", "equation":{"expression":"v=d/t","output_units":{"v":"km/h"}}, "data":[{"type":"constant","name":"d","value":100,"unit":"m"},{"type":"constant","name":"t","value":5,"unit":"s"}], "expected":{"v":"72"}, "unit":{"v":"km/h"}},
+    {"id":"recursive_formula", "equation":"y=b+1", "data":[{"type":"equation","name":"b","value":{"equation":"b=p/q","data":[{"type":"constant","name":"p","value":5},{"type":"constant","name":"q","value":2}]}}], "expected":{"y":"7/2"}},
+    {"id":"cancelled_hole", "equation":"(x^2-1)/(x-1)=2", "data":[], "status":"inconsistent"},
+    {"id":"certified_zeros", "equation":{"expression":"x^2=4","domain":"real","method":"certified"}, "data":[], "status":"certified", "roots":["-2","2"]},
+    {"id":"latex_formula", "equation":{"expression":"y=\\frac{m b}{2}+x","syntax":"latex"}, "data":[{"type":"constant","name":"m","value":5},{"type":"constant","name":"b","value":6},{"type":"constant","name":"x","value":5}], "expected":{"y":"20"}}
+  ]
+}

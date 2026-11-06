@@ -1,0 +1,41 @@
+{
+  "summary": "Solve direct or recursive equations with assumptions, cases, certificates, units, and structured conditions. Batch or map owned tables, continue prior results, calculate matrices/calculus, and normalize strict LaTeX. Verification and completeness remain separate.",
+  "tools": [
+    {"name": "tool_math_solve", "purpose": "Evaluate expressions or solve direct/recursive systems with optional assumptions, cases, units, and certified real polynomial roots.", "connection": "Local bounded SymPy workers", "commands": ["solve"]},
+    {"name": "tool_math_batch", "purpose": "Evaluate up to 32 records with indexed partial progress and ordered final results.", "connection": "Local bounded SymPy workers", "commands": ["batch"]},
+    {"name": "tool_math_continue", "purpose": "Continue one selected prior solution/value while preserving units, domain facts, and approximation scope.", "connection": "Local bounded SymPy workers", "commands": ["continue"]},
+    {"name": "tool_math_table", "purpose": "Apply a formula to a caller-owned numeric attached table page with progress.", "connection": "Existing table registry and bounded SymPy workers", "commands": ["table"]},
+    {"name": "tool_math_matrix", "purpose": "Exact arithmetic, inverse, determinant, rank, reduction and solving for matrices up to 8 by 8.", "connection": "Local bounded SymPy workers", "commands": ["matrix"]},
+    {"name": "tool_math_calculus", "purpose": "Differentiate or integrate restricted expressions with domain and branch evidence.", "connection": "Local bounded SymPy workers", "commands": ["calculus"]}
+  ],
+  "commands": [
+    {"name": "solve", "tool": "tool_math_solve", "params": [
+      {"name": "equation", "required": true, "default": null, "description": "String or structured controls: expression string/equality list, syntax math/latex, solve_for, domain, precision, assumptions, split_cases, method including certified, units/output_units, numerical hints, and trace."},
+      {"name": "data", "required": true, "default": null, "description": "JSON list of constant, variable-reference, or recursive equation bindings; [] when none."}
+    ]},
+    {"name": "batch", "tool": "tool_math_batch", "params": [
+      {"name": "equation", "required": true, "default": null, "description": "Shared equation string or structured controls, as solve accepts."},
+      {"name": "data", "required": true, "default": null, "description": "1–32 records with optional id and independent recursive data bindings. Validation/math errors remain local; order is preserved."}
+    ]},
+    {"name": "continue", "tool": "tool_math_continue", "params": [
+      {"name": "equation", "required": true, "default": null, "description": "Next equation string or structured controls."},
+      {"name": "data", "required": true, "default": null, "description": "previous result object; solution_index or slot:value/value_name; optional bindings. Approximate reuse requires allow_approximate:true. Opaque facts cannot be reused."}
+    ]},
+    {"name": "table", "tool": "tool_math_table", "params": [
+      {"name": "equation", "required": true, "default": null, "description": "Shared equation string or structured controls."},
+      {"name": "data", "required": true, "default": null, "description": "Actual attached table_id, columns mapping variable to exact numeric column name, optional shared bindings, offset, limit1–32. Follow source.next_offset."}
+    ]},
+    {"name": "matrix", "tool": "tool_math_matrix", "params": [
+      {"name": "operation", "required": true, "default": null, "description": "add/subtract/multiply/transpose/determinant/inverse/rank/rref/solve."},
+      {"name": "data", "required": true, "default": null, "description": "matrices: one or two finite constant-expression matrices <=8x8; precision15–100; syntax math/latex. solve uses [A,b] for Ax=b."}
+    ]},
+    {"name": "calculus", "tool": "tool_math_calculus", "params": [
+      {"name": "expression", "required": true, "default": null, "description": "Restricted scalar expression, <=4096 characters."},
+      {"name": "data", "required": true, "default": null, "description": "operation differentiate/integrate, variable, optional derivative order1–8, domain real/complex, finite real integration bounds, precision15–100, syntax math/latex. Retain domain and branch conditions."}
+    ]}
+  ],
+  "workflow": [
+    {"sequence": "1", "tool": "tool_math_solve", "ai_only_step": false, "explanation": "Supply formula/system and bindings. Declare assumptions and physical units, or enable bounded parameter cases. Certified mode covers only supported exact real rational-polynomial roots. Inspect conditions, verification, completeness, and diagnostics."},
+    {"sequence": "2 (optional)", "tool": "tool_math_batch", "ai_only_step": false, "explanation": "Reuse the equation/options across independent records; inspect each row and retry unfinished rows in smaller batches."}
+  ]
+}

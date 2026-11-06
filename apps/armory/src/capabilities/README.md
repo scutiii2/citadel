@@ -13,6 +13,7 @@ what it does:
 - `obsidian/` - Local REST API vault listing, search and note read/write/append, with writes disabled by default (`/obsidian ...`).
 - `repo_reader/` - read-only git history and code (`/repo ...`).
 - `tables/` - questions about an attached CSV or Excel file (`/data ...`).
+- `math/` - direct/recursive equations, assumptions, cases, certificates, units, batch/table formulas, result continuation, matrices, calculus, and strict LaTeX (`/math ...`).
 - `email/` - shared outgoing email and threaded replies (`/email ...`).
 - `memory/` - per-user saved notes the model can search and forget (`/memory ...`).
 - `notes/` - the notes a user shared with agents on ember's Notes page, read-only (`/notes ...`).

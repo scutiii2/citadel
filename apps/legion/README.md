@@ -191,6 +191,25 @@ more specialists as extra files.
 `code-architect` (port 9130, disabled) plans multi-function code and assembles
 `code-writer` outputs, with optional read-only context from `repo-helper`.
 
+`mathematician` (port 9121) handles standalone mathematical questions through
+Armory's `tool_math_*` tools: equations, units, matrices, calculus, and repeated
+formulas. Its answers retain verification, completeness, assumptions and domain
+conditions. It does not replace unavailable tools with manual computations.
+Enable Armory's Mathematics capability for this specialist to be usable.
+The existing roster filters hide it when its math tools are unavailable.
+
+Ember routes standalone mathematics to Mathematician and attached-table work to
+Analyst, using only the current available roster. Analyst can use math tools for
+derived formulas over owned numeric table pages; it retains table discovery and
+token-usage tools. Reviewer already permits math tools and now receives explicit
+instructions for independent mathematical checks from the original problem.
+Ember retains its existing tool scope and delegates calculations.
+
+These are tracked defaults. Per-machine agent overrides can shadow them; update
+or clear those overrides in the admin UI if present. The supervisor watches agent
+definitions and reconciles validated changes; an unchanged running deployment
+needs the updated files and Armory workers before the new capability is usable.
+
 `server-ops` also covers app monitoring (the former `scheduler` / App Monitor agent, port 9114, now removed). It reports
 watched status, and starting an app also starts its owner notifications through ServerWatcher. URL/port monitoring and
 recurring schedules are unavailable. `data-analyst` (label "Analyst") also answers token-usage questions through
