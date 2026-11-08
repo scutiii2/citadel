@@ -1,4 +1,4 @@
-# Stack: ember_web / ember_admin / legion_admin -> ember_api -> armory / legion / treasury; legion -> LayaModel (its own stack, reached through the host's published port 9120, not started here).
+# Stack: ember_web / ember_admin / legion_admin -> ember_api -> armory / legion / treasury; legion -> LayaModel (its own stack, reached through the host's published port 29220, not started here).
 # Start:  docker compose up -d --build
 # The internal token is made on first start and shared through the internal_token volume. Per-app
 # secrets stay in apps/<app>/.env and are loaded when the file exists.

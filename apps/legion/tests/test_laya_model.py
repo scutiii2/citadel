@@ -25,10 +25,10 @@ def ok(url, body=ANSWER):
 def test_ask_sends_the_strategy_token_and_tuning_and_asks_for_the_trace(monkeypatch):
     sent = []
     post_returning(monkeypatch, ok, sent)
-    agent = LAYAModel("http://laya:9120/", "tok")
+    agent = LAYAModel("http://laya:29220/", "tok")
     assert agent.ask("typed-only", "text", QUESTIONS, 4096, min_confidence=0.6, prune_ratio=None) == ANSWER
     url, kwargs = sent[0]
-    assert url == "http://laya:9120/v1/ask" and kwargs["headers"] == {"X-Internal-Token": "tok"}
+    assert url == "http://laya:29220/v1/ask" and kwargs["headers"] == {"X-Internal-Token": "tok"}
     assert kwargs["json"] == {"strategy": "typed-only", "text": "text", "questions": QUESTIONS, "max_len": 4096,
                               "trace": True, "min_confidence": 0.6}
 
@@ -39,7 +39,7 @@ def test_ask_sends_the_strategy_token_and_tuning_and_asks_for_the_trace(monkeypa
 def test_ask_uses_capped_http_timeout_without_changing_payload(monkeypatch, options, expected):
     sent = []
     post_returning(monkeypatch, ok, sent)
-    assert LAYAModel("http://laya:9120").ask("auto", "text", QUESTIONS, 512, **options) == ANSWER
+    assert LAYAModel("http://laya:29220").ask("auto", "text", QUESTIONS, 512, **options) == ANSWER
     assert sent[0][1]["timeout"] == expected
     assert sent[0][1]["json"] == {
         "strategy": "auto", "text": "text", "questions": QUESTIONS, "max_len": 512, "trace": True,
@@ -49,7 +49,7 @@ def test_ask_uses_capped_http_timeout_without_changing_payload(monkeypatch, opti
 def test_combine_posts_the_voters(monkeypatch):
     sent = []
     post_returning(monkeypatch, lambda url: ok(url, {"kept": ["a", "b"]}), sent)
-    assert LAYAModel("http://laya:9120").combine({"jev": {}}, ["a", "b"], 0.25, 0.5) == {"kept": ["a", "b"]}
+    assert LAYAModel("http://laya:29220").combine({"jev": {}}, ["a", "b"], 0.25, 0.5) == {"kept": ["a", "b"]}
     assert sent[0][0].endswith("/v1/combine") and sent[0][1]["json"]["options"] == ["a", "b"]
     assert sent[0][1]["headers"] == {}
 
@@ -58,7 +58,7 @@ def test_a_refused_request_carries_the_calls_the_service_made(monkeypatch):
     detail = {"detail": {"message": "Laya could not read the complete input", "calls": [{"model": "m", "ok": False}]}}
     post_returning(monkeypatch, lambda url: httpx.Response(413, json=detail, request=httpx.Request("POST", url)), [])
     with pytest.raises(LayaServiceError, match="complete input") as error:
-        LAYAModel("http://laya:9120").ask("auto", "t", QUESTIONS, 512)
+        LAYAModel("http://laya:29220").ask("auto", "t", QUESTIONS, 512)
     assert error.value.calls == [{"model": "m", "ok": False}]
 
 
@@ -68,7 +68,7 @@ def test_a_service_that_cannot_be_reached_is_a_runtime_error(monkeypatch):
 
     monkeypatch.setattr(laya_model.httpx, "post", post)
     with pytest.raises(RuntimeError, match="could not be reached"):
-        LAYAModel("http://laya:9120").ask("auto", "t", QUESTIONS, 512)
+        LAYAModel("http://laya:29220").ask("auto", "t", QUESTIONS, 512)
 
 
 def test_without_a_url_nothing_is_configured(monkeypatch):
@@ -76,7 +76,7 @@ def test_without_a_url_nothing_is_configured(monkeypatch):
     assert laya_model.configured() is False
     with pytest.raises(LayaServiceError, match="LAYA_SERVICE_URL"):
         laya_model.agent().ask("auto", "t", QUESTIONS, 512)
-    monkeypatch.setenv("LAYA_SERVICE_URL", "http://laya:9120")
+    monkeypatch.setenv("LAYA_SERVICE_URL", "http://laya:29220")
     assert laya_model.configured() is True
 
 
@@ -88,14 +88,14 @@ def test_strategies_lists_the_service_names_and_its_default(monkeypatch):
         return httpx.Response(200, json={"default": "auto", "strategies": ["english-only", "auto"]})
 
     monkeypatch.setattr(httpx, "get", get)
-    result = LAYAModel("http://laya:9120/", token="t").strategies()
+    result = LAYAModel("http://laya:29220/", token="t").strategies()
     assert result == {"strategies": ["english-only", "auto"], "default": "auto"}
-    assert seen == {"url": "http://laya:9120/v1/strategies", "headers": {"X-Internal-Token": "t"}}
+    assert seen == {"url": "http://laya:29220/v1/strategies", "headers": {"X-Internal-Token": "t"}}
 
 
 def test_strategies_accepts_a_mapping_of_names(monkeypatch):
     monkeypatch.setattr(httpx, "get", lambda *a, **k: httpx.Response(200, json={"default": "auto", "strategies": {"a": "x", "b": "y"}}))
-    assert LAYAModel("http://laya:9120").strategies()["strategies"] == ["a", "b"]
+    assert LAYAModel("http://laya:29220").strategies()["strategies"] == ["a", "b"]
 
 
 def test_strategies_errors_become_service_errors(monkeypatch):
@@ -103,7 +103,7 @@ def test_strategies_errors_become_service_errors(monkeypatch):
         LAYAModel("").strategies()
     monkeypatch.setattr(httpx, "get", lambda *a, **k: httpx.Response(500, text="boom"))
     with pytest.raises(LayaServiceError) as refused:
-        LAYAModel("http://laya:9120").strategies()
+        LAYAModel("http://laya:29220").strategies()
     assert refused.value.status == 500
 
     def down(*a, **k):
@@ -111,7 +111,7 @@ def test_strategies_errors_become_service_errors(monkeypatch):
 
     monkeypatch.setattr(httpx, "get", down)
     with pytest.raises(LayaServiceError, match="could not be reached"):
-        LAYAModel("http://laya:9120").strategies()
+        LAYAModel("http://laya:29220").strategies()
 
 
 def test_a_busy_service_is_retried_after_its_retry_after_and_then_answers(monkeypatch):
@@ -119,7 +119,7 @@ def test_a_busy_service_is_retried_after_its_retry_after_and_then_answers(monkey
     monkeypatch.setattr(laya_model.time, "sleep", waits.append)
     replies = iter([httpx.Response(429, headers={"Retry-After": "5"}), httpx.Response(429, headers={"Retry-After": "99"}), None])
     post_returning(monkeypatch, lambda url: next(replies) or ok(url), sent)
-    assert LAYAModel("http://laya:9120").ask("auto", "text", QUESTIONS, 512) == ANSWER
+    assert LAYAModel("http://laya:29220").ask("auto", "text", QUESTIONS, 512) == ANSWER
     assert len(sent) == 3 and waits == [5.0, laya_model.MAX_WAIT_SECONDS]
 
 
@@ -128,5 +128,5 @@ def test_a_service_that_stays_busy_gives_the_429_after_the_retries(monkeypatch):
     monkeypatch.setattr(laya_model.time, "sleep", lambda seconds: None)
     post_returning(monkeypatch, httpx.Response(429, json={"detail": "busy"}), sent)
     with pytest.raises(LayaServiceError) as error:
-        LAYAModel("http://laya:9120").ask("auto", "text", QUESTIONS, 512)
+        LAYAModel("http://laya:29220").ask("auto", "text", QUESTIONS, 512)
     assert error.value.status == 429 and len(sent) == laya_model.BUSY_RETRIES + 1
