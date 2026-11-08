@@ -312,9 +312,9 @@ def test_post_internal_is_passed_to_the_config(client, monkeypatch):
     monkeypatch.setattr(extensions, "current_statuses", lambda: [])
     monkeypatch.setattr(extensions, "add_extension", fake_add_extension)
 
-    assert client.post("/extensions", json={"label": "X", "url": "http://bard:8090/mcp", "internal": True}).status_code == 201
+    assert client.post("/extensions", json={"label": "X", "url": "http://bard:29400/mcp", "internal": True}).status_code == 201
     assert captured["internal"] is True
-    assert client.post("/extensions", json={"label": "X", "url": "http://bard:8090/mcp", "internal": "yes"}).status_code == 400
+    assert client.post("/extensions", json={"label": "X", "url": "http://bard:29400/mcp", "internal": "yes"}).status_code == 400
 
 
 def test_an_internal_extension_sends_the_token_and_others_do_not(monkeypatch):

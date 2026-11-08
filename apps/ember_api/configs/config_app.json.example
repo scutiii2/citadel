@@ -9,8 +9,8 @@
   "require_email_verification": true,
   "agents_registry_path": "../../legion/.data/agent_registry.json",
   "mcp_server_url": "http://127.0.0.1:8010/mcp",
-  "bard_url": "http://127.0.0.1:8090",
-  "scribe_url": "http://127.0.0.1:8091",
+  "bard_url": "http://127.0.0.1:29400",
+  "scribe_url": "http://127.0.0.1:29401",
   "db_gateway": {
     "url": "http://127.0.0.1:8071",
     "instance": "ember",

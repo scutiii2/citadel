@@ -235,9 +235,9 @@ class Settings:
     agents_registry_url: str | None = None
     mcp_server_url: str = "http://127.0.0.1:8010/mcp"
     # Bard (text to speech): audio files are streamed from here, never exposed to the browser.
-    bard_url: str = "http://127.0.0.1:8090"
+    bard_url: str = "http://127.0.0.1:29400"
     # Scribe (speech to text): attached audio is uploaded here, never exposed to the browser.
-    scribe_url: str = "http://127.0.0.1:8091"
+    scribe_url: str = "http://127.0.0.1:29401"
     security: SecuritySettings = field(default_factory=SecuritySettings)
     usage: UsageSettings = field(default_factory=UsageSettings)
     pricing: PricingSettings = field(default_factory=PricingSettings)
@@ -281,8 +281,8 @@ def load_settings() -> Settings:
         agents_registry_path=_project_path(registry_path),
         agents_registry_url=raw.get("agents_registry_url") or None,
         mcp_server_url=raw.get("mcp_server_url") or "http://127.0.0.1:8010/mcp",
-        bard_url=raw.get("bard_url") or "http://127.0.0.1:8090",
-        scribe_url=raw.get("scribe_url") or "http://127.0.0.1:8091",
+        bard_url=raw.get("bard_url") or "http://127.0.0.1:29400",
+        scribe_url=raw.get("scribe_url") or "http://127.0.0.1:29401",
         security=SecuritySettings.from_config(raw.get("security", {})),
         usage=UsageSettings.from_config(raw.get("usage", {})),
         pricing=PricingSettings.from_config(load_json_config(CONFIGS_DIR / "config_pricing.json")),

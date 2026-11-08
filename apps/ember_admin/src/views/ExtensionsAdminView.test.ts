@@ -53,12 +53,12 @@ describe("ExtensionsAdminView", () => {
     const wrapper = await mounted();
 
     await wrapper.find("[data-test=label]").setValue("Bard");
-    await wrapper.find("[data-test=url]").setValue("http://bard:8090/mcp");
+    await wrapper.find("[data-test=url]").setValue("http://bard:29400/mcp");
     await wrapper.find("[data-test=internal]").setValue(true);
     await wrapper.find("form").trigger("submit");
     await flushPromises();
 
-    expect(add).toHaveBeenCalledWith({ label: "Bard", url: "http://bard:8090/mcp", description: "", internal: true });
+    expect(add).toHaveBeenCalledWith({ label: "Bard", url: "http://bard:29400/mcp", description: "", internal: true });
   });
 
   it("removes an extension only after the confirm", async () => {

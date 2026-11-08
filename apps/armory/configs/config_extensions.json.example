@@ -31,19 +31,19 @@
     "web_url": "http://127.0.0.1:5175"
   },
   "bard": {
-    "_comment": "Bard's MCP endpoint (Python/Bard). It requires the shared internal token, sent here as a header. Start Bard before mcp_server so the connection succeeds at startup. forward_requester sends the asking user's username upstream (_meta.requester); Bard keeps each user's audio private to them and refuses a call without it. Ember plays the audio through ember_api (GET /api/bard/audio/{file_id}), so there is no web_url.",
+    "_comment": "Bard's MCP endpoint (Python/Bard). It requires its own token (made on its admin page, Tokens card), kept in armory's .env as BARD_TOKEN and sent here as a header. Start Bard before mcp_server so the connection succeeds at startup. forward_requester sends the asking user's username upstream (_meta.requester); Bard keeps each user's audio private to them and refuses a call without it. Ember plays the audio through ember_api (GET /api/bard/audio/{file_id}), so there is no web_url.",
     "label": "Bard",
     "description": "Text to speech: turns text into an MP3 and plays it in chat. English voice.",
-    "url": "http://127.0.0.1:8090/mcp",
-    "headers": { "X-Internal-Token": "${INTERNAL_API_TOKEN}" },
+    "url": "http://127.0.0.1:29400/mcp",
+    "headers": { "X-Internal-Token": "${BARD_TOKEN}" },
     "forward_requester": true
   },
   "scribe": {
-    "_comment": "Scribe's MCP endpoint (Python/Scribe). It requires the shared internal token, sent here as a header. Start Scribe before mcp_server so the connection succeeds at startup. forward_requester sends the asking user's username upstream (_meta.requester); Scribe keeps each user's audio private to them and refuses a call without it. Audio is uploaded through ember_api (POST /api/attachments/audio), so there is no web_url.",
+    "_comment": "Scribe's MCP endpoint (Python/Scribe). It requires its own token (made on its admin page, Tokens card), kept in armory's .env as SCRIBE_TOKEN and sent here as a header. Start Scribe before mcp_server so the connection succeeds at startup. forward_requester sends the asking user's username upstream (_meta.requester); Scribe keeps each user's audio private to them and refuses a call without it. Audio is uploaded through ember_api (POST /api/attachments/audio), so there is no web_url.",
     "label": "Scribe",
     "description": "Speech to text: transcribes an attached audio file to English text.",
-    "url": "http://127.0.0.1:8091/mcp",
-    "headers": { "X-Internal-Token": "${INTERNAL_API_TOKEN}" },
+    "url": "http://127.0.0.1:29401/mcp",
+    "headers": { "X-Internal-Token": "${SCRIBE_TOKEN}" },
     "forward_requester": true
   }
 }

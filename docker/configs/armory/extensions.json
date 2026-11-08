@@ -3,14 +3,16 @@
     "_comment": "Bard runs from Python/Bard (its own compose project, joined to this stack's core network), so Armory reaches it by service name. Start the Citadel stack first, then Bard, then restart armory so its startup handshake succeeds. Bard needs the same INTERNAL_API_TOKEN as this stack.",
     "label": "Bard",
     "description": "Text to speech: turns text into an MP3 and plays it in chat. English voice.",
-    "url": "http://bard:8090/mcp",
-    "internal": true
+    "url": "http://bard:29400/mcp",
+    "headers": { "X-Internal-Token": "${BARD_TOKEN}" },
+    "forward_requester": true
   },
   "scribe": {
     "_comment": "Scribe runs from Python/Scribe (its own compose project, joined to this stack's core network), so Armory reaches it by service name. Start the Citadel stack first, then Scribe, then restart armory so its startup handshake succeeds. Scribe needs the same INTERNAL_API_TOKEN as this stack.",
     "label": "Scribe",
     "description": "Speech to text: transcribes an attached audio file to English text.",
-    "url": "http://scribe:8091/mcp",
-    "internal": true
+    "url": "http://scribe:29401/mcp",
+    "headers": { "X-Internal-Token": "${SCRIBE_TOKEN}" },
+    "forward_requester": true
   }
 }
