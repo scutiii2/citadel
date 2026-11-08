@@ -1,0 +1,117 @@
+import { apiRequest } from "./http";
+
+export interface GatewayInfo {
+  id: string;
+  label: string;
+  model: string;
+  tiers: { tier: string; id: string }[];
+}
+
+/** Provider id -> the gateways it can run through (from ai_agent's gateways/<provider>/<gateway>.json files). */
+export type ProviderCatalog = Record<string, GatewayInfo[]>;
+
+interface AgentGatewayChoice {
+  gateway: string;
+  model?: string;
+}
+
+interface AgentLlm {
+  provider: string;
+  strategy?: "laya-only" | "jev-only" | "both";
+  min_confidence?: number;
+  gateway?: string;
+  model?: string;
+  fallback_gateways?: (string | AgentGatewayChoice)[];
+  reasoning_effort?: string;
+  temperature?: number;
+  max_tokens?: number;
+  max_tool_rounds?: number;
+  max_turn_tokens?: number;
+  max_turn_seconds?: number;
+  max_effort?: string;
+  min_tier?: string;
+  max_tier?: string;
+  [key: string]: unknown;
+}
+
+/** An agent file's content. Fields the form does not edit are kept as they are. */
+export interface AgentConfig {
+  role: "orchestrator" | "router" | "specialist";
+  decision?: Partial<RouterPolicy>;
+  label?: string;
+  port: number;
+  /** Address peers and ember_api reach the agent at; unset = http://127.0.0.1:<port>/mcp. */
+  url?: string;
+  enabled?: boolean;
+  entry?: boolean;
+  /** Offer the update_plan checklist tool; on when unset. */
+  plan_tool?: boolean;
+  llm: AgentLlm;
+  persona?: string;
+  instructions?: string;
+  focus?: string;
+  /** Replaces the shared identity line for this agent. */
+  identity?: string;
+  tools?: { allow?: string[]; deny?: string[] };
+  [key: string]: unknown;
+}
+
+export interface RouterPolicy {
+  choose_agent: boolean;
+  choose_tier: boolean;
+  strategy: "laya-only" | "jev-only" | "both";
+  min_confidence?: number;
+  trace: boolean;
+  deadline_seconds: number;
+  remote_timeout_seconds: number;
+  size_tiers: Record<"tiny" | "everyday" | "large" | "hardest", string>;
+}
+
+/** A listed agent: its file plus the id; a file ai_agent could not read has only `error`.
+ * `overridden`: this machine's edits replace the tracked default file, which can be reset to. */
+export type AgentFile = Partial<AgentConfig> & { id: string; error?: string; overridden?: boolean };
+
+export type AgentStatus = "running" | "offline" | "disabled";
+
+/** A model an agent may run on: its strength tier, model id and what the tier is for. */
+export interface AgentTier {
+  tier: string;
+  id: string;
+  use_for: string;
+}
+
+/** What ember_api reports about an agent right now. */
+export interface LiveAgent {
+  status: AgentStatus;
+  tiers: AgentTier[];
+  decision?: Partial<RouterPolicy> & { fallback_available?: boolean; local_status?: string };
+}
+
+/** The prompt texts every agent shares. `overridden` lists the ones that differ from the built-in default. */
+export interface SharedPrompts {
+  values: Record<string, string>;
+  defaults: Record<string, string>;
+  overridden: string[];
+}
+
+/** ember_api's /api/admin/agents (needs agents.manage), which ai_agent validates and applies. */
+export const agentsAdminClient = {
+  gateways: async () => (await apiRequest<{ providers: ProviderCatalog }>("GET", "/api/admin/agents/gateways")).providers,
+  list: async () => (await apiRequest<{ agents: AgentFile[] }>("GET", "/api/admin/agents")).agents,
+  create: (id: string, config: AgentConfig) => apiRequest<AgentFile>("POST", "/api/admin/agents", { id, config }),
+  update: (id: string, config: AgentConfig) => apiRequest<AgentFile>("PUT", `/api/admin/agents/${encodeURIComponent(id)}`, { config }),
+  /** Drops this machine's edits so the tracked default file applies again. */
+  reset: (id: string) => apiRequest<AgentFile>("POST", `/api/admin/agents/${encodeURIComponent(id)}/reset`),
+  remove: (id: string) => apiRequest<void>("DELETE", `/api/admin/agents/${encodeURIComponent(id)}`),
+  prompts: () => apiRequest<SharedPrompts>("GET", "/api/admin/agent-prompts"),
+  /** `null` (or blank) resets a text to its default. ai_agent restarts every agent to apply it. */
+  setPrompts: (changes: Record<string, string | null>) => apiRequest<SharedPrompts>("PUT", "/api/admin/agent-prompts", changes),
+  /** The assembled system prompt a draft agent file would get. */
+  previewPrompt: async (id: string, config: AgentConfig, caveman: boolean) =>
+    (await apiRequest<{ prompt: string }>("POST", "/api/admin/agent-prompt-preview", { id, config, caveman })).prompt,
+  /** Status and effective model tiers by agent id (needs chat.use; callers treat a failure as "unknown"). */
+  live: async (): Promise<Record<string, LiveAgent>> => {
+    const rows = await apiRequest<({ id: string } & LiveAgent)[]>("GET", "/api/agents");
+    return Object.fromEntries(rows.map((r) => [r.id, { status: r.status, tiers: r.tiers ?? [], decision: r.decision }]));
+  },
+};

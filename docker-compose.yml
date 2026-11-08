@@ -1,4 +1,4 @@
-# Stack: ember_web / ember_admin -> ember_api -> armory / legion / treasury; legion -> LayaModel (its own stack, reached through the host's published port 9120, not started here).
+# Stack: ember_web / ember_admin / legion_admin -> ember_api -> armory / legion / treasury; legion -> LayaModel (its own stack, reached through the host's published port 9120, not started here).
 # Start:  docker compose up -d --build
 # Needs a root .env with INTERNAL_API_TOKEN (see .env.example). Per-app
 # secrets stay in apps/<app>/.env and are loaded when the file exists.
@@ -102,6 +102,14 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:5176:80"
+    depends_on: [ember_api]
+    networks: [core]
+
+  legion_admin:
+    build: ./apps/legion_admin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:26500:80"
     depends_on: [ember_api]
     networks: [core]
 
