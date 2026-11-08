@@ -1,14 +1,14 @@
 # Stack: ember_web / ember_admin / legion_admin -> ember_api -> armory / legion / treasury; legion -> LayaModel (its own stack, reached through the host's published port 9120, not started here).
 # Start:  docker compose up -d --build
-# Needs a root .env with INTERNAL_API_TOKEN (see .env.example). Per-app
+# The internal token is made on first start and shared through the internal_token volume. Per-app
 # secrets stay in apps/<app>/.env and are loaded when the file exists.
 # Container-only configs live in docker/configs and are mounted over each
 # app's configs/ file; the apps' own configs stay untouched.
 
 name: citadel
 
-x-internal-token: &internal_token
-  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?set INTERNAL_API_TOKEN in .env}
+x-internal-token: &internal_token  # shared file, made by whichever app starts first
+  INTERNAL_TOKEN_FILE: /run/citadel/internal_token
 
 services:
   armory:
@@ -29,6 +29,7 @@ services:
       # Writable: the Capabilities page in ember_admin saves its on/off toggles into this tracked file.
       - ./docker/configs/armory/capabilities.json:/app/configs/config_capabilities.json
       - armory_data:/app/.data
+      - internal_token:/run/citadel
       # server_manager (Docker apps list/start/stop/logs) talks to the host daemon.
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on: [treasury]
@@ -51,6 +52,7 @@ services:
     volumes:
       - ./docker/configs/legion/servers.json:/app/configs/config_servers.json:ro
       - agent_data:/app/.data
+      - internal_token:/run/citadel
     depends_on: [armory]
     networks: [core]
 
@@ -67,6 +69,7 @@ services:
       - ./docker/configs/treasury/app.json:/app/configs/config_app.json:ro
       - ./docker/configs/treasury/connections.json:/app/configs/config_connections.json:ro
       - treasury_data:/app/data
+      - internal_token:/run/citadel
     networks: [core]
 
   ember_api:
@@ -83,6 +86,7 @@ services:
       # ember_api reads and writes its secrets (EMBER_SECRETS_KEY) in its own .env file.
       - ./apps/Ember/ember_api/.env:/app/.env
       - ember_api_data:/app/data
+      - internal_token:/run/citadel
       - agent_data:/agent_data:ro
     depends_on: [armory, legion, treasury]
     networks: [core]
@@ -124,3 +128,4 @@ volumes:
   agent_data:
   treasury_data:
   ember_api_data:
+  internal_token:

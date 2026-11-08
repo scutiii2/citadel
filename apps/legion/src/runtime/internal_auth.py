@@ -29,6 +29,7 @@ from typing import Any, Mapping
 from dotenv import dotenv_values
 
 from src.runtime.seed import seed_from_example
+from src.runtime.shared_token import shared_token
 
 _SECRETS_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
 
@@ -44,9 +45,10 @@ PROTECTED_PATHS = ("/mcp", "/registry", "/agents")
 
 def load_token() -> str:
     """INTERNAL_API_TOKEN from the environment, else from the secret file
-    (seeded from its .example on first run). "" = not configured."""
+    (seeded from its .example on first run), else the shared token file
+    (made on first run). "" = not configured."""
     seed_from_example(_SECRETS_PATH)
-    return os.getenv("INTERNAL_API_TOKEN") or dotenv_values(_SECRETS_PATH).get("INTERNAL_API_TOKEN") or ""
+    return os.getenv("INTERNAL_API_TOKEN") or dotenv_values(_SECRETS_PATH).get("INTERNAL_API_TOKEN") or shared_token()
 
 
 TOKEN = load_token()

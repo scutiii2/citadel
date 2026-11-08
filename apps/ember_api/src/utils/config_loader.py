@@ -7,10 +7,13 @@ copied from its committed ``.example`` twin on first use instead of failing.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 
 from dotenv import dotenv_values
+
+from src.utils.shared_token import shared_token
 
 
 def _ensure_from_example(path: Path) -> bool:
@@ -38,3 +41,8 @@ def load_env_secrets(path: str | Path) -> dict[str, str]:
     if not _ensure_from_example(path):
         return {}
     return {k: v for k, v in dotenv_values(path).items() if v is not None}
+
+
+def internal_token(path: str | Path) -> str:
+    """INTERNAL_API_TOKEN from the environment, else the secret file, else the shared token file. "" = not configured."""
+    return os.getenv("INTERNAL_API_TOKEN") or load_env_secrets(path).get("INTERNAL_API_TOKEN") or shared_token()

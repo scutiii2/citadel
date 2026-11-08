@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.services.shared_token import shared_token
+
 
 def _env(name: str, default: str) -> str:
     """os.getenv, but an empty value counts as unset.
@@ -35,7 +37,7 @@ class Settings:
     log_dir: Path = Path(_env("MCP_LOG_DIR", ".logs"))
     # Shared secret, same value both directions; blank by default so it fails loudly.
     # POST /upload (upload_routes.py) checks it inbound because chat_app proxies user files here.
-    internal_api_token: str = _env("INTERNAL_API_TOKEN", "")
+    internal_api_token: str = _env("INTERNAL_API_TOKEN", "") or shared_token()
     # Where POST /upload (upload_routes.py) writes files dropped into a command-form modal.
     # Relative to CWD like the paths above.
     uploads_dir: Path = Path(_env("MCP_UPLOADS_DIR", ".data/uploads"))

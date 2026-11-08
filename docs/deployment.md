@@ -12,12 +12,12 @@ Citadel runs as containers from one `docker-compose.yml`:
 | `treasury` | database gateway | internal 8071 |
 
 Only the two web apps publish ports. The rest talk over the internal `core` network. Laya is not in this stack: it runs
-from the separate `LayaModel` project (see "Laya" below) and legion reaches it through the host's published port, `http://host.docker.internal:9120`.
+from the separate `LayaModel` project (see "Laya" below) and legion reaches it through the host's published port, `http://host.docker.internal:29220`.
 
 ## 1. Local (Windows, macOS, Linux with Docker Desktop or Engine)
 
-1. Copy `.env.example` to `.env` in the repo root and set `INTERNAL_API_TOKEN` to a long random string. Compose
-   refuses to start without it. Per-app secrets live in `apps/<app>/.env` and are loaded when the file exists.
+1. The internal token is made on first start and shared through the `internal_token` volume; you set nothing.
+   Per-app secrets live in `apps/<app>/.env` and are loaded when the file exists.
 2. Start the stack:
 
    ```bash
@@ -80,9 +80,9 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
 2. **Deploy `LayaModel` separately** (it is its own project and Citadel's compose does not start it). Run
    `docker compose up -d --build` in the `LayaModel` folder (`/media/ZimaOS-HD/Apps/LayaModel`), in any order relative
-   to Citadel. It publishes port 9120 on the host and legion reaches it at `http://host.docker.internal:9120`
+   to Citadel. It publishes port 29220 on the host and legion reaches it at `http://host.docker.internal:29220`
    (Compose maps that name to the host with `extra_hosts`), so the two stacks share no Docker network. Set
-   `LAYA_SERVICE_URL=http://host.docker.internal:9120` in `apps/legion/.env`; if you change `LAYA_PORT` in `LayaModel`,
+   `LAYA_SERVICE_URL=http://host.docker.internal:29220` in `apps/legion/.env`; if you change `LAYA_PORT` in `LayaModel`,
    change the port there to match. A container cannot resolve the server's own hostname (`scutiserver1`). See
    `LayaModel/deployment.md` for replicas, port and weights.
 
@@ -90,11 +90,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    The simplest way is deploy option 2, which copies yours from the PC. To create them by hand, run from the Citadel
    folder (names that start with a dot are hidden: use `ls -la`).
 
-   Root `.env` (required). ZimaOS has no `openssl`, so build the token from `/dev/urandom`:
-
-   ```bash
-   echo "INTERNAL_API_TOKEN=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" > .env
-   ```
+   No root `.env` is needed: the internal token is made on first start.
 
    Per-app files: copy each committed `.env.example` and fill in the values.
 
@@ -113,7 +109,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
    | `apps/Ember/ember_api/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
 
-   - The root token reaches every service and overrides any `INTERNAL_API_TOKEN` in a per-app file.
+   - Leave `INTERNAL_API_TOKEN` out of the per-app files. A value there wins over the generated token for that app only, so the apps would stop agreeing.
    - Skip `MCP_HOST`, `MCP_PORT` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. Set `LAYA_SERVICE_URL`
      and `OMNIROUTE_BASE_URL` in `apps/legion/.env` to `http://host.docker.internal:<port>`. Do not use `localhost` or
      the server's hostname for another service.
@@ -255,7 +251,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 
 - The Docker socket is root on the host. Anyone who can call the `tool_srv_*` tools can control every container.
 - Server Manager lists every container on the host, not only Citadel's. On ZimaOS that includes your other apps.
-- Keep `INTERNAL_API_TOKEN` secret. Do not publish armory's port 8010.
+- Keep the `internal_token` volume secret. Do not publish armory's port 8010.
 - Keep `server` disabled where you do not need it.
 
 **Checking it works.** With the stack up and `server` enabled, ask the assistant to list apps, or call
@@ -267,8 +263,8 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 
 | Symptom | Cause and fix |
 |---|---|
-| `set INTERNAL_API_TOKEN in .env` | The root `.env` is missing or empty. |
-| legion cannot reach Laya | LayaModel is not running, or its published port is not 9120. Run `docker compose ps` in `LayaModel`, then `docker compose exec legion python -c "import urllib.request as u; print(u.urlopen('http://host.docker.internal:9120/health').status)"`. Expect 200. |
+| `401 Invalid or missing internal API token` between apps | One app has its own `INTERNAL_API_TOKEN` in its `.env`. Remove it, then `docker compose up -d`. |
+| legion cannot reach Laya | LayaModel is not running, or its published port is not 29220. Run `docker compose ps` in `LayaModel`, then `docker compose exec legion python -c "import urllib.request as u; print(u.urlopen('http://host.docker.internal:29220/health').status)"`. Expect 200. |
 | `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
 | `scp` will not log in | Check `DEPLOY_HOST` and that the folder exists. Run `ssh <host>` by hand to test. |
 | `openssl: command not found` | Use the `/dev/urandom` command in first-time setup, step 3. A failed `echo` leaves an empty `.env`, so run it again. |

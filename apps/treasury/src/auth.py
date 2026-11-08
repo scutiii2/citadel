@@ -10,6 +10,7 @@ from pathlib import Path
 from dotenv import dotenv_values
 
 from src.seed import seed_from_example
+from src.shared_token import shared_token
 
 ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 INTERNAL_TOKEN_HEADER = "X-Internal-Token"
@@ -18,11 +19,11 @@ OPEN_PATHS = ("/health",)
 
 def load_token(path: Path | None = None) -> str:
     """INTERNAL_API_TOKEN from the environment, else from the project's .env
-    (seeded from .env.example on first run). "" = not configured."""
+    (seeded from .env.example on first run), else the shared token file. "" = not configured."""
     if path is None:
         path = ENV_PATH
         seed_from_example(path)
-    return os.getenv("INTERNAL_API_TOKEN") or dotenv_values(path).get("INTERNAL_API_TOKEN") or ""
+    return os.getenv("INTERNAL_API_TOKEN") or dotenv_values(path).get("INTERNAL_API_TOKEN") or shared_token()
 
 
 class InternalTokenMiddleware:

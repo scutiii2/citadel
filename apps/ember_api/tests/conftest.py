@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import os
+
+# Tests never read or create the shared token file.
+os.environ["INTERNAL_TOKEN_FILE"] = ""
+
 import asyncio
 import json
 from collections.abc import Callable, Iterator

@@ -1,5 +1,10 @@
 """Shared fixtures. Tests never read the real configs/ or .env files."""
 
+import os
+
+# Tests never read or create the shared token file.
+os.environ["INTERNAL_TOKEN_FILE"] = ""
+
 import pytest
 
 from src.backends.base import DatabaseBackend

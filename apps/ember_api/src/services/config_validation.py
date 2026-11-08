@@ -28,7 +28,8 @@ import httpx
 from dotenv import dotenv_values
 
 from src.config import Settings
-from src.utils.config_loader import load_env_secrets
+from src.utils.config_loader import internal_token, load_env_secrets
+from src.utils.shared_token import shared_token
 
 _PLACEHOLDER = re.compile(
     r"^(change[-_ ]?me|replace[-_ ]?me|your[-_ ].*|<.*>|x{3,}|todo)$|@example\.(com|org|net)$",
@@ -178,12 +179,12 @@ def _check_agents(data: Any) -> list[Problem]:
 
 
 def _check_internal_api(env: dict[str, str]) -> list[Problem]:
-    if not env.get("INTERNAL_API_TOKEN"):
+    if not (env.get("INTERNAL_API_TOKEN") or shared_token()):
         return [
             (
                 "INTERNAL_API_TOKEN",
                 "is empty: mcp_server and ai_agent accept requests from anything that can reach them. "
-                "Set the same token in each project's .env",
+                "Leave INTERNAL_TOKEN_FILE at its default so every app shares one generated token, or set the same INTERNAL_API_TOKEN in each project's .env",
             )
         ]
     return []
@@ -253,7 +254,7 @@ async def _registry_url_issues(settings: Settings) -> list[ConfigIssue]:
     """Fetches agents_registry_url once and checks what comes back."""
     url = settings.agents_registry_url
     name = "agents registry (URL)"
-    token = (await asyncio.to_thread(load_env_secrets, settings.env_path)).get("INTERNAL_API_TOKEN")
+    token = await asyncio.to_thread(internal_token, settings.env_path)
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(3.0)) as client:
             response = await client.get(url, headers={"X-Internal-Token": token} if token else {})

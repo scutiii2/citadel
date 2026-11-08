@@ -77,7 +77,7 @@ from src.services.server_tools import McpServerTools, ServerTools
 from src.services.session_service import SessionService
 from src.services.traffic import TrafficMiddleware, TrafficRecorder
 from src.services.turns import TurnRegistry
-from src.utils.config_loader import load_env_secrets
+from src.utils.config_loader import internal_token as load_internal_token, load_env_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +134,7 @@ def create_app(
             # Printed once, like chat_app; never logged to a file.
             print(f"Bootstrap admin created with password: {generated} (save it now, it won't be shown again)")
 
-        internal_token = load_env_secrets(settings.env_path).get("INTERNAL_API_TOKEN")
+        internal_token = load_internal_token(settings.env_path)
         # Raises SecretBoxError (a clear one-line message) when .env holds a key that is not valid.
         secret_box = SecretBox(ensure_secrets_key(settings.env_path))
         upstream = httpx.AsyncClient(transport=upstream_transport, timeout=_UPSTREAM_TIMEOUT)
