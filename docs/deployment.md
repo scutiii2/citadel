@@ -79,7 +79,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    `git fetch origin live && git switch -c live --track origin/live`.
 
 2. **Deploy `LayaModel` separately** (it is its own project and Citadel's compose does not start it). Run
-   `docker compose up -d --build` in the `LayaModel` folder (`/media/ZimaOS-HD/Apps/LayaModel`), in any order relative
+   `docker compose up -d --build` in the `LayaModel` folder (`/media/ZimaOS-HD/Apps/ModelServices/DSC_Laya_Model`), in any order relative
    to Citadel. It publishes port 29220 on the host and legion reaches it at `http://host.docker.internal:29220`
    (Compose maps that name to the host with `extra_hosts`), so the two stacks share no Docker network. Set
    `LAYA_SERVICE_URL=http://host.docker.internal:29220` in `apps/legion/.env`; if you change `LAYA_PORT` in `LayaModel`,
