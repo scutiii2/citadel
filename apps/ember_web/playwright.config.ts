@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-// A spare port, so the test never meets a dev server of yours on 5173/4173.
+// A spare port, so the test never meets a dev server of yours on 26502/4173.
 const PORT = Number(process.env.EMBER_E2E_PORT ?? 5199);
 
 // `pnpm run test:e2e`. The browser is the Chrome installed on this machine (no

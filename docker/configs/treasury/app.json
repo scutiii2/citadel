@@ -1,5 +1,5 @@
 {
   "host": "0.0.0.0",
-  "port": 8071,
+  "port": 29602,
   "default_cache": {"ttl_seconds": 30, "max_entries": 1000, "negative_ttl_seconds": 5}
 }

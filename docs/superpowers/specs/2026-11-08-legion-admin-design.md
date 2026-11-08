@@ -10,7 +10,7 @@ because Legion-related features will be removed from `ember_admin` later. First 
 - Stack matches `ember_admin`: Vue 3 + TypeScript + Vite + Pinia + vue-router, pnpm, vitest.
 - Backend path: via `ember_api`. No new backend routes. The app uses `/api/auth/*` and
   `/api/admin/agents*` (`ember_api/src/routes/agent_admin.py`, permission `agents.manage`).
-- Vite dev server proxies `/api` to `ember_api` (`EMBER_API_PORT`, default 8030) with `xfwd`,
+- Vite dev server proxies `/api` to `ember_api` (`EMBER_API_PORT`, default 29601) with `xfwd`,
   so the browser sees one origin. Session cookie is `SameSite=Strict`, so no cross-origin calls.
 - Admin-only: router guard allows only accounts holding `agents.manage`; others get a
   no-access view. `ember_api` enforces the same permission server-side; the guard is UX only.

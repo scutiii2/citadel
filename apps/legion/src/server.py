@@ -4,7 +4,7 @@ that itself talks to mcp_server as an MCP client (mcp_upstream.py).
 
 Run with:
     python -m src.supervisor   (starts one python -m src.server child per agent file)
-    python -m src.server --mcp-url http://127.0.0.1:8010/mcp   (with AI_AGENT_FILE set)
+    python -m src.server --mcp-url http://127.0.0.1:29600/mcp   (with AI_AGENT_FILE set)
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ _parser.add_argument(
     help=(
         "Override the mcp_server URL this agent connects to as an MCP "
         "client (configs/config_servers.json's 'main' entry), e.g. "
-        "http://127.0.0.1:8010/mcp to point at a different host/port. "
+        "http://127.0.0.1:29600/mcp to point at a different host/port. "
         "Takes precedence over MCP_SERVER_URL. Set before mcp_upstream.connect() "
         "runs in main() below."
     ),
@@ -75,7 +75,7 @@ except Exception as _exc:
     sys.exit(1)
 
 HOST = os.getenv("AI_AGENT_HOST", "127.0.0.1")
-PORT = int(os.getenv("AI_AGENT_PORT", "9100"))
+PORT = int(os.getenv("AI_AGENT_PORT", "29603"))
 
 
 

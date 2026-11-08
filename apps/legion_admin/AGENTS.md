@@ -10,4 +10,4 @@ Vue 3 + TypeScript admin app for Legion, only for accounts holding `agents.manag
 - Radius only through `--radius-*` tokens, colors only through `style.css` tokens (`radiusScale.test.ts` enforces it).
 - A switch that calls the server stays pending until the server answers.
 - Never add reduced-motion code.
-- Checks: `pnpm exec vue-tsc -b`, `pnpm test`. Dev: `pnpm dev` (port 26500; `EMBER_API_PORT` sets the proxy target, default 8030).
+- Checks: `pnpm exec vue-tsc -b`, `pnpm test`. Dev: `pnpm dev` (port 26500; `EMBER_API_PORT` sets the proxy target, default 29601).

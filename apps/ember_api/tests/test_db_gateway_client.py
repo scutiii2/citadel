@@ -127,7 +127,7 @@ def test_app_exposes_the_injected_store(client, db_gateway):
 
 
 def test_settings_defaults_and_validation():
-    assert DbGatewaySettings.from_config({}) == DbGatewaySettings("http://127.0.0.1:8071", "ember", "data")
+    assert DbGatewaySettings.from_config({}) == DbGatewaySettings("http://127.0.0.1:29602", "ember", "data")
     assert DbGatewaySettings.from_config({"url": "http://h:1/"}).url == "http://h:1"
     assert _check_app({"db_gateway": {"url": "nope", "instance": ""}}) == [
         ("db_gateway.url", "must be an http(s) URL"),

@@ -12,7 +12,7 @@ local/fallback readiness. Reset and disable use the existing agent lifecycle.
 
 
 Admin web app for ember, built with Vue 3, TypeScript and Vite. It runs on
-port 5176 (`EMBER_ADMIN_PORT`) and talks only to [ember_api](../ember_api)
+port 26501 (`EMBER_ADMIN_PORT`) and talks only to [ember_api](../ember_api)
 over the same origin, like [ember_web](../ember_web): its Vite server forwards
 `/api` to ember_api, so the browser holds no server URL or token.
 
@@ -21,19 +21,19 @@ over the same origin, like [ember_web](../ember_web): its Vite server forwards
 Needs `ember_api` and `mcp_server` running (ember_api proxies the capability
 and extension calls to mcp_server).
 
-- `pnpm install` once, then `pnpm run dev` starts Vite (port `EMBER_ADMIN_PORT`, default 5176).
+- `pnpm install` once, then `pnpm run dev` starts Vite (port `EMBER_ADMIN_PORT`, default 26501).
   Extra arguments go to Vite after `--`.
 - `dev_deploy.bat` rebuilds and restarts the `ember_admin` container from the root `docker-compose.yml`
   (see [docs/deployment.md](../../../docs/deployment.md)).
 
-Open <http://127.0.0.1:5176> and log in with an account that has
+Open <http://127.0.0.1:26501> and log in with an account that has
 at least one of the page permissions below. A login made in ember_web also works here: cookies are not
 scoped by port, so the same ember_api session cookie is sent.
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `EMBER_ADMIN_PORT` | `5176` | Vite's port. |
-| `EMBER_API_PORT` | `8030` | Where Vite forwards `/api` (ember_api). |
+| `EMBER_ADMIN_PORT` | `26501` | Vite's port. |
+| `EMBER_API_PORT` | `29601` | Where Vite forwards `/api` (ember_api). |
 
 ## Pages
 

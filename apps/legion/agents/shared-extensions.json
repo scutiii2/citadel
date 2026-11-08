@@ -1,6 +1,6 @@
 {
   "label": "Shared Extensions",
-  "port": 9119,
+  "port": 29618,
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",

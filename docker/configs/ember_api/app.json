@@ -1,6 +1,6 @@
 {
   "host": "0.0.0.0",
-  "port": 8030,
+  "port": 29601,
   "database_path": "data/ember_api.db",
   "session_cookie_name": "ember_session",
   "session_hours": 12,
@@ -8,11 +8,11 @@
   "default_role": "Member",
   "require_email_verification": false,
   "agents_registry_path": "/agent_data/agent_registry.json",
-  "mcp_server_url": "http://armory:8010/mcp",
+  "mcp_server_url": "http://armory:29600/mcp",
   "bard_url": "http://bard:29400",
   "scribe_url": "http://scribe:29401",
   "db_gateway": {
-    "url": "http://treasury:8071",
+    "url": "http://treasury:29602",
     "instance": "ember",
     "connection": "data"
   },

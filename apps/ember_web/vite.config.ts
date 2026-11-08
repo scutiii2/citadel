@@ -8,7 +8,7 @@ import { defineConfig } from 'vitest/config'
 // xfwd: adds X-Forwarded-For, so ember_api (which trusts it only from
 // loopback) rate-limits logins per real client, not per proxy.
 const apiProxy = {
-  '/api': { target: `http://127.0.0.1:${process.env.EMBER_API_PORT ?? 8030}`, xfwd: true, ws: true },
+  '/api': { target: `http://127.0.0.1:${process.env.EMBER_API_PORT ?? 29601}`, xfwd: true, ws: true },
 }
 
 // For the built app (`vite preview`). Not on the dev server: HMR needs
@@ -73,7 +73,7 @@ export default defineConfig({
   server: {
     // Set by the launcher or the environment. strictPort: fail instead of silently
     // moving to the next port, so the launcher's port is always the real one.
-    port: Number(process.env.EMBER_WEB_PORT ?? 5173),
+    port: Number(process.env.EMBER_WEB_PORT ?? 26502),
     strictPort: true,
     // Explicit IPv4: on Windows "localhost" can bind only [::1], which the
     // launcher's 127.0.0.1 port check would miss.

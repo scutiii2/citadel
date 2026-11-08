@@ -166,7 +166,7 @@ class DbGatewaySettings:
     """config_app.json's "db_gateway" block: where new document data is stored
     (the db_gateway project), and which of its instances and connections to use."""
 
-    url: str = "http://127.0.0.1:8071"
+    url: str = "http://127.0.0.1:29602"
     instance: str = "ember"
     connection: str = "data"
 
@@ -233,7 +233,7 @@ class Settings:
     # ai_agent's GET /registry, for an ai_agent in another directory or on
     # another machine. Wins over agents_registry_path when set.
     agents_registry_url: str | None = None
-    mcp_server_url: str = "http://127.0.0.1:8010/mcp"
+    mcp_server_url: str = "http://127.0.0.1:29600/mcp"
     # Bard (text to speech): audio files are streamed from here, never exposed to the browser.
     bard_url: str = "http://127.0.0.1:29400"
     # Scribe (speech to text): attached audio is uploaded here, never exposed to the browser.
@@ -270,7 +270,7 @@ def load_settings() -> Settings:
         registry_path = "../../legion/.data/agent_registry.json"
     return Settings(
         host=os.getenv("EMBER_API_HOST") or raw.get("host", "127.0.0.1"),
-        port=int(os.getenv("EMBER_API_PORT") or raw.get("port", 8030)),
+        port=int(os.getenv("EMBER_API_PORT") or raw.get("port", 29601)),
         database_path=database_path,
         session_cookie_name=raw.get("session_cookie_name", "ember_session"),
         session_hours=int(raw.get("session_hours", 12)),
@@ -280,7 +280,7 @@ def load_settings() -> Settings:
         require_email_verification=bool(raw.get("require_email_verification", True)),
         agents_registry_path=_project_path(registry_path),
         agents_registry_url=raw.get("agents_registry_url") or None,
-        mcp_server_url=raw.get("mcp_server_url") or "http://127.0.0.1:8010/mcp",
+        mcp_server_url=raw.get("mcp_server_url") or "http://127.0.0.1:29600/mcp",
         bard_url=raw.get("bard_url") or "http://127.0.0.1:29400",
         scribe_url=raw.get("scribe_url") or "http://127.0.0.1:29401",
         security=SecuritySettings.from_config(raw.get("security", {})),

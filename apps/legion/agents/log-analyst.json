@@ -1,6 +1,6 @@
 {
   "label": "Log Analyst",
-  "port": 9106,
+  "port": 29607,
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",

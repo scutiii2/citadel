@@ -46,7 +46,7 @@ describe("OverviewView", () => {
     auth.account = { ...auth.account!, permissions: ["traffic.view", "roles.manage"] };
     await wrapper.vm.$nextTick();
     expect(wrapper.findAll(".card").map((link) => link.attributes("href"))).toEqual([
-      "/brains", "/account", "http://localhost:5176/overview",
+      "/brains", "/account", "http://localhost:26501/overview",
     ]);
     expect(wrapper.find(".hero").exists()).toBe(false);
     expect(wrapper.get(".admin-shortcut").attributes("target")).toBe("_blank");

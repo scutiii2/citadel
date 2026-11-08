@@ -259,7 +259,7 @@ def _agent_url(check: _Checker, data: dict[str, Any]) -> str | None:
         return None
     parts = urlsplit(value.strip())
     if parts.scheme not in ("http", "https") or not parts.hostname or parts.query or parts.fragment:
-        raise check.fail("url", "must be an http(s) address like http://10.0.0.5:9103/mcp")
+        raise check.fail("url", "must be an http(s) address like http://10.0.0.5:29605/mcp")
     try:
         parts.port  # noqa: B018 - raises ValueError for a port out of range
     except ValueError:

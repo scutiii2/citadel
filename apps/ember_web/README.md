@@ -419,7 +419,7 @@ All calls use the same-origin session and require `tickets.create`:
 ## Requirements
 
 - Node.js 24 with pnpm (`corepack enable pnpm`)
-- A running **ember_api** (default `127.0.0.1:8030`), plus the `ai_agent`
+- A running **ember_api** (default `127.0.0.1:29601`), plus the `ai_agent`
   and `mcp_server` it proxies to.
 
 ## Setup and running
@@ -432,18 +432,18 @@ No `.env` is needed: nothing server-specific is compiled into the bundle.
 
 Run with any of:
 
-- `pnpm install` once, then `pnpm run dev` starts Vite (port `EMBER_WEB_PORT`, default 5173).
+- `pnpm install` once, then `pnpm run dev` starts Vite (port `EMBER_WEB_PORT`, default 26502).
   Extra arguments go to Vite after `--` (e.g. `pnpm run dev -- --open`).
 - `dev_deploy.bat` - rebuilds and restarts the `ember_web` container from the root `docker-compose.yml`
   (see [docs/deployment.md](../../../docs/deployment.md)).
 
-Then open <http://127.0.0.1:5173> and log in (first time: the ember_api
+Then open <http://127.0.0.1:26502> and log in (first time: the ember_api
 bootstrap admin - see ember_api's README).
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `EMBER_WEB_PORT` | `5173` | Vite's port. Vite fails instead of silently switching ports (`strictPort`). |
-| `EMBER_API_PORT` | `8030` | Where Vite forwards `/api` (ember_api). |
+| `EMBER_WEB_PORT` | `26502` | Vite's port. Vite fails instead of silently switching ports (`strictPort`). |
+| `EMBER_API_PORT` | `29601` | Where Vite forwards `/api` (ember_api). |
 
 ## Tests
 
@@ -566,7 +566,7 @@ uses `usage.all.view`. Navigation and controls follow these permissions, and the
 API enforces every action. Delegated administrators can only grant or change
 roles within their own permissions.
 
-Administrators can open Ember Admin from the desktop rail or the Overview page (also on mobile). The link opens in a new tab and uses this host on port 5176 by default (matching Server Launcher; port 5175 is used by Video Downloader). Set `VITE_EMBER_ADMIN_URL` before starting Vite or building to use a different address, such as `https://admin.example.com/` or a reverse-proxy path `/admin/`. It appears for verified accounts with access to an Ember Admin page, including delegated administrators. Ember Admin's account menu has the matching "Ember" row back to this app (new tab, this host on port 5173 by default); set `VITE_EMBER_WEB_URL` in ember_admin to override it.
+Administrators can open Ember Admin from the desktop rail or the Overview page (also on mobile). The link opens in a new tab and uses this host on port 26501 by default (matching Server Launcher; port 5175 is used by Video Downloader). Set `VITE_EMBER_ADMIN_URL` before starting Vite or building to use a different address, such as `https://admin.example.com/` or a reverse-proxy path `/admin/`. It appears for verified accounts with access to an Ember Admin page, including delegated administrators. Ember Admin's account menu has the matching "Ember" row back to this app (new tab, this host on port 26502 by default); set `VITE_EMBER_WEB_URL` in ember_admin to override it.
 
 Content pages share heading typography, description typography, and horizontal spacing through `ember_web/src/components/layout/pageLayout.css` (also imported by Ember Admin).
 

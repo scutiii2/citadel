@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config'
 // the SameSite=Strict session cookie works and no CORS is involved.
 // xfwd: ember_api trusts X-Forwarded-For only from loopback, so logins are rate-limited per real client.
 const apiProxy = {
-  '/api': { target: `http://127.0.0.1:${process.env.EMBER_API_PORT ?? 8030}`, xfwd: true },
+  '/api': { target: `http://127.0.0.1:${process.env.EMBER_API_PORT ?? 29601}`, xfwd: true },
 }
 
 const contentSecurityPolicy = [

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 CONFIG_FILE = Path(__file__).resolve().parents[1] / "configs" / "config_cli.json"
-DEFAULT_URL = "http://127.0.0.1:8030"
+DEFAULT_URL = "http://127.0.0.1:29601"
 
 
 class ConfigError(Exception):

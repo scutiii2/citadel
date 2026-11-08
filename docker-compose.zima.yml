@@ -9,7 +9,7 @@ services:
       - /DATA/AppData/obsidian/config/Desktop/Obsidian-vaults/citadel-brain:/vault:ro
   ember_web:
     ports: !override
-      - "5173:80"
+      - "26502:80"
   ember_admin:
     ports: !override
-      - "5176:80"
+      - "26501:80"

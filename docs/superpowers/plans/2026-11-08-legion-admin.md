@@ -112,7 +112,7 @@ import { defineConfig } from 'vitest/config'
 // the SameSite=Strict session cookie works and no CORS is involved.
 // xfwd: ember_api trusts X-Forwarded-For only from loopback, so logins are rate-limited per real client.
 const apiProxy = {
-  '/api': { target: `http://127.0.0.1:${process.env.EMBER_API_PORT ?? 8030}`, xfwd: true },
+  '/api': { target: `http://127.0.0.1:${process.env.EMBER_API_PORT ?? 29601}`, xfwd: true },
 }
 
 const contentSecurityPolicy = [
@@ -748,7 +748,7 @@ EXPOSE 80
 ```bash
 cp apps/ember_admin/nginx.conf apps/legion_admin/nginx.conf
 ```
-Change its first comment line to `# Serves the built legion_admin and sends /api to ember_api, so the browser`. Keep the rest (CSP, `/api/` proxy to `ember_api:8030`, SPA fallback).
+Change its first comment line to `# Serves the built legion_admin and sends /api to ember_api, so the browser`. Keep the rest (CSP, `/api/` proxy to `ember_api:29601`, SPA fallback).
 
 - [ ] **Step 4: Add the compose service** in `docker-compose.yml`, after the `ember_admin` service:
 
@@ -778,7 +778,7 @@ Vue 3 + TypeScript admin app for Legion, only for accounts holding `agents.manag
 - Radius only through `--radius-*` tokens, colors only through `style.css` tokens (`radiusScale.test.ts` enforces it).
 - A switch that calls the server stays pending until the server answers.
 - Never add reduced-motion code.
-- Checks: `pnpm exec vue-tsc -b`, `pnpm test`. Dev: `pnpm dev` (port 26500; `EMBER_API_PORT` sets the proxy target, default 8030).
+- Checks: `pnpm exec vue-tsc -b`, `pnpm test`. Dev: `pnpm dev` (port 26500; `EMBER_API_PORT` sets the proxy target, default 29601).
 ```
 `CLAUDE.md` is exactly `@AGENTS.md`. `README.md`: three lines: what it is, `pnpm install && pnpm dev`, and "needs ember_api running and an account with `agents.manage`".
 

@@ -1,6 +1,6 @@
 {
   "label": "Ember",
-  "port": 9100,
+  "port": 29603,
   "entry": true,
   "memory_recall": true,
   "skill_recall": true,

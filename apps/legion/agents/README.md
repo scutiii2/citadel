@@ -38,7 +38,7 @@ for the field descriptions and examples.
 The supervisor watches this directory and the overrides file and reconciles
 validated changes.
 
-`mathematician.json` defines the delegable mathematics specialist on port 9121.
+`mathematician.json` defines the delegable mathematics specialist on port 29620.
 It permits only `tool_math_*` and the standard ticket support tool. Analyst also
 permits math tools for attached-table formulas. Ember routes using the live
 roster; Reviewer independently checks math through its existing permitted tools.

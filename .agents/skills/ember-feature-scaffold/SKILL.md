@@ -6,7 +6,7 @@ description: Add a feature to ember_web (the Vue 3 + TypeScript browser app) and
 # ember_web + ember_api feature scaffolding
 
 Two projects that ship together (plus **ember_admin/**, a second Vue app in
-`apps/Ember/` for administrators on port 5176: same stack and shared control
+`apps/Ember/` for administrators on port 26501: same stack and shared control
 files as ember_web, talks only to ember_api; staff-only pages such as Tickets,
 Capabilities, Agents and Analytics go there, not in ember_web):
 

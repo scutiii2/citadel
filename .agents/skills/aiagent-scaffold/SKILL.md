@@ -41,7 +41,7 @@ agent one provider+model, all `--MCP-->` mcp_server.
    {
      "label": "Calculator",
      "role": "specialist",
-     "port": 9103,
+     "port": 29605,
      "llm": { "provider": "anthropic", "gateway": "openrouter", "model": "claude-sonnet-5-5" },
      "persona": "You are a precise mathematician. Show every step.",
      "focus": "Arithmetic, algebra, percentages, unit conversion.",

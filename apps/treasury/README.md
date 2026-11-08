@@ -23,7 +23,7 @@ uv run python -m src.run
 ```
 Sync once. The first start seeds `.env`,
 `configs/config_app.json` and `configs/config_connections.json` from their `.example` twins.
-Default port is 8071 (`DB_GATEWAY_PORT` overrides it).
+Default port is 29602 (`DB_GATEWAY_PORT` overrides it).
 
 In Docker: `dev_deploy.bat` in this folder rebuilds and restarts the `treasury` container from the root `docker-compose.yml` (see [docs/deployment.md](../../docs/deployment.md)).
 

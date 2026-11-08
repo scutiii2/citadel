@@ -313,7 +313,7 @@ function previewPrompt(): void {
 
       <label class="field">
         <span>URL</span>
-        <input v-model="url" data-test="url" type="text" autocomplete="off" placeholder="http://127.0.0.1:9104/mcp" />
+        <input v-model="url" data-test="url" type="text" autocomplete="off" placeholder="http://127.0.0.1:29606/mcp" />
         <small>Where ember and the other agents reach this agent. Leave empty to use this machine and the port above; set it for an agent behind another host or a proxy.</small>
       </label>
 

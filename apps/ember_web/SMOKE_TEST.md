@@ -11,8 +11,8 @@ the confirmation dialogs or the admin screens. It takes about 15 minutes.
 Use a throwaway setup, not your own account. Several steps delete things.
 
 1. Start the stack, one by one:
-   `mcp_server`, `ai_agent`, `ember_api` (port 8030) and `ember_web`
-   (`pnpm run dev`, port 5173). Open `http://127.0.0.1:5173`.
+   `mcp_server`, `ai_agent`, `ember_api` (port 29601) and `ember_web`
+   (`pnpm run dev`, port 26502). Open `http://127.0.0.1:26502`.
 2. Log in as the bootstrap admin. If `BOOTSTRAP_ADMIN_PASSWORD` is empty, the
    random password was printed in ember_api's console on its first start.
 3. Make two throwaway members. For each: Admin > Invites > create an invite

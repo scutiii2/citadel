@@ -22,7 +22,7 @@ The internal Router chooses specialists and model tiers through that arrangement
 
 2. Make sure `mcp_server` is running (`py -m src.run` in `apps/armory/`) -
    `apps/legion/configs/config_servers.json` points at its default
-   `http://127.0.0.1:8010/mcp`.
+   `http://127.0.0.1:29600/mcp`.
 
 3. Start the agents from `apps/legion/`: install the project once with `uv sync`
    (creates `.venv`), then run `uv run python -m src.supervisor`. See Agents below.
@@ -67,7 +67,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 ```json
 {
   "label": "Calculator",
-  "port": 9103,
+  "port": 29605,
   "enabled": true,
   "entry": false,
   "llm": {
@@ -123,7 +123,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 An orchestrator file:
 
 ```json
-{ "port": 9100, "entry": true, "llm": { "provider": "anthropic" }, "role": "orchestrator" }
+{ "port": 29603, "entry": true, "llm": { "provider": "anthropic" }, "role": "orchestrator" }
 ```
 
 ### Gateway failover
@@ -188,10 +188,10 @@ not its model (`ember`, `server-ops`, `reviewer`). Exactly one enabled file
 sets `entry: true`. Add
 more specialists as extra files.
 
-`code-architect` (port 9130, disabled) plans multi-function code and assembles
+`code-architect` (port 29621, disabled) plans multi-function code and assembles
 `code-writer` outputs, with optional read-only context from `repo-helper`.
 
-`mathematician` (port 9121) handles standalone mathematical questions through
+`mathematician` (port 29620) handles standalone mathematical questions through
 Armory's `tool_math_*` tools: equations, units, matrices, calculus, and repeated
 formulas. Its answers retain verification, completeness, assumptions and domain
 conditions. It does not replace unavailable tools with manual computations.
@@ -383,7 +383,7 @@ Operations, approvals, runtime skill marking and the Ember rollout remain deferr
 
 ## Internal Router agent
 
-`agents/router.json` defines the supervised internal Router on port 9117. It is
+`agents/router.json` defines the supervised internal Router on port 29616. It is
 visible on both Agents pages, but cannot receive chat questions or appear in a
 delegation roster. Ember Admin's existing Agents editor (`agents.manage`) controls
 its enabled state, task switches, local voters, confidence thresholds, narrowing,
@@ -449,7 +449,7 @@ local usage log. Browser APIs keep their existing usage and log permissions.
 
 ### Shared context summarizer
 
-`agents/context-summarizer.json` defines the supervised helper on port 9118.
+`agents/context-summarizer.json` defines the supervised helper on port 29617.
 It uses the existing Anthropic/OpenRouter light tier (currently `openrouter/free`
 in tracked defaults), with no tools, delegation, memory recall or planning. It
 is not an entry agent or a routable specialist. The existing agent editor and

@@ -20,9 +20,9 @@ services:
     environment:
       <<: *internal_token
       MCP_HOST: 0.0.0.0
-      MCP_PORT: "8010"
-      DB_GATEWAY_URL: http://treasury:8071
-      EMBER_API_URL: http://ember_api:8030
+      MCP_PORT: "29600"
+      DB_GATEWAY_URL: http://treasury:29602
+      EMBER_API_URL: http://ember_api:29601
     volumes:
       # Writable: the Extensions page in ember_admin saves added extensions into this tracked file.
       - ./docker/configs/armory/extensions.json:/app/configs/config_extensions.json
@@ -45,7 +45,7 @@ services:
       <<: *internal_token
       AI_AGENT_HOST: 0.0.0.0
       AI_AGENT_ADVERTISE_URL: http://legion
-      MCP_SERVER_URL: http://armory:8010/mcp
+      MCP_SERVER_URL: http://armory:29600/mcp
     # Lets apps/legion/.env reach host-published stacks (LayaModel, OmniRoute) as host.docker.internal.
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -64,7 +64,7 @@ services:
         required: false
     environment:
       <<: *internal_token
-      DB_GATEWAY_PORT: "8071"
+      DB_GATEWAY_PORT: "29602"
     volumes:
       - ./docker/configs/treasury/app.json:/app/configs/config_app.json:ro
       - ./docker/configs/treasury/connections.json:/app/configs/config_connections.json:ro
@@ -95,7 +95,7 @@ services:
     build: ./apps/Ember/ember_web
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5173:80"
+      - "127.0.0.1:26502:80"
     depends_on: [ember_api]
     networks: [core]
 
@@ -105,7 +105,7 @@ services:
       dockerfile: ember_admin/Dockerfile
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5176:80"
+      - "127.0.0.1:26501:80"
     depends_on: [ember_api]
     networks: [core]
 

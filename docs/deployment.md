@@ -4,12 +4,12 @@ Citadel runs as containers from one `docker-compose.yml`:
 
 | Service | Role | Port |
 |---|---|---|
-| `ember_web` | user web app | 5173 |
-| `ember_admin` | admin web app | 5176 |
+| `ember_web` | user web app | 26502 |
+| `ember_admin` | admin web app | 26501 |
 | `ember_api` | backend for both web apps | internal |
-| `armory` | MCP server (capabilities, including Server Manager) | internal 8010 |
+| `armory` | MCP server (capabilities, including Server Manager) | internal 29600 |
 | `legion` | AI agent | internal |
-| `treasury` | database gateway | internal 8071 |
+| `treasury` | database gateway | internal 29602 |
 
 Only the two web apps publish ports. The rest talk over the internal `core` network. Laya is not in this stack: it runs
 from the separate `LayaModel` project (see "Laya" below) and legion reaches it through the host's published port, `http://host.docker.internal:29220`.
@@ -24,7 +24,7 @@ from the separate `LayaModel` project (see "Laya" below) and legion reaches it t
    docker compose up -d --build
    ```
 
-3. Open http://localhost:5173 (ember_web) and http://localhost:5176 (ember_admin). Both bind to `127.0.0.1`.
+3. Open http://localhost:26502 (ember_web) and http://localhost:26501 (ember_admin). Both bind to `127.0.0.1`.
 
 To rebuild one service, run `docker compose up -d --build <service>`, or double-click the `dev_deploy.bat` in that
 service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/Ember/ember_api`, `ember_web`, `ember_admin`).
@@ -104,7 +104,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
    | File | Keys to fill in |
    |---|---|
-   | `apps/armory/.env` | Only the capability keys you use: `SMTP_PASSWORD`, `TEAMS_WEBHOOK_URL`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://legion:9111/mcp` to group tickets with the triage agent) |
+   | `apps/armory/.env` | Only the capability keys you use: `SMTP_PASSWORD`, `TEAMS_WEBHOOK_URL`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://legion:29611/mcp` to group tickets with the triage agent) |
    | `apps/legion/.env` | `CLAUDE_API_KEY`, or the keys of the gateway your agents use; `HF_TOKEN` if used; `LAYA_TOKEN` (must equal the one in `LayaModel`'s `.env`) |
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
    | `apps/Ember/ember_api/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
@@ -143,7 +143,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    docker compose up -d --build
    ```
 
-6. Open `http://<zima-ip>:5173` and `http://<zima-ip>:5176` from any device on your network.
+6. Open `http://<zima-ip>:26502` and `http://<zima-ip>:26501` from any device on your network.
 
 ### Updating
 
@@ -192,11 +192,11 @@ under compose.
 
    | Name | URL | Icon |
    |---|---|---|
-   | Ember | `http://<zima-ip>:5173` | `apps/Ember/ember_web/public/icons/icon-512.png` |
-   | Ember Admin | `http://<zima-ip>:5176` | `apps/Ember/ember_admin/public/icons/icon-512.png` |
+   | Ember | `http://<zima-ip>:26502` | `apps/Ember/ember_web/public/icons/icon-512.png` |
+   | Ember Admin | `http://<zima-ip>:26501` | `apps/Ember/ember_admin/public/icons/icon-512.png` |
 
-3. If the dashboard asks for an image URL, use `http://<zima-ip>:5173/icons/icon-512.png` and
-   `http://<zima-ip>:5176/icons/icon-512.png`. Avoid `icon-maskable-512.png`; its padding makes the tile look small.
+3. If the dashboard asks for an image URL, use `http://<zima-ip>:26502/icons/icon-512.png` and
+   `http://<zima-ip>:26501/icons/icon-512.png`. Avoid `icon-maskable-512.png`; its padding makes the tile look small.
 
 Give the box a fixed IP (a DHCP reservation in the router) so the links keep working. If your version has no external
 link option, use a browser bookmark.
@@ -204,7 +204,7 @@ link option, use a browser bookmark.
 ### Public access with Tailscale Funnel
 
 Funnel publishes Ember on `https://<box>.<tailnet>.ts.net/` without a Tailscale client on the viewing device. Only
-`ember_web` (5173) goes public; keep `ember_admin` (5176) on the LAN. Public signup must stay off, because anyone with
+`ember_web` (26502) goes public; keep `ember_admin` (26501) on the LAN. Public signup must stay off, because anyone with
 the URL can reach the login page.
 
 1. In the Tailscale admin console, give the box the `funnel` attribute (`nodeAttrs` in the access controls) and turn on
@@ -217,7 +217,7 @@ the URL can reach the login page.
 
    ```bash
    docker compose up -d --build ember_api ember_web
-   docker exec tailscale tailscale funnel --bg 5173
+   docker exec tailscale tailscale funnel --bg 26502
    docker exec tailscale tailscale funnel status
    ```
 
@@ -225,7 +225,7 @@ the URL can reach the login page.
 
 Funnel sends `X-Forwarded-Proto: https` for TLS requests. nginx passes it on, and ember_api adds `Secure` to the session
 cookie when the request came through a `trusted_proxies` peer with that header. Plain-HTTP LAN access at
-`http://<zima-ip>:5173` keeps working, with no `Secure` flag, so leave `cookie_secure` at `false`.
+`http://<zima-ip>:26502` keeps working, with no `Secure` flag, so leave `cookie_secure` at `false`.
 
 ## 3. Server Manager
 
@@ -251,7 +251,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 
 - The Docker socket is root on the host. Anyone who can call the `tool_srv_*` tools can control every container.
 - Server Manager lists every container on the host, not only Citadel's. On ZimaOS that includes your other apps.
-- Keep the `internal_token` volume secret. Do not publish armory's port 8010.
+- Keep the `internal_token` volume secret. Do not publish armory's port 29600.
 - Keep `server` disabled where you do not need it.
 
 **Checking it works.** With the stack up and `server` enabled, ask the assistant to list apps, or call
@@ -271,7 +271,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 | ember_api fails and `apps/Ember/ember_api/.env` is a directory | Compose created it because the file was missing. Run `rmdir apps/Ember/ember_api/.env`, then `touch apps/Ember/ember_api/.env`, then start again. |
 | UI loads on the box but not on another device | Overlay not used. Check `COMPOSE_FILE` in the root `.env`, or add `-f docker-compose.zima.yml`. |
 | Overlay still binds `127.0.0.1` | Compose older than 2.24 ignores `!override`. Update Compose, or edit the `ports` lines in the main file. |
-| Port already in use | Another app uses 5173 or 5176. Change the left side of the port mapping. |
+| Port already in use | Another app uses 26502 or 26501. Change the left side of the port mapping. |
 | `permission denied` on the Docker socket | The container cannot read `/var/run/docker.sock`. Check its owner and mode on the host. |
 | Capability toggle reverted after a rebuild | `docker/configs/armory/capabilities.json` was reset (for example by `git checkout` or `git stash`) or is not mounted. Check `docker-compose.yml` mounts it, then set the toggle again. |
 | Funnel page loads but big files stall or time out | Check `docker inspect tailscale --format "{{.RestartCount}}"`. The ZimaOS Tailscale app's entrypoint (`tailscaled ... & sleep 10; tailscale web --listen 0.0.0.0:5252`) can exit after 10 s and restart the container in a loop. Append `; wait` to that entrypoint line in `/var/lib/casaos/apps/tailscale/docker-compose.yml` and run `docker compose up -d` there. A CasaOS app update may overwrite it. |

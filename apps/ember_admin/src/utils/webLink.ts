@@ -7,7 +7,7 @@ export function emberWebUrl(current = window.location.href, configured = import.
     } catch { /* Invalid deployment URL: use the default below. */ }
   }
   const url = new URL(current);
-  url.port = "5173";
+  url.port = "26502";
   url.pathname = "/overview";
   url.search = url.hash = "";
   return url.href;

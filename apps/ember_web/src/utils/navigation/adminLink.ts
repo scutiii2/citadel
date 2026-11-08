@@ -14,7 +14,7 @@ export function emberAdminUrl(current = window.location.href, configured = impor
     } catch { /* Invalid deployment URL: use the default below. */ }
   }
   const url = new URL(current);
-  url.port = "5176";
+  url.port = "26501";
   url.pathname = "/overview";
   url.search = url.hash = "";
   return url.href;

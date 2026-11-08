@@ -2,7 +2,7 @@
   "label": "Code Architect",
   "role": "architect",
   "kind": "code",
-  "port": 9130,
+  "port": 29621,
   "enabled": false,
   "entry": false,
   "plan_tool": false,

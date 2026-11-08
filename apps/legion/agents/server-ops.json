@@ -1,6 +1,6 @@
 {
   "label": "Server Ops",
-  "port": 9103,
+  "port": 29605,
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",

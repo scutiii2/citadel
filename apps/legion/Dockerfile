@@ -12,5 +12,5 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY . .
 # Keep the public configs path while persisting admin edits in agent_data.
 RUN ln -s /app/.data/admin_tuning_overrides.json /app/configs/tuning_overrides.json
-EXPOSE 9100
+EXPOSE 29603
 CMD ["python", "-m", "src.supervisor"]

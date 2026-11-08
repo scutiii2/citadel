@@ -253,7 +253,7 @@ top-level context fields still describe its own window.
 
 ## Setup and running
 
-The server listens on `EMBER_API_PORT` (default `8030`).
+The server listens on `EMBER_API_PORT` (default `29601`).
 
 In Docker: `dev_deploy.bat` in this folder rebuilds and restarts the `ember_api` container from the root `docker-compose.yml` (see [docs/deployment.md](../../../docs/deployment.md)).
 
@@ -817,7 +817,7 @@ Accounts, chats, usage and the rest stay in this project's SQLAlchemy database. 
 needs no joins or foreign keys can be kept as documents in the `db_gateway` project instead, so
 it can sit on SQLite, Postgres or Firestore and be shared with other apps.
 
-`config_app.json` has a `db_gateway` block: `url` (default `http://127.0.0.1:8071`), `instance`
+`config_app.json` has a `db_gateway` block: `url` (default `http://127.0.0.1:29602`), `instance`
 (`ember`) and `connection` (`data`). The connection must be listed in that instance in
 db_gateway's `configs/config_connections.json` (see its `.example`). Calls send the same
 `INTERNAL_API_TOKEN` as the other services.

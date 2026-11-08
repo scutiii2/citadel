@@ -17,14 +17,14 @@ not a server, so it has no compose service.
 uv sync
 uv run python -m src.main
 uv run python -m src.main --user ada
-uv run python -m src.main --url http://127.0.0.1:8030 --ask
+uv run python -m src.main --url http://127.0.0.1:29601 --ask
 ```
 
 `uv sync` creates `.venv` and installs once; afterwards only the `uv run` lines.
 
 | Option | Meaning |
 |---|---|
-| `--url URL` | ember_api's address (default: `configs/config_cli.json`, else `http://127.0.0.1:8030`) |
+| `--url URL` | ember_api's address (default: `configs/config_cli.json`, else `http://127.0.0.1:29601`) |
 | `--user NAME` | the account to log in as (default: the config, else asked) |
 | `--ask` | ask before each tool runs (same as `/ask on`) |
 
@@ -70,7 +70,7 @@ Not here: attachments, summaries, regenerate and edit, branching, sharing, promp
 `configs/config_cli.json` (copied from `config_cli.json.example` on first run, gitignored):
 
 ```json
-{ "ember_api_url": "http://127.0.0.1:8030", "username": "" }
+{ "ember_api_url": "http://127.0.0.1:29601", "username": "" }
 ```
 
 ## Layout

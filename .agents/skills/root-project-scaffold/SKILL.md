@@ -66,11 +66,11 @@ changes the convention for every project after it.
    setup steps, how to run it — model it on `apps/armory/README.md`.
 5. Add a service for it to the root `docker-compose.yml` if it is a
    **long-running service**; an interactive program like `chat_cli` (a terminal
-   client, not a server) gets none. Give the port an env var (`DB_GATEWAY_PORT=8071`,
+   client, not a server) gets none. Give the port an env var (`DB_GATEWAY_PORT=29602`,
    read by `src/config.py` as an override) and set it in the compose service.
-   Pick a free port: 8010 mcp_server,
-   8030 ember_api, 8040 pdf_merger, 8071 db_gateway,
-   9100+ ai_agent agents.
+   Pick a free port: 29600 mcp_server,
+   29601 ember_api, 8040 pdf_merger, 29602 db_gateway,
+   29603+ ai_agent agents.
 6. Services reached over HTTP/MCP by other projects must take the shared
    `INTERNAL_API_TOKEN` from a secrets file (`.env` in each project) and, for
    `/mcp`, reject calls without it once set. Never import another root

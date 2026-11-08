@@ -27,7 +27,7 @@ The capability exists at `apps/armory/src/capabilities/firecrawl/`, but its test
 - `tools/deploy.bat` against the real server: option 2 (one-session `tar` push as `lex`, `COMPOSE_FILE` line, the chown helper) and option 1 (publish to `origin/live`). Same for `LayaModel/tools/deploy.bat` and `Bard/tools/deploy.bat` (Bard: publish creates `origin/live`; first start downloads the Piper voice).
 - Bard in the stack: start Citadel, then `Bard` (`docker compose up -d --build` there), restart armory, and check `bard__tool_bard_speak` plays in chat.
 - A full `docker compose up -d --build` on ZimaOS with `LayaModel` next to `Citadel`, then `tool_srv_listApps` returning the `citadel-*` containers.
-- `LAYA_URL=http://legion:9111/mcp` in `apps/armory/.env`: confirm legion listens on 9111 inside the container and tickets get grouped.
+- `LAYA_URL=http://legion:29611/mcp` in `apps/armory/.env`: confirm legion listens on 29611 inside the container and tickets get grouped.
 - Self-stop: `/server stop armory` kills the server running the tool; expected, but it cannot be restarted from the same chat.
 
 **SMTP credential rotation (repository cleaned 2026-10-09)**: `zima_host.yaml` is deleted (2026-10-25), but its old inline password remains in Git history. Still required: revoke the exposed password at the mail provider, put a replacement `SMTP_PASSWORD` in the deployment `.env`, recreate the container and verify email delivery.
@@ -38,8 +38,8 @@ The capability exists at `apps/armory/src/capabilities/firecrawl/`, but its test
 
 The agents are implemented. These manual checks remain unverified:
 
-- **Email Assistant** (`email-assistant`, port 9112): paste an email and check its summary, triage and draft reply.
-- **Analyst** (`data-analyst`, port 9113): attach a CSV, ask for a total and a top 5, and check the results. Also ask which agent used the most tokens this week (usage merged in).
+- **Email Assistant** (`email-assistant`, port 29612): paste an email and check its summary, triage and draft reply.
+- **Analyst** (`data-analyst`, port 29613): attach a CSV, ask for a total and a top 5, and check the results. Also ask which agent used the most tokens this week (usage merged in).
 - **App monitoring** (now in `server-ops`): verify an explicitly requested app start shows `watched`, and a crash sends the original owner an email. URL/port checks and recurring schedules are unavailable.
 - **Ember routing**: check delegation across the specialist roster with Laya routing enabled.
 

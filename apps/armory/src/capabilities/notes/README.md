@@ -48,7 +48,7 @@ Lets agents use the notes a user chose to share. A user keeps private notes in e
 
 ## Configuration
 
-- `DB_GATEWAY_URL` (default `http://127.0.0.1:8071`), `DB_GATEWAY_INSTANCE` (default `mcp_server`) and `DB_GATEWAY_CONNECTION` (default `data`) in `.env`, read in `src/config.py`. The requests carry `INTERNAL_API_TOKEN`.
+- `DB_GATEWAY_URL` (default `http://127.0.0.1:29602`), `DB_GATEWAY_INSTANCE` (default `mcp_server`) and `DB_GATEWAY_CONNECTION` (default `data`) in `.env`, read in `src/config.py`. The requests carry `INTERNAL_API_TOKEN`.
 - db_gateway's `configs/config_connections.json` must list the connection under that instance, e.g. `"mcp_server": ["data"]` (the `.example` file has it). It is the same `data` connection ember_api uses, so a change in ember shows here at once.
 - The record shape is ember_api's (`apps/Ember/ember_api/src/services/notes.py`): collection `notes`, fields `id`, `owner`, `title`, `body`, `tags`, `agent_readable`, `updated_at`. If that changes, change `utils/gateway.py` and `domain.py` with it.
 - Starts offline. Switch it online in ember_admin (Capabilities), then each user adds it in the Supermarket.

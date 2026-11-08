@@ -4,9 +4,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { agentsAdminClient, type AgentFile } from "../api/AgentsAdminClient";
 import AgentsAdminView from "./AgentsAdminView.vue";
 
-const EMBER: AgentFile = { id: "ember", label: "Ember", port: 9100, entry: true, role: "orchestrator", llm: { provider: "anthropic", gateway: "openrouter" } };
+const EMBER: AgentFile = { id: "ember", label: "Ember", port: 29603, entry: true, role: "orchestrator", llm: { provider: "anthropic", gateway: "openrouter" } };
 const CALC: AgentFile = {
-  id: "calc", label: "Calc", port: 9103, focus: "Maths", temperature: 0.2,
+  id: "calc", label: "Calc", port: 29605, focus: "Maths", temperature: 0.2,
   llm: { provider: "anthropic", gateway: "claude", temperature: 0.1 },
 } as AgentFile;
 const PROVIDERS = {
@@ -154,7 +154,7 @@ describe("per-agent gateway order", () => {
 
 describe("AgentsAdminView", () => {
   it("lets a router become a specialist without carrying its router policy", async () => {
-    const router: AgentFile = { id: "router", label: "Router", role: "router", port: 9117,
+    const router: AgentFile = { id: "router", label: "Router", role: "router", port: 29616,
       llm: { provider: "decision" }, decision: {}, delegable: false, plan_tool: false, tools: { deny: ["*"] } };
     vi.mocked(agentsAdminClient.list).mockResolvedValue([router]);
     const update = vi.spyOn(agentsAdminClient, "update").mockResolvedValue(router);
@@ -171,7 +171,7 @@ describe("AgentsAdminView", () => {
     wrapper.unmount();
   });
   it("edits Router policy while keeping its internal role and denied tools", async () => {
-    const router: AgentFile = { id: "router", label: "Router", port: 9117, role: "router",
+    const router: AgentFile = { id: "router", label: "Router", port: 29616, role: "router",
       llm: { provider: "decision", strategy: "both", min_confidence: 0.9 }, decision: { strategy: "laya-only" }, delegable: false,
       plan_tool: false, tools: { deny: ["*"] } };
     vi.mocked(agentsAdminClient.list).mockResolvedValue([EMBER, router]);
@@ -195,7 +195,7 @@ describe("AgentsAdminView", () => {
     const wrapper = await mounted();
     expect(wrapper.findAll("[data-test=agent]")).toHaveLength(2);
     expect(wrapper.find("[data-id=ember]").text()).toContain("openrouter");
-    expect(wrapper.find("[data-id=ember]").text()).toContain("9100");
+    expect(wrapper.find("[data-id=ember]").text()).toContain("29603");
     expect(wrapper.find("[data-id=ember] [aria-label='Model tiers']").text()).toContain("big-model");
     expect(wrapper.find("[data-id=calc] [data-test=status]").text()).toContain("Offline");
   });
@@ -216,7 +216,7 @@ describe("AgentsAdminView", () => {
     await wrapper.find("[data-test=label]").setValue("Docs");
     await wrapper.find("[data-test=provider]").setValue("openai");
     await wrapper.find("[data-test=gateway]").setValue("gpt");
-    await wrapper.find("[data-test=url]").setValue("http://10.0.0.5:9104/mcp");
+    await wrapper.find("[data-test=url]").setValue("http://10.0.0.5:29606/mcp");
     await wrapper.find("[data-test=persona]").setValue("Be brief.");
     await wrapper.find("[data-test=allow]").setValue("docs_*, wiki_*");
     await wrapper.find("form").trigger("submit");
@@ -226,7 +226,7 @@ describe("AgentsAdminView", () => {
     const [id, config] = create.mock.calls[0]!;
     expect(id).toBe("docs");
     expect(config).toMatchObject({
-      label: "Docs", port: 9104, url: "http://10.0.0.5:9104/mcp", enabled: true, entry: false, role: "specialist",
+      label: "Docs", port: 29606, url: "http://10.0.0.5:29606/mcp", enabled: true, entry: false, role: "specialist",
       llm: { provider: "openai", gateway: "gpt" },
       persona: "Be brief.", tools: { allow: ["docs_*", "wiki_*"], deny: [] },
     });
@@ -254,12 +254,12 @@ describe("AgentsAdminView", () => {
 
     const [id, config] = update.mock.calls[0]!;
     expect(id).toBe("calc");
-    expect(config).toMatchObject({ label: "Calculator", port: 9103, temperature: 0.2, llm: { temperature: 0.1, gateway: "claude" } });
+    expect(config).toMatchObject({ label: "Calculator", port: 29605, temperature: 0.2, llm: { temperature: 0.1, gateway: "claude" } });
     expect(config).not.toHaveProperty("id");
   });
 
   it("shows the reason when ai_agent refuses a save and keeps the form open", async () => {
-    vi.spyOn(agentsAdminClient, "create").mockRejectedValue(new Error("port 9104 is already used by enabled agent 'x'"));
+    vi.spyOn(agentsAdminClient, "create").mockRejectedValue(new Error("port 29606 is already used by enabled agent 'x'"));
     const wrapper = await mounted();
     await wrapper.find("[data-test=new]").trigger("click");
     await wrapper.find("[data-test=id]").setValue("docs");
@@ -488,7 +488,7 @@ describe("AgentsAdminView", () => {
     await wrapper.find("[data-test=preview]").trigger("click");
     await flushPromises();
 
-    expect(preview).toHaveBeenCalledWith("calc", expect.objectContaining({ port: 9103 }), true);
+    expect(preview).toHaveBeenCalledWith("calc", expect.objectContaining({ port: 29605 }), true);
     expect(wrapper.find("[data-test=preview-text]").text()).toBe("Your name is Ember: Calc.");
 
     preview.mockRejectedValue(new Error("llm.provider: must be one of"));

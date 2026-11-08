@@ -48,7 +48,7 @@ const resetError = ref("");
 
 let settleTimer: ReturnType<typeof setTimeout> | undefined;
 
-const suggestedPort = computed(() => Math.max(9100, ...agents.value.map((a) => a.port ?? 0)) + 1);
+const suggestedPort = computed(() => Math.max(29603, ...agents.value.map((a) => a.port ?? 0)) + 1);
 
 async function loadStatuses(): Promise<void> {
   try {

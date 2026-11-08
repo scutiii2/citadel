@@ -19,6 +19,6 @@ echo.
 docker compose ps %SERVICE%
 echo.
 echo Logs:  docker compose logs -f %SERVICE%
-echo Open:  http://127.0.0.1:5176
+echo Open:  http://127.0.0.1:26501
 popd
 pause

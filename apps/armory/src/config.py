@@ -24,7 +24,7 @@ class Settings:
     # Loopback by default: this server has no auth, so anything reaching the port can call every tool.
     # Set MCP_HOST to expose it only behind a reverse proxy, VPN or firewall that authenticates.
     host: str = _env("MCP_HOST", "127.0.0.1")
-    port: int = int(_env("MCP_PORT", "8010"))
+    port: int = int(_env("MCP_PORT", "29600"))
     # known_hosts file used to verify SSH host keys; defaults to the ssh client's own.
     ssh_known_hosts: Path = Path(
         _env("SSH_KNOWN_HOSTS", str(Path.home() / ".ssh" / "known_hosts"))
@@ -53,13 +53,13 @@ class Settings:
     memory_db_path: Path = Path(_env("MCP_MEMORY_DB_PATH", "specifics/memory/.data/memory.db"))
     # Per-user learned skills (capabilities/skills). Runtime state: gitignored.
     skills_db_path: Path = Path(_env("MCP_SKILLS_DB_PATH", "specifics/skills/.data/skills.db"))
-    # Support tickets (capabilities/tickets/utils/service.py): SQLite file and the optional Laya MCP address (http://host:9111/mcp).
+    # Support tickets (capabilities/tickets/utils/service.py): SQLite file and the optional Laya MCP address (http://host:29611/mcp).
     # Blank LAYA_URL skips Laya; tickets still work.
     tickets_db_path: Path = Path(_env("MCP_TICKETS_DB_PATH", "specifics/tickets/.data/tickets.db"))
     laya_url: str = _env("LAYA_URL", "")
     # db_gateway, where ember_api keeps per-account notes; the notes capability reads those shared with agents.
     # The instance must list the connection (db_gateway's configs/config_connections.json); requests carry INTERNAL_API_TOKEN.
-    db_gateway_url: str = _env("DB_GATEWAY_URL", "http://127.0.0.1:8071")
+    db_gateway_url: str = _env("DB_GATEWAY_URL", "http://127.0.0.1:29602")
     db_gateway_instance: str = _env("DB_GATEWAY_INSTANCE", "mcp_server")
     db_gateway_connection: str = _env("DB_GATEWAY_CONNECTION", "data")
     # Obsidian Local REST API. Never include the address or credential in settings repr.
@@ -73,7 +73,7 @@ class Settings:
     obsidian_ollama_url: str = _env("OBSIDIAN_OLLAMA_URL", "http://127.0.0.1:11434")
     obsidian_embed_model: str = _env("OBSIDIAN_EMBED_MODEL", "nomic-embed-text")
     obsidian_refresh_seconds: float = float(_env("OBSIDIAN_REFRESH_SECONDS", "60"))
-    ember_api_url: str = _env("EMBER_API_URL", "http://127.0.0.1:8030")
+    ember_api_url: str = _env("EMBER_API_URL", "http://127.0.0.1:29601")
     # Tavily API key for the web_research capability. Blank until set in .env;
     # the tools then fail with a message naming the variable.
     tavily_api_key: str = _env("TAVILY_API_KEY", "")

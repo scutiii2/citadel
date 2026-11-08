@@ -286,7 +286,7 @@ it("offers Ember Admin to delegated admins and hides it for members and unverifi
   auth.account = { ...ACCOUNT, permissions: ["roles.view"] };
   await flushPromises();
   await openMenu(wrapper);
-  expect(wrapper.get(".admin-link").attributes("href")).toBe("http://localhost:5176/overview");
+  expect(wrapper.get(".admin-link").attributes("href")).toBe("http://localhost:26501/overview");
   expect(wrapper.get(".admin-link").attributes("target")).toBe("_blank");
   expect(wrapper.get(".admin-link").attributes("rel")).toBe("noopener noreferrer");
   auth.account = { ...auth.account, email_verified: false };
