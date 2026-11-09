@@ -22,6 +22,7 @@ from src.routes.server_info import get_server_info
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import McpServerInfo, McpServerRefused, McpServerUnavailable
 from src.services.permissions import FILES_UPLOAD
+from src.services.reader import ReaderGateway
 from src.services.scribe import ScribeGateway
 from src.services.session_service import SessionService
 from src.services.capability_files import CapabilityFilesGateway
@@ -209,11 +210,55 @@ async def attachment_audio(
     """Keep the original for Scribe's transcribe tool; the agent gets the file_id."""
     filename, content = _audio_content(body)
     gateway = ScribeGateway(request.app.state.upstream, request.app.state.settings.scribe_url,
-                            request.app.state.internal_token)
+                            request.app.state.scribe_token)
     uploaded = await gateway.upload(account, filename, content)
     await logs.action(account, "attachments.audio", f"Attached '{filename}' ({len(content):,} bytes) for transcription")
     return AttachmentAudioOut(
         filename=filename, file_id=uploaded["file_id"], duration_s=float(uploaded["duration_s"]),
+        expires_at=float(uploaded["expires_at"]),
+    )
+
+
+_DOCUMENT_SUFFIXES = (".pdf", ".png", ".jpg", ".jpeg", ".webp")
+_MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
+_MAX_DOCUMENT_BASE64 = (_MAX_DOCUMENT_BYTES + 2) // 3 * 4
+
+
+class DocumentIn(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    data: str = Field(min_length=1, max_length=_MAX_DOCUMENT_BASE64)
+
+
+class AttachmentDocumentOut(BaseModel):
+    filename: str
+    file_id: str
+    page_count: int
+    expires_at: float
+
+
+@router.post("/document")
+async def attachment_document(
+    body: DocumentIn,
+    request: Request,
+    account: Account = Depends(require_chat),
+    logs: LogWriter = Depends(get_log_writer),
+) -> AttachmentDocumentOut:
+    """Keep the original for Reader's OCR tool; the agent gets the file_id."""
+    filename = body.filename.replace("\\", "/").rsplit("/", 1)[-1]
+    if not filename.lower().endswith(_DOCUMENT_SUFFIXES):
+        raise HTTPException(400, "Upload a pdf, png, jpg, jpeg or webp file")
+    try:
+        content = base64.b64decode(body.data, validate=True)
+    except (binascii.Error, ValueError) as error:
+        raise HTTPException(400, "data must be base64") from error
+    if len(content) > _MAX_DOCUMENT_BYTES:
+        raise HTTPException(413, "The document is larger than 20 MB")
+    gateway = ReaderGateway(request.app.state.upstream, request.app.state.settings.reader_url,
+                            request.app.state.reader_token)
+    uploaded = await gateway.upload(account, filename, content)
+    await logs.action(account, "attachments.document", f"Attached '{filename}' ({len(content):,} bytes) for OCR")
+    return AttachmentDocumentOut(
+        filename=filename, file_id=uploaded["file_id"], page_count=int(uploaded["page_count"]),
         expires_at=float(uploaded["expires_at"]),
     )
 
@@ -247,7 +292,7 @@ async def dictate(
     """Return speech as draft text without asking the chat agent to transcribe it."""
     filename, content = _audio_content(body)
     gateway = ScribeGateway(request.app.state.upstream, request.app.state.settings.scribe_url,
-                            request.app.state.internal_token)
+                            request.app.state.scribe_token)
     result = await gateway.transcribe(account, filename, content)
     await logs.action(account, "attachments.dictate", f"Transcribed {len(content):,} bytes of dictated audio")
     return DictationOut(text=result["text"], duration_s=float(result["duration_s"]))
@@ -262,7 +307,7 @@ async def dictate_partial(
     """Transient cumulative recording preview: no uploaded file or transcript log."""
     filename, content = _audio_content(body)
     gateway = ScribeGateway(request.app.state.upstream, request.app.state.settings.scribe_url,
-                            request.app.state.internal_token)
+                            request.app.state.scribe_token)
     result = await gateway.transcribe_partial(account, filename, content)
     return DictationOut(text=result["text"], duration_s=float(result["duration_s"]))
 
@@ -301,7 +346,7 @@ async def dictate_stream(websocket: WebSocket):
     state.dictation_accounts.add(account.id)
     try:
         await websocket.accept()
-        gateway = ScribeGateway(state.upstream, settings.scribe_url, state.internal_token)
+        gateway = ScribeGateway(state.upstream, settings.scribe_url, state.scribe_token)
 
         async def log_final(byte_count):
             await state.logs.action(account, "attachments.dictate", f"Transcribed {byte_count:,} bytes of dictated audio")

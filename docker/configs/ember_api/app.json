@@ -11,6 +11,7 @@
   "mcp_server_url": "http://armory:29600/mcp",
   "bard_url": "http://bard:29400",
   "scribe_url": "http://scribe:29401",
+  "reader_url": "http://reader:29402",
   "db_gateway": {
     "url": "http://treasury:29602",
     "instance": "ember",

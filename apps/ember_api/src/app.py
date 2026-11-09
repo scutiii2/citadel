@@ -77,7 +77,7 @@ from src.services.server_tools import McpServerTools, ServerTools
 from src.services.session_service import SessionService
 from src.services.traffic import TrafficMiddleware, TrafficRecorder
 from src.services.turns import TurnRegistry
-from src.utils.config_loader import internal_token as load_internal_token, load_env_secrets
+from src.utils.config_loader import internal_token as load_internal_token, load_env_secrets, service_token
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +149,9 @@ def create_app(
         app.state.email_sender = email_sender or McpEmailSender(settings.mcp_server_url, internal_token or None, recorder)
         app.state.upstream = upstream
         app.state.internal_token = internal_token or None
+        app.state.bard_token = service_token(settings.env_path, "bard") or None
+        app.state.scribe_token = service_token(settings.env_path, "scribe") or None
+        app.state.reader_token = service_token(settings.env_path, "reader") or None
         app.state.dictation_accounts = set()
         app.state.secret_box = secret_box
         app.state.agent_directory = AgentDirectory(

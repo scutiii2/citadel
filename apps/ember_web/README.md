@@ -239,7 +239,10 @@ Live dictation uses the same-origin `/api/attachments/dictate/stream` WebSocket 
   with a valid internal token and `forward_requester: true`. Stored files expire
   according to PDFMerger's TTL; upload again if an ID expires. Removing a chip
   removes it from the question; its stored original expires through that TTL.
-  Images can be inspected for metadata and merged; this integration adds no OCR.
+  Images can be inspected for metadata and merged. OCR is opt-in: a PDF or image
+  (pdf, png, jpg, webp) chip shows a "Read with OCR" button; only when clicked is the
+  file sent to Reader (through ember_api) and a `[Document file_id: ...]` line added
+  to that chip.
 - Summarize (condense the history into a summary the agent keeps) and Clear
   (start afresh); earlier messages stay readable as a collapsed log. A chat
   is also summarized automatically once its context is 60% full. A

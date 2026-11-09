@@ -4,7 +4,10 @@
     "label": "Reference Extension (dev fixture)",
     "description": "Two trivial tools (echo, add) used to prove services/extensions.py's proxy mechanism works end to end.",
     "command": ".venv/Scripts/python.exe",
-    "args": ["-m", "src._fixtures.reference_extension_server"]
+    "args": [
+      "-m",
+      "src._fixtures.reference_extension_server"
+    ]
   },
   "example-http": {
     "_comment": "Example of the http transport: an MCP server that's already running somewhere else, reached over streamable HTTP instead of spawned as a subprocess - 'url' is that server's MCP endpoint. An extension entry has either 'command' (stdio, above) or 'url' (http, here), never both. This same shape is also what POST /extensions creates at runtime (see extension_routes.py) - hand-edit it here, or add it live through that route; both end up in this same file.",
@@ -17,7 +20,9 @@
     "label": "PDF Merger",
     "description": "Merge PDFs and images into one PDF by file ID; returns a download link.",
     "url": "http://127.0.0.1:8040/mcp",
-    "headers": { "X-Internal-Token": "${INTERNAL_API_TOKEN}" },
+    "headers": {
+      "X-Internal-Token": "${INTERNAL_API_TOKEN}"
+    },
     "forward_requester": true,
     "web_url": "http://127.0.0.1:5174"
   },
@@ -26,7 +31,9 @@
     "label": "Media Downloader",
     "description": "Download a video or its audio from YouTube, TikTok and other sites; returns a download link. Start a job, then poll its status.",
     "url": "http://127.0.0.1:8050/mcp",
-    "headers": { "X-Internal-Token": "${INTERNAL_API_TOKEN}" },
+    "headers": {
+      "X-Internal-Token": "${INTERNAL_API_TOKEN}"
+    },
     "forward_requester": true,
     "web_url": "http://127.0.0.1:5175"
   },
@@ -35,7 +42,9 @@
     "label": "Bard",
     "description": "Text to speech: turns text into an MP3 and plays it in chat. English voice.",
     "url": "http://127.0.0.1:29400/mcp",
-    "headers": { "X-Internal-Token": "${BARD_TOKEN}" },
+    "headers": {
+      "X-Internal-Token": "${BARD_TOKEN}"
+    },
     "forward_requester": true
   },
   "scribe": {
@@ -43,7 +52,39 @@
     "label": "Scribe",
     "description": "Speech to text: transcribes an attached audio file to English text.",
     "url": "http://127.0.0.1:29401/mcp",
-    "headers": { "X-Internal-Token": "${SCRIBE_TOKEN}" },
+    "headers": {
+      "X-Internal-Token": "${SCRIBE_TOKEN}"
+    },
+    "forward_requester": true
+  },
+  "ocr": {
+    "_comment": "Reader's MCP endpoint (AI/ToolServices/Reader). It requires its own token (made on its admin page, Tokens card), kept in armory's .env as READER_TOKEN and sent here as a header. Start Reader before mcp_server so the connection succeeds at startup. forward_requester sends the asking user's username upstream (_meta.requester); Reader refuses a call without it.",
+    "label": "Reader",
+    "description": "OCR: reads an attached PDF or image and returns the text of every page.",
+    "url": "http://127.0.0.1:29402/mcp",
+    "headers": {
+      "X-Internal-Token": "${READER_TOKEN}"
+    },
+    "forward_requester": true
+  },
+  "lens": {
+    "_comment": "Lens's MCP endpoint (AI/ToolServices/Lens). It requires its own token (made on its admin page, Tokens card), kept in armory's .env as LENS_TOKEN and sent here as a header. Start Lens before mcp_server so the connection succeeds at startup. forward_requester sends the asking user's username upstream (_meta.requester); Lens refuses a call without it.",
+    "label": "Lens",
+    "description": "CPU image OCR. Choose fast or accurate per request; default accurate.",
+    "url": "http://127.0.0.1:29403/mcp",
+    "headers": {
+      "X-Internal-Token": "${LENS_TOKEN}"
+    },
+    "forward_requester": true
+  },
+  "mimic": {
+    "_comment": "Mimic's MCP endpoint (AI/ToolServices/Mimic). It requires its own token (made on its admin page, Tokens card), kept in armory's .env as MIMIC_TOKEN and sent here as a header. Start Mimic before mcp_server so the connection succeeds at startup. forward_requester sends the asking user's username upstream (_meta.requester); Mimic refuses a call without it.",
+    "label": "Mimic",
+    "description": "Consented private voice cloning and synthetic speech. CPU generation is slow.",
+    "url": "http://127.0.0.1:29404/mcp",
+    "headers": {
+      "X-Internal-Token": "${MIMIC_TOKEN}"
+    },
     "forward_requester": true
   }
 }

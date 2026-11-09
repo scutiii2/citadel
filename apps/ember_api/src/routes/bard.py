@@ -14,7 +14,7 @@ ID = r"^[0-9a-f]{32}$"
 
 
 def gateway(request: Request) -> BardGateway:
-    return BardGateway(request.app.state.upstream, request.app.state.settings.bard_url, request.app.state.internal_token)
+    return BardGateway(request.app.state.upstream, request.app.state.settings.bard_url, request.app.state.bard_token)
 
 
 class SpeakIn(BaseModel):

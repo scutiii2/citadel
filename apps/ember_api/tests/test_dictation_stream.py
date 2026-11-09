@@ -81,7 +81,7 @@ def test_stream_requires_upload_permission(client, email, remote):
 
 def test_stream_proxies_pcm_stop_transcripts_and_identity(client, remote):
     as_admin(client)
-    client.app.state.internal_token = 'test-private-token'
+    client.app.state.scribe_token = 'test-private-token'
     with client.websocket_connect(PATH, headers=ORIGIN) as ws:
         assert ws.receive_json() == {'type': 'partial', 'text': 'hello'}
         ws.send_bytes(b'\x00\x01' * 320)

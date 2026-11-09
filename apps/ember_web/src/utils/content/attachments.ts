@@ -36,6 +36,14 @@ export function audioHeader(a: { file_id: string; duration_s: number; expires_at
   return `[Audio file_id: ${a.file_id} | ${a.duration_s.toFixed(1)} s | expires_at: ${a.expires_at} | call scribe tool_scribe_transcribe with this file_id to get the transcript; preserve this file_id when delegating]`;
 }
 
+/** Documents Reader can OCR (it reads fewer formats than PDF_FILE). */
+export const DOCUMENT_FILE = /\.(pdf|png|jpe?g|webp)$/i;
+
+/** The line that stands in for a Reader upload: the id tool_ocr_parse needs and what to do with it. */
+export function documentHeader(d: { file_id: string; page_count: number; expires_at: number }): string {
+  return `[Document file_id: ${d.file_id} | ${d.page_count} pages | expires_at: ${d.expires_at} | call ocr tool_ocr_parse with this file_id to get the text of every page; preserve this file_id when delegating]`;
+}
+
 const MAX_LISTED_COLUMNS = 30;
 
 /** The line that opens an attachment's text for a table: the id the data tools

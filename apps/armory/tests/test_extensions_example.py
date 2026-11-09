@@ -18,3 +18,13 @@ def test_scribe_example_entry_matches_the_service_defaults():
     assert entry["headers"] == {"X-Internal-Token": "${SCRIBE_TOKEN}"}
     assert entry["forward_requester"] is True
     assert "command" not in entry
+
+
+def test_other_tool_services_are_registered_with_their_own_tokens():
+    entries = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+    for key, port, token in (("ocr", 29402, "READER_TOKEN"), ("lens", 29403, "LENS_TOKEN"), ("mimic", 29404, "MIMIC_TOKEN")):
+        entry = entries[key]
+        assert entry["url"] == f"http://127.0.0.1:{port}/mcp"
+        assert entry["headers"] == {"X-Internal-Token": "${" + token + "}"}
+        assert entry["forward_requester"] is True
+        assert "command" not in entry

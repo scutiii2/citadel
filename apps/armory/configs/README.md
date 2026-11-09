@@ -44,9 +44,13 @@ mechanics); paths come from `Settings.email_config_path` /
   tools from (see `services/extensions.py`). Also written to at runtime by
   `POST`/`DELETE /extensions` (see `extension_routes.py`) - hand-edit it
   or add an extension live through that route, both end up here.
-  Set `"internal": true` on an http entry for a server of this stack (Bard,
-  Scribe): armory then sends it `INTERNAL_API_TOKEN` and forwards the requester,
-  so no `headers` are needed. Never set it for a server you do not run.
+  Set `"internal": true` on an http entry for a server of this stack: armory
+  then sends it `INTERNAL_API_TOKEN` and forwards the requester, so no
+  `headers` are needed. Never set it for a server you do not run.
+  Tool services (Bard, Scribe, Reader as `ocr`, Lens, Mimic) keep per-caller
+  tokens instead: make one on the service's admin page (Tokens card), put it
+  in `.env` as `<NAME>_TOKEN` and send it with
+  `"headers": {"X-Internal-Token": "${<NAME>_TOKEN}"}`.
 - **`config_capabilities.json`** - which built-in capabilities
   (`server` - the toggle
   id, shorter than its folder name `server_manager` on purpose) are enabled.

@@ -238,6 +238,8 @@ class Settings:
     bard_url: str = "http://127.0.0.1:29400"
     # Scribe (speech to text): attached audio is uploaded here, never exposed to the browser.
     scribe_url: str = "http://127.0.0.1:29401"
+    # Reader (document OCR): attached PDFs and images are uploaded here, never exposed to the browser.
+    reader_url: str = "http://127.0.0.1:29402"
     security: SecuritySettings = field(default_factory=SecuritySettings)
     usage: UsageSettings = field(default_factory=UsageSettings)
     pricing: PricingSettings = field(default_factory=PricingSettings)
@@ -283,6 +285,7 @@ def load_settings() -> Settings:
         mcp_server_url=raw.get("mcp_server_url") or "http://127.0.0.1:29600/mcp",
         bard_url=raw.get("bard_url") or "http://127.0.0.1:29400",
         scribe_url=raw.get("scribe_url") or "http://127.0.0.1:29401",
+        reader_url=raw.get("reader_url") or "http://127.0.0.1:29402",
         security=SecuritySettings.from_config(raw.get("security", {})),
         usage=UsageSettings.from_config(raw.get("usage", {})),
         pricing=PricingSettings.from_config(load_json_config(CONFIGS_DIR / "config_pricing.json")),

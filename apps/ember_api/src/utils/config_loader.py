@@ -46,3 +46,10 @@ def load_env_secrets(path: str | Path) -> dict[str, str]:
 def internal_token(path: str | Path) -> str:
     """INTERNAL_API_TOKEN from the environment, else the secret file, else the shared token file. "" = not configured."""
     return os.getenv("INTERNAL_API_TOKEN") or load_env_secrets(path).get("INTERNAL_API_TOKEN") or shared_token()
+
+
+def service_token(path: str | Path, name: str) -> str:
+    """The token a tool service (Bard, Scribe...) issued to this app: `<NAME>_TOKEN` from the environment, else the secret file.
+    Tool services keep their own per-caller tokens, so the shared internal token is not a fallback. "" = not configured."""
+    key = f"{name.upper()}_TOKEN"
+    return os.getenv(key) or load_env_secrets(path).get(key) or ""

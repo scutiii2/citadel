@@ -4,7 +4,9 @@
     "label": "Bard",
     "description": "Text to speech: turns text into an MP3 and plays it in chat. English voice.",
     "url": "http://bard:29400/mcp",
-    "headers": { "X-Internal-Token": "${BARD_TOKEN}" },
+    "headers": {
+      "X-Internal-Token": "${BARD_TOKEN}"
+    },
     "forward_requester": true
   },
   "scribe": {
@@ -12,7 +14,39 @@
     "label": "Scribe",
     "description": "Speech to text: transcribes an attached audio file to English text.",
     "url": "http://scribe:29401/mcp",
-    "headers": { "X-Internal-Token": "${SCRIBE_TOKEN}" },
+    "headers": {
+      "X-Internal-Token": "${SCRIBE_TOKEN}"
+    },
+    "forward_requester": true
+  },
+  "ocr": {
+    "_comment": "Reader runs from AI/ToolServices/Reader (its own compose project, joined to this stack's core network), so Armory reaches it by service name. Start the Citadel stack first, then Reader, then restart armory. It needs its own token (made on its admin page, Tokens card), kept in armory's .env as READER_TOKEN.",
+    "label": "Reader",
+    "description": "OCR: reads an attached PDF or image and returns the text of every page.",
+    "url": "http://reader:29402/mcp",
+    "headers": {
+      "X-Internal-Token": "${READER_TOKEN}"
+    },
+    "forward_requester": true
+  },
+  "lens": {
+    "_comment": "Lens runs from AI/ToolServices/Lens (its own compose project, joined to this stack's core network), so Armory reaches it by service name. Start the Citadel stack first, then Lens, then restart armory. It needs its own token (made on its admin page, Tokens card), kept in armory's .env as LENS_TOKEN.",
+    "label": "Lens",
+    "description": "CPU image OCR. Choose fast or accurate per request; default accurate.",
+    "url": "http://lens:29403/mcp",
+    "headers": {
+      "X-Internal-Token": "${LENS_TOKEN}"
+    },
+    "forward_requester": true
+  },
+  "mimic": {
+    "_comment": "Mimic runs from AI/ToolServices/Mimic (its own compose project, joined to this stack's core network), so Armory reaches it by service name. Start the Citadel stack first, then Mimic, then restart armory. It needs its own token (made on its admin page, Tokens card), kept in armory's .env as MIMIC_TOKEN.",
+    "label": "Mimic",
+    "description": "Consented private voice cloning and synthetic speech. CPU generation is slow.",
+    "url": "http://mimic:29404/mcp",
+    "headers": {
+      "X-Internal-Token": "${MIMIC_TOKEN}"
+    },
     "forward_requester": true
   }
 }

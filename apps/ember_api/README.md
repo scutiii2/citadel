@@ -4,13 +4,14 @@
 
 | Route | Permission | Behavior |
 | --- | --- | --- |
+| `POST /api/attachments/document` | `files.upload` | `DocumentIn` base64 JSON, pdf/png/jpg/jpeg/webp, 20 MB cap; uploads to Reader and returns `{filename, file_id, page_count, expires_at}`. Logs `attachments.document`. |
 | `POST /api/attachments/dictate` | `files.upload` | `AudioIn` base64 JSON, supported audio suffix, 20 MB cap; returns `{text, duration_s}` from Scribe. Logs `attachments.dictate` without transcript text. |
 | `POST /api/attachments/dictate/partial` | `files.upload` | Same audio validation; transient cumulative preview through Scribe `/api/transcribe-partial`, returning `{text, duration_s}` without retaining audio or logging transcript text. |
 | `WS /api/attachments/dictate/stream` | session cookie + `files.upload` | Same-origin binary mono 16 kHz PCM16 and JSON `{"type":"stop"}`; returns `{type:"partial"|"final", text}` events. Scribe capacity closes with 1013 so the browser can use HTTP previews. |
 | `POST /api/bard/speak` | `tools.execute` + `files.download` | JSON `{text, voice?}`; returns `{file_id, duration_s, voice}`. Logs `bard.speak` without spoken text. |
 | `GET /api/bard/voices` | `tools.execute` + `files.download` | Returns `{voices: string[]}` for installed voices only. |
 
-Speech gateways supply account identity and the internal token. Rejected audio/text remains 400, quota/size 413 and unreachable services or refused internal credentials become 502. Existing audio upload and Bard streaming routes retain their contracts.
+Speech gateways supply account identity and the service's own token: `BARD_TOKEN` / `SCRIBE_TOKEN` / `READER_TOKEN` (environment, else `.env`), made on that tool service's admin page (Tokens card) and sent as `X-Internal-Token`. The shared `INTERNAL_API_TOKEN` is not used for tool services, which keep per-caller tokens; leave a token empty only for a tool service with no admin password (open, loopback). Rejected audio/text remains 400, quota/size 413 and unreachable services or refused credentials become 502. Existing audio upload and Bard streaming routes retain their contracts.
 
 Live dictation allows one stream per account per ember_api process, with at most
 64,000 bytes per PCM frame, 150 seconds of audio, 15 seconds idle while recording,

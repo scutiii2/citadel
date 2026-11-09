@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../../api/types";
-import { AUDIO_FILE, audioHeader, questionHistory, splitAttachments, tableHeader, TABLE_FILE, withAttachments } from "./attachments";
+import { AUDIO_FILE, audioHeader, DOCUMENT_FILE, documentHeader, questionHistory, splitAttachments, tableHeader, TABLE_FILE, withAttachments } from "./attachments";
 
 const user = (content: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ role: "user", content, ...extra });
 const assistant = (content: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ role: "assistant", content, ...extra });
@@ -103,5 +103,19 @@ describe("audio attachments", () => {
     const header = audioHeader({ file_id: "a".repeat(32), duration_s: 12.34, expires_at: 99 });
     expect(header).toContain(`[Audio file_id: ${"a".repeat(32)} | 12.3 s | expires_at: 99 |`);
     expect(header).toContain("tool_scribe_transcribe");
+  });
+});
+
+describe("Reader documents", () => {
+  it("matches only the formats Reader reads", () => {
+    expect(DOCUMENT_FILE.test("scan.PDF")).toBe(true);
+    expect(DOCUMENT_FILE.test("photo.jpeg")).toBe(true);
+    expect(DOCUMENT_FILE.test("photo.heic")).toBe(false);
+  });
+
+  it("writes a header the agent can act on", () => {
+    const header = documentHeader({ file_id: "b".repeat(32), page_count: 3, expires_at: 99 });
+    expect(header).toContain(`[Document file_id: ${"b".repeat(32)} | 3 pages | expires_at: 99 |`);
+    expect(header).toContain("tool_ocr_parse");
   });
 });

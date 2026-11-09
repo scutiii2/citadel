@@ -31,6 +31,13 @@ interface AttachmentAudio {
   expires_at: number;
 }
 
+interface AttachmentDocument {
+  filename: string;
+  file_id: string;
+  page_count: number;
+  expires_at: number;
+}
+
 export interface DictationResult {
   text: string;
   duration_s: number;
@@ -77,6 +84,13 @@ export const attachmentsClient = {
   async audio(file: File): Promise<AttachmentAudio> {
     if (file.size > MAX_AUDIO_BYTES) throw new Error("Too large - the limit is 20 MB");
     return apiRequest<AttachmentAudio>("POST", "/api/attachments/audio", {
+      filename: file.name, data: await toBase64(file),
+    });
+  },
+  /** Uploads the document to Reader through ember_api; the agent reads it with tool_ocr_parse by file_id. */
+  async document(file: File): Promise<AttachmentDocument> {
+    if (file.size > MAX_AUDIO_BYTES) throw new Error("Too large - the limit is 20 MB");
+    return apiRequest<AttachmentDocument>("POST", "/api/attachments/document", {
       filename: file.name, data: await toBase64(file),
     });
   },

@@ -143,7 +143,7 @@ watch(() => auth.hasPermission("files.upload"), (allowed) => { if (!allowed) can
 const fileInput = ref<HTMLInputElement | null>(null);
 const {
   attachments, reading, ready, dragging,
-  removeAttachment, restoreAttachments, onPick, onDragOver, onDragLeave, onDrop, onPaste,
+  removeAttachment, readWithOcr, restoreAttachments, onPick, onDragOver, onDragLeave, onDrop, onPaste,
 } = useComposerAttachments();
 
 const isCommand = computed(() => draft.value.trimStart().startsWith("/"));
@@ -478,7 +478,12 @@ function onKeydown(event: KeyboardEvent): void {
           <small v-if="a.state === 'ready' && a.truncated">(cut to {{ a.chars.toLocaleString() }} characters)</small>
           <small v-if="a.state === 'ready' && a.pages">({{ a.pages }} pages · available for PDF tools)</small>
           <small v-if="a.state === 'ready' && a.rows">({{ a.rows.toLocaleString() }} rows, {{ a.columns }} columns)</small>
+          <small v-if="a.ocr === 'done'">(OCR ready)</small>
+          <small v-if="a.ocr === 'error'">(OCR failed: {{ a.error }})</small>
         </span>
+        <button v-if="a.state === 'ready' && a.source && a.ocr !== 'done'" type="button" class="ocr" :disabled="a.ocr === 'reading'" @click="readWithOcr(a.id)">
+          {{ a.ocr === "reading" ? "Sending to OCR …" : a.ocr === "error" ? "Retry OCR" : "Read with OCR" }}
+        </button>
         <button type="button" :aria-label="`Remove ${a.filename}`" @click="removeAttachment(a.id)">×</button>
       </li>
     </ul>
@@ -837,6 +842,14 @@ button.dictation.ending { color: var(--danger); }
   font-size: 1.1em;
   color: inherit;
   background: transparent;
+}
+.attachments button.ocr {
+  font-size: 1em;
+  color: var(--accent);
+}
+.attachments button.ocr:disabled {
+  cursor: default;
+  color: var(--muted);
 }
 textarea {
   width: 100%;

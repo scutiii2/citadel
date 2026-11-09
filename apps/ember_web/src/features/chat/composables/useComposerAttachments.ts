@@ -1,7 +1,7 @@
 import { computed, ref } from "vue";
 import { useAuthStore } from "../../../stores/auth";
 import { attachmentsClient } from "../../../api/files/AttachmentsClient";
-import { splitAttachments, AUDIO_FILE, PDF_FILE, TABLE_FILE, audioHeader, tableHeader } from "../../../utils/content/attachments";
+import { splitAttachments, AUDIO_FILE, DOCUMENT_FILE, PDF_FILE, TABLE_FILE, audioHeader, documentHeader, tableHeader } from "../../../utils/content/attachments";
 import { errorMessage } from "../../../utils/errors";
 
 /** File uploads, previews, and input events for one chat composer. */
@@ -22,6 +22,9 @@ export function useComposerAttachments() {
     columns: number;
     error: string;
     pages?: number;
+    /** The original file, kept only while Reader (OCR) can still be asked to read it. */
+    source?: File;
+    ocr?: "reading" | "done" | "error";
   }
 
   let nextAttachmentId = 1;
@@ -60,6 +63,8 @@ export function useComposerAttachments() {
               ? `[Image file_id: ${result.file_id} | ${result.pages} pages | image | expires_at: ${result.expires_at} | preserve this file_id when delegating; the original image is stored with the pdf_merger tools]\n[No text preview available; inspect the original image when needed.]`
               : `[PDFMerger file_id: ${result.file_id} | ${result.pages} pages | ${result.kind} | expires_at: ${result.expires_at} | use pdf_merger tools to inspect/merge this original; preserve this file_id when delegating to PDF Assistant]\n` +
                 (result.text || "[No text preview available; the original file is available for inspection and merging.]"),
+            // Reader (OCR) is opt-in: the file is kept so "Read with OCR" can upload it on request.
+            source: DOCUMENT_FILE.test(file.name) ? file : undefined,
             chars: result.char_count, truncated: result.truncated, pages: result.pages,
           });
         }).catch((err: unknown) => Object.assign(live, { state: "error", error: errorMessage(err) }));
@@ -84,6 +89,22 @@ export function useComposerAttachments() {
         .catch((err: unknown) => {
           Object.assign(live, { state: "error", error: errorMessage(err) });
         });
+    }
+  }
+
+  /** Only on the user's request: upload the kept original to Reader and tell the agent to OCR it. */
+  async function readWithOcr(id: number): Promise<void> {
+    const live = attachments.value.find((a) => a.id === id);
+    if (!live?.source || live.ocr === "reading" || live.ocr === "done") return;
+    live.ocr = "reading";
+    try {
+      const doc = await attachmentsClient.document(live.source);
+      live.text = documentHeader(doc) + "\n" + live.text;
+      live.chars = live.text.length;
+      live.ocr = "done";
+    } catch (err: unknown) {
+      live.ocr = "error";
+      live.error = errorMessage(err);
     }
   }
 
@@ -141,6 +162,6 @@ export function useComposerAttachments() {
 
   return {
     attachments, reading, ready, dragging,
-    removeAttachment, restoreAttachments, onPick, onDragOver, onDragLeave, onDrop, onPaste,
+    removeAttachment, readWithOcr, restoreAttachments, onPick, onDragOver, onDragLeave, onDrop, onPaste,
   };
 }
