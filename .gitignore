@@ -103,7 +103,7 @@ node_modules/
 apps/legion/configs/tuning_overrides.json
 
 # Ember API run cache (regenerated, not source).
-/apps/Ember/ember_api/.cache/
+/apps/ember_api/.cache/
 
 # Every folder starting with "." or "_" is local state or tooling, never source.
 # Re-included: folders that hold tracked files (skills, Codex links, test fixtures).

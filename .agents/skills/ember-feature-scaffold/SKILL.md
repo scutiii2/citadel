@@ -6,7 +6,7 @@ description: Add a feature to ember_web (the Vue 3 + TypeScript browser app) and
 # ember_web + ember_api feature scaffolding
 
 Two projects that ship together (plus **ember_admin/**, a second Vue app in
-`apps/Ember/` for administrators on port 26501: same stack and shared control
+`apps/` for administrators on port 26501: same stack and shared control
 files as ember_web, talks only to ember_api; staff-only pages such as Tickets,
 Capabilities, Agents and Analytics go there, not in ember_web):
 
@@ -23,10 +23,10 @@ Capabilities, Agents and Analytics go there, not in ember_web):
 A third client uses the same REST API: **chat_cli/** (terminal chat, logs in
 with the account, same cookie session, same SSE events). A change to an
 existing route's shape or to the turn/events contract must keep it working -
-check `apps/Ember/ember_cli/src/api.py` and `events.py` - and a new route the web app
+check `apps/ember_cli/src/api.py` and `events.py` - and a new route the web app
 needs is not automatically wanted there.
 
-Read both READMEs (`apps/Ember/ember_web/README.md`, `apps/Ember/ember_api/README.md`) before
+Read both READMEs (`apps/ember_web/README.md`, `apps/ember_api/README.md`) before
 designing - they hold the current API table and security model this skill
 compresses.
 
@@ -113,14 +113,14 @@ in routes), `src/models/` (SQLAlchemy 2 typed models), `src/deps.py`
 5. **POST bodies are always JSON** - `JsonOnlyMiddleware` rejects anything
    else with 415 (CSRF guard with the `SameSite=Strict` cookie). Don't
    add form endpoints.
-6. **Tests** in `apps/Ember/ember_api/tests/`: fixtures in `conftest.py` give
+6. **Tests** in `apps/ember_api/tests/`: fixtures in `conftest.py` give
    `client`, `client_factory(**settings)`, `email` (FakeEmailSender) and
    `upstream` (FakeUpstream for the MCP proxy); `tests/test_registration.py`
    has `as_admin`, `new_invite`, `register` helpers. Cover: happy path,
    401 when logged out, 403 without the permission / unverified, and
    validation errors. Run:
-   `uv run pytest -q` (from `apps/Ember/ember_api/`).
-7. Update the API table in `apps/Ember/ember_api/README.md`.
+   `uv run pytest -q` (from `apps/ember_api/`).
+7. Update the API table in `apps/ember_api/README.md`.
 
 ## 3. ember_web side
 
@@ -177,7 +177,7 @@ preference), `src/components/` (reusable pieces only), `src/router/`,
    enums - declare fields explicitly.
 7. **Markdown/HTML from the server or a model** only via
    `components/MarkdownContent.vue` (DOMPurify-sanitized) - never raw `v-html`.
-8. Verify from `apps/Ember/ember_web/`: `pnpm exec vue-tsc -b --noEmit` (must print
+8. Verify from `apps/ember_web/`: `pnpm exec vue-tsc -b --noEmit` (must print
    nothing) and `pnpm exec vite build`, then delete `dist/`. Tests sit beside the source
    (`*.test.ts`, Vitest + jsdom, ember_api mocked): `pnpm test`. If a page now
    calls a new `/api` route, add it to `e2e/fakeApi.ts` - the Playwright test

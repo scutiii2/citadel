@@ -34,13 +34,15 @@ DEPLOY_PATHS = [
     "apps/armory",
     "apps/legion",
     "apps/treasury",
-    "apps/Ember",
+    "apps/ember_api",
+    "apps/ember_web",
+    "apps/ember_admin",
     "docs/deployment.md",
 ]
 # Left out of live. Python tests/ folders are not built into any image; e2e/ and src/*.test.ts stay
 # because the web apps' tsconfig includes them. ember_cli is not a compose service.
 EXCLUDE_DIRS = {"tests"}
-EXCLUDE_PREFIXES = ("apps/Ember/ember_cli/",)
+EXCLUDE_PREFIXES = ("apps/ember_cli/",)
 BRANCH = "live"
 REMOTE = "origin"
 ROOT = Path(__file__).resolve().parent.parent

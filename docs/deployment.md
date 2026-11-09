@@ -27,7 +27,7 @@ from the separate `LayaModel` project (see "Laya" below) and legion reaches it t
 3. Open http://localhost:26502 (ember_web) and http://localhost:26501 (ember_admin). Both bind to `127.0.0.1`.
 
 To rebuild one service, run `docker compose up -d --build <service>`, or double-click the `dev_deploy.bat` in that
-service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/Ember/ember_api`, `ember_web`, `ember_admin`).
+service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/ember_api`, `ember_web`, `ember_admin`).
 
 ```bash
 docker compose ps              # state of every service
@@ -98,8 +98,8 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    cp apps/armory/.env.example apps/armory/.env
    cp apps/legion/.env.example apps/legion/.env
    cp apps/treasury/.env.example apps/treasury/.env
-   cp apps/Ember/ember_api/.env.example apps/Ember/ember_api/.env
-   chmod 600 .env apps/*/.env apps/Ember/ember_api/.env
+   cp apps/ember_api/.env.example apps/ember_api/.env
+   chmod 600 .env apps/*/.env apps/ember_api/.env
    ```
 
    | File | Keys to fill in |
@@ -107,7 +107,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | `apps/armory/.env` | Only the capability keys you use: `SMTP_PASSWORD`, `TEAMS_WEBHOOK_URL`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://legion:29611/mcp` to group tickets with the triage agent) |
    | `apps/legion/.env` | `CLAUDE_API_KEY`, or the keys of the gateway your agents use; `HF_TOKEN` if used; `LAYA_TOKEN` (must equal the one in `LayaModel`'s `.env`) |
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
-   | `apps/Ember/ember_api/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
+   | `apps/ember_api/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
 
    - Leave `INTERNAL_API_TOKEN` out of the per-app files. A value there wins over the generated token for that app only, so the apps would stop agreeing.
    - Skip `MCP_HOST`, `MCP_PORT` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. Set `LAYA_SERVICE_URL`
@@ -115,7 +115,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
      the server's hostname for another service.
    - **Laya settings** (`LAYA_TOKEN`, `LAYA_REPLICAS`, `LAYA_PORT`) belong in `LayaModel`'s own `.env`, not here. Each
      replica loads its own copy of the models in RAM, so keep `LAYA_REPLICAS` low on a small box.
-   - `apps/Ember/ember_api/.env` must exist before the first start. Compose bind-mounts it, and if it is missing Docker
+   - `apps/ember_api/.env` must exist before the first start. Compose bind-mounts it, and if it is missing Docker
      creates a directory in its place and ember_api fails. ember_api writes `EMBER_SECRETS_KEY` into it, so keep it
      when you rebuild.
 
@@ -126,7 +126,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | File | On a fresh clone |
    |---|---|
    | `apps/legion/configs/config_tuning.json` | Created from its `.example` automatically |
-   | `apps/Ember/ember_api/configs/config_pricing.json` | Created from its `.example` automatically |
+   | `apps/ember_api/configs/config_pricing.json` | Created from its `.example` automatically |
    | `apps/armory/configs/config_email.json`, `config_tickets.json` | Copy each `.example` and fill in `config_email.json` |
 
    These files are baked into the image at build time, so a change made to them inside the container is lost when
@@ -164,10 +164,10 @@ The box needs only what the stack builds from, not the whole repo. `tools/publis
 `main` with just these paths:
 
 - `docker-compose.yml`, `docker-compose.zima.yml`, `.env.example`, `docker/`
-- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/Ember`
+- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/ember_api`, `apps/ember_web`, `apps/ember_admin`
 - `docs/deployment.md`
 
-It leaves out other docs, skills, `tools/`, the Python `tests/` folders and `apps/Ember/ember_cli`. `e2e/` and the
+It leaves out other docs, skills, `tools/`, the Python `tests/` folders and `apps/ember_cli`. `e2e/` and the
 `src/*.test.ts` files stay because the web apps' tsconfig includes them. The path lists are at the top of the script;
 add a path there when you add a compose service.
 
@@ -192,8 +192,8 @@ under compose.
 
    | Name | URL | Icon |
    |---|---|---|
-   | Ember | `http://<zima-ip>:26502` | `apps/Ember/ember_web/public/icons/icon-512.png` |
-   | Ember Admin | `http://<zima-ip>:26501` | `apps/Ember/ember_admin/public/icons/icon-512.png` |
+   | Ember | `http://<zima-ip>:26502` | `apps/ember_web/public/icons/icon-512.png` |
+   | Ember Admin | `http://<zima-ip>:26501` | `apps/ember_admin/public/icons/icon-512.png` |
 
 3. If the dashboard asks for an image URL, use `http://<zima-ip>:26502/icons/icon-512.png` and
    `http://<zima-ip>:26501/icons/icon-512.png`. Avoid `icon-maskable-512.png`; its padding makes the tile look small.
@@ -268,7 +268,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 | `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
 | `scp` will not log in | Check `DEPLOY_HOST` and that the folder exists. Run `ssh <host>` by hand to test. |
 | `openssl: command not found` | Use the `/dev/urandom` command in first-time setup, step 3. A failed `echo` leaves an empty `.env`, so run it again. |
-| ember_api fails and `apps/Ember/ember_api/.env` is a directory | Compose created it because the file was missing. Run `rmdir apps/Ember/ember_api/.env`, then `touch apps/Ember/ember_api/.env`, then start again. |
+| ember_api fails and `apps/ember_api/.env` is a directory | Compose created it because the file was missing. Run `rmdir apps/ember_api/.env`, then `touch apps/ember_api/.env`, then start again. |
 | UI loads on the box but not on another device | Overlay not used. Check `COMPOSE_FILE` in the root `.env`, or add `-f docker-compose.zima.yml`. |
 | Overlay still binds `127.0.0.1` | Compose older than 2.24 ignores `!override`. Update Compose, or edit the `ports` lines in the main file. |
 | Port already in use | Another app uses 26502 or 26501. Change the left side of the port mapping. |

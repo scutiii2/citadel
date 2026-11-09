@@ -1,6 +1,6 @@
 ---
 name: ember-frontend-design
-description: Use when designing, building, restyling or reviewing any screen, component or layout in ember_web or ember_admin (the two Vue 3 apps in apps/Ember/). Covers which app a page belongs in, the shared tokens and components to reuse, page layout, navigation placement, confirmations, settings behaviour, the radius test and how to check a UI. Use even for small visual tweaks ("make this card nicer", "add a settings row", "fix the spacing on the tickets page").
+description: Use when designing, building, restyling or reviewing any screen, component or layout in ember_web or ember_admin (the two Vue 3 apps in apps/). Covers which app a page belongs in, the shared tokens and components to reuse, page layout, navigation placement, confirmations, settings behaviour, the radius test and how to check a UI. Use even for small visual tweaks ("make this card nicer", "add a settings row", "fix the spacing on the tickets page").
 ---
 
 # Ember frontend design (ember_web + ember_admin)
@@ -87,7 +87,7 @@ These are the user's preferred Ember patterns. Choose the shape that fits the ta
 
 Use these existing pages as implementation references:
 
-| Task | Reference under `apps/Ember/ember_web/src/` |
+| Task | Reference under `apps/ember_web/src/` |
 |---|---|
 | Writing with secondary tools | `features/notes/NotesView.vue`: draft-safe sidebar search, growing document editor, individual tool disclosures and persistent Save |
 | Reviewing short facts | `features/memory/MemoryView.vue`: searchable list/editor workspace, mobile Back, guarded drafts and management disclosure |

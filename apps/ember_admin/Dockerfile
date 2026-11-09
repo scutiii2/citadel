@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Build context is apps/Ember: ember_admin imports two files from ember_web
+# Build context is apps/: ember_admin imports two files from ember_web
 # (PwaStatus.vue, pageLayout.css) by relative path.
 FROM node:22-alpine AS build
 WORKDIR /src/ember_admin

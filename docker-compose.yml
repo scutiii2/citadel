@@ -73,10 +73,10 @@ services:
     networks: [core]
 
   ember_api:
-    build: ./apps/Ember/ember_api
+    build: ./apps/ember_api
     restart: unless-stopped
     env_file:
-      - path: ./apps/Ember/ember_api/.env
+      - path: ./apps/ember_api/.env
         required: false
     environment:
       <<: *internal_token
@@ -84,7 +84,7 @@ services:
     volumes:
       - ./docker/configs/ember_api/app.json:/app/configs/config_app.json:ro
       # ember_api reads and writes its secrets (EMBER_SECRETS_KEY) in its own .env file.
-      - ./apps/Ember/ember_api/.env:/app/.env
+      - ./apps/ember_api/.env:/app/.env
       - ember_api_data:/app/data
       - internal_token:/run/citadel
       - agent_data:/agent_data:ro
@@ -92,7 +92,7 @@ services:
     networks: [core]
 
   ember_web:
-    build: ./apps/Ember/ember_web
+    build: ./apps/ember_web
     restart: unless-stopped
     ports:
       - "127.0.0.1:26502:80"
@@ -101,7 +101,7 @@ services:
 
   ember_admin:
     build:
-      context: ./apps/Ember
+      context: ./apps
       dockerfile: ember_admin/Dockerfile
     restart: unless-stopped
     ports:
