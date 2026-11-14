@@ -34,6 +34,7 @@ DEPLOY_PATHS = [
     "apps/armory",
     "apps/legion",
     "apps/treasury",
+    "apps/stronghold",
     "apps/portcullis",
     "apps/ember_web",
     "apps/ember_admin",

@@ -1,4 +1,4 @@
-# Stack: ember_web / ember_admin / legion_admin -> portcullis -> armory / legion / treasury; legion -> LayaModel (its own stack, reached through the host's published port 29220, not started here).
+# Stack: ember_web / ember_admin / legion_admin -> portcullis -> armory / legion / treasury / stronghold; legion -> LayaModel (its own stack, reached through the host's published port 29220, not started here).
 # Start:  docker compose up -d --build
 # The internal token is made on first start and shared through the internal_token volume. Per-app
 # secrets stay in apps/<app>/.env and are loaded when the file exists.
@@ -72,6 +72,22 @@ services:
       - internal_token:/run/citadel
     networks: [core]
 
+  # Product logic. Only portcullis calls it, so no port is published.
+  stronghold:
+    build: ./apps/stronghold
+    restart: unless-stopped
+    env_file:
+      - path: ./apps/stronghold/.env
+        required: false
+    environment:
+      <<: *internal_token
+      STRONGHOLD_HOST: 0.0.0.0
+      STRONGHOLD_PORT: "29650"
+    volumes:
+      - internal_token:/run/citadel
+    depends_on: [treasury]
+    networks: [core]
+
   portcullis:
     build: ./apps/portcullis
     restart: unless-stopped
@@ -88,7 +104,7 @@ services:
       - portcullis_data:/app/data
       - internal_token:/run/citadel
       - agent_data:/agent_data:ro
-    depends_on: [armory, legion, treasury]
+    depends_on: [armory, legion, treasury, stronghold]
     networks: [core]
 
   ember_web:

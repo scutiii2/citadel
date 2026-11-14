@@ -10,6 +10,7 @@ Citadel runs as containers from one `docker-compose.yml`:
 | `armory` | MCP server (capabilities, including Server Manager) | internal 29600 |
 | `legion` | AI agent | internal |
 | `treasury` | database gateway | internal 29602 |
+| `stronghold` | product logic, called only by portcullis | internal 29650 |
 
 Only the two web apps publish ports. The rest talk over the internal `core` network. Laya is not in this stack: it runs
 from the separate `LayaModel` project (see "Laya" below) and legion reaches it through the host's published port, `http://host.docker.internal:29220`.
@@ -27,7 +28,7 @@ from the separate `LayaModel` project (see "Laya" below) and legion reaches it t
 3. Open http://localhost:26502 (ember_web) and http://localhost:26501 (ember_admin). Both bind to `127.0.0.1`.
 
 To rebuild one service, run `docker compose up -d --build <service>`, or double-click the `dev_deploy.bat` in that
-service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/portcullis`, `ember_web`, `ember_admin`).
+service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `ember_web`, `ember_admin`).
 
 ```bash
 docker compose ps              # state of every service
@@ -164,7 +165,7 @@ The box needs only what the stack builds from, not the whole repo. `tools/publis
 `main` with just these paths:
 
 - `docker-compose.yml`, `docker-compose.zima.yml`, `.env.example`, `docker/`
-- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/portcullis`, `apps/ember_web`, `apps/ember_admin`
+- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `apps/ember_web`, `apps/ember_admin`
 - `docs/deployment.md`
 
 It leaves out other docs, skills, `tools/`, the Python `tests/` folders and `apps/ember_cli`. `e2e/` and the
