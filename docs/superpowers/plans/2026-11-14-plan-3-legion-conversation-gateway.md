@@ -1246,3 +1246,11 @@ git commit -m "feat: run ConversationGateway in the Citadel stack" -m "Co-Author
 - **Not in this plan:** the OpenAI-protocol provider (`openai_provider.py`, `gateways/openai/*.json`, the `openai` dependency, the OpenAI branch of `classify`). That is Plan 3b, same pattern. The decision provider is Plan 4.
 - **Placeholders:** none. Task 4 Step 6 gives a closed rule for each kind of failing test and a stop condition for anything else.
 - **Names:** `GatewayCallError(status, code, message, kind, retry_after)`, `ConversationGatewayClient.stream` / `.chat_sync`, `saved_gateway_ids`, `reset_cache`, `GatewayShim`, `request_body`, `response_message`, `gateway_error` (test helper), `CONVERSATION_GATEWAY_URL`, `CONVERSATION_GATEWAY_TOKEN`, `CONVERSATION_GATEWAY_ADMIN_PASSWORD`, `CONVERSATION_GATEWAY_DIR` and service `conversationgateway` are spelled the same in every task.
+
+## Execution notes (2026-11-14)
+
+- Tests are plain `def` tests that drive coroutines with `asyncio.run(...)`: Legion has no async pytest plugin.
+- `saved_gateway_ids()` returns `None` when ConversationGateway cannot be asked, and `gateway_client.is_saved(name)` treats that as saved. Reason: `agent_config._resolve()` checks `has_api_key()` when an agent process starts, so the plan's "empty set when unreachable" would stop Legion from starting before the gateway. A down gateway now shows up as an `unavailable` failure on the call.
+- Tasks 4 and 5 ran together for the tests. Legion suite: 1445 passed, 0 failed (1436 before; SDK-parametrized cases halved, new tests added).
+- Not run: Task 6 Steps 4 and 5 (first start, token, saved gateways, live chat). They need the user and Docker, which was not running.
+- The stack now refuses to start without `CONVERSATION_GATEWAY_ADMIN_PASSWORD` in the root `.env`.
