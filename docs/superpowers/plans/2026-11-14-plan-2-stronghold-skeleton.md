@@ -838,3 +838,8 @@ Expected: `vault OK`.
 - **Placeholders:** none.
 - **Names:** `StrongholdForwarder.forward`, `ForwardedResponse(status, body, content_type)`, `StrongholdUnavailable`, `get_stronghold`, `as_response`, `current_requester`, `stronghold_url` and port 29650 are spelled the same in every task.
 - **Not covered here, on purpose:** per-route permission checks (each domain route in Plan 5 adds its own `require_permission`), request bodies other than JSON (added with the first domain that needs uploads), streaming responses (added with chats).
+
+## Execution notes (2026-11-14)
+
+- Task 2 tests run their coroutines with `asyncio.run(...)` in plain `def` tests. Portcullis has no async pytest plugin, so the `async def` tests written above do not run there.
+- Task 4 Steps 6 and 7 (image build and the Docker end-to-end check) were not run: Docker was not running. Stronghold was started locally on test port 29901 instead: `/health` answered, `/whoami` gave 401 without the token and the requester with it.
