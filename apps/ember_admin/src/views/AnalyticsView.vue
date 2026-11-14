@@ -17,12 +17,12 @@ import { KIND_COLORS, KIND_LABELS, RANGE_OPTIONS, accountLabel } from "../utils/
 
 /** Analytics page (was Logs): charts over the log entries (Overview), network
  * traffic (Traffic) and the entries themselves (Entries). Any `logs.*` permission
- * opens Overview and Entries and `traffic.view` opens Traffic; ember_api only
+ * opens Overview and Entries and `traffic.view` opens Traffic; portcullis only
  * counts the kinds the account may read, so the page just draws what it gets. */
 
 type Tab = "overview" | "traffic" | "entries";
 
-// Rows per kind in the ranking cards; ember_api sends up to ten.
+// Rows per kind in the ranking cards; portcullis sends up to ten.
 const TOP_SHOWN = 5;
 
 const auth = useAuthStore();

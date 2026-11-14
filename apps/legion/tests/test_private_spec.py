@@ -1,4 +1,4 @@
-"""spec.py: what ember_api may send for one private extension, and error text that never leaks a secret."""
+"""spec.py: what portcullis may send for one private extension, and error text that never leaks a secret."""
 
 from __future__ import annotations
 

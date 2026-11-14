@@ -1,4 +1,4 @@
-/** JSON calls to ember_api's REST routes (same origin, session cookie). */
+/** JSON calls to portcullis's REST routes (same origin, session cookie). */
 
 export class ApiError extends Error {
   readonly status: number;
@@ -35,7 +35,7 @@ function messageOf(data: unknown, fallback: string): string {
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export async function apiRequest<T>(method: HttpMethod, path: string, body?: unknown): Promise<T> {
-  // Every POST is JSON, even with no payload: ember_api rejects anything
+  // Every POST is JSON, even with no payload: portcullis rejects anything
   // else as a CSRF guard. Other methods send a body only when given one.
   const init: RequestInit = { method, credentials: "same-origin" };
   if (method === "POST" || body !== undefined) {

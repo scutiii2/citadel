@@ -1,4 +1,4 @@
-# Stack: ember_web / ember_admin / legion_admin -> ember_api -> armory / legion / treasury; legion -> LayaModel (its own stack, reached through the host's published port 29220, not started here).
+# Stack: ember_web / ember_admin / legion_admin -> portcullis -> armory / legion / treasury; legion -> LayaModel (its own stack, reached through the host's published port 29220, not started here).
 # Start:  docker compose up -d --build
 # The internal token is made on first start and shared through the internal_token volume. Per-app
 # secrets stay in apps/<app>/.env and are loaded when the file exists.
@@ -22,7 +22,7 @@ services:
       MCP_HOST: 0.0.0.0
       MCP_PORT: "29600"
       DB_GATEWAY_URL: http://treasury:29602
-      EMBER_API_URL: http://ember_api:29601
+      EMBER_API_URL: http://portcullis:29601
     volumes:
       # Writable: the Extensions page in ember_admin saves added extensions into this tracked file.
       - ./docker/configs/armory/extensions.json:/app/configs/config_extensions.json
@@ -72,20 +72,20 @@ services:
       - internal_token:/run/citadel
     networks: [core]
 
-  ember_api:
-    build: ./apps/ember_api
+  portcullis:
+    build: ./apps/portcullis
     restart: unless-stopped
     env_file:
-      - path: ./apps/ember_api/.env
+      - path: ./apps/portcullis/.env
         required: false
     environment:
       <<: *internal_token
       EMBER_API_HOST: 0.0.0.0
     volumes:
-      - ./docker/configs/ember_api/app.json:/app/configs/config_app.json:ro
-      # ember_api reads and writes its secrets (EMBER_SECRETS_KEY) in its own .env file.
-      - ./apps/ember_api/.env:/app/.env
-      - ember_api_data:/app/data
+      - ./docker/configs/portcullis/app.json:/app/configs/config_app.json:ro
+      # portcullis reads and writes its secrets (EMBER_SECRETS_KEY) in its own .env file.
+      - ./apps/portcullis/.env:/app/.env
+      - portcullis_data:/app/data
       - internal_token:/run/citadel
       - agent_data:/agent_data:ro
     depends_on: [armory, legion, treasury]
@@ -96,7 +96,7 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:26502:80"
-    depends_on: [ember_api]
+    depends_on: [portcullis]
     networks: [core]
 
   ember_admin:
@@ -106,7 +106,7 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:26501:80"
-    depends_on: [ember_api]
+    depends_on: [portcullis]
     networks: [core]
 
   legion_admin:
@@ -114,7 +114,7 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:26500:80"
-    depends_on: [ember_api]
+    depends_on: [portcullis]
     networks: [core]
 
 networks:
@@ -127,5 +127,5 @@ volumes:
   armory_data:
   agent_data:
   treasury_data:
-  ember_api_data:
+  portcullis_data:
   internal_token:

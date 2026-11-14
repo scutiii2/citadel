@@ -3,19 +3,19 @@ import { computed, ref } from "vue";
 import { authClient, type Account } from "../api/AuthClient";
 import { onUnauthorized, UnauthorizedError } from "../api/http";
 
-/** Who is logged in (ember_api's session). */
+/** Who is logged in (portcullis's session). */
 export const useAuthStore = defineStore("auth", () => {
   const account = ref<Account | null>(null);
   let loaded: Promise<void> | null = null;
 
-  // Any 401 from ember_api means the session is gone.
+  // Any 401 from portcullis means the session is gone.
   onUnauthorized(() => {
     account.value = null;
   });
 
   const permissions = computed(() => new Set(account.value?.permissions ?? []));
 
-  // Mirrors ember_api: an unverified email holds no permissions, unless verification is switched off there.
+  // Mirrors portcullis: an unverified email holds no permissions, unless verification is switched off there.
   const needsVerification = computed(
     () => account.value !== null && !account.value.email_verified && account.value.email_verification_required !== false,
   );
@@ -24,7 +24,7 @@ export const useAuthStore = defineStore("auth", () => {
     return account.value !== null && !needsVerification.value && permissions.value.has(name);
   }
 
-  /** Asks ember_api once per page load who is logged in (the router guard awaits it). */
+  /** Asks portcullis once per page load who is logged in (the router guard awaits it). */
   function ensureLoaded(): Promise<void> {
     loaded ??= authClient
       .me()

@@ -9,13 +9,13 @@ import BarList from "./BarList.vue";
 import LineChart from "./LineChart.vue";
 import StatTile from "./StatTile.vue";
 
-/** The Analytics page's Traffic tab: requests and upstream calls ember_api has
+/** The Analytics page's Traffic tab: requests and upstream calls portcullis has
  * counted (never who made them). Fetches its own report for `range`, and again
  * whenever `refresh` changes; `loading` tells the page's toolbar. */
 const props = defineProps<{ range: AnalyticsRange; refresh: number }>();
 const loading = defineModel<boolean>("loading", { default: false });
 
-// Rows per ranking; ember_api sends up to ten.
+// Rows per ranking; portcullis sends up to ten.
 const TOP_SHOWN = 5;
 const BAR_COLOR = "var(--kind-action)";
 
@@ -105,7 +105,7 @@ watch(() => [props.range, props.refresh], load);
   <p v-else-if="!report" class="muted">loading ...</p>
   <div v-if="report" :class="['overview', { dim: loading }]">
     <p v-if="idle" class="muted idle">
-      No traffic recorded in the last {{ since }} yet. Counting starts when ember_api is updated to a version that records it.
+      No traffic recorded in the last {{ since }} yet. Counting starts when portcullis is updated to a version that records it.
     </p>
 
     <div class="tiles">

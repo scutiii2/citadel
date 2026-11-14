@@ -116,7 +116,7 @@ def test_ask_records_delegated_by_and_appends_to_the_usage_log():
 
 def test_ask_reports_the_prompt_in_the_reply_row_but_not_the_usage_log():
     """The prompt (history + question, never the system prompt) rides back in agent_usage
-    for ember_api's chat-turn log; the local JSONL copy stays small."""
+    for portcullis's chat-turn log; the local JSONL copy stays small."""
     async def _run():
         with patch("src.server.agent_config.run_chat", new_callable=AsyncMock, return_value=ChatResult(response="hi")), \
              patch("src.server.agent_config.status", return_value={"model": "m", "context_window": 1}), \

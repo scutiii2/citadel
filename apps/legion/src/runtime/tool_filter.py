@@ -1,6 +1,6 @@
 """Tools one user switched off for their own chats.
 
-ember_web lets each account turn a built-in capability off for itself; ember_api
+ember_web lets each account turn a built-in capability off for itself; portcullis
 passes the tool names of those capabilities to `ask()` as `disabled_tools`.
 This is the other half of `agents/<id>.json`'s `tools` scope: that one is the
 agent's own, fixed in its file, while this one belongs to the turn.

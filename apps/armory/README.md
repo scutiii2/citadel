@@ -40,10 +40,10 @@ Both loaded once at boot by `src/run.py`:
 - **`/mcp` needs the internal token** once `INTERNAL_API_TOKEN` is set in
   `.env` (`X-Internal-Token`, compared in
   constant time; `401` otherwise). Every caller is another server in this
-  repo - chat_app, ai_agent, ember_api - and all of them send it. The
+  repo - chat_app, ai_agent, portcullis - and all of them send it. The
   startup banner says whether it's on.
 - **Who is asking**: tools read the user from `X-Requester-Username` /
-  `X-Requester-Email` (chat_app, ember_api), or from the tool call's
+  `X-Requester-Email` (chat_app, portcullis), or from the tool call's
   `_meta.requester` (ai_agent, whose one session serves every user) - see
   `src/services/identity_context.py`. Each tool call is logged with it
   (`tool call <name> by <user>` in `server.log`).

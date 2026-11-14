@@ -5,7 +5,7 @@ import type { ConfigIssue, ConfigIssueSeverity } from "../api/ConfigIssuesClient
 import "../components/infoPage.css";
 import { useConfigIssuesStore } from "../stores/configIssues";
 
-/** Problems in ember_api's config and secret files (port of chat_app's
+/** Problems in portcullis's config and secret files (port of chat_app's
  * Config issues page). File and key names only, never secret values. The
  * page opens only while there are issues; once a check finds none it
  * leaves for the home page. */
@@ -58,8 +58,8 @@ async function check(): Promise<void> {
         <button type="button" class="chip" :disabled="store.loading" @click="check">Check again</button>
       </div>
       <p class="muted intro page-description">
-        Problems in <code>ember_api/configs</code> and <code>ember_api/secrets</code>. Secret files are re-read on
-        every check; changes to <code>config_app.json</code> take effect once ember_api restarts.
+        Problems in <code>portcullis/configs</code> and <code>portcullis/secrets</code>. Secret files are re-read on
+        every check; changes to <code>config_app.json</code> take effect once portcullis restarts.
       </p>
 
       <p v-if="store.error" class="error">{{ store.error }}</p>

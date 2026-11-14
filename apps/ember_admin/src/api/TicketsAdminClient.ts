@@ -29,7 +29,7 @@ export interface AdminTicket {
   reporter: string;
   source: TicketSource;
   tags: string[];
-  /** `reported` came from the reporter or a model and is unverified; `verified` was added by ember_api. */
+  /** `reported` came from the reporter or a model and is unverified; `verified` was added by portcullis. */
   context: { reported?: Record<string, string>; verified?: Record<string, string> };
   /** Laya was unsure whether this ticket belongs to that group. */
   possible_group_id: number | null;

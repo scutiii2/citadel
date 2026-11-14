@@ -18,7 +18,7 @@ Project-specific layer on top of `ember-design-system` (tokens, radius scale, fo
 | Every signed-in user, chat, capability tools (Notes, Memory, Generator, Tickets as a user) | `ember_web` (port 26502) |
 | Staff: accounts, roles, invites, agents, capabilities, analytics, ticket triage, workspace settings | `ember_admin` (port 26501) |
 
-Gate admin pages by permission in `ember_admin/src/router/pages.ts`; the guard is cosmetic, ember_api enforces.
+Gate admin pages by permission in `ember_admin/src/router/pages.ts`; the guard is cosmetic, portcullis enforces.
 
 ## 2. Shared base
 

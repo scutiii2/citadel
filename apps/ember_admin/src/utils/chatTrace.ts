@@ -1,6 +1,6 @@
 import { parseServerTime } from "./usageFormat";
 
-/** One agent that ran during a chat turn, as ember_api writes it into the entry's details. */
+/** One agent that ran during a chat turn, as portcullis writes it into the entry's details. */
 export interface TraceAgent {
   agent_id: string;
   agent_label?: string;
@@ -22,7 +22,7 @@ export interface TraceAgent {
 
 export interface TracePrompt {
   messages: { role: string; content: string }[];
-  /** Older messages, or part of one, were left out to fit ember_api's size limit. */
+  /** Older messages, or part of one, were left out to fit portcullis's size limit. */
   truncated: boolean;
 }
 

@@ -1,5 +1,5 @@
 """Typed operations on the notes a user let agents use (`agent_readable` on), for the asking account only.
-Other notes are reported as "no such note". Limits mirror ember_api's `services/notes.py`; change them together."""
+Other notes are reported as "no such note". Limits mirror portcullis's `services/notes.py`; change them together."""
 
 from __future__ import annotations
 
@@ -78,7 +78,7 @@ def _preview(doc: dict[str, Any]) -> str:
 
 def _parse_tags(raw: str) -> list[str]:
     """Comma-separated tags: trimmed, lowercase, repeats and empty entries dropped. The same
-    rules ember_api enforces, so a note an agent writes opens cleanly on the Notes page."""
+    rules portcullis enforces, so a note an agent writes opens cleanly on the Notes page."""
     tags: list[str] = []
     for item in raw.split(","):
         tag = item.strip().lower()

@@ -4,7 +4,7 @@ import { defineConfig } from "@playwright/test";
 const PORT = Number(process.env.EMBER_E2E_PORT ?? 5198);
 
 // `pnpm run test:e2e`. The browser is the Chrome installed on this machine (no
-// download); ember_api is not needed because the test answers every /api call itself.
+// download); portcullis is not needed because the test answers every /api call itself.
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,

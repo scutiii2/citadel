@@ -7,7 +7,7 @@ declare module "vue-router" {
   interface RouteMeta {
     /** Reachable without logging in (login). */
     guestOnly?: boolean;
-    /** The ember_api permission the page needs; a list = any one of them. */
+    /** The portcullis permission the page needs; a list = any one of them. */
     permission?: string | string[];
   }
 }
@@ -49,7 +49,7 @@ export const router = createRouter({
   ],
 });
 
-// ember_api enforces every permission itself; the guard keeps the UI from
+// portcullis enforces every permission itself; the guard keeps the UI from
 // showing pages whose calls would be refused.
 router.beforeEach(async (to): Promise<true | RouteLocationRaw> => {
   const auth = useAuthStore();

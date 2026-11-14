@@ -1,4 +1,4 @@
-"""Require the shared internal token (X-Internal-Token) on /mcp, which only trusted servers (chat_app, ai_agent, ember_api) call.
+"""Require the shared internal token (X-Internal-Token) on /mcp, which only trusted servers (chat_app, ai_agent, portcullis) call.
 Enforced only when a token is configured, else the loopback-only trust model applies (run.py warns); /upload checks the token itself."""
 
 from __future__ import annotations

@@ -2,8 +2,8 @@ import { McpClientBase } from "./McpClientBase";
 import { toolTitle } from "../utils/toolTitles";
 import type { JsonSchema, ResourceInfo, ToolInfo, ToolRunResult } from "./types";
 
-/** mcp_server's MCP surface as ember_web uses it, via ember_api's
- * /api/mcp/server proxy. Holds no secrets: ember_api adds identity and the
+/** mcp_server's MCP surface as ember_web uses it, via portcullis's
+ * /api/mcp/server proxy. Holds no secrets: portcullis adds identity and the
  * internal token server-side. */
 export class McpServerClient extends McpClientBase {
   constructor() {

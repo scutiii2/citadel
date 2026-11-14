@@ -6,7 +6,7 @@ Citadel runs as containers from one `docker-compose.yml`:
 |---|---|---|
 | `ember_web` | user web app | 26502 |
 | `ember_admin` | admin web app | 26501 |
-| `ember_api` | backend for both web apps | internal |
+| `portcullis` | backend for both web apps | internal |
 | `armory` | MCP server (capabilities, including Server Manager) | internal 29600 |
 | `legion` | AI agent | internal |
 | `treasury` | database gateway | internal 29602 |
@@ -27,7 +27,7 @@ from the separate `LayaModel` project (see "Laya" below) and legion reaches it t
 3. Open http://localhost:26502 (ember_web) and http://localhost:26501 (ember_admin). Both bind to `127.0.0.1`.
 
 To rebuild one service, run `docker compose up -d --build <service>`, or double-click the `dev_deploy.bat` in that
-service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/ember_api`, `ember_web`, `ember_admin`).
+service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/portcullis`, `ember_web`, `ember_admin`).
 
 ```bash
 docker compose ps              # state of every service
@@ -98,8 +98,8 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    cp apps/armory/.env.example apps/armory/.env
    cp apps/legion/.env.example apps/legion/.env
    cp apps/treasury/.env.example apps/treasury/.env
-   cp apps/ember_api/.env.example apps/ember_api/.env
-   chmod 600 .env apps/*/.env apps/ember_api/.env
+   cp apps/portcullis/.env.example apps/portcullis/.env
+   chmod 600 .env apps/*/.env apps/portcullis/.env
    ```
 
    | File | Keys to fill in |
@@ -107,7 +107,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | `apps/armory/.env` | Only the capability keys you use: `SMTP_PASSWORD`, `TEAMS_WEBHOOK_URL`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://legion:29611/mcp` to group tickets with the triage agent) |
    | `apps/legion/.env` | `CLAUDE_API_KEY`, or the keys of the gateway your agents use; `HF_TOKEN` if used; `LAYA_TOKEN` (must equal the one in `LayaModel`'s `.env`) |
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
-   | `apps/ember_api/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
+   | `apps/portcullis/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
 
    - Leave `INTERNAL_API_TOKEN` out of the per-app files. A value there wins over the generated token for that app only, so the apps would stop agreeing.
    - Skip `MCP_HOST`, `MCP_PORT` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. Set `LAYA_SERVICE_URL`
@@ -115,8 +115,8 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
      the server's hostname for another service.
    - **Laya settings** (`LAYA_TOKEN`, `LAYA_REPLICAS`, `LAYA_PORT`) belong in `LayaModel`'s own `.env`, not here. Each
      replica loads its own copy of the models in RAM, so keep `LAYA_REPLICAS` low on a small box.
-   - `apps/ember_api/.env` must exist before the first start. Compose bind-mounts it, and if it is missing Docker
-     creates a directory in its place and ember_api fails. ember_api writes `EMBER_SECRETS_KEY` into it, so keep it
+   - `apps/portcullis/.env` must exist before the first start. Compose bind-mounts it, and if it is missing Docker
+     creates a directory in its place and portcullis fails. portcullis writes `EMBER_SECRETS_KEY` into it, so keep it
      when you rebuild.
 
 4. **Create the config files git does not hold.** `config_*.json` is gitignored (deploy option 2 copies yours). Compose
@@ -126,7 +126,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | File | On a fresh clone |
    |---|---|
    | `apps/legion/configs/config_tuning.json` | Created from its `.example` automatically |
-   | `apps/ember_api/configs/config_pricing.json` | Created from its `.example` automatically |
+   | `apps/portcullis/configs/config_pricing.json` | Created from its `.example` automatically |
    | `apps/armory/configs/config_email.json`, `config_tickets.json` | Copy each `.example` and fill in `config_email.json` |
 
    These files are baked into the image at build time, so a change made to them inside the container is lost when
@@ -164,7 +164,7 @@ The box needs only what the stack builds from, not the whole repo. `tools/publis
 `main` with just these paths:
 
 - `docker-compose.yml`, `docker-compose.zima.yml`, `.env.example`, `docker/`
-- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/ember_api`, `apps/ember_web`, `apps/ember_admin`
+- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/portcullis`, `apps/ember_web`, `apps/ember_admin`
 - `docs/deployment.md`
 
 It leaves out other docs, skills, `tools/`, the Python `tests/` folders and `apps/ember_cli`. `e2e/` and the
@@ -209,21 +209,21 @@ the URL can reach the login page.
 
 1. In the Tailscale admin console, give the box the `funnel` attribute (`nodeAttrs` in the access controls) and turn on
    MagicDNS and HTTPS. The first `funnel` command prints an approval link if something is missing.
-2. Set `"security": {"rate_limit": {"scope": "account"}}` in the ember_api config (`docker/configs/ember_api/app.json`).
+2. Set `"security": {"rate_limit": {"scope": "account"}}` in the portcullis config (`docker/configs/portcullis/app.json`).
    Behind Funnel every client reaches nginx through the Docker bridge, so the IP-based lockout would count all users as
    one address. With the default `"both"`, five wrong passwords from anyone would lock everyone out.
 3. Rebuild and start Funnel. The `docker exec tailscale` prefix is for the ZimaOS Tailscale app; drop it if Tailscale
    runs on the host:
 
    ```bash
-   docker compose up -d --build ember_api ember_web
+   docker compose up -d --build portcullis ember_web
    docker exec tailscale tailscale funnel --bg 26502
    docker exec tailscale tailscale funnel status
    ```
 
    Turn it off with `docker exec tailscale tailscale funnel --https=443 off`.
 
-Funnel sends `X-Forwarded-Proto: https` for TLS requests. nginx passes it on, and ember_api adds `Secure` to the session
+Funnel sends `X-Forwarded-Proto: https` for TLS requests. nginx passes it on, and portcullis adds `Secure` to the session
 cookie when the request came through a `trusted_proxies` peer with that header. Plain-HTTP LAN access at
 `http://<zima-ip>:26502` keeps working, with no `Secure` flag, so leave `cookie_secure` at `false`.
 
@@ -268,7 +268,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 | `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
 | `scp` will not log in | Check `DEPLOY_HOST` and that the folder exists. Run `ssh <host>` by hand to test. |
 | `openssl: command not found` | Use the `/dev/urandom` command in first-time setup, step 3. A failed `echo` leaves an empty `.env`, so run it again. |
-| ember_api fails and `apps/ember_api/.env` is a directory | Compose created it because the file was missing. Run `rmdir apps/ember_api/.env`, then `touch apps/ember_api/.env`, then start again. |
+| portcullis fails and `apps/portcullis/.env` is a directory | Compose created it because the file was missing. Run `rmdir apps/portcullis/.env`, then `touch apps/portcullis/.env`, then start again. |
 | UI loads on the box but not on another device | Overlay not used. Check `COMPOSE_FILE` in the root `.env`, or add `-f docker-compose.zima.yml`. |
 | Overlay still binds `127.0.0.1` | Compose older than 2.24 ignores `!override`. Update Compose, or edit the `ports` lines in the main file. |
 | Port already in use | Another app uses 26502 or 26501. Change the left side of the port mapping. |

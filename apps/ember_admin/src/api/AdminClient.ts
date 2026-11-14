@@ -10,7 +10,7 @@ export interface Invite {
 
 export interface CreatedInvite {
   invite: Invite;
-  /** Shown once: ember_api stores only its hash. */
+  /** Shown once: portcullis stores only its hash. */
   code: string;
   email_sent: boolean;
   email_error: string | null;
@@ -81,7 +81,7 @@ export interface RoleChanges {
 
 const enc = encodeURIComponent;
 
-/** ember_api's /api/admin routes (separate administrative permissions). */
+/** portcullis's /api/admin routes (separate administrative permissions). */
 export const adminClient = {
   listInvites: () => apiRequest<Invite[]>("GET", "/api/admin/invites"),
   createInvite: (invitee_email: string | null, delivery_method: "manual" | "email") =>

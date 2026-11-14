@@ -1,5 +1,5 @@
 # apps/legion/tests/test_tuning_routes.py
-"""/agents/tuning: what ember_api's admin page reads and writes."""
+"""/agents/tuning: what portcullis's admin page reads and writes."""
 
 from pathlib import Path
 

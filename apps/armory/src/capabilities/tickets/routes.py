@@ -1,4 +1,4 @@
-"""HTTP routes for support tickets, mounted like /download (see run.py); plain HTTP, ember_api is the caller.
+"""HTTP routes for support tickets, mounted like /download (see run.py); plain HTTP, portcullis is the caller.
 All need X-Internal-Token; /tickets touches only the requester's own tickets, /ticket-admin is staff-only. They stay up when `tickets` is off."""
 
 from __future__ import annotations

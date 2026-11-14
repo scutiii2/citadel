@@ -3,7 +3,7 @@
 **Date:** 2026-09-25 · **Branch:** `home` · **Range:** `4d257f8..85142a4`
 
 Building the two new root projects - `ember_web/` (Vue 3 + TypeScript
-frontend) and `ember_api/` (FastAPI backend that owns ember's accounts and
+frontend) and `portcullis/` (FastAPI backend that owns ember's accounts and
 proxies MCP) - touched the existing projects only lightly. This note records
 what changed in them, what was added and later removed again, and why, so
 nobody has to reconstruct it from the commit history.
@@ -26,8 +26,8 @@ Net diff for these four projects: 7 files, +76 / -12 lines
    directly over MCP. That needed CORS on both servers (`be5b686`) and a
    way for the browser to discover agents (`list_agents` tool, `2817177`).
 2. **Auth decision:** instead of reusing chat_app's login, ember got its own
-   backend, **ember_api**, with its own accounts, and all MCP traffic now
-   goes browser -> ember_api -> ai_agent / mcp_server, the same
+   backend, **portcullis**, with its own accounts, and all MCP traffic now
+   goes browser -> portcullis -> ai_agent / mcp_server, the same
    server-to-server pattern chat_app uses.
 3. **Cleanup** (`85142a4`): with no browser calling ai_agent or mcp_server
    anymore, the CORS middleware and the `list_agents` tool were removed.
@@ -36,15 +36,15 @@ Net diff for these four projects: 7 files, +76 / -12 lines
 
 **No changes.** chat_app's code, config and database are untouched.
 
-- ember_api *mirrors* chat_app's auth logic (werkzeug password hashes,
+- portcullis *mirrors* chat_app's auth logic (werkzeug password hashes,
   bootstrap admin, invite codes, email-verification codes, role/permission
-  tables) but in its own database (`ember_api/data/ember_api.db`). Accounts
+  tables) but in its own database (`portcullis/data/ember_api.db`). Accounts
   are **not shared**: a chat_app user can't log into ember_web with the same
   credentials unless an account is created there too.
 - Because the logic is copied, a security fix in
   `chat_app/src/services/auth_service.py` or `otp_service.py` may need the
-  same fix in `ember_api/src/services/`.
-- `ember_api/secrets/secret_smtp.env` and `secret_internal_api.env` use the
+  same fix in `portcullis/src/services/`.
+- `portcullis/secrets/secret_smtp.env` and `secret_internal_api.env` use the
   same keys as chat_app's; the internal token should have the same value
   everywhere if it's used.
 
@@ -70,15 +70,15 @@ one place later (e.g. an `X-Internal-Token` check).
 | What | Added | Removed | Why removed |
 |---|---|---|---|
 | `CORSMiddleware` allowing `http://127.0.0.1:5173` / `http://localhost:5173`, exposing `Mcp-Session-Id` | `be5b686` | `85142a4` | the browser no longer calls ai_agent |
-| `list_agents()` MCP tool returning the agent registry | `2817177` | `85142a4` | ember_api reads `configs/config_agents.json` itself; chat_app never used the tool |
+| `list_agents()` MCP tool returning the agent registry | `2817177` | `85142a4` | portcullis reads `configs/config_agents.json` itself; chat_app never used the tool |
 
-**Still relevant to ember:** ember_api reads ai_agent's registry file
+**Still relevant to ember:** portcullis reads ai_agent's registry file
 (`ai_agent/configs/config_agents.json`, path configurable as
-`agents_registry_path` in `ember_api/configs/config_app.json`, or fetched
+`agents_registry_path` in `portcullis/configs/config_app.json`, or fetched
 from ai_agent's `GET /registry` when `agents_registry_url` is set, for an
 ai_agent on another machine) and only proxies to agents listed there. Through the proxy, a browser may call only
 `ask`, `cancel` and `status`, and `ask` without the `depth` argument (see
-`ember_api/src/services/mcp_policy.py`).
+`portcullis/src/services/mcp_policy.py`).
 
 ## mcp_server
 
@@ -88,11 +88,11 @@ ai_agent on another machine) and only proxies to agents listed there. Through th
 added after `IdentityContextMiddleware` in `be5b686` and removed in
 `85142a4`.
 
-**Still relevant to ember:** ember_api's proxy calls mcp_server's `/mcp`
+**Still relevant to ember:** portcullis's proxy calls mcp_server's `/mcp`
 with `X-Requester-Username` / `X-Requester-Email` set from the logged-in
 ember account (headers the browser sends are dropped), which
 `IdentityContextMiddleware` reads exactly as it does for chat_app. It also
-sends `X-Internal-Token` when `ember_api/secrets/secret_internal_api.env`
+sends `X-Internal-Token` when `portcullis/secrets/secret_internal_api.env`
 sets one.
 
 ## server_launcher
@@ -103,7 +103,7 @@ sets one.
 The launcher previously understood only Python projects (a `run.bat` with
 `call .venv_<name>\Scripts\activate` and `py -m <module>`). It now also runs
 **npm projects**, which is how ember_web shows up as "Ember Web".
-(ember_api is a normal Python project and needed no launcher change.)
+(portcullis is a normal Python project and needed no launcher change.)
 
 | File | Change |
 |---|---|
@@ -128,19 +128,19 @@ through `_spawn()` / `_kill_pid_tree()` on a test port.
 | `be5b686` | Add CORS to ai_agent and mcp_server for browser clients | ai_agent, mcp_server |
 | `6a8f900` | Let server_launcher detect and run npm projects | server_launcher |
 | `2817177` | Let ember_web pick which ai_agent to chat with | ai_agent (`list_agents`), ember_web |
-| `85142a4` | Drop direct-browser CORS and list_agents now that ember_api proxies | ai_agent, mcp_server, ember_api README |
+| `85142a4` | Drop direct-browser CORS and list_agents now that portcullis proxies | ai_agent, mcp_server, portcullis README |
 
-Everything else on the branch in this range is ember_web / ember_api only.
+Everything else on the branch in this range is ember_web / portcullis only.
 
 ## Operating notes
 
 - **Ports:** mcp_server 8010, ai_agent 9100 (+ further instances, e.g.
-  9102), chat_app 5000, ember_api 8030, ember_web 5173.
+  9102), chat_app 5000, portcullis 8030, ember_web 5173.
 - **Internal token on `/mcp`** (since 2026-09-26, see below): ai_agent and
   mcp_server reject `/mcp` requests without `X-Internal-Token` once
   `INTERNAL_API_TOKEN` is set. Use one value in all four
   `secret_internal_api.env` files (mcp_server, ai_agent, chat_app,
-  ember_api). With it blank, keep both servers on `127.0.0.1`.
+  portcullis). With it blank, keep both servers on `127.0.0.1`.
 - After pulling these changes, restart ai_agent and mcp_server once.
 
 ## 2026-09-26: internal token and user identity
@@ -152,7 +152,7 @@ Both former open follow-ups are done.
 | mcp_server | `services/internal_token.py`: pure-ASGI middleware, `401` on `/mcp` without the right `X-Internal-Token` (constant-time) when `INTERNAL_API_TOKEN` is set; added in `run.py`, which also prints whether it's on. `identity_context.py`: `current_username()` / `current_email()` fall back to the tool call's `_meta.requester` when no identity header came. `extensions.py` logs `tool call <name> by <user>`. |
 | ai_agent | `src/internal_auth.py`: the token (from new `secrets/secret_internal_api.env`, seeded from its `.example`), the same middleware on `/mcp`, and the asking user. `ask()` reads `X-Requester-*` from the request and binds it for the turn; `mcp_upstream.call_tool` sends it as `_meta.requester` (the one upstream session serves every user); the upstream session and `delegate_to_agent` sessions carry the token (`registry` / `transports` gained `extra_headers`, `call_tool` gained `meta`). |
 | chat_app | `src/services/internal_auth.py`'s `mcp_headers()` adds the token to every MCP session to mcp_server and ai_agent (`mcp_client.py`, `ai_agent_client.py`); `run.py` copies the token into the environment. |
-| ember_api | nothing in code (it already sent the token); its `secret_internal_api.env` now needs the value. |
+| portcullis | nothing in code (it already sent the token); its `secret_internal_api.env` now needs the value. |
 
-Restart mcp_server, ai_agent, chat_app and ember_api after setting the
+Restart mcp_server, ai_agent, chat_app and portcullis after setting the
 token; a caller without it gets `401` from `/mcp`.

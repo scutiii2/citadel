@@ -63,7 +63,7 @@ Optional follow-up features, not implemented:
 
 **Context**: `Python/chess` is its own project, not part of Citadel or Ember. A conventional engine proposes and scores moves and its own local Laya picks among the top candidates, with the engine's best move as fallback. Laya is required, not optional. Port 8070, renamed from `mini_games` 2026-10-16. Spec 1 (backend, 144 tests, Laya eval in `docs/laya-eval.md`) merged as `8c4dc28e`.
 
-**Dropped 2026-10-19**: the `ember_api` proxy with an `ember_web` page (old spec 2) and the mcp_server/armory chat tools (old spec 3). Chess does not use legion; it has its own Laya client.
+**Dropped 2026-10-19**: the `portcullis` proxy with an `ember_web` page (old spec 2) and the mcp_server/armory chat tools (old spec 3). Chess does not use legion; it has its own Laya client.
 
 **To do** (tracked in `Brain/Projects/chess.md`; chess has no git repo yet): (run.bat and 103 tests pass 2026-10-19; Tetris removed, chess only) `git init`; own UI; an autonomous brain; decide the auth headers and the folder name; session persistence.
 
@@ -76,19 +76,19 @@ Optional follow-up features, not implemented:
 **Context**: The context panel (opened from the header's context meter) breaks the answering agent's prompt into system prompt, delegable agents, built-in tools, MCP tools and messages, estimated or counted by the provider (`apps/legion/src/providers/context_breakdown.py`). When the orchestrator delegates, each specialist runs its own prompt, and none of that is broken down.
 
 - Each agent would build its own breakdown; `ai_agent` already returns one usage row per agent in `agent_usage`.
-- `ember_api` would pass each agent's breakdown along with its usage row (`AgentUsageIn` in `routes/chats.py`), and the panel would add a per-agent section.
+- `portcullis` would pass each agent's breakdown along with its usage row (`AgentUsageIn` in `routes/chats.py`), and the panel would add a per-agent section.
 - Open question: a specialist's prompt never fills the orchestrator's window, so this answers "what did each agent's prompt cost", not "how full is my context". Decide if that is worth a panel section before building.
 
 **Revisit when**: user wants to see where a delegated answer's tokens went.
 
 ## Make chat Stop (cancel) near-instant (added 2026-10-18)
 
-**Context**: Stop in the Ember chat page is cooperative. `ember_web` `chat.stop()` calls `POST /chats/{id}/cancel`, `TurnRegistry.cancel` (`apps/Ember/ember_api/src/services/turns.py`) sets `cancel_requested`, publishes `cancelling`, and forwards `cancel` to ai_agent. There the flag in `apps/legion/src/providers/cancellation.py` is checked only between provider rounds (`anthropic_provider.py`, `openai_provider.py`), so an LLM call or tool call already running finishes first. Approval and question waits already poll the flag.
+**Context**: Stop in the Ember chat page is cooperative. `ember_web` `chat.stop()` calls `POST /chats/{id}/cancel`, `TurnRegistry.cancel` (`apps/portcullis/src/services/turns.py`) sets `cancel_requested`, publishes `cancelling`, and forwards `cancel` to ai_agent. There the flag in `apps/legion/src/providers/cancellation.py` is checked only between provider rounds (`anthropic_provider.py`, `openai_provider.py`), so an LLM call or tool call already running finishes first. Approval and question waits already poll the flag.
 
 **Plan**, by payoff:
 1. **Abort the in-flight LLM call**: check the flag per streamed chunk and close the HTTP stream on cancel, then raise `ChatCancelled`. The partial text is already kept (`turns.py`). `bind_request` already carries a per-turn `threading.Event` into worker threads.
 2. **Abort running tool calls**: `dispatch_with_progress` stops waiting and raises `ChatCancelled`. Python cannot kill a thread, so the tool runs on as an orphan. Safe for read-only tools; decide per tool for ones with side effects. Check that the delegation loop (`delegation.py`) polls fast enough.
-3. **Instant UI in ember_api**: finish the turn at once on cancel (save the streamed text, publish `final` with `cancelled: true`, drop later agent events) while the agent cancel runs in the background. Risk: the next turn in that chat must not overlap the orphaned one.
+3. **Instant UI in portcullis**: finish the turn at once on cancel (save the streamed text, publish `final` with `cancelled: true`, drop later agent events) while the agent cancel runs in the background. Risk: the next turn in that chat must not overlap the orphaned one.
 
 **Also check**: a failed gateway cancel is only logged (`turns.py` `cancel`), so the user sees "stopping ..." while the turn keeps running; and cancel arriving between `turn.asking = True` and the request being sent may be missed.
 
@@ -99,7 +99,7 @@ Optional follow-up features, not implemented:
 **Context**: `apps/treasury` is backend only (`auth.py`, `config.py`, `registry.py`, `run.py`, `seed.py`, `backends/`); no UI exists. Only `ember_web` (`NotesView.vue`, `NotesClient.ts`) touches it, as a notes feature. Build a gateway frontend that uses the ember_web and ember_admin designs (shared tokens, components, radius scale, in-app confirms).
 
 - Decide first which app hosts it (likely `ember_admin`, since it is an admin tool) and which gateway routes it needs; check `registry.py` and `run.py` for the API.
-- Follow the `ember-frontend-design` and `ember-feature-scaffold` skills; any new `ember_api` route proxies to the gateway behind a permission.
+- Follow the `ember-frontend-design` and `ember-feature-scaffold` skills; any new `portcullis` route proxies to the gateway behind a permission.
 
 **Revisit when**: user wants it built. Brainstorm the design first.
 
@@ -111,7 +111,7 @@ Optional follow-up features, not implemented:
 - **Spec**: add an optional `provider` to each fallback entry (default: the agent's provider). Validate it in `agent_spec.py`, `agent_config.py` and `agent_store.py`.
 - **Failover above the providers**: move the retry loop out of the provider modules so a failed round can be retried on another provider. Keep completed tool results; strip gateway-bound thinking/reasoning.
 - **History converter**: convert Anthropic and OpenAI message and tool-call history both ways, including tool results already collected in the turn.
-- **ember_api**: pass the new field through the agent admin routes and validation.
+- **portcullis**: pass the new field through the agent admin routes and validation.
 - **ember_admin**: one gateway list across providers, each row labelled with its provider (`AgentForm.vue`, `AgentGatewayList.vue`); stop resetting rows on provider change.
 - **Docs and tests**: README "Gateway failover" and the `aiagent-scaffold` skill; unit tests for the converter and failover order.
 
@@ -124,7 +124,7 @@ Optional follow-up features, not implemented:
 **Context**: `apps/treasury` (the db_gateway) lives inside Citadel and ships in the root `docker-compose.yml`. It should deploy as its own stack, because other services will use it too, not just Citadel.
 
 - Move it to its own project folder with its own repo, `docker-compose.yml`, `.env` and `tools/deploy.bat` (like `LayaModel` and `Bard`).
-- Citadel services that call it (`ember_api` notes, `NotesClient.ts` path) reach it by URL on a shared Docker network, not by service name inside the `core` network.
+- Citadel services that call it (`portcullis` notes, `NotesClient.ts` path) reach it by URL on a shared Docker network, not by service name inside the `core` network.
 - Remove it from Citadel's root compose, `docker/configs/`, `tools/deploy.bat`, `docs/deployment.md` and the Citadel docs and vault note.
 - Check auth: other services need their own tokens or clients in `auth.py` and `registry.py`.
 - Update the "Frontend for db_gateway" item above, since the gateway frontend then lives with Treasury.

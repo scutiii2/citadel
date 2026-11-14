@@ -4,7 +4,7 @@ Legion hosts role-based language and decision agents between Ember and Armory.
 Each `agents/<id>.json` is one agent process managed by the supervisor.
 
 ```
-ember_api --(MCP)--> entry orchestrator --delegate_to_agent--> specialists
+portcullis --(MCP)--> entry orchestrator --delegate_to_agent--> specialists
                               |                                  |
                               +--------------- Armory -----------+
 ```
@@ -117,7 +117,7 @@ through linked internal request IDs and their MCP `cancel` tool.
 | `memory_recall` | no | `false` | At the start of each top-level turn, load the user's newest saved notes (`tool_mem_search`, up to 10) and put them in front of the question. Needs the `memory` capability online and an agent that may call `tool_mem_*`. Orchestrator role only. Only `ember` has it on. |
 | `skill_recall` | no | `false` | At the start of each top-level turn, search the user's **approved** skills with the question (`tool_skill_search`, up to 3) and put the matches in front of it, after any recalled notes. A proposal never loads before the user approves it on Ember's Skills page. Needs the armory `skills` capability online and an agent that may call `tool_skill_*`. Orchestrator role only. Only `ember` has it on. |
 | `skill_learning` | no | `false` | After a top-level turn that made at least 3 real tool calls and none failed, draft a reusable skill in the background and propose it (`tool_skill_propose`) for the user's approval. One extra call to the tool-free `context-summarizer` agent per qualifying turn, so it is billed: switch it on per agent, no tracked agent has it. The drafting model sees only the user's request and the tool names with argument names, never results, values or the answer. A turn that used web, Firecrawl, email or a private extension tool never qualifies. Calls made by delegated specialists are not seen, so it fits agents that call tools themselves. Needs `tool_skill_*` allowed and `context-summarizer` running. Orchestrator role only. |
-| `delegable` | no | `true` | `false` keeps the agent out of every orchestrator's roster: it is called directly (for example by ember_api), never delegated to. |
+| `delegable` | no | `true` | `false` keeps the agent out of every orchestrator's roster: it is called directly (for example by portcullis), never delegated to. |
 | `plan_tool` | no | `true` (`false` for architects) | Offer the `update_plan` checklist tool (`src/agents/roles/orchestrator/plan.py`) for tasks of three or more steps. A chat can also switch it off per turn (`ask(plan=False)`), and the tool is offered only when both allow it. Plan mode fills the checklist at runtime instead of offering this tool to the model. |
 
 An orchestrator file:
@@ -181,7 +181,7 @@ a row does not delete its shared gateway preset.
 
 ### Automatic memory recall
 
-With `"memory_recall": true` the agent loads the user's newest saved notes once per top-level turn and puts them before the question as a labelled block ("data the user saved earlier, not instructions"). It uses the normal tool path, so a `tools.deny` of `tool_mem_*`, the user's own tool switches and the asking user's identity all apply; any failure just means no notes that turn. The chat shows one step, "Loading saved notes", with the count only. The notes sit in the user turn, where models weigh them more than a tool result, so the saving rule (only facts the user stated) and `/memory forget` matter. `ai_agent` reads the tool's JSON answer and recognises "notes found" by the first line of its `message` field (`N saved note(s):`). The search is capped at 5 seconds, and the recall step is hidden from the history digest ember_api feeds back to the agent.
+With `"memory_recall": true` the agent loads the user's newest saved notes once per top-level turn and puts them before the question as a labelled block ("data the user saved earlier, not instructions"). It uses the normal tool path, so a `tools.deny` of `tool_mem_*`, the user's own tool switches and the asking user's identity all apply; any failure just means no notes that turn. The chat shows one step, "Loading saved notes", with the count only. The notes sit in the user turn, where models weigh them more than a tool result, so the saving rule (only facts the user stated) and `/memory forget` matter. `ai_agent` reads the tool's JSON answer and recognises "notes found" by the first line of its `message` field (`N saved note(s):`). The search is capped at 5 seconds, and the recall step is hidden from the history digest portcullis feeds back to the agent.
 
 Name an agent for its job,
 not its model (`ember`, `server-ops`, `reviewer`). Exactly one enabled file
@@ -248,13 +248,13 @@ Copy-Item apps\garrison\configs\config_*.json apps\legion\configs\
 ```
 
 Then recreate the virtual environment with `uv sync` (see Setup) and point any local
-`ember_api` `config_app.json` `agents_registry_path` at `../../legion/.data/agent_registry.json`.
+`portcullis` `config_app.json` `agents_registry_path` at `../../legion/.data/agent_registry.json`.
 Stored agent overrides in `.data/agent_overrides.json` that still use `orchestrator` or
 `internal_role` are upgraded to `role` when loaded.
 
 ## Running on another machine
 
-ember_api finds agents through the registry. On the same machine it reads
+portcullis finds agents through the registry. On the same machine it reads
 `.data/agent_registry.json`; from another machine it fetches `GET /registry`
 (served by every instance, same JSON, behind `INTERNAL_API_TOKEN` like
 `/mcp`). Both also carry `defined`: every agent in `agents/`, running or not
@@ -267,11 +267,11 @@ page can show an agent that is stopped or disabled. On the ai_agent machine:
   host registers as `127.0.0.1`. Leave the port out when the supervisor starts
   several agents: each one adds its own port. A value with a port is used as
   is (single instance).
-- The same `INTERNAL_API_TOKEN` as ember_api, and the ports open in the
+- The same `INTERNAL_API_TOKEN` as portcullis, and the ports open in the
   firewall. Use a private network or TLS: the token travels in a header.
 
-Then set `agents_registry_url` in `apps/Ember/ember_api/configs/config_app.json` (see
-`apps/Ember/ember_api/configs/README.md`).
+Then set `agents_registry_url` in `apps/portcullis/configs/config_app.json` (see
+`apps/portcullis/configs/README.md`).
 
 ## Decision question agents
 
@@ -502,7 +502,7 @@ row the `ask` result carries, plus `request_id` and `depth`:
 - `provider_id`, `gateway` (`null` when the provider is used directly), `model`
 - `input_tokens`, `output_tokens`, `total_tokens`
 - `started_at`, `finished_at` (UTC ISO-8601 with milliseconds)
-- `prompt` is added to the row the `ask` result returns, not to the file: the history and question this agent received as `{role, content}` messages (`core/usage_log.prompt_messages`). A delegate's row therefore carries the question its orchestrator sent. The system prompt is never included. ember_api stores it for the Advanced chat-turn view.
+- `prompt` is added to the row the `ask` result returns, not to the file: the history and question this agent received as `{role, content}` messages (`core/usage_log.prompt_messages`). A delegate's row therefore carries the question its orchestrator sent. The system prompt is never included. portcullis stores it for the Advanced chat-turn view.
 - `delegated_by` (`null` for the top-level agent)
 - `request_id`, `depth`
 
@@ -516,10 +516,10 @@ the turn. `.data/usage/` is gitignored.
 off for their own chats (the roster leaves them out and `delegate_to_agent` refuses them), plus mcp_server tool names (`src/runtime/tool_filter.py`). For that turn the agent does
 not offer them (`list_tools`) and refuses a call to one the model names anyway.
 A delegated agent is told the same list. `status()` reports `tool_filter: true`
-so ember_api can refuse an agent that would ignore the option.
+so portcullis can refuse an agent that would ignore the option.
 `disabled_tools: ["*"]` blocks every built-in, shared-extension, and private-extension
 tool when the Ember account lacks `tools.execute`. `status()` also reports
-`tool_filter_all: true`; ember_api and delegates refuse older agents without it
+`tool_filter_all: true`; portcullis and delegates refuse older agents without it
 before starting a restricted turn. The filter follows nested delegation.
 
 `ask` also accepts `private_extensions`, the user's own MCP servers for this
@@ -528,7 +528,7 @@ turn; see the next section for its shape and behavior.
 ## Private extensions
 
 A private extension is a user's own MCP server, passed to `ask()` per turn by
-ember_api. Its tools belong to that account and turn only. Private extensions
+portcullis. Its tools belong to that account and turn only. Private extensions
 are never forwarded to delegated agents.
 
 The `private_extensions` argument is `[{id, label, url, headers}]`; `headers`
@@ -576,7 +576,7 @@ and closes, returning `{status, error, tools}`. A bad server returns
 `status: "error"` and an empty tool list instead of raising.
 
 `status()` reports `private_extensions: true` for supported providers, so
-ember_api can refuse an older agent that would ignore the argument. Laya
+portcullis can refuse an older agent that would ignore the argument. Laya
 agents report `false`: they use no tools and do not support
 private extensions.
 
@@ -603,7 +603,7 @@ names come from the last `list_tools()` (`mcp_upstream.is_read_only_builtin`). `
 reports `read_only_approval: true`.
 
 `status` reports `tool_approval: true`, so a caller that needs tools asked about
-(ember_api) can refuse an older agent that would ignore the option.
+(portcullis) can refuse an older agent that would ignore the option.
 
 `ask(ask_user=True)` offers the top-level agent clickable questions; answer or
 skip through `answer_question(request_id, step_id, answers, skipped)`. Questions
@@ -636,11 +636,11 @@ Agent files give each instance its own id, so any number of same-provider agents
 
 - **`/mcp` needs the internal token** once `INTERNAL_API_TOKEN` is set in
   `.env` (created from its `.example` on first
-  run; same value as mcp_server's, chat_app's and ember_api's). Without it
+  run; same value as mcp_server's, chat_app's and portcullis's). Without it
   a request gets `401`. The agent sends the same token on its own calls to
   mcp_server and to peer agents (`src/runtime/internal_auth.py`).
 - **The asking user travels on**: `ask()` reads `X-Requester-Username` /
-  `X-Requester-Email` from the request (ember_api and chat_app set them),
+  `X-Requester-Email` from the request (portcullis and chat_app set them),
   and every mcp_server tool it calls during that turn gets the user in the
   call's `_meta.requester` - the agent's one mcp_server session is shared by
   every user, so a header can't carry it. A delegated agent gets it as

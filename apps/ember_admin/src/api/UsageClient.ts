@@ -82,7 +82,7 @@ function query(days: number, since: string | undefined, extra: Record<string, st
   return parts.join("&");
 }
 
-/** ember_api's usage routes. */
+/** portcullis's usage routes. */
 export interface AccountUsage { account_id: number; username: string; tokens: number; turns: number; last_used_at: string | null; }
 export const usageClient = {
   allAccounts: (days: number, since?: string) => apiRequest<AccountUsage[]>("GET", `/api/admin/usage?${period(days, since)}`),

@@ -114,7 +114,7 @@ function send(): void {
         </dl>
       </template>
       <template v-if="verified.length">
-        <p class="muted small-text">Added by ember_api</p>
+        <p class="muted small-text">Added by portcullis</p>
         <dl>
           <template v-for="[key, value] in verified" :key="`v-${key}`">
             <dt>{{ key }}</dt>

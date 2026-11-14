@@ -40,7 +40,7 @@ export interface AgentConfig {
   decision?: Partial<RouterPolicy>;
   label?: string;
   port: number;
-  /** Address peers and ember_api reach the agent at; unset = http://127.0.0.1:<port>/mcp. */
+  /** Address peers and portcullis reach the agent at; unset = http://127.0.0.1:<port>/mcp. */
   url?: string;
   enabled?: boolean;
   entry?: boolean;
@@ -80,7 +80,7 @@ export interface AgentTier {
   use_for: string;
 }
 
-/** What ember_api reports about an agent right now. */
+/** What portcullis reports about an agent right now. */
 export interface LiveAgent {
   status: AgentStatus;
   tiers: AgentTier[];
@@ -94,7 +94,7 @@ export interface SharedPrompts {
   overridden: string[];
 }
 
-/** ember_api's /api/admin/agents (needs agents.manage), which ai_agent validates and applies. */
+/** portcullis's /api/admin/agents (needs agents.manage), which ai_agent validates and applies. */
 export const agentsAdminClient = {
   gateways: async () => (await apiRequest<{ providers: ProviderCatalog }>("GET", "/api/admin/agents/gateways")).providers,
   list: async () => (await apiRequest<{ agents: AgentFile[] }>("GET", "/api/admin/agents")).agents,

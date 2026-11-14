@@ -64,7 +64,7 @@ def _refuse(request: Request) -> JSONResponse | None:
 
 
 async def owner_skills(request: Request) -> Response:
-    """Internal page API. Only ember_api may choose an owner; never an MCP tool."""
+    """Internal page API. Only portcullis may choose an owner; never an MCP tool."""
     if (refusal := _refuse(request)) is not None:
         return refusal
     uid = request.path_params["uid"]

@@ -54,7 +54,7 @@ class MemoryUpdate(MemoryBody):
 
 
 async def memory_notes(request: Request) -> Response:
-    """Internal page API. Only ember_api may choose an owner; never an MCP tool."""
+    """Internal page API. Only portcullis may choose an owner; never an MCP tool."""
     if not _token_valid(request):
         return JSONResponse({"error": "Invalid or missing internal API token"}, status_code=401)
     if not _memory_online():

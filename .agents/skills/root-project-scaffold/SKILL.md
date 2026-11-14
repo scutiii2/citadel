@@ -5,10 +5,10 @@ description: Create or audit a new top-level project directory under apps/ (a ne
 
 # root_project_scaffold
 
-Every Python project in this repo's `apps/` folder (`mcp_server`, `ai_agent`, `ember_api`,
+Every Python project in this repo's `apps/` folder (`mcp_server`, `ai_agent`, `portcullis`,
 `chat_cli` and `db_gateway`;
 `PDFMerger` and `MediaDownloader` each hold a Python app and a web app) shares one top-level shape. The three Ember projects sit together in
-`apps/` (`ember_api`, plus the Node apps `ember_web` and `ember_admin`, which have their
+`apps/` (`portcullis`, plus the Node apps `ember_web` and `ember_admin`, which have their
 own layout - see ember-feature-scaffold); everything else is `apps/<name>/`. A new root-level project must match it, not
 invent its own layout — consistency here is what lets `docker-compose.yml`,
 onboarding docs, and anyone jumping between projects rely on the same
@@ -34,9 +34,9 @@ pre-create empty ones "for consistency":
 
 | Path | When to add it |
 |---|---|
-| `data/` | Persists runtime data to disk (mcp_server, ember_api have it; ai_agent keeps its registry and usage JSONL under `.data/`; chat_cli keeps nothing, ember_api stores its chats) |
+| `data/` | Persists runtime data to disk (mcp_server, portcullis have it; ai_agent keeps its registry and usage JSONL under `.data/`; chat_cli keeps nothing, portcullis stores its chats) |
 | `docs/` | Documentation beyond the README is substantial enough to split out |
-| `migrations/`, `scripts/` | ember_api only: Alembic revisions and its CLIs (`migrate_db`, `backup_db`, `import_chat_app`). A new project with a database may follow it; otherwise use `src/` |
+| `migrations/`, `scripts/` | portcullis only: Alembic revisions and its CLIs (`migrate_db`, `backup_db`, `import_chat_app`). A new project with a database may follow it; otherwise use `src/` |
 | `logs/` | The project writes its own log files (needs a `logging_setup.py`-style module in `src/`, not an ad-hoc log call) |
 
 Do not invent additional top-level folders (`lib/`, `scripts/`, `bin/`,
@@ -69,13 +69,13 @@ changes the convention for every project after it.
    client, not a server) gets none. Give the port an env var (`DB_GATEWAY_PORT=29602`,
    read by `src/config.py` as an override) and set it in the compose service.
    Pick a free port: 29600 mcp_server,
-   29601 ember_api, 8040 pdf_merger, 29602 db_gateway,
+   29601 portcullis, 8040 pdf_merger, 29602 db_gateway,
    29603+ ai_agent agents.
 6. Services reached over HTTP/MCP by other projects must take the shared
    `INTERNAL_API_TOKEN` from a secrets file (`.env` in each project) and, for
    `/mcp`, reject calls without it once set. Never import another root
    project: self-contained means a separate venv and no shared packages
-   (see `chat_cli`, which talks to ember_api over HTTP instead of reusing
+   (see `chat_cli`, which talks to portcullis over HTTP instead of reusing
    its code). Never expose the shared token in a browser UI.
 
 ## mcp_server's dotted variant
@@ -84,7 +84,7 @@ changes the convention for every project after it.
 **dot-prefixed = untracked runtime state or secrets, plain `configs/` = tracked**. Its root has `.data/`, `.logs/`, `.cache/`
 (in place of plain `data/`, `logs/`), a single `.env`, and `configs/`; each capability gets `.data/ .logs/ .cache/ .secrets/ configs/` under
 `specifics/<capability_name>/`. An untracked dot-folder needs no `README.md`; a
-credentials README that is worth keeping lives in `docs/` (see `apps/armory/docs/secrets.md`); `.env.example` stays tracked. `apps/armory/migrate_state_layout.py` moves an older checkout onto this shape. `ai_agent`, `ember_api` and `chat_cli` use the
+credentials README that is worth keeping lives in `docs/` (see `apps/armory/docs/secrets.md`); `.env.example` stays tracked. `apps/armory/migrate_state_layout.py` moves an older checkout onto this shape. `ai_agent`, `portcullis` and `chat_cli` use the
 plain folder names above.
 
 ## Auditing an existing root folder

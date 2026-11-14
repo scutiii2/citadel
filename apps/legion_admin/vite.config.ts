@@ -1,9 +1,9 @@
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vitest/config'
 
-// legion_admin: everything under /api goes to ember_api, so the browser sees one origin:
+// legion_admin: everything under /api goes to portcullis, so the browser sees one origin:
 // the SameSite=Strict session cookie works and no CORS is involved.
-// xfwd: ember_api trusts X-Forwarded-For only from loopback, so logins are rate-limited per real client.
+// xfwd: portcullis trusts X-Forwarded-For only from loopback, so logins are rate-limited per real client.
 const apiProxy = {
   '/api': { target: `http://127.0.0.1:${process.env.EMBER_API_PORT ?? 29601}`, xfwd: true },
 }

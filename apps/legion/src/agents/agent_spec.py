@@ -159,9 +159,9 @@ class AgentSpec:
     skill_learning: bool = False
     # Offer the update_plan checklist tool (agents/plan.py); the chat's own toggle can still switch it off.
     plan_tool: bool = True
-    # False keeps the agent out of every orchestrator's roster: it is called directly (ember_api), never delegated to.
+    # False keeps the agent out of every orchestrator's roster: it is called directly (portcullis), never delegated to.
     delegable: bool = True
-    # Address peers and ember_api reach this agent at (what it registers);
+    # Address peers and portcullis reach this agent at (what it registers);
     # None = derived from the host and port it listens on.
     url: str | None = None
     source: Path | None = None

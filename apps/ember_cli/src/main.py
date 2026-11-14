@@ -2,7 +2,7 @@
 
     python -m src.main [--url URL] [--user NAME] [--ask]
 
-Logs in to ember_api with your account (the password is typed, hidden, and kept
+Logs in to portcullis with your account (the password is typed, hidden, and kept
 only in memory), then chats like the web page does: the same agents, saved
 chats, usage limits and tool approvals.
 """
@@ -35,7 +35,7 @@ async def authenticate(
     tries: int = LOGIN_TRIES,
 ) -> bool:
     """Logs in, asking for the password up to `tries` times. A lockout, a missing
-    answer from ember_api or an exhausted number of tries ends it (False)."""
+    answer from portcullis or an exhausted number of tries ends it (False)."""
     for attempt in range(1, tries + 1):
         try:
             password = await read_secret(f"Password for {username}: ")
@@ -61,7 +61,7 @@ async def authenticate(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="chat_cli", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--url", help="ember_api's address (default: configs/config_cli.json)")
+    parser.add_argument("--url", help="portcullis's address (default: configs/config_cli.json)")
     parser.add_argument("--user", help="the account to log in as (default: configs/config_cli.json, else asked)")
     parser.add_argument("--ask", action="store_true", help="ask before each tool runs")
     return parser

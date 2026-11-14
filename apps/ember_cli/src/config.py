@@ -1,4 +1,4 @@
-"""chat_cli's settings: where ember_api is, and which account to log in as.
+"""chat_cli's settings: where portcullis is, and which account to log in as.
 
 `configs/config_cli.json` is yours and gitignored; the first run copies it from
 `config_cli.json.example`. The password is never stored: it is typed at login.

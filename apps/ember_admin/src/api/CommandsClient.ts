@@ -32,7 +32,7 @@ export interface ParamOption {
 
 const enc = encodeURIComponent;
 
-/** ember_api's pass-through to mcp_server's command registry, capability
+/** portcullis's pass-through to mcp_server's command registry, capability
  * help (tools.view) and capability switchboard (switching: capabilities.manage). */
 export const commandsClient = {
   list: () => apiRequest<CommandInfo[]>("GET", "/api/commands"),

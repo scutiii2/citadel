@@ -229,7 +229,7 @@ async def ask(
         if ctx is not None:
             await ctx.report_progress(0, None, json.dumps(agent_events.stamp(event, _AGENT_ID, _AGENT_LABEL)))
 
-    # The asking user, from ember_api's / chat_app's identity headers; every
+    # The asking user, from portcullis's / chat_app's identity headers; every
     # mcp_server tool this turn calls carries it on (see internal_auth.py).
     started_at = agent_events.now_iso()
     requester_token = internal_auth.bind_requester(internal_auth.Requester.from_headers(_request_headers(ctx)))
@@ -309,7 +309,7 @@ async def ask(
 @mcp.custom_route("/registry", methods=["GET"])
 async def registry(_request: Request) -> JSONResponse:
     """The agent registry (the same JSON as .data/agent_registry.json), so
-    ember_api can find agents by URL instead of by file path, plus `defined`:
+    portcullis can find agents by URL instead of by file path, plus `defined`:
     every agent in agents/ (running or not, from agent_definitions.json). Behind the
     internal token like /mcp (see internal_auth.PROTECTED_PATHS)."""
     await asyncio.to_thread(agent_registry.reload)
@@ -530,7 +530,7 @@ def status() -> dict[str, Any]:
 @mcp.tool()
 async def probe_extension(url: str, headers: dict[str, str] | None = None) -> dict[str, Any]:
     """Connect once to the MCP server at `url` (with `headers`, which may carry
-    a secret) and report `{status, error, tools}`. Used by ember_api when a user
+    a secret) and report `{status, error, tools}`. Used by portcullis when a user
     adds or edits a private extension. Never raises; the error is short and
     never contains a header value."""
     return await mcp_upstream.probe_private(url, headers)
@@ -607,7 +607,7 @@ def main() -> None:
         # Same app, host, port and log level mcp.run(transport="streamable-http")
         # would use, built explicitly so middleware can be added here. No CORS:
         # only servers call this agent (chat_app directly, ember_web's browser
-        # via ember_api's proxy), never a browser - which is also why /mcp
+        # via portcullis's proxy), never a browser - which is also why /mcp
         # can require the shared internal token (once one is configured).
         app = mcp.streamable_http_app()
         app.add_middleware(internal_auth.InternalTokenMiddleware, token=internal_auth.TOKEN)

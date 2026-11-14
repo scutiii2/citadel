@@ -23,17 +23,17 @@ The retired pieces: roles in `prompts.json` and a hand-run
 instance per `AI_AGENT_PROVIDER`/`AI_AGENT_PORT` (and the `--gateway` flag)
 are not how agents are added now; every agent is an `agents/<id>.json`. Don't
 hand-edit `.data/agent_registry.json` - it is the runtime registry the children
-write (atomic temp file + `os.replace`); ember_api reads it.
+write (atomic temp file + `os.replace`); portcullis reads it.
 
 `apps/legion/README.md` ("Agents", "Orchestrator", "Decision layer", "Usage log") is
 the source of truth this skill compresses; read it first. Running shape:
-`ember_api --MCP--> legion (entry) --delegate_to_agent--> specialists`, each
+`portcullis --MCP--> legion (entry) --delegate_to_agent--> specialists`, each
 agent one provider+model, all `--MCP-->` mcp_server.
 
 ## Path 1 - New agent (file only)
 
 1. Create `apps/legion/agents/<id>.json`. The stem is the id
-   (`^[a-z0-9][a-z0-9-]{0,62}$`); it is what ember_api, stored chat turns and
+   (`^[a-z0-9][a-z0-9-]{0,62}$`); it is what portcullis, stored chat turns and
    the usage log name, so pick it once. Unknown keys are an error. Minimal
    specialist:
 
@@ -114,7 +114,7 @@ to TypeSafe; `laya-only` keeps it local.
 Specialist work streams to the caller as
 `agent_start` / `agent_end` / `agent_token` plus `step_*` events stamped with
 `agent_id`; a specialist's step ids can collide with the orchestrator's, so
-consumers key on `(agent_id, id)` - ember_api and ember_web already do.
+consumers key on `(agent_id, id)` - portcullis and ember_web already do.
 
 ## Decision agents
 
@@ -188,16 +188,16 @@ Google's native SDK rather than an OpenAI-compatible endpoint):
        (`parsed_arguments`) or the next request 400s. `on_event` may be
        `None` (e.g. `run_interpret`'s non-streaming callers) — guard
        every emit with `if on_event is not None:`. This is what
-       ultimately reaches ember_api (and from there ember_web) as events - see
+       ultimately reaches portcullis (and from there ember_web) as events - see
        `server.py`'s `ask()` tool (`ctx.report_progress(0, None, json.dumps(event))`)
-       and `apps/ember_api/src/services/agent_gateway.py` on the other end.
+       and `apps/portcullis/src/services/agent_gateway.py` on the other end.
    - `run_interpret(text, model) -> ChatResult` — one non-agentic
      completion, no tools offered (used to finish an AI-required
      `mcp_server` tool's result — see `server.py`'s `interpret` tool).
    - Report token spend, never enforce it: return the response's
      `total_tokens` (and `context_tokens`) on the `ChatResult`, nothing
      more. legion keeps no usage store and applies no rolling
-     6-hour/weekly cap — ember_api records each answer's
+     6-hour/weekly cap — portcullis records each answer's
      `agent_usage` per account and owns the caps (chat_app, now retired,
      did the same with its `usage.db`).
      Only the per-request `max_output_tokens`/`max_context_tokens`/`max_tool_rounds` in
@@ -256,15 +256,15 @@ label, provider, gateway, model, tokens, `started_at`/`finished_at`,
 turn). A new provider fills those fields from its `ChatResult`; it does not
 write the file itself. The reply row (not the file) also carries `prompt`, the
 `{role, content}` messages this agent received (`runtime/usage_log.prompt_messages`,
-never the system prompt); ember_api keeps it for the admin Advanced chat-turn view.
-ember_api owns usage limits and the usage reports.
+never the system prompt); portcullis keeps it for the admin Advanced chat-turn view.
+portcullis owns usage limits and the usage reports.
 
 ## Verify before calling it done
 
 - **Agent file**: start `python -m src.supervisor`. A bad file, a shared port or a wrong number
   of entry agents stops the supervisor with the file and field named. Then
   `[<id>]` lines appear and the agent is listed in `.data/agent_registry.json`;
-  `GET /api/agent` on ember_api names the entry agent. Stop with Ctrl+C and
+  `GET /api/agent` on portcullis names the entry agent. Stop with Ctrl+C and
   confirm no child is left running and the entry leaves the registry.
 - **Orchestrator**: ask the entry agent something that fits a
   specialist's `focus`; ember_web shows "Ember -> <Specialist>" while it works

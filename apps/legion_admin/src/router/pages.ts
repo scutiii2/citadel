@@ -1,4 +1,4 @@
-/** The pages of the Legion admin app, in nav order, with the ember_api permission each needs.
+/** The pages of the Legion admin app, in nav order, with the portcullis permission each needs.
  * One list, so the nav, the router and the guard cannot drift. */
 export interface LegionPage {
   to: string;

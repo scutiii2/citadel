@@ -1,10 +1,10 @@
 [project]
 name = "chat_cli"
 version = "0.1.0"
-description = "Terminal chat client for ember_api"
+description = "Terminal chat client for portcullis"
 requires-python = ">=3.11"
 dependencies = [
-    # ember_api's REST and Server-Sent Events API.
+    # portcullis's REST and Server-Sent Events API.
     "httpx>=0.27,<1.0",
     # Markdown and live rendering of the streamed answer.
     "rich>=13.7",

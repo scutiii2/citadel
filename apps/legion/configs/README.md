@@ -57,7 +57,7 @@ retained file; copy back any settings changed after migration.
 
 - **`../.data/agent_registry.json`** - the `ai_agent` instances currently
   running, which `delegate_to_agent` (`src/agents/delegation.py`,
-  `src/agents/agent_registry.py`) and ember_api read. Each instance upserts its
+  `src/agents/agent_registry.py`) and portcullis read. Each instance upserts its
   own `{id, label, url, entry, orchestrator, focus}` on startup and removes
   it on clean shutdown, so never edit it by hand. Gitignored with the rest
   of `.data/`; created on first start.

@@ -14,7 +14,7 @@ from src.providers.base_provider import OnEvent
 from src.runtime import questions
 
 
-# Leave room under ember_api's five-minute streaming ask read timeout.
+# Leave room under portcullis's five-minute streaming ask read timeout.
 PLAN_STEP_TIMEOUT_SECONDS = 270
 
 

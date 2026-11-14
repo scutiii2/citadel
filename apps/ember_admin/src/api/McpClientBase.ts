@@ -6,7 +6,7 @@ import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.j
 /** What Client.callTool resolves to. */
 export type RawToolResult = Awaited<ReturnType<Client["callTool"]>>;
 
-/** One lazily-opened MCP session to one server, reached through ember_api's
+/** One lazily-opened MCP session to one server, reached through portcullis's
  * same-origin proxy (the session cookie rides along automatically);
  * subclasses add typed tool methods. */
 export abstract class McpClientBase {
@@ -14,7 +14,7 @@ export abstract class McpClientBase {
   private client: Client | null = null;
   private connecting: Promise<Client> | null = null;
 
-  /** path: an ember_api proxy route, e.g. "/api/mcp/server". */
+  /** path: a portcullis proxy route, e.g. "/api/mcp/server". */
   constructor(path: string) {
     this.path = path;
   }

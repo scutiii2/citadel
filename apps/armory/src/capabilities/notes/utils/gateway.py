@@ -1,5 +1,5 @@
 """Reads and writes ember's notes in db_gateway over HTTP.
-Record shape is ember_api's (`apps/Ember/ember_api/src/services/notes.py`); agent-written notes carry `last_editor: "agent"`."""
+Record shape is portcullis's (`apps/portcullis/src/services/notes.py`); agent-written notes carry `last_editor: "agent"`."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from typing import Any
 from urllib.parse import quote
 
 COLLECTION = "notes"
-MAX_NOTES = 200  # ember_api's per-account cap
+MAX_NOTES = 200  # portcullis's per-account cap
 _NO_RECORD = "no record"
 
 
@@ -40,7 +40,7 @@ class NotesGateway:
         self._send("PUT", f"/records/{quote(key, safe='')}", {"doc": doc})
 
     def count_owned(self, owner: str) -> int:
-        """How many notes `owner` has, shared with agents or not (ember_api caps it at MAX_NOTES)."""
+        """How many notes `owner` has, shared with agents or not (portcullis caps it at MAX_NOTES)."""
         body = {"filters": {"owner": owner}, "limit": MAX_NOTES, "offset": 0}
         return len(self._send("POST", "/query", body)["docs"])
 

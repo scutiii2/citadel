@@ -2,10 +2,10 @@ import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vitest/config'
 
-// ember_admin: everything under /api goes to ember_api, so the browser sees one origin:
-// the session cookie just works and no CORS is involved. ember_api then
+// ember_admin: everything under /api goes to portcullis, so the browser sees one origin:
+// the session cookie just works and no CORS is involved. portcullis then
 // proxies MCP on to ai_agent / mcp_server.
-// xfwd: adds X-Forwarded-For, so ember_api (which trusts it only from
+// xfwd: adds X-Forwarded-For, so portcullis (which trusts it only from
 // loopback) rate-limits logins per real client, not per proxy.
 const apiProxy = {
   '/api': { target: `http://127.0.0.1:${process.env.EMBER_API_PORT ?? 29601}`, xfwd: true },
@@ -80,7 +80,7 @@ export default defineConfig({
     host: '127.0.0.1',
     proxy: apiProxy,
   },
-  // `vite preview` (the production build) talks to ember_api the same way.
+  // `vite preview` (the production build) talks to portcullis the same way.
   preview: {
     proxy: apiProxy,
     headers: {

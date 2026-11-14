@@ -1,4 +1,4 @@
-"""Watching a turn: the events of an answer ember_api is writing, with the same
+"""Watching a turn: the events of an answer portcullis is writing, with the same
 reconnect rules as the web page (ember_web's turnStream)."""
 
 from __future__ import annotations
@@ -50,6 +50,6 @@ async def watch_turn(
             # TurnGone and SessionExpired are other EmberErrors: they pass through.
             pass
         if attempt >= len(BACKOFF_SECONDS):
-            raise ConnectionLost("Lost the connection to ember_api")
+            raise ConnectionLost("Lost the connection to portcullis")
         await sleep(BACKOFF_SECONDS[attempt])
         attempt += 1

@@ -25,7 +25,7 @@ def _slugify(label: str) -> str:
 
 
 def _unsaved(error: OSError) -> JSONResponse:
-    """A 4xx on purpose: ember_api shows a 4xx's message but reports any 5xx as "unreachable"."""
+    """A 4xx on purpose: portcullis shows a 4xx's message but reports any 5xx as "unreachable"."""
     return JSONResponse({"error": f"Could not save the extensions config ({error.strerror or error})"}, status_code=409)
 
 

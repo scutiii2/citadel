@@ -1,12 +1,12 @@
 import { apiRequest } from "./http";
 
-/** The logged-in account, as ember_api's /api/auth routes return it. */
+/** The logged-in account, as portcullis's /api/auth routes return it. */
 export interface Account {
   id: number;
   username: string;
   email: string;
   email_verified: boolean;
-  /** False when ember_api lets unverified accounts work. Absent counts as true. */
+  /** False when portcullis lets unverified accounts work. Absent counts as true. */
   email_verification_required?: boolean;
   /** The chat suggests the next prompt after each answer. Absent counts as true. */
   prompt_suggestions?: boolean;
@@ -49,7 +49,7 @@ export interface KnownDevice {
   current: boolean;
 }
 
-/** ember_api's /api/auth and /api/account routes. Stateless; the auth store holds the account. */
+/** portcullis's /api/auth and /api/account routes. Stateless; the auth store holds the account. */
 export const authClient = {
   me: () => apiRequest<Account>("GET", "/api/auth/me"),
   login: (username: string, password: string) =>

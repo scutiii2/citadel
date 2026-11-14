@@ -1,20 +1,20 @@
 ---
 name: ember-feature-scaffold
-description: Add a feature to ember_web (the Vue 3 + TypeScript browser app) and/or ember_api (its FastAPI backend) following this repo's established layout, auth and proxy conventions. Use whenever the user asks for a new ember_web page, screen, tab, panel, store or API call, a new ember_api route, permission, admin action or model, or wants ember_web to reach a new ai_agent / mcp_server capability - even if they only describe the behavior ("let admins see login attempts", "add a settings page to ember", "show token usage per answer") without naming files. Also use when reviewing whether ember_web/ember_api code follows these conventions. Not for new mcp_server tools (use mcp-capability-scaffold).
+description: Add a feature to ember_web (the Vue 3 + TypeScript browser app) and/or portcullis (its FastAPI backend) following this repo's established layout, auth and proxy conventions. Use whenever the user asks for a new ember_web page, screen, tab, panel, store or API call, a new portcullis route, permission, admin action or model, or wants ember_web to reach a new ai_agent / mcp_server capability - even if they only describe the behavior ("let admins see login attempts", "add a settings page to ember", "show token usage per answer") without naming files. Also use when reviewing whether ember_web/portcullis code follows these conventions. Not for new mcp_server tools (use mcp-capability-scaffold).
 ---
 
-# ember_web + ember_api feature scaffolding
+# ember_web + portcullis feature scaffolding
 
 Two projects that ship together (plus **ember_admin/**, a second Vue app in
 `apps/` for administrators on port 26501: same stack and shared control
-files as ember_web, talks only to ember_api; staff-only pages such as Tickets,
+files as ember_web, talks only to portcullis; staff-only pages such as Tickets,
 Capabilities, Agents and Analytics go there, not in ember_web):
 
 - **ember_web/** - Vue 3 + TS (Vite, Pinia, vue-router). Talks **only** to
-  ember_api, same-origin: Vite forwards `/api` to ember_api (`vite.config.ts`),
+  portcullis, same-origin: Vite forwards `/api` to portcullis (`vite.config.ts`),
   so the `HttpOnly` session cookie just works and no server URL, token or
   key is ever in the bundle.
-- **ember_api/** - FastAPI + async SQLAlchemy (SQLite/aiosqlite). Owns
+- **portcullis/** - FastAPI + async SQLAlchemy (SQLite/aiosqlite). Owns
   accounts, sessions, roles/permissions, invites, email verification (can be
   switched off with `require_email_verification: false`), and
   proxies MCP to ai_agent (`/api/mcp/agents/{id}`) and mcp_server
@@ -26,7 +26,7 @@ existing route's shape or to the turn/events contract must keep it working -
 check `apps/ember_cli/src/api.py` and `events.py` - and a new route the web app
 needs is not automatically wanted there.
 
-Read both READMEs (`apps/ember_web/README.md`, `apps/ember_api/README.md`) before
+Read both READMEs (`apps/ember_web/README.md`, `apps/portcullis/README.md`) before
 designing - they hold the current API table and security model this skill
 compresses.
 
@@ -43,14 +43,14 @@ every ember change so far was made, and the user explicitly asked for it.
 | The feature needs... | Touch |
 |---|---|
 | Only presentation of data ember_web already has | ember_web only |
-| New data, a new action, or anything that must be enforced | ember_api route (+ service/model) **and** ember_web client/view |
+| New data, a new action, or anything that must be enforced | portcullis route (+ service/model) **and** ember_web client/view |
 | Something ai_agent or mcp_server can do | the MCP proxy path (section 4) - never a direct browser call |
 
 Anything security-relevant (who may see or do what) must be enforced in
-ember_api. ember_web's router guard and hidden tabs are cosmetic: they
+portcullis. ember_web's router guard and hidden tabs are cosmetic: they
 keep the UI from offering calls the server would refuse, nothing more.
 
-## 2. ember_api side
+## 2. portcullis side
 
 Layout: `src/routes/` (one `APIRouter` per area, prefix `/api/...`),
 `src/services/` (classes taking an `AsyncSession` - logic lives here, not
@@ -75,7 +75,7 @@ in routes), `src/models/` (SQLAlchemy 2 typed models), `src/deps.py`
    `src/models/__init__.py` (that import is what registers the table).
    Relationships use `lazy="selectin"` - async sessions can't lazy-load.
    Store times as naive UTC via `src.db.utcnow`. Any model change (new
-   table or column) needs an Alembic migration: stop ember_api, run
+   table or column) needs an Alembic migration: stop portcullis, run
    `python -m scripts.migrate_db revision "what changed"`, read the file it
    writes (a new `NOT NULL` column needs a `server_default`). Startup applies
    it after a backup; `tests/test_migrations.py` fails if it is missing. Bump its
@@ -95,7 +95,7 @@ in routes), `src/models/` (SQLAlchemy 2 typed models), `src/deps.py`
    (Notes is the example) goes to `db_gateway` through `DbGatewayClient`
    (`services/db_gateway.py`, the `get_db_gateway` dependency, `Settings.db_gateway`;
    tests pass `FakeDbGateway` through the `db_gateway` fixture). Answer `503`
-   when it is unreachable: ember_api must start and the rest of the API must keep
+   when it is unreachable: portcullis must start and the rest of the API must keep
    working without it. Data that mcp_server owns (tickets, memory) is not copied
    here: the route is a thin authenticated proxy in a gateway service
    (`services/ticket_gateway.py`, `services/memory.py`) that sends the internal
@@ -113,14 +113,14 @@ in routes), `src/models/` (SQLAlchemy 2 typed models), `src/deps.py`
 5. **POST bodies are always JSON** - `JsonOnlyMiddleware` rejects anything
    else with 415 (CSRF guard with the `SameSite=Strict` cookie). Don't
    add form endpoints.
-6. **Tests** in `apps/ember_api/tests/`: fixtures in `conftest.py` give
+6. **Tests** in `apps/portcullis/tests/`: fixtures in `conftest.py` give
    `client`, `client_factory(**settings)`, `email` (FakeEmailSender) and
    `upstream` (FakeUpstream for the MCP proxy); `tests/test_registration.py`
    has `as_admin`, `new_invite`, `register` helpers. Cover: happy path,
    401 when logged out, 403 without the permission / unverified, and
    validation errors. Run:
-   `uv run pytest -q` (from `apps/ember_api/`).
-7. Update the API table in `apps/ember_api/README.md`.
+   `uv run pytest -q` (from `apps/portcullis/`).
+7. Update the API table in `apps/portcullis/README.md`.
 
 ## 3. ember_web side
 
@@ -179,17 +179,17 @@ preference), `src/components/` (reusable pieces only), `src/router/`,
    `components/MarkdownContent.vue` (DOMPurify-sanitized) - never raw `v-html`.
 8. Verify from `apps/ember_web/`: `pnpm exec vue-tsc -b --noEmit` (must print
    nothing) and `pnpm exec vite build`, then delete `dist/`. Tests sit beside the source
-   (`*.test.ts`, Vitest + jsdom, ember_api mocked): `pnpm test`. If a page now
+   (`*.test.ts`, Vitest + jsdom, portcullis mocked): `pnpm test`. If a page now
    calls a new `/api` route, add it to `e2e/fakeApi.ts` - the Playwright test
    (`pnpm run test:e2e`) fails on any call the fake does not know.
 
 ## 4. Reaching ai_agent / mcp_server
 
-The browser never gets their URLs; everything goes through ember_api's
+The browser never gets their URLs; everything goes through portcullis's
 proxy, which drops browser-supplied identity/token headers and adds
 `X-Requester-Username` / `X-Requester-Email` (+ `X-Internal-Token` if
 configured) itself. ai_agent and mcp_server reject `/mcp` without that
-token once it's configured, so any new ember_api client of theirs must
+token once it's configured, so any new portcullis client of theirs must
 send it too (`identity_headers()` in `services/mcp_session.py` does).
 
 - **mcp_server tools and resources**: already allowed for `tools.execute`
@@ -207,10 +207,10 @@ send it too (`identity_headers()` in `services/mcp_session.py` does).
   (`/notes`, stored in db_gateway); Memory is what the assistant saved about
   them (`/memory`, stored by mcp_server).
 - **Tickets**: the reporter side is ember_web (`/tickets`, `tickets.create`),
-  the staff board is ember_admin (`/tickets`, `tickets.manage`); ember_api only
+  the staff board is ember_admin (`/tickets`, `tickets.manage`); portcullis only
   proxies to mcp_server. A change to the reporter and the staff routes should be
   checked on both apps.
-- **Chat with ai_agent** runs inside ember_api, never through the proxy:
+- **Chat with ai_agent** runs inside portcullis, never through the proxy:
   `services/turns.py` (TurnRegistry) calls the agent through
   `services/agent_gateway.py` (the `mcp` SDK), saves the answer and records
   usage; the browser starts a turn (`POST /api/chats/{id}/turns`) and
@@ -228,7 +228,7 @@ send it too (`identity_headers()` in `services/mcp_session.py` does).
   (`LogWriter` via `Depends(get_log_writer)`) after it succeeded. New
   permissions go in `services/permissions.py`; the Administrator role gets
   them on the next start.
-- Agent discovery is ember_api's `GET /api/agent` (the entry agent; reads ai_agent's
+- Agent discovery is portcullis's `GET /api/agent` (the entry agent; reads ai_agent's
   `.data/agent_registry.json` through `AgentDirectory`: `entry`, `orchestrator`,
   `focus`); don't add a tool for it. **There is no agent picker**: every turn goes
   to the entry agent, a browser-sent `agent_id` is ignored, and the entry agent
@@ -249,7 +249,7 @@ send it too (`identity_headers()` in `services/mcp_session.py` does).
 
 ## 5. Before reporting done
 
-- ember_api tests pass; ember_web (and ember_admin, if touched) type-check and build pass.
+- portcullis tests pass; ember_web (and ember_admin, if touched) type-check and build pass.
 - READMEs updated (API table, features, layout) when the surface changed.
 - Summarize for the user what changed, what was verified and how, what
   they should test by hand (they test manually - don't launch browser

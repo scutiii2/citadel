@@ -1,4 +1,4 @@
-"""EmberClient against a fake ember_api (httpx's MockTransport)."""
+"""EmberClient against a fake portcullis (httpx's MockTransport)."""
 
 from __future__ import annotations
 
@@ -126,7 +126,7 @@ class TestErrors:
 
     @pytest.mark.parametrize("body", [b"", b"not json", b"[]", b'{"detail": 5}', b'{"detail": ""}'])
     def test_a_body_without_a_usable_message_falls_back_to_the_status(self, body: bytes) -> None:
-        assert error_detail(httpx.Response(502, content=body)) == "ember_api answered 502"
+        assert error_detail(httpx.Response(502, content=body)) == "portcullis answered 502"
 
 
 class TestCalls:

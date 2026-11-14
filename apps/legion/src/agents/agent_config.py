@@ -159,7 +159,7 @@ async def run_chat(
 
     limits: the user's own output-token and tool-round caps for this turn; lower only.
 
-    private_extensions: the user's own MCP servers for this turn, as ember_api
+    private_extensions: the user's own MCP servers for this turn, as portcullis
     sent them (see private_extensions/turn.py). Their tools are offered after
     the user approves each one; a server that cannot be reached is reported
     in `result.private_extension_errors` and the turn goes on without it.

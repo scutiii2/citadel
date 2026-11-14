@@ -35,7 +35,7 @@ isolation does not hide data from the operator of the deployment.
 
 Armory needs `EMBER_API_URL` to reach Ember API's internal connection resolver.
 The local default is `http://127.0.0.1:29601`; Compose sets
-`http://ember_api:29601`. Both services require the same `INTERNAL_API_TOKEN`.
+`http://portcullis:29601`. Both services require the same `INTERNAL_API_TOKEN`.
 Resolution fails closed without a token and trusted, valid account UID. No browser
 or model supplies an owner UID or receives a stored credential.
 

@@ -17,10 +17,10 @@ export interface AttachmentTable {
   notes: string[];
 }
 
-/** Same limit ember_api enforces; checked here first to skip the upload. */
+/** Same limit portcullis enforces; checked here first to skip the upload. */
 export const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 
-/** The file's bytes as base64 (ember_api takes JSON only). */
+/** The file's bytes as base64 (portcullis takes JSON only). */
 export function toBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -34,7 +34,7 @@ export function toBase64(file: File): Promise<string> {
 }
 
 export const attachmentsClient = {
-  /** Text ember_api extracted from the file; the file itself isn't kept. */
+  /** Text portcullis extracted from the file; the file itself isn't kept. */
   async text(file: File): Promise<AttachmentText> {
     if (file.size > MAX_ATTACHMENT_BYTES) {
       throw new Error(`Too large - the limit is ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB`);

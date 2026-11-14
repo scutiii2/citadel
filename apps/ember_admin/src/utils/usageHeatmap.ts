@@ -7,7 +7,7 @@ export interface HeatDay {
 }
 
 export const HEAT_LEVELS = 4;
-// Days back from today the map reaches (ember_api reports at most 366).
+// Days back from today the map reaches (portcullis reports at most 366).
 const SPAN_DAYS = 365;
 const DAY_MS = 86_400_000;
 

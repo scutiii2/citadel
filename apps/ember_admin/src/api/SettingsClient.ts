@@ -1,6 +1,6 @@
 import { apiRequest } from "./http";
 
-/** What the administrator has switched on for everyone (ember_api's /api/settings). */
+/** What the administrator has switched on for everyone (portcullis's /api/settings). */
 export interface AppSettings {
   /** Every answer asks before each tool runs, and "allow for this chat" is not offered. */
   force_tool_approval: boolean;
@@ -25,6 +25,6 @@ export const settingsClient = {
     apiRequest<Partial<AppSettings>>("PUT", `/api/admin/settings/${name}`, { value }),
   /** Any logged-in account may read the hidden pages. */
   pages: () => apiRequest<HiddenPages>("GET", "/api/settings/pages"),
-  /** settings.manage only. Replaces the list; ember_api refuses "/" and "/settings". */
+  /** settings.manage only. Replaces the list; portcullis refuses "/" and "/settings". */
   setPages: (hidden: string[]) => apiRequest<HiddenPages>("PUT", "/api/admin/settings/pages", { hidden }),
 };

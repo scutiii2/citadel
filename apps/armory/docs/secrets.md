@@ -9,7 +9,7 @@ and its explanation.
 - **Server** - `MCP_HOST`, `MCP_PORT`. Not secrets in the "must never
   leak" sense, but deployment-specific and kept with the ones that are.
 - **Internal API auth** - `INTERNAL_API_TOKEN`, the same value as
-  ai_agent's and ember_api's. When set, every request to `/mcp` must carry
+  ai_agent's and portcullis's. When set, every request to `/mcp` must carry
   it as `X-Internal-Token` (`services/internal_token.py`, else `401`), and
   `POST /upload` (`upload_routes.py`) always requires it. Blank leaves
   `/mcp` open, which is only safe while the port stays on `127.0.0.1`.

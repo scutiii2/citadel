@@ -1,6 +1,6 @@
 """ChatSession: which chat is open, and which agent answers it.
 
-The conversation itself lives on ember_api (it saves every turn), so nothing
+The conversation itself lives on portcullis (it saves every turn), so nothing
 about the messages is kept here."""
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ class ChatSession:
         self.allowed_tools = set()
 
     def open(self, chat: ChatSummary) -> None:
-        """Continues a saved chat. The agent stays the entry agent: ember_api sends every question there."""
+        """Continues a saved chat. The agent stays the entry agent: portcullis sends every question there."""
         self.chat_id = chat.id
         self.is_new = False
         self.allowed_tools = set()

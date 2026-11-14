@@ -114,7 +114,7 @@ describe("AnalyticsView overview", () => {
     expect(analytics).toHaveBeenCalledTimes(2);
   });
 
-  it("draws only the kinds ember_api sent", async () => {
+  it("draws only the kinds portcullis sent", async () => {
     analytics.mockResolvedValue(report(["action"]));
     const wrapper = await mountView();
 

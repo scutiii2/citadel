@@ -12,13 +12,13 @@ local/fallback readiness. Reset and disable use the existing agent lifecycle.
 
 
 Admin web app for ember, built with Vue 3, TypeScript and Vite. It runs on
-port 26501 (`EMBER_ADMIN_PORT`) and talks only to [ember_api](../ember_api)
+port 26501 (`EMBER_ADMIN_PORT`) and talks only to [portcullis](../portcullis)
 over the same origin, like [ember_web](../ember_web): its Vite server forwards
-`/api` to ember_api, so the browser holds no server URL or token.
+`/api` to portcullis, so the browser holds no server URL or token.
 
 ## Run
 
-Needs `ember_api` and `mcp_server` running (ember_api proxies the capability
+Needs `portcullis` and `mcp_server` running (portcullis proxies the capability
 and extension calls to mcp_server).
 
 - `pnpm install` once, then `pnpm run dev` starts Vite (port `EMBER_ADMIN_PORT`, default 26501).
@@ -28,12 +28,12 @@ and extension calls to mcp_server).
 
 Open <http://127.0.0.1:26501> and log in with an account that has
 at least one of the page permissions below. A login made in ember_web also works here: cookies are not
-scoped by port, so the same ember_api session cookie is sent.
+scoped by port, so the same portcullis session cookie is sent.
 
 | Env var | Default | Meaning |
 |---|---|---|
 | `EMBER_ADMIN_PORT` | `26501` | Vite's port. |
-| `EMBER_API_PORT` | `29601` | Where Vite forwards `/api` (ember_api). |
+| `EMBER_API_PORT` | `29601` | Where Vite forwards `/api` (portcullis). |
 
 ## Pages
 
@@ -55,7 +55,7 @@ scoped by port, so the same ember_api session cookie is sent.
 | Email verification (`/verify-email`) | any logged-in account |
 
 The router and the nav read one list (`src/router/pages.ts`). A user with none
-of these sees the no-access page. ember_api enforces every permission itself;
+of these sees the no-access page. portcullis enforces every permission itself;
 the UI only decides what to show.
 
 Profile mirrors Ember Web's account page: identity and email status, password
@@ -224,7 +224,7 @@ pnpm run test:e2e
 `pnpm exec vue-tsc -b` type-checks the app and its tests. `pnpm run test:e2e` runs
 Playwright against the built app on port 5198 (`EMBER_E2E_PORT`) in the
 Chrome installed on this machine. `e2e/fakeApi.ts` answers every `/api` call,
-so ember_api is not needed.
+so portcullis is not needed.
 
 ### Granular permissions
 

@@ -292,7 +292,7 @@ class ChatRepl:
         self._say(f"{self._symbols.cancelled} Cancelled", "yellow")
 
     async def _approve(self, chat_id: str, event: dict[str, Any]) -> None:
-        """Asks whether a tool may run, and tells ember_api. Anything but an explicit yes is a no."""
+        """Asks whether a tool may run, and tells portcullis. Anything but an explicit yes is a no."""
         step_id = str(event.get("id", ""))
         tool = str(event.get("tool", ""))
         always = "" if self._forced else ", [a]lways for this chat"

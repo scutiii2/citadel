@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { buildHeatmap, type HeatDay } from "../utils/usageHeatmap";
 
 // The last 12 months as a grid of days, one column per week (Sunday first),
-// darker for more tokens. Days are UTC days, as ember_api counts them. Hover a
+// darker for more tokens. Days are UTC days, as portcullis counts them. Hover a
 // day to see its tokens.
 const props = defineProps<{
   daily: { date: string; tokens: number }[];

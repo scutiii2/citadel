@@ -1,4 +1,4 @@
-"""Server-Sent Events, as ember_api writes them: `id:` and `data:` lines, each
+"""Server-Sent Events, as portcullis writes them: `id:` and `data:` lines, each
 event ended by a blank line, `: ping` lines as keep-alives."""
 
 from __future__ import annotations

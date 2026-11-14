@@ -2,7 +2,7 @@
 
 Project note: `Brain/Projects/legion_admin.md` in the Obsidian vault (`../../../../Brain/` from this folder).
 
-Vue 3 + TypeScript admin app for Legion, only for accounts holding `agents.manage`. Talks only to `ember_api` through the Vite `/api` proxy (no backend of its own). First page: Agents.
+Vue 3 + TypeScript admin app for Legion, only for accounts holding `agents.manage`. Talks only to `portcullis` through the Vite `/api` proxy (no backend of its own). First page: Agents.
 
 ## Rules
 - Code is copied from `ember_admin`, not shared. Nothing here imports from `ember_admin` or `ember_web`. Apply future fixes in both while both pages exist.

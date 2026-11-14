@@ -4,7 +4,7 @@ import { configIssuesClient, type ConfigIssue } from "../api/ConfigIssuesClient"
 import { errorMessage } from "../utils/errors";
 import { useAuthStore } from "./auth";
 
-/** Problems in ember_api's config and secret files. The nav rail shows its
+/** Problems in portcullis's config and secret files. The nav rail shows its
  * alert, and the Config issues page opens, only while there are any. */
 export const useConfigIssuesStore = defineStore("configIssues", () => {
   const auth = useAuthStore();

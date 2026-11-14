@@ -13,7 +13,7 @@ export interface GuardAuth {
   hasPermission(name: string): boolean;
 }
 
-/** UX gate only: ember_api enforces every permission itself. Admin-only means agents.manage. */
+/** UX gate only: portcullis enforces every permission itself. Admin-only means agents.manage. */
 export function resolveGuard(to: GuardTarget, auth: GuardAuth): true | RouteLocationRaw {
   if (!auth.signedIn) {
     return to.guestOnly ? true : { name: "login", query: to.fullPath === "/" ? {} : { redirect: to.fullPath } };

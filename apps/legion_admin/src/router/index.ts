@@ -6,7 +6,7 @@ declare module "vue-router" {
   interface RouteMeta {
     /** Reachable without logging in (login). */
     guestOnly?: boolean;
-    /** The ember_api permission the page needs. */
+    /** The portcullis permission the page needs. */
     permission?: string;
   }
 }

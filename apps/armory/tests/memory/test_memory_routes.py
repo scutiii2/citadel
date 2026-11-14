@@ -1,4 +1,4 @@
-"""DELETE /memory/owners/{uid}: the route ember_api calls when an account is deleted."""
+"""DELETE /memory/owners/{uid}: the route portcullis calls when an account is deleted."""
 
 from __future__ import annotations
 

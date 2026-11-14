@@ -106,7 +106,7 @@ async def _serve() -> None:
         # Where chat_app proxies a file dropped into a command-form modal; a plain route checked against
         # the internal shared secret. See upload_routes.py.
         install_upload_routes(app)
-        # Where a caller fetches a file a tool offered it (via ember_api); a plain route checked against
+        # Where a caller fetches a file a tool offered it (via portcullis); a plain route checked against
         # the internal token and the requester. See download_routes.py.
         install_download_routes(app)
         # Each capability mounts its own always-on routes (memory, skills, obsidian, tickets), even when its tools are off.

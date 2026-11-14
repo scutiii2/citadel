@@ -211,7 +211,7 @@ through `Field(json_schema_extra={...})`:
 - `options_url` - a plain path on this server (e.g.
   `"/system/check-capabilities"`) returning the select's options as a JSON
   list of strings, a list of `{"value", "label"}`, or a `{value: label}`
-  object. The form fetches it through ember_api's `GET /api/commands/options`. If it fails the
+  object. The form fetches it through portcullis's `GET /api/commands/options`. If it fails the
   form falls back to a text box.
 - `depends_on` - another param whose value fills a `{placeholder}` in
   `options_url` (e.g. `"/apps/options?kind={kind}"`);

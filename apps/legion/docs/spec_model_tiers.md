@@ -26,7 +26,7 @@ same model. The orchestrator (ember) picks which specialist handles a task
 - Automatic escalation (retry on a stronger tier when an answer is poor).
 - Cost-based or Laya-based tier selection; the model decides from the tier
   descriptions.
-- UI changes in `ember_web` / `ember_api`. They never send a tier, so nothing
+- UI changes in `ember_web` / `portcullis`. They never send a tier, so nothing
   there changes.
 
 ## Concepts

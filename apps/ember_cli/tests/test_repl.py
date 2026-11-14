@@ -172,13 +172,13 @@ class TestCommands:
 
     async def test_a_command_that_fails_is_reported_and_the_loop_goes_on(self, client: FakeClient, console: Console) -> None:
         async def broken() -> list:
-            raise EmberUnreachable("Cannot reach ember_api")
+            raise EmberUnreachable("Cannot reach portcullis")
 
         client.chats = broken  # type: ignore[method-assign]
 
         await make_repl(client, console, Script("/chats", "Q")).run()
 
-        assert "Cannot reach ember_api" in screen(console) and len(client.turns) == 1
+        assert "Cannot reach portcullis" in screen(console) and len(client.turns) == 1
 
 
 class TestAskBeforeTools:
@@ -340,7 +340,7 @@ class TestFailures:
         (api_error(429, "You've reached your 6-hour limit. It frees up in about 40 min."), "6-hour limit"),
         (api_error(409, "Already answering"), "Already answering"),
         (api_error(403, "Missing permission: chat.use"), "Missing permission"),
-        (EmberUnreachable("Cannot reach ember_api at http://x"), "Cannot reach ember_api"),
+        (EmberUnreachable("Cannot reach portcullis at http://x"), "Cannot reach portcullis"),
     ])
     async def test_a_turn_that_cannot_start_shows_why_and_nothing_is_streamed(self, client: FakeClient, console: Console, error, shown: str) -> None:
         client.start_error = error
@@ -365,7 +365,7 @@ class TestFailures:
         assert "no longer running" in screen(console)
 
     async def test_a_lost_connection_says_the_answer_carries_on(self, client: FakeClient, console: Console) -> None:
-        client.stream_error = ConnectionLost("Lost the connection to ember_api")
+        client.stream_error = ConnectionLost("Lost the connection to portcullis")
 
         await make_repl(client, console, Script("Q")).run()
 

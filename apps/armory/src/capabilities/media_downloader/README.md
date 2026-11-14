@@ -66,7 +66,7 @@ Each account can hold 20 groups with up to 50 media links each. Drafts and
 finished history expire on the existing file TTL sweep; active packages remain
 until finished. Groups and job history live in process memory and are lost on
 restart. Completed ZIPs persist with existing file sidecars and TTL.
-Restart Armory and ember_api after deploying the new HTTP adapters.
+Restart Armory and portcullis after deploying the new HTTP adapters.
 
 ## Configuration and operation
 

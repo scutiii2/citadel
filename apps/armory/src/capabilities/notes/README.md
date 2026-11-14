@@ -1,6 +1,6 @@
 # capabilities/notes/
 
-Lets agents use the notes a user chose to share. A user keeps private notes in ember (the Notes page; ember_api stores them in db_gateway) and turns on "Let agents read this note" for the ones agents may see. This capability reads and changes only those notes, only for the asking user. Agents can also create a new note. They can never delete a note or change its switch. 6 tools. (Memory, `/memory`, is a different store.)
+Lets agents use the notes a user chose to share. A user keeps private notes in ember (the Notes page; portcullis stores them in db_gateway) and turns on "Let agents read this note" for the ones agents may see. This capability reads and changes only those notes, only for the asking user. Agents can also create a new note. They can never delete a note or change its switch. 6 tools. (Memory, `/memory`, is a different store.)
 
 ## Tools
 
@@ -36,10 +36,10 @@ Lets agents use the notes a user chose to share. A user keeps private notes in e
 
 ## Who can read and change what
 
-- The owner comes from `identity_context.current_uid()`: ember's account uid, sent by ember_api and ai_agent, never a tool parameter. It is the same value ember_api stores as a note's `owner`.
+- The owner comes from `identity_context.current_uid()`: ember's account uid, sent by portcullis and ai_agent, never a tool parameter. It is the same value portcullis stores as a note's `owner`.
 - A note is returned only when `owner` matches and `agent_readable` is `true`. Another account's note, a note whose switch is off, a malformed id and a missing note all give the same answer ("no note with that id is available to agents").
 - Changing is limited the same way: a note can be updated or appended to only when it is the caller's own and its switch is on. Creating is limited to 200 notes per account.
-- Agents cannot delete a note or change a note's switch. A note an agent creates starts with the switch on; one an agent changes gets `last_editor: "agent"` in its record. The limits (title 200, text 20,000, 10 tags of 30 characters, 200 notes) repeat ember_api's `services/notes.py`: change them together.
+- Agents cannot delete a note or change a note's switch. A note an agent creates starts with the switch on; one an agent changes gets `last_editor: "agent"` in its record. The limits (title 200, text 20,000, 10 tags of 30 characters, 200 notes) repeat portcullis's `services/notes.py`: change them together.
 - Two writers at the same moment do not merge (the gateway has no compare-and-set): the last save wins.
 - Writes do not always ask the user first. They ask only when the user has "Ask before tools" on.
 - Without an identity, or when the server listens on a non-loopback host without `INTERNAL_API_TOKEN` (so a caller could claim any uid), every call fails and no note is read.
@@ -49,7 +49,7 @@ Lets agents use the notes a user chose to share. A user keeps private notes in e
 ## Configuration
 
 - `DB_GATEWAY_URL` (default `http://127.0.0.1:29602`), `DB_GATEWAY_INSTANCE` (default `mcp_server`) and `DB_GATEWAY_CONNECTION` (default `data`) in `.env`, read in `src/config.py`. The requests carry `INTERNAL_API_TOKEN`.
-- db_gateway's `configs/config_connections.json` must list the connection under that instance, e.g. `"mcp_server": ["data"]` (the `.example` file has it). It is the same `data` connection ember_api uses, so a change in ember shows here at once.
-- The record shape is ember_api's (`apps/Ember/ember_api/src/services/notes.py`): collection `notes`, fields `id`, `owner`, `title`, `body`, `tags`, `agent_readable`, `updated_at`. If that changes, change `utils/gateway.py` and `domain.py` with it.
+- db_gateway's `configs/config_connections.json` must list the connection under that instance, e.g. `"mcp_server": ["data"]` (the `.example` file has it). It is the same `data` connection portcullis uses, so a change in ember shows here at once.
+- The record shape is portcullis's (`apps/portcullis/src/services/notes.py`): collection `notes`, fields `id`, `owner`, `title`, `body`, `tags`, `agent_readable`, `updated_at`. If that changes, change `utils/gateway.py` and `domain.py` with it.
 - Starts offline. Switch it online in ember_admin (Capabilities), then each user adds it in the Supermarket.
 - No state of its own: nothing is stored under `specifics/`.

@@ -1,7 +1,7 @@
 import type { Page, Route } from "@playwright/test";
 
-/** A stand-in for ember_api: answers the calls the admin app makes, so the
- * built app runs in a real browser without ember_api or mcp_server. Any call
+/** A stand-in for portcullis: answers the calls the admin app makes, so the
+ * built app runs in a real browser without portcullis or mcp_server. Any call
  * not listed is recorded in `unexpected`, and the test fails on it. */
 
 export const ADMIN_ACCOUNT = {

@@ -24,7 +24,7 @@ export interface ExtensionCreate {
 /** Separates an extension tool's id from its own name. */
 export const EXTENSION_SEPARATOR = "__";
 
-/** ember_api's pass-through to mcp_server's extensions: listing needs
+/** portcullis's pass-through to mcp_server's extensions: listing needs
  * chat.use or tools.view, adding/removing extensions.manage. */
 export const extensionsClient = {
   list: () => apiRequest<ExtensionInfo[]>("GET", "/api/extensions"),

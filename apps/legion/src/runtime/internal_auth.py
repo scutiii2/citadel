@@ -1,15 +1,15 @@
 """The shared internal token and the asking user's identity, both ways.
 
 Inbound: every caller of this agent's /mcp is another server in this repo
-(chat_app, ember_api, a delegating peer agent), so once INTERNAL_API_TOKEN
+(chat_app, portcullis, a delegating peer agent), so once INTERNAL_API_TOKEN
 is configured (.env, the same value as
-mcp_server's, chat_app's and ember_api's) InternalTokenMiddleware rejects a
+mcp_server's, chat_app's and portcullis's) InternalTokenMiddleware rejects a
 request without it.
 
 Outbound: the same token goes on this agent's own calls - to mcp_server
 (mcp_upstream.py) and to peers (delegation.py) - and so does the asking
 user. ask() reads X-Requester-Username / X-Requester-Email / X-Requester-Uid off the HTTP
-request (set by ember_api / chat_app, never by the model) and binds them
+request (set by portcullis / chat_app, never by the model) and binds them
 for the turn with bind_requester(). The persistent mcp_server session is
 shared by every user, so the identity travels in each tool call's `_meta`
 (requester_meta()) instead of in headers; mcp_server's identity_context.py

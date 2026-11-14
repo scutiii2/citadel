@@ -1,6 +1,6 @@
 """One turn's private extensions.
 
-`ask()` builds a `PrivateTurn` from what ember_api sent, `agent_config.run_chat`
+`ask()` builds a `PrivateTurn` from what portcullis sent, `agent_config.run_chat`
 binds it for the turn (a ContextVar, like tool_filter.py and approvals.py, so
 the worker threads that run tools see it) and calls `prefetch` before the
 provider starts. The providers' blocking `list_tools()` then reads the cache

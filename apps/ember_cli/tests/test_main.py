@@ -62,7 +62,7 @@ class TestAuthenticate:
         assert len(client.tried) == 1 and "Try again in 15 minutes" in screen(console)
 
     async def test_an_unreachable_server_stops_at_once(self, console: Console) -> None:
-        client = FakeLogin(EmberUnreachable("Cannot reach ember_api at http://x"), OK)
+        client = FakeLogin(EmberUnreachable("Cannot reach portcullis at http://x"), OK)
 
         assert await authenticate(client, "ada", Script("a", "b"), console) is False
 
@@ -113,6 +113,6 @@ class TestCommandLine:
             build_parser().parse_args(["--password", "x"])
 
     def test_there_is_no_agent_option(self) -> None:
-        # Every question goes to ember_api's entry agent, so there is nothing to pick.
+        # Every question goes to portcullis's entry agent, so there is nothing to pick.
         with pytest.raises(SystemExit):
             build_parser().parse_args(["--agent", "a1"])

@@ -25,6 +25,6 @@ Add up token usage per agent, model or day from ai_agent's usage log - one tool.
 `MCP_USAGE_DIR` in `.env`: the folder holding ai_agent's `YYYY-MM-DD.<agent id>.jsonl` files. Default
 `../legion/.data/usage`, relative to `apps/armory/`. Read-only. The date in the file name picks the files to
 read. A line that is not valid JSON is counted in `skipped_lines`. Tokens only: the log has no prices. This is
-the agents' own log; ember_api's per-account usage and limits are separate.
+the agents' own log; portcullis's per-account usage and limits are separate.
 
 Toggle: `"usage"` in `configs/config_capabilities.json`.

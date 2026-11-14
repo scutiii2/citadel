@@ -2,7 +2,7 @@
 
 A provider's tool loop calls `review()` between announcing a step
 (`step_start`) and running it. What happens depends on the turn's
-`ApprovalPolicy`, which ember_api sets per `ask()` call:
+`ApprovalPolicy`, which portcullis sets per `ask()` call:
 
 * ``off``   - nothing is asked (the default; chat_app never sets a policy).
 * ``ask``   - an ``approval_request`` event goes to the caller, and the tool
@@ -44,7 +44,7 @@ from src.providers.base_provider import ChatCancelled, OnEvent, step_event
 APPROVAL_MODES = ("off", "ask", "deny")
 DECISIONS = ("allow", "always", "deny")
 
-# Under ember_api's 5-minute read timeout on a streaming ask() call, with room to spare.
+# Under portcullis's 5-minute read timeout on a streaming ask() call, with room to spare.
 DECISION_TIMEOUT_SECONDS = 240.0
 POLL_SECONDS = 0.5
 

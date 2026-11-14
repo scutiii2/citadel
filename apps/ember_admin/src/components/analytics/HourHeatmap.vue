@@ -4,7 +4,7 @@ import type { AnalyticsReport } from "../../api/LogsClient";
 import { WEEKDAYS, buildHourHeatmap, type HourCell } from "../../utils/logAnalytics";
 
 /** When entries happen: weekday (rows, Sunday first) by hour (columns), darker
- * for more. UTC, like ember_api's buckets. */
+ * for more. UTC, like portcullis's buckets. */
 const props = defineProps<{ cells: AnalyticsReport["heatmap"] }>();
 
 const rows = computed(() => buildHourHeatmap(props.cells));

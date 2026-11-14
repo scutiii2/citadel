@@ -16,7 +16,7 @@
   "identity": "You write tags for notes.",
   "persona": "",
   "instructions": "You get a note and the tags the user already has. Reply with a JSON array of at most 3 new tags, best first. A tag is one lowercase word or short phrase joined by '-', letters and digits only. A tag names the main topic of the note. Never repeat an existing tag. If the note has no clear topic, reply []. Reply with the array and nothing else.",
-  "focus": "Internal: new tags for a note. Called by ember_api, never delegated to.",
+  "focus": "Internal: new tags for a note. Called by portcullis, never delegated to.",
   "tools": {
     "allow": [],
     "deny": [

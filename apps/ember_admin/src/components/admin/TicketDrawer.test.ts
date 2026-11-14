@@ -47,7 +47,7 @@ describe("TicketDrawer", () => {
     expect(text).toContain("Priority: High");
     expect(text).toContain("Reported by the reporter or a model (unverified)");
     expect(text).toContain("tool_email_sendEmail");
-    expect(text).toContain("Added by ember_api");
+    expect(text).toContain("Added by portcullis");
     expect(text).toContain("Here is the log");
   });
 

@@ -1,4 +1,4 @@
-"""EmberClient: ember_api's REST and event-stream API, as chat_cli uses it.
+"""EmberClient: portcullis's REST and event-stream API, as chat_cli uses it.
 
 Every call is async. The login cookie stays in the client's cookie jar (memory
 only); nothing is written to disk. Errors are turned into `EmberError`s whose
@@ -22,15 +22,15 @@ STREAM_TIMEOUT = httpx.Timeout(10.0, read=None)
 
 
 class EmberError(Exception):
-    """Anything that went wrong talking to ember_api."""
+    """Anything that went wrong talking to portcullis."""
 
 
 class EmberUnreachable(EmberError):
-    """ember_api did not answer (down, wrong address, network)."""
+    """portcullis did not answer (down, wrong address, network)."""
 
 
 class ApiError(EmberError):
-    """ember_api answered with an error status. `detail` is its own message."""
+    """portcullis answered with an error status. `detail` is its own message."""
 
     def __init__(self, status: int, detail: str, retry_after: int | None = None) -> None:
         super().__init__(detail)
@@ -114,7 +114,7 @@ def error_detail(response: httpx.Response) -> str:
         if isinstance(first, dict) and first.get("msg"):
             where = ".".join(str(p) for p in first.get("loc", ())[1:])
             return f"{where}: {first['msg']}" if where else str(first["msg"])
-    return f"ember_api answered {response.status_code}"
+    return f"portcullis answered {response.status_code}"
 
 
 class EmberClient:
@@ -133,7 +133,7 @@ class EmberClient:
         try:
             response = await self._http.request(method, path, json=body)
         except httpx.HTTPError as error:
-            raise EmberUnreachable(f"Cannot reach ember_api at {self._http.base_url}: {error}") from error
+            raise EmberUnreachable(f"Cannot reach portcullis at {self._http.base_url}: {error}") from error
         return self._checked(response, login=login)
 
     @staticmethod
@@ -159,7 +159,7 @@ class EmberClient:
             pass  # leaving anyway; the session expires on its own
 
     async def entry_agent(self) -> Agent:
-        """The agent every question goes to (ember_api picks it; 503 when none is running)."""
+        """The agent every question goes to (portcullis picks it; 503 when none is running)."""
         data = await self._request("GET", "/api/agent")
         return Agent(id=str(data["id"]), label=str(data.get("label", data["id"])))
 
@@ -234,7 +234,7 @@ class EmberClient:
                 if response.status_code == 401:
                     raise SessionExpired(401, "Your session ended")
                 if response.status_code >= 400:
-                    raise EmberUnreachable(f"ember_api answered {response.status_code}")
+                    raise EmberUnreachable(f"portcullis answered {response.status_code}")
                 parser = SseParser()
                 async for text in response.aiter_text():
                     for event in parser.feed(text):
