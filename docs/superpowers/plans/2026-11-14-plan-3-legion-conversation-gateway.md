@@ -1254,3 +1254,12 @@ git commit -m "feat: run ConversationGateway in the Citadel stack" -m "Co-Author
 - Tasks 4 and 5 ran together for the tests. Legion suite: 1445 passed, 0 failed (1436 before; SDK-parametrized cases halved, new tests added).
 - Not run: Task 6 Steps 4 and 5 (first start, token, saved gateways, live chat). They need the user and Docker, which was not running.
 - The stack now refuses to start without `CONVERSATION_GATEWAY_ADMIN_PASSWORD` in the root `.env`.
+
+## Change after execution (2026-11-15): settings in the database
+
+- The gateway address and Legion's access token no longer go in `apps/legion/.env`. Legion keeps them in Treasury (instance `legion`, connection `data`, collection `legion_settings`, record `conversation_gateway`) through `src/runtime/gateway_settings.py`, cached 30 s per agent process.
+- Edited on the new **Connections** page of `legion_admin`, through `GET/PUT /api/admin/gateway-settings` in portcullis (`agents.manage`) and `GET/PUT /agents/gateway-settings` in Legion. The token is write-only.
+- `CONVERSATION_GATEWAY_URL` (set by compose) and `CONVERSATION_GATEWAY_TOKEN` in the environment only fill a value the record lacks, or serve while Treasury cannot be reached.
+- Task 6 Step 4 item 5 changes: put the token on the Connections page, not in `.env`.
+- Still in the root `.env`: `CONVERSATION_GATEWAY_ADMIN_PASSWORD`. ConversationGateway reads it when its container starts.
+- The token is stored unencrypted in Treasury, as it was in `.env`.
