@@ -1,7 +1,7 @@
 """The internal token every Citadel app shares, made once on first run so nobody sets it by hand.
 The first app to start writes a random secret to INTERNAL_TOKEN_FILE (default ~/.citadel/internal_token; in Docker a shared volume); the others read it.
 INTERNAL_API_TOKEN, when set, still wins. INTERNAL_TOKEN_FILE set to empty turns this off (tests, or a deliberately open loopback setup).
-Keep this file identical in armory, legion, treasury and portcullis."""
+Keep this file identical in armory, legion, treasury, portcullis and stronghold."""
 
 from __future__ import annotations
 
