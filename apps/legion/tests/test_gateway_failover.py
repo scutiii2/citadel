@@ -2,7 +2,6 @@
 
 import httpx
 import json
-import anthropic
 import openai
 import pytest
 
@@ -31,7 +30,7 @@ def isolated(monkeypatch):
     failover._cooldown_settings()
 
 
-@pytest.mark.parametrize("sdk", [anthropic, openai])
+@pytest.mark.parametrize("sdk", [openai])
 @pytest.mark.parametrize("status,message,want", [
     (429, "slow", "rate_limit"), (402, "pay", "quota"),
     (400, "INSUFFICIENT credit", "quota"), (429, "Quota used", "quota"),
@@ -44,7 +43,7 @@ def test_classification(sdk, status, message, want):
     assert (result.value if result else None) == want
 
 
-@pytest.mark.parametrize("sdk", [anthropic, openai])
+@pytest.mark.parametrize("sdk", [openai])
 @pytest.mark.parametrize("name", ["APIConnectionError", "APITimeoutError"])
 def test_transport_errors(sdk, name):
     error = getattr(sdk, name)(request=httpx.Request("POST", "https://fake.invalid"))
@@ -54,14 +53,6 @@ def test_transport_errors(sdk, name):
 @pytest.mark.parametrize("error", [ValueError("quota"), TimeoutError(), RuntimeError("overloaded")])
 def test_non_sdk_errors_are_not_retried(error):
     assert failover.classify(error) is None
-
-
-def test_anthropic_sse_json_failure_is_an_upstream_failure():
-    from anthropic._streaming import ServerSentEvent
-
-    with pytest.raises(json.JSONDecodeError) as raised:
-        ServerSentEvent(event="message_start", data="invalid upstream event").json()
-    assert failover.classify(raised.value) == failover.FailureKind.unavailable
 
 
 def test_application_json_failure_is_not_an_upstream_failure():
@@ -75,11 +66,11 @@ def test_route_skips_missing_credentials_and_cooldowns_and_never_flaps():
     route = failover.GatewayRoute.for_turn("anthropic", "primary", ["missing", "backup", "last"],
                                           lambda name: name != "missing")
     assert route.current == "backup"
-    switch = route.advance(sdk_error(anthropic, 429, headers={"retry-after": "17"}))
+    switch = route.advance(gateway_error(429, retry_after=17.0))
     assert (switch.from_gateway, switch.to_gateway, switch.reason) == ("backup", "last", "rate_limit")
     assert 16 < cooldown.seconds_remaining("anthropic:backup") <= 17
     assert route.switches == [switch]
-    assert route.advance(sdk_error(anthropic, 402)) is None
+    assert route.advance(gateway_error(402)) is None
     assert cooldown.is_in_cooldown("anthropic:last")
 
 
@@ -117,7 +108,7 @@ def test_configured_cooldown(monkeypatch):
     assert failover.cooldown_seconds(failover.FailureKind.quota, sdk_error(openai, 402)) == 42
 
 
-@pytest.mark.parametrize("sdk", [anthropic, openai])
+@pytest.mark.parametrize("sdk", [openai])
 def test_overloaded_sse_error_with_http_200_fails_over(sdk):
     error = sdk_error(sdk, 200, "OverLoAdEd")
     assert failover.classify(error) == failover.FailureKind.unavailable
@@ -128,7 +119,7 @@ def test_advance_does_not_read_config_files_on_failure(monkeypatch):
         raise AssertionError("failure handling must use startup-loaded settings")
     monkeypatch.setattr(failover, "read_section", forbidden_read)
     route = failover.GatewayRoute.for_turn("anthropic", "primary", ["backup"], lambda _: True)
-    assert route.advance(sdk_error(anthropic, 500)).to_gateway == "backup"
+    assert route.advance(gateway_error(500)).to_gateway == "backup"
 
 
 from src.providers.gateway_client import GatewayCallError  # noqa: E402

@@ -1,7 +1,5 @@
 {
   "label": "OmniRoute",
-  "base_url": "{OMNIROUTE_BASE_URL}",
-  "api_key": "{OMNIROUTE_API_KEY}",
   "model": "combo/standard",
   "models": {
     "light": {

@@ -15,10 +15,14 @@ The internal Router chooses specialists and model tiers through that arrangement
 
 ## Setup
 
-1. Copy `.env.example` to `.env` and
-   fill in `CLAUDE_API_KEY` and/or `GPT_API_KEY` (whichever provider(s)
-   you're running), or the key(s) for whichever `llm.gateway` your agent
-   files point at instead. Both can be set at once - one file backs every agent.
+1. Copy `.env.example` to `.env`.
+   - **Anthropic-protocol agents** (`llm.provider: "anthropic"`) call their models through
+     ConversationGateway (`AI/ModelProviders/ConversationGateway`, port 29407). Their keys are saved
+     there, not here: on its `/admin/gateways.html` page save a gateway with the same id as the file in
+     `gateways/anthropic/` (`claude`, `openrouter`, ...), create an access token for Legion, and set
+     `CONVERSATION_GATEWAY_TOKEN` (and, outside Docker, `CONVERSATION_GATEWAY_URL`) in `.env`.
+   - **OpenAI-protocol agents** still read their key from `.env` (`GPT_API_KEY`, or the key(s) for
+     whichever `llm.gateway` the agent file points at).
 
 2. Make sure `mcp_server` is running (`py -m src.run` in `apps/armory/`) -
    `apps/legion/configs/config_servers.json` points at its default
@@ -26,6 +30,24 @@ The internal Router chooses specialists and model tiers through that arrangement
 
 3. Start the agents from `apps/legion/`: install the project once with `uv sync`
    (creates `.venv`), then run `uv run python -m src.supervisor`. See Agents below.
+
+### Behavior since the ConversationGateway move (2026-11-14)
+
+Applies to Anthropic-protocol agents. The tool loop, failover, cooldowns and budgets are unchanged.
+
+1. A malformed provider stream is no longer retried once on the same gateway. ConversationGateway
+   reports it as `unavailable`; Legion cools that gateway down and moves to the next one.
+2. The context breakdown is always an estimate: the gateway has no token-count route.
+3. While a round streams, the live token meter counts answer text only, not thinking or
+   tool-argument text. The exact total at the end of each round is unchanged.
+4. A gateway "has credentials" when ConversationGateway has a gateway saved under that id. When the
+   service cannot be asked, Legion assumes it does and lets the call report the outage, so Legion can
+   start before the gateway.
+5. Bedrock and Vertex are configured in ConversationGateway, not through Legion's AWS and Google
+   env vars.
+
+Failover reads the gateway's error `kind` (`rate_limit`, `quota`, `auth`, `unavailable`) and
+`Retry-After`. An error without a kind (the request itself was refused) is never retried.
 
 ### Laya service
 

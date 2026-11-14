@@ -35,6 +35,24 @@ services:
     depends_on: [treasury]
     networks: [core]
 
+  # Shared chat-model gateway (its own repo). Part of this stack, but open to callers
+  # outside Citadel: each one gets its own token on http://<host>:29407/admin/.
+  conversationgateway:
+    build: ${CONVERSATION_GATEWAY_DIR:-../../AI/ModelProviders/ConversationGateway}
+    restart: unless-stopped
+    environment:
+      SERVICE_ADMIN_PASSWORD: ${CONVERSATION_GATEWAY_ADMIN_PASSWORD:?set CONVERSATION_GATEWAY_ADMIN_PASSWORD in the root .env}
+    ports:
+      - "0.0.0.0:29407:29407"
+    volumes:
+      - conversationgateway_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:29407/health')"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+    networks: [core]
+
   legion:
     build: ./apps/legion
     restart: unless-stopped
@@ -46,6 +64,7 @@ services:
       AI_AGENT_HOST: 0.0.0.0
       AI_AGENT_ADVERTISE_URL: http://legion
       MCP_SERVER_URL: http://armory:29600/mcp
+      CONVERSATION_GATEWAY_URL: http://conversationgateway:29407
     # Lets apps/legion/.env reach host-published stacks (LayaModel, OmniRoute) as host.docker.internal.
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -53,7 +72,7 @@ services:
       - ./docker/configs/legion/servers.json:/app/configs/config_servers.json:ro
       - agent_data:/app/.data
       - internal_token:/run/citadel
-    depends_on: [armory]
+    depends_on: [armory, conversationgateway]
     networks: [core]
 
   treasury:
@@ -144,4 +163,5 @@ volumes:
   agent_data:
   treasury_data:
   portcullis_data:
+  conversationgateway_data:
   internal_token:

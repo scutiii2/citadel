@@ -1,25 +1,18 @@
-"""Same-provider routing; only SDK gateway failures may advance a turn."""
+"""Same-provider routing; only gateway failures may advance a turn."""
 
 from __future__ import annotations
 
-import json
-import traceback
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import lru_cache
 from typing import Callable, Iterable
 
-import anthropic
 import openai
 
 from src.runtime import tuning_overrides
 from src.runtime.config_files import TUNING_PATH, read_section
 from src.providers import cooldown
 from src.providers.gateway_client import GatewayCallError
-
-_SDK_ERRORS = (anthropic.APIError, openai.APIError)
-_TRANSPORT_ERRORS = (anthropic.APIConnectionError, openai.APIConnectionError)
-
 
 class FailureKind(StrEnum):
     rate_limit = "rate_limit"
@@ -38,20 +31,13 @@ _KINDS = {kind.value: kind for kind in FailureKind}
 
 
 def classify(error: Exception) -> FailureKind | None:
-    """Inspect SDK origin before status/wording so local failures never retry."""
+    """A gateway failure's kind, or None when the round must not be retried.
+    ConversationGateway classifies its own failures; OpenAI-protocol agents
+    still call the SDK directly until they move to the gateway too."""
     if isinstance(error, GatewayCallError):
-        # The gateway already classified the upstream failure. No kind means
-        # the request itself was refused: never retry that.
+        # No kind means the request itself was refused: never retry that.
         return _KINDS.get(error.kind or "")
-    if isinstance(error, json.JSONDecodeError):
-        # The Messages SDK parses SSE event data before producing message/tool
-        # events. Only this parser's failures represent malformed upstream data.
-        if any(frame.f_globals.get("__name__") == "anthropic._streaming"
-               and frame.f_code.co_name == "json"
-               for frame, _ in traceback.walk_tb(error.__traceback__)):
-            return FailureKind.unavailable
-        return None
-    if not isinstance(error, _SDK_ERRORS):
+    if not isinstance(error, openai.APIError):
         return None
     status = getattr(error, "status_code", None)
     if status == 402:
@@ -60,14 +46,13 @@ def classify(error: Exception) -> FailureKind | None:
         return FailureKind.auth
     if status in (400, 429) and any(word in str(error).lower() for word in _FAILURE_WORDS[FailureKind.quota]):
         return FailureKind.quota
-    if status == 429 or isinstance(error, (anthropic.RateLimitError, openai.RateLimitError)):
+    if status == 429 or isinstance(error, openai.RateLimitError):
         return FailureKind.rate_limit
-    if (isinstance(status, int) and 500 <= status < 600) or isinstance(error, _TRANSPORT_ERRORS):
+    if (isinstance(status, int) and 500 <= status < 600) or isinstance(error, openai.APIConnectionError):
         return FailureKind.unavailable
-    if isinstance(error, (anthropic.AuthenticationError, openai.AuthenticationError,
-                          anthropic.PermissionDeniedError, openai.PermissionDeniedError)):
+    if isinstance(error, (openai.AuthenticationError, openai.PermissionDeniedError)):
         return FailureKind.auth
-    if isinstance(error, (anthropic.InternalServerError, openai.InternalServerError)):
+    if isinstance(error, openai.InternalServerError):
         return FailureKind.unavailable
     # SDK stream errors may retain the successful HTTP 200 status of the
     # connection. A plain bad request remains non-retryable unless quota-related.

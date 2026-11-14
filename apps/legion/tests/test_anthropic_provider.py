@@ -161,21 +161,15 @@ def test_is_available_false_during_cooldown_even_with_key(monkeypatch):
 
 
 def test_rate_limit_error_starts_a_cooldown(monkeypatch):
-    import httpx
-    from anthropic import RateLimitError
+    from src.providers.gateway_client import GatewayCallError
 
     monkeypatch.setenv("CLAUDE_API_KEY", "sk-ant-test")
-    fake_response = httpx.Response(
-        429,
-        headers={"retry-after": "5"},
-        request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"),
-    )
-    error = RateLimitError("rate limited", response=fake_response, body=None)
+    error = GatewayCallError(429, "gateway_rate_limit", "rate limited", kind="rate_limit", retry_after=5.0)
 
     fake_client = SimpleNamespace(messages=SimpleNamespace(stream=Mock(side_effect=error)))
     with patch("src.providers.language.anthropic_provider._get_client", return_value=fake_client), \
          patch("src.providers.language.anthropic_provider.list_tools", return_value=[]):
-        with pytest.raises(RateLimitError):
+        with pytest.raises(GatewayCallError):
             asyncio.run(anthropic_provider.run_chat("hello", []))
 
     assert cooldown.is_in_cooldown("anthropic:claude") is True

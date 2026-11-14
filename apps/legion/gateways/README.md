@@ -22,7 +22,9 @@ wrapper keys. For example, `anthropic/claude.json`:
 }
 ```
 
-Use `{ENV_VAR_NAME}` placeholders for credentials; the actual values belong
+Files in `anthropic/` hold only `label`, `prompt_cache`, `model` and `models`. Their connection and key are saved in ConversationGateway (`AI/ModelProviders/ConversationGateway`, admin page `/admin/gateways.html`) under the same id as the filename. `openai/` files still hold their connection fields until those agents move too.
+
+For `openai/` files, use `{ENV_VAR_NAME}` placeholders for credentials; the actual values belong
 in `../.env`. Files can also specify gateway-specific fields such as
 `base_url`, `auth_token`, `azure_endpoint`, or `aws_region`. An `anthropic`
 gateway that serves Claude models can set `"prompt_cache": true` to cache its system prompt,
