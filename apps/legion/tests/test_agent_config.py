@@ -91,7 +91,10 @@ def test_provider_without_api_key_fails_loudly(monkeypatch):
     monkeypatch.setenv("AI_AGENT_PROVIDER", "anthropic")
 
     from src.agents import agent_config
+    from src.providers import gateway_client
 
+    # An anthropic gateway's key lives in ConversationGateway: "no key" means "not saved there".
+    monkeypatch.setattr(gateway_client, "is_saved", lambda gateway: False)
     with pytest.raises(agent_config.AgentConfigError, match="its API key is not configured"):
         agent_config._resolve()
 
@@ -163,8 +166,9 @@ def test_missing_fallback_credentials_warn_and_route_skips_it(monkeypatch, caplo
         spec = agent_spec.current()
         monkeypatch.setattr(agent_spec, "_current", replace(spec, source=Path("calc.json"), llm=replace(spec.llm,
                             fallback_gateways=(agent_spec.GatewayChoice("unkeyed"), agent_spec.GatewayChoice("backup")))))
-        monkeypatch.setattr(llm_config, "_config", {"anthropic": {
-            "claude": {"api_key": "fake"}, "unkeyed": {}, "backup": {"api_key": "fake"}}})
+        monkeypatch.setattr(llm_config, "_config", {"anthropic": {"claude": {}, "unkeyed": {}, "backup": {}}})
+        from src.providers import gateway_client
+        monkeypatch.setattr(gateway_client, "is_saved", lambda gateway: gateway != "unkeyed")
         agent_config._resolve()
         assert len([r for r in caplog.records if "unkeyed" in r.message]) == 1
         cooldown.start_cooldown("anthropic:claude", 30)

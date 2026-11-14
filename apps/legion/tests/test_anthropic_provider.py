@@ -138,12 +138,18 @@ def test_dispatch_forwards_model_tier_to_delegation():
     fake_delegate.assert_called_once_with("openai-agent", "hi", 1, model_tier="light")
 
 
-def test_has_api_key_reflects_env_var(monkeypatch):
-    monkeypatch.delenv("CLAUDE_API_KEY", raising=False)
-    assert anthropic_provider.has_api_key() is False
-
-    monkeypatch.setenv("CLAUDE_API_KEY", "sk-ant-test")
+def test_has_api_key_means_saved_in_the_gateway(monkeypatch):
+    from src.providers import gateway_client
+    monkeypatch.setattr(gateway_client, "is_saved", lambda gateway: gateway == "claude")
     assert anthropic_provider.has_api_key() is True
+    assert anthropic_provider.has_api_key("claude") is True
+    assert anthropic_provider.has_api_key("openrouter") is False
+
+
+def test_not_available_when_the_gateway_is_not_saved(monkeypatch):
+    from src.providers import gateway_client
+    monkeypatch.setattr(gateway_client, "is_saved", lambda gateway: False)
+    assert anthropic_provider.is_available() is False
 
 
 def test_is_available_false_during_cooldown_even_with_key(monkeypatch):
@@ -406,9 +412,9 @@ def test_empty_answer_recovery_respects_turn_budgets(monkeypatch, limits):
 
 
 def test_run_chat_sends_agent_llm_options_and_retries_without_a_rejected_one(monkeypatch):
-    import anthropic
     from src.agents import agent_spec
     from src.agents.agent_spec import AgentSpec, LlmSpec
+    from src.providers.gateway_client import GatewayCallError
     from src.providers import llm_options
 
     monkeypatch.setenv("CLAUDE_API_KEY", "sk-ant-test")
@@ -417,9 +423,8 @@ def test_run_chat_sends_agent_llm_options_and_retries_without_a_rejected_one(mon
     monkeypatch.setattr(agent_spec, "_current", spec)
     llm_options.reset_cache()
 
-    rejected = anthropic.BadRequestError(
-        "temperature is not supported", response=MagicMock(status_code=400), body=None,
-    )
+    # The gateway reports a provider's 400 as a 422 without a kind.
+    rejected = GatewayCallError(422, "invalid_request", "temperature is not supported")
 
     class _RejectingCM:
         async def __aenter__(self):

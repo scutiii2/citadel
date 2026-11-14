@@ -11,6 +11,9 @@ import pytest
 from src.providers import gateway_client
 from src.providers.gateway_client import ConversationGatewayClient, GatewayCallError
 
+# conftest replaces is_saved for every test; these tests check the real one.
+is_saved = gateway_client.is_saved
+
 DONE = {"type": "done", "content": [{"type": "text", "text": "Hi"}], "stop_reason": "end",
         "usage": {"input_tokens": 3, "output_tokens": 1, "cached_input_tokens": 0, "reasoning_tokens": 0}}
 
@@ -121,7 +124,7 @@ def test_saved_gateway_ids_is_cached(monkeypatch):
 
     monkeypatch.setattr(gateway_client, "_SYNC_TRANSPORT", httpx.MockTransport(handler))
     assert gateway_client.saved_gateway_ids() == frozenset({"claude", "openrouter"})
-    assert gateway_client.is_saved("claude") and not gateway_client.is_saved("bedrock")
+    assert is_saved("claude") and not is_saved("bedrock")
     assert calls == ["/api/gateways"]
 
 
@@ -133,4 +136,4 @@ def test_an_unreachable_service_is_unknown_and_not_cached(monkeypatch):
     assert gateway_client.saved_gateway_ids() is None
     assert gateway_client._ids is None
     # Unknown counts as saved: the call itself reports the outage, and Legion can start first.
-    assert gateway_client.is_saved("claude")
+    assert is_saved("claude")

@@ -31,6 +31,8 @@ _AGENT_FILE.write_text(
 os.environ.setdefault("AI_AGENT_FILE", str(_AGENT_FILE))
 os.environ.setdefault("AI_AGENT_PROVIDER", "anthropic")
 os.environ.setdefault("CLAUDE_API_KEY", "test-key")
+# Tests never reach a real ConversationGateway: nothing listens on the discard port.
+os.environ["CONVERSATION_GATEWAY_URL"] = "http://127.0.0.1:9"
 
 
 import pytest  # noqa: E402
@@ -65,3 +67,11 @@ import tempfile  # noqa: E402
 # server.ask() appends every turn to the usage log; keep test turns out of
 # the real ai_agent/.data/usage/.
 os.environ.setdefault("AI_AGENT_USAGE_DIR", tempfile.mkdtemp(prefix="ai_agent_usage_"))
+
+
+@pytest.fixture(autouse=True)
+def _saved_gateways(monkeypatch):
+    """Every gateway counts as saved in ConversationGateway; tests never call the service."""
+    from src.providers import gateway_client
+
+    monkeypatch.setattr(gateway_client, "is_saved", lambda gateway: True)
