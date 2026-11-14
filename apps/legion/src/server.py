@@ -458,6 +458,28 @@ async def gateway_settings_put(request: Request) -> JSONResponse:
     return JSONResponse(gateway_settings.view(saved))
 
 
+@mcp.custom_route("/agents/decision-gateway-settings", methods=["GET"])
+async def decision_gateway_settings_get(_request: Request) -> JSONResponse:
+    """Where DecisionGateway is and whether a token is set. The token itself is never returned."""
+    return JSONResponse(gateway_settings.view(await gateway_settings.current(gateway_settings.DECISION_KEY)))
+
+
+@mcp.custom_route("/agents/decision-gateway-settings", methods=["PUT"])
+async def decision_gateway_settings_put(request: Request) -> JSONResponse:
+    """Same body and rules as /agents/gateway-settings, for DecisionGateway."""
+    from src.providers.decision import gateway_client as decision_gateway
+
+    changes = await _json_object(request)
+    if changes is None:
+        return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
+    try:
+        saved = await gateway_settings.save(changes, gateway_settings.DECISION_KEY)
+    except gateway_settings.GatewaySettingsError as error:
+        return JSONResponse({"error": str(error)}, status_code=400)
+    decision_gateway.reset_cache()
+    return JSONResponse(gateway_settings.view(saved))
+
+
 @mcp.custom_route("/agents/tuning", methods=["GET"])
 async def tuning_get(_request: Request) -> JSONResponse:
     """The editable tuning values: the file's, the admin's changes, and the two merged."""

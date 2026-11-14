@@ -55,14 +55,13 @@ Failover reads the gateway's error `kind` (`rate_limit`, `quota`, `auth`, `unava
 
 ### Laya service
 
-Laya is gateway `laya` of provider `decision`; Jev is gateway `jev`. Legion
-loads no weights. `src/providers/decision/laya_model.py` is the HTTP connection
-to the separate LayaModel service (`LAYA_SERVICE_URL`, optional `LAYA_TOKEN`).
-Jev calls TypeSafe with `TYPESAFE_API_KEY`.
+Laya is gateway `laya` of provider `decision`; Jev is gateway `jev`. Legion loads no model and holds
+no address or key for either: both are entries saved in DecisionGateway
+(`AI/ModelProviders/DecisionGateway`, port 29406) under those two ids. Set that service's address and
+Legion's token on the Legion admin app's **Connections** page (kept in Treasury, like
+ConversationGateway's). Laya's strategy and window, and Jev's model and key, are set on the
+gateway entry there.
 
-Laya's internal strategy comes from `gateways/decision/laya.json` and is read on
-every call. Edit it without restarting; `english-then-typed` is the default.
-At supervisor startup, a reachable service must offer the configured strategy.
 An unreachable service warns, allowing `both` to fall through to Jev per request.
 Agent strategies are `laya-only`, `jev-only` and `both`; see
 [Decision question agents](#decision-question-agents).
@@ -323,11 +322,10 @@ levels for `score`, or false/true labels for `noul` (yes/no). Requests may overr
 `min_confidence`. The wrapper accepts up to 16,000 characters; Laya's own window
 is 4,000, so longer requests need Jev or return unavailable with `laya-only`.
 
-Laya runs in the separate LayaModel service. Its internal strategy belongs in
-`gateways/decision/laya.json`, defaults to `english-then-typed`, and is read on
-every call: edit the file without restarting. Callers and account settings do
-not choose a Laya service strategy. Jev uses `gateways/decision/jev.json` and
-`TYPESAFE_API_KEY`; cloud requests send text off this machine.
+Laya runs in the separate LayaModel service, reached through DecisionGateway. Its internal
+strategy is set on the `laya` gateway entry there (`english-then-typed` by default). Callers and
+account settings do not choose a Laya service strategy. Jev's model and key are set on the `jev`
+entry; cloud requests send text off this machine.
 
 Answers contain per-question confidences, uncertainty and the gateway that
 answered. Confidence scores are not calibrated accuracy claims. Token usage
@@ -514,8 +512,8 @@ percentages from 0 to 100. Admin Tuning edits strategy and confidence; enable
 flags and tier mappings stay in the file. Router uses its agent's separate
 `decision` policy and does not mutate these helper settings.
 
-Laya and Jev transport/model presets belong in `gateways/decision/`. Jev calls
-TypeSafe's API with `TYPESAFE_API_KEY`; Laya uses the configured local service.
+Laya and Jev connections and model presets are saved in DecisionGateway under the ids `laya`
+and `jev`; `gateways/decision/` keeps only their labels.
 
 ## Usage log
 

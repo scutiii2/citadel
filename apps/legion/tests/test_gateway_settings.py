@@ -81,7 +81,7 @@ def test_an_outage_keeps_the_last_known_values(treasury):
     treasury.doc = {"url": "http://gateway.test:29407", "token": "cg_saved"}
     settings.current_sync()
     treasury.down = True
-    settings._cached_until = 0.0  # the cache has expired
+    settings._cache[settings.KEY] = (settings._cache[settings.KEY][0], 0.0)  # the cache has expired
     assert settings.current_sync().token == "cg_saved"
 
 
@@ -134,3 +134,14 @@ def test_routes_read_and_save_without_showing_the_token(treasury):
     assert treasury.doc == {"url": "http://gateway.test:29407", "token": "cg_new"}
     refused = client.put("/agents/gateway-settings", json={"url": "nope"})
     assert refused.status_code == 400 and "http(s)" in refused.json()["error"]
+
+
+def test_the_decision_gateway_has_its_own_record_and_environment(treasury, monkeypatch):
+    monkeypatch.setenv("DECISION_GATEWAY_URL", "http://decisiongateway:29406")
+    which = settings.DECISION_KEY
+    assert settings.current_sync(which) == settings.GatewaySettings("http://decisiongateway:29406", "")
+    assert str(treasury.requests[0].url).endswith("/records/decision_gateway")
+    saved = asyncio.run(settings.save({"token": "dg_new"}, which))
+    assert saved == settings.GatewaySettings("http://decisiongateway:29406", "dg_new")
+    assert str(treasury.requests[-1].url).endswith("/records/decision_gateway")
+    assert settings._fresh(settings.KEY) is None  # the other service's cache is untouched

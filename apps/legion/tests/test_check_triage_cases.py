@@ -10,7 +10,7 @@ import pytest
 
 from scripts import check_triage_cases as cases
 from src.providers.decision import provider
-from src.providers.decision.gateways.laya import MAX_CHARS
+from src.providers.decision.gateways.saved import LAYA_MAX_CHARS as MAX_CHARS
 
 
 def test_every_case_is_a_valid_request_for_the_fallback_sized_window():

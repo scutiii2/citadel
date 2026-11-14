@@ -188,3 +188,29 @@ def test_gateway_settings_need_agents_manage(client_factory, email: FakeEmailSen
     assert member.get("/api/admin/gateway-settings").status_code == 403
     assert member.put("/api/admin/gateway-settings", json={"token": "x"}).status_code == 403
     assert upstream.requests == []
+
+
+def test_decision_gateway_settings_use_their_own_legion_route(client, upstream: FakeUpstream) -> None:
+    def agent(request: httpx.Request) -> httpx.Response:
+        if request.url.path != "/agents/decision-gateway-settings":
+            return ai_agent(request)
+        return httpx.Response(200, json={"url": "http://decisiongateway:29406", "has_token": request.method == "PUT"})
+
+    upstream.handler = agent
+    as_admin(client)
+    assert client.get("/api/admin/decision-gateway-settings").json() == {
+        "url": "http://decisiongateway:29406", "has_token": False}
+    changed = client.put("/api/admin/decision-gateway-settings", json={"token": "dg_secret"})
+    assert (changed.status_code, changed.json()["has_token"]) == (200, True)
+    assert json.loads(upstream.requests[-1].content) == {"token": "dg_secret"}
+    assert "dg_secret" not in changed.text
+    assert client.put("/api/admin/decision-gateway-settings", json={"password": "x"}).status_code == 422
+
+
+def test_decision_gateway_settings_need_agents_manage(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
+    assert client_factory().get("/api/admin/decision-gateway-settings").status_code == 401
+    member = client_factory()
+    make_member(member, email)
+    login(member, "alice")
+    assert member.put("/api/admin/decision-gateway-settings", json={"token": "x"}).status_code == 403
+    assert upstream.requests == []

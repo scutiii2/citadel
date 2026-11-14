@@ -94,7 +94,7 @@ export interface SharedPrompts {
   overridden: string[];
 }
 
-/** Where Legion reaches ConversationGateway. The token is write-only: only its presence comes back. */
+/** Where Legion reaches ConversationGateway or DecisionGateway. The token is write-only: only its presence comes back. */
 export interface GatewaySettingsView {
   url: string;
   has_token: boolean;
@@ -113,6 +113,9 @@ export const agentsAdminClient = {
   /** Only the fields given are changed; an empty token removes the saved one. */
   setGatewaySettings: (changes: { url?: string; token?: string }) =>
     apiRequest<GatewaySettingsView>("PUT", "/api/admin/gateway-settings", changes),
+  decisionGatewaySettings: () => apiRequest<GatewaySettingsView>("GET", "/api/admin/decision-gateway-settings"),
+  setDecisionGatewaySettings: (changes: { url?: string; token?: string }) =>
+    apiRequest<GatewaySettingsView>("PUT", "/api/admin/decision-gateway-settings", changes),
   prompts: () => apiRequest<SharedPrompts>("GET", "/api/admin/agent-prompts"),
   /** `null` (or blank) resets a text to its default. ai_agent restarts every agent to apply it. */
   setPrompts: (changes: Record<string, string | null>) => apiRequest<SharedPrompts>("PUT", "/api/admin/agent-prompts", changes),

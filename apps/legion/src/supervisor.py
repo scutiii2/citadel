@@ -29,12 +29,9 @@ import time
 from pathlib import Path
 from typing import Awaitable, Callable, Sequence
 
-from dotenv import dotenv_values
 
 from src.agents import agent_registry, agent_spec, prompt_config
 from src.agents.agent_spec import AgentSpec
-from src.providers import llm_config
-from src.providers.decision import laya_model, settings as classifier_settings
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MAX_CRASHES = 5
@@ -350,47 +347,12 @@ class Supervisor:
             await asyncio.to_thread(self._deregister, child.spec.id)
 
 
-def _uses_laya(specs) -> bool:
-    """True when a decision agent, or an enabled auto_tier/auto_route feature, may ask the Laya gateway."""
-    if any(spec.enabled and spec.llm.provider == "decision"
-           and (spec.decision.strategy if spec.role == "router" else spec.llm.strategy) != "jev-only"
-           for spec in specs):
-        return True
-    try:
-        features = classifier_settings.settings()
-    except ValueError:  # an invalid classifier section is reported by the agents that read it
-        return False
-    return any(f.enabled and f.strategy != "jev-only" for f in (features.auto_tier, features.auto_route))
-
-
-def check_laya_strategy(uses_laya: bool) -> None:
-    if not uses_laya:
-        return
-    service = laya_model.agent()
-    if not service.configured:
-        return
-    wanted = str(llm_config.load_gateways().get("decision", {}).get("laya", {}).get("strategy") or "english-then-typed")
-    try:
-        offered = service.strategies()["strategies"]
-    except laya_model.LayaServiceError as error:
-        logging.getLogger(__name__).warning("Laya strategy %r not checked: %s", wanted, error)
-        return
-    if wanted not in offered:
-        raise SystemExit(f"gateways/decision/laya.json: strategy {wanted!r} is not offered by the Laya service (offered: {', '.join(offered)})")
-
-
 def main() -> None:
     try:
         specs = agent_spec.load_dir(agent_spec.AGENTS_DIR)
     except agent_spec.AgentSpecError as error:
         sys.stderr.write(f"\nai_agent cannot start - agent file error:\n  {error}\n\n")
         sys.exit(1)
-    # Match the child's environment precedence without importing agent_config,
-    # which resolves an individual agent's provider at import time.
-    for key, value in dotenv_values(PROJECT_ROOT / ".env").items():
-        if key in {"LAYA_SERVICE_URL", "LAYA_TOKEN"} and value:
-            os.environ.setdefault(key, value)
-    check_laya_strategy(uses_laya=_uses_laya(specs))
     try:
         asyncio.run(Supervisor(specs, watch_dir=agent_spec.AGENTS_DIR, restart_on=[prompt_config.PATH]).run())
     except KeyboardInterrupt:

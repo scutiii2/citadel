@@ -82,9 +82,9 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
 2. **Deploy `LayaModel` separately** (it is its own project and Citadel's compose does not start it). Run
    `docker compose up -d --build` in the `LayaModel` folder (`/media/ZimaOS-HD/Apps/ModelServices/DSC_Laya_Model`), in any order relative
-   to Citadel. It publishes port 29220 on the host and legion reaches it at `http://host.docker.internal:29220`
+   to Citadel. It publishes port 29220 on the host and DecisionGateway reaches it at `http://host.docker.internal:29220`
    (Compose maps that name to the host with `extra_hosts`), so the two stacks share no Docker network. Set
-   `LAYA_SERVICE_URL=http://host.docker.internal:29220` in `apps/legion/.env`; if you change `LAYA_PORT` in `LayaModel`,
+   that address on the `laya` gateway in DecisionGateway (see "DecisionGateway" below); if you change `LAYA_PORT` in `LayaModel`,
    change the port there to match. A container cannot resolve the server's own hostname (`scutiserver1`). See
    `LayaModel/deployment.md` for replicas, port and weights.
 
@@ -107,13 +107,13 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | File | Keys to fill in |
    |---|---|
    | `apps/armory/.env` | Only the capability keys you use: `SMTP_PASSWORD`, `TEAMS_WEBHOOK_URL`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://legion:29611/mcp` to group tickets with the triage agent) |
-   | `apps/legion/.env` | `CLAUDE_API_KEY`, or the keys of the gateway your agents use; `HF_TOKEN` if used; `LAYA_TOKEN` (must equal the one in `LayaModel`'s `.env`) |
+   | `apps/legion/.env` | `HF_TOKEN` if used. Model provider keys, the Laya token and the TypeSafe key are saved in ConversationGateway and DecisionGateway, not here |
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
    | `apps/portcullis/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
 
    - Leave `INTERNAL_API_TOKEN` out of the per-app files. A value there wins over the generated token for that app only, so the apps would stop agreeing.
-   - Skip `MCP_HOST`, `MCP_PORT` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. Set `LAYA_SERVICE_URL`
-     and `OMNIROUTE_BASE_URL` in `apps/legion/.env` to `http://host.docker.internal:<port>`. Do not use `localhost` or
+   - Skip `MCP_HOST`, `MCP_PORT` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. A gateway entry that points at a service
+     published on the host uses `http://host.docker.internal:<port>`. Do not use `localhost` or
      the server's hostname for another service.
    - **Laya settings** (`LAYA_TOKEN`, `LAYA_REPLICAS`, `LAYA_PORT`) belong in `LayaModel`'s own `.env`, not here. Each
      replica loads its own copy of the models in RAM, so keep `LAYA_REPLICAS` low on a small box.
@@ -239,6 +239,18 @@ Legion's Anthropic-protocol and OpenAI-protocol agents call their models through
 - **Outside callers**: the port is published on all interfaces. Give each caller its own token; it connects to `http://<host>:29407` and sends the token as `X-Internal-Token`. There is no TLS in front.
 - **One copy per host**: do not also start the gateway's own `docker-compose.yml` on the same host; port 29407 would clash.
 - Provider keys, gateway entries and tokens live in the `conversationgateway_data` volume. Back it up with the other volumes.
+
+## DecisionGateway
+
+Legion's decision agents and its automatic routing ask Laya and Jev through DecisionGateway. It is a service of this stack, built from its own repo, and other services may use it too.
+
+- **Source**: `AI/ModelProviders/DecisionGateway` beside this workspace. On a server set `DECISION_GATEWAY_DIR` in the root `.env` to where that repo sits.
+- **Admin password**: `DECISION_GATEWAY_ADMIN_PASSWORD` in the root `.env`. The stack refuses to start without it.
+- **First start**: open `http://<host>:29406/admin/`, create an access token for Legion. In the Legion admin app, **Connections**, save the address (`http://decisiongateway:29406` inside Docker) and that token in the DecisionGateway card.
+- **Gateways**: on `/admin/gateways.html` save two entries with exactly these ids. `laya`: kind `scuti`, URL of the Laya model service (`http://host.docker.internal:29220`), its token if it has one, and the strategy and window that used to be in `gateways/decision/laya.json` (`english-then-typed`, `4096`). `jev`: kind `typesafe`, model `jev-latest`, and the TypeSafe API key. Legion treats `laya` as the local gateway and `jev` as the cloud one.
+- **Outside callers**: port 29406 is published on all interfaces. Give each caller its own token. There is no TLS in front.
+- **One copy per host**: do not also start the gateway's own `docker-compose.yml` on the same host.
+- `LAYA_SERVICE_URL`, `LAYA_TOKEN` and `TYPESAFE_API_KEY` in `apps/legion/.env` are no longer read.
 
 ## 3. Server Manager
 

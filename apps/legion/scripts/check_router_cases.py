@@ -1,7 +1,7 @@
 """Router contract smoke cases, or an explicit live classifier comparison.
 
 Offline is the default and uses synthetic predictions: it measures plumbing, not
-model accuracy. --live uses the Laya service (LAYA_SERVICE_URL) and environment credentials;
+model accuracy. --live asks the gateways saved in DecisionGateway;
 it never dispatches specialist work. Run live only in a prepared deployment.
 """
 from __future__ import annotations

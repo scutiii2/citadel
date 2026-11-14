@@ -1,13 +1,14 @@
-"""Where ConversationGateway is and the token Legion calls it with.
+"""Where ConversationGateway and DecisionGateway are, and the token Legion calls each with.
 
 Kept in Treasury (the database gateway), not in .env, so an admin sets them on
 the Legion admin page. Every agent process reads the same record and caches it
 for a short time, so an edit reaches all agents without a restart. The token is
 write-only: `view()` reports only whether one is set.
 
-Environment values (`CONVERSATION_GATEWAY_URL`, which the compose file sets,
-and `CONVERSATION_GATEWAY_TOKEN`) fill in whatever the record does not hold,
-and are all Legion has while Treasury cannot be reached.
+Each service has its own record (`KEY` or `DECISION_KEY`, the `which` argument
+below). Environment values (`CONVERSATION_GATEWAY_URL` / `DECISION_GATEWAY_URL`,
+which the compose file sets, and the matching `..._TOKEN`) fill in whatever the
+record does not hold, and are all Legion has while Treasury cannot be reached.
 """
 
 from __future__ import annotations
@@ -27,6 +28,12 @@ INSTANCE = "legion"
 CONNECTION = "data"
 COLLECTION = "legion_settings"
 KEY = "conversation_gateway"
+DECISION_KEY = "decision_gateway"
+# Record key -> (URL variable, token variable, URL used when nothing is set).
+_SERVICES = {
+    KEY: ("CONVERSATION_GATEWAY_URL", "CONVERSATION_GATEWAY_TOKEN", DEFAULT_URL),
+    DECISION_KEY: ("DECISION_GATEWAY_URL", "DECISION_GATEWAY_TOKEN", "http://127.0.0.1:29406"),
+}
 MAX_TOKEN_LENGTH = 512
 
 _TIMEOUT = httpx.Timeout(3.0)
@@ -37,8 +44,8 @@ _RETRY_SECONDS = 10.0
 _TRANSPORT: httpx.AsyncBaseTransport | None = None
 _SYNC_TRANSPORT: httpx.BaseTransport | None = None
 
-_cached: "GatewaySettings | None" = None
-_cached_until = 0.0
+# Record key -> (settings, monotonic time they stay fresh until).
+_cache: "dict[str, tuple[GatewaySettings, float]]" = {}
 
 
 class GatewaySettingsError(Exception):
@@ -51,9 +58,9 @@ class GatewaySettings:
     token: str
 
 
-def _record_url() -> str:
+def _record_url(which: str = KEY) -> str:
     base = (os.getenv("DB_GATEWAY_URL") or "http://127.0.0.1:29602").rstrip("/")
-    return f"{base}/instances/{INSTANCE}/connections/{CONNECTION}/collections/{COLLECTION}/records/{KEY}"
+    return f"{base}/instances/{INSTANCE}/connections/{CONNECTION}/collections/{COLLECTION}/records/{which}"
 
 
 def _headers() -> dict[str, str]:
@@ -61,11 +68,12 @@ def _headers() -> dict[str, str]:
     return {"X-Internal-Token": token} if token else {}
 
 
-def _from_doc(doc: Any) -> GatewaySettings:
+def _from_doc(doc: Any, which: str = KEY) -> GatewaySettings:
     """The record's values, with the environment filling the gaps."""
     doc = doc if isinstance(doc, dict) else {}
-    url = doc.get("url") or os.getenv("CONVERSATION_GATEWAY_URL") or DEFAULT_URL
-    token = doc.get("token") or os.getenv("CONVERSATION_GATEWAY_TOKEN") or ""
+    url_env, token_env, default_url = _SERVICES[which]
+    url = doc.get("url") or os.getenv(url_env) or default_url
+    token = doc.get("token") or os.getenv(token_env) or ""
     return GatewaySettings(str(url).rstrip("/"), str(token))
 
 
@@ -82,46 +90,45 @@ def _doc(response: httpx.Response) -> dict[str, Any] | None:
     return doc if isinstance(doc, dict) else None
 
 
-async def _read() -> dict[str, Any] | None:
+async def _read(which: str = KEY) -> dict[str, Any] | None:
     try:
         async with httpx.AsyncClient(transport=_TRANSPORT, timeout=_TIMEOUT) as client:
-            return _doc(await client.get(_record_url(), headers=_headers()))
+            return _doc(await client.get(_record_url(which), headers=_headers()))
     except httpx.HTTPError:
         return None
 
 
-def _read_sync() -> dict[str, Any] | None:
+def _read_sync(which: str = KEY) -> dict[str, Any] | None:
     try:
         with httpx.Client(transport=_SYNC_TRANSPORT, timeout=_TIMEOUT) as client:
-            return _doc(client.get(_record_url(), headers=_headers()))
+            return _doc(client.get(_record_url(which), headers=_headers()))
     except httpx.HTTPError:
         return None
 
 
-def _remember(doc: dict[str, Any] | None) -> GatewaySettings:
+def _remember(doc: dict[str, Any] | None, which: str = KEY) -> GatewaySettings:
     """Cache what was read. A failed read keeps the last known values for a short while."""
-    global _cached, _cached_until
     if doc is None:
-        _cached = _cached or _from_doc(None)
-        _cached_until = time.monotonic() + _RETRY_SECONDS
+        known = _cache[which][0] if which in _cache else _from_doc(None, which)
+        _cache[which] = (known, time.monotonic() + _RETRY_SECONDS)
     else:
-        _cached = _from_doc(doc)
-        _cached_until = time.monotonic() + _TTL_SECONDS
-    return _cached
+        _cache[which] = (_from_doc(doc, which), time.monotonic() + _TTL_SECONDS)
+    return _cache[which][0]
 
 
-def _fresh() -> GatewaySettings | None:
-    return _cached if _cached is not None and time.monotonic() < _cached_until else None
+def _fresh(which: str = KEY) -> GatewaySettings | None:
+    cached = _cache.get(which)
+    return cached[0] if cached and time.monotonic() < cached[1] else None
 
 
-async def current() -> GatewaySettings:
+async def current(which: str = KEY) -> GatewaySettings:
     """The settings to use now (async callers: a streamed chat round)."""
-    return _fresh() or _remember(await _read())
+    return _fresh(which) or _remember(await _read(which), which)
 
 
-def current_sync() -> GatewaySettings:
-    """The settings to use now (sync callers: interpret, the saved-gateway check)."""
-    return _fresh() or _remember(_read_sync())
+def current_sync(which: str = KEY) -> GatewaySettings:
+    """The settings to use now (sync callers: interpret, decisions, the saved-gateway check)."""
+    return _fresh(which) or _remember(_read_sync(which), which)
 
 
 def _checked_url(value: Any) -> str:
@@ -140,13 +147,13 @@ def _checked_token(value: Any) -> str:
     return value
 
 
-async def save(changes: dict[str, Any]) -> GatewaySettings:
+async def save(changes: dict[str, Any], which: str = KEY) -> GatewaySettings:
     """Store `changes` ({"url"?, "token"?}). A missing key keeps the stored value; an empty
     token clears it. Nothing is saved when a value is refused or Treasury cannot be reached."""
     unknown = set(changes) - {"url", "token"}
     if unknown:
         raise GatewaySettingsError(f"unknown setting: {', '.join(sorted(unknown))}")
-    stored = await _read()
+    stored = await _read(which)
     if stored is None:
         raise GatewaySettingsError("Treasury is not reachable; the settings were not saved")
     doc = {key: stored[key] for key in ("url", "token") if stored.get(key)}
@@ -156,12 +163,12 @@ async def save(changes: dict[str, Any]) -> GatewaySettings:
         doc["token"] = _checked_token(changes["token"])
     try:
         async with httpx.AsyncClient(transport=_TRANSPORT, timeout=_TIMEOUT) as client:
-            response = await client.put(_record_url(), json={"doc": doc}, headers=_headers())
+            response = await client.put(_record_url(which), json={"doc": doc}, headers=_headers())
     except httpx.HTTPError as error:
         raise GatewaySettingsError("Treasury is not reachable; the settings were not saved") from error
     if response.status_code >= 400:
         raise GatewaySettingsError(f"Treasury refused the settings ({response.status_code})")
-    return _remember(doc)
+    return _remember(doc, which)
 
 
 def view(settings: GatewaySettings) -> dict[str, Any]:
@@ -170,5 +177,4 @@ def view(settings: GatewaySettings) -> dict[str, Any]:
 
 
 def reset_cache() -> None:
-    global _cached, _cached_until
-    _cached, _cached_until = None, 0.0
+    _cache.clear()

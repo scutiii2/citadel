@@ -8,7 +8,7 @@ Spec: `docs/superpowers/specs/2026-11-14-citadel-revision-design.md`. This file 
 | 2 | Stronghold skeleton and Portcullis forwarder | 2 | 1 | `feat/stronghold-skeleton` | Written: `2026-11-14-plan-2-stronghold-skeleton.md` |
 | 3 | Legion on ConversationGateway, Anthropic-protocol agents | 2b | 1 | `refactor/legion-conversation-gateway` | Written: `2026-11-14-plan-3-legion-conversation-gateway.md` |
 | 3b | Legion on ConversationGateway, OpenAI-protocol agents | 2b | 3 | `refactor/legion-openai-gateway` | Written and executed 2026-11-15: `2026-11-15-plan-3b-legion-openai-gateway.md` |
-| 4 | Legion on DecisionGateway | 2b | 3b | `refactor/legion-decision-gateway` | To write after Plan 3 |
+| 4 | Legion on DecisionGateway | 2b | 3b | `refactor/legion-decision-gateway` | Written and executed 2026-11-15: `2026-11-15-plan-4-legion-decision-gateway.md` |
 | 5 | Move product logic to Stronghold, domain by domain | 3 | 2 | `refactor/stronghold-<domain>` per domain | To write after Plan 2, one sub-plan per domain |
 | 6 | Stronghold database schema | 4 | 5 (chats domain) | `feat/stronghold-schema` | To write with the chats sub-plan |
 | 7 | Admin app split | 5 | 5 | `refactor/admin-split` | To write after Plan 5 |

@@ -12,17 +12,16 @@ from src.agents.roles.router.router_contract import DecisionOutcome, RouteReques
 from src.agents.roles.router.router_engine import RouterEngine
 from src.runtime import internal_auth, usage_log
 from src.providers import cancellation
-from src.providers.decision import strategy, laya_model
-from src.providers.decision.gateways.jev import JevGateway
+from src.providers.decision import gateway_client as decision_gateway, strategy
 
 _engine = RouterEngine()
 
 
 def status_summary() -> dict:
     policy = agent_spec.current().decision
-    local_status = "loaded" if laya_model.configured() and laya_model.agent().health() else "unavailable"
+    local_status = "loaded" if decision_gateway.is_reachable("laya") else "unavailable"
     return {**policy.summary(), "local_status": local_status,
-            "fallback_available": "jev" in strategy._ORDER[policy.strategy] and JevGateway().available()}
+            "fallback_available": "jev" in strategy._ORDER[policy.strategy] and decision_gateway.is_usable("jev")}
 
 
 async def route(raw: dict, headers) -> dict:

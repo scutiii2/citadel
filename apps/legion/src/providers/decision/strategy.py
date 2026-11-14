@@ -1,4 +1,4 @@
-"""Runs a decision strategy over the gateway arrangement [laya, jev].
+"""Runs a decision strategy over the gateway arrangement [laya, jev], both saved in DecisionGateway.
 
 laya-only / jev-only ask one gateway. `both` asks laya first and jev only about the questions laya failed
 to settle (error, or confidence below the request's minimum). The agent wrapper picks the strategy; gateways
@@ -39,10 +39,9 @@ class Choice:
 
 
 def default_gateways() -> dict[str, DecisionGateway]:
-    from src.providers.decision.gateways.jev import JevGateway
-    from src.providers.decision.gateways.laya import LayaGateway
+    from src.providers.decision.gateways import saved
 
-    return {"laya": LayaGateway(), "jev": JevGateway()}
+    return {"laya": saved.laya(), "jev": saved.jev()}
 
 
 def _settled(answer: Mapping[str, Any] | None, minimum: float | None) -> bool:

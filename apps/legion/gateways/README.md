@@ -47,18 +47,12 @@ Temporary migration files are also ignored.
 
 The gateway loader and admin catalog cache normal presets for the process
 lifetime. Restart the agent processes and supervisor after editing those files.
-Laya service strategy is the exception: `gateways/decision/laya.json` is read
-on every call, so editing its strategy needs no restart. For rollback, use the previous code with the retained
+For rollback, use the previous code with the retained
 legacy file; copy any subsequent gateway changes back into that file first.
 
 ## decision
 
-Provider folder `decision/` holds `laya.json` and `jev.json`. Laya is the
-local LayaModel service; its `strategy` selects any name offered by the
-service's `GET /v1/strategies` endpoint (default `english-then-typed`), and its
-`window` is the token window sent as `max_len` (default 4096, allowed 16 to 8192;
-the service refuses text that does not fit it with a 413). The service URL is
-configured through `LAYA_SERVICE_URL`.
-
-Jev calls the TypeSafe API; its URL and model are preset in `jev.json`, and
-its credential is resolved from `TYPESAFE_API_KEY`.
+Provider folder `decision/` holds `laya.json` and `jev.json`, each with only a `label`. The two
+ids name entries saved in DecisionGateway (`AI/ModelProviders/DecisionGateway`): `laya` is the
+local Laya model service, `jev` is TypeSafe's cloud API. Address, key, model, strategy and window
+are set there. Agents choose `laya-only`, `jev-only` or `both`; that arrangement stays in Legion.

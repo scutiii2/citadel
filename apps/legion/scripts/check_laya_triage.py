@@ -1,7 +1,7 @@
 """Small real-model smoke evaluation, not an accuracy or calibration benchmark.
 
 Run from ai_agent: python -m scripts.check_laya_triage
-Asks the Laya service only (LAYA_SERVICE_URL); never calls a cloud LLM or changes agent configuration.
+Asks the Laya service only (gateway `laya` in DecisionGateway); never calls a cloud LLM or changes agent configuration.
 Sends the triage example schema below through the same provider path agents use.
 """
 
