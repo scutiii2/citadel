@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
-from src.routes import brains
+from src.routes import brains, stronghold
 from src.services.brain_connections import BrainError
 
 from src.config import Settings
@@ -75,6 +75,7 @@ from src.services.public_rate_limiter import PublicReadLimiter
 from src.services.share_service import purge_expired_shares
 from src.services.server_tools import McpServerTools, ServerTools
 from src.services.session_service import SessionService
+from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 from src.services.traffic import TrafficMiddleware, TrafficRecorder
 from src.services.turns import TurnRegistry
 from src.utils.config_loader import internal_token as load_internal_token, load_env_secrets, service_token
@@ -160,6 +161,9 @@ def create_app(
             else settings.agents_registry_path
         )
         app.state.mcp_proxy = McpProxy(upstream, internal_token or None, recorder)
+        app.state.stronghold = StrongholdForwarder(
+            upstream, settings.stronghold_url, internal_token or None, recorder
+        )
         app.state.memory_purger = MemoryPurger(upstream, settings.mcp_server_url, internal_token or None)
         app.state.memory = MemoryClient(upstream, settings.mcp_server_url, internal_token or None)
         app.state.skills = SkillsClient(upstream, settings.mcp_server_url, internal_token or None)
@@ -251,6 +255,7 @@ def create_app(
     app.include_router(bard.router)
     app.include_router(capability_files.router)
     app.include_router(calendar_routes.router)
+    app.include_router(stronghold.router)
 
     @app.exception_handler(CalendarError)
     async def calendar_error(_request: Request, error: CalendarError):
@@ -274,6 +279,10 @@ def create_app(
         if request.url.path.startswith("/api/brains"):
             return JSONResponse({"detail": "Invalid brain request. Check the fields and limits."}, status_code=422)
         return await request_validation_exception_handler(request, error)
+
+    @app.exception_handler(StrongholdUnavailable)
+    async def stronghold_unavailable(_request: Request, _error: StrongholdUnavailable) -> JSONResponse:
+        return JSONResponse({"detail": "Stronghold is unavailable"}, status_code=502)
 
     @app.exception_handler(DbGatewayError)
     async def storage_unavailable(request: Request, error: DbGatewayError) -> JSONResponse:

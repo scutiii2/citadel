@@ -234,6 +234,8 @@ class Settings:
     # another machine. Wins over agents_registry_path when set.
     agents_registry_url: str | None = None
     mcp_server_url: str = "http://127.0.0.1:29600/mcp"
+    # Stronghold (product logic): reached only from here, never by the browser.
+    stronghold_url: str = "http://127.0.0.1:29650"
     # Bard (text to speech): audio files are streamed from here, never exposed to the browser.
     bard_url: str = "http://127.0.0.1:29400"
     # Scribe (speech to text): attached audio is uploaded here, never exposed to the browser.
@@ -283,6 +285,7 @@ def load_settings() -> Settings:
         agents_registry_path=_project_path(registry_path),
         agents_registry_url=raw.get("agents_registry_url") or None,
         mcp_server_url=raw.get("mcp_server_url") or "http://127.0.0.1:29600/mcp",
+        stronghold_url=raw.get("stronghold_url") or "http://127.0.0.1:29650",
         bard_url=raw.get("bard_url") or "http://127.0.0.1:29400",
         scribe_url=raw.get("scribe_url") or "http://127.0.0.1:29401",
         reader_url=raw.get("reader_url") or "http://127.0.0.1:29402",
