@@ -15,6 +15,7 @@ import openai
 from src.runtime import tuning_overrides
 from src.runtime.config_files import TUNING_PATH, read_section
 from src.providers import cooldown
+from src.providers.gateway_client import GatewayCallError
 
 _SDK_ERRORS = (anthropic.APIError, openai.APIError)
 _TRANSPORT_ERRORS = (anthropic.APIConnectionError, openai.APIConnectionError)
@@ -33,8 +34,15 @@ _FAILURE_WORDS = {
 }
 
 
+_KINDS = {kind.value: kind for kind in FailureKind}
+
+
 def classify(error: Exception) -> FailureKind | None:
     """Inspect SDK origin before status/wording so local failures never retry."""
+    if isinstance(error, GatewayCallError):
+        # The gateway already classified the upstream failure. No kind means
+        # the request itself was refused: never retry that.
+        return _KINDS.get(error.kind or "")
     if isinstance(error, json.JSONDecodeError):
         # The Messages SDK parses SSE event data before producing message/tool
         # events. Only this parser's failures represent malformed upstream data.

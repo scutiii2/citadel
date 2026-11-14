@@ -57,6 +57,9 @@ def extract_retry_after_seconds(error: Exception) -> float | None:
     """Both openai and anthropic's rate-limit errors carry the original
     httpx response, which may include a Retry-After header - prefer the
     server's own answer over guessing a fixed cooldown length."""
+    direct = getattr(error, "retry_after", None)
+    if isinstance(direct, (int, float)) and not isinstance(direct, bool):
+        return float(direct)
     response = getattr(error, "response", None)
     if response is None:
         return None

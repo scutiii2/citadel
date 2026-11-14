@@ -129,3 +129,30 @@ def test_advance_does_not_read_config_files_on_failure(monkeypatch):
     monkeypatch.setattr(failover, "read_section", forbidden_read)
     route = failover.GatewayRoute.for_turn("anthropic", "primary", ["backup"], lambda _: True)
     assert route.advance(sdk_error(anthropic, 500)).to_gateway == "backup"
+
+
+from src.providers.gateway_client import GatewayCallError  # noqa: E402
+
+
+def gateway_error(status, message="failure", retry_after=None):
+    """What ConversationGateway reports for an upstream failure of this status."""
+    kind = {429: "rate_limit", 402: "quota", 401: "auth", 403: "auth", 500: "unavailable"}.get(status)
+    return GatewayCallError(status, "gateway_error", message, kind=kind, retry_after=retry_after)
+
+
+@pytest.mark.parametrize("status,kind", [(429, "rate_limit"), (402, "quota"), (401, "auth"), (500, "unavailable")])
+def test_classify_reads_the_gateway_kind(status, kind):
+    assert failover.classify(gateway_error(status)) == failover.FailureKind(kind)
+
+
+def test_a_gateway_error_without_kind_is_not_retried():
+    assert failover.classify(GatewayCallError(422, "invalid_request", "bad body")) is None
+
+
+def test_an_unknown_gateway_kind_is_not_retried():
+    assert failover.classify(GatewayCallError(500, "x", "y", kind="mystery")) is None
+
+
+def test_rate_limit_cooldown_uses_the_gateway_retry_after():
+    error = gateway_error(429, retry_after=7.0)
+    assert failover.cooldown_seconds(failover.FailureKind.rate_limit, error) == 7.0
