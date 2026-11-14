@@ -124,6 +124,38 @@ class PreviewIn(BaseModel):
     caveman: bool = False
 
 
+class GatewaySettingsIn(BaseModel):
+    """Only the fields sent are changed. An empty token clears the stored one."""
+
+    model_config = {"extra": "forbid"}
+
+    url: str | None = Field(default=None, max_length=300)
+    token: str | None = Field(default=None, max_length=512)
+
+
+@prompts_router.get("/gateway-settings")
+async def get_gateway_settings(
+    account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)
+) -> Any:
+    """Where legion reaches ConversationGateway: `{url, has_token}`."""
+    return await _call(admin.gateway_settings(account))
+
+
+@prompts_router.put("/gateway-settings")
+async def set_gateway_settings(
+    body: GatewaySettingsIn,
+    account: Account = Depends(require_agents_manage),
+    admin: AgentAdmin = Depends(get_agent_admin),
+    logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    """legion validates and stores the change. The log names the fields, never the token."""
+    changes = body.model_dump(exclude_unset=True, exclude_none=True)
+    result = await _call(admin.set_gateway_settings(account, changes))
+    await logs.action(account, "agents.gateway_settings",
+                      f"Changed ConversationGateway settings ({', '.join(sorted(changes)) or 'none'})")
+    return result
+
+
 @prompts_router.get("/agent-prompts")
 async def get_prompts(account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
     """The prompt texts every agent shares: `{values, defaults, overridden}`."""

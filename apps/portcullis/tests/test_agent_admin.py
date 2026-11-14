@@ -151,3 +151,40 @@ def test_role_config_is_forwarded_and_retired_key_refusal_is_preserved(client, u
     response = client.post("/api/admin/agents", json={"id": "calc", "config": {**CONFIG, "orchestrator": True}})
     assert response.status_code == 400
     assert "orchestrator is not a known field" in response.json()["detail"]
+
+
+def gateway_settings_agent(request: httpx.Request) -> httpx.Response:
+    if request.url.path != "/agents/gateway-settings":
+        return ai_agent(request)
+    if request.method == "GET":
+        return httpx.Response(200, json={"url": "http://conversationgateway:29407", "has_token": False})
+    body = json.loads(request.content)
+    if body.get("url") == "nope":
+        return httpx.Response(400, json={"error": "url must be an http(s) address"})
+    return httpx.Response(200, json={"url": body.get("url", "http://conversationgateway:29407"), "has_token": True})
+
+
+def test_gateway_settings_read_change_and_never_echo_the_token(client, upstream: FakeUpstream) -> None:
+    upstream.handler = gateway_settings_agent
+    as_admin(client)
+
+    assert client.get("/api/admin/gateway-settings").json() == {
+        "url": "http://conversationgateway:29407", "has_token": False}
+    changed = client.put("/api/admin/gateway-settings", json={"token": "cg_secret"})
+    assert (changed.status_code, changed.json()["has_token"]) == (200, True)
+    assert json.loads(upstream.requests[-1].content) == {"token": "cg_secret"}
+    assert "cg_secret" not in changed.text
+    refused = client.put("/api/admin/gateway-settings", json={"url": "nope"})
+    assert (refused.status_code, refused.json()["detail"]) == (400, "url must be an http(s) address")
+    assert client.put("/api/admin/gateway-settings", json={"password": "x"}).status_code == 422
+
+
+def test_gateway_settings_need_agents_manage(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
+    upstream.handler = gateway_settings_agent
+    assert client_factory().get("/api/admin/gateway-settings").status_code == 401
+    member = client_factory()
+    make_member(member, email)
+    login(member, "alice")
+    assert member.get("/api/admin/gateway-settings").status_code == 403
+    assert member.put("/api/admin/gateway-settings", json={"token": "x"}).status_code == 403
+    assert upstream.requests == []

@@ -89,6 +89,14 @@ class AgentAdmin:
         providers = body.get("providers") if isinstance(body, dict) else None
         return providers if isinstance(providers, dict) else {}
 
+    async def gateway_settings(self, account: Account) -> dict[str, Any]:
+        """Where legion reaches ConversationGateway: {url, has_token}. The token is never returned."""
+        return await self._request("GET", "/agents/gateway-settings", account)
+
+    async def set_gateway_settings(self, account: Account, changes: dict[str, Any]) -> dict[str, Any]:
+        """Save {"url"?, "token"?} (legion keeps them in the database service); returns the new view."""
+        return await self._request("PUT", "/agents/gateway-settings", account, json=changes)
+
     async def tuning(self, account: Account) -> dict[str, Any]:
         """legion's editable tuning: {defaults, overrides, effective}."""
         return await self._request("GET", "/agents/tuning", account)
