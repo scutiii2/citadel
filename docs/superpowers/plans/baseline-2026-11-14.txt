@@ -1,0 +1,11 @@
+Pre-rename test baseline, 2026-11-14, branch refactor/portcullis-rename (from main 90c57046).
+
+== ember_api     1584 passed, 3 warnings (19 min). Run as `uv run python -m pytest -q`:
+                 `uv run pytest` failed with "uv trampoline failed to canonicalize script path" (stale .venv).
+== armory        1839 passed, 1 skipped
+== legion        1436 passed
+== treasury      52 passed, 13 skipped
+== ember_cli     203 passed. Same stale .venv note as ember_api.
+== ember_admin   57 files, 533 tests passed
+== legion_admin  9 files, 71 tests passed
+== compose       docker compose config --quiet: ok
