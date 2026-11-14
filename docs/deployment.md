@@ -231,7 +231,7 @@ cookie when the request came through a `trusted_proxies` peer with that header. 
 
 ## ConversationGateway
 
-Legion's Anthropic-protocol agents call their models through ConversationGateway. It is a service of this stack, built from its own repo, and other services may use it too.
+Legion's Anthropic-protocol and OpenAI-protocol agents call their models through ConversationGateway. It is a service of this stack, built from its own repo, and other services may use it too.
 
 - **Source**: `AI/ModelProviders/ConversationGateway` beside this workspace. On a server set `CONVERSATION_GATEWAY_DIR` in the root `.env` to where that repo sits.
 - **Admin password**: `CONVERSATION_GATEWAY_ADMIN_PASSWORD` in the root `.env`. The stack refuses to start without it.

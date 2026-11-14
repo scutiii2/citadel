@@ -3,9 +3,8 @@
 import asyncio
 from dataclasses import replace
 from types import SimpleNamespace as NS
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, Mock
 
-import openai
 import pytest
 
 from src.agents import agent_spec
@@ -13,7 +12,7 @@ from src.providers.language import openai_provider as provider
 from src.providers import cooldown, gateway_failover, token_limits
 from src.providers.base_provider import ChatCancelled
 from tests.test_openai_provider import _fake_stream
-from tests.test_gateway_failover import sdk_error
+from tests.test_gateway_failover import gateway_error
 
 
 def response(output=None):
@@ -45,7 +44,7 @@ def clients(monkeypatch, primary_steps, backup_steps):
 @pytest.mark.parametrize("status,reason,seconds", [(429, "rate_limit", 60), (402, "quota", 3600),
                                                   (401, "auth", 3600), (500, "unavailable", 30)])
 def test_stream_switches_and_reports_gateway(monkeypatch, status, reason, seconds):
-    clients(monkeypatch, [sdk_error(openai, status)], [_fake_stream(["answer"], response())])
+    clients(monkeypatch, [gateway_error(status)], [_fake_stream(["answer"], response())])
     events = []
     async def emit(event):
         events.append(event)
@@ -63,7 +62,7 @@ def test_reasoning_stripped_and_completed_tool_runs_once(monkeypatch):
     tool.model_dump = lambda **kwargs: {"type": "function_call", "name": "lookup", "arguments": "{}",
                                        "call_id": "t1", "parsed_arguments": {}}
     reasoning = NS(type="reasoning", model_dump=lambda **kwargs: {"type": "reasoning", "id": "signed", "summary": []})
-    _, backup = clients(monkeypatch, [_fake_stream([], response([reasoning, tool])), sdk_error(openai, 500)],
+    _, backup = clients(monkeypatch, [_fake_stream([], response([reasoning, tool])), gateway_error(500)],
                         [_fake_stream(["done"], response())])
     dispatch = Mock(return_value="saved result")
     monkeypatch.setattr(provider, "_dispatch", dispatch)
@@ -79,7 +78,7 @@ def test_reasoning_stripped_and_completed_tool_runs_once(monkeypatch):
 
 def test_failed_partial_stream_resets_tokens(monkeypatch):
     cm = _fake_stream(["discard"], response())
-    cm.__aenter__.return_value.get_final_response.side_effect = sdk_error(openai, 500)
+    cm.__aenter__.return_value.get_final_response.side_effect = gateway_error(500)
     clients(monkeypatch, [cm], [_fake_stream(["answer"], response())])
     events = []
     async def emit(event):
@@ -90,7 +89,7 @@ def test_failed_partial_stream_resets_tokens(monkeypatch):
     assert reset < next(i for i, event in enumerate(events) if event.get("text") == "answer")
 
 
-@pytest.mark.parametrize("error", [sdk_error(openai, 400), ChatCancelled(), ValueError("credit")])
+@pytest.mark.parametrize("error", [gateway_error(422), ChatCancelled(), ValueError("credit")])
 def test_non_gateway_error_is_unchanged(monkeypatch, error):
     _, backup = clients(monkeypatch, [error], [])
     with pytest.raises(type(error)) as raised:
@@ -101,8 +100,8 @@ def test_non_gateway_error_is_unchanged(monkeypatch, error):
 
 
 def test_all_candidates_fail_with_last_error(monkeypatch):
-    last = sdk_error(openai, 402)
-    clients(monkeypatch, [sdk_error(openai, 500)], [last])
+    last = gateway_error(402)
+    clients(monkeypatch, [gateway_error(500)], [last])
     with pytest.raises(type(last)) as raised:
         asyncio.run(provider.run_chat("hello", []))
     assert raised.value is last
@@ -110,7 +109,7 @@ def test_all_candidates_fail_with_last_error(monkeypatch):
 
 
 def test_interpret_failover(monkeypatch):
-    primary = NS(responses=NS(create=Mock(side_effect=sdk_error(openai, 401))))
+    primary = NS(responses=NS(create=Mock(side_effect=gateway_error(401))))
     backup = NS(responses=NS(create=Mock(return_value=response())))
     monkeypatch.setattr(provider, "_get_sync_client", lambda gateway=None: backup if gateway == "backup" else primary)
     result = provider.run_interpret("hello")
@@ -120,18 +119,15 @@ def test_interpret_failover(monkeypatch):
 def test_clients_cached_per_gateway(monkeypatch):
     cls = provider._OpenAI
     monkeypatch.setattr(cls, "_clients", {}, raising=False)
-    monkeypatch.setattr(cls, "_sync_clients", {}, raising=False)
-    monkeypatch.setattr(provider.llm_config, "gateway", lambda *args: {"api_key": "fake", "base_url": "https://fake.invalid"})
-    monkeypatch.setattr(provider, "AsyncOpenAI", Mock(side_effect=lambda **kwargs: object()))
-    monkeypatch.setattr(provider, "OpenAI", Mock(side_effect=lambda **kwargs: object()))
     for get_client in (cls.get_client, cls.get_sync_client):
         assert get_client() is get_client("gpt")
         assert get_client("backup") is get_client("backup")
         assert get_client("backup") is not get_client()
+    assert cls.get_client() is cls.get_sync_client()
 
 
 def test_backup_context_limit_is_checked_before_retry(monkeypatch):
-    primary, backup = clients(monkeypatch, [sdk_error(openai, 500)], [_fake_stream(["answer"], response())])
+    primary, backup = clients(monkeypatch, [gateway_error(500)], [_fake_stream(["answer"], response())])
     monkeypatch.setattr(token_limits, "_config", {"default": {
         "max_output_tokens": 2048, "max_context_tokens": 100000, "max_tool_rounds": 6},
         "openai": {"gateways": {"backup": {"max_context_tokens": 1}}}})
@@ -140,37 +136,3 @@ def test_backup_context_limit_is_checked_before_retry(monkeypatch):
     assert primary.responses.stream.call_count == 1
     assert backup.responses.stream.call_count == 0
     assert not cooldown.is_in_cooldown("openai:backup")
-
-
-@pytest.mark.parametrize("code,reason", [("server_error", "unavailable"), ("rate_limit_exceeded", "rate_limit")])
-def test_terminal_gateway_failure_event_switches(monkeypatch, code, reason):
-    async def events():
-        yield NS(type="response.failed", response=NS(error=NS(code=code, message="gateway failed")))
-    stream = MagicMock()
-    stream.__aiter__ = lambda self: events()
-    stream.get_final_response = AsyncMock(side_effect=RuntimeError("Didn't receive a response.completed event."))
-    cm = MagicMock()
-    cm.__aenter__ = AsyncMock(return_value=stream)
-    cm.__aexit__ = AsyncMock(return_value=False)
-    clients(monkeypatch, [cm], [_fake_stream(["answer"], response())])
-    result = asyncio.run(provider.run_chat("hello", []))
-    assert (result.response, result.gateway) == ("answer", "backup")
-    assert result.gateway_switches[0]["reason"] == reason
-
-
-def test_non_gateway_terminal_failure_is_not_retried(monkeypatch):
-    async def events():
-        yield NS(type="response.failed", response=NS(error=NS(code="invalid_prompt", message="bad prompt")))
-    stream = MagicMock()
-    stream.__aiter__ = lambda self: events()
-    error = RuntimeError("Didn't receive a response.completed event.")
-    stream.get_final_response = AsyncMock(side_effect=error)
-    cm = MagicMock()
-    cm.__aenter__ = AsyncMock(return_value=stream)
-    cm.__aexit__ = AsyncMock(return_value=False)
-    _, backup = clients(monkeypatch, [cm], [])
-    with pytest.raises(RuntimeError) as raised:
-        asyncio.run(provider.run_chat("hello", []))
-    assert raised.value is error
-    assert backup.responses.stream.call_count == 0
-    assert not cooldown.is_in_cooldown("openai:gpt")

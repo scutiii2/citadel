@@ -25,8 +25,8 @@ The internal Router chooses specialists and model tiers through that arrangement
      must point at Treasury; every agent process picks an edit up within half a minute. The token is
      write-only. `CONVERSATION_GATEWAY_URL` and `CONVERSATION_GATEWAY_TOKEN` in the environment are
      only used for a value the saved record does not hold, or while Treasury cannot be reached.
-   - **OpenAI-protocol agents** still read their key from `.env` (`GPT_API_KEY`, or the key(s) for
-     whichever `llm.gateway` the agent file points at).
+   - **OpenAI-protocol agents** use the same service and the same token. Save a gateway with the
+     same id as the file in `gateways/openai/` (`gpt`, `groq`, `azure`, ...).
 
 2. Make sure `mcp_server` is running (`py -m src.run` in `apps/armory/`) -
    `apps/legion/configs/config_servers.json` points at its default
@@ -37,7 +37,7 @@ The internal Router chooses specialists and model tiers through that arrangement
 
 ### Behavior since the ConversationGateway move (2026-11-14)
 
-Applies to Anthropic-protocol agents. The tool loop, failover, cooldowns and budgets are unchanged.
+Applies to Anthropic-protocol agents, and since 2026-11-15 to OpenAI-protocol agents. The tool loop, failover, cooldowns and budgets are unchanged.
 
 1. A malformed provider stream is no longer retried once on the same gateway. ConversationGateway
    reports it as `unavailable`; Legion cools that gateway down and moves to the next one.

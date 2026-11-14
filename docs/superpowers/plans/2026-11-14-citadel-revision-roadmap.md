@@ -7,7 +7,7 @@ Spec: `docs/superpowers/specs/2026-11-14-citadel-revision-design.md`. This file 
 | 1 | Baseline and Portcullis rename | 0, 1 | none | `refactor/portcullis-rename` | Written: `2026-11-14-plan-1-baseline-and-portcullis-rename.md` |
 | 2 | Stronghold skeleton and Portcullis forwarder | 2 | 1 | `feat/stronghold-skeleton` | Written: `2026-11-14-plan-2-stronghold-skeleton.md` |
 | 3 | Legion on ConversationGateway, Anthropic-protocol agents | 2b | 1 | `refactor/legion-conversation-gateway` | Written: `2026-11-14-plan-3-legion-conversation-gateway.md` |
-| 3b | Legion on ConversationGateway, OpenAI-protocol agents | 2b | 3 | `refactor/legion-conversation-gateway-openai` | To write after Plan 3 (same shim pattern for `openai_provider.py`) |
+| 3b | Legion on ConversationGateway, OpenAI-protocol agents | 2b | 3 | `refactor/legion-openai-gateway` | Written and executed 2026-11-15: `2026-11-15-plan-3b-legion-openai-gateway.md` |
 | 4 | Legion on DecisionGateway | 2b | 3b | `refactor/legion-decision-gateway` | To write after Plan 3 |
 | 5 | Move product logic to Stronghold, domain by domain | 3 | 2 | `refactor/stronghold-<domain>` per domain | To write after Plan 2, one sub-plan per domain |
 | 6 | Stronghold database schema | 4 | 5 (chats domain) | `feat/stronghold-schema` | To write with the chats sub-plan |

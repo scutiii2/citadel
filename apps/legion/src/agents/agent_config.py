@@ -82,7 +82,7 @@ def _resolve() -> tuple[str, Any]:
     if not module.has_api_key():
         raise AgentConfigError(
             f"AI_AGENT_PROVIDER is {provider_id!r} but its API key is not configured in {_SECRETS_PATH}"
-            " (an anthropic gateway must be saved in ConversationGateway under the same id)"
+            " (an anthropic or openai gateway must be saved in ConversationGateway under the same id)"
         )
     spec = agent_spec.current()
     for index, choice in enumerate(spec.llm.fallback_gateways):

@@ -1,34 +1,14 @@
-"""OpenAI Responses API provider - pinned by agent_config.py when
+"""OpenAI-protocol provider - pinned by agent_config.py when
 AI_AGENT_PROVIDER=openai.
 
-Adapted from chat_app/src/services/llm/openai_provider.py - see
-anthropic_provider.py's module docstring for what changed and why.
+Every model call goes through ConversationGateway, which holds the provider
+keys and knows each saved gateway's wire protocol (Responses, Chat
+Completions, Azure). AI_AGENT_GATEWAY names the gateway; an entry with the
+same id must be saved in ConversationGateway. gateways/openai/<gateway>.json
+only keeps what Legion itself needs: the label and the model tiers.
 
-AI_AGENT_GATEWAY picks which client this instance talks through, same
-pattern as anthropic_provider.py: always loaded from
-gateways/openai/<gateway>.json. "gpt" (default)
-is just another block there, except it has no base_url (the OpenAI SDK
-already defaults to api.openai.com) and its api_key points at the plain
-GPT_API_KEY var. "azure" is the one exception requiring a different SDK
-client class (AzureOpenAI - azure_endpoint/api_version/deployment, not a
-base_url swap). Any other value (e.g. "together", "groq", "fireworks",
-"deepinfra", "perplexity", "ollama", "vllm") is a plain OpenAI-compatible
-base_url swap block.
-
-has_api_key() checks the CURRENTLY SELECTED gateway's own required
-secret(s), not a fixed var - a developer running only "groq" with
-GROQ_API_KEY set (and no GPT_API_KEY at all) is correctly seen as
-configured.
-
-Caveat worth knowing: run_chat/run_interpret below call client.responses.
-create - the OpenAI Responses API. Azure OpenAI supports it; most of the
-other gateways (Together, Groq, Fireworks, DeepInfra, Perplexity, Ollama,
-vLLM) only implement the older Chat Completions API
-(client.chat.completions.create), not Responses. Pointing AI_AGENT_GATEWAY
-at one of those will build a client fine but run_chat's actual API calls
-may 404 - swapping the call site to chat.completions is a separate,
-larger change (different message/tool-call shapes) than the client
-wiring here.
+The tool loop below still builds Responses-shaped requests and reads
+Responses-shaped replies; openai_gateway_shim.py translates both ways.
 """
 
 from __future__ import annotations
@@ -36,9 +16,6 @@ from __future__ import annotations
 import json
 import os
 from typing import Any, Sequence
-
-import httpx
-from openai import APIStatusError, AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, BadRequestError, OpenAI
 
 from src.providers.turn_guard import TurnStopped
 from src.agents import agent_routing, agent_spec
@@ -48,7 +25,9 @@ from src.providers.gateway_failover import GatewayRoute, classify
 from src.runtime import approvals, questions
 
 from src.agents.agent_spec import RosterEntry
-from src.providers import cancellation, cooldown, llm_config, llm_options, token_limits
+from src.providers import cancellation, cooldown, gateway_client, llm_config, llm_options, token_limits
+from src.providers.gateway_client import GatewayCallError
+from src.providers.language.openai_gateway_shim import GatewayShim
 from src.agents.agent_roles import SYSTEM_PROMPT, roster_block, system_prompt_for
 from src.providers.context_breakdown import ProviderCounter, breakdown_fields
 from src.runtime.chat_history import validate_history
@@ -73,8 +52,7 @@ class _OpenAI(BaseProvider):
     GATEWAY_ENV = "AI_AGENT_GATEWAY"
     DEFAULT_MODEL_FALLBACK = "gpt-5.6-sol"
 
-    _clients: dict[str, Any] = {}
-    _sync_clients: dict[str, Any] = {}
+    _clients: dict[str, GatewayShim] = {}
 
     @classmethod
     def _gateway_name(cls) -> str:
@@ -82,14 +60,10 @@ class _OpenAI(BaseProvider):
 
     @classmethod
     def has_api_key(cls, gateway: str | None = None) -> bool:
-        gateway_name = gateway or cls._gateway_name()
-        try:
-            cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
-        except KeyError:
-            return False
-        if gateway_name == "azure":
-            return bool(cfg.get("azure_endpoint") and cfg.get("api_key"))
-        return bool(cfg.get("api_key") or cfg.get("auth_token"))
+        """Whether ConversationGateway has this gateway saved. The keys live there,
+        so "saved" is all Legion can know; a bad key shows up as an `auth` failure.
+        True when the service cannot be asked, so Legion can start before it does."""
+        return gateway_client.is_saved(gateway or cls._gateway_name())
 
     @classmethod
     def is_available(cls) -> bool:
@@ -98,50 +72,17 @@ class _OpenAI(BaseProvider):
                    for name in names)
 
     @classmethod
-    def _build_client(cls, gateway: str | None, cache: dict[str, Any], plain: Any, azure: Any) -> Any:
-        """Resolve the gateway and build (once, cached in `cache`) its SDK client from the
-        given classes: the Async* ones for get_client(), the sync ones for get_sync_client()."""
+    def get_client(cls, gateway: str | None = None) -> GatewayShim:
+        """The shim for this gateway, built once."""
         gateway_name = gateway or cls._gateway_name()
-        if gateway_name in cache:
-            return cache[gateway_name]
-
-        if gateway_name == "azure":
-            cfg = llm_config.gateway(PROVIDER_NAME, "azure")
-            if not cfg.get("azure_endpoint") or not cfg.get("api_key"):
-                raise ValueError(
-                    "gateways/openai/azure.json: AZURE_OPENAI_ENDPOINT / "
-                    "AZURE_OPENAI_API_KEY not set in .env"
-                )
-            cache[gateway_name] = azure(
-                azure_endpoint=cfg["azure_endpoint"],
-                api_version=cfg.get("api_version"),
-                api_key=cfg["api_key"],
-            )
-            return cache[gateway_name]
-
-        # Every other block ("gpt" itself, "together", "groq", "ollama",
-        # ...) is a plain OpenAI() build - the gateway file supplies
-        # api_key/base_url, "gpt"'s own block just leaves base_url unset
-        # (SDK default).
-        cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
-        secret = cfg.get("api_key") or cfg.get("auth_token")
-        if not secret:
-            raise ValueError(
-                f"gateways/openai/{gateway_name}.json: its api_key env var is not "
-                "set in .env"
-            )
-        cache[gateway_name] = plain(api_key=secret, base_url=cfg.get("base_url"))
-        return cache[gateway_name]
+        if gateway_name not in cls._clients:
+            cls._clients[gateway_name] = GatewayShim(gateway_name, gateway_client.ConversationGatewayClient())
+        return cls._clients[gateway_name]
 
     @classmethod
-    def get_client(cls, gateway: str | None = None) -> AsyncOpenAI | AsyncAzureOpenAI:
-        return cls._build_client(gateway, cls._clients, AsyncOpenAI, AsyncAzureOpenAI)
-
-    @classmethod
-    def get_sync_client(cls, gateway: str | None = None) -> OpenAI | AzureOpenAI:
-        """Same as get_client(), but the plain synchronous SDK classes, cached separately.
-        Used by run_interpret(), whose client.responses.create(...) calls are never awaited."""
-        return cls._build_client(gateway, cls._sync_clients, OpenAI, AzureOpenAI)
+    def get_sync_client(cls, gateway: str | None = None) -> GatewayShim:
+        """Same object as get_client(): the shim has both the async stream and the sync create."""
+        return cls.get_client(gateway)
 
     @classmethod
     def resolve_default_model(cls) -> str:
@@ -407,22 +348,12 @@ async def run_chat(
                                     # Not shown as the answer, but the model is
                                     # spending tokens: keep the live meter moving.
                                     await meter.chars(len(event.delta))
-                                elif event.type == "response.failed":
-                                    failure = getattr(event.response, "error", None)
-                                    status = {"server_error": 503, "rate_limit_exceeded": 429}.get(
-                                        getattr(failure, "code", None))
-                                    if status is not None:
-                                        # Responses can fail after HTTP 200. Adapt known SDK
-                                        # failure codes to the shared HTTP classifier before
-                                        # get_final_response loses them behind a RuntimeError.
-                                        # These transport objects perform no network I/O.
-                                        response_error = httpx.Response(status, request=httpx.Request(
-                                            "POST", "https://gateway.invalid"))
-                                        raise APIStatusError(failure.message, response=response_error, body=None)
                             response = await stream.get_final_response()
                         break
                     except Exception as error:
-                        if isinstance(error, BadRequestError) and classify(error) is None:
+                        # 422 without a kind: the provider refused the request itself.
+                        # If it names an option we sent, drop that option and repeat the round.
+                        if isinstance(error, GatewayCallError) and error.status == 422 and classify(error) is None:
                             if not text_parts and options.drop_rejected(str(error), model_name):
                                 continue
                         switch = route.advance(error)

@@ -1,6 +1,5 @@
 {
   "label": "GPT",
-  "api_key": "{GPT_API_KEY}",
   "model": "gpt-6.1-sol",
   "models": {
     "light": {

@@ -13,7 +13,6 @@ wrapper keys. For example, `anthropic/claude.json`:
 ```json
 {
   "label": "Claude",
-  "api_key": "{CLAUDE_API_KEY}",
   "model": "claude-sonnet-5",
   "models": {
     "light": {"id": "claude-haiku-4-5", "use_for": "quick tasks"},
@@ -22,11 +21,9 @@ wrapper keys. For example, `anthropic/claude.json`:
 }
 ```
 
-Files in `anthropic/` hold only `label`, `prompt_cache`, `model` and `models`. Their connection and key are saved in ConversationGateway (`AI/ModelProviders/ConversationGateway`, admin page `/admin/gateways.html`) under the same id as the filename. `openai/` files still hold their connection fields until those agents move too.
+Files in `anthropic/` and `openai/` hold only `label`, `prompt_cache`, `model` and `models`. Their connection and key are saved in ConversationGateway (`AI/ModelProviders/ConversationGateway`, admin page `/admin/gateways.html`) under the same id as the filename.
 
-For `openai/` files, use `{ENV_VAR_NAME}` placeholders for credentials; the actual values belong
-in `../.env`. Files can also specify gateway-specific fields such as
-`base_url`, `auth_token`, `azure_endpoint`, or `aws_region`. An `anthropic`
+A model id may be an `{ENV_VAR_NAME}` placeholder (Azure deployment names); the value belongs in `../.env`. An `anthropic`
 gateway that serves Claude models can set `"prompt_cache": true` to cache its system prompt,
 tool list and conversation so far between calls (leave it off for gateways that route to other models). Optional `models`
 defines the `light`, `standard`, `heavy`, and `extreme` tiers. Agent files keep their

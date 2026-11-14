@@ -77,7 +77,6 @@ def _fake_stream(delta_texts, final_response):
 def test_run_interpret_uses_agent_output_cap_or_shared_default(monkeypatch, agent_limit, expected):
     from src.agents.agent_spec import LlmSpec
     from src.providers.llm_options import LlmOptions
-    monkeypatch.setenv("GPT_API_KEY", "sk-test")
     response = SimpleNamespace(output_text="ok", usage=SimpleNamespace(total_tokens=1, input_tokens=1))
     client = SimpleNamespace(responses=SimpleNamespace(create=Mock(return_value=response)))
     with patch("src.providers.language.openai_provider._get_sync_client", return_value=client), \
@@ -90,7 +89,6 @@ def test_run_interpret_uses_agent_output_cap_or_shared_default(monkeypatch, agen
 
 
 def test_run_interpret_rejects_context_before_calling_openai(monkeypatch):
-    monkeypatch.setenv("GPT_API_KEY", "sk-test")
     client = SimpleNamespace(responses=SimpleNamespace(create=Mock()))
     with patch("src.providers.language.openai_provider._get_sync_client", return_value=client), \
          patch("src.providers.language.openai_provider.token_limits.enforce_context_limit", side_effect=token_limits.ContextLimitError("too large")):
@@ -164,16 +162,20 @@ def test_dispatch_forwards_model_tier_to_delegation():
     fake_delegate.assert_called_once_with("openai-agent", "hi", 1, model_tier="light")
 
 
-def test_has_api_key_reflects_env_var(monkeypatch):
-    monkeypatch.delenv("GPT_API_KEY", raising=False)
-    assert openai_provider.has_api_key() is False
-
-    monkeypatch.setenv("GPT_API_KEY", "sk-test")
+def test_has_api_key_means_saved_in_the_gateway(monkeypatch):
+    from src.providers import gateway_client
+    monkeypatch.setattr(gateway_client, "is_saved", lambda gateway: gateway == "gpt")
     assert openai_provider.has_api_key() is True
+    assert openai_provider.has_api_key("groq") is False
+
+
+def test_not_available_when_the_gateway_is_not_saved(monkeypatch):
+    from src.providers import gateway_client
+    monkeypatch.setattr(gateway_client, "is_saved", lambda gateway: False)
+    assert openai_provider.is_available() is False
 
 
 def test_is_available_false_during_cooldown_even_with_key(monkeypatch):
-    monkeypatch.setenv("GPT_API_KEY", "sk-test")
     assert openai_provider.is_available() is True
 
     cooldown.start_cooldown("openai:gpt", seconds=30)
@@ -181,26 +183,12 @@ def test_is_available_false_during_cooldown_even_with_key(monkeypatch):
 
 
 def test_rate_limit_error_starts_a_cooldown(monkeypatch):
-    """NOT executed/verified in every sandbox - requires the openai
-    package installed with network-independent SDK internals. The
-    RateLimitError constructor signature below matches openai>=1.x's
-    documented shape (message, response, body); if the installed version
-    differs, this is the first place to check on a failure."""
-    import httpx
-    from openai import RateLimitError
+    from src.providers.gateway_client import GatewayCallError
 
-    monkeypatch.setenv("GPT_API_KEY", "sk-test")
-    fake_response = httpx.Response(
-        429,
-        headers={"retry-after": "5"},
-        request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
-    )
-    error = RateLimitError("rate limited", response=fake_response, body=None)
-
+    error = GatewayCallError(429, "gateway_rate_limit", "rate limited", kind="rate_limit", retry_after=5.0)
     fake_client = SimpleNamespace(responses=SimpleNamespace(stream=Mock(side_effect=error)))
-    with patch("src.providers.language.openai_provider._get_client", return_value=fake_client), \
-         patch("src.providers.language.openai_provider.list_tools", return_value=[]):
-        with pytest.raises(RateLimitError):
+    with patch("src.providers.language.openai_provider._get_client", return_value=fake_client),          patch("src.providers.language.openai_provider.list_tools", return_value=[]):
+        with pytest.raises(GatewayCallError):
             asyncio.run(openai_provider.run_chat("hello", []))
 
     assert cooldown.is_in_cooldown("openai:gpt") is True
@@ -208,7 +196,6 @@ def test_rate_limit_error_starts_a_cooldown(monkeypatch):
 
 
 def test_run_chat_dispatches_a_delegate_function_call_through_delegation(monkeypatch):
-    monkeypatch.setenv("GPT_API_KEY", "sk-test")
 
     function_call = SimpleNamespace(
         type="function_call", call_id="call-1", name="delegate_to_agent",
@@ -236,7 +223,6 @@ def test_run_chat_dispatches_a_delegate_function_call_through_delegation(monkeyp
 
 
 def test_run_chat_shows_a_failed_delegation_the_same_way_as_a_failed_tool_call(monkeypatch):
-    monkeypatch.setenv("GPT_API_KEY", "sk-test")
 
     function_call = SimpleNamespace(
         type="function_call", call_id="call-1", name="delegate_to_agent",
@@ -261,7 +247,6 @@ def test_run_chat_shows_a_failed_delegation_the_same_way_as_a_failed_tool_call(m
 
 
 def test_run_chat_raises_chat_cancelled_before_any_api_call_when_already_cancelled(monkeypatch):
-    monkeypatch.setenv("GPT_API_KEY", "sk-test")
     cancellation.cancel("req-1")
 
     async def _fail_if_called(**_):
@@ -277,7 +262,6 @@ def test_run_chat_raises_chat_cancelled_before_any_api_call_when_already_cancell
 
 
 def test_run_chat_emits_step_events_around_a_tool_call(monkeypatch):
-    monkeypatch.setenv("GPT_API_KEY", "sk-test")
 
     async def _run():
         events = []
@@ -330,20 +314,17 @@ def test_output_items_are_resent_without_sdk_only_fields():
 
 
 def test_run_chat_sends_agent_llm_options_and_retries_without_a_rejected_one(monkeypatch):
-    import openai
     from src.agents import agent_spec
+    from src.providers.gateway_client import GatewayCallError
     from src.agents.agent_spec import AgentSpec, LlmSpec
     from src.providers import llm_options
 
-    monkeypatch.setenv("GPT_API_KEY", "sk-test")
     spec = AgentSpec(id="calc", label="Calculator", port=9103,
                      llm=LlmSpec(provider="openai", temperature=0.0, max_tokens=321, max_tool_rounds=2))
     monkeypatch.setattr(agent_spec, "_current", spec)
     llm_options.reset_cache()
 
-    rejected = openai.BadRequestError(
-        "temperature is not supported", response=MagicMock(status_code=400), body=None,
-    )
+    rejected = GatewayCallError(422, "provider_rejected", "temperature is not supported")
 
     class _RejectingCM:
         async def __aenter__(self):

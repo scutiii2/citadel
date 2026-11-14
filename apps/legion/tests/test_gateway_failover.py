@@ -1,20 +1,17 @@
-"""Route failures using SDK identity/status, without exposing gateway messages."""
+"""Route failures by the kind ConversationGateway reports, without exposing gateway messages."""
 
 import httpx
 import json
-import openai
 import pytest
 
 from src.providers import cooldown, gateway_failover as failover
+from src.providers.gateway_client import GatewayCallError
 
 
-def sdk_error(sdk, status, message="failure", headers=None):
-    request = httpx.Request("POST", "https://fake.invalid")
-    response = httpx.Response(status, request=request, headers=headers)
-    cls = {400: sdk.BadRequestError, 401: sdk.AuthenticationError,
-           403: sdk.PermissionDeniedError, 429: sdk.RateLimitError,
-           500: sdk.InternalServerError}.get(status, sdk.APIStatusError)
-    return cls(message, response=response, body=None)
+def gateway_error(status, message="failure", retry_after=None):
+    """What ConversationGateway reports for an upstream failure of this status."""
+    kind = {429: "rate_limit", 402: "quota", 401: "auth", 403: "auth", 500: "unavailable"}.get(status)
+    return GatewayCallError(status, "gateway_error", message, kind=kind, retry_after=retry_after)
 
 
 @pytest.fixture(autouse=True)
@@ -30,28 +27,8 @@ def isolated(monkeypatch):
     failover._cooldown_settings()
 
 
-@pytest.mark.parametrize("sdk", [openai])
-@pytest.mark.parametrize("status,message,want", [
-    (429, "slow", "rate_limit"), (402, "pay", "quota"),
-    (400, "INSUFFICIENT credit", "quota"), (429, "Quota used", "quota"),
-    (401, "key", "auth"), (403, "denied", "auth"),
-    (500, "failure", "unavailable"), (529, "overloaded", "unavailable"),
-    (400, "wrong option", None), (404, "missing model", None),
-])
-def test_classification(sdk, status, message, want):
-    result = failover.classify(sdk_error(sdk, status, message))
-    assert (result.value if result else None) == want
-
-
-@pytest.mark.parametrize("sdk", [openai])
-@pytest.mark.parametrize("name", ["APIConnectionError", "APITimeoutError"])
-def test_transport_errors(sdk, name):
-    error = getattr(sdk, name)(request=httpx.Request("POST", "https://fake.invalid"))
-    assert failover.classify(error).value == "unavailable"
-
-
 @pytest.mark.parametrize("error", [ValueError("quota"), TimeoutError(), RuntimeError("overloaded")])
-def test_non_sdk_errors_are_not_retried(error):
+def test_other_errors_are_not_retried(error):
     assert failover.classify(error) is None
 
 
@@ -78,7 +55,7 @@ def test_primary_recovers_on_next_turn(monkeypatch):
     clock = [100.0]
     monkeypatch.setattr(cooldown.time, "monotonic", lambda: clock[0])
     route = failover.GatewayRoute.for_turn("openai", "primary", ["backup"], lambda _: True)
-    route.advance(sdk_error(openai, 500))
+    route.advance(gateway_error(500))
     assert route.current == "backup"
     assert failover.GatewayRoute.for_turn("openai", "primary", ["backup"], lambda _: True).current == "backup"
     clock[0] += 31
@@ -99,19 +76,13 @@ def test_all_cooling_still_tries_primary_and_nonfailure_has_no_effect():
 @pytest.mark.parametrize("kind,seconds", [("rate_limit", 60), ("quota", 3600),
                                           ("auth", 3600), ("unavailable", 30)])
 def test_default_cooldowns(kind, seconds):
-    assert failover.cooldown_seconds(failover.FailureKind(kind), sdk_error(openai, 500)) == seconds
+    assert failover.cooldown_seconds(failover.FailureKind(kind), gateway_error(500)) == seconds
 
 
 def test_configured_cooldown(monkeypatch):
     monkeypatch.setattr(failover, "read_section", lambda *args, **kwargs: {"quota_cooldown_seconds": 42})
     failover._cooldown_settings.cache_clear()
-    assert failover.cooldown_seconds(failover.FailureKind.quota, sdk_error(openai, 402)) == 42
-
-
-@pytest.mark.parametrize("sdk", [openai])
-def test_overloaded_sse_error_with_http_200_fails_over(sdk):
-    error = sdk_error(sdk, 200, "OverLoAdEd")
-    assert failover.classify(error) == failover.FailureKind.unavailable
+    assert failover.cooldown_seconds(failover.FailureKind.quota, gateway_error(402)) == 42
 
 
 def test_advance_does_not_read_config_files_on_failure(monkeypatch):
@@ -120,15 +91,6 @@ def test_advance_does_not_read_config_files_on_failure(monkeypatch):
     monkeypatch.setattr(failover, "read_section", forbidden_read)
     route = failover.GatewayRoute.for_turn("anthropic", "primary", ["backup"], lambda _: True)
     assert route.advance(gateway_error(500)).to_gateway == "backup"
-
-
-from src.providers.gateway_client import GatewayCallError  # noqa: E402
-
-
-def gateway_error(status, message="failure", retry_after=None):
-    """What ConversationGateway reports for an upstream failure of this status."""
-    kind = {429: "rate_limit", 402: "quota", 401: "auth", 403: "auth", 500: "unavailable"}.get(status)
-    return GatewayCallError(status, "gateway_error", message, kind=kind, retry_after=retry_after)
 
 
 @pytest.mark.parametrize("status,kind", [(429, "rate_limit"), (402, "quota"), (401, "auth"), (500, "unavailable")])

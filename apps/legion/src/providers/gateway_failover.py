@@ -7,8 +7,6 @@ from enum import StrEnum
 from functools import lru_cache
 from typing import Callable, Iterable
 
-import openai
-
 from src.runtime import tuning_overrides
 from src.runtime.config_files import TUNING_PATH, read_section
 from src.providers import cooldown
@@ -21,43 +19,16 @@ class FailureKind(StrEnum):
     unavailable = "unavailable"
 
 
-_FAILURE_WORDS = {
-    FailureKind.quota: ("credit", "quota", "billing", "insufficient", "balance", "exceeded your current"),
-    FailureKind.unavailable: ("overloaded",),
-}
-
-
 _KINDS = {kind.value: kind for kind in FailureKind}
 
 
 def classify(error: Exception) -> FailureKind | None:
     """A gateway failure's kind, or None when the round must not be retried.
-    ConversationGateway classifies its own failures; OpenAI-protocol agents
-    still call the SDK directly until they move to the gateway too."""
+    ConversationGateway classifies its own failures; anything else is Legion's
+    own error and never a reason to switch gateway."""
     if isinstance(error, GatewayCallError):
         # No kind means the request itself was refused: never retry that.
         return _KINDS.get(error.kind or "")
-    if not isinstance(error, openai.APIError):
-        return None
-    status = getattr(error, "status_code", None)
-    if status == 402:
-        return FailureKind.quota
-    if status in (401, 403):
-        return FailureKind.auth
-    if status in (400, 429) and any(word in str(error).lower() for word in _FAILURE_WORDS[FailureKind.quota]):
-        return FailureKind.quota
-    if status == 429 or isinstance(error, openai.RateLimitError):
-        return FailureKind.rate_limit
-    if (isinstance(status, int) and 500 <= status < 600) or isinstance(error, openai.APIConnectionError):
-        return FailureKind.unavailable
-    if isinstance(error, (openai.AuthenticationError, openai.PermissionDeniedError)):
-        return FailureKind.auth
-    if isinstance(error, openai.InternalServerError):
-        return FailureKind.unavailable
-    # SDK stream errors may retain the successful HTTP 200 status of the
-    # connection. A plain bad request remains non-retryable unless quota-related.
-    if status != 400 and any(word in str(error).lower() for word in _FAILURE_WORDS[FailureKind.unavailable]):
-        return FailureKind.unavailable
     return None
 
 
