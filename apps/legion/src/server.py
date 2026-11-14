@@ -16,7 +16,8 @@ import os
 import sys
 from uuid import uuid4
 from pathlib import Path
-from src.runtime import config_files, tuning_overrides
+from src.providers import gateway_client
+from src.runtime import config_files, gateway_settings, tuning_overrides
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -434,6 +435,27 @@ async def agent_prompt_preview(request: Request) -> JSONResponse:
 
 def _tuning_overlay() -> Path:
     return config_files.TUNING_PATH.with_name(tuning_overrides.OVERLAY_NAME)
+
+
+@mcp.custom_route("/agents/gateway-settings", methods=["GET"])
+async def gateway_settings_get(_request: Request) -> JSONResponse:
+    """Where ConversationGateway is and whether a token is set. The token itself is never returned."""
+    return JSONResponse(gateway_settings.view(await gateway_settings.current()))
+
+
+@mcp.custom_route("/agents/gateway-settings", methods=["PUT"])
+async def gateway_settings_put(request: Request) -> JSONResponse:
+    """Body: {"url"?, "token"?}; a missing key keeps the stored value, an empty token clears it.
+    Saved in Treasury; other agent processes pick the edit up within half a minute."""
+    changes = await _json_object(request)
+    if changes is None:
+        return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
+    try:
+        saved = await gateway_settings.save(changes)
+    except gateway_settings.GatewaySettingsError as error:
+        return JSONResponse({"error": str(error)}, status_code=400)
+    gateway_client.reset_cache()
+    return JSONResponse(gateway_settings.view(saved))
 
 
 @mcp.custom_route("/agents/tuning", methods=["GET"])

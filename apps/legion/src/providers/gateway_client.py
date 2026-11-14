@@ -10,15 +10,14 @@ turns into a cooldown and a switch.
 from __future__ import annotations
 
 import json
-import os
 import time
 from typing import Any, AsyncIterator
 
 import httpx
 
-from src.runtime import internal_auth
+from src.runtime import gateway_settings, internal_auth
+from src.runtime.gateway_settings import GatewaySettings
 
-DEFAULT_URL = "http://127.0.0.1:29407"
 # No read timeout: a round streams for as long as the model writes. The turn
 # guard and Stop end a slow turn; connect, write and pool still fail fast.
 _STREAM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=10.0)
@@ -45,15 +44,10 @@ class GatewayCallError(Exception):
         self.retry_after = retry_after
 
 
-def base_url() -> str:
-    return (os.getenv("CONVERSATION_GATEWAY_URL") or DEFAULT_URL).rstrip("/")
-
-
-def _headers() -> dict[str, str]:
+def _headers(settings: GatewaySettings) -> dict[str, str]:
     headers = {"X-Requester-Username": internal_auth.current_requester().username or "legion"}
-    token = os.getenv("CONVERSATION_GATEWAY_TOKEN")
-    if token:
-        headers["X-Internal-Token"] = token
+    if settings.token:
+        headers["X-Internal-Token"] = settings.token
     return headers
 
 
@@ -100,12 +94,13 @@ class ConversationGatewayClient:
     async def stream(self, body: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         """The round's NDJSON events in order; the last one is `done`."""
         finished = False
+        settings = await gateway_settings.current()
         try:
             # shortcut: one HTTP client per round, safe across Legion's event loops;
             # pool per loop if connection setup shows up in round latency.
             async with httpx.AsyncClient(transport=self._transport, timeout=_STREAM_TIMEOUT) as client:
                 async with client.stream(
-                    "POST", f"{base_url()}/api/chat", json={**body, "stream": True}, headers=_headers(),
+                    "POST", f"{settings.url}/api/chat", json={**body, "stream": True}, headers=_headers(settings),
                 ) as response:
                     if response.status_code != 200:
                         await response.aread()
@@ -127,9 +122,11 @@ class ConversationGatewayClient:
 
     def chat_sync(self, body: dict[str, Any]) -> dict[str, Any]:
         """One non-streamed reply, for the sync `interpret` path."""
+        settings = gateway_settings.current_sync()
         try:
             with httpx.Client(transport=self._sync_transport, timeout=_SYNC_TIMEOUT) as client:
-                response = client.post(f"{base_url()}/api/chat", json={**body, "stream": False}, headers=_headers())
+                response = client.post(f"{settings.url}/api/chat", json={**body, "stream": False},
+                                       headers=_headers(settings))
         except httpx.HTTPError as error:
             raise _unavailable(f"ConversationGateway is unreachable: {type(error).__name__}") from error
         payload = _json(response.text)
@@ -148,9 +145,10 @@ def saved_gateway_ids() -> frozenset[str] | None:
     global _ids, _ids_until
     if _ids is not None and time.monotonic() < _ids_until:
         return _ids
+    settings = gateway_settings.current_sync()
     try:
         with httpx.Client(transport=_SYNC_TRANSPORT, timeout=_IDS_TIMEOUT) as client:
-            response = client.get(f"{base_url()}/api/gateways", headers=_headers())
+            response = client.get(f"{settings.url}/api/gateways", headers=_headers(settings))
         entries = response.json().get("gateways") if response.status_code == 200 else None
     except (httpx.HTTPError, ValueError, AttributeError):
         entries = None

@@ -75,3 +75,18 @@ def _saved_gateways(monkeypatch):
     from src.providers import gateway_client
 
     monkeypatch.setattr(gateway_client, "is_saved", lambda gateway: True)
+
+
+@pytest.fixture(autouse=True)
+def _no_treasury(monkeypatch):
+    """ConversationGateway's settings come from the environment; tests never call Treasury."""
+    from src.runtime import gateway_settings
+
+    async def no_record():
+        return {}
+
+    monkeypatch.setattr(gateway_settings, "_read", no_record)
+    monkeypatch.setattr(gateway_settings, "_read_sync", lambda: {})
+    gateway_settings.reset_cache()
+    yield
+    gateway_settings.reset_cache()
