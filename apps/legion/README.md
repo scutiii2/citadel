@@ -19,8 +19,12 @@ The internal Router chooses specialists and model tiers through that arrangement
    - **Anthropic-protocol agents** (`llm.provider: "anthropic"`) call their models through
      ConversationGateway (`AI/ModelProviders/ConversationGateway`, port 29407). Their keys are saved
      there, not here: on its `/admin/gateways.html` page save a gateway with the same id as the file in
-     `gateways/anthropic/` (`claude`, `openrouter`, ...), create an access token for Legion, and set
-     `CONVERSATION_GATEWAY_TOKEN` (and, outside Docker, `CONVERSATION_GATEWAY_URL`) in `.env`.
+     `gateways/anthropic/` (`claude`, `openrouter`, ...) and create an access token for Legion. Then
+     set the gateway's address and that token on the Legion admin app's **Connections** page. Legion
+     keeps them in Treasury (instance `legion`, collection `legion_settings`), so `DB_GATEWAY_URL`
+     must point at Treasury; every agent process picks an edit up within half a minute. The token is
+     write-only. `CONVERSATION_GATEWAY_URL` and `CONVERSATION_GATEWAY_TOKEN` in the environment are
+     only used for a value the saved record does not hold, or while Treasury cannot be reached.
    - **OpenAI-protocol agents** still read their key from `.env` (`GPT_API_KEY`, or the key(s) for
      whichever `llm.gateway` the agent file points at).
 

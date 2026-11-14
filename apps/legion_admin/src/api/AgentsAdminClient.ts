@@ -94,6 +94,12 @@ export interface SharedPrompts {
   overridden: string[];
 }
 
+/** Where Legion reaches ConversationGateway. The token is write-only: only its presence comes back. */
+export interface GatewaySettingsView {
+  url: string;
+  has_token: boolean;
+}
+
 /** portcullis's /api/admin/agents (needs agents.manage), which ai_agent validates and applies. */
 export const agentsAdminClient = {
   gateways: async () => (await apiRequest<{ providers: ProviderCatalog }>("GET", "/api/admin/agents/gateways")).providers,
@@ -103,6 +109,10 @@ export const agentsAdminClient = {
   /** Drops this machine's edits so the tracked default file applies again. */
   reset: (id: string) => apiRequest<AgentFile>("POST", `/api/admin/agents/${encodeURIComponent(id)}/reset`),
   remove: (id: string) => apiRequest<void>("DELETE", `/api/admin/agents/${encodeURIComponent(id)}`),
+  gatewaySettings: () => apiRequest<GatewaySettingsView>("GET", "/api/admin/gateway-settings"),
+  /** Only the fields given are changed; an empty token removes the saved one. */
+  setGatewaySettings: (changes: { url?: string; token?: string }) =>
+    apiRequest<GatewaySettingsView>("PUT", "/api/admin/gateway-settings", changes),
   prompts: () => apiRequest<SharedPrompts>("GET", "/api/admin/agent-prompts"),
   /** `null` (or blank) resets a text to its default. ai_agent restarts every agent to apply it. */
   setPrompts: (changes: Record<string, string | null>) => apiRequest<SharedPrompts>("PUT", "/api/admin/agent-prompts", changes),

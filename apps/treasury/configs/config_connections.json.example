@@ -8,6 +8,7 @@
     "default": ["main", "scratch"],
     "reports": ["main"],
     "ember": ["data"],
-    "mcp_server": ["data"]
+    "mcp_server": ["data"],
+    "legion": ["data"]
   }
 }

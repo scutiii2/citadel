@@ -65,6 +65,8 @@ services:
       AI_AGENT_ADVERTISE_URL: http://legion
       MCP_SERVER_URL: http://armory:29600/mcp
       CONVERSATION_GATEWAY_URL: http://conversationgateway:29407
+      # Legion keeps the gateway address and token an admin sets in Treasury.
+      DB_GATEWAY_URL: http://treasury:29602
     # Lets apps/legion/.env reach host-published stacks (LayaModel, OmniRoute) as host.docker.internal.
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -72,7 +74,7 @@ services:
       - ./docker/configs/legion/servers.json:/app/configs/config_servers.json:ro
       - agent_data:/app/.data
       - internal_token:/run/citadel
-    depends_on: [armory, conversationgateway]
+    depends_on: [armory, conversationgateway, treasury]
     networks: [core]
 
   treasury:

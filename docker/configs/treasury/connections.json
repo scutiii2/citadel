@@ -6,6 +6,7 @@
   "instances": {
     "default": ["main"],
     "ember": ["data"],
-    "armory": ["data"]
+    "armory": ["data"],
+    "legion": ["data"]
   }
 }

@@ -235,7 +235,7 @@ Legion's Anthropic-protocol agents call their models through ConversationGateway
 
 - **Source**: `AI/ModelProviders/ConversationGateway` beside this workspace. On a server set `CONVERSATION_GATEWAY_DIR` in the root `.env` to where that repo sits.
 - **Admin password**: `CONVERSATION_GATEWAY_ADMIN_PASSWORD` in the root `.env`. The stack refuses to start without it.
-- **First start**: open `http://<host>:29407/admin/`, create an access token for Legion and put it in `apps/legion/.env` as `CONVERSATION_GATEWAY_TOKEN`. On `/admin/gateways.html` save one gateway per file in `apps/legion/gateways/anthropic/` that your agents use, with the same id as the filename (`claude`, `openrouter`, ...), then restart `legion`.
+- **First start**: open `http://<host>:29407/admin/`, create an access token for Legion. Then open the Legion admin app (`http://<host>:26500`), go to **Connections**, and save the gateway address (`http://conversationgateway:29407` inside Docker) and that token. They are stored in Treasury, not in a `.env` file. On `/admin/gateways.html` save one gateway per file in `apps/legion/gateways/anthropic/` that your agents use, with the same id as the filename (`claude`, `openrouter`, ...). No restart is needed; agents pick the settings up within half a minute.
 - **Outside callers**: the port is published on all interfaces. Give each caller its own token; it connects to `http://<host>:29407` and sends the token as `X-Internal-Token`. There is no TLS in front.
 - **One copy per host**: do not also start the gateway's own `docker-compose.yml` on the same host; port 29407 would clash.
 - Provider keys, gateway entries and tokens live in the `conversationgateway_data` volume. Back it up with the other volumes.
