@@ -1,0 +1,199 @@
+<script setup lang="ts">
+import ListEditorLayout from "../../components/layout/ListEditorLayout.vue";
+import { matchesWords } from "../../utils/search";
+import { shortDate } from "../../utils/time";
+import PageLayout from "../../components/layout/PageLayout.vue";
+import { computed, ref, watch } from "vue";
+import { useUnsavedGuard } from "../../composables/useUnsavedGuard";
+import { MEMORY_MAX, MEMORY_TEXT_MAX, memoryClient, type MemoryNote } from "./api/MemoryClient";
+import ListRow from "../../components/ui/lists/ListRow.vue";
+import SearchField from "../../components/ui/lists/SearchField.vue";
+import StateMessage from "../../components/ui/status/StateMessage.vue";
+import DangerZone from "../../components/ui/status/DangerZone.vue";
+import CharacterCount from "../../components/ui/status/CharacterCount.vue";
+import ConfirmModal from "../../components/ui/dialogs/ConfirmModal.vue";
+import "../../components/layout/infoPage.css";
+import { useDeleteConfirm } from "../../composables/useDeleteConfirm";
+import { useListLoad } from "../../composables/useListLoad";
+import { errorMessage } from "../../utils/errors";
+
+const { items: memories, loading, loadError, load } = useListLoad(() => memoryClient.list());
+const notice = ref("");
+const query = ref("");
+const visible = ref(20);
+const matches = computed(() => memories.value.filter((memory) => matchesWords(query.value, memory.text)));
+const shown = computed(() => matches.value.slice(0, visible.value));
+watch(query, () => { visible.value = 20; }, { flush: "sync" });
+
+const editorOpen = ref(false);
+const editing = ref<MemoryNote | null>(null);
+const text = ref("");
+const formError = ref("");
+const saving = ref(false);
+const dirty = computed(() => editorOpen.value && text.value !== (editing.value?.text ?? ""));
+const canSave = computed(() => dirty.value && text.value.trim() !== "" && text.value.length <= MEMORY_TEXT_MAX && !saving.value && !removing.value && (editing.value !== null || memories.value.length < MEMORY_MAX));
+const guard = useUnsavedGuard({
+  dirty: () => dirty.value,
+  busy: () => saving.value || removing.value,
+  onAsk: () => { discardTarget.value = null; },
+});
+const discardOpen = guard.open;
+type EditorTarget = MemoryNote | "new" | "close";
+const discardTarget = ref<EditorTarget | null>(null);
+
+function showEditor(target: EditorTarget): void {
+  const memory = typeof target === "object" ? target : null;
+  editing.value = memory;
+  text.value = memory?.text ?? "";
+  formError.value = "";
+  notice.value = "";
+  editorOpen.value = target !== "close";
+}
+function go(target: EditorTarget): void {
+  if (saving.value || removing.value) return;
+  if (target === "new" && memories.value.length >= MEMORY_MAX) return;
+  if (editorOpen.value && (target === "new" ? editing.value === null : typeof target === "object" && editing.value?.id === target.id)) return;
+  if (dirty.value) { discardTarget.value = target; discardOpen.value = true; }
+  else showEditor(target);
+}
+function openEditor(memory: MemoryNote | null = null): void {
+  go(memory ?? "new");
+}
+function closeEditor(): void {
+  go("close");
+}
+function answerDiscard(discard: boolean): void {
+  if (discard) showEditor(discardTarget.value ?? "close");
+  discardTarget.value = null;
+  guard.answer(discard);
+}
+
+async function save(): Promise<void> {
+  if (!canSave.value) return;
+  saving.value = true;
+  formError.value = "";
+  try {
+    const note = editing.value
+      ? await memoryClient.update(editing.value.id, text.value, editing.value.text)
+      : await memoryClient.create(text.value);
+    memories.value = [note, ...memories.value.filter((memory) => memory.id !== note.id)];
+    memories.value.sort((a, b) => b.id - a.id);
+    query.value = "";
+    // Keep the saved item visible, including an older memory edited beyond page one.
+    visible.value = Math.max(20, memories.value.findIndex((memory) => memory.id === note.id) + 1);
+    editing.value = note;
+    text.value = note.text;
+    notice.value = "Memory saved.";
+  } catch (error) { formError.value = errorMessage(error); }
+  finally { saving.value = false; }
+}
+
+const { deleting, removing, removeError, ask: askDelete, confirm: remove } = useDeleteConfirm<MemoryNote>(
+  (memory) => memoryClient.remove(memory.id),
+  (memory) => {
+    memories.value = memories.value.filter((m) => m.id !== memory.id);
+    if (editing.value?.id === memory.id) showEditor("close");
+    notice.value = "Memory deleted.";
+  },
+);
+</script>
+
+
+<template>
+  <PageLayout title="Memory" description="Review what Ember remembers about you." class="memory info-content" :class="{ 'memory-open': editorOpen }" wide fill>
+    <template #actions><button type="button" class="primary" :disabled="loading || !!loadError || saving || removing || memories.length >= MEMORY_MAX" @click="openEditor()">Add memory</button></template>
+    <div class="column">
+      <p v-if="notice" class="notice" role="status">{{ notice }}</p>
+      <StateMessage v-if="loading" kind="loading">Loading memories…</StateMessage>
+      <StateMessage v-else-if="loadError" kind="error" @retry="load">Could not load memories: {{ loadError }}</StateMessage>
+      <ListEditorLayout
+        v-else
+        class="layout"
+        :editing="editorOpen"
+        list-label="Memory list"
+        editor-label="Memory editor"
+        back-label="All memories"
+        :busy="saving || removing"
+        :saving="saving"
+        :dirty="dirty"
+        :can-save="canSave"
+        show-saved-state
+        @back="closeEditor"
+        @submit="save"
+      >
+        <template #list>
+          <div class="list-heading"><span>All memories</span><span>{{ memories.length }}/{{ MEMORY_MAX }}</span></div>
+          <SearchField v-model="query" class="memory-search" label="Search memories" placeholder="Search memories…" />
+          <div class="list-scroll">
+            <div class="memory-list" aria-label="Saved memories">
+              <article v-if="editorOpen && !editing" class="draft-row"><ListRow class="memory-row" active :disabled="saving || removing" @click="openEditor()"><span class="memory-text">New memory</span><span class="memory-date">Not saved yet</span></ListRow></article>
+              <article v-for="memory in shown" :key="memory.id">
+                <ListRow class="memory-row" :active="editorOpen && editing?.id === memory.id" :aria-label="'Edit memory ' + memory.id" :aria-describedby="'memory-summary-' + memory.id" :disabled="saving || removing" @click="openEditor(memory)">
+                  <span :id="'memory-summary-' + memory.id" class="memory-text">{{ memory.text }}</span><span class="memory-date">Created <time :datetime="memory.created_at">{{ shortDate(memory.created_at) }}</time></span>
+                </ListRow>
+              </article>
+            </div>
+            <StateMessage v-if="memories.length === 0 && !(editorOpen && !editing)" kind="empty" title="No saved memories yet.">Add a useful fact, preference, or instruction for Ember to remember.</StateMessage>
+            <StateMessage v-else-if="memories.length && matches.length === 0" kind="empty" title="No memories match your search.">Try a different word or clear your search.<template #action><button type="button" class="chip" @click="query = ''">Clear search</button></template></StateMessage>
+            <footer v-if="matches.length" class="pagination"><p>Showing {{ shown.length }} of {{ matches.length }}</p><button v-if="shown.length < matches.length" type="button" class="chip" @click="visible += 20">Load more</button></footer>
+            <p v-if="memories.length >= MEMORY_MAX" class="capacity-note">Memory is full. Delete a memory before adding another.</p>
+          </div>
+          <p class="list-help">One useful fact, preference or instruction per memory.</p>
+        </template>
+        <template #head><span class="context-label"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18V5M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4M17.6 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.6 1.5 4 4 0 0 0-2.8 5.6 4 4 0 0 0 .6 6.9A4 4 0 0 0 12 20a4 4 0 0 0 7.8-1 4 4 0 0 0 .6-6.9 4 4 0 0 0-2.8-5.6" /></svg>Remembered context</span></template>
+        <template #editor>
+            <div class="writing">
+              <label class="body-field" for="memory-text"><span class="memory-label">{{ editing ? 'Memory' : 'New memory' }}</span></label>
+              <textarea id="memory-text" v-model="text" aria-label="Memory" :maxlength="MEMORY_TEXT_MAX" :disabled="saving || removing" placeholder="One useful fact for Ember to remember…" autofocus />
+              <CharacterCount class="memory-count" :length="text.length" :max="MEMORY_TEXT_MAX" suffix=" characters" />
+              <p v-if="editing" class="memory-created">Created <time :datetime="editing.created_at">{{ shortDate(editing.created_at) }}</time></p>
+              <p v-else class="memory-created">Not saved yet</p>
+              <p class="writing-hint">Keep it short and specific. Edit this context when it no longer fits.</p>
+            </div>
+            <details v-if="editing" :key="editing.id" class="manage-memory"><summary>Manage memory <span aria-hidden="true">›</span></summary><DangerZone class="memory-danger"><template #label><b>Danger zone</b></template><button type="button" class="danger" :aria-label="'Delete memory ' + editing.id" :disabled="saving || removing" @click="askDelete(editing)">Delete memory</button></DangerZone></details>
+            <p v-if="formError" class="error form-error" role="alert">{{ formError }}</p>
+        </template>
+        <template #placeholder><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4c-5-5-10 2-6 5-6 2-2 9 2 7-1 6 4 6 4 2V4zm0 0c5-5 10 2 6 5 6 2 2 9-2 7 1 6-4 6-4 2" /></svg><h3>Keep the useful context</h3><p>Pick a memory, or add a new one.</p><button type="button" class="chip" :disabled="memories.length >= MEMORY_MAX" @click="openEditor()">Create a memory</button></template>
+      </ListEditorLayout>
+    </div>
+    <ConfirmModal :open="deleting !== null" title="Delete this memory?" :message="removeError || 'Ember will no longer remember this. This cannot be undone.'" confirm-label="Delete memory" danger :busy="removing" @confirm="remove" @close="!removing && (deleting = null)" />
+    <ConfirmModal :open="discardOpen" title="Discard your changes?" message="This memory has changes you have not saved." confirm-label="Discard" danger @confirm="answerDiscard(true)" @close="answerDiscard(false)" />
+  </PageLayout>
+</template>
+
+<style scoped src="../../components/layout/editorPage.css"></style>
+<style scoped>
+.column { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+
+.memory-search { margin-bottom: 12px; flex-shrink: 0; }
+.list-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.memory-list { display: flex; flex-direction: column; gap: 6px; }
+.memory-text { font-weight: 500; overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.memory-date { color: var(--muted); font-size: .75em; }
+.pagination { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 16px 10px 0; font-size: .75em; color: var(--muted); }
+.pagination p { margin: 0; }
+.capacity-note { font-size: .8em; color: var(--muted); margin: 16px 10px 0; }
+.memory-label { font-size: 1.35em; font-weight: 600; letter-spacing: -.015em; }
+.writing textarea { flex: 1; width: 100%; min-width: 0; min-height: 200px; padding: 0; border: 0; border-radius: 0; color: var(--text); background: transparent; font: inherit; line-height: 1.9; resize: vertical; }
+.memory-created { font-size: .75em; color: var(--muted); margin: 0; }
+.writing-hint { font-size: .8em; color: var(--muted); margin: 0; max-width: 450px; }
+.memory-danger { margin-bottom: 16px; }
+.memory-count { align-self: flex-end; }
+.manage-memory { border-top: 1px solid var(--border); padding: 0 28px; flex-shrink: 0; }
+summary span { color: var(--muted); }
+.form-error { margin: 12px 20px; font-size: .85em; }
+
+@media (max-width: 900px) and (min-width: 768px) { .manage-memory { padding-inline: 20px; } }
+@media (max-width: 767px) {
+  .memory :deep(.page-column) { padding: 18px 16px 12px; }
+  .memory :deep(.page-head) { flex-direction: row; align-items: center; margin-bottom: 16px; gap: 10px; }
+  .memory :deep(.page-title) { margin: 0; }
+  .memory :deep(.page-description) { display: none; }
+  .memory.memory-open :deep(.page-head) { display: none; }
+  .memory :deep(.page-actions button) { min-height: 44px; }
+  button.memory-row { min-height: 100px; }
+  .writing textarea { min-height: 250px; }
+  .memory-label { font-size: 1.3em; }
+  .manage-memory { padding-inline: 20px; }
+}
+</style>

@@ -100,13 +100,23 @@ def get_share_limiter(request: Request) -> PublicReadLimiter:
     return request.app.state.share_limiter
 
 
+def session_token(request: Request, settings: Settings) -> str | None:
+    """The session token: the cookie (browsers) or `Authorization: Bearer` (the Windows app, which is a
+    different origin and cannot hold the SameSite=Strict cookie)."""
+    token = request.cookies.get(settings.session_cookie_name)
+    if token:
+        return token
+    scheme, _, value = request.headers.get("authorization", "").partition(" ")
+    return value.strip() or None if scheme.lower() == "bearer" else None
+
+
 async def current_account(
     request: Request,
     settings: Settings = Depends(get_settings),
     sessions: SessionService = Depends(get_session_service),
 ) -> Account:
     """The logged-in account, or 401."""
-    token = request.cookies.get(settings.session_cookie_name)
+    token = session_token(request, settings)
     account = await sessions.resolve(token) if token else None
     if account is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not logged in")

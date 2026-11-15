@@ -22,6 +22,7 @@ from src.deps import (
     get_otp_service,
     get_session_service,
     get_settings,
+    session_token,
 )
 from src.models import Account
 from src.security import client_ip
@@ -161,7 +162,7 @@ async def change_password(
     except AccountChangeError as error:
         raise _http_error(error) from error
     # current_account already proved the cookie is there and valid.
-    await sessions.revoke_others(account.id, request.cookies[settings.session_cookie_name])
+    await sessions.revoke_others(account.id, session_token(request, settings))
     await logs.action(account, "account.password", "Changed password; other sessions logged out")
     return AccountOut.of(account, settings)
 

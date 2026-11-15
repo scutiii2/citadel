@@ -144,3 +144,61 @@ def test_restart_updates_known_permission_descriptions_and_creates_missing_rows(
             return permission.description
 
     assert restarted.portal.call(retired_description) == "Leave this description alone"
+
+
+DESKTOP = "tauri://localhost"
+
+
+def test_desktop_login_returns_a_token_that_works_as_a_bearer(client: TestClient) -> None:
+    response = client.post(
+        "/api/auth/login",
+        json={"username": ADMIN_USERNAME, "password": ADMIN_PASSWORD},
+        headers={"X-Ember-Client": "desktop"},
+    )
+    token = response.json()["session_token"]
+    client.cookies.clear()
+
+    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert me.status_code == 200 and me.json()["username"] == ADMIN_USERNAME
+    assert "session_token" not in me.json()
+
+
+def test_browser_login_never_returns_the_token(client: TestClient) -> None:
+    assert "session_token" not in login(client).json()
+
+
+def test_a_bad_bearer_is_401(client: TestClient) -> None:
+    assert client.get("/api/auth/me", headers={"Authorization": "Bearer nope"}).status_code == 401
+
+
+def test_logout_with_a_bearer_ends_the_session(client: TestClient) -> None:
+    token = client.post(
+        "/api/auth/login",
+        json={"username": ADMIN_USERNAME, "password": ADMIN_PASSWORD},
+        headers={"X-Ember-Client": "desktop"},
+    ).json()["session_token"]
+    client.cookies.clear()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    assert client.post("/api/auth/logout", json={}, headers=headers).status_code == 204
+    assert client.get("/api/auth/me", headers=headers).status_code == 401
+
+
+def test_cors_allows_the_desktop_origin_without_credentials(client: TestClient) -> None:
+    preflight = client.options(
+        "/api/auth/me",
+        headers={"Origin": DESKTOP, "Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "authorization"},
+    )
+
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] == DESKTOP
+    assert "access-control-allow-credentials" not in preflight.headers
+
+
+def test_cors_refuses_other_origins(client: TestClient) -> None:
+    preflight = client.options(
+        "/api/auth/me", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "GET"}
+    )
+
+    assert "access-control-allow-origin" not in preflight.headers

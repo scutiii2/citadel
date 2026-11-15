@@ -18,6 +18,8 @@ from src.routes import brains, stronghold
 from src.config import Settings
 from src.db import Database
 from src.body_limit import BodyLimitMiddleware
+from starlette.middleware.cors import CORSMiddleware
+
 from src.json_only import JsonOnlyMiddleware
 from src.security import SecurityMiddleware
 from src.routes import (
@@ -197,6 +199,14 @@ def create_app(
 
     app = FastAPI(title="portcullis", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(JsonOnlyMiddleware)
+    # The Windows app calls from its own origin with a bearer token. No credentials (cookies) are allowed.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(settings.desktop_origins),
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Ember-Client", "Mcp-Session-Id", "Mcp-Protocol-Version", "Last-Event-ID", "Accept"],
+        expose_headers=["Mcp-Session-Id", "Retry-After"],
+    )
     # Largest legitimate body: a chat-history import of several 2 MB chats.
     app.add_middleware(
         BodyLimitMiddleware,

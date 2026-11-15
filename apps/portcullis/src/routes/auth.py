@@ -17,6 +17,7 @@ from src.deps import (
     get_otp_service,
     get_session_service,
     get_settings,
+    session_token,
 )
 from src.models import Account
 from src.security import client_ip, request_is_https
@@ -77,6 +78,12 @@ class AccountOut(BaseModel):
         )
 
 
+class DesktopLoginOut(AccountOut):
+    """Login answer for the Windows app (header X-Ember-Client: desktop): the session token it sends as a bearer."""
+
+    session_token: str
+
+
 class RegisterOut(BaseModel):
     account: AccountOut
     # False when SMTP failed; the account exists anyway and resend can retry.
@@ -90,7 +97,7 @@ class EmailSentOut(BaseModel):
 
 async def _start_session(
     request: Request, response: Response, account: Account, sessions: SessionService, settings: Settings
-) -> None:
+) -> str:
     token = await sessions.create(account)
     response.set_cookie(
         settings.session_cookie_name,
@@ -101,6 +108,7 @@ async def _start_session(
         secure=settings.cookie_secure or request_is_https(request),
         path="/",
     )
+    return token
 
 
 async def send_verification_code(account: Account, otp: OtpService, email: EmailSender) -> str | None:
@@ -129,7 +137,7 @@ def _minutes(seconds: int) -> str:
     return "1 minute" if minutes == 1 else f"{minutes} minutes"
 
 
-@router.post("/login")
+@router.post("/login", response_model=AccountOut | DesktopLoginOut, response_model_exclude_none=True)
 async def login(
     body: LoginRequest,
     request: Request,
@@ -138,7 +146,7 @@ async def login(
     sessions: SessionService = Depends(get_session_service),
     settings: Settings = Depends(get_settings),
     logs: LogWriter = Depends(get_log_writer),
-) -> AccountOut:
+) -> AccountOut | DesktopLoginOut:
     auth = AuthService(db)
     ip_address = client_ip(request)
     # Before the password check: a locked-out caller gets no answer about
@@ -160,7 +168,7 @@ async def login(
         # One message for every failure reason, so usernames can't be probed.
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid username or password")
 
-    await _start_session(request, response, account, sessions, settings)
+    token = await _start_session(request, response, account, sessions, settings)
     await logs.action(account, "auth.login", f"Logged in from {ip_address}")
     if settings.security.fingerprint_enabled:
         device = device_signals(request)
@@ -169,7 +177,10 @@ async def login(
             await logs.action(
                 account, "auth.new_device", f"First login from this device: {describe(device.user_agent)}, {device.subnet}"
             )
-    return AccountOut.of(account, settings)
+    out = AccountOut.of(account, settings)
+    if request.headers.get("x-ember-client") == "desktop":
+        return DesktopLoginOut(**out.model_dump(), session_token=token)
+    return out
 
 
 def device_signals(request: Request) -> DeviceSignals:
@@ -189,7 +200,7 @@ async def logout(
     logs: LogWriter = Depends(get_log_writer),
 ) -> None:
     """Always succeeds: logging out while already logged out is a no-op."""
-    token = request.cookies.get(settings.session_cookie_name)
+    token = session_token(request, settings)
     if token:
         account = await sessions.resolve(token)
         await sessions.revoke(token)

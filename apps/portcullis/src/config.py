@@ -184,6 +184,8 @@ class Settings:
     cookie_secure: bool
     env_path: Path
     default_role: str = "Member"
+    # Origins of the Ember Windows app (Tauri). They may call the API with a bearer token; cookies are never allowed cross-origin.
+    desktop_origins: tuple[str, ...] = ("tauri://localhost", "http://tauri.localhost", "https://tauri.localhost")
     # False: an account works without verifying its email, and registration
     # sends no code. Verifying stays available (resend, the verify page).
     require_email_verification: bool = True
@@ -236,6 +238,7 @@ def load_settings() -> Settings:
         cookie_secure=bool(raw.get("cookie_secure", False)),
         env_path=ENV_PATH,
         default_role=raw.get("default_role") or "Member",
+        desktop_origins=tuple(raw.get("desktop_origins", ("tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"))),
         require_email_verification=bool(raw.get("require_email_verification", True)),
         agents_registry_path=_project_path(registry_path),
         agents_registry_url=raw.get("agents_registry_url") or None,
