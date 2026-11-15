@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 
+import logging
 import os
 
 import httpx
@@ -28,7 +29,7 @@ from src.chats.store import ChatStore
 from src.calendar.runtime import build_calendar_runtime
 from src.calendar.store import CalendarError
 from src.config import Settings, load_settings
-from src.document_store import DbGatewayClient, DbGatewayUnavailable, DocumentStore
+from src.document_store import DbGatewayClient, DbGatewayError, DbGatewayUnavailable, DocumentStore
 from src import log_privacy
 from src.keys import load_keys
 from src.memory import routes as memory_routes
@@ -36,6 +37,8 @@ from src.memory.client import MemoryClient
 from src.notes import routes as notes_routes
 from src.platform import PortcullisClient
 from src.requester import Requester, current_requester
+from src.schema import migrations
+from src.schema import routes as schema_routes
 from src.secret_box import SecretBox
 from src.skills import routes as skills_routes
 from src.skills.client import SkillsClient
@@ -114,6 +117,12 @@ def create_app(
                                    keys=keys, platform=app.state.platform)
             if settings.calendar.enabled else None
         )
+        app.state.schema_version = None
+        try:
+            app.state.schema_version = (await migrations.migrate(app.state.store))["version"]
+        except (DbGatewayError, migrations.SchemaTooNew) as error:
+            # Storage down: Stronghold still starts (a feature fails alone). Data newer than this code: leave it alone.
+            logging.getLogger(__name__).error("schema migration not run: %s", error)
         try:
             yield
         finally:
@@ -135,6 +144,7 @@ def create_app(
     app.include_router(skills_routes.router)
     app.include_router(templates_routes.router)
     app.include_router(usage_routes.router)
+    app.include_router(schema_routes.router)
     app.include_router(shares_routes.router)
     app.include_router(tickets_routes.router)
     app.include_router(tickets_routes.admin_router)

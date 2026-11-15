@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from src.calendar.settings import utcnow
+from src.schema.models import ChatDoc, ChatFolderDoc, ChatMessagesDoc, checked
 from src.document_store import DocumentStore
 from src.shares.store import ShareStore
 
@@ -173,9 +174,9 @@ class ChatStore:
 
     async def _save(self, doc: dict[str, Any], messages: list[ChatMessage] | None = None) -> None:
         if messages is not None:
-            await self._store.put(MESSAGES, doc["key"], {"key": doc["key"], "owner": doc["owner"],
-                                                         "chat_id": doc["chat_id"], "messages": messages})
-        await self._store.put(CHATS, doc["key"], doc)
+            await self._store.put(MESSAGES, doc["key"], checked(ChatMessagesDoc, {
+                "key": doc["key"], "owner": doc["owner"], "chat_id": doc["chat_id"], "messages": messages}))
+        await self._store.put(CHATS, doc["key"], checked(ChatDoc, doc))
 
     async def replace_messages(self, owner: str, chat_id: str, messages: list[ChatMessage],
                                agent_id: str | None = None) -> dict[str, Any]:
@@ -313,20 +314,20 @@ class ChatStore:
             folder_id = secrets.randbelow(2**31 - 1) + 1
         doc = {"key": _key(owner, folder_id), "owner": owner, "id": folder_id, "name": name,
                "position": max((d["position"] for d in existing), default=-1) + 1, "created_at": _now()}
-        await self._store.put(FOLDERS, doc["key"], doc)
+        await self._store.put(FOLDERS, doc["key"], checked(ChatFolderDoc, doc))
         return {"id": folder_id, "name": name, "position": doc["position"], "chat_count": 0}
 
     async def rename_folder(self, owner: str, folder_id: int, name: str) -> dict[str, Any]:
         doc = await self._folder(owner, folder_id)
         await self._name_free(owner, name, folder_id)
         doc["name"] = name
-        await self._store.put(FOLDERS, doc["key"], doc)
+        await self._store.put(FOLDERS, doc["key"], checked(ChatFolderDoc, doc))
         return doc
 
     async def reorder_folder(self, owner: str, folder_id: int, position: int) -> dict[str, Any]:
         doc = await self._folder(owner, folder_id)
         doc["position"] = position
-        await self._store.put(FOLDERS, doc["key"], doc)
+        await self._store.put(FOLDERS, doc["key"], checked(ChatFolderDoc, doc))
         return doc
 
     async def move_folder(self, owner: str, folder_id: int, direction: str) -> dict[str, Any]:
@@ -341,7 +342,7 @@ class ChatStore:
         for position, item in enumerate(ordered):
             if item["position"] != position:
                 item["position"] = position
-                await self._store.put(FOLDERS, item["key"], item)
+                await self._store.put(FOLDERS, item["key"], checked(ChatFolderDoc, item))
         return next(item for item in ordered if item["id"] == folder_id)
 
     async def count_in_folder(self, owner: str, folder_id: int) -> int:

@@ -17,29 +17,40 @@ IDENTITY = {
 
 
 class FakeDbGateway:
-    """In-memory DocumentStore: same behaviour as Treasury for get/put/delete/query."""
+    """In-memory DocumentStore: same behaviour as Treasury for get/put/delete/query.
+
+    A collection missing from src/schema/catalog.py is refused, so new storage cannot skip the catalog.
+    The schema state lives in `system`, apart from `records`, which tests compare as the account data."""
 
     def __init__(self) -> None:
         self.records: dict[tuple[str, str], dict] = {}
+        self.system: dict[tuple[str, str], dict] = {}
+
+    def _table(self, collection):
+        from src.schema.catalog import BY_NAME, STATE
+
+        assert collection in BY_NAME, f"collection {collection!r} is not in src/schema/catalog.py"
+        return self.system if collection == STATE else self.records
 
     async def get(self, collection, key):
-        doc = self.records.get((collection, key))
+        doc = self._table(collection).get((collection, key))
         return None if doc is None else json.loads(json.dumps(doc))
 
     async def put(self, collection, key, doc):
-        self.records[(collection, key)] = json.loads(json.dumps(doc))
+        self._table(collection)[(collection, key)] = json.loads(json.dumps(doc))
 
     async def create(self, collection, key, doc):
-        if (collection, key) in self.records:
+        table = self._table(collection)
+        if (collection, key) in table:
             return False
-        self.records[(collection, key)] = json.loads(json.dumps(doc))
+        table[(collection, key)] = json.loads(json.dumps(doc))
         return True
 
     async def delete(self, collection, key):
-        return self.records.pop((collection, key), None) is not None
+        return self._table(collection).pop((collection, key), None) is not None
 
     async def query(self, collection, filters=None, limit=100, offset=0):
-        rows = sorted((k, d) for (c, k), d in self.records.items() if c == collection)
+        rows = sorted((k, d) for (c, k), d in self._table(collection).items() if c == collection)
         matching = [d for _, d in rows if all(d.get(f) == v for f, v in (filters or {}).items())]
         return json.loads(json.dumps(matching[offset : offset + limit]))  # copies, like a real HTTP answer
 

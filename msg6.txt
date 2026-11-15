@@ -1,0 +1,17 @@
+Add Stronghold schema layer over Treasury (Plan 6)
+
+Plan 5 put every Stronghold domain in Treasury as documents, so Plan 6
+formalizes that instead of adding SQL. src/schema has pydantic models for
+chats, shares and usage documents (checked before every write), a catalog
+of all 21 Treasury collections and a versioned migration runner that keeps
+its version in a schema_state document and runs at start. Newer data than
+the code is refused; storage down does not stop Stronghold. GET /schema
+shows version, steps and the catalog. The test database refuses any
+collection missing from the catalog.
+
+No data migration: existing documents already fit.
+
+Tests: stronghold 533 passed. Portcullis and Armory untouched.
+Not run: Docker build, a real Treasury, two replicas starting together.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>

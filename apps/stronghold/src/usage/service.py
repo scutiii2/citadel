@@ -16,6 +16,7 @@ from typing import Any
 
 from src.calendar.settings import utcnow
 from src.document_store import DocumentStore
+from src.schema.models import UsageRecordDoc, checked
 from src.usage.settings import Pricing, UsageSettings
 
 COLLECTION = "usage_records"
@@ -73,7 +74,7 @@ class UsageService:
                 "key": key, "owner": owner, "turn_id": turn_id, "kind": kind, "chat_id": chat_id,
                 "day": now.date().isoformat(), "created_at": now.isoformat(),
             }
-            await self._store.put(COLLECTION, key, doc)
+            await self._store.put(COLLECTION, key, checked(UsageRecordDoc, doc))
         return sum(row["total_tokens"] for row in rows)
 
     async def _day(self, owner: str | None, day: date) -> list[dict[str, Any]]:

@@ -18,6 +18,7 @@ from typing import Any
 
 from src.calendar.settings import utcnow
 from src.document_store import DocumentStore
+from src.schema.models import ShareDoc, checked
 
 COLLECTION = "shared_chats"
 MAX_ACTIVE_SHARES_PER_ACCOUNT = 50
@@ -84,7 +85,7 @@ class ShareStore:
             "messages": messages, "message_count": len(messages), "created_at": now.isoformat(),
             "expires_at": (now + timedelta(days=expires_in_days)).isoformat() if expires_in_days else None,
         }
-        await self._store.put(COLLECTION, key, doc)
+        await self._store.put(COLLECTION, key, checked(ShareDoc, doc))
         return CreatedShare(doc, token)
 
     async def list(self, owner: str, chat_id: str | None = None) -> list[dict[str, Any]]:

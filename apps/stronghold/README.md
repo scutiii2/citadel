@@ -49,6 +49,7 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/attachments/...` | Text from a file attached to a question (`text`), PDFs and tables kept in Armory (`pdf`, `table`), audio for Scribe (`audio`, `dictate`, `dictate/partial`) and documents for Reader (`document`). Portcullis exposes them as `/api/attachments/...` and still streams file content and the dictation socket |
 | `/brains...` | Encrypted Obsidian brain connections, browsing through Armory, Note publication and AI promotion suggestions. Portcullis exposes them as `/api/brains`; Armory resolves a connection with `POST /brains/resolve`. Stronghold asks Portcullis for the account's permissions on every request |
 | `/chats...`, `/chat-folders...` | Chat history (details and transcript in separate documents), folders and search. Portcullis exposes them as `/api/chats` and `/api/chat-folders` and runs the answers itself, saving the question and the answer here. Deleting chats revokes their share links first, inside the same call |
+| `/schema` | The schema version the stored data is at, the steps applied and every Treasury collection Stronghold uses |
 | `/tuning/...` | An account's own response limits (`GET\|PUT\|DELETE /tuning/limits`, `GET /tuning/limits/own`), capped by Legion's tuning, which Stronghold reads from the entry agent. Portcullis exposes them as `/api/account/tuning` and reads `/tuning/limits/own` when a chat turn starts |
 | `/bard/...` | `POST /bard/speak` and `GET /bard/voices`, asked from Bard. Portcullis exposes them as `/api/bard/speak|voices` and still streams `/api/bard/audio/{id}` |
 | `/shares...` | Share links to frozen chat snapshots (Treasury, collection `shared_chats`) and the public read of one (`GET /shares/public/{token}`, no requester). Portcullis exposes them as `/api/chats/{id}/shares`, `/api/shares...` and `/api/shared/{token}`, and calls `POST /shares/revoke` before it deletes chats |
@@ -56,6 +57,10 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/templates/...` | Saved prompts, kept in Treasury (collection `prompt_templates`). Portcullis exposes them as `/api/templates/...` after checking `chat.use` |
 | `/skills/...` | Learned skills, which Armory keeps. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
 | `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`calendar`, `notes`, `memory`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `brains`). Called by Portcullis only |
+
+## Schema
+
+Treasury keeps any JSON, so `src/schema` is Stronghold's schema. `models.py` has the document shapes for chats, shares and usage; a store checks a document there before it writes it. `catalog.py` lists every collection (key shape, model, purge route); a test fails when code uses a collection that is not listed. `migrations.py` keeps a version in the `schema_state` document and runs the steps above it at start: add a step to `MIGRATIONS` (never edit a shipped one) and make it safe to run twice.
 
 ## Notes and memory
 
