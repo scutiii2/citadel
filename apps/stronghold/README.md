@@ -17,7 +17,7 @@ Default address `127.0.0.1:29650`. `STRONGHOLD_HOST` and `STRONGHOLD_PORT` overr
 |---|---|---|
 | `DB_GATEWAY_URL` | `http://127.0.0.1:29602` | Treasury. Stronghold uses instance `stronghold`, connection `stronghold` |
 | `PORTCULLIS_URL` | `http://127.0.0.1:29601` | Portcullis's `/internal` API (see below) |
-| `ARMORY_URL` | `http://127.0.0.1:29600` | Armory, which keeps the assistant memory |
+| `ARMORY_URL` | `http://127.0.0.1:29600` | Armory, which keeps the assistant memory and the learned skills |
 | `AGENTS_REGISTRY_PATH` | `../legion/.data/agent_registry.json` | Legion's list of running agents (file) |
 | `AGENTS_REGISTRY_URL` | none | The same list over HTTP; wins over the file when set |
 | `STRONGHOLD_DATA_DIR` | `.data` | Holds `keys.json` |
@@ -44,7 +44,9 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/calendar/...` | Feeds, events, alarms, prefs, push, alerts. Portcullis exposes them as `/api/calendar/...` after checking `calendar.use` |
 | `/notes/...` | Notes, tags, tag suggestions and generation. Portcullis exposes them as `/api/notes/...` after checking `chat.use` |
 | `/memory/...` | Assistant memory. Portcullis exposes it as `/api/memory/...` after checking `chat.use` |
-| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`calendar`, `notes`, `memory`). Called by Portcullis only |
+| `/templates/...` | Saved prompts, kept in Treasury (collection `prompt_templates`). Portcullis exposes them as `/api/templates/...` after checking `chat.use` |
+| `/skills/...` | Learned skills, which Armory keeps. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
+| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`calendar`, `notes`, `memory`, `skills`, `templates`). Called by Portcullis only |
 
 ## Notes and memory
 

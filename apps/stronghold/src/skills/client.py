@@ -1,7 +1,7 @@
-"""Account-scoped access to mcp_server's learned skills, never a browser-selected owner.
+"""Account-scoped access to Armory's learned skills, never a browser-selected owner.
 
-Skills are how-tos the assistant proposed and the user approves. mcp_server owns them; this is a
-thin client that sends the internal token and the signed-in account's uid. Logs carry no skill text.
+Skills are how-tos the assistant proposed and the user approves. Armory owns them; this is a
+thin client that sends the internal token and the requester's uid. Logs carry no skill text.
 """
 from __future__ import annotations
 
@@ -11,8 +11,6 @@ from urllib.parse import quote
 
 import httpx
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
-
-from src.services.mcp_server_info import base_url
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +27,7 @@ class Skill(BaseModel):
     successes: int = Field(ge=0)
     failures: int = Field(ge=0)
     created_at: str
-    # It failed often and more often than it worked, so mcp_server no longer offers it to the assistant.
+    # It failed often and more often than it worked, so Armory no longer offers it to the assistant.
     failing: bool = False
 
 
@@ -55,16 +53,17 @@ def _reason(response: httpx.Response) -> str:
 
 
 class SkillsClient:
-    def __init__(self, client: httpx.AsyncClient, mcp_url: str, token: str | None) -> None:
+    """`client` carries Armory's base URL; the caller closes it."""
+
+    def __init__(self, client: httpx.AsyncClient, token: str | None) -> None:
         self._client = client
-        self._base = base_url(mcp_url)
         self._headers = {"X-Internal-Token": token} if token else {}
 
     def _owner(self, uid: str) -> str:
-        return f"{self._base}/skills/owners/{quote(uid, safe='')}"
+        return f"/skills/owners/{quote(uid, safe='')}"
 
     async def _send(self, method: str, url: str, body: dict | None = None, *, show_reason: bool = False) -> httpx.Response:
-        """`show_reason` passes mcp_server's own 409/422 sentence on (it is about the user's text, never about
+        """`show_reason` passes Armory's own 409/422 sentence on (it is about the user's text, never about
         other data), for the edit form; everywhere else a fixed message is used."""
         try:
             response = await self._client.request(method, url, headers=self._headers, json=body,
@@ -101,7 +100,7 @@ class SkillsClient:
         await self._send("DELETE", f"{self._owner(uid)}/skills/{skill_id}")
 
     async def purge(self, uid: str) -> bool:
-        """DELETE /skills/owners/<uid> on mcp_server. True only when it confirmed; never raises."""
+        """DELETE /skills/owners/<uid> on Armory. True only when it confirmed; never raises."""
         if not uid:
             return False
         try:

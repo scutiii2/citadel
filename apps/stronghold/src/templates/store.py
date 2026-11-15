@@ -1,4 +1,4 @@
-"""Per-account prompt templates, stored as documents in db_gateway.
+"""Per-account prompt templates, stored as documents in Treasury.
 
 One document per template in the "prompt_templates" collection. The key is the owner's uid plus
 a hash of the name folded to lower case, so "Review" and "review" are the same key and the
@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from src.db import utcnow
-from src.services.db_gateway import DocumentStore
+from src.calendar.settings import utcnow
+from src.document_store import DocumentStore
 
 COLLECTION = "prompt_templates"
 MAX_TEMPLATES_PER_ACCOUNT = 100

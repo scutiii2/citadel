@@ -66,7 +66,6 @@ from src.services.extension_probe import ExtensionProbe
 from src.services.log_service import LogWriter
 from src.services.mcp_proxy import McpProxy
 from src.services import uid_log_filter
-from src.services.skills import SkillsClient
 from src.services.otp_service import OtpService
 from src.services.secret_box import SecretBox, ensure_secrets_key
 from src.services.public_rate_limiter import PublicReadLimiter
@@ -163,7 +162,6 @@ def create_app(
             upstream, settings.stronghold_url, internal_token or None, recorder
         )
         uid_log_filter.install()
-        app.state.skills = SkillsClient(upstream, settings.mcp_server_url, internal_token or None)
         app.state.agent_gateway = agent_gateway or McpAgentGateway(internal_token or None, recorder)
         app.state.extension_probe = ExtensionProbe(app.state.agent_gateway)
         app.state.server_tools = server_tools or McpServerTools(settings.mcp_server_url, internal_token or None, recorder)

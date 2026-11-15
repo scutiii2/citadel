@@ -217,11 +217,13 @@ with `chat.use`; the owner is always the authenticated account's internal uid.
 | PUT | `/api/skills/{id}/status` | `{status}` approves (`active`), rejects or retires (`retired`) or sends back for review (`proposed`); 409 at the 50-active-skills cap, 404 when missing. |
 | DELETE | `/api/skills/{id}` | Deletes an owned skill (204); 404 when missing. |
 
-portcullis forwards these to token-protected `/skills/owners/{uid}/skills` routes on
-mcp_server. Upstream failures return 503, a disabled capability returns 404, and
-redirects are refused. Changes are logged by action only, never skill text. Deleting an
-account asks mcp_server to purge its skills (`DELETE /skills/owners/{uid}`, best effort,
-logged as `admin.skills_purge` when it fails).
+portcullis checks the login and `chat.use`, then passes each request to Stronghold
+(`/skills/...`), which calls Armory's token-protected `/skills/owners/{uid}/skills`
+routes. Stronghold down returns 502 `Stronghold is unavailable`, Armory down returns
+503, a disabled capability returns 404, and redirects are refused. Changes are logged
+by action only, never skill text. Deleting an account purges its skills through
+Stronghold (`DELETE /skills/accounts/{uid}`, best effort, logged as
+`admin.skills_purge` when it fails).
 
 Backend for [ember_web](../ember_web). It owns ember_web's user accounts and
 login sessions (its own database, separate from chat_app's) and will proxy
@@ -414,7 +416,7 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `GET` | `/api/templates` | `chat.use` | This account's saved prompts, most recently edited first: `[{id, name, body, created_at, updated_at}]`; `id` is a 32-character hex string. Kept in db_gateway (`503` while it is down). |
 | `POST` | `/api/templates` | `chat.use` | `{name, body}` -> `201` the template. Name up to 60 characters (trimmed), body up to 10,000, at most 100 per account. `409` for a name the account already has (ignoring case) or the limit, `422` for a blank or too-long field. |
 | `PUT` | `/api/templates/{id}` | `chat.use` | `{name, body}` replaces one. `404` if missing or another account's, `409` name taken, `422` for an id that is not 32 hex characters. |
-| `DELETE` | `/api/templates/{id}` | `chat.use` | `204`; `404` if missing or another account's. |
+| `DELETE` | `/api/templates/{id}` | `chat.use` | `204`; `404` if missing or another account's. The template routes are answered by Stronghold (`apps/stronghold/src/templates`), which keeps them in its own database; `502` when Stronghold is down. Deleting an account purges them there (best effort, `admin.templates_purge` on failure). |
 | `GET` | `/api/nav-preferences` | any logged-in account | How this account arranges its nav rail: `{order, pinned, hidden}`, lists of page ids (route paths such as `/agents`). All empty means the default arrangement. |
 | `PUT` | `/api/nav-preferences` | any logged-in account | Replaces it with the same shape. At most 50 ids per list, each 1-64 characters (`422` otherwise). Repeats are dropped; `pinned` and `hidden` keep only ids in `order`, and a hidden page is never pinned. portcullis does not know the page list, so unknown ids are kept. Returns what was stored. |
 | `DELETE` | `/api/nav-preferences` | any logged-in account | Back to the default arrangement. `204`, also when nothing was saved. | Nav preferences and the account's switched-off agents are kept in db_gateway (one document per account, keyed by uid). While it is down, `GET` answers the default arrangement and saving gives `503`; account agents answer `503` for every call (an empty list would switch every agent back on). Migration `0023` drops the old tables, and refuses to run while any still holds rows: copy them to the gateway or empty them first. |

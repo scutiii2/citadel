@@ -31,7 +31,6 @@ from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.account_agent_service import purge_owner as purge_account_agents
 from src.services.tuning_limits_service import purge_owner as purge_tuning_limits
 from src.services.nav_preference_service import purge_owner as purge_nav_preferences
-from src.services.template_service import purge_owner as purge_templates
 from src.services.user_extension_service import purge_owner as purge_user_extensions
 from src.services.brain_connections import purge_owner as purge_brains
 from src.services.otp_service import OtpService
@@ -310,8 +309,9 @@ async def delete_account(
         await admin_service.delete_account(admin, target)
     except AdminError as error:
         raise _http_error(error) from error
-    # Memory and the calendar live in Stronghold. Best effort: the account is already gone.
-    for domain, what in (("memory", "Memory notes"), ("calendar", "Calendar"), ("notes", "Notes")):
+    # These domains live in Stronghold. Best effort: the account is already gone.
+    for domain, what in (("memory", "Memory notes"), ("calendar", "Calendar"), ("notes", "Notes"),
+                         ("skills", "Skills"), ("templates", "Templates")):
         try:
             purged = await request.app.state.stronghold.forward("DELETE", f"/{domain}/accounts/{uid}", admin)
             confirmed = purged.status < 400
@@ -321,15 +321,10 @@ async def delete_account(
             await logs.error(
                 admin.id, f"admin.{domain}_purge", f"{what} of deleted account '{username}' were not purged (stronghold did not confirm)"
             )
-    if not await request.app.state.skills.purge(uid):
-        await logs.error(
-            admin.id, "admin.skills_purge", f"Skills of deleted account '{username}' were not purged (mcp_server did not confirm)"
-        )
     try:
         await purge_nav_preferences(store, uid)
         await purge_tuning_limits(store, uid)
         await purge_account_agents(store, uid)
-        await purge_templates(store, uid)
         await purge_user_extensions(store, uid)
         await purge_brains(store, uid)
         from src.services.brain_gateway import BrainGateway
