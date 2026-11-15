@@ -1,5 +1,7 @@
 # ember_web
 
+> **Reference only (Plan 8).** This app is disabled: it is not in `docker-compose.yml`, not published, and not maintained. Its code is the source for the Ember Windows app (`apps/ember`, Plan 9). Do not extend it. Its backend `ember_api` no longer exists; Portcullis is the gateway now.
+
 Browser chat frontend for this repo, built with Vue 3, TypeScript and Vite.
 It talks only to [ember_api](../ember_api), its own backend, over the same
 origin: ember_api owns the accounts and login sessions and proxies MCP to

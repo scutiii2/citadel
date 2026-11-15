@@ -1,4 +1,4 @@
-# ZimaOS overlay for docker-compose.yml. Opens the two web UIs to the LAN.
+# ZimaOS overlay for docker-compose.yml. Opens the admin web UIs to the LAN.
 # Needs Docker Compose 2.24+ (for !override).
 # Start:  docker compose -f docker-compose.yml -f docker-compose.zima.yml up -d --build
 
@@ -7,9 +7,6 @@ services:
     # Dedicated Obsidian vault, read-only, for the obsidian capability's semantic index.
     volumes:
       - /DATA/AppData/obsidian/config/Desktop/Obsidian-vaults/citadel-brain:/vault:ro
-  ember_web:
-    ports: !override
-      - "26502:80"
   portcullis_admin:
     ports: !override
       - "26501:80"

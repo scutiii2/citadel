@@ -12,7 +12,7 @@ Spec: `docs/superpowers/specs/2026-11-14-citadel-revision-design.md`. This file 
 | 5 | Move product logic to Stronghold, domain by domain | 3 | 2 | `refactor/stronghold-<domain>` per domain | Overview written, 5.1 (calendar) executed 2026-11-15: `2026-11-15-plan-5-stronghold-domains.md` |
 | 6 | Stronghold database schema | 4 | 5 (chats domain) | `feat/stronghold-schema` | Executed 2026-11-16 as a schema layer over Treasury: `2026-11-16-plan-6-stronghold-schema.md` |
 | 7 | Admin app split | 5 | 5 | `refactor/admin-split` | Executed 2026-11-16: `2026-11-16-plan-7-admin-split.md` |
-| 8 | Disable `ember_web` | 6 | 7 | `chore/disable-ember-web` | To write after Plan 7 |
+| 8 | Disable `ember_web` | 6 | 7 | `chore/disable-ember-web` | Executed 2026-11-16: `2026-11-16-plan-8-disable-ember-web.md` |
 | 9 | Ember Windows app | 7 | 8 | `feat/ember-windows` | To write after Plan 8 |
 
 ## Order and parallel work

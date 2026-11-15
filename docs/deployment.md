@@ -4,7 +4,7 @@ Citadel runs as containers from one `docker-compose.yml`:
 
 | Service | Role | Port |
 |---|---|---|
-| `ember_web` | user web app | 26502 |
+| `ember_web` | user web app, disabled (reference only; the Ember Windows app replaces it) | 26502, unused |
 | `portcullis_admin` | admin web app: accounts, roles, invites, settings | 26501 |
 | `legion_admin` | admin web app: agents, connections | 26500 |
 | `armory_admin` | admin web app: capabilities, extensions | 26503 |
@@ -30,10 +30,10 @@ from the separate `LayaModel` project (see "Laya" below) and legion reaches it t
    docker compose up -d --build
    ```
 
-3. Open http://localhost:26502 (ember_web) and http://localhost:26501 (portcullis_admin; the other admin apps are on 26500 and 26503 to 26505). All bind to `127.0.0.1`.
+3. Open http://localhost:26501 (portcullis_admin; the other admin apps are on 26500 and 26503 to 26505). All bind to `127.0.0.1`.
 
 To rebuild one service, run `docker compose up -d --build <service>`, or double-click the `dev_deploy.bat` in that
-service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `ember_web`, `portcullis_admin`, `legion_admin`, `armory_admin`, `stronghold_admin`, `treasury_admin`).
+service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `portcullis_admin`, `legion_admin`, `armory_admin`, `stronghold_admin`, `treasury_admin`).
 
 ```bash
 docker compose ps              # state of every service
@@ -170,7 +170,7 @@ The box needs only what the stack builds from, not the whole repo. `tools/publis
 `main` with just these paths:
 
 - `docker-compose.yml`, `docker-compose.zima.yml`, `.env.example`, `docker/`
-- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `apps/ember_web`, `apps/portcullis_admin`, `apps/legion_admin`, `apps/armory_admin`, `apps/stronghold_admin`, `apps/treasury_admin`
+- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `apps/portcullis_admin`, `apps/legion_admin`, `apps/armory_admin`, `apps/stronghold_admin`, `apps/treasury_admin`
 - `docs/deployment.md`
 
 It leaves out other docs, skills, `tools/`, the Python `tests/` folders and `apps/ember_cli`. `e2e/` and the
@@ -194,23 +194,21 @@ Custom Install cannot adopt compose containers or build our images. Add external
 under compose.
 
 1. In the dashboard, click **+** and choose **Add external link**. The label may differ by version.
-2. Add two links, using the box's LAN IP (not `localhost`) so they work from other devices:
+2. Add a link per admin app, using the box's LAN IP (not `localhost`) so they work from other devices:
 
    | Name | URL | Icon |
    |---|---|---|
-   | Ember | `http://<zima-ip>:26502` | `apps/ember_web/public/icons/icon-512.png` |
    | Ember Admin | `http://<zima-ip>:26501` | `apps/portcullis_admin/public/icons/icon-512.png` |
 
-3. If the dashboard asks for an image URL, use `http://<zima-ip>:26502/icons/icon-512.png` and
-   `http://<zima-ip>:26501/icons/icon-512.png`. Avoid `icon-maskable-512.png`; its padding makes the tile look small.
+3. If the dashboard asks for an image URL, use `http://<zima-ip>:26501/icons/icon-512.png`. Avoid `icon-maskable-512.png`; its padding makes the tile look small.
 
 Give the box a fixed IP (a DHCP reservation in the router) so the links keep working. If your version has no external
 link option, use a browser bookmark.
 
 ### Public access with Tailscale Funnel
 
-Funnel publishes Ember on `https://<box>.<tailnet>.ts.net/` without a Tailscale client on the viewing device. Only
-`ember_web` (26502) goes public; keep the admin apps (26500 to 26505) on the LAN. Public signup must stay off, because anyone with
+Funnel publishes a web app on `https://<box>.<tailnet>.ts.net/` without a Tailscale client on the viewing device. No user web
+app runs while `ember_web` is disabled (Plan 8), so this section applies again only when one is back (port 26502); keep the admin apps (26500 to 26505) on the LAN. Public signup must stay off, because anyone with
 the URL can reach the login page.
 
 1. In the Tailscale admin console, give the box the `funnel` attribute (`nodeAttrs` in the access controls) and turn on
@@ -222,7 +220,7 @@ the URL can reach the login page.
    runs on the host:
 
    ```bash
-   docker compose up -d --build portcullis ember_web
+   docker compose up -d --build portcullis
    docker exec tailscale tailscale funnel --bg 26502
    docker exec tailscale tailscale funnel status
    ```
