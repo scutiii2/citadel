@@ -25,13 +25,21 @@ browser/Ember --Portcullis (login, permission, force-approval flag, tools.execut
                                                           <-- SSE pass-through of /turns/{chat}/events
 ```
 
-## Decisions to settle first (ask the owner before 10.1)
+## Decisions to settle first (answered below)
 
 1. **Running state is in memory.** Two Stronghold replicas would each see only their own turns. Either Stronghold stays one replica for turns (document it, say so in compose), or running state moves to Treasury. Recommend: one replica, same as Portcullis today.
 2. **Who builds the turn options.** Recommend Portcullis sends a small trusted block with the request (`forced_approval`, `tools_execute`, `extension_ids`), and Stronghold fills the rest itself (disabled agents, private extensions, limits, usage check, brain scope). That keeps Stronghold off Portcullis's settings DB. Private extensions and account agents are Treasury documents Portcullis reads today (`UserExtensionService`, `AccountAgentService`): move them to Stronghold first (10.1) or Stronghold cannot fill them.
 3. **Logs.** `LogWriter` writes Portcullis's DB (error log, chat-trace log, shown in `stronghold_admin` Analytics). Options: Stronghold calls a new internal `POST /internal/logs` on Portcullis (recommended: admin pages keep working, one log store), or Stronghold keeps its own log. The Portcullis `PortcullisClient` already exists in Stronghold (used for permissions).
 4. **Legion access from Stronghold.** Stronghold needs the Legion registry (file or URL) and the internal token; today only Portcullis has them. Add `LEGION_REGISTRY` / URL settings to Stronghold and compose.
 5. **SSE pass-through.** `pass_on` buffers; the events route needs a streaming pass-through that survives long idle gaps and client disconnects (cancels the upstream read, never the turn).
+
+## Decided (owner, 2026-11-16)
+
+1. One Stronghold replica runs turns. Say so in `docker-compose.yml`. State stays in memory.
+2. Stronghold fills most turn options. Portcullis sends only `forced_approval`, `tools_execute` and `extension_ids`. So 10.1 (account agents and private extensions to Stronghold) comes first.
+3. Turn error and chat-trace logs go to a new Portcullis `POST /internal/logs` (internal token, same as the permissions route).
+4. `extension_probe` and the admin Agents pages stay in Portcullis for now, with their own copy of the Legion gateway. Duplicate code until a later plan.
+5. Not asked, taken as recommended: Stronghold gets Legion's registry and the internal token through its own settings and compose; the events route gets a streaming pass-through.
 
 ## Steps
 
