@@ -10,6 +10,6 @@ services:
   ember_web:
     ports: !override
       - "26502:80"
-  ember_admin:
+  portcullis_admin:
     ports: !override
       - "26501:80"

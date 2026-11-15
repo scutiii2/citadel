@@ -64,7 +64,7 @@ retained file; copy back any settings changed after migration.
 
 ## tuning_overrides.json
 
-Written by the admin Tuning page (ember_admin), not by hand. It holds only what an admin
+Written by the admin Tuning page (stronghold_admin), not by hand. It holds only what an admin
 changed, as flat dotted paths such as `"token_limits.default.max_tool_rounds": 20`, and is
 merged over `config_tuning.json` when that file is read. Delete a line (or reset it on the page)
 to go back to the file's value. Gitignore it like the other local configs. Keys that are not

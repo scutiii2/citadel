@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { useTheme } from "../composables/useTheme";
 import { LEGION_PAGES } from "../router/pages";
+import { ADMIN_APPS, adminAppUrl } from "../utils/siblings";
 import { useAuthStore } from "../stores/auth";
 
 const auth = useAuthStore();
@@ -10,6 +11,7 @@ const route = useRoute();
 const { theme, next, cycle } = useTheme();
 const LABELS = { system: "System", light: "Light", dark: "Dark" } as const;
 const pages = computed(() => LEGION_PAGES.filter((p) => auth.hasPermission(p.permission)));
+const others = ADMIN_APPS.filter((a) => a.port !== 26500);
 const themeLabel = computed(() => `Theme: ${LABELS[theme.value]}. Switch to ${LABELS[next()]}`);
 </script>
 
@@ -20,6 +22,9 @@ const themeLabel = computed(() => `Theme: ${LABELS[theme.value]}. Switch to ${LA
       <RouterLink v-for="page in pages" :key="page.to" :to="page.to" :data-label="page.label" :aria-label="page.label" :aria-current="route.path === page.to ? 'page' : undefined">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path v-for="d in page.icon" :key="d" :d="d" /></svg>
       </RouterLink>
+    </nav>
+    <nav v-if="others.length" class="apps" aria-label="Other admin apps">
+      <a v-for="app in others" :key="app.port" :href="adminAppUrl(app.port)" :data-label="app.name" :aria-label="app.name">{{ app.letter }}</a>
     </nav>
     <div class="bottom">
       <button type="button" :data-label="themeLabel" :aria-label="themeLabel" @click="cycle">
@@ -48,11 +53,13 @@ const themeLabel = computed(() => `Theme: ${LABELS[theme.value]}. Switch to ${LA
   position: relative;
   z-index: 30;
 }
-.pages, .bottom { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pages, .apps, .bottom { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .pages { margin-top: 8px; }
-.bottom { margin-top: auto; }
+.apps { margin-top: auto; }
+.apps a { font-size: 0.85rem; font-weight: 600; }
+.bottom { margin-top: 8px; }
 .wordmark { display: grid; place-items: center; width: 36px; height: 36px; font-weight: 700; color: var(--accent); }
-.pages a, button {
+.pages a, .apps a, button {
   position: relative;
   display: grid;
   place-items: center;
@@ -67,7 +74,7 @@ const themeLabel = computed(() => `Theme: ${LABELS[theme.value]}. Switch to ${LA
   text-decoration: none;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.pages a:hover, button:hover { color: var(--text); background: var(--bg); }
+.pages a:hover, .apps a:hover, button:hover { color: var(--text); background: var(--bg); }
 a[aria-current="page"] { color: var(--text); background: var(--bg); box-shadow: inset 2px 0 0 var(--accent); }
 svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -90,8 +97,9 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
   .rail { flex-direction: row; width: 100%; height: var(--rail-height); padding: 0 4px env(safe-area-inset-bottom, 0px); gap: 4px; border-right: none; border-top: 1px solid var(--border); }
   .wordmark { width: 28px; height: 28px; flex-shrink: 0; }
   .pages { flex: 1; min-width: 0; margin: 0; flex-direction: row; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; gap: 0; }
+  .apps { flex-direction: row; flex-shrink: 0; margin: 0; gap: 0; }
   .bottom { flex-direction: row; flex-shrink: 0; margin: 0; gap: 0; }
-  .pages a, button { width: 44px; height: 44px; flex-shrink: 0; }
+  .pages a, .apps a, button { width: 44px; height: 44px; flex-shrink: 0; }
   a[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--accent); }
   [data-label]::after { display: none; }
 }

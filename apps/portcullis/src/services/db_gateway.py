@@ -70,6 +70,10 @@ class DbGatewayClient:
             raise DbGatewayError(f"db_gateway answered {response.status_code}: {_error_text(response)}")
         return response
 
+    async def instances(self) -> dict[str, list[str]]:
+        """The gateway's instances and the connections each may use."""
+        return self._check(await self._send("GET", "/instances")).json()
+
     async def get(self, collection: str, key: str) -> Document | None:
         response = await self._send("GET", self._record(collection, key))
         if self._is_missing_record(response):

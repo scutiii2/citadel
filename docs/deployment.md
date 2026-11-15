@@ -5,7 +5,11 @@ Citadel runs as containers from one `docker-compose.yml`:
 | Service | Role | Port |
 |---|---|---|
 | `ember_web` | user web app | 26502 |
-| `ember_admin` | admin web app | 26501 |
+| `portcullis_admin` | admin web app: accounts, roles, invites, settings | 26501 |
+| `legion_admin` | admin web app: agents, connections | 26500 |
+| `armory_admin` | admin web app: capabilities, extensions | 26503 |
+| `stronghold_admin` | admin web app: usage, analytics, tickets, tuning | 26504 |
+| `treasury_admin` | admin web app: Treasury instances (read-only) | 26505 |
 | `portcullis` | backend for both web apps | internal |
 | `armory` | MCP server (capabilities, including Server Manager) | internal 29600 |
 | `legion` | AI agent | internal |
@@ -26,10 +30,10 @@ from the separate `LayaModel` project (see "Laya" below) and legion reaches it t
    docker compose up -d --build
    ```
 
-3. Open http://localhost:26502 (ember_web) and http://localhost:26501 (ember_admin). Both bind to `127.0.0.1`.
+3. Open http://localhost:26502 (ember_web) and http://localhost:26501 (portcullis_admin; the other admin apps are on 26500 and 26503 to 26505). All bind to `127.0.0.1`.
 
 To rebuild one service, run `docker compose up -d --build <service>`, or double-click the `dev_deploy.bat` in that
-service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `ember_web`, `ember_admin`).
+service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `ember_web`, `portcullis_admin`, `legion_admin`, `armory_admin`, `stronghold_admin`, `treasury_admin`).
 
 ```bash
 docker compose ps              # state of every service
@@ -136,7 +140,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
    `docker/configs/armory/extensions.json` and `docker/configs/armory/capabilities.json` are the exception: they are
    mounted writable, so extensions added on the Extensions page and capability toggles set on the Capabilities page of
-   ember_admin are saved into those files and survive restarts and rebuilds. On the device they differ from git after
+   armory_admin are saved into those files and survive restarts and rebuilds. On the device they differ from git after
    the first change; keep them when you update (`git stash` or `git update-index --skip-worktree`).
 
 5. **Start:**
@@ -166,7 +170,7 @@ The box needs only what the stack builds from, not the whole repo. `tools/publis
 `main` with just these paths:
 
 - `docker-compose.yml`, `docker-compose.zima.yml`, `.env.example`, `docker/`
-- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `apps/ember_web`, `apps/ember_admin`
+- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `apps/ember_web`, `apps/portcullis_admin`, `apps/legion_admin`, `apps/armory_admin`, `apps/stronghold_admin`, `apps/treasury_admin`
 - `docs/deployment.md`
 
 It leaves out other docs, skills, `tools/`, the Python `tests/` folders and `apps/ember_cli`. `e2e/` and the
@@ -195,7 +199,7 @@ under compose.
    | Name | URL | Icon |
    |---|---|---|
    | Ember | `http://<zima-ip>:26502` | `apps/ember_web/public/icons/icon-512.png` |
-   | Ember Admin | `http://<zima-ip>:26501` | `apps/ember_admin/public/icons/icon-512.png` |
+   | Ember Admin | `http://<zima-ip>:26501` | `apps/portcullis_admin/public/icons/icon-512.png` |
 
 3. If the dashboard asks for an image URL, use `http://<zima-ip>:26502/icons/icon-512.png` and
    `http://<zima-ip>:26501/icons/icon-512.png`. Avoid `icon-maskable-512.png`; its padding makes the tile look small.
@@ -206,7 +210,7 @@ link option, use a browser bookmark.
 ### Public access with Tailscale Funnel
 
 Funnel publishes Ember on `https://<box>.<tailnet>.ts.net/` without a Tailscale client on the viewing device. Only
-`ember_web` (26502) goes public; keep `ember_admin` (26501) on the LAN. Public signup must stay off, because anyone with
+`ember_web` (26502) goes public; keep the admin apps (26500 to 26505) on the LAN. Public signup must stay off, because anyone with
 the URL can reach the login page.
 
 1. In the Tailscale admin console, give the box the `funnel` attribute (`nodeAttrs` in the access controls) and turn on
@@ -270,13 +274,13 @@ The Server Manager capability (chat id `server`) lists, starts, stops and restar
 logs. It works through the host Docker socket, which `docker-compose.yml` mounts into `armory`
 (`/var/run/docker.sock`).
 
-Enable it on the Capabilities page of ember_admin, or in `docker/configs/armory/capabilities.json`:
+Enable it on the Capabilities page of armory_admin, or in `docker/configs/armory/capabilities.json`:
 
 ```json
 "server": { "enabled": true }
 ```
 
-You can also toggle it on the Capabilities page in ember_admin, but that toggle lives in the container and is lost when
+You can also toggle it on the Capabilities page in armory_admin, but that toggle lives in the container and is lost when
 armory is rebuilt, so set the repo file to keep it. The file is gitignored: set it on the box, or push it with deploy
 option 2.
 

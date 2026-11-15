@@ -379,6 +379,10 @@ class FakeDbGateway:
 
     def __init__(self) -> None:
         self.records: dict[tuple[str, str], dict] = {}
+        self.instances_seen = {"portcullis": ["main"], "stronghold": ["stronghold"]}
+
+    async def instances(self):
+        return self.instances_seen
 
     async def get(self, collection, key):
         doc = self.records.get((collection, key))

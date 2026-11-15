@@ -5,7 +5,7 @@ Project note: `Brain/Projects/legion_admin.md` in the Obsidian vault (`../../../
 Vue 3 + TypeScript admin app for Legion, only for accounts holding `agents.manage`. Talks only to `portcullis` through the Vite `/api` proxy (no backend of its own). First page: Agents.
 
 ## Rules
-- Code is copied from `ember_admin`, not shared. Nothing here imports from `ember_admin` or `ember_web`. Apply future fixes in both while both pages exist.
+- Code is copied between the admin apps, not shared. Nothing here imports from another app. Apply a fix to a shared component in every admin app that has a copy.
 - Add a page: one entry in `src/router/pages.ts`, one route in `src/router/index.ts` with `meta.permission`, one view.
 - Radius only through `--radius-*` tokens, colors only through `style.css` tokens (`radiusScale.test.ts` enforces it).
 - A switch that calls the server stays pending until the server answers.

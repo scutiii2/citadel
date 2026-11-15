@@ -37,7 +37,11 @@ DEPLOY_PATHS = [
     "apps/stronghold",
     "apps/portcullis",
     "apps/ember_web",
-    "apps/ember_admin",
+    "apps/portcullis_admin",
+    "apps/legion_admin",
+    "apps/armory_admin",
+    "apps/stronghold_admin",
+    "apps/treasury_admin",
     "docs/deployment.md",
 ]
 # Left out of live. Python tests/ folders are not built into any image; e2e/ and src/*.test.ts stay

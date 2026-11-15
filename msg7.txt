@@ -1,0 +1,22 @@
+Split the admin app into one per backend (Plan 7)
+
+ember_admin is renamed portcullis_admin (git mv, history kept) and
+trimmed to accounts, roles, invites, settings, config issues, profile
+and login. New armory_admin (Capabilities, Extensions), stronghold_admin
+(Usage, Analytics, Tickets, Tuning) and treasury_admin (read-only
+Instances) are built from the legion_admin skeleton with their pages
+copied from ember_admin. Each rail links to the other admin apps by
+swapping the port; the session cookie is host-wide, so one login works
+in all. New Portcullis route GET /api/admin/treasury (settings.manage)
+shows Treasury's instances. docker-compose, deployment docs and
+publish_live follow; ports 26500 and 26501, 26503 to 26505.
+
+The duplicate Agents page in ember_admin was dropped (legion_admin has
+it). The e2e specs for the moved pages were removed with them.
+
+Tests: portcullis 1313 passed; vitest armory_admin 95, stronghold_admin
+260, treasury_admin 32, portcullis_admin 201, legion_admin 78.
+Not run: Docker builds, the apps in a browser, Playwright. legion_admin
+vue-tsc still reports an old error in ConnectionsView.vue.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>

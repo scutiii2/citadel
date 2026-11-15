@@ -88,7 +88,7 @@ online re-imports the capability from disk, and answers `409` with
 (offline) and returns the same list. A new folder is never loaded until it
 is switched online. See `src/capability_routes.py`,
 `src/services/capability_loader.py` and `src/infra/README.md`'s
-`capability_registry.py` entry. ember_admin's Capabilities page calls these.
+`capability_registry.py` entry. armory_admin's Capabilities page calls these.
 
 Client-readable URI resources follow the same pattern one level over -
 see [`src/resources/README.md`](src/resources/README.md).
