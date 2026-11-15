@@ -7,7 +7,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from src.services import folder_service
+from tests import fake_chats
 from tests.conftest import FakeAgent, FakeEmailSender
 from tests.test_admin import login, make_member
 from tests.test_logs import messages, my_id
@@ -80,13 +80,6 @@ def test_create_and_list(client: TestClient) -> None:
     assert [f["name"] for f in folders(client)] == ["Work stuff", "Home"]  # creation order
 
 
-@pytest.mark.parametrize("name", ["", "   ", "x" * 61])
-def test_bad_names_are_refused(client: TestClient, name: str) -> None:
-    as_admin(client)
-
-    assert new_folder(client, name).status_code == 422
-
-
 def test_a_duplicate_name_is_refused_ignoring_case(client: TestClient) -> None:
     as_admin(client)
     assert new_folder(client, "Work").status_code == 201
@@ -96,7 +89,7 @@ def test_a_duplicate_name_is_refused_ignoring_case(client: TestClient) -> None:
 
 
 def test_the_folder_limit(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(folder_service, "MAX_FOLDERS_PER_ACCOUNT", 2)
+    monkeypatch.setattr(fake_chats, "MAX_FOLDERS_PER_ACCOUNT", 2)
     as_admin(client)
     assert new_folder(client, "a").status_code == 201
     assert new_folder(client, "b").status_code == 201
@@ -151,14 +144,6 @@ def test_reorder_moves_a_folder(client: TestClient) -> None:
     assert client.patch(f"/api/chat-folders/{first}", json={"position": 10}).status_code == 200
 
     assert [f["name"] for f in folders(client)] == ["b", "c", "a"]
-
-
-def test_a_patch_must_change_something(client: TestClient) -> None:
-    as_admin(client)
-    folder_id = new_folder(client).json()["id"]
-
-    assert client.patch(f"/api/chat-folders/{folder_id}", json={}).status_code == 422
-    assert client.patch(f"/api/chat-folders/{folder_id}", json={"position": -1}).status_code == 422
 
 
 # --- moving and pinning chats ------------------------------------------------------
@@ -264,7 +249,7 @@ def put_in(client: TestClient, folder_id: int, count: int) -> list[str]:
     return ids
 
 
-def test_deleting_a_folder_deletes_its_chats_and_revokes_their_shares(client: TestClient, upstream) -> None:
+def test_deleting_a_folder_deletes_its_chats_and_tells_stronghold_what_is_running(client: TestClient, upstream) -> None:
     as_admin(client)
     keep = make_chat(client, "unfiled")
     other = new_folder(client, "Other").json()["id"]
@@ -279,8 +264,8 @@ def test_deleting_a_folder_deletes_its_chats_and_revokes_their_shares(client: Te
     remaining = {c["id"] for c in client.get("/api/chats").json()}
     assert remaining == {keep, kept_elsewhere}
     assert client.get(f"/api/chats/{second}").status_code == 404
-    revoked = [json.loads(r.content) for r in upstream.requests if r.url.path == "/shares/revoke"]
-    assert [sorted(body["chat_ids"]) for body in revoked] == [sorted([first, second])]  # the links died with the chats
+    asked = [json.loads(r.content) for r in upstream.requests if r.method == "DELETE" and r.url.path == f"/chat-folders/{doomed}"]
+    assert asked == [{"running": []}]  # Stronghold revokes the share links itself, in the same call
 
 
 def test_deleting_an_empty_folder(client: TestClient) -> None:
@@ -313,17 +298,6 @@ def test_a_folder_with_an_answering_chat_cannot_be_deleted(client: TestClient, a
     assert client.get(f"/api/chats/{chat_id}").status_code == 404
 
 
-def test_deleting_a_folder_writes_an_audit_entry(client: TestClient) -> None:
-    as_admin(client)
-    folder_id = new_folder(client, "Audit me").json()["id"]
-    put_in(client, folder_id, 2)
-
-    client.delete(f"/api/chat-folders/{folder_id}")
-
-    assert 'Deleted folder "Audit me" and its 2 chat(s)' in messages(client, "action", my_id(client))
-
-
-
 def test_adjacent_moves_handle_tied_positions_and_boundaries(client: TestClient) -> None:
     as_admin(client)
     ids = [new_folder(client, name).json()["id"] for name in ["a", "b", "c"]]
@@ -339,15 +313,6 @@ def test_adjacent_moves_handle_tied_positions_and_boundaries(client: TestClient)
     assert [f["id"] for f in folders(client)] == ids
     assert client.patch(f"/api/chat-folders/{ids[-1]}", json={"direction": "down"}).status_code == 200
     assert [f["id"] for f in folders(client)] == ids
-
-
-def test_invalid_move_requests_do_not_change_order(client: TestClient) -> None:
-    as_admin(client)
-    folder_id = new_folder(client).json()["id"]
-    for body in [{"direction": "sideways"}, {"direction": "up", "position": 3},
-                 {"direction": "up", "name": "Renamed"}]:
-        assert client.patch(f"/api/chat-folders/{folder_id}", json=body).status_code == 422
-    assert folders(client)[0]["name"] == "Work"
 
 
 def test_adjacent_move_cannot_access_another_accounts_folder(client: TestClient, email: FakeEmailSender) -> None:

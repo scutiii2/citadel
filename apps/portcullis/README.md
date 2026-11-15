@@ -1,5 +1,7 @@
 # portcullis
 
+> **Chats (Plan 5.9).** Stronghold keeps chat history, folders and search (`apps/stronghold/src/chats`). Portcullis still runs the answers (the turn engine) and saves the question and answer through `services/chat_service.py`, a client that asks Stronghold. Every chat route needs Stronghold running (502 otherwise), and chats made before the move are not copied. The old `chats` and `chat_folders` SQL tables stay here, unused.
+
 ## Speech HTTP routes
 
 | Route | Permission | Behavior |

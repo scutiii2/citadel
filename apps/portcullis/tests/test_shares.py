@@ -268,51 +268,7 @@ def test_stronghold_down_gives_502_for_managing_and_reading(client_factory, upst
 # --- what removes links -------------------------------------------------------------------
 
 
-def revokes(upstream: FakeUpstream) -> list[dict]:
-    return [json.loads(r.content) for r in sent_to(upstream, "/shares/revoke")]
-
-
-def test_deleting_a_chat_revokes_its_links_first(client: TestClient, served) -> None:
-    as_admin(client)
-    doomed = make_chat(client, title="Doomed")
-    kept = make_chat(client, title="Kept")
-
-    assert client.delete(f"/api/chats/{doomed}").status_code == 204
-
-    assert revokes(served) == [{"chat_ids": [doomed]}]
-    assert client.get(f"/api/chats/{doomed}").status_code == 404
-    assert client.get(f"/api/chats/{kept}").status_code == 200
-
-
-def test_deleting_all_chats_revokes_every_link_of_the_account(client: TestClient, served) -> None:
-    as_admin(client)
-    make_chat(client)
-
-    assert client.delete("/api/chats").status_code == 204
-
-    assert revokes(served) == [{"chat_ids": "all"}]
-
-
-def test_deleting_a_folder_revokes_the_links_of_its_chats(client: TestClient, served) -> None:
-    as_admin(client)
-    folder = client.post("/api/chat-folders", json={"name": "Work"}).json()["id"]
-    inside = make_chat(client)
-    assert client.patch(f"/api/chats/{inside}", json={"folder_id": folder}).status_code == 200
-    outside = make_chat(client)
-
-    assert client.delete(f"/api/chat-folders/{folder}").status_code == 204
-
-    assert revokes(served) == [{"chat_ids": [inside]}]
-    assert client.get(f"/api/chats/{outside}").status_code == 200
-
-
-def test_an_empty_folder_asks_for_no_revoke(client: TestClient, served) -> None:
-    as_admin(client)
-    folder = client.post("/api/chat-folders", json={"name": "Empty"}).json()["id"]
-
-    assert client.delete(f"/api/chat-folders/{folder}").status_code == 204
-
-    assert revokes(served) == []
+# Stronghold revokes a chat's links in the same call that deletes the chat (its own tests prove it).
 
 
 def test_nothing_is_deleted_when_the_links_cannot_be_revoked(client: TestClient, upstream: FakeUpstream) -> None:

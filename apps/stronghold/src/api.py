@@ -20,6 +20,8 @@ from src.attachments.services import ArmoryUploads
 from src.bard import routes as bard_routes
 from src.auth import ENV_PATH, InternalTokenMiddleware
 from src.calendar import routes as calendar_routes
+from src.chats import routes as chats_routes
+from src.chats.store import ChatStore
 from src.calendar.runtime import build_calendar_runtime
 from src.calendar.store import CalendarError
 from src.config import Settings, load_settings
@@ -101,6 +103,7 @@ def create_app(
         app.state.reader = tool_services.reader(tools_in.get("reader") or http(settings.reader_url), service_token("reader"))
         app.state.bard = tool_services.bard(tools_in.get("bard") or http(settings.bard_url), service_token("bard"))
         app.state.shares = ShareStore(app.state.store)
+        app.state.chats = ChatStore(app.state.store, app.state.shares)
         app.state.usage = UsageService(app.state.store, settings.usage, Pricing(settings.pricing))
         app.state.calendar = (
             build_calendar_runtime(config=settings.calendar, store=app.state.store, box=app.state.box,
@@ -120,6 +123,8 @@ def create_app(
     app.include_router(attachments_routes.router)
     app.include_router(bard_routes.router)
     app.include_router(calendar_routes.router)
+    app.include_router(chats_routes.router)
+    app.include_router(chats_routes.folder_router)
     app.include_router(memory_routes.router)
     app.include_router(notes_routes.router)
     app.include_router(skills_routes.router)

@@ -5,7 +5,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from src.services import chat_service
+from tests import fake_chats
 from tests.conftest import FakeEmailSender
 from tests.test_admin import login, make_member
 from tests.test_registration import as_admin
@@ -125,7 +125,7 @@ def test_validation(client: TestClient) -> None:
 
 
 def test_chat_over_size_limit_is_refused(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(chat_service, "MAX_CHAT_BYTES", 1000)
+    monkeypatch.setattr(fake_chats, "MAX_CHAT_BYTES", 1000)
     as_admin(client)
 
     response = put(client, new_id(), messages=[{"role": "user", "content": "x" * 2000}])
@@ -134,7 +134,7 @@ def test_chat_over_size_limit_is_refused(client: TestClient, monkeypatch: pytest
 
 
 def test_chat_count_limit(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(chat_service, "MAX_CHATS_PER_ACCOUNT", 2)
+    monkeypatch.setattr(fake_chats, "MAX_CHATS_PER_ACCOUNT", 2)
     as_admin(client)
     first = new_id()
     put(client, first)
@@ -160,7 +160,7 @@ def test_oversized_request_body_is_refused_before_parsing(client: TestClient) ->
 # --- account deletion ---------------------------------------------------------
 
 
-def test_chats_go_with_their_account(client: TestClient, email: FakeEmailSender) -> None:
+def test_chats_go_with_their_account(client: TestClient, email: FakeEmailSender, upstream) -> None:
     alice_id = make_member(client, email)
     login(client, "alice")
     put(client, new_id())
@@ -169,15 +169,8 @@ def test_chats_go_with_their_account(client: TestClient, email: FakeEmailSender)
     as_admin(client)
     client.delete(f"/api/admin/accounts/{alice_id}")
 
-    async def remaining() -> int:
-        from sqlalchemy import func, select
-
-        from src.models import Chat
-
-        async with client.app.state.database.sessions() as session:
-            return await session.scalar(select(func.count()).select_from(Chat))
-
-    assert client.portal.call(remaining) == 0
+    # Stronghold purges them: a chats purge call is made for the deleted account.
+    assert any(r.method == "DELETE" and r.url.path.startswith("/chats/accounts/") for r in upstream.requests)
 
 
 # --- search -------------------------------------------------------------------

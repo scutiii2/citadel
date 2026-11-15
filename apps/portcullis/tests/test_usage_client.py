@@ -113,13 +113,13 @@ def test_a_turn_still_answers_when_its_usage_cannot_be_recorded(client, upstream
 
     as_admin(client)
     chat_id = new_id()
-    start(client, chat_id)
     upstream.usage.down = False
     upstream.usage.six_hour_limit = 0
     original = upstream.usage.respond
     upstream.usage.respond = lambda request: (
         httpx.Response(503, json={"detail": "down"}) if request.method == "POST" and request.url.path == "/usage/records"
         else original(request))
+    start(client, chat_id)  # the answer starts at once, so the failure must be in place first
 
     stream = events(client, chat_id)
 

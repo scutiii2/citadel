@@ -22,13 +22,11 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import Settings
 from src.deps import (
     get_agent_gateway,
     get_db_gateway,
-    get_db_session,
     get_log_writer,
     get_pricing,
     get_secret_box,
@@ -38,7 +36,7 @@ from src.deps import (
     get_turns,
     require_permission,
 )
-from src.models import Account, Chat
+from src.models import Account
 from src.routes.mcp import get_agent_directory
 from src.routes.server_info import get_server_info
 from src.services.brain_connections import BrainConnections
@@ -46,24 +44,19 @@ from src.services import question_answers, second_brain, suggestions, summarizat
 from src.services.account_agent_service import AccountAgentService, blocked_names
 from src.services.agent_directory import NO_AGENT_RUNNING, AgentDirectory
 from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
-from src.services.chat_search import (
-    MAX_QUERY_CHARS,
-    MIN_QUERY_CHARS,
-    ChatSearch,
-    SearchHit,
-)
 from src.services.chat_service import (
     TITLE_MAX,
     ChatLimitError,
     ChatMessage,
     ChatNotFound,
+    ChatRecord,
     ChatService,
+    FolderNotFound,
     NotABranchPoint,
     decode_messages,
     message_time,
 )
 from src.services.db_gateway import DbGatewayError, DocumentStore
-from src.services.folder_service import FolderNotFound
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import (
     McpServerInfo,
@@ -84,7 +77,7 @@ from src.services.turns import (
     TurnOptions,
     TurnRegistry,
 )
-from src.services.share_service import revoke_shares
+from src.routes.stronghold import pass_on
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 from src.services.usage_client import LimitBlock, UsageClient, UsageUnavailable
 from src.services.user_extension_service import TurnExtensions, UserExtensionService
@@ -105,18 +98,15 @@ ChatId = Path(pattern=_CHAT_ID_PATTERN)
 QUESTION_MAX = 200_000
 
 
+MIN_QUERY_CHARS = 2
+MAX_QUERY_CHARS = 100
+
+
 def get_chat_service(
     account: Account = Depends(require_chat),
-    session: AsyncSession = Depends(get_db_session),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> ChatService:
-    return ChatService(session, account.id)
-
-
-def get_chat_search(
-    account: Account = Depends(require_chat),
-    session: AsyncSession = Depends(get_db_session),
-) -> ChatSearch:
-    return ChatSearch(session, account.id)
+    return ChatService(stronghold, account)
 
 
 # --- models ------------------------------------------------------------------
@@ -344,7 +334,7 @@ class ChatSummaryOut(BaseModel):
     second_brain_scope: Literal["instance", "personal"] = "instance"
 
     @classmethod
-    def of(cls, chat: Chat, running: bool = False) -> ChatSummaryOut:
+    def of(cls, chat: ChatRecord, running: bool = False) -> ChatSummaryOut:
         return cls(
             id=chat.chat_id,
             title=chat.title,
@@ -364,52 +354,9 @@ class ChatOut(ChatSummaryOut):
     messages: list[dict[str, Any]]
 
     @classmethod
-    def of(cls, chat: Chat, pricing: Pricing, running: bool = False) -> ChatOut:  # type: ignore[override]
+    def of(cls, chat: ChatRecord, pricing: Pricing, running: bool = False) -> ChatOut:  # type: ignore[override]
         return cls(**ChatSummaryOut.of(chat, running).model_dump(),
                    messages=[with_cost(message, pricing) for message in decode_messages(chat)])
-
-
-class SpanOut(BaseModel):
-    start: int
-    length: int
-
-
-class SnippetOut(BaseModel):
-    text: str
-    start: int
-    length: int
-
-
-class SearchHitOut(BaseModel):
-    id: str
-    folder_id: int | None
-    title: str
-    updated_at: datetime
-    # Where the query sits in the title, if it does.
-    title_match: SpanOut | None
-    # The text around the first message containing it, and which message.
-    snippet: SnippetOut | None
-    message_index: int | None
-    message_matches: int
-
-    @classmethod
-    def of(cls, hit: SearchHit) -> SearchHitOut:
-        title = SpanOut(start=hit.title_match.start, length=hit.title_match.length) if hit.title_match else None
-        snippet = (
-            SnippetOut(text=hit.snippet.text, start=hit.snippet.match.start, length=hit.snippet.match.length)
-            if hit.snippet
-            else None
-        )
-        return cls(
-            id=hit.chat.chat_id,
-            folder_id=hit.chat.folder_id,
-            title=hit.chat.title,
-            updated_at=hit.chat.updated_at,
-            title_match=title,
-            snippet=snippet,
-            message_index=hit.message_index,
-            message_matches=hit.message_matches,
-        )
 
 
 class TurnOut(BaseModel):
@@ -480,23 +427,24 @@ async def delete_all_chats(
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
     turns: TurnRegistry = Depends(get_turns),
-    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> Response:
-    await revoke_shares(stronghold, account, "all")
-    await turns.discard_account(account.id)
+    """Stronghold revokes every share link first and deletes nothing if it cannot."""
     await chats.delete_all()
+    await turns.discard_account(account.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/search")
 async def search_chats(
+    request: Request,
     q: str = Query(min_length=MIN_QUERY_CHARS, max_length=MAX_QUERY_CHARS),
-    search: ChatSearch = Depends(get_chat_search),
-) -> list[SearchHitOut]:
+    account: Account = Depends(require_chat),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
+) -> Response:
     """Chats whose title or messages contain `q` (case-insensitive, literal),
     newest first, at most 50, each with a snippet around the first message
-    match. Declared before /{chat_id}, which would otherwise take "search"."""
-    return [SearchHitOut.of(hit) for hit in await search.search(q)]
+    match (Stronghold searches). Declared before /{chat_id}, which would otherwise take "search"."""
+    return await pass_on(request, stronghold, account, "/chats/search")
 
 
 async def _second_brain_available(account: Account, store: DocumentStore, info: McpServerInfo, box=None, scope="instance") -> bool:
@@ -635,16 +583,13 @@ async def delete_chat(
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
     turns: TurnRegistry = Depends(get_turns),
-    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> Response:
-    """Also stops an answer still being written for it, and revokes its share links."""
+    """Also stops an answer still being written for it. Stronghold revokes its share links first."""
     try:
-        await chats.get(chat_id)
+        await chats.delete(chat_id)
     except ChatNotFound as error:
         raise _not_found() from error
-    await revoke_shares(stronghold, account, [chat_id])
     await turns.discard(account.id, chat_id)
-    await chats.delete(chat_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

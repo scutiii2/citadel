@@ -6,17 +6,14 @@ The rules that keep a link safe about the chat itself live here, not in the brow
   the user typed and the assistant's plain answers. Tool steps and results,
   usage data, summaries, raw logs, slash-command results, error texts and the
   text of attached files never leave.
-* Deleting a chat revokes its links first (`revoke_shares`), so a deleted chat never keeps a working link.
+* Deleting a chat revokes its links first, inside Stronghold, so a deleted chat never keeps a working link.
 """
 
 from __future__ import annotations
 
 import re
-from typing import Literal
 
-from src.models import Account
 from src.services.chat_service import ChatMessage
-from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 
 # A question's attached files travel inside its text (see the chat views).
 _ATTACHMENT = re.compile(r'\[\[ATTACHMENT filename="([^"]*)"[^\]]*\]\]\n[\s\S]*?\n\[\[/ATTACHMENT\]\]')
@@ -48,13 +45,3 @@ def snapshot_messages(messages: list[ChatMessage]) -> list[ChatMessage]:
         if content:
             shared.append({"role": role, "content": content})
     return shared
-
-
-async def revoke_shares(stronghold: StrongholdForwarder, account: Account, chat_ids: list[str] | Literal["all"]) -> None:
-    """Asks Stronghold to revoke the links of these chats (of every chat of the account for "all").
-    Raises StrongholdUnavailable when it cannot: the caller must then not delete the chats."""
-    if chat_ids != "all" and not chat_ids:
-        return
-    answer = await stronghold.forward("POST", "/shares/revoke", account, json={"chat_ids": chat_ids})
-    if answer.status >= 300:
-        raise StrongholdUnavailable(f"stronghold answered {answer.status} to a share revoke")

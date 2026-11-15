@@ -47,13 +47,14 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/tickets/...`, `/ticket-admin/...` | Tickets (Armory keeps them) and the account's read receipts (Treasury, collection `ticket_seen`). Portcullis exposes them as `/api/tickets/...` (`tickets.create`) and `/api/admin/tickets...`, `/api/admin/ticket-groups...` (`tickets.manage`) |
 | `/triage/titles`, `/triage/ask` | Option titles from the `title-writer` agent and typed questions to the Triage Assistant (Laya); both count toward the token limits. Portcullis exposes them as `/api/triage/...` after checking `chat.use` |
 | `/attachments/...` | Text from a file attached to a question (`text`), PDFs and tables kept in Armory (`pdf`, `table`), audio for Scribe (`audio`, `dictate`, `dictate/partial`) and documents for Reader (`document`). Portcullis exposes them as `/api/attachments/...` and still streams file content and the dictation socket |
+| `/chats...`, `/chat-folders...` | Chat history (details and transcript in separate documents), folders and search. Portcullis exposes them as `/api/chats` and `/api/chat-folders` and runs the answers itself, saving the question and the answer here. Deleting chats revokes their share links first, inside the same call |
 | `/tuning/...` | An account's own response limits (`GET\|PUT\|DELETE /tuning/limits`, `GET /tuning/limits/own`), capped by Legion's tuning, which Stronghold reads from the entry agent. Portcullis exposes them as `/api/account/tuning` and reads `/tuning/limits/own` when a chat turn starts |
 | `/bard/...` | `POST /bard/speak` and `GET /bard/voices`, asked from Bard. Portcullis exposes them as `/api/bard/speak|voices` and still streams `/api/bard/audio/{id}` |
 | `/shares...` | Share links to frozen chat snapshots (Treasury, collection `shared_chats`) and the public read of one (`GET /shares/public/{token}`, no requester). Portcullis exposes them as `/api/chats/{id}/shares`, `/api/shares...` and `/api/shared/{token}`, and calls `POST /shares/revoke` before it deletes chats |
 | `/usage/...` | Token usage and limits, kept in Treasury (collection `usage_records`). Portcullis exposes the reads as `/api/usage/...` and `/api/admin/usage/...`, and calls `POST /usage/check` and `POST /usage/records` around every agent call |
 | `/templates/...` | Saved prompts, kept in Treasury (collection `prompt_templates`). Portcullis exposes them as `/api/templates/...` after checking `chat.use` |
 | `/skills/...` | Learned skills, which Armory keeps. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
-| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`calendar`, `notes`, `memory`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`). Called by Portcullis only |
+| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`calendar`, `notes`, `memory`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`). Called by Portcullis only |
 
 ## Notes and memory
 

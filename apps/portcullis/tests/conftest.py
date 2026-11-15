@@ -24,6 +24,7 @@ from src.services.agent_gateway import AgentCallError, Caller
 from src.services.email_service import EmailDeliveryError
 from src.services.server_tools import ServerUnavailable
 from src.services.traffic import TrafficRecorder
+from tests.fake_chats import FakeChats
 
 ADMIN_USERNAME = "root"
 ADMIN_PASSWORD = "correct horse battery"
@@ -128,6 +129,8 @@ class FakeUpstream:
     unreachable: bool = False
     # Answers Stronghold's /usage routes whatever `handler` is; set to None to let `handler` answer them.
     usage: FakeUsage | None = field(default_factory=FakeUsage)
+    # Answers Stronghold's /chats and /chat-folders routes the same way; None lets `handler` answer them.
+    chats: FakeChats | None = field(default_factory=FakeChats)
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
         await request.aread()
@@ -136,6 +139,8 @@ class FakeUpstream:
             raise httpx.ConnectError("connection refused (fake)", request=request)
         if self.usage is not None and request.url.path.startswith("/usage"):
             return self.usage.respond(request)
+        if self.chats is not None and request.url.path.startswith(("/chats", "/chat-folders")):
+            return self.chats.respond(request)
         if self.handler:
             return self.handler(request)
         if request.url.path == "/shares/revoke":  # Stronghold's: chats are deleted after their links are revoked

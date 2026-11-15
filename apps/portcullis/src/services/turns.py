@@ -540,11 +540,10 @@ class TurnRegistry:
             )
 
     async def _answer(self, turn: Turn) -> None:
-        async with self._database.sessions() as session:
-            try:
-                messages = decode_messages(await ChatService(session, turn.account_id).get(turn.chat_id))
-            except ChatNotFound:
-                return
+        try:
+            messages = decode_messages(await ChatService(self._stronghold, turn.caller).get(turn.chat_id))
+        except ChatNotFound:
+            return
         if not messages or messages[-1].get("role") != "user":
             await self._finish(turn, "error: nothing to answer", status="failed", error="Nothing to answer.")
             return
@@ -665,13 +664,10 @@ class TurnRegistry:
             return earlier
         for result in outcome.results:
             await self._record_usage(turn, "summary", result)
-        async with self._database.sessions() as session:
-            try:
-                await ChatService(session, turn.account_id).replace_messages(
-                    turn.chat_id, [*outcome.messages, question]
-                )
-            except ChatNotFound:
-                return earlier
+        try:
+            await ChatService(self._stronghold, turn.caller).replace_messages(turn.chat_id, [*outcome.messages, question])
+        except ChatNotFound:
+            return earlier
         await self._publish(turn, {"type": "summarized"})
         return outcome.messages
 
@@ -700,10 +696,9 @@ class TurnRegistry:
             # The step id only matters to a live viewer (snapshot); it is not saved.
             message = {**message, "steps": [{k: v for k, v in s.items() if k != "id"} for s in turn.steps]}
         try:
-            async with self._database.sessions() as session:
-                chats = ChatService(session, turn.account_id)
-                current = decode_messages(await chats.get(turn.chat_id))
-                await chats.replace_messages(turn.chat_id, [*current, message], agent_id=turn.agent.id)
+            chats = ChatService(self._stronghold, turn.caller)
+            current = decode_messages(await chats.get(turn.chat_id))
+            await chats.replace_messages(turn.chat_id, [*current, message], agent_id=turn.agent.id)
         except ChatNotFound:
             pass  # deleted while the answer was running
         except Exception:

@@ -6,7 +6,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from src.services import chat_service
+from tests import fake_chats
 from tests.conftest import FakeAgent, FakeEmailSender
 from tests.test_admin import login, make_member
 from tests.test_registration import as_admin
@@ -261,7 +261,7 @@ def test_an_unknown_chat_is_404(client: TestClient) -> None:
 
 
 def test_the_chat_count_limit_applies(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(chat_service, "MAX_CHATS_PER_ACCOUNT", 1)
+    monkeypatch.setattr(fake_chats, "MAX_CHATS_PER_ACCOUNT", 1)
     as_admin(client)
     source = make_chat(client)
 

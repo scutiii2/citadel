@@ -311,7 +311,7 @@ async def delete_account(
     # These domains live in Stronghold. Best effort: the account is already gone.
     for domain, what in (("memory", "Memory notes"), ("calendar", "Calendar"), ("notes", "Notes"),
                          ("skills", "Skills"), ("templates", "Templates"), ("usage", "Usage"), ("tickets", "Tickets"), ("shares", "Share links"),
-                         ("tuning", "Response limits")):
+                         ("tuning", "Response limits"), ("chats", "Chats and folders")):
         try:
             purged = await request.app.state.stronghold.forward("DELETE", f"/{domain}/accounts/{uid}", admin)
             confirmed = purged.status < 400

@@ -1,34 +1,37 @@
-"""Per-account chat history (port of chat_app/src/services/chats_store.py).
+"""Portcullis's view of an account's chat history, which Stronghold keeps.
 
-Every lookup filters by account, so another user's chat id behaves exactly
-like a nonexistent one - nothing here can be used to probe or read someone
-else's chats.
+`ChatService` has the calls the routes and the turn engine use (list, get, put, replace_messages,
+update, branch, delete) and asks Stronghold (`apps/stronghold/src/chats`) for each. Stronghold
+checks the owner, so another account's chat id behaves exactly like a nonexistent one; it also
+revokes a chat's share links before it deletes the chat. When Stronghold is down the call raises
+StrongholdUnavailable (answered 502), so nothing is lost or half-done.
 """
 
 from __future__ import annotations
 
 import json
-import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Protocol
 
-from sqlalchemy import delete, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import defer
+from fastapi import HTTPException
 
-from src.db import utcnow
-from src.models import Chat, ChatFolder
-from src.services.folder_service import FolderNotFound
+from src.services.stronghold_forwarder import StrongholdForwarder
 
+# Stronghold's limits (apps/stronghold/src/chats/store.py); kept here for the legacy chat_app importer.
 MAX_CHAT_BYTES = 2 * 1024 * 1024
 MAX_CHATS_PER_ACCOUNT = 1000
-TITLE_MAX = 120  # the chats.title column
+TITLE_MAX = 120
 # "folder_id was not sent", as opposed to None ("take it out of its folder").
 UNSET: Any = object()
 
 
 class ChatNotFound(Exception):
     """Unknown id, or another account's (deliberately indistinguishable)."""
+
+
+class FolderNotFound(Exception):
+    """Unknown folder id, or another account's."""
 
 
 class ChatLimitError(Exception):
@@ -61,135 +64,103 @@ def _encode(messages: list[ChatMessage]) -> str:
     return text
 
 
-def decode_messages(chat: Chat) -> list[ChatMessage]:
-    return json.loads(chat.messages)
+@dataclass
+class ChatRecord:
+    """A chat as Stronghold answered. `messages` is None in a list: the sidebar never reads transcripts."""
+
+    chat_id: str
+    title: str
+    agent_id: str | None
+    message_count: int
+    folder_id: int | None
+    pinned: bool
+    save_to_second_brain: bool
+    second_brain_scope: str
+    created_at: datetime
+    updated_at: datetime
+    messages: list[ChatMessage] | None = None
+
+    @classmethod
+    def of(cls, doc: dict[str, Any]) -> ChatRecord:
+        return cls(
+            chat_id=doc["chat_id"], title=doc["title"], agent_id=doc["agent_id"], message_count=doc["message_count"],
+            folder_id=doc["folder_id"], pinned=doc["pinned"], save_to_second_brain=doc["save_to_second_brain"],
+            second_brain_scope=doc["second_brain_scope"], created_at=datetime.fromisoformat(doc["created_at"]),
+            updated_at=datetime.fromisoformat(doc["updated_at"]), messages=doc.get("messages"),
+        )
+
+
+def decode_messages(chat: ChatRecord) -> list[ChatMessage]:
+    if chat.messages is None:
+        raise ValueError("this chat was listed without its messages")
+    return chat.messages
+
+
+class Caller(Protocol):
+    username: str
+    email: str
+    uid: str
 
 
 class ChatService:
-    def __init__(self, session: AsyncSession, account_id: int) -> None:
-        self._session = session
-        self._account_id = account_id
+    def __init__(self, stronghold: StrongholdForwarder, who: Caller) -> None:
+        self._stronghold = stronghold
+        self._who = who
 
-    async def list(self) -> list[Chat]:
-        """Newest first, without transcripts (the sidebar needs only titles;
-        `messages` must not be read from these rows)."""
-        return list(
-            await self._session.scalars(
-                select(Chat)
-                .options(defer(Chat.messages, raiseload=True))
-                .where(Chat.account_id == self._account_id)
-                .order_by(Chat.updated_at.desc())
-            )
-        )
+    async def _call(self, method: str, path: str, body: Any = None) -> Any:
+        answer = await self._stronghold.forward(method, path, self._who, json=body)  # type: ignore[arg-type]
+        if answer.status < 300:
+            return json.loads(answer.body) if answer.body else None
+        try:
+            detail = json.loads(answer.body).get("detail")
+        except (ValueError, AttributeError):
+            detail = None
+        if answer.status == 404:
+            raise (FolderNotFound(path) if detail == "Folder not found" else ChatNotFound(path))
+        if answer.status == 413:
+            raise ChatLimitError(str(detail))
+        if answer.status == 422 and path.endswith("/branch"):
+            raise NotABranchPoint(path)
+        raise HTTPException(answer.status, detail if isinstance(detail, str) else "Stronghold refused the request")
 
-    async def get(self, chat_id: str) -> Chat:
-        chat = await self._find(chat_id)
-        if chat is None:
-            raise ChatNotFound(chat_id)
-        return chat
+    async def list(self) -> list[ChatRecord]:
+        """Newest first, without transcripts."""
+        return [ChatRecord.of(doc) for doc in await self._call("GET", "/chats")]
 
-    async def put(self, chat_id: str, title: str, agent_id: str | None, messages: list[ChatMessage]) -> Chat:
+    async def get(self, chat_id: str) -> ChatRecord:
+        return ChatRecord.of(await self._call("GET", f"/chats/{chat_id}"))
+
+    async def put(self, chat_id: str, title: str, agent_id: str | None, messages: list[ChatMessage]) -> ChatRecord:
         """Creates the chat or replaces its title, agent and transcript."""
-        encoded = _encode(messages)
-        chat = await self._find(chat_id)
-        now = utcnow()
-        if chat is None:
-            await self._ensure_room(1)
-            chat = Chat(account_id=self._account_id, chat_id=chat_id, created_at=now)
-            self._session.add(chat)
-        chat.title = title
-        chat.agent_id = agent_id
-        chat.messages = encoded
-        chat.message_count = len(messages)
-        chat.updated_at = now
-        await self._session.commit()
-        return chat
+        return ChatRecord.of(await self._call(
+            "PUT", f"/chats/{chat_id}", {"title": title, "agent_id": agent_id, "messages": messages}))
 
-    async def branch(self, source_id: str, upto: int) -> Chat:
-        """A new chat holding the source's messages up to and including
-        message `upto`, which must be one of the assistant's answers. The
-        source is not touched; the copy shares nothing with it. It keeps the
-        source's agent and folder (never its pin) and is titled "Branch of <title>"."""
-        source = await self.get(source_id)
-        messages = decode_messages(source)
-        target = messages[upto] if 0 <= upto < len(messages) else None
-        if target is None or target.get("role") != "assistant" or target.get("kind"):
-            raise NotABranchPoint(upto)
-        title = f"Branch of {source.title}"
-        if len(title) > TITLE_MAX:
-            title = title[: TITLE_MAX - 1] + "…"
-        branched = await self.put(str(uuid.uuid4()), title, source.agent_id, messages[: upto + 1])
-        if source.folder_id is not None:
-            branched.folder_id = source.folder_id
-            await self._session.commit()
-        return branched
+    async def branch(self, source_id: str, upto: int) -> ChatRecord:
+        """A new chat holding the source's messages up to and including answer `upto`."""
+        return ChatRecord.of(await self._call("POST", f"/chats/{source_id}/branch", {"upto": upto}))
 
-    async def replace_messages(self, chat_id: str, messages: list[ChatMessage], agent_id: str | None = None) -> Chat:
-        """New transcript for an existing chat, keeping its title (and its
-        agent unless one is given). Used by server-run turns."""
-        chat = await self.get(chat_id)
-        chat.messages = _encode(messages)
-        chat.message_count = len(messages)
-        if agent_id is not None:
-            chat.agent_id = agent_id
-        chat.updated_at = utcnow()
-        await self._session.commit()
-        return chat
-
-    async def rename(self, chat_id: str, title: str) -> Chat:
-        chat = await self.get(chat_id)
-        chat.title = title
-        await self._session.commit()
-        return chat
+    async def replace_messages(self, chat_id: str, messages: list[ChatMessage], agent_id: str | None = None) -> ChatRecord:
+        """New transcript for an existing chat, keeping its title (and its agent unless one is given)."""
+        return ChatRecord.of(await self._call(
+            "PUT", f"/chats/{chat_id}/messages", {"messages": messages, **({"agent_id": agent_id} if agent_id else {})}))
 
     async def update(
         self, chat_id: str, *, title: str | None = None, folder_id: int | None = UNSET,
         pinned: bool | None = None, save_to_second_brain: bool | None = None,
         second_brain_scope: str | None = None,
-    ) -> Chat:
-        """Changes whichever of title, folder and pin are given. `folder_id`
-        None takes the chat out of its folder; a folder of another account is
-        FolderNotFound. Does not touch updated_at: filing a chat is not
-        activity, and must not reorder the list."""
-        chat = await self.get(chat_id)
+    ) -> ChatRecord:
+        """Changes whichever of title, folder, pin and the second-brain settings are given. `folder_id` None
+        takes the chat out of its folder; a folder of another account is FolderNotFound."""
+        changes: dict[str, Any] = {"title": title, "pinned": pinned, "save_to_second_brain": save_to_second_brain,
+                                   "second_brain_scope": second_brain_scope}
+        body = {k: v for k, v in changes.items() if v is not None}
         if folder_id is not UNSET:
-            if folder_id is not None:
-                owned = await self._session.scalar(
-                    select(ChatFolder.id).where(ChatFolder.id == folder_id, ChatFolder.account_id == self._account_id)
-                )
-                if owned is None:
-                    raise FolderNotFound(folder_id)
-            chat.folder_id = folder_id
-        if title is not None:
-            chat.title = title
-        if pinned is not None:
-            chat.pinned = pinned
-        if save_to_second_brain is not None:
-            chat.save_to_second_brain = save_to_second_brain
-        if second_brain_scope is not None:
-            chat.second_brain_scope = second_brain_scope
-        await self._session.commit()
-        return chat
+            body["folder_id"] = folder_id
+        return ChatRecord.of(await self._call("PATCH", f"/chats/{chat_id}", body))
 
     async def delete(self, chat_id: str) -> None:
-        """Deletes the chat. Its share links are revoked before this is called (services/share_service.py)."""
-        chat = await self.get(chat_id)
-        await self._session.delete(chat)
-        await self._session.commit()
+        """Deletes the chat and its share links."""
+        await self._call("DELETE", f"/chats/{chat_id}")
 
-    async def delete_all(self) -> int:
-        result = await self._session.execute(delete(Chat).where(Chat.account_id == self._account_id))
-        await self._session.commit()
-        return result.rowcount or 0
-
-    async def _find(self, chat_id: str) -> Chat | None:
-        return await self._session.scalar(
-            select(Chat).where(Chat.account_id == self._account_id, Chat.chat_id == chat_id)
-        )
-
-    async def _ensure_room(self, adding: int) -> None:
-        count = await self._session.scalar(
-            select(func.count()).select_from(Chat).where(Chat.account_id == self._account_id)
-        )
-        if (count or 0) + adding > MAX_CHATS_PER_ACCOUNT:
-            raise ChatLimitError(f"At most {MAX_CHATS_PER_ACCOUNT} chats per account - delete some first")
+    async def delete_all(self) -> None:
+        await self._call("DELETE", "/chats")
