@@ -25,7 +25,7 @@ services:
       # The notes tools read the notes the Notes page saves, which Stronghold keeps in its own database.
       DB_GATEWAY_INSTANCE: armory
       DB_GATEWAY_CONNECTION: stronghold
-      EMBER_API_URL: http://portcullis:29601
+      STRONGHOLD_URL: http://stronghold:29650
     volumes:
       # Writable: the Extensions page in ember_admin saves added extensions into this tracked file.
       - ./docker/configs/armory/extensions.json:/app/configs/config_extensions.json

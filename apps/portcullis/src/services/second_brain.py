@@ -11,7 +11,7 @@ import re
 from src.models import Account
 from src.services.mcp_server_info import McpServerInfo
 from src.services.permissions import TOOLS_EXECUTE
-from src.services.brain_connections import PUBLISH, BrainError
+from src.services.brain_client import PUBLISH, BrainError
 
 
 async def available(account: Account, info: McpServerInfo, *, scope="instance", connections=None) -> bool:

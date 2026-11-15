@@ -98,9 +98,9 @@ Protocol reference: [Local REST API OpenAPI specification](https://github.com/co
 
 ## Managed connections and promotion
 
-Ember API owns encrypted, revisioned connections. Armory resolves each operation
-through `EMBER_API_URL` (local default `http://127.0.0.1:29601`, Compose
-`http://portcullis:29601`) using the shared internal token and trusted requester UID.
+Stronghold owns encrypted, revisioned connections. Armory resolves each operation
+through `STRONGHOLD_URL` (local default `http://127.0.0.1:29650`, Compose
+`http://stronghold:29650`) using the shared internal token and trusted requester UID.
 Saved/disabled revisions apply without a restart; they override legacy environment
 configuration. Personal HTTPS connections pin checked DNS addresses, reject
 backend loopback/link-local/metadata and redirects, and always verify TLS.

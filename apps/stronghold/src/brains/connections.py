@@ -11,9 +11,9 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from src.db import utcnow
-from src.services.db_gateway import DocumentStore, DbGatewayError
-from src.services.secret_box import SecretBox, SecretBoxError
+from src.calendar.settings import utcnow
+from src.document_store import DbGatewayError, DocumentStore
+from src.secret_box import SecretBox, SecretBoxError
 
 COLLECTION = "brain_connections"
 REVISIONS = "brain_connection_revisions"

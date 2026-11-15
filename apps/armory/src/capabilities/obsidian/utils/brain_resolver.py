@@ -15,7 +15,7 @@ def resolve(scope: str, operation: str, uid: str | None = None) -> dict:
     constrained = identity_context._from_request_meta("brain_scope")
     if operation in {"write", "append"} and constrained in {"personal", "instance"} and scope != constrained:
         raise ObsidianGatewayError("The selected auto-save destination cannot be changed by the model.")
-    request = urllib.request.Request(settings.ember_api_url.rstrip("/") + "/api/brains/internal/resolve",
+    request = urllib.request.Request(settings.stronghold_url.rstrip("/") + "/brains/resolve",
         data=json.dumps({"scope": scope, "operation": operation}).encode(), method="POST",
         headers={"X-Internal-Token": settings.internal_api_token, "X-Requester-Uid": uid, "Content-Type": "application/json"})
     try:

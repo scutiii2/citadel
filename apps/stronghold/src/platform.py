@@ -41,6 +41,15 @@ class PortcullisClient:
             raise PlatformError(f"Portcullis answered {response.status_code}")
         return response.json()
 
+    async def permissions(self, uid: str) -> set[str] | None:
+        """The permissions of an account that is active (and verified, when required); None for any other."""
+        response = await self._send("GET", f"/internal/accounts/{uid}/permissions")
+        if response.status_code == 404:
+            return None
+        if response.status_code != 200:
+            raise PlatformError(f"Portcullis answered {response.status_code}")
+        return set(response.json()["permissions"])
+
     async def switches(self) -> dict[str, bool]:
         """The administrator's on/off settings, by name."""
         response = await self._send("GET", "/internal/switches")

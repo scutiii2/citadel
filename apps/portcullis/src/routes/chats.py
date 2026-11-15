@@ -39,7 +39,7 @@ from src.deps import (
 from src.models import Account
 from src.routes.mcp import get_agent_directory
 from src.routes.server_info import get_server_info
-from src.services.brain_connections import BrainConnections
+from src.services.brain_client import RemoteBrains
 from src.services import question_answers, second_brain, suggestions, summarization
 from src.services.account_agent_service import AccountAgentService, blocked_names
 from src.services.agent_directory import NO_AGENT_RUNNING, AgentDirectory
@@ -447,22 +447,21 @@ async def search_chats(
     return await pass_on(request, stronghold, account, "/chats/search")
 
 
-async def _second_brain_available(account: Account, store: DocumentStore, info: McpServerInfo, box=None, scope="instance") -> bool:
+async def _second_brain_available(account: Account, stronghold: StrongholdForwarder, info: McpServerInfo, scope="instance") -> bool:
     try:
-        return await second_brain.available(account, info, scope=scope, connections=BrainConnections(store, box) if box else None)
-    except (DbGatewayError, McpServerUnavailable, McpServerRefused):
+        return await second_brain.available(account, info, scope=scope, connections=RemoteBrains(stronghold, account))
+    except (StrongholdUnavailable, McpServerUnavailable, McpServerRefused):
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Could not check Obsidian capability availability") from None
 
 
 @router.get("/second-brain")
 async def second_brain_status(
     scope: Literal["instance", "personal", "both"] = "instance",
-    box: SecretBox = Depends(get_secret_box),
     account: Account = Depends(require_chat),
-    store: DocumentStore = Depends(get_db_gateway),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
     info: McpServerInfo = Depends(get_server_info),
 ) -> dict[str, bool]:
-    return {"available": await _second_brain_available(account, store, info, box, scope)}
+    return {"available": await _second_brain_available(account, stronghold, info, scope)}
 
 
 @router.get("/{chat_id}")
@@ -548,12 +547,11 @@ async def put_chat(
 @router.patch("/{chat_id}")
 async def update_chat(
     body: UpdateChatRequest,
-    box: SecretBox = Depends(get_secret_box),
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
     turns: TurnRegistry = Depends(get_turns),
-    store: DocumentStore = Depends(get_db_gateway),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
     info: McpServerInfo = Depends(get_server_info),
     logs: LogWriter = Depends(get_log_writer),
 ) -> ChatSummaryOut:
@@ -565,7 +563,7 @@ async def update_chat(
     try:
         previous = await chats.get(chat_id)
         destination = body.second_brain_scope or previous.second_brain_scope
-        if (body.save_to_second_brain is True or body.second_brain_scope is not None and previous.save_to_second_brain) and not await _second_brain_available(account, store, info, box, destination):
+        if (body.save_to_second_brain is True or body.second_brain_scope is not None and previous.save_to_second_brain) and not await _second_brain_available(account, stronghold, info, destination):
             raise HTTPException(status.HTTP_409_CONFLICT, "Add and activate the Obsidian capability before enabling auto-save")
         chat = await chats.update(chat_id, **changes)
     except ChatNotFound as error:
@@ -696,7 +694,7 @@ async def start_turn(
     brain_notice = ""
     auto_save = saved_preference if body.save_to_second_brain is None else body.save_to_second_brain
     if auto_save:
-        permitted = await _second_brain_available(account, db_gateway, info, box, brain_scope)
+        permitted = await _second_brain_available(account, stronghold, info, brain_scope)
         if body.save_to_second_brain is True and not permitted:
             raise HTTPException(status.HTTP_409_CONFLICT, "Activate Obsidian and enable its write tool before auto-saving")
         if not permitted:

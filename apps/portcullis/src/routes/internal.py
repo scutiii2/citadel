@@ -55,6 +55,15 @@ async def recipient(
     return {"uid": account.uid, "email": account.email}
 
 
+@router.get("/accounts/{uid}/permissions")
+async def permissions(
+    uid: Uid, session: AsyncSession = Depends(get_db_session), settings: Settings = Depends(get_settings),
+) -> dict[str, list[str]]:
+    """What a usable account may do right now; 404 for an unknown, inactive or unverified one."""
+    account = await _usable_account(session, settings, uid)
+    return {"permissions": sorted(account.permission_names)}
+
+
 @router.get("/switches")
 async def switches(session: AsyncSession = Depends(get_db_session)) -> dict[str, bool]:
     """The administrator's on/off settings."""

@@ -131,6 +131,8 @@ class FakeUpstream:
     usage: FakeUsage | None = field(default_factory=FakeUsage)
     # Answers Stronghold's /chats and /chat-folders routes the same way; None lets `handler` answer them.
     chats: FakeChats | None = field(default_factory=FakeChats)
+    # Stronghold's answer to "may this account write to its brain?" when `handler` does not take /brains/writable.
+    brain_writable: bool = True
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
         await request.aread()
@@ -141,6 +143,8 @@ class FakeUpstream:
             return self.usage.respond(request)
         if self.chats is not None and request.url.path.startswith(("/chats", "/chat-folders")):
             return self.chats.respond(request)
+        if request.url.path.startswith("/brains/writable/"):
+            return httpx.Response(200, json={"writable": self.brain_writable})
         if self.handler:
             return self.handler(request)
         if request.url.path == "/shares/revoke":  # Stronghold's: chats are deleted after their links are revoked

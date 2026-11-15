@@ -51,9 +51,15 @@ class FakePlatform:
         self.sent: list[tuple[str, str, str]] = []
         self.errors: list[tuple[str, str]] = []
         self.actions: list[tuple[str, str, str]] = []
+        # What each account may do; `granted[uid] = None` is an inactive or unverified account.
+        self.default_permissions = {"chat.use", "settings.manage", "brain.instance.publish", "tools.execute"}
+        self.granted: dict[str, set[str] | None] = {}
 
     async def recipient(self, uid, permission):
         return {"uid": uid, "email": f"{uid}@example.com"}
+
+    async def permissions(self, uid):
+        return self.granted.get(uid, self.default_permissions)
 
     async def switches(self):
         return {"calendar_inapp": True, "calendar_email": True, "calendar_push": True}

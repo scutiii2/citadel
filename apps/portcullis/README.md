@@ -436,7 +436,7 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 
 Tags are trimmed and lowercased, repeats are dropped, and each is 1 to 30 characters of `a-z`, `0-9`, `-` and `_` (not starting with `-` or `_`); at most 10 per note, otherwise `422`. `agent_readable` (default off) marks a note agents may read; mcp_server's `notes` capability (read-only) is the only reader: it lists, searches and reads just the notes whose flag is on, for the asking account, straight from db_gateway. A note saved before tags existed reads as untagged and not agent-readable. `last_editor` is `"agent"` when mcp_server's notes tools saved the note last and `"user"` otherwise (older notes too); a create or save from the page always sets `"user"`, and a `last_editor` in a request body is ignored.
 
-The notes routes are answered by Stronghold (`apps/stronghold/src/notes`): portcullis checks the login and `chat.use`, then passes the request on. Notes are kept in Stronghold's database in Treasury. A malformed id is refused here with `404` and does not reach Stronghold. When Stronghold is down every notes route answers `502` `Stronghold is unavailable`. Brains (still here) read notes from Stronghold through `services/remote_notes.py`.
+The notes routes are answered by Stronghold (`apps/stronghold/src/notes`): portcullis checks the login and `chat.use`, then passes the request on. Notes are kept in Stronghold's database in Treasury. A malformed id is refused here with `404` and does not reach Stronghold. When Stronghold is down every notes route answers `502` `Stronghold is unavailable`. Brains are in Stronghold too.
 
 Tag suggestions (Stronghold, `src/notes/tag_suggestions.py`): Stronghold finds the running agent whose definition uses the `laya` provider (`AgentDirectory.find_by_provider`) and sends it `ask` with a text and one yes/no question per candidate tag. The text is the first 700 characters of title and body, at most 8 candidates (the most used) are checked, 4 per call (a call Laya finds too long is retried one tag at a time), and the whole request has a 30 second limit. Only answers that are yes (0.5 or more) and not marked uncertain are returned, best first, at most 5. Laya runs locally, so the note text does not leave the machine; the agent logs a usage row for each call. The suggestions are rough (Laya's confidence is uncalibrated), so the page only offers them and never applies one.
 
@@ -847,7 +847,9 @@ gateway. Routes get it from `get_db_gateway` in `src/deps.py`; tests use `FakeDb
 ## Obsidian brains
 
 Authenticated `/api/brains` routes manage scoped vault connections and Notes
-promotion. See [operations and storage](../../../docs/obsidian-brains.md).
+promotion. Stronghold (`apps/stronghold/src/brains`) keeps the connections and does the work and asks
+Portcullis for the account's permissions on every request (`/internal/accounts/{uid}/permissions`);
+Portcullis checks the login (and `chat.use`) and passes each request on. See [operations and storage](../../../docs/obsidian-brains.md).
 
 | Route | Responsibility |
 | --- | --- |
@@ -855,7 +857,7 @@ promotion. See [operations and storage](../../../docs/obsidian-brains.md).
 | `POST /api/brains/connections/{scope}/test` | Bounded read-only candidate test; no activation or publication. |
 | `GET /api/brains/destinations` | Authorized destination labels, revisions and write availability. |
 | `POST /api/brains/browse` | Signed-in browse/read/status/scoped hybrid search, independent of Supermarket opt-in. |
-| `POST /api/brains/internal/resolve` | Internal-token/trusted-UID snapshots for Armory; never a browser credential API. |
+| (Stronghold) `POST /brains/resolve` | Internal-token/trusted-UID snapshots for Armory (no longer a Portcullis route); never a browser credential API. |
 | `GET /api/brains/notes/{id}/review` | Owned Note content/hash/revision for publication review. |
 | `GET /api/brains/promotions` | Owned publication receipts and changed-source state. |
 | `POST /api/brains/notes/{id}/promote` | Recoverable, create-only reviewed publication; preserves the source Note. |

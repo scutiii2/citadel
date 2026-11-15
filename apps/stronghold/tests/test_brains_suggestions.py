@@ -2,9 +2,9 @@ import asyncio
 
 import pytest
 
-from src.services.brain_connections import BrainError
-from src.services.brain_suggestions import eligible_notes, parse_suggestions
-from src.services.notes import NotesService
+from src.brains.connections import BrainError
+from src.brains.suggestions import eligible_notes, parse_suggestions
+from src.notes.store import NotesService
 from tests.conftest import FakeDbGateway
 
 

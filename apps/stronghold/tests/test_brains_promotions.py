@@ -4,10 +4,10 @@ import hashlib
 import pytest
 from cryptography.fernet import Fernet
 
-from src.services.brain_connections import BrainConnections, BrainError, ConnectionInput
-from src.services.brain_promotions import Promotions, PublicationInput, note_hash
-from src.services.notes import NotesService
-from src.services.secret_box import SecretBox
+from src.brains.connections import BrainConnections, BrainError, ConnectionInput
+from src.brains.promotions import Promotions, PublicationInput, note_hash
+from src.notes.store import NotesService
+from src.secret_box import SecretBox
 from tests.conftest import FakeDbGateway
 
 

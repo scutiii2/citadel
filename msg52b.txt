@@ -1,0 +1,20 @@
+Move brains to Stronghold (Plan 5.2b)
+
+Stronghold keeps the encrypted Obsidian brain connections, Note
+publication and AI promotion suggestions in Treasury. Stronghold has no
+sessions, so it asks Portcullis what an account may do on every request
+(new /internal/accounts/{uid}/permissions); a permission taken away
+applies at once. Armory resolves connections through Stronghold's
+POST /brains/resolve (STRONGHOLD_URL replaces EMBER_API_URL). Portcullis
+/api/brains routes are pass-throughs; auto-save asks Stronghold whether a
+destination is writable. Account delete purges brains through Stronghold.
+
+No data migration: connections, promotions and suggestions start empty,
+so saved Obsidian API keys must be entered again.
+
+Tests: stronghold 521 passed, armory 1839 passed (1 skipped), portcullis
+1310 passed.
+Not run: Docker builds, Armory against a real Stronghold, a real vault,
+browser.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>

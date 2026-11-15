@@ -18,6 +18,9 @@ from src.attachments import routes as attachments_routes
 from src.attachments import services as tool_services
 from src.attachments.services import ArmoryUploads
 from src.bard import routes as bard_routes
+from src.brains import routes as brains_routes
+from src.brains.connections import BrainError
+from src.brains.gateway import BrainGateway
 from src.auth import ENV_PATH, InternalTokenMiddleware
 from src.calendar import routes as calendar_routes
 from src.chats import routes as chats_routes
@@ -86,6 +89,7 @@ def create_app(
         armory_client = armory or http(settings.armory_url)
         app.state.memory = MemoryClient(armory_client, token or None)
         app.state.skills = SkillsClient(armory_client, token or None)
+        app.state.brain_gateway = BrainGateway(armory_client, token or None)
         app.state.tickets = ArmoryTickets(armory_client, token or None)
         app.state.ticket_unread = TicketUnread(app.state.store)
         app.state.limits = LimitsStore(app.state.store)
@@ -122,6 +126,7 @@ def create_app(
     app.add_middleware(InternalTokenMiddleware, token=token)
     app.include_router(attachments_routes.router)
     app.include_router(bard_routes.router)
+    app.include_router(brains_routes.router)
     app.include_router(calendar_routes.router)
     app.include_router(chats_routes.router)
     app.include_router(chats_routes.folder_router)
@@ -135,6 +140,10 @@ def create_app(
     app.include_router(tickets_routes.admin_router)
     app.include_router(triage_routes.router)
     app.include_router(tuning_routes.router)
+
+    @app.exception_handler(BrainError)
+    async def brain_error(_request: Request, error: BrainError):
+        return JSONResponse({"detail": str(error)}, status_code=error.status)
 
     @app.exception_handler(CalendarError)
     async def calendar_error(_request: Request, error: CalendarError):

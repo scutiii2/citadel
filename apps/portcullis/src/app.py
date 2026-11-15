@@ -14,7 +14,6 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 from src.routes import brains, stronghold
-from src.services.brain_connections import BrainError
 
 from src.config import Settings
 from src.db import Database
@@ -250,14 +249,8 @@ def create_app(
     app.include_router(tickets_routes.router)
     app.include_router(tickets_routes.admin_router)
 
-    @app.exception_handler(BrainError)
-    async def brain_error(_request: Request, error: BrainError):
-        return JSONResponse({"detail": str(error)}, status_code=error.status)
-
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, error: RequestValidationError):
-        if request.url.path.startswith("/api/brains"):
-            return JSONResponse({"detail": "Invalid brain request. Check the fields and limits."}, status_code=422)
         return await request_validation_exception_handler(request, error)
 
     @app.exception_handler(UsageUnavailable)

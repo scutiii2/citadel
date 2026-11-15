@@ -3,8 +3,8 @@ import asyncio
 import pytest
 from cryptography.fernet import Fernet
 
-from src.services.brain_connections import BrainConnections, BrainError, ConnectionInput
-from src.services.secret_box import SecretBox
+from src.brains.connections import BrainConnections, BrainError, ConnectionInput
+from src.secret_box import SecretBox
 from tests.conftest import FakeDbGateway
 
 

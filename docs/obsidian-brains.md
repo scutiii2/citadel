@@ -27,15 +27,15 @@ TLS verification, refuses redirects, and ignores proxy environment variables.
 Install the plugin certificate in the backend trust store when necessary; there
 is no personal TLS bypass. An instance administrator can configure a local vault.
 
-API keys are encrypted by Ember API's existing SecretBox in db_gateway. Protect
+API keys are encrypted by Stronghold's SecretBox (key in `keys.json` of Stronghold's data folder) in its own database. Protect
 the existing encryption key together with storage backups. Product account
 isolation does not hide data from the operator of the deployment.
 
 ## Backend configuration and compatibility
 
-Armory needs `EMBER_API_URL` to reach Ember API's internal connection resolver.
-The local default is `http://127.0.0.1:29601`; Compose sets
-`http://portcullis:29601`. Both services require the same `INTERNAL_API_TOKEN`.
+Armory needs `STRONGHOLD_URL` to reach Stronghold's internal connection resolver.
+The local default is `http://127.0.0.1:29650`; Compose sets
+`http://stronghold:29650`. Both services require the same `INTERNAL_API_TOKEN`.
 Resolution fails closed without a token and trusted, valid account UID. No browser
 or model supplies an owner UID or receives a stored credential.
 
@@ -120,7 +120,7 @@ another brain. CLI parsing and optional turn parameters preserve this contract.
 
 ## Stored and generated state
 
-Ember API owns db_gateway collections `brain_connections`,
+Stronghold owns Treasury collections `brain_connections`,
 `brain_connection_revisions`, `brain_promotions`, `brain_promotion_attempts`,
 `brain_promotion_decisions`, `brain_promotion_requests` and `brain_suggestions`.
 Connection revisions and promotion decisions use create-if-absent claims; mutable
