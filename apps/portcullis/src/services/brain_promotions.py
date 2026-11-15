@@ -40,21 +40,23 @@ class PublicationInput(BaseModel):
 
 
 class Promotions:
-    def __init__(self, store, connections, remote, uid: str, *, publish: bool):
+    def __init__(self, store, connections, remote, uid: str, *, publish: bool, notes=None):
         self.store, self.connections, self.remote, self.uid = store, connections, remote, uid
+        # Where the account's notes are read from; the routes pass RemoteNotes (Stronghold).
+        self.notes = notes or NotesService(store, uid)
         self.can_publish = publish
 
     async def list(self, note_id: str | None = None):
         rows = await self.store.query(COLLECTION, {"owner": self.uid}, limit=500)
         rows = [await self._current(row["id"]) for row in rows if row.get("owner") == self.uid]
-        notes = {note.id: note_hash(note) for note in await NotesService(self.store, self.uid).list()}
+        notes = {note.id: note_hash(note) for note in await self.notes.list()}
         return [{k: v for k, v in row.items() if k not in {"draft", "owner", "idempotency_key"}} | {
             "source_changed": notes.get(row["note_id"]) != row["source_hash"]}
             for row in rows if row.get("owner") == self.uid and (note_id is None or row["note_id"] == note_id)]
 
     async def publish(self, note_id: str, body: PublicationInput):
         try:
-            note = await NotesService(self.store, self.uid).get(note_id)
+            note = await self.notes.get(note_id)
         except NoteNotFound:
             raise BrainError("Note not found", 404) from None
         if note_hash(note) != body.source_hash or note.updated_at != body.source_revision:

@@ -13,7 +13,7 @@ from src.services.brain_connections import BrainConnections, BrainError, Connect
 from src.services.brain_gateway import BrainGateway
 from src.services.brain_promotions import Promotions, PublicationInput, note_hash
 from src.services import brain_suggestions
-from src.services.notes import NotesService
+from src.services.remote_notes import RemoteNotes
 from src.services.agent_gateway import Caller, AgentCallError
 from src.routes.mcp import get_agent_directory
 from src.services.usage_service import UsageService
@@ -117,8 +117,10 @@ async def browse(body: BrowseBody, account=Depends(valid_account), remote=Depend
 
 
 
-def promotions(account=Depends(require_permission("chat.use")), service=Depends(connections), remote=Depends(gateway)):
-    return Promotions(service.store, service, remote, account.uid, publish=PUBLISH in account.permission_names)
+def promotions(request: Request, account=Depends(require_permission("chat.use")), service=Depends(connections),
+               remote=Depends(gateway)):
+    return Promotions(service.store, service, remote, account.uid, publish=PUBLISH in account.permission_names,
+                      notes=RemoteNotes(request.app.state.stronghold, account))
 
 
 @router.get("/promotions")
@@ -127,10 +129,10 @@ async def list_promotions(service=Depends(promotions)):
 
 
 @router.get("/notes/{note_id}/review")
-async def review_publication(note_id: str, account=Depends(require_permission("chat.use")), service=Depends(connections)):
+async def review_publication(note_id: str, request: Request, account=Depends(require_permission("chat.use"))):
     from src.services.notes import NoteNotFound
     try:
-        note = await NotesService(service.store, account.uid).get(note_id)
+        note = await RemoteNotes(request.app.state.stronghold, account).get(note_id)
     except NoteNotFound:
         raise BrainError("Note not found", 404) from None
     return {"note_id": note.id, "title": note.title, "body": note.body,
@@ -161,7 +163,7 @@ async def review_notes(body: ReviewBody, request: Request, account=Depends(requi
                        service=Depends(connections), session=Depends(get_db_session),
                        settings=Depends(get_settings), agent_gateway=Depends(get_agent_gateway),
                        directory=Depends(get_agent_directory)):
-    notes_service = NotesService(service.store, account.uid)
+    notes_service = RemoteNotes(request.app.state.stronghold, account)
     notes = await brain_suggestions.eligible_notes(notes_service, body.note_ids, body.explicit_private)
     snapshots = {}
     for scope in ("personal", "instance"):
@@ -199,9 +201,9 @@ async def review_notes(body: ReviewBody, request: Request, account=Depends(requi
 
 
 @router.get("/suggestions")
-async def list_suggestions(account=Depends(require_permission("chat.use")), service=Depends(connections)):
+async def list_suggestions(request: Request, account=Depends(require_permission("chat.use")), service=Depends(connections)):
     rows = await service.store.query(brain_suggestions.COLLECTION, {"owner": account.uid}, limit=500)
-    notes = {n.id: n for n in await NotesService(service.store, account.uid).list()}
+    notes = {n.id: n for n in await RemoteNotes(request.app.state.stronghold, account).list()}
     results = []
     for row in rows:
         note = notes.get(row["note_id"])

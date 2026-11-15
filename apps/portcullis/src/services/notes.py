@@ -5,6 +5,9 @@ account's uid (never reused). A note is only ever returned to its owner: anyone 
 id is reported as not found, the same as an id that does not exist.
 """
 
+# The Notes page and its storage moved to Stronghold (apps/stronghold/src/notes). What stays here
+# is what brains still use: the Note type, its errors and NotesService for the brain unit tests.
+# It leaves with brains.
 from __future__ import annotations
 
 import re

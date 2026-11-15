@@ -15,7 +15,6 @@ from src.services.db_gateway import DocumentStore
 from src.services.stronghold_forwarder import StrongholdForwarder
 from src.services.email_service import EmailSender
 from src.services.log_service import LogWriter
-from src.services.memory_purger import MemoryPurger
 from src.services.otp_service import OtpService
 from src.services.public_rate_limiter import PublicReadLimiter
 from src.services.server_tools import ServerTools
@@ -79,10 +78,6 @@ def get_extension_probe(request: Request) -> ExtensionProbe:
 
 def get_server_tools(request: Request) -> ServerTools:
     return request.app.state.server_tools
-
-
-def get_memory_purger(request: Request) -> MemoryPurger:
-    return request.app.state.memory_purger
 
 
 def get_log_writer(request: Request) -> LogWriter:

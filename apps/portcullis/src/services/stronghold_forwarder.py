@@ -17,6 +17,7 @@ import httpx
 
 from src.models import Account
 from src.services.traffic import TrafficRecorder
+from src.services.uid_log_filter import redact
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,8 @@ class StrongholdForwarder:
     ) -> ForwardedResponse:
         """One call to a fixed Stronghold path. `path` is built by the route, never by the browser."""
         try:
-            with self._traffic.timed("stronghold", f"{method} {path}") as timing:
+            # A purge path carries an account uid: keep it out of the traffic counters and the log.
+            with self._traffic.timed("stronghold", f"{method} {redact(path)}") as timing:
                 response = await self._client.request(
                     method,
                     f"{self._base}{path}",
@@ -76,11 +78,12 @@ class StrongholdForwarder:
                     json=json,
                     headers=self._headers(account),
                     timeout=_TIMEOUT,
+                    follow_redirects=False,  # the identity headers must never follow one
                 )
                 timing.ok = response.status_code < 500
         except httpx.HTTPError as error:
-            logger.warning("stronghold %s %s unreachable: %s", method, path, error)
-            raise StrongholdUnavailable(str(error)) from error
+            logger.warning("stronghold %s %s unreachable: %s", method, redact(path), type(error).__name__)
+            raise StrongholdUnavailable(type(error).__name__) from error
         if response.status_code >= 500:
             raise StrongholdUnavailable(f"stronghold answered {response.status_code}")
         return ForwardedResponse(

@@ -22,6 +22,9 @@ services:
       MCP_HOST: 0.0.0.0
       MCP_PORT: "29600"
       DB_GATEWAY_URL: http://treasury:29602
+      # The notes tools read the notes the Notes page saves, which Stronghold keeps in its own database.
+      DB_GATEWAY_INSTANCE: armory
+      DB_GATEWAY_CONNECTION: stronghold
       EMBER_API_URL: http://portcullis:29601
     volumes:
       # Writable: the Extensions page in ember_admin saves added extensions into this tracked file.
@@ -126,9 +129,20 @@ services:
       <<: *internal_token
       STRONGHOLD_HOST: 0.0.0.0
       STRONGHOLD_PORT: "29650"
+      DB_GATEWAY_URL: http://treasury:29602
+      # Account facts, admin switches, email and the error log are asked from Portcullis.
+      PORTCULLIS_URL: http://portcullis:29601
+      ARMORY_URL: http://armory:29600
+      AGENTS_REGISTRY_PATH: /agent_data/agent_registry.json
+      STRONGHOLD_DATA_DIR: /data
     volumes:
+      - ./docker/configs/stronghold/app.json:/app/configs/config_app.json:ro
+      # keys.json: the key that encrypts saved calendar links, and the web push key pair.
+      - stronghold_data:/data
+      # Legion's registry of running agents (notes ask the Laya and tag-writer agents).
+      - agent_data:/agent_data:ro
       - internal_token:/run/citadel
-    depends_on: [treasury]
+    depends_on: [treasury, armory]
     networks: [core]
 
   portcullis:
@@ -187,6 +201,7 @@ volumes:
   agent_data:
   treasury_data:
   portcullis_data:
+  stronghold_data:
   conversationgateway_data:
   decisiongateway_data:
   internal_token:

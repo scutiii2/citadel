@@ -1,0 +1,111 @@
+"""/internal: what Stronghold asks Portcullis for. Never for browsers.
+
+Stronghold's background jobs have no request to take an account from, and Portcullis
+owns accounts, admin switches, email and the error log. Every route needs the shared
+internal token; with none configured the routes refuse, because Portcullis is the
+one service that outside machines can reach.
+"""
+
+from __future__ import annotations
+
+import hmac
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request, Response, status
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.deps import get_db_session, get_email_sender, get_log_writer, get_settings
+from src.config import Settings
+from src.models import Account
+from src.services.email_service import EmailDeliveryError, EmailSender
+from src.services.log_service import LogWriter
+from src.services.permissions import is_known_permission
+from src.services.settings_service import SettingsService
+
+
+def require_internal(request: Request, x_internal_token: str = Header("")) -> None:
+    expected: str | None = request.app.state.internal_token
+    if not expected or not hmac.compare_digest(expected.encode("utf-8"), x_internal_token.encode("utf-8")):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or missing internal API token")
+
+
+router = APIRouter(prefix="/internal", tags=["internal"], dependencies=[Depends(require_internal)])
+Uid = Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
+
+
+async def _usable_account(session: AsyncSession, settings: Settings, uid: str) -> Account:
+    """An account that may be contacted: active, and verified when verification is required."""
+    account = await session.scalar(select(Account).where(Account.uid == uid))
+    if account is None or not account.is_active or (settings.require_email_verification and not account.email_verified):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipient")
+    return account
+
+
+@router.get("/accounts/{uid}/recipient")
+async def recipient(
+    uid: Uid, permission: Annotated[str, Query(max_length=64)],
+    session: AsyncSession = Depends(get_db_session), settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    """`{uid, email}` when the account is usable and still holds `permission`; 404 otherwise."""
+    account = await _usable_account(session, settings, uid)
+    if not is_known_permission(permission) or permission not in account.permission_names:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such recipient")
+    return {"uid": account.uid, "email": account.email}
+
+
+@router.get("/switches")
+async def switches(session: AsyncSession = Depends(get_db_session)) -> dict[str, bool]:
+    """The administrator's on/off settings."""
+    return await SettingsService(session).all()
+
+
+class NotifyIn(BaseModel):
+    subject: str = Field(min_length=1, max_length=150)
+    body: str = Field(min_length=1, max_length=5000)
+
+
+@router.post("/accounts/{uid}/notify", status_code=status.HTTP_204_NO_CONTENT)
+async def notify(
+    uid: Uid, body: NotifyIn,
+    session: AsyncSession = Depends(get_db_session), settings: Settings = Depends(get_settings),
+    sender: EmailSender = Depends(get_email_sender),
+) -> Response:
+    """Email the account at its own address. The caller names an account, never an address."""
+    account = await _usable_account(session, settings, uid)
+    try:
+        await sender.send_notification(account.email, " ".join(body.subject.split()), body.body)
+    except EmailDeliveryError:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "The email could not be sent") from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class ActionIn(BaseModel):
+    action: str = Field(pattern=r"^[a-z0-9_.]{1,60}$")
+    message: str = Field(min_length=1, max_length=300)
+
+
+@router.post("/accounts/{uid}/actions", status_code=status.HTTP_204_NO_CONTENT)
+async def log_action(
+    uid: Uid, body: ActionIn,
+    session: AsyncSession = Depends(get_db_session), logs: LogWriter = Depends(get_log_writer),
+) -> Response:
+    """Something the account did in Stronghold, for the Logs page. 404 for an unknown account."""
+    account = await session.scalar(select(Account).where(Account.uid == uid))
+    if account is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such account")
+    await logs.action(account, body.action, body.message)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class ErrorIn(BaseModel):
+    source: str = Field(pattern=r"^[a-z0-9_.]{1,40}$")
+    message: str = Field(min_length=1, max_length=500)
+
+
+@router.post("/errors", status_code=status.HTTP_204_NO_CONTENT)
+async def report_error(body: ErrorIn, logs: LogWriter = Depends(get_log_writer)) -> Response:
+    """One line in the administrators' Errors log, marked as coming from Stronghold."""
+    await logs.error(None, f"stronghold.{body.source}", body.message)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

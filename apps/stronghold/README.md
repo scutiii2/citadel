@@ -13,6 +13,22 @@ Product logic for Citadel and Ember. Only `portcullis` calls it.
 
 Default address `127.0.0.1:29650`. `STRONGHOLD_HOST` and `STRONGHOLD_PORT` override it.
 
+| Variable | Default | Purpose |
+|---|---|---|
+| `DB_GATEWAY_URL` | `http://127.0.0.1:29602` | Treasury. Stronghold uses instance `stronghold`, connection `stronghold` |
+| `PORTCULLIS_URL` | `http://127.0.0.1:29601` | Portcullis's `/internal` API (see below) |
+| `ARMORY_URL` | `http://127.0.0.1:29600` | Armory, which keeps the assistant memory |
+| `AGENTS_REGISTRY_PATH` | `../legion/.data/agent_registry.json` | Legion's list of running agents (file) |
+| `AGENTS_REGISTRY_URL` | none | The same list over HTTP; wins over the file when set |
+| `STRONGHOLD_DATA_DIR` | `.data` | Holds `keys.json` |
+| `STRONGHOLD_CONFIG` | `configs/config_app.json` | Feature settings; copy `config_app.json.example`. A missing file means defaults |
+
+`keys.json` is made on first start: the key that encrypts saved secrets (calendar links) and the web push key pair. Back it up with the data. Without it, saved links cannot be read and browsers must subscribe to push again.
+
+## What Stronghold asks Portcullis
+
+Background jobs have no request to take an account from. They call Portcullis's `/internal` routes with the internal token: an account's address and standing (`recipient`), the administrator's switches, sending an email to an account, a line on the Logs page for an action, and writing to the Errors log. See `src/platform.py`.
+
 In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container from the root `docker-compose.yml`.
 
 ## Test
@@ -25,3 +41,17 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 |---|---|
 | `GET /health` | Open. `{"status": "ok"}` |
 | `GET /whoami` | Echoes the requester. Portcullis exposes it as `GET /api/stronghold/whoami` |
+| `/calendar/...` | Feeds, events, alarms, prefs, push, alerts. Portcullis exposes them as `/api/calendar/...` after checking `calendar.use` |
+| `/notes/...` | Notes, tags, tag suggestions and generation. Portcullis exposes them as `/api/notes/...` after checking `chat.use` |
+| `/memory/...` | Assistant memory. Portcullis exposes it as `/api/memory/...` after checking `chat.use` |
+| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`calendar`, `notes`, `memory`). Called by Portcullis only |
+
+## Notes and memory
+
+`/notes/...` are an account's private notes, kept in Treasury (collection `notes`). Armory's notes tools read the same collection for the notes an account shared with agents, so Armory must use the `stronghold` connection (`DB_GATEWAY_CONNECTION=stronghold`). Tag suggestions ask the Laya agent; tag generation asks the `tag-writer` agent. `/memory/...` is the assistant memory, which Armory keeps; Stronghold scopes every call to the requester.
+
+`src/agents/` is a copy of Portcullis's agent client. Change both until chats move here.
+
+## Calendar
+
+Private read-only schedules from ICS links, with alerts before events (in-app, email, web push). The `calendar` block of the config file sets `enabled`, `tick_seconds`, `feed_refresh_minutes`, `lookahead_hours`, `late_grace_minutes`, `max_feeds_per_account`, `max_alarm_rules`, `max_ics_bytes`, `fetch_timeout_s`, `allow_private_urls` and `push_contact`. With `enabled` false the routes answer 404 and no scheduler runs. The channel switches (`calendar_inapp`, `calendar_email`, `calendar_push`) stay on Portcullis's admin Settings page.

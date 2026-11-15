@@ -240,6 +240,17 @@ Legion's Anthropic-protocol and OpenAI-protocol agents call their models through
 - **One copy per host**: do not also start the gateway's own `docker-compose.yml` on the same host; port 29407 would clash.
 - Provider keys, gateway entries and tokens live in the `conversationgateway_data` volume. Back it up with the other volumes.
 
+## Stronghold
+
+Product logic, called only by Portcullis. The calendar is the first feature that lives there.
+
+- **Storage**: Treasury, connection `stronghold` (`data/stronghold.db` in the `treasury_data` volume). `docker/configs/treasury/connections.json` must list the `stronghold` connection and instance.
+- **Keys**: `stronghold_data:/data/keys.json` is made on first start. It holds the key that encrypts saved calendar links and the web push key pair. Back the volume up. Without the file, saved links must be entered again and browsers must subscribe to push again.
+- **Settings**: `docker/configs/stronghold/app.json` (the `calendar` block). The `calendar` block in Portcullis's config and `EMBER_VAPID_*` in its `.env` are no longer read.
+- **Notes shared with agents**: Armory's notes tools read Stronghold's database. Compose sets `DB_GATEWAY_INSTANCE=armory` and `DB_GATEWAY_CONNECTION=stronghold` for Armory, and `docker/configs/treasury/connections.json` lists `stronghold` under instance `armory`. A value for these in `apps/armory/.env` is overridden by Compose.
+- Stronghold reads Legion's agent registry from the `agent_data` volume (read-only) and calls Armory for the assistant memory.
+- Stronghold calls Portcullis's `/internal` routes with the shared internal token (account standing, admin switches, email, Errors log). Nothing to configure: Compose sets `PORTCULLIS_URL`.
+
 ## DecisionGateway
 
 Legion's decision agents and its automatic routing ask Laya and Jev through DecisionGateway. It is a service of this stack, built from its own repo, and other services may use it too.

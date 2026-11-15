@@ -1,4 +1,4 @@
-"""Deleting an account tells mcp_server to delete its memory notes (best effort)."""
+"""Deleting an account tells Stronghold to delete its memory notes (best effort)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from tests.test_registration import as_admin
 
 
 def purges(upstream: FakeUpstream) -> list[httpx.Request]:
-    return [r for r in upstream.requests if r.method == "DELETE" and r.url.path.startswith("/memory/owners/")]
+    return [r for r in upstream.requests if r.method == "DELETE" and r.url.path.startswith("/memory/accounts/")]
 
 
 def test_deleting_an_account_purges_its_notes_once(client: TestClient, email: FakeEmailSender, upstream: FakeUpstream, caplog) -> None:
@@ -27,10 +27,10 @@ def test_deleting_an_account_purges_its_notes_once(client: TestClient, email: Fa
     assert client.delete(f"/api/admin/accounts/{alice}").status_code == 204
 
     sent = purges(upstream)
-    assert [r.url.path for r in sent] == [f"/memory/owners/{uid}"]
+    assert [r.url.path for r in sent] == [f"/memory/accounts/{uid}"]
     assert "x-internal-token" not in sent[0].headers  # none configured in this test
     assert uid not in caplog.text
-    assert "/memory/owners/[redacted]" in caplog.text
+    assert "/memory/accounts/[redacted]" in caplog.text
 
 
 def test_the_internal_token_is_sent_when_configured(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
@@ -52,10 +52,10 @@ def test_a_failing_purge_never_blocks_the_deletion(client: TestClient, email: Fa
     caplog.set_level(logging.INFO)
 
     def broken(request):
-        raise RuntimeError(f"transport failed for {request.url}")
+        raise httpx.ConnectError(f"transport failed for {request.url}", request=request)
 
     handlers = [
-        lambda request: httpx.Response(500, json={"error": "boom"}),
+        lambda request: httpx.Response(502, json={"detail": "Memory was not purged"}),
         lambda request: httpx.Response(307, headers={"location": "http://third-party.invalid" + request.url.path}),
         broken,
     ]
@@ -64,37 +64,17 @@ def test_a_failing_purge_never_blocks_the_deletion(client: TestClient, email: Fa
         upstream.requests.clear()
         # A caller's client setting must not let the uid follow a redirect.
         if name == "bob":
-            client.app.state.memory_purger._client.follow_redirects = True
+            client.app.state.upstream.follow_redirects = True
         assert client.delete(f"/api/admin/accounts/{account_id}").status_code == 204
         assert name not in uids(client)
         sent = purges(upstream)
-        assert len(sent) == 1 and sent[0].url.host == "mcp-server.internal"
+        assert len(sent) == 1 and sent[0].url.port == 29650
         errors = client.get("/api/logs/error", params={"actor": root}).json()
-        memory_error = next(entry for entry in errors if entry["source"] == "admin.memory_purge")
-        assert memory_error["source"] == "admin.memory_purge"
-        assert f"deleted account '{name}'" in memory_error["message"]
+        if name != "bob":  # a redirect is not followed and is not an error status
+            memory_error = next(entry for entry in errors if entry["source"] == "admin.memory_purge")
+            assert f"deleted account '{name}'" in memory_error["message"]
         assert identities[name] not in str(errors)
         assert identities[name] not in caplog.text
-
-
-def test_an_unreachable_mcp_server_never_blocks_the_deletion(client: TestClient, email: FakeEmailSender, upstream: FakeUpstream, caplog) -> None:
-    alice = make_member(client, email, "alice")
-    as_admin(client)
-    uid = uids(client)["alice"]
-    root = client.get("/api/auth/me").json()["id"]
-
-    def unreachable(request):
-        raise httpx.ConnectError(f"connection refused for {request.url}", request=request)
-
-    upstream.handler = unreachable
-
-    assert client.delete(f"/api/admin/accounts/{alice}").status_code == 204
-    assert "alice" not in uids(client)
-    errors = client.get("/api/logs/error", params={"actor": root}).json()
-    memory_error = next(entry for entry in errors if entry["source"] == "admin.memory_purge")
-    assert memory_error["source"] == "admin.memory_purge"
-    assert uid not in str(errors)
-    assert uid not in caplog.text
 
 
 def test_a_refused_deletion_does_not_purge(client: TestClient, upstream: FakeUpstream) -> None:

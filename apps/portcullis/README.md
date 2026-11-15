@@ -195,10 +195,13 @@ account's internal uid. Browser-supplied owner fields are ignored.
 Text is limited to 500 characters, whitespace is normalized, and the store holds
 at most 200 memories per account. Creation dates survive edits. Mutations log only
 the action, never memory text. No categories or source labels are inferred.
-portcullis forwards these requests to token-protected `/memory/owners/{uid}/notes`
-routes on mcp_server; both services need the same internal token and the memory
-capability must be enabled. Upstream failures return 503, missing/disabled memory
-returns 404, and redirects are refused. Private `/api/notes` remains separate.
+portcullis checks the login and `chat.use`, then passes each request to Stronghold
+(`/memory/...`), which calls Armory's token-protected `/memory/owners/{uid}/notes`
+routes; all three services need the same internal token and the memory capability
+must be enabled. Stronghold down returns 502 `Stronghold is unavailable`, Armory
+down returns 503, missing/disabled memory returns 404, and redirects are refused.
+Deleting an account purges its memories through Stronghold (best effort; a failure
+is logged as the error `admin.memory_purge`). Private `/api/notes` remains separate.
 
 ## Skills page API
 
@@ -415,7 +418,7 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `GET` | `/api/nav-preferences` | any logged-in account | How this account arranges its nav rail: `{order, pinned, hidden}`, lists of page ids (route paths such as `/agents`). All empty means the default arrangement. |
 | `PUT` | `/api/nav-preferences` | any logged-in account | Replaces it with the same shape. At most 50 ids per list, each 1-64 characters (`422` otherwise). Repeats are dropped; `pinned` and `hidden` keep only ids in `order`, and a hidden page is never pinned. portcullis does not know the page list, so unknown ids are kept. Returns what was stored. |
 | `DELETE` | `/api/nav-preferences` | any logged-in account | Back to the default arrangement. `204`, also when nothing was saved. | Nav preferences and the account's switched-off agents are kept in db_gateway (one document per account, keyed by uid). While it is down, `GET` answers the default arrangement and saving gives `503`; account agents answer `503` for every call (an empty list would switch every agent back on). Migration `0023` drops the old tables, and refuses to run while any still holds rows: copy them to the gateway or empty them first. |
-| `GET` | `/api/notes` | `chat.use` | This account's private notes, newest edit first: `[{id, title, body, tags, agent_readable, last_editor, created_at, updated_at}]`. Kept in db_gateway, not in this database. |
+| `GET` | `/api/notes` | `chat.use` | This account's private notes, newest edit first: `[{id, title, body, tags, agent_readable, last_editor, created_at, updated_at}]`. Kept by Stronghold in db_gateway, not in this database. |
 | `GET` | `/api/notes/tags` | `chat.use` | The tags this account already uses, most used first: `[{tag, count}]`. |
 | `POST` | `/api/notes/suggest-tags` | `chat.use` | `{title?, body?, tags?}` (the note as the editor holds it): which of this account's existing tags, not already in `tags`, Laya thinks fit. `{suggested, checked, skipped}`. Needs a running agent whose file uses the `laya` provider, else `503`. Laya answers alone (`local_only`: English, then typed-decisions; no fallback to Jev). |
 | `POST` | `/api/notes/generate-tag` | `chat.use` | `{title?, body?, tags?}` (the note as the editor holds it): `{tags}`, up to 3 new lowercase tags (not already on the note or used by the account) written by the `tag-writer` agent, a light-tier model that sees about 1,500 characters of the note and the account's tag names. An unusable reply gives `[]`. Nothing is saved. `503` when `tag-writer` is not running or does not answer. |
@@ -426,9 +429,11 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 
 Tags are trimmed and lowercased, repeats are dropped, and each is 1 to 30 characters of `a-z`, `0-9`, `-` and `_` (not starting with `-` or `_`); at most 10 per note, otherwise `422`. `agent_readable` (default off) marks a note agents may read; mcp_server's `notes` capability (read-only) is the only reader: it lists, searches and reads just the notes whose flag is on, for the asking account, straight from db_gateway. A note saved before tags existed reads as untagged and not agent-readable. `last_editor` is `"agent"` when mcp_server's notes tools saved the note last and `"user"` otherwise (older notes too); a create or save from the page always sets `"user"`, and a `last_editor` in a request body is ignored.
 
-Tag suggestions (`services/tag_suggestions.py`): portcullis finds the running agent whose definition uses the `laya` provider (`AgentDirectory.find_by_provider`) and sends it `ask` with a text and one yes/no question per candidate tag. The text is the first 700 characters of title and body, at most 8 candidates (the most used) are checked, 4 per call (a call Laya finds too long is retried one tag at a time), and the whole request has a 30 second limit. Only answers that are yes (0.5 or more) and not marked uncertain are returned, best first, at most 5. Laya runs locally, so the note text does not leave the machine; the agent logs a usage row for each call. The suggestions are rough (Laya's confidence is uncalibrated), so the page only offers them and never applies one.
+The notes routes are answered by Stronghold (`apps/stronghold/src/notes`): portcullis checks the login and `chat.use`, then passes the request on. Notes are kept in Stronghold's database in Treasury. A malformed id is refused here with `404` and does not reach Stronghold. When Stronghold is down every notes route answers `502` `Stronghold is unavailable`. Brains (still here) read notes from Stronghold through `services/remote_notes.py`.
 
-Every notes route answers `503` `Notes storage is unavailable` when db_gateway cannot be reached; the rest of the API is unaffected. Create, edit and delete are written to the action log without the note text, and so is each time the agent switch is turned on or off ("Let agents read a note", "Stopped agents reading a note"). Deleting an account removes its notes (best effort: a failure is logged as an error and the deletion still succeeds).
+Tag suggestions (Stronghold, `src/notes/tag_suggestions.py`): Stronghold finds the running agent whose definition uses the `laya` provider (`AgentDirectory.find_by_provider`) and sends it `ask` with a text and one yes/no question per candidate tag. The text is the first 700 characters of title and body, at most 8 candidates (the most used) are checked, 4 per call (a call Laya finds too long is retried one tag at a time), and the whole request has a 30 second limit. Only answers that are yes (0.5 or more) and not marked uncertain are returned, best first, at most 5. Laya runs locally, so the note text does not leave the machine; the agent logs a usage row for each call. The suggestions are rough (Laya's confidence is uncalibrated), so the page only offers them and never applies one.
+
+Every notes route answers `503` when Stronghold cannot reach db_gateway; the rest of the API is unaffected. Create, edit and delete are written to the action log without the note text, and so is each time the agent switch is turned on or off ("Let agents read a note", "Stopped agents reading a note"); Stronghold sends these lines through `POST /internal/accounts/{uid}/actions`, and a line is lost if that call fails. Deleting an account removes its notes through Stronghold (best effort: a failure is logged as the error `admin.notes_purge` and the deletion still succeeds).
 | `GET` | `/api/account-agents` | any logged-in account | The specialist agents this account switched off: `{disabled: [agent ids]}`. A new account has every agent on. `503` while db_gateway is down (an empty list would switch them all back on). |
 | `PUT` | `/api/account-agents/{agent_id}` | any logged-in account | `{enabled: bool}` switches one agent on or off for this account's chats (`agent_id` 1-64 characters of `A-Za-z0-9_.-`, else `422`). Same reply as `GET`. Repeating a change is a no-op; at most 200 agents per account (`409`). Logged as `account.agent_enable` / `account.agent_disable`. The entry agent leaves a switched-off specialist out of its roster and refuses to delegate to it. |
 | `GET` | `/api/user-extensions` | `chat.use` | This account's own MCP servers ("private extensions"): `[{id, label, description, url, header_names, enabled, status, error, tools}]`. `id` is a slug of the label, unique per account. `status` is `connected`, `error` or `unknown`, from `ai_agent`'s `probe_extension`, cached for 60 seconds; a disabled extension is not probed and reports `unknown`. Header **values** are never returned, only their names. |
@@ -859,24 +864,11 @@ db_gateway, and account deletion purges all personal brain records.
 
 ## Calendar
 
-Private read-only schedules use ICS links and require `calendar.use`. Calendar data is stored in db_gateway documents. Configure the `calendar` block in `configs/config_app.json`:
+The calendar lives in Stronghold (`apps/stronghold`, see its README for settings and keys). Portcullis keeps the public `/api/calendar/...` routes: it checks the login and `calendar.use`, then passes the request on. It also keeps the admin Settings switches `calendar_inapp`, `calendar_email` and `calendar_push`, which Stronghold reads through `GET /internal/switches`.
 
-| Key | Default |
-| --- | --- |
-| `enabled` | true |
-| `tick_seconds` | 30 |
-| `feed_refresh_minutes` | 10 |
-| `lookahead_hours` | 48 |
-| `late_grace_minutes` | 5 |
-| `max_feeds_per_account` | 10 |
-| `max_alarm_rules` | 10 |
-| `max_ics_bytes` | 5242880 |
-| `fetch_timeout_s` | 15 |
-| `allow_private_urls` | false |
+## Internal API
 
-`push_contact` defaults to `mailto:admin@example.com`; set a contact starting with `mailto:` or `https://`. The admin Settings switches `calendar_inapp`, `calendar_email` and `calendar_push` default to on and control each channel for every account.
-
-`EMBER_VAPID_PRIVATE_KEY` and `EMBER_VAPID_PUBLIC_KEY` are generated into `.env` on first start. Deleting them requires every browser to subscribe again. Web push requires HTTPS and the built web app (`vite preview` or production). Email alerts use the existing Email capability.
+`/internal/...` is for Stronghold only. Every route needs the shared internal token and is refused when none is configured. `GET /internal/accounts/{uid}/recipient?permission=`, `GET /internal/switches`, `POST /internal/accounts/{uid}/notify` and `POST /internal/errors`. The web apps' nginx proxies only `/api/`, so these routes are not reachable from a browser.
 
 All calendar routes require a signed-in account with `calendar.use`; data is private to its immutable account UID. Feed URLs are accepted for writes and never returned.
 

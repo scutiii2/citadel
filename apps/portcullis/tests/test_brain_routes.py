@@ -36,7 +36,32 @@ def test_internal_resolution_requires_real_uid_and_checks_publish(client):
     assert response.status_code == 403
 
 
-def test_ai_review_consent_and_usage_even_for_invalid_output(client, agent):
+def notes_in_stronghold(upstream):
+    """Answers Stronghold's /notes routes from memory; every other upstream call gets the usual empty result."""
+    import httpx
+
+    saved: dict[str, dict] = {}
+
+    def handler(request):
+        path = request.url.path
+        if not path.startswith("/notes"):
+            return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": {}}, headers={"mcp-session-id": "sess-1"})
+        if request.method == "POST":
+            note_id = f"{len(saved) + 1:032x}"
+            saved[note_id] = {"id": note_id, "body": "", "tags": [], "agent_readable": False, "last_editor": "user",
+                              "created_at": "2026-11-15T00:00:00", "updated_at": "2026-11-15T00:00:00",
+                              **json.loads(request.content)}
+            return httpx.Response(201, json=saved[note_id])
+        if path == "/notes":
+            return httpx.Response(200, json=list(saved.values()))
+        note = saved.get(path.rsplit("/", 1)[1])
+        return httpx.Response(200, json=note) if note else httpx.Response(404, json={"detail": "Note not found"})
+
+    upstream.handler = handler
+
+
+def test_ai_review_consent_and_usage_even_for_invalid_output(client, agent, upstream):
+    notes_in_stronghold(upstream)
     as_admin(client)
     client.put("/api/brains/connections/personal", json={"label": "Mine", "endpoint": "https://vault.lan",
         "api_key": "not-for-the-model", "allow_write": True})

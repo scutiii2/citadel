@@ -15,7 +15,6 @@ from src.deps import (
     get_email_sender,
     get_log_writer,
     get_db_gateway,
-    get_memory_purger,
     get_otp_service,
     get_settings_service,
     require_permission,
@@ -24,18 +23,16 @@ from src.deps import (
 )
 from src.config import Settings
 from src.models import Account, InviteCode, Permission, Role
-from src.services.calendar_store import purge_owner as purge_calendar
+from src.services.stronghold_forwarder import StrongholdUnavailable
 from src.services.admin_service import AccountStatus, AdminError, AdminService, DelegationError, NotFoundError
 from src.services.email_service import EmailDeliveryError, EmailSender
 from src.services.log_service import LogWriter
 from src.services.db_gateway import DbGatewayError, DocumentStore
-from src.services.memory_purger import MemoryPurger
 from src.services.account_agent_service import purge_owner as purge_account_agents
 from src.services.tuning_limits_service import purge_owner as purge_tuning_limits
 from src.services.nav_preference_service import purge_owner as purge_nav_preferences
 from src.services.template_service import purge_owner as purge_templates
 from src.services.user_extension_service import purge_owner as purge_user_extensions
-from src.services.notes import purge_owner as purge_notes
 from src.services.brain_connections import purge_owner as purge_brains
 from src.services.otp_service import OtpService
 from src.services.permissions import (
@@ -304,7 +301,6 @@ async def delete_account(
     admin: Account = Depends(require_accounts_delete),
     admin_service: AdminService = Depends(get_admin_service),
     logs: LogWriter = Depends(get_log_writer),
-    purger: MemoryPurger = Depends(get_memory_purger),
     store: DocumentStore = Depends(get_db_gateway),
 ) -> Response:
     try:
@@ -314,25 +310,27 @@ async def delete_account(
         await admin_service.delete_account(admin, target)
     except AdminError as error:
         raise _http_error(error) from error
-    if not await purger.purge(uid):
-        await logs.error(
-            admin.id, "admin.memory_purge", f"Memory notes of deleted account '{username}' were not purged (mcp_server did not confirm)"
-        )
+    # Memory and the calendar live in Stronghold. Best effort: the account is already gone.
+    for domain, what in (("memory", "Memory notes"), ("calendar", "Calendar"), ("notes", "Notes")):
+        try:
+            purged = await request.app.state.stronghold.forward("DELETE", f"/{domain}/accounts/{uid}", admin)
+            confirmed = purged.status < 400
+        except StrongholdUnavailable:
+            confirmed = False
+        if not confirmed:
+            await logs.error(
+                admin.id, f"admin.{domain}_purge", f"{what} of deleted account '{username}' were not purged (stronghold did not confirm)"
+            )
     if not await request.app.state.skills.purge(uid):
         await logs.error(
             admin.id, "admin.skills_purge", f"Skills of deleted account '{username}' were not purged (mcp_server did not confirm)"
         )
-    try:  # best effort, like the memory purge: the account is already gone
-        await purge_notes(store, uid)
-    except DbGatewayError as error:
-        await logs.error(admin.id, "admin.notes_purge", f"Notes of deleted account '{username}' were not purged ({error})")
     try:
         await purge_nav_preferences(store, uid)
         await purge_tuning_limits(store, uid)
         await purge_account_agents(store, uid)
         await purge_templates(store, uid)
         await purge_user_extensions(store, uid)
-        await purge_calendar(store, uid)
         await purge_brains(store, uid)
         from src.services.brain_gateway import BrainGateway
         from src.services.brain_connections import BrainError

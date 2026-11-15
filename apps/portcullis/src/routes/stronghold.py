@@ -7,7 +7,9 @@ domain adds its own route file and reuses `as_response`.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from src.deps import current_account, get_stronghold
 from src.models import Account
@@ -19,6 +21,17 @@ router = APIRouter(prefix="/api/stronghold", tags=["stronghold"])
 def as_response(forwarded: ForwardedResponse) -> Response:
     """Stronghold's status, body and content type, unchanged."""
     return Response(forwarded.body, status_code=forwarded.status, media_type=forwarded.content_type)
+
+
+async def pass_on(request: Request, stronghold: StrongholdForwarder, account: Account, path: str) -> Response:
+    """Send this request's method, query and JSON body to a Stronghold path the route built."""
+    raw = await request.body()
+    try:
+        body = json.loads(raw) if raw else None
+    except ValueError:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "The body must be JSON") from None
+    return as_response(await stronghold.forward(
+        request.method, path, account, params=dict(request.query_params), json=body))
 
 
 @router.get("/whoami")
