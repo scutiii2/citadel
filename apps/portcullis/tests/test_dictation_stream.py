@@ -8,7 +8,11 @@ from starlette.websockets import WebSocket
 from websockets.exceptions import ConnectionClosedError
 from websockets.frames import Close
 
-from tests.test_attachments_audio import body
+from tests.test_attachments import body as _body
+
+
+def body(name='a.mp3', data=b'abc'):
+    return _body(name, data)
 from tests.test_permission_split import limited_account
 from tests.test_registration import as_admin
 
@@ -134,22 +138,6 @@ def test_stream_rejects_bad_frames(client, remote, payload):
             ws.receive_json()
         assert error.value.code in (1008, 1009)
     assert not remote.sent
-
-
-def test_partial_transcription_identity_validation_and_no_retention(client, upstream):
-    as_admin(client)
-    upstream.handler = lambda r: httpx.Response(200, json={'text': 'hello', 'duration_s': 2.5})
-    result = client.post('/api/attachments/dictate/partial', json=body('../speech.webm'))
-    assert result.status_code == 200
-    assert result.json() == {'text': 'hello', 'duration_s': 2.5}
-    sent = upstream.requests[-1]
-    assert sent.url.path == '/api/transcribe-partial'
-    assert sent.content == b'abc' and sent.headers['x-filename'] == 'speech.webm'
-    assert sent.headers['x-requester-username'] == 'root'
-    upstream.requests.clear()
-    assert client.post('/api/attachments/dictate/partial', json=body('x.exe')).status_code == 400
-    assert client.post('/api/attachments/dictate/partial', json={'filename': 'x.webm', 'data': '!!!'}).status_code == 400
-    assert not upstream.requests
 
 
 def test_partial_requires_login_and_upload_permission(client, email, upstream):

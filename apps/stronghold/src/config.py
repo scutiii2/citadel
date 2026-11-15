@@ -21,6 +21,10 @@ class Settings:
     portcullis_url: str = "http://127.0.0.1:29601"
     db_gateway_url: str = "http://127.0.0.1:29602"
     armory_url: str = "http://127.0.0.1:29600"
+    # Tool services that take attachments and speech (Bard, Scribe, Reader); each has its own token.
+    bard_url: str = "http://127.0.0.1:29400"
+    scribe_url: str = "http://127.0.0.1:29401"
+    reader_url: str = "http://127.0.0.1:29402"
     # Legion's registry of running agents: the file its supervisor writes, or its /registry URL (wins when set).
     agents_registry_path: Path = PROJECT_DIR.parent / "legion" / ".data" / "agent_registry.json"
     agents_registry_url: str | None = None
@@ -43,6 +47,9 @@ def load_settings() -> Settings:
         portcullis_url=os.getenv("PORTCULLIS_URL") or base.portcullis_url,
         db_gateway_url=os.getenv("DB_GATEWAY_URL") or base.db_gateway_url,
         armory_url=os.getenv("ARMORY_URL") or base.armory_url,
+        bard_url=os.getenv("BARD_URL") or base.bard_url,
+        scribe_url=os.getenv("SCRIBE_URL") or base.scribe_url,
+        reader_url=os.getenv("READER_URL") or base.reader_url,
         agents_registry_path=Path(os.getenv("AGENTS_REGISTRY_PATH") or base.agents_registry_path),
         agents_registry_url=os.getenv("AGENTS_REGISTRY_URL") or None,
         data_dir=Path(os.getenv("STRONGHOLD_DATA_DIR") or base.data_dir),

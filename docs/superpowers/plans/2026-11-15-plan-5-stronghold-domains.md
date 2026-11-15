@@ -36,6 +36,6 @@ Accounts, SMTP, settings and logs stay in Portcullis. Later domains add routes h
 | 5.4 | tickets, triage | Executed 2026-11-15: `2026-11-15-plan-5-4-tickets-and-triage.md` |
 | 5.5 | shares | Executed 2026-11-15: `2026-11-15-plan-5-5-shares.md` |
 | 5.6 | usage | Executed 2026-11-15: `2026-11-15-plan-5-6-usage.md` |
-| 5.7 | attachments, bard | To write |
+| 5.7 | attachments, bard | Executed 2026-11-15: `2026-11-15-plan-5-7-attachments-bard.md` |
 | 5.8 | tuning (account and admin) | To write |
 | 5.9 | chats, folders, turns (with Plan 6, the schema) | To write |

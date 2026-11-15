@@ -123,12 +123,23 @@ def armory() -> FakeArmory:
 
 
 @pytest.fixture
+def tools() -> dict[str, FakeArmory]:
+    """Scribe, Reader and Bard: each answers through its own handler and records its requests."""
+    return {name: FakeArmory() for name in ("scribe", "reader", "bard")}
+
+
+def tool_clients(tools: dict[str, FakeArmory]) -> dict[str, httpx.AsyncClient]:
+    return {name: httpx.AsyncClient(base_url=f"http://{name}.test", transport=httpx.MockTransport(fake))
+            for name, fake in tools.items()}
+
+
+@pytest.fixture
 def platform() -> FakePlatform:
     return FakePlatform()
 
 
 @pytest.fixture
-def client(tmp_path, db_gateway, armory, platform, agent):
+def client(tmp_path, db_gateway, armory, platform, agent, tools):
     """The app with its lifespan running, an open token and the requester headers already set."""
     from src.api import create_app
     from src.config import Settings
@@ -137,13 +148,14 @@ def client(tmp_path, db_gateway, armory, platform, agent):
     registry = tmp_path / "config_agents.json"  # tests add agents by rewriting it
     registry.write_text(json.dumps({"agents": AGENTS}), encoding="utf-8")
     app = create_app("shared-test-token", Settings(data_dir=tmp_path / "data", agents_registry_path=registry),
-                     store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent)
+                     store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent,
+                     tools=tool_clients(tools))
     with TestClient(app, headers={**IDENTITY, "X-Internal-Token": "shared-test-token"}) as test_client:
         yield test_client
 
 
 @pytest.fixture
-def make_client(tmp_path, db_gateway, armory, platform, agent):
+def make_client(tmp_path, db_gateway, armory, platform, agent, tools):
     from src.api import create_app
     from src.config import Settings
     from src.usage.settings import PricingSettings, UsageSettings
@@ -156,7 +168,8 @@ def make_client(tmp_path, db_gateway, armory, platform, agent):
         upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory))
         settings = Settings(data_dir=tmp_path / "data", agents_registry_path=registry,
                             usage=usage or UsageSettings(), pricing=pricing or PricingSettings())
-        app = create_app("shared-test-token", settings, store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent)
+        app = create_app("shared-test-token", settings, store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent,
+                     tools=tool_clients(tools))
         client = TestClient(app, headers={**IDENTITY, "X-Internal-Token": "shared-test-token"})
         clients.append(client)
         return client.__enter__()

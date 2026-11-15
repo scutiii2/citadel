@@ -12,7 +12,6 @@
   "stronghold_url": "http://127.0.0.1:29650",
   "bard_url": "http://127.0.0.1:29400",
   "scribe_url": "http://127.0.0.1:29401",
-  "reader_url": "http://127.0.0.1:29402",
   "db_gateway": {
     "url": "http://127.0.0.1:29602",
     "instance": "ember",

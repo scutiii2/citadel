@@ -148,7 +148,6 @@ def create_app(
         app.state.internal_token = internal_token or None
         app.state.bard_token = service_token(settings.env_path, "bard") or None
         app.state.scribe_token = service_token(settings.env_path, "scribe") or None
-        app.state.reader_token = service_token(settings.env_path, "reader") or None
         app.state.dictation_accounts = set()
         app.state.secret_box = secret_box
         app.state.agent_directory = AgentDirectory(

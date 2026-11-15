@@ -10,15 +10,21 @@ from pydantic import BaseModel, Field
 
 from src.deps import get_log_writer, require_permission
 from src.models import Account
-from src.routes.attachments import AttachmentIn
 from src.routes.server_info import get_server_info, _call
 from src.services.capability_files import Area, CapabilityFilesGateway, PUBLIC
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import McpServerInfo
-from src.services.text_extraction import MAX_FILE_BYTES
 
 router = APIRouter(tags=["capability-files"])
 ID = r"^[A-Za-z0-9_-]{1,100}$"
+MAX_FILE_BYTES = 15 * 1024 * 1024  # a large document, not a video dropped by mistake
+# base64 is 4 characters per 3 bytes.
+_MAX_BASE64 = (MAX_FILE_BYTES + 2) // 3 * 4
+
+
+class AttachmentIn(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    data: str = Field(min_length=1, max_length=_MAX_BASE64)
 
 
 class Segment(BaseModel):

@@ -22,9 +22,6 @@ dependencies = [
     "mcp>=1.30.0,<2.0.0",
     # Text from files attached to a chat question (same libraries as
     # chat_app's text_extraction).
-    "pypdf>=4.0",
-    "python-docx>=1.1",
-    "openpyxl>=3.1",
     # Schema migrations (run at startup).
     "alembic>=1.13,<2.0",
     # Encrypts the header values of users' private extensions at rest.

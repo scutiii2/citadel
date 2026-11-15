@@ -194,12 +194,10 @@ class Settings:
     mcp_server_url: str = "http://127.0.0.1:29600/mcp"
     # Stronghold (product logic): reached only from here, never by the browser.
     stronghold_url: str = "http://127.0.0.1:29650"
-    # Bard (text to speech): audio files are streamed from here, never exposed to the browser.
+    # Bard (text to speech): finished audio files are streamed from here; Stronghold asks it for speech.
     bard_url: str = "http://127.0.0.1:29400"
-    # Scribe (speech to text): attached audio is uploaded here, never exposed to the browser.
+    # Scribe (speech to text): the dictation WebSocket is relayed from here; Stronghold sends it audio files.
     scribe_url: str = "http://127.0.0.1:29401"
-    # Reader (document OCR): attached PDFs and images are uploaded here, never exposed to the browser.
-    reader_url: str = "http://127.0.0.1:29402"
     security: SecuritySettings = field(default_factory=SecuritySettings)
     usage: UsageSettings = field(default_factory=UsageSettings)
     pricing: PricingSettings = field(default_factory=PricingSettings)
@@ -245,7 +243,6 @@ def load_settings() -> Settings:
         stronghold_url=raw.get("stronghold_url") or "http://127.0.0.1:29650",
         bard_url=raw.get("bard_url") or "http://127.0.0.1:29400",
         scribe_url=raw.get("scribe_url") or "http://127.0.0.1:29401",
-        reader_url=raw.get("reader_url") or "http://127.0.0.1:29402",
         security=SecuritySettings.from_config(raw.get("security", {})),
         usage=UsageSettings.from_config(raw.get("usage", {})),
         pricing=PricingSettings.from_config(load_json_config(CONFIGS_DIR / "config_pricing.json")),

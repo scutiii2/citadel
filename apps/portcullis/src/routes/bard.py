@@ -1,13 +1,17 @@
-"""Audio for Bard's text-to-speech results; Bard owns every file."""
+"""Audio for Bard's text-to-speech results; Bard owns every file.
+
+Stronghold (`apps/stronghold/src/bard`) asks Bard for the speech and the voice list. The finished
+file is streamed from here, with the browser's Range header, so Portcullis keeps that one route.
+"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Path, Request
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Path, Request, Response
 
-from src.deps import get_log_writer, require_permission
+from src.deps import get_stronghold, require_permission
 from src.models import Account
+from src.routes.stronghold import pass_on
 from src.services.bard import BardGateway
-from src.services.log_service import LogWriter
+from src.services.stronghold_forwarder import StrongholdForwarder
 
 router = APIRouter(prefix="/api/bard", tags=["bard"])
 ID = r"^[0-9a-f]{32}$"
@@ -17,42 +21,24 @@ def gateway(request: Request) -> BardGateway:
     return BardGateway(request.app.state.upstream, request.app.state.settings.bard_url, request.app.state.bard_token)
 
 
-class SpeakIn(BaseModel):
-    text: str = Field(min_length=1)
-    voice: str | None = Field(default=None, min_length=1, max_length=150)
-
-
-class SpeakOut(BaseModel):
-    file_id: str
-    duration_s: float
-    voice: str
-
-
-class VoicesOut(BaseModel):
-    voices: list[str]
-
-
 @router.post("/speak")
 async def speak(
-    body: SpeakIn,
+    request: Request,
     account: Account = Depends(require_permission("tools.execute")),
     _transfer: Account = Depends(require_permission("files.download")),
-    client: BardGateway = Depends(gateway),
-    logs: LogWriter = Depends(get_log_writer),
-) -> SpeakOut:
-    """Generate one bounded batch and log metadata without the spoken text."""
-    result = await client.speak(account, body.text, body.voice)
-    await logs.action(account, "bard.speak", f"Generated speech file {result['file_id']}")
-    return SpeakOut(**result)
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
+) -> Response:
+    return await pass_on(request, stronghold, account, "/bard/speak")
 
 
 @router.get("/voices")
 async def voices(
+    request: Request,
     account: Account = Depends(require_permission("tools.execute")),
     _transfer: Account = Depends(require_permission("files.download")),
-    client: BardGateway = Depends(gateway),
-) -> VoicesOut:
-    return VoicesOut(**await client.voices(account))
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
+) -> Response:
+    return await pass_on(request, stronghold, account, "/bard/voices")
 
 
 @router.get("/audio/{file_id}")

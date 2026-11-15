@@ -5,13 +5,20 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 
+import os
+
 import httpx
+from dotenv import dotenv_values
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from src.agents.directory import AgentDirectory, HttpRegistrySource
 from src.agents.gateway import AgentGateway, McpAgentGateway
-from src.auth import InternalTokenMiddleware
+from src.attachments import routes as attachments_routes
+from src.attachments import services as tool_services
+from src.attachments.services import ArmoryUploads
+from src.bard import routes as bard_routes
+from src.auth import ENV_PATH, InternalTokenMiddleware
 from src.calendar import routes as calendar_routes
 from src.calendar.runtime import build_calendar_runtime
 from src.calendar.store import CalendarError
@@ -45,9 +52,11 @@ def create_app(
     token: str, settings: Settings | None = None, *,
     store: DocumentStore | None = None, platform: PortcullisClient | None = None,
     armory: httpx.AsyncClient | None = None, agent_gateway: AgentGateway | None = None,
+    tools: dict[str, httpx.AsyncClient] | None = None,
 ) -> FastAPI:
     """token: the shared internal token; "" leaves the app open (tests, loopback).
-    `store`, `platform`, `armory` and `agent_gateway` are injected by tests; otherwise they are HTTP clients built at start."""
+    `store`, `platform`, `armory`, `agent_gateway` and `tools` (clients for "bard", "scribe" and "reader") are injected by tests;
+    otherwise they are HTTP clients built at start."""
     settings = settings or load_settings()
     log_privacy.install()
 
@@ -75,6 +84,18 @@ def create_app(
         app.state.skills = SkillsClient(armory_client, token or None)
         app.state.tickets = ArmoryTickets(armory_client, token or None)
         app.state.ticket_unread = TicketUnread(app.state.store)
+        tools_in = tools or {}
+        env = dotenv_values(ENV_PATH) if tools is None and ENV_PATH.exists() else {}  # tests inject `tools` and read no .env
+
+        def service_token(name: str) -> str | None:
+            # Tool services issue their own tokens; the shared internal token is no fallback.
+            key = f"{name.upper()}_TOKEN"
+            return os.getenv(key) or env.get(key) or None
+
+        app.state.uploads = ArmoryUploads(armory_client, token or None)
+        app.state.scribe = tool_services.scribe(tools_in.get("scribe") or http(settings.scribe_url), service_token("scribe"))
+        app.state.reader = tool_services.reader(tools_in.get("reader") or http(settings.reader_url), service_token("reader"))
+        app.state.bard = tool_services.bard(tools_in.get("bard") or http(settings.bard_url), service_token("bard"))
         app.state.shares = ShareStore(app.state.store)
         app.state.usage = UsageService(app.state.store, settings.usage, Pricing(settings.pricing))
         app.state.calendar = (
@@ -92,6 +113,8 @@ def create_app(
 
     app = FastAPI(title="stronghold", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.add_middleware(InternalTokenMiddleware, token=token)
+    app.include_router(attachments_routes.router)
+    app.include_router(bard_routes.router)
     app.include_router(calendar_routes.router)
     app.include_router(memory_routes.router)
     app.include_router(notes_routes.router)
