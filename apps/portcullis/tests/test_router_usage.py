@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from src.services.turns import _trace_parts
-from src.services.usage_service import usage_rows
+from src.services.usage_rows import usage_rows
 
 
 def test_router_attempt_trace_keeps_outcomes_without_prompt_or_keys():

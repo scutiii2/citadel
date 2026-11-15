@@ -145,7 +145,7 @@ process restart. Cancellation is cooperative and may finish after the response.
 
 ## Usage cost estimates
 
-Configure `configs/config_pricing.json` with your model names and separate
+Configure `configs/config_pricing.json` (costs on chat messages) and Stronghold's `pricing` block (the Usage page) with your model names and separate
 `input` / `output` prices in **USD per 1,000,000 tokens** (`currency: "USD"`).
 The file is created from its `.example` on first startup; the shipped
 `example-model` entry is a placeholder. Fill in real names and prices yourself,
@@ -313,8 +313,9 @@ that is missing leaves that part out and is named in the report.
   is broken, over 2 MB or beyond the 1000-per-account cap is reported and left
   out; the rest still import.
 - **Usage:** every row with tokens, with its agent, model, input/output split and
-  chat, so the 6-hour and weekly limits and the Usage page carry on from the old
-  history. Rows chat_app wrote at the same moment stay one turn.
+  chat. Since usage moved to Stronghold (Plan 5.6) these rows go into the old
+  `usage_records` table, which the Usage page no longer reads.
+  Rows chat_app wrote at the same moment stay one turn.
 - **Log entries:** chat_app's Logs rows (logins, admin actions, errors, chat
   turns) with their times. An entry of an imported account belongs to it. An
   entry of an account that was skipped (portcullis has its own `admin`) or that
@@ -652,9 +653,10 @@ calls (in each call's `_meta`), so mcp_server sees who asked either way.
 - **Chat search** (`services/chat_search.py`, `GET /api/chats/search`): a
   literal, case-insensitive scan of the account's titles and messages,
   streamed and stopped at 50 hits; ASCII queries are pre-filtered in SQL.
-- **Usage limits** (`services/usage_service.py`, config `usage`): tokens of
-  every answer and summary are recorded per agent; a question over the
-  6-hour or weekly cap is refused with `429` before anything is saved.
+- **Usage limits** (`services/usage_client.py`; the caps are in Stronghold's config `usage`): tokens of
+  every answer and summary are recorded per agent by Stronghold; a question over the
+  6-hour or weekly cap is refused with `429` before anything is saved, and with `503`
+  when Stronghold cannot say (a failed record is only logged).
 - **Extensions:** portcullis turns on every extension mcp_server lists; the
   browser cannot name one. Which agent may call an extension's tools is that
   agent's `tools.allow`. Adding an extension makes mcp_server connect to any
@@ -814,6 +816,8 @@ file-transfer route; it does not prohibit copying chat text or tool results.
 To roll back, deploy the previous code with the pre-migration backup. Alembic
 downgrade to 0009 retains original broad grants and removes the new permission
 rows, but does not undo role edits made after upgrading.
+
+The usage routes (`/api/usage...`, `/api/admin/usage...`) are answered by Stronghold (`apps/stronghold/src/usage`), which keeps the rows in Treasury; portcullis checks the login and the permission and passes the request on (`502` when Stronghold is down; the browser's own `account_id`/`uid` fields are never sent on). The caps (`usage.six_hour_token_limit`, `usage.weekly_token_limit`) and the `pricing` block are Stronghold's config. Usage recorded before the move stays in the old `usage_records` table and is not shown; the old table is not dropped. The administrators' list asks Stronghold for totals per uid and adds every account itself.
 
 Admin usage includes every existing account, including disabled accounts and accounts with no usage in the selected period. Tokens include summaries; answers count distinct chat turns (delegated agents count once, summaries count zero). Personal usage remains scoped to the session account. Admin detail routes require usage.all.view, independently of chat.use and accounts.view.
 

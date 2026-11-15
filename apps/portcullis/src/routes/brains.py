@@ -16,7 +16,7 @@ from src.services import brain_suggestions
 from src.services.remote_notes import RemoteNotes
 from src.services.agent_gateway import Caller, AgentCallError
 from src.routes.mcp import get_agent_directory
-from src.services.usage_service import UsageService
+from src.services.usage_client import UsageClient
 
 router = APIRouter(prefix="/api/brains", tags=["brains"])
 Scope = Literal["instance", "personal"]
@@ -160,8 +160,7 @@ class ReviewBody(BaseModel):
 
 @router.post("/suggestions/review")
 async def review_notes(body: ReviewBody, request: Request, account=Depends(require_permission("chat.use")),
-                       service=Depends(connections), session=Depends(get_db_session),
-                       settings=Depends(get_settings), agent_gateway=Depends(get_agent_gateway),
+                       service=Depends(connections), agent_gateway=Depends(get_agent_gateway),
                        directory=Depends(get_agent_directory)):
     notes_service = RemoteNotes(request.app.state.stronghold, account)
     notes = await brain_suggestions.eligible_notes(notes_service, body.note_ids, body.explicit_private)
@@ -175,8 +174,8 @@ async def review_notes(body: ReviewBody, request: Request, account=Depends(requi
         raise BrainError("Configure a writable brain destination before reviewing promotions")
     if not notes:
         return []
-    usage = UsageService(session, settings.usage)
-    blocked = await usage.check(account.id)
+    usage = UsageClient(request.app.state.stronghold, account)
+    blocked = await usage.check()
     if blocked:
         raise BrainError(blocked.reason, 429)
     agent = await directory.entry()
@@ -188,7 +187,7 @@ async def review_notes(body: ReviewBody, request: Request, account=Depends(requi
     except AgentCallError:
         raise BrainError("AI promotion review is unavailable. Manual promotion remains available.", 503) from None
     # Account for the actual call even when its output fails validation.
-    await usage.record(account.id, uuid.uuid4().hex, "brain_suggestions", None, result)
+    await usage.record(uuid.uuid4().hex, "brain_suggestions", None, result)
     items = brain_suggestions.parse_suggestions(str(result.get("response", "")), {n.id for n in notes}, set(snapshots))
     current = {n.id: n for n in await notes_service.list()}
     if any(n.id not in current or note_hash(current[n.id]) != note_hash(n) or current[n.id].updated_at != n.updated_at for n in notes):

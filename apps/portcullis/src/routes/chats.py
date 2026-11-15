@@ -32,6 +32,7 @@ from src.deps import (
     get_log_writer,
     get_pricing,
     get_secret_box,
+    get_stronghold,
     get_settings,
     get_settings_service,
     get_turns,
@@ -84,7 +85,8 @@ from src.services.turns import (
     TurnOptions,
     TurnRegistry,
 )
-from src.services.usage_service import LimitBlock, UsageService
+from src.services.stronghold_forwarder import StrongholdForwarder
+from src.services.usage_client import LimitBlock, UsageClient, UsageUnavailable
 from src.services.user_extension_service import TurnExtensions, UserExtensionService
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
@@ -532,11 +534,10 @@ async def chat_suggestion(
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
-    session: AsyncSession = Depends(get_db_session),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
     turns: TurnRegistry = Depends(get_turns),
     directory: AgentDirectory = Depends(get_agent_directory),
     gateway: AgentGateway = Depends(get_agent_gateway),
-    settings: Settings = Depends(get_settings),
 ) -> SuggestionOut:
     """The message the user will probably type next, for the chat box's
     placeholder. Never an error: anything that stops it (switched off, an
@@ -561,13 +562,16 @@ async def chat_suggestion(
     agent = await directory.entry()
     if agent is None:
         return SuggestionOut()
-    usage = UsageService(session, settings.usage)
-    if await usage.check(account.id) is not None:
+    usage = UsageClient(stronghold, account)
+    try:
+        if await usage.check() is not None:
+            return SuggestionOut()
+    except UsageUnavailable:
         return SuggestionOut()
     outcome = await suggestions.suggest(gateway, agent.url, _caller(account), question, answer)
     if outcome is None:
         return SuggestionOut()
-    await usage.record(account.id, uuid.uuid4().hex, "suggestion", chat_id, outcome.result)
+    await usage.record(uuid.uuid4().hex, "suggestion", chat_id, outcome.result)
     suggestions.CACHE.put(key, outcome.text)
     return SuggestionOut(text=outcome.text)
 
@@ -696,7 +700,7 @@ async def start_turn(
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
-    session: AsyncSession = Depends(get_db_session),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
     turns: TurnRegistry = Depends(get_turns),
     directory: AgentDirectory = Depends(get_agent_directory),
     settings: Settings = Depends(get_settings),
@@ -713,7 +717,7 @@ async def start_turn(
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, NO_AGENT_RUNNING)
     if turns.is_running(account.id, chat_id):
         raise _busy()
-    block = await UsageService(session, settings.usage).check(account.id)
+    block = await UsageClient(stronghold, account).check()
     if block is not None:
         raise limit_reached(block)
 
@@ -922,11 +926,10 @@ async def summarize_chat(
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
-    session: AsyncSession = Depends(get_db_session),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
     turns: TurnRegistry = Depends(get_turns),
     directory: AgentDirectory = Depends(get_agent_directory),
     gateway: AgentGateway = Depends(get_agent_gateway),
-    settings: Settings = Depends(get_settings),
     pricing: Pricing = Depends(get_pricing),
 ) -> ChatOut:
     """Replaces the history with one summary (what the agent sees from now
@@ -941,8 +944,8 @@ async def summarize_chat(
     agent = await directory.get(summarization.SUMMARIZER_AGENT_ID)
     if agent is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Context summarizer is not running")
-    usage = UsageService(session, settings.usage)
-    block = await usage.check(account.id)
+    usage = UsageClient(stronghold, account)
+    block = await usage.check()
     if block is not None:
         raise limit_reached(block)
 
@@ -954,7 +957,7 @@ async def summarize_chat(
         return ChatOut.of(chat, pricing)  # nothing new since the last summary
     turn_id = uuid.uuid4().hex
     for result in outcome.results:
-        await usage.record(account.id, turn_id, "summary", chat_id, result)
+        await usage.record(turn_id, "summary", chat_id, result)
     try:
         chat = await chats.replace_messages(chat_id, outcome.messages)
     except ChatNotFound as error:

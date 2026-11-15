@@ -62,6 +62,62 @@ MCP_SERVER_URL = "http://mcp-server.internal/mcp"
 
 
 @dataclass
+class FakeUsage:
+    """Stronghold's /usage routes, simply: rows by account uid. `six_hour_limit` blocks `/usage/check`
+    once an account has used that many tokens (0 = never); `down` makes every call a 503."""
+
+    rows: list[dict[str, Any]] = field(default_factory=list)
+    six_hour_limit: int = 0
+    down: bool = False
+
+    def respond(self, request: httpx.Request) -> httpx.Response:
+        if self.down:
+            return httpx.Response(503, json={"detail": "Storage is unavailable"})
+        uid = request.headers.get("x-requester-uid", "")
+        path, mine = request.url.path, [row for row in self.rows if row["owner"] == uid]
+        if path == "/usage/check":
+            used = sum(row["total_tokens"] for row in mine)
+            block = {"reason": "6-hour token limit reached", "reset_at": (datetime.now() + timedelta(hours=1)).isoformat()}
+            return httpx.Response(200, json={"block": block if self.six_hour_limit and used >= self.six_hour_limit else None})
+        if path == "/usage/records" and request.method == "POST":
+            body = json.loads(request.content)
+            for row in body["rows"]:
+                self.rows.append({**row, "owner": uid, "turn_id": body["turn_id"], "kind": body["kind"],
+                                  "chat_id": body["chat_id"], "created_at": datetime.now().isoformat(), "id": len(self.rows) + 1})
+            return httpx.Response(201, json={"total": sum(row["total_tokens"] for row in body["rows"])})
+        if path == "/usage/records":
+            return httpx.Response(200, json=list(reversed(mine)))
+        if path == "/usage":
+            used = sum(row["total_tokens"] for row in mine)
+            by_agent: dict[tuple, int] = {}
+            for row in mine:
+                key = (row.get("agent") or "unknown", row.get("model") or "")
+                by_agent[key] = by_agent.get(key, 0) + row["total_tokens"]
+            report = {
+                "total_tokens": used, "summary_tokens": sum(r["total_tokens"] for r in mine if r["kind"] == "summary"),
+                "turns": len({r["turn_id"] for r in mine if r["kind"] != "summary"}), "chats": len({r["chat_id"] for r in mine if r["chat_id"]}),
+                "by_agent": [{"agent": a, "model": m, "tokens": t, "cost": None} for (a, m), t in by_agent.items()],
+                "daily": [{"date": datetime.now().date().isoformat(), "tokens": used}] if used else [],
+            }
+            return httpx.Response(200, json={
+                "six_hour": {"used": used, "limit": self.six_hour_limit, "reset_at": None},
+                "weekly": {"used": used, "limit": 5_000_000, "reset_at": None}, "report": report})
+        if path == "/usage/all":
+            totals: dict[str, dict[str, Any]] = {}
+            for row in self.rows:
+                entry = totals.setdefault(row["owner"], {"uid": row["owner"], "tokens": 0, "turn_ids": set(), "last_used_at": None})
+                entry["tokens"] += row["total_tokens"]
+                entry["turn_ids"] |= {row["turn_id"]} if row["kind"] != "summary" else set()
+                entry["last_used_at"] = row["created_at"]
+            return httpx.Response(200, json=[{"uid": e["uid"], "tokens": e["tokens"], "turns": len(e["turn_ids"]),
+                                             "last_used_at": e["last_used_at"]} for e in totals.values()])
+        if request.method == "DELETE" and path.startswith("/usage/accounts/"):
+            self.rows[:] = [row for row in self.rows if row["owner"] != path.rsplit("/", 1)[1]]
+            return httpx.Response(204)
+        return httpx.Response(404, json={"detail": "Not found"})
+
+
+@dataclass
 class FakeUpstream:
     """Stands in for ai_agent/mcp_server behind the proxy. Records every
     request it gets; `handler` decides the response (default: an empty
@@ -70,12 +126,16 @@ class FakeUpstream:
     requests: list[httpx.Request] = field(default_factory=list)
     handler: Callable[[httpx.Request], httpx.Response] | None = None
     unreachable: bool = False
+    # Answers Stronghold's /usage routes whatever `handler` is; set to None to let `handler` answer them.
+    usage: FakeUsage | None = field(default_factory=FakeUsage)
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
         await request.aread()
         self.requests.append(request)
         if self.unreachable:
             raise httpx.ConnectError("connection refused (fake)", request=request)
+        if self.usage is not None and request.url.path.startswith("/usage"):
+            return self.usage.respond(request)
         if self.handler:
             return self.handler(request)
         return httpx.Response(

@@ -40,7 +40,9 @@ from src.services.chat_service import (
 )
 from src.services.log_service import LogWriter
 from src.services.pricing import Pricing, with_cost
-from src.services.usage_service import UsageService, usage_rows
+from src.services.stronghold_forwarder import StrongholdForwarder
+from src.services.usage_client import UsageClient
+from src.services.usage_rows import usage_rows
 
 logger = logging.getLogger(__name__)
 
@@ -312,12 +314,14 @@ class TurnRegistry:
         *,
         pricing: Pricing | None = None,
         directory: AgentDirectory | None = None,
+        stronghold: StrongholdForwarder | None = None,
         max_running_per_account: int = 3,
         retention_seconds: float = 120.0,
     ) -> None:
         self._database = database
         self._gateway = gateway
         self._usage = usage
+        self._stronghold = stronghold
         self._logs = logs
         self._pricing = pricing or Pricing(PricingSettings())
         self._directory = directory
@@ -672,9 +676,10 @@ class TurnRegistry:
         return outcome.messages
 
     async def _record_usage(self, turn: Turn, kind: str, result: dict[str, Any]) -> None:
+        if self._stronghold is None:
+            return
         try:
-            async with self._database.sessions() as session:
-                await UsageService(session, self._usage).record(turn.account_id, turn.request_id, kind, turn.chat_id, result)
+            await UsageClient(self._stronghold, turn.caller).record(turn.request_id, kind, turn.chat_id, result)
         except Exception:  # Accounting must not lose the user's answer.
             logger.exception("recording usage of turn %s failed", turn.request_id)
 

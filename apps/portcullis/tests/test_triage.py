@@ -338,8 +338,9 @@ def test_an_unavailable_agent_is_logged_as_an_error_and_costs_nothing(client: Te
     ]
 
 
-def test_the_usage_limit_blocks_both_routes(client_factory, agent: FakeAgent, tmp_path: Path, monkeypatch) -> None:
-    client = as_admin(client_factory(usage=UsageSettings(six_hour_token_limit=100)))
+def test_the_usage_limit_blocks_both_routes(client: TestClient, upstream, agent: FakeAgent, tmp_path: Path, monkeypatch) -> None:
+    as_admin(client)
+    upstream.usage.six_hour_limit = 100
     run_agents(tmp_path)
     laya_answers(agent, monkeypatch, {"type": "noul", "noul": 0.9, "answer_confidence": 0.9, "uncertain": False})
     assert client.post(ASK, json=YES_NO).status_code == 200  # 370 tokens: over the limit now

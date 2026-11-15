@@ -88,9 +88,9 @@ def _check_app(data: dict[str, Any]) -> list[Problem]:
     problems = [(key, f"must be {expected}") for key, check, expected in rules if key in data and not check(data[key])]
     usage = data.get("usage")
     if isinstance(usage, dict):
-        for key in ("six_hour_token_limit", "weekly_token_limit", "max_context_tokens_per_chat"):
+        for key in ("max_context_tokens_per_chat",):
             if key in usage and not _is_int(usage[key], 0):
-                problems.append((f"usage.{key}", "must be a whole number, 0 or more (0 = unlimited)"))
+                problems.append((f"usage.{key}", "must be a whole number, 0 or more"))
     backup = data.get("backup")
     if isinstance(backup, dict):
         if "enabled" in backup and not isinstance(backup["enabled"], bool):

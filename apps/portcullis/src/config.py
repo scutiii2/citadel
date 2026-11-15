@@ -82,11 +82,9 @@ class SecuritySettings:
 
 @dataclass(frozen=True)
 class UsageSettings:
-    """config_app.json's "usage" block (port of chat_app's
-    config_usage_limits.json). A limit of 0 means unlimited."""
+    """config_app.json's "usage" block. The token limits (six_hour_token_limit, weekly_token_limit)
+    are Stronghold's now; only the chat context settings stay here."""
 
-    six_hour_token_limit: int = 1_000_000
-    weekly_token_limit: int = 5_000_000
     # Soft cap on one chat's context, whatever the model allows: at
     # auto_summarize_ratio of it (or of the model's window, if smaller) the
     # chat is summarized before the next question is sent.
@@ -99,8 +97,6 @@ class UsageSettings:
         if not 0 < ratio <= 1:
             raise ValueError("usage.auto_summarize_ratio must be above 0 and at most 1")
         return cls(
-            six_hour_token_limit=max(0, int(raw.get("six_hour_token_limit", 1_000_000))),
-            weekly_token_limit=max(0, int(raw.get("weekly_token_limit", 5_000_000))),
             max_context_tokens_per_chat=max(0, int(raw.get("max_context_tokens_per_chat", 150_000))),
             auto_summarize_ratio=ratio,
         )

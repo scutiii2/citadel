@@ -781,8 +781,9 @@ def test_delegated_agents_count_separately(client: TestClient, agent: FakeAgent)
     assert {r["agent"] for r in report["by_agent"]} == {"claude", "openai"}
 
 
-def test_usage_limit_blocks_new_turns(client_factory, agent: FakeAgent) -> None:
-    client = as_admin(client_factory(usage=UsageSettings(six_hour_token_limit=100)))
+def test_usage_limit_blocks_new_turns(client: TestClient, upstream, agent: FakeAgent) -> None:
+    as_admin(client)
+    upstream.usage.six_hour_limit = 100
     chat_id = new_id()
     start(client, chat_id)
     events(client, chat_id)

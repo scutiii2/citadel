@@ -249,6 +249,7 @@ Product logic, called only by Portcullis. The calendar is the first feature that
 - **Settings**: `docker/configs/stronghold/app.json` (the `calendar` block). The `calendar` block in Portcullis's config and `EMBER_VAPID_*` in its `.env` are no longer read.
 - **Notes shared with agents**: Armory's notes tools read Stronghold's database. Compose sets `DB_GATEWAY_INSTANCE=armory` and `DB_GATEWAY_CONNECTION=stronghold` for Armory, and `docker/configs/treasury/connections.json` lists `stronghold` under instance `armory`. A value for these in `apps/armory/.env` is overridden by Compose.
 - Stronghold reads Legion's agent registry from the `agent_data` volume (read-only) and calls Armory for the assistant memory.
+- **Token limits and prices**: `usage.six_hour_token_limit`, `usage.weekly_token_limit` and the `pricing` block are in `docker/configs/stronghold/app.json` (Stronghold keeps usage). A limit set in Portcullis's config is ignored.
 - Stronghold calls Portcullis's `/internal` routes with the shared internal token (account standing, admin switches, email, Errors log). Nothing to configure: Compose sets `PORTCULLIS_URL`.
 
 ## DecisionGateway

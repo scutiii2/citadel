@@ -44,9 +44,10 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/calendar/...` | Feeds, events, alarms, prefs, push, alerts. Portcullis exposes them as `/api/calendar/...` after checking `calendar.use` |
 | `/notes/...` | Notes, tags, tag suggestions and generation. Portcullis exposes them as `/api/notes/...` after checking `chat.use` |
 | `/memory/...` | Assistant memory. Portcullis exposes it as `/api/memory/...` after checking `chat.use` |
+| `/usage/...` | Token usage and limits, kept in Treasury (collection `usage_records`). Portcullis exposes the reads as `/api/usage/...` and `/api/admin/usage/...`, and calls `POST /usage/check` and `POST /usage/records` around every agent call |
 | `/templates/...` | Saved prompts, kept in Treasury (collection `prompt_templates`). Portcullis exposes them as `/api/templates/...` after checking `chat.use` |
 | `/skills/...` | Learned skills, which Armory keeps. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
-| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`calendar`, `notes`, `memory`, `skills`, `templates`). Called by Portcullis only |
+| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`calendar`, `notes`, `memory`, `skills`, `templates`, `usage`). Called by Portcullis only |
 
 ## Notes and memory
 

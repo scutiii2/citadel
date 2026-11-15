@@ -28,6 +28,9 @@ from src.secret_box import SecretBox
 from src.skills import routes as skills_routes
 from src.skills.client import SkillsClient
 from src.templates import routes as templates_routes
+from src.usage import routes as usage_routes
+from src.usage.service import UsageService
+from src.usage.settings import Pricing
 
 _TIMEOUT = httpx.Timeout(15.0, connect=5.0)
 
@@ -64,6 +67,7 @@ def create_app(
         armory_client = armory or http(settings.armory_url)
         app.state.memory = MemoryClient(armory_client, token or None)
         app.state.skills = SkillsClient(armory_client, token or None)
+        app.state.usage = UsageService(app.state.store, settings.usage, Pricing(settings.pricing))
         app.state.calendar = (
             build_calendar_runtime(config=settings.calendar, store=app.state.store, box=app.state.box,
                                    keys=keys, platform=app.state.platform)
@@ -84,6 +88,7 @@ def create_app(
     app.include_router(notes_routes.router)
     app.include_router(skills_routes.router)
     app.include_router(templates_routes.router)
+    app.include_router(usage_routes.router)
 
     @app.exception_handler(CalendarError)
     async def calendar_error(_request: Request, error: CalendarError):

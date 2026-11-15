@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import Settings
-from src.deps import get_agent_gateway, get_db_session, get_log_writer, get_settings, require_permission
+from src.deps import get_agent_gateway, get_log_writer, get_stronghold, require_permission
 from src.models import Account
 from src.routes.chats import limit_reached
 from src.routes.mcp import get_agent_directory
@@ -32,7 +32,8 @@ from src.services.triage_questions import (
     TriageRejected,
     TriageUnavailable,
 )
-from src.services.usage_service import UsageService
+from src.services.stronghold_forwarder import StrongholdForwarder
+from src.services.usage_client import UsageClient
 
 router = APIRouter(prefix="/api/triage", tags=["triage"])
 
@@ -97,13 +98,12 @@ async def write_titles(
     body: TitlesBody,
     account: Account = Depends(require_chat),
     triage: TriageQuestions = Depends(get_triage_questions),
-    session: AsyncSession = Depends(get_db_session),
-    settings: Settings = Depends(get_settings),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
     logs: LogWriter = Depends(get_log_writer),
 ) -> TitlesOut:
     """A one-word title for each option description, in order. Counts toward the usage limits."""
-    usage = UsageService(session, settings.usage)
-    block = await usage.check(account.id)
+    usage = UsageClient(stronghold, account)
+    block = await usage.check()
     if block is not None:
         raise limit_reached(block)
     try:
@@ -111,7 +111,7 @@ async def write_titles(
     except TriageUnavailable as error:
         await logs.error(account.id, "triage.titles", str(error))
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"Option titles are unavailable: {error}") from error
-    await usage.record(account.id, uuid.uuid4().hex, "triage_titles", None, outcome.result)
+    await usage.record(uuid.uuid4().hex, "triage_titles", None, outcome.result)
     await logs.action(account, "triage.titles", f"Wrote titles for {len(body.descriptions)} options")
     return TitlesOut(titles=outcome.titles)
 
@@ -121,13 +121,12 @@ async def ask(
     body: AskBody,
     account: Account = Depends(require_chat),
     triage: TriageQuestions = Depends(get_triage_questions),
-    session: AsyncSession = Depends(get_db_session),
-    settings: Settings = Depends(get_settings),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
     logs: LogWriter = Depends(get_log_writer),
 ) -> dict[str, Any]:
     """Asks the Triage Assistant one yes or no, multiple choice or score question about a text. Counts toward the usage limits."""
-    usage = UsageService(session, settings.usage)
-    block = await usage.check(account.id)
+    usage = UsageClient(stronghold, account)
+    block = await usage.check()
     if block is not None:
         raise limit_reached(block)
     options = [Option(o.title.lower(), o.description) for o in body.options]
@@ -138,7 +137,7 @@ async def ask(
     except TriageUnavailable as error:
         await logs.error(account.id, "triage.ask", str(error))
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"The Triage Assistant is unavailable: {error}") from error
-    await usage.record(account.id, uuid.uuid4().hex, "triage", None, outcome.result)
+    await usage.record(uuid.uuid4().hex, "triage", None, outcome.result)
     # Never the text or the question: only what kind it was and how it came out.
     if body.kind == "yes_no":
         shape = "yes or no"

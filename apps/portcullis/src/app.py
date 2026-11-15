@@ -73,6 +73,7 @@ from src.services.share_service import purge_expired_shares
 from src.services.server_tools import McpServerTools, ServerTools
 from src.services.session_service import SessionService
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
+from src.services.usage_client import UsageUnavailable
 from src.services.traffic import TrafficMiddleware, TrafficRecorder
 from src.services.turns import TurnRegistry
 from src.utils.config_loader import internal_token as load_internal_token, load_env_secrets, service_token
@@ -173,7 +174,7 @@ def create_app(
 
         app.state.pricing = Pricing(settings.pricing)
         app.state.turns = TurnRegistry(database, app.state.agent_gateway, settings.usage, log_writer,
-            pricing=app.state.pricing, directory=app.state.agent_directory)
+            pricing=app.state.pricing, directory=app.state.agent_directory, stronghold=app.state.stronghold)
         backups: BackupScheduler | None = None
         app.state.backups = None
         if settings.backup.enabled:
@@ -261,6 +262,10 @@ def create_app(
         if request.url.path.startswith("/api/brains"):
             return JSONResponse({"detail": "Invalid brain request. Check the fields and limits."}, status_code=422)
         return await request_validation_exception_handler(request, error)
+
+    @app.exception_handler(UsageUnavailable)
+    async def usage_unavailable(_request: Request, _error: UsageUnavailable) -> JSONResponse:
+        return JSONResponse({"detail": "Usage is unavailable"}, status_code=503)
 
     @app.exception_handler(StrongholdUnavailable)
     async def stronghold_unavailable(_request: Request, _error: StrongholdUnavailable) -> JSONResponse:
