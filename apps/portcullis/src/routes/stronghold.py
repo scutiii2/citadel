@@ -20,7 +20,8 @@ router = APIRouter(prefix="/api/stronghold", tags=["stronghold"])
 
 def as_response(forwarded: ForwardedResponse) -> Response:
     """Stronghold's status, body and content type, unchanged."""
-    return Response(forwarded.body, status_code=forwarded.status, media_type=forwarded.content_type)
+    headers = {"Retry-After": forwarded.retry_after} if forwarded.retry_after else None
+    return Response(forwarded.body, status_code=forwarded.status, media_type=forwarded.content_type, headers=headers)
 
 
 async def pass_on(request: Request, stronghold: StrongholdForwarder, account: Account, path: str) -> Response:

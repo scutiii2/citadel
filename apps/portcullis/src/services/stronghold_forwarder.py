@@ -35,6 +35,8 @@ class ForwardedResponse:
     status: int
     body: bytes
     content_type: str
+    # Stronghold's own Retry-After (a 429 for a token limit), kept so the browser still sees it.
+    retry_after: str | None = None
 
 
 class StrongholdForwarder:
@@ -90,4 +92,5 @@ class StrongholdForwarder:
             response.status_code,
             response.content,
             response.headers.get("content-type", "application/json"),
+            response.headers.get("retry-after"),
         )

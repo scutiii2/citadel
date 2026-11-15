@@ -165,14 +165,16 @@ totals. Public share links still expose only plain questions and answers.
 
 ## Ticket read receipts
 
+The ticket and triage routes are answered by Stronghold (`apps/stronghold/src/tickets`, `src/triage`); portcullis checks the login and the permission and passes the request on (`502` when Stronghold is down). Stronghold keeps the read receipts in Treasury; the old `ticket_staff_activity` and `account_ticket_seen` tables stay in this database, unused. Deleting an account purges its receipts through Stronghold (best effort, `admin.tickets_purge`).
+
 Reporter routes require `tickets.create` and return only reporter-safe fields.
 `GET /api/tickets` includes `has_unread` per ticket;
 `GET /api/tickets/unread-count` returns `{count}` for the navigation badge.
 `GET /api/tickets/{id}` checks upstream ownership before marking the ticket seen.
-Staff activity is recorded atomically by mcp_server and reconciled locally,
+Staff activity is recorded atomically by mcp_server and read from it on every list and detail,
 including changes made outside Ember. Reporter lists include all owned tickets
-so old tickets contribute to unread counts. Migration `0018` adds cached staff
-activity timestamps and per-account ticket read receipts.
+so old tickets contribute to unread counts. Migration `0018` once added cached staff
+activity timestamps and per-account ticket read receipts; Stronghold replaced both.
 
 `POST /api/tickets/{id}/reopen` requires `tickets.create` and upstream ownership.
 Only resolved or closed tickets may reopen. The core sets status to open, clears
@@ -511,18 +513,18 @@ addresses only, never loopback, link-local or cloud-metadata ones).
   be read, is reported to the watcher as a live turn event
   `{type: "notice", notices: [{id, label, error}]}`. It is not saved in the chat.
 
-Tickets and groups live in mcp_server; portcullis stores no ticket data and
-only proxies authenticated calls with the internal token and session identity.
+Tickets and groups live in mcp_server (Armory); portcullis stores no ticket data and
+only passes authenticated calls to Stronghold, which calls Armory with the internal token and session identity.
 Creates always send `source: "user"` and `verified_context` containing
-`via: "portcullis"` and the stable `account_id` as text. Ticket ownership is
+`via: "portcullis"` and the account's uid (a stable text) as `account_id`. Ticket ownership is
 keyed by username: renaming an account orphans its existing tickets in
 mcp_server's store. The verified account id is retained for a later ownership migration.
 
 Titles are 1-120 characters, descriptions 1-4000, comments 1-2000 and
 assignees at most 64. Invalid request fields and ids return `422`.
-mcp_server's `404` is preserved; other upstream `4xx` responses become `400`
+Armory's `404` is preserved; other upstream `4xx` responses become `400`
 with the upstream message. Unreachable, malformed or `5xx` upstream responses
-become `502 "mcp_server is unreachable"`. Staff actions log ids and changed
+become `502` (Stronghold says `"armory is unreachable"`, portcullis `"Stronghold is unavailable"`). Staff actions log ids and changed
 field names only, after upstream success, never titles, descriptions or comments.
 Manual ticket creation has no additional rate limiter; mcp_server limits
 automatic reports. Add manual limits later if abuse appears.

@@ -33,7 +33,7 @@ Accounts, SMTP, settings and logs stay in Portcullis. Later domains add routes h
 | 5.2 | memory, notes (with a copy of the agent client) | Executed 2026-11-15: `2026-11-15-plan-5-2-memory-and-notes.md` |
 | 5.2b | brains (usage accounting is in Stronghold now; needs per-request permissions) | To write |
 | 5.3 | templates, skills | Executed 2026-11-15: `2026-11-15-plan-5-3-templates-and-skills.md` |
-| 5.4 | tickets, triage | To write |
+| 5.4 | tickets, triage | Executed 2026-11-15: `2026-11-15-plan-5-4-tickets-and-triage.md` |
 | 5.5 | shares | To write |
 | 5.6 | usage | Executed 2026-11-15: `2026-11-15-plan-5-6-usage.md` |
 | 5.7 | attachments, bard | To write |

@@ -16,8 +16,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from src.services.agent_directory import AgentDirectory
-from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
+from src.agents.directory import AgentDirectory
+from src.agents.gateway import AgentCallError, AgentGateway, Caller
 
 logger = logging.getLogger(__name__)
 

@@ -37,29 +37,6 @@ def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
     return clock
 
 
-@pytest.fixture
-def make_client(tmp_path, db_gateway, armory, platform, agent):
-    from src.api import create_app
-    from src.config import Settings
-
-    clients = []
-
-    def make(usage: UsageSettings | None = None, pricing: PricingSettings | None = None) -> TestClient:
-        registry = tmp_path / "config_agents.json"
-        registry.write_text(json.dumps({"agents": AGENTS}), encoding="utf-8")
-        upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory))
-        settings = Settings(data_dir=tmp_path / "data", agents_registry_path=registry,
-                            usage=usage or UsageSettings(), pricing=pricing or PricingSettings())
-        app = create_app("shared-test-token", settings, store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent)
-        client = TestClient(app, headers={**IDENTITY, "X-Internal-Token": "shared-test-token"})
-        clients.append(client)
-        return client.__enter__()
-
-    yield make
-    for client in clients:
-        client.__exit__(None, None, None)
-
-
 def row(tokens: int = 100, **extra) -> dict:
     return {"agent": "claude", "provider_id": "claude", "model": "m", "total_tokens": tokens, **extra}
 
@@ -269,7 +246,8 @@ def test_cost_comes_from_the_configured_price_at_read_time(make_client, clock: C
     assert r["total_cost"] == pytest.approx(7.0) and r["currency"] == "USD"
     assert r["unpriced_tokens"] == 5
     assert r["by_agent"][0]["cost"] == pytest.approx(7.0)
-    assert client.get("/usage/records").json()[1]["cost"] == pytest.approx(7.0)
+    costs = {r["model"]: r["cost"] for r in client.get("/usage/records").json()}
+    assert costs == {"m": pytest.approx(7.0), "free": None}
 
 
 # --- records ---------------------------------------------------------------------

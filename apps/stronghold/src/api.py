@@ -28,6 +28,10 @@ from src.secret_box import SecretBox
 from src.skills import routes as skills_routes
 from src.skills.client import SkillsClient
 from src.templates import routes as templates_routes
+from src.tickets import routes as tickets_routes
+from src.tickets.client import ArmoryTickets, TicketRefused, TicketUnavailable
+from src.tickets.unread import TicketUnread
+from src.triage import routes as triage_routes
 from src.usage import routes as usage_routes
 from src.usage.service import UsageService
 from src.usage.settings import Pricing
@@ -67,6 +71,8 @@ def create_app(
         armory_client = armory or http(settings.armory_url)
         app.state.memory = MemoryClient(armory_client, token or None)
         app.state.skills = SkillsClient(armory_client, token or None)
+        app.state.tickets = ArmoryTickets(armory_client, token or None)
+        app.state.ticket_unread = TicketUnread(app.state.store)
         app.state.usage = UsageService(app.state.store, settings.usage, Pricing(settings.pricing))
         app.state.calendar = (
             build_calendar_runtime(config=settings.calendar, store=app.state.store, box=app.state.box,
@@ -89,10 +95,21 @@ def create_app(
     app.include_router(skills_routes.router)
     app.include_router(templates_routes.router)
     app.include_router(usage_routes.router)
+    app.include_router(tickets_routes.router)
+    app.include_router(tickets_routes.admin_router)
+    app.include_router(triage_routes.router)
 
     @app.exception_handler(CalendarError)
     async def calendar_error(_request: Request, error: CalendarError):
         return JSONResponse({"detail": str(error)}, status_code=error.status)
+
+    @app.exception_handler(TicketRefused)
+    async def ticket_refused(_request: Request, error: TicketRefused):
+        return JSONResponse({"detail": str(error)}, status_code=404 if error.status == 404 else 400)
+
+    @app.exception_handler(TicketUnavailable)
+    async def tickets_down(_request: Request, _error: TicketUnavailable):
+        return JSONResponse({"detail": "armory is unreachable"}, status_code=502)
 
     @app.exception_handler(DbGatewayUnavailable)
     async def storage_down(_request: Request, _error: DbGatewayUnavailable):

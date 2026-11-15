@@ -140,3 +140,27 @@ def client(tmp_path, db_gateway, armory, platform, agent):
                      store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent)
     with TestClient(app, headers={**IDENTITY, "X-Internal-Token": "shared-test-token"}) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def make_client(tmp_path, db_gateway, armory, platform, agent):
+    from src.api import create_app
+    from src.config import Settings
+    from src.usage.settings import PricingSettings, UsageSettings
+
+    clients = []
+
+    def make(usage: "UsageSettings | None" = None, pricing: "PricingSettings | None" = None) -> TestClient:
+        registry = tmp_path / "config_agents.json"
+        registry.write_text(json.dumps({"agents": AGENTS}), encoding="utf-8")
+        upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory))
+        settings = Settings(data_dir=tmp_path / "data", agents_registry_path=registry,
+                            usage=usage or UsageSettings(), pricing=pricing or PricingSettings())
+        app = create_app("shared-test-token", settings, store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent)
+        client = TestClient(app, headers={**IDENTITY, "X-Internal-Token": "shared-test-token"})
+        clients.append(client)
+        return client.__enter__()
+
+    yield make
+    for client in clients:
+        client.__exit__(None, None, None)
