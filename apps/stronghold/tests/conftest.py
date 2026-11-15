@@ -123,6 +123,12 @@ def armory() -> FakeArmory:
 
 
 @pytest.fixture
+def legion() -> FakeArmory:
+    """Legion's /agents/tuning route: `handler` answers, `requests` records."""
+    return FakeArmory()
+
+
+@pytest.fixture
 def tools() -> dict[str, FakeArmory]:
     """Scribe, Reader and Bard: each answers through its own handler and records its requests."""
     return {name: FakeArmory() for name in ("scribe", "reader", "bard")}
@@ -139,7 +145,7 @@ def platform() -> FakePlatform:
 
 
 @pytest.fixture
-def client(tmp_path, db_gateway, armory, platform, agent, tools):
+def client(tmp_path, db_gateway, armory, platform, agent, tools, legion):
     """The app with its lifespan running, an open token and the requester headers already set."""
     from src.api import create_app
     from src.config import Settings
@@ -149,13 +155,13 @@ def client(tmp_path, db_gateway, armory, platform, agent, tools):
     registry.write_text(json.dumps({"agents": AGENTS}), encoding="utf-8")
     app = create_app("shared-test-token", Settings(data_dir=tmp_path / "data", agents_registry_path=registry),
                      store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent,
-                     tools=tool_clients(tools))
+                     tools=tool_clients(tools), legion=httpx.AsyncClient(transport=httpx.MockTransport(legion)))
     with TestClient(app, headers={**IDENTITY, "X-Internal-Token": "shared-test-token"}) as test_client:
         yield test_client
 
 
 @pytest.fixture
-def make_client(tmp_path, db_gateway, armory, platform, agent, tools):
+def make_client(tmp_path, db_gateway, armory, platform, agent, tools, legion):
     from src.api import create_app
     from src.config import Settings
     from src.usage.settings import PricingSettings, UsageSettings
@@ -169,7 +175,7 @@ def make_client(tmp_path, db_gateway, armory, platform, agent, tools):
         settings = Settings(data_dir=tmp_path / "data", agents_registry_path=registry,
                             usage=usage or UsageSettings(), pricing=pricing or PricingSettings())
         app = create_app("shared-test-token", settings, store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent,
-                     tools=tool_clients(tools))
+                     tools=tool_clients(tools), legion=httpx.AsyncClient(transport=httpx.MockTransport(legion)))
         client = TestClient(app, headers={**IDENTITY, "X-Internal-Token": "shared-test-token"})
         clients.append(client)
         return client.__enter__()

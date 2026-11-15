@@ -41,6 +41,8 @@ from src.tickets import routes as tickets_routes
 from src.tickets.client import ArmoryTickets, TicketRefused, TicketUnavailable
 from src.tickets.unread import TicketUnread
 from src.triage import routes as triage_routes
+from src.tuning import routes as tuning_routes
+from src.tuning.limits import LegionTuning, LimitsStore
 from src.usage import routes as usage_routes
 from src.usage.service import UsageService
 from src.usage.settings import Pricing
@@ -52,10 +54,10 @@ def create_app(
     token: str, settings: Settings | None = None, *,
     store: DocumentStore | None = None, platform: PortcullisClient | None = None,
     armory: httpx.AsyncClient | None = None, agent_gateway: AgentGateway | None = None,
-    tools: dict[str, httpx.AsyncClient] | None = None,
+    tools: dict[str, httpx.AsyncClient] | None = None, legion: httpx.AsyncClient | None = None,
 ) -> FastAPI:
     """token: the shared internal token; "" leaves the app open (tests, loopback).
-    `store`, `platform`, `armory`, `agent_gateway` and `tools` (clients for "bard", "scribe" and "reader") are injected by tests;
+    `store`, `platform`, `armory`, `agent_gateway` and `tools` (clients for "bard", "scribe" and "reader") and `legion` are injected by tests;
     otherwise they are HTTP clients built at start."""
     settings = settings or load_settings()
     log_privacy.install()
@@ -84,6 +86,8 @@ def create_app(
         app.state.skills = SkillsClient(armory_client, token or None)
         app.state.tickets = ArmoryTickets(armory_client, token or None)
         app.state.ticket_unread = TicketUnread(app.state.store)
+        app.state.limits = LimitsStore(app.state.store)
+        app.state.legion = LegionTuning(legion or http(""), app.state.agents, token or None)
         tools_in = tools or {}
         env = dotenv_values(ENV_PATH) if tools is None and ENV_PATH.exists() else {}  # tests inject `tools` and read no .env
 
@@ -125,6 +129,7 @@ def create_app(
     app.include_router(tickets_routes.router)
     app.include_router(tickets_routes.admin_router)
     app.include_router(triage_routes.router)
+    app.include_router(tuning_routes.router)
 
     @app.exception_handler(CalendarError)
     async def calendar_error(_request: Request, error: CalendarError):

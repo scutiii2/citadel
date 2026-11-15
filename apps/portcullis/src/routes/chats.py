@@ -43,7 +43,6 @@ from src.routes.mcp import get_agent_directory
 from src.routes.server_info import get_server_info
 from src.services.brain_connections import BrainConnections
 from src.services import question_answers, second_brain, suggestions, summarization
-from src.services.tuning_limits_service import TuningLimitsService
 from src.services.account_agent_service import AccountAgentService, blocked_names
 from src.services.agent_directory import NO_AGENT_RUNNING, AgentDirectory
 from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
@@ -86,7 +85,7 @@ from src.services.turns import (
     TurnRegistry,
 )
 from src.services.share_service import revoke_shares
-from src.services.stronghold_forwarder import StrongholdForwarder
+from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 from src.services.usage_client import LimitBlock, UsageClient, UsageUnavailable
 from src.services.user_extension_service import TurnExtensions, UserExtensionService
 
@@ -699,6 +698,21 @@ async def append_messages(
 # --- turns ---------------------------------------------------------------------
 
 
+_LIMIT_FIELDS = ("max_output_tokens", "max_tool_rounds")
+
+
+async def _own_limits(stronghold: StrongholdForwarder, account: Account) -> dict[str, int]:
+    """The account's own response limits from Stronghold. Without them the turn still runs, on the admin's values."""
+    try:
+        answer = await stronghold.forward("GET", "/tuning/limits/own", account)
+        stored = json.loads(answer.body) if answer.status == 200 else {}
+    except (StrongholdUnavailable, ValueError):
+        return {}
+    if not isinstance(stored, dict):
+        return {}
+    return {f: stored[f] for f in _LIMIT_FIELDS if isinstance(stored.get(f), int) and not isinstance(stored.get(f), bool)}
+
+
 @router.post("/{chat_id}/turns", status_code=status.HTTP_202_ACCEPTED)
 async def start_turn(
     body: TurnRequest,
@@ -784,10 +798,7 @@ async def start_turn(
         private = TurnExtensions(
             (), ({"id": "private", "label": "Private extensions", "error": "Private extensions storage is unavailable"},)
         )
-    try:
-        limits = await TuningLimitsService(db_gateway, account.uid).get()
-    except DbGatewayError:
-        limits = {}
+    limits = await _own_limits(stronghold, account)
     try:
         options = TurnOptions(
             limits=limits,
