@@ -12,7 +12,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models import Chat, ChatFolder, SharedChat
+from src.models import Chat, ChatFolder
 
 MAX_FOLDERS_PER_ACCOUNT = 30
 NAME_MAX = 60  # the chat_folders.name column
@@ -99,9 +99,9 @@ class FolderService:
         await self._session.commit()
         return folder
 
-    async def delete(self, folder_id: int, running: set[str]) -> tuple[str, int]:
-        """Deletes the folder and every chat in it, with those chats' share
-        links, in one transaction. `running` holds this account's chat ids
+    async def delete(self, folder_id: int, running: set[str], before_delete=None) -> tuple[str, int]:
+        """Deletes the folder and every chat in it in one transaction, after
+        `before_delete(chat_ids)` (it revokes those chats' share links; if it raises nothing is deleted). `running` holds this account's chat ids
         that have an answer being written: if any is in the folder nothing is
         deleted (FolderBusy). Returns (folder name, chats deleted)."""
         folder = await self._get(folder_id)
@@ -110,9 +110,8 @@ class FolderService:
             raise FolderBusy(folder_id)
         name = folder.name
         if chat_ids:
-            await self._session.execute(
-                delete(SharedChat).where(SharedChat.account_id == self._account_id, SharedChat.chat_id.in_(chat_ids))
-            )
+            if before_delete is not None:
+                await before_delete(chat_ids)
             await self._session.execute(
                 delete(Chat).where(Chat.account_id == self._account_id, Chat.folder_id == folder.id)
             )

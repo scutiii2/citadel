@@ -85,6 +85,7 @@ from src.services.turns import (
     TurnOptions,
     TurnRegistry,
 )
+from src.services.share_service import revoke_shares
 from src.services.stronghold_forwarder import StrongholdForwarder
 from src.services.usage_client import LimitBlock, UsageClient, UsageUnavailable
 from src.services.user_extension_service import TurnExtensions, UserExtensionService
@@ -480,7 +481,9 @@ async def delete_all_chats(
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
     turns: TurnRegistry = Depends(get_turns),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> Response:
+    await revoke_shares(stronghold, account, "all")
     await turns.discard_account(account.id)
     await chats.delete_all()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -633,12 +636,14 @@ async def delete_chat(
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
     turns: TurnRegistry = Depends(get_turns),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> Response:
-    """Also stops an answer still being written for it."""
+    """Also stops an answer still being written for it, and revokes its share links."""
     try:
         await chats.get(chat_id)
     except ChatNotFound as error:
         raise _not_found() from error
+    await revoke_shares(stronghold, account, [chat_id])
     await turns.discard(account.id, chat_id)
     await chats.delete(chat_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

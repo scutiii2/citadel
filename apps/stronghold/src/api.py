@@ -27,6 +27,8 @@ from src.requester import Requester, current_requester
 from src.secret_box import SecretBox
 from src.skills import routes as skills_routes
 from src.skills.client import SkillsClient
+from src.shares import routes as shares_routes
+from src.shares.store import ShareStore
 from src.templates import routes as templates_routes
 from src.tickets import routes as tickets_routes
 from src.tickets.client import ArmoryTickets, TicketRefused, TicketUnavailable
@@ -73,6 +75,7 @@ def create_app(
         app.state.skills = SkillsClient(armory_client, token or None)
         app.state.tickets = ArmoryTickets(armory_client, token or None)
         app.state.ticket_unread = TicketUnread(app.state.store)
+        app.state.shares = ShareStore(app.state.store)
         app.state.usage = UsageService(app.state.store, settings.usage, Pricing(settings.pricing))
         app.state.calendar = (
             build_calendar_runtime(config=settings.calendar, store=app.state.store, box=app.state.box,
@@ -95,6 +98,7 @@ def create_app(
     app.include_router(skills_routes.router)
     app.include_router(templates_routes.router)
     app.include_router(usage_routes.router)
+    app.include_router(shares_routes.router)
     app.include_router(tickets_routes.router)
     app.include_router(tickets_routes.admin_router)
     app.include_router(triage_routes.router)

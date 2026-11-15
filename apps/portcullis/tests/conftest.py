@@ -138,6 +138,8 @@ class FakeUpstream:
             return self.usage.respond(request)
         if self.handler:
             return self.handler(request)
+        if request.url.path == "/shares/revoke":  # Stronghold's: chats are deleted after their links are revoked
+            return httpx.Response(204)
         return httpx.Response(
             200, json={"jsonrpc": "2.0", "id": 1, "result": {}}, headers={"mcp-session-id": "sess-1"}
         )

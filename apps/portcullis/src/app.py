@@ -69,7 +69,6 @@ from src.services import uid_log_filter
 from src.services.otp_service import OtpService
 from src.services.secret_box import SecretBox, ensure_secrets_key
 from src.services.public_rate_limiter import PublicReadLimiter
-from src.services.share_service import purge_expired_shares
 from src.services.server_tools import McpServerTools, ServerTools
 from src.services.session_service import SessionService
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
@@ -124,7 +123,6 @@ def create_app(
             await SessionService(session, settings.session_hours).purge_expired()
             await OtpService(session).purge_stale()
             await auth_service.purge_login_attempts()
-            await purge_expired_shares(session)
         log_writer = LogWriter(database)
         await log_writer.purge_old()
         recorder = traffic or TrafficRecorder(database)

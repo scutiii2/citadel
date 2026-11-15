@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.deps import get_db_session, get_log_writer, get_turns, require_permission
+from src.deps import get_db_session, get_log_writer, get_stronghold, get_turns, require_permission
 from src.models import Account, ChatFolder
 from src.services.folder_service import (
     NAME_MAX,
@@ -21,6 +21,8 @@ from src.services.folder_service import (
 )
 from src.services.log_service import LogWriter
 from src.services.permissions import CHAT_USE
+from src.services.share_service import revoke_shares
+from src.services.stronghold_forwarder import StrongholdForwarder
 from src.services.turns import TurnRegistry
 
 router = APIRouter(prefix="/api/chat-folders", tags=["chat-folders"])
@@ -146,11 +148,13 @@ async def delete_folder(
     folders: FolderService = Depends(get_folder_service),
     turns: TurnRegistry = Depends(get_turns),
     logs: LogWriter = Depends(get_log_writer),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> Response:
-    """Deletes the folder and every chat in it. Refused while one of those
-    chats has an answer being written, so a live answer is never cut off."""
+    """Deletes the folder and every chat in it, after revoking their share links. Refused while one of
+    those chats has an answer being written, so a live answer is never cut off."""
     try:
-        name, chat_count = await folders.delete(folder_id, turns.running_chat_ids(account.id))
+        name, chat_count = await folders.delete(
+            folder_id, turns.running_chat_ids(account.id), lambda chat_ids: revoke_shares(stronghold, account, chat_ids))
     except FolderNotFound as error:
         raise _not_found() from error
     except FolderBusy as error:

@@ -640,18 +640,17 @@ calls (in each call's `_meta`), so mcp_server sees who asked either way.
   server-made id. Only saved messages are read, so a chat that is still
   answering can be branched.
 - **Chat folders and pins** (`services/folder_service.py`, `routes/chat_folders.py`): folders are one level deep per account. A branch stays in its source's folder and is not pinned. The schema change is migration `0005`.
-- **Share links** (`services/share_service.py`, `routes/shares.py`): the one
+- **Share links** (`services/share_service.py`, `routes/shares.py`; Stronghold keeps the links in `apps/stronghold/src/shares`): the one
   feature that lets someone read a chat without logging in, so its rules live
   on the server. A link's token is 256 random bits and only its SHA-256 is
   stored (shown once, at creation). What is shared is a frozen copy taken
   then, cut to the questions the user typed and the assistant's plain
   answers: tool steps and results, usage data, summaries, raw logs,
   slash-command results, error texts, download markers and the text of
-  attached files are left out. Links expire (1, 7 or 30 days, or never; expired
-  ones are purged at startup), can be revoked, and die with their chat
-  (deleting one chat or all of them) or account. Unknown, revoked and expired
+  attached files are left out. Links expire (1, 7 or 30 days, or never; an expired one is removed when read or when its owner makes a new link), can be revoked, and die with their chat
+  (deleting one chat, all of them or a folder revokes the links first, and nothing is deleted if Stronghold cannot) or account. Unknown, revoked and expired
   links answer alike, and `GET /api/shared/{token}` is limited per address
-  (`PublicReadLimiter`, in memory).
+  (`PublicReadLimiter`, in memory). portcullis cuts the chat down to what may be shared and passes the snapshot on; Stronghold answers `502` when it is down. Links made before Plan 5.5 are gone, and the old `shared_chats` table stays here, unused.
 - **Chat search** (`services/chat_search.py`, `GET /api/chats/search`): a
   literal, case-insensitive scan of the account's titles and messages,
   streamed and stopped at 50 hits; ASCII queries are pre-filtered in SQL.

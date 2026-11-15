@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.services.share_service import hash_token, snapshot_messages
+from src.services.share_service import snapshot_messages
 
 FILE = '[[ATTACHMENT filename="report.txt" chars="9" truncated="false"]]\nsecretword\n[[/ATTACHMENT]]'
 
@@ -94,7 +94,3 @@ def test_does_not_change_its_input() -> None:
     snapshot_messages(messages)
 
     assert messages == before
-
-
-def test_token_hash_is_a_stable_sha256_hex() -> None:
-    assert hash_token("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"

@@ -52,10 +52,12 @@ class StrongholdForwarder:
         self._internal_token = internal_token
         self._traffic = traffic or TrafficRecorder()
 
-    def _headers(self, account: Account) -> dict[str, str]:
-        headers = {"X-Requester-Username": account.username, "X-Requester-Email": account.email}
-        if account.uid:
-            headers["X-Requester-Uid"] = account.uid
+    def _headers(self, account: Account | None) -> dict[str, str]:
+        headers: dict[str, str] = {}
+        if account is not None:  # None: a call nobody is logged in for (the public read of a share link)
+            headers = {"X-Requester-Username": account.username, "X-Requester-Email": account.email}
+            if account.uid:
+                headers["X-Requester-Uid"] = account.uid
         if self._internal_token:
             headers["X-Internal-Token"] = self._internal_token
         return headers
@@ -64,7 +66,7 @@ class StrongholdForwarder:
         self,
         method: str,
         path: str,
-        account: Account,
+        account: Account | None,
         *,
         params: dict[str, str] | None = None,
         json: Any = None,

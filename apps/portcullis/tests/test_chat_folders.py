@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import uuid
 
 import pytest
@@ -262,15 +264,13 @@ def put_in(client: TestClient, folder_id: int, count: int) -> list[str]:
     return ids
 
 
-def test_deleting_a_folder_deletes_its_chats_and_their_shares(client: TestClient) -> None:
+def test_deleting_a_folder_deletes_its_chats_and_revokes_their_shares(client: TestClient, upstream) -> None:
     as_admin(client)
     keep = make_chat(client, "unfiled")
     other = new_folder(client, "Other").json()["id"]
     (kept_elsewhere,) = put_in(client, other, 1)
     doomed = new_folder(client, "Doomed").json()["id"]
     first, second = put_in(client, doomed, 2)
-    token = client.post(f"/api/chats/{first}/shares", json={}).json()["token"]
-    assert client.get(f"/api/shared/{token}").status_code == 200
 
     response = client.delete(f"/api/chat-folders/{doomed}")
 
@@ -279,7 +279,8 @@ def test_deleting_a_folder_deletes_its_chats_and_their_shares(client: TestClient
     remaining = {c["id"] for c in client.get("/api/chats").json()}
     assert remaining == {keep, kept_elsewhere}
     assert client.get(f"/api/chats/{second}").status_code == 404
-    assert client.get(f"/api/shared/{token}").status_code == 404  # the link died with the chat
+    revoked = [json.loads(r.content) for r in upstream.requests if r.url.path == "/shares/revoke"]
+    assert [sorted(body["chat_ids"]) for body in revoked] == [sorted([first, second])]  # the links died with the chats
 
 
 def test_deleting_an_empty_folder(client: TestClient) -> None:

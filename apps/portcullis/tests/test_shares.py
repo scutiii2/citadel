@@ -1,20 +1,18 @@
+"""Share links: Portcullis cuts the chat down, checks login and permission and rate-limits the public read;
+Stronghold keeps the links (its own tests cover expiry, limits and tokens)."""
+
 from __future__ import annotations
 
-import hashlib
-import re
+import json
 import uuid
-from datetime import timedelta
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select, update
 
-from src.db import utcnow
-from src.models import LogEntry, SharedChat
-from src.services import share_service
 from src.services.public_rate_limiter import PublicReadLimiter
-from src.services.share_service import purge_expired_shares
-from tests.conftest import FakeEmailSender
+from tests.conftest import FakeEmailSender, FakeUpstream
+from tests.test_account_uid import uids
 from tests.test_admin import login, make_member
 from tests.test_registration import as_admin
 
@@ -35,6 +33,7 @@ CONVERSATION = [
     {"role": "user", "content": "and again?"},
     {"role": "assistant", "content": "error: provider blew up at 10.0.0.5"},
 ]
+TOKEN = "T" * 43
 
 
 def new_id() -> str:
@@ -55,32 +54,28 @@ def share(client: TestClient, chat_id: str, **body):
     return client.post(f"/api/chats/{chat_id}/shares", json=body)
 
 
-def read(client: TestClient, token: str):
-    return client.get(f"/api/shared/{token}")
+def stronghold(request: httpx.Request) -> httpx.Response:
+    if request.url.path == "/shares" and request.method == "POST":
+        return httpx.Response(201, json={"id": 5, "token": TOKEN})
+    if request.url.path.startswith("/shares/public/"):
+        return httpx.Response(200, json={"title": "Quarterly report", "messages": [], "created_at": "x", "expires_at": None})
+    return httpx.Response(204 if request.method in ("DELETE", "POST") else 200, json=[])
 
 
-def db(client: TestClient, work):
-    """Runs `work(session)` against portcullis's own database."""
-
-    async def run():
-        async with client.app.state.database.sessions() as session:
-            return await work(session)
-
-    return client.portal.call(run)
+@pytest.fixture
+def served(upstream: FakeUpstream) -> FakeUpstream:
+    upstream.handler = stronghold
+    return upstream
 
 
-def expire(client: TestClient, share_id: int) -> None:
-    async def work(session):
-        await session.execute(update(SharedChat).where(SharedChat.id == share_id).values(expires_at=utcnow() - timedelta(minutes=1)))
-        await session.commit()
-
-    db(client, work)
+def sent_to(upstream: FakeUpstream, path: str) -> list[httpx.Request]:
+    return [r for r in upstream.requests if r.url.path == path]
 
 
 # --- access -------------------------------------------------------------------
 
 
-def test_managing_links_needs_login_and_chat_use(client: TestClient, email: FakeEmailSender) -> None:
+def test_managing_links_needs_login_and_chat_use(client: TestClient, email: FakeEmailSender, served) -> None:
     assert share(client, new_id()).status_code == 401
     assert client.get("/api/shares").status_code == 401
     assert client.delete("/api/shares/1").status_code == 401
@@ -90,73 +85,62 @@ def test_managing_links_needs_login_and_chat_use(client: TestClient, email: Fake
     assert share(client, new_id()).status_code == 403  # unverified: no permissions
     assert client.get("/api/shares").status_code == 403
     assert client.delete("/api/shares/1").status_code == 403
+    assert sent_to(served, "/shares") == []
 
 
-def test_reading_a_link_needs_no_login(client_factory) -> None:
-    owner = client_factory()
-    as_admin(owner)
-    token = share(owner, make_chat(owner)).json()["token"]
-
+def test_reading_a_link_needs_no_login_and_sends_no_identity(client_factory, served) -> None:
     stranger = client_factory()  # a browser that never logged in
 
-    assert read(stranger, token).status_code == 200
-    assert read(owner, token).status_code == 200  # and logging in changes nothing
+    response = stranger.get(f"/api/shared/{TOKEN}")
+
+    assert response.status_code == 200
+    (call,) = sent_to(served, f"/shares/public/{TOKEN}")
+    assert "x-requester-uid" not in call.headers and "x-requester-username" not in call.headers
 
 
 # --- creating -----------------------------------------------------------------
 
 
-def test_creating_a_link_returns_the_token_once(client: TestClient) -> None:
+def test_creating_sends_only_the_sanitized_conversation(client: TestClient, served) -> None:
     as_admin(client)
     chat_id = make_chat(client)
 
-    response = share(client, chat_id)
+    response = share(client, chat_id, expires_in_days=30)
 
-    assert response.status_code == 201
-    body = response.json()
-    assert re.fullmatch(r"[A-Za-z0-9_-]{43}", body["token"])
-    assert (body["chat_id"], body["title"], body["message_count"]) == (chat_id, "Quarterly report", 3)
-    created = _parse(body["created_at"])
-    assert _parse(body["expires_at"]) - created == timedelta(days=7)  # the default
+    assert (response.status_code, response.json()) == (201, {"id": 5, "token": TOKEN})
+    (call,) = sent_to(served, "/shares")
+    assert call.headers["x-requester-uid"] == uids(client)["root"]
+    body = json.loads(call.content)
+    assert body == {
+        "chat_id": chat_id, "title": "Quarterly report", "expires_in_days": 30,
+        "messages": [
+            {"role": "user", "content": "please summarize\n\n📎 report.txt"},
+            {"role": "assistant", "content": "Here you go."},
+            {"role": "user", "content": "and again?"},
+        ],
+    }
+    for secret in ("SUMMARY-SECRET", "secretword", "TOOL-ARG", "TOOL-RESULT", "COMMAND-RESULT", "10.0.0.5", "/internal/f", "claude-test"):
+        assert secret not in call.content.decode()
 
 
-@pytest.mark.parametrize("days", [1, 7, 30])
-def test_expiry_choices(client: TestClient, days: int) -> None:
+def test_the_default_expiry_is_a_week(client: TestClient, served) -> None:
     as_admin(client)
 
-    body = share(client, make_chat(client), expires_in_days=days).json()
+    share(client, make_chat(client))
 
-    assert _parse(body["expires_at"]) - _parse(body["created_at"]) == timedelta(days=days)
-
-
-def test_a_link_can_be_made_without_expiry(client: TestClient) -> None:
-    as_admin(client)
-
-    body = share(client, make_chat(client), expires_in_days=None).json()
-
-    assert body["expires_at"] is None
-    assert read(client, body["token"]).json()["expires_at"] is None
+    assert json.loads(sent_to(served, "/shares")[0].content)["expires_in_days"] == 7
 
 
 @pytest.mark.parametrize("days", [0, 2, 365, -1, "7", 7.5, "forever"])
-def test_other_expiries_are_refused(client: TestClient, days) -> None:
+def test_other_expiries_are_refused_before_stronghold(client: TestClient, served, days) -> None:
     as_admin(client)
     chat_id = make_chat(client)
 
     assert share(client, chat_id, expires_in_days=days).status_code == 422
-    assert client.get("/api/shares").json() == []
+    assert sent_to(served, "/shares") == []
 
 
-def test_every_link_gets_its_own_token(client: TestClient) -> None:
-    as_admin(client)
-    chat_id = make_chat(client)
-
-    tokens = {share(client, chat_id).json()["token"] for _ in range(5)}
-
-    assert len(tokens) == 5
-
-
-def test_unknown_and_foreign_chats_are_404(client_factory, email: FakeEmailSender) -> None:
+def test_unknown_and_foreign_chats_are_404(client_factory, email: FakeEmailSender, served) -> None:
     alice = client_factory()
     make_member(alice, email)
     make_member(alice, email, "bob")
@@ -167,11 +151,11 @@ def test_unknown_and_foreign_chats_are_404(client_factory, email: FakeEmailSende
 
     assert share(alice, new_id()).status_code == 404
     assert share(bob, chat_id).status_code == 404
-    assert bob.get("/api/shares").json() == []
     assert share(alice, "x").status_code == 422  # not even an id
+    assert sent_to(served, "/shares") == []
 
 
-def test_a_chat_with_nothing_shareable_is_refused(client: TestClient) -> None:
+def test_a_chat_with_nothing_shareable_is_refused(client: TestClient, served) -> None:
     as_admin(client)
     only_private_parts = [
         {"role": "assistant", "kind": "summary", "content": "S"},
@@ -183,82 +167,58 @@ def test_a_chat_with_nothing_shareable_is_refused(client: TestClient) -> None:
 
     assert share(client, make_chat(client, only_private_parts)).status_code == 422
     assert share(client, make_chat(client, [])).status_code == 422
-    assert client.get("/api/shares").json() == []
+    assert sent_to(served, "/shares") == []
 
 
-# --- what is stored ---------------------------------------------------------------
-
-
-def test_the_token_is_not_stored_only_its_hash(client: TestClient) -> None:
+def test_a_refusal_from_stronghold_passes_through(client: TestClient, upstream: FakeUpstream) -> None:
+    upstream.handler = lambda request: httpx.Response(409, json={"detail": "At most 50 active shared links per account - revoke some first"})
     as_admin(client)
-    body = share(client, make_chat(client)).json()
 
-    async def rows(session):
-        found = list(await session.scalars(select(SharedChat)))
-        return [(r.token_hash, r.title, r.messages, r.chat_id) for r in found]
+    refused = share(client, make_chat(client))
 
-    (stored,) = db(client, rows)
-
-    assert stored[0] == hashlib.sha256(body["token"].encode()).hexdigest()
-    assert all(body["token"] not in str(column) for column in stored)
+    assert (refused.status_code, refused.json()["detail"]) == (409, "At most 50 active shared links per account - revoke some first")
 
 
-def test_lists_never_contain_a_token(client: TestClient) -> None:
+def test_shares_are_posted_as_json_only(client: TestClient, served) -> None:
     as_admin(client)
     chat_id = make_chat(client)
-    share(client, chat_id)
 
-    listed = client.get("/api/shares").json()
+    response = client.post(f"/api/chats/{chat_id}/shares", content="expires_in_days=7", headers={"Content-Type": "text/plain"})
 
-    assert len(listed) == 1
-    assert "token" not in listed[0]
-    assert set(listed[0]) == {"id", "chat_id", "title", "message_count", "created_at", "expires_at"}
+    assert response.status_code == 415
 
 
-# --- reading ------------------------------------------------------------------------
+# --- listing and revoking --------------------------------------------------------
 
-
-def test_a_link_shows_only_the_sanitized_conversation(client_factory) -> None:
-    owner = client_factory()
-    as_admin(owner)
-    token = share(owner, make_chat(owner)).json()["token"]
-
-    response = read(client_factory(), token)
-
-    assert response.status_code == 200
-    shared = response.json()
-    assert shared["title"] == "Quarterly report"
-    assert shared["messages"] == [
-        {"role": "user", "content": "please summarize\n\n📎 report.txt"},
-        {"role": "assistant", "content": "Here you go."},
-        {"role": "user", "content": "and again?"},
-    ]
-    everything = response.text
-    for secret in ("SUMMARY-SECRET", "secretword", "TOOL-ARG", "TOOL-RESULT", "COMMAND-RESULT", "10.0.0.5", "/internal/f", "claude-test"):
-        assert secret not in everything
-    assert set(shared) == {"title", "messages", "created_at", "expires_at"}
-
-
-def test_a_link_is_a_frozen_copy(client: TestClient, client_factory) -> None:
+def test_list_and_revoke_go_to_stronghold_as_the_signed_in_account(client: TestClient, served) -> None:
     as_admin(client)
-    chat_id = make_chat(client)
-    token = share(client, chat_id).json()["token"]
-    anon = client_factory()
-    before = read(anon, token).json()
+    uid = uids(client)["root"]
+    served.requests.clear()
 
-    client.put(
-        f"/api/chats/{chat_id}",
-        json={"title": "Renamed", "agent_id": None, "messages": [{"role": "user", "content": "something else entirely"}]},
-    )
+    assert client.get("/api/shares", params={"chat_id": "abcdefgh"}).json() == []
+    assert client.delete("/api/shares/12").status_code == 204
 
-    assert read(anon, token).json() == before
+    listed, revoked = served.requests
+    assert (listed.url.path, dict(listed.url.params)) == ("/shares", {"chat_id": "abcdefgh"})
+    assert (revoked.method, revoked.url.path) == ("DELETE", "/shares/12")
+    assert listed.headers["x-requester-uid"] == revoked.headers["x-requester-uid"] == uid
 
 
-def test_the_public_response_is_never_cached_or_indexed(client: TestClient, client_factory) -> None:
+def test_share_ids_are_validated(client: TestClient, served) -> None:
     as_admin(client)
-    token = share(client, make_chat(client)).json()["token"]
+    served.requests.clear()
 
-    response = read(client_factory(), token)
+    assert client.delete("/api/shares/0").status_code == 422
+    assert client.delete("/api/shares/abc").status_code == 422
+    assert client.delete("/api/shares/accounts/someone").status_code in (404, 405)
+    assert served.requests == []
+
+
+# --- the public read ---------------------------------------------------------------
+
+
+def test_the_public_response_is_never_cached_or_indexed(client_factory, served) -> None:
+    response = client_factory().get(f"/api/shared/{TOKEN}")
 
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["x-robots-tag"] == "noindex, nofollow"
@@ -271,248 +231,126 @@ def test_only_reading_is_possible_without_login(client_factory) -> None:
         assert getattr(anon, method)("/api/shared/" + "a" * 43).status_code in (401, 403, 405, 415, 422)
 
 
-def test_unknown_malformed_expired_and_revoked_links_all_look_the_same(client: TestClient, client_factory) -> None:
-    as_admin(client)
-    chat_id = make_chat(client)
-    expired = share(client, chat_id).json()
-    revoked = share(client, chat_id).json()
-    expire(client, expired["id"])
-    assert client.delete(f"/api/shares/{revoked['id']}").status_code == 204
+def test_malformed_tokens_never_reach_stronghold_and_look_like_unknown_ones(client_factory, upstream: FakeUpstream) -> None:
+    upstream.handler = lambda request: httpx.Response(404, json={"detail": "Shared chat not found"})
     anon = client_factory()
 
-    attempts = [
-        "A" * 43,  # well-formed, never issued
-        "short",
-        "x" * 200,
-        "has spaces and !!",
-        expired["token"],
-        revoked["token"],
-    ]
-    answers = [read(anon, t) for t in attempts]
+    answers = [anon.get(f"/api/shared/{t}") for t in ("short", "x" * 200, "has spaces and !!", "A" * 43)]
 
     assert {r.status_code for r in answers} == {404}
     assert len({r.text for r in answers}) == 1  # nothing tells the cases apart
+    assert [r.url.path for r in upstream.requests] == ["/shares/public/" + "A" * 43]
+    assert "cache-control" not in answers[-1].headers
 
 
-def test_a_link_with_no_expiry_or_a_future_one_keeps_working(client: TestClient, client_factory) -> None:
-    as_admin(client)
-    chat_id = make_chat(client)
-    forever = share(client, chat_id, expires_in_days=None).json()["token"]
-    week = share(client, chat_id, expires_in_days=7).json()["token"]
+def test_reading_is_rate_limited_per_address(client_factory, served) -> None:
     anon = client_factory()
-
-    assert read(anon, forever).status_code == 200
-    assert read(anon, week).status_code == 200
-
-
-def test_reading_is_rate_limited_per_address(client: TestClient, client_factory) -> None:
-    as_admin(client)
-    token = share(client, make_chat(client)).json()["token"]
-    anon = client_factory()  # its own app instance over the same database
     anon.app.state.share_limiter = PublicReadLimiter(max_requests=3, window_seconds=60)
 
-    codes = [read(anon, token).status_code for _ in range(3)]
-    refused = read(anon, "A" * 43)  # guesses count too
+    codes = [anon.get(f"/api/shared/{TOKEN}").status_code for _ in range(3)]
+    refused = anon.get("/api/shared/" + "A" * 43)  # guesses count too
 
     assert codes == [200, 200, 200]
     assert refused.status_code == 429
     assert int(refused.headers["retry-after"]) >= 1
-    assert read(anon, token).status_code == 429
+    assert anon.get(f"/api/shared/{TOKEN}").status_code == 429
 
 
-# --- listing and revoking ---------------------------------------------------------------
+def test_stronghold_down_gives_502_for_managing_and_reading(client_factory, upstream: FakeUpstream) -> None:
+    owner = client_factory()
+    as_admin(owner)
+    upstream.unreachable = True
 
-
-def test_listing_is_newest_first_and_can_be_narrowed_to_one_chat(client: TestClient) -> None:
-    as_admin(client)
-    first, second = make_chat(client, title="First"), make_chat(client, title="Second")
-    a = share(client, first).json()
-    b = share(client, second).json()
-    c = share(client, first).json()
-
-    assert [s["id"] for s in client.get("/api/shares").json()] == [c["id"], b["id"], a["id"]]
-    assert [s["id"] for s in client.get("/api/shares", params={"chat_id": first}).json()] == [c["id"], a["id"]]
-    assert client.get("/api/shares", params={"chat_id": "no way"}).status_code == 422
-
-
-def test_expired_links_drop_out_of_the_list(client: TestClient) -> None:
-    as_admin(client)
-    chat_id = make_chat(client)
-    old = share(client, chat_id).json()
-    kept = share(client, chat_id).json()
-
-    expire(client, old["id"])
-
-    assert [s["id"] for s in client.get("/api/shares").json()] == [kept["id"]]
-
-
-def test_links_are_private_per_account(client_factory, email: FakeEmailSender) -> None:
-    alice = client_factory()
-    make_member(alice, email)
-    make_member(alice, email, "bob")
-    login(alice, "alice")
-    mine = share(alice, make_chat(alice)).json()
-    bob = client_factory()
-    login(bob, "bob")
-
-    assert bob.get("/api/shares").json() == []
-    assert bob.delete(f"/api/shares/{mine['id']}").status_code == 404
-    assert read(bob, mine["token"]).status_code == 200  # a link is readable by anyone who has it
-    assert len(alice.get("/api/shares").json()) == 1  # ... but only its owner can revoke it
-
-
-def test_revoking_kills_the_link_at_once(client: TestClient, client_factory) -> None:
-    as_admin(client)
-    made = share(client, make_chat(client)).json()
-    anon = client_factory()
-    assert read(anon, made["token"]).status_code == 200
-
-    assert client.delete(f"/api/shares/{made['id']}").status_code == 204
-
-    assert read(anon, made["token"]).status_code == 404
-    assert client.get("/api/shares").json() == []
-    assert client.delete(f"/api/shares/{made['id']}").status_code == 404
-
-
-def test_share_ids_are_validated(client: TestClient) -> None:
-    as_admin(client)
-
-    assert client.delete("/api/shares/0").status_code == 422
-    assert client.delete("/api/shares/abc").status_code == 422
-    assert client.delete("/api/shares/99999").status_code == 404
-
-
-def test_shares_are_posted_as_json_only(client: TestClient) -> None:
-    as_admin(client)
-    chat_id = make_chat(client)
-
-    response = client.post(f"/api/chats/{chat_id}/shares", content="expires_in_days=7", headers={"Content-Type": "text/plain"})
-
-    assert response.status_code == 415
-
-
-# --- limits ----------------------------------------------------------------------------
-
-
-def test_active_link_limit(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(share_service, "MAX_ACTIVE_SHARES_PER_ACCOUNT", 2)
-    as_admin(client)
-    chat_id = make_chat(client)
-    first = share(client, chat_id).json()
-    second = share(client, chat_id).json()
-
-    refused = share(client, chat_id)
-
-    assert refused.status_code == 409
-    assert "At most 2" in refused.json()["detail"]
-    # Revoking frees a slot, and so does a link expiring.
-    client.delete(f"/api/shares/{first['id']}")
-    assert share(client, chat_id).status_code == 201
-    expire(client, second["id"])
-    assert share(client, chat_id).status_code == 201
-
-
-# --- audit -----------------------------------------------------------------------------
-
-
-def test_creating_and_revoking_are_logged_without_the_token(client: TestClient) -> None:
-    as_admin(client)
-    made = share(client, make_chat(client), expires_in_days=30).json()
-    client.delete(f"/api/shares/{made['id']}")
-
-    async def entries(session):
-        rows = list(await session.scalars(select(LogEntry).where(LogEntry.source.in_(["share.create", "share.revoke"]))))
-        return sorted((r.source, r.message) for r in rows)
-
-    logged = db(client, entries)
-
-    assert [source for source, _ in logged] == ["share.create", "share.revoke"]
-    assert "Quarterly report" in logged[0][1] and "30 days" in logged[0][1]
-    assert all(made["token"] not in message for _, message in logged)
+    assert owner.get("/api/shares").status_code == 502
+    assert client_factory().get(f"/api/shared/{TOKEN}").status_code == 502
 
 
 # --- what removes links -------------------------------------------------------------------
 
 
-def _share_count(client: TestClient) -> int:
-    async def work(session):
-        return len(list(await session.scalars(select(SharedChat))))
-
-    return db(client, work)
+def revokes(upstream: FakeUpstream) -> list[dict]:
+    return [json.loads(r.content) for r in sent_to(upstream, "/shares/revoke")]
 
 
-def test_deleting_a_chat_revokes_its_links_and_only_its_links(client: TestClient, client_factory) -> None:
+def test_deleting_a_chat_revokes_its_links_first(client: TestClient, served) -> None:
     as_admin(client)
-    doomed, kept = make_chat(client, title="Doomed"), make_chat(client, title="Kept")
-    gone = share(client, doomed).json()["token"]
-    stays = share(client, kept).json()["token"]
-    anon = client_factory()
+    doomed = make_chat(client, title="Doomed")
+    kept = make_chat(client, title="Kept")
 
     assert client.delete(f"/api/chats/{doomed}").status_code == 204
 
-    assert read(anon, gone).status_code == 404
-    assert read(anon, stays).status_code == 200
-    assert _share_count(client) == 1
+    assert revokes(served) == [{"chat_ids": [doomed]}]
+    assert client.get(f"/api/chats/{doomed}").status_code == 404
+    assert client.get(f"/api/chats/{kept}").status_code == 200
 
 
-def test_deleting_all_chats_revokes_every_link_of_the_account(client: TestClient, client_factory) -> None:
+def test_deleting_all_chats_revokes_every_link_of_the_account(client: TestClient, served) -> None:
     as_admin(client)
-    tokens = [share(client, make_chat(client)).json()["token"] for _ in range(3)]
+    make_chat(client)
 
     assert client.delete("/api/chats").status_code == 204
 
-    assert all(read(client_factory(), t).status_code == 404 for t in tokens)
-    assert _share_count(client) == 0
+    assert revokes(served) == [{"chat_ids": "all"}]
 
 
-def test_deleting_all_chats_leaves_other_accounts_links_alone(client_factory, email: FakeEmailSender) -> None:
-    alice = client_factory()
-    make_member(alice, email)
-    make_member(alice, email, "bob")
-    login(alice, "alice")
-    bob = client_factory()
-    login(bob, "bob")
-    alice_token = share(alice, make_chat(alice)).json()["token"]
-    share(bob, make_chat(bob))
-
-    bob.delete("/api/chats")
-
-    assert read(client_factory(), alice_token).status_code == 200
-
-
-def test_links_go_with_their_account(client: TestClient, email: FakeEmailSender) -> None:
-    alice_id = make_member(client, email)
-    login(client, "alice")
-    token = share(client, make_chat(client)).json()["token"]
-    client.post("/api/auth/logout", json={})
-
+def test_deleting_a_folder_revokes_the_links_of_its_chats(client: TestClient, served) -> None:
     as_admin(client)
-    client.delete(f"/api/admin/accounts/{alice_id}")
+    folder = client.post("/api/chat-folders", json={"name": "Work"}).json()["id"]
+    inside = make_chat(client)
+    assert client.patch(f"/api/chats/{inside}", json={"folder_id": folder}).status_code == 200
+    outside = make_chat(client)
 
-    assert _share_count(client) == 0
-    assert read(client, token).status_code == 404
+    assert client.delete(f"/api/chat-folders/{folder}").status_code == 204
+
+    assert revokes(served) == [{"chat_ids": [inside]}]
+    assert client.get(f"/api/chats/{outside}").status_code == 200
 
 
-def test_startup_purges_expired_links(client: TestClient) -> None:
+def test_an_empty_folder_asks_for_no_revoke(client: TestClient, served) -> None:
+    as_admin(client)
+    folder = client.post("/api/chat-folders", json={"name": "Empty"}).json()["id"]
+
+    assert client.delete(f"/api/chat-folders/{folder}").status_code == 204
+
+    assert revokes(served) == []
+
+
+def test_nothing_is_deleted_when_the_links_cannot_be_revoked(client: TestClient, upstream: FakeUpstream) -> None:
     as_admin(client)
     chat_id = make_chat(client)
-    old = share(client, chat_id).json()
-    keep = share(client, chat_id).json()
-    forever = share(client, chat_id, expires_in_days=None).json()
-    expire(client, old["id"])
+    folder = client.post("/api/chat-folders", json={"name": "Work"}).json()["id"]
+    client.patch(f"/api/chats/{chat_id}", json={"folder_id": folder})
+    other = make_chat(client)
+    upstream.unreachable = True
 
-    async def purge(session):
-        await purge_expired_shares(session)
+    assert client.delete(f"/api/chats/{other}").status_code == 502
+    assert client.delete("/api/chats").status_code == 502
+    assert client.delete(f"/api/chat-folders/{folder}").status_code == 502
 
-    db(client, purge)
-
-    async def ids(session):
-        return {r.id for r in await session.scalars(select(SharedChat))}
-
-    assert db(client, ids) == {keep["id"], forever["id"]}
+    upstream.unreachable = False
+    assert client.get(f"/api/chats/{other}").status_code == 200
+    assert client.get(f"/api/chats/{chat_id}").status_code == 200
+    assert client.get("/api/chat-folders").json()[0]["chat_count"] == 1
 
 
-def _parse(text: str):
-    from datetime import datetime
+def test_deleting_an_account_purges_its_links_in_stronghold(client: TestClient, email: FakeEmailSender, served) -> None:
+    alice = make_member(client, email, "alice")
+    as_admin(client)
+    uid = uids(client)["alice"]
+    served.requests.clear()
 
-    return datetime.fromisoformat(text)
+    assert client.delete(f"/api/admin/accounts/{alice}").status_code == 204
+
+    assert [r.method for r in sent_to(served, f"/shares/accounts/{uid}")] == ["DELETE"]
+
+
+def test_failed_link_purge_never_blocks_account_deletion(client: TestClient, email: FakeEmailSender, upstream: FakeUpstream) -> None:
+    alice = make_member(client, email, "alice")
+    as_admin(client)
+    root = client.get("/api/auth/me").json()["id"]
+    upstream.handler = lambda request: httpx.Response(503, json={"detail": "Storage is unavailable"})
+
+    assert client.delete(f"/api/admin/accounts/{alice}").status_code == 204
+
+    errors = client.get("/api/logs/error", params={"actor": root}).json()
+    assert any(entry["source"] == "admin.shares_purge" for entry in errors)
