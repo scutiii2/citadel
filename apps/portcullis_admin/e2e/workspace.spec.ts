@@ -258,11 +258,11 @@ test('permission switch appearance follows repeated pointer and keyboard changes
   expect(api.unexpected).toEqual([]);
 });
 
-test('a capabilities administrator can use the overview and sees only available destinations', async ({ page }) => {
-  const api = await installFakeApi(page, ['capabilities.manage']);
+test('an invites administrator can use the overview and sees only available destinations', async ({ page }) => {
+  const api = await installFakeApi(page, ['invites.manage']);
   await logInAdmin(page);
   await expect(page.locator('.destination')).toHaveCount(1);
-  await expect(page.locator('.destination')).toHaveAttribute('href', '/capabilities');
+  await expect(page.locator('.destination')).toHaveAttribute('href', '/admin/invites');
   await expect(page.locator('.destination p')).not.toBeEmpty();
   expect(api.unexpected).toEqual([]);
 });

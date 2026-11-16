@@ -41,24 +41,24 @@ test("settings applies theme instantly and saves sidebar drafts for reload", asy
   await installFakeApi(page, state);
   await page.goto("/settings");
   await page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true }).click();
-  const capabilitySwitch = page.getByRole("switch", { name: "Show Capabilities in the sidebar" });
-  await capabilitySwitch.focus();
-  await capabilitySwitch.press("Space");
-  await expect(capabilitySwitch).not.toBeChecked();
+  const inviteSwitch = page.getByRole("switch", { name: "Show Invites in the sidebar" });
+  await inviteSwitch.focus();
+  await inviteSwitch.press("Space");
+  await expect(inviteSwitch).not.toBeChecked();
   const nav = page.getByRole("navigation", { name: "Admin sections" });
-  await expect(nav.getByRole("link", { name: "Capabilities", exact: true })).toHaveCount(1);
+  await expect(nav.getByRole("link", { name: "Invites", exact: true })).toHaveCount(1);
   expect(await page.evaluate<string>("document.documentElement.style.colorScheme")).toBe("dark");
   await page.getByRole("button", { name: "root - account menu", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: /^Theme\s+Dark$/ })).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Revert", exact: true }).click();
-  await expect(capabilitySwitch).toBeChecked();
+  await expect(inviteSwitch).toBeChecked();
   await expect(page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("group", { name: "Unsaved settings" })).toHaveCount(0);
   await page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true }).click();
-  await capabilitySwitch.focus();
-  await capabilitySwitch.press("Space");
-  await page.getByRole("button", { name: "Pin Extensions to the top" }).click();
+  await inviteSwitch.focus();
+  await inviteSwitch.press("Space");
+  await page.getByRole("button", { name: "Pin Accounts to the top" }).click();
   for (const width of [1280, 768, 375]) {
     await page.setViewportSize({ width, height: 800 });
     await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
@@ -66,11 +66,11 @@ test("settings applies theme instantly and saves sidebar drafts for reload", asy
     expect(bar!.y + bar!.height).toBe(width < 768 ? 748 : 800);
   }
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(nav.getByRole("link", { name: "Capabilities", exact: true })).toHaveCount(0);
-  await expect(nav.getByRole("link").first()).toHaveAttribute("aria-label", "Extensions");
+  await expect(nav.getByRole("link", { name: "Invites", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("link").first()).toHaveAttribute("aria-label", "Accounts");
   await page.reload();
   await expect(page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(nav.getByRole("link", { name: "Capabilities", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Invites", exact: true })).toHaveCount(0);
   await page.getByLabel("Search settings").fill("theme");
   await expect(page.getByRole("region", { name: "Sidebar", exact: true })).toHaveCount(0);
   for (const width of [1280, 768, 375]) {

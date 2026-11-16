@@ -7,7 +7,7 @@ test("production manifest, offline shell, network-only API, and reconnect", asyn
   await page.goto("/login");
   const manifestHref = await page.locator('link[rel="manifest"]').getAttribute("href");
   const manifest = await (await page.request.get(manifestHref!)).json();
-  expect(manifest.name).toBe("Ember Admin");
+  expect(manifest.name).toBe("Portcullis Admin");
   expect(manifest.display).toBe("standalone");
   expect(manifest.start_url).toBe("/overview");
   for (const size of ["192x192", "512x512"]) expect(manifest.icons.some((icon: { sizes: string }) => icon.sizes === size)).toBe(true);
@@ -38,8 +38,8 @@ for (const width of [375, 768]) {
   test(`phone/tablet layout at ${width}px has usable navigation and no page overflow`, async ({ page }) => {
     await page.setViewportSize({ width, height: 812 });
     await installFakeApi(page, newState());
-    await page.goto("/capabilities");
-    await expect(page.getByRole("heading", { name: "Capabilities", exact: true })).toBeVisible();
+    await page.goto("/overview");
+    await expect(page.getByRole("heading", { name: "Workspace overview", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.getByRole("button", { name: "root - account menu", exact: true }).click();
     await expect(page.getByRole("menuitem", { name: "Settings", exact: true })).toBeVisible();

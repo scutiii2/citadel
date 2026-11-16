@@ -1,6 +1,6 @@
 # portcullis_admin
 
-Project note: `Brain/Projects/portcullis_admin.md` in the Obsidian vault (`../../../../Brain/` from this folder), once it exists. Renamed from `ember_admin` in Plan 7.
+Project note: `Brain/Projects/portcullis_admin.md` in the Obsidian vault (`../../../../Brain/` from this folder). Renamed from `ember_admin` in Plan 7.
 
 Vue 3 + TypeScript admin app for Portcullis: Overview, Accounts, Roles, Invites, Workspace settings, Config issues, Profile and Login. It talks only to `portcullis` through the Vite `/api` proxy. The other backends have their own admin apps (`legion_admin`, `armory_admin`, `stronghold_admin`, `treasury_admin`); the rail links to them. Follow the `ember-design-system` and `ember-feature-scaffold` skills for UI and API conventions.
 

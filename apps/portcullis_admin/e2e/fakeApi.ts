@@ -59,6 +59,8 @@ export async function installFakeApi(page: Page, state: FakeState): Promise<void
     const { pathname } = new URL(request.url());
     const method = request.method();
 
+    // The Roles and Accounts pages only list; these specs look at the shell around them.
+    if (method === "GET" && ["/api/admin/roles", "/api/admin/permissions", "/api/admin/accounts"].includes(pathname)) return json(route, []);
     if (method === "GET" && pathname.startsWith("/api/brains/connections/")) return json(route, {
       id: null, scope: pathname.endsWith("instance") ? "instance" : "personal", label: "Brain", endpoint: "", folder: "Inbox",
       enabled: false, allow_write: false, credential_configured: false, revision: 0, generation: null, status: "not_configured"
