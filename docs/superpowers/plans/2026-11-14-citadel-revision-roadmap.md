@@ -14,7 +14,7 @@ Spec: `docs/superpowers/specs/2026-11-14-citadel-revision-design.md`. This file 
 | 7 | Admin app split | 5 | 5 | `refactor/admin-split` | Executed 2026-11-16: `2026-11-16-plan-7-admin-split.md` |
 | 8 | Disable `ember_web` | 6 | 7 | `chore/disable-ember-web` | Executed 2026-11-16: `2026-11-16-plan-8-disable-ember-web.md` |
 | 9 | Ember Windows app | 7 | 8 | `feat/ember-windows` | Executed 2026-11-16 (shell not built): `2026-11-16-plan-9-ember-windows.md` |
-| 10 | Move the turn engine to Stronghold | 5 | 9 | `refactor/turns-<step>` | Planned 2026-11-16, not executed: `2026-11-16-plan-10-turn-engine.md` |
+| 10 | Move the turn engine to Stronghold | 5 | 9 | `refactor/turns-<step>` | Planned 2026-11-16; steps 10.1 and 10.2 done, 10.3-10.6 open: `2026-11-16-plan-10-turn-engine.md` |
 
 ## Order and parallel work
 - Plans 2 and 3 can run in parallel after Plan 1. They touch different services (`stronghold` is new; Legion's provider code).

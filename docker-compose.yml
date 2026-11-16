@@ -119,6 +119,7 @@ services:
     networks: [core]
 
   # Product logic. Only portcullis calls it, so no port is published.
+  # Run ONE replica: running chat turns live in this process's memory (Plan 10), so a second replica could not see them.
   stronghold:
     build: ./apps/stronghold
     restart: unless-stopped
