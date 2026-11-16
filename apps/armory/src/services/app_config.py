@@ -36,9 +36,6 @@ class EmailConfig:
     # Domains a caller may name any address at; currently unused (its OTP consumer was removed), kept as infrastructure.
     # Empty means "no domains", never "any domain", so an absent key is the strict case.
     allowed_recipient_domains: list[str] = field(default_factory=list)
-    # Optional MS Teams incoming-webhook URL for state-transition alerts (none currently).
-    # Empty means Teams alerts are off; an empty string is never POSTed to.
-    teams_webhook_url: str = ""
 
 
 @dataclass(frozen=True)
@@ -209,7 +206,6 @@ def load_email_config(config_path: Path) -> EmailConfig:
         password=str(section.get("password", "")),
         security=security,
         allowed_recipient_domains=domains,
-        teams_webhook_url=str(section.get("teams_webhook_url", "")),
     )
 
 

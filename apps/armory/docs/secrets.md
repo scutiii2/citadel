@@ -13,8 +13,7 @@ and its explanation.
   it as `X-Internal-Token` (`services/internal_token.py`, else `401`), and
   `POST /upload` (`upload_routes.py`) always requires it. Blank leaves
   `/mcp` open, which is only safe while the port stays on `127.0.0.1`.
-- **SMTP** - `SMTP_PASSWORD`, backing `config_email.json`'s `"password"`,
-  and `TEAMS_WEBHOOK_URL`.
+- **SMTP** - `SMTP_PASSWORD`, backing `config_email.json`'s `"password"`.
 - **SSH** - `SSH_HOST_KEY_POLICY`, `SSH_KNOWN_HOSTS`. Applies to every SSH
   connection this server makes (`services/ssh.py`). No credentials.
 
