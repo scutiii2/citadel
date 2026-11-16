@@ -1,4 +1,4 @@
-"""HTTP API. Every route but /health needs X-Internal-Token (once configured).
+"""HTTP API. Every route but /health requires a signed service assertion.
 
 Records live at /instances/{instance}/connections/{connection}/collections/{collection}/...
 A connection is reachable only through an instance that lists it.
@@ -15,7 +15,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.auth import InternalTokenMiddleware
+from src.citadel_auth import Keyring, ServiceAuthMiddleware, from_env
 from src.backends.base import UnsupportedOperation
 from src.registry import InstanceManager, RawSqlDisabled, UnknownConnection, UnknownInstance
 
@@ -46,14 +46,16 @@ def _error(status: int):
     return handler
 
 
-def create_app(manager: InstanceManager, token: str = "") -> FastAPI:
+def create_app(manager: InstanceManager, keyring: Keyring | None = None) -> FastAPI:
+    keyring = keyring if keyring is not None else from_env("treasury", data_dir="data")
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        await keyring.ensure_identity()
         yield
         await manager.close()
 
     app = FastAPI(title="db_gateway", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
-    app.add_middleware(InternalTokenMiddleware, token=token)
+    app.add_middleware(ServiceAuthMiddleware, keyring=keyring, audience="treasury")
 
     for error, status in (
         (UnknownInstance, 404), (UnknownConnection, 404), (RawSqlDisabled, 403),

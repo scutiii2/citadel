@@ -5,16 +5,20 @@ from src.api import create_app
 from src.backends.factory import build_backend
 from src.registry import ConnectionRegistry, InstanceManager
 from tests.conftest import memory_spec
+from src.citadel_auth import ServiceAuth
+from src.citadel_auth.testing import make_stack, signed
 
 REC = "/instances/one/connections/a/collections/users/records"
 
 
 @pytest.fixture
-async def client():
+async def client(tmp_path):
     registry = ConnectionRegistry({"a": memory_spec("a"), "b": memory_spec("b", raw_sql=True)}, build_backend)
     manager = InstanceManager({"one": ("a", "b"), "two": ("a",)}, registry)
-    app = create_app(manager)
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as http:
+    stack = await make_stack(tmp_path)
+    app = create_app(manager, keyring=stack["treasury"])
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t",
+                                auth=ServiceAuth(stack["stronghold"], "treasury")) as http:
         yield http
     await manager.close()
 
@@ -70,10 +74,41 @@ async def test_raw_sql_permissions(client):
     assert broken.status_code == 400
 
 
-async def test_token_required_when_configured():
+async def test_assertion_required_and_health_open(tmp_path):
     registry = ConnectionRegistry({"a": memory_spec("a")}, build_backend)
-    app = create_app(InstanceManager({"one": ("a",)}, registry), token="secret")
+    stack = await make_stack(tmp_path)
+    app = create_app(InstanceManager({"one": ("a",)}, registry), keyring=stack["treasury"])
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as http:
         assert (await http.get("/health")).status_code == 200
         assert (await http.get("/instances")).status_code == 401
-        assert (await http.get("/instances", headers={"X-Internal-Token": "secret"})).status_code == 200
+        assert (await http.get("/instances", headers=signed(stack["stronghold"], "treasury"))).status_code == 200
+
+
+@pytest.mark.parametrize("caller", ["portcullis", "stronghold", "legion", "armory"])
+async def test_policy_allows_data_callers(tmp_path, caller):
+    stack = await make_stack(tmp_path)
+    manager = InstanceManager({}, ConnectionRegistry({}, build_backend))
+    app = create_app(manager, keyring=stack["treasury"])
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as http:
+        assert (await http.get("/instances", headers=signed(stack[caller], "treasury"))).status_code == 200
+
+
+async def test_policy_denies_self_unknown_and_requester_forwarding(tmp_path):
+    import jwt
+    import time
+    from src.citadel_auth import sign_assertion
+    from src.citadel_auth.testing import requester_headers
+    stack = await make_stack(tmp_path)
+    app = create_app(InstanceManager({}, ConnectionRegistry({}, build_backend)), keyring=stack["treasury"])
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as http:
+        assert (await http.get("/instances", headers=signed(stack["treasury"], "treasury"))).status_code == 403
+        token = sign_assertion(stack["armory"], "treasury")
+        claims = jwt.decode(token, options={"verify_signature": False})
+        claims["iss"] = "unknown"
+        unknown = jwt.encode(claims, stack["armory"].private_key, algorithm="EdDSA", headers={"kid": stack["armory"].kid})
+        assert (await http.get("/instances", headers={"Authorization": "Bearer " + unknown})).status_code == 401
+        forwarded = {**signed(stack["stronghold"], "treasury"),
+                     **requester_headers(stack["portcullis"], "uid", aud=["treasury"])}
+        assert (await http.get("/instances", headers=forwarded)).status_code == 403
+        forged = {**signed(stack["stronghold"], "treasury"), "X-Requester-Uid": "forged"}
+        assert (await http.get("/instances", headers=forged)).status_code == 200

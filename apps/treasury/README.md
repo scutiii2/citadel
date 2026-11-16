@@ -34,7 +34,9 @@ Tests: `uv run pytest`
 - `configs/config_connections.json`: `connections` (name -> `type`, type options, optional `cache`,
   `allow_raw_sql`) and `instances` (name -> list of connection names). Strings may use `${NAME}`,
   resolved from the environment and `.env`, so DSNs and key paths stay out of the JSON.
-- `.env`: `INTERNAL_API_TOKEN`. When set, every route but `/health` needs the `X-Internal-Token` header.
+- Every route except `/health` requires a short-lived Ed25519 service assertion.
+  Identity keys are created on first start; peers read public keys from `CITADEL_TRUST_DIR`.
+  `CITADEL_IDENTITY_DIR` keeps Treasury's private key separate from public trust data.
 
 SQLite paths are relative to this folder. Files go under `data/` (gitignored).
 

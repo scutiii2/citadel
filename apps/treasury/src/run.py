@@ -7,7 +7,6 @@ import logging
 import uvicorn
 
 from src.api import create_app
-from src.auth import load_token
 from src.backends.factory import build_backend
 from src.config import load_config, load_connections
 from src.registry import ConnectionRegistry, InstanceManager
@@ -21,7 +20,7 @@ def build_app():
     registry = ConnectionRegistry(connections.connections, build_backend)
     manager = InstanceManager(connections.instances, registry)
     log.info("instances: %s", ", ".join(connections.instances) or "none")
-    return create_app(manager, load_token()), config
+    return create_app(manager), config
 
 
 def main() -> None:
