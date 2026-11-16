@@ -36,7 +36,7 @@ pre-create empty ones "for consistency":
 |---|---|
 | `data/` | Persists runtime data to disk (mcp_server, portcullis have it; ai_agent keeps its registry and usage JSONL under `.data/`; chat_cli keeps nothing, portcullis stores its chats) |
 | `docs/` | Documentation beyond the README is substantial enough to split out |
-| `migrations/`, `scripts/` | portcullis only: Alembic revisions and its CLIs (`migrate_db`, `backup_db`, `import_chat_app`). A new project with a database may follow it; otherwise use `src/` |
+| `migrations/`, `scripts/` | portcullis only: Alembic revisions and its CLIs (`migrate_db`, `backup_db`). A new project with a database may follow it; otherwise use `src/` |
 | `logs/` | The project writes its own log files (needs a `logging_setup.py`-style module in `src/`, not an ad-hoc log call) |
 
 Do not invent additional top-level folders (`lib/`, `scripts/`, `bin/`,

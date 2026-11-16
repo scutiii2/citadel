@@ -47,10 +47,6 @@ class CreateBody(BaseModel):
     expires_in_days: Literal[1, 7, 30] | None = 7
 
 
-class RevokeBody(BaseModel):
-    chat_ids: list[ChatIdText] | Literal["all"]
-
-
 def _out(doc: dict) -> dict:
     return {"id": doc["id"], "chat_id": doc["chat_id"], "title": doc["title"], "message_count": doc["message_count"],
             "created_at": doc["created_at"], "expires_at": doc["expires_at"]}
@@ -75,14 +71,6 @@ async def list_shares(chat_id: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9
                       who: Requester = Depends(current_requester), shares: ShareStore = Depends(get_shares)) -> list[dict]:
     """This account's active links (never their tokens), newest first; `chat_id` narrows them to one chat."""
     return [_out(doc) for doc in await shares.list(who.uid, chat_id)]
-
-
-@router.post("/revoke", status_code=status.HTTP_204_NO_CONTENT)
-async def revoke_chats(body: RevokeBody, who: Requester = Depends(current_requester),
-                       shares: ShareStore = Depends(get_shares)) -> Response:
-    """Portcullis calls this before it deletes chats, so a deleted chat never keeps a working link."""
-    await shares.revoke_chats(who.uid, None if body.chat_ids == "all" else body.chat_ids)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/public/{token}")

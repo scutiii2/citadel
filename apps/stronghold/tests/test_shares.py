@@ -49,7 +49,6 @@ def test_managing_links_needs_the_requester_identity(client: TestClient) -> None
     assert client.post("/shares", json={"chat_id": CHAT, "title": "t", "messages": MESSAGES}, headers=anonymous).status_code == 400
     assert client.get("/shares", headers=anonymous).status_code == 400
     assert client.delete("/shares/1", headers=anonymous).status_code == 400
-    assert client.post("/shares/revoke", json={"chat_ids": "all"}, headers=anonymous).status_code == 400
 
 
 def test_reading_a_link_needs_no_requester(client: TestClient) -> None:
@@ -261,36 +260,6 @@ def test_making_a_link_removes_the_accounts_expired_ones(client: TestClient, db_
 
 
 # --- what removes links ----------------------------------------------------------------------
-
-
-def test_revoking_chats_removes_their_links_and_only_theirs(client: TestClient) -> None:
-    doomed = share(client, CHAT).json()["token"]
-    stays = share(client, OTHER_CHAT).json()["token"]
-
-    assert client.post("/shares/revoke", json={"chat_ids": [CHAT]}).status_code == 204
-
-    assert read(client, doomed).status_code == 404 and read(client, stays).status_code == 200
-
-
-def test_revoking_all_removes_every_link_of_the_account_and_no_one_elses(client: TestClient) -> None:
-    login(client, "alice")
-    mine = [share(client).json()["token"] for _ in range(3)]
-    login(client, "bob")
-    bobs = share(client).json()["token"]
-
-    login(client, "alice")
-    assert client.post("/shares/revoke", json={"chat_ids": "all"}).status_code == 204
-
-    assert all(read(client, t).status_code == 404 for t in mine)
-    assert read(client, bobs).status_code == 200
-
-
-@pytest.mark.parametrize("body", [{}, {"chat_ids": "some"}, {"chat_ids": ["x"]}, {"chat_ids": None}, {"all": True}])
-def test_revoke_needs_chat_ids_or_all(client: TestClient, body: dict) -> None:
-    token = share(client).json()["token"]
-
-    assert client.post("/shares/revoke", json=body).status_code == 422
-    assert read(client, token).status_code == 200
 
 
 def test_purging_an_account_removes_only_its_links(client: TestClient) -> None:
