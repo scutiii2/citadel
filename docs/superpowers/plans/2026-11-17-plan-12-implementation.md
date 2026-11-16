@@ -118,3 +118,8 @@ Files: `src/utils/{config_loader,shared_token}.py`, `app.py`, `routes/{agent_adm
 - All suites pass: Treasury, Armory (`-m ""`), Stronghold, Legion (`-m ""`), Portcullis, `libs/citadel_auth`, Ember vitest, `vue-tsc -b`.
 - Each app's README states the new auth in two or three lines.
 - A short "what changed for operators" note in `docs/deployment.md`: nothing to set; keys are made on first start; backing up `identity_*` volumes is optional (a lost key is remade).
+
+## Changes found during work
+
+- 12.1: MCP 1.28 accepts `httpx.Auth` through `create_mcp_http_client(auth=...)` and `streamable_http_client(http_client=...)`. Real FastMCP session remained usable after its initial 60-second assertion expired (62.70-second spike, 1 passed).
+- 12.1: Decisions 7 and 9 conflict: reusing a cached signed assertion reuses its `jti`, so receivers must reject it. Preserve replay protection and sign a fresh assertion for each HTTP request; cache loaded signing key rather than reusable JWT. This strengthens freshness without changing service or requester identity rules.

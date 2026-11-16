@@ -20,6 +20,9 @@ services:
     environment:
       <<: *internal_token
       MCP_HOST: 0.0.0.0
+      CITADEL_SERVICE: armory
+      CITADEL_TRUST_DIR: /trust
+      CITADEL_IDENTITY_DIR: /identity
       MCP_PORT: "29600"
       DB_GATEWAY_URL: http://treasury:29602
       # The notes tools read the notes the Notes page saves, which Stronghold keeps in its own database.
@@ -32,6 +35,12 @@ services:
       # Writable: the Capabilities page in armory_admin saves its on/off toggles into this tracked file.
       - ./docker/configs/armory/capabilities.json:/app/configs/config_capabilities.json
       - armory_data:/app/.data
+      - identity_armory:/identity:rw
+      - trust_armory:/trust/armory:rw
+      - trust_legion:/trust/legion:ro
+      - trust_treasury:/trust/treasury:ro
+      - trust_stronghold:/trust/stronghold:ro
+      - trust_portcullis:/trust/portcullis:ro
       - internal_token:/run/citadel
       # server_manager (Docker apps list/start/stop/logs) talks to the host daemon.
       - /var/run/docker.sock:/var/run/docker.sock
@@ -86,6 +95,9 @@ services:
     environment:
       <<: *internal_token
       AI_AGENT_HOST: 0.0.0.0
+      CITADEL_SERVICE: legion
+      CITADEL_TRUST_DIR: /trust
+      CITADEL_IDENTITY_DIR: /identity
       AI_AGENT_ADVERTISE_URL: http://legion
       MCP_SERVER_URL: http://armory:29600/mcp
       CONVERSATION_GATEWAY_URL: http://conversationgateway:29407
@@ -97,6 +109,12 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./docker/configs/legion/servers.json:/app/configs/config_servers.json:ro
+      - identity_legion:/identity:rw
+      - trust_armory:/trust/armory:ro
+      - trust_legion:/trust/legion:rw
+      - trust_treasury:/trust/treasury:ro
+      - trust_stronghold:/trust/stronghold:ro
+      - trust_portcullis:/trust/portcullis:ro
       - agent_data:/app/.data
       - internal_token:/run/citadel
     depends_on: [armory, conversationgateway, decisiongateway, treasury]
@@ -111,10 +129,19 @@ services:
     environment:
       <<: *internal_token
       DB_GATEWAY_PORT: "29602"
+      CITADEL_SERVICE: treasury
+      CITADEL_TRUST_DIR: /trust
+      CITADEL_IDENTITY_DIR: /identity
     volumes:
       - ./docker/configs/treasury/app.json:/app/configs/config_app.json:ro
       - ./docker/configs/treasury/connections.json:/app/configs/config_connections.json:ro
       - treasury_data:/app/data
+      - identity_treasury:/identity:rw
+      - trust_armory:/trust/armory:ro
+      - trust_legion:/trust/legion:ro
+      - trust_treasury:/trust/treasury:rw
+      - trust_stronghold:/trust/stronghold:ro
+      - trust_portcullis:/trust/portcullis:ro
       - internal_token:/run/citadel
     networks: [core]
 
@@ -131,6 +158,9 @@ services:
     environment:
       <<: *internal_token
       STRONGHOLD_HOST: 0.0.0.0
+      CITADEL_SERVICE: stronghold
+      CITADEL_TRUST_DIR: /trust
+      CITADEL_IDENTITY_DIR: /identity
       STRONGHOLD_PORT: "29650"
       DB_GATEWAY_URL: http://treasury:29602
       # Account facts, admin switches, email and the error log are asked from Portcullis.
@@ -146,6 +176,12 @@ services:
       - ./docker/configs/stronghold/app.json:/app/configs/config_app.json:ro
       # keys.json: the key that encrypts saved secrets (brain keys, private-extension headers).
       - stronghold_data:/data
+      - identity_stronghold:/identity:rw
+      - trust_armory:/trust/armory:ro
+      - trust_legion:/trust/legion:ro
+      - trust_treasury:/trust/treasury:ro
+      - trust_stronghold:/trust/stronghold:rw
+      - trust_portcullis:/trust/portcullis:ro
       # Legion's registry of running agents (notes ask the Laya and tag-writer agents).
       - agent_data:/agent_data:ro
       - internal_token:/run/citadel
@@ -161,11 +197,20 @@ services:
     environment:
       <<: *internal_token
       EMBER_API_HOST: 0.0.0.0
+      CITADEL_SERVICE: portcullis
+      CITADEL_TRUST_DIR: /trust
+      CITADEL_IDENTITY_DIR: /identity
     volumes:
       - ./docker/configs/portcullis/app.json:/app/configs/config_app.json:ro
       # portcullis reads and writes its secrets (EMBER_SECRETS_KEY) in its own .env file.
       - ./apps/portcullis/.env:/app/.env
       - portcullis_data:/app/data
+      - identity_portcullis:/identity:rw
+      - trust_armory:/trust/armory:ro
+      - trust_legion:/trust/legion:ro
+      - trust_treasury:/trust/treasury:ro
+      - trust_stronghold:/trust/stronghold:ro
+      - trust_portcullis:/trust/portcullis:rw
       - internal_token:/run/citadel
       - agent_data:/agent_data:ro
     depends_on: [armory, legion, treasury, stronghold]
@@ -228,3 +273,13 @@ volumes:
   conversationgateway_data:
   decisiongateway_data:
   internal_token:
+  trust_armory:
+  trust_legion:
+  trust_treasury:
+  trust_stronghold:
+  trust_portcullis:
+  identity_armory:
+  identity_legion:
+  identity_treasury:
+  identity_stronghold:
+  identity_portcullis:

@@ -1,0 +1,17 @@
+[project]
+name = "citadel-auth"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["httpx>=0.27", "PyJWT>=2.10", "cryptography>=44"]
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "mcp==1.28.0", "uvicorn>=0.49", "PyYAML>=6"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["."]
+testpaths = ["tests"]
