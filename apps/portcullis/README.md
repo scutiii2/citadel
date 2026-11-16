@@ -1,6 +1,6 @@
 # portcullis
 
-> **Chats (Plan 5.9).** Stronghold keeps chat history, folders and search (`apps/stronghold/src/chats`). Portcullis still runs the answers (the turn engine) and saves the question and answer through `services/chat_service.py`, a client that asks Stronghold. Every chat route needs Stronghold running (502 otherwise), and chats made before the move are not copied. The old `chats` and `chat_folders` SQL tables stay here, unused.
+> **Chats (Plan 5.9).** Stronghold keeps chat history, folders and search (`apps/stronghold/src/chats`). Since Plan 10 Stronghold also runs the answers (the turn engine); Portcullis only passes the turn routes on. Every chat route needs Stronghold running (502 otherwise), and chats made before the move are not copied. The old `chats` and `chat_folders` SQL tables stay here, unused.
 
 ## Speech HTTP routes
 
@@ -608,32 +608,19 @@ files); without a token they're protected only by listening on
 `127.0.0.1`. ai_agent passes the asking user on to the mcp_server tools it
 calls (in each call's `_meta`), so mcp_server sees who asked either way.
 
-- **Chat turns** (`services/turns.py`, `services/agent_gateway.py`):
-  portcullis calls ai_agent's `ask` itself over MCP (the `mcp` SDK), with the
-  account's identity headers, and saves the answer. Watchers only subscribe;
-  the event buffer stays small because streamed text is kept as one string
-  and late joiners get it as a snapshot. At most 3 running answers per
-  account. On shutdown a running answer is saved as interrupted.
-- **Asking before tools** (`ask_before_tools`, `services/turns.py`,
-  `POST /api/chats/{id}/approvals`): the turn calls the agent's `ask` with
-  `approval_mode: "ask"`. The agent's `approval_request` / `approval_resolved`
-  events are relayed to watchers, and the requests still waiting are kept in
-  the turn and sent in the late-joiner snapshot (`approvals`), so a reloaded
-  page still shows the question. An answer goes to the agent's `decide` tool;
-  the agent's own `approval_resolved` event then clears it. It fails closed:
-  `AgentGateway.ask` checks the agent's `status` for `tool_approval` first and
-  refuses an agent that would ignore the option, so no tool can run unasked.
-  **Required for everyone** (`force_tool_approval`, stored in `app_settings`,
-  switched by an admin with `PUT /api/admin/settings/force_tool_approval`):
-  every turn then asks, whatever `ask_before_tools` says; `allowed_tools` from
-  the browser is dropped; and an `always` answer is passed to the agent as
-  `allow`, so a tool never stops asking. Typed commands (`/tool`) call
-  mcp_server directly with no agent and are not affected.
-  **Auto** (`allow_read_only: true` together with `ask_before_tools`): the agent runs built-in
-  mcp_server tools that declare themselves read-only without asking, and still asks for
-  everything else (see ai_agent's README). It is dropped while approval is required for everyone,
-  and has no effect without `ask_before_tools`. It is not fail-closed: an agent whose `status`
-  lacks `read_only_approval` is not sent the option and asks about every tool, the stricter way.
+- **Chat turns** (`routes/chats.py`, `services/stronghold_forwarder.py`): Stronghold runs the
+  answers (`apps/stronghold/src/turns`: Legion calls, the event buffer, approvals, questions,
+  summaries, suggestions, usage and the chat trace). Portcullis checks login and permission, then
+  passes the request on and relays the event stream. The browser leaving closes only the relay.
+  At most 3 running answers per account, kept in Stronghold's memory (run one replica); a
+  Stronghold stop saves a running answer as interrupted.
+- **What only Portcullis decides** (the `trusted` block of `POST /api/chats/{id}/turns`, filled here
+  and overwriting anything the browser sends): `forced_approval` (`force_tool_approval` in
+  `app_settings`, switched by an admin with `PUT /api/admin/settings/force_tool_approval`),
+  `tools_execute` (the account's `tools.execute` permission), `extension_ids` (every extension
+  Armory lists; the browser cannot name one) and `second_brain_available`. Stronghold's defaults
+  are the safe side: approval forced, no tool execution, no extensions, no auto-save.
+  Typed commands (`/tool`) call Armory directly with no agent and are not affected.
 - **Regenerate / edit** (`truncate_to` on `POST /api/chats/{id}/turns`): the
   server cuts the history before a typed question and asks again, so the
   browser never rewrites saved history itself.
@@ -669,9 +656,8 @@ calls (in each call's `_meta`), so mcp_server sees who asked either way.
   and passes them to the agent as `agent:<id>` entries in `disabled_tools`.
 - **Errors:** an unhandled exception answers a generic `500` and is written
   to the error log with its traceback (under the account, when logged in).
-- **Summaries** (`services/summarization.py`, port of chat_app's): manual
-  (Summarize) or automatic before a question once the chat's context is 60%
-  full. Written only when a usable summary came back.
+- **Summaries:** done by Stronghold (`POST /api/chats/{id}/summarize` passes through); automatic
+  before a question once the chat's context is 60% full (Stronghold's `usage` config).
 - **Chat history:** every query is filtered by the logged-in account, and
   chat ids are unique per account, so another user's chat looks exactly like
   a missing one (`404`). Limits: 2 MB per chat, 1000 chats per account.
@@ -776,8 +762,8 @@ src/
   models/     Account, AppSetting, Role, Permission, LoginAttempt, AuthSession, InviteCode, EmailVerificationCode, Chat,
               UsageRecord, LogEntry, KnownDevice, PromptTemplate, SharedChat
   services/   ChatAppImporter (chat_app_import), DatabaseBackup / BackupScheduler (backup_service), MigrationRunner (migrations), SettingsService (settings_service), AuthService, SessionService, OtpService, RegistrationService, EmailSender (MCP Email capability),
-              AccountService, AdminService, AgentDirectory, AgentGateway, ChatService, ChatSearch, TemplateService, ShareService, PublicReadLimiter, TurnRegistry,
-              UsageService, summarization, McpServerInfo, McpServerTools, mcp_session, LogWriter,
+              AccountService, AdminService, AgentDirectory, AgentGateway, ChatService, ChatSearch, TemplateService, ShareService, PublicReadLimiter,
+              UsageService, McpServerInfo, McpServerTools, mcp_session, LogWriter,
               text_extraction, config_validation, DeviceService, LoginRateLimiter, McpPolicy, McpProxy,
               permissions, DbGatewayClient (db_gateway), NotesService (notes)
   routes/     auth, account, admin, settings, chats, templates, shares, usage, mcp, server_info, logs,
