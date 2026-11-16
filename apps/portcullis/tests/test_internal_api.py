@@ -74,3 +74,18 @@ def test_an_action_is_logged_for_the_named_account(client_factory, email: FakeEm
     account_id = client.get("/api/auth/me").json()["id"]
     entries = client.get("/api/logs/action", params={"actor": str(account_id)}).json()
     assert [e["message"] for e in entries if e["source"] == "memory.create"] == ["Saved a memory"]
+
+
+def test_a_turn_log_line_lands_in_the_accounts_logs(client_factory) -> None:
+    client = client_factory(internal_token="internal-secret")
+    admin_uid = uid_of(client, "root")
+    line = {"kind": "chat_trace", "uid": admin_uid, "source": "chat.turn", "message": "hi → agent/model, 1.0s", "details": "{}", "prompts": None}
+    assert client.post("/internal/logs", json=line, headers=TOKEN).status_code == 204
+    assert client.post("/internal/logs", json={**line, "kind": "error", "source": "chat.answer", "message": "boom"}, headers=TOKEN).status_code == 204
+    assert client.post("/internal/logs", json={**line, "uid": "0" * 32}, headers=TOKEN).status_code == 404
+    assert client.post("/internal/logs", json={**line, "kind": "action"}, headers=TOKEN).status_code == 422
+    assert client.post("/internal/logs", json=line).status_code == 401
+    as_admin(client)
+    account_id = client.get("/api/auth/me").json()["id"]
+    assert "boom" in client.get("/api/logs/error", params={"actor": account_id}).text
+    assert "agent/model" in client.get("/api/logs/chat_trace", params={"actor": account_id}).text

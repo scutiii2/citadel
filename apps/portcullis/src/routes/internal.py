@@ -9,7 +9,7 @@ one service that outside machines can reach.
 from __future__ import annotations
 
 import hmac
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request, Response, status
 from pydantic import BaseModel, Field
@@ -117,4 +117,27 @@ class ErrorIn(BaseModel):
 async def report_error(body: ErrorIn, logs: LogWriter = Depends(get_log_writer)) -> Response:
     """One line in the administrators' Errors log, marked as coming from Stronghold."""
     await logs.error(None, f"stronghold.{body.source}", body.message)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class LogIn(BaseModel):
+    kind: Literal["error", "chat_trace"]
+    uid: str = Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")
+    source: str = Field(pattern=r"^[a-z0-9_.]{1,40}$")
+    message: str = Field(min_length=1, max_length=2000)
+    details: str | None = Field(default=None, max_length=100_000)
+    # The prompts of a chat trace: JSON text, bounded by the sender (only some admins may read it).
+    prompts: str | None = Field(default=None, max_length=500_000)
+
+
+@router.post("/logs", status_code=status.HTTP_204_NO_CONTENT)
+async def write_log(
+    body: LogIn, session: AsyncSession = Depends(get_db_session), logs: LogWriter = Depends(get_log_writer),
+) -> Response:
+    """An account's error or chat-trace line from a chat turn Stronghold ran. Kept under the source name the
+    admin Logs pages already know (chat.answer, chat.turn). 404 for an unknown account."""
+    account = await session.scalar(select(Account).where(Account.uid == body.uid))
+    if account is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such account")
+    await logs.write(body.kind, account.id, body.source, body.message, body.details, body.prompts)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

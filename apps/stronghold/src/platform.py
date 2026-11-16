@@ -79,3 +79,15 @@ class PortcullisClient:
             await self._send("POST", "/internal/errors", json={"source": source, "message": message})
         except PlatformError as error:
             logger.warning("error report not delivered: %s", error)
+
+    async def write_log(self, kind: str, uid: str, source: str, message: str,
+                        details: str | None = None, prompts: str | None = None) -> None:
+        """Add a line to the account's error or chat-trace log in Portcullis. Never raises: a lost
+        log line must not break the chat turn being logged."""
+        body = {"kind": kind, "uid": uid, "source": source, "message": message, "details": details, "prompts": prompts}
+        try:
+            response = await self._send("POST", "/internal/logs", json=body)
+            if response.status_code >= 400:
+                logger.warning("log line refused with status %s", response.status_code)
+        except PlatformError as error:
+            logger.warning("log line not delivered: %s", error)

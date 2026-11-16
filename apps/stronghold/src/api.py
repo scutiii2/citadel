@@ -56,6 +56,9 @@ from src.tuning import routes as tuning_routes
 from src.tuning.limits import LegionTuning, LimitsStore
 from src.usage import routes as usage_routes
 from src.usage.service import UsageService
+from src.turns import routes as turns_routes
+from src.turns.engine import TurnRegistry
+from src.turns.logs import PlatformLogs
 from src.usage.settings import Pricing
 
 _TIMEOUT = httpx.Timeout(15.0, connect=5.0)
@@ -115,7 +118,11 @@ def create_app(
         app.state.bard = tool_services.bard(tools_in.get("bard") or http(settings.bard_url), service_token("bard"))
         app.state.shares = ShareStore(app.state.store)
         app.state.chats = ChatStore(app.state.store, app.state.shares)
-        app.state.usage = UsageService(app.state.store, settings.usage, Pricing(settings.pricing))
+        app.state.pricing = Pricing(settings.pricing)
+        app.state.usage = UsageService(app.state.store, settings.usage, app.state.pricing)
+        app.state.turns = TurnRegistry(
+            app.state.chats, app.state.usage, app.state.agent_gateway, settings.usage, PlatformLogs(app.state.platform),
+            pricing=app.state.pricing, directory=app.state.agents)
         app.state.calendar = (
             build_calendar_runtime(config=settings.calendar, store=app.state.store, box=app.state.box,
                                    keys=keys, platform=app.state.platform)
@@ -130,6 +137,7 @@ def create_app(
         try:
             yield
         finally:
+            await app.state.turns.shutdown()
             if app.state.calendar is not None:
                 await app.state.calendar.close()
             for client in clients:
@@ -155,6 +163,7 @@ def create_app(
     app.include_router(tickets_routes.router)
     app.include_router(tickets_routes.admin_router)
     app.include_router(triage_routes.router)
+    app.include_router(turns_routes.router)
     app.include_router(tuning_routes.router)
 
     @app.exception_handler(BrainError)

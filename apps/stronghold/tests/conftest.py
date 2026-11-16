@@ -62,6 +62,7 @@ class FakePlatform:
         self.sent: list[tuple[str, str, str]] = []
         self.errors: list[tuple[str, str]] = []
         self.actions: list[tuple[str, str, str]] = []
+        self.logs: list[dict] = []
         # What each account may do; `granted[uid] = None` is an inactive or unverified account.
         self.default_permissions = {"chat.use", "settings.manage", "brain.instance.publish", "tools.execute"}
         self.granted: dict[str, set[str] | None] = {}
@@ -80,6 +81,9 @@ class FakePlatform:
 
     async def log_action(self, uid, action, message):
         self.actions.append((uid, action, message))
+
+    async def write_log(self, kind, uid, source, message, details=None, prompts=None):
+        self.logs.append({"kind": kind, "uid": uid, "source": source, "message": message, "details": details, "prompts": prompts})
 
     async def report_error(self, source, message):
         self.errors.append((source, message))
