@@ -21,6 +21,9 @@ from src.tools.private_extensions import guard
 from src.tools.private_extensions.pool import PrivateSessionPool
 from src.tools.private_extensions.spec import PrivateSpec
 
+# Real MCP servers, restarts and timeouts: about 11 s, so skipped unless run with -m "".
+pytestmark = pytest.mark.slow
+
 WAIT = 30
 
 

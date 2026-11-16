@@ -111,7 +111,8 @@ Dot-prefixed folders hold untracked runtime state and secrets; plain
 ## Tests
 
 ```
-pytest
+pytest            # fast run: skips the `slow` tests (tests/math, real worker processes)
+pytest -m ""      # everything; run before a merge
 ```
 
 ## Docker

@@ -11,7 +11,7 @@ from typing import Any, Protocol
 import httpx
 from mcp.types import PaginatedRequestParams
 
-from src.services.agent_gateway import Caller
+from src.services.caller import Caller
 from src.services.mcp_session import identity_headers, mcp_session, root_cause
 from src.services.traffic import TrafficRecorder
 

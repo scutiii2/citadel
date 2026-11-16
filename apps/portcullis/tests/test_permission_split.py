@@ -98,21 +98,3 @@ def test_chat_without_execution_blocks_every_agent_tool(client, email, upstream)
     response = client.post("/api/chats/chat-1234/turns", json={"question": "hello", "allowed_tools": ["tool_pdf_merge"]})
     assert response.status_code == 202, response.text
     assert upstream.turns.bodies("POST", "")[-1]["trusted"]["tools_execute"] is False
-
-
-def test_gateway_refuses_older_agent_before_asking():
-    import asyncio
-    from unittest.mock import AsyncMock
-
-    from src.services.agent_gateway import AgentCallError, Caller, McpAgentGateway
-
-    gateway = McpAgentGateway(None)
-    gateway._call = AsyncMock(return_value={"tool_filter": True})
-    with pytest.raises(AgentCallError):
-        asyncio.run(gateway.ask(
-            "http://unused/mcp", Caller(username="alice", email="a@example.com"),
-            question="hello", history=[], request_id="turn", caveman=False,
-            enabled_extensions=[], on_event=None, disabled_tools=["*"],
-        ))
-    assert gateway._call.await_count == 1
-    assert gateway._call.call_args.args[2] == "status"

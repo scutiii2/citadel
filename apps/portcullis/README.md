@@ -704,7 +704,7 @@ src/
   models/     Account, AppSetting, Role, Permission, LoginAttempt, AuthSession, InviteCode, EmailVerificationCode, Chat,
               UsageRecord, LogEntry, KnownDevice, PromptTemplate, SharedChat
   services/   DatabaseBackup / BackupScheduler (backup_service), MigrationRunner (migrations), SettingsService (settings_service), AuthService, SessionService, OtpService, RegistrationService, EmailSender (MCP Email capability),
-              AccountService, AdminService, AgentDirectory, AgentGateway, ChatService, ChatSearch, TemplateService, ShareService, PublicReadLimiter,
+              AccountService, AdminService, AgentDirectory, ChatService, ChatSearch, TemplateService, ShareService, PublicReadLimiter,
               UsageService, McpServerInfo, McpServerTools, mcp_session, LogWriter,
               text_extraction, config_validation, DeviceService, LoginRateLimiter, McpPolicy, McpProxy,
               permissions, DbGatewayClient (db_gateway), NotesService (notes)

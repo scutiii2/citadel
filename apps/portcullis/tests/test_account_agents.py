@@ -8,7 +8,6 @@ import json
 import httpx
 from fastapi.testclient import TestClient
 
-from tests.conftest import FakeAgent
 from tests.test_registration import as_admin
 from tests.turn_helpers import events, new_id, start
 

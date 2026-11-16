@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import Settings
 from src.db import Database
 from src.models import Account
-from src.services.agent_gateway import AgentGateway
 from src.services.db_gateway import DocumentStore
 from src.services.stronghold_forwarder import StrongholdForwarder
 from src.services.email_service import EmailSender
@@ -56,10 +55,6 @@ def get_otp_service(session: AsyncSession = Depends(get_db_session)) -> OtpServi
 
 def get_email_sender(request: Request) -> EmailSender:
     return request.app.state.email_sender
-
-
-def get_agent_gateway(request: Request) -> AgentGateway:
-    return request.app.state.agent_gateway
 
 
 def get_secret_box(request: Request) -> SecretBox:

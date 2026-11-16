@@ -13,6 +13,10 @@ Language agents use Anthropic or OpenAI protocols and may call tools. Decision
 agents use the Laya/Jev arrangement to answer typed questions without generation.
 The internal Router chooses specialists and model tiers through that arrangement.
 
+## Tests
+
+`uv run pytest` skips the `slow` tests (`test_private_integration.py`, real MCP servers). `uv run pytest -m ""` runs everything; do that before a merge.
+
 ## Setup
 
 1. Copy `.env.example` to `.env`.

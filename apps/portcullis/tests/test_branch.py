@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests import fake_chats
-from tests.conftest import FakeAgent, FakeEmailSender
+from tests.conftest import FakeEmailSender
 from tests.test_admin import login, make_member
 from tests.test_registration import as_admin
 from tests.turn_helpers import events, start

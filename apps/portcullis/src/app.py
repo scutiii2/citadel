@@ -55,7 +55,6 @@ from src.routes import (
     user_extensions,
 )
 from src.services.agent_directory import AgentDirectory, HttpRegistrySource
-from src.services.agent_gateway import AgentGateway, McpAgentGateway
 from src.services.auth_service import AuthService
 from src.services.capability_files import CapabilityFailure
 from src.services.backup_service import BackupScheduler, DatabaseBackup
@@ -96,15 +95,14 @@ def create_app(
     settings: Settings,
     email_sender: EmailSender | None = None,
     upstream_transport: httpx.AsyncBaseTransport | None = None,
-    agent_gateway: AgentGateway | None = None,
     server_tools: ServerTools | None = None,
     traffic: TrafficRecorder | None = None,
     *,
     db_gateway: DocumentStore | None = None,
 ) -> FastAPI:
     """email_sender defaults to the MCP Email capability,
-    upstream_transport to real HTTP, agent_gateway to a real MCP client for
-    ai_agent, server_tools to one for mcp_server and db_gateway to one for the
+    upstream_transport to real HTTP, server_tools to a real MCP client for
+    mcp_server and db_gateway to one for the
     db_gateway service; tests pass fakes. traffic
     defaults to a recorder saving to the database; tests pass their own."""
 
@@ -159,7 +157,6 @@ def create_app(
             upstream, settings.stronghold_url, internal_token or None, recorder
         )
         uid_log_filter.install()
-        app.state.agent_gateway = agent_gateway or McpAgentGateway(internal_token or None, recorder)
         app.state.server_tools = server_tools or McpServerTools(settings.mcp_server_url, internal_token or None, recorder)
         app.state.logs = log_writer
         app.state.traffic = recorder

@@ -1,5 +1,5 @@
 """Traffic counters: bands, the recorder's memory and flush, the middleware,
-and the upstream timing around the proxy, the agent gateway and the server tools."""
+and the upstream timing around the proxy and the server tools."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from sqlalchemy import select
 
 from src.db import Database
 from src.models import TrafficBucket
-from src.services.agent_gateway import AgentCallError, Caller, McpAgentGateway
+from src.services.caller import Caller
 from src.services.mcp_server_info import McpServerInfo, McpServerUnavailable, _traffic_name
 from src.services.server_tools import McpServerTools, ServerUnavailable
 from src.services.traffic import (
@@ -35,7 +35,6 @@ from src.services.traffic import (
     status_class,
 )
 from tests.conftest import FakeUpstream
-from tests.test_agent_gateway import CALLER, agent_url  # noqa: F401 - a real fake agent server
 from tests.test_mcp_proxy import AGENT_PATH, SERVER_PATH, post, rpc
 from tests.test_registration import as_admin
 
@@ -370,24 +369,6 @@ def test_a_call_the_policy_refuses_never_reaches_the_upstream_counters(
     post(client, AGENT_PATH, rpc("tools/call", {"name": "ask", "arguments": {}}))
 
     assert upstream_seen(traffic) == set()
-
-
-def test_the_real_gateway_counts_a_call(agent_url: str) -> None:  # noqa: F811
-    counter = recorder()
-
-    asyncio.run(McpAgentGateway(None, counter).interpret(agent_url, CALLER, "sum"))
-
-    assert upstream_seen(counter) == {("ai_agent interpret", "ok")}
-
-
-def test_the_real_gateway_counts_an_unreachable_agent_as_failed() -> None:
-    counter = recorder()
-    gateway = McpAgentGateway(None, counter)
-
-    with pytest.raises(AgentCallError):
-        asyncio.run(gateway.cancel(f"http://127.0.0.1:{_free_port()}/mcp", CALLER, "r1"))
-
-    assert upstream_seen(counter) == {("ai_agent cancel", "failed")}
 
 
 def test_the_real_server_tools_count_a_call(server_url: str) -> None:  # noqa: F811
