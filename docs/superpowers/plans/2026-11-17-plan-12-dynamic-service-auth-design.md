@@ -1,6 +1,6 @@
 # Plan 12: dynamic service-to-service auth (design)
 
-Status: design only, for review. Replaces the shared `INTERNAL_API_TOKEN` between `portcullis`, `stronghold`, `legion`, `armory` and `treasury`. Implementation can be handed to Codex after this is approved.
+Status: design approved 2026-11-17 (decisions below). Replaces the shared `INTERNAL_API_TOKEN` between `portcullis`, `stronghold`, `legion`, `armory` and `treasury`. Implementation can be handed to Codex after this is approved.
 
 ## Problem
 
@@ -68,29 +68,30 @@ New package `citadel_auth` (kept in this repo, vendored or path-installed into e
 - `requester`: `mint` (Portcullis only), `verify`, `current()` context variable.
 - Policy table and its loader.
 
-## Rollout (each step ships and passes tests on its own)
+## Rollout: hard cut-over, no legacy
 
-Both schemes are accepted during the move: a receiver takes a valid assertion **or** the old token while `AUTH_LEGACY=1`.
+Decided: no dual-accept, no `AUTH_LEGACY`, no migration of the old token. Each service deletes the shared token as it moves, so there is never old code to keep in step. No stack has run live yet, so nothing running is broken by this.
+
+All steps land on one branch (`plan-12-service-auth`) and merge to `main` once, after 12.7. Between steps the services cannot call each other for real (their unit tests use fakes and stay green), so the first honest test across services is 12.7.
 
 | Step | Work |
 |---|---|
-| 12.1 | `citadel_auth` library, unit tests, trust-directory mounts in compose. No behaviour change. |
-| 12.2 | Treasury accepts assertions (smallest, 5 files), then Stronghold and Armory call it with assertions. |
-| 12.3 | Armory: `/mcp`, `/upload`, media routes; requester from the token. |
-| 12.4 | Stronghold: inbound routes, outbound clients (armory, legion, treasury, portcullis `/internal`), requester token refresh. |
-| 12.5 | Legion: `/mcp`, `/registry`, `/agents`; outbound to Armory and gateways. |
-| 12.6 | Portcullis: mint requester tokens, sign every outgoing call, `/internal/*` checks callers. |
-| 12.7 | Remove `AUTH_LEGACY`, `INTERNAL_API_TOKEN`, `INTERNAL_TOKEN_FILE`, `shared_token.py` (five copies), the `internal_token` volume, docs, `.env.example` lines, and tests of the old scheme. |
-| 12.8 | Live run of the whole stack (nobody has run it live yet). |
+| 12.1 | `citadel_auth` library, unit tests, trust-directory mounts in `docker-compose.yml`. |
+| 12.2 | Treasury: inbound checks. Smallest; delete its `shared_token.py` and token tests. |
+| 12.3 | Armory: `/mcp`, `/upload`, media routes, outbound to Stronghold and Treasury; requester read from the token. |
+| 12.4 | Stronghold: inbound, outbound (armory, legion, treasury, portcullis `/internal`), requester-token refresh. |
+| 12.5 | Legion: `/mcp`, `/registry`, `/agents`; outbound to Armory and Treasury. |
+| 12.6 | Portcullis: mint requester tokens, sign every outgoing call, `/internal/*` checks callers. Remove `INTERNAL_API_TOKEN`, `INTERNAL_TOKEN_FILE`, the `internal_token` volume, `.env.example` lines and docs for them. |
+| 12.7 | Live run of the whole stack (nobody has run it live yet). Fix what it shows, then merge. |
 
-Order matters: receivers change before senders, so no step breaks a running stack.
+Each service's step removes that service's old token code and tests in the same step.
 
 ## Tests
 
 - Library: sign/verify, expiry, wrong audience, wrong key, replayed `jti` inside the window (small in-memory set per receiver), tampered claims, unknown `kid` reload.
 - Per service: one test per rule in the policy table that matters (allowed, denied, unknown caller), one that a forged `X-Requester-Uid` is ignored.
 - Compose: a check that the trust mounts are `rw` for the owner only.
-- These are the only new test families; the old token tests are deleted in 12.7.
+- These are the only new test families; each service's old token tests are deleted in its own step.
 - The slow tests are tagged `slow` per the test audit (`2026-11-17-test-audit.md`).
 
 ## Failure behaviour
@@ -104,16 +105,16 @@ Order matters: receivers change before senders, so no step breaks a running stac
 
 - Replay inside the 60 s window needs the `jti` check; without it a sniffed assertion works for 60 s. Traffic stays on the private Docker network, so the exposure is small.
 - Private keys on disk: volume per service, mode 0600. A host admin can read them; the same was true of the shared token.
-- A bug in the shared library breaks all five services at once; the dual-accept rollout and the library tests are the guard.
+- A bug in the shared library breaks all five services at once; the library tests and the live run in 12.7 are the guard.
 - Not testable without a live run: real container start order, volume mount modes, Windows file permissions.
 
-## Open questions for you
+## Decisions on the open questions
 
-1. **Turn length:** requester tokens last 15 minutes and Stronghold refreshes them. Is that acceptable, or should a turn carry one token for its whole life (simpler, but a longer window if it leaks)?
-2. **Admin apps:** they call only Portcullis with a user session today. Keep that, or let them call Treasury and others directly? Recommendation: keep.
-3. **Dev without Docker:** is `~/.citadel/trust` acceptable, or should local runs use one shared folder inside the repo?
-4. **Legacy period:** is dual-accept until 12.7 fine, or do you want a hard cut-over after 12.6?
+1. **Turn length:** requester tokens last 15 minutes. Stronghold refreshes them from Portcullis while a turn runs, only for an account with a running turn. A leaked token is useful for 15 minutes at most, not for the whole turn.
+2. **Admin apps:** unchanged. They call only Portcullis with a user session and never hold service keys.
+3. **Dev without Docker:** trust directory is `~/.citadel/trust/<service>/`, overridable with `CITADEL_TRUST_DIR`. Same code path as Docker.
+4. **Legacy:** hard cut-over (see Rollout). The old shared token is not read anywhere after its service moves.
 
 ## Size
 
-About 8 steps, one pull request each. The library (12.1) and Portcullis (12.6) are the largest; Treasury (12.2) is the smallest.
+Seven steps on one branch. The library (12.1) and Portcullis (12.6) are the largest; Treasury (12.2) is the smallest.
