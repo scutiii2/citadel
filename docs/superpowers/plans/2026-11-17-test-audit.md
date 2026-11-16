@@ -1,6 +1,6 @@
 # Test audit (2026-11-17)
 
-**Done 2026-11-17: A.1 and B.** B was cut down after measuring: only Armory `tests/math` (280 tests, about 42 s) and Legion `test_private_integration.py` (6 tests, about 11 s) are `slow`. Portcullis `test_backup`/`test_migrations` (104 tests, 28 s) and `test_traffic` (37 tests, 10 s) are fast enough and guard data, so they stay in the default run. Stronghold's zip-bomb tests are security checks and 3 s, so they stay too. `pytest` skips `slow`; `pytest -m ""` runs everything. Results: Armory 126 s to 72 s, Legion 41 s to 20 s. C and E are not done.
+**Done 2026-11-17: A.1 and B.** B was cut down after measuring: only Armory `tests/math` (280 tests, about 42 s) and Legion `test_private_integration.py` (6 tests, about 11 s) are `slow`. Portcullis `test_backup`/`test_migrations` (104 tests, 28 s) and `test_traffic` (37 tests, 10 s) are fast enough and guard data, so they stay in the default run. Stronghold's zip-bomb tests are security checks and 3 s, so they stay too. `pytest` skips `slow`; `pytest -m ""` runs everything. Results: Armory 126 s to 72 s, Legion 41 s to 20 s. **Done 2026-11-17: C.1 and C.2.** Portcullis full run 12m12s to 9m37s (the run shared the machine with other jobs). Ember vitest 79s to about 12s (`vmThreads`; `turnStream.test.ts` keeps the default pool). Admin apps left as they are (3 to 14 s each). C.3 (xdist) and E are not done.
 
 Nothing is deleted yet. This lists what to remove, what to stop running every time, and what to speed up. Each item needs a yes before it is done.
 

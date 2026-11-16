@@ -7,6 +7,8 @@ os.environ["INTERNAL_TOKEN_FILE"] = ""
 
 import asyncio
 import json
+import shutil
+import tempfile
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -18,6 +20,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.app import create_app
+from src.db import Database
+from src.services.migrations import MigrationRunner
 from src.config import BackupSettings, PricingSettings, SecuritySettings, Settings, UsageSettings
 from src.services import otp_service
 from src.services.caller import Caller
@@ -215,6 +219,27 @@ class FakeDbGateway:
         return json.loads(json.dumps(matching[offset : offset + limit]))  # copies, like a real HTTP answer
 
 
+_MIGRATED_TEMPLATE: Path | None = None
+
+
+def migrated_database() -> Path:
+    """One migrated, empty database per test session. Every test app copies it, so its start finds the
+    database already current and skips the migrations (about 0.4 s a test). Tests of the migrations
+    themselves build their own database."""
+    global _MIGRATED_TEMPLATE
+    if _MIGRATED_TEMPLATE is None:
+        path = Path(tempfile.mkdtemp(prefix="portcullis-template-")) / "template.db"
+
+        async def build() -> None:
+            database = Database(f"sqlite+aiosqlite:///{path.as_posix()}")
+            await MigrationRunner(database.engine).run()
+            await database.engine.dispose()
+
+        asyncio.run(build())
+        _MIGRATED_TEMPLATE = path
+    return _MIGRATED_TEMPLATE
+
+
 def make_settings(
     tmp_path: Path,
     *,
@@ -237,10 +262,14 @@ def make_settings(
         f"BOOTSTRAP_ADMIN_PASSWORD={admin_password}\n",
         encoding="utf-8",
     )
+    database_path = tmp_path / "data" / "test.db"
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+    if not database_path.exists():  # a second app in one test shares the first one's database
+        shutil.copyfile(migrated_database(), database_path)
     return Settings(
         host="127.0.0.1",
         port=0,
-        database_path=tmp_path / "data" / "test.db",
+        database_path=database_path,
         session_cookie_name="ember_session",
         session_hours=session_hours,
         cookie_secure=False,  # TestClient talks plain http

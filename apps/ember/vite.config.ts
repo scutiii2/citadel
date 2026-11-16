@@ -24,6 +24,8 @@ const contentSecurityPolicy = [
 ].join('; ')
 
 // https://vite.dev/config/
+const STREAM_TESTS = ['src/features/chat/services/turnStream.test.ts']
+
 export default defineConfig({
   plugins: [vue()],
   build: {
@@ -34,10 +36,15 @@ export default defineConfig({
   },
   // `pnpm test`: unit tests sit beside their source as *.test.ts. jsdom gives
   // the stores and components a browser-like document and localStorage.
+  // vmThreads makes one jsdom per worker instead of one per file (79 s down to 15 s), but its
+  // context has no ReadableStream, so the stream tests keep the default pool.
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.ts'],
     restoreMocks: true,
+    projects: [
+      { extends: true, test: { name: 'unit', pool: 'vmThreads', include: ['src/**/*.test.ts'], exclude: STREAM_TESTS } },
+      { extends: true, test: { name: 'streams', include: STREAM_TESTS } },
+    ],
   },
   server: {
     // Set by the launcher or the environment. strictPort: fail instead of silently
