@@ -28,6 +28,7 @@ My earlier sketch had Portcullis issue tokens. That fails on start order and on 
 - **Public keys are distributed through a trust directory**, one folder per service.
   - Docker: a volume per service, mounted **read-write only in its owner** and **read-only in the others**. Mount rules, not a secret, decide who may publish a key, so a service cannot replace another's key.
   - Without Docker: `~/.citadel/trust/<service>/` on a dev machine; the same rule, relaxed to the user account.
+- **Private keys stay out of the trust folders** (others can read those). Each service keeps its private key in its own identity folder and publishes only the public key.
 - **Receivers re-read the directory on an unknown key id**, so a service that restarts with a new key is picked up without a restart.
 
 Rejected alternatives:
