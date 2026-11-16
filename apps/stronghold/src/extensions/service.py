@@ -15,7 +15,7 @@ from dataclasses import asdict, dataclass, replace
 from typing import Any
 from urllib.parse import urlsplit
 
-from src.calendar.settings import utcnow
+from src.clock import utcnow
 from src.document_store import DocumentStore
 from src.secret_box import SecretBox, SecretBoxError
 

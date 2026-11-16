@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from src.calendar.settings import utcnow
+from src.clock import utcnow
 from src.shares import store as share_store
 from tests.conftest import FakeDbGateway
 from tests.helpers import as_admin, login, uid_of

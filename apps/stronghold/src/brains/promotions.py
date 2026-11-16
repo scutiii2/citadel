@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from src.calendar.settings import utcnow
+from src.clock import utcnow
 from src.brains.connections import BrainError, brain_path
 from src.notes.store import NotesService, NoteNotFound
 

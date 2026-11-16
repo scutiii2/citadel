@@ -144,7 +144,7 @@ services:
       STRONGHOLD_DATA_DIR: /data
     volumes:
       - ./docker/configs/stronghold/app.json:/app/configs/config_app.json:ro
-      # keys.json: the key that encrypts saved calendar links, and the web push key pair.
+      # keys.json: the key that encrypts saved secrets (brain keys, private-extension headers).
       - stronghold_data:/data
       # Legion's registry of running agents (notes ask the Laya and tag-writer agents).
       - agent_data:/agent_data:ro

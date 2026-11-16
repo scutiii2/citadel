@@ -67,7 +67,7 @@ def test_every_collection_named_in_code_is_in_the_catalog():
         named |= set(re.findall(r'^[A-Z_]+ = "([a-z][a-z_]+)"$', text, re.MULTILINE))
     # Constants that name something else than a collection.
     named -= {"instance", "personal", "baseline", "stronghold", "agent", "provider", "gateway", "model", "chat", "ok"}
-    collections = {name for name in named if name in BY_NAME or name.startswith(("chat_", "brain_", "calendar_", "usage_", "shared_", "prompt_", "tuning_", "ticket_"))}
+    collections = {name for name in named if name in BY_NAME or name.startswith(("chat_", "brain_", "usage_", "shared_", "prompt_", "tuning_", "ticket_"))}
     assert collections <= set(BY_NAME), collections - set(BY_NAME)
 
 

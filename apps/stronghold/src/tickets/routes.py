@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Res
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.calendar.settings import utcnow
+from src.clock import utcnow
 from src.platform import PortcullisClient
 from src.requester import Requester, current_requester
 from src.tickets.client import ArmoryTickets

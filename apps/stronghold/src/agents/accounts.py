@@ -8,7 +8,7 @@ It holds only ids and does not know which agents exist: Legion owns that.
 
 from __future__ import annotations
 
-from src.calendar.settings import utcnow
+from src.clock import utcnow
 from src.document_store import DocumentStore
 
 COLLECTION = "account_agents"

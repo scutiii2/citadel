@@ -1,8 +1,7 @@
-"""What Stronghold asks Portcullis for: account facts, admin switches, email and the error log.
+"""What Stronghold asks Portcullis for: account facts and the logs.
 
 Portcullis owns accounts, settings, SMTP and logs. Requests arrive from it with the
-requester's identity, but a background job (the calendar's alert scheduler) has no request,
-so it asks here. Calls go to Portcullis's /internal routes with the shared internal token.
+requester's identity; a job without a request asks here. Calls go to Portcullis's /internal routes with the shared internal token.
 """
 
 from __future__ import annotations
@@ -32,15 +31,6 @@ class PortcullisClient:
         except httpx.HTTPError as error:
             raise PlatformError(f"Portcullis is unreachable: {type(error).__name__}") from error
 
-    async def recipient(self, uid: str, permission: str) -> dict[str, str] | None:
-        """`{uid, email}` of an account that is active, verified and holds `permission`; else None."""
-        response = await self._send("GET", f"/internal/accounts/{uid}/recipient", params={"permission": permission})
-        if response.status_code == 404:
-            return None
-        if response.status_code != 200:
-            raise PlatformError(f"Portcullis answered {response.status_code}")
-        return response.json()
-
     async def permissions(self, uid: str) -> set[str] | None:
         """The permissions of an account that is active (and verified, when required); None for any other."""
         response = await self._send("GET", f"/internal/accounts/{uid}/permissions")
@@ -49,19 +39,6 @@ class PortcullisClient:
         if response.status_code != 200:
             raise PlatformError(f"Portcullis answered {response.status_code}")
         return set(response.json()["permissions"])
-
-    async def switches(self) -> dict[str, bool]:
-        """The administrator's on/off settings, by name."""
-        response = await self._send("GET", "/internal/switches")
-        if response.status_code != 200:
-            raise PlatformError(f"Portcullis answered {response.status_code}")
-        return response.json()
-
-    async def notify(self, uid: str, subject: str, body: str) -> None:
-        """Email the account. Portcullis looks the address up; Stronghold never chooses it."""
-        response = await self._send("POST", f"/internal/accounts/{uid}/notify", json={"subject": subject, "body": body})
-        if response.status_code >= 400:
-            raise PlatformError(f"Portcullis answered {response.status_code}")
 
     async def log_action(self, uid: str, action: str, message: str) -> None:
         """Add a line to the Logs page for something the account did. Never raises:

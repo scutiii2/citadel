@@ -1,4 +1,4 @@
-"""Encrypting secrets at rest (a calendar feed's link), one Fernet token per value map.
+"""Encrypting secrets at rest (a brain's API key, a private extension's headers), one Fernet token per value map.
 
 The key comes from keys.py. If it is lost, stored secrets cannot be read and must be entered again.
 """

@@ -9,11 +9,12 @@ Spec: `docs/superpowers/specs/2026-11-14-citadel-revision-design.md`. This file 
 | 3 | Legion on ConversationGateway, Anthropic-protocol agents | 2b | 1 | `refactor/legion-conversation-gateway` | Written: `2026-11-14-plan-3-legion-conversation-gateway.md` |
 | 3b | Legion on ConversationGateway, OpenAI-protocol agents | 2b | 3 | `refactor/legion-openai-gateway` | Written and executed 2026-11-15: `2026-11-15-plan-3b-legion-openai-gateway.md` |
 | 4 | Legion on DecisionGateway | 2b | 3b | `refactor/legion-decision-gateway` | Written and executed 2026-11-15: `2026-11-15-plan-4-legion-decision-gateway.md` |
-| 5 | Move product logic to Stronghold, domain by domain | 3 | 2 | `refactor/stronghold-<domain>` per domain | Overview written, 5.1 (calendar) executed 2026-11-15: `2026-11-15-plan-5-stronghold-domains.md` |
+| 5 | Move product logic to Stronghold, domain by domain | 3 | 2 | `refactor/stronghold-<domain>` per domain | All sub-plans 5.1 to 5.9 executed 2026-11-15/16 (the calendar of 5.1 was removed by Plan 11): `2026-11-15-plan-5-stronghold-domains.md` |
 | 6 | Stronghold database schema | 4 | 5 (chats domain) | `feat/stronghold-schema` | Executed 2026-11-16 as a schema layer over Treasury: `2026-11-16-plan-6-stronghold-schema.md` |
 | 7 | Admin app split | 5 | 5 | `refactor/admin-split` | Executed 2026-11-16: `2026-11-16-plan-7-admin-split.md` |
 | 8 | Disable `ember_web` | 6 | 7 | `chore/disable-ember-web` | Executed 2026-11-16: `2026-11-16-plan-8-disable-ember-web.md` |
 | 9 | Ember Windows app | 7 | 8 | `feat/ember-windows` | Executed 2026-11-16 (shell not built): `2026-11-16-plan-9-ember-windows.md` |
+| 11 | Remove the calendar from Citadel | - | 10 | `refactor/remove-calendar` | Executed 2026-11-16: `2026-11-16-plan-11-remove-calendar.md` |
 | 10 | Move the turn engine to Stronghold | 5 | 9 | `refactor/turns-<step>` | Planned 2026-11-16; all steps 10.1 to 10.6 done: `2026-11-16-plan-10-turn-engine.md` |
 
 ## Order and parallel work

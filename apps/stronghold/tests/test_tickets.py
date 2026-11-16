@@ -11,7 +11,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from src.calendar.settings import utcnow
+from src.clock import utcnow
 from src.tickets.client import ArmoryTickets
 from src.tickets.unread import TicketUnread
 from tests.conftest import IDENTITY, FakeArmory, FakeDbGateway

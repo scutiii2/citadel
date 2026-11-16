@@ -306,7 +306,7 @@ async def delete_account(
     except AdminError as error:
         raise _http_error(error) from error
     # These domains live in Stronghold. Best effort: the account is already gone.
-    for domain, what in (("memory", "Memory notes"), ("calendar", "Calendar"), ("notes", "Notes"),
+    for domain, what in (("memory", "Memory notes"), ("notes", "Notes"),
                          ("skills", "Skills"), ("templates", "Templates"), ("usage", "Usage"), ("tickets", "Tickets"), ("shares", "Share links"),
                          ("tuning", "Response limits"), ("chats", "Chats and folders"), ("brains", "Brain connections"),
                          ("account-agents", "Switched-off agents"), ("user-extensions", "Private extensions"),

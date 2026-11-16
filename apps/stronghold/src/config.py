@@ -10,7 +10,6 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.calendar.settings import CalendarSettings
 from src.usage.settings import PricingSettings, UsageSettings
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
@@ -32,7 +31,6 @@ class Settings:
     db_instance: str = "stronghold"
     db_connection: str = "stronghold"
     data_dir: Path = PROJECT_DIR / ".data"
-    calendar: CalendarSettings = field(default_factory=CalendarSettings)
     usage: UsageSettings = field(default_factory=UsageSettings)
     pricing: PricingSettings = field(default_factory=PricingSettings)
 
@@ -53,7 +51,6 @@ def load_settings() -> Settings:
         agents_registry_path=Path(os.getenv("AGENTS_REGISTRY_PATH") or base.agents_registry_path),
         agents_registry_url=os.getenv("AGENTS_REGISTRY_URL") or None,
         data_dir=Path(os.getenv("STRONGHOLD_DATA_DIR") or base.data_dir),
-        calendar=CalendarSettings.from_config(raw.get("calendar", {})),
         usage=UsageSettings.from_config(raw.get("usage", {})),
         pricing=PricingSettings.from_config(raw.get("pricing", {})),
     )

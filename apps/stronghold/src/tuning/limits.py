@@ -13,7 +13,7 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 
 from src.agents.directory import AgentDirectory
-from src.calendar.settings import utcnow
+from src.clock import utcnow
 from src.document_store import DocumentStore
 from src.requester import Requester
 

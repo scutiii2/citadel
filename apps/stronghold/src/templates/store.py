@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from src.calendar.settings import utcnow
+from src.clock import utcnow
 from src.document_store import DocumentStore
 
 COLLECTION = "prompt_templates"

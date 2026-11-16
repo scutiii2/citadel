@@ -9,7 +9,7 @@ vi.mock("../../api/SettingsClient", () => ({ settingsClient: { get: vi.fn(), set
 const client = vi.mocked(settingsClient);
 
 async function panel(forced: boolean) {
-  client.get.mockResolvedValue({ force_tool_approval: forced, calendar_inapp: true, calendar_email: true, calendar_push: true });
+  client.get.mockResolvedValue({ force_tool_approval: forced });
   const wrapper = mount(SettingsPanel);
   await flushPromises();
   return wrapper;

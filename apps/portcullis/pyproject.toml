@@ -26,7 +26,6 @@ dependencies = [
     "alembic>=1.13,<2.0",
     # Encrypts the header values of users' private extensions at rest.
     "cryptography>=42",
-    # Calendar: read ICS feeds, expand recurrences, send web push alerts.
     # Time zone database for zoneinfo on Windows.
     "tzdata>=2024.1",
 ]

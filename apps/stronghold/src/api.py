@@ -26,11 +26,8 @@ from src.brains import routes as brains_routes
 from src.brains.connections import BrainError
 from src.brains.gateway import BrainGateway
 from src.auth import ENV_PATH, InternalTokenMiddleware
-from src.calendar import routes as calendar_routes
 from src.chats import routes as chats_routes
 from src.chats.store import ChatStore
-from src.calendar.runtime import build_calendar_runtime
-from src.calendar.store import CalendarError
 from src.config import Settings, load_settings
 from src.document_store import DbGatewayClient, DbGatewayError, DbGatewayUnavailable, DocumentStore
 from src import log_privacy
@@ -123,11 +120,6 @@ def create_app(
         app.state.turns = TurnRegistry(
             app.state.chats, app.state.usage, app.state.agent_gateway, settings.usage, PlatformLogs(app.state.platform),
             pricing=app.state.pricing, directory=app.state.agents)
-        app.state.calendar = (
-            build_calendar_runtime(config=settings.calendar, store=app.state.store, box=app.state.box,
-                                   keys=keys, platform=app.state.platform)
-            if settings.calendar.enabled else None
-        )
         app.state.schema_version = None
         try:
             app.state.schema_version = (await migrations.migrate(app.state.store))["version"]
@@ -138,8 +130,6 @@ def create_app(
             yield
         finally:
             await app.state.turns.shutdown()
-            if app.state.calendar is not None:
-                await app.state.calendar.close()
             for client in clients:
                 await client.aclose()
 
@@ -150,7 +140,6 @@ def create_app(
     app.include_router(attachments_routes.router)
     app.include_router(bard_routes.router)
     app.include_router(brains_routes.router)
-    app.include_router(calendar_routes.router)
     app.include_router(chats_routes.router)
     app.include_router(chats_routes.folder_router)
     app.include_router(memory_routes.router)
@@ -168,10 +157,6 @@ def create_app(
 
     @app.exception_handler(BrainError)
     async def brain_error(_request: Request, error: BrainError):
-        return JSONResponse({"detail": str(error)}, status_code=error.status)
-
-    @app.exception_handler(CalendarError)
-    async def calendar_error(_request: Request, error: CalendarError):
         return JSONResponse({"detail": str(error)}, status_code=error.status)
 
     @app.exception_handler(TicketRefused)

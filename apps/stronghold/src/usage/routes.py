@@ -13,7 +13,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.calendar.settings import utcnow
+from src.clock import utcnow
 from src.requester import Requester, current_requester
 from src.usage.service import MAX_REPORT_DAYS, UsageService
 

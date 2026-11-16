@@ -13,7 +13,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
-from src.calendar.settings import utcnow
+from src.clock import utcnow
 from src.document_store import DocumentStore
 
 COLLECTION = "notes"

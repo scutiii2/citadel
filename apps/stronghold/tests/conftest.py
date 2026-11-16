@@ -59,7 +59,6 @@ class FakePlatform:
     """Portcullis as Stronghold sees it: every account is a recipient, every switch is on."""
 
     def __init__(self) -> None:
-        self.sent: list[tuple[str, str, str]] = []
         self.errors: list[tuple[str, str]] = []
         self.actions: list[tuple[str, str, str]] = []
         self.logs: list[dict] = []
@@ -67,17 +66,8 @@ class FakePlatform:
         self.default_permissions = {"chat.use", "settings.manage", "brain.instance.publish", "tools.execute"}
         self.granted: dict[str, set[str] | None] = {}
 
-    async def recipient(self, uid, permission):
-        return {"uid": uid, "email": f"{uid}@example.com"}
-
     async def permissions(self, uid):
         return self.granted.get(uid, self.default_permissions)
-
-    async def switches(self):
-        return {"calendar_inapp": True, "calendar_email": True, "calendar_push": True}
-
-    async def notify(self, uid, subject, body):
-        self.sent.append((uid, subject, body))
 
     async def log_action(self, uid, action, message):
         self.actions.append((uid, action, message))

@@ -14,7 +14,6 @@ def test_keys_are_made_once_and_then_reused(tmp_path) -> None:
     first = load_keys(tmp_path / "data")
     assert load_keys(tmp_path / "data") == first
     assert SecretBox(first.secrets).decrypt_map(SecretBox(first.secrets).encrypt_map({"url": "x"})) == {"url": "x"}
-    assert len(first.vapid_public) > 60
 
 
 def test_a_damaged_keys_file_is_an_error_not_a_silent_replacement(tmp_path) -> None:
@@ -29,31 +28,15 @@ def platform(handler) -> PortcullisClient:
     return PortcullisClient(client, "internal")
 
 
-def test_recipient_sends_the_token_and_maps_404_to_none() -> None:
-    seen = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen.append(request)
-        if "/u-gone/" in request.url.path:
-            return httpx.Response(404, json={"detail": "No such recipient"})
-        return httpx.Response(200, json={"uid": "u-1", "email": "ana@example.com"})
-
-    api = platform(handler)
-    assert asyncio.run(api.recipient("u-1", "calendar.use")) == {"uid": "u-1", "email": "ana@example.com"}
-    assert asyncio.run(api.recipient("u-gone", "calendar.use")) is None
-    assert seen[0].headers["x-internal-token"] == "internal"
-    assert str(seen[0].url) == "http://portcullis.test/internal/accounts/u-1/recipient?permission=calendar.use"
-
-
 def test_refusals_and_outages_are_platform_errors_but_error_reports_never_raise() -> None:
     def down(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("refused", request=request)
 
     with pytest.raises(PlatformError):
-        asyncio.run(platform(lambda request: httpx.Response(401)).switches())
+        asyncio.run(platform(lambda request: httpx.Response(401)).permissions("u-1"))
     with pytest.raises(PlatformError):
-        asyncio.run(platform(down).notify("u-1", "s", "b"))
-    asyncio.run(platform(down).report_error("calendar", "x"))
+        asyncio.run(platform(down).permissions("u-1"))
+    asyncio.run(platform(down).report_error("tickets", "x"))
 
 
 def test_action_log_names_the_account_and_never_raises() -> None:
@@ -78,6 +61,6 @@ def test_uids_in_request_lines_are_redacted() -> None:
     from src.log_privacy import UidLogFilter
 
     record = logging.LogRecord("httpx", logging.INFO, "", 0, "HTTP Request: %s %s", (
-        "GET", "http://portcullis:29601/internal/accounts/abc123/recipient?permission=calendar.use"), None)
+        "GET", "http://portcullis:29601/internal/accounts/abc123/permissions"), None)
     UidLogFilter().filter(record)
-    assert record.getMessage() == "HTTP Request: GET http://portcullis:29601/internal/accounts/[redacted]/recipient?permission=calendar.use"
+    assert record.getMessage() == "HTTP Request: GET http://portcullis:29601/internal/accounts/[redacted]/permissions"

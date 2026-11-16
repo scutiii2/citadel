@@ -859,26 +859,6 @@ auto-save with a visible notice. Keys use existing SecretBox encryption in
 db_gateway, and account deletion purges all personal brain records.
 
 
-## Calendar
-
-The calendar lives in Stronghold (`apps/stronghold`, see its README for settings and keys). Portcullis keeps the public `/api/calendar/...` routes: it checks the login and `calendar.use`, then passes the request on. It also keeps the admin Settings switches `calendar_inapp`, `calendar_email` and `calendar_push`, which Stronghold reads through `GET /internal/switches`.
-
 ## Internal API
 
-`/internal/...` is for Stronghold only. Every route needs the shared internal token and is refused when none is configured. `GET /internal/accounts/{uid}/recipient?permission=`, `GET /internal/switches`, `POST /internal/accounts/{uid}/notify` and `POST /internal/errors`. The web apps' nginx proxies only `/api/`, so these routes are not reachable from a browser.
-
-All calendar routes require a signed-in account with `calendar.use`; data is private to its immutable account UID. Feed URLs are accepted for writes and never returned.
-
-| Method | Route | Behavior |
-| --- | --- | --- |
-| GET/POST | `/api/calendar/feeds` | List calendars or add an encrypted ICS link. |
-| PATCH/DELETE | `/api/calendar/feeds/{id}` | Update or remove an owned calendar. |
-| GET | `/api/calendar/events?from=&to=` | Expanded, merged events over at most 62 days, with feed errors. |
-| GET/POST | `/api/calendar/alarms` | List or add rules; first visit seeds an in-app rule 15 minutes before events. |
-| PATCH/DELETE | `/api/calendar/alarms/{id}` | Update or remove an owned rule. |
-| GET/PUT | `/api/calendar/prefs` | Read or save the account timezone. |
-| GET | `/api/calendar/push/key` | Public VAPID key. |
-| POST | `/api/calendar/push/subscribe` | Save this browser's subscription. |
-| POST | `/api/calendar/push/unsubscribe` | Remove this browser's subscription. |
-| GET | `/api/calendar/alerts?unseen=1` | Unseen in-app alerts. |
-| POST | `/api/calendar/alerts/{id}/seen` | Dismiss an owned alert. |
+`/internal/...` is for Stronghold only. Every route needs the shared internal token and is refused when none is configured. `GET /internal/accounts/{uid}/permissions`, `POST /internal/accounts/{uid}/actions`, `POST /internal/errors` and `POST /internal/logs`. The web apps' nginx proxies only `/api/`, so these routes are not reachable from a browser.

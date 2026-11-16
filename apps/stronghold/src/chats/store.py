@@ -17,7 +17,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from src.calendar.settings import utcnow
+from src.clock import utcnow
 from src.schema.models import ChatDoc, ChatFolderDoc, ChatMessagesDoc, checked
 from src.document_store import DocumentStore
 from src.shares.store import ShareStore

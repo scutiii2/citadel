@@ -32,7 +32,6 @@ from src.routes import (
     attachments,
     bard,
     capability_files,
-    calendar as calendar_routes,
     internal as internal_routes,
     auth,
     chat_folders,
@@ -241,7 +240,6 @@ def create_app(
     app.include_router(attachments.router)
     app.include_router(bard.router)
     app.include_router(capability_files.router)
-    app.include_router(calendar_routes.router)
     app.include_router(stronghold.router)
     app.include_router(internal_routes.router)
 
