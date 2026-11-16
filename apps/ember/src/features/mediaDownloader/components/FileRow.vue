@@ -1,13 +1,17 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import ActionButton from "../../../components/ui/buttons/ActionButton.vue"
 import { useAuthStore } from '../../../stores/auth'
 import type { FileInfo } from '../api/MediaDownloaderTypes'
 import { formatBytes } from '../../../utils/format'
 import { formatMediaLength, formatExpiry } from '../utils/format'
+import { saveFile } from '../../../utils/server'
 
-defineProps<{ file: FileInfo; now: number; busy?: boolean }>()
+const props = defineProps<{ file: FileInfo; now: number; busy?: boolean }>()
 defineEmits<{ details: [] }>()
 const auth = useAuthStore()
+const failed = ref('')
+async function save(event: Event) { failed.value = await saveFile(event, props.file.download_url, props.file.name) }
 </script>
 
 <template>
@@ -21,8 +25,9 @@ const auth = useAuthStore()
     </div>
     <div class="file-actions">
       <span class="expiry muted">{{ file.expires_at > now ? `Expires in ${formatExpiry(file.expires_at, now)}` : 'Expired' }}</span>
-      <a v-if="file.expires_at > now && auth.hasPermission('files.download')" class="save-file" :href="file.download_url" :aria-label="`Download ${file.name}`" download><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" /></svg>Save file</a>
+      <a v-if="file.expires_at > now && auth.hasPermission('files.download')" class="save-file" :href="file.download_url" :aria-label="`Download ${file.name}`" download @click="save($event)"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" /></svg>Save file</a>
       <span v-else class="unavailable muted">{{ file.expires_at > now ? 'Download unavailable' : 'Expired' }}</span>
+      <span v-if="failed" class="unavailable muted" role="alert">{{ failed }}</span>
       <ActionButton icon="more" icon-only :disabled="busy" :aria-busy="busy" :aria-label="`File options for ${file.name}`" :title="`File options for ${file.name}`" @click="$emit('details')">File options</ActionButton>
     </div>
   </li>

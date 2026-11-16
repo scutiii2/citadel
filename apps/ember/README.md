@@ -16,10 +16,15 @@ Ember Windows app: the `ember_web` UI (Vue 3, TypeScript, Vite) in a Tauri 2 she
 - `pnpm tauri build` makes the NSIS installer (per-user) under `src-tauri/target/release/bundle/nsis`.
 - Checks: `pnpm exec vue-tsc -b`, `pnpm test`.
 
-## Not working yet in the Windows app
+## Windows app specifics
 
-- Live dictation (a WebSocket, which cannot carry the bearer): it falls back to recording, then transcribing.
-- Direct file links that are not images or Bard audio: the PDF merger and media downloader pages, and downloads linked from chat. They need the same `mediaUrl` treatment.
-- Shared-chat links point at `<server>/shared/<token>`, but Portcullis serves no web page there since `ember_web` is off. The app's own `/shared/:token` page works inside the app only.
-- No web push and no offline banner (the PWA code was removed). Native notifications are a later step.
-- No calendar or games page: `ember_web` never had them.
+- Live dictation works over a WebSocket. It cannot carry a header, so the app offers its token as the subprotocol pair `ember.bearer, <token>`; Portcullis accepts that only from a configured desktop origin. If the socket fails, it falls back to recording, then transcribing.
+- File links (chat download cards, PDF merger, media downloader) are fetched with the bearer and saved from a blob (`saveFile` in `src/utils/server.ts`).
+- Shared-chat links (`<server>/shared/<token>`) open a read-only page that Portcullis serves itself (plain HTML, no script).
+- Completion alerts use the web `Notification` API of the WebView2 window. No Tauri notification plugin is added.
+
+## Not done
+
+- The Tauri shell has never been compiled: Rust is not installed on the build machine, so `pnpm tauri dev` and `pnpm tauri build` are untested and there is no `Cargo.lock`.
+- Not run: the app in a window against a live Portcullis, and WebView2's notification and download behaviour.
+- No web push and no offline banner (the PWA code was removed). There is no calendar or games page (the calendar was removed from Citadel in Plan 11).

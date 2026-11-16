@@ -82,9 +82,14 @@ async def dictate_partial(request: Request, account: Account = Depends(require_c
     return await pass_on(request, stronghold, account, "/attachments/dictate/partial")
 
 
+BEARER_PROTOCOL = "ember.bearer"
+
+
 @router.websocket("/dictate/stream")
 async def dictate_stream(websocket: WebSocket):
-    """Cookie-authenticated same-origin PCM stream; Scribe stays private."""
+    """PCM stream; Scribe stays private. A browser is same-origin and sends its cookie. The Windows app
+    (a configured desktop origin) cannot, so it offers its session token as the subprotocol pair
+    `ember.bearer, <token>` (a WebSocket cannot carry an Authorization header)."""
     try:
         origin = urlsplit(websocket.headers.get("origin", ""))
         same_origin = (origin.scheme == ("https" if websocket.url.scheme == "wss" or getattr(websocket.state, "https", False) else "http") and origin.netloc
@@ -93,12 +98,18 @@ async def dictate_stream(websocket: WebSocket):
                        and not origin.username and not origin.password)
     except ValueError:
         same_origin = False
-    if not same_origin:
-        await websocket.close(4403, "Origin refused")
-        return
     state = websocket.app.state
     settings = state.settings
-    token = websocket.cookies.get(settings.session_cookie_name)
+    desktop = websocket.headers.get("origin", "") in settings.desktop_origins
+    if not same_origin and not desktop:
+        await websocket.close(4403, "Origin refused")
+        return
+    offered = [part.strip() for part in websocket.headers.get("sec-websocket-protocol", "").split(",")]
+    subprotocol = BEARER_PROTOCOL if desktop and BEARER_PROTOCOL in offered else None
+    token = websocket.cookies.get(settings.session_cookie_name) if not desktop else None
+    if subprotocol:
+        others = [part for part in offered if part and part != BEARER_PROTOCOL]
+        token = others[0] if len(others) == 1 else None
     async with state.database.sessions() as session:
         account = await SessionService(session, settings.session_hours).resolve(token) if token else None
         if account is None:
@@ -110,12 +121,12 @@ async def dictate_stream(websocket: WebSocket):
             return
     # No await between checking and claiming: all streams run on this app's loop.
     if account.id in state.dictation_accounts:
-        await websocket.accept()
+        await websocket.accept(subprotocol=subprotocol)
         await websocket.close(1013, "A dictation stream is already active")
         return
     state.dictation_accounts.add(account.id)
     try:
-        await websocket.accept()
+        await websocket.accept(subprotocol=subprotocol)
         gateway = ScribeGateway(state.upstream, settings.scribe_url, state.scribe_token)
 
         async def log_final(byte_count):

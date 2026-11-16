@@ -14,7 +14,7 @@
       { "label": "main", "title": "Ember", "width": 1200, "height": 800, "minWidth": 480, "minHeight": 600 }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; media-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost http: https:; object-src 'none'; base-uri 'self'; form-action 'self'"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; media-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost http: https: ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self'"
     }
   },
   "bundle": {

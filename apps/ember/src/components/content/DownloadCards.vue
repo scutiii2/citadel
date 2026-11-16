@@ -1,11 +1,19 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { useAuthStore } from "../../stores/auth";
+import { saveFile } from "../../utils/server";
 import type { DownloadCard } from "../../utils/content/downloads";
 import { formatFileSize } from "../../utils/content/downloads";
 
 const auth = useAuthStore();
 
 defineProps<{ downloads: DownloadCard[] }>();
+
+const failed = ref("");
+
+async function save(event: Event, card: DownloadCard): Promise<void> {
+  failed.value = await saveFile(event, card.href ?? "", card.filename);
+}
 
 function size(card: DownloadCard): string {
   const text = formatFileSize(card.bytes);
@@ -17,11 +25,12 @@ function size(card: DownloadCard): string {
   <div v-if="downloads.length" class="downloads">
     <div v-for="(card, i) in downloads" :key="i" class="card">
       <div class="tag">{{ card.label }}</div>
-      <a v-if="card.href && auth.hasPermission('files.download')" class="file" :href="card.href" download>⬇ Download {{ card.filename }}{{ size(card) }}</a>
+      <a v-if="card.href && auth.hasPermission('files.download')" class="file" :href="card.href" download @click="save($event, card)">⬇ Download {{ card.filename }}{{ size(card) }}</a>
       <span v-else class="file unavailable" title="This file cannot be downloaded from here">
         {{ card.filename }}{{ size(card) }} (unavailable)
       </span>
     </div>
+    <p v-if="failed" class="failed" role="alert">{{ failed }}</p>
   </div>
 </template>
 
@@ -47,6 +56,11 @@ function size(card: DownloadCard): string {
   color: var(--text);
   font-size: 0.9em;
   text-decoration: none;
+}
+.failed {
+  margin: 0;
+  font-size: 0.85em;
+  color: var(--danger, var(--muted));
 }
 a.file:hover {
   border-color: var(--accent);

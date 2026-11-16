@@ -231,6 +231,7 @@ def create_app(
     app.include_router(user_extensions.router)
     app.include_router(shares.router)
     app.include_router(shares.public_router)
+    app.include_router(shares.page_router)
     app.include_router(usage.router)
     app.include_router(settings_routes.router)
     app.include_router(mcp.router)

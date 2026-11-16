@@ -1,4 +1,5 @@
 import { attachmentsClient, type DictationResult } from "../../../api/files/AttachmentsClient";
+import { apiUrl, isDesktop, sessionToken } from "../../../utils/server";
 
 export type LiveMode = "live" | "periodic" | "stop";
 
@@ -44,9 +45,10 @@ export class LiveDictation {
     }
     const ready = new Promise<void>((resolve) => { this.resolveReady = resolve; });
     try {
-      const url = new URL("/api/attachments/dictate/stream", location.href);
-      url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
-      this.socket = new WebSocket(url);
+      const url = new URL(apiUrl("/api/attachments/dictate/stream"), location.href);
+      url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      // A WebSocket cannot send an Authorization header: the Windows app offers its token as a subprotocol.
+      this.socket = isDesktop() ? new WebSocket(url, ["ember.bearer", sessionToken()]) : new WebSocket(url);
       this.deadline = setTimeout(() => this.fallback(), 5000);
       this.setupDeadline = setTimeout(() => this.fallback(), 5000);
       this.socket.onopen = () => { clearTimeout(this.deadline); this.onMode("live"); this.flush(); };

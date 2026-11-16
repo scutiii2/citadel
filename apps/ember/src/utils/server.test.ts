@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiUrl, authHeaders, credentialsMode, hasServer, normalizeServerUrl, publicOrigin, setServerBase, setSessionToken } from "./server";
+import { apiUrl, authHeaders, credentialsMode, hasServer, normalizeServerUrl, publicOrigin, saveFile, setServerBase, setSessionToken } from "./server";
 
 function desktop(on: boolean): void {
   if (on) vi.stubGlobal("__TAURI_INTERNALS__", {});
@@ -42,4 +42,38 @@ describe("server in the Windows app", () => {
 it("normalizes server URLs", () => {
   expect(normalizeServerUrl(" https://a.example/path ")).toBe("https://a.example");
   expect(normalizeServerUrl("nope")).toBeNull();
+});
+
+describe("saveFile", () => {
+  it("leaves the link alone in the browser", async () => {
+    const event = new Event("click", { cancelable: true });
+    expect(await saveFile(event, "/api/files/a", "a.txt")).toBe("");
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("fetches with the bearer and saves a blob in the Windows app", async () => {
+    desktop(true);
+    setServerBase("http://10.0.0.5:29601");
+    setSessionToken("abc");
+    const fetched = vi.fn(async () => new Response("data"));
+    vi.stubGlobal("fetch", fetched);
+    URL.createObjectURL = vi.fn(() => "blob:x");
+    URL.revokeObjectURL = vi.fn();
+    const clicked = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const event = new Event("click", { cancelable: true });
+
+    expect(await saveFile(event, "/api/files/a", "a.txt")).toBe("");
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(fetched).toHaveBeenCalledWith("http://10.0.0.5:29601/api/files/a", { credentials: "omit", headers: { Authorization: "Bearer abc" } });
+    expect(clicked).toHaveBeenCalledOnce();
+    clicked.mockRestore();
+  });
+
+  it("returns a message when the file is gone", async () => {
+    desktop(true);
+    setServerBase("http://10.0.0.5:29601");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
+    expect(await saveFile(new Event("click", { cancelable: true }), "/api/files/a", "a.txt")).toMatch(/could not be downloaded/);
+  });
 });

@@ -5,10 +5,13 @@ read-only. Stronghold keeps the links; portcullis cuts the chat down to what may
 
 from __future__ import annotations
 
+import html
+import json
 import re
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from src.deps import get_share_limiter, get_stronghold, require_permission
@@ -85,15 +88,8 @@ async def revoke_share(request: Request, share_id: int = ShareId, account: Accou
 # --- the public read ----------------------------------------------------------------
 
 
-@public_router.get("/{token}")
-async def read_shared_chat(
-    token: str,
-    request: Request,
-    stronghold: StrongholdForwarder = Depends(get_stronghold),
-    limiter: PublicReadLimiter = Depends(get_share_limiter),
-) -> Response:
-    """No login. A link that is unknown, revoked or expired gives the same
-    404 as one that never existed. Never cached, never indexed."""
+async def _read(token: str, request: Request, stronghold: StrongholdForwarder, limiter: PublicReadLimiter):
+    """The frozen chat behind a link (Stronghold's answer), or the 429 / 404 every public read gives."""
     wait = limiter.retry_after(client_ip(request))
     if wait is not None:
         raise HTTPException(
@@ -104,7 +100,58 @@ async def read_shared_chat(
     answer = await stronghold.forward("GET", f"/shares/public/{token}", None)
     if answer.status != 200:
         raise _not_found()
-    response = as_response(answer)
+    return answer
+
+
+@public_router.get("/{token}")
+async def read_shared_chat(
+    token: str,
+    request: Request,
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
+    limiter: PublicReadLimiter = Depends(get_share_limiter),
+) -> Response:
+    """No login. A link that is unknown, revoked or expired gives the same
+    404 as one that never existed. Never cached, never indexed."""
+    response = as_response(await _read(token, request, stronghold, limiter))
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return response
+
+
+# The page a link opens in a browser: `<server>/shared/<token>`. Plain HTML, escaped, no script.
+page_router = APIRouter(tags=["shares"])
+_PAGE_CSP = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"
+_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><title>{title}</title>
+<style>
+:root {{ color-scheme: light dark; }}
+body {{ font: 16px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 46rem; padding: 1.5rem 1rem 3rem; }}
+h1 {{ font-size: 1.3rem; margin: 0 0 .25rem; }}
+.meta {{ opacity: .65; font-size: .85rem; margin-bottom: 1.5rem; }}
+.message {{ margin: 0 0 1rem; padding: .75rem 1rem; border-radius: .75rem; border: 1px solid #8884; white-space: pre-wrap; overflow-wrap: anywhere; }}
+.user {{ background: #8881; }}
+.role {{ display: block; font-size: .75rem; letter-spacing: .05em; text-transform: uppercase; opacity: .65; margin-bottom: .25rem; }}
+</style></head><body>
+<h1>{title}</h1>
+<p class="meta">A shared chat, read only.</p>
+{messages}
+</body></html>"""
+
+
+@page_router.get("/shared/{token}", response_class=HTMLResponse)
+async def shared_chat_page(
+    token: str,
+    request: Request,
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
+    limiter: PublicReadLimiter = Depends(get_share_limiter),
+) -> HTMLResponse:
+    chat = json.loads((await _read(token, request, stronghold, limiter)).body)
+    rows = "\n".join(
+        f'<div class="message {"user" if m["role"] == "user" else "assistant"}">'
+        f'<span class="role">{"You" if m["role"] == "user" else "Assistant"}</span>{html.escape(m["content"])}</div>'
+        for m in chat["messages"]
+    )
+    page = _PAGE.format(title=html.escape(chat["title"]), messages=rows)
+    return HTMLResponse(page, headers={
+        "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Content-Security-Policy": _PAGE_CSP})

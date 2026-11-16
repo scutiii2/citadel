@@ -221,3 +221,36 @@ def test_socket_task_cancellation_drains_relays_and_releases_account(client, rem
 
     client.portal.call(cancel_connection)
     assert remote.closed == 1
+
+
+DESKTOP = {'origin': 'tauri://localhost'}
+
+
+def desktop_token(client) -> str:
+    from tests.conftest import ADMIN_PASSWORD, ADMIN_USERNAME
+
+    return client.post('/api/auth/login', json={'username': ADMIN_USERNAME, 'password': ADMIN_PASSWORD}, headers={'X-Ember-Client': 'desktop'}).json()['session_token']
+
+
+def test_the_windows_app_streams_with_its_token_as_a_subprotocol(client, remote):
+    token = desktop_token(client)
+    client.cookies.clear()
+    with client.websocket_connect(PATH, headers=DESKTOP, subprotocols=['ember.bearer', token]) as ws:
+        assert ws.accepted_subprotocol == 'ember.bearer'
+        assert ws.receive_json() == {'type': 'partial', 'text': 'hello'}
+
+
+@pytest.mark.parametrize('protocols', [[], ['ember.bearer'], ['ember.bearer', 'wrong'], ['other', 'x']])
+def test_the_windows_app_is_refused_without_a_valid_token(client, remote, protocols):
+    as_admin(client)
+    client.cookies.clear()
+    with pytest.raises(WebSocketDisconnect) as error:
+        with client.websocket_connect(PATH, headers=DESKTOP, subprotocols=protocols) as ws:
+            ws.receive_json()
+    assert error.value.code == 4401
+    assert not remote.opened
+
+
+def test_a_desktop_origin_cannot_use_the_cookie(client, remote):
+    as_admin(client)
+    rejected(client, 4401, DESKTOP)

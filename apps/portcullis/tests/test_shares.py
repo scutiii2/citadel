@@ -310,3 +310,29 @@ def test_failed_link_purge_never_blocks_account_deletion(client: TestClient, ema
 
     errors = client.get("/api/logs/error", params={"actor": root}).json()
     assert any(entry["source"] == "admin.shares_purge" for entry in errors)
+
+
+# --- the page a link opens ---------------------------------------------------------
+
+
+def test_the_link_opens_a_read_only_page_with_escaped_text(client_factory, upstream: FakeUpstream) -> None:
+    chat = {"title": "A <b>title</b>", "created_at": "x", "expires_at": None, "messages": [
+        {"role": "user", "content": "<script>alert(1)</script> hi"}, {"role": "assistant", "content": "line one\nline two"}]}
+    upstream.handler = lambda request: httpx.Response(200, json=chat)
+
+    page = client_factory().get(f"/shared/{TOKEN}")
+
+    assert page.status_code == 200 and page.headers["content-type"].startswith("text/html")
+    assert "<script>alert" not in page.text and "&lt;script&gt;alert(1)&lt;/script&gt; hi" in page.text
+    assert "A &lt;b&gt;title&lt;/b&gt;" in page.text and "line one\nline two" in page.text
+    assert page.headers["cache-control"] == "no-store" and page.headers["x-robots-tag"] == "noindex, nofollow"
+    assert "script-src" not in page.headers["content-security-policy"]
+    assert "default-src 'none'" in page.headers["content-security-policy"]
+
+
+def test_an_unknown_or_malformed_link_page_is_a_404(client_factory, upstream: FakeUpstream) -> None:
+    upstream.handler = lambda request: httpx.Response(404, json={"detail": "x"})
+    anon = client_factory()
+
+    assert anon.get(f"/shared/{TOKEN}").status_code == 404
+    assert anon.get("/shared/short").status_code == 404

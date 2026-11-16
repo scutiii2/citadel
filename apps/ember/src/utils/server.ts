@@ -91,3 +91,26 @@ export async function mediaUrl(path: string): Promise<string> {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return URL.createObjectURL(await response.blob());
 }
+
+/**
+ * A plain `<a download>` cannot send the bearer, so in the Windows app a click fetches the file and saves the blob.
+ * Call from the link's click handler; in the browser it does nothing and the link works as it always did.
+ * Resolves to an error text (empty when saved) so the caller can show it.
+ */
+export async function saveFile(event: Event, path: string, filename: string): Promise<string> {
+  if (!isDesktop()) return "";
+  event.preventDefault();
+  try {
+    const blobUrl = await mediaUrl(path);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    return "";
+  } catch {
+    return "The file could not be downloaded. It may have expired.";
+  }
+}
