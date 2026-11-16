@@ -507,3 +507,4 @@ def test_shutdown_saves_what_streamed_as_interrupted(client: TestClient, agent: 
     client.portal.call(client.app.state.turns.shutdown)
     saved = chat(client, chat_id)["messages"][-1]["content"]
     assert saved.startswith("Hello!") and "Interrupted" in saved
+    assert client.get("/turns/running").json() == {"chat_ids": []}

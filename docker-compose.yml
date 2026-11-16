@@ -123,6 +123,8 @@ services:
   stronghold:
     build: ./apps/stronghold
     restart: unless-stopped
+    # On stop, running turns are cancelled and their partial text saved; give that time before SIGKILL.
+    stop_grace_period: 30s
     env_file:
       - path: ./apps/stronghold/.env
         required: false
