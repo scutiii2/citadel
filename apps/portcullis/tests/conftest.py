@@ -24,6 +24,7 @@ from src.services.agent_gateway import AgentCallError, Caller
 from src.services.email_service import EmailDeliveryError
 from src.services.server_tools import ServerUnavailable
 from src.services.traffic import TrafficRecorder
+from tests.fake_turns import FakeTurns
 from tests.fake_chats import FakeChats
 
 ADMIN_USERNAME = "root"
@@ -131,6 +132,8 @@ class FakeUpstream:
     usage: FakeUsage | None = field(default_factory=FakeUsage)
     # Answers Stronghold's /chats and /chat-folders routes the same way; None lets `handler` answer them.
     chats: FakeChats | None = field(default_factory=FakeChats)
+    # Answers Stronghold's /turns routes; None lets `handler` answer them.
+    turns: FakeTurns | None = field(default_factory=FakeTurns)
     # Stronghold's answer to "may this account write to its brain?" when `handler` does not take /brains/writable.
     brain_writable: bool = True
     # Stronghold's answers when a turn starts: the agents the account switched off, and its private extensions.
@@ -147,6 +150,8 @@ class FakeUpstream:
             raise httpx.ConnectError("connection refused (fake)", request=request)
         if self.usage is not None and request.url.path.startswith("/usage"):
             return self.usage.respond(request)
+        if self.turns is not None and request.url.path.startswith("/turns"):
+            return self.turns.respond(request)
         if self.chats is not None and request.url.path.startswith(("/chats", "/chat-folders")):
             return self.chats.respond(request)
         if self.agents_fake and request.url.path == "/account-agents" and request.method == "GET":

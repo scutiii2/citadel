@@ -21,7 +21,6 @@ from src.services.server_tools import ServerTools
 from src.services.session_service import SessionService
 from src.services.settings_service import SettingsService
 from src.services.traffic import TrafficRecorder
-from src.services.turns import TurnRegistry
 from src.services.secret_box import SecretBox
 from src.services.pricing import Pricing
 
@@ -61,10 +60,6 @@ def get_email_sender(request: Request) -> EmailSender:
 
 def get_agent_gateway(request: Request) -> AgentGateway:
     return request.app.state.agent_gateway
-
-
-def get_turns(request: Request) -> TurnRegistry:
-    return request.app.state.turns
 
 
 def get_secret_box(request: Request) -> SecretBox:

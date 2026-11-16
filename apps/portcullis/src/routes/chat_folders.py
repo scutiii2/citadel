@@ -9,12 +9,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request, Response
 
-from src.deps import get_stronghold, get_turns, require_permission
+from src.deps import get_stronghold, require_permission
 from src.models import Account
 from src.routes.stronghold import as_response, pass_on
 from src.services.permissions import CHAT_USE
 from src.services.stronghold_forwarder import StrongholdForwarder
-from src.services.turns import TurnRegistry
+from src.services.stronghold_turns import running_chat_ids
 
 router = APIRouter(prefix="/api/chat-folders", tags=["chat-folders"])
 
@@ -41,9 +41,8 @@ async def update_folder(folder_id: int, request: Request, account: Account = Dep
 
 @router.delete("/{folder_id}", status_code=204)
 async def delete_folder(folder_id: int, account: Account = Depends(require_chat),
-                        turns: TurnRegistry = Depends(get_turns),
                         stronghold: StrongholdForwarder = Depends(get_stronghold)) -> Response:
     """Deletes the folder and every chat in it, after revoking their share links. Refused while one of
     those chats has an answer being written."""
     return as_response(await stronghold.forward(
-        "DELETE", f"/chat-folders/{folder_id}", account, json={"running": sorted(turns.running_chat_ids(account.id))}))
+        "DELETE", f"/chat-folders/{folder_id}", account, json={"running": sorted(await running_chat_ids(stronghold, account))}))

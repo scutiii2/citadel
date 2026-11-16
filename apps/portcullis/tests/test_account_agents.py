@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from tests.conftest import FakeAgent
 from tests.test_registration import as_admin
-from tests.test_turns import events, new_id, start
+from tests.turn_helpers import events, new_id, start
 
 URL = "/api/account-agents"
 
@@ -64,41 +64,3 @@ def test_stronghold_down_is_a_502(client: TestClient, upstream) -> None:
     upstream.unreachable = True
 
     assert client.get(URL).status_code == 502
-
-
-def test_every_agent_is_on_until_the_account_switches_one_off(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
-    chat_id = new_id()
-
-    start(client, chat_id, "hi")
-    events(client, chat_id)
-
-    assert agent.asks[0]["disabled_tools"] == []
-
-
-def test_a_switched_off_agent_is_passed_to_the_agent_as_a_filter_entry(client: TestClient, agent: FakeAgent, upstream) -> None:
-    as_admin(client)
-    upstream.disabled_agents = ["planner"]
-    chat_id = new_id()
-
-    start(client, chat_id, "hi")
-    events(client, chat_id)
-
-    assert agent.asks[0]["disabled_tools"] == ["agent:planner"]
-
-
-def test_the_browser_can_no_longer_name_tools_to_switch_off(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
-    chat_id = new_id()
-
-    start(client, chat_id, "hi", disabled_tools=["tool_calc"])
-    events(client, chat_id)
-
-    assert agent.asks[0]["disabled_tools"] == []
-
-
-def test_without_the_list_the_turn_is_refused_rather_than_offering_every_agent(client: TestClient, upstream) -> None:
-    as_admin(client)
-    upstream.agents_status = 503
-
-    assert start(client, new_id(), "hi").status_code == 503

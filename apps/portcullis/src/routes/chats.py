@@ -5,9 +5,8 @@ from __future__ import annotations
 
 import json
 import re
-import uuid
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import (
@@ -25,22 +24,17 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.config import Settings
 from src.deps import (
-    get_agent_gateway,
     get_log_writer,
     get_pricing,
     get_stronghold,
     get_settings,
     get_settings_service,
-    get_turns,
     require_permission,
 )
 from src.models import Account
-from src.routes.mcp import get_agent_directory
 from src.routes.server_info import get_server_info
 from src.services.brain_client import RemoteBrains
-from src.services import question_answers, second_brain, suggestions, summarization
-from src.services.agent_directory import NO_AGENT_RUNNING, AgentDirectory
-from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
+from src.services import question_answers, second_brain
 from src.services.chat_service import (
     TITLE_MAX,
     ChatLimitError,
@@ -51,7 +45,6 @@ from src.services.chat_service import (
     FolderNotFound,
     NotABranchPoint,
     decode_messages,
-    message_time,
 )
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import (
@@ -62,19 +55,9 @@ from src.services.mcp_server_info import (
 from src.services.permissions import CHAT_USE, TOOLS_EXECUTE
 from src.services.pricing import Pricing, with_cost
 from src.services.settings_service import FORCE_TOOL_APPROVAL, SettingsService
-from src.services.turns import (
-    MAX_AGENT_USAGE_ROWS,
-    MAX_STEPS,
-    STEP_RESULT_MAX,
-    TooManyTurns,
-    TurnConflict,
-    TurnNotFound,
-    TurnOptions,
-    TurnRegistry,
-)
-from src.routes.stronghold import pass_on
-from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
-from src.services.usage_client import LimitBlock, UsageClient, UsageUnavailable
+from src.routes.stronghold import as_response, pass_on
+from src.services.stronghold_forwarder import ForwardedResponse, StrongholdForwarder, StrongholdUnavailable
+from src.services.stronghold_turns import running_chat_ids
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
@@ -104,6 +87,12 @@ def get_chat_service(
 
 
 # --- models ------------------------------------------------------------------
+
+
+# Limits of a saved answer's steps and per-agent usage rows (as in Stronghold's turn engine).
+STEP_RESULT_MAX = 4000
+MAX_STEPS = 50
+MAX_AGENT_USAGE_ROWS = 20
 
 
 class StepIn(BaseModel):
@@ -380,29 +369,6 @@ def _busy() -> HTTPException:
     return HTTPException(status.HTTP_409_CONFLICT, "An answer is still being written for this chat")
 
 
-def limit_reached(block: LimitBlock) -> HTTPException:
-    minutes = max(1, int((block.reset_at - datetime.now(UTC).replace(tzinfo=None)).total_seconds() // 60) + 1)
-    wait = f"{minutes} min" if minutes < 60 else f"{minutes // 60} h {minutes % 60} min"
-    return HTTPException(
-        status.HTTP_429_TOO_MANY_REQUESTS,
-        f"You've reached your {block.reason}. It frees up in about {wait}.",
-        headers={"Retry-After": str(minutes * 60)},
-    )
-
-
-def _replaced_from(existing: list[ChatMessage], index: int) -> list[ChatMessage]:
-    """`existing` up to (not including) `index`, which must be a question the
-    user typed - never a summary, a raw log or a slash command."""
-    target = existing[index] if index < len(existing) else None
-    if target is None or target.get("role") != "user" or target.get("kind"):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Only a question you typed can be regenerated or edited")
-    return existing[:index]
-
-
-def _caller(account: Account) -> Caller:
-    return Caller(username=account.username, email=account.email, uid=account.uid)
-
-
 # --- history -----------------------------------------------------------------
 
 
@@ -410,9 +376,9 @@ def _caller(account: Account) -> Caller:
 async def list_chats(
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
-    turns: TurnRegistry = Depends(get_turns),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> list[ChatSummaryOut]:
-    running = turns.running_chat_ids(account.id)
+    running = await running_chat_ids(stronghold, account)
     return [ChatSummaryOut.of(c, c.chat_id in running) for c in await chats.list()]
 
 
@@ -420,11 +386,11 @@ async def list_chats(
 async def delete_all_chats(
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
-    turns: TurnRegistry = Depends(get_turns),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> Response:
     """Stronghold revokes every share link first and deletes nothing if it cannot."""
     await chats.delete_all()
-    await turns.discard_account(account.id)
+    await stronghold.forward("DELETE", "/turns", account)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -463,60 +429,27 @@ async def get_chat(
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
-    turns: TurnRegistry = Depends(get_turns),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
     pricing: Pricing = Depends(get_pricing),
 ) -> ChatOut:
     try:
-        return ChatOut.of(await chats.get(chat_id), pricing, turns.is_running(account.id, chat_id))
+        return ChatOut.of(await chats.get(chat_id), pricing, chat_id in await running_chat_ids(stronghold, account))
     except ChatNotFound as error:
         raise _not_found() from error
 
 
 @router.get("/{chat_id}/suggestion")
 async def chat_suggestion(
+    request: Request,
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
-    chats: ChatService = Depends(get_chat_service),
     stronghold: StrongholdForwarder = Depends(get_stronghold),
-    turns: TurnRegistry = Depends(get_turns),
-    directory: AgentDirectory = Depends(get_agent_directory),
-    gateway: AgentGateway = Depends(get_agent_gateway),
-) -> SuggestionOut:
-    """The message the user will probably type next, for the chat box's
-    placeholder. Never an error: anything that stops it (switched off, an
-    answer still running, nothing to follow up, no agent, usage limit, agent
-    failure) is `{text: null}`. One small model call, counted in the usage
-    like a chat turn, remembered per answer."""
-    try:
-        chat = await chats.get(chat_id)
-    except ChatNotFound as error:
-        raise _not_found() from error
-    if not account.prompt_suggestions or turns.is_running(account.id, chat_id):
-        return SuggestionOut()
-    messages = decode_messages(chat)
-    exchange = suggestions.last_exchange(messages)
-    if exchange is None:
-        return SuggestionOut()
-    question, answer = exchange
-    key = suggestions.cache_key(account.id, chat_id, len(messages), answer)
-    known, cached = suggestions.CACHE.lookup(key)
-    if known:
-        return SuggestionOut(text=cached)
-    agent = await directory.entry()
-    if agent is None:
-        return SuggestionOut()
-    usage = UsageClient(stronghold, account)
-    try:
-        if await usage.check() is not None:
-            return SuggestionOut()
-    except UsageUnavailable:
-        return SuggestionOut()
-    outcome = await suggestions.suggest(gateway, agent.url, _caller(account), question, answer)
-    if outcome is None:
-        return SuggestionOut()
-    await usage.record(uuid.uuid4().hex, "suggestion", chat_id, outcome.result)
-    suggestions.CACHE.put(key, outcome.text)
-    return SuggestionOut(text=outcome.text)
+) -> Response:
+    """The message the user will probably type next, for the chat box's placeholder (Stronghold asks the
+    model). With suggestions switched off for the account it is `{text: null}`."""
+    if not account.prompt_suggestions:
+        return Response('{"text":null}', media_type="application/json")
+    return await pass_on(request, stronghold, account, f"/turns/{chat_id}/suggestion")
 
 
 @router.put("/{chat_id}")
@@ -525,11 +458,11 @@ async def put_chat(
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
-    turns: TurnRegistry = Depends(get_turns),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> ChatSummaryOut:
     """Creates the chat or replaces it whole. Refused while an answer is
     being written, which would otherwise be lost or land in the wrong place."""
-    if turns.is_running(account.id, chat_id):
+    if chat_id in await running_chat_ids(stronghold, account):
         raise _busy()
     try:
         chat = await chats.put(chat_id, body.title, body.agent_id, _messages(body.messages))
@@ -544,7 +477,6 @@ async def update_chat(
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
-    turns: TurnRegistry = Depends(get_turns),
     stronghold: StrongholdForwarder = Depends(get_stronghold),
     info: McpServerInfo = Depends(get_server_info),
     logs: LogWriter = Depends(get_log_writer),
@@ -566,7 +498,7 @@ async def update_chat(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Folder not found") from error
     if body.save_to_second_brain is not None:
         await logs.action(account, "chat.second_brain", f"Chat {chat_id}: auto-save={body.save_to_second_brain}")
-    return ChatSummaryOut.of(chat, turns.is_running(account.id, chat_id))
+    return ChatSummaryOut.of(chat, chat_id in await running_chat_ids(stronghold, account))
 
 
 @router.delete("/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -574,14 +506,14 @@ async def delete_chat(
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
-    turns: TurnRegistry = Depends(get_turns),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> Response:
     """Also stops an answer still being written for it. Stronghold revokes its share links first."""
     try:
         await chats.delete(chat_id)
     except ChatNotFound as error:
         raise _not_found() from error
-    await turns.discard(account.id, chat_id)
+    await stronghold.forward("DELETE", f"/turns/{chat_id}", account)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -614,11 +546,11 @@ async def append_messages(
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
-    turns: TurnRegistry = Depends(get_turns),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> ChatSummaryOut:
     """Adds messages the browser produced itself - a slash command and its
     result - creating the chat if needed."""
-    if turns.is_running(account.id, chat_id):
+    if chat_id in await running_chat_ids(stronghold, account):
         raise _busy()
     extra = _messages(body.messages)
     try:
@@ -632,50 +564,7 @@ async def append_messages(
     return ChatSummaryOut.of(chat)
 
 
-# --- turns ---------------------------------------------------------------------
-
-
-_LIMIT_FIELDS = ("max_output_tokens", "max_tool_rounds")
-
-
-async def _own_limits(stronghold: StrongholdForwarder, account: Account) -> dict[str, int]:
-    """The account's own response limits from Stronghold. Without them the turn still runs, on the admin's values."""
-    try:
-        answer = await stronghold.forward("GET", "/tuning/limits/own", account)
-        stored = json.loads(answer.body) if answer.status == 200 else {}
-    except (StrongholdUnavailable, ValueError):
-        return {}
-    if not isinstance(stored, dict):
-        return {}
-    return {f: stored[f] for f in _LIMIT_FIELDS if isinstance(stored.get(f), int) and not isinstance(stored.get(f), bool)}
-
-
-async def _switched_off_agents(stronghold: StrongholdForwarder, account: Account) -> list[str]:
-    """The agents the account switched off, from Stronghold. Closed on failure: an empty list would
-    quietly offer agents the account switched off."""
-    unavailable = HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Account agents storage is unavailable")
-    try:
-        answer = await stronghold.forward("GET", "/account-agents", account)
-        disabled = json.loads(answer.body)["disabled"] if answer.status == 200 else None
-    except (StrongholdUnavailable, ValueError, KeyError, TypeError):
-        raise unavailable from None
-    if not isinstance(disabled, list):
-        raise unavailable
-    return [str(agent_id) for agent_id in disabled]
-
-
-async def _private_extensions(
-    stronghold: StrongholdForwarder, account: Account
-) -> tuple[tuple[dict, ...], tuple[dict, ...]]:
-    """(extensions for Legion, notices) from Stronghold. On any failure: none, and a notice saying why."""
-    try:
-        answer = await stronghold.forward("GET", "/user-extensions/for-turn", account)
-        turn = json.loads(answer.body) if answer.status == 200 else None
-        if isinstance(turn, dict) and isinstance(turn.get("items"), list) and isinstance(turn.get("skipped"), list):
-            return tuple(turn["items"]), tuple(turn["skipped"])
-    except (StrongholdUnavailable, ValueError):
-        pass
-    return (), ({"id": "private", "label": "Private extensions", "error": "Private extensions storage is unavailable"},)
+# --- turns: Stronghold runs them; Portcullis checks login and permission and adds what only it knows ---------
 
 
 @router.post("/{chat_id}/turns", status_code=status.HTTP_202_ACCEPTED)
@@ -685,103 +574,41 @@ async def start_turn(
     account: Account = Depends(require_chat),
     chats: ChatService = Depends(get_chat_service),
     stronghold: StrongholdForwarder = Depends(get_stronghold),
-    turns: TurnRegistry = Depends(get_turns),
-    directory: AgentDirectory = Depends(get_agent_directory),
-    settings: Settings = Depends(get_settings),
     app_settings: SettingsService = Depends(get_settings_service),
     info: McpServerInfo = Depends(get_server_info),
-) -> TurnOut:
-    """Saves the question and starts answering it in portcullis. The answer
-    keeps going (and is saved) even if the browser leaves; watch it via
-    /events."""
-    agent = await directory.entry()
-    if agent is None:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, NO_AGENT_RUNNING)
-    if turns.is_running(account.id, chat_id):
-        raise _busy()
-    block = await UsageClient(stronghold, account).check()
-    if block is not None:
-        raise limit_reached(block)
-
+) -> Response:
+    """Starts answering in Stronghold, which saves the question and keeps going (and saves the answer)
+    even if the browser leaves; watch it via /events. The `trusted` block is Portcullis's alone: a
+    `trusted` key sent by the browser never reaches Stronghold."""
     try:
-        saved_chat = await chats.get(chat_id)
-        saved_preference = saved_chat.save_to_second_brain
-        saved_scope = saved_chat.second_brain_scope
+        saved = await chats.get(chat_id)
+        saved_preference, saved_scope = saved.save_to_second_brain, saved.second_brain_scope
     except ChatNotFound:
-        saved_preference = False
-        saved_scope = "instance"
-    brain_scope = body.second_brain_scope or saved_scope
-    brain_notice = ""
-    auto_save = saved_preference if body.save_to_second_brain is None else body.save_to_second_brain
-    if auto_save:
-        permitted = await _second_brain_available(account, stronghold, info, brain_scope)
-        if body.save_to_second_brain is True and not permitted:
-            raise HTTPException(status.HTTP_409_CONFLICT, "Activate Obsidian and enable its write tool before auto-saving")
-        if not permitted:
-            brain_notice = "Auto-save was disabled because the selected brain or publish permission is unavailable. No other destination was used."
-        auto_save = permitted
-
-    question = {"role": "user", "content": body.question, "at": message_time()}
+        saved_preference, saved_scope = False, "instance"
+    scope = body.second_brain_scope or saved_scope
+    wants_auto_save = saved_preference if body.save_to_second_brain is None else body.save_to_second_brain
+    available = {scope: await _second_brain_available(account, stronghold, info, scope)} if wants_auto_save else {}
+    # Every extension mcp_server lists is on: which agent may call which tool is the agent file's
+    # tools.allow. Without the listing the answer still runs, just without extension tools.
     try:
-        try:
-            existing = decode_messages(await chats.get(chat_id))
-            if body.truncate_to is not None:
-                existing = _replaced_from(existing, body.truncate_to)
-            chat = await chats.replace_messages(chat_id, [*existing, question], agent_id=agent.id)
-        except ChatNotFound:
-            if body.truncate_to is not None:
-                raise _not_found() from None
-            title = _clean_title(body.title or body.question[:60])
-            chat = await chats.put(chat_id, title, agent.id, [question])
-    except ChatLimitError as error:
-        raise _too_large(error) from error
-
-    if body.save_to_second_brain is not None or body.second_brain_scope is not None or brain_notice:
-        chat = await chats.update(chat_id, save_to_second_brain=auto_save, second_brain_scope=brain_scope)
-
-    # When the administrator requires it, the browser's choice does not matter:
-    # every tool asks, and no tool is pre-allowed.
-    forced = await app_settings.get_bool(FORCE_TOOL_APPROVAL)
-    # Closed on failure: an empty list would quietly offer agents the account switched off.
-    switched_off_agents = await _switched_off_agents(stronghold, account)
-    # Every extension mcp_server lists is on: which agent may call which tool is the agent
-    # file's tools.allow. Without the listing the answer still runs, just without extension tools.
-    try:
-        extension_ids = tuple(e["id"] for e in await info.extensions(account) if isinstance(e, dict) and isinstance(e.get("id"), str))
+        extension_ids = [e["id"] for e in await info.extensions(account) if isinstance(e, dict) and isinstance(e.get("id"), str)]
     except (McpServerUnavailable, McpServerRefused):
-        extension_ids = ()
-    # The caller's own private extensions, read from Stronghold: the browser cannot name one.
-    # If Stronghold cannot give them the answer still runs, without them, and says so.
-    private_items, private_skipped = await _private_extensions(stronghold, account)
-    limits = await _own_limits(stronghold, account)
-    try:
-        options = TurnOptions(
-            limits=limits,
-            caveman=body.caveman,
-            independent=body.independent,
-            save_to_second_brain=auto_save,
-            second_brain_scope=brain_scope,
-            second_brain_notice=brain_notice,
-            plan=body.plan,
-            plan_lean=body.plan_lean,
-            exact_context=body.exact_context,
-            enabled_extensions=extension_ids,
-            ask_before_tools=body.ask_before_tools or forced,
-            allowed_tools=() if forced else tuple(dict.fromkeys(body.allowed_tools)),
-            allow_read_only=body.allow_read_only and body.ask_before_tools and not forced,
-            disabled_tools=tuple("agent:" + agent_id for agent_id in switched_off_agents) if TOOLS_EXECUTE in account.permission_names else ("*",),
-            can_ask=body.can_ask,
-            private_extensions=private_items,
-            private_skipped=private_skipped,
-        )
-        turn = turns.start(account.id, chat_id, agent, _caller(account), options)
-    except TurnConflict as error:
-        raise _busy() from error
-    except TooManyTurns as error:
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS, "Too many answers running at once - wait for one to finish"
-        ) from error
-    return TurnOut(chat=ChatSummaryOut.of(chat, running=True), sequence=turn.sequence)
+        extension_ids = []
+    payload = {
+        **body.model_dump(exclude={"agent_id"}),
+        "trusted": {
+            "forced_approval": await app_settings.get_bool(FORCE_TOOL_APPROVAL),
+            "tools_execute": TOOLS_EXECUTE in account.permission_names,
+            "extension_ids": extension_ids,
+            "second_brain_available": available,
+        },
+    }
+    answer = await stronghold.forward("POST", f"/turns/{chat_id}", account, json=payload)
+    if answer.status != status.HTTP_202_ACCEPTED:
+        return as_response(answer)
+    started = json.loads(answer.body)
+    out = TurnOut(chat=ChatSummaryOut.of(ChatRecord.of(started["chat"]), running=True), sequence=started["sequence"])
+    return Response(out.model_dump_json(), status_code=status.HTTP_202_ACCEPTED, media_type="application/json")
 
 
 @router.get("/{chat_id}/events")
@@ -790,31 +617,32 @@ async def turn_events(
     chat_id: str = ChatId,
     after: int = Query(default=0, ge=0),
     account: Account = Depends(require_chat),
-    turns: TurnRegistry = Depends(get_turns),
-) -> StreamingResponse:
-    """Server-Sent Events for the chat's current (or just finished) turn:
-    a snapshot of the text so far when joining late, then live events, and
-    last a "final" or "error" event. 404 when there is no turn to watch."""
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
+) -> Response:
+    """Server-Sent Events for the chat's current (or just finished) turn, relayed from Stronghold as they
+    come: a snapshot of the text so far when joining late, then live events, and last a "final" or "error"
+    event. 404 when there is no turn to watch. A browser that leaves ends only the relay, never the turn."""
     last_event_id = request.headers.get("last-event-id", "")
     if last_event_id.isdigit():
         after = max(after, int(last_event_id))
-    try:
-        events = await turns.subscribe(account.id, chat_id, after)
-    except TurnNotFound as error:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No answer is being written for this chat") from error
+    upstream = await stronghold.open_stream(f"/turns/{chat_id}/events", account, params={"after": str(after)})
+    if upstream.status_code != status.HTTP_200_OK:
+        body = await upstream.aread()
+        await upstream.aclose()
+        if upstream.status_code >= 500:
+            raise StrongholdUnavailable(f"stronghold answered {upstream.status_code}")
+        return Response(body, status_code=upstream.status_code,
+                        media_type=upstream.headers.get("content-type", "application/json"))
 
-    async def stream() -> AsyncIterator[bytes]:
-        async for event in events:
-            if event.get("type") == "ping":
-                yield b": ping\n\n"
-                continue
-            yield f"id: {event['sequence']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n".encode()
+    async def relay() -> AsyncIterator[bytes]:
+        try:
+            async for chunk in upstream.aiter_bytes():
+                yield chunk
+        finally:
+            await upstream.aclose()
 
-    return StreamingResponse(
-        stream(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    return StreamingResponse(relay(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.post("/{chat_id}/approvals")
@@ -822,31 +650,20 @@ async def decide_approval(
     body: ApprovalRequest,
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
-    turns: TurnRegistry = Depends(get_turns),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
     logs: LogWriter = Depends(get_log_writer),
     app_settings: SettingsService = Depends(get_settings_service),
-) -> dict[str, bool]:
-    """Answers a tool the running answer is waiting to run (the `id` of an
-    `approval_request` event). Only the chat's own account can; once a step is
-    answered nothing else can answer it. Recorded in the activity log."""
-    if not turns.is_running(account.id, chat_id):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No answer is being written for this chat")
-    pending = turns.pending_approval(account.id, chat_id, body.step_id)
-    if pending is None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Nothing is waiting for that answer")
-    # "Always" would let the tool skip asking for the rest of the turn; while
-    # approval is required it means "this once".
-    decision = body.decision
-    if decision == "always" and await app_settings.get_bool(FORCE_TOOL_APPROVAL):
-        decision = "allow"
-    try:
-        decided = await turns.decide(account.id, chat_id, body.step_id, decision)
-    except AgentCallError as error:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
-    if not decided:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Nothing is waiting for that answer")
-    await logs.action(account, "tool.approval", f'{decision}: "{pending["tool"]}"')
-    return {"decided": True}
+) -> Response:
+    """Answers a tool the running answer is waiting to run (the `id` of an `approval_request` event).
+    Only the chat's own account can; once a step is answered nothing else can answer it. Recorded in the
+    activity log. While the administrator requires approval, "always" means "this once"."""
+    payload = {**body.model_dump(), "trusted": {"forced_approval": await app_settings.get_bool(FORCE_TOOL_APPROVAL)}}
+    answer = await stronghold.forward("POST", f"/turns/{chat_id}/approvals", account, json=payload)
+    if answer.status != status.HTTP_200_OK:
+        return as_response(answer)
+    decided = json.loads(answer.body)
+    await logs.action(account, "tool.approval", f'{decided["decision"]}: "{decided["tool"]}"')
+    return Response('{"decided":true}', media_type="application/json")
 
 
 @router.post("/{chat_id}/questions")
@@ -854,41 +671,32 @@ async def answer_questions(
     body: QuestionRequest,
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
-    turns: TurnRegistry = Depends(get_turns),
-) -> dict[str, bool]:
-    """Answers (or skips) the questions the running answer is waiting on (the
-    `id` of a `question_request` event). Only the chat's own account can; once
-    answered nothing else can answer them. The answer text is not logged: it
-    is the user's own words, kept only in the chat's saved steps."""
-    if not turns.is_running(account.id, chat_id):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No answer is being written for this chat")
-    pending = turns.pending_question(account.id, chat_id, body.step_id)
-    if pending is None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Nothing is waiting for that answer")
-    answers = [answer.model_dump() for answer in body.answers] if not body.skipped else []
-    if not body.skipped:
-        problem = question_answers.check_answers(pending["questions"], answers)
-        if problem is not None:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problem)
-    try:
-        answered = await turns.answer(account.id, chat_id, body.step_id, answers, body.skipped)
-    except AgentCallError as error:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(error)) from error
-    if not answered:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Nothing is waiting for that answer")
-    return {"answered": True}
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
+) -> Response:
+    """Answers (or skips) the questions the running answer is waiting on (the `id` of a `question_request`
+    event). The answer text is not logged: it is the user's own words, kept only in the chat's saved steps."""
+    return as_response(await stronghold.forward("POST", f"/turns/{chat_id}/questions", account, json=body.model_dump()))
 
 
 @router.post("/{chat_id}/cancel")
 async def cancel_turn(
+    request: Request,
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
-    turns: TurnRegistry = Depends(get_turns),
-) -> dict[str, bool]:
-    return {"cancelled": await turns.cancel(account.id, chat_id)}
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
+) -> Response:
+    return await pass_on(request, stronghold, account, f"/turns/{chat_id}/cancel")
 
 
 # --- summarize / clear ---------------------------------------------------------
+
+
+def _chat_out(answer: ForwardedResponse, pricing: Pricing) -> Response:
+    """Stronghold's saved chat as the browser reads it."""
+    if answer.status != status.HTTP_200_OK:
+        return as_response(answer)
+    return Response(ChatOut.of(ChatRecord.of(json.loads(answer.body)), pricing).model_dump_json(),
+                    media_type="application/json")
 
 
 @router.post("/{chat_id}/summarize")
@@ -896,65 +704,21 @@ async def summarize_chat(
     body: SummarizeRequest,
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
-    chats: ChatService = Depends(get_chat_service),
     stronghold: StrongholdForwarder = Depends(get_stronghold),
-    turns: TurnRegistry = Depends(get_turns),
-    directory: AgentDirectory = Depends(get_agent_directory),
-    gateway: AgentGateway = Depends(get_agent_gateway),
     pricing: Pricing = Depends(get_pricing),
-) -> ChatOut:
-    """Replaces the history with one summary (what the agent sees from now
-    on) plus the raw log it replaced. Nothing changes if it fails. Counts
-    toward the usage limits like a chat turn."""
-    if turns.is_running(account.id, chat_id):
-        raise _busy()
-    try:
-        chat = await chats.get(chat_id)
-    except ChatNotFound as error:
-        raise _not_found() from error
-    agent = await directory.get(summarization.SUMMARIZER_AGENT_ID)
-    if agent is None:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Context summarizer is not running")
-    usage = UsageClient(stronghold, account)
-    block = await usage.check()
-    if block is not None:
-        raise limit_reached(block)
-
-    try:
-        outcome = await summarization.summarize(gateway, agent.url, _caller(account), decode_messages(chat))
-    except summarization.SummarizeError as error:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Couldn't summarize: {error}") from error
-    if outcome is None:
-        return ChatOut.of(chat, pricing)  # nothing new since the last summary
-    turn_id = uuid.uuid4().hex
-    for result in outcome.results:
-        await usage.record(turn_id, "summary", chat_id, result)
-    try:
-        chat = await chats.replace_messages(chat_id, outcome.messages)
-    except ChatNotFound as error:
-        raise _not_found() from error
-    return ChatOut.of(chat, pricing)
+) -> Response:
+    """Replaces the history with one summary (what the agent sees from now on) plus the raw log it
+    replaced. Nothing changes if it fails. Counts toward the usage limits like a chat turn."""
+    return _chat_out(await stronghold.forward("POST", f"/turns/{chat_id}/summarize", account), pricing)
 
 
 @router.post("/{chat_id}/clear")
 async def clear_chat(
     chat_id: str = ChatId,
     account: Account = Depends(require_chat),
-    chats: ChatService = Depends(get_chat_service),
-    turns: TurnRegistry = Depends(get_turns),
+    stronghold: StrongholdForwarder = Depends(get_stronghold),
     pricing: Pricing = Depends(get_pricing),
-) -> ChatOut:
-    """Starts the conversation afresh without asking an agent: the old
-    messages are kept as one raw log the agent never sees again."""
-    if turns.is_running(account.id, chat_id):
-        raise _busy()
-    try:
-        chat = await chats.get(chat_id)
-        messages = summarization.cleared(decode_messages(chat))
-        if messages is not None:
-            chat = await chats.replace_messages(chat_id, messages)
-    except ChatNotFound as error:
-        raise _not_found() from error
-    except ChatLimitError as error:
-        raise _too_large(error) from error
-    return ChatOut.of(chat, pricing)
+) -> Response:
+    """Starts the conversation afresh without asking an agent: the old messages are kept as one raw log
+    the agent never sees again."""
+    return _chat_out(await stronghold.forward("POST", f"/turns/{chat_id}/clear", account), pricing)

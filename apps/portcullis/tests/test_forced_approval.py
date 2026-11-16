@@ -1,4 +1,5 @@
-"""Requiring approval for everyone: the admin switch, and what it overrides in a turn."""
+"""Requiring approval for everyone: the admin switch (what it does to a turn is tested with the pass-through
+routes and in Stronghold)."""
 
 from __future__ import annotations
 
@@ -10,11 +11,9 @@ from sqlalchemy import select
 
 from src.models import AppSetting, LogEntry
 from src.services.settings_service import FORCE_TOOL_APPROVAL, SettingsService, UnknownSetting
-from tests.conftest import FakeAgent, FakeEmailSender
+from tests.conftest import FakeEmailSender
 from tests.test_admin import login, make_member
-from tests.test_approvals import TOOL, approve, begin, wait_for_request
 from tests.test_registration import as_admin
-from tests.test_turns import events, new_id, start
 
 URL = f"/api/admin/settings/{FORCE_TOOL_APPROVAL}"
 
@@ -98,171 +97,6 @@ class TestTheSwitch:
                 return [(r.name, r.value) for r in await session.scalars(select(AppSetting))]
 
         assert asyncio.run(read()) == [(FORCE_TOOL_APPROVAL, "1")]
-
-
-class TestWhileRequired:
-    def test_a_turn_asks_even_when_the_browser_says_not_to(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        force(client)
-        chat_id = new_id()
-
-        start(client, chat_id, "hi", ask_before_tools=False)
-        events(client, chat_id)
-
-        assert agent.asks[0]["approval_mode"] == "ask"
-
-    def test_a_turn_asks_when_the_browser_sends_nothing_about_it(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        force(client)
-        chat_id = new_id()
-
-        start(client, chat_id, "hi")
-        events(client, chat_id)
-
-        assert agent.asks[0]["approval_mode"] == "ask"
-
-    def test_tools_the_browser_pre_allowed_still_ask(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        force(client)
-        chat_id = begin(client, agent, TOOL, allowed_tools=[TOOL])
-
-        wait_for_request(client, chat_id)  # asked, although the browser listed it as allowed
-        approve(client, chat_id)
-        events(client, chat_id)
-
-        assert agent.asks[0]["allowed_tools"] == []
-
-    def test_a_member_is_held_to_it_too(self, client: TestClient, agent: FakeAgent, email: FakeEmailSender) -> None:
-        as_admin(client)
-        force(client)
-        make_member(client, email)
-        login(client, "alice")
-        chat_id = new_id()
-
-        start(client, chat_id, "hi")
-        events(client, chat_id)
-
-        assert agent.asks[0]["approval_mode"] == "ask"
-
-    def test_always_means_only_this_once(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        force(client)
-        chat_id = begin(client, agent)
-        wait_for_request(client, chat_id)
-
-        assert approve(client, chat_id, decision="always").status_code == 200
-
-        events(client, chat_id)
-        assert agent.decisions[0][2] == "allow"
-        assert agent.ran == [TOOL]
-        assert log_messages(client, "tool.approval") == [f'allow: "{TOOL}"']
-
-    def test_a_refusal_is_still_a_refusal(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        force(client)
-        chat_id = begin(client, agent)
-        wait_for_request(client, chat_id)
-
-        approve(client, chat_id, decision="deny")
-
-        events(client, chat_id)
-        assert agent.decisions[0][2] == "deny"
-        assert agent.ran == []
-
-
-class TestAfterItIsSwitchedOff:
-    def test_the_browsers_choice_applies_again(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        force(client)
-        force(client, False)
-        chat_id = new_id()
-
-        start(client, chat_id, "hi")
-        events(client, chat_id)
-
-        assert agent.asks[0]["approval_mode"] == "off"
-
-    def test_always_is_passed_on_again(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        force(client)
-        force(client, False)
-        chat_id = begin(client, agent)
-        wait_for_request(client, chat_id)
-
-        approve(client, chat_id, decision="always")
-
-        events(client, chat_id)
-        assert agent.decisions[0][2] == "always"
-
-    def test_allowed_tools_are_passed_on_again(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        force(client)
-        force(client, False)
-        chat_id = new_id()
-
-        start(client, chat_id, "hi", ask_before_tools=True, allowed_tools=["tool_a"])
-        events(client, chat_id)
-
-        assert agent.asks[0]["allowed_tools"] == ["tool_a"]
-
-
-class TestAutoMode:
-    """Auto: ask_before_tools plus allow_read_only. The administrator's switch overrides it."""
-
-    def test_a_turn_passes_it_to_the_agent(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        chat_id = new_id()
-
-        start(client, chat_id, "hi", ask_before_tools=True, allow_read_only=True)
-        events(client, chat_id)
-
-        assert (agent.asks[0]["approval_mode"], agent.asks[0]["allow_read_only"]) == ("ask", True)
-
-    def test_it_is_off_unless_asked_for(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        chat_id = new_id()
-
-        start(client, chat_id, "hi", ask_before_tools=True)
-        events(client, chat_id)
-
-        assert agent.asks[0]["allow_read_only"] is False
-
-    def test_it_means_nothing_without_asking(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        chat_id = new_id()
-
-        start(client, chat_id, "hi", ask_before_tools=False, allow_read_only=True)
-        events(client, chat_id)
-
-        assert (agent.asks[0]["approval_mode"], agent.asks[0]["allow_read_only"]) == ("off", False)
-
-    def test_the_admin_switch_overrides_it(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        force(client)
-        chat_id = new_id()
-
-        start(client, chat_id, "hi", ask_before_tools=True, allow_read_only=True)
-        events(client, chat_id)
-
-        assert (agent.asks[0]["approval_mode"], agent.asks[0]["allow_read_only"]) == ("ask", False)
-
-    def test_it_is_available_again_when_the_switch_goes_off(self, client: TestClient, agent: FakeAgent) -> None:
-        as_admin(client)
-        force(client)
-        force(client, False)
-        chat_id = new_id()
-
-        start(client, chat_id, "hi", ask_before_tools=True, allow_read_only=True)
-        events(client, chat_id)
-
-        assert agent.asks[0]["allow_read_only"] is True
-
-    def test_a_non_boolean_is_refused(self, client: TestClient) -> None:
-        as_admin(client)
-
-        response = client.post(f"/api/chats/{new_id()}/turns", json={"question": "hi", "allow_read_only": "maybe"})
-
-        assert response.status_code == 422
 
 
 class TestSettingsService:

@@ -12,7 +12,7 @@ from tests.conftest import FakeAgent, FakeEmailSender
 from tests.test_admin import login, make_member
 from tests.test_logs import messages, my_id
 from tests.test_registration import as_admin
-from tests.test_turns import events, start
+from tests.turn_helpers import events, start
 
 
 def make_chat(client: TestClient, title: str = "A chat") -> str:
@@ -275,27 +275,6 @@ def test_deleting_an_empty_folder(client: TestClient) -> None:
     assert client.delete(f"/api/chat-folders/{folder_id}").status_code == 204
     assert folders(client) == []
     assert client.delete(f"/api/chat-folders/{folder_id}").status_code == 404
-
-
-def test_a_folder_with_an_answering_chat_cannot_be_deleted(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
-    folder_id = new_folder(client).json()["id"]
-    (chat_id,) = put_in(client, folder_id, 1)
-    agent.hold = True
-    assert start(client, chat_id, "q3").status_code == 202
-
-    try:
-        response = client.delete(f"/api/chat-folders/{folder_id}")
-        assert response.status_code == 409
-        assert "answer" in response.json()["detail"]
-        assert len(folders(client)) == 1  # nothing was deleted
-        assert client.get(f"/api/chats/{chat_id}").status_code == 200
-    finally:
-        agent.release()
-    events(client, chat_id)
-
-    assert client.delete(f"/api/chat-folders/{folder_id}").status_code == 204
-    assert client.get(f"/api/chats/{chat_id}").status_code == 404
 
 
 def test_adjacent_moves_handle_tied_positions_and_boundaries(client: TestClient) -> None:

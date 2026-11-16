@@ -30,9 +30,8 @@ def new_id() -> str:
 
 
 def start(client: TestClient, chat_id: str, question: str = "hi there", trusted: dict | None = None, **extra):
-    body = {"question": question, **extra}
-    if trusted is not None:
-        body["trusted"] = trusted
+    """Portcullis's trusted block defaults here to "asking is up to the browser, tools allowed"."""
+    body = {"question": question, "trusted": {"forced_approval": False, "tools_execute": True, **(trusted or {})}, **extra}
     return client.post(f"/turns/{chat_id}", json=body)
 
 
@@ -349,7 +348,7 @@ def test_an_agent_failure_while_deciding_is_502(client: TestClient, agent: TurnA
     agent.tool_calls = ["x"]
     agent.decide_error = "agent gone"
     chat_id = new_id()
-    start(client, chat_id)
+    start(client, chat_id, ask_before_tools=True)
     wait_until(lambda: client.app.state.turns.pending_approval("u-1", chat_id, "step0") is not None)
     assert client.post(f"/turns/{chat_id}/approvals", json={"step_id": "step0", "decision": "allow"}).status_code == 502
     client.post(f"/turns/{chat_id}/cancel")

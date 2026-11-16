@@ -92,12 +92,12 @@ def test_upload_permission_does_not_require_tool_execution(client, email):
     assert client.post("/api/mcp/server", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "anything"}}).status_code == 403
 
 
-def test_chat_without_execution_blocks_every_agent_tool(client, email, agent):
+def test_chat_without_execution_blocks_every_agent_tool(client, email, upstream):
+    """Stronghold blocks every tool for a turn whose trusted block says tools_execute is false."""
     limited_account(client, email, "chat.use")
     response = client.post("/api/chats/chat-1234/turns", json={"question": "hello", "allowed_tools": ["tool_pdf_merge"]})
     assert response.status_code == 202, response.text
-    client.get("/api/chats/chat-1234/events")
-    assert agent.asks[-1]["disabled_tools"] == ["*"]
+    assert upstream.turns.bodies("POST", "")[-1]["trusted"]["tools_execute"] is False
 
 
 def test_gateway_refuses_older_agent_before_asking():

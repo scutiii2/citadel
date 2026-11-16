@@ -22,6 +22,7 @@ from src.services.uid_log_filter import redact
 logger = logging.getLogger(__name__)
 
 _TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+_STREAM_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0)
 
 
 class StrongholdUnavailable(Exception):
@@ -61,6 +62,17 @@ class StrongholdForwarder:
         if self._internal_token:
             headers["X-Internal-Token"] = self._internal_token
         return headers
+
+    async def open_stream(self, path: str, account: Account | None, *, params: dict[str, str] | None = None) -> httpx.Response:
+        """GET a fixed Stronghold path as a stream the caller must close (the turn events). No read timeout:
+        Stronghold sends a ping while idle, so a silent stream means it is gone."""
+        try:
+            request = self._client.build_request(
+                "GET", f"{self._base}{path}", params=params, headers=self._headers(account), timeout=_STREAM_TIMEOUT)
+            return await self._client.send(request, stream=True, follow_redirects=False)
+        except httpx.HTTPError as error:
+            logger.warning("stronghold GET %s unreachable: %s", redact(path), type(error).__name__)
+            raise StrongholdUnavailable(type(error).__name__) from error
 
     async def forward(
         self,

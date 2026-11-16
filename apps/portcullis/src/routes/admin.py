@@ -309,7 +309,8 @@ async def delete_account(
     for domain, what in (("memory", "Memory notes"), ("calendar", "Calendar"), ("notes", "Notes"),
                          ("skills", "Skills"), ("templates", "Templates"), ("usage", "Usage"), ("tickets", "Tickets"), ("shares", "Share links"),
                          ("tuning", "Response limits"), ("chats", "Chats and folders"), ("brains", "Brain connections"),
-                         ("account-agents", "Switched-off agents"), ("user-extensions", "Private extensions")):
+                         ("account-agents", "Switched-off agents"), ("user-extensions", "Private extensions"),
+                         ("turns", "Running answers")):
         try:
             purged = await request.app.state.stronghold.forward("DELETE", f"/{domain}/accounts/{uid}", admin)
             confirmed = purged.status < 400

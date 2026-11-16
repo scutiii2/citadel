@@ -47,30 +47,3 @@ def test_stronghold_refusals_reach_the_browser_and_an_outage_is_a_502(client: Te
 
     upstream.handler = lambda r: httpx.Response(503, json={"detail": "down"})
     assert client.get(URL).status_code == 502
-
-
-def test_saved_limits_reach_the_chat_turn(client, upstream, agent):
-    from tests.test_turns import events, new_id, start
-    as_admin(client)
-    upstream.handler = lambda r: httpx.Response(200, json={"max_tool_rounds": 4, "max_output_tokens": True, "other": 1}) \
-        if r.url.path == "/tuning/limits/own" else httpx.Response(200, json={})
-    chat_id = new_id()
-
-    assert start(client, chat_id).status_code == 202
-    events(client, chat_id)
-
-    assert agent.asks[-1]["limits"] == {"max_tool_rounds": 4}  # only the two known fields, only whole numbers
-    assert any(r.url.path == "/tuning/limits/own" and r.method == "GET" for r in upstream.requests)
-
-
-def test_a_stronghold_failure_keeps_the_turn_running_without_limits(client, upstream, agent):
-    from tests.test_turns import events, new_id, start
-    as_admin(client)
-
-    for handler in (lambda r: httpx.Response(503, json={}), lambda r: httpx.Response(200, content=b"not json"),
-                    lambda r: httpx.Response(200, json=["list"]), lambda r: httpx.Response(404, json={})):
-        upstream.handler = handler
-        chat_id = new_id()
-        assert start(client, chat_id).status_code == 202
-        events(client, chat_id)
-        assert (agent.asks[-1]["limits"] or {}) == {}

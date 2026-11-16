@@ -8,9 +8,9 @@ import threading
 
 from fastapi.testclient import TestClient
 
-from src.services.turns import Turn
-from tests.conftest import FakeAgent
-from tests.test_registration import as_admin
+from src.turns.engine import Turn
+from tests.turn_agent import TurnAgent as FakeAgent
+from tests.test_turns import agent  # noqa: F401  (the Legion stand-in fixture)
 from tests.test_turns import chat, events, new_id, start, wait_until
 
 ORCH = {"agent_id": "claude-agent", "agent_label": "Ember"}
@@ -35,7 +35,6 @@ def delegation_events() -> list[dict]:
 
 
 def test_agent_events_are_relayed_with_their_caps(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     agent.events = delegation_events()
     agent.answer = "Done."
     chat_id = new_id()
@@ -43,7 +42,7 @@ def test_agent_events_are_relayed_with_their_caps(client: TestClient, agent: Fak
     assert start(client, chat_id).status_code == 202
     # Join once the turn is over: a watcher that joins while it runs gets a
     # snapshot instead of the buffered events, which would make this racy.
-    wait_until(lambda: (turn := client.app.state.turns.get(1, chat_id)) is not None and turn.status != "running")
+    wait_until(lambda: (turn := client.app.state.turns.get("u-1", chat_id)) is not None and turn.status != "running")
     stream = events(client, chat_id)
 
     kinds = [e["type"] for e in stream]
@@ -55,7 +54,6 @@ def test_agent_events_are_relayed_with_their_caps(client: TestClient, agent: Fak
 
 
 def test_nested_steps_are_kept_apart_and_labelled_with_their_agent(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     agent.events = delegation_events()
     chat_id = new_id()
     start(client, chat_id)
@@ -71,7 +69,6 @@ def test_nested_steps_are_kept_apart_and_labelled_with_their_agent(client: TestC
 
 
 def test_agent_tokens_are_not_saved_with_the_answer(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     agent.events = delegation_events()
     chat_id = new_id()
     start(client, chat_id)
@@ -84,7 +81,6 @@ def test_agent_tokens_are_not_saved_with_the_answer(client: TestClient, agent: F
 
 
 def test_a_late_joiner_is_told_who_is_working(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     agent.events = delegation_events()[:3]  # delegation started, specialist streaming
     agent.hold = True
     chat_id = new_id()
@@ -105,7 +101,6 @@ def test_a_late_joiner_is_told_who_is_working(client: TestClient, agent: FakeAge
 
 
 def test_the_stack_is_empty_when_the_turn_ends_without_agent_end(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     agent.events = delegation_events()[:2]  # started, never ended (specialist crashed)
     chat_id = new_id()
     start(client, chat_id)
@@ -114,12 +109,11 @@ def test_the_stack_is_empty_when_the_turn_ends_without_agent_end(client: TestCli
 
     assert stream[-1]["type"] == "final"
     registry = client.app.state.turns
-    turn = registry.get(1, chat_id)
+    turn = registry.get("u-1", chat_id)
     assert turn is not None and turn.active_agents == []
 
 
 def test_a_late_joiners_steps_carry_their_id_and_agent(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     agent.events = delegation_events()[:5]  # both steps started, the specialist's one done
     agent.hold = True
     chat_id = new_id()
@@ -141,7 +135,7 @@ def test_a_late_joiners_steps_carry_their_id_and_agent(client: TestClient, agent
 
 
 def test_an_agent_label_is_capped_like_the_saved_step_allows() -> None:
-    turn = Turn(account_id=1, chat_id="c", agent=None, caller=None)  # type: ignore[arg-type]
+    turn = Turn(owner="u-1", chat_id="c", agent=None, caller=None)  # type: ignore[arg-type]
 
     turn.record_step({"type": "step_start", "id": "s", "tool": "t", "agent_id": "calc", "agent_label": "L" * 500})
 
@@ -149,7 +143,7 @@ def test_an_agent_label_is_capped_like_the_saved_step_allows() -> None:
 
 
 def test_the_snapshot_lists_delegated_agents_outermost_first() -> None:
-    turn = Turn(account_id=1, chat_id="c", agent=None, caller=None)  # type: ignore[arg-type]
+    turn = Turn(owner="u-1", chat_id="c", agent=None, caller=None)  # type: ignore[arg-type]
 
     def stacked() -> list[tuple[str, str]]:
         return [(a["agent_id"], a["step_id"]) for a in turn.snapshot()["active_agents"]]

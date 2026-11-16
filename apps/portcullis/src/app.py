@@ -75,7 +75,6 @@ from src.services.session_service import SessionService
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 from src.services.usage_client import UsageUnavailable
 from src.services.traffic import TrafficMiddleware, TrafficRecorder
-from src.services.turns import TurnRegistry
 from src.utils.config_loader import internal_token as load_internal_token, load_env_secrets, service_token
 
 logger = logging.getLogger(__name__)
@@ -170,8 +169,6 @@ def create_app(
         from src.services.pricing import Pricing
 
         app.state.pricing = Pricing(settings.pricing)
-        app.state.turns = TurnRegistry(database, app.state.agent_gateway, settings.usage, log_writer,
-            pricing=app.state.pricing, directory=app.state.agent_directory, stronghold=app.state.stronghold)
         backups: BackupScheduler | None = None
         app.state.backups = None
         if settings.backup.enabled:
@@ -187,8 +184,6 @@ def create_app(
         finally:
             if backups is not None:
                 await backups.stop()
-            # Before the database closes: running turns save what they have.
-            await app.state.turns.shutdown()
             # Saves the counters (turns just ended may have added some).
             await recorder.stop()
             await upstream.aclose()

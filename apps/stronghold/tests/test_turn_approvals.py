@@ -7,19 +7,16 @@ import time
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 
-from src.models import LogEntry
-from tests.conftest import FakeAgent, FakeEmailSender
-from tests.test_admin import login, make_member
-from tests.test_registration import as_admin
+from tests.turn_agent import TurnAgent as FakeAgent
+from tests.test_turns import OTHER, agent  # noqa: F401  (the Legion stand-in fixture)
 from tests.test_turns import chat, events, new_id, start, wait_until
 
 TOOL = "tool_srv_stopApp"
 
 
 def approve(client: TestClient, chat_id: str, step_id: str = "step0", decision: str = "allow"):
-    return client.post(f"/api/chats/{chat_id}/approvals", json={"step_id": step_id, "decision": decision})
+    return client.post(f"/turns/{chat_id}/approvals", json={"step_id": step_id, "decision": decision, "trusted": {"forced_approval": False}})
 
 
 def turn_of(client: TestClient, chat_id: str):
@@ -52,7 +49,6 @@ def begin(client: TestClient, agent: FakeAgent, *tools: str, ask: bool = True, *
 
 
 def test_asking_is_off_unless_the_browser_turns_it_on(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = new_id()
 
     start(client, chat_id, "hi")
@@ -62,7 +58,6 @@ def test_asking_is_off_unless_the_browser_turns_it_on(client: TestClient, agent:
 
 
 def test_the_options_are_passed_to_the_agent(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = new_id()
 
     start(client, chat_id, "hi", ask_before_tools=True, allowed_tools=["tool_a", "tool_b", "tool_a"])
@@ -74,7 +69,6 @@ def test_the_options_are_passed_to_the_agent(client: TestClient, agent: FakeAgen
 
 @pytest.mark.parametrize("names", [["has space"], ["x" * 121], [""], ["a/b"], ["ok", "not ok"]])
 def test_allowed_tool_names_are_validated(client: TestClient, agent: FakeAgent, names: list[str]) -> None:
-    as_admin(client)
 
     response = start(client, new_id(), "hi", ask_before_tools=True, allowed_tools=names)
 
@@ -83,7 +77,6 @@ def test_allowed_tool_names_are_validated(client: TestClient, agent: FakeAgent, 
 
 
 def test_at_most_200_allowed_tools(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
 
     assert start(client, new_id(), "hi", allowed_tools=[f"t{i}" for i in range(201)]).status_code == 422
     assert start(client, new_id(), "hi", allowed_tools=[f"t{i}" for i in range(200)]).status_code == 202
@@ -93,14 +86,13 @@ def test_at_most_200_allowed_tools(client: TestClient, agent: FakeAgent) -> None
 
 
 def test_allow_lets_the_tool_run(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = begin(client, agent)
     wait_for_request(client, chat_id)
     assert agent.ran == []  # nothing ran while it waited
 
     response = approve(client, chat_id, decision="allow")
 
-    assert (response.status_code, response.json()) == (200, {"decided": True})
+    assert (response.status_code, response.json()) == (200, {"decided": True, "decision": "allow", "tool": TOOL})
     stream = whole_stream(client, chat_id)
     assert agent.ran == [TOOL]
     kinds = [e["type"] for e in stream if e["type"] in ("step_start", "approval_request", "approval_resolved", "step_end", "final")]
@@ -118,7 +110,6 @@ def turn_request_id(agent: FakeAgent) -> str:
 
 
 def test_deny_keeps_the_tool_from_running(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = begin(client, agent)
     wait_for_request(client, chat_id)
 
@@ -130,7 +121,6 @@ def test_deny_keeps_the_tool_from_running(client: TestClient, agent: FakeAgent) 
 
 
 def test_always_is_passed_on_to_the_agent(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = begin(client, agent)
     wait_for_request(client, chat_id)
 
@@ -142,7 +132,6 @@ def test_always_is_passed_on_to_the_agent(client: TestClient, agent: FakeAgent) 
 
 
 def test_tools_already_allowed_for_the_chat_do_not_ask(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = begin(client, agent, TOOL, allowed_tools=[TOOL])
 
     events(client, chat_id)
@@ -152,7 +141,6 @@ def test_tools_already_allowed_for_the_chat_do_not_ask(client: TestClient, agent
 
 
 def test_each_tool_of_a_turn_asks_in_turn(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = begin(client, agent, "tool_one", "tool_two")
 
     wait_for_request(client, chat_id, "step0")
@@ -166,7 +154,6 @@ def test_each_tool_of_a_turn_asks_in_turn(client: TestClient, agent: FakeAgent) 
 
 
 def test_the_late_joiner_snapshot_lists_what_is_waiting(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = begin(client, agent)
     wait_for_request(client, chat_id)
 
@@ -180,11 +167,10 @@ def test_the_late_joiner_snapshot_lists_what_is_waiting(client: TestClient, agen
 
 
 def test_stop_ends_the_wait_and_the_tool_never_runs(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = begin(client, agent)
     wait_for_request(client, chat_id)
 
-    assert client.post(f"/api/chats/{chat_id}/cancel", json={}).json() == {"cancelled": True}
+    assert client.post(f"/turns/{chat_id}/cancel", json={}).json() == {"cancelled": True}
 
     stream = whole_stream(client, chat_id)
     assert agent.ran == []
@@ -196,16 +182,7 @@ def test_stop_ends_the_wait_and_the_tool_never_runs(client: TestClient, agent: F
 # --- who may answer ---------------------------------------------------------------------------
 
 
-def test_answering_needs_login_and_chat_use(client: TestClient, email: FakeEmailSender) -> None:
-    assert approve(client, new_id()).status_code == 401
-
-    make_member(client, email, verify=False)
-    login(client, "alice")
-    assert approve(client, new_id()).status_code == 403
-
-
 def test_nothing_running_is_404(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
 
     assert approve(client, new_id()).status_code == 404
     chat_id = new_id()
@@ -214,27 +191,7 @@ def test_nothing_running_is_404(client: TestClient, agent: FakeAgent) -> None:
     assert approve(client, chat_id).status_code == 404  # finished
 
 
-def test_another_account_cannot_answer_for_a_running_turn(client_factory, email: FakeEmailSender, agent: FakeAgent) -> None:
-    alice = client_factory()
-    make_member(alice, email)
-    make_member(alice, email, "bob")
-    login(alice, "alice")
-    chat_id = begin(alice, agent)
-    wait_for_request(alice, chat_id)
-    bob = client_factory()
-    login(bob, "bob")
-
-    response = approve(bob, chat_id, decision="allow")
-
-    assert response.status_code == 404
-    assert agent.decisions == []
-    assert agent.ran == []
-    approve(alice, chat_id, decision="deny")
-    events(alice, chat_id)
-
-
 def test_an_unknown_step_is_refused_and_nothing_changes(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = begin(client, agent)
     wait_for_request(client, chat_id)
 
@@ -248,7 +205,6 @@ def test_an_unknown_step_is_refused_and_nothing_changes(client: TestClient, agen
 
 
 def test_a_step_that_was_answered_cannot_be_answered_again(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = begin(client, agent, "tool_one", "tool_two")
     wait_for_request(client, chat_id, "step0")
     assert approve(client, chat_id, "step0", "deny").status_code == 200
@@ -263,7 +219,6 @@ def test_a_step_that_was_answered_cannot_be_answered_again(client: TestClient, a
 
 
 def test_the_agent_saying_nothing_is_waiting_is_a_conflict(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = begin(client, agent)
     wait_for_request(client, chat_id)
     agent.decide_result = False
@@ -277,7 +232,6 @@ def test_the_agent_saying_nothing_is_waiting_is_a_conflict(client: TestClient, a
 
 
 def test_an_unreachable_agent_is_a_bad_gateway_and_the_tool_stays_blocked(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = begin(client, agent)
     wait_for_request(client, chat_id)
     agent.decide_error = "Could not reach the agent: refused"
@@ -305,41 +259,11 @@ def test_an_unreachable_agent_is_a_bad_gateway_and_the_tool_stays_blocked(client
     ],
 )
 def test_the_answer_is_validated(client: TestClient, agent: FakeAgent, body: dict) -> None:
-    as_admin(client)
 
-    assert client.post(f"/api/chats/{new_id()}/approvals", json=body).status_code == 422
-
-
-def test_answers_are_posted_as_json_only(client: TestClient) -> None:
-    as_admin(client)
-
-    response = client.post(
-        f"/api/chats/{new_id()}/approvals", content="step_id=step0&decision=allow", headers={"Content-Type": "text/plain"}
-    )
-
-    assert response.status_code == 415
-
-
-def test_answers_are_written_to_the_activity_log(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
-    chat_id = begin(client, agent)
-    wait_for_request(client, chat_id)
-    approve(client, chat_id, decision="allow")
-    events(client, chat_id)
-
-    async def entries(session):
-        rows = await session.scalars(select(LogEntry).where(LogEntry.source == "tool.approval"))
-        return [r.message for r in rows]
-
-    async def read():
-        async with client.app.state.database.sessions() as session:
-            return await entries(session)
-
-    assert client.portal.call(read) == [f'allow: "{TOOL}"']
+    assert client.post(f"/turns/{new_id()}/approvals", json=body).status_code == 422
 
 
 def test_a_turn_that_ended_leaves_nothing_pending(client: TestClient, agent: FakeAgent) -> None:
-    as_admin(client)
     chat_id = begin(client, agent)
     wait_for_request(client, chat_id)
     approve(client, chat_id, decision="allow")
@@ -351,3 +275,15 @@ def test_a_turn_that_ended_leaves_nothing_pending(client: TestClient, agent: Fak
         time.sleep(0.02)
 
     assert turn_of(client, chat_id).pending_approvals == {}
+
+
+def test_another_account_cannot_answer_for_a_running_turn(client: TestClient, agent: FakeAgent) -> None:
+    chat_id = begin(client, agent)
+    wait_for_request(client, chat_id)
+
+    other = client.post(f"/turns/{chat_id}/approvals", json={"step_id": "step0", "decision": "allow"}, headers=OTHER)
+
+    assert other.status_code == 404
+    assert agent.decisions == [] and agent.ran == []
+    approve(client, chat_id, decision="deny")
+    events(client, chat_id)

@@ -108,50 +108,5 @@ def test_a_record_that_cannot_be_stored_is_logged_and_never_raises(answer, caplo
 # --- through the app -----------------------------------------------------------------
 
 
-def test_a_turn_still_answers_when_its_usage_cannot_be_recorded(client, upstream, agent):
-    from tests.test_turns import chat, events, new_id, start
-
-    as_admin(client)
-    chat_id = new_id()
-    upstream.usage.down = False
-    upstream.usage.six_hour_limit = 0
-    original = upstream.usage.respond
-    upstream.usage.respond = lambda request: (
-        httpx.Response(503, json={"detail": "down"}) if request.method == "POST" and request.url.path == "/usage/records"
-        else original(request))
-    start(client, chat_id)  # the answer starts at once, so the failure must be in place first
-
-    stream = events(client, chat_id)
-
-    assert stream[-1]["type"] == "final"
-    assert chat(client, chat_id)["messages"][-1]["content"] == "Hello!"
-    assert upstream.usage.rows == []
-
-
-def test_a_turn_is_refused_when_the_limit_cannot_be_checked(client, upstream, agent):
-    from tests.test_turns import chat, new_id, start
-
-    as_admin(client)
-    upstream.usage.down = True
-    chat_id = new_id()
-
-    response = start(client, chat_id)
-
-    assert (response.status_code, response.json()["detail"]) == (503, "Usage is unavailable")
-    assert agent.asks == []
-
-
-def test_a_suggestion_is_skipped_when_the_limit_cannot_be_checked(client, upstream, agent):
-    from tests.test_suggestions import seed, suggestion
-
-    as_admin(client)
-    chat_id = __import__("tests.test_turns", fromlist=["new_id"]).new_id()
-    seed(client, chat_id)
-    upstream.usage.down = True
-
-    assert suggestion(client, chat_id).json() == {"text": None}
-    assert agent.interprets == []
-
-
 def test_the_token_limits_are_no_longer_settings_of_portcullis():
     assert not hasattr(UsageSettings(), "six_hour_token_limit")
