@@ -16,8 +16,8 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
-from src.services.user_extension_service import UNREADABLE_MESSAGE, StoredExtension
+from src.agents.gateway import AgentCallError, AgentGateway, Caller
+from src.extensions.service import UNREADABLE_MESSAGE, StoredExtension
 
 TTL_SECONDS = 60.0
 CONCURRENCY = 5
@@ -53,16 +53,16 @@ class ExtensionProbe:
         self._ttl = ttl
         self._clock = clock
         self._semaphore = asyncio.Semaphore(concurrency)
-        self._cache: dict[tuple[int, str], tuple[str, float, ProbeResult]] = {}
+        self._cache: dict[tuple[str, str], tuple[str, float, ProbeResult]] = {}
 
     async def check(
-        self, agent_url: str | None, caller: Caller, account_id: int, stored: StoredExtension
+        self, agent_url: str | None, caller: Caller, account_key: str, stored: StoredExtension
     ) -> ProbeResult:
         if not stored.readable:
             return ProbeResult("error", UNREADABLE_MESSAGE, ())
         if agent_url is None:
             return NO_AGENT
-        key = (account_id, stored.row.slug)
+        key = (account_key, stored.row.slug)
         fingerprint = _fingerprint(stored)
         cached = self._cache.get(key)
         if cached is not None and cached[0] == fingerprint and cached[1] > self._clock():

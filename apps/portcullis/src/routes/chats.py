@@ -26,10 +26,8 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from src.config import Settings
 from src.deps import (
     get_agent_gateway,
-    get_db_gateway,
     get_log_writer,
     get_pricing,
-    get_secret_box,
     get_stronghold,
     get_settings,
     get_settings_service,
@@ -41,7 +39,6 @@ from src.routes.mcp import get_agent_directory
 from src.routes.server_info import get_server_info
 from src.services.brain_client import RemoteBrains
 from src.services import question_answers, second_brain, suggestions, summarization
-from src.services.account_agent_service import AccountAgentService, blocked_names
 from src.services.agent_directory import NO_AGENT_RUNNING, AgentDirectory
 from src.services.agent_gateway import AgentCallError, AgentGateway, Caller
 from src.services.chat_service import (
@@ -56,7 +53,6 @@ from src.services.chat_service import (
     decode_messages,
     message_time,
 )
-from src.services.db_gateway import DbGatewayError, DocumentStore
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import (
     McpServerInfo,
@@ -65,7 +61,6 @@ from src.services.mcp_server_info import (
 )
 from src.services.permissions import CHAT_USE, TOOLS_EXECUTE
 from src.services.pricing import Pricing, with_cost
-from src.services.secret_box import SecretBox
 from src.services.settings_service import FORCE_TOOL_APPROVAL, SettingsService
 from src.services.turns import (
     MAX_AGENT_USAGE_ROWS,
@@ -80,7 +75,6 @@ from src.services.turns import (
 from src.routes.stronghold import pass_on
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 from src.services.usage_client import LimitBlock, UsageClient, UsageUnavailable
-from src.services.user_extension_service import TurnExtensions, UserExtensionService
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
@@ -656,6 +650,34 @@ async def _own_limits(stronghold: StrongholdForwarder, account: Account) -> dict
     return {f: stored[f] for f in _LIMIT_FIELDS if isinstance(stored.get(f), int) and not isinstance(stored.get(f), bool)}
 
 
+async def _switched_off_agents(stronghold: StrongholdForwarder, account: Account) -> list[str]:
+    """The agents the account switched off, from Stronghold. Closed on failure: an empty list would
+    quietly offer agents the account switched off."""
+    unavailable = HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Account agents storage is unavailable")
+    try:
+        answer = await stronghold.forward("GET", "/account-agents", account)
+        disabled = json.loads(answer.body)["disabled"] if answer.status == 200 else None
+    except (StrongholdUnavailable, ValueError, KeyError, TypeError):
+        raise unavailable from None
+    if not isinstance(disabled, list):
+        raise unavailable
+    return [str(agent_id) for agent_id in disabled]
+
+
+async def _private_extensions(
+    stronghold: StrongholdForwarder, account: Account
+) -> tuple[tuple[dict, ...], tuple[dict, ...]]:
+    """(extensions for Legion, notices) from Stronghold. On any failure: none, and a notice saying why."""
+    try:
+        answer = await stronghold.forward("GET", "/user-extensions/for-turn", account)
+        turn = json.loads(answer.body) if answer.status == 200 else None
+        if isinstance(turn, dict) and isinstance(turn.get("items"), list) and isinstance(turn.get("skipped"), list):
+            return tuple(turn["items"]), tuple(turn["skipped"])
+    except (StrongholdUnavailable, ValueError):
+        pass
+    return (), ({"id": "private", "label": "Private extensions", "error": "Private extensions storage is unavailable"},)
+
+
 @router.post("/{chat_id}/turns", status_code=status.HTTP_202_ACCEPTED)
 async def start_turn(
     body: TurnRequest,
@@ -667,8 +689,6 @@ async def start_turn(
     directory: AgentDirectory = Depends(get_agent_directory),
     settings: Settings = Depends(get_settings),
     app_settings: SettingsService = Depends(get_settings_service),
-    box: SecretBox = Depends(get_secret_box),
-    db_gateway: DocumentStore = Depends(get_db_gateway),
     info: McpServerInfo = Depends(get_server_info),
 ) -> TurnOut:
     """Saves the question and starts answering it in portcullis. The answer
@@ -723,24 +743,16 @@ async def start_turn(
     # every tool asks, and no tool is pre-allowed.
     forced = await app_settings.get_bool(FORCE_TOOL_APPROVAL)
     # Closed on failure: an empty list would quietly offer agents the account switched off.
-    try:
-        switched_off_agents = await AccountAgentService(db_gateway, account.uid).disabled()
-    except DbGatewayError as error:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Account agents storage is unavailable") from error
+    switched_off_agents = await _switched_off_agents(stronghold, account)
     # Every extension mcp_server lists is on: which agent may call which tool is the agent
     # file's tools.allow. Without the listing the answer still runs, just without extension tools.
     try:
         extension_ids = tuple(e["id"] for e in await info.extensions(account) if isinstance(e, dict) and isinstance(e.get("id"), str))
     except (McpServerUnavailable, McpServerRefused):
         extension_ids = ()
-    # The caller's own private extensions, read here from db_gateway: the browser cannot name one.
-    # If the gateway is down the answer still runs, without them, and says so.
-    try:
-        private = await UserExtensionService(db_gateway, account.uid, box).enabled_for_turn()
-    except DbGatewayError:
-        private = TurnExtensions(
-            (), ({"id": "private", "label": "Private extensions", "error": "Private extensions storage is unavailable"},)
-        )
+    # The caller's own private extensions, read from Stronghold: the browser cannot name one.
+    # If Stronghold cannot give them the answer still runs, without them, and says so.
+    private_items, private_skipped = await _private_extensions(stronghold, account)
     limits = await _own_limits(stronghold, account)
     try:
         options = TurnOptions(
@@ -757,10 +769,10 @@ async def start_turn(
             ask_before_tools=body.ask_before_tools or forced,
             allowed_tools=() if forced else tuple(dict.fromkeys(body.allowed_tools)),
             allow_read_only=body.allow_read_only and body.ask_before_tools and not forced,
-            disabled_tools=blocked_names(switched_off_agents) if TOOLS_EXECUTE in account.permission_names else ("*",),
+            disabled_tools=tuple("agent:" + agent_id for agent_id in switched_off_agents) if TOOLS_EXECUTE in account.permission_names else ("*",),
             can_ask=body.can_ask,
-            private_extensions=private.items,
-            private_skipped=private.skipped,
+            private_extensions=private_items,
+            private_skipped=private_skipped,
         )
         turn = turns.start(account.id, chat_id, agent, _caller(account), options)
     except TurnConflict as error:

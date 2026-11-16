@@ -30,6 +30,8 @@ CATALOG: tuple[Collection, ...] = (
     Collection("usage_records", "usage", "<owner uid>:<random>", UsageRecordDoc, "/usage/accounts/{uid}"),
     Collection("notes", "notes", "<note id>", None, "/notes/accounts/{uid}"),
     Collection("prompt_templates", "templates", "<owner uid>:<template id>", None, "/templates/accounts/{uid}"),
+    Collection("account_agents", "agents", "<owner uid>", None, "/account-agents/accounts/{uid}"),
+    Collection("user_extensions", "extensions", "<owner uid>:<slug>", None, "/user-extensions/accounts/{uid}"),
     Collection("tuning_limits", "tuning", "<owner uid>", None, "/tuning/accounts/{uid}"),
     Collection("ticket_seen", "tickets", "<owner uid>:<ticket id>", None, "/tickets/accounts/{uid}"),
     Collection("calendar_feeds", "calendar", "<owner uid>:<feed id>", None, "/calendar/accounts/{uid}"),

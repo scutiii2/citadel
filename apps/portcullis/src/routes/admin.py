@@ -28,9 +28,7 @@ from src.services.admin_service import AccountStatus, AdminError, AdminService, 
 from src.services.email_service import EmailDeliveryError, EmailSender
 from src.services.log_service import LogWriter
 from src.services.db_gateway import DbGatewayError, DocumentStore
-from src.services.account_agent_service import purge_owner as purge_account_agents
 from src.services.nav_preference_service import purge_owner as purge_nav_preferences
-from src.services.user_extension_service import purge_owner as purge_user_extensions
 from src.services.otp_service import OtpService
 from src.services.permissions import (
     ADMIN_ROLE, is_known_permission, ADMIN_PERMISSIONS, ACCOUNTS_VIEW, ACCOUNTS_MANAGE,
@@ -310,7 +308,8 @@ async def delete_account(
     # These domains live in Stronghold. Best effort: the account is already gone.
     for domain, what in (("memory", "Memory notes"), ("calendar", "Calendar"), ("notes", "Notes"),
                          ("skills", "Skills"), ("templates", "Templates"), ("usage", "Usage"), ("tickets", "Tickets"), ("shares", "Share links"),
-                         ("tuning", "Response limits"), ("chats", "Chats and folders"), ("brains", "Brain connections")):
+                         ("tuning", "Response limits"), ("chats", "Chats and folders"), ("brains", "Brain connections"),
+                         ("account-agents", "Switched-off agents"), ("user-extensions", "Private extensions")):
         try:
             purged = await request.app.state.stronghold.forward("DELETE", f"/{domain}/accounts/{uid}", admin)
             confirmed = purged.status < 400
@@ -322,8 +321,6 @@ async def delete_account(
             )
     try:
         await purge_nav_preferences(store, uid)
-        await purge_account_agents(store, uid)
-        await purge_user_extensions(store, uid)
     except DbGatewayError as error:
         await logs.error(
             admin.id, "admin.settings_purge", f"Saved settings of deleted account '{username}' were not purged ({error})"

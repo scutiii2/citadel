@@ -1,19 +1,19 @@
 """Per-account list of specialist agents the account switched off. Stored as one
-document per account in db_gateway (collection "account_agents", key the account uid).
+document per account in Treasury (collection "account_agents", key the account uid).
 An id in the list means off; an account that never touched it has every agent on.
 
-It holds only ids and does not know which agents exist: ai_agent owns that.
-`blocked_names` turns the list into the entries ai_agent's tool filter understands.
+It holds only ids and does not know which agents exist: Legion owns that.
+`blocked_names` turns the list into the entries Legion's tool filter understands.
 """
 
 from __future__ import annotations
 
-from src.db import utcnow
-from src.services.db_gateway import DocumentStore
+from src.calendar.settings import utcnow
+from src.document_store import DocumentStore
 
 COLLECTION = "account_agents"
 MAX_ITEMS = 200
-# Mirrors ai_agent's core/tool_filter.AGENT_PREFIX.
+# Mirrors Legion's core/tool_filter.AGENT_PREFIX.
 AGENT_PREFIX = "agent:"
 
 

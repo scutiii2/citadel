@@ -15,9 +15,9 @@ from dataclasses import asdict, dataclass, replace
 from typing import Any
 from urllib.parse import urlsplit
 
-from src.db import utcnow
-from src.services.db_gateway import DocumentStore
-from src.services.secret_box import SecretBox, SecretBoxError
+from src.calendar.settings import utcnow
+from src.document_store import DocumentStore
+from src.secret_box import SecretBox, SecretBoxError
 
 COLLECTION = "user_extensions"
 MAX_EXTENSIONS = 20

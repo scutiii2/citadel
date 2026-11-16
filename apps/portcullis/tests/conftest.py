@@ -133,6 +133,12 @@ class FakeUpstream:
     chats: FakeChats | None = field(default_factory=FakeChats)
     # Stronghold's answer to "may this account write to its brain?" when `handler` does not take /brains/writable.
     brain_writable: bool = True
+    # Stronghold's answers when a turn starts: the agents the account switched off, and its private extensions.
+    disabled_agents: list = field(default_factory=list)
+    agents_status: int = 200
+    agents_fake: bool = True  # False: `handler` answers /account-agents too (pass-through tests)
+    private: dict = field(default_factory=lambda: {"items": [], "skipped": []})
+    private_status: int = 200
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
         await request.aread()
@@ -143,6 +149,10 @@ class FakeUpstream:
             return self.usage.respond(request)
         if self.chats is not None and request.url.path.startswith(("/chats", "/chat-folders")):
             return self.chats.respond(request)
+        if self.agents_fake and request.url.path == "/account-agents" and request.method == "GET":
+            return httpx.Response(self.agents_status, json={"disabled": self.disabled_agents})
+        if request.url.path == "/user-extensions/for-turn":
+            return httpx.Response(self.private_status, json=self.private)
         if request.url.path.startswith("/brains/writable/"):
             return httpx.Response(200, json={"writable": self.brain_writable})
         if self.handler:

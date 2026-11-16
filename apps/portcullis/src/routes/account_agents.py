@@ -1,70 +1,39 @@
 """/api/account-agents: which specialist agents the logged-in account switched off
-(any logged-in account; private to it). portcullis leaves those agents out of the
-roster of every answer this account asks for."""
+(any logged-in account; private to it), answered by Stronghold. The account's chat turns leave
+those agents out of the roster."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
-from pydantic import BaseModel
+import json
 
-from src.deps import current_account, get_db_gateway, get_log_writer
+from fastapi import APIRouter, Depends, Path, Request, Response
+
+from src.deps import current_account, get_log_writer, get_stronghold
 from src.models import Account
-from src.routes.mcp import get_agent_directory
-from src.services.agent_directory import AgentDirectory
-from src.services.account_agent_service import AccountAgentService, TooManyItems
-from src.services.db_gateway import DbGatewayError, DocumentStore
+from src.routes.stronghold import pass_on
 from src.services.log_service import LogWriter
+from src.services.stronghold_forwarder import StrongholdForwarder
 
 router = APIRouter(prefix="/api/account-agents", tags=["account-agents"])
 
 KEY_PATTERN = r"^[A-Za-z0-9_.-]{1,64}$"
 
 
-def get_service(
-    account: Account = Depends(current_account), store: DocumentStore = Depends(get_db_gateway)
-) -> AccountAgentService:
-    return AccountAgentService(store, account.uid)
-
-
-def _unavailable() -> HTTPException:
-    # No fallback to an empty list: that would silently switch every agent back on.
-    return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Account agents storage is unavailable")
-
-
-class EnabledBody(BaseModel):
-    enabled: bool
-
-
-class AccountAgentsOut(BaseModel):
-    disabled: list[str]
-
-
 @router.get("")
-async def read_account_agents(
-    service: AccountAgentService = Depends(get_service),
-    directory: AgentDirectory = Depends(get_agent_directory),
-) -> AccountAgentsOut:
-    try:
-        return AccountAgentsOut(disabled=await service.disabled(await directory.known_ids()))
-    except DbGatewayError as error:
-        raise _unavailable() from error
+async def read_account_agents(request: Request, account: Account = Depends(current_account),
+                              stronghold: StrongholdForwarder = Depends(get_stronghold)) -> Response:
+    return await pass_on(request, stronghold, account, "/account-agents")
 
 
 @router.put("/{agent_id}")
-async def set_account_agent(
-    body: EnabledBody,
-    agent_id: str = Path(pattern=KEY_PATTERN),
-    account: Account = Depends(current_account),
-    service: AccountAgentService = Depends(get_service),
-    directory: AgentDirectory = Depends(get_agent_directory),
-    logs: LogWriter = Depends(get_log_writer),
-) -> AccountAgentsOut:
-    """Switches one agent on or off; returns the whole disabled list as stored. Retired agents' ids are dropped."""
-    try:
-        disabled = await service.set_enabled(agent_id, body.enabled, await directory.known_ids())
-    except TooManyItems as error:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Too many agents switched off on this account") from error
-    except DbGatewayError as error:
-        raise _unavailable() from error
-    await logs.action(account, f"account.agent_{'enable' if body.enabled else 'disable'}", f"{'Enabled' if body.enabled else 'Disabled'} agent '{agent_id}'")
-    return AccountAgentsOut(disabled=disabled)
+async def set_account_agent(request: Request, agent_id: str = Path(pattern=KEY_PATTERN),
+                            account: Account = Depends(current_account),
+                            stronghold: StrongholdForwarder = Depends(get_stronghold),
+                            logs: LogWriter = Depends(get_log_writer)) -> Response:
+    """Switches one agent on or off; the answer is the whole disabled list as stored."""
+    answer = await pass_on(request, stronghold, account, f"/account-agents/{agent_id}")
+    if answer.status_code == 200:
+        enabled = json.loads(await request.body() or b"{}").get("enabled")
+        await logs.action(account, f"account.agent_{'enable' if enabled else 'disable'}",
+                          f"{'Enabled' if enabled else 'Disabled'} agent '{agent_id}'")
+    return answer

@@ -45,7 +45,7 @@ browser/Ember --Portcullis (login, permission, force-approval flag, tools.execut
 
 | Step | Result | Notes |
 |---|---|---|
-| 10.1 | Account agents and private extensions (domains) move to Stronghold, with purge routes | Same method as Plan 5 sub-plans. Needed so Stronghold can build turn options. |
+| 10.1 | **Done 2026-11-16** (`2026-11-16-plan-10-1-agents-extensions.md`): account agents and private extensions (domains) move to Stronghold, with purge routes | Same method as Plan 5 sub-plans. Needed so Stronghold can build turn options. |
 | 10.2 | Legion client in Stronghold: `AgentGateway`, `AgentDirectory`, `mcp_session`, `Caller` copied and adapted; config, compose, tests with a fake gateway | Portcullis keeps its copy while `extension_probe` still uses it. |
 | 10.3 | Stronghold `/turns`: registry, publish, subscribe, cancel, approvals, questions, discard, summarization, suggestions, second-brain request, usage record, log client. Tests ported from `tests/test_turns*.py` and `test_chat_turns*.py` | The bulk. `TurnRegistry` is copied nearly as is; its DB handle goes away (it only keeps it). |
 | 10.4 | Portcullis routes become pass-throughs; `get_turns` and `TurnRegistry` removed; `running` flags come from Stronghold (`GET /turns/running`, folder delete and chat list ask it); streaming pass-through for events; FakeUpstream gains turn fakes | Public `/api/chats/{id}/turns|events|approvals|questions|cancel` unchanged. |

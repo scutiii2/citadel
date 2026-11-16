@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from src.services.agent_gateway import AgentCallError, Caller
-from src.services.extension_probe import NO_AGENT, UNKNOWN_MESSAGE, ExtensionProbe, ProbeResult
-from src.services.user_extension_service import UNREADABLE_MESSAGE, StoredExtension
+from src.agents.gateway import AgentCallError, Caller
+from src.extensions.probe import NO_AGENT, UNKNOWN_MESSAGE, ExtensionProbe, ProbeResult
+from src.extensions.service import UNREADABLE_MESSAGE, StoredExtension
 
 CALLER = Caller(username="alice", email="alice@example.com")
 

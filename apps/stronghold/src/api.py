@@ -13,7 +13,10 @@ from dotenv import dotenv_values
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from src.agents import routes as agents_routes
 from src.agents.directory import AgentDirectory, HttpRegistrySource
+from src.extensions import routes as extensions_routes
+from src.extensions.probe import ExtensionProbe
 from src.agents.gateway import AgentGateway, McpAgentGateway
 from src.attachments import routes as attachments_routes
 from src.attachments import services as tool_services
@@ -89,6 +92,7 @@ def create_app(
             HttpRegistrySource(settings.agents_registry_url, http(settings.agents_registry_url), token or None)
             if settings.agents_registry_url else settings.agents_registry_path
         )
+        app.state.extension_probe = ExtensionProbe(app.state.agent_gateway)
         armory_client = armory or http(settings.armory_url)
         app.state.memory = MemoryClient(armory_client, token or None)
         app.state.skills = SkillsClient(armory_client, token or None)
@@ -133,6 +137,8 @@ def create_app(
 
     app = FastAPI(title="stronghold", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.add_middleware(InternalTokenMiddleware, token=token)
+    app.include_router(agents_routes.router)
+    app.include_router(extensions_routes.router)
     app.include_router(attachments_routes.router)
     app.include_router(bard_routes.router)
     app.include_router(brains_routes.router)

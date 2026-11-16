@@ -64,7 +64,6 @@ from src.services.migrations import MigrationRunner
 from src.services.chat_service import MAX_CHAT_BYTES
 from src.services.db_gateway import DbGatewayClient, DbGatewayError, DocumentStore
 from src.services.email_service import EmailSender, McpEmailSender
-from src.services.extension_probe import ExtensionProbe
 from src.services.log_service import LogWriter
 from src.services.mcp_proxy import McpProxy
 from src.services import uid_log_filter
@@ -163,7 +162,6 @@ def create_app(
         )
         uid_log_filter.install()
         app.state.agent_gateway = agent_gateway or McpAgentGateway(internal_token or None, recorder)
-        app.state.extension_probe = ExtensionProbe(app.state.agent_gateway)
         app.state.server_tools = server_tools or McpServerTools(settings.mcp_server_url, internal_token or None, recorder)
         app.state.logs = log_writer
         app.state.traffic = recorder

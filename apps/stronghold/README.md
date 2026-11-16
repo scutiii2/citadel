@@ -49,6 +49,8 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/attachments/...` | Text from a file attached to a question (`text`), PDFs and tables kept in Armory (`pdf`, `table`), audio for Scribe (`audio`, `dictate`, `dictate/partial`) and documents for Reader (`document`). Portcullis exposes them as `/api/attachments/...` and still streams file content and the dictation socket |
 | `/brains...` | Encrypted Obsidian brain connections, browsing through Armory, Note publication and AI promotion suggestions. Portcullis exposes them as `/api/brains`; Armory resolves a connection with `POST /brains/resolve`. Stronghold asks Portcullis for the account's permissions on every request |
 | `/chats...`, `/chat-folders...` | Chat history (details and transcript in separate documents), folders and search. Portcullis exposes them as `/api/chats` and `/api/chat-folders` and runs the answers itself, saving the question and the answer here. Deleting chats revokes their share links first, inside the same call |
+| `/account-agents...` | The specialist agents an account switched off (Treasury, collection `account_agents`). Portcullis exposes it as `/api/account-agents` and reads the list when a chat turn starts |
+| `/user-extensions...` | An account's own MCP servers: stored with encrypted headers (collection `user_extensions`), probed through Legion for status and tools. Portcullis exposes them as `/api/user-extensions` (`chat.use` to read, `extensions.personal.manage` to change) and reads `GET /user-extensions/for-turn` when a chat turn starts |
 | `/schema` | The schema version the stored data is at, the steps applied and every Treasury collection Stronghold uses |
 | `/tuning/...` | An account's own response limits (`GET\|PUT\|DELETE /tuning/limits`, `GET /tuning/limits/own`), capped by Legion's tuning, which Stronghold reads from the entry agent. Portcullis exposes them as `/api/account/tuning` and reads `/tuning/limits/own` when a chat turn starts |
 | `/bard/...` | `POST /bard/speak` and `GET /bard/voices`, asked from Bard. Portcullis exposes them as `/api/bard/speak|voices` and still streams `/api/bard/audio/{id}` |
@@ -56,7 +58,7 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/usage/...` | Token usage and limits, kept in Treasury (collection `usage_records`). Portcullis exposes the reads as `/api/usage/...` and `/api/admin/usage/...`, and calls `POST /usage/check` and `POST /usage/records` around every agent call |
 | `/templates/...` | Saved prompts, kept in Treasury (collection `prompt_templates`). Portcullis exposes them as `/api/templates/...` after checking `chat.use` |
 | `/skills/...` | Learned skills, which Armory keeps. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
-| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`calendar`, `notes`, `memory`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `brains`). Called by Portcullis only |
+| `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`calendar`, `notes`, `memory`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `brains`, `account-agents`, `user-extensions`). Called by Portcullis only |
 
 ## Schema
 

@@ -8,10 +8,10 @@ from pathlib import Path
 import pytest
 from cryptography.fernet import Fernet
 
-from src.services import user_extension_service as svc
-from src.services.secret_box import SecretBox
+from src.extensions import service as svc
+from src.secret_box import SecretBox
 from tests.conftest import FakeDbGateway
-from src.services.user_extension_service import (
+from src.extensions.service import (
     ExtensionLimit,
     ExtensionNotFound,
     InvalidExtension,

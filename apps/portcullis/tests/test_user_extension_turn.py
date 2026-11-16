@@ -1,25 +1,16 @@
-"""Private extensions on a turn: only the caller's enabled ones go to the agent,
-the browser cannot name one, notices reach the watcher, and a private tool asks."""
+"""Private extensions on a turn: Stronghold's list goes to the agent, the browser cannot name one,
+notices reach the watcher, and a private tool asks."""
 
 from __future__ import annotations
-
-from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from src.services.turns import TurnOptions
-from tests.conftest import FakeAgent, FakeEmailSender
-from tests.test_admin import login, make_member
+from tests.conftest import FakeAgent
 from tests.test_registration import as_admin
 from tests.test_turns import chat, events, new_id, start, wait_until
 
-URL = "/api/user-extensions"
-
-
-def add(client: TestClient, label: str, url: str, **extra):
-    response = client.post(URL, json={"label": label, "url": url, **extra})
-    assert response.status_code == 201, response.text
-    return response
+NOTES = {"id": "notes", "label": "Notes", "url": "https://notes.example.com/mcp", "headers": {"X-Key": "s3cret"}}
 
 
 def finished(client: TestClient, chat_id: str) -> list[dict]:
@@ -27,25 +18,15 @@ def finished(client: TestClient, chat_id: str) -> list[dict]:
     return events(client, chat_id)
 
 
-def test_only_the_callers_enabled_extensions_are_sent(client_factory, email: FakeEmailSender, agent: FakeAgent) -> None:
-    alice = client_factory()
-    make_member(alice, email)
-    make_member(alice, email, "bob")
-    login(alice, "alice")
-    add(alice, "Notes", "https://notes.example.com/mcp", headers={"X-Key": "s3cret"})
-    add(alice, "Off", "https://off.example.com/mcp")
-    alice.patch(f"{URL}/off", json={"enabled": False})
-    bob = client_factory()
-    login(bob, "bob")
-    add(bob, "Bobs", "https://bob.example.com/mcp")
-
+def test_what_stronghold_hands_over_is_sent_to_the_agent(client: TestClient, agent: FakeAgent, upstream) -> None:
+    as_admin(client)
+    upstream.private = {"items": [NOTES], "skipped": []}
     chat_id = new_id()
-    assert start(alice, chat_id).status_code == 202
-    finished(alice, chat_id)
 
-    assert agent.asks[-1]["private_extensions"] == [
-        {"id": "notes", "label": "Notes", "url": "https://notes.example.com/mcp", "headers": {"X-Key": "s3cret"}}
-    ]
+    assert start(client, chat_id).status_code == 202
+    finished(client, chat_id)
+
+    assert agent.asks[-1]["private_extensions"] == [NOTES]
 
 
 def test_a_turn_without_private_extensions_sends_none(client: TestClient, agent: FakeAgent) -> None:
@@ -68,9 +49,11 @@ def test_the_browser_cannot_name_an_extension_for_a_turn(client: TestClient, age
     assert not agent.asks[-1]["private_extensions"]
 
 
-def test_what_the_agent_could_not_connect_to_reaches_the_watcher_as_a_notice(client: TestClient, agent: FakeAgent) -> None:
+def test_what_the_agent_could_not_connect_to_reaches_the_watcher_as_a_notice(
+    client: TestClient, agent: FakeAgent, upstream
+) -> None:
     as_admin(client)
-    add(client, "Notes", "https://notes.example.com/mcp")
+    upstream.private = {"items": [NOTES], "skipped": []}
     notices = [{"id": "notes", "label": "Notes", "error": "Timed out"}]
     agent.result_extra = {"private_extension_errors": notices}
     chat_id = new_id()
@@ -81,9 +64,9 @@ def test_what_the_agent_could_not_connect_to_reaches_the_watcher_as_a_notice(cli
     assert [e["notices"] for e in stream if e["type"] == "notice"] == [notices]
 
 
-def test_no_notice_when_everything_connected(client: TestClient, agent: FakeAgent) -> None:
+def test_no_notice_when_everything_connected(client: TestClient, upstream) -> None:
     as_admin(client)
-    add(client, "Notes", "https://notes.example.com/mcp")
+    upstream.private = {"items": [NOTES], "skipped": []}
     chat_id = new_id()
 
     start(client, chat_id)
@@ -91,15 +74,10 @@ def test_no_notice_when_everything_connected(client: TestClient, agent: FakeAgen
     assert not [e for e in finished(client, chat_id) if e["type"] == "notice"]
 
 
-def test_an_extension_whose_headers_cannot_be_read_is_left_out_with_a_notice(
-    client: TestClient, agent: FakeAgent, db_gateway
-) -> None:
+def test_an_extension_stronghold_skipped_reaches_the_watcher_as_a_notice(client: TestClient, agent: FakeAgent, upstream) -> None:
     as_admin(client)
-    add(client, "Notes", "https://notes.example.com/mcp", headers={"X-Key": "one"})
-    add(client, "Wiki", "https://wiki.example.com/mcp")
-    for (collection, _), doc in db_gateway.records.items():
-        if collection == "user_extensions" and doc["slug"] == "notes":
-            doc["headers_encrypted"] = "garbage"
+    skipped = {"id": "notes", "label": "Notes", "error": "Its headers can't be read (the secrets key changed). Edit it to set them again."}
+    upstream.private = {"items": [{**NOTES, "id": "wiki"}], "skipped": [skipped]}
     chat_id = new_id()
 
     start(client, chat_id)
@@ -111,9 +89,9 @@ def test_an_extension_whose_headers_cannot_be_read_is_left_out_with_a_notice(
     assert "can't be read" in notice["notices"][0]["error"]
 
 
-def test_a_private_tool_asks_even_when_ask_before_tools_is_off(client: TestClient, agent: FakeAgent) -> None:
+def test_a_private_tool_asks_even_when_ask_before_tools_is_off(client: TestClient, agent: FakeAgent, upstream) -> None:
     as_admin(client)
-    add(client, "Notes", "https://notes.example.com/mcp")
+    upstream.private = {"items": [NOTES], "skipped": []}
     agent.tool_calls = ["u_notes__search"]
     chat_id = new_id()
 
@@ -134,19 +112,13 @@ def test_turn_options_never_show_header_values_in_repr() -> None:
     assert "s3cret" not in repr(options)
 
 
-def test_gateway_down_still_answers_without_private_extensions(
-    client: TestClient, agent: FakeAgent, db_gateway, monkeypatch
+def test_stronghold_unable_to_answer_still_runs_the_turn_without_private_extensions(
+    client: TestClient, agent: FakeAgent, upstream
 ) -> None:
-    from src.services.db_gateway import DbGatewayUnavailable
-
     as_admin(client)
-    add(client, "Notes", "https://notes.example.com/mcp")
+    upstream.private_status = 503
     chat_id = new_id()
 
-    async def down(*args, **kwargs):
-        raise DbGatewayUnavailable("db_gateway is not reachable")
-
-    monkeypatch.setattr(db_gateway, "query", down)
     start(client, chat_id)
     stream = finished(client, chat_id)
 

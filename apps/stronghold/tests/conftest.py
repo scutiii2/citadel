@@ -104,6 +104,9 @@ class FakeAgent:
         self.summary = "SUMMARY"
         self.fail: str | None = None
         self.interprets: list[str] = []
+        self.probes: list[dict] = []
+        self.probe_results: dict = {}
+        self.probe_fail: str | None = None
 
     async def ask(self, url, caller, **kwargs):
         raise AssertionError("this test did not expect an ask() call")
@@ -115,6 +118,14 @@ class FakeAgent:
         if self.fail:
             raise AgentCallError(self.fail)
         return {"response": self.summary, "provider_id": "claude", "model": "claude-test", "total_tokens": 10}
+
+    async def probe_extension(self, url, caller, *, extension_url, headers):
+        from src.agents.gateway import AgentCallError
+
+        self.probes.append({"url": url, "caller": caller, "extension_url": extension_url, "headers": headers})
+        if self.probe_fail:
+            raise AgentCallError(self.probe_fail)
+        return self.probe_results.get(extension_url, {"status": "connected", "error": None, "tools": ["add", "search"]})
 
 
 @pytest.fixture
