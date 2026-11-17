@@ -2,7 +2,7 @@
 
 Project note: `Brain/Projects/treasury_admin.md` in the Obsidian vault (`../../../../Brain/` from this folder), once it exists.
 
-Vue 3 + TypeScript admin app for Treasury, for accounts holding `settings.manage`. Talks only to `portcullis` through the Vite `/api` proxy (no backend of its own). Pages: Instances: Treasury's instances and the connections each may use, read-only.
+Vue 3 + TypeScript admin app for Treasury, for accounts holding `settings.manage`. Talks only to `portcullis` through the Vite `/api` proxy (no backend of its own). Pages: Instances (Treasury's instances and the connections each may use, read-only) and Connections (the databases Treasury keeps data in, and the cache defaults, saved in Treasury's database).
 
 ## Rules
 - Code is copied between the admin apps, not shared. Nothing here imports from another app. Apply a fix to a shared component (PageLayout, ToggleSwitch, BaseModal...) in every admin app that has a copy.

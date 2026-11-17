@@ -1,5 +1,11 @@
 # Usage cost beside the token count
 
+<!-- history-note -->
+> **History (noted 2026-11-18).** This document names files and settings that no longer exist: `specifics/`, seed files,
+> `config_*.json` toggle, tuning and connection files, and tokens or addresses kept in `.env`. Those settings are now saved
+> in each service's database and edited in its admin app; see `apps/armory/docs/settings.md` and each service's
+> `configs/README.md`. Kept as it was written; do not follow its file paths.
+
 **Goal:** show a money cost next to every token count in ember_web (answer chip, chip panel, Usage page). Cost = tokens x a per-model price from an editable JSON table in ember_api.
 
 **Decisions (user-approved)**

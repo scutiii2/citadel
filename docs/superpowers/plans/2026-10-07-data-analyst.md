@@ -1,5 +1,11 @@
 # Data Analyst Implementation Plan
 
+<!-- history-note -->
+> **History (noted 2026-11-18).** This document names files and settings that no longer exist: `specifics/`, seed files,
+> `config_*.json` toggle, tuning and connection files, and tokens or addresses kept in `.env`. Those settings are now saved
+> in each service's database and edited in its admin app; see `apps/armory/docs/settings.md` and each service's
+> `configs/README.md`. Kept as it was written; do not follow its file paths.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A user attaches a CSV or XLSX file in Ember chat and a new `data-analyst` agent answers questions about the whole file by calling read-only table tools in `mcp_server`.

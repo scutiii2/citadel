@@ -16,6 +16,7 @@ export const router = createRouter({
   routes: [
     { path: "/", redirect: "/instances" },
     { path: "/instances", name: "instances", component: () => import("../views/InstancesView.vue"), meta: { permission: "settings.manage" } },
+    { path: "/connections", name: "connections", component: () => import("../views/ConnectionsView.vue"), meta: { permission: "settings.manage" } },
     { path: "/login", name: "login", component: () => import("../views/LoginView.vue"), meta: { guestOnly: true } },
     { path: "/no-access", name: "no-access", component: () => import("../views/NoAccessView.vue") },
     { path: "/:pathMatch(.*)*", redirect: "/" },

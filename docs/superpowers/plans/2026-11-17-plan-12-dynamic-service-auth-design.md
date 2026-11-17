@@ -1,5 +1,11 @@
 # Plan 12: dynamic service-to-service auth (design)
 
+<!-- history-note -->
+> **History (noted 2026-11-18).** This document names files and settings that no longer exist: `specifics/`, seed files,
+> `config_*.json` toggle, tuning and connection files, and tokens or addresses kept in `.env`. Those settings are now saved
+> in each service's database and edited in its admin app; see `apps/armory/docs/settings.md` and each service's
+> `configs/README.md`. Kept as it was written; do not follow its file paths.
+
 Status: design approved 2026-11-17 (decisions below). Replaces the shared `INTERNAL_API_TOKEN` between `portcullis`, `stronghold`, `legion`, `armory` and `treasury`. Implementation can be handed to Codex after this is approved.
 
 ## Problem

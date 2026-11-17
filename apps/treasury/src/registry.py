@@ -43,6 +43,14 @@ class ConnectionRegistry:
     def names(self) -> list[str]:
         return sorted(self._specs)
 
+    def add_spec(self, spec: ConnectionSpec) -> bool:
+        """Offer a new connection to the instances. False (nothing changes) when the name is taken: a connection that
+        may already be open is changed or removed only by a restart."""
+        if spec.name in self._specs:
+            return False
+        self._specs[spec.name] = spec
+        return True
+
     def open_names(self) -> list[str]:
         return sorted(self._open)
 
@@ -116,6 +124,9 @@ class InstanceManager:
 
     def connection_names(self) -> list[str]:
         return self._registry.names()
+
+    def add_connection(self, spec: ConnectionSpec) -> bool:
+        return self._registry.add_spec(spec)
 
     async def register(self, name: str, members: tuple[str, ...]) -> None:
         """Add or replace an instance while running. Unknown connections are refused; the old handle is closed."""

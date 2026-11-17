@@ -128,7 +128,6 @@ services:
       CITADEL_IDENTITY_DIR: /identity
     volumes:
       - ./docker/configs/treasury/app.json:/app/configs/config_app.json:ro
-      - ./docker/configs/treasury/connections.json:/app/configs/config_connections.json:ro
       - ${CITADEL_DATA_DIR:-./.data}/treasury:/app/.data
       - identity_treasury:/identity:rw
       - ./.env:/citadel.env:ro

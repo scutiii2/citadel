@@ -1,5 +1,11 @@
 # Council: shared Laya service and training pipeline
 
+<!-- history-note -->
+> **History (noted 2026-11-18).** This document names files and settings that no longer exist: `specifics/`, seed files,
+> `config_*.json` toggle, tuning and connection files, and tokens or addresses kept in `.env`. Those settings are now saved
+> in each service's database and edited in its admin app; see `apps/armory/docs/settings.md` and each service's
+> `configs/README.md`. Kept as it was written; do not follow its file paths.
+
 Date: 2026-10-22 (Asia/Manila)
 Status: Draft for review. Documentation only; implementation and deployment have not started.
 Plan: [Council implementation plan](../plans/2026-10-22-council.md).

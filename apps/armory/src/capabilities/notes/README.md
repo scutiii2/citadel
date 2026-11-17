@@ -49,7 +49,7 @@ Lets agents use the notes a user chose to share. A user keeps private notes in e
 ## Configuration
 
 - Account identity comes only from a verified Portcullis requester token. Service assertions authenticate callers; missing identity refuses account operations.
-- db_gateway's `configs/config_connections.json` must list the connection under that instance, e.g. `"mcp_server": ["data"]` (the `.example` file has it). It is the same `data` connection portcullis uses, so a change in ember shows here at once.
+- Armory registers its own instance with Treasury (`armory` or `mcp_server`, connection `data`; see `apps/treasury/configs/README.md`). It is the same `data` connection portcullis uses, so a change in ember shows here at once.
 - The record shape is portcullis's (`apps/portcullis/src/services/notes.py`): collection `notes`, fields `id`, `owner`, `title`, `body`, `tags`, `agent_readable`, `updated_at`. If that changes, change `utils/gateway.py` and `domain.py` with it.
 - Starts offline. Switch it online in ember_admin (Capabilities), then each user adds it in the Supermarket.
 - No state of its own: nothing is stored in `.data/armory/`.

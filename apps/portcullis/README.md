@@ -754,8 +754,8 @@ needs no joins or foreign keys can be kept as documents in the `db_gateway` proj
 it can sit on SQLite, Postgres or Firestore and be shared with other apps.
 
 `config_app.json` has a `db_gateway` block: `url` (default `http://127.0.0.1:29602`), `instance`
-(`ember`) and `connection` (`data`). The connection must be listed in that instance in
-db_gateway's `configs/config_connections.json` (see its `.example`). Calls require a short-lived Portcullis service assertion for Treasury.
+(`ember`) and `connection` (`data`). Portcullis registers that instance with Treasury at start, and the
+connection must exist there (`data` is built in; see `apps/treasury/configs/README.md`). Calls require a short-lived Portcullis service assertion for Treasury.
 
 `src/services/db_gateway.py` has `DbGatewayClient` with `get`, `put`, `delete` and `query`
 (equality filters). A missing record is `None` or `False`. An unreachable gateway raises

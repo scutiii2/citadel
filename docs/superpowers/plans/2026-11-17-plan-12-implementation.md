@@ -1,5 +1,11 @@
 # Plan 12 implementation: dynamic service-to-service auth
 
+<!-- history-note -->
+> **History (noted 2026-11-18).** This document names files and settings that no longer exist: `specifics/`, seed files,
+> `config_*.json` toggle, tuning and connection files, and tokens or addresses kept in `.env`. Those settings are now saved
+> in each service's database and edited in its admin app; see `apps/armory/docs/settings.md` and each service's
+> `configs/README.md`. Kept as it was written; do not follow its file paths.
+
 Design (read first, it is the source of truth for the why): `docs/superpowers/plans/2026-11-17-plan-12-dynamic-service-auth-design.md`.
 This file is the how: exact decisions, steps, files, tests and done criteria. Where the two disagree, the design wins, then raise it.
 

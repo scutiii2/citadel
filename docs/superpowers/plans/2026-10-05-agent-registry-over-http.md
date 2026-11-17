@@ -1,5 +1,11 @@
 # Agent registry over HTTP (ai_agent on another machine)
 
+<!-- history-note -->
+> **History (noted 2026-11-18).** This document names files and settings that no longer exist: `specifics/`, seed files,
+> `config_*.json` toggle, tuning and connection files, and tokens or addresses kept in `.env`. Those settings are now saved
+> in each service's database and edited in its admin app; see `apps/armory/docs/settings.md` and each service's
+> `configs/README.md`. Kept as it was written; do not follow its file paths.
+
 Status: implemented 2026-10-05, not committed. Change from the plan: `AI_AGENT_ADVERTISE_URL` may omit the port, and each instance then adds its own, so one value serves every supervised agent.
 
 ## Goal

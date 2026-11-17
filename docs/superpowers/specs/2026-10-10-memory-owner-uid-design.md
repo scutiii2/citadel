@@ -1,5 +1,11 @@
 # Memory notes keyed on a stable account uid
 
+<!-- history-note -->
+> **History (noted 2026-11-18).** This document names files and settings that no longer exist: `specifics/`, seed files,
+> `config_*.json` toggle, tuning and connection files, and tokens or addresses kept in `.env`. Those settings are now saved
+> in each service's database and edited in its admin app; see `apps/armory/docs/settings.md` and each service's
+> `configs/README.md`. Kept as it was written; do not follow its file paths.
+
 Date: 2026-10-10
 Status: design approved in chat, not implemented
 Amends: `docs/superpowers/specs/2026-10-10-persistent-memory-design.md` (owner identity) and closes follow-up 1 of `_TODO.md` item 6.

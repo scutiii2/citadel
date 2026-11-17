@@ -1,26 +1,38 @@
 # configs
 
-Every JSON file here is tracked; there is no `.example` twin. Secrets in a connection (a DSN, a password) are `${NAME}`
-placeholders filled from `../.env` (see `../.env.example`). Restart Treasury after editing.
-
-## config_app.json
+`config_app.json` is tracked; there is no `.example` twin. It holds only where Treasury listens:
 
 | Key | Meaning |
 |---|---|
-| `host`, `port` | Where Treasury listens. `DB_GATEWAY_PORT` in the environment overrides `port`. |
-| `default_cache` | Read cache used by every connection that sets none: `ttl_seconds`, `max_entries`, `negative_ttl_seconds`. |
+| `host` | Address to bind. `127.0.0.1` keeps Treasury on this machine. |
+| `port` | Port to listen on. `DB_GATEWAY_PORT` in the environment overrides it. |
 
-## config_connections.json
+Restart Treasury after editing.
 
-- `connections`: each has a `type` (`sqlite`, and the Postgres and Firestore backends), the options of that type,
-  `allow_raw_sql` (default false) and an optional `cache` block. A relative sqlite `path` is placed in
-  `.data/treasury/` in the Citadel folder.
+## The connections are not here
+
+Four local SQLite connections are built in, so a new install works before anyone has opened the admin page:
+`main` (`main.db`), `data` (`ember.db`, Portcullis's data), `stronghold` (`stronghold.db`) and `scratch`
+(`scratch.db`, raw SQL allowed, no cache). A relative sqlite `path` is placed in `.data/treasury/` in the Citadel folder.
+
+An administrator changes them on the Connections page of Treasury Admin; what is saved there lives in
+`.data/treasury/settings.db` (table `connections`, see `src/connection_admin.py`) and replaces the built-in connection of
+the same name or adds a new one. "Use the built-in" removes the saved one. Each connection has a `type` (`sqlite`,
+`postgres` or `firestore`), the options of that type, `allow_raw_sql` (default false) and an optional `cache`.
+
+- A new connection is offered to the instances at once. A changed or removed one is used from the next start.
+- A Postgres `dsn` must be a `${NAME}` placeholder: the value stays in `../.env` (see `../.env.example`), so no secret
+  is saved in the database. Saving a placeholder whose name is not set is refused.
+- A connection an instance uses cannot be removed.
+
+The cache defaults (`ttl_seconds`, `max_entries`, `negative_ttl_seconds`) for a connection that sets none are on the
+same page (table `settings`, key `default_cache`) and are used from the next start.
 
 ## Instances: not here
 
 Treasury keeps no list of its callers. Each service registers its own instance when it starts
 (`PUT /instances/{name}` with `{"connections": [...]}`): Portcullis registers `ember`, Stronghold `stronghold`,
 Legion `legion`, Armory `armory` (or `mcp_server`), each with the connection it uses. A service may only register
-the instance it owns, and only connections that exist in `config_connections.json`; anything else is refused.
+the instance it owns, and only connections that exist (built in or saved); anything else is refused.
 Registration takes effect at once and is kept in the `instances` table of `.data/treasury/settings.db`, so a
 Treasury restart keeps it. A service retries until Treasury answers, so start order does not matter.

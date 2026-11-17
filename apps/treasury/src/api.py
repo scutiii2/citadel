@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from src.citadel_auth import Keyring, ServiceAuthMiddleware, current_caller, data_dir, from_env, settings_store
 from src.backends.base import UnsupportedOperation
+from src import connection_admin
 from src.registry import InstanceManager, RawSqlDisabled, UnknownConnection, UnknownInstance
 
 MAX_LIMIT = 1000
@@ -98,6 +99,47 @@ def create_app(manager: InstanceManager, keyring: Keyring | None = None, setting
         if settings_db is not None:
             settings_store.put(settings_db, "instances", name, list(dict.fromkeys(body.connections)))
         return {"saved": name}
+
+    def _admin_only() -> None:
+        """The connections page is Portcullis's (staff only there); no other service may change a connection."""
+        caller = current_caller()
+        if caller is None or caller.name != "portcullis":
+            raise HTTPException(403, "only Portcullis may change connections")
+        if settings_db is None:
+            raise HTTPException(409, "this Treasury keeps no settings database")
+
+    @app.get("/admin/connections")
+    async def list_connections() -> dict[str, Any]:
+        _admin_only()
+        return connection_admin.view(settings_db, manager)
+
+    @app.put("/admin/connections/{name}")
+    async def put_connection(name: str, spec: dict[str, Any]) -> dict[str, Any]:
+        _admin_only()
+        try:
+            applies = connection_admin.save_connection(settings_db, manager, name, spec)
+        except connection_admin.ConnectionAdminError as error:
+            raise HTTPException(400, str(error)) from error
+        return {**connection_admin.view(settings_db, manager), "applies": applies}
+
+    @app.delete("/admin/connections/{name}")
+    async def delete_connection(name: str) -> dict[str, Any]:
+        _admin_only()
+        try:
+            applies = connection_admin.remove_connection(settings_db, manager, name)
+        except connection_admin.ConnectionAdminError as error:
+            raise HTTPException(400, str(error)) from error
+        return {**connection_admin.view(settings_db, manager), "applies": applies}
+
+    @app.put("/admin/default-cache")
+    async def put_default_cache(changes: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Body: ttl_seconds, max_entries and/or negative_ttl_seconds; an empty body puts the built-in defaults back."""
+        _admin_only()
+        try:
+            connection_admin.save_default_cache(settings_db, changes or None)
+        except connection_admin.ConnectionAdminError as error:
+            raise HTTPException(400, str(error)) from error
+        return {**connection_admin.view(settings_db, manager), "applies": "next start"}
 
     @app.get(BASE + "/collections/{collection}/records/{key}")
     async def get_record(instance: str, connection: str, collection: str, key: str) -> dict[str, Any]:

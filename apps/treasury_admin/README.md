@@ -2,7 +2,7 @@
 
 Admin web app for Treasury, built with Vue 3, TypeScript and Vite. It runs on port 26505 (`TREASURY_ADMIN_PORT`) and talks only to [portcullis](../portcullis) over the same origin: its Vite server (and its nginx in Docker) forwards `/api` to Portcullis, so the browser holds no server URL or token.
 
-Pages: Instances: Treasury's instances and the connections each may use, read-only. Calls: `/api/admin/treasury`. Treasury's instances and connections are set in its own config files, so this app shows them and does not edit them.
+Pages: Instances (Treasury's instances and the connections each may use, read-only) and Connections (the databases Treasury keeps data in, plus the cache defaults). Calls: `/api/admin/treasury` and `/api/admin/treasury/connections`. Each service registers its own instance; the connections are built in or saved here.
 
 ## Run
 

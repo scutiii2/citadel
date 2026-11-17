@@ -192,9 +192,19 @@ class FakeDbGateway:
     def __init__(self) -> None:
         self.records: dict[tuple[str, str], dict] = {}
         self.instances_seen = {"portcullis": ["main"], "stronghold": ["stronghold"]}
+        self.admin_calls: list[tuple] = []
 
     async def instances(self):
         return self.instances_seen
+
+    async def admin(self, method, path, body=None):
+        """Treasury's /admin routes: remembers the calls; a refusal is staged with `admin_refusal`."""
+        from src.services.db_gateway import DbGatewayRefused
+
+        self.admin_calls.append((method, path, body))
+        if getattr(self, "admin_refusal", None):
+            raise DbGatewayRefused(400, self.admin_refusal)
+        return {"connections": [], "default_cache": {}, "applies": "now"}
 
     async def set_instance(self, name, connections):
         self.instances_seen[name] = list(connections)

@@ -1,5 +1,11 @@
 # Shared Email Capability Implementation Plan
 
+<!-- history-note -->
+> **History (noted 2026-11-18).** This document names files and settings that no longer exist: `specifics/`, seed files,
+> `config_*.json` toggle, tuning and connection files, and tokens or addresses kept in `.env`. Those settings are now saved
+> in each service's database and edited in its admin app; see `apps/armory/docs/settings.md` and each service's
+> `configs/README.md`. Kept as it was written; do not follow its file paths.
+
 > **For agentic workers:** Use `superpowers:executing-plans` for native execution, or `superpowers:subagent-driven-development` if the user chooses delegation. Steps use checkboxes for tracking. User approved this plan and native execution on a separate branch; implementation and verification are complete; the progress ledger records an existing intermittent question-event test failure.
 
 **Goal:** Make MCP's email capability the delivery path for MCP notifications and Ember account emails, with optional outgoing reply headers.

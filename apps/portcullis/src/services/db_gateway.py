@@ -25,6 +25,14 @@ class DbGatewayError(Exception):
     pass
 
 
+class DbGatewayRefused(DbGatewayError):
+    """Treasury refused an admin change (4xx); `message` is its own and safe to show."""
+
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+
+
 class DbGatewayUnavailable(DbGatewayError):
     pass
 
@@ -75,6 +83,13 @@ class DbGatewayClient:
     async def instances(self) -> dict[str, list[str]]:
         """The gateway's instances and the connections each may use."""
         return self._check(await self._send("GET", "/instances")).json()
+
+    async def admin(self, method: str, path: str, body: Any = None) -> Any:
+        """A call to Treasury's /admin routes (the connections page). A 4xx comes back as DbGatewayRefused with Treasury's own message."""
+        response = await self._send(method, path, body)
+        if 400 <= response.status_code < 500:
+            raise DbGatewayRefused(response.status_code, _error_text(response) or f"db_gateway answered {response.status_code}")
+        return self._check(response).json()
 
     async def get(self, collection: str, key: str) -> Document | None:
         response = await self._send("GET", self._record(collection, key))

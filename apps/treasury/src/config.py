@@ -1,4 +1,7 @@
-"""Typed loaders for configs/config_app.json, configs/config_connections.json and the registered instances."""
+"""Typed loaders for configs/config_app.json (host and port), the connections and the registered instances.
+
+The connections are built-in defaults (the four local SQLite databases) with what an administrator saved on the
+Connections page of Treasury Admin on top, kept in the settings database. The cache defaults are saved there too."""
 
 from __future__ import annotations
 
@@ -18,12 +21,22 @@ from src.seed import seed_from_example
 ROOT = Path(__file__).resolve().parent.parent
 apply_root_env(ROOT)  # the Citadel root .env overrides this service's .env
 CONFIG_PATH = ROOT / "configs" / "config_app.json"
-CONNECTIONS_PATH = ROOT / "configs" / "config_connections.json"
 # Which connections an instance may use is registered by the service that owns the instance (PUT /instances/{name}).
 # The registrations are kept in the `instances` table of Treasury's settings database, so a restart keeps them.
 SETTINGS_DB = data_dir(ROOT) / "settings.db"
 ENV_PATH = ROOT / ".env"
 PORT_ENV_VAR = "DB_GATEWAY_PORT"
+CONNECTIONS_TABLE = "connections"
+SETTINGS_TABLE = "settings"
+CACHE_KEY = "default_cache"
+# Every install starts with these, so the other services can store their data before anyone has opened the admin page.
+# A saved connection of the same name replaces one; "Use the built-in" on the page removes the saved one.
+DEFAULT_CONNECTIONS: dict[str, dict[str, Any]] = {
+    "main": {"type": "sqlite", "path": "main.db", "allow_raw_sql": False},
+    "data": {"type": "sqlite", "path": "ember.db"},
+    "stronghold": {"type": "sqlite", "path": "stronghold.db"},
+    "scratch": {"type": "sqlite", "path": "scratch.db", "allow_raw_sql": True, "cache": {"ttl_seconds": 0}},
+}
 _PLACEHOLDER = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
@@ -141,11 +154,28 @@ def _read_json(path: Path) -> Any:
         raise ConfigError(f"cannot read {path}: {error}") from error
 
 
+def stored_connections(settings_db: Path) -> dict[str, dict[str, Any]]:
+    return {name: spec for name, spec in settings_store.read_all(settings_db, CONNECTIONS_TABLE).items() if isinstance(spec, dict)}
+
+
+def stored_default_cache(settings_db: Path) -> dict[str, Any] | None:
+    saved = settings_store.read_all(settings_db, SETTINGS_TABLE).get(CACHE_KEY)
+    return saved if isinstance(saved, dict) else None
+
+
+def connections_raw(settings_db: Path) -> dict[str, dict[str, Any]]:
+    """The built-in connections with the saved ones on top (a saved one replaces the built-in of its name)."""
+    return {**DEFAULT_CONNECTIONS, **stored_connections(settings_db)}
+
+
 def load_config(path: Path | None = None) -> AppConfig:
-    """Load the app config. With no path, use configs/config_app.json."""
+    """Load the app config. With no path, use configs/config_app.json, and the cache defaults saved in Treasury Admin."""
+    use_stored = path is None
     if path is None:
         path = CONFIG_PATH
     config = parse_app_config(_read_json(path))
+    if use_stored and (saved := stored_default_cache(SETTINGS_DB)) is not None:
+        config = replace(config, default_cache=parse_cache(saved, config.default_cache))
     override = os.getenv(PORT_ENV_VAR)
     if override:  # a launcher or container passes the port it assigned
         try:
@@ -159,18 +189,15 @@ def load_config(path: Path | None = None) -> AppConfig:
 
 
 def load_connections(default_cache: CacheSettings, path: Path | None = None) -> ConnectionsConfig:
-    """Load connections and instances. With no path, the connections come from
-    configs/config_connections.json (${NAME} resolved from the environment and .env) and the
-    instances registered so far from the settings database. With a path, one file holds both."""
+    """Load connections and instances. With no path, the connections are the built-in ones with the saved ones on
+    top (${NAME} resolved from the environment and .env) and the instances are the ones registered so far, all from
+    the settings database. With a path, one file holds both."""
     env: dict[str, str] = {}
     data_root = None
     if path is None:
         data_root = data_dir(ROOT)
-        path = CONNECTIONS_PATH
         seed_from_example(ENV_PATH)
         env = {k: v for k, v in {**dotenv_values(ENV_PATH), **os.environ}.items() if v is not None}
-        raw = _read_json(path)
-        if isinstance(raw, dict):
-            raw = {**raw, "instances": settings_store.read_all(SETTINGS_DB, "instances")}
+        raw = {"connections": connections_raw(SETTINGS_DB), "instances": settings_store.read_all(SETTINGS_DB, "instances")}
         return parse_connections(raw, default_cache, env, data_root)
     return parse_connections(_read_json(path), default_cache, env, data_root)

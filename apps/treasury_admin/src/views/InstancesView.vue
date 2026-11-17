@@ -28,7 +28,7 @@ onMounted(load);
   <PageLayout
     class="info-content instances"
     title="Instances"
-    description="The databases Treasury serves. Each instance lists the connections it may use. They are set in Treasury's own configuration files, so this page only shows them."
+    description="The databases Treasury serves. Each instance lists the connections it may use. Each service registers its own, so this page only shows them. The connections they use are on the Connections page."
   >
     <template #actions>
       <button type="button" :disabled="loading" @click="load">Refresh</button>
