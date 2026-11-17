@@ -42,7 +42,7 @@ class NotesError(Exception):
 
 def open_gateway() -> NotesGateway:
     return NotesGateway(
-        settings.db_gateway_url,
+        settings.treasury_url,
         settings.db_gateway_instance,
         settings.db_gateway_connection,
         keyring,

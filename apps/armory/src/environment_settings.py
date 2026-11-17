@@ -50,10 +50,6 @@ SPECS: tuple[Spec, ...] = (
          "Blank: the hosted API. Set it for a self-hosted server."),
     Spec("laya_url", "Laya address (tickets)", "Tickets", "url",
          "MCP address of Legion's triage agent. Blank: tickets are not tagged.", restart=True),
-    Spec("stronghold_url", "Stronghold address", "Services Armory calls", "url",
-         "Stronghold keeps the notes and the brain connections."),
-    Spec("db_gateway_url", "Treasury address", "Services Armory calls", "url",
-         "Treasury holds the notes data.", restart=True),
     Spec("db_gateway_instance", "Treasury instance name", "Services Armory calls", "text",
          "The name Armory registers itself under in Treasury.", restart=True),
     Spec("db_gateway_connection", "Treasury connection", "Services Armory calls", "text",
@@ -102,7 +98,12 @@ def coerce(spec: Spec, raw: Any) -> Any:
 
 
 def stored(path: Path) -> dict[str, Any]:
-    return settings_store.read_all(path, TABLE)
+    values = settings_store.read_all(path, TABLE)
+    for name in ("db_gateway_url", "stronghold_url"):
+        if name in values:
+            settings_store.delete(path, TABLE, name)
+            del values[name]
+    return values
 
 
 def overlay(base: Any, path: Path) -> Any:

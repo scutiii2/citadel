@@ -71,7 +71,8 @@ class Settings:
     laya_url: str = _env("LAYA_URL", "")
     # db_gateway, where portcullis keeps per-account notes; the notes capability reads those shared with agents.
     # The instance must list the connection; requests carry Armory service assertions.
-    db_gateway_url: str = _env("DB_GATEWAY_URL", "http://127.0.0.1:29602")
+    treasury_url: str = _env("TREASURY_URL", str(_APP.get("treasury_url") or "http://127.0.0.1:29602"))
+    advertise_url: str | None = _APP.get("advertise_url") or None
     db_gateway_instance: str = _env("DB_GATEWAY_INSTANCE", "mcp_server")
     db_gateway_connection: str = _env("DB_GATEWAY_CONNECTION", "data")
     # Obsidian Local REST API. Never include the address or credential in settings repr.

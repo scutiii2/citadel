@@ -12,6 +12,8 @@ from src.config import settings  # noqa: E402
 from src.services import capability_registry  # noqa: E402
 from src.services.capability_loader import CapabilityLoader  # noqa: E402
 from src.services.identity_context import IdentityContextMiddleware  # noqa: E402
+from src.citadel_auth import advertised_url
+from src.service_catalog import catalog
 from src.citadel_auth.treasury import register_in_background  # noqa: E402
 from src.services.service_auth import install_auth, keyring  # noqa: E402
 from src.utils.logging_setup import configure_logging  # noqa: E402
@@ -34,9 +36,10 @@ async def _serve() -> None:
     from src.services import extensions
 
     await keyring.ensure_identity()
+    catalog.start("armory", advertised_url(settings.host, settings.port, settings.advertise_url))
     # Treasury keeps no list of its callers: Armory tells it which connection its instance uses.
     registration = register_in_background(
-        keyring, settings.db_gateway_url, settings.db_gateway_instance, [settings.db_gateway_connection])
+        keyring, settings.treasury_url, settings.db_gateway_instance, [settings.db_gateway_connection])
 
     try:
         # Before tool_names on purpose: extensions register proxied tools onto `mcp`,
@@ -114,6 +117,7 @@ async def _serve() -> None:
         server = uvicorn.Server(uvicorn.Config(app, host=settings.host, port=settings.port))
         await server.serve()
     finally:
+        await catalog.stop()
         registration.cancel()
         # Mirrors install_extensions() at the top: subprocesses opened get closed on shutdown or startup failure.
         await extensions.shutdown_extensions()

@@ -39,35 +39,35 @@ def row(body: dict, field: str) -> dict:
 
 def test_stored_values_win_over_the_defaults_and_bad_ones_are_skipped(tmp_path):
     path = tmp_path / "settings.db"
-    settings_store.put(path, "environment", "stronghold_url", "http://stronghold:29650")
+    settings_store.put(path, "environment", "firecrawl_api_url", "http://firecrawl:3002")
     settings_store.put(path, "environment", "vault_dir", "/data/vault")
     settings_store.put(path, "environment", "obsidian_timeout", -1)
     settings_store.put(path, "environment", "no_such_setting", "x")
 
     result = environment_settings.overlay(config.Settings(), path)
 
-    assert result.stronghold_url == "http://stronghold:29650"
+    assert result.firecrawl_api_url == "http://firecrawl:3002"
     assert result.vault_dir == Path("/data/vault")
     assert result.obsidian_timeout == config.Settings().obsidian_timeout
 
 
 def test_a_change_is_saved_used_at_once_and_reset_puts_the_default_back(client, live):
-    default = config.Settings().stronghold_url
+    default = config.Settings().firecrawl_api_url
 
-    saved = client.put("/admin/environment", json={"stronghold_url": " http://stronghold:29650 ", "obsidian_allow_write": True})
+    saved = client.put("/admin/environment", json={"firecrawl_api_url": " http://firecrawl:3002 ", "obsidian_allow_write": True})
 
     assert saved.status_code == 200 and saved.json()["restart"] == []
-    assert live.stronghold_url == "http://stronghold:29650" and live.obsidian_allow_write is True
-    assert row(saved.json(), "stronghold_url")["stored"] is True
-    assert environment_settings.stored(live.settings_db_path)["stronghold_url"] == "http://stronghold:29650"
+    assert live.firecrawl_api_url == "http://firecrawl:3002" and live.obsidian_allow_write is True
+    assert row(saved.json(), "firecrawl_api_url")["stored"] is True
+    assert environment_settings.stored(live.settings_db_path)["firecrawl_api_url"] == "http://firecrawl:3002"
 
-    reset = client.put("/admin/environment", json={"stronghold_url": None})
+    reset = client.put("/admin/environment", json={"firecrawl_api_url": None})
 
-    assert live.stronghold_url == default and row(reset.json(), "stronghold_url")["stored"] is False
+    assert live.firecrawl_api_url == default and row(reset.json(), "firecrawl_api_url")["stored"] is False
 
 
 def test_a_setting_read_once_is_reported_as_needing_a_restart(client):
-    answer = client.put("/admin/environment", json={"laya_url": "http://legion:29611/mcp", "stronghold_url": "http://s:1"})
+    answer = client.put("/admin/environment", json={"laya_url": "http://legion:29611/mcp", "firecrawl_api_url": "http://s:1"})
 
     assert answer.json()["restart"] == ["laya_url"]
 
@@ -83,8 +83,8 @@ def test_secrets_are_never_returned(client, live):
 
 
 @pytest.mark.parametrize("changes", [
-    {"stronghold_url": "ftp://x"},
-    {"stronghold_url": "http://user:pw@host"},
+    {"firecrawl_api_url": "ftp://x"},
+    {"firecrawl_api_url": "http://user:pw@host"},
     {"obsidian_timeout": 0},
     {"obsidian_verify_tls": "yes"},
     {"vault_dir": "  "},
@@ -92,12 +92,12 @@ def test_secrets_are_never_returned(client, live):
     {},
 ])
 def test_a_refused_change_saves_nothing(client, live, changes):
-    before = live.stronghold_url
+    before = live.firecrawl_api_url
 
     answer = client.put("/admin/environment", json={"laya_url": "http://ok:1/mcp", **changes} if changes else changes)
 
     assert answer.status_code == 400 and answer.json()["error"]
-    assert live.stronghold_url == before and live.laya_url == config.Settings().laya_url
+    assert live.firecrawl_api_url == before and live.laya_url == config.Settings().laya_url
     assert environment_settings.stored(live.settings_db_path) == {}
 
 
