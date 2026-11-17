@@ -24,7 +24,8 @@ class Settings:
     host: str = "127.0.0.1"
     port: int = 29650
     portcullis_url: str = "http://127.0.0.1:29601"
-    db_gateway_url: str = "http://127.0.0.1:29602"
+    treasury_url: str = "http://127.0.0.1:29602"
+    advertise_url: str | None = None
     armory_url: str = "http://127.0.0.1:29600"
     # Tool services that take attachments and speech (Bard, Scribe, Reader); each has its own token.
     bard_url: str = "http://127.0.0.1:29400"
@@ -53,7 +54,8 @@ def load_settings() -> Settings:
         host=os.getenv("STRONGHOLD_HOST") or str(raw.get("host", base.host)),
         port=int(os.getenv("STRONGHOLD_PORT") or raw.get("port", base.port)),
         portcullis_url=os.getenv("PORTCULLIS_URL") or base.portcullis_url,
-        db_gateway_url=os.getenv("DB_GATEWAY_URL") or base.db_gateway_url,
+        treasury_url=os.getenv("TREASURY_URL") or raw.get("treasury_url") or base.treasury_url,
+        advertise_url=raw.get("advertise_url") or None,
         armory_url=os.getenv("ARMORY_URL") or base.armory_url,
         bard_url=os.getenv("BARD_URL") or base.bard_url,
         scribe_url=os.getenv("SCRIBE_URL") or base.scribe_url,

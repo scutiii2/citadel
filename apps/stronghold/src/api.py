@@ -29,7 +29,7 @@ from src.brains import routes as brains_routes
 from src.brains.connections import BrainError
 from src.brains.gateway import BrainGateway
 from pathlib import Path
-from src.citadel_auth import Keyring, ServiceAuthMiddleware, from_env
+from src.citadel_auth import Keyring, ServiceAuthMiddleware, ServiceCatalog, advertised_url, from_env
 from src.citadel_auth.treasury import register_in_background
 from src.chats import routes as chats_routes
 from src.chats.store import ChatStore
@@ -83,6 +83,10 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         await keyring.ensure_identity()
+        catalog = ServiceCatalog(keyring, settings.treasury_url, cache_path=settings.data_dir / "catalog_cache.json")
+        app.state.catalog = catalog
+        if store is None:
+            catalog.start("stronghold", advertised_url(settings.host, settings.port, settings.advertise_url))
         clients: list[httpx.AsyncClient] = []
 
         def http(base_url: str) -> httpx.AsyncClient:
@@ -93,9 +97,9 @@ def create_app(
         app.state.settings = settings
         app.state.box = SecretBox(keys.secrets)
         app.state.store = store or DbGatewayClient(
-            http(settings.db_gateway_url), settings.db_instance, settings.db_connection, keyring)
+            http(settings.treasury_url), settings.db_instance, settings.db_connection, keyring)
         registration = None if store is not None else register_in_background(
-            keyring, settings.db_gateway_url, settings.db_instance, [settings.db_connection])
+            keyring, settings.treasury_url, settings.db_instance, [settings.db_connection])
         app.state.platform = platform or PortcullisClient(http(settings.portcullis_url), keyring)
         app.state.agent_gateway = agent_gateway or McpAgentGateway(keyring)
         app.state.agents = AgentDirectory(
@@ -145,6 +149,7 @@ def create_app(
         try:
             yield
         finally:
+            await catalog.stop()
             if registration is not None:
                 registration.cancel()
             await app.state.turns.shutdown()
