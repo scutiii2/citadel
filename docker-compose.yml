@@ -4,6 +4,7 @@
 # with peers; private identities remain in their own volumes. Per-app secrets load when present.
 # Runtime data and cache are folders in this repo: ${CITADEL_DATA_DIR:-./.data}/<service> and
 # ${CITADEL_CACHE_DIR:-./.cache}/<service> (set both in the root .env to move them).
+# The root .env is mounted read-only in each service; see citadel_auth/rootenv.py for what it overrides.
 # Container-only configs live in docker/configs and are mounted over each
 # app's configs/ file; the apps' own configs stay untouched.
 
@@ -19,6 +20,7 @@ services:
     environment:
       MCP_HOST: 0.0.0.0
       CITADEL_SERVICE: armory
+      CITADEL_ROOT_ENV: /citadel.env
       CITADEL_TRUST_DIR: /trust
       CITADEL_IDENTITY_DIR: /identity
       MCP_PORT: "29600"
@@ -35,6 +37,7 @@ services:
       - ${CITADEL_DATA_DIR:-./.data}/armory:/app/.data
       - ${CITADEL_CACHE_DIR:-./.cache}/armory:/app/.cache
       - identity_armory:/identity:rw
+      - ./.env:/citadel.env:ro
       - trust_armory:/trust/armory:rw
       - trust_legion:/trust/legion:ro
       - trust_treasury:/trust/treasury:ro
@@ -93,6 +96,7 @@ services:
     environment:
       AI_AGENT_HOST: 0.0.0.0
       CITADEL_SERVICE: legion
+      CITADEL_ROOT_ENV: /citadel.env
       CITADEL_TRUST_DIR: /trust
       CITADEL_IDENTITY_DIR: /identity
       AI_AGENT_ADVERTISE_URL: http://legion
@@ -107,6 +111,7 @@ services:
     volumes:
       - ./docker/configs/legion/servers.json:/app/configs/config_servers.json:ro
       - identity_legion:/identity:rw
+      - ./.env:/citadel.env:ro
       - trust_armory:/trust/armory:ro
       - trust_legion:/trust/legion:rw
       - trust_treasury:/trust/treasury:ro
@@ -125,6 +130,7 @@ services:
     environment:
       DB_GATEWAY_PORT: "29602"
       CITADEL_SERVICE: treasury
+      CITADEL_ROOT_ENV: /citadel.env
       CITADEL_TRUST_DIR: /trust
       CITADEL_IDENTITY_DIR: /identity
     volumes:
@@ -132,6 +138,7 @@ services:
       - ./docker/configs/treasury/connections.json:/app/configs/config_connections.json:ro
       - ${CITADEL_DATA_DIR:-./.data}/treasury:/app/.data
       - identity_treasury:/identity:rw
+      - ./.env:/citadel.env:ro
       - trust_armory:/trust/armory:ro
       - trust_legion:/trust/legion:ro
       - trust_treasury:/trust/treasury:rw
@@ -152,6 +159,7 @@ services:
     environment:
       STRONGHOLD_HOST: 0.0.0.0
       CITADEL_SERVICE: stronghold
+      CITADEL_ROOT_ENV: /citadel.env
       CITADEL_TRUST_DIR: /trust
       CITADEL_IDENTITY_DIR: /identity
       STRONGHOLD_PORT: "29650"
@@ -170,6 +178,7 @@ services:
       # keys.json: the key that encrypts saved secrets (brain keys, private-extension headers).
       - ${CITADEL_DATA_DIR:-./.data}/stronghold:/data
       - identity_stronghold:/identity:rw
+      - ./.env:/citadel.env:ro
       - trust_armory:/trust/armory:ro
       - trust_legion:/trust/legion:ro
       - trust_treasury:/trust/treasury:ro
@@ -189,6 +198,7 @@ services:
     environment:
       EMBER_API_HOST: 0.0.0.0
       CITADEL_SERVICE: portcullis
+      CITADEL_ROOT_ENV: /citadel.env
       CITADEL_TRUST_DIR: /trust
       CITADEL_IDENTITY_DIR: /identity
     volumes:
@@ -197,6 +207,7 @@ services:
       - ./apps/portcullis/.env:/app/.env
       - ${CITADEL_DATA_DIR:-./.data}/portcullis:/app/.data
       - identity_portcullis:/identity:rw
+      - ./.env:/citadel.env:ro
       - trust_armory:/trust/armory:ro
       - trust_legion:/trust/legion:ro
       - trust_treasury:/trust/treasury:ro

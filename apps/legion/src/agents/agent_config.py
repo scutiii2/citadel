@@ -27,10 +27,12 @@ from src.tools.private_extensions import turn as private_turn
 from src.agents import auto_tier
 from src.providers import context_breakdown, llm_config, llm_options, model_tiers, token_limits
 from src.providers import reasoning_effort as effort_limits
+from src.citadel_auth import apply_root_env
 from src.runtime.seed import seed_from_example
 from src.runtime.chat_history import validate_history
 
 _SECRETS_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
+apply_root_env(_SECRETS_PATH.parent)  # the Citadel root .env overrides this service's .env
 _log = logging.getLogger(__name__)
 
 

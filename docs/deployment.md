@@ -318,3 +318,11 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 ## Runtime data and cache
 
 Every service keeps its runtime data in `.data/<service>/` and files it can make again in `.cache/<service>/`, both in the Citadel folder (gitignored). Compose bind-mounts them into the containers; running a service directly uses the same folders. Set `CITADEL_DATA_DIR` and `CITADEL_CACHE_DIR` in the root `.env` to move them (a relative value is relative to the Citadel folder). Back up `.data/`; `.cache/` can be deleted. Service keys stay in the `identity_*` and `trust_*` Docker volumes, not in `.data/`.
+
+## Overriding a service's `.env` from the root `.env`
+
+A value in the root `.env` wins over the same name in `apps/<service>/.env`. Empty values are ignored.
+- `TAVILY_API_KEY=...` applies to every service that lists that name in its `.env.example` or `.env`.
+- `ARMORY__TAVILY_API_KEY=...` applies to Armory only (prefixes `ARMORY__`, `LEGION__`, `PORTCULLIS__`, `STRONGHOLD__`, `TREASURY__`; two underscores). It wins over the plain form.
+
+Other root variables, such as the gateway admin passwords and `CITADEL_DATA_DIR`, never reach a service's settings. Compose mounts the whole root `.env` read-only at `/citadel.env` in each service, so a process that can read files there can read those passwords too.

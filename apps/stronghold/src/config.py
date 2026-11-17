@@ -10,11 +10,12 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.citadel_auth import data_dir as _data_dir
+from src.citadel_auth import apply_root_env, data_dir as _data_dir
 
 from src.usage.settings import PricingSettings, UsageSettings
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+apply_root_env(PROJECT_DIR)  # the Citadel root .env overrides this service's .env
 
 
 @dataclass(frozen=True)

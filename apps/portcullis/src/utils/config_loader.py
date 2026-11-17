@@ -13,6 +13,8 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
+from src.citadel_auth import root_overrides
+
 
 
 def _ensure_from_example(path: Path) -> bool:
@@ -39,7 +41,7 @@ def load_env_secrets(path: str | Path) -> dict[str, str]:
     path = Path(path)
     if not _ensure_from_example(path):
         return {}
-    return {k: v for k, v in dotenv_values(path).items() if v is not None}
+    return {**{k: v for k, v in dotenv_values(path).items() if v is not None}, **root_overrides(path.parent)}
 
 
 def service_token(path: str | Path, name: str) -> str:

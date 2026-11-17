@@ -213,3 +213,21 @@ def test_data_and_cache_live_under_the_citadel_root(tmp_path, monkeypatch):
     monkeypatch.setenv("CITADEL_DATA_DIR", str(tmp_path / "env"))
     assert data_dir(project) == tmp_path / "env" / "armory"
     assert data_dir(tmp_path / "app") == (tmp_path / "app").resolve() / ".data"
+
+
+def test_root_env_overrides_a_service_env(tmp_path, monkeypatch):
+    from citadel_auth import root_overrides
+
+    monkeypatch.delenv("CITADEL_ROOT_ENV", raising=False)
+    monkeypatch.delenv("CITADEL_SERVICE", raising=False)
+    armory = tmp_path / "apps" / "armory"
+    legion = tmp_path / "apps" / "legion"
+    for folder, names in ((armory, "TAVILY_API_KEY=\nBARD_TOKEN=\n"), (legion, "BARD_TOKEN=\n")):
+        folder.mkdir(parents=True)
+        (folder / ".env.example").write_text(names, encoding="utf-8")
+    (tmp_path / ".env").write_text(
+        "TAVILY_API_KEY=plain\nBARD_TOKEN=shared\nARMORY__BARD_TOKEN=armory-only\nGATEWAY_ADMIN_PASSWORD=secret\nLEGION__EMPTY=\n",
+        encoding="utf-8")
+    assert root_overrides(armory) == {"TAVILY_API_KEY": "plain", "BARD_TOKEN": "armory-only"}
+    assert root_overrides(legion) == {"BARD_TOKEN": "shared"}
+    assert root_overrides(tmp_path / "other") == {}

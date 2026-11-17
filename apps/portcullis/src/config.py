@@ -7,11 +7,12 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.citadel_auth import data_dir
+from src.citadel_auth import apply_root_env, data_dir
 from src.utils.config_loader import load_json_config
 from src.utils.env_file import ensure_env_file
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+apply_root_env(PROJECT_DIR)  # the Citadel root .env overrides this service's .env
 CONFIGS_DIR = PROJECT_DIR / "configs"
 ENV_PATH = PROJECT_DIR / ".env"
 # Pre-.env layout: one secret_*.env file per concern. Read once to build .env.

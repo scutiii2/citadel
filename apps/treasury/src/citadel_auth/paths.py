@@ -7,6 +7,8 @@ as in a container, the service's own `.data` and `.cache` folders are used (moun
 import os
 from pathlib import Path
 
+from .rootenv import read_env_file
+
 
 def _root(project_dir: Path) -> Path | None:
     project = Path(project_dir).resolve()
@@ -15,15 +17,7 @@ def _root(project_dir: Path) -> Path | None:
 
 def _root_env(root: Path, name: str) -> str:
     """One value from the Citadel root `.env`, empty when the file or the key is missing."""
-    try:
-        lines = (root / ".env").read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return ""
-    for line in lines:
-        key, _, value = line.partition("=")
-        if key.strip() == name:
-            return value.strip().strip("'\"")
-    return ""
+    return read_env_file(root / ".env").get(name, "")
 
 
 def _folder(project_dir: Path, variable: str, default: str) -> Path:

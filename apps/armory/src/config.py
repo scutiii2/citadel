@@ -6,9 +6,10 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.citadel_auth import cache_dir, data_dir
+from src.citadel_auth import apply_root_env, cache_dir, data_dir
 
 _PROJECT = Path(__file__).resolve().parent.parent
+apply_root_env(_PROJECT)  # the Citadel root .env overrides this service's .env
 # Runtime data and cache live under the Citadel root: .data/armory and .cache/armory (see citadel_auth.paths).
 DATA = data_dir(_PROJECT)
 CACHE = cache_dir(_PROJECT)

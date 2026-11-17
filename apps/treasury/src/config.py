@@ -13,10 +13,11 @@ from typing import Any
 from dotenv import dotenv_values
 
 from src.cache import CacheSettings
-from src.citadel_auth import data_dir
+from src.citadel_auth import apply_root_env, data_dir
 from src.seed import seed_from_example
 
 ROOT = Path(__file__).resolve().parent.parent
+apply_root_env(ROOT)  # the Citadel root .env overrides this service's .env
 CONFIG_PATH = ROOT / "configs" / "config_app.json"
 CONNECTIONS_PATH = ROOT / "configs" / "config_connections.json"
 ENV_PATH = ROOT / ".env"
