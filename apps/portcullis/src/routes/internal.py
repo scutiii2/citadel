@@ -1,16 +1,14 @@
 """/internal: what Stronghold asks Portcullis for. Never for browsers.
 
-Stronghold asks here for what Portcullis owns: accounts, permissions and the logs. Every route needs the shared
-internal token; with none configured the routes refuse, because Portcullis is the
-one service that outside machines can reach.
+Stronghold asks here for accounts, permissions, logs and requester renewal.
+Mandatory service middleware admits only signed Stronghold assertions.
 """
 
 from __future__ import annotations
 
-import hmac
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Path, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,15 +17,10 @@ from src.deps import get_db_session, get_log_writer, get_settings
 from src.config import Settings
 from src.models import Account
 from src.services.log_service import LogWriter
+from src.services.service_auth import identity_headers
 
 
-def require_internal(request: Request, x_internal_token: str = Header("")) -> None:
-    expected: str | None = request.app.state.internal_token
-    if not expected or not hmac.compare_digest(expected.encode("utf-8"), x_internal_token.encode("utf-8")):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or missing internal API token")
-
-
-router = APIRouter(prefix="/internal", tags=["internal"], dependencies=[Depends(require_internal)])
+router = APIRouter(prefix="/internal", tags=["internal"])
 Uid = Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 
 
@@ -99,3 +92,26 @@ async def write_log(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such account")
     await logs.write(body.kind, account.id, body.source, body.message, body.details, body.prompts)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+class RequesterTokenIn(BaseModel):
+    uid: str = Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")
+
+
+@router.post("/requester-token")
+async def renew_requester(body: RequesterTokenIn, request: Request,
+                          session: AsyncSession = Depends(get_db_session),
+                          settings: Settings = Depends(get_settings)) -> dict[str, str]:
+    """Renew only active accounts with an existing running Stronghold turn."""
+    account = await _usable_account(session, settings, body.uid)
+    response = await request.app.state.stronghold.forward("GET", "/turns/running", account)
+    import json
+    try:
+        running = json.loads(response.body)
+    except (ValueError, TypeError):
+        running = None
+    if response.status != 200 or not isinstance(running, dict) or not running.get("chat_ids"):
+        raise HTTPException(status.HTTP_409_CONFLICT, "No running turn")
+    headers = identity_headers(account.username, account.email, account.uid, fresh=True,
+                               identity=request.app.state.keyring)
+    return {"token": headers["X-Citadel-Requester"]}
+

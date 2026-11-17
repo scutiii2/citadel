@@ -1,6 +1,8 @@
 """DbGatewayClient against a mock transport, plus the app wiring and config."""
 
 import asyncio
+
+from tests.auth_helpers import requester, assertion
 import functools
 import json
 
@@ -24,9 +26,9 @@ def sync(test):
     return run
 
 
-def make_client(handler, token: str | None = "tok") -> DbGatewayClient:
+def make_client(handler, identity=None) -> DbGatewayClient:
     http = httpx.AsyncClient(base_url="http://gateway", transport=httpx.MockTransport(handler))
-    return DbGatewayClient(http, "ember", "data", token)
+    return DbGatewayClient(http, "ember", "data", identity)
 
 
 @sync
@@ -40,16 +42,16 @@ async def test_get_returns_doc_and_sends_token_and_encoded_path():
     assert await make_client(handler).get("my col", "k/1") == {"a": 1}
     assert seen[0].method == "GET"
     assert seen[0].url.raw_path.decode() == f"{BASE}/collections/my%20col/records/k%2F1"
-    assert seen[0].headers["X-Internal-Token"] == "tok"
+    assert assertion(seen[0])["iss"] == "portcullis"
 
 
 @sync
 async def test_no_token_header_when_not_configured():
     def handler(request):
-        assert "X-Internal-Token" not in request.headers
+        assert assertion(request)["iss"] == "portcullis"
         return httpx.Response(200, json={"doc": {}})
 
-    await make_client(handler, token=None).get("c", "k")
+    await make_client(handler, identity=None).get("c", "k")
 
 
 @sync

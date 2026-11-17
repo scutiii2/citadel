@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.models import Account
-from src.services.mcp_session import identity_headers
+from src.services.service_auth import tool_headers
 
 _FORWARDED = ("content-type", "content-length", "content-range", "accept-ranges")
 
@@ -21,7 +21,7 @@ class BardGateway:
         self.client, self.base, self.token = client, base_url.rstrip("/"), token
 
     async def stream(self, file_id: str, account: Account, range_header: str | None = None) -> StreamingResponse:
-        headers = identity_headers(account.username, account.email, self.token, account.uid)
+        headers = tool_headers(account.username, account.email, self.token, account.uid)
         headers["Accept-Encoding"] = "identity"
         if range_header:
             headers["Range"] = range_header

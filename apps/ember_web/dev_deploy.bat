@@ -1,6 +1,6 @@
 @echo off
 rem Build and (re)start the ember_web container from the root docker-compose.yml on this machine.
-rem Needs Docker Desktop running and a root .env with INTERNAL_API_TOKEN. Extra args go to "up"
+rem Needs Docker Desktop running. Compose supplies service identity/trust mounts. Extra args go to "up"
 rem (e.g. dev_deploy.bat --no-deps). Dependencies that are not running yet are started, not rebuilt.
 setlocal
 set "SERVICE=ember_web"

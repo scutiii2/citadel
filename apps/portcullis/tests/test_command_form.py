@@ -4,6 +4,7 @@ options_url, and file uploads to mcp_server for file-path parameters."""
 from __future__ import annotations
 
 import base64
+from tests.auth_helpers import assertion
 
 import httpx
 from fastapi.testclient import TestClient
@@ -23,7 +24,7 @@ def mcp_server(request: httpx.Request) -> httpx.Response:
         app = path.split("/")[3]
         return httpx.Response(200, json={f"{app}-1": f"{app} v1"})
     if path == "/upload" and request.method == "POST":
-        if request.headers.get("x-internal-token") != "s3cret":
+        if assertion(request, "armory")["iss"] != "portcullis":
             return httpx.Response(401, json={"error": "Invalid or missing internal API token"})
         if b'filename="input.csv"' not in request.content:
             return httpx.Response(400, json={"error": "Unsupported file type - allowed: .csv"})
@@ -71,7 +72,7 @@ def test_options_refuse_undeclared_paths(client: TestClient, upstream: FakeUpstr
 
 def test_upload_forwards_the_file_with_the_token(client_factory, upstream: FakeUpstream) -> None:
     upstream.handler = mcp_server
-    client = client_factory(internal_token="s3cret")
+    client = client_factory()
     as_admin(client)
     data = base64.b64encode(b"a,b\n1,2\n").decode()
 

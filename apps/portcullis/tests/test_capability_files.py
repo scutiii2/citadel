@@ -1,6 +1,8 @@
 import base64
 import json
 
+from tests.auth_helpers import requester, assertion
+
 import httpx
 import pytest
 
@@ -66,7 +68,7 @@ def test_tools_view_cannot_execute(client, email, area):
 
 
 def test_files_and_jobs_use_trusted_identity_and_local_download_links(client_factory, db_gateway, upstream):
-    client = client_factory(internal_token='test-internal')
+    client = client_factory()
     uid = enable(client, db_gateway, 'pdf', 'video')
     def serve(request):
         area = request.url.path.split('/')[1]
@@ -79,8 +81,8 @@ def test_files_and_jobs_use_trusted_identity_and_local_download_links(client_fac
         assert result.json()[0]['download_url'] == f'/api/{public}/files/f_one/download'
         request = upstream.requests[-1]
         assert request.url.path == f'/{area}/ui/files'
-        assert request.headers['x-requester-uid'] == uid
-        assert request.headers['x-internal-token'] == 'test-internal'
+        assert requester(request)["sub"] == uid
+        assert assertion(request)["iss"] == "portcullis"
         job = client.get(f'/api/{public}/jobs/j_one')
         assert job.json()['result']['download_url'] == f'/api/{public}/files/f_one/download'
 
@@ -162,7 +164,7 @@ def test_pdf_content_remains_account_scoped(client, db_gateway, upstream):
     uid = enable(client, db_gateway, 'pdf')
     def serve(request):
         assert request.url.path == '/pdf/ui/files/f_one/content'
-        assert request.headers['x-requester-uid'] == uid
+        assert requester(request)["sub"] == uid
         return httpx.Response(200, content=b'%PDF-test', headers={'content-type': 'application/pdf'})
     upstream.handler = serve
     response = client.get('/api/pdf-merger/files/f_one/content')

@@ -11,6 +11,8 @@ from typing import Any, Protocol
 from urllib.parse import quote
 
 import httpx
+from src.citadel_auth import Keyring, ServiceAuth
+from src.services import service_auth
 
 Document = dict[str, Any]
 
@@ -42,21 +44,21 @@ class DocumentStore(Protocol):
 
 
 class DbGatewayClient:
-    """One instance and connection of db_gateway, reached over HTTP with the internal token.
+    """One instance and connection of db_gateway, reached over HTTP with signed service assertions.
 
     `client` carries the gateway's base URL and a timeout; the caller closes it."""
 
-    def __init__(self, client: httpx.AsyncClient, instance: str, connection: str, internal_token: str | None) -> None:
+    def __init__(self, client: httpx.AsyncClient, instance: str, connection: str, identity: Keyring | None) -> None:
         self._client = client
         self._base = f"/instances/{quote(instance, safe='')}/connections/{quote(connection, safe='')}"
-        self._headers = {"X-Internal-Token": internal_token} if internal_token else {}
+        self._auth = ServiceAuth(identity or service_auth.keyring, "treasury")
 
     def _record(self, collection: str, key: str) -> str:
         return f"{self._base}/collections/{quote(collection, safe='')}/records/{quote(key, safe='')}"
 
     async def _send(self, method: str, path: str, json: Any = None) -> httpx.Response:
         try:
-            return await self._client.request(method, path, json=json, headers=self._headers)
+            return await self._client.request(method, path, json=json, auth=self._auth)
         except httpx.TransportError as error:
             raise DbGatewayUnavailable(f"db_gateway is not reachable: {error.__class__.__name__}") from error
 

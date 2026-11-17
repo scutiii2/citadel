@@ -35,7 +35,7 @@ isolation does not hide data from the operator of the deployment.
 
 Armory needs `STRONGHOLD_URL` to reach Stronghold's internal connection resolver.
 The local default is `http://127.0.0.1:29650`; Compose sets
-`http://stronghold:29650`. Both services require the same `INTERNAL_API_TOKEN`.
+`http://stronghold:29650`. Both services require per-service Ed25519 assertions; requester identity comes from a Portcullis-signed token.
 Resolution fails closed without a token and trusted, valid account UID. No browser
 or model supplies an owner UID or receives a stored credential.
 

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import requester, assertion
+
 import json
 
 import httpx
@@ -34,7 +36,7 @@ def test_admin_reads_and_edits(client, upstream: FakeUpstream) -> None:
     assert saved.status_code == 200
     assert saved.json()["overrides"] == {"token_limits.default.max_tool_rounds": 20}
     sent = upstream.requests[-1]
-    assert sent.headers["x-requester-username"] == "root"
+    assert requester(sent)["username"] == "root"
     assert json.loads(sent.content) == {"token_limits.default.max_tool_rounds": 20}
 
 

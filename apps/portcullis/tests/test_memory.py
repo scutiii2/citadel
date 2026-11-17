@@ -2,6 +2,8 @@
 
 import json
 
+from tests.auth_helpers import requester, assertion
+
 import httpx
 
 from tests.test_account_uid import uids
@@ -41,14 +43,14 @@ def test_memory_requires_chat_permission_on_every_action(client, email, upstream
 
 
 def test_memory_goes_to_stronghold_as_the_signed_in_account(client_factory, upstream):
-    client = client_factory(internal_token="shared-test-token")
+    client = client_factory()
     as_admin(client)
     uid = uids(client)["root"]
 
     def respond(request):
         assert request.url.host == "127.0.0.1" and request.url.port == 29650
-        assert request.headers["X-Requester-Uid"] == uid
-        assert request.headers["X-Internal-Token"] == "shared-test-token"
+        assert requester(request)["sub"] == uid
+        assert assertion(request)["iss"] == "portcullis"
         if request.method == "DELETE":
             return httpx.Response(204)
         return httpx.Response(201 if request.method == "POST" else 200, json=[NOTE] if request.method == "GET" else NOTE)

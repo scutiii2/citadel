@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import requester, assertion
+
 import base64
 import json
 
@@ -48,7 +50,7 @@ def test_the_request_goes_to_stronghold_with_the_identity(client: TestClient, up
     sent = upstream.requests[-1]
     assert sent.method == "POST" and sent.url.path == f"/attachments/{path}"
     assert json.loads(sent.content) == body(name, b"hello")
-    assert sent.headers["x-requester-username"] == "root" and sent.headers["x-requester-uid"]
+    assert requester(sent)["username"] == "root" and requester(sent)["sub"]
     assert "cookie" not in sent.headers
 
 
@@ -102,7 +104,7 @@ def test_speak_and_voices_are_passed_to_stronghold(client: TestClient, upstream:
     assert (voices.method, voices.url.path) == ("GET", "/bard/voices")
     assert (speak.method, speak.url.path) == ("POST", "/bard/speak")
     assert json.loads(speak.content) == {"text": "hello", "voice": "v2"}
-    assert speak.headers["x-requester-username"] == "root"
+    assert requester(speak)["username"] == "root"
 
 
 @pytest.mark.parametrize("code, expected", [(400, 400), (413, 413), (422, 422), (503, 502)])

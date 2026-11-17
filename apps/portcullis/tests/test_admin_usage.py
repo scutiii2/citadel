@@ -4,6 +4,8 @@ Admin inspection is independent of chat and account-management access.
 """
 import json
 
+from tests.auth_helpers import requester, assertion
+
 import httpx
 import pytest
 from sqlalchemy import select
@@ -56,7 +58,7 @@ def test_my_usage_goes_to_stronghold_as_the_signed_in_account_whatever_the_brows
     assert usage["six_hour"]["used"] == 40 and [r["total_tokens"] for r in records] == [40]
     assert [r.url.path for r in upstream.requests] == ["/usage", "/usage/records"]
     assert upstream.requests[0].url.params["days"] == "7"
-    assert all(r.headers["x-requester-uid"] == uid for r in upstream.requests)
+    assert all(requester(r)["sub"] == uid for r in upstream.requests)
 
 
 def test_a_refusal_from_stronghold_passes_through(client, upstream):
@@ -101,7 +103,7 @@ def test_target_report_and_records_are_that_accounts_not_the_admins(client, acco
     records = client.get(f"/api/admin/usage/{accounts['alice']}/records", params={"limit": 1}).json()
 
     assert report["report"]["total_tokens"] == 135 and [r["total_tokens"] for r in records] == [135]
-    assert all(r.headers["x-requester-uid"] == uids(client)["alice"] for r in upstream.requests)
+    assert all(requester(r)["sub"] == uids(client)["alice"] for r in upstream.requests)
     assert upstream.requests[0].url.params["group_by"] == "model"
     assert client.get(f"/api/admin/usage/{accounts['empty']}").json()["report"]["total_tokens"] == 0
 

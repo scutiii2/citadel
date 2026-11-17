@@ -3,6 +3,8 @@ Stronghold keeps the links (its own tests cover expiry, limits and tokens)."""
 
 from __future__ import annotations
 
+from tests.auth_helpers import requester, assertion
+
 import json
 import uuid
 
@@ -109,7 +111,7 @@ def test_creating_sends_only_the_sanitized_conversation(client: TestClient, serv
 
     assert (response.status_code, response.json()) == (201, {"id": 5, "token": TOKEN})
     (call,) = sent_to(served, "/shares")
-    assert call.headers["x-requester-uid"] == uids(client)["root"]
+    assert requester(call)["sub"] == uids(client)["root"]
     body = json.loads(call.content)
     assert body == {
         "chat_id": chat_id, "title": "Quarterly report", "expires_in_days": 30,
@@ -201,7 +203,7 @@ def test_list_and_revoke_go_to_stronghold_as_the_signed_in_account(client: TestC
     listed, revoked = served.requests
     assert (listed.url.path, dict(listed.url.params)) == ("/shares", {"chat_id": "abcdefgh"})
     assert (revoked.method, revoked.url.path) == ("DELETE", "/shares/12")
-    assert listed.headers["x-requester-uid"] == revoked.headers["x-requester-uid"] == uid
+    assert requester(listed)["sub"] == requester(revoked)["sub"] == uid
 
 
 def test_share_ids_are_validated(client: TestClient, served) -> None:

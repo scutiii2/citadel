@@ -45,14 +45,14 @@ def test_an_invalid_key_is_refused_with_a_clear_message():
 
 def test_a_missing_key_is_generated_once_and_appended(tmp_path: Path):
     env = tmp_path / ".env"
-    env.write_text("INTERNAL_API_TOKEN=abc", encoding="utf-8")  # no trailing newline
+    env.write_text("TEST_CREDENTIAL=abc", encoding="utf-8")  # no trailing newline
 
     first = ensure_secrets_key(env)
     second = ensure_secrets_key(env)
 
     assert first == second
     text = env.read_text(encoding="utf-8")
-    assert text.startswith("INTERNAL_API_TOKEN=abc\n")
+    assert text.startswith("TEST_CREDENTIAL=abc\n")
     assert text.count(KEY_NAME) == 1
     assert load_env_secrets(env)[KEY_NAME] == first
     SecretBox(first)  # a usable key

@@ -1,14 +1,11 @@
 # Stack: portcullis_admin / legion_admin / armory_admin / stronghold_admin / treasury_admin -> portcullis -> armory / legion / treasury / stronghold; legion -> LayaModel (its own stack, reached through the host's published port 29220, not started here).
 # Start:  docker compose up -d --build
-# The internal token is made on first start and shared through the internal_token volume. Per-app
-# secrets stay in apps/<app>/.env and are loaded when the file exists.
+# Per-service Ed25519 identities are created on first start. Public trust is shared read-only
+# with peers; private identities remain in their own volumes. Per-app secrets load when present.
 # Container-only configs live in docker/configs and are mounted over each
 # app's configs/ file; the apps' own configs stay untouched.
 
 name: citadel
-
-x-internal-token: &internal_token  # shared file, made by whichever app starts first
-  INTERNAL_TOKEN_FILE: /run/citadel/internal_token
 
 services:
   armory:
@@ -18,7 +15,6 @@ services:
       - path: ./apps/armory/.env
         required: false
     environment:
-      <<: *internal_token
       MCP_HOST: 0.0.0.0
       CITADEL_SERVICE: armory
       CITADEL_TRUST_DIR: /trust
@@ -41,7 +37,6 @@ services:
       - trust_treasury:/trust/treasury:ro
       - trust_stronghold:/trust/stronghold:ro
       - trust_portcullis:/trust/portcullis:ro
-      - internal_token:/run/citadel
       # server_manager (Docker apps list/start/stop/logs) talks to the host daemon.
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on: [treasury]
@@ -93,7 +88,6 @@ services:
       - path: ./apps/legion/.env
         required: false
     environment:
-      <<: *internal_token
       AI_AGENT_HOST: 0.0.0.0
       CITADEL_SERVICE: legion
       CITADEL_TRUST_DIR: /trust
@@ -116,7 +110,6 @@ services:
       - trust_stronghold:/trust/stronghold:ro
       - trust_portcullis:/trust/portcullis:ro
       - agent_data:/app/.data
-      - internal_token:/run/citadel
     depends_on: [armory, conversationgateway, decisiongateway, treasury]
     networks: [core]
 
@@ -127,7 +120,6 @@ services:
       - path: ./apps/treasury/.env
         required: false
     environment:
-      <<: *internal_token
       DB_GATEWAY_PORT: "29602"
       CITADEL_SERVICE: treasury
       CITADEL_TRUST_DIR: /trust
@@ -142,7 +134,6 @@ services:
       - trust_treasury:/trust/treasury:rw
       - trust_stronghold:/trust/stronghold:ro
       - trust_portcullis:/trust/portcullis:ro
-      - internal_token:/run/citadel
     networks: [core]
 
   # Product logic. Only portcullis calls it, so no port is published.
@@ -156,7 +147,6 @@ services:
       - path: ./apps/stronghold/.env
         required: false
     environment:
-      <<: *internal_token
       STRONGHOLD_HOST: 0.0.0.0
       CITADEL_SERVICE: stronghold
       CITADEL_TRUST_DIR: /trust
@@ -184,7 +174,6 @@ services:
       - trust_portcullis:/trust/portcullis:ro
       # Legion's registry of running agents (notes ask the Laya and tag-writer agents).
       - agent_data:/agent_data:ro
-      - internal_token:/run/citadel
     depends_on: [treasury, armory]
     networks: [core]
 
@@ -195,7 +184,6 @@ services:
       - path: ./apps/portcullis/.env
         required: false
     environment:
-      <<: *internal_token
       EMBER_API_HOST: 0.0.0.0
       CITADEL_SERVICE: portcullis
       CITADEL_TRUST_DIR: /trust
@@ -211,7 +199,6 @@ services:
       - trust_treasury:/trust/treasury:ro
       - trust_stronghold:/trust/stronghold:ro
       - trust_portcullis:/trust/portcullis:rw
-      - internal_token:/run/citadel
       - agent_data:/agent_data:ro
     depends_on: [armory, legion, treasury, stronghold]
     networks: [core]
@@ -272,7 +259,6 @@ volumes:
   stronghold_data:
   conversationgateway_data:
   decisiongateway_data:
-  internal_token:
   trust_armory:
   trust_legion:
   trust_treasury:

@@ -3,6 +3,8 @@ marker, streamed from mcp_server's /download."""
 
 from __future__ import annotations
 
+from tests.auth_helpers import requester, assertion
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -62,7 +64,7 @@ def test_the_type_is_never_the_one_mcp_server_claims(client: TestClient, served:
 
 def test_the_path_goes_as_a_query_value_with_the_identity(client_factory, upstream: FakeUpstream) -> None:
     upstream.handler = mcp_server
-    client = client_factory(internal_token="s3cret")
+    client = client_factory()
     as_admin(client)
 
     client.get("/api/server/download", params={"path": PATH})
@@ -70,9 +72,9 @@ def test_the_path_goes_as_a_query_value_with_the_identity(client_factory, upstre
     sent = upstream.requests[-1]
     assert sent.method == "GET" and sent.url.path == "/download"
     assert sent.url.params["path"] == PATH
-    assert sent.headers["x-requester-username"] == "root"
-    assert len(sent.headers["x-requester-uid"]) == 32
-    assert sent.headers["x-internal-token"] == "s3cret"
+    assert requester(sent)["username"] == "root"
+    assert len(requester(sent)["sub"]) == 32
+    assert assertion(sent)["iss"] == "portcullis"
 
 
 def test_a_path_cannot_add_query_parameters_or_change_the_route(client: TestClient, served: FakeUpstream) -> None:

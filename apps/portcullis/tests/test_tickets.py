@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import requester, assertion
+
 import json
 
 import httpx
@@ -58,7 +60,7 @@ def test_every_reporter_route_goes_to_stronghold_as_the_signed_in_account(client
     assert member.post("/api/tickets/7/close", json={}).json()["path"] == "/tickets/7/close"
     assert member.post("/api/tickets/7/reopen", json={}).json()["path"] == "/tickets/7/reopen"
 
-    assert all(request.headers["x-requester-uid"] == uid for request in served.requests)
+    assert all(requester(request)["sub"] == uid for request in served.requests)
     assert json.loads(served.requests[0].content) == NEW
     assert len(served.requests) == 7
 
@@ -78,7 +80,7 @@ def test_every_staff_route_goes_to_stronghold_as_the_staff_account(client, serve
     assert admin.get("/api/admin/ticket-groups").json()["path"] == "/ticket-admin/groups"
     assert admin.patch("/api/admin/ticket-groups/3", json={"pinned": False}).json()["path"] == "/ticket-admin/groups/3"
 
-    assert all(request.headers["x-requester-uid"] == uid for request in served.requests)
+    assert all(requester(request)["sub"] == uid for request in served.requests)
     assert json.loads(served.requests[3].content) == {"status": "closed"}
     assert len(served.requests) == 8
 

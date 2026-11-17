@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import requester, assertion
+
 import logging
 
 import httpx
@@ -28,20 +30,20 @@ def test_deleting_an_account_purges_its_notes_once(client: TestClient, email: Fa
 
     sent = purges(upstream)
     assert [r.url.path for r in sent] == [f"/memory/accounts/{uid}"]
-    assert "x-internal-token" not in sent[0].headers  # none configured in this test
+    assert assertion(sent[0])["iss"] == "portcullis"
     assert uid not in caplog.text
     assert "/memory/accounts/[redacted]" in caplog.text
 
 
 def test_the_internal_token_is_sent_when_configured(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
-    client = client_factory(internal_token="secret-token")
+    client = client_factory()
     alice = make_member(client, email, "alice")
     as_admin(client)
     upstream.requests.clear()
 
     assert client.delete(f"/api/admin/accounts/{alice}").status_code == 204
 
-    assert purges(upstream)[0].headers["x-internal-token"] == "secret-token"
+    assert assertion(purges(upstream)[0])["iss"] == "portcullis"
 
 
 def test_a_failing_purge_never_blocks_the_deletion(client: TestClient, email: FakeEmailSender, upstream: FakeUpstream, caplog) -> None:

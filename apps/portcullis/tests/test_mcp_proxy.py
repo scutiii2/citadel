@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.auth_helpers import requester, assertion
+
 import json
 import re
 
@@ -12,6 +14,19 @@ from tests.test_registration import as_admin, new_invite, register
 AGENT_PATH = "/api/mcp/agents/claude-agent"
 SERVER_PATH = "/api/mcp/server"
 MCP_HEADERS = {"accept": "application/json, text/event-stream"}
+
+
+def test_browser_requester_metadata_is_replaced(client, upstream):
+    as_admin(client)
+    body = rpc("tools/call", {"name": "example", "arguments": {},
+        "_meta": {"requester_token": "forged", "requester": {"uid": "foreign"}}})
+    response = post(client, SERVER_PATH, body, **{"X-Citadel-Requester": "forged"})
+    assert response.status_code == 200
+    sent = upstream.requests[-1]
+    meta = json.loads(sent.content)["params"]["_meta"]
+    assert "requester" not in meta
+    assert meta["requester_token"] == sent.headers["X-Citadel-Requester"]
+    assert requester(sent)["username"] == "root"
 
 
 def rpc(method: str, params: dict | None = None, request_id: int = 1) -> dict:
@@ -129,10 +144,10 @@ def test_initialize_is_forwarded_with_identity_and_session_id(client: TestClient
     assert response.headers["mcp-session-id"] == "sess-1"
     sent = upstream.requests[-1]
     assert str(sent.url) == AGENTS[0]["url"]
-    assert sent.headers["x-requester-username"] == "root"
-    assert sent.headers["x-requester-email"] == "root@example.com"
-    assert re.fullmatch(r"[0-9a-f]{32}", sent.headers["x-requester-uid"])
-    assert "x-internal-token" not in sent.headers  # none configured
+    assert requester(sent)["username"] == "root"
+    assert requester(sent)["email"] == "root@example.com"
+    assert re.fullmatch(r"[0-9a-f]{32}", requester(sent)["sub"])
+    assert assertion(sent)["iss"] == "portcullis"
 
 
 def test_browser_cannot_forge_identity_or_leak_its_cookie(client: TestClient, upstream: FakeUpstream) -> None:
@@ -146,19 +161,19 @@ def test_browser_cannot_forge_identity_or_leak_its_cookie(client: TestClient, up
     )
 
     sent = upstream.requests[-1]
-    assert sent.headers["x-requester-username"] == "root"
-    assert sent.headers["x-requester-uid"] != "forged"
-    assert "x-internal-token" not in sent.headers
+    assert requester(sent)["username"] == "root"
+    assert requester(sent)["sub"] != "forged"
+    assert assertion(sent)["iss"] == "portcullis"
     assert "cookie" not in sent.headers
     assert sent.headers["mcp-session-id"] == "sess-9"  # MCP headers do pass through
 
 
 def test_internal_token_is_sent_when_configured(client_factory, upstream: FakeUpstream) -> None:
-    client = as_admin(client_factory(internal_token="s3cret-token"))
+    client = as_admin(client_factory())
 
     post(client, AGENT_PATH, rpc("initialize", {}))
 
-    assert upstream.requests[-1].headers["x-internal-token"] == "s3cret-token"
+    assert assertion(upstream.requests[-1])["iss"] == "portcullis"
 
 
 def test_event_stream_response_is_relayed(client: TestClient, upstream: FakeUpstream) -> None:

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import requester, assertion
+
 import json
 
 import httpx
@@ -33,7 +35,7 @@ def test_read_save_and_reset_go_to_stronghold(client: TestClient, upstream: Fake
     read, save, reset = upstream.requests
     assert [(r.method, r.url.path) for r in (read, save, reset)] == [("GET", "/tuning/limits"), ("PUT", "/tuning/limits"), ("DELETE", "/tuning/limits")]
     assert json.loads(save.content) == {"max_tool_rounds": 4}
-    assert read.headers["x-requester-username"] == "root" and read.headers["x-requester-uid"]
+    assert requester(read)["username"] == "root" and requester(read)["sub"]
 
 
 def test_stronghold_refusals_reach_the_browser_and_an_outage_is_a_502(client: TestClient, upstream: FakeUpstream) -> None:

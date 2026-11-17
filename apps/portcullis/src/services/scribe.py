@@ -16,7 +16,7 @@ from websockets.asyncio import client as websocket_client
 from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from src.models import Account
-from src.services.mcp_session import identity_headers
+from src.services.service_auth import tool_headers
 
 
 class _StreamRefused(Exception):
@@ -43,7 +43,7 @@ class ScribeGateway:
         base = urlsplit(self.base)
         uri = urlunsplit(("wss" if base.scheme == "https" else "ws", base.netloc,
                           base.path + "/api/stream", "", ""))
-        headers = identity_headers(account.username, account.email, self.token, account.uid)
+        headers = tool_headers(account.username, account.email, self.token, account.uid)
         byte_count = 0
 
         async def upload(remote):

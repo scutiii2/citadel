@@ -40,7 +40,7 @@ def transport(monkeypatch):
 
 
 def test_invite_uses_template_and_mcp_config(transport) -> None:
-    sender = email_service.McpEmailSender("http://mcp.test/mcp", "internal-secret")
+    sender = email_service.McpEmailSender("http://mcp.test/mcp", None)
     asyncio.run(sender.send_invite("a@x.com", "ABC123", EXPIRES))
     calls, setup, _ = transport
     name, args = calls[0]
@@ -51,7 +51,7 @@ def test_invite_uses_template_and_mcp_config(transport) -> None:
     assert name == "tool_email_sendEmail"
     assert args["to"] == "a@x.com" and args["subject"] == "Your Ember invite code"
     assert args["prefix_subject"] is False and args["capability_alias"] == "ember"
-    assert setup == [("http://mcp.test/mcp", {"X-Requester-Username": "ember", "X-Requester-Email": "", "X-Internal-Token": "internal-secret"})]
+    assert setup == [("http://mcp.test/mcp", {})]
 
 
 def test_verification_preserves_subject_and_code(transport) -> None:
@@ -59,7 +59,7 @@ def test_verification_preserves_subject_and_code(transport) -> None:
     calls, setup, _ = transport
     assert "Your verification code: 999" in calls[0][1]["body_text"]
     assert calls[0][1]["subject"] == "Verify your Ember email"
-    assert "X-Internal-Token" not in setup[0][1]
+    assert setup[0][1] == {}
 
 
 def test_missing_placeholder_raises() -> None:

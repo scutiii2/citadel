@@ -1,6 +1,8 @@
 """UsageClient: the check before and the record after every agent call, answered by Stronghold."""
 
 import json
+
+from tests.auth_helpers import requester, assertion
 import logging
 from datetime import datetime
 
@@ -23,7 +25,7 @@ RESULT = {"agent_usage": [
 
 
 def forwarder(handler):
-    return StrongholdForwarder(httpx.AsyncClient(transport=httpx.MockTransport(handler)), "http://stronghold.test", "tok")
+    return StrongholdForwarder(httpx.AsyncClient(transport=httpx.MockTransport(handler)), "http://stronghold.test", None)
 
 
 def run(coro):
@@ -46,7 +48,7 @@ def test_check_returns_none_when_under_the_limit_and_the_block_when_over():
     seen = []
 
     def handler(request):
-        seen.append((request.method, request.url.path, request.headers["x-requester-uid"], request.headers["x-internal-token"]))
+        seen.append((request.method, request.url.path, requester(request)["sub"], assertion(request)["iss"]))
         return httpx.Response(200, json=next(answers))
 
     usage = UsageClient(forwarder(handler), ACCOUNT)
@@ -54,7 +56,7 @@ def test_check_returns_none_when_under_the_limit_and_the_block_when_over():
     assert run(usage.check()) is None
     block = run(usage.check())
     assert (block.reason, block.reset_at) == ("weekly token limit reached", datetime(2026, 3, 20, 10))
-    assert seen == [("POST", "/usage/check", "u-1", "tok")] * 2
+    assert seen == [("POST", "/usage/check", "u-1", "portcullis")] * 2
 
 
 @pytest.mark.parametrize("answer", [

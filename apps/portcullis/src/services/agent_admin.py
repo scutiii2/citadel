@@ -3,7 +3,7 @@
 ai_agent owns the files (agents/<id>.json) and validates every change; its
 supervisor then starts, restarts or stops the matching process. This client
 only forwards: the browser never names a URL, the route is found in ai_agent's
-registry (the entry agent, else any running one), and the internal token and
+registry (the entry agent, else any running one), and signed service assertions and
 the admin's identity go along like they do for the MCP proxy.
 """
 
@@ -14,6 +14,8 @@ from typing import Any
 from urllib.parse import quote
 
 import httpx
+from src.citadel_auth import Keyring, ServiceAuth
+from src.services import service_auth
 
 from src.models import Account
 from src.services.agent_directory import NO_AGENT_RUNNING, AgentDirectory
@@ -40,21 +42,18 @@ class AgentAdmin:
         self,
         client: httpx.AsyncClient,
         directory: AgentDirectory,
-        internal_token: str | None,
+        identity: Keyring | None,
         traffic: TrafficRecorder | None = None,
     ) -> None:
         self._client = client
         self._directory = directory
-        self._internal_token = internal_token
+        self._identity = identity or service_auth.keyring
         self._traffic = traffic or TrafficRecorder()
 
     def _headers(self, account: Account) -> dict[str, str]:
-        headers = {"X-Requester-Username": account.username, "X-Requester-Email": account.email}
-        if account.uid:
-            headers["X-Requester-Uid"] = account.uid
-        if self._internal_token:
-            headers["X-Internal-Token"] = self._internal_token
-        return headers
+        if account is None:
+            return {}
+        return service_auth.identity_headers(account.username, account.email, account.uid, identity=self._identity)
 
     async def _base(self) -> str:
         agent = await self._directory.entry() or next(iter(await self._directory.all()), None)
@@ -67,7 +66,7 @@ class AgentAdmin:
         try:
             with self._traffic.timed("ai_agent", f"{method} /agents") as timing:
                 response = await self._client.request(
-                    method, f"{base}{path}", json=json, headers=self._headers(account), timeout=15.0
+                    method, f"{base}{path}", json=json, headers=self._headers(account), auth=ServiceAuth(self._identity, "legion"), timeout=15.0
                 )
                 timing.ok = response.status_code < 500
         except httpx.HTTPError as error:

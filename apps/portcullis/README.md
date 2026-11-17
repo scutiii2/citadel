@@ -13,7 +13,7 @@
 | `POST /api/bard/speak` | `tools.execute` + `files.download` | JSON `{text, voice?}`; returns `{file_id, duration_s, voice}`. Logs `bard.speak` without spoken text. |
 | `GET /api/bard/voices` | `tools.execute` + `files.download` | Returns `{voices: string[]}` for installed voices only. |
 
-Since Plan 5.7 Stronghold sends attached files, dictation and speech requests to Scribe, Reader, Bard and Armory; Portcullis checks the login and permission, passes the JSON on, and keeps only the streams (attachment content, Bard audio, the dictation WebSocket). Speech gateways supply account identity and the service's own token: `BARD_TOKEN` / `SCRIBE_TOKEN` / `READER_TOKEN` (environment, else `.env`; Stronghold reads the three from its own `.env`, Portcullis only `BARD_TOKEN` and `SCRIBE_TOKEN`), made on that tool service's admin page (Tokens card) and sent as `X-Internal-Token`. The shared `INTERNAL_API_TOKEN` is not used for tool services, which keep per-caller tokens; leave a token empty only for a tool service with no admin password (open, loopback). Rejected audio/text remains 400, quota/size 413 and unreachable services or refused credentials become 502. Existing audio upload and Bard streaming routes retain their contracts.
+Since Plan 5.7 Stronghold sends attached files, dictation and speech requests to Scribe, Reader, Bard and Armory; Portcullis checks the login and permission, passes the JSON on, and keeps only the streams (attachment content, Bard audio, the dictation WebSocket). Speech gateways supply account identity and the service's own token: `BARD_TOKEN` / `SCRIBE_TOKEN` / `READER_TOKEN` (environment, else `.env`; Stronghold reads the three from its own `.env`, Portcullis only `BARD_TOKEN` and `SCRIBE_TOKEN`), made on that tool service's admin page (Tokens card) and sent as `X-Internal-Token`. Tool services keep per-caller tokens; leave a token empty only for a tool service with no admin password (open, loopback). Rejected audio/text remains 400, quota/size 413 and unreachable services or refused credentials become 502. Existing audio upload and Bard streaming routes retain their contracts.
 
 Live dictation allows one stream per account per portcullis process, with at most
 64,000 bytes per PCM frame, 150 seconds of audio, 15 seconds idle while recording,
@@ -109,7 +109,7 @@ Restart Armory and portcullis after deployment; no database migration is needed.
 
 PDF/video workspaces proxy only fixed Armory routes (`/pdf/ui`, `/media/ui`,
 and the existing `/upload/pdf`). Armory must be restarted after installing
-the HTTP adapters, with the shared internal token configured and `pdf` / `video`
+the HTTP adapters, with service identity and public trust mounts configured and `pdf` / `video`
 online. The authenticated account must add the native capability from the
 Supermarket. Legacy standalone extension subscriptions do not grant native access.
 Every route requires `tools.execute`; file uploads additionally require
@@ -201,7 +201,7 @@ at most 200 memories per account. Creation dates survive edits. Mutations log on
 the action, never memory text. No categories or source labels are inferred.
 portcullis checks the login and `chat.use`, then passes each request to Stronghold
 (`/memory/...`), which calls Armory's token-protected `/memory/owners/{uid}/notes`
-routes; all three services need the same internal token and the memory capability
+routes; all three services need service identity and public trust mounts and the memory capability
 must be enabled. Stronghold down returns 502 `Stronghold is unavailable`, Armory
 down returns 503, missing/disabled memory returns 404, and redirects are refused.
 Deleting an account purges its memories through Stronghold (best effort; a failure
@@ -531,9 +531,9 @@ automatic reports. Add manual limits later if abuse appears.
   (`agents_registry_path`), never from the request. Only
   `content-type`, `accept`, `mcp-session-id`, `mcp-protocol-version` and
   `last-event-id` are forwarded; the browser's cookie and any
-  `X-Requester-*` / `X-Internal-Token` it sends are dropped, and portcullis
-  adds `X-Requester-Username` / `X-Requester-Email` from the session (plus
-  `X-Internal-Token` from `INTERNAL_API_TOKEN` in `.env`, if set).
+  claimed identity headers and metadata are dropped. Portcullis adds a signed
+  requester token from the authenticated account and a fresh Ed25519 service
+  assertion to each backend request. `/internal/*` admits only Stronghold.
   Responses, including SSE, are relayed chunk by chunk; the upstream request
   closes when the browser disconnects.
 - **What may pass** (`src/services/mcp_policy.py`, bodies up to 1 MB): the
@@ -544,11 +544,8 @@ automatic reports. Add manual limits later if abuse appears.
   `resources/list` / `resources/templates/list` / `resources/read`.
   Anything else gets a JSON-RPC error (`403`) and never reaches the server.
 
-ai_agent and mcp_server require that token on `/mcp` once they have one
-configured (use the same value in all four projects' `.env`
-files); without a token they're protected only by listening on
-`127.0.0.1`. ai_agent passes the asking user on to the mcp_server tools it
-calls (in each call's `_meta`), so mcp_server sees who asked either way.
+Legion and Armory require signed service assertions. Each downstream user
+operation verifies Portcullis's requester token, including per-tool MCP metadata.
 
 - **Chat turns** (`routes/chats.py`, `services/stronghold_forwarder.py`): Stronghold runs the
   answers (`apps/stronghold/src/turns`: Legion calls, the event buffer, approvals, questions,
@@ -652,8 +649,7 @@ calls (in each call's `_meta`), so mcp_server sees who asked either way.
     as it is. It must therefore be an **opaque id that mcp_server checks against
     the requesting account**, never a file path mcp_server would serve to anyone
     who names it. mcp_server's `/download` does exactly that: ids are random,
-    held in memory for 10 minutes, bound to the asking username (sent as
-    `X-Requester-Username`), and an unknown, expired or someone else's id are
+    held in memory for 10 minutes, bound to the verified requester username, and an unknown, expired or someone else's id are
     the same `404`. Today `/server logs` is the one tool that offers a file.
   - Known and left as is: five wrong logins lock that account (and address)
     out for the lockout time, so someone can lock a known username out on
@@ -663,8 +659,7 @@ calls (in each call's `_meta`), so mcp_server sees who asked either way.
   every 24 hours (default) into `data/backups` and keeps 14. See the config
   README. `python -m scripts.backup_db` makes one now. The Config issues page
   warns when backups are off, when `cookie_secure` is off on a host other
-  machines can reach, when HSTS is off while cookies are secure, and when
-  `INTERNAL_API_TOKEN` is empty.
+  machines can reach, when HSTS is off while cookies are secure.
 
 ## Changing the schema
 
@@ -697,7 +692,7 @@ migrations build, so a model edit without its migration is caught.
 
 ```
 configs/   config_app.json(.example)          host, port, db path, session/cookie settings
-.env       BOOTSTRAP_ADMIN_*, INTERNAL_API_TOKEN (+ .env.example); secrets/ is the old layout, read once to build it
+.env       BOOTSTRAP_ADMIN_* (+ .env.example); secrets/ is the old layout, read once to build it
 data/      ember_api.db (runtime, gitignored)
 src/
   run.py, app.py, config.py, db.py, deps.py, json_only.py, security.py, body_limit.py
@@ -761,8 +756,7 @@ it can sit on SQLite, Postgres or Firestore and be shared with other apps.
 
 `config_app.json` has a `db_gateway` block: `url` (default `http://127.0.0.1:29602`), `instance`
 (`ember`) and `connection` (`data`). The connection must be listed in that instance in
-db_gateway's `configs/config_connections.json` (see its `.example`). Calls send the same
-`INTERNAL_API_TOKEN` as the other services.
+db_gateway's `configs/config_connections.json` (see its `.example`). Calls require a short-lived Portcullis service assertion for Treasury.
 
 `src/services/db_gateway.py` has `DbGatewayClient` with `get`, `put`, `delete` and `query`
 (equality filters). A missing record is `None` or `False`. An unreachable gateway raises
@@ -784,7 +778,7 @@ Portcullis checks the login (and `chat.use`) and passes each request on. See [op
 | `POST /api/brains/connections/{scope}/test` | Bounded read-only candidate test; no activation or publication. |
 | `GET /api/brains/destinations` | Authorized destination labels, revisions and write availability. |
 | `POST /api/brains/browse` | Signed-in browse/read/status/scoped hybrid search, independent of Supermarket opt-in. |
-| (Stronghold) `POST /brains/resolve` | Internal-token/trusted-UID snapshots for Armory (no longer a Portcullis route); never a browser credential API. |
+| (Stronghold) `POST /brains/resolve` | Service-authenticated, signed requester snapshots for Armory (no longer a Portcullis route); never a browser credential API. |
 | `GET /api/brains/notes/{id}/review` | Owned Note content/hash/revision for publication review. |
 | `GET /api/brains/promotions` | Owned publication receipts and changed-source state. |
 | `POST /api/brains/notes/{id}/promote` | Recoverable, create-only reviewed publication; preserves the source Note. |
@@ -802,4 +796,4 @@ db_gateway, and account deletion purges all personal brain records.
 
 ## Internal API
 
-`/internal/...` is for Stronghold only. Every route needs the shared internal token and is refused when none is configured. `GET /internal/accounts/{uid}/permissions`, `POST /internal/accounts/{uid}/actions`, `POST /internal/errors` and `POST /internal/logs`. The web apps' nginx proxies only `/api/`, so these routes are not reachable from a browser.
+`/internal/...` is for Stronghold only. Every route requires a signed Stronghold service assertion. `POST /internal/requester-token` renews identity only for an active account with a running Stronghold turn. `GET /internal/accounts/{uid}/permissions`, `POST /internal/accounts/{uid}/actions`, `POST /internal/errors` and `POST /internal/logs`. The web apps' nginx proxies only `/api/`, so these routes are not reachable from a browser.

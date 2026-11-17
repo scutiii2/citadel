@@ -1,7 +1,7 @@
 """Portcullis's one way into Stronghold.
 
 Portcullis has already authenticated the account and checked its permission.
-This sends the request on with the account's identity and the internal token.
+This sends the request on with the account's identity and signed service assertions.
 The browser's cookies and headers are never forwarded: only what is built here
 leaves, so Stronghold cannot see a session. Stronghold's own answers below 500
 go back unchanged, so a route keeps the status and body Stronghold chose.
@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
+from src.citadel_auth import Keyring, ServiceAuth
+from src.services import service_auth
 
 from src.models import Account
 from src.services.traffic import TrafficRecorder
@@ -45,23 +47,18 @@ class StrongholdForwarder:
         self,
         client: httpx.AsyncClient,
         base_url: str,
-        internal_token: str | None,
+        identity: Keyring | None,
         traffic: TrafficRecorder | None = None,
     ) -> None:
         self._client = client
         self._base = base_url.rstrip("/")
-        self._internal_token = internal_token
+        self._identity = identity or service_auth.keyring
         self._traffic = traffic or TrafficRecorder()
 
     def _headers(self, account: Account | None) -> dict[str, str]:
-        headers: dict[str, str] = {}
-        if account is not None:  # None: a call nobody is logged in for (the public read of a share link)
-            headers = {"X-Requester-Username": account.username, "X-Requester-Email": account.email}
-            if account.uid:
-                headers["X-Requester-Uid"] = account.uid
-        if self._internal_token:
-            headers["X-Internal-Token"] = self._internal_token
-        return headers
+        if account is None:
+            return {}
+        return service_auth.identity_headers(account.username, account.email, account.uid, identity=self._identity)
 
     async def open_stream(self, path: str, account: Account | None, *, params: dict[str, str] | None = None) -> httpx.Response:
         """GET a fixed Stronghold path as a stream the caller must close (the turn events). No read timeout:
@@ -69,7 +66,7 @@ class StrongholdForwarder:
         try:
             request = self._client.build_request(
                 "GET", f"{self._base}{path}", params=params, headers=self._headers(account), timeout=_STREAM_TIMEOUT)
-            return await self._client.send(request, stream=True, follow_redirects=False)
+            return await self._client.send(request, stream=True, follow_redirects=False, auth=ServiceAuth(self._identity, "stronghold"))
         except httpx.HTTPError as error:
             logger.warning("stronghold GET %s unreachable: %s", redact(path), type(error).__name__)
             raise StrongholdUnavailable(type(error).__name__) from error
@@ -92,7 +89,7 @@ class StrongholdForwarder:
                     f"{self._base}{path}",
                     params=params,
                     json=json,
-                    headers=self._headers(account),
+                    headers=self._headers(account), auth=ServiceAuth(self._identity, "stronghold"),
                     timeout=_TIMEOUT,
                     follow_redirects=False,  # the identity headers must never follow one
                 )

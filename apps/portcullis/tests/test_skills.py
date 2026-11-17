@@ -1,6 +1,8 @@
 """/api/skills: Portcullis checks the login and chat.use; Stronghold answers."""
 
 import json
+
+from tests.auth_helpers import requester, assertion
 import logging
 
 import httpx
@@ -59,7 +61,7 @@ def test_every_skills_route_goes_to_stronghold_as_the_signed_in_account(client, 
     assert client.put(f"{URL}/1", json=EDIT).json() == {"path": "/skills/1"}
     assert client.delete(f"{URL}/1").status_code == 204
 
-    assert all(request.headers["x-requester-uid"] == uid for request in upstream.requests)
+    assert all(requester(request)["sub"] == uid for request in upstream.requests)
     assert json.loads(upstream.requests[2].content) == EDIT
     assert len(upstream.requests) == 4
 

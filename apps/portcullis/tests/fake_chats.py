@@ -7,6 +7,8 @@ answers like it. `down` makes every call a 503.
 
 from __future__ import annotations
 
+from tests.auth_helpers import requester, assertion
+
 import json
 import re
 import uuid
@@ -66,7 +68,7 @@ class FakeChats:
         self.calls.append((method, path))
         if self.down:
             return _answer(503, {"detail": "Storage is unavailable"})
-        uid = request.headers.get("x-requester-uid", "")
+        uid = requester(request)["sub"]
         body = json.loads(request.content) if request.content else {}
         if path.startswith("/chats/accounts/") and method == "DELETE":
             owner = path.rsplit("/", 1)[-1]

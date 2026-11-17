@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import requester, assertion
+
 import json
 
 import httpx
@@ -42,7 +44,7 @@ def test_both_routes_go_to_stronghold_as_the_signed_in_account(client: TestClien
     assert client.post(TITLES, json=DESCRIPTIONS).json() == {"path": "/triage/titles"}
     assert client.post(ASK, json={**YES_NO, "trace": True}).json() == {"path": "/triage/ask"}
 
-    assert all(request.headers["x-requester-uid"] == uid for request in upstream.requests)
+    assert all(requester(request)["sub"] == uid for request in upstream.requests)
     assert json.loads(upstream.requests[1].content) == {**YES_NO, "trace": True}
 
 

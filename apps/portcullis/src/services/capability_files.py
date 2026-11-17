@@ -5,6 +5,8 @@ from typing import Any, Literal
 from urllib.parse import quote, urlsplit
 
 import httpx
+from src.citadel_auth import Keyring, ServiceAuth
+from src.services import service_auth
 from fastapi.responses import StreamingResponse
 
 from src.models import Account
@@ -22,17 +24,18 @@ class CapabilityFailure(Exception):
 
 
 class CapabilityFilesGateway:
-    def __init__(self, client: httpx.AsyncClient, mcp_url: str, token: str | None):
-        self.client, self.base, self.token = client, base_url(mcp_url), token
+    def __init__(self, client: httpx.AsyncClient, mcp_url: str, identity: Keyring | None):
+        self.client, self.base = client, base_url(mcp_url)
+        self._identity = identity or service_auth.keyring
 
     def headers(self, account: Account) -> dict[str, str]:
-        return identity_headers(account.username, account.email, self.token, account.uid)
+        return identity_headers(account.username, account.email, account.uid, identity=self._identity)
 
     async def request(self, area: Area, method: str, path: str, account: Account, **kwargs) -> Any:
         try:
             response = await self.client.request(
                 method, f"{self.base}/{area}/ui{path}", headers=self.headers(account),
-                timeout=120, follow_redirects=False, **kwargs,
+                timeout=120, follow_redirects=False, auth=ServiceAuth(self._identity, "armory"), **kwargs,
             )
         except httpx.HTTPError as error:
             raise CapabilityFailure(502, "unavailable", "Armory is unreachable. Try again.") from error
@@ -105,7 +108,7 @@ class CapabilityFilesGateway:
             headers["Range"] = range_header
         request = self.client.build_request("GET", url, headers=headers, timeout=120)
         try:
-            response = await self.client.send(request, stream=True, follow_redirects=False)
+            response = await self.client.send(request, stream=True, follow_redirects=False, auth=ServiceAuth(self._identity, "armory"))
         except httpx.HTTPError as error:
             raise CapabilityFailure(502, "unavailable", "Armory is unreachable.") from error
         if response.status_code not in (200, 206):

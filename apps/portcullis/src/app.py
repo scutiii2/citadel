@@ -64,7 +64,7 @@ from src.services.db_gateway import DbGatewayClient, DbGatewayError, DocumentSto
 from src.services.email_service import EmailSender, McpEmailSender
 from src.services.log_service import LogWriter
 from src.services.mcp_proxy import McpProxy
-from src.services import uid_log_filter
+from src.services import uid_log_filter, service_auth
 from src.services.otp_service import OtpService
 from src.services.secret_box import SecretBox, ensure_secrets_key
 from src.services.public_rate_limiter import PublicReadLimiter
@@ -73,7 +73,7 @@ from src.services.session_service import SessionService
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 from src.services.usage_client import UsageUnavailable
 from src.services.traffic import TrafficMiddleware, TrafficRecorder
-from src.utils.config_loader import internal_token as load_internal_token, load_env_secrets, service_token
+from src.utils.config_loader import load_env_secrets, service_token
 
 logger = logging.getLogger(__name__)
 
@@ -128,36 +128,36 @@ def create_app(
             # Printed once, like chat_app; never logged to a file.
             print(f"Bootstrap admin created with password: {generated} (save it now, it won't be shown again)")
 
-        internal_token = load_internal_token(settings.env_path)
+        await service_auth.keyring.ensure_identity()
         # Raises SecretBoxError (a clear one-line message) when .env holds a key that is not valid.
         secret_box = SecretBox(ensure_secrets_key(settings.env_path))
         upstream = httpx.AsyncClient(transport=upstream_transport, timeout=_UPSTREAM_TIMEOUT)
 
         gateway_client = httpx.AsyncClient(base_url=settings.db_gateway.url, timeout=_DB_GATEWAY_TIMEOUT)
         app.state.db_gateway = db_gateway or DbGatewayClient(
-            gateway_client, settings.db_gateway.instance, settings.db_gateway.connection, internal_token or None
+            gateway_client, settings.db_gateway.instance, settings.db_gateway.connection, service_auth.keyring
         )
 
         app.state.settings = settings
         app.state.database = database
-        app.state.email_sender = email_sender or McpEmailSender(settings.mcp_server_url, internal_token or None, recorder)
+        app.state.email_sender = email_sender or McpEmailSender(settings.mcp_server_url, service_auth.keyring, recorder)
         app.state.upstream = upstream
-        app.state.internal_token = internal_token or None
+        app.state.keyring = service_auth.keyring
         app.state.bard_token = service_token(settings.env_path, "bard") or None
         app.state.scribe_token = service_token(settings.env_path, "scribe") or None
         app.state.dictation_accounts = set()
         app.state.secret_box = secret_box
         app.state.agent_directory = AgentDirectory(
-            HttpRegistrySource(settings.agents_registry_url, upstream, internal_token or None)
+            HttpRegistrySource(settings.agents_registry_url, upstream, service_auth.keyring)
             if settings.agents_registry_url
             else settings.agents_registry_path
         )
-        app.state.mcp_proxy = McpProxy(upstream, internal_token or None, recorder)
+        app.state.mcp_proxy = McpProxy(upstream, service_auth.keyring, recorder)
         app.state.stronghold = StrongholdForwarder(
-            upstream, settings.stronghold_url, internal_token or None, recorder
+            upstream, settings.stronghold_url, service_auth.keyring, recorder
         )
         uid_log_filter.install()
-        app.state.server_tools = server_tools or McpServerTools(settings.mcp_server_url, internal_token or None, recorder)
+        app.state.server_tools = server_tools or McpServerTools(settings.mcp_server_url, service_auth.keyring, recorder)
         app.state.logs = log_writer
         app.state.traffic = recorder
         recorder.start()
@@ -187,6 +187,7 @@ def create_app(
             await database.dispose()
 
     app = FastAPI(title="portcullis", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app.add_middleware(service_auth.InternalServiceAuthMiddleware, identity=service_auth.keyring)
     app.add_middleware(JsonOnlyMiddleware)
     # The Windows app calls from its own origin with a bearer token. No credentials (cookies) are allowed.
     app.add_middleware(

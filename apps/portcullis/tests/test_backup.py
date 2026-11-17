@@ -566,26 +566,6 @@ class TestDeploymentChecks:
         assert "config_app.json:backup.enabled" in issues_for(tmp_path, backup=BackupSettings(enabled=False))
         assert "config_app.json:backup.enabled" not in issues_for(tmp_path, backup=BackupSettings(enabled=True))
 
-    def test_an_empty_internal_token_is_flagged(self, tmp_path: Path) -> None:
-        empty = issues_for(tmp_path)  # conftest writes an empty token
-
-        assert ".env:INTERNAL_API_TOKEN" in empty
-
-    def test_a_set_internal_token_is_fine(self, tmp_path: Path) -> None:
-        make_settings(tmp_path, internal_token="s3cret-token-value")
-        settings = replace(make_settings(tmp_path, internal_token="s3cret-token-value"))
-        (tmp_path / "config_app.json").write_text("{}", encoding="utf-8")
-
-        found = {i.file + ":" + i.key for i in collect_issues(settings)}
-
-        assert ".env:INTERNAL_API_TOKEN" not in found
-
-    def test_the_token_value_never_appears_in_a_message(self, tmp_path: Path) -> None:
-        settings = make_settings(tmp_path, internal_token="s3cret-token-value")
-        (tmp_path / "config_app.json").write_text("{}", encoding="utf-8")
-
-        assert not any("s3cret-token-value" in i.message for i in collect_issues(settings))
-
 
 class TestBackupBlockInTheFile:
     def issues(self, tmp_path: Path, block: object) -> set[tuple[str, str]]:

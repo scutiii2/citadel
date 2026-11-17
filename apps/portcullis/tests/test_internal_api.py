@@ -10,7 +10,17 @@ from tests.conftest import FakeEmailSender
 from tests.test_admin import make_member
 from tests.test_registration import as_admin
 
-TOKEN = {"X-Internal-Token": "internal-secret"}
+from src.citadel_auth.testing import signed
+from src.services import service_auth
+from src.citadel_auth.keyring import Keyring
+
+
+def internal_headers(client):
+    own = client.app.state.keyring
+    caller = Keyring("stronghold", own.trust_dir, own.identity_dir.parent / "stronghold")
+    import asyncio
+    asyncio.run(caller.ensure_identity())
+    return signed(caller, "portcullis")
 
 
 def uid_of(client: TestClient, username: str) -> str:
@@ -21,33 +31,33 @@ def uid_of(client: TestClient, username: str) -> str:
     return client.portal.call(read)
 
 
-def test_refused_without_the_token_and_when_none_is_configured(client_factory) -> None:
-    locked = client_factory(internal_token="internal-secret")
+def test_browser_session_cannot_authenticate_internal_routes(client_factory) -> None:
+    locked = client_factory()
     assert locked.get("/internal/accounts/0/permissions").status_code == 401
-    assert locked.get("/internal/accounts/0/permissions", headers={"X-Internal-Token": "wrong"}).status_code == 401
+    assert locked.get("/internal/accounts/0/permissions", headers={"Authorization": "wrong"}).status_code == 401
     as_admin(locked)  # a browser session is not the token
     assert locked.get("/internal/accounts/0/permissions").status_code == 401
-    assert locked.get(f"/internal/accounts/{uid_of(locked, 'root')}/permissions", headers=TOKEN).status_code == 200
+    assert locked.get(f"/internal/accounts/{uid_of(locked, 'root')}/permissions", headers=internal_headers(locked)).status_code == 200
     unconfigured = client_factory()
-    assert unconfigured.get("/internal/accounts/0/permissions", headers={"X-Internal-Token": ""}).status_code == 401
+    assert unconfigured.get("/internal/accounts/0/permissions", headers={"Authorization": ""}).status_code == 401
 
 
 def test_error_log(client_factory) -> None:
-    client = client_factory(internal_token="internal-secret")
-    assert client.post("/internal/errors", json={"source": "tickets", "message": "alerts could not run"}, headers=TOKEN).status_code == 204
-    assert client.post("/internal/errors", json={"source": "Bad Source", "message": "x"}, headers=TOKEN).status_code == 422
+    client = client_factory()
+    assert client.post("/internal/errors", json={"source": "tickets", "message": "alerts could not run"}, headers=internal_headers(client)).status_code == 204
+    assert client.post("/internal/errors", json={"source": "Bad Source", "message": "x"}, headers=internal_headers(client)).status_code == 422
     as_admin(client)
     logged = client.get("/api/logs/error").text
     assert "stronghold.tickets" in logged and "alerts could not run" in logged
 
 
 def test_an_action_is_logged_for_the_named_account(client_factory, email: FakeEmailSender) -> None:
-    client = client_factory(internal_token="internal-secret")
+    client = client_factory()
     admin_uid = uid_of(client, "root")
     url = f"/internal/accounts/{admin_uid}/actions"
-    assert client.post(url, json={"action": "memory.create", "message": "Saved a memory"}, headers=TOKEN).status_code == 204
-    assert client.post(url, json={"action": "Bad Action", "message": "x"}, headers=TOKEN).status_code == 422
-    assert client.post(f"/internal/accounts/{'0' * 32}/actions", json={"action": "memory.create", "message": "x"}, headers=TOKEN).status_code == 404
+    assert client.post(url, json={"action": "memory.create", "message": "Saved a memory"}, headers=internal_headers(client)).status_code == 204
+    assert client.post(url, json={"action": "Bad Action", "message": "x"}, headers=internal_headers(client)).status_code == 422
+    assert client.post(f"/internal/accounts/{'0' * 32}/actions", json={"action": "memory.create", "message": "x"}, headers=internal_headers(client)).status_code == 404
     assert client.post(url, json={"action": "memory.create", "message": "x"}).status_code == 401
     as_admin(client)
     account_id = client.get("/api/auth/me").json()["id"]
@@ -56,13 +66,13 @@ def test_an_action_is_logged_for_the_named_account(client_factory, email: FakeEm
 
 
 def test_a_turn_log_line_lands_in_the_accounts_logs(client_factory) -> None:
-    client = client_factory(internal_token="internal-secret")
+    client = client_factory()
     admin_uid = uid_of(client, "root")
     line = {"kind": "chat_trace", "uid": admin_uid, "source": "chat.turn", "message": "hi → agent/model, 1.0s", "details": "{}", "prompts": None}
-    assert client.post("/internal/logs", json=line, headers=TOKEN).status_code == 204
-    assert client.post("/internal/logs", json={**line, "kind": "error", "source": "chat.answer", "message": "boom"}, headers=TOKEN).status_code == 204
-    assert client.post("/internal/logs", json={**line, "uid": "0" * 32}, headers=TOKEN).status_code == 404
-    assert client.post("/internal/logs", json={**line, "kind": "action"}, headers=TOKEN).status_code == 422
+    assert client.post("/internal/logs", json=line, headers=internal_headers(client)).status_code == 204
+    assert client.post("/internal/logs", json={**line, "kind": "error", "source": "chat.answer", "message": "boom"}, headers=internal_headers(client)).status_code == 204
+    assert client.post("/internal/logs", json={**line, "uid": "0" * 32}, headers=internal_headers(client)).status_code == 404
+    assert client.post("/internal/logs", json={**line, "kind": "action"}, headers=internal_headers(client)).status_code == 422
     assert client.post("/internal/logs", json=line).status_code == 401
     as_admin(client)
     account_id = client.get("/api/auth/me").json()["id"]

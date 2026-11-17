@@ -121,6 +121,11 @@ Files: `src/utils/{config_loader,shared_token}.py`, `app.py`, `routes/{agent_adm
 
 ## Changes found during work
 
+- 12.6 (in progress, uncommitted): Portcullis also needs `services/capability_files.py`, additional identity-bearing test modules, and operator text in `configs/README.md`, frontend deployment scripts, Armory's source README and `docs/obsidian-brains.md`. Browser MCP `_meta.requester_token` must be overwritten from the authenticated account, because downstream per-tool metadata takes precedence over session headers.
+- 12.6 (in progress): Chosen renewal check is Stronghold's existing `GET /turns/running`, scoped by a Portcullis-signed requester token, after checking the account is active/usable. Return a freshly minted token only when `chat_ids` is nonempty.
+- 12.6 (in progress): Concurrent Legion keyrings sharing one identity mount can read a partially created private key. Added a reproducing test and atomic key publication changes in the canonical library; final verification and synchronization remain pending.
+- Work stopped during 12.6, as instructed, on an unrelated Ember Vitest failure: `src/themeContrast.test.ts:39` opens missing `apps/ember_admin/src/style.css`. Vitest reported 180 passed files, one failed suite, 2208 passed tests. No failing test was weakened or deleted. Step 12.6 remains uncommitted; no live run was attempted.
+
 - 12.5: Persistent MCP authentication also crosses `tools/mcp_client/{transports,registry,sync_wrapper}.py`; router clients/routing and orchestrator delegation, summarization and skill reflection also contained shared-token gates. Migrated these callers and their additional test modules. External model gateways retain their own Treasury-backed credentials.
 - 12.5: Legion verifies requester tokens per MCP tool call (including `status`) and keeps a bounded per-user cache of verified renewal updates. Running asks read the newest verified token before each outbound call; shared sessions cannot inherit another caller's identity.
 

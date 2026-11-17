@@ -5,6 +5,7 @@ import hashlib
 import os
 import threading
 import time
+import uuid
 from collections import OrderedDict
 from pathlib import Path
 
@@ -48,15 +49,22 @@ class Keyring:
                 return
             self.identity_dir.mkdir(parents=True, exist_ok=True)
             path = self.identity_dir / "key.pem"
-            try:
-                descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            except FileExistsError:
-                private = serialization.load_pem_private_key(path.read_bytes(), password=None)
-            else:
+            if not path.exists():
+                # Publish only complete bytes, without replacing a concurrent winner's identity.
+                temporary_private = self.identity_dir / f"key.{uuid.uuid4().hex}.tmp"
                 private = Ed25519PrivateKey.generate()
-                with os.fdopen(descriptor, "wb") as output:
-                    output.write(private.private_bytes(serialization.Encoding.PEM,
-                        serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+                descriptor = os.open(temporary_private, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                try:
+                    with os.fdopen(descriptor, "wb") as output:
+                        output.write(private.private_bytes(serialization.Encoding.PEM,
+                            serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+                    try:
+                        os.link(temporary_private, path)
+                    except FileExistsError:
+                        pass
+                finally:
+                    temporary_private.unlink(missing_ok=True)
+            private = serialization.load_pem_private_key(path.read_bytes(), password=None)
             if not isinstance(private, Ed25519PrivateKey):
                 raise AuthError("identity is not Ed25519")
             if os.name != "nt":
@@ -68,7 +76,15 @@ class Keyring:
             # Atomic publish: another service never observes a partially-written public key.
             temporary = folder / f"key.{os.getpid()}.{threading.get_ident()}.tmp"
             temporary.write_bytes(public_bytes)
-            temporary.replace(folder / "key.pub")
+            published = folder / "key.pub"
+            try:
+                try:
+                    os.link(temporary, published)
+                except FileExistsError:
+                    if published.read_bytes() != public_bytes:
+                        temporary.replace(published)
+            finally:
+                temporary.unlink(missing_ok=True)
             self.private_key = private
             self.kid = key_id(public)
 

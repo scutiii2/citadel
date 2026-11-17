@@ -28,8 +28,9 @@ import httpx
 from dotenv import dotenv_values
 
 from src.config import Settings
-from src.utils.config_loader import internal_token, load_env_secrets
-from src.utils.shared_token import shared_token
+from src.utils.config_loader import load_env_secrets
+from src.citadel_auth import service_client
+from src.services import service_auth
 
 _PLACEHOLDER = re.compile(
     r"^(change[-_ ]?me|replace[-_ ]?me|your[-_ ].*|<.*>|x{3,}|todo)$|@example\.(com|org|net)$",
@@ -171,18 +172,6 @@ def _check_agents(data: Any) -> list[Problem]:
     return problems
 
 
-def _check_internal_api(env: dict[str, str]) -> list[Problem]:
-    if not (env.get("INTERNAL_API_TOKEN") or shared_token()):
-        return [
-            (
-                "INTERNAL_API_TOKEN",
-                "is empty: mcp_server and ai_agent accept requests from anything that can reach them. "
-                "Leave INTERNAL_TOKEN_FILE at its default so every app shares one generated token, or set the same INTERNAL_API_TOKEN in each project's .env",
-            )
-        ]
-    return []
-
-
 def _check_bootstrap_admin(env: dict[str, str]) -> list[Problem]:
     email = env.get("BOOTSTRAP_ADMIN_EMAIL", "")
     if email and "@" not in email:
@@ -193,7 +182,7 @@ def _check_bootstrap_admin(env: dict[str, str]) -> list[Problem]:
 _ENV_CHECKS: tuple[Callable[[dict[str, str]], list[Problem]], ...] = (_check_bootstrap_admin,)
 
 # What in .env only warrants a warning.
-_ENV_WARNINGS: tuple[Callable[[dict[str, str]], list[Problem]], ...] = (_check_internal_api,)
+_ENV_WARNINGS: tuple[Callable[[dict[str, str]], list[Problem]], ...] = ()
 
 
 def _read_json(path: Path, name: str, issues: list[ConfigIssue]) -> Any:
@@ -247,10 +236,9 @@ async def _registry_url_issues(settings: Settings) -> list[ConfigIssue]:
     """Fetches agents_registry_url once and checks what comes back."""
     url = settings.agents_registry_url
     name = "agents registry (URL)"
-    token = await asyncio.to_thread(internal_token, settings.env_path)
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(3.0)) as client:
-            response = await client.get(url, headers={"X-Internal-Token": token} if token else {})
+        async with service_client(service_auth.keyring, "legion", timeout=httpx.Timeout(3.0)) as client:
+            response = await client.get(url)
         response.raise_for_status()
         data = response.json()
     except (httpx.HTTPError, ValueError) as error:

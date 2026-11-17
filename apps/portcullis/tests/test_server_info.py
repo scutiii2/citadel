@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.auth_helpers import requester, assertion
+
 import json
 import uuid
 
@@ -79,7 +81,7 @@ def test_commands_and_help_are_passed_through(client: TestClient, upstream: Fake
 
     sent = upstream.requests[0]
     assert str(sent.url) == "http://mcp-server.internal/commands"
-    assert sent.headers["x-requester-username"] == "root"
+    assert requester(sent)["username"] == "root"
 
 
 def test_capabilities_list_and_admin_switch(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
@@ -106,7 +108,7 @@ def test_capability_page_is_passed_through(client: TestClient, upstream: FakeUps
     assert client.get("/api/capabilities/server_manager/gui").json() == GUI_PAGE
     missing = client.get("/api/capabilities/nope/gui")
     assert (missing.status_code, missing.json()["detail"]) == (404, "Capability 'nope' has no page")
-    assert upstream.requests[0].headers["x-requester-username"] == "root"
+    assert requester(upstream.requests[0])["username"] == "root"
 
 
 def test_capability_page_needs_tools_use(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:

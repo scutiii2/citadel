@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import requester, assertion
+
 import json
 
 import httpx
@@ -49,7 +51,7 @@ def test_every_template_route_goes_to_stronghold_as_the_signed_in_account(client
     assert client.put(f"{URL}/{TEMPLATE_ID}", json=BODY).json() == {"path": f"/templates/{TEMPLATE_ID}"}
     assert client.delete(f"{URL}/{TEMPLATE_ID}").status_code == 204
 
-    assert all(request.headers["x-requester-uid"] == uid for request in upstream.requests)
+    assert all(requester(request)["sub"] == uid for request in upstream.requests)
     assert json.loads(upstream.requests[1].content) == BODY
     assert len(upstream.requests) == 4
 

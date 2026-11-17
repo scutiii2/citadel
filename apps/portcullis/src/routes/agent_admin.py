@@ -31,7 +31,7 @@ AGENT_ID_PATTERN = r"^[a-z0-9][a-z0-9-]{0,62}$"
 def get_agent_admin(request: Request) -> AgentAdmin:
     return AgentAdmin(
         request.app.state.upstream, request.app.state.agent_directory,
-        request.app.state.internal_token, request.app.state.traffic,
+        request.app.state.keyring, request.app.state.traffic,
     )
 
 

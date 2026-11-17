@@ -5,7 +5,7 @@ form's select options (a tool's `options_url`) and file uploads (/upload) -
 the same routes chat_app's Chat and Capabilities pages use.
 
 Only these fixed paths are reachable, with the same identity and
-internal-token headers as the MCP proxy; the browser never names a URL
+signed requester headers as the MCP proxy; the browser never names a URL
 (an options path is one a tool's schema declares - see routes/server_info.py).
 """
 
@@ -16,6 +16,8 @@ from typing import Any
 from urllib.parse import quote, urlsplit, urlunsplit
 
 import httpx
+from src.citadel_auth import Keyring, ServiceAuth
+from src.services import service_auth
 
 from src.models import Account
 from src.services.traffic import TrafficRecorder
@@ -43,20 +45,17 @@ def base_url(mcp_url: str) -> str:
 
 class McpServerInfo:
     def __init__(
-        self, client: httpx.AsyncClient, mcp_url: str, internal_token: str | None, traffic: TrafficRecorder | None = None
+        self, client: httpx.AsyncClient, mcp_url: str, identity: Keyring | None, traffic: TrafficRecorder | None = None
     ) -> None:
         self._client = client
         self._base = base_url(mcp_url)
-        self._internal_token = internal_token
+        self._identity = identity or service_auth.keyring
         self._traffic = traffic or TrafficRecorder()
 
     def _headers(self, account: Account) -> dict[str, str]:
-        headers = {"X-Requester-Username": account.username, "X-Requester-Email": account.email}
-        if account.uid:
-            headers["X-Requester-Uid"] = account.uid
-        if self._internal_token:
-            headers["X-Internal-Token"] = self._internal_token
-        return headers
+        if account is None:
+            return {}
+        return service_auth.identity_headers(account.username, account.email, account.uid, identity=self._identity)
 
     async def _request(
         self,
@@ -76,7 +75,7 @@ class McpServerInfo:
                     params=params,
                     json=json,
                     files=files,
-                    headers=self._headers(account),
+                    headers=self._headers(account), auth=ServiceAuth(self._identity, "armory"),
                     timeout=timeout,
                 )
                 timing.ok = response.status_code < 500
@@ -198,7 +197,7 @@ class McpServerInfo:
         )
         try:
             with self._traffic.timed("mcp_server", "GET /download") as timing:
-                response = await self._client.send(request, stream=True)
+                response = await self._client.send(request, stream=True, auth=ServiceAuth(self._identity, "armory"))
                 timing.ok = response.status_code < 500
         except httpx.HTTPError as error:
             logger.warning("mcp_server download unreachable: %s", error)

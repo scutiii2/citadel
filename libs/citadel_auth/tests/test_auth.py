@@ -23,6 +23,24 @@ async def stack(tmp_path):
     return await make_stack(tmp_path, services=["portcullis", "stronghold", "legion", "armory", "treasury"])
 
 
+async def test_concurrent_process_identities_never_read_partial_private_key(tmp_path, monkeypatch):
+    """Independent Legion keyrings can start together against one identity mount."""
+    from pathlib import Path
+    original = os.open
+    final = tmp_path / "identity" / "key.pem"
+
+    def slow_create(path, flags, mode=0o777, **kwargs):
+        descriptor = original(path, flags, mode, **kwargs)
+        if Path(path) == final and flags & os.O_CREAT:
+            time.sleep(0.05)  # Expose any premature publication before its writer fills the file.
+        return descriptor
+
+    monkeypatch.setattr(os, "open", slow_create)
+    rings = [Keyring("legion", tmp_path / "trust", final.parent) for _ in range(16)]
+    await asyncio.gather(*(ring.ensure_identity() for ring in rings))
+    assert len({ring.kid for ring in rings}) == 1
+
+
 async def test_sign_verify_and_replay(stack):
     assertion = sign_assertion(stack["stronghold"], "armory")
     assert (await verify_assertion(stack["armory"], assertion, "armory")).name == "stronghold"

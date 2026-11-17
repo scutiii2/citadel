@@ -9,6 +9,7 @@ import logging
 from typing import Any, Protocol
 
 import httpx
+from src.citadel_auth import Keyring
 from mcp.types import PaginatedRequestParams
 
 from src.services.caller import Caller
@@ -29,15 +30,15 @@ class ServerTools(Protocol):
 
 
 class McpServerTools:
-    def __init__(self, url: str, internal_token: str | None, traffic: TrafficRecorder | None = None) -> None:
+    def __init__(self, url: str, identity: Keyring | None, traffic: TrafficRecorder | None = None) -> None:
         self._url = url
-        self._internal_token = internal_token
+        self._identity = identity
         self._traffic = traffic or TrafficRecorder()
 
     async def options_templates(self, caller: Caller) -> set[str]:
         """Every `options_url` a tool parameter declares (chat_app's command
         form hint): the only paths /api/commands/options may fetch."""
-        headers = identity_headers(caller.username, caller.email, self._internal_token, caller.uid)
+        headers = identity_headers(caller.username, caller.email, caller.uid, identity=self._identity)
         try:
             with self._traffic.timed("mcp_server", "options_templates"):
                 async with mcp_session(self._url, headers, _TIMEOUT) as session:

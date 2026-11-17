@@ -43,7 +43,7 @@ reads `from src.foo import bar`, matching chat_app's layout.
 - `upload_routes.py`, `download_routes.py` - plain HTTP routes for files:
   `POST /upload` takes a file dropped into a command form; `GET /download?path=<id>`
   hands a caller a file a tool offered it (an opaque id, bound to the
-  asking account; see `services/downloads.py`). Both need `X-Internal-Token`.
+  asking account; see `services/downloads.py`). Both require a signed service assertion and verified requester token.
 
 ## Runtime data (not code)
 

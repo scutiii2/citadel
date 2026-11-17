@@ -13,7 +13,6 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
-from src.utils.shared_token import shared_token
 
 
 def _ensure_from_example(path: Path) -> bool:
@@ -43,13 +42,8 @@ def load_env_secrets(path: str | Path) -> dict[str, str]:
     return {k: v for k, v in dotenv_values(path).items() if v is not None}
 
 
-def internal_token(path: str | Path) -> str:
-    """INTERNAL_API_TOKEN from the environment, else the secret file, else the shared token file. "" = not configured."""
-    return os.getenv("INTERNAL_API_TOKEN") or load_env_secrets(path).get("INTERNAL_API_TOKEN") or shared_token()
-
-
 def service_token(path: str | Path, name: str) -> str:
     """The token a tool service (Bard, Scribe...) issued to this app: `<NAME>_TOKEN` from the environment, else the secret file.
-    Tool services keep their own per-caller tokens, so the shared internal token is not a fallback. "" = not configured."""
+    Tool services keep their own per-caller tokens, and never reuse service assertions. "" = not configured."""
     key = f"{name.upper()}_TOKEN"
     return os.getenv(key) or load_env_secrets(path).get(key) or ""

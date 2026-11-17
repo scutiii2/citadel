@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import os
-
-# Tests never read or create the shared token file.
-os.environ["INTERNAL_TOKEN_FILE"] = ""
 
 import asyncio
 import json
@@ -17,6 +13,9 @@ from typing import Any
 
 import httpx
 import pytest
+from src.citadel_auth.testing import make_stack
+from src.services import service_auth
+from tests.auth_helpers import requester
 from fastapi.testclient import TestClient
 
 from src.app import create_app
@@ -79,7 +78,7 @@ class FakeUsage:
     def respond(self, request: httpx.Request) -> httpx.Response:
         if self.down:
             return httpx.Response(503, json={"detail": "Storage is unavailable"})
-        uid = request.headers.get("x-requester-uid", "")
+        uid = requester(request)["sub"]
         path, mine = request.url.path, [row for row in self.rows if row["owner"] == uid]
         if path == "/usage/check":
             used = sum(row["total_tokens"] for row in mine)
@@ -245,7 +244,6 @@ def make_settings(
     *,
     admin_password: str = ADMIN_PASSWORD,
     session_hours: int = 12,
-    internal_token: str = "",
     security: SecuritySettings | None = None,
     usage: UsageSettings | None = None,
     pricing: PricingSettings | None = None,
@@ -256,7 +254,6 @@ def make_settings(
     registry.write_text(json.dumps({"agents": AGENTS}), encoding="utf-8")
     env_path = tmp_path / ".env"
     env_path.write_text(
-        f"INTERNAL_API_TOKEN={internal_token}\n"
         f"BOOTSTRAP_ADMIN_USERNAME={ADMIN_USERNAME}\n"
         "BOOTSTRAP_ADMIN_EMAIL=root@example.com\n"
         f"BOOTSTRAP_ADMIN_PASSWORD={admin_password}\n",
@@ -357,3 +354,14 @@ def client_factory(
 @pytest.fixture
 def client(client_factory) -> TestClient:
     return client_factory()
+
+@pytest.fixture(scope="session")
+def auth_stack(tmp_path_factory):
+    return asyncio.run(make_stack(tmp_path_factory.mktemp("auth")))
+
+
+@pytest.fixture(autouse=True)
+def service_identity(monkeypatch, auth_stack):
+    monkeypatch.setattr(service_auth, "keyring", auth_stack["portcullis"])
+    service_auth._cache.clear()
+

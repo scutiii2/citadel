@@ -41,18 +41,18 @@ def test_migrate_leaves_an_existing_env_alone(tmp_path: Path) -> None:
 
 def test_ensure_copies_example_when_no_legacy_files(tmp_path: Path) -> None:
     example = tmp_path / ".env.example"
-    example.write_text("INTERNAL_API_TOKEN=\n", encoding="utf-8")
+    example.write_text("TEST_CREDENTIAL=\n", encoding="utf-8")
     env = tmp_path / ".env"
 
     ensure_env_file(env, example, tmp_path / "secrets")
 
-    assert env.read_text(encoding="utf-8") == "INTERNAL_API_TOKEN=\n"
+    assert env.read_text(encoding="utf-8") == "TEST_CREDENTIAL=\n"
 
 
 def test_ensure_prefers_legacy_files_over_example(tmp_path: Path) -> None:
     legacy = _legacy(tmp_path)
     example = tmp_path / ".env.example"
-    example.write_text("INTERNAL_API_TOKEN=\n", encoding="utf-8")
+    example.write_text("TEST_CREDENTIAL=\n", encoding="utf-8")
     env = tmp_path / ".env"
 
     ensure_env_file(env, example, legacy)

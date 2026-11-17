@@ -22,7 +22,7 @@ from the separate `LayaModel` project (see "Laya" below) and legion reaches it t
 
 ## 1. Local (Windows, macOS, Linux with Docker Desktop or Engine)
 
-1. The internal token is made on first start and shared through the `internal_token` volume; you set nothing.
+1. Service identity keys are made on first start; no shared token or auth setting is needed. Each service writes only its own public trust folder and private `identity_*` volume; peers mount that public folder read-only. Backing up private identity volumes is optional: a lost key is remade and peers reload its new public key.
    Per-app secrets live in `apps/<app>/.env` and are loaded when the file exists.
 2. Start the stack:
 
@@ -115,7 +115,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
    | `apps/portcullis/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
 
-   - Leave `INTERNAL_API_TOKEN` out of the per-app files. A value there wins over the generated token for that app only, so the apps would stop agreeing.
+   - Compose supplies `CITADEL_SERVICE`, `CITADEL_TRUST_DIR` and `CITADEL_IDENTITY_DIR`. Keep the trust and identity mounts; authentication is mandatory.
    - Skip `MCP_HOST`, `MCP_PORT` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. A gateway entry that points at a service
      published on the host uses `http://host.docker.internal:<port>`. Do not use `localhost` or
      the server's hostname for another service.
@@ -290,7 +290,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 
 - The Docker socket is root on the host. Anyone who can call the `tool_srv_*` tools can control every container.
 - Server Manager lists every container on the host, not only Citadel's. On ZimaOS that includes your other apps.
-- Keep the `internal_token` volume secret. Do not publish armory's port 29600.
+- Keep each service's private `identity_*` volume private. Do not publish armory's port 29600.
 - Keep `server` disabled where you do not need it.
 
 **Checking it works.** With the stack up and `server` enabled, ask the assistant to list apps, or call
@@ -302,7 +302,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 
 | Symptom | Cause and fix |
 |---|---|
-| `401 Invalid or missing internal API token` between apps | One app has its own `INTERNAL_API_TOKEN` in its `.env`. Remove it, then `docker compose up -d`. |
+| `401` or `403` between backends | Check service identity/trust mounts, clock synchronization and the caller's route policy. There is no legacy token fallback. |
 | legion cannot reach Laya | LayaModel is not running, or its published port is not 29220. Run `docker compose ps` in `LayaModel`, then `docker compose exec legion python -c "import urllib.request as u; print(u.urlopen('http://host.docker.internal:29220/health').status)"`. Expect 200. |
 | `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
 | `scp` will not log in | Check `DEPLOY_HOST` and that the folder exists. Run `ssh <host>` by hand to test. |
