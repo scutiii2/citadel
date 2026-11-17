@@ -8,7 +8,6 @@
   "bard_url": "http://127.0.0.1:29400",
   "scribe_url": "http://127.0.0.1:29401",
   "db_gateway": {
-    "url": "http://127.0.0.1:29602",
     "instance": "ember",
     "connection": "data"
   },
@@ -17,5 +16,6 @@
       "127.0.0.1",
       "::1"
     ]
-  }
+  },
+  "treasury_url": "http://127.0.0.1:29602"
 }

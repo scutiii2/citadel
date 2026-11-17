@@ -956,3 +956,5 @@ def http_catalog(name: str) -> httpx.AsyncClient:
 - User approved existing disposable test-fixture `.env` and signing-key files only; real configuration and secret files remain prohibited.
 
 - Task 4: existing navigation guard chooses first allowed page. Append Services after Instances/Connections to preserve default landing page; route must also be added to `router/index.ts`. Tests live beside views, not in `__tests__`.
+
+- Task 5b: `test_db_gateway_client.py` asserted removed `DbGatewaySettings.url`; migrate its validation coverage to `treasury_url`, retaining instance checks.

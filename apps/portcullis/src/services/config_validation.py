@@ -82,6 +82,7 @@ def _check_app(data: dict[str, Any]) -> list[Problem]:
         ("mcp_server_url", _is_http_url, "an http(s) URL"),
         ("security", lambda v: isinstance(v, dict), "an object"),
         ("backup", lambda v: isinstance(v, dict), "an object"),
+        ("treasury_url", _is_http_url, "an http(s) URL"),
         ("db_gateway", lambda v: isinstance(v, dict), "an object"),
     ]
     problems = [(key, f"must be {expected}") for key, check, expected in rules if key in data and not check(data[key])]
@@ -94,8 +95,6 @@ def _check_app(data: dict[str, Any]) -> list[Problem]:
                 problems.append((f"backup.{key}", "must be a positive integer"))
     gateway = data.get("db_gateway")
     if isinstance(gateway, dict):
-        if "url" in gateway and not _is_http_url(gateway["url"]):
-            problems.append(("db_gateway.url", "must be an http(s) URL"))
         for key in ("instance", "connection"):
             if key in gateway and not _is_text(gateway[key]):
                 problems.append((f"db_gateway.{key}", "must be a non-empty string"))

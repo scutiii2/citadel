@@ -106,16 +106,14 @@ class DbGatewaySettings:
     """config_app.json's "db_gateway" block: where new document data is stored
     (the db_gateway project), and which of its instances and connections to use."""
 
-    url: str = "http://127.0.0.1:29602"
     instance: str = "ember"
     connection: str = "data"
 
     @classmethod
     def from_config(cls, raw: dict) -> DbGatewaySettings:
-        url = str(raw.get("url") or cls.url).rstrip("/")
         instance = str(raw.get("instance") or cls.instance)
         connection = str(raw.get("connection") or cls.connection)
-        return cls(url=url, instance=instance, connection=connection)
+        return cls(instance=instance, connection=connection)
 
 
 @dataclass(frozen=True)
@@ -127,6 +125,8 @@ class Settings:
     session_hours: int
     cookie_secure: bool
     env_path: Path
+    treasury_url: str = "http://127.0.0.1:29602"
+    advertise_url: str | None = None
     default_role: str = "Member"
     # Origins of the Ember Windows app (Tauri). They may call the API with a bearer token; cookies are never allowed cross-origin.
     desktop_origins: tuple[str, ...] = ("tauri://localhost", "http://tauri.localhost", "https://tauri.localhost")
@@ -180,6 +180,8 @@ def load_settings() -> Settings:
         session_hours=int(raw.get("session_hours", 12)),
         cookie_secure=bool(raw.get("cookie_secure", False)),
         env_path=ENV_PATH,
+        treasury_url=os.getenv("TREASURY_URL") or raw.get("treasury_url") or "http://127.0.0.1:29602",
+        advertise_url=raw.get("advertise_url") or None,
         default_role=raw.get("default_role") or "Member",
         desktop_origins=tuple(raw.get("desktop_origins", ("tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"))),
         require_email_verification=bool(raw.get("require_email_verification", True)),

@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
+from src.citadel_auth import ServiceCatalog, advertised_url
 from src.citadel_auth.treasury import register_in_background
 from src.routes import brains, stronghold
 
@@ -134,17 +135,21 @@ def create_app(
             print(f"Bootstrap admin created with password: {generated} (save it now, it won't be shown again)")
 
         await service_auth.keyring.ensure_identity()
+        catalog = ServiceCatalog(service_auth.keyring, settings.treasury_url, cache_path=settings.database_path.parent / "catalog_cache.json")
+        app.state.catalog = catalog
+        if db_gateway is None:
+            catalog.start("portcullis", advertised_url(settings.host, settings.port, settings.advertise_url))
         # Raises SecretBoxError (a clear one-line message) when .env holds a key that is not valid.
         secret_box = SecretBox(ensure_secrets_key(settings.env_path))
         upstream = httpx.AsyncClient(transport=upstream_transport, timeout=_UPSTREAM_TIMEOUT)
 
-        gateway_client = httpx.AsyncClient(base_url=settings.db_gateway.url, timeout=_DB_GATEWAY_TIMEOUT)
+        gateway_client = httpx.AsyncClient(base_url=settings.treasury_url, timeout=_DB_GATEWAY_TIMEOUT)
         app.state.db_gateway = db_gateway or DbGatewayClient(
             gateway_client, settings.db_gateway.instance, settings.db_gateway.connection, service_auth.keyring
         )
         # Treasury keeps no list of its callers: Portcullis tells it which connection its instance uses.
         registration = None if db_gateway is not None else register_in_background(
-            service_auth.keyring, settings.db_gateway.url, settings.db_gateway.instance, [settings.db_gateway.connection])
+            service_auth.keyring, settings.treasury_url, settings.db_gateway.instance, [settings.db_gateway.connection])
 
         app.state.settings = settings
         app.state.database = database
@@ -189,6 +194,7 @@ def create_app(
         try:
             yield
         finally:
+            await catalog.stop()
             if registration is not None:
                 registration.cancel()
             if backups is not None:
