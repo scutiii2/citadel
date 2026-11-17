@@ -1,8 +1,7 @@
 # .env
 
-The credential values that `../configs/*.json` refers to by name
-via `${VAR}` placeholders, plus
-the server's own deployment settings. One file, `mcp_server/.env`,
+The server's own deployment settings and the credential values you
+prefer to keep out of the database. One file, `mcp_server/.env`,
 gitignored; `.env.example` is the committed template with every variable
 and its explanation.
 

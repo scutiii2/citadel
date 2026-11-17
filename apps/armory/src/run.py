@@ -71,7 +71,7 @@ async def _serve() -> None:
         banner = [
             "MCP server",
             f"  Endpoint : http://{settings.host}:{settings.port}/mcp",
-            f"  Config   : {settings.configs_dir}",
+            f"  Settings : {settings.settings_db_path}",
             f"  Capabilities: {', '.join(enabled_capabilities) or 'none'}",
             f"  Tools    : {len(tool_names)}",
             *(f"    - {name}" for name in tool_names),

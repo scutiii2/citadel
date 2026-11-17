@@ -339,6 +339,38 @@ async def set_armory_environment(
     return result
 
 
+@router.get("/armory-tuning")
+async def armory_tuning(account: Account = Depends(require_admin), info: McpServerInfo = Depends(get_server_info)) -> Any:
+    """The caps and lifetimes of Armory's PDF and video capabilities."""
+    return await _call(info.tuning(account))
+
+
+@router.put("/armory-tuning/{name}")
+async def set_armory_tuning(
+    changes: dict[str, Any],
+    name: Literal["pdf_merger", "media_downloader"],
+    account: Account = Depends(require_admin),
+    info: McpServerInfo = Depends(get_server_info),
+    logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    """Armory checks the whole result and saves it; the capability uses it from Armory's next start."""
+    result = await _call(info.set_tuning(account, name, changes))
+    await logs.action(account, "mcp.tuning", f"Changed {name} limits ({', '.join(sorted(changes)) or 'none'})")
+    return result
+
+
+@router.delete("/armory-tuning/{name}")
+async def reset_armory_tuning(
+    name: Literal["pdf_merger", "media_downloader"],
+    account: Account = Depends(require_admin),
+    info: McpServerInfo = Depends(get_server_info),
+    logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    result = await _call(info.reset_tuning(account, name))
+    await logs.action(account, "mcp.tuning", f"Reset {name} limits to the defaults")
+    return result
+
+
 @router.get("/armory-email")
 async def armory_email(account: Account = Depends(require_admin), info: McpServerInfo = Depends(get_server_info)) -> Any:
     """Armory's SMTP settings. The password is never returned."""

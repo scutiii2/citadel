@@ -13,8 +13,7 @@ starting/stopping/restarting/listing managed apps. Built to be called by
 
 ## Setup
 
-1. Copy `.env.example` to `.env` (created automatically on first run) and
-   the `.example` files under `configs/`, and fill in real values - see [Configuration](#configuration).
+1. Copy `.env.example` to `.env` (created automatically on first run). Everything else is set in Armory Admin - see [Configuration](#configuration).
 
 2. Run the server:
 
@@ -32,8 +31,8 @@ Both loaded once at boot by `src/run.py`:
 
 - **`.env`** - credentials and deployment settings, gitignored. Copy
   `.env.example` to `.env`. See [`docs/secrets.md`](docs/secrets.md).
-- **`configs/*.json`** - structure, mostly committed. See
-  [`configs/README.md`](configs/README.md).
+- **Armory Admin pages** - capabilities, extensions, deployment values, email, limits and ticket settings, saved in
+  `.data/armory/settings.db`. See [`docs/settings.md`](docs/settings.md).
 
 ## Security
 

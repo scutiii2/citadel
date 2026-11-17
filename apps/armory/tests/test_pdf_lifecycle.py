@@ -4,6 +4,7 @@ from tests.auth_helpers import FreshHeaders
 import asyncio
 import importlib
 import json
+from src.citadel_auth import settings_store
 from dataclasses import replace
 
 import pytest
@@ -90,8 +91,8 @@ def test_pdf_refresh_help_and_runtime_survive_reload(tmp_path, monkeypatch):
     {"limits": {"job_timeout_seconds": float("inf")}},
 ])
 def test_runtime_rejects_unsafe_tuning(tmp_path, updates):
-    config = tmp_path / "tuning.json"
-    config.write_text(json.dumps(updates))
-    test_settings = replace(settings, pdf_merger_config_path=config)
+    config = tmp_path / "settings.db"
+    settings_store.put(config, "tuning", "pdf_merger", updates)
+    test_settings = replace(settings, settings_db_path=config)
     with pytest.raises(ValueError):
         pdf_runtime._engine_config(test_settings)

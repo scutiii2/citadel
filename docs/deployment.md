@@ -126,7 +126,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
      when you rebuild.
 
 4. **Configs are tracked.** Every `configs/*.json` is in git and none has an `.example` twin; each `configs/` folder has a
-   `README.md` describing its keys. Secrets are `${NAME}` placeholders filled from the `.env` files (see the
+   `README.md` describing its keys (Armory has none: its settings are in Armory Admin, see `apps/armory/docs/settings.md`). Secrets are `${NAME}` placeholders filled from the `.env` files (see the
    `.env.example` beside each). Compose mounts the tracked files under `docker/configs/` read-only for container values (Portcullis's, Stronghold's
    and Treasury's `config_app.json`, Treasury's `config_connections.json`). Everything an
    admin changes at run time is saved in `.data/<service>/`, so it survives rebuilds and never shows in git: Armory's

@@ -35,6 +35,12 @@ export const ARMORY_PAGES: ArmoryPage[] = [
     permission: "capabilities.manage",
   },
   {
+    to: "/limits",
+    label: "Limits",
+    icon: ["M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3", "M1 14h6M9 8h6M17 16h6"],
+    permission: "capabilities.manage",
+  },
+  {
     to: "/email",
     label: "Email",
     icon: ["M3 6h18v12H3z", "m3 7 9 6 9-6"],

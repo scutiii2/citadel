@@ -24,7 +24,7 @@ reads `from src.foo import bar`, matching chat_app's layout.
 - `server.py` - the shared `FastMCP` instance every capability/resource
   registers onto.
 - `config.py` - `Settings`, the process-level env-var-driven
-  configuration (bind host/port, where `configs/`/`.data/`/`.logs/` live).
+  configuration (bind host/port, where `.data/`/`.logs/` live).
 - `commands.py` - the `@command` registry backing chat_app's `/`
   slash-command autocomplete; capability id is inferred from the
   decorated function's module path.
@@ -51,8 +51,8 @@ All runtime-data folders live one level up, at the project root rather
 than under `src/` - nothing in them is package code, so they don't need
 to sit alongside the modules that write to them:
 
-- **[`../configs/`](../configs/README.md)** - structured settings,
-  mostly committed.
+- **[`../docs/settings.md`](../docs/settings.md)** - what an administrator
+  sets in Armory Admin, saved in `settings.db`.
 - **[`../.env`](../docs/secrets.md)** - credential values,
   gitignored.
 - `../.data/` - runtime state shared across capabilities, gitignored.

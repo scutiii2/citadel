@@ -39,11 +39,10 @@ Ember's existing `/upload/pdf` path now uploads to the native store. It requires
 
 ## Configuration
 
-Armory settings read its normal environment configuration. Capability tuning lives in `configs/config_pdf_merger.json`, a tracked file explained in `configs/README.md`.
+Armory settings read its normal environment configuration. Caps and lifetimes are set on the Limits page of Armory Admin (see `docs/settings.md`).
 
 | Setting | Purpose |
 | --- | --- |
-| `MCP_PDF_MERGER_CONFIG_PATH` | Tuning JSON path; defaults to `configs/config_pdf_merger.json`. |
 | `MCP_PDF_MERGER_STORE_DIR` | Generated file store; defaults to `.data/armory/pdf_merger/store`. |
 | `MCP_PDF_MERGER_PUBLIC_BASE_URL` | Browser-reachable Armory base URL for download links; defaults to `http://127.0.0.1:{MCP_PORT}`. Configure it for remote browsers or a reverse proxy. |
 | `PDF_MERGER_SIGNING_KEY` | Stable HMAC signing secret. If absent, Armory warns and generates an ephemeral key; links stop working after a process restart. |

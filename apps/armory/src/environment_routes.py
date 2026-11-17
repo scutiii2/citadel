@@ -1,4 +1,5 @@
 """HTTP endpoints for the deployment values an administrator edits while Armory runs; plain routes beside the MCP surface.
+GET /admin/tuning, PUT and DELETE /admin/tuning/{pdf_merger|media_downloader} read, change and reset the caps and lifetimes of the PDF and video capabilities.
 GET/PUT /admin/email read and change the SMTP settings (the password only as `has_password`).
 GET /admin/environment lists every setting (a secret only as `has_value`); PUT /admin/environment takes
 ``{field: value | null}`` (null puts the `.env` or default value back) and answers 400 with the reason if any is refused."""
@@ -10,7 +11,21 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from src import config, environment_settings
-from src.services import app_config
+from src.services import app_config, capability_tuning
+
+
+def _validator(name: str):
+    if name == "pdf_merger":
+        from src.capabilities.pdf_merger.utils.pdf_runtime import validate_tuning
+    else:
+        from src.capabilities.media_downloader.utils.media_downloads import validate_tuning
+    return validate_tuning
+
+
+def tuning_view(path) -> dict[str, object]:
+    """The caps and lifetimes of the PDF and video capabilities, with whether each was changed from the defaults."""
+    return {name: {**capability_tuning.document(path, name), "stored": capability_tuning.is_stored(path, name)}
+            for name in capability_tuning.DEFAULTS}
 
 
 def email_view(path) -> dict[str, object]:
@@ -31,6 +46,32 @@ def email_view(path) -> dict[str, object]:
 
 
 def install_environment_routes(app: Starlette) -> None:
+    async def get_tuning(request: Request) -> JSONResponse:
+        return JSONResponse(tuning_view(config.settings.settings_db_path))
+
+    async def put_tuning(request: Request) -> JSONResponse:
+        name = request.path_params["name"]
+        try:
+            changes = await request.json()
+        except Exception:  # noqa: BLE001 - malformed JSON is a 400, not a 500
+            changes = None
+        try:
+            if name not in capability_tuning.DEFAULTS:
+                raise capability_tuning.TuningError(f"Unknown capability: {name}.")
+            capability_tuning.save(config.settings.settings_db_path, name, changes, _validator(name))
+        except capability_tuning.TuningError as error:
+            return JSONResponse({"error": str(error)}, status_code=400)
+        except OSError as error:
+            return JSONResponse({"error": f"Could not save the limits ({error.strerror or error})"}, status_code=409)
+        return JSONResponse({**tuning_view(config.settings.settings_db_path), "applies": "next start"})
+
+    async def reset_tuning(request: Request) -> JSONResponse:
+        try:
+            capability_tuning.reset(config.settings.settings_db_path, request.path_params["name"])
+        except capability_tuning.TuningError as error:
+            return JSONResponse({"error": str(error)}, status_code=400)
+        return JSONResponse({**tuning_view(config.settings.settings_db_path), "applies": "next start"})
+
     async def get_email(request: Request) -> JSONResponse:
         return JSONResponse(email_view(config.settings.settings_db_path))
 
@@ -72,5 +113,8 @@ def install_environment_routes(app: Starlette) -> None:
 
     app.add_route("/admin/environment", get_environment, methods=["GET"])
     app.add_route("/admin/environment", put_environment, methods=["PUT"])
+    app.add_route("/admin/tuning", get_tuning, methods=["GET"])
+    app.add_route("/admin/tuning/{name}", put_tuning, methods=["PUT"])
+    app.add_route("/admin/tuning/{name}", reset_tuning, methods=["DELETE"])
     app.add_route("/admin/email", get_email, methods=["GET"])
     app.add_route("/admin/email", put_email, methods=["PUT"])

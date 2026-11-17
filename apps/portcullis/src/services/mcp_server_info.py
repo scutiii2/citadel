@@ -135,6 +135,19 @@ class McpServerInfo:
         body = await self._request("PUT", "/admin/environment", account, json=changes)
         return body if isinstance(body, dict) else {}
 
+    async def tuning(self, account: Account) -> dict[str, Any]:
+        """Armory's caps and lifetimes for the PDF and video capabilities."""
+        body = await self._request("GET", "/admin/tuning", account)
+        return body if isinstance(body, dict) else {}
+
+    async def set_tuning(self, account: Account, name: str, changes: dict[str, Any]) -> dict[str, Any]:
+        body = await self._request("PUT", f"/admin/tuning/{quote(name, safe='')}", account, json=changes)
+        return body if isinstance(body, dict) else {}
+
+    async def reset_tuning(self, account: Account, name: str) -> dict[str, Any]:
+        body = await self._request("DELETE", f"/admin/tuning/{quote(name, safe='')}", account)
+        return body if isinstance(body, dict) else {}
+
     async def email_settings(self, account: Account) -> dict[str, Any]:
         """Armory's SMTP settings; the password is only `has_password`."""
         body = await self._request("GET", "/admin/email", account)

@@ -56,8 +56,8 @@ top level is a **closed whitelist** - nothing else is allowed there:
 - **No runtime state or capability-owned config here.** A capability's
   own state lives outside `src/`: runtime data in `.data/armory/<capability_name>/`
   and rebuildable files in `.cache/armory/<capability_name>/`, both in the
-  Citadel folder and gitignored; tracked tuning is a `configs/config_<name>.json`
-  with its keys explained in `configs/README.md`. See each
+  Citadel folder and gitignored; tuning an administrator can change is a document in the `tuning`
+  table of `settings.db`, explained in `docs/settings.md`. See each
   capability's own `STATIC-GUIDELINES.md` for what it actually uses.
   `__pycache__/` is exempt from this rule (Python controls that name,
   not this convention).
@@ -262,7 +262,7 @@ adding or removing a declaration means changing that test too.
    standard explain-the-result note to that tool's description. There is no `needs_ai_review` or
    `ai_required` metadata anymore, and slash commands never go through an AI agent.
 5. `capabilities/<name>/README.md` - what it reads (which
-   `../../configs/*.json` files, which `../../.env` variables), what (if
+   settings (`docs/settings.md`), which `../../.env` variables), what (if
    anything) it owns under its own dot-folders, and how to toggle it
    off. Every capability README uses the same three tables under fixed
    headings: `## Tools` (`Tool | Purpose | Connection`; slash-command tools

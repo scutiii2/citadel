@@ -354,3 +354,34 @@ def test_armory_email_is_admin_only_and_never_logs_the_password(client_factory, 
     login(member, "alice")
     assert member.get("/api/armory-email").status_code == 403
     assert member.put("/api/armory-email", json={"smtp_port": 25}).status_code == 403
+
+
+def test_armory_limits_pass_through_are_admin_only_and_logged(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
+    def armory(request: httpx.Request) -> httpx.Response:
+        if not request.url.path.startswith("/admin/tuning"):
+            return mcp_server(request)
+        if request.method == "PUT" and json.loads(request.content).get("file_ttl_hours") == 0:
+            return httpx.Response(400, json={"error": "PDF expiry and sweep intervals must be positive and finite"})
+        return httpx.Response(200, json={"pdf_merger": {"file_ttl_hours": 6, "stored": request.method == "PUT"}, "applies": "next start"})
+
+    upstream.handler = armory
+    admin = as_admin(client_factory())
+
+    assert admin.get("/api/armory-tuning").json()["pdf_merger"]["file_ttl_hours"] == 6
+    assert admin.put("/api/armory-tuning/pdf_merger", json={"file_ttl_hours": 12}).status_code == 200
+    assert upstream.requests[-1].url.path == "/admin/tuning/pdf_merger" and json.loads(upstream.requests[-1].content) == {"file_ttl_hours": 12}
+    refused = admin.put("/api/armory-tuning/pdf_merger", json={"file_ttl_hours": 0})
+    assert (refused.status_code, refused.json()["detail"]) == (400, "PDF expiry and sweep intervals must be positive and finite")
+    assert admin.delete("/api/armory-tuning/media_downloader").status_code == 200
+    assert upstream.requests[-1].method == "DELETE" and upstream.requests[-1].url.path == "/admin/tuning/media_downloader"
+    assert admin.put("/api/armory-tuning/other", json={"file_ttl_hours": 1}).status_code == 422
+    uid = admin.get("/api/auth/me").json()["id"]
+    logged = " ".join(entry["message"] for entry in admin.get("/api/logs/action", params={"actor": uid}).json())
+    assert "Changed pdf_merger limits (file_ttl_hours)" in logged and "Reset media_downloader limits" in logged
+
+    member = client_factory()
+    make_member(member, email)
+    login(member, "alice")
+    assert member.get("/api/armory-tuning").status_code == 403
+    assert member.put("/api/armory-tuning/pdf_merger", json={"file_ttl_hours": 1}).status_code == 403
+    assert member.delete("/api/armory-tuning/pdf_merger").status_code == 403

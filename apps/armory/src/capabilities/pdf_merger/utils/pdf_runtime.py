@@ -11,7 +11,7 @@ import threading
 from dataclasses import asdict, replace
 from urllib.parse import urlsplit
 
-from src.services.app_config import load_config
+from src.services import capability_tuning
 
 logger = logging.getLogger(__name__)
 
@@ -75,10 +75,10 @@ _lock = threading.Lock()
 _runtime = None
 
 
-def _engine_config(settings):
-    from src.capabilities.pdf_merger.utils.config import Limits, Settings
+def validate_tuning(raw):
+    """Refuse an unusable caps-and-lifetimes document (ValueError); the Limits page uses it before saving."""
+    from src.capabilities.pdf_merger.utils.config import Limits
 
-    raw = load_config(settings.pdf_merger_config_path)
     limits = Limits.from_config(raw.get("limits", {}))
     for name, value in asdict(limits).items():
         if not math.isfinite(value) or value <= 0:
@@ -91,6 +91,14 @@ def _engine_config(settings):
     link = float(raw.get("download_link_minutes", 60)) * 60
     if any(not math.isfinite(v) or v < 1 for v in (ttl, sweep, link)):
         raise ValueError("PDF expiry and sweep intervals must be positive and finite")
+    return limits, wait, ttl, sweep, link
+
+
+def _engine_config(settings):
+    from src.capabilities.pdf_merger.utils.config import Settings
+
+    raw = capability_tuning.document(settings.settings_db_path, "pdf_merger")
+    limits, wait, ttl, sweep, link = validate_tuning(raw)
     url = settings.pdf_merger_public_base_url or f"http://127.0.0.1:{settings.port}"
     parsed = urlsplit(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.query or parsed.fragment or parsed.username:

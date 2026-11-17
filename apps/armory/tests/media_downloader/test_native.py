@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import json
+from src.citadel_auth import settings_store
 import threading
 from dataclasses import replace
 from pathlib import Path
@@ -198,23 +199,20 @@ def test_ttl_sweeper_runs_without_tool_calls(settings, fake_extractor):
         runtime.close()
 
 
-def test_native_config_uses_existing_shape(tmp_path, monkeypatch):
-    path = tmp_path / "config_media_downloader.json"
-    tracked = Path(__file__).parents[2] / "configs/config_media_downloader.json"
-    path.write_text(tracked.read_text())
-    monkeypatch.setattr(media_downloads, "settings", replace(media_downloads.settings, media_config_path=path, media_public_base_url="https://armory.example", media_signing_key="test-only-key"))
+def test_native_config_uses_the_defaults_when_nothing_is_saved(tmp_path, monkeypatch):
+    path = tmp_path / "settings.db"
+    monkeypatch.setattr(media_downloads, "settings", replace(media_downloads.settings, settings_db_path=path, media_public_base_url="https://armory.example", media_signing_key="test-only-key"))
     config, max_caller = media_downloads.load_media_settings()
     assert config.limits.max_file_bytes == 500 * 1024 * 1024
     assert config.file_ttl_seconds == 21600 and config.download_link_seconds == 3600
     assert config.public_base_url == "https://armory.example" and max_caller == 2
-    assert path.exists()
 
 
 @pytest.mark.parametrize("patch", [{"file_ttl_hours": 0}, {"sweep_interval_minutes": -1}, {"download_link_minutes": float("inf")}, {"limits": {"max_concurrent_downloads": 0}}, {"limits": {"max_caller_downloads": 0}}])
 def test_native_config_rejects_unusable_limits(tmp_path, monkeypatch, patch):
-    path = tmp_path / "video.json"
-    path.write_text(json.dumps(patch))
-    monkeypatch.setattr(media_downloads, "settings", replace(media_downloads.settings, media_config_path=path))
+    path = tmp_path / "settings.db"
+    settings_store.put(path, "tuning", "media_downloader", patch)
+    monkeypatch.setattr(media_downloads, "settings", replace(media_downloads.settings, settings_db_path=path))
     with pytest.raises(ValueError):
         media_downloads.load_media_settings()
 

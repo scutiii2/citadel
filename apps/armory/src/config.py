@@ -26,9 +26,6 @@ def _env(name: str, default: str) -> str:
 
 @dataclass(frozen=True)
 class Settings:
-    # Where the config_*.json files (see services/app_config.py) live.
-    # Relative to CWD like the paths below; mcp_server always runs from its own directory.
-    configs_dir: Path = Path(_env("MCP_CONFIGS_DIR", "configs"))
     # Loopback by default: this server has no auth, so anything reaching the port can call every tool.
     # Set MCP_HOST to expose it only behind a reverse proxy, VPN or firewall that authenticates.
     host: str = _env("MCP_HOST", "127.0.0.1")
@@ -40,7 +37,6 @@ class Settings:
     # Relative to CWD like the paths above.
     uploads_dir: Path = Path(_env("MCP_UPLOADS_DIR", str(DATA / "uploads")))
     pdf_merger_store_dir: Path = Path(_env("MCP_PDF_MERGER_STORE_DIR", str(DATA / "pdf_merger" / "store")))
-    pdf_merger_config_path: Path = Path(_env("MCP_PDF_MERGER_CONFIG_PATH", "configs/config_pdf_merger.json"))
     pdf_merger_public_base_url: str = _env("MCP_PDF_MERGER_PUBLIC_BASE_URL", "")
     pdf_merger_signing_key: str = _env("PDF_MERGER_SIGNING_KEY", "")
     # Where capability-owned job watchers keep their state
@@ -86,7 +82,6 @@ class Settings:
     # Video downloads stay on armory's listener; only the public origin is configurable.
     media_store_dir: Path = Path(_env("MCP_MEDIA_STORE_DIR", str(CACHE / "media_downloader" / "store")))
     media_log_dir: Path = Path(_env("MCP_MEDIA_LOG_DIR", str(DATA / "media_downloader" / "logs")))
-    media_config_path: Path = Path(_env("MCP_MEDIA_CONFIG_PATH", "configs/config_media_downloader.json"))
     media_public_base_url: str = _env("MCP_MEDIA_PUBLIC_BASE_URL", "")
     media_signing_key: str = _env("MCP_MEDIA_SIGNING_KEY", "")
 

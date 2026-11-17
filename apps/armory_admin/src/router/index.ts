@@ -19,6 +19,7 @@ export const router = createRouter({
     { path: "/extensions", name: "extensions", component: () => import("../views/ExtensionsAdminView.vue"), meta: { permission: "extensions.manage" } },
     { path: "/tickets", name: "tickets", component: () => import("../views/TicketSettingsView.vue"), meta: { permission: "tickets.manage" } },
     { path: "/settings", name: "settings", component: () => import("../views/EnvironmentSettingsView.vue"), meta: { permission: "capabilities.manage" } },
+    { path: "/limits", name: "limits", component: () => import("../views/LimitsView.vue"), meta: { permission: "capabilities.manage" } },
     { path: "/email", name: "email", component: () => import("../views/EmailSettingsView.vue"), meta: { permission: "capabilities.manage" } },
     { path: "/login", name: "login", component: () => import("../views/LoginView.vue"), meta: { guestOnly: true } },
     { path: "/no-access", name: "no-access", component: () => import("../views/NoAccessView.vue") },
