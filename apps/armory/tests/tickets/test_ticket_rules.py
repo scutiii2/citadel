@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from src.capabilities.tickets.utils import rules
 
 ELEVATION = {"high": {"tickets": 3, "recent": 2}, "urgent": {"tickets": 6, "recent": 4}}
@@ -33,22 +35,13 @@ def test_clean_tags_keeps_known_unique_and_capped():
     assert len(rules.clean_tags(vocabulary, vocabulary)) == 5
 
 
-def test_elevation_by_ticket_count():
-    assert rules.elevated_priority("normal", 2, 0, ELEVATION) == "normal"
-    assert rules.elevated_priority("normal", 3, 0, ELEVATION) == "high"
-    assert rules.elevated_priority("normal", 6, 0, ELEVATION) == "urgent"
-
-
-def test_elevation_by_recent_rate():
-    assert rules.elevated_priority("normal", 2, 1, ELEVATION) == "normal"
-    assert rules.elevated_priority("normal", 2, 2, ELEVATION) == "high"
-    assert rules.elevated_priority("normal", 2, 4, ELEVATION) == "urgent"
-
-
-def test_elevation_never_lowers():
-    assert rules.elevated_priority("urgent", 1, 0, ELEVATION) == "urgent"
-    assert rules.elevated_priority("high", 1, 0, ELEVATION) == "high"
-    assert rules.elevated_priority("high", 3, 0, ELEVATION) == "high"
+@pytest.mark.parametrize("priority, tickets, recent, expected", [
+    ("normal", 2, 0, "normal"), ("normal", 3, 0, "high"), ("normal", 6, 0, "urgent"),  # by ticket count
+    ("normal", 2, 1, "normal"), ("normal", 2, 2, "high"), ("normal", 2, 4, "urgent"),  # by recent rate
+    ("urgent", 1, 0, "urgent"), ("high", 1, 0, "high"), ("high", 3, 0, "high"),  # never lowers
+])
+def test_elevation(priority, tickets, recent, expected):
+    assert rules.elevated_priority(priority, tickets, recent, ELEVATION) == expected
 
 
 def test_elevation_with_no_rules_changes_nothing():

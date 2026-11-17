@@ -644,22 +644,15 @@ def test_capability_enabled_defaults_to_true_when_file_is_missing(tmp_path: Path
     assert capability_enabled(load_capabilities_config(missing), "otp") is True
 
 
-def test_capability_enabled_defaults_to_true_when_entry_is_absent(tmp_path: Path):
-    path = _caps(tmp_path, {"otp": {"enabled": True}})
+@pytest.mark.parametrize("stored, name, expected", [
+    ({"otp": {"enabled": True}}, "host_health", True),  # no entry: on
+    ({"otp": {"enabled": False}}, "otp", False),
+    ({"otp": {"enabled": True}}, "otp", True),
+])
+def test_capability_enabled_follows_its_entry_and_defaults_to_true(tmp_path: Path, stored, name, expected):
+    path = _caps(tmp_path, stored)
 
-    assert capability_enabled(load_capabilities_config(path), "host_health") is True
-
-
-def test_capability_can_be_explicitly_disabled(tmp_path: Path):
-    path = _caps(tmp_path, {"otp": {"enabled": False}})
-
-    assert capability_enabled(load_capabilities_config(path), "otp") is False
-
-
-def test_capability_explicitly_enabled_is_true(tmp_path: Path):
-    path = _caps(tmp_path, {"otp": {"enabled": True}})
-
-    assert capability_enabled(load_capabilities_config(path), "otp") is True
+    assert capability_enabled(load_capabilities_config(path), name) is expected
 
 
 def test_save_capabilities_config_creates_a_missing_file(tmp_path: Path):

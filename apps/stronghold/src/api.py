@@ -19,6 +19,8 @@ from src.extensions import routes as extensions_routes
 from src.extensions.probe import ExtensionProbe
 from src.agents.gateway import AgentGateway, McpAgentGateway
 from src.attachments import routes as attachments_routes
+from src import tool_tokens
+from src import tool_token_routes
 from src.attachments import services as tool_services
 from src.attachments.services import ArmoryUploads
 from src.bard import routes as bard_routes
@@ -111,10 +113,15 @@ def create_app(
         tools_in = tools or {}
         env = dotenv_values(ENV_PATH) if tools is None and ENV_PATH.exists() else {}  # tests inject `tools` and read no .env
 
+        settings_db = settings.data_dir / "settings.db"
+        env_tokens = {name: os.getenv(f"{name.upper()}_TOKEN") or env.get(f"{name.upper()}_TOKEN") or None
+                      for name in tool_tokens.NAMES}
+        app.state.env_tokens = env_tokens
+
         def service_token(name: str) -> str | None:
             # Tool services issue their own tokens; the shared internal token is no fallback.
-            key = f"{name.upper()}_TOKEN"
-            return os.getenv(key) or env.get(key) or None
+            # A token saved on the Tool services page wins over the environment's.
+            return tool_tokens.token_for(settings_db if tools is None else None, name, env_tokens[name])
 
         app.state.uploads = ArmoryUploads(armory_client, keyring)
         app.state.scribe = tool_services.scribe(tools_in.get("scribe") or http(settings.scribe_url), service_token("scribe"))
@@ -160,6 +167,7 @@ def create_app(
     app.include_router(schema_routes.router)
     app.include_router(shares_routes.router)
     app.include_router(tickets_routes.router)
+    app.include_router(tool_token_routes.router)
     app.include_router(tickets_routes.admin_router)
     app.include_router(triage_routes.router)
     app.include_router(turns_routes.router)

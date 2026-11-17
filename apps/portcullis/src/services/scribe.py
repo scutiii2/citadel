@@ -94,7 +94,7 @@ class ScribeGateway:
                 if kind == "final":
                     return byte_count
 
-        code, result = 1000, None
+        code = 1000
         try:
             async with asyncio.timeout(STREAM_MAX_SECONDS):
                 async with websocket_client.connect(uri, additional_headers=headers, open_timeout=10,
@@ -103,9 +103,7 @@ class ScribeGateway:
                     try:
                         done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
                         for task in done:
-                            value = task.result()
-                            if value is not None:
-                                result = value
+                            task.result()  # raises what the task raised
                     finally:
                         for task in tasks:
                             task.cancel()

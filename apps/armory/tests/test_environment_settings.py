@@ -129,3 +129,13 @@ def test_a_bad_email_change_is_refused_with_the_reason_and_saves_nothing(client,
         assert refused.status_code == 400 and refused.json()["error"]
     assert client.get("/admin/email").json()["smtp_port"] == 587
     assert client.put("/admin/email", json=[]).status_code == 400
+
+
+def test_web_research_keys_are_editable_secrets_used_at_once(client, live):
+    answer = client.put("/admin/environment", json={"tavily_api_key": "tvly-1", "firecrawl_api_key": "fc-1",
+                                                    "firecrawl_api_url": "http://firecrawl:3002"})
+
+    assert answer.json()["restart"] == [] and "tvly-1" not in answer.text and "fc-1" not in answer.text
+    assert row(answer.json(), "tavily_api_key")["has_value"] is True
+    assert row(answer.json(), "firecrawl_api_url")["value"] == "http://firecrawl:3002"
+    assert (live.tavily_api_key, live.firecrawl_api_key) == ("tvly-1", "fc-1")

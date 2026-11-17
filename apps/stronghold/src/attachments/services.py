@@ -44,6 +44,14 @@ class ToolService:
         self._client, self._token, self._name = client, token, name
         self._rejected, self._refusal = rejected, refusal
 
+    def set_token(self, token: str | None) -> None:
+        """Use a new token from the next request on."""
+        self._token = token or None
+
+    @property
+    def has_token(self) -> bool:
+        return bool(self._token)
+
     async def _send(self, method: str, path: str, who: Requester, **kwargs: Any) -> dict:
         try:
             response = await self._client.request(method, path, headers={**_headers(who, self._token), **kwargs.pop("headers", {})},

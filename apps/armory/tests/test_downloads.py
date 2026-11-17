@@ -37,23 +37,12 @@ class TestOwner:
 
         assert got is not None and got.data == b"hello" and got.filename == "web.log"
 
-    def test_another_account_gets_nothing(self, clock: Clock) -> None:
+    @pytest.mark.parametrize("asker", ["bob", "", "Alice"], ids=["another account", "no identity", "name differing only in case"])
+    def test_only_the_account_it_was_offered_to_gets_it(self, clock: Clock, asker: str) -> None:
         registry = make(clock)
         entry = registry.offer("alice", "web.log", b"hello")
 
-        assert registry.get(entry.id, "bob") is None
-
-    def test_no_identity_gets_nothing(self, clock: Clock) -> None:
-        registry = make(clock)
-        entry = registry.offer("alice", "web.log", b"hello")
-
-        assert registry.get(entry.id, "") is None
-
-    def test_names_that_differ_only_in_case_are_different_accounts(self, clock: Clock) -> None:
-        registry = make(clock)
-        entry = registry.offer("alice", "web.log", b"hello")
-
-        assert registry.get(entry.id, "Alice") is None
+        assert registry.get(entry.id, asker) is None
 
     def test_an_unknown_id_gets_nothing(self, clock: Clock) -> None:
         assert make(clock).get("nope", "alice") is None

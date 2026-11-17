@@ -162,7 +162,7 @@ services:
       # Account facts, admin switches, email and the error log are asked from Portcullis.
       PORTCULLIS_URL: http://portcullis:29601
       ARMORY_URL: http://armory:29600
-      # Attached files and speech go to these tool services; their tokens are BARD_TOKEN, SCRIBE_TOKEN and READER_TOKEN in apps/stronghold/.env.
+      # Attached files and speech go to these tool services; their tokens are set in Stronghold admin > Tool services.
       BARD_URL: http://bard:29400
       SCRIBE_URL: http://scribe:29401
       READER_URL: http://reader:29402

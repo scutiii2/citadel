@@ -25,8 +25,8 @@ Search the web and read a page's text through [Tavily](https://tavily.com) - two
 
 ## Configuration
 
-`TAVILY_API_KEY` in `apps/armory/.env` (key from https://app.tavily.com). Without it each tool fails with a
-message naming the variable; the rest of the server is unaffected. The client is built per call.
+Set the Tavily API key on the Settings page of Armory Admin (key from https://app.tavily.com); it is saved in
+Armory's database and used at once. Without it each tool fails with a message naming the setting; the rest of the server is unaffected. The client is built per call.
 
 Tavily fetches the pages, so this server never connects to an address a caller chose. Page text is capped at
 24 KB and fenced as remote data (`services/untrusted.py`); search snippets are cut to 600 characters. Tavily's

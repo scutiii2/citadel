@@ -110,7 +110,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
    | File | Keys to fill in |
    |---|---|
-   | `apps/armory/.env` | Only the capability keys you use: `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://legion:29611/mcp` to group tickets with the triage agent) |
+   | `apps/armory/.env` | Nothing is needed. Set the capability keys you use (Tavily, Firecrawl), `LAYA_URL` (`http://legion:29611/mcp` to group tickets with the triage agent) and the email account in Armory Admin (Settings and Email pages) |
    | `apps/legion/.env` | `HF_TOKEN` if used. Model provider keys, the Laya token and the TypeSafe key are saved in ConversationGateway and DecisionGateway, not here |
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
    | `apps/portcullis/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
@@ -315,7 +315,7 @@ Every service keeps its runtime data in `.data/<service>/` and files it can make
 ## Overriding a service's `.env` from the root `.env`
 
 A value in the root `.env` wins over the same name in `apps/<service>/.env`. Empty values are ignored.
-- `TAVILY_API_KEY=...` applies to every service that lists that name in its `.env.example` or `.env`.
-- `ARMORY__TAVILY_API_KEY=...` applies to Armory only (prefixes `ARMORY__`, `LEGION__`, `PORTCULLIS__`, `STRONGHOLD__`, `TREASURY__`; two underscores). It wins over the plain form.
+- `BOOTSTRAP_ADMIN_PASSWORD=...` applies to every service that lists that name in its `.env.example` or `.env`.
+- `PORTCULLIS__BOOTSTRAP_ADMIN_PASSWORD=...` applies to Portcullis only (prefixes `ARMORY__`, `LEGION__`, `PORTCULLIS__`, `STRONGHOLD__`, `TREASURY__`; two underscores). It wins over the plain form.
 
 Other root variables, such as the gateway admin passwords and `CITADEL_DATA_DIR`, never reach a service's settings. Compose mounts the whole root `.env` read-only at `/citadel.env` in each service, so a process that can read files there can read those passwords too.

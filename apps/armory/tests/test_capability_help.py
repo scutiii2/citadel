@@ -67,28 +67,12 @@ def test_build_help_target_all_includes_every_table(widget_help):
     assert "Makes widgets." in result["message"]
 
 
-def test_build_help_target_tools_only_includes_tools_table(widget_help):
-    result = capability_help.build_help("widget", target="tools")
+@pytest.mark.parametrize("target", ["tools", "commands", "workflow"])
+def test_build_help_target_only_includes_its_own_table(widget_help, target):
+    result = capability_help.build_help("widget", target=target)
 
-    assert "tools" in result
-    assert "commands" not in result
-    assert "workflow" not in result
-
-
-def test_build_help_target_commands_only_includes_commands_table(widget_help):
-    result = capability_help.build_help("widget", target="commands")
-
-    assert "commands" in result
-    assert "tools" not in result
-    assert "workflow" not in result
-
-
-def test_build_help_target_workflow_only_includes_workflow_table(widget_help):
-    result = capability_help.build_help("widget", target="workflow")
-
-    assert "workflow" in result
-    assert "tools" not in result
-    assert "commands" not in result
+    assert target in result
+    assert all(other not in result for other in {"tools", "commands", "workflow"} - {target})
 
 
 def test_build_help_tool_row_prefixes_capability_id_onto_slash_command(widget_help):

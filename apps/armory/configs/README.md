@@ -51,10 +51,10 @@ mechanics).
     per-caller token from. The page never shows the token again. Tick "Runs in this stack" for a server of this
     stack: it signs a service assertion instead of using a token.
   - **Settings** (table `environment`) are the deployment values an administrator edits on the Settings page:
-    public addresses and signing keys of the PDF and video links, `LAYA_URL`, `STRONGHOLD_URL`,
+    the Tavily and Firecrawl keys, the public addresses and signing keys of the PDF and video links, `LAYA_URL`, `STRONGHOLD_URL`,
     `DB_GATEWAY_URL`/`INSTANCE`/`CONNECTION`, the `OBSIDIAN_*` values and `MCP_VAULT_DIR`/`MCP_WORKSPACE_DIR`.
     `.env` and the defaults give the starting value; a saved value wins, and "Use the default" removes it. A secret
-    (the two signing keys, `OBSIDIAN_API_KEY`) is write-only. A change is used at once, except what is read only
+    (the signing keys, `OBSIDIAN_API_KEY`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`) is write-only. A change is used at once, except what is read only
     at start (the signing keys, `LAYA_URL`, Treasury, the Obsidian index), which the page marks "after restart".
     See `environment_settings.py`.
   - **Ticket settings** have no file. The defaults are in

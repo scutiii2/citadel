@@ -365,15 +365,17 @@ def test_memory_recall_defaults_to_false_and_loads_true(tmp_path):
     assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "memory_recall": True})).memory_recall is True
 
 
-def test_memory_recall_must_be_a_boolean(tmp_path):
-    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}, "memory_recall": "yes"})
-    with pytest.raises(AgentSpecError, match="memory_recall"):
+@pytest.mark.parametrize("flag, bad", [("memory_recall", "yes"), ("skill_recall", "yes"), ("delegable", "no"), ("plan_tool", "no")])
+def test_a_flag_must_be_a_boolean(tmp_path, flag, bad):
+    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}, flag: bad})
+    with pytest.raises(AgentSpecError, match=flag):
         agent_spec.load_file(path)
 
 
-def test_laya_cannot_recall_memory(tmp_path):
-    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "decision"}, "tools": {"deny": ["*"]}, "memory_recall": True})
-    with pytest.raises(AgentSpecError, match="memory_recall"):
+@pytest.mark.parametrize("flag", ["memory_recall", "skill_recall", "skill_learning"])
+def test_laya_cannot_recall_memory_or_use_skills(tmp_path, flag):
+    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "decision"}, "tools": {"deny": ["*"]}, flag: True})
+    with pytest.raises(AgentSpecError, match=flag):
         agent_spec.load_file(path)
 
 
@@ -383,30 +385,12 @@ def test_skill_recall_defaults_to_false_and_loads_true(tmp_path):
     assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "skill_recall": True})).skill_recall is True
 
 
-def test_skill_recall_must_be_a_boolean(tmp_path):
-    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}, "skill_recall": "yes"})
-    with pytest.raises(AgentSpecError, match="skill_recall"):
-        agent_spec.load_file(path)
-
-
-def test_laya_cannot_recall_skills(tmp_path):
-    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "decision"}, "tools": {"deny": ["*"]}, "skill_recall": True})
-    with pytest.raises(AgentSpecError, match="skill_recall"):
-        agent_spec.load_file(path)
-
-
 def test_skill_learning_defaults_to_false_loads_true_and_must_be_a_boolean(tmp_path):
     base = {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}}
     assert agent_spec.load_file(_write(tmp_path, "calc", base)).skill_learning is False
     assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "skill_learning": True})).skill_learning is True
     with pytest.raises(AgentSpecError, match="skill_learning"):
         agent_spec.load_file(_write(tmp_path, "calc", {**base, "skill_learning": "yes"}))
-
-
-def test_laya_cannot_learn_skills(tmp_path):
-    path = _write(tmp_path, "triage", {"role": "specialist", "port": 9110, "llm": {"provider": "decision"}, "tools": {"deny": ["*"]}, "skill_learning": True})
-    with pytest.raises(AgentSpecError, match="skill_learning"):
-        agent_spec.load_file(path)
 
 
 def test_only_the_entry_agent_recalls_skills_and_nobody_learns_them_by_default():
@@ -444,19 +428,9 @@ def test_delegable_defaults_to_true_and_loads_false(tmp_path):
     assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "delegable": False})).delegable is False
 
 
-def test_delegable_must_be_a_boolean(tmp_path):
-    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}, "delegable": "no"})
-    with pytest.raises(AgentSpecError, match="delegable"):
-        agent_spec.load_file(path)
-
-
 def test_plan_tool_defaults_to_true_and_loads_false(tmp_path):
     base = {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}}
     assert agent_spec.load_file(_write(tmp_path, "calc", base)).plan_tool is True
     assert agent_spec.load_file(_write(tmp_path, "calc", {**base, "plan_tool": False})).plan_tool is False
 
 
-def test_plan_tool_must_be_a_boolean(tmp_path):
-    path = _write(tmp_path, "calc", {"role": "specialist", "port": 9103, "llm": {"provider": "anthropic"}, "plan_tool": "no"})
-    with pytest.raises(AgentSpecError, match="plan_tool"):
-        agent_spec.load_file(path)

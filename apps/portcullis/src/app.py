@@ -46,6 +46,7 @@ from src.routes import (
     account_tuning,
     notes,
     server_info,
+    tool_token_routes,
     settings as settings_routes,
     shares,
     skills,
@@ -74,6 +75,7 @@ from src.services.session_service import SessionService
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 from src.services.usage_client import UsageUnavailable
 from src.services.traffic import TrafficMiddleware, TrafficRecorder
+from src.services import tool_tokens
 from src.utils.config_loader import service_token
 
 logger = logging.getLogger(__name__)
@@ -147,8 +149,11 @@ def create_app(
         app.state.email_sender = email_sender or McpEmailSender(settings.mcp_server_url, service_auth.keyring, recorder)
         app.state.upstream = upstream
         app.state.keyring = service_auth.keyring
-        app.state.bard_token = service_token(settings.env_path, "bard") or None
-        app.state.scribe_token = service_token(settings.env_path, "scribe") or None
+        # A token saved on the Tool services page (settings.db next to the database) wins over the environment's.
+        app.state.tool_tokens_db = settings.database_path.parent / "settings.db"
+        app.state.env_tool_tokens = {name: service_token(settings.env_path, name) or None for name in tool_tokens.NAMES}
+        app.state.bard_token = tool_tokens.token_for(app.state.tool_tokens_db, "bard", app.state.env_tool_tokens["bard"])
+        app.state.scribe_token = tool_tokens.token_for(app.state.tool_tokens_db, "scribe", app.state.env_tool_tokens["scribe"])
         app.state.dictation_accounts = set()
         app.state.secret_box = secret_box
         app.state.agent_directory = AgentDirectory(
@@ -218,6 +223,7 @@ def create_app(
     app.include_router(account.router)
     app.include_router(admin.router)
     app.include_router(agent_admin.router)
+    app.include_router(tool_token_routes.router)
     app.include_router(agent_admin.prompts_router)
     app.include_router(admin_tuning.router)
     app.include_router(admin_treasury.router)
