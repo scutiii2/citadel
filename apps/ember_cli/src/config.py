@@ -1,13 +1,11 @@
 """chat_cli's settings: where portcullis is, and which account to log in as.
 
-`configs/config_cli.json` is yours and gitignored; the first run copies it from
-`config_cli.json.example`. The password is never stored: it is typed at login.
+`configs/config_cli.json` is tracked; the password is never stored: it is typed at login.
 """
 
 from __future__ import annotations
 
 import json
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,12 +24,7 @@ class CliConfig:
 
 
 def load_config(path: Path = CONFIG_FILE) -> CliConfig:
-    """Reads the settings; a missing file is made from its `.example` twin, or
-    the defaults are used when that is missing too."""
-    if not path.is_file():
-        example = path.with_name(path.name + ".example")
-        if example.is_file():
-            shutil.copyfile(example, path)
+    """Reads the settings; the defaults are used when the file is missing."""
     if not path.is_file():
         return CliConfig()
     try:

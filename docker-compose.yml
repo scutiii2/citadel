@@ -30,10 +30,9 @@ services:
       DB_GATEWAY_CONNECTION: stronghold
       STRONGHOLD_URL: http://stronghold:29650
     volumes:
-      # Writable: the Extensions page in armory_admin saves added extensions into this tracked file.
-      - ./docker/configs/armory/extensions.json:/app/configs/config_extensions.json
-      # Writable: the Capabilities page in armory_admin saves its on/off toggles into this tracked file.
-      - ./docker/configs/armory/capabilities.json:/app/configs/config_capabilities.json
+      # Defaults only. The Extensions and Capabilities pages save their changes to .data/armory/config/.
+      - ./docker/configs/armory/extensions.json:/app/configs/config_extensions.json:ro
+      - ./docker/configs/armory/capabilities.json:/app/configs/config_capabilities.json:ro
       - ${CITADEL_DATA_DIR:-./.data}/armory:/app/.data
       - ${CITADEL_CACHE_DIR:-./.cache}/armory:/app/.cache
       - identity_armory:/identity:rw

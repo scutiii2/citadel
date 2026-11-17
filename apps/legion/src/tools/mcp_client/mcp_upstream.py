@@ -76,12 +76,10 @@ def tool_description(tool: Any) -> str:
 
 def connect() -> None:
     # MCP_SERVER_URL (set directly, or via --mcp-url - see server.py) repoints
-    # the "main" upstream server without editing config_servers.json - same
-    # env var chat_app's own services/llm/settings.py reads for its direct
-    # connection to mcp_server, so one variable controls both.
+    # the "main" upstream server without editing config_servers.json.
     override = os.getenv("MCP_SERVER_URL")
     url_overrides = {_SERVER_ID: override} if override else None
-    # mcp_server requires the shared internal token on /mcp once it's configured.
+    # Armory checks a signed service assertion on /mcp.
     client.connect_all(_CONFIG_PATH, url_overrides, auth_by_server={_SERVER_ID: ServiceAuth(internal_auth.keyring, "armory")})
 
 

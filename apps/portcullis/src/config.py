@@ -220,7 +220,7 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    """Reads config_app.json (created from its .example if missing) and makes
+    """Reads config_app.json and makes
     sure .env exists (built from the old secrets/ files, else .env.example).
     EMBER_API_HOST / EMBER_API_PORT win over the file, so a launcher or
     container can pick the port."""

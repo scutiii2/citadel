@@ -10,7 +10,7 @@ mechanics); paths come from `Settings.email_config_path` /
   recipient list.
   `smtp_server`/
   `smtp_port`/`security` depend on which provider `from` lives on -
-  since JSON has no comments, the `.example` file only shows Gmail;
+  since JSON has no comments, the tracked file only shows Gmail;
   the other two mainstream cases:
 
   ```jsonc
@@ -69,17 +69,20 @@ mechanics); paths come from `Settings.email_config_path` /
   capability with no entry is on; after it, a folder with no entry starts
   offline. That first run also writes `enabled: true` for every capability
   that exists then, so nothing that was on goes dark. The file is
-  gitignored (`config_*.json`); `config_capabilities.json.example` is the
-  tracked copy.
+  tracked and holds the defaults; toggles made on the Capabilities page are kept
+  in `.data/armory/config/config_capabilities.json` (see below).
 
 Each file's top-level JSON *is* its content - there's no wrapper key.
 Anything sensitive is a `${VAR}` placeholder resolved from
 `../.env` at load time, never a literal value in these files -
 see `services/app_config.py`'s docstring for the substitution syntax.
-Every file has a committed `.example` twin with the same shape.
+Every file here is tracked, and none has an `.example` twin. Values that must
+stay out of git are `${VAR}` placeholders (`${SMTP_FROM}`, `${SMTP_PASSWORD}`),
+filled from `../.env`; `../.env.example` lists them.
 
-`config_email.json` is gitignored by exact path even though this
-folder is otherwise committed - it carries this deployment's real
-recipient addresses.
-`config_extensions.json` and `config_capabilities.json` are gitignored by
-the `config_*.json` rule; each has a tracked `.example` twin.
+`config_extensions.json` and `config_capabilities.json` hold the defaults.
+What an admin changes at run time (adding or removing an extension, switching
+a capability) is saved as a small overlay in
+`.data/armory/config/<same name>` in the Citadel folder, never in this folder:
+an entry there wins over the tracked one, and `null` removes a tracked entry.
+Delete the overlay to go back to the defaults. `CITADEL_DATA_DIR` moves it.

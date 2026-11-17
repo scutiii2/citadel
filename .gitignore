@@ -13,11 +13,8 @@ __pycache__/
 .vscode
 .vs
 
-# mcp_server's real config/secrets/runtime-state. config_*.json holds
-# structure (committed) with ${VAR} placeholders for anything sensitive;
-# .env holds the real values (gitignored) those placeholders resolve to.
-# Both keep an .example twin, which IS committed. .secrets/ is the legacy
-# folder run.py migrates into .env on first start.
+# Configs (configs/*.json) are tracked and name secrets as ${VAR}; the values live in .env (never tracked,
+# each has a .env.example beside it). .secrets/ is the legacy folder run.py migrates into .env on first start.
 /apps/armory/.env
 /apps/armory/.secrets/*
 !/apps/armory/.secrets/*.example
@@ -25,9 +22,6 @@ __pycache__/
 # ai_agent's real API keys / pinned-provider selection, same treatment
 # as mcp_server's secret_*.env above - only .env.example is committed.
 /apps/legion/.env
-/apps/legion/configs/*
-!/apps/legion/configs/*.example
-!/apps/legion/configs/README.md
 # Agent definitions and gateway presets are tracked; runtime state is not.
 /apps/legion/.data/
 # Temporary agent writes and gateway migration state remain local.
@@ -36,13 +30,6 @@ __pycache__/
 /apps/legion/gateways/*/*.tmp
 /apps/legion/gateways/*.tmp
 
-# mcp_server's real SMTP-account addresses. The equivalent data lived in the old root-level config.json,
-# which was gitignored outright - these carry the same real deployment
-# details (no literal secrets, those are all ${VAR}) and keep the same
-# treatment. config_extensions.json and config_capabilities.json are NOT
-# listed here - low-sensitivity structure, tracked normally like their
-# .example twins.
-/apps/armory/configs/config_email.json
 
 # Runtime state, not source: one-time-code
 # records, and any capability's own data/ (e.g. capabilities/otp/data/).
@@ -83,7 +70,6 @@ MCPServer.yaml
 .sessions/
 .output/
 PyRFC
-config_*.json
 dev_rfc.log
 
 
@@ -100,13 +86,10 @@ node_modules/
 /apps/treasury/firestore-debug.log
 /apps/stronghold/.env
 /apps/stronghold/.data/
-/apps/stronghold/configs/config_app.json
 
 # docker compose secrets (INTERNAL_API_TOKEN)
 /.env
 
-# Admin runtime tuning overlay
-apps/legion/configs/tuning_overrides.json
 
 # Ember API run cache (regenerated, not source).
 /apps/portcullis/.cache/

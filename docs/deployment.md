@@ -60,7 +60,7 @@ Double-click it for a menu:
 | Option | Does |
 |---|---|
 | 1 | Publish code to the `live` branch (see "The live branch") |
-| 2 | Copy the gitignored `.env` and `config_*.json` files to the server as one `tar` stream over a single `ssh` connection (one password prompt), and set `COMPOSE_FILE` in the server's `.env` |
+| 2 | Copy the gitignored `.env` files to the server (configs come with git) as one `tar` stream over a single `ssh` connection (one password prompt), and set `COMPOSE_FILE` in the server's `.env` |
 | 3 | Both: publish, then push |
 | 4, 5 | Dry-run previews of 1 and 2 |
 | 6 | Chown helper: copies `chown -R <user> <dir>` to the clipboard and opens the server's web terminal (root shell) so you can paste it |
@@ -125,23 +125,13 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
      creates a directory in its place and portcullis fails. portcullis writes `EMBER_SECRETS_KEY` into it, so keep it
      when you rebuild.
 
-4. **Create the config files git does not hold.** `config_*.json` is gitignored (deploy option 2 copies yours). Compose
-   mounts the tracked files under `docker/configs/` over `config_extensions.json`, `config_servers.json`,
-   `config_app.json` and `config_connections.json`. For the rest:
-
-   | File | On a fresh clone |
-   |---|---|
-   | `apps/legion/configs/config_tuning.json` | Created from its `.example` automatically |
-   | `apps/portcullis/configs/config_pricing.json` | Created from its `.example` automatically |
-   | `apps/armory/configs/config_email.json`, `config_tickets.json` | Copy each `.example` and fill in `config_email.json` |
-
-   These files are baked into the image at build time, so a change made to them inside the container is lost when
-   armory is rebuilt. Edit the file instead.
-
-   `docker/configs/armory/extensions.json` and `docker/configs/armory/capabilities.json` are the exception: they are
-   mounted writable, so extensions added on the Extensions page and capability toggles set on the Capabilities page of
-   armory_admin are saved into those files and survive restarts and rebuilds. On the device they differ from git after
-   the first change; keep them when you update (`git stash` or `git update-index --skip-worktree`).
+4. **Configs are tracked.** Every `configs/*.json` is in git and none has an `.example` twin; each `configs/` folder has a
+   `README.md` describing its keys. Secrets are `${NAME}` placeholders filled from the `.env` files (see the
+   `.env.example` beside each). Compose mounts the tracked files under `docker/configs/` read-only over
+   `config_extensions.json`, `config_capabilities.json`, `config_servers.json`, `config_app.json` and
+   `config_connections.json` for container values. Changes an admin makes at run time (extensions, capability
+   toggles, Legion tuning and prompts) are saved in `.data/<service>/`, so they survive rebuilds and never show in git.
+   Fill in `apps/armory/.env` (`SMTP_FROM`, `SMTP_PASSWORD`) before using email.
 
 5. **Start:**
 

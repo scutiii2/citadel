@@ -1,5 +1,4 @@
-"""Typed loaders for configs/config_app.json and configs/config_connections.json
-(each seeded from its .example on first run)."""
+"""Typed loaders for configs/config_app.json and configs/config_connections.json."""
 
 from __future__ import annotations
 
@@ -140,11 +139,9 @@ def _read_json(path: Path) -> Any:
 
 
 def load_config(path: Path | None = None) -> AppConfig:
-    """Load the app config. With no path, use configs/config_app.json and create
-    it from the .example on first run."""
+    """Load the app config. With no path, use configs/config_app.json."""
     if path is None:
         path = CONFIG_PATH
-        seed_from_example(path)
     config = parse_app_config(_read_json(path))
     override = os.getenv(PORT_ENV_VAR)
     if override:  # a launcher or container passes the port it assigned
@@ -160,13 +157,12 @@ def load_config(path: Path | None = None) -> AppConfig:
 
 def load_connections(default_cache: CacheSettings, path: Path | None = None) -> ConnectionsConfig:
     """Load connections and instances. With no path, use configs/config_connections.json
-    (seeded from its .example) and resolve ${NAME} from the environment and .env."""
+    and resolve ${NAME} from the environment and .env."""
     env: dict[str, str] = {}
     data_root = None
     if path is None:
         data_root = data_dir(ROOT)
         path = CONNECTIONS_PATH
-        seed_from_example(path)
         seed_from_example(ENV_PATH)
         env = {k: v for k, v in {**dotenv_values(ENV_PATH), **os.environ}.items() if v is not None}
     return parse_connections(_read_json(path), default_cache, env, data_root)

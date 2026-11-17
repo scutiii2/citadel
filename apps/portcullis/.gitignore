@@ -5,11 +5,6 @@ __pycache__/
 .test-tmp/
 .venv_ember_api/
 
-# Real config/secrets/runtime data stay local; only .example twins and
-# READMEs are committed (same pattern as chat_app).
-configs/*
-!configs/*.example
-!configs/README.md
 # Real secrets live in .env; secrets/ is only the pre-.env layout, read once
 # to build .env.
 .env

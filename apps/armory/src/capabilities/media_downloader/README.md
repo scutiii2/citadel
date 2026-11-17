@@ -72,7 +72,7 @@ Restart Armory and portcullis after deploying the new HTTP adapters.
 
 Enable `media` on armory's Capabilities page after Refresh (or `POST /capabilities/refresh`, then `PATCH /capabilities/media` with `{"enabled": true}`). A fresh install leaves it offline. `/media help` uses the adjacent `help.json`. Toggle `media` offline to hide tools and refuse new signed HTTP downloads; already running jobs finish and expire normally. Shared HTTP/runtime changes require an armory restart on deployment.
 
-Caps and TTLs use `specifics/media_downloader/configs/config_media_downloader.json.example`; the existing app config loader copies it to `config_media_downloader.json` on first use. The shape preserves `file_ttl_hours`, `sweep_interval_minutes`, `download_link_minutes` and the original `limits` keys (file MB, duration minutes, session MB, concurrency, queue size and job timeout minutes). `limits.max_caller_downloads` additionally bounds each account's unfinished jobs, default 2. All caps and intervals must be positive, except the queued-job allowance may be zero.
+Caps and TTLs are in the tracked `specifics/media_downloader/configs/config_media_downloader.json` (see the README beside it). The shape preserves `file_ttl_hours`, `sweep_interval_minutes`, `download_link_minutes` and the original `limits` keys (file MB, duration minutes, session MB, concurrency, queue size and job timeout minutes). `limits.max_caller_downloads` additionally bounds each account's unfinished jobs, default 2. All caps and intervals must be positive, except the queued-job allowance may be zero.
 
 Account operations require signed service assertions and verified Portcullis requester tokens. Private keys stay in the identity directory.
 

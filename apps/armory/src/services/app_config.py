@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -123,25 +122,47 @@ def resolve_section(value: Any, *, where: str, config_path: Path) -> Any:
     return value
 
 
-def load_config(config_path: Path) -> dict[str, Any]:
-    """Read and parse one config file, raising on anything unusable.
-    Returns the document as written, ``${VAR}`` placeholders included; resolve with ``resolve_section``."""
-    example_path = config_path.with_name(config_path.name + ".example")
-    if not config_path.exists() and example_path.exists():
-        shutil.copyfile(example_path, config_path)
-    if not config_path.exists():
-        raise FileNotFoundError(
-            f"Config file not found: {config_path}. Copy {config_path.name}.example "
-            f"to {config_path.name} in the same folder and fill it in."
-        )
+# Admin pages change these two at run time. The tracked file in configs/ holds the defaults; the changes
+# are kept as a small overlay in Armory's data folder (.data/armory/config/<name>), so git never sees them.
+RUNTIME_CONFIGS = ("config_extensions.json", "config_capabilities.json")
+
+
+def _overlay_path(config_path: Path) -> Path | None:
+    """The overlay of one of the two files above when `config_path` is the real one in configs/."""
+    if config_path.name not in RUNTIME_CONFIGS:
+        return None
+    from src.config import DATA, settings
+
+    if config_path.resolve().parent != settings.configs_dir.resolve():
+        return None
+    return DATA / "config" / config_path.name
+
+
+def _read_object(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {path}.")
     try:
-        with config_path.open(encoding="utf-8") as handle:
+        with path.open(encoding="utf-8") as handle:
             data = json.load(handle)
     except json.JSONDecodeError as error:
-        raise ValueError(f"Config file {config_path} is not valid JSON: {error}") from error
-
+        raise ValueError(f"Config file {path} is not valid JSON: {error}") from error
     if not isinstance(data, dict):
-        raise ValueError(f"Config file {config_path} must contain a JSON object at the top level")
+        raise ValueError(f"Config file {path} must contain a JSON object at the top level")
+    return data
+
+
+def load_config(config_path: Path) -> dict[str, Any]:
+    """Read and parse one config file, raising on anything unusable.
+    Returns the document as written, ``${VAR}`` placeholders included; resolve with ``resolve_section``.
+    For the two run-time files the overlay is applied on top: its entries win, and ``null`` removes one."""
+    data = _read_object(config_path)
+    overlay = _overlay_path(config_path)
+    if overlay is not None and overlay.exists():
+        for key, value in _read_object(overlay).items():
+            if value is None:
+                data.pop(key, None)
+            else:
+                data[key] = value
     return data
 
 
@@ -313,6 +334,14 @@ def load_extension_config(config_path: Path, id_: str) -> ExtensionConfig:
 
 
 def _write_config(config_path: Path, data: dict[str, Any]) -> None:
+    """Save `data`. For the two run-time files only the difference from the tracked file is written, to the overlay."""
+    overlay = _overlay_path(config_path)
+    if overlay is not None:
+        tracked = _read_object(config_path)
+        data = {**{key: value for key, value in data.items() if tracked.get(key) != value},
+                **{key: None for key in tracked if key not in data}}
+        config_path = overlay
+        config_path.parent.mkdir(parents=True, exist_ok=True)
     with config_path.open("w", encoding="utf-8") as handle:
         json.dump(data, handle, indent=2)
 
@@ -352,7 +381,7 @@ def delete_extension_config(config_path: Path, extension_id: str) -> None:
 
 def load_capabilities_config(config_path: Path) -> dict[str, dict[str, Any]]:
     """Read config_capabilities.json: which capabilities are enabled.
-    A missing file gives {} (all enabled), unlike other loaders, so deployments predating it keep working."""
+    A missing file gives {} (all enabled), unlike other loaders."""
     if not config_path.exists():
         return {}
     return load_config(config_path)

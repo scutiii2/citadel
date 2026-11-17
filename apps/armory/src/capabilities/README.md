@@ -71,7 +71,7 @@ top level is a **closed whitelist** - nothing else is allowed there:
   content because it *is* the source; others (e.g. `static/knowledge/`,
   `static/policies/`) gitignore their real content because it's
   deployment-specific, and commit only that `README.md` plus - for JSON
-  files only - a `<name>.json.example` sibling documenting the shape. See
+  files only - the tracked `<name>.json` and a `README.md` documenting each key. See
   each capability's own `STATIC-GUIDELINES.md` for which applies where.
 
 Nothing outside this list belongs at a capability's top level - a new
@@ -315,7 +315,7 @@ adding or removing a declaration means changing that test too.
    by the loader the first time the capability is switched online or
    offline, so there is nothing to add by hand. A folder with no entry
    starts offline. Add `{ "<id>": { "enabled": true } }` to
-   `config_capabilities.json.example` only if it should be on in a fresh
+   `config_capabilities.json` only if it should be on in a fresh
    install (`<id>` is the short id from step 7 below, not necessarily the
    folder name).
 

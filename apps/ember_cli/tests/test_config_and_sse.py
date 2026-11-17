@@ -17,22 +17,8 @@ def write(path: Path, data) -> Path:
 
 
 class TestConfig:
-    def test_defaults_when_there_is_no_file_and_no_example(self, tmp_path: Path) -> None:
+    def test_defaults_when_there_is_no_file(self, tmp_path: Path) -> None:
         assert load_config(tmp_path / "config_cli.json") == CliConfig(DEFAULT_URL, "")
-
-    def test_the_first_run_copies_the_example(self, tmp_path: Path) -> None:
-        write(tmp_path / "config_cli.json.example", {"ember_api_url": "http://example:1", "username": "ada"})
-
-        config = load_config(tmp_path / "config_cli.json")
-
-        assert config == CliConfig("http://example:1", "ada")
-        assert (tmp_path / "config_cli.json").is_file()
-
-    def test_a_real_file_wins_over_the_example(self, tmp_path: Path) -> None:
-        write(tmp_path / "config_cli.json.example", {"username": "example"})
-        write(tmp_path / "config_cli.json", {"username": "mine"})
-
-        assert load_config(tmp_path / "config_cli.json").username == "mine"
 
     def test_a_trailing_slash_and_spaces_are_cleaned(self, tmp_path: Path) -> None:
         write(tmp_path / "c.json", {"ember_api_url": "https://ember.example/", "username": "  ada "})

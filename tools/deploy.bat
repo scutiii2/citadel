@@ -1,6 +1,5 @@
 @echo off
-rem Deploy menu: publish the code to the live branch and/or copy the git-ignored .env and
-rem config_*.json files to the deployment machine in ONE ssh session (one password prompt).
+rem Deploy menu: publish the code to the live branch and/or copy the git-ignored .env files to the deployment machine in ONE ssh session (one password prompt).
 rem The server refuses root over ssh, so we log in as a normal user. If the copy cannot write,
 rem option 6 copies the one-time "chown" command and opens the server's web terminal (root shell).
 rem Override the target: set DEPLOY_HOST / DEPLOY_DIR / DEPLOY_WEB_PORT before running.
@@ -16,7 +15,7 @@ echo.
 echo Target: %DEPLOY_HOST%:%DEPLOY_DIR%
 echo.
 echo   1  Publish code to the live branch
-echo   2  Push .env and config files to the server
+echo   2  Push .env files to the server
 echo   3  Both (publish, then push)
 echo   4  Preview publish ^(dry run^)
 echo   5  Preview push ^(dry run^)
@@ -56,7 +55,6 @@ set /a COUNT=0
 call :add ".env"
 for %%A in (%APPS%) do (
     call :add "%%A/.env"
-    for %%F in ("%ROOT%\%%A\configs\config_*.json") do call :add "%%A/configs/%%~nxF"
 )
 echo.
 if !COUNT!==0 (echo Nothing to send. & del "%LIST%" & exit /b 0)
@@ -74,7 +72,7 @@ if not "!RC!"=="0" (
     exit /b 1
 )
 echo Done.
-call :reminder ".env and config files are on the server. In the web terminal:" "docker compose up -d --build" "(run git pull first if the code changed; if only .env/config changed, add --force-recreate)"
+call :reminder ".env files are on the server. In the web terminal:" "docker compose up -d --build" "(run git pull first if the code changed; if only .env changed, add --force-recreate)"
 exit /b 0
 
 rem :add <path relative to the Citadel root, same path on the server>

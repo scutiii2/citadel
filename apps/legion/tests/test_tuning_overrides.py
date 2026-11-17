@@ -14,7 +14,7 @@ from src.runtime.tuning_overrides import TuningError
 def tuning(tmp_path):
     path = tmp_path / "config_tuning.json"
     examples = Path(config_files.__file__).resolve().parents[2] / "configs"
-    path.with_suffix(".json.example").write_bytes((examples / "config_tuning.json.example").read_bytes())
+    path.write_bytes((examples / "config_tuning.json").read_bytes())
     return path, tmp_path / tuning_overrides.OVERLAY_NAME
 
 

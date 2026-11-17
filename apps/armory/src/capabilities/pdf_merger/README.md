@@ -39,7 +39,7 @@ Ember's existing `/upload/pdf` path now uploads to the native store. It requires
 
 ## Configuration
 
-Armory settings read its normal environment configuration. Capability tuning lives in `specifics/pdf_merger/configs/config_pdf_merger.json`, with the tracked `.json.example` documenting the shape. Armory's shared config loader copies the example when the real file is absent.
+Armory settings read its normal environment configuration. Capability tuning lives in `specifics/pdf_merger/configs/config_pdf_merger.json`, a tracked file with a `README.md` beside it.
 
 | Setting | Purpose |
 | --- | --- |

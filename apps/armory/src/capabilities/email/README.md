@@ -30,7 +30,7 @@ standard [capability conventions](../README.md).
 ## Configuration and integration
 
 Reads MCP's existing `configs/config_email.json` via `settings.email_config_path`.
-Use `configs/config_email.json.example` as the format reference, configuring SMTP
+Use `configs/config_email.json` as the format reference, configuring SMTP
 host, port, From, password and security on MCP only. No config is created by a send.
 Existing deployments must refresh capabilities and switch **Email** online; new
 example configurations enable it. Switching it offline blocks both local MCP

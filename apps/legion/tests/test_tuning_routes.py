@@ -14,8 +14,9 @@ from src.runtime import config_files, tuning_overrides
 def client(tmp_path, monkeypatch):
     path = tmp_path / "config_tuning.json"
     examples = Path(config_files.__file__).resolve().parents[2] / "configs"
-    path.with_suffix(".json.example").write_bytes((examples / "config_tuning.json.example").read_bytes())
+    path.write_bytes((examples / "config_tuning.json").read_bytes())
     monkeypatch.setattr(config_files, "TUNING_PATH", path)
+    monkeypatch.setattr(tuning_overrides, "PATH", tmp_path / tuning_overrides.OVERLAY_NAME)
     monkeypatch.setattr(tuning_overrides, "_seen", None)
     return TestClient(server.mcp.streamable_http_app())
 

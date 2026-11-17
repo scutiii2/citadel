@@ -43,7 +43,7 @@ def test_retired_keys_are_ignored_without_validation(monkeypatch, caplog, key):
 
 
 def test_existing_example_loads_with_default_strategies(monkeypatch):
-    path = Path(__file__).resolve().parents[1] / "configs" / "config_tuning.json.example"
+    path = Path(__file__).resolve().parents[1] / "configs" / "config_tuning.json"
     raw = json.loads(path.read_text(encoding="utf-8"))["classifier"]
     use_section(monkeypatch, raw)
     config = settings.settings()

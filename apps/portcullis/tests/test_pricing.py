@@ -62,11 +62,11 @@ def test_with_cost_does_not_mutate_and_removes_stale_cost(pricing):
     assert message["agent_usage"][0]["cost"] == 99
 
 
-def test_settings_load_pricing_from_example(tmp_path, monkeypatch):
+def test_settings_load_pricing_from_the_tracked_file(tmp_path, monkeypatch):
     configs = tmp_path / "configs"
     configs.mkdir()
-    (configs / "config_app.json.example").write_text("{}")
-    (configs / "config_pricing.json.example").write_text(json.dumps({
+    (configs / "config_app.json").write_text("{}")
+    (configs / "config_pricing.json").write_text(json.dumps({
         "currency": "USD", "models": {"example-model": {"input": 0, "output": 0}},
     }))
     monkeypatch.setattr(config, "CONFIGS_DIR", configs)

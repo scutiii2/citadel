@@ -200,8 +200,8 @@ def test_ttl_sweeper_runs_without_tool_calls(settings, fake_extractor):
 
 def test_native_config_uses_existing_shape(tmp_path, monkeypatch):
     path = tmp_path / "config_media_downloader.json"
-    example = Path(__file__).parents[2] / "specifics/media_downloader/configs/config_media_downloader.json.example"
-    path.with_suffix(".json.example").write_text(example.read_text())
+    tracked = Path(__file__).parents[2] / "specifics/media_downloader/configs/config_media_downloader.json"
+    path.write_text(tracked.read_text())
     monkeypatch.setattr(media_downloads, "settings", replace(media_downloads.settings, media_config_path=path, media_public_base_url="https://armory.example", media_signing_key="test-only-key"))
     config, max_caller = media_downloads.load_media_settings()
     assert config.limits.max_file_bytes == 500 * 1024 * 1024

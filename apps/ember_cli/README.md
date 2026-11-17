@@ -67,7 +67,7 @@ Not here: attachments, summaries, regenerate and edit, branching, sharing, promp
 
 ## Configuration
 
-`configs/config_cli.json` (copied from `config_cli.json.example` on first run, gitignored):
+`configs/config_cli.json` (tracked; see `configs/README.md`):
 
 ```json
 { "ember_api_url": "http://127.0.0.1:29601", "username": "" }

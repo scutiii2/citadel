@@ -434,7 +434,7 @@ async def agent_prompt_preview(request: Request) -> JSONResponse:
 
 
 def _tuning_overlay() -> Path:
-    return config_files.TUNING_PATH.with_name(tuning_overrides.OVERLAY_NAME)
+    return tuning_overrides.PATH
 
 
 @mcp.custom_route("/agents/gateway-settings", methods=["GET"])

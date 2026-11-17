@@ -1,6 +1,6 @@
 """The prompt text every agent shares, editable without touching code.
 
-`configs/config_prompts.json` holds only the pieces an admin changed; any
+`config_prompts.json` in Legion's data folder holds only the pieces an admin changed; any
 missing or empty piece falls back to DEFAULTS below, so an absent file means
 today's behaviour. agent_roles.py builds each agent's system prompt from
 these values once at start-up, so a change takes effect when the agent
@@ -17,7 +17,9 @@ import string
 import tempfile
 from pathlib import Path
 
-PATH = Path(__file__).resolve().parent.parent.parent / "configs" / "config_prompts.json"
+from src.citadel_auth import data_dir
+
+PATH = data_dir(Path(__file__).resolve().parents[2]) / "config_prompts.json"
 
 DEFAULTS: dict[str, str] = {
     "app_name": "Ember",

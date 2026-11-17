@@ -22,7 +22,7 @@ Default address `127.0.0.1:29650`. `STRONGHOLD_HOST` and `STRONGHOLD_PORT` overr
 | `AGENTS_REGISTRY_PATH` | `../legion/.data/agent_registry.json` | Legion's list of running agents (file) |
 | `AGENTS_REGISTRY_URL` | none | The same list over HTTP; wins over the file when set |
 | `STRONGHOLD_DATA_DIR` | `.data` | Holds `keys.json` |
-| `STRONGHOLD_CONFIG` | `configs/config_app.json` | Feature settings; copy `config_app.json.example`. A missing file means defaults |
+| `STRONGHOLD_CONFIG` | `configs/config_app.json` | Feature settings (tracked; see `configs/README.md`). A missing file means defaults |
 
 `keys.json` is made on first start: the key that encrypts saved secrets (brain keys, private-extension headers). Back it up with the data. Without it, saved secrets cannot be read. An older file may also hold a web push key pair; it is ignored.
 
