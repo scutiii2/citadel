@@ -75,23 +75,6 @@ def test_a_bad_model_name_change_saves_nothing(client, db):
     assert settings_store.read_all(db, "models") == {}
 
 
-def test_the_treasury_address_is_saved_used_at_once_and_goes_back_to_the_environment(client, db, monkeypatch):
-    from src.runtime import gateway_settings
-
-    monkeypatch.delenv("DB_GATEWAY_URL", raising=False)
-    assert client.get("/agents/treasury-address").json() == {"url": "http://127.0.0.1:29602", "stored": False}
-
-    saved = client.put("/agents/treasury-address", json={"url": " http://treasury:29602/ "})
-
-    assert saved.json() == {"url": "http://treasury:29602", "stored": True}
-    assert gateway_settings.treasury_address() == "http://treasury:29602"
-    assert "http://treasury:29602/instances/legion" in gateway_settings._record_url()
-    monkeypatch.setenv("DB_GATEWAY_URL", "http://from-env:29602")
-    assert gateway_settings.treasury_address() == "http://treasury:29602"  # the saved address wins
-    assert client.put("/agents/treasury-address", json={"url": None}).json() == {"url": "http://from-env:29602", "stored": False}
-
-
-def test_a_bad_treasury_address_is_refused(client, db):
-    for bad in ({}, {"url": "ftp://x"}, {"url": "http://u:p@h"}, {"url": ""}, {"url": "http://x", "other": 1}):
-        assert client.put("/agents/treasury-address", json=bad).status_code == 400
-    assert client.get("/agents/treasury-address").json()["stored"] is False
+def test_the_treasury_address_routes_are_removed(client):
+    assert client.get("/agents/treasury-address").status_code == 404
+    assert client.put("/agents/treasury-address", json={"url": "http://treasury:29602"}).status_code == 404

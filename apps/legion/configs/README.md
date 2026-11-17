@@ -63,3 +63,5 @@ to go back to the file's value. Keys that are not
 listed in `src/runtime/tuning_overrides.py` stay file-only, including feature enable flags and tier mappings.
 Each agent process notices a change at the start of its next turn; no restart is needed.
 In Docker the `.data/legion` folder is bind-mounted, so the overlay survives container recreation.
+
+Treasury bootstrap address lives in tracked `configs/config_app.json` as `treasury_url`; `TREASURY_URL` overrides it. Legion entry agents register their base address in Treasury’s catalog. Treasury Admin, Services controls address pins; Legion Admin no longer edits Treasury’s address.

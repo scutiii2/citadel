@@ -133,13 +133,6 @@ class AgentAdmin:
     async def delete_server(self, account: Account, server_id: str) -> None:
         await self._request("DELETE", f"/agents/servers/{quote(server_id, safe='')}", account)
 
-    async def treasury_address(self, account: Account) -> dict[str, Any]:
-        """Where legion reaches Treasury: {url, stored}."""
-        return await self._request("GET", "/agents/treasury-address", account)
-
-    async def set_treasury_address(self, account: Account, url: str | None) -> dict[str, Any]:
-        return await self._request("PUT", "/agents/treasury-address", account, json={"url": url})
-
     async def model_names(self, account: Account) -> dict[str, Any]:
         """The open model names of Legion's gateway presets: {models: [{name, value, stored}]}."""
         body = await self._request("GET", "/agents/models", account)

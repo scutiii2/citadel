@@ -237,31 +237,6 @@ async def delete_server(
     return {"deleted": server_id}
 
 
-class TreasuryAddressIn(BaseModel):
-    model_config = {"extra": "forbid"}
-
-    url: str | None = Field(max_length=300)
-
-
-@prompts_router.get("/treasury-address")
-async def get_treasury_address(account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
-    """Where legion reaches Treasury: `{url, stored}`."""
-    return await _call(admin.treasury_address(account))
-
-
-@prompts_router.put("/treasury-address")
-async def set_treasury_address(
-    body: TreasuryAddressIn,
-    account: Account = Depends(require_agents_manage),
-    admin: AgentAdmin = Depends(get_agent_admin),
-    logs: LogWriter = Depends(get_log_writer),
-) -> Any:
-    """legion validates and saves the address in its own settings database; its next Treasury request uses it."""
-    result = await _call(admin.set_treasury_address(account, body.url))
-    await logs.action(account, "agents.treasury_address", "Changed the address of Treasury for Legion")
-    return result
-
-
 @prompts_router.get("/model-names")
 async def get_model_names(account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
     """The model names gateway presets leave open (Azure deployments, vLLM models), with the saved value of each."""

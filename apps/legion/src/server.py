@@ -17,7 +17,10 @@ import sys
 from uuid import uuid4
 from pathlib import Path
 from src.providers import gateway_client
-from src.citadel_auth import settings_store
+from contextlib import asynccontextmanager
+from src.citadel_auth import settings_store, advertised_url
+from src.citadel_auth.treasury import register_instance
+from src.runtime.service_catalog import catalog
 from src.runtime import config_files, gateway_settings, tuning_overrides
 from src.tools.mcp_client import config as mcp_config
 from typing import Any
@@ -547,24 +550,6 @@ async def models_put(request: Request) -> JSONResponse:
     return JSONResponse({**await asyncio.to_thread(_models_view), "applies": "next agent start"})
 
 
-@mcp.custom_route("/agents/treasury-address", methods=["GET"])
-async def treasury_address_get(_request: Request) -> JSONResponse:
-    """Where Legion reaches Treasury: `{url, stored}`."""
-    return JSONResponse(await asyncio.to_thread(gateway_settings.treasury_view))
-
-
-@mcp.custom_route("/agents/treasury-address", methods=["PUT"])
-async def treasury_address_put(request: Request) -> JSONResponse:
-    """Body `{"url": "http://host:29602"}`, or `{"url": null}` to go back to the environment's or the default. Used at once."""
-    body = await _json_object(request)
-    if body is None or set(body) != {"url"}:
-        return JSONResponse({"error": "body must be {\"url\": address or null}"}, status_code=400)
-    try:
-        return JSONResponse(await asyncio.to_thread(gateway_settings.save_treasury_address, body["url"]))
-    except gateway_settings.GatewaySettingsError as error:
-        return JSONResponse({"error": str(error)}, status_code=400)
-
-
 @mcp.custom_route("/agents/tuning", methods=["GET"])
 async def tuning_get(_request: Request) -> JSONResponse:
     """The editable tuning values: the file's, the admin's changes, and the two merged."""
@@ -710,24 +695,25 @@ if SPEC.internal_role == "router":
     mcp.tool()(route)
 
 
-def _register_with_treasury() -> None:
-    """Treasury keeps no list of its callers: tell it which connection Legion's instance uses.
-    A background thread, so a Treasury that is not up yet never delays the agent; it retries on its own."""
-    import threading
-
-    from src.citadel_auth.treasury import register_instance
-
-    url = gateway_settings.treasury_address()
-    threading.Thread(
-        target=lambda: asyncio.run(register_instance(
-            internal_auth.keyring, url, gateway_settings.INSTANCE, [gateway_settings.CONNECTION])),
-        daemon=True, name="treasury-registration",
-    ).start()
+@asynccontextmanager
+async def _register_with_treasury():
+    """Register in the serving loop and release both background tasks on shutdown."""
+    registration = asyncio.create_task(register_instance(
+        internal_auth.keyring, gateway_settings.treasury_address(), gateway_settings.INSTANCE, [gateway_settings.CONNECTION]))
+    parts = urlsplit(_AGENT_URL)
+    origin = f"{parts.scheme}://{parts.netloc}"
+    catalog.start("legion" if SPEC.entry else None,
+                  advertised_url(HOST, PORT, origin) if SPEC.entry else None)
+    try:
+        yield
+    finally:
+        await catalog.stop()
+        registration.cancel()
+        await asyncio.gather(registration, return_exceptions=True)
 
 
 def main() -> None:
     asyncio.run(internal_auth.keyring.ensure_identity())
-    _register_with_treasury()
     role_info = {}
     if SPEC.role == "architect":
         role_info = {"kind": SPEC.kind, "workers": list(SPEC.workers)}
@@ -758,6 +744,14 @@ def main() -> None:
         internal_auth.install_mcp(mcp)
         app = mcp.streamable_http_app()
         internal_auth.install_auth(app)
+        previous_lifespan = app.router.lifespan_context
+
+        @asynccontextmanager
+        async def lifespan(application):
+            async with previous_lifespan(application), _register_with_treasury():
+                yield
+
+        app.router.lifespan_context = lifespan
         uvicorn.run(app, host=HOST, port=PORT, log_level=mcp.settings.log_level.lower())
     finally:
         agent_registry.deregister(_AGENT_ID)

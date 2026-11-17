@@ -960,3 +960,5 @@ def http_catalog(name: str) -> httpx.AsyncClient:
 - Task 5b: `test_db_gateway_client.py` asserted removed `DbGatewaySettings.url`; migrate its validation coverage to `treasury_url`, retaining instance checks.
 
 - Task 5c: no stale environment-row deletion exists on committed main. Added narrow deletion for `db_gateway_url` and `stronghold_url` in `stored()`. Group retains Treasury instance/connection controls. Existing editable-URL tests now exercise Firecrawl address with unchanged assertions. Created shared Armory catalog module here for startup, reused in Task 6c.
+
+- Task 5d: Legion previously registered in a daemon thread with no shutdown. Catalog and instance registration now share the serving event loop through the existing ASGI lifespan, preserving FastMCP lifecycle and cancelling both on shutdown.

@@ -39,7 +39,7 @@ def treasury(monkeypatch):
     monkeypatch.setattr(settings, "_read_sync", _read_sync)
     monkeypatch.setattr(settings, "_TRANSPORT", httpx.MockTransport(fake))
     monkeypatch.setattr(settings, "_SYNC_TRANSPORT", httpx.MockTransport(fake))
-    monkeypatch.setenv("DB_GATEWAY_URL", "http://treasury.test:29602/")
+    monkeypatch.setenv("TREASURY_URL", "http://treasury.test:29602/")
     settings.reset_cache()
     yield fake
     settings.reset_cache()

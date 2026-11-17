@@ -10,13 +10,12 @@ below). Whatever the record does not hold is the default address and no token, a
 that is all Legion has while Treasury cannot be reached. No environment variable
 names a gateway.
 
-Where Treasury itself is: `treasury_address()`. An administrator saves it on the
-Connections page (Legion's own settings database); the `DB_GATEWAY_URL` environment
-variable, which the compose file sets, is only the starting value.
+Where Treasury itself is: `treasury_address()`, from TREASURY_URL or tracked config_app.json.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from dataclasses import dataclass
@@ -26,7 +25,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from src.runtime import internal_auth
-from src.citadel_auth import AuthError, ServiceAuth, service_client, settings_store
+from src.citadel_auth import AuthError, ServiceAuth, service_client
 
 DEFAULT_URL = "http://127.0.0.1:29407"
 INSTANCE = "legion"
@@ -40,8 +39,6 @@ _SERVICES = {
     DECISION_KEY: "http://127.0.0.1:29406",
 }
 DEFAULT_TREASURY_URL = "http://127.0.0.1:29602"
-ENVIRONMENT_TABLE = "environment"
-TREASURY_KEY = "db_gateway_url"
 MAX_TOKEN_LENGTH = 512
 
 _TIMEOUT = httpx.Timeout(3.0)
@@ -67,33 +64,15 @@ class GatewaySettings:
 
 
 def treasury_address() -> str:
-    """Where Treasury is: the address saved on the Connections page, else `DB_GATEWAY_URL`, else the local default."""
+    """The only bootstrap address: TREASURY_URL, config_app.json, then local default."""
     from src.runtime import config_files
 
-    try:
-        saved = settings_store.read_all(config_files.SETTINGS_DB, ENVIRONMENT_TABLE).get(TREASURY_KEY)
-    except Exception:  # noqa: BLE001 - an unreadable settings file must not stop Legion from reaching Treasury
-        saved = None
-    return str(saved or os.getenv("DB_GATEWAY_URL") or DEFAULT_TREASURY_URL).rstrip("/")
-
-
-def treasury_view() -> dict[str, Any]:
-    """What the Connections page shows: the address in use and whether it was saved there."""
-    from src.runtime import config_files
-
-    saved = settings_store.read_all(config_files.SETTINGS_DB, ENVIRONMENT_TABLE).get(TREASURY_KEY)
-    return {"url": treasury_address(), "stored": bool(saved)}
-
-
-def save_treasury_address(value: Any) -> dict[str, Any]:
-    """Save the address of Treasury (None goes back to `DB_GATEWAY_URL` or the default). Used by the next request."""
-    from src.runtime import config_files
-
-    if value is None:
-        settings_store.delete(config_files.SETTINGS_DB, ENVIRONMENT_TABLE, TREASURY_KEY)
-    else:
-        settings_store.put(config_files.SETTINGS_DB, ENVIRONMENT_TABLE, TREASURY_KEY, _checked_url(value))
-    return treasury_view()
+    override = os.getenv("TREASURY_URL")
+    if override:
+        return override.strip().rstrip("/")
+    path = config_files.CONFIGS_DIR / "config_app.json"
+    raw = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    return str(raw.get("treasury_url") or DEFAULT_TREASURY_URL).strip().rstrip("/")
 
 
 def _record_url(which: str = KEY) -> str:
