@@ -204,7 +204,12 @@ class CatalogTransport(httpx.AsyncBaseTransport):
             target = httpx.URL(self._catalog.url(host[: -len(LOGICAL_SUFFIX)]))
             request.url = request.url.copy_with(scheme=target.scheme, host=target.host, port=target.port)
             request.headers["host"] = target.netloc.decode("ascii")
-        return await self._inner.handle_async_request(request)
+        try:
+            return await self._inner.handle_async_request(request)
+        except httpx.ConnectError:
+            if host.endswith(LOGICAL_SUFFIX):
+                self._catalog.refresh_soon()
+            raise
 
     async def aclose(self) -> None:
         await self._inner.aclose()

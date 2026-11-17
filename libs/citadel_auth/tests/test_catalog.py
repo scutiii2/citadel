@@ -174,3 +174,16 @@ def test_start_registers_then_refreshes_and_stop_cancels(tmp_path):
     catalog = asyncio.run(go())
     assert state["puts"] == 1 and state["gets"] >= 2
     assert catalog.url("armory") == "http://armory:29600"
+
+
+def test_logical_connection_failure_wakes_catalog_refresh(tmp_path):
+    catalog = make(lambda request: httpx.Response(500), tmp_path)
+    async def go():
+        catalog._wake = asyncio.Event()
+        def down(request):
+            raise httpx.ConnectError("down", request=request)
+        async with httpx.AsyncClient(transport=CatalogTransport(catalog, httpx.MockTransport(down))) as client:
+            with pytest.raises(httpx.ConnectError):
+                await client.get(logical_url("portcullis") + "/internal/accounts/u/permissions")
+        assert catalog._wake.is_set()
+    asyncio.run(go())

@@ -16,9 +16,6 @@ Default address `127.0.0.1:29650`. `STRONGHOLD_HOST` and `STRONGHOLD_PORT` overr
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DB_GATEWAY_URL` | `http://127.0.0.1:29602` | Treasury. Stronghold uses instance `stronghold`, connection `stronghold` |
-| `PORTCULLIS_URL` | `http://127.0.0.1:29601` | Portcullis's `/internal` API (see below) |
-| `ARMORY_URL` | `http://127.0.0.1:29600` | Armory, which keeps the assistant memory and the learned skills |
 | `AGENTS_REGISTRY_PATH` | `../legion/.data/agent_registry.json` | Legion's list of running agents (file) |
 | `AGENTS_REGISTRY_URL` | none | The same list over HTTP; wins over the file when set |
 | `STRONGHOLD_DATA_DIR` | `.data` | Holds `keys.json` |
@@ -70,3 +67,5 @@ Treasury keeps any JSON, so `src/schema` is Stronghold's schema. `models.py` has
 `/notes/...` are an account's private notes, kept in Treasury (collection `notes`). Armory's notes tools read the same collection for the notes an account shared with agents, so Armory must use the `stronghold` connection (`DB_GATEWAY_CONNECTION=stronghold`). Tag suggestions ask the Laya agent; tag generation asks the `tag-writer` agent. `/memory/...` is the assistant memory, which Armory keeps; Stronghold scopes every call to the requester.
 
 `src/agents/` is a copy of Portcullis's agent client. Change both until chats move here.
+
+`TREASURY_URL` overrides the `treasury_url` bootstrap address in `configs/config_app.json`. Internal peers resolve through Treasury’s catalog at request time.

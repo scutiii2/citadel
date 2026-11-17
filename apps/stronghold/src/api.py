@@ -29,7 +29,7 @@ from src.brains import routes as brains_routes
 from src.brains.connections import BrainError
 from src.brains.gateway import BrainGateway
 from pathlib import Path
-from src.citadel_auth import Keyring, ServiceAuthMiddleware, ServiceCatalog, advertised_url, from_env
+from src.citadel_auth import Keyring, ServiceAuthMiddleware, ServiceCatalog, CatalogTransport, logical_url, advertised_url, from_env
 from src.citadel_auth.treasury import register_in_background
 from src.chats import routes as chats_routes
 from src.chats.store import ChatStore
@@ -93,21 +93,25 @@ def create_app(
             clients.append(httpx.AsyncClient(base_url=base_url, timeout=_TIMEOUT))
             return clients[-1]
 
+        def http_catalog(name: str) -> httpx.AsyncClient:
+            clients.append(httpx.AsyncClient(base_url=logical_url(name), timeout=_TIMEOUT, transport=CatalogTransport(catalog)))
+            return clients[-1]
+
         keys = load_keys(settings.data_dir)
         app.state.settings = settings
         app.state.box = SecretBox(keys.secrets)
         app.state.store = store or DbGatewayClient(
-            http(settings.treasury_url), settings.db_instance, settings.db_connection, keyring)
+            http_catalog("treasury"), settings.db_instance, settings.db_connection, keyring)
         registration = None if store is not None else register_in_background(
             keyring, settings.treasury_url, settings.db_instance, [settings.db_connection])
-        app.state.platform = platform or PortcullisClient(http(settings.portcullis_url), keyring)
+        app.state.platform = platform or PortcullisClient(http_catalog("portcullis"), keyring)
         app.state.agent_gateway = agent_gateway or McpAgentGateway(keyring)
         app.state.agents = AgentDirectory(
             HttpRegistrySource(settings.agents_registry_url, http(settings.agents_registry_url), keyring)
             if settings.agents_registry_url else settings.agents_registry_path
         )
         app.state.extension_probe = ExtensionProbe(app.state.agent_gateway)
-        armory_client = armory or http(settings.armory_url)
+        armory_client = armory or http_catalog("armory")
         app.state.memory = MemoryClient(armory_client, keyring)
         app.state.skills = SkillsClient(armory_client, keyring)
         app.state.brain_gateway = BrainGateway(armory_client, keyring)
