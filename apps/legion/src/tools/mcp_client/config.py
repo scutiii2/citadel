@@ -10,11 +10,12 @@ because it is itself a server with tools of its own.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from src.citadel_auth import settings_store
+from src.citadel_auth import settings_store, resolved
 
 
 class ConfigError(ValueError):
@@ -35,7 +36,7 @@ class ServerConfig:
     label: str
     description: str
     transport: str  # "stdio" | "http"
-    url: str | None = None
+    url: str | Callable[[], str] | None = None
     command: str | None = None
     args: list[str] | None = None
     auth: AuthConfig | None = None
@@ -106,7 +107,7 @@ def validate_server(server_id: str, raw: dict[str, Any]) -> ServerConfig:
     return _build_server(server_id, raw)
 
 
-def load_servers_config(path: Path, url_overrides: dict[str, str] | None = None) -> dict[str, ServerConfig]:
+def load_servers_config(path: Path, url_overrides: dict[str, str | Callable[[], str]] | None = None) -> dict[str, ServerConfig]:
     """Load and validate every server in the settings database at `path`.
 
     Raises ConfigError for any entry missing a required field, using an
@@ -117,10 +118,15 @@ def load_servers_config(path: Path, url_overrides: dict[str, str] | None = None)
 
     `url_overrides` (server_id -> url) replaces an http entry's configured
     url after loading - used by mcp_upstream.py to let --mcp-url/
-    MCP_SERVER_URL repoint the "main" upstream server without editing
+    the catalog default repoint the "main" upstream server without editing
     changing the stored entry. Ignored for a stdio entry or an unknown server_id.
     """
     raw_data = settings_store.read_all(path, "servers")
+    # The catalog supplies Armory on fresh installs or when main has no saved URL.
+    if url_overrides and "main" in url_overrides:
+        main = raw_data.get("main", {"label": "Armory", "transport": "http"})
+        if main.get("transport") == "http" and not main.get("url"):
+            raw_data["main"] = {**main, "url": resolved(url_overrides["main"])}
     servers = {server_id: _build_server(server_id, raw) for server_id, raw in raw_data.items()}
     for server_id, url in (url_overrides or {}).items():
         config = servers.get(server_id)

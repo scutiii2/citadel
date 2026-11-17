@@ -23,8 +23,7 @@ the cooldown durations, and enables no backups by itself.
   `gateways/decision/`, and Laya's internal service strategy is read there on
   every call. It has no account or admin override.
 - **The MCP servers are not here.** The servers this agent connects to as a client are the `servers` table of
-  `.data/legion/settings.db`. A new install has none: an administrator adds `main` (Armory, e.g.
-  `http://127.0.0.1:29600/mcp`) and any other. `GET /agents/servers` lists them, `PUT`/`DELETE /agents/servers/{id}`
+  `.data/legion/settings.db`. A new install defaults `main` to Armory from the service catalog. An administrator may save a different `main` URL or add other servers. `GET /agents/servers` lists them, `PUT`/`DELETE /agents/servers/{id}`
   change them (a restart applies the change). Loaded by `src/tools/mcp_client/config.py`'s `load_servers_config`
   into typed `ServerConfig` entries; each entry is `{label, description,
   transport, url|command, auth?}`.

@@ -12,7 +12,6 @@ connection - not reconnected per call, unlike chat_app's mcp_client.py.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from src.agents import agent_spec
@@ -22,7 +21,8 @@ from src.runtime import approvals, internal_auth, tool_filter
 from src.tools.mcp_client import tool_progress
 from src.runtime.config_files import SETTINGS_DB
 from src.tools.mcp_client.sync_wrapper import SyncMcpClient
-from src.citadel_auth import ServiceAuth
+from src.citadel_auth import ServiceAuth, settings_store
+from src.runtime.service_catalog import catalog
 
 import asyncio
 
@@ -74,11 +74,11 @@ def tool_description(tool: Any) -> str:
     return description
 
 
-def connect() -> None:
-    # MCP_SERVER_URL (set directly, or via --mcp-url - see server.py) repoints
-    # the "main" upstream server without editing the stored server.
-    override = os.getenv("MCP_SERVER_URL")
-    url_overrides = {_SERVER_ID: override} if override else None
+def connect(url_override: str | None = None) -> None:
+    """Saved main URLs win over the catalog; an explicit CLI override wins over both."""
+    main = settings_store.read_all(_CONFIG_PATH, "servers").get(_SERVER_ID, {})
+    url_overrides = {_SERVER_ID: url_override} if url_override else (
+        {_SERVER_ID: catalog.mcp_url} if not main.get("url") and main.get("transport", "http") == "http" else None)
     # Armory checks a signed service assertion on /mcp.
     client.connect_all(_CONFIG_PATH, url_overrides, auth_by_server={_SERVER_ID: ServiceAuth(internal_auth.keyring, "armory")})
 

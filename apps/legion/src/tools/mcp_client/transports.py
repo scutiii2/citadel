@@ -23,6 +23,7 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import streamablehttp_client
 
 from src.tools.mcp_client.config import ServerConfig
+from src.citadel_auth import resolved
 
 
 class AuthResolutionError(RuntimeError):
@@ -78,10 +79,11 @@ async def open_session(
     `extra_headers` (HTTP only) are added to the auth block's."""
     if config.transport == "http":
         assert config.url is not None  # guaranteed by config.load_servers_config
-        await _check_tcp_reachable(config.url, timeout_seconds)
+        url = resolved(config.url)
+        await _check_tcp_reachable(url, timeout_seconds)
         headers = {**resolve_headers(config), **(extra_headers or {})}
         read_stream, write_stream, _get_session_id = await stack.enter_async_context(
-            streamablehttp_client(config.url, headers=headers or None, **({"auth": auth} if auth else {}))
+            streamablehttp_client(url, headers=headers or None, **({"auth": auth} if auth else {}))
         )
     else:
         params = StdioServerParameters(command=config.command, args=config.args or [])

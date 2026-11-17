@@ -33,13 +33,11 @@ _parser.add_argument(
         "Override the mcp_server URL this agent connects to as an MCP "
         "client (the 'main' server in Legion's settings database), e.g. "
         "http://127.0.0.1:29600/mcp to point at a different host/port. "
-        "Takes precedence over MCP_SERVER_URL. Set before mcp_upstream.connect() "
+        "Takes precedence over saved main URL and the catalog. Set before mcp_upstream.connect() "
         "runs in main() below."
     ),
 )
 _args, _ = _parser.parse_known_args()
-if _args.mcp_url:
-    os.environ["MCP_SERVER_URL"] = _args.mcp_url
 
 # A supervised child (see supervisor.py) gets its agent file in
 # AI_AGENT_FILE. Its provider/gateway/model must reach the env vars before
@@ -726,7 +724,10 @@ def main() -> None:
 
         provider.prepare()
     elif agent_config.PROVIDER_ID != "decision":
-        mcp_upstream.connect()
+        if _args.mcp_url:
+            mcp_upstream.connect(_args.mcp_url)
+        else:
+            mcp_upstream.connect()
         mcp_upstream.warn_unmatched_tool_globs()
     agent_registry.register(
         _AGENT_ID, _AGENT_LABEL, _AGENT_URL,

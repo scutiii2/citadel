@@ -966,3 +966,5 @@ def http_catalog(name: str) -> httpx.AsyncClient:
 - Task 6a: handle logical-peer connection errors in shared `CatalogTransport`, waking catalog refresh for both Stronghold→Portcullis and Portcullis→Stronghold without per-client callbacks. Added failing regression before implementation and resynced canonical library.
 
 - Task 6b: test fixtures supplied removed `mcp_server_url`; seed the fake Armory address in the test catalog instead. Existing config validation tests now exercise Treasury bootstrap URL; environment pass-through tests use retained Firecrawl URL. Classes that store MCP URLs now accept callables and resolve each session.
+
+- Task 6d: committed `load_servers_config` has no built-in `main` entry, and Legion retains persistent MCP sessions. Supply missing HTTP `main` only when catalog default is requested; saved URLs and stdio entries win, CLI override remains explicit. Keep catalog default as callable until session open so reconnect picks current address. Existing sessions retain their URL until reconnect. Failed startup catalog-backed sessions retry on next tools request; tested before implementation.
