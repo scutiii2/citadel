@@ -5,11 +5,13 @@ The Protocol is what routes depend on; tests swap in a fake.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import logging
 from typing import Any, Protocol
 
 import httpx
-from src.citadel_auth import Keyring
+from src.citadel_auth import Keyring, resolved
 from mcp.types import PaginatedRequestParams
 
 from src.services.caller import Caller
@@ -30,7 +32,7 @@ class ServerTools(Protocol):
 
 
 class McpServerTools:
-    def __init__(self, url: str, identity: Keyring | None, traffic: TrafficRecorder | None = None) -> None:
+    def __init__(self, url: str | Callable[[], str], identity: Keyring | None, traffic: TrafficRecorder | None = None) -> None:
         self._url = url
         self._identity = identity
         self._traffic = traffic or TrafficRecorder()
@@ -41,7 +43,7 @@ class McpServerTools:
         headers = identity_headers(caller.username, caller.email, caller.uid, identity=self._identity)
         try:
             with self._traffic.timed("mcp_server", "options_templates"):
-                async with mcp_session(self._url, headers, _TIMEOUT) as session:
+                async with mcp_session(resolved(self._url), headers, _TIMEOUT) as session:
                     tools = await _tools(session)
         except Exception as error:  # noqa: BLE001 - any transport failure is one "unreachable" outcome
             logger.warning("mcp_server tool list failed: %s", error)

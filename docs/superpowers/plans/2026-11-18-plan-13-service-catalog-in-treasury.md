@@ -964,3 +964,5 @@ def http_catalog(name: str) -> httpx.AsyncClient:
 - Task 5d: Legion previously registered in a daemon thread with no shutdown. Catalog and instance registration now share the serving event loop through the existing ASGI lifespan, preserving FastMCP lifecycle and cancelling both on shutdown.
 
 - Task 6a: handle logical-peer connection errors in shared `CatalogTransport`, waking catalog refresh for both Stronghold→Portcullis and Portcullis→Stronghold without per-client callbacks. Added failing regression before implementation and resynced canonical library.
+
+- Task 6b: test fixtures supplied removed `mcp_server_url`; seed the fake Armory address in the test catalog instead. Existing config validation tests now exercise Treasury bootstrap URL; environment pass-through tests use retained Firecrawl URL. Classes that store MCP URLs now accept callables and resolve each session.

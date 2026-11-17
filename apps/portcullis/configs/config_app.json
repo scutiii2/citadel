@@ -3,8 +3,6 @@
   "port": 29601,
   "session_cookie_name": "ember_session",
   "cookie_secure": false,
-  "mcp_server_url": "http://127.0.0.1:29600/mcp",
-  "stronghold_url": "http://127.0.0.1:29650",
   "bard_url": "http://127.0.0.1:29400",
   "scribe_url": "http://127.0.0.1:29401",
   "db_gateway": {

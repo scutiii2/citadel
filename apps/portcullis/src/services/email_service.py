@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import json
 import re
 from datetime import datetime
@@ -10,7 +12,7 @@ from string import Template
 from typing import Protocol
 
 import httpx
-from src.citadel_auth import Keyring
+from src.citadel_auth import Keyring, resolved
 
 from src.services.mcp_session import mcp_session
 from src.services.traffic import TrafficRecorder
@@ -43,7 +45,7 @@ class EmailSender(Protocol):
 class McpEmailSender:
     """Use the shared MCP SMTP service; Ember owns templates, never credentials."""
 
-    def __init__(self, url: str, identity: Keyring | None, traffic: TrafficRecorder | None = None) -> None:
+    def __init__(self, url: str | Callable[[], str], identity: Keyring | None, traffic: TrafficRecorder | None = None) -> None:
         self._url = url
         self._identity = identity
         self._traffic = traffic or TrafficRecorder()
@@ -70,7 +72,7 @@ class McpEmailSender:
         # Account emails can precede login/verification; service identity is intentional.
         with self._traffic.timed("mcp_server", "email.send"):
             try:
-                async with mcp_session(self._url, headers, _TIMEOUT) as session:
+                async with mcp_session(resolved(self._url), headers, _TIMEOUT) as session:
                     result = await session.call_tool("tool_email_sendEmail", {
                         "to": to, "subject": subject, "body_text": body,
                         "capability_alias": "ember", "prefix_subject": False,

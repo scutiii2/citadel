@@ -158,4 +158,4 @@ async def proxy_server(
     body = await _checked_body(request, policy)
     if isinstance(body, Response):
         return body
-    return await proxy.forward(request, settings.mcp_server_url, account, body, target="mcp_server")
+    return await proxy.forward(request, request.app.state.catalog.mcp_url(), account, body, target="mcp_server")

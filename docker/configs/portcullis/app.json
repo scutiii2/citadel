@@ -4,8 +4,6 @@
   "session_cookie_name": "ember_session",
   "cookie_secure": false,
   "agents_registry_path": "/agent_data/agent_registry.json",
-  "mcp_server_url": "http://armory:29600/mcp",
-  "stronghold_url": "http://stronghold:29650",
   "bard_url": "http://bard:29400",
   "scribe_url": "http://scribe:29401",
   "db_gateway": {

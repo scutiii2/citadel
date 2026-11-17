@@ -27,7 +27,7 @@ def test_reports_config_and_secret_problems(client: TestClient, tmp_path: Path) 
     assert not any("email is not configured" in message for _, _, message in found)
 
     (tmp_path / "config_app.json").write_text(
-        json.dumps({**GOOD_CONFIG, "port": 99999, "mcp_server_url": "ftp://x"}),
+        json.dumps({**GOOD_CONFIG, "port": 99999, "treasury_url": "ftp://x"}),
         encoding="utf-8",
     )
     with (tmp_path / ".env").open("a", encoding="utf-8") as env_file:
@@ -40,7 +40,7 @@ def test_reports_config_and_secret_problems(client: TestClient, tmp_path: Path) 
     found = issues(client)
     assert {i for i in found if i[0] == "config_app.json"} == {
         ("config_app.json", "port", "must be a port number (1-65535)"),
-        ("config_app.json", "mcp_server_url", "must be an http(s) URL"),
+        ("config_app.json", "treasury_url", "must be an http(s) URL"),
         # The test app runs with backups off.
         ("config_app.json", "backup.enabled", "is false: the database is not backed up automatically"),
     }

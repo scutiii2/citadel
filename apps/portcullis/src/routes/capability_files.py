@@ -62,7 +62,7 @@ class PackageIn(BaseModel):
 
 
 def gateway(request: Request) -> CapabilityFilesGateway:
-    return CapabilityFilesGateway(request.app.state.upstream, request.app.state.settings.mcp_server_url,
+    return CapabilityFilesGateway(request.app.state.upstream, request.app.state.catalog.mcp_url(),
                                   request.app.state.keyring)
 
 

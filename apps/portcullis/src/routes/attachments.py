@@ -35,7 +35,7 @@ async def attachment_content(
     account: Account = Depends(require_permission("files.download")),
 ):
     """Preview an owned chat attachment without a PDF workspace subscription."""
-    client = CapabilityFilesGateway(request.app.state.upstream, request.app.state.settings.mcp_server_url,
+    client = CapabilityFilesGateway(request.app.state.upstream, request.app.state.catalog.mcp_url(),
                                     request.app.state.keyring)
     return await client.stream("pdf", file_id, account, content=True, range_header=request.headers.get("range"))
 

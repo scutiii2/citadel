@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
-from src.citadel_auth import ServiceCatalog, advertised_url
+from src.citadel_auth import ServiceCatalog, CatalogTransport, logical_url, advertised_url
 from src.citadel_auth.treasury import register_in_background
 from src.routes import brains, stronghold
 
@@ -141,7 +141,7 @@ def create_app(
             catalog.start("portcullis", advertised_url(settings.host, settings.port, settings.advertise_url))
         # Raises SecretBoxError (a clear one-line message) when .env holds a key that is not valid.
         secret_box = SecretBox(ensure_secrets_key(settings.env_path))
-        upstream = httpx.AsyncClient(transport=upstream_transport, timeout=_UPSTREAM_TIMEOUT)
+        upstream = httpx.AsyncClient(transport=CatalogTransport(catalog, upstream_transport), timeout=_UPSTREAM_TIMEOUT)
 
         gateway_client = httpx.AsyncClient(base_url=settings.treasury_url, timeout=_DB_GATEWAY_TIMEOUT)
         app.state.db_gateway = db_gateway or DbGatewayClient(
@@ -153,7 +153,7 @@ def create_app(
 
         app.state.settings = settings
         app.state.database = database
-        app.state.email_sender = email_sender or McpEmailSender(settings.mcp_server_url, service_auth.keyring, recorder)
+        app.state.email_sender = email_sender or McpEmailSender(lambda: catalog.mcp_url(), service_auth.keyring, recorder)
         app.state.upstream = upstream
         app.state.keyring = service_auth.keyring
         # A token saved on the Tool services page (settings.db next to the database) wins over the environment's.
@@ -170,10 +170,10 @@ def create_app(
         )
         app.state.mcp_proxy = McpProxy(upstream, service_auth.keyring, recorder)
         app.state.stronghold = StrongholdForwarder(
-            upstream, settings.stronghold_url, service_auth.keyring, recorder
+            upstream, logical_url("stronghold"), service_auth.keyring, recorder
         )
         uid_log_filter.install()
-        app.state.server_tools = server_tools or McpServerTools(settings.mcp_server_url, service_auth.keyring, recorder)
+        app.state.server_tools = server_tools or McpServerTools(lambda: catalog.mcp_url(), service_auth.keyring, recorder)
         app.state.logs = log_writer
         app.state.traffic = recorder
         recorder.start()

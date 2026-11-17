@@ -289,7 +289,6 @@ def make_settings(
         require_email_verification=require_email_verification,
         env_path=env_path,
         agents_registry_path=registry,
-        mcp_server_url=MCP_SERVER_URL,
         security=security or SecuritySettings(),
         # Off unless a test asks: a background copy of every test's database is noise.
         backup=backup or BackupSettings(enabled=False),
@@ -357,6 +356,7 @@ def client_factory(
             client=(address, 50000),
         )
         client.__enter__()
+        client.app.state.catalog._known["armory"] = "http://mcp-server.internal"
         opened.append(client)
         return client
 

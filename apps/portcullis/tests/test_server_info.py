@@ -302,19 +302,19 @@ def test_armory_environment_is_admin_only_logged_and_never_logs_values(client_fa
         if request.url.path != "/admin/environment":
             return mcp_server(request)
         if request.method == "GET":
-            return httpx.Response(200, json={"settings": [{"field": "stronghold_url", "value": "http://s:1"}]})
-        if json.loads(request.content).get("stronghold_url") == "bad":
+            return httpx.Response(200, json={"settings": [{"field": "firecrawl_api_url", "value": "http://s:1"}]})
+        if json.loads(request.content).get("firecrawl_api_url") == "bad":
             return httpx.Response(400, json={"error": "Stronghold address: use an http(s) address without a login."})
         return httpx.Response(200, json={"settings": [], "restart": ["media_signing_key"]})
 
     upstream.handler = armory
     admin = as_admin(client_factory())
 
-    assert admin.get("/api/armory-environment").json()["settings"][0]["field"] == "stronghold_url"
+    assert admin.get("/api/armory-environment").json()["settings"][0]["field"] == "firecrawl_api_url"
     changed = admin.put("/api/armory-environment", json={"media_signing_key": "s3cret", "obsidian_verify_tls": False})
     assert changed.status_code == 200 and changed.json()["restart"] == ["media_signing_key"]
     assert json.loads(upstream.requests[-1].content) == {"media_signing_key": "s3cret", "obsidian_verify_tls": False}
-    refused = admin.put("/api/armory-environment", json={"stronghold_url": "bad"})
+    refused = admin.put("/api/armory-environment", json={"firecrawl_api_url": "bad"})
     assert (refused.status_code, refused.json()["detail"]) == (400, "Stronghold address: use an http(s) address without a login.")
     root = admin.get("/api/auth/me").json()["id"]
     logged = " ".join(entry["message"] for entry in admin.get("/api/logs/action", params={"actor": root}).json())
@@ -385,3 +385,14 @@ def test_armory_limits_pass_through_are_admin_only_and_logged(client_factory, em
     assert member.get("/api/armory-tuning").status_code == 403
     assert member.put("/api/armory-tuning/pdf_merger", json={"file_ttl_hours": 1}).status_code == 403
     assert member.delete("/api/armory-tuning/pdf_merger").status_code == 403
+
+
+def test_armory_address_changes_on_the_next_request(client, upstream):
+    upstream.handler = mcp_server
+    as_admin(client)
+    client.app.state.catalog._known["armory"] = "http://armory.test:29600"
+    assert client.get("/api/commands").status_code == 200
+    client.app.state.catalog._known["armory"] = "http://moved.test:29600"
+    assert client.get("/api/commands").status_code == 200
+    sent = [request for request in upstream.requests if request.url.path == "/commands"]
+    assert [request.url.host for request in sent] == ["armory.test", "moved.test"]
