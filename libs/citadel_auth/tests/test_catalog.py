@@ -187,3 +187,34 @@ def test_logical_connection_failure_wakes_catalog_refresh(tmp_path):
                 await client.get(logical_url("portcullis") + "/internal/accounts/u/permissions")
         assert catalog._wake.is_set()
     asyncio.run(go())
+
+
+@pytest.mark.parametrize("bad", ["http://@host", "http://host:bad", "http://host:99999", "http://host:", "http://ho st", "http://host//", "http://host?", "http://host#", "http://ho\nst"])
+def test_checked_address_refuses_invalid_origins(bad):
+    with pytest.raises(ValueError):
+        checked_address(bad)
+
+
+def test_a_successful_snapshot_removes_an_unpinned_address(tmp_path):
+    responses = [{"services": {"armory": "http://pinned:29600"}}, {"services": {}}]
+    catalog = make(lambda request: httpx.Response(200, json=responses.pop(0)), tmp_path)
+    assert asyncio.run(catalog.refresh()) is True
+    assert catalog.url("armory") == "http://pinned:29600"
+    assert asyncio.run(catalog.refresh()) is True
+    assert catalog.url("armory") == "http://127.0.0.1:29600"
+
+
+def test_background_refusal_is_final(tmp_path):
+    calls = []
+    def handler(request):
+        if request.method == "PUT":
+            calls.append(request.url.path)
+            return httpx.Response(403)
+        return httpx.Response(200, json={"services": {}})
+    async def go():
+        catalog = make(handler, tmp_path, interval=0.001)
+        catalog.start("stronghold", "http://stronghold:29650")
+        await asyncio.sleep(0.02)
+        await catalog.stop()
+    asyncio.run(go())
+    assert calls == ["/services/stronghold"]

@@ -40,11 +40,20 @@ class UnknownService(KeyError):
 
 def checked_address(value: object) -> str:
     """A base address `http(s)://host[:port]`, without the trailing slash. ValueError otherwise."""
-    text = str(value or "").strip().rstrip("/") if isinstance(value, str) else ""
-    parts = urlsplit(text)
-    if parts.scheme not in ("http", "https") or not parts.hostname or parts.username or parts.password or parts.path or parts.query or parts.fragment:
-        raise ValueError("an address looks like http://host:port")
-    return text
+    text = value.strip() if isinstance(value, str) else ""
+    try:
+        parts = urlsplit(text)
+        port = parts.port  # Reject malformed and out-of-range ports before saving.
+        if (parts.scheme not in ("http", "https") or not parts.hostname
+                or parts.username is not None or parts.password is not None
+                or parts.path not in ("", "/") or "?" in text or "#" in text
+                or parts.netloc.endswith(":") or port == 0 or "\\" in text
+                or any(char.isspace() or ord(char) < 32 for char in text)):
+            raise ValueError
+        httpx.URL(text)
+    except (ValueError, httpx.InvalidURL):
+        raise ValueError("an address looks like http://host:port") from None
+    return text.removesuffix("/")
 
 
 def advertised_url(host: str, port: int, configured: str | None = None) -> str:
@@ -73,7 +82,9 @@ class ServiceCatalog:
         self._keyring = keyring
         self._treasury_url = checked_address(treasury_url)
         self._cache_path = Path(cache_path) if cache_path else None
+        self._defaults = dict(defaults)
         self._known = dict(defaults)
+        self._registration_refused = False
         self._interval = interval
         self._transport = transport
         self._wake: asyncio.Event | None = None  # created in start(), inside the running loop
@@ -126,7 +137,10 @@ class ServiceCatalog:
             services = response.json().get("services")
         except (httpx.HTTPError, ValueError, AttributeError):
             return False
+        if not isinstance(services, dict):
+            return False
         before = dict(self._known)
+        self._known = dict(self._defaults)
         self._merge(services)
         if self._known != before or (self._cache_path is not None and not self._cache_path.exists()):
             await asyncio.to_thread(self._write_cache)
@@ -145,6 +159,7 @@ class ServiceCatalog:
 
     async def register(self, name: str, url: str, *, attempts: int = 30, delay: float = 2.0) -> bool:
         """Tell Treasury where this service is. True once accepted. Retries while Treasury is down; a refusal is final."""
+        self._registration_refused = False
         body = {"url": checked_address(url)}
         for attempt in range(attempts):
             try:
@@ -153,6 +168,7 @@ class ServiceCatalog:
                 if response.status_code == 200:
                     return True
                 if response.status_code not in _RETRY_STATUS:
+                    self._registration_refused = True
                     log.error("Treasury refused the address of %r (%s): %s", name, response.status_code, response.text[:200])
                     return False
             except httpx.HTTPError:
@@ -174,12 +190,14 @@ class ServiceCatalog:
         return self._task
 
     async def _run(self, name: str | None, url: str | None) -> None:
-        if name and url:
-            await self.register(name, url)
+        pending = bool(name and url)
         while True:
+            if pending:
+                accepted = await self.register(name, url, attempts=1)
+                pending = not accepted and not self._registration_refused
             await self.refresh()
             try:
-                await asyncio.wait_for(self._wake.wait(), self._interval)
+                await asyncio.wait_for(self._wake.wait(), min(self._interval, 2.0) if pending else self._interval)
             except asyncio.TimeoutError:
                 pass
             self._wake.clear()
