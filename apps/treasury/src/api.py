@@ -6,6 +6,7 @@ A connection is reachable only through an instance that lists it.
 
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,7 +19,7 @@ from pydantic import BaseModel, Field
 
 from src.citadel_auth import Keyring, ServiceAuthMiddleware, current_caller, data_dir, from_env, settings_store
 from src.backends.base import UnsupportedOperation
-from src import connection_admin
+from src import connection_admin, service_catalog
 from src.registry import InstanceManager, RawSqlDisabled, UnknownConnection, UnknownInstance
 
 MAX_LIMIT = 1000
@@ -46,6 +47,10 @@ def _error(status: int):
         return JSONResponse({"error": str(message)}, status_code=status)
 
     return handler
+
+
+class ServiceBody(BaseModel):
+    url: str
 
 
 class InstanceBody(BaseModel):
@@ -100,6 +105,25 @@ def create_app(manager: InstanceManager, keyring: Keyring | None = None, setting
             settings_store.put(settings_db, "instances", name, list(dict.fromkeys(body.connections)))
         return {"saved": name}
 
+    @app.get("/services")
+    async def services() -> dict[str, Any]:
+        """The catalog every service reads: the address each one registered, or an administrator pinned."""
+        return {"services": await asyncio.to_thread(service_catalog.effective, settings_db) if settings_db is not None else {}}
+
+    @app.put("/services/{name}")
+    async def register_service(name: str, body: ServiceBody) -> dict[str, Any]:
+        """A service says where it is. Only a service may set its own address."""
+        caller = current_caller()
+        if caller is None or caller.name != name:
+            raise HTTPException(403, f"{caller.name if caller else 'this caller'} may not register the address of {name!r}")
+        if settings_db is None:
+            raise HTTPException(409, "this Treasury keeps no settings database")
+        try:
+            await asyncio.to_thread(service_catalog.register, settings_db, name, body.url)
+        except service_catalog.ServiceCatalogError as error:
+            raise HTTPException(400, str(error)) from error
+        return {"saved": name}
+
     def _admin_only() -> None:
         """The connections page is Portcullis's (staff only there); no other service may change a connection."""
         caller = current_caller()
@@ -140,6 +164,29 @@ def create_app(manager: InstanceManager, keyring: Keyring | None = None, setting
         except connection_admin.ConnectionAdminError as error:
             raise HTTPException(400, str(error)) from error
         return {**connection_admin.view(settings_db, manager), "applies": "next start"}
+
+    @app.get("/admin/services")
+    async def admin_services() -> dict[str, Any]:
+        _admin_only()
+        return await asyncio.to_thread(service_catalog.view, settings_db)
+
+    @app.put("/admin/services/{name}")
+    async def pin_service(name: str, body: ServiceBody) -> dict[str, Any]:
+        _admin_only()
+        try:
+            await asyncio.to_thread(service_catalog.pin, settings_db, name, body.url)
+        except service_catalog.ServiceCatalogError as error:
+            raise HTTPException(400, str(error)) from error
+        return await asyncio.to_thread(service_catalog.view, settings_db)
+
+    @app.delete("/admin/services/{name}")
+    async def unpin_service(name: str) -> dict[str, Any]:
+        _admin_only()
+        try:
+            await asyncio.to_thread(service_catalog.unpin, settings_db, name)
+        except service_catalog.ServiceCatalogError as error:
+            raise HTTPException(400, str(error)) from error
+        return await asyncio.to_thread(service_catalog.view, settings_db)
 
     @app.get(BASE + "/collections/{collection}/records/{key}")
     async def get_record(instance: str, connection: str, collection: str, key: str) -> dict[str, Any]:
