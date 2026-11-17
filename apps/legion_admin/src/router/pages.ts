@@ -27,4 +27,10 @@ export const LEGION_PAGES: LegionPage[] = [
     icon: ["M4 5h16v5H4zM4 14h16v5H4z", "M8 7.5h.01M8 16.5h.01"],
     permission: "agents.manage",
   },
+  {
+    to: "/tuning",
+    label: "Tuning",
+    icon: ["M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3", "M1 14h6M9 8h6M17 16h6"],
+    permission: "tuning.manage",
+  },
 ];

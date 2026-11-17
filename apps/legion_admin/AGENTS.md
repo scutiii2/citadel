@@ -2,7 +2,7 @@
 
 Project note: `Brain/Projects/legion_admin.md` in the Obsidian vault (`../../../../Brain/` from this folder).
 
-Vue 3 + TypeScript admin app for Legion, only for accounts holding `agents.manage`. Talks only to `portcullis` through the Vite `/api` proxy (no backend of its own). First page: Agents.
+Vue 3 + TypeScript admin app for Legion, for accounts holding `agents.manage` (Agents, Connections, MCP servers) or `tuning.manage` (Tuning: response-limit ceilings, `/api/admin/tuning`). Talks only to `portcullis` through the Vite `/api` proxy (no backend of its own).
 
 ## Rules
 - Code is copied between the admin apps, not shared. Nothing here imports from another app. Apply a fix to a shared component in every admin app that has a copy.

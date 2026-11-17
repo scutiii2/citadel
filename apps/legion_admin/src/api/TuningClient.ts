@@ -1,4 +1,4 @@
-// apps/Ember/ember_admin/src/api/TuningClient.ts
+// Legion tuning as Portcullis returns it (/api/admin/tuning).
 import { apiRequest } from "./http";
 
 /** legion's editable tuning as portcullis returns it (/api/admin/tuning). */

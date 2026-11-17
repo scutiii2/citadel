@@ -33,10 +33,4 @@ export const STRONGHOLD_PAGES: StrongholdPage[] = [
     icon: ["M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z", "M13 5v2", "M13 17v2", "M13 11v2"],
     permission: "tickets.manage",
   },
-  {
-    to: "/tuning",
-    label: "Tuning",
-    icon: ["M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3", "M1 14h6M9 8h6M17 16h6"],
-    permission: "tuning.manage",
-  },
 ];
