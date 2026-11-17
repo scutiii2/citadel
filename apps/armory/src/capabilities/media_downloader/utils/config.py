@@ -42,6 +42,5 @@ class Settings:
     file_ttl_seconds: int = 6 * 3600
     sweep_interval_seconds: int = 600
     download_link_seconds: int = 3600
-    internal_api_token: str = ""
     signing_key: bytes = b""
     limits: Limits = field(default_factory=Limits)

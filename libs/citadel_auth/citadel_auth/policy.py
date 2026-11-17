@@ -17,11 +17,12 @@ POLICY = {
         "armory": Rule(("/brains/resolve", "/notes", "/memory", "/skills", "/tickets"), True),
     },
     "armory": {
-        "portcullis": Rule(("/mcp", "/upload", "/download", "/media", "/admin", "/capabilities", "/extensions"), True),
-        "stronghold": Rule(("/mcp", "/skills", "/memory", "/notes", "/tickets"), True),
+        "portcullis": Rule(("/mcp", "/upload", "/download", "/media", "/pdf", "/admin", "/capabilities", "/extensions", "/commands", "/tickets/tags"), True),
+        "stronghold": Rule(("/mcp", "/skills", "/memory", "/notes", "/tickets", "/ticket-admin", "/upload", "/brains/operation"), True),
         "legion": Rule(("/mcp",), True),
     },
     "legion": {
+        "armory": Rule(("/mcp",), True),
         "portcullis": Rule(("/mcp", "/registry", "/agents"), True),
         "stronghold": Rule(("/mcp", "/registry"), True),
     },

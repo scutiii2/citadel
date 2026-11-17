@@ -536,19 +536,28 @@ def test_http_extension_empty_url_is_rejected(tmp_path: Path):
 
 
 def test_http_extension_headers_resolve_placeholders(tmp_path: Path, monkeypatch):
-    monkeypatch.setenv("INTERNAL_API_TOKEN", "s3cret")
+    monkeypatch.setenv("PDF_MERGER_TOKEN", "s3cret")
     path = _write(
         tmp_path,
         {
             "pdf_merger": {
                 "label": "PDF Merger",
                 "url": "http://127.0.0.1:8040/mcp",
-                "headers": {"X-Internal-Token": "${INTERNAL_API_TOKEN}"},
+                "headers": {"X-Internal-Token": "${PDF_MERGER_TOKEN}"},
             }
         },
     )
 
     assert load_extensions_config(path)["pdf_merger"].headers == {"X-Internal-Token": "s3cret"}
+
+
+def test_legacy_shared_token_placeholder_is_rejected_even_if_set(tmp_path: Path, monkeypatch):
+    name = "INTERNAL_" + "API_TOKEN"
+    monkeypatch.setenv(name, "must-not-be-used")
+    path = _write(tmp_path, {"legacy": {"label": "Legacy", "url": "http://legion/mcp",
+                                      "headers": {"Authorization": "${" + name + "}"}}})
+    with pytest.raises(ValueError, match="unsupported"):
+        load_extensions_config(path)
 
 
 def test_http_extension_without_headers_has_none(tmp_path: Path):

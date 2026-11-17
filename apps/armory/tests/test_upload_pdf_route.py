@@ -1,4 +1,6 @@
 """Native uploads reuse the Ember endpoint and require stable account identity."""
+
+from tests.auth_helpers import FreshHeaders
 from types import SimpleNamespace
 from unittest.mock import Mock
 import sys
@@ -12,7 +14,7 @@ from src.services import capability_registry
 from src.services.identity_context import IdentityContextMiddleware, current_uid
 from src.capabilities.pdf_merger.utils.errors import ErrorCode, MergerError
 
-HEADERS = {"X-Internal-Token": "shared", "X-Requester-UID": "account-alice", "X-Requester-Username": "alice"}
+HEADERS = FreshHeaders(uid="account-alice", username="alice")
 FILE = {"file_id": "f_1", "name": "scan.pdf", "pages": 2, "kind": "pdf", "size": 12, "expires_at": 2000000000}
 
 class PdfError(Exception):
@@ -20,7 +22,7 @@ class PdfError(Exception):
 
 @pytest.fixture
 def setup(monkeypatch):
-    monkeypatch.setattr(upload_routes, "settings", SimpleNamespace(internal_api_token="shared"))
+    monkeypatch.setattr(upload_routes, "settings", SimpleNamespace())
     monkeypatch.setattr(capability_registry, "is_enabled", lambda _: True)
     identities = []
     def save(name, content):
@@ -50,7 +52,7 @@ def test_original_bytes_and_authenticated_uid_cross_thread_boundary(setup):
     assert identities == ["account-alice"]
 
 
-@pytest.mark.parametrize("headers, status", [({}, 401), ({"X-Internal-Token": "bad"}, 401), ({"X-Internal-Token": "shared", "X-Requester-Username": "alice"}, 400)])
+@pytest.mark.parametrize("headers, status", [({}, 401), (FreshHeaders(invalid=True), 401), (FreshHeaders(), 400)])
 def test_token_and_stable_identity_required(setup, headers, status):
     client, upload, _ = setup
     assert post(client, headers=headers).status_code == status
@@ -89,7 +91,13 @@ def test_body_limit_stops_reading_before_multipart_finishes(setup):
     headers = [(k.lower().encode(), v.encode()) for k, v in HEADERS.items()]
     headers.append((b"content-type", b"multipart/form-data; boundary=boundary"))
     request = Request({"type": "http", "method": "POST", "path": "/upload/pdf", "headers": headers}, receive=receive)
-    response = asyncio.run(upload_routes.upload_pdf(request))
+    from src.citadel_auth import Caller, requester_context
+    from tests import auth_helpers
+    async def invoke():
+        async with requester_context(auth_helpers.stack["armory"], Caller("portcullis"),
+                HEADERS["X-Citadel-Requester"], "armory"):
+            return await upload_routes.upload_pdf(request)
+    response = asyncio.run(invoke())
     assert response.status_code == 413
     assert received < 32
     upload.assert_not_called()

@@ -55,6 +55,7 @@ class ServiceAuthMiddleware:
         caller_context = _caller.set(caller)
         requester_context = _requester.set(requester)
         token_context = _requester_token.set(token)
+        scope["citadel_auth"] = (caller, requester, token)
         try:
             await self.app(scope, receive, send)
         finally:

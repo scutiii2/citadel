@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import FreshHeaders
+
 import logging
 from types import SimpleNamespace
 
@@ -15,7 +17,7 @@ from src.capabilities.skills.utils import skill_store as store
 TOKEN = "shared-secret"
 UID_A = "a" * 32
 UID_B = "b" * 32
-HEADERS = {"X-Internal-Token": TOKEN}
+HEADERS = FreshHeaders(caller="stronghold", )
 
 
 @pytest.fixture
@@ -32,7 +34,7 @@ def online(monkeypatch):
 
 @pytest.fixture
 def client(monkeypatch, db, online):
-    monkeypatch.setattr(skill_routes, "settings", SimpleNamespace(internal_api_token=TOKEN, skills_db_path=db))
+    monkeypatch.setattr(skill_routes, "settings", SimpleNamespace(skills_db_path=db))
     app = Starlette()
     skill_routes.install_skill_routes(app)
     with TestClient(app) as test_client:
@@ -150,15 +152,10 @@ def test_the_active_cap_is_a_409(client, db, monkeypatch):
 @pytest.mark.parametrize("token", [None, "wrong"])
 def test_a_missing_or_wrong_token_is_a_401_and_changes_nothing(client, db, token):
     skill_id = propose(db)
-    headers = {"X-Internal-Token": token} if token else {}
+    headers = FreshHeaders(caller="stronghold", invalid=token != TOKEN) if token else {}
     assert client.get(url(), headers=headers).status_code == 401
     assert client.put(url(tail=f"/{skill_id}/status"), headers=headers, json={"status": "active"}).status_code == 401
     assert store.list_skills(db, UID_A)[0].status == "proposed"
-
-
-def test_an_unset_token_never_validates(client, db, monkeypatch):
-    monkeypatch.setattr(skill_routes, "settings", SimpleNamespace(internal_api_token="", skills_db_path=db))
-    assert client.get(url(), headers={"X-Internal-Token": ""}).status_code == 401
 
 
 @pytest.mark.parametrize("uid", ["alice", "A" * 32, "a" * 31, "a" * 33])

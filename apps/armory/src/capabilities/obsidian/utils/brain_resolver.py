@@ -1,5 +1,8 @@
 """Resolve current authorized snapshots in Ember; secrets live only in request objects."""
 import json
+import asyncio
+from src.citadel_auth import service_client, requester_header
+from src.services.service_auth import keyring
 import urllib.error
 import urllib.request
 
@@ -10,25 +13,35 @@ from src.capabilities.obsidian.utils.gateway import ObsidianGateway, ObsidianGat
 
 def resolve(scope: str, operation: str, uid: str | None = None) -> dict:
     uid = uid if uid is not None else identity_context.current_uid()
-    if scope not in {"instance", "personal"} or not settings.internal_api_token or not uid:
+    if scope not in {"instance", "personal"} or not uid or uid != identity_context.current_uid():
         raise ObsidianGatewayError("Brain access requires a signed-in user and configured internal authentication.")
     constrained = identity_context._from_request_meta("brain_scope")
     if operation in {"write", "append"} and constrained in {"personal", "instance"} and scope != constrained:
         raise ObsidianGatewayError("The selected auto-save destination cannot be changed by the model.")
-    request = urllib.request.Request(settings.stronghold_url.rstrip("/") + "/brains/resolve",
-        data=json.dumps({"scope": scope, "operation": operation}).encode(), method="POST",
-        headers={"X-Internal-Token": settings.internal_api_token, "X-Requester-Uid": uid, "Content-Type": "application/json"})
     try:
-        with urllib.request.build_opener(_NoRedirect()).open(request, timeout=5) as response:
-            raw = response.read(32_001)
-            if len(raw) > 32_000:
-                raise ValueError()
-            result = json.loads(raw)
-            if not isinstance(result, dict) or result.get("scope") != scope:
-                raise ValueError()
-            return result
+        return asyncio.run(_resolve(scope, operation))
     except (OSError, ValueError):
         raise ObsidianGatewayError("Brain connection is unavailable or access was refused. Check your destination and permissions.") from None
+
+
+async def _resolve(scope: str, operation: str) -> dict:
+    import httpx
+    try:
+        async with service_client(keyring, "stronghold", timeout=5) as client:
+            async with client.stream("POST", settings.stronghold_url.rstrip("/") + "/brains/resolve",
+                    json={"scope": scope, "operation": operation}, headers=requester_header()) as response:
+                response.raise_for_status()
+                raw = bytearray()
+                async for chunk in response.aiter_bytes():
+                    raw.extend(chunk)
+                    if len(raw) > 32_000:
+                        raise ValueError("brain reply too large")
+        result = json.loads(raw)
+        if not isinstance(result, dict) or result.get("scope") != scope:
+            raise ValueError("invalid brain reply")
+        return result
+    except httpx.HTTPError:
+        raise ValueError("brain connection unavailable") from None
 
 
 def gateway(snapshot: dict) -> ObsidianGateway:

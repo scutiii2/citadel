@@ -32,7 +32,7 @@ Reusable how-tos the assistant proposes after solving a multi-step task. Three t
 - A skill that failed at least 3 times, and more often than it worked, is **failing** (`skill_store.is_failing`): search no longer returns it, and the Skills page shows "Often fails". Nothing retires or deletes it. The user edits it (`skill_store.update` through `PUT /skills/owners/{uid}/skills/{id}`: text changes, status stays, the worked and failed counts reset, so it is offered again) or retires it. Editing is user-side only, like approving.
 - Limits: 80 / 300 / 1200 / 200 characters for title / when_to_use / steps / tools; 20 proposed and 50 active skills per account. A skill with the same title (ignoring case and spacing, unless retired) is stored once.
 - The model must not put secrets or text copied from tool results into a skill. That rule is in the tool description (an instruction), not enforced by code. Search results are fenced as data (`services/untrusted.py`), which is not a security boundary.
-- Keyed on the account uid. Every tool refuses when `MCP_HOST` is not loopback and `INTERNAL_API_TOKEN` is empty, and when no uid is known.
+- Account identity comes only from a verified Portcullis requester token. Service assertions authenticate callers; missing identity refuses account operations.
 - Agents that must not write skills (`reviewer`, any agent without a tool scope) need `"tools": { "deny": ["tool_skill_*"] }` in their agent file, as for `tool_mem_*`.
 
 ## Configuration

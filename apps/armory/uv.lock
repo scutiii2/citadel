@@ -1153,6 +1153,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
+    { name = "cryptography" },
     { name = "docker" },
     { name = "gallery-dl" },
     { name = "img2pdf" },
@@ -1164,6 +1165,7 @@ dependencies = [
     { name = "pillow-heif" },
     { name = "pydantic" },
     { name = "pydantic-core" },
+    { name = "pyjwt" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "pyyaml" },
@@ -1182,6 +1184,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = "==3.14.3" },
+    { name = "cryptography", specifier = ">=44" },
     { name = "docker", specifier = ">=7.0" },
     { name = "gallery-dl", specifier = "==1.32.17" },
     { name = "img2pdf", specifier = ">=0.5" },
@@ -1193,6 +1196,7 @@ requires-dist = [
     { name = "pillow-heif", specifier = ">=0.18" },
     { name = "pydantic", specifier = "==2.13.4" },
     { name = "pydantic-core", specifier = "==2.46.4" },
+    { name = "pyjwt", specifier = ">=2.10" },
     { name = "python-dotenv", specifier = "==1.2.2" },
     { name = "python-multipart", specifier = "==0.0.32" },
     { name = "pyyaml", specifier = ">=6.0.2,<7" },

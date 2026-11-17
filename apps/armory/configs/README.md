@@ -45,8 +45,8 @@ mechanics); paths come from `Settings.email_config_path` /
   `POST`/`DELETE /extensions` (see `extension_routes.py`) - hand-edit it
   or add an extension live through that route, both end up here.
   Set `"internal": true` on an http entry for a server of this stack: armory
-  then sends it `INTERNAL_API_TOKEN` and forwards the requester, so no
-  `headers` are needed. Never set it for a server you do not run.
+  then signs a fresh service assertion and forwards the signed requester token.
+  Set `audience` to the receiver service name (default `legion`); no credential headers are needed.
   Tool services (Bard, Scribe, Reader as `ocr`, Lens, Mimic) keep per-caller
   tokens instead: make one on the service's admin page (Tokens card), put it
   in `.env` as `<NAME>_TOKEN` and send it with

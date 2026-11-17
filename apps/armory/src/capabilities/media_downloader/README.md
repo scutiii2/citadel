@@ -74,16 +74,15 @@ Enable `media` on armory's Capabilities page after Refresh (or `POST /capabiliti
 
 Caps and TTLs use `specifics/media_downloader/configs/config_media_downloader.json.example`; the existing app config loader copies it to `config_media_downloader.json` on first use. The shape preserves `file_ttl_hours`, `sweep_interval_minutes`, `download_link_minutes` and the original `limits` keys (file MB, duration minutes, session MB, concurrency, queue size and job timeout minutes). `limits.max_caller_downloads` additionally bounds each account's unfinished jobs, default 2. All caps and intervals must be positive, except the queued-job allowance may be zero.
 
-Settings in `src/config.py` accept `MCP_MEDIA_STORE_DIR` (default `specifics/media_downloader/.data/store`), `MCP_MEDIA_LOG_DIR` (reserved log location), `MCP_MEDIA_CONFIG_PATH`, `MCP_MEDIA_PUBLIC_BASE_URL` and `MCP_MEDIA_SIGNING_KEY`. Paths follow armory's working directory convention. Set the public base URL to the externally reachable armory origin (including any proxy path prefix); the fallback is `http://127.0.0.1:<MCP_PORT>`. A persistent random signing key keeps old links valid across restarts; absent a key, a process-local random key is used and restart invalidates old links. `MCP_HOST`, `MCP_PORT` and `INTERNAL_API_TOKEN` retain their existing armory meaning.
+Account operations require signed service assertions and verified Portcullis requester tokens. Private keys stay in the identity directory.
 
 Install armory's dependencies, including pinned `yt-dlp[default,curl-cffi]==2026.8.19` and `gallery-dl==1.32.17`. FFmpeg must be on PATH for video/music; photos work without it. Missing FFmpeg refuses video/music probe/download with `ffmpeg_missing`, while photos, server startup and file/status reads remain available. DRM, login-only media, live streams and playlists are refused. The configured download cap is rechecked against extraction and actual bytes; concurrent commits reserve account storage. For carousels the file cap covers the combined photos and final ZIP; cancellation and account quotas still apply.
 
 ## File serving decision
 
 Ember's Media Downloader screen uses fixed internal HTTP adapters on this same
-listener. Every `/media/ui` call requires `X-Internal-Token` and
-`X-Requester-Uid`. Only that UID owns the files and jobs; the token does not
-grant cross-account access. Disabled or absent capabilities return 503 before
+listener. Every `/media/ui` call requires a service assertion and a signed requester token.
+Only the verified requester UID owns files and jobs. Disabled or absent capabilities return 503 before
 initializing the runtime. No extra MCP tool schemas are exposed.
 
 | Method and path | Request / response |

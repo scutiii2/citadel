@@ -5,7 +5,6 @@ from src.capabilities.tickets.contract import CreateResult, DetailResult, ListRe
 from src.config import settings
 from src.services import identity_context, untrusted
 from src.capabilities.tickets.utils import service as tickets
-from src.services.internal_token import is_exposed_without_token
 from src.capabilities.tickets.utils.service import TicketError, TicketNotFound
 
 _NO_USER = "No signed-in user is known for this request, so tickets are unavailable."
@@ -17,12 +16,6 @@ class TicketDesk:
     def _identity(self) -> tuple[str, str]:
         """(the caller's uid, a refusal message). The uid owns the tickets, so a rename or a reused
         username never moves them. A non-empty refusal means no ticket may be touched."""
-        if is_exposed_without_token(settings.host, settings.internal_api_token):
-            # Without the token any machine that can reach the port could claim any uid.
-            return "", (
-                f"Tickets are disabled: this server listens on {settings.host!r} without INTERNAL_API_TOKEN, "
-                "so anyone on the network could read tickets. Set INTERNAL_API_TOKEN, or bind to 127.0.0.1."
-            )
         owner = identity_context.current_uid()
         return owner, ("" if owner else _NO_USER)
 

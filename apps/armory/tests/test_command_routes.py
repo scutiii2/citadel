@@ -7,6 +7,7 @@ import pytest
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
+from tests.auth_helpers import service_auth
 from src import commands
 from src.command_routes import install_command_routes
 from src.services import capability_registry
@@ -17,6 +18,7 @@ def client():
     app = Starlette()
     install_command_routes(app)
     with TestClient(app) as test_client:
+        test_client.auth = service_auth()
         yield test_client
 
 

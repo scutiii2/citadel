@@ -37,16 +37,9 @@ Both loaded once at boot by `src/run.py`:
 
 ## Security
 
-- **`/mcp` needs the internal token** once `INTERNAL_API_TOKEN` is set in
-  `.env` (`X-Internal-Token`, compared in
-  constant time; `401` otherwise). Every caller is another server in this
-  repo - chat_app, ai_agent, portcullis - and all of them send it. The
-  startup banner says whether it's on.
-- **Who is asking**: tools read the user from `X-Requester-Username` /
-  `X-Requester-Email` (chat_app, portcullis), or from the tool call's
-  `_meta.requester` (ai_agent, whose one session serves every user) - see
-  `src/services/identity_context.py`. Each tool call is logged with it
-  (`tool call <name> by <user>` in `server.log`).
+Every internal route requires a short-lived Ed25519 service assertion; keys are generated on first start.
+User identity comes only from a Portcullis-signed requester token, verified per tool call on shared MCP sessions.
+Private identity keys stay separate from public keys in `CITADEL_TRUST_DIR`; there is no auth-off mode.
 
 ## Code layout
 
@@ -129,13 +122,6 @@ removing the file does not remove it from Git history.
 ### PDF chat attachments
 
 `POST /upload/pdf` accepts a multipart `file` (PDF, PNG, JPEG, WebP, TIFF,
-GIF or HEIC; at most 15 MB). It requires this server's `X-Internal-Token`
-and an authenticated `X-Requester-Username` supplied by Ember's API.
-The configured `pdf_merger` extension must use HTTP, an internal token in
-its headers, and `forward_requester: true`. The route resolves only that
-extension's configuration and sends original bytes to its `/api/files`
-endpoint under the same requester used by the proxied PDF tools. Browser
-session fallback is rejected before uploading when the PDFMerger token is wrong.
-The response contains PDFMerger's opaque file ID, metadata and expiry.
-Originals remain in PDFMerger's store until its configured TTL expires.
-No document bytes, extension credentials or internal URLs are sent to the model.
+GIF or HEIC; at most 15 MB). It requires a service assertion and a signed requester token.
+Original bytes remain in Armory's native PDF store under the verified account UID.
+The response contains an opaque file ID, metadata and expiry; ownership checks apply to every operation.

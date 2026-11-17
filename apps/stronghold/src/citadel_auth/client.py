@@ -17,6 +17,11 @@ class ServiceAuth(httpx.Auth):
         request.headers["Authorization"] = "Bearer " + sign_assertion(self.keyring, self.audience)
         yield request
 
+    def auth_flow(self, request):
+        """Support already-initialized synchronous clients without filesystem I/O."""
+        request.headers["Authorization"] = "Bearer " + sign_assertion(self.keyring, self.audience)
+        yield request
+
 
 def service_client(keyring, audience: str, **httpx_kwargs) -> httpx.AsyncClient:
     return httpx.AsyncClient(auth=ServiceAuth(keyring, audience), **httpx_kwargs)

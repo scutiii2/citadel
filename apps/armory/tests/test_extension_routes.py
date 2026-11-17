@@ -321,9 +321,8 @@ def test_an_internal_extension_sends_the_token_and_others_do_not(monkeypatch):
     from src.config import settings
     from src.services.app_config import ExtensionConfig
 
-    monkeypatch.setattr(extensions, "settings", type("S", (), {"internal_api_token": "tok"})())
     plain = ExtensionConfig(id="a", label="A", description="", transport="http", url="http://a/mcp", headers={"K": "v"})
     inside = ExtensionConfig(id="b", label="B", description="", transport="http", url="http://b/mcp", internal=True)
 
     assert extensions._request_headers(plain) == {"K": "v"}
-    assert extensions._request_headers(inside) == {"X-Internal-Token": "tok"}
+    assert extensions._request_headers(inside) == {}

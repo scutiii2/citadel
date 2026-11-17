@@ -3,6 +3,8 @@ test_help_routes.py."""
 
 from __future__ import annotations
 
+from tests.auth_helpers import FreshHeaders
+
 from types import SimpleNamespace
 
 import pytest
@@ -23,7 +25,7 @@ def client():
 
 @pytest.fixture
 def fake_settings(tmp_path, monkeypatch):
-    fake = SimpleNamespace(internal_api_token="shared-secret", uploads_dir=tmp_path / "uploads")
+    fake = SimpleNamespace(uploads_dir=tmp_path / "uploads")
     monkeypatch.setattr(upload_routes, "settings", fake)
     return fake
 
@@ -38,28 +40,14 @@ def test_upload_wrong_token_is_a_401(client, fake_settings):
     response = client.post(
         "/upload",
         files={"file": ("input.xlsx", b"data", "application/vnd.ms-excel")},
-        headers={"X-Internal-Token": "not-the-secret"},
-    )
-
-    assert response.status_code == 401
-
-
-def test_upload_with_no_configured_token_never_validates(client, fake_settings):
-    """An unset expected token must never validate against an empty header ("forgot to configure" must not mean "anyone can call it"),
-    as in chat_app's internal_routes.py."""
-    fake_settings.internal_api_token = ""
-
-    response = client.post(
-        "/upload",
-        files={"file": ("input.xlsx", b"data", "application/vnd.ms-excel")},
-        headers={"X-Internal-Token": ""},
+        headers=FreshHeaders(invalid=True),
     )
 
     assert response.status_code == 401
 
 
 def test_upload_missing_file_is_a_400(client, fake_settings):
-    response = client.post("/upload", headers={"X-Internal-Token": "shared-secret"})
+    response = client.post("/upload", headers=FreshHeaders())
 
     assert response.status_code == 400
 
@@ -68,7 +56,7 @@ def test_upload_disallowed_extension_is_a_400(client, fake_settings):
     response = client.post(
         "/upload",
         files={"file": ("script.exe", b"data", "application/octet-stream")},
-        headers={"X-Internal-Token": "shared-secret"},
+        headers=FreshHeaders(),
     )
 
     assert response.status_code == 400
@@ -78,7 +66,7 @@ def test_upload_success_writes_the_file_under_uploads_dir_with_a_generated_name(
     response = client.post(
         "/upload",
         files={"file": ("input.xlsx", b"binary content", "application/vnd.ms-excel")},
-        headers={"X-Internal-Token": "shared-secret"},
+        headers=FreshHeaders(),
     )
 
     assert response.status_code == 200

@@ -12,7 +12,7 @@ from src.config import settings  # noqa: E402
 from src.services import capability_registry  # noqa: E402
 from src.services.capability_loader import CapabilityLoader  # noqa: E402
 from src.services.identity_context import IdentityContextMiddleware  # noqa: E402
-from src.services.internal_token import InternalTokenMiddleware, is_exposed_without_token  # noqa: E402
+from src.services.service_auth import install_auth, keyring  # noqa: E402
 from src.utils.logging_setup import configure_logging  # noqa: E402
 from src.server import mcp  # noqa: E402
 
@@ -31,6 +31,8 @@ async def _serve() -> None:
     import uvicorn
 
     from src.services import extensions
+
+    await keyring.ensure_identity()
 
     try:
         # Before tool_names on purpose: extensions register proxied tools onto `mcp`,
@@ -71,14 +73,7 @@ async def _serve() -> None:
             f"  Resources: {resource_count}",
             f"  Extensions: {', '.join(f'{s.id} ({s.status})' for s in extension_statuses) or 'none'}",
         ]
-        banner.append(
-            "  /mcp auth : X-Internal-Token required"
-            if settings.internal_api_token
-            else "  /mcp auth : none (set INTERNAL_API_TOKEN in .env)"
-        )
-        if is_exposed_without_token(settings.host, settings.internal_api_token):
-            # No authentication here, so a non-loopback bind lets anything that can reach the port call every tool.
-            banner.append(f"  WARNING  : bound to {settings.host} with no authentication.")
+        banner.append("  /mcp auth : signed Ed25519 service assertion required")
 
         # flush=True matters: stdout is block-buffered when not a terminal (Docker, systemd, files),
         # so the banner and the no-authentication warning would lag uvicorn's stderr logs.
@@ -88,12 +83,7 @@ async def _serve() -> None:
         capability_loader.run_startup_hooks()
 
         app = mcp.streamable_http_app()
-        # Reads chat_app's X-Requester-Username/X-Requester-Email headers into per-request contextvars
-        # so identity-gated capabilities don't take identity as a tool argument (see services/identity_context.py).
-        app.add_middleware(IdentityContextMiddleware)
-        # Added last, so it runs first: /mcp requests without the shared internal token never reach the transport
-        # (only when a token is configured). See services/internal_token.py.
-        app.add_middleware(InternalTokenMiddleware, token=settings.internal_api_token)
+        install_auth(app)
         # Where a human or chat_app's sidebar checks what's connected; a plain route, not a tool. See extension_routes.py.
         install_extension_routes(app)
         # Where chat_app discovers which built-in tools are invocable as "/" commands; a plain route. See command_routes.py.
@@ -104,10 +94,10 @@ async def _serve() -> None:
         # A plain route: a model must not change what it can do. See capability_routes.py.
         install_capability_routes(app, capability_loader)
         # Where chat_app proxies a file dropped into a command-form modal; a plain route checked against
-        # the internal shared secret. See upload_routes.py.
+        # service assertions. See upload_routes.py.
         install_upload_routes(app)
         # Where a caller fetches a file a tool offered it (via portcullis); a plain route checked against
-        # the internal token and the requester. See download_routes.py.
+        # service assertions and signed requester identity. See download_routes.py.
         install_download_routes(app)
         # Each capability mounts its own always-on routes (memory, skills, obsidian, tickets), even when its tools are off.
         capability_loader.install_routes(app)

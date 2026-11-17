@@ -1,6 +1,5 @@
 """Token-protected deterministic brain gateway; independent of user tool opt-in."""
 import asyncio
-import hmac
 import json
 from typing import Literal
 
@@ -11,6 +10,9 @@ from src.config import settings
 from src.capabilities.obsidian import domain
 from src.capabilities.obsidian.utils.gateway import ObsidianGatewayError
 from src.capabilities.obsidian.utils import brain_resolver
+from src.services.identity_context import current_uid
+from src.services.service_auth import install_auth
+from src.citadel_auth import current_caller
 
 
 class Operation(BaseModel):
@@ -70,9 +72,8 @@ def execute(body: Operation, uid: str):
 
 
 async def operate(request):
-    token = request.headers.get("X-Internal-Token", "")
-    uid = request.headers.get("X-Requester-Uid", "")
-    if not settings.internal_api_token or not hmac.compare_digest(token, settings.internal_api_token) or not uid:
+    uid = current_uid()
+    if current_caller() is None or not uid:
         return JSONResponse({"error": "Valid internal authentication and requester required"}, status_code=401)
     raw = await request.body()
     if len(raw) > 200_000:
@@ -89,4 +90,5 @@ async def operate(request):
 
 
 def install_brain_routes(app):
+    install_auth(app)
     app.add_route("/brains/operation", operate, methods=["POST"])

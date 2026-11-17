@@ -332,7 +332,7 @@ def get_service() -> TicketService:
             from src.capabilities.tickets.utils.laya_transport import McpLayaTransport
 
             laya = TicketLaya(
-                McpLayaTransport(settings.laya_url, settings.internal_api_token),
+                McpLayaTransport(settings.laya_url),
                 min_confidence=config.laya_min_confidence, timeout=config.laya_timeout_seconds,
             )
         _service = TicketService(TicketStore(settings.tickets_db_path), config, laya)

@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+from tests.auth_helpers import FreshHeaders
+
 import pytest
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
@@ -9,14 +11,14 @@ from src.capabilities.memory.utils import memory_store
 
 UID = "a" * 32
 OTHER = "b" * 32
-HEADERS = {"X-Internal-Token": "test-token"}
+HEADERS = FreshHeaders(caller="stronghold")
 URL = f"/memory/owners/{UID}/notes"
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(memory_routes, "settings", SimpleNamespace(
-        internal_api_token="test-token", memory_db_path=tmp_path / "memory.db"))
+        memory_db_path=tmp_path / "memory.db"))
     monkeypatch.setattr(memory_routes, "_memory_online", lambda: True)
     app = Starlette()
     memory_routes.install_memory_routes(app)

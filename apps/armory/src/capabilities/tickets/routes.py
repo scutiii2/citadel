@@ -1,9 +1,8 @@
 """HTTP routes for support tickets, mounted like /download (see run.py); plain HTTP, portcullis is the caller.
-All need X-Internal-Token; /tickets touches only the requester's own tickets, /ticket-admin is staff-only. They stay up when `tickets` is off."""
+All require signed service assertions; /tickets touches only the requester's own tickets, /ticket-admin is staff-only. They stay up when `tickets` is off."""
 
 from __future__ import annotations
 
-import hmac
 from functools import wraps
 from typing import Any, Awaitable, Callable
 
@@ -12,21 +11,20 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from src.config import settings
+from src.citadel_auth import current_caller
+from src.services.service_auth import install_auth
+from src.services.identity_context import current_uid, current_username
 from src.capabilities.tickets.utils import service as tickets
-from src.services.identity_context import REQUESTER_UID_HEADER, REQUESTER_USERNAME_HEADER
 from src.capabilities.tickets.utils.service import TicketError, TicketNotFound
 
 
-def _token_valid(request: Request) -> bool:
-    expected = settings.internal_api_token
-    if not expected:
-        return False
-    return hmac.compare_digest(expected, request.headers.get("X-Internal-Token", ""))
+def _authenticated(request: Request) -> bool:
+    return current_caller() is not None
 
 
 def _requester(request: Request) -> str:
     """The requester's display name (staff comments are signed with it)."""
-    username = request.headers.get(REQUESTER_USERNAME_HEADER, "").strip()
+    username = current_username().strip()
     if not username:
         raise TicketError("No requester was named for this request.")
     return username
@@ -35,14 +33,14 @@ def _requester(request: Request) -> str:
 def _owner(request: Request) -> str:
     """The requester's stable uid: the only thing that decides whose tickets they are.
     A username can be changed by an admin or taken over by someone else."""
-    uid = request.headers.get(REQUESTER_UID_HEADER, "").strip()
+    uid = current_uid().strip()
     if not uid:
         raise TicketError("No requester id was sent for this request.")
     return uid
 
 
 def _display_name(request: Request, owner: str) -> str:
-    return request.headers.get(REQUESTER_USERNAME_HEADER, "").strip() or owner
+    return current_username().strip() or owner
 
 
 async def _body(request: Request) -> dict[str, Any]:
@@ -81,8 +79,8 @@ Handler = Callable[[Request], Awaitable[JSONResponse]]
 def _guarded(handler: Handler) -> Handler:
     @wraps(handler)
     async def wrapper(request: Request) -> JSONResponse:
-        if not _token_valid(request):
-            return JSONResponse({"error": "Invalid or missing internal API token"}, status_code=401)
+        if not _authenticated(request):
+            return JSONResponse({"error": "Missing authenticated service caller"}, status_code=401)
         try:
             return await handler(request)
         except TicketNotFound as error:
@@ -223,6 +221,7 @@ async def staff_stats(request: Request) -> JSONResponse:
 
 
 def install_ticket_routes(app: Starlette) -> None:
+    install_auth(app)
     app.add_route("/tickets/tags", tag_options, methods=["GET"])
     app.add_route("/tickets", create_ticket, methods=["POST"])
     app.add_route("/tickets", list_own, methods=["GET"])

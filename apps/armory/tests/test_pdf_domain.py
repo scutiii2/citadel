@@ -8,19 +8,13 @@ from src.services import identity_context
 
 @pytest.fixture
 def caller(monkeypatch):
-    monkeypatch.setattr(domain, "settings", replace(domain.settings, host="127.0.0.1", internal_api_token="test"))
+    monkeypatch.setattr(domain, "settings", replace(domain.settings, host="127.0.0.1"))
     monkeypatch.setattr(identity_context, "current_uid", lambda: "account-a")
 
 
 def test_identity_required(monkeypatch):
     monkeypatch.setattr(identity_context, "current_uid", lambda: "")
     with pytest.raises(domain.PdfError, match="signed-in"):
-        domain.desk.list_files()
-
-
-def test_exposed_without_token_refuses_even_identified_caller(caller, monkeypatch):
-    monkeypatch.setattr(domain, "settings", replace(domain.settings, host="0.0.0.0", internal_api_token=""))
-    with pytest.raises(domain.PdfError, match="INTERNAL_API_TOKEN"):
         domain.desk.list_files()
 
 

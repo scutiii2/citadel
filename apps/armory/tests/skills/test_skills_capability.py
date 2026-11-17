@@ -35,7 +35,7 @@ def capability(tmp_path, monkeypatch):
     # Pin the exposure inputs, so a developer's MCP_HOST or token in .env cannot change the result.
     monkeypatch.setattr(
         domain, "settings",
-        dataclasses.replace(settings, skills_db_path=tmp_path / "skills.db", host="127.0.0.1", internal_api_token=""),
+        dataclasses.replace(settings, skills_db_path=tmp_path / "skills.db", host="127.0.0.1"),
     )
     monkeypatch.setattr(identity_context, "current_uid", lambda: "uid-alice")
     server.db = tmp_path / "skills.db"
@@ -91,9 +91,4 @@ def test_refuses_without_identity(capability, monkeypatch):
         call(capability, "tool_skill_propose", PROPOSAL)
 
 
-def test_refuses_when_exposed_without_a_token(capability, monkeypatch):
-    exposed = dataclasses.replace(capability.domain.settings, host="0.0.0.0", internal_api_token="")
-    monkeypatch.setattr(capability.domain, "settings", exposed)
-    with pytest.raises(Exception, match="INTERNAL_API_TOKEN"):
-        call(capability, "tool_skill_search", {"query": "x"})
-    assert not capability.db.exists()
+

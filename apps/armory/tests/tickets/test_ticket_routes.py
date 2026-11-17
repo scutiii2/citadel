@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tests.auth_helpers import FreshHeaders
 
 from dataclasses import replace
 from types import SimpleNamespace
@@ -21,7 +22,7 @@ TOKEN = "shared-secret"
 def client(tmp_path, monkeypatch):
     service = TicketService(TicketStore(tmp_path / "t.db"), load_ticket_config(tmp_path / "none.json"))
     monkeypatch.setattr(tickets, "_service", service)
-    monkeypatch.setattr(ticket_routes, "settings", SimpleNamespace(internal_api_token=TOKEN))
+    monkeypatch.setattr(ticket_routes, "settings", SimpleNamespace())
     app = Starlette()
     install_ticket_routes(app)
     with TestClient(app) as test_client:
@@ -30,16 +31,9 @@ def client(tmp_path, monkeypatch):
 
 def headers(user="alice", token=TOKEN, uid="default"):
     """Requester headers: the username is only a display name; the uid (uid-<user> unless given) owns tickets."""
-    result = {}
-    if token is not None:
-        result["X-Internal-Token"] = token
-    if user is not None:
-        result["X-Requester-Username"] = user
     if uid == "default":
         uid = f"uid-{user}" if user is not None else None
-    if uid is not None:
-        result["X-Requester-Uid"] = uid
-    return result
+    return FreshHeaders(caller="stronghold", uid=uid or "", username=user or "", invalid=token != TOKEN) if token is not None else {}
 
 
 BODY = {"type": "bug", "title": "Email fails", "description": "It does not send", "tags": ["email"]}
@@ -56,11 +50,6 @@ def test_token_is_required_on_every_route(client):
                          ("get", "/ticket-admin/groups"), ("get", "/ticket-admin/stats")]:
         assert getattr(client, method)(path, headers=headers(token=None)).status_code == 401
         assert getattr(client, method)(path, headers=headers(token="wrong")).status_code == 401
-
-
-def test_unset_token_never_validates(client, monkeypatch):
-    monkeypatch.setattr(ticket_routes, "settings", SimpleNamespace(internal_api_token=""))
-    assert client.get("/tickets", headers={"X-Internal-Token": ""}).status_code == 401
 
 
 def test_create_list_get_comment_close_as_reporter(client):

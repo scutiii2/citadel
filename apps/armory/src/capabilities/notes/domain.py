@@ -19,8 +19,8 @@ from src.capabilities.notes.contract import (
 )
 from src.capabilities.notes.utils.gateway import MAX_NOTES, NotesGateway, NotesGatewayError
 from src.config import settings
+from src.services.service_auth import keyring
 from src.services import identity_context, untrusted
-from src.services.internal_token import is_exposed_without_token
 
 logger = logging.getLogger(__name__)
 
@@ -45,18 +45,12 @@ def open_gateway() -> NotesGateway:
         settings.db_gateway_url,
         settings.db_gateway_instance,
         settings.db_gateway_connection,
-        settings.internal_api_token,
+        keyring,
     )
 
 
 def _owner() -> str:
     """The caller's account uid, after checking that the identity can be trusted at all."""
-    if is_exposed_without_token(settings.host, settings.internal_api_token):
-        # Without the token any machine that can reach the port could claim any uid.
-        raise NotesError(
-            f"Notes are disabled: this server listens on {settings.host!r} without INTERNAL_API_TOKEN, "
-            "so anyone on the network could read notes. Set INTERNAL_API_TOKEN, or bind to 127.0.0.1."
-        )
     uid = identity_context.current_uid()
     if not uid:
         raise NotesError("Notes need a signed-in user, and this call carried no identity.")

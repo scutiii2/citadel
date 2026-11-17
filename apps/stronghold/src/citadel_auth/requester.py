@@ -3,6 +3,7 @@
 import time
 import uuid
 from contextvars import ContextVar
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from .errors import AuthError
@@ -45,3 +46,25 @@ async def verify_requester(keyring: Keyring, token: str, aud: str) -> Requester:
     if any(not isinstance(claims.get(name), str) for name in ("sub", "username", "email")) or not claims["sub"]:
         raise AuthError("invalid requester claims")
     return Requester(claims["sub"], claims["username"], claims["email"])
+
+
+@asynccontextmanager
+async def requester_context(keyring: Keyring, caller, token: str, aud: str):
+    """Bind one MCP tool call, clearing any identity inherited from session startup."""
+    from .asgi import _caller
+    from .errors import Forbidden
+    from .policy import may_forward
+    requester = None
+    if token:
+        if caller is None or not may_forward(aud, caller.name):
+            raise Forbidden("caller not allowed to forward requester")
+        requester = await verify_requester(keyring, token, aud)
+    caller_handle = _caller.set(caller)
+    requester_handle = _requester.set(requester)
+    token_handle = _requester_token.set(token)
+    try:
+        yield requester
+    finally:
+        _requester_token.reset(token_handle)
+        _requester.reset(requester_handle)
+        _caller.reset(caller_handle)

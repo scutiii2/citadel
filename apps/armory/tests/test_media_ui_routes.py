@@ -1,4 +1,6 @@
 """Exercise the HTTP boundary against the real owned stores and job loops."""
+
+from tests.auth_helpers import FreshHeaders
 import asyncio
 import threading
 from dataclasses import replace
@@ -19,8 +21,8 @@ from src.capabilities.media_downloader.utils.policy.url_policy import UrlPolicy
 from tests.media_downloader.conftest import FakeExtractor, public_resolver
 
 
-HEADERS = {"X-Internal-Token": "test", "X-Requester-Uid": "alice"}
-OTHER = {**HEADERS, "X-Requester-Uid": "bob"}
+HEADERS = FreshHeaders(uid="alice")
+OTHER = FreshHeaders(uid="bob", username="alice")
 
 
 def test_delete_package_http_requires_owner_and_rejects_active_jobs(native):
@@ -104,7 +106,7 @@ def native(tmp_path, monkeypatch):
     monkeypatch.setattr(pdf_runtime, "get_runtime", lambda _: pdf)
     monkeypatch.setattr(media_downloads, "get_runtime", lambda: video)
     monkeypatch.setattr(domain.shutil, "which", lambda _: "ffmpeg")
-    monkeypatch.setattr(media_ui_routes, "settings", replace(media_ui_routes.settings, internal_api_token="test", host="127.0.0.1"))
+    monkeypatch.setattr(media_ui_routes, "settings", replace(media_ui_routes.settings, host="127.0.0.1"))
     monkeypatch.setattr(capability_registry, "is_enabled", lambda _: True)
     app = Starlette()
     media_ui_routes.install_media_ui_routes(app)
@@ -121,11 +123,10 @@ def test_auth_identity_and_disabled_gate(native, monkeypatch, kind):
     client, *_ = native
     path = f"/{kind}/ui/files"
     assert client.get(path).status_code == 401
-    assert client.get(path, headers={"X-Internal-Token": "test"}).status_code == 400
+    assert client.get(path, headers=FreshHeaders()).status_code == 400
     monkeypatch.setattr(capability_registry, "is_enabled", lambda _: False)
     assert client.get(path, headers=HEADERS).status_code == 503
-    monkeypatch.setattr(media_ui_routes, "settings", replace(media_ui_routes.settings, internal_api_token=""))
-    assert client.get(path, headers=HEADERS).status_code == 401
+    assert client.get(path, headers=FreshHeaders(invalid=True)).status_code == 401
 
 
 def upload_pdf(runtime, tmp_path):

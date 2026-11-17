@@ -35,7 +35,7 @@ def capability(tmp_path, monkeypatch):
     monkeypatch.setattr(
         domain,
         "settings",
-        dataclasses.replace(settings, memory_db_path=tmp_path / "memory.db", host="127.0.0.1", internal_api_token=""),
+        dataclasses.replace(settings, memory_db_path=tmp_path / "memory.db", host="127.0.0.1"),
     )
     assert domain.settings.memory_db_path.parent == tmp_path
     monkeypatch.setattr(identity_context, "current_uid", lambda: "uid-alice")
@@ -144,29 +144,6 @@ def test_tools_commands_and_help_follow_the_contract(capability):
     }
     # Memory results come from stored text: they are never worth an AI explanation pass.
     assert not any((tool.meta or {}).get("ai_explain_result") for tool in tools.values())
-
-
-def test_memory_refuses_when_the_server_is_exposed_without_a_token(capability, monkeypatch):
-    domain = sys.modules["src.capabilities.memory.domain"]
-    monkeypatch.setattr(domain, "settings", dataclasses.replace(domain.settings, host="0.0.0.0", internal_api_token=""))
-
-    for name, args in (
-        ("tool_mem_save", {"text": "x"}),
-        ("tool_mem_search", {}),
-        ("tool_mem_forget", {"note_id": 1}),
-        ("tool_mem_clear", {}),
-    ):
-        with pytest.raises(Exception, match="INTERNAL_API_TOKEN"):
-            call(capability, name, args)
-
-    assert not domain.settings.memory_db_path.exists()
-
-
-def test_memory_works_on_an_exposed_host_once_a_token_is_set(capability, monkeypatch):
-    domain = sys.modules["src.capabilities.memory.domain"]
-    monkeypatch.setattr(domain, "settings", dataclasses.replace(domain.settings, host="0.0.0.0", internal_api_token="secret"))
-
-    assert structured(call(capability, "tool_mem_save", {"text": "fine"}))["id"] == 1
 
 
 def test_search_text_over_mcp_is_a_json_envelope_whose_message_starts_with_the_count(capability):

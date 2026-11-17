@@ -3,7 +3,6 @@ from pathlib import Path
 
 from src.config import settings
 from src.services import identity_context, untrusted
-from src.services.internal_token import is_exposed_without_token
 from src.capabilities.pdf_merger.utils.pdf_runtime import get_runtime
 
 from .contract import FailedItem, FileInfo, InspectResult, LinkedFileInfo, ListFilesResult, MergePlan, MergeToolResult
@@ -17,12 +16,7 @@ class PdfError(Exception):
 class PdfDesk:
     """The signed-in account's PDF files; every method checks exposure and identity first."""
 
-    def _check_exposure(self):
-        if is_exposed_without_token(settings.host, settings.internal_api_token):
-            raise PdfError("PDF files are disabled: configure INTERNAL_API_TOKEN or bind to loopback.")
-
     def _caller(self):
-        self._check_exposure()
         uid = identity_context.current_uid()
         if not uid:
             raise PdfError("PDF files need a signed-in user; this call carried no account identity.")
@@ -79,7 +73,6 @@ class PdfDesk:
         return runtime.call(perform())
 
     def download(self, file_id: str, exp: int, sig: str) -> tuple[Path, str]:
-        self._check_exposure()
         runtime = get_runtime(settings)
 
         async def perform():

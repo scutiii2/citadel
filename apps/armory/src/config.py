@@ -6,7 +6,6 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.services.shared_token import shared_token
 
 
 def _env(name: str, default: str) -> str:
@@ -35,9 +34,6 @@ class Settings:
     # Where logging_setup.configure_logging() writes server.log and errors.report() writes per-reference files.
     # Relative to CWD like the paths above.
     log_dir: Path = Path(_env("MCP_LOG_DIR", ".logs"))
-    # Shared secret, same value both directions; blank by default so it fails loudly.
-    # POST /upload (upload_routes.py) checks it inbound because chat_app proxies user files here.
-    internal_api_token: str = _env("INTERNAL_API_TOKEN", "") or shared_token()
     # Where POST /upload (upload_routes.py) writes files dropped into a command-form modal.
     # Relative to CWD like the paths above.
     uploads_dir: Path = Path(_env("MCP_UPLOADS_DIR", ".data/uploads"))
@@ -58,7 +54,7 @@ class Settings:
     tickets_db_path: Path = Path(_env("MCP_TICKETS_DB_PATH", "specifics/tickets/.data/tickets.db"))
     laya_url: str = _env("LAYA_URL", "")
     # db_gateway, where portcullis keeps per-account notes; the notes capability reads those shared with agents.
-    # The instance must list the connection (db_gateway's configs/config_connections.json); requests carry INTERNAL_API_TOKEN.
+    # The instance must list the connection; requests carry Armory service assertions.
     db_gateway_url: str = _env("DB_GATEWAY_URL", "http://127.0.0.1:29602")
     db_gateway_instance: str = _env("DB_GATEWAY_INSTANCE", "mcp_server")
     db_gateway_connection: str = _env("DB_GATEWAY_CONNECTION", "data")

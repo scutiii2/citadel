@@ -42,13 +42,13 @@ Lets agents use the notes a user chose to share. A user keeps private notes in e
 - Agents cannot delete a note or change a note's switch. A note an agent creates starts with the switch on; one an agent changes gets `last_editor: "agent"` in its record. The limits (title 200, text 20,000, 10 tags of 30 characters, 200 notes) repeat portcullis's `services/notes.py`: change them together.
 - Two writers at the same moment do not merge (the gateway has no compare-and-set): the last save wins.
 - Writes do not always ask the user first. They ask only when the user has "Ask before tools" on.
-- Without an identity, or when the server listens on a non-loopback host without `INTERNAL_API_TOKEN` (so a caller could claim any uid), every call fails and no note is read.
+- Account identity comes only from a verified Portcullis requester token. Service assertions authenticate callers; missing identity refuses account operations.
 - Note text is returned fenced as data and capped (`services/untrusted.py`). It is the user's own writing, but it can still contain text that looks like instructions.
 - What an agent reads goes to that agent's LLM provider. The switch's warning on the Notes page says so.
 
 ## Configuration
 
-- `DB_GATEWAY_URL` (default `http://127.0.0.1:29602`), `DB_GATEWAY_INSTANCE` (default `mcp_server`) and `DB_GATEWAY_CONNECTION` (default `data`) in `.env`, read in `src/config.py`. The requests carry `INTERNAL_API_TOKEN`.
+- Account identity comes only from a verified Portcullis requester token. Service assertions authenticate callers; missing identity refuses account operations.
 - db_gateway's `configs/config_connections.json` must list the connection under that instance, e.g. `"mcp_server": ["data"]` (the `.example` file has it). It is the same `data` connection portcullis uses, so a change in ember shows here at once.
 - The record shape is portcullis's (`apps/portcullis/src/services/notes.py`): collection `notes`, fields `id`, `owner`, `title`, `body`, `tags`, `agent_readable`, `updated_at`. If that changes, change `utils/gateway.py` and `domain.py` with it.
 - Starts offline. Switch it online in ember_admin (Capabilities), then each user adds it in the Supermarket.

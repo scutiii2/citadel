@@ -1,10 +1,9 @@
 """Internal account-scoped Memory page routes and account-deletion purge.
-Plain HTTP, not tools, so no model can name a user; checked against the internal token."""
+Plain HTTP, not tools, so no model can name a user; verified by service auth."""
 
 from __future__ import annotations
 
 import asyncio
-import hmac
 import logging
 import re
 import json
@@ -19,18 +18,17 @@ from starlette.responses import JSONResponse
 from starlette.responses import Response
 
 from src.config import settings
+from src.citadel_auth import current_caller
+from src.services.service_auth import install_auth
+from src.services.identity_context import current_uid, current_username
 from src.services import capability_registry
 from src.capabilities.memory.utils import memory_store
 
 _UID = re.compile(r"[0-9a-f]{32}")
 
 
-def _token_valid(request: Request) -> bool:
-    expected = settings.internal_api_token
-    provided = request.headers.get("X-Internal-Token", "")
-    if not expected:
-        return False
-    return hmac.compare_digest(expected, provided)
+def _authenticated(request: Request) -> bool:
+    return current_caller() is not None
 
 
 def _memory_online() -> bool:
@@ -55,8 +53,8 @@ class MemoryUpdate(MemoryBody):
 
 async def memory_notes(request: Request) -> Response:
     """Internal page API. Only portcullis may choose an owner; never an MCP tool."""
-    if not _token_valid(request):
-        return JSONResponse({"error": "Invalid or missing internal API token"}, status_code=401)
+    if not _authenticated(request):
+        return JSONResponse({"error": "Missing authenticated service caller"}, status_code=401)
     if not _memory_online():
         return JSONResponse({"error": "Memory is not enabled"}, status_code=404)
     uid = request.path_params["uid"]
@@ -96,8 +94,8 @@ async def memory_notes(request: Request) -> Response:
 
 
 async def purge_memory_owner(request: Request) -> JSONResponse:
-    if not _token_valid(request):
-        return JSONResponse({"error": "Invalid or missing internal API token"}, status_code=401)
+    if not _authenticated(request):
+        return JSONResponse({"error": "Missing authenticated service caller"}, status_code=401)
     if not _memory_online():
         return JSONResponse({"error": "Memory is not enabled"}, status_code=404)
     uid = request.path_params["uid"]
@@ -124,6 +122,7 @@ class _PurgeLogFilter(logging.Filter):
 
 
 def install_memory_routes(app: Starlette) -> None:
+    install_auth(app)
     access_logger = logging.getLogger("uvicorn.access")
     if not any(isinstance(f, _PurgeLogFilter) for f in access_logger.filters):
         access_logger.addFilter(_PurgeLogFilter())

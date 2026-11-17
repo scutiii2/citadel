@@ -4,6 +4,9 @@ Record shape is portcullis's (`apps/portcullis/src/services/notes.py`); agent-wr
 from __future__ import annotations
 
 import json
+import asyncio
+import httpx
+from src.citadel_auth import service_client
 import urllib.error
 import urllib.request
 from typing import Any
@@ -19,13 +22,13 @@ class NotesGatewayError(Exception):
 
 
 class NotesGateway:
-    def __init__(self, base_url: str, instance: str, connection: str, token: str, timeout: float = 5.0) -> None:
+    def __init__(self, base_url: str, instance: str, connection: str, keyring, timeout: float = 5.0) -> None:
         self._base = (
             base_url.rstrip("/")
             + f"/instances/{quote(instance, safe='')}/connections/{quote(connection, safe='')}"
             + f"/collections/{COLLECTION}"
         )
-        self._token = token
+        self._keyring = keyring
         self._timeout = timeout
 
     def get(self, key: str) -> dict[str, Any] | None:
@@ -51,23 +54,20 @@ class NotesGateway:
         return sorted(docs, key=lambda doc: str(doc.get("updated_at", "")), reverse=True)
 
     def _send(self, method: str, path: str, body: dict | None = None) -> dict[str, Any]:
-        headers = {"Content-Type": "application/json"}
-        if self._token:
-            headers["X-Internal-Token"] = self._token
-        request = urllib.request.Request(
-            self._base + path,
-            data=json.dumps(body).encode() if body is not None else None,
-            headers=headers,
-            method=method,
-        )
+        """Bridge existing offloaded synchronous note operations to async HTTP."""
+        return asyncio.run(self._send_async(method, path, body))
+
+    async def _send_async(self, method: str, path: str, body: dict | None) -> dict[str, Any]:
         try:
-            with urllib.request.urlopen(request, timeout=self._timeout) as response:  # noqa: S310 - base URL comes from config, not a caller
-                return json.loads(response.read())
-        except urllib.error.HTTPError as error:
-            if error.code == 404 and _error_text(error).startswith(_NO_RECORD):
-                raise _Missing from error
-            raise NotesGatewayError(f"db_gateway answered HTTP {error.code}: {_error_text(error)}") from error
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+            async with service_client(self._keyring, "treasury", timeout=self._timeout) as client:
+                response = await client.request(method, self._base + path, json=body)
+            payload = response.json()
+            if response.status_code == 404 and str(payload.get("error", "")).startswith(_NO_RECORD):
+                raise _Missing
+            if response.is_error:
+                raise NotesGatewayError(f"db_gateway answered HTTP {response.status_code}: {payload.get('error', '')}")
+            return payload
+        except (httpx.HTTPError, TimeoutError, json.JSONDecodeError) as error:
             raise NotesGatewayError(f"Could not reach db_gateway: {error}") from error
 
 

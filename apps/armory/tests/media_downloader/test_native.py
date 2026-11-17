@@ -12,6 +12,7 @@ from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
+from tests.auth_helpers import service_auth
 from src import commands
 from src.capabilities.media_downloader import domain
 from src.capabilities.media_downloader.utils.errors import DownloaderError, ErrorCode
@@ -27,7 +28,7 @@ def native(settings, fake_extractor, monkeypatch):
     runtime = media_downloads.MediaRuntime(settings, extractor=fake_extractor, policy=UrlPolicy(public_resolver), max_caller_downloads=1)
     monkeypatch.setattr(domain, "get_runtime", lambda: runtime)
     monkeypatch.setattr(domain.shutil, "which", lambda name: "/mock/ffmpeg")
-    monkeypatch.setattr(domain, "settings", replace(domain.settings, host="127.0.0.1", internal_api_token=""))
+    monkeypatch.setattr(domain, "settings", replace(domain.settings, host="127.0.0.1"))
     token = identity_context._uid.set("alice-id")
     try:
         yield runtime
@@ -62,13 +63,6 @@ def test_package_capability_batches_links_fences_text_and_locks(native):
     package = domain.desk.list_packages(package_id).packages[0]
     assert package.status.file.kind == 'package' and 'BEGIN REMOTE OUTPUT' in package.status.file.name
     assert 'BEGIN REMOTE OUTPUT' in package.items[0].title
-
-
-def test_exposed_without_token_refuses(native, monkeypatch):
-    monkeypatch.setattr(domain, "settings", replace(domain.settings, host="0.0.0.0", internal_api_token=""))
-    for operation in [lambda: domain.desk.probe("https://example.com/v"), lambda: domain.desk.download("https://example.com/v"), lambda: domain.desk.status("missing"), domain.desk.list_files]:
-        with pytest.raises(ValueError, match="INTERNAL_API_TOKEN"):
-            operation()
 
 
 def test_missing_ffmpeg_fails_tool_not_loading(native, monkeypatch):
@@ -145,7 +139,7 @@ def test_signed_route_and_range_disabled_and_invalid_links(native, monkeypatch):
     monkeypatch.setattr(media_routes, "get_runtime", lambda: native)
     enabled = [True]
     monkeypatch.setattr(capability_registry, "is_enabled", lambda name: enabled[0])
-    monkeypatch.setattr(media_routes, "settings", replace(media_routes.settings, host="127.0.0.1", internal_api_token=""))
+    monkeypatch.setattr(media_routes, "settings", replace(media_routes.settings, host="127.0.0.1"))
     async def store(service):
         work = await service.store.make_work_dir()
         path = work / "mock.mp4"
@@ -157,6 +151,7 @@ def test_signed_route_and_range_disabled_and_invalid_links(native, monkeypatch):
     app = Starlette()
     install_command_routes(app)
     with TestClient(app) as client:
+        client.auth = service_auth()
         response = client.get(url)
         assert response.status_code == 200 and response.content == b"0123456789"
         assert response.headers["x-content-type-options"] == "nosniff"
@@ -246,6 +241,7 @@ def test_refresh_load_help_tools_and_reload_preserve_runtime(tmp_path, monkeypat
     install_help_routes(app)
     guard_module = importlib.import_module("src.capabilities.media_downloader.utils.policy.socket_guard")
     with TestClient(app) as client:
+        client.auth = service_auth()
         response = client.post("/capabilities/refresh")
         assert response.status_code == 200
         response = client.patch("/capabilities/media", json={"enabled": True})

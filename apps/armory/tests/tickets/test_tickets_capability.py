@@ -109,13 +109,4 @@ def test_a_renamed_account_keeps_its_tickets_and_a_name_reuser_sees_none(capabil
     assert "No ticket 1" in call(capability, "tool_ticket_getTicket", {"ticket_id": 1})["message"]
 
 
-def test_tools_refuse_when_the_server_is_exposed_without_a_token(capability, monkeypatch):
-    import dataclasses
-    import sys
 
-    domain = sys.modules["src.capabilities.tickets.domain"]
-    monkeypatch.setattr(domain, "settings", dataclasses.replace(domain.settings, host="0.0.0.0", internal_api_token=""))
-
-    refused = call(capability, "tool_ticket_createTicket", {"type": "bug", "title": "t", "description": "d"})
-
-    assert refused["id"] == 0 and "INTERNAL_API_TOKEN" in refused["message"]

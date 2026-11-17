@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import FreshHeaders
+
 import asyncio
 import dataclasses
 import json
@@ -17,6 +19,8 @@ from src.capabilities.notes.utils.gateway import NotesGateway, NotesGatewayError
 from src.config import settings
 from src.services import capability_meta, capability_registry, identity_context
 from src.services.capability_loader import CapabilityLoader
+from tests import auth_helpers
+from src.citadel_auth import verify_assertion
 
 ALICE, BOB = "uid-alice", "uid-bob"
 ID1, ID2, ID3, ID4 = (c * 32 for c in "1234")
@@ -86,7 +90,7 @@ def capability(tmp_path, monkeypatch, library):
     domain = sys.modules["src.capabilities.notes.domain"]
     # Pin the exposure inputs, so a developer's MCP_HOST or token in .env cannot change the result.
     monkeypatch.setattr(
-        domain, "settings", dataclasses.replace(settings, host="127.0.0.1", internal_api_token="")
+        domain, "settings", dataclasses.replace(settings, host="127.0.0.1")
     )
     monkeypatch.setattr(domain, "open_gateway", lambda: library)
     monkeypatch.setattr(identity_context, "current_uid", lambda: ALICE)
@@ -176,26 +180,6 @@ def test_every_tool_refuses_without_an_identity(capability, monkeypatch):
     ):
         with pytest.raises(Exception, match="signed-in user"):
             call(capability, name, args)
-
-
-def test_every_tool_refuses_when_the_server_is_exposed_without_a_token(capability, monkeypatch):
-    domain = sys.modules["src.capabilities.notes.domain"]
-    monkeypatch.setattr(domain, "settings", dataclasses.replace(domain.settings, host="0.0.0.0", internal_api_token=""))
-
-    for name, args in (
-        ("tool_notes_listNotes", {}),
-        ("tool_notes_searchNotes", {"query": "wifi"}),
-        ("tool_notes_readNote", {"note_id": ID1}),
-    ):
-        with pytest.raises(Exception, match="INTERNAL_API_TOKEN"):
-            call(capability, name, args)
-
-
-def test_it_works_on_an_exposed_host_once_a_token_is_set(capability, monkeypatch):
-    domain = sys.modules["src.capabilities.notes.domain"]
-    monkeypatch.setattr(domain, "settings", dataclasses.replace(domain.settings, host="0.0.0.0", internal_api_token="secret"))
-
-    assert structured(call(capability, "tool_notes_listNotes"))["count"] == 2
 
 
 def test_an_unreachable_gateway_is_a_clear_error(capability, library):
@@ -422,12 +406,6 @@ def test_every_write_tool_refuses_without_an_identity_or_on_an_exposed_host(capa
     for name, args in calls:
         with pytest.raises(Exception, match="signed-in user"):
             call(capability, name, args)
-    monkeypatch.setattr(identity_context, "current_uid", lambda: ALICE)
-    domain = sys.modules["src.capabilities.notes.domain"]
-    monkeypatch.setattr(domain, "settings", dataclasses.replace(domain.settings, host="0.0.0.0", internal_api_token=""))
-    for name, args in calls:
-        with pytest.raises(Exception, match="INTERNAL_API_TOKEN"):
-            call(capability, name, args)
 
     assert library.docs == before
 
@@ -464,7 +442,8 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def _record(self, body=None):
-        self.seen.append({"method": self.command, "path": self.path, "token": self.headers.get("X-Internal-Token"), "body": body})
+        caller = asyncio.run(verify_assertion(auth_helpers.stack["treasury"], self.headers["Authorization"][7:], "treasury"))
+        self.seen.append({"method": self.command, "path": self.path, "caller": caller.name, "body": body})
 
     def do_GET(self):
         self._record()
@@ -506,52 +485,52 @@ def server():
 def test_the_client_queries_the_right_collection_with_the_token_and_filters(server):
     url, handler = server
 
-    docs = NotesGateway(url + "/", "mcp_server", "data", "secret").readable_by_agents(ALICE)
+    docs = NotesGateway(url + "/", "mcp_server", "data", auth_helpers.stack["armory"]).readable_by_agents(ALICE)
 
     assert [d["title"] for d in docs] == ["B", "A"]  # newest edit first
     seen = handler.seen[0]
     assert seen["method"] == "POST"
     assert seen["path"] == "/instances/mcp_server/connections/data/collections/notes/query"
-    assert seen["token"] == "secret"
+    assert seen["caller"] == "armory"
     assert seen["body"] == {"filters": {"owner": ALICE, "agent_readable": True}, "limit": 200, "offset": 0}
 
 
 def test_the_client_reads_one_record_and_reports_a_missing_one_as_none(server):
     url, handler = server
-    client = NotesGateway(url, "mcp_server", "data", "")
+    client = NotesGateway(url, "mcp_server", "data", auth_helpers.stack["armory"])
 
     assert client.get(ID1)["title"] == "A"
     assert client.get("9" * 32) is None
-    assert handler.seen[0]["token"] is None  # no token configured: none sent
+    assert handler.seen[0]["caller"] == "armory"
 
 
 def test_the_client_turns_failures_into_one_error(server):
     url, _ = server
 
     with pytest.raises(NotesGatewayError, match="HTTP 500: database is on fire"):
-        NotesGateway(url, "mcp_server", "data", "").get("boom")
+        NotesGateway(url, "mcp_server", "data", auth_helpers.stack["armory"]).get("boom")
     with pytest.raises(NotesGatewayError, match="Could not reach db_gateway"):
-        NotesGateway("http://127.0.0.1:1", "mcp_server", "data", "", timeout=1).get(ID1)
+        NotesGateway("http://127.0.0.1:1", "mcp_server", "data", auth_helpers.stack["armory"], timeout=1).get(ID1)
 
 
 def test_the_client_encodes_names_so_they_cannot_change_the_path(server):
     url, handler = server
 
-    NotesGateway(url, "a/b", "c d", "").get("../x")
+    NotesGateway(url, "a/b", "c d", auth_helpers.stack["armory"]).get("../x")
 
     assert handler.seen[0]["path"] == "/instances/a%2Fb/connections/c%20d/collections/notes/records/..%2Fx"
 
 
 def test_the_client_puts_a_record_and_counts_a_users_notes(server):
     url, handler = server
-    client = NotesGateway(url, "mcp_server", "data", "secret")
+    client = NotesGateway(url, "mcp_server", "data", auth_helpers.stack["armory"])
 
     client.put(ID2, note(ID2, ALICE, "new", shared=False))  # counted although agents cannot read it
     assert client.count_owned(ALICE) == 3  # the two seeded notes and this one
 
     put, query = handler.seen
-    assert (put["method"], put["path"], put["token"]) == (
-        "PUT", f"/instances/mcp_server/connections/data/collections/notes/records/{ID2}", "secret",
+    assert (put["method"], put["path"], put["caller"]) == (
+        "PUT", f"/instances/mcp_server/connections/data/collections/notes/records/{ID2}", "armory",
     )
     assert put["body"]["doc"]["title"] == "new"
     assert query["body"] == {"filters": {"owner": ALICE}, "limit": 200, "offset": 0}

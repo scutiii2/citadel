@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import FreshHeaders
+
 from types import SimpleNamespace
 
 import pytest
@@ -13,7 +15,7 @@ from src.capabilities.tables.utils import tables
 from src.upload_routes import install_upload_routes
 
 CSV = b"region,units\nEU,10\nUS,20\n"
-HEADERS = {"X-Internal-Token": "shared-secret", "X-Requester-Username": "alice"}
+HEADERS = FreshHeaders(uid="alice", username="alice")
 
 
 @pytest.fixture
@@ -26,7 +28,7 @@ def client():
 
 @pytest.fixture(autouse=True)
 def fake_settings(tmp_path, monkeypatch):
-    fake = SimpleNamespace(internal_api_token="shared-secret", uploads_dir=tmp_path / "uploads")
+    fake = SimpleNamespace(uploads_dir=tmp_path / "uploads")
     monkeypatch.setattr(upload_routes, "settings", fake)
     return fake
 
@@ -56,13 +58,7 @@ def test_a_csv_becomes_a_table_owned_by_the_requester(client, fresh_registry):
 
 def test_missing_or_wrong_token_is_a_401(client):
     assert post(client, headers={"X-Requester-Username": "alice"}).status_code == 401
-    assert post(client, headers={**HEADERS, "X-Internal-Token": "nope"}).status_code == 401
-
-
-def test_an_unset_token_never_validates(client, fake_settings):
-    fake_settings.internal_api_token = ""
-
-    assert post(client, headers={"X-Internal-Token": "", "X-Requester-Username": "alice"}).status_code == 401
+    assert post(client, headers=FreshHeaders(invalid=True, uid="alice", username="alice")).status_code == 401
 
 
 def test_missing_file_is_a_400(client):
@@ -75,6 +71,6 @@ def test_a_refused_file_is_a_400_with_the_reason(client):
 
 
 def test_an_unidentified_caller_is_refused(client):
-    response = post(client, headers={"X-Internal-Token": "shared-secret"})
+    response = post(client, headers=FreshHeaders())
 
     assert response.status_code == 400 and "not identified" in response.json()["error"]

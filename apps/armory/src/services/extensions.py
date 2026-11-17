@@ -26,7 +26,9 @@ from src.services.app_config import (
     load_extensions_config,
     save_extension_config,
 )
-from src.services.identity_context import REQUESTER_META_KEY, current_email, current_username
+from src.services.identity_context import current_email, current_username
+from src.citadel_auth import ServiceAuth, requester_meta
+from src.services.service_auth import keyring, mcp_requester
 
 logger = logging.getLogger(__name__)
 
@@ -61,13 +63,11 @@ async def _check_tcp_reachable(url: str) -> None:
 
 
 def _request_headers(config: ExtensionConfig) -> dict[str, str]:
-    """The configured headers, plus the stack's internal token for an ``internal`` extension."""
-    if not config.internal:
-        return config.headers
-    return {**config.headers, "X-Internal-Token": settings.internal_api_token}
+    """External credentials remain upstream-specific; service auth uses an HTTP hook."""
+    return config.headers
 
 
-async def _check_handshake_accepted(url: str, headers: dict[str, str] | None) -> None:
+async def _check_handshake_accepted(url: str, headers: dict[str, str] | None, auth=None) -> None:
     """Raise a plain exception if `url` answers an MCP ``initialize`` POST with an HTTP error status (401, 403, 404, 5xx).
     Companion to _check_tcp_reachable: a rejected handshake inside streamablehttp_client hits the cancel-scope bug, while plain httpx fails normally. Only the status is read, never headers."""
     request_headers = {
@@ -85,7 +85,7 @@ async def _check_handshake_accepted(url: str, headers: dict[str, str] | None) ->
             "clientInfo": {"name": "mcp_server-preflight", "version": "0"},
         },
     }
-    async with httpx.AsyncClient(timeout=CONNECT_TIMEOUT_SECONDS) as client:
+    async with httpx.AsyncClient(timeout=CONNECT_TIMEOUT_SECONDS, auth=auth) as client:
         async with client.stream("POST", url, json=payload, headers=request_headers) as response:
             if response.status_code >= 400:
                 hint = " (check the extension's token/headers)" if response.status_code in (401, 403) else ""
@@ -123,7 +123,8 @@ def _requester_meta() -> dict[str, Any] | None:
     username, email = current_username(), current_email()
     if not (username or email):
         return None
-    return {REQUESTER_META_KEY: {"username": username, "email": email}}
+    # External tool services retain their protocol; values came from verified requester context.
+    return {"requester": {"username": username, "email": email}}
 
 
 class ExtensionRegistry:
@@ -136,6 +137,7 @@ class ExtensionRegistry:
         self._extension_stacks: dict[str, AsyncExitStack] = {}
         self._sessions: dict[str, ClientSession] = {}  # extension id -> session
         self._forward_requester: set[str] = set()  # ids whose config opted in to requester forwarding
+        self._internal: set[str] = set()
         self._proxied: dict[str, _ProxiedTool] = {}  # namespaced name -> tool
         self._statuses: list[ExtensionStatus] = []
         self._mcp: FastMCP | None = None
@@ -213,6 +215,8 @@ class ExtensionRegistry:
         self._sessions[extension_id] = session
         if config.forward_requester or config.internal:
             self._forward_requester.add(extension_id)
+        if config.internal:
+            self._internal.add(extension_id)
         status = ExtensionStatus(
             id=extension_id,
             label=config.label,
@@ -242,6 +246,7 @@ class ExtensionRegistry:
 
         self._sessions.pop(extension_id, None)
         self._forward_requester.discard(extension_id)
+        self._internal.discard(extension_id)
         for name in [n for n, proxied in self._proxied.items() if proxied.extension_id == extension_id]:
             del self._proxied[name]
         self._statuses = [status for status in self._statuses if status.id != extension_id]
@@ -269,9 +274,13 @@ class ExtensionRegistry:
             assert config.url is not None  # guaranteed by _build_extension/the POST route
             await _check_tcp_reachable(config.url)
             headers = _request_headers(config)
-            await _check_handshake_accepted(config.url, headers)
+            auth = ServiceAuth(keyring, config.audience) if config.internal else None
+            if auth is not None:
+                await _check_handshake_accepted(config.url, headers, auth)
+            else:
+                await _check_handshake_accepted(config.url, headers)
             read_stream, write_stream, _get_session_id = await local_stack.enter_async_context(
-                streamablehttp_client(config.url, headers=headers or None)
+                streamablehttp_client(config.url, headers=headers or None, **({"auth": auth} if auth else {}))
             )
         else:
             params = StdioServerParameters(command=config.command, args=config.args)
@@ -294,7 +303,8 @@ class ExtensionRegistry:
             proxied.upstream_name,
             arguments,
             read_timeout_seconds=timedelta(seconds=CALL_TIMEOUT_SECONDS),
-            meta=_requester_meta() if proxied.extension_id in self._forward_requester else None,
+            meta=(requester_meta() if proxied.extension_id in self._internal else _requester_meta())
+                 if proxied.extension_id in self._forward_requester else None,
         )
 
     async def merged_list_tools(self) -> list[types.Tool]:
@@ -311,10 +321,11 @@ class ExtensionRegistry:
         assert self._mcp is not None, "install() must run before merged_call_tool()"
         # Who asked, when the caller said (identity headers, or ai_agent's
         # per-call _meta - see identity_context.py); "-" otherwise.
-        logger.info("tool call %s by %s", name, current_username() or current_email() or "-")
-        if self.is_proxied(name):
-            return await self.call(name, arguments)
-        return await self._mcp.call_tool(name, arguments)
+        async with mcp_requester():
+            logger.info("tool call %s by %s", name, current_username() or current_email() or "-")
+            if self.is_proxied(name):
+                return await self.call(name, arguments)
+            return await self._mcp.call_tool(name, arguments)
 
     def install(self, mcp: FastMCP) -> None:
         """Wire this registry's tools into `mcp`'s list_tools/call_tool by re-registering the handlers (see module docstring).

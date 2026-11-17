@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.auth_helpers import FreshHeaders
+
 import asyncio
 import dataclasses
 import json
@@ -22,7 +24,9 @@ from src.services import capability_meta, capability_registry
 from src.services.email import delivery as email_delivery
 from src.services.capability_loader import CapabilityLoader
 from src.services.identity_context import IdentityContextMiddleware
-from src.services.internal_token import InternalTokenMiddleware
+from src.services.service_auth import install_auth
+from src.citadel_auth import ServiceAuth
+from tests import auth_helpers
 
 
 @pytest.fixture
@@ -97,7 +101,7 @@ def test_authenticated_wire_delivery_and_audit_never_return_content(capability, 
     server, _, smtp = capability
     app = server.streamable_http_app()
     app.add_middleware(IdentityContextMiddleware)
-    app.add_middleware(InternalTokenMiddleware, token="test-internal-token")
+    install_auth(app)
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
@@ -107,8 +111,9 @@ def test_authenticated_wire_delivery_and_audit_never_return_content(capability, 
     url = f"http://127.0.0.1:{port}/mcp"
 
     async def send_and_audit():
-        headers = {"X-Internal-Token": "test-internal-token", "X-Requester-Username": "ember"}
-        async with streamable_http_client(url, http_client=httpx.AsyncClient(headers=headers)) as (read, write, _):
+        headers = FreshHeaders(uid="ember", username="ember")
+        async with httpx.AsyncClient(headers=headers, auth=ServiceAuth(auth_helpers.stack["portcullis"], "armory")) as http:
+          async with streamable_http_client(url, http_client=http) as (read, write, _):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 sent = await session.call_tool("tool_email_sendEmail", {

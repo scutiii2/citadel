@@ -17,7 +17,6 @@ def settings(tmp_path: Path) -> Settings:
     return Settings(
         store_dir=tmp_path / "store",
         log_dir=tmp_path / "logs",
-        internal_api_token=TEST_TOKEN,
         signing_key=b"s" * 32,
     )
 

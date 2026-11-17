@@ -8,13 +8,14 @@ from src.capabilities.obsidian.utils.gateway import ObsidianGateway, ObsidianGat
 
 
 def test_missing_identity_and_token_fail_closed(monkeypatch):
-    monkeypatch.setattr(brain_resolver, "settings", replace(brain_resolver.settings, internal_api_token=""))
+    monkeypatch.setattr(brain_resolver, "settings", replace(brain_resolver.settings))
     with pytest.raises(ObsidianGatewayError, match="authentication"):
         brain_resolver.resolve("instance", "read", "alice")
 
 
 def test_auto_save_metadata_refuses_another_destination_before_remote_request(monkeypatch):
-    monkeypatch.setattr(brain_resolver, "settings", replace(brain_resolver.settings, internal_api_token="test-token"))
+    monkeypatch.setattr(identity_context, "current_uid", lambda: "alice")
+    monkeypatch.setattr(brain_resolver, "settings", replace(brain_resolver.settings))
     monkeypatch.setattr(identity_context, "_from_request_meta", lambda key: "personal" if key == "brain_scope" else "")
     with pytest.raises(ObsidianGatewayError, match="destination"):
         brain_resolver.resolve("instance", "write", "alice")

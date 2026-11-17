@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import FreshHeaders
+
 import logging
 from types import SimpleNamespace
 
@@ -25,7 +27,7 @@ def db(tmp_path):
 
 @pytest.fixture
 def fake_settings(monkeypatch, db):
-    fake = SimpleNamespace(internal_api_token=TOKEN, memory_db_path=db)
+    fake = SimpleNamespace(memory_db_path=db)
     monkeypatch.setattr(memory_routes, "settings", fake)
     return fake
 
@@ -46,8 +48,12 @@ def client(fake_settings, online):
 
 
 def purge(client, uid=UID_A, token=TOKEN):
-    headers = {"X-Internal-Token": token} if token is not None else {}
-    return client.delete(f"/memory/owners/{uid}", headers=headers)
+    headers = FreshHeaders(caller="stronghold", invalid=token != TOKEN) if token is not None else {}
+    response = client.delete(f"/memory/owners/{uid}", headers=headers, follow_redirects=False)
+    if response.status_code in (307, 308):
+        headers = FreshHeaders(caller="stronghold", invalid=token != TOKEN) if token is not None else {}
+        return client.delete(response.headers["location"], headers=headers, follow_redirects=False)
+    return response
 
 
 def test_it_removes_only_that_owners_notes(client, db, caplog):
@@ -78,13 +84,6 @@ def test_a_missing_or_wrong_token_is_a_401_and_deletes_nothing(client, db, token
     assert len(memory_store.search(db, UID_A)) == 1
 
 
-def test_an_unset_token_never_validates(client, fake_settings, db):
-    fake_settings.internal_api_token = ""
-    memory_store.save(db, UID_A, "alpha")
-    assert purge(client, token="").status_code == 401
-    assert len(memory_store.search(db, UID_A)) == 1
-
-
 @pytest.mark.parametrize("uid", ["alice", "A" * 32, "a" * 31, "a" * 33, "..%2F"])
 def test_only_a_32_hex_uid_is_accepted(client, uid):
     assert purge(client, uid=uid).status_code in (400, 404)
@@ -98,4 +97,4 @@ def test_it_does_nothing_when_memory_is_offline(client, online, db):
 
 
 def test_only_delete_is_allowed(client):
-    assert client.get(f"/memory/owners/{UID_A}", headers={"X-Internal-Token": TOKEN}).status_code == 405
+    assert client.get(f"/memory/owners/{UID_A}", headers=FreshHeaders(caller="stronghold", )).status_code == 405

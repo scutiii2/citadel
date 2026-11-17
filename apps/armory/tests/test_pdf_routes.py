@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
+from tests.auth_helpers import service_auth
 from src import command_routes
 from src.services import capability_registry
 from src.capabilities.pdf_merger.utils.errors import ErrorCode, MergerError
@@ -26,6 +27,7 @@ def setup(tmp_path, monkeypatch):
     app = Starlette()
     command_routes.install_command_routes(app)
     with TestClient(app) as client:
+        client.auth = service_auth()
         yield client, download
 
 
