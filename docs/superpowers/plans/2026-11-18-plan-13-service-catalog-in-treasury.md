@@ -945,3 +945,8 @@ def http_catalog(name: str) -> httpx.AsyncClient:
 - **Coverage:** circular start (Treasury holds the catalog, `treasury_url` is the one bootstrap value: Tasks 2, 5), registration and safety (own name only, address check, pin only through Portcullis: Task 2), outage (cache, defaults, retry: Task 1 and 8), admin control (Tasks 3, 4), every internal address in the table (Tasks 5, 6, 7), docs and vault (Tasks 7, 9).
 - **Placeholders:** the per-site edits in Tasks 3, 5 and 6 name exact files and lines found by search on 2026-11-18, and tell the executor to read the surrounding class before editing; any line number may have moved by a few lines.
 - **Names:** `ServiceCatalog`, `CatalogTransport`, `logical_url`, `advertised_url`, `checked_address`, `resolved`, `SERVICE_DEFAULTS`, `catalog.url/mcp_url/address/refresh/register/start/stop/refresh_soon`, `service_catalog.effective/view/register/pin/unpin`, tables `service_addresses` and `service_pins`, env `TREASURY_URL` and `CITADEL_ADVERTISE_URL` are used the same way in every task.
+
+## Changes found during work
+
+- Existing main worktree has uncommitted Legion, Compose and documentation edits. Implementation uses isolated `.worktrees/plan-13-service-catalog`, based on committed `main` (09cc60c7); original edits remain untouched.
+- Task 1 FakeKeyring lacks `private_key` and `kid` required by real `sign_assertion`. Tests use in-memory Ed25519 identity; service authentication remains enabled.
