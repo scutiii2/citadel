@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from src.citadel_auth import apply_root_env, cache_dir, data_dir
+from src.environment_settings import overlay
 
 _PROJECT = Path(__file__).resolve().parent.parent
 apply_root_env(_PROJECT)  # the Citadel root .env overrides this service's .env
@@ -18,7 +19,7 @@ CACHE = cache_dir(_PROJECT)
 
 def _env(name: str, default: str) -> str:
     """os.getenv, but an empty value counts as unset.
-    A blank line like ``SSH_KNOWN_HOSTS=`` would otherwise override a default with Path("")."""
+    A blank line like ``MCP_LOG_DIR=`` would otherwise override a default with Path("")."""
     value = os.getenv(name)
     return value if value else default
 
@@ -32,13 +33,6 @@ class Settings:
     # Set MCP_HOST to expose it only behind a reverse proxy, VPN or firewall that authenticates.
     host: str = _env("MCP_HOST", "127.0.0.1")
     port: int = int(_env("MCP_PORT", "29600"))
-    # known_hosts file used to verify SSH host keys; defaults to the ssh client's own.
-    ssh_known_hosts: Path = Path(
-        _env("SSH_KNOWN_HOSTS", str(Path.home() / ".ssh" / "known_hosts"))
-    )
-    # "reject" (default) or "auto". Rejecting unknown host keys keeps man-in-the-middle and changed keys visible.
-    # "auto" trusts and records the first key, fine only for a throwaway lab.
-    ssh_host_key_policy: str = _env("SSH_HOST_KEY_POLICY", "reject")
     # Where logging_setup.configure_logging() writes server.log and errors.report() writes per-reference files.
     # Relative to CWD like the paths above.
     log_dir: Path = Path(_env("MCP_LOG_DIR", str(DATA / "logs")))
@@ -102,10 +96,7 @@ class Settings:
     vault_dir: Path = Path(_env("MCP_VAULT_DIR", "../../../../Brain"))
     workspace_dir: Path = Path(_env("MCP_WORKSPACE_DIR", "../../../.."))
 
-    @property
-    def email_config_path(self) -> Path:
-        return self.configs_dir / "config_email.json"
 
 
-
-settings = Settings()
+# .env and the defaults give the first value; what an administrator saved (environment_settings.py) wins.
+settings = overlay(Settings(), Settings().settings_db_path)

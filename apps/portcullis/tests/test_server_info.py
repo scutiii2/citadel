@@ -295,3 +295,62 @@ def test_load_error_is_shown_only_to_admins(client_factory, email: FakeEmailSend
     assert admin_entry["load_error"] == "boom"
     assert member_entry["load_error"] is None
     assert {k: v for k, v in admin_entry.items() if k != "load_error"} == {k: v for k, v in member_entry.items() if k != "load_error"}
+
+
+def test_armory_environment_is_admin_only_logged_and_never_logs_values(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
+    def armory(request: httpx.Request) -> httpx.Response:
+        if request.url.path != "/admin/environment":
+            return mcp_server(request)
+        if request.method == "GET":
+            return httpx.Response(200, json={"settings": [{"field": "stronghold_url", "value": "http://s:1"}]})
+        if json.loads(request.content).get("stronghold_url") == "bad":
+            return httpx.Response(400, json={"error": "Stronghold address: use an http(s) address without a login."})
+        return httpx.Response(200, json={"settings": [], "restart": ["media_signing_key"]})
+
+    upstream.handler = armory
+    admin = as_admin(client_factory())
+
+    assert admin.get("/api/armory-environment").json()["settings"][0]["field"] == "stronghold_url"
+    changed = admin.put("/api/armory-environment", json={"media_signing_key": "s3cret", "obsidian_verify_tls": False})
+    assert changed.status_code == 200 and changed.json()["restart"] == ["media_signing_key"]
+    assert json.loads(upstream.requests[-1].content) == {"media_signing_key": "s3cret", "obsidian_verify_tls": False}
+    refused = admin.put("/api/armory-environment", json={"stronghold_url": "bad"})
+    assert (refused.status_code, refused.json()["detail"]) == (400, "Stronghold address: use an http(s) address without a login.")
+    root = admin.get("/api/auth/me").json()["id"]
+    logged = " ".join(entry["message"] for entry in admin.get("/api/logs/action", params={"actor": root}).json())
+    assert "Changed Armory settings (media_signing_key, obsidian_verify_tls)" in logged and "s3cret" not in logged
+
+    member = client_factory()
+    make_member(member, email)
+    login(member, "alice")
+    assert member.get("/api/armory-environment").status_code == 403
+    assert member.put("/api/armory-environment", json={"laya_url": "http://x:1"}).status_code == 403
+
+
+def test_armory_email_is_admin_only_and_never_logs_the_password(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
+    def armory(request: httpx.Request) -> httpx.Response:
+        if request.url.path != "/admin/email":
+            return mcp_server(request)
+        if request.method == "GET":
+            return httpx.Response(200, json={"configured": True, "smtp_server": "smtp.x", "has_password": True})
+        if json.loads(request.content).get("smtp_port") == "abc":
+            return httpx.Response(400, json={"error": "Email settings: 'smtp_port' must be a whole number."})
+        return httpx.Response(200, json={"configured": True, "has_password": True})
+
+    upstream.handler = armory
+    admin = as_admin(client_factory())
+
+    assert admin.get("/api/armory-email").json()["has_password"] is True
+    assert admin.put("/api/armory-email", json={"password": "p4ss", "to": ["a@x.com"]}).status_code == 200
+    assert json.loads(upstream.requests[-1].content) == {"password": "p4ss", "to": ["a@x.com"]}
+    refused = admin.put("/api/armory-email", json={"smtp_port": "abc"})
+    assert (refused.status_code, refused.json()["detail"]) == (400, "Email settings: 'smtp_port' must be a whole number.")
+    root = admin.get("/api/auth/me").json()["id"]
+    logged = " ".join(entry["message"] for entry in admin.get("/api/logs/action", params={"actor": root}).json())
+    assert "Changed Armory email settings (password, to)" in logged and "p4ss" not in logged
+
+    member = client_factory()
+    make_member(member, email)
+    login(member, "alice")
+    assert member.get("/api/armory-email").status_code == 403
+    assert member.put("/api/armory-email", json={"smtp_port": 25}).status_code == 403

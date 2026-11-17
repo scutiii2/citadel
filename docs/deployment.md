@@ -110,7 +110,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
    | File | Keys to fill in |
    |---|---|
-   | `apps/armory/.env` | Only the capability keys you use: `SMTP_PASSWORD`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://legion:29611/mcp` to group tickets with the triage agent) |
+   | `apps/armory/.env` | Only the capability keys you use: `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://legion:29611/mcp` to group tickets with the triage agent) |
    | `apps/legion/.env` | `HF_TOKEN` if used. Model provider keys, the Laya token and the TypeSafe key are saved in ConversationGateway and DecisionGateway, not here |
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
    | `apps/portcullis/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
@@ -134,7 +134,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    prompts, and the instances Treasury's callers register. A new install starts with every Armory capability off, no
    Armory extension and no Legion server: an administrator turns on and adds what the machine needs. Stronghold alone
    owns the usage limits and the price table; Portcullis reads the prices from it.
-   Fill in `apps/armory/.env` (`SMTP_FROM`, `SMTP_PASSWORD`) before using email.
+   Set up email on the Email page of Armory Admin before using it.
 
 5. **Start:**
 

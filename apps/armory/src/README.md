@@ -11,7 +11,7 @@ reads `from src.foo import bar`, matching chat_app's layout.
   server can do."
 - **[`resources/`](resources/README.md)** - one folder per
   client-readable URI resource.
-- **[`services/`](services/README.md)** - shared clients (SSH, email, the
+- **[`services/`](services/README.md)** - shared clients (email, the
   config-file loader, the pending-requests store) every capability
   reuses.
 - **[`utils/`](utils/README.md)** - small, single-purpose helpers with

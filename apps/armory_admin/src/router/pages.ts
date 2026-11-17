@@ -28,4 +28,16 @@ export const ARMORY_PAGES: ArmoryPage[] = [
     icon: ["M4 9V6h16v3a2 2 0 0 0 0 6v3H4v-3a2 2 0 0 0 0-6z", "M10 8v8"],
     permission: "tickets.manage",
   },
+  {
+    to: "/settings",
+    label: "Settings",
+    icon: ["M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3", "M1 14h6M9 8h6M17 16h6"],
+    permission: "capabilities.manage",
+  },
+  {
+    to: "/email",
+    label: "Email",
+    icon: ["M3 6h18v12H3z", "m3 7 9 6 9-6"],
+    permission: "capabilities.manage",
+  },
 ];

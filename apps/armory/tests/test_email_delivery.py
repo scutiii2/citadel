@@ -11,14 +11,16 @@ from src.services import capability_registry
 from src.services.email import delivery as email_delivery
 from src.services.email import audit as email_audit
 from src.config import settings
+from src.citadel_auth import settings_store
+from src.services.app_config import email_document
 
 
 @pytest.fixture
 def delivery(tmp_path, monkeypatch):
-    cfg = tmp_path / "config_email.json"
-    cfg.write_text(json.dumps({"smtp_server": "smtp.example.com", "smtp_port": 587,
-                              "from": "sender@example.com", "password": "private-password"}))
-    test_settings = dataclasses.replace(settings, configs_dir=tmp_path, email_audit_path=tmp_path / "audit.db")
+    cfg = tmp_path / "settings.db"
+    settings_store.put(cfg, "email", "smtp", {"smtp_server": "smtp.example.com", "smtp_port": 587,
+                                              "from": "sender@example.com", "password": "private-password"})
+    test_settings = dataclasses.replace(settings, settings_db_path=cfg, email_audit_path=tmp_path / "audit.db")
     monkeypatch.setattr(email_delivery, "settings", test_settings)
     monkeypatch.setattr(capability_registry, "_REGISTRY", {})
     capability_registry.register_unloaded("email", "Email")
@@ -65,16 +67,16 @@ def test_disabled_or_unregistered_email_never_connects(delivery, registered):
 
 def test_missing_config_is_not_created(delivery):
     cfg, _, smtp = delivery
-    cfg.unlink()
+    settings_store.delete(cfg, "email", "smtp")
     with pytest.raises(email_delivery.EmailUnavailable, match="not configured"):
         send()
-    assert not cfg.exists()
+    assert email_document(cfg) is None
     smtp.assert_not_called()
 
 
 def test_invalid_config_is_sanitized(delivery, caplog):
     cfg, _, smtp = delivery
-    cfg.write_text('{"secret": "ABC123"}')
+    settings_store.put(cfg, "email", "smtp", {"secret": "ABC123"})
     with pytest.raises(email_delivery.EmailUnavailable, match="config is invalid") as error:
         send()
     assert "ABC123" not in str(error.value) + caplog.text

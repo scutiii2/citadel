@@ -161,14 +161,48 @@ SUPPORTED_EMAIL_SECURITY = ("starttls", "ssl", "none")
 # The IANA implicit-TLS submission port, used by mainstream providers, so `security` can be inferred from it.
 IMPLICIT_TLS_PORT = 465
 
-def load_email_config(config_path: Path) -> EmailConfig:
-    """Parse config_email.json into an EmailConfig; ``from`` is read from JSON and exposed as ``from_address``.
-    Optional keys: ``password`` (unauthenticated relays), ``security`` (implied by port), ``allowed_recipient_domains`` (absent is stricter), ``to``."""
-    section = load_config(config_path)
-    section = resolve_section(section, where="", config_path=config_path)
+EMAIL_TABLE = "email"
+EMAIL_KEY = "smtp"
+EMAIL_FIELDS = ("smtp_server", "smtp_port", "security", "from", "password", "to", "allowed_recipient_domains")
 
+
+def email_document(config_path: Path) -> dict[str, Any] | None:
+    """The stored SMTP document, or None when the administrator has not set email up."""
+    document = settings_store.read_all(config_path, EMAIL_TABLE).get(EMAIL_KEY)
+    return document if isinstance(document, dict) else None
+
+
+def load_email_config(config_path: Path) -> EmailConfig:
+    """Build an EmailConfig from the SMTP settings stored in the settings database at ``config_path``; ``from`` is exposed as ``from_address``.
+    Optional keys: ``password`` (unauthenticated relays), ``security`` (implied by port), ``allowed_recipient_domains`` (absent is stricter), ``to``."""
+    section = email_document(config_path)
+    if section is None:
+        raise FileNotFoundError(f"Email is not set up in {config_path}.")
+    return _email_config(section, config_path)
+
+
+def save_email_settings(config_path: Path, changes: dict[str, Any]) -> dict[str, Any]:
+    """Merge ``changes`` into the stored document (a None value removes a key), check the result as a whole, and save it.
+    Raises KeyError or ValueError, and saves nothing, when the result is not a usable email setup."""
+    unknown = set(changes) - set(EMAIL_FIELDS)
+    if unknown:
+        raise ValueError(f"Unknown email setting: {', '.join(sorted(unknown))}.")
+    document = {**(email_document(config_path) or {})}
+    for key, value in changes.items():
+        if value is None:
+            document.pop(key, None)
+        else:
+            document[key] = value
+    _email_config(document, config_path)
+    settings_store.put(config_path, EMAIL_TABLE, EMAIL_KEY, document)
+    return document
+
+
+def _email_config(section: dict[str, Any], config_path: Path) -> EmailConfig:
     def required(key: str) -> Any:
-        return _require(section, key, prefix="", config_path=config_path)
+        if key not in section or section[key] in ("", None):
+            raise KeyError(f"Email settings are missing '{key}'")
+        return section[key]
 
     def as_string_list(value: Any) -> list[str]:
         # A bare string is the obvious way to write one recipient or domain; iterating it per character would be a nasty surprise.
@@ -188,13 +222,16 @@ def load_email_config(config_path: Path) -> EmailConfig:
     # and would just appear in refusal messages.
     domains = [domain for domain in domains if domain]
 
-    port = int(required("smtp_port"))
+    try:
+        port = int(required("smtp_port"))
+    except (TypeError, ValueError):
+        raise ValueError("Email settings: 'smtp_port' must be a whole number.") from None
     inferred = "ssl" if port == IMPLICIT_TLS_PORT else "starttls"
     security = str(section.get("security", inferred)).strip().lower()
     if security not in SUPPORTED_EMAIL_SECURITY:
         # No permissive fallback on a typo: downgrading "tls" to plaintext or unverified would silently send the password in the clear.
         raise ValueError(
-            f"Config file {config_path}: 'security' is {security!r}, "
+            f"Email settings: 'security' is {security!r}, "
             f"expected one of {', '.join(SUPPORTED_EMAIL_SECURITY)}."
         )
 

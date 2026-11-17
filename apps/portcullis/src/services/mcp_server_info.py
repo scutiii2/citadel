@@ -125,6 +125,25 @@ class McpServerInfo:
     async def set_capability(self, account: Account, name: str, enabled: bool) -> dict[str, Any]:
         return await self._request("PATCH", f"/capabilities/{quote(name, safe='')}", account, json={"enabled": enabled})
 
+    async def environment(self, account: Account) -> dict[str, Any]:
+        """Armory's deployment values: every setting, a secret only as `has_value`."""
+        body = await self._request("GET", "/admin/environment", account)
+        return body if isinstance(body, dict) else {}
+
+    async def set_environment(self, account: Account, changes: dict[str, Any]) -> dict[str, Any]:
+        """Save `{field: value | None}`; Armory validates all of it and answers with the new list."""
+        body = await self._request("PUT", "/admin/environment", account, json=changes)
+        return body if isinstance(body, dict) else {}
+
+    async def email_settings(self, account: Account) -> dict[str, Any]:
+        """Armory's SMTP settings; the password is only `has_password`."""
+        body = await self._request("GET", "/admin/email", account)
+        return body if isinstance(body, dict) else {}
+
+    async def set_email_settings(self, account: Account, changes: dict[str, Any]) -> dict[str, Any]:
+        body = await self._request("PUT", "/admin/email", account, json=changes)
+        return body if isinstance(body, dict) else {}
+
     async def refresh_capabilities(self, account: Account) -> list[dict[str, Any]]:
         """mcp_server scans its capabilities folder again; returns the new list."""
         body = await self._request("POST", "/capabilities/refresh", account)

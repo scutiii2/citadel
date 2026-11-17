@@ -60,6 +60,7 @@ async def _serve() -> None:
         from src.capability_routes import install_capability_routes
         from src.command_routes import install_command_routes
         from src.download_routes import install_download_routes
+        from src.environment_routes import install_environment_routes
         from src.extension_routes import install_extension_routes
         from src.help_routes import install_help_routes
         from src.upload_routes import install_upload_routes
@@ -97,6 +98,8 @@ async def _serve() -> None:
         # Where chat_app's Capabilities page toggles built-in capabilities live, rescans src/capabilities/ and reloads code on going online.
         # A plain route: a model must not change what it can do. See capability_routes.py.
         install_capability_routes(app, capability_loader)
+        # Where Armory Admin edits the deployment values (addresses, link keys, Obsidian, folders); saved in settings.db. See environment_routes.py.
+        install_environment_routes(app)
         # Where chat_app proxies a file dropped into a command-form modal; a plain route checked against
         # service assertions. See upload_routes.py.
         install_upload_routes(app)

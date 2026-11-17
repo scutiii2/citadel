@@ -320,6 +320,44 @@ async def switch_capability(
     return capability
 
 
+@router.get("/armory-environment")
+async def armory_environment(account: Account = Depends(require_admin), info: McpServerInfo = Depends(get_server_info)) -> Any:
+    """Armory's deployment values (addresses, link keys, Obsidian, folders). A secret is never returned."""
+    return await _call(info.environment(account))
+
+
+@router.put("/armory-environment")
+async def set_armory_environment(
+    changes: dict[str, str | float | bool | None],
+    account: Account = Depends(require_admin),
+    info: McpServerInfo = Depends(get_server_info),
+    logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    """Armory checks and saves the change. The log names the settings, never their values."""
+    result = await _call(info.set_environment(account, changes))
+    await logs.action(account, "mcp.environment", f"Changed Armory settings ({', '.join(sorted(changes)) or 'none'})")
+    return result
+
+
+@router.get("/armory-email")
+async def armory_email(account: Account = Depends(require_admin), info: McpServerInfo = Depends(get_server_info)) -> Any:
+    """Armory's SMTP settings. The password is never returned."""
+    return await _call(info.email_settings(account))
+
+
+@router.put("/armory-email")
+async def set_armory_email(
+    changes: dict[str, str | int | list[str] | None],
+    account: Account = Depends(require_admin),
+    info: McpServerInfo = Depends(get_server_info),
+    logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    """Armory checks the whole result and saves it. The log names the settings, never their values."""
+    result = await _call(info.set_email_settings(account, changes))
+    await logs.action(account, "mcp.email", f"Changed Armory email settings ({', '.join(sorted(changes)) or 'none'})")
+    return result
+
+
 @router.post("/capabilities/refresh")
 async def refresh_capabilities(
     account: Account = Depends(require_admin),

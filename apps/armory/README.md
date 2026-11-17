@@ -108,7 +108,7 @@ it on this machine with `dev_deploy.bat` in this folder, or `docker compose up -
 Deploying to the ZimaOS box is covered in [docs/deployment.md](../../docs/deployment.md).
 
 Container-only configs are mounted from `docker/configs/armory/`, and the host Docker socket is mounted for the
-Server Manager capability. Credentials such as `SMTP_PASSWORD` come from this folder's `.env` (gitignored).
+Server Manager capability. The SMTP account is set on the Email page of Armory Admin.
 The SMTP password the old `zima_host.yaml` recipe once held must still be revoked at the mail provider, because
 removing the file does not remove it from Git history.
 

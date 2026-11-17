@@ -1,43 +1,15 @@
 # src/configs/
 
-Structured, per-deployment settings: the mail settings and the two capability tuning files. Loaded by
+Structured, per-deployment settings: the two capability tuning files. Loaded by
 `services/app_config.py` (see that module's docstring for the full loader
-mechanics); the mail path comes from `Settings.email_config_path` in `config.py`.
+mechanics).
 
-- **`config_email.json`** - SMTP settings and the standing
-  recipient list.
-  `smtp_server`/
-  `smtp_port`/`security` depend on which provider `from` lives on -
-  since JSON has no comments, the tracked file only shows Gmail;
-  the other two mainstream cases:
-
-  ```jsonc
-  // Outlook / Hotmail / Live / Microsoft 365
-  {
-    "smtp_server": "smtp.office365.com",
-    "smtp_port": 587,
-    "security": "starttls",
-    "from": "you@outlook.com",
-    "password": "${SMTP_PASSWORD}"
-  }
-
-  // Proton Mail - needs Proton Mail Bridge running locally first;
-  // Proton doesn't expose SMTP directly even with an app password.
-  // smtp_server/smtp_port come from the Bridge's own settings pane,
-  // and the password is the Bridge-generated one, not the mailbox
-  // password.
-  {
-    "smtp_server": "127.0.0.1",
-    "smtp_port": 1025,
-    "security": "starttls",
-    "from": "you@proton.me",
-    "password": "${SMTP_PASSWORD}"
-  }
-  ```
-
-  All three still need an app-specific password per this file's
-  `email.py` docstring - Gmail and Outlook because of 2FA, Proton
-  because Bridge issues its own.
+- **Email is not a file.** The SMTP server, port, connection (`ssl`, `starttls` or `none`), sender, password,
+  standing recipients and allowed domains are set on the Email page of Armory Admin and kept in `settings.db`
+  (table `email`, key `smtp`). Typical values: Gmail `smtp.gmail.com` 465 ssl; Outlook / Microsoft 365
+  `smtp.office365.com` 587 starttls; Proton Mail needs Proton Mail Bridge running, then `127.0.0.1` 1025 starttls
+  with the Bridge's own password. Gmail, Outlook, Yahoo and iCloud need an app password. A relay without a login
+  needs none. The password is write-only. A send uses the saved values at once. See `services/app_config.py`.
 - **`config_media_downloader.json`** - caps and lifetimes of the media downloader.
   Its path can be changed with `MCP_MEDIA_CONFIG_PATH`. Restart Armory after editing.
 
@@ -65,7 +37,7 @@ mechanics); the mail path comes from `Settings.email_config_path` in `config.py`
   | `limits.max_segments`, `limits.max_output_pages`, `limits.max_image_megapixels` | Caps on one merge. |
   | `limits.max_concurrent_merges`, `limits.job_timeout_seconds` | Parallel merges and the time one may take. |
 
-  The signing key and public address are in `.env` (`PDF_MERGER_SIGNING_KEY`, `MCP_PDF_MERGER_PUBLIC_BASE_URL`).
+  The signing key and public address are set on the Settings page (see below); `.env` can give a starting value.
   Files are in `.data/armory/pdf_merger/store/` in the Citadel folder.
 - **Run-time settings are not here.** Extensions, capability toggles and ticket
   settings (tags, hourly cap, elevation, Laya limits) are changed from admin
@@ -78,6 +50,13 @@ mechanics); the mail path comes from `Settings.email_config_path` in `config.py`
     `settings.db` and sends it in the `X-Internal-Token` header, the header those services read their
     per-caller token from. The page never shows the token again. Tick "Runs in this stack" for a server of this
     stack: it signs a service assertion instead of using a token.
+  - **Settings** (table `environment`) are the deployment values an administrator edits on the Settings page:
+    public addresses and signing keys of the PDF and video links, `LAYA_URL`, `STRONGHOLD_URL`,
+    `DB_GATEWAY_URL`/`INSTANCE`/`CONNECTION`, the `OBSIDIAN_*` values and `MCP_VAULT_DIR`/`MCP_WORKSPACE_DIR`.
+    `.env` and the defaults give the starting value; a saved value wins, and "Use the default" removes it. A secret
+    (the two signing keys, `OBSIDIAN_API_KEY`) is write-only. A change is used at once, except what is read only
+    at start (the signing keys, `LAYA_URL`, Treasury, the Obsidian index), which the page marks "after restart".
+    See `environment_settings.py`.
   - **Ticket settings** have no file. The defaults are in
     `capabilities/tickets/utils/config.py`; staff change them with
     `GET`/`PATCH /ticket-admin/settings` (see `capabilities/tickets/routes.py`).
@@ -88,5 +67,4 @@ Anything sensitive is a `${VAR}` placeholder resolved from
 `../.env` at load time, never a literal value in these files -
 see `services/app_config.py`'s docstring for the substitution syntax.
 Every JSON file here is tracked, and none has an `.example` twin. Values that must
-stay out of git are `${VAR}` placeholders (`${SMTP_FROM}`, `${SMTP_PASSWORD}`),
-filled from `../.env`; `../.env.example` lists them.
+stay out of git are `${VAR}` placeholders filled from `../.env`; `../.env.example` lists them.

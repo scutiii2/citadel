@@ -5,8 +5,8 @@ rather than each one inventing its own. Nothing here knows about `mcp`
 or any specific capability - see each capability's own `domain.py` for
 where that logic lives instead.
 
-- **`app_config.py`** - loaders for `../../configs/config_email.json`
-  (`load_email_config`) and for the extensions and capability toggles kept in
+- **`app_config.py`** - loaders for the SMTP settings kept in the settings store
+  (`load_email_config`, `save_email_settings`) and for the extensions and capability toggles kept in
   the settings store (`settings_store.py`, `.data/armory/settings.db`):
   `load_extensions_config`/`load_extension_config`, plus
   `save_extension_config`/`delete_extension_config` for the runtime
@@ -24,11 +24,8 @@ where that logic lives instead.
   into a couple of FastMCP's private dicts (no public way to remove a
   resource template) and why it captures actual `Tool`/`ResourceTemplate`
   objects rather than bare functions.
-- **`ssh.py`** - `SSHClient`, the one paramiko-connecting code path in
-  this server. Host-key verification, auth fallback (key then
-  password), and command execution all go through here.
 - **`email/send.py`** - `send_email()`, stdlib `smtplib` wrapper supporting
-  the three transports `config_email.json`'s `"security"` can name
+  the three transports the email `security` setting can name
   (`starttls` / `ssl` / `none`). Subjects go out as
   `[EMBER] <subject>` and every message ends with an
   auto-generated notice.
@@ -70,6 +67,6 @@ HTTP routes sit in that capability's folder (`utils/`, `routes.py`), e.g.
 Only add a module here if more than one capability needs it, or if it's
 a new kind of external connection (a new protocol, a new kind of
 credential) - a client only one capability uses belongs in that
-capability's own `domain.py` instead. Follow `ssh.py`'s or `email/send.py`'s
+capability's own `domain.py` instead. Follow `email/send.py`'s
 shape: a small, typed surface that raises rather than swallowing errors,
 so a capability's `domain.py` can decide what a failure means for it.

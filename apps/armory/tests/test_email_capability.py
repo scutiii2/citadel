@@ -25,7 +25,7 @@ from src.services.email import delivery as email_delivery
 from src.services.capability_loader import CapabilityLoader
 from src.services.identity_context import IdentityContextMiddleware
 from src.services.service_auth import install_auth
-from src.citadel_auth import ServiceAuth
+from src.citadel_auth import ServiceAuth, settings_store
 from tests import auth_helpers
 
 
@@ -41,10 +41,10 @@ def capability(tmp_path, monkeypatch):
     loader = CapabilityLoader(server, "src.capabilities", config)
     loader.scan()
     asyncio.run(loader.set_online("email", True))
-    (tmp_path / "config_email.json").write_text(json.dumps({"smtp_server": "smtp.example.com",
-        "smtp_port": 587, "from": "sender@example.com"}))
+    settings_store.put(config, "email", "smtp", {"smtp_server": "smtp.example.com",
+        "smtp_port": 587, "from": "sender@example.com"})
     monkeypatch.setattr(email_delivery, "settings", dataclasses.replace(settings,
-        configs_dir=tmp_path, email_audit_path=tmp_path / "audit.db"))
+        settings_db_path=config, email_audit_path=tmp_path / "audit.db"))
     smtp = MagicMock()
     smtp.return_value.__enter__.return_value.sendmail.return_value = {}
     monkeypatch.setattr("smtplib.SMTP", smtp)

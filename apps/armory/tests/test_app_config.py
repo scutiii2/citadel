@@ -32,6 +32,13 @@ def _write(tmp_path: Path, data: dict) -> Path:
     return path
 
 
+def _email(tmp_path: Path, document: dict) -> Path:
+    """A settings store holding this SMTP document."""
+    path = tmp_path / "settings.db"
+    settings_store.put(path, "email", "smtp", document)
+    return path
+
+
 def _store(tmp_path: Path, extensions: dict) -> Path:
     """A settings store holding these extensions."""
     path = tmp_path / "settings.db"
@@ -77,57 +84,13 @@ VALID_EXTENSIONS = {
 }
 
 
-# --- ${VAR} resolution ---
-# Config files name secrets instead of holding them: cover the value arriving and a clear failure when unset (via load_email_config; every loader shares resolve_section).
-
-
-def test_placeholder_is_replaced_with_the_environment_value(tmp_path: Path, monkeypatch):
-    monkeypatch.setenv("SMTP_PASSWORD", "s3cret")
-    path = _write(tmp_path, {**VALID_EMAIL, "password": "${SMTP_PASSWORD}"})
-
-    assert load_email_config(path).password == "s3cret"
-
-
-def test_placeholder_can_be_embedded_in_a_larger_string(tmp_path: Path, monkeypatch):
-    monkeypatch.setenv("MAIL_HOST", "mail.internal")
-    path = _write(tmp_path, {**VALID_EMAIL, "smtp_server": "smtp.${MAIL_HOST}.example"})
-
-    assert load_email_config(path).smtp_server == "smtp.mail.internal.example"
-
-
-def test_placeholders_resolve_inside_lists(tmp_path: Path, monkeypatch):
-    """Resolution walks the whole structure, so a key added later gets it
-    without touching this module."""
-    monkeypatch.setenv("ONCALL_EMAIL", "oncall@example.com")
-    path = _write(tmp_path, {**VALID_EMAIL, "to": ["team@example.com", "${ONCALL_EMAIL}"]})
-
-    assert load_email_config(path).to == ["team@example.com", "oncall@example.com"]
-
-
-def test_unset_variable_raises_naming_both_the_variable_and_the_key(tmp_path: Path, monkeypatch):
-    monkeypatch.delenv("SMTP_PASSWORD", raising=False)
-    path = _write(tmp_path, {**VALID_EMAIL, "password": "${SMTP_PASSWORD}"})
-
-    with pytest.raises(KeyError) as error:
-        load_email_config(path)
-
-    message = str(error.value)
-    assert "SMTP_PASSWORD" in message
-    assert "password" in message  # the JSON key, so you know where to look
-
-
-def test_empty_variable_raises_rather_than_yielding_a_blank_secret(tmp_path: Path, monkeypatch):
-    """An unset and a blank var are the same mistake ("SMTP_PASSWORD=" in .env); fail here, not at SMTP login."""
-    monkeypatch.setenv("SMTP_PASSWORD", "")
-    path = _write(tmp_path, {**VALID_EMAIL, "password": "${SMTP_PASSWORD}"})
-
-    with pytest.raises(ValueError, match="empty string"):
-        load_email_config(path)
+# --- email settings ---
+# Email settings live in the settings database as literal values; ${VAR} resolution (resolve_section) still serves the extension and file configs.
 
 
 def test_literal_empty_string_is_still_allowed(tmp_path: Path):
     """The documented escape hatch: write "" directly if empty is intended."""
-    path = _write(tmp_path, {**VALID_EMAIL, "password": ""})
+    path = _email(tmp_path, {**VALID_EMAIL, "password": ""})
 
     assert load_email_config(path).password == ""
 
@@ -208,7 +171,7 @@ def test_top_level_array_is_rejected(tmp_path: Path):
 def test_load_email_config_maps_from_to_from_address(tmp_path: Path):
     """``from`` is a Python keyword, so the dataclass field can't share its
     name - this is the one place that rename happens."""
-    path = _write(tmp_path, VALID_EMAIL)
+    path = _email(tmp_path, VALID_EMAIL)
 
     config = load_email_config(path)
 
@@ -223,7 +186,7 @@ def test_load_email_config_maps_from_to_from_address(tmp_path: Path):
 
 def test_missing_required_key_names_the_key(tmp_path: Path):
     incomplete = {k: v for k, v in VALID_EMAIL.items() if k != "smtp_server"}
-    path = _write(tmp_path, incomplete)
+    path = _email(tmp_path, incomplete)
     with pytest.raises(KeyError, match="smtp_server"):
         load_email_config(path)
 
@@ -231,7 +194,7 @@ def test_missing_required_key_names_the_key(tmp_path: Path):
 def test_to_may_be_omitted_entirely(tmp_path: Path):
     """A deployment mailing only caller-supplied addresses has no standing recipient list; requiring one would force an invented address."""
     no_to = {k: v for k, v in VALID_EMAIL.items() if k != "to"}
-    path = _write(tmp_path, no_to)
+    path = _email(tmp_path, no_to)
 
     config = load_email_config(path)
 
@@ -241,7 +204,7 @@ def test_to_may_be_omitted_entirely(tmp_path: Path):
 def test_to_and_domains_may_be_absent(tmp_path: Path):
     """Load time is the wrong place to reject this: send_email raises "No recipients" at the moment it matters."""
     no_to = {k: v for k, v in VALID_EMAIL.items() if k != "to"}
-    path = _write(tmp_path, {**no_to, "allowed_recipient_domains": ["example.com"]})
+    path = _email(tmp_path, {**no_to, "allowed_recipient_domains": ["example.com"]})
 
     config = load_email_config(path)
 
@@ -252,20 +215,20 @@ def test_to_and_domains_may_be_absent(tmp_path: Path):
 def test_password_may_be_omitted_entirely(tmp_path: Path):
     """An unauthenticated send is a real config (LAN relay); demanding the key would force a dummy password offered to a server without AUTH."""
     no_password = {k: v for k, v in VALID_EMAIL.items() if k != "password"}
-    path = _write(tmp_path, no_password)
+    path = _email(tmp_path, no_password)
 
     assert load_email_config(path).password == ""
 
 
 def test_security_defaults_to_starttls_on_a_submission_port(tmp_path: Path):
-    path = _write(tmp_path, VALID_EMAIL)
+    path = _email(tmp_path, VALID_EMAIL)
 
     assert load_email_config(path).security == "starttls"
 
 
 def test_port_465_infers_implicit_tls(tmp_path: Path):
     """465 is the implicit-TLS port every mainstream provider uses, so the port implies the transport."""
-    path = _write(tmp_path, {**VALID_EMAIL, "smtp_port": 465})
+    path = _email(tmp_path, {**VALID_EMAIL, "smtp_port": 465})
 
     assert load_email_config(path).security == "ssl"
 
@@ -273,13 +236,13 @@ def test_port_465_infers_implicit_tls(tmp_path: Path):
 def test_explicit_security_beats_the_port_inference(tmp_path: Path):
     """Inference is a convenience, not a rule: a relay can listen for
     STARTTLS on 465, and the config file has to win when it disagrees."""
-    path = _write(tmp_path, {**VALID_EMAIL, "smtp_port": 465, "security": "starttls"})
+    path = _email(tmp_path, {**VALID_EMAIL, "smtp_port": 465, "security": "starttls"})
 
     assert load_email_config(path).security == "starttls"
 
 
 def test_security_is_normalized(tmp_path: Path):
-    path = _write(tmp_path, {**VALID_EMAIL, "security": " SSL "})
+    path = _email(tmp_path, {**VALID_EMAIL, "security": " SSL "})
 
     assert load_email_config(path).security == "ssl"
 
@@ -287,7 +250,7 @@ def test_security_is_normalized(tmp_path: Path):
 def test_unsupported_security_is_rejected_rather_than_falling_back(tmp_path: Path):
     """A typo must not quietly become a plaintext connection: the password
     would go out in the clear and nothing in the run would say so."""
-    path = _write(tmp_path, {**VALID_EMAIL, "security": "tls"})
+    path = _email(tmp_path, {**VALID_EMAIL, "security": "tls"})
 
     with pytest.raises(ValueError, match="expected one of"):
         load_email_config(path)
@@ -295,13 +258,13 @@ def test_unsupported_security_is_rejected_rather_than_falling_back(tmp_path: Pat
 
 def test_single_recipient_string_is_accepted_as_a_list(tmp_path: Path):
     """A bare string is the obvious way to write one recipient; iterating it per character would be a nasty surprise."""
-    path = _write(tmp_path, {**VALID_EMAIL, "to": "solo@example.com"})
+    path = _email(tmp_path, {**VALID_EMAIL, "to": "solo@example.com"})
 
     assert load_email_config(path).to == ["solo@example.com"]
 
 
 def test_string_port_is_coerced_to_int(tmp_path: Path):
-    path = _write(tmp_path, {**VALID_EMAIL, "smtp_port": "587"})
+    path = _email(tmp_path, {**VALID_EMAIL, "smtp_port": "587"})
 
     assert load_email_config(path).smtp_port == 587
 
@@ -312,13 +275,13 @@ def test_string_port_is_coerced_to_int(tmp_path: Path):
 
 def test_omitting_allowed_recipient_domains_allows_no_domains(tmp_path: Path):
     """The dangerous default, tested directly: an absent key must mean "no domains", never "any domain"."""
-    path = _write(tmp_path, VALID_EMAIL)
+    path = _email(tmp_path, VALID_EMAIL)
 
     assert load_email_config(path).allowed_recipient_domains == []
 
 
 def test_allowed_recipient_domains_are_loaded_in_order(tmp_path: Path):
-    path = _write(tmp_path, {**VALID_EMAIL, "allowed_recipient_domains": ["example.com", "example.org"]})
+    path = _email(tmp_path, {**VALID_EMAIL, "allowed_recipient_domains": ["example.com", "example.org"]})
 
     assert load_email_config(path).allowed_recipient_domains == ["example.com", "example.org"]
 
@@ -326,7 +289,7 @@ def test_allowed_recipient_domains_are_loaded_in_order(tmp_path: Path):
 def test_domains_are_normalized_to_bare_lowercase(tmp_path: Path):
     """People write "@example.com" or ".example.com" as readily as the bare form, and domains are case-insensitive.
     A config that looks right but matches nothing is the worst outcome."""
-    path = _write(
+    path = _email(
         tmp_path,
         {
             **VALID_EMAIL,
@@ -343,7 +306,7 @@ def test_domains_are_normalized_to_bare_lowercase(tmp_path: Path):
 
 def test_blank_domain_entries_are_dropped(tmp_path: Path):
     """A leftover "" can only fail to match, but would appear in refusal messages."""
-    path = _write(tmp_path, {**VALID_EMAIL, "allowed_recipient_domains": ["", "  "]})
+    path = _email(tmp_path, {**VALID_EMAIL, "allowed_recipient_domains": ["", "  "]})
 
     assert load_email_config(path).allowed_recipient_domains == []
 
@@ -351,20 +314,9 @@ def test_blank_domain_entries_are_dropped(tmp_path: Path):
 def test_a_single_domain_string_is_accepted_as_a_list(tmp_path: Path):
     """Same reasoning as 'to': iterating a bare string character by
     character would produce a list of one-letter domains."""
-    path = _write(tmp_path, {**VALID_EMAIL, "allowed_recipient_domains": "example.com"})
+    path = _email(tmp_path, {**VALID_EMAIL, "allowed_recipient_domains": "example.com"})
 
     assert load_email_config(path).allowed_recipient_domains == ["example.com"]
-
-
-def test_domains_resolve_placeholders_and_are_still_normalized(tmp_path: Path):
-    """${VAR} resolution runs before normalization, so environment-supplied domains are treated like file-typed ones."""
-    data = {**VALID_EMAIL, "allowed_recipient_domains": ["${STAFF_DOMAIN}"]}
-    path = _write(tmp_path, data)
-
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setenv("STAFF_DOMAIN", "@Staff.Example")
-
-        assert load_email_config(path).allowed_recipient_domains == ["staff.example"]
 
 
 # --- extensions ---
@@ -833,3 +785,26 @@ def test_renamed_capability_does_not_override_a_new_entry_or_a_missing_file(tmp_
     settings_store.put(path, "capabilities", "media", {"enabled": True})
     migrate_renamed_capabilities(path)
     assert settings_store.read_all(path, "capabilities") == {"media": {"enabled": True}}
+
+
+def test_save_email_settings_merges_checks_and_keeps_the_rest(tmp_path: Path):
+    path = tmp_path / "settings.db"
+    from src.services.app_config import save_email_settings
+    save_email_settings(path, {"smtp_server": "smtp.example.com", "smtp_port": 587, "from": "a@example.com", "password": "pw"})
+
+    saved = save_email_settings(path, {"smtp_port": 465, "password": None})
+
+    assert saved == {"smtp_server": "smtp.example.com", "smtp_port": 465, "from": "a@example.com"}
+    assert load_email_config(path).security == "ssl" and load_email_config(path).password == ""
+
+
+def test_save_email_settings_refuses_a_bad_result_and_saves_nothing(tmp_path: Path):
+    path = tmp_path / "settings.db"
+    from src.services.app_config import email_document, save_email_settings
+    save_email_settings(path, {"smtp_server": "smtp.example.com", "smtp_port": 587, "from": "a@example.com"})
+
+    for bad in ({"smtp_port": "abc"}, {"security": "tls"}, {"from": None}, {"made_up": 1}):
+        with pytest.raises((KeyError, ValueError)):
+            save_email_settings(path, bad)
+
+    assert email_document(path) == {"smtp_server": "smtp.example.com", "smtp_port": 587, "from": "a@example.com"}

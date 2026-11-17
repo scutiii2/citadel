@@ -1,7 +1,7 @@
 # .env
 
-The actual credential values that `../configs/*.json` refers to by name
-via `${VAR}` placeholders (e.g. `"password": "${SMTP_PASSWORD}"`), plus
+The credential values that `../configs/*.json` refers to by name
+via `${VAR}` placeholders, plus
 the server's own deployment settings. One file, `mcp_server/.env`,
 gitignored; `.env.example` is the committed template with every variable
 and its explanation.
@@ -11,9 +11,8 @@ and its explanation.
 - **Internal API auth** - Ed25519 identity keys are generated automatically.
   `CITADEL_IDENTITY_DIR` holds the private key; `CITADEL_TRUST_DIR` distributes only public keys.
   Every internal request requires a short-lived service assertion; user calls also carry a signed requester token.
-- **SMTP** - `SMTP_PASSWORD`, backing `config_email.json`'s `"password"`.
-- **SSH** - `SSH_HOST_KEY_POLICY`, `SSH_KNOWN_HOSTS`. Applies to every SSH
-  connection this server makes (`services/ssh.py`). No credentials.
+- **Email** - not here. The SMTP server, sender and password are set on the Email page of Armory Admin and kept in
+  `settings.db`.
 
 `run.py` loads `.env` before anything else (`utils/env_file.py`). If it is
 missing, it is built once: from the old `.secrets/secret_*.env` files when

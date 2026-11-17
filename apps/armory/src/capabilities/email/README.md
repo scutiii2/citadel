@@ -22,16 +22,15 @@ standard [capability conventions](../README.md).
 
 | Sequence | Tool | Explanation |
 |---|---|---|
-| 1 | *(manual - no tool)* | Configure MCP SMTP and enable Email. |
+| 1 | *(manual - no tool)* | Set up SMTP on the Email page and enable Email. |
 | 2 | `tool_email_sendEmail` | Send the initial message; retain its Message-ID. |
 | 3 | `tool_email_replyEmail` | Send an update with its parent and optional references. Retain the new ID. |
 | 4 | `tool_email_getAuditLog` | Inspect your delivery metadata. |
 
 ## Configuration and integration
 
-Reads MCP's existing `configs/config_email.json` via `settings.email_config_path`.
-Use `configs/config_email.json` as the format reference, configuring SMTP
-host, port, From, password and security on MCP only. No config is created by a send.
+Reads the SMTP settings an administrator saved on the Email page of Armory Admin (`settings.db`, table `email`).
+No config is created by a send, and email stays unavailable until the page is filled in.
 Existing deployments must refresh capabilities and switch **Email** online; new
 example configurations enable it. Switching it offline blocks both local MCP
 notifications and Ember sends. SMTP config changes take effect per send.
