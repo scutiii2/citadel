@@ -28,7 +28,6 @@ import httpx
 from dotenv import dotenv_values
 
 from src.config import Settings
-from src.utils.config_loader import load_env_secrets
 from src.citadel_auth import service_client
 from src.services import service_auth
 

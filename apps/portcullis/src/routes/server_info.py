@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field, field_validator
 from src.config import Settings
 from src.deps import get_db_gateway, get_log_writer, get_server_tools, get_settings, require_any_permission, require_permission
 from src.models import Account
-from src.services.db_gateway import DbGatewayError, DocumentStore
+from src.services.db_gateway import DocumentStore
 from src.services.caller import Caller
 from src.services.log_service import LogWriter
 from src.services.mcp_server_info import McpServerInfo, McpServerRefused, McpServerUnavailable, is_server_path

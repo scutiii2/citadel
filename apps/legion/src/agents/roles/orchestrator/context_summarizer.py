@@ -7,7 +7,6 @@ import anyio
 
 from src.agents import agent_registry, agent_spec
 from src.agents.roles.orchestrator import delegation
-from src.runtime import internal_auth
 from src.providers import cancellation
 
 AGENT_ID = "context-summarizer"

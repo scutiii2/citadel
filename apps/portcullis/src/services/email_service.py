@@ -12,7 +12,7 @@ from typing import Protocol
 import httpx
 from src.citadel_auth import Keyring
 
-from src.services.mcp_session import identity_headers, mcp_session
+from src.services.mcp_session import mcp_session
 from src.services.traffic import TrafficRecorder
 
 

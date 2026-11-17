@@ -22,12 +22,10 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from src.config import Settings
 from src.deps import (
     get_log_writer,
     get_pricing,
     get_stronghold,
-    get_settings,
     get_settings_service,
     require_permission,
 )

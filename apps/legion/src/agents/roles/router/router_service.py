@@ -9,7 +9,7 @@ import anyio
 from src.agents import agent_spec
 from src.agents.roles.router.router_contract import DecisionOutcome, RouteRequest, RouteResponse
 from src.agents.roles.router.router_engine import RouterEngine
-from src.runtime import internal_auth, usage_log
+from src.runtime import usage_log
 from src.citadel_auth import current_caller
 from src.providers import cancellation
 from src.providers.decision import gateway_client as decision_gateway, strategy

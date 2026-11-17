@@ -11,7 +11,6 @@ from typing import Any
 
 import httpx
 from src.service_auth import authenticate
-from src.citadel_auth import requester_header
 from src.citadel_auth import verify_requester
 from src import service_auth
 

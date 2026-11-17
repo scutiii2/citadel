@@ -22,7 +22,6 @@ import anyio
 
 from src.agents import agent_registry, agent_spec
 from src.agents.roles.orchestrator import delegation, plan
-from src.runtime import internal_auth
 from src.providers.base_provider import ChatResult
 from src.tools.private_extensions import turn as private_turn
 

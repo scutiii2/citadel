@@ -11,7 +11,6 @@ from urllib.parse import quote
 
 import httpx
 from src.service_auth import authenticate
-from src.citadel_auth import requester_header
 
 Document = dict[str, Any]
 

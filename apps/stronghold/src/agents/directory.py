@@ -23,7 +23,6 @@ from typing import Any, Protocol
 
 import httpx
 from src.service_auth import authenticate
-from src.citadel_auth import requester_header
 
 logger = logging.getLogger(__name__)
 

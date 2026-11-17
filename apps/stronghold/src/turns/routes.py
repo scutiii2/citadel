@@ -25,7 +25,7 @@ from src.chats.store import ChatLimitError, ChatNotFound, ChatStore, message_tim
 from src.document_store import DbGatewayError, DocumentStore
 from src.extensions.service import UserExtensionService
 from src.requester import Requester, current_requester
-from src.tuning.limits import FIELDS as LIMIT_FIELDS, LimitsStore
+from src.tuning.limits import LimitsStore
 from src.turns import question_answers, suggestions, summarization
 from src.turns.engine import TooManyTurns, TurnConflict, TurnNotFound, TurnOptions, TurnRegistry
 from src.usage.limits import limit_reached

@@ -74,7 +74,7 @@ from src.services.session_service import SessionService
 from src.services.stronghold_forwarder import StrongholdForwarder, StrongholdUnavailable
 from src.services.usage_client import UsageUnavailable
 from src.services.traffic import TrafficMiddleware, TrafficRecorder
-from src.utils.config_loader import load_env_secrets, service_token
+from src.utils.config_loader import service_token
 
 logger = logging.getLogger(__name__)
 

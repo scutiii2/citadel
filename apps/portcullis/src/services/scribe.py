@@ -11,7 +11,7 @@ from collections.abc import Awaitable, Callable
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
-from fastapi import HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect
 from websockets.asyncio import client as websocket_client
 from websockets.exceptions import ConnectionClosed, WebSocketException
 
