@@ -97,8 +97,6 @@ services:
       CITADEL_IDENTITY_DIR: /identity
       AI_AGENT_ADVERTISE_URL: http://legion
       MCP_SERVER_URL: http://armory:29600/mcp
-      CONVERSATION_GATEWAY_URL: http://conversationgateway:29407
-      DECISION_GATEWAY_URL: http://decisiongateway:29406
       # Legion keeps each gateway's address and token, set by an admin, in Treasury.
       DB_GATEWAY_URL: http://treasury:29602
     # Lets legion reach host-published stacks as host.docker.internal.

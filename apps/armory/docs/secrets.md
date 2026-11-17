@@ -5,8 +5,8 @@ prefer to keep out of the database. One file, `mcp_server/.env`,
 gitignored; `.env.example` is the committed template with every variable
 and its explanation.
 
-- **Server** - `MCP_HOST`, `MCP_PORT`. Not secrets in the "must never
-  leak" sense, but deployment-specific and kept with the ones that are.
+- **Server** - not here. `host` and `port` are in the tracked `configs/config_app.json`; `MCP_HOST` and `MCP_PORT`
+  override them (Compose sets them).
 - **Internal API auth** - Ed25519 identity keys are generated automatically.
   `CITADEL_IDENTITY_DIR` holds the private key; `CITADEL_TRUST_DIR` distributes only public keys.
   Every internal request requires a short-lived service assertion; user calls also carry a signed requester token.

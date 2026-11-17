@@ -3,20 +3,17 @@
 from __future__ import annotations
 
 import logging
-import os
 
 import uvicorn
 
 from src.api import create_app
-
-DEFAULT_PORT = 29650
+from src.config import load_settings
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    host = os.getenv("STRONGHOLD_HOST", "127.0.0.1")
-    port = int(os.getenv("STRONGHOLD_PORT", str(DEFAULT_PORT)))
-    uvicorn.run(create_app(), host=host, port=port, log_level="info")
+    settings = load_settings()
+    uvicorn.run(create_app(settings=settings), host=settings.host, port=settings.port, log_level="info")
 
 
 if __name__ == "__main__":

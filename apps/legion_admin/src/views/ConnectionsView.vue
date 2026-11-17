@@ -4,6 +4,7 @@ import { agentsAdminClient } from "../api/AgentsAdminClient";
 const { gatewaySettings, setGatewaySettings, decisionGatewaySettings, setDecisionGatewaySettings } = agentsAdminClient;
 import GatewayConnectionCard from "../components/GatewayConnectionCard.vue";
 import ModelNamesCard from "../components/ModelNamesCard.vue";
+import TreasuryAddressCard from "../components/TreasuryAddressCard.vue";
 import PageLayout from "../components/PageLayout.vue";
 import "../components/infoPage.css";
 </script>
@@ -29,6 +30,7 @@ import "../components/infoPage.css";
         :load="decisionGatewaySettings"
         :store="setDecisionGatewaySettings"
       />
+      <TreasuryAddressCard />
       <ModelNamesCard />
     </div>
   </PageLayout>

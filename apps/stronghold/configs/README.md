@@ -1,16 +1,17 @@
 # configs
 
-`config_app.json` is tracked; there is no `.example` twin. Secrets (the tool service tokens) are not kept here
-but in `../.env` (see `../.env.example`). Restart Stronghold after editing.
+`config_app.json` is tracked; there is no `.example` twin. It holds only where Stronghold listens:
 
 | Key | Meaning |
 |---|---|
-| `usage.six_hour_token_limit`, `usage.weekly_token_limit` | Rolling token caps per account. 0 = unlimited. A new question over a cap gets `429`. |
-| `usage.max_context_tokens_per_chat`, `usage.auto_summarize_ratio` | Optional. When the last answer used this share (above 0, at most 1) of the smaller of the model's context window and the cap, the chat is summarized before the next question. |
-| `pricing.currency` | Must be `USD`. |
-| `pricing.models` | Price per model name, `input` and `output` in USD per 1,000,000 tokens. A model that is not listed has no cost estimate. |
+| `host` | Address to bind. `127.0.0.1` keeps Stronghold on this machine. |
+| `port` | Port to listen on. |
 
-Stronghold is the only owner of the usage limits and the price table. Portcullis keeps no copy: it reads the
-prices from `GET /usage/pricing` to price the chat messages it holds.
+`STRONGHOLD_HOST` and `STRONGHOLD_PORT` win over the file; Compose sets them. Restart Stronghold after editing.
 
-Stronghold's data and keys are not here: they are in `.data/stronghold/` in the Citadel folder.
+The usage limits and the price table are not here. An administrator sets them on the Usage settings page of Stronghold
+Admin and they are kept in `.data/stronghold/settings.db` (table `limits_and_prices`); a change is used at once.
+Stronghold is the only owner of both: Portcullis keeps no copy and reads the prices from `GET /usage/pricing` to price
+the chat messages it holds. The tool service tokens are on the Tool services page, not in `.env`.
+
+Stronghold's data and keys are in `.data/stronghold/` in the Citadel folder.

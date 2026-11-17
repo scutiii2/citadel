@@ -20,6 +20,7 @@ from src.extensions.probe import ExtensionProbe
 from src.agents.gateway import AgentGateway, McpAgentGateway
 from src.attachments import routes as attachments_routes
 from src import tool_tokens
+from src.usage import settings_routes as usage_settings_routes
 from src import tool_token_routes
 from src.attachments import services as tool_services
 from src.attachments.services import ArmoryUploads
@@ -167,6 +168,7 @@ def create_app(
     app.include_router(schema_routes.router)
     app.include_router(shares_routes.router)
     app.include_router(tickets_routes.router)
+    app.include_router(usage_settings_routes.router)
     app.include_router(tool_token_routes.router)
     app.include_router(tickets_routes.admin_router)
     app.include_router(triage_routes.router)

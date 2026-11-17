@@ -125,7 +125,6 @@ def test_routes_read_and_save_the_decision_gateway_settings(monkeypatch):
         stored.update(changes)
         return gateway_settings.GatewaySettings(stored.get("url", ""), stored.get("token", ""))
 
-    monkeypatch.delenv("DECISION_GATEWAY_URL", raising=False)
     monkeypatch.setattr(gateway_settings, "_read", read)
     monkeypatch.setattr(gateway_settings, "save", save)
     gateway_settings.reset_cache()

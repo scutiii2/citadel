@@ -46,6 +46,8 @@ from src.routes import (
     account_tuning,
     notes,
     server_info,
+    app_policy_routes,
+    stronghold_usage_settings,
     tool_token_routes,
     settings as settings_routes,
     shares,
@@ -224,6 +226,8 @@ def create_app(
     app.include_router(admin.router)
     app.include_router(agent_admin.router)
     app.include_router(tool_token_routes.router)
+    app.include_router(app_policy_routes.router)
+    app.include_router(stronghold_usage_settings.router)
     app.include_router(agent_admin.prompts_router)
     app.include_router(admin_tuning.router)
     app.include_router(admin_treasury.router)

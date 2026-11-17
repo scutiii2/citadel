@@ -2,10 +2,7 @@
   "host": "0.0.0.0",
   "port": 29601,
   "session_cookie_name": "ember_session",
-  "session_hours": 12,
   "cookie_secure": false,
-  "default_role": "Member",
-  "require_email_verification": false,
   "agents_registry_path": "/agent_data/agent_registry.json",
   "mcp_server_url": "http://armory:29600/mcp",
   "stronghold_url": "http://stronghold:29650",
@@ -21,14 +18,6 @@
       "127.0.0.1",
       "::1",
       "172.28.0.0/16"
-    ],
-    "rate_limit": {
-      "scope": "account"
-    }
-  },
-  "backup": {
-    "enabled": true,
-    "keep": 14,
-    "every_hours": 24
+    ]
   }
 }

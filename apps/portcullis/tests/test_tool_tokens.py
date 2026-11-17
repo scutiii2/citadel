@@ -66,3 +66,24 @@ def test_every_tool_token_route_needs_settings_manage(client_factory, email, ups
     assert member.put("/api/admin/tool-tokens", json={"bard": "x"}).status_code == 403
     assert member.put("/api/admin/stronghold-tool-tokens", json={"bard": "x"}).status_code == 403
     assert len(upstream.requests) == served
+
+
+def test_stronghold_usage_settings_pass_through_log_the_sections_and_need_settings_manage(client_factory, email, upstream) -> None:
+    def stronghold(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"path": request.url.path, "method": request.method})
+
+    upstream.handler = stronghold
+    admin = as_admin(client_factory())
+
+    assert admin.get("/api/admin/stronghold-usage-settings").json()["path"] == "/admin/usage-settings"
+    assert admin.put("/api/admin/stronghold-usage-settings", json={"usage": {"weekly_token_limit": 9}}).status_code == 200
+    assert json.loads(upstream.requests[-1].content) == {"usage": {"weekly_token_limit": 9}}
+    uid = admin.get("/api/auth/me").json()["id"]
+    logged = " ".join(entry["message"] for entry in admin.get("/api/logs/action", params={"actor": uid}).json())
+    assert "Changed Stronghold usage settings (usage)" in logged
+
+    member = client_factory()
+    make_member(member, email)
+    login(member, "alice")
+    assert member.get("/api/admin/stronghold-usage-settings").status_code == 403
+    assert member.put("/api/admin/stronghold-usage-settings", json={"usage": {}}).status_code == 403

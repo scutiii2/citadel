@@ -1,4 +1,5 @@
-"""The "usage" and "pricing" blocks of Stronghold's config.
+"""The usage limits and the price table. An administrator edits them in Stronghold Admin; they are kept in the
+settings database (see usage/admin_settings.py).
 
 `usage` holds the token limits (0 = unlimited). `pricing` holds model prices per million
 tokens; a model without a price has no cost estimate.
@@ -74,6 +75,10 @@ class Pricing:
     """Read-time cost estimates; a derived price is never stored."""
 
     def __init__(self, settings: PricingSettings) -> None:
+        self.replace(settings)
+
+    def replace(self, settings: PricingSettings) -> None:
+        """Use this table from the next estimate on (the admin page changed it)."""
         self.currency = settings.currency
         self._models = dict(settings.models)
         self._folded = {model.casefold(): price for model, price in self._models.items()}

@@ -147,7 +147,7 @@ process restart. Cancellation is cooperative and may finish after the response.
 
 ## Usage cost estimates
 
-Prices live only in Stronghold's `pricing` block (`apps/stronghold/configs/config_app.json`); Portcullis reads them from `GET /usage/pricing` for the cost on chat messages and the Usage page. Fill it with your model names and separate
+Prices live only in Stronghold (Stronghold Admin > Usage settings); Portcullis reads them from `GET /usage/pricing` for the cost on chat messages and the Usage page. Fill it with your model names and separate
 `input` / `output` prices in **USD per 1,000,000 tokens** (`currency: "USD"`).
 The shipped
 `example-model` entry is a placeholder. Fill in real names and prices yourself,
@@ -654,7 +654,7 @@ operation verifies Portcullis's requester token, including per-tool MCP metadata
     out for the lockout time, so someone can lock a known username out on
     purpose; and any member with `tools.use` can run any tool (that is what the
     permission means; "ask before each tool" is opt-in per chat).
-- **Backups:** the `backup` block in `config_app.json` copies the database
+- **Backups:** the backup settings (Portcullis Admin > Workspace settings) copy the database
   every 24 hours (default) into `.data/portcullis/backups` and keeps 14. See the config
   README. `python -m scripts.backup_db` makes one now. The Config issues page
   warns when backups are off, when `cookie_secure` is off on a host other
@@ -690,7 +690,7 @@ migrations build, so a model edit without its migration is caught.
 ## Layout
 
 ```
-configs/   config_app.json                    host, session/cookie settings, URLs, security, backup
+configs/   config_app.json                    host, port, cookie, URLs, trusted proxies (the rest is in Admin)
 .env       BOOTSTRAP_ADMIN_* (+ .env.example); secrets/ is the old layout, read once to build it
            (runtime data - ember_api.db, backups - is in .data/portcullis/ of the Citadel folder)
 src/

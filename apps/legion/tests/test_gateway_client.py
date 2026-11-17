@@ -9,6 +9,7 @@ import httpx
 import pytest
 
 from src.providers import gateway_client
+from src.runtime import gateway_settings
 from src.providers.gateway_client import ConversationGatewayClient, GatewayCallError
 
 # conftest replaces is_saved for every test; these tests check the real one.
@@ -24,8 +25,8 @@ def ndjson(*events: dict) -> bytes:
 
 @pytest.fixture(autouse=True)
 def env(monkeypatch):
-    monkeypatch.setenv("CONVERSATION_GATEWAY_URL", "http://gateway.test:29407/")
-    monkeypatch.setenv("CONVERSATION_GATEWAY_TOKEN", "cg_test")
+    monkeypatch.setattr(gateway_settings, "_cache", {gateway_settings.KEY: (
+        gateway_settings.GatewaySettings("http://gateway.test:29407", "cg_test"), float("inf"))})
     gateway_client.reset_cache()
     yield
     gateway_client.reset_cache()

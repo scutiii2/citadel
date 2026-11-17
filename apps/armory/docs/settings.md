@@ -45,5 +45,5 @@ Downloads are cache: `.cache/armory/media_downloader/`; logs are in `.data/armor
 
 ## What stays in `.env`
 
-Only what must exist before an administrator can log in or Armory can start: the host and port, and any key a capability
-reads that you prefer to keep out of the database. `.env.example` lists them. Never put a real value in a tracked file.
+Only what you prefer to keep out of the database. Where Armory listens (`host`, `port`) is in the tracked
+`configs/config_app.json`. `.env.example` lists them. Never put a real value in a tracked file.

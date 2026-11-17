@@ -6,9 +6,13 @@ for a short time, so an edit reaches all agents without a restart. The token is
 write-only: `view()` reports only whether one is set.
 
 Each service has its own record (`KEY` or `DECISION_KEY`, the `which` argument
-below). Environment values (`CONVERSATION_GATEWAY_URL` / `DECISION_GATEWAY_URL`,
-which the compose file sets, and the matching `..._TOKEN`) fill in whatever the
-record does not hold, and are all Legion has while Treasury cannot be reached.
+below). Whatever the record does not hold is the default address and no token, and
+that is all Legion has while Treasury cannot be reached. No environment variable
+names a gateway.
+
+Where Treasury itself is: `treasury_address()`. An administrator saves it on the
+Connections page (Legion's own settings database); the `DB_GATEWAY_URL` environment
+variable, which the compose file sets, is only the starting value.
 """
 
 from __future__ import annotations
@@ -22,7 +26,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from src.runtime import internal_auth
-from src.citadel_auth import AuthError, ServiceAuth, service_client
+from src.citadel_auth import AuthError, ServiceAuth, service_client, settings_store
 
 DEFAULT_URL = "http://127.0.0.1:29407"
 INSTANCE = "legion"
@@ -30,11 +34,14 @@ CONNECTION = "data"
 COLLECTION = "legion_settings"
 KEY = "conversation_gateway"
 DECISION_KEY = "decision_gateway"
-# Record key -> (URL variable, token variable, URL used when nothing is set).
+# Record key -> the URL used when the record holds none.
 _SERVICES = {
-    KEY: ("CONVERSATION_GATEWAY_URL", "CONVERSATION_GATEWAY_TOKEN", DEFAULT_URL),
-    DECISION_KEY: ("DECISION_GATEWAY_URL", "DECISION_GATEWAY_TOKEN", "http://127.0.0.1:29406"),
+    KEY: DEFAULT_URL,
+    DECISION_KEY: "http://127.0.0.1:29406",
 }
+DEFAULT_TREASURY_URL = "http://127.0.0.1:29602"
+ENVIRONMENT_TABLE = "environment"
+TREASURY_KEY = "db_gateway_url"
 MAX_TOKEN_LENGTH = 512
 
 _TIMEOUT = httpx.Timeout(3.0)
@@ -59,8 +66,38 @@ class GatewaySettings:
     token: str
 
 
+def treasury_address() -> str:
+    """Where Treasury is: the address saved on the Connections page, else `DB_GATEWAY_URL`, else the local default."""
+    from src.runtime import config_files
+
+    try:
+        saved = settings_store.read_all(config_files.SETTINGS_DB, ENVIRONMENT_TABLE).get(TREASURY_KEY)
+    except Exception:  # noqa: BLE001 - an unreadable settings file must not stop Legion from reaching Treasury
+        saved = None
+    return str(saved or os.getenv("DB_GATEWAY_URL") or DEFAULT_TREASURY_URL).rstrip("/")
+
+
+def treasury_view() -> dict[str, Any]:
+    """What the Connections page shows: the address in use and whether it was saved there."""
+    from src.runtime import config_files
+
+    saved = settings_store.read_all(config_files.SETTINGS_DB, ENVIRONMENT_TABLE).get(TREASURY_KEY)
+    return {"url": treasury_address(), "stored": bool(saved)}
+
+
+def save_treasury_address(value: Any) -> dict[str, Any]:
+    """Save the address of Treasury (None goes back to `DB_GATEWAY_URL` or the default). Used by the next request."""
+    from src.runtime import config_files
+
+    if value is None:
+        settings_store.delete(config_files.SETTINGS_DB, ENVIRONMENT_TABLE, TREASURY_KEY)
+    else:
+        settings_store.put(config_files.SETTINGS_DB, ENVIRONMENT_TABLE, TREASURY_KEY, _checked_url(value))
+    return treasury_view()
+
+
 def _record_url(which: str = KEY) -> str:
-    base = (os.getenv("DB_GATEWAY_URL") or "http://127.0.0.1:29602").rstrip("/")
+    base = treasury_address()
     return f"{base}/instances/{INSTANCE}/connections/{CONNECTION}/collections/{COLLECTION}/records/{which}"
 
 
@@ -69,11 +106,10 @@ def _headers() -> dict[str, str]:
 
 
 def _from_doc(doc: Any, which: str = KEY) -> GatewaySettings:
-    """The record's values, with the environment filling the gaps."""
+    """The record's values, with the default address filling the gap."""
     doc = doc if isinstance(doc, dict) else {}
-    url_env, token_env, default_url = _SERVICES[which]
-    url = doc.get("url") or os.getenv(url_env) or default_url
-    token = doc.get("token") or os.getenv(token_env) or ""
+    url = doc.get("url") or _SERVICES[which]
+    token = doc.get("token") or ""
     return GatewaySettings(str(url).rstrip("/"), str(token))
 
 

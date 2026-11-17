@@ -26,9 +26,6 @@ _AGENT_FILE.write_text(
 os.environ.setdefault("AI_AGENT_FILE", str(_AGENT_FILE))
 os.environ.setdefault("AI_AGENT_PROVIDER", "anthropic")
 os.environ.setdefault("CLAUDE_API_KEY", "test-key")
-# Tests never reach a real ConversationGateway: nothing listens on the discard port.
-os.environ["CONVERSATION_GATEWAY_URL"] = "http://127.0.0.1:9"
-os.environ["DECISION_GATEWAY_URL"] = "http://127.0.0.1:9"
 
 
 import pytest  # noqa: E402
@@ -110,3 +107,13 @@ def _no_treasury(monkeypatch):
     gateway_settings.reset_cache()
     yield
     gateway_settings.reset_cache()
+
+
+@pytest.fixture(autouse=True)
+def gateways_are_unreachable(monkeypatch):
+    """Tests never reach a real ConversationGateway or DecisionGateway: nothing listens on the discard port."""
+    from src.runtime import gateway_settings
+
+    unreachable = gateway_settings.GatewaySettings("http://127.0.0.1:9", "")
+    monkeypatch.setattr(gateway_settings, "_cache", {
+        gateway_settings.KEY: (unreachable, float("inf")), gateway_settings.DECISION_KEY: (unreachable, float("inf"))})

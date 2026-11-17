@@ -40,8 +40,6 @@ def treasury(monkeypatch):
     monkeypatch.setattr(settings, "_TRANSPORT", httpx.MockTransport(fake))
     monkeypatch.setattr(settings, "_SYNC_TRANSPORT", httpx.MockTransport(fake))
     monkeypatch.setenv("DB_GATEWAY_URL", "http://treasury.test:29602/")
-    monkeypatch.delenv("CONVERSATION_GATEWAY_URL", raising=False)
-    monkeypatch.delenv("CONVERSATION_GATEWAY_TOKEN", raising=False)
     settings.reset_cache()
     yield fake
     settings.reset_cache()
@@ -59,16 +57,14 @@ def test_reads_the_record_with_the_internal_token(treasury):
                       algorithms=["EdDSA"], audience="treasury")["iss"] == "legion"
 
 
-def test_the_environment_fills_what_the_record_lacks(treasury, monkeypatch):
-    monkeypatch.setenv("CONVERSATION_GATEWAY_URL", "http://conversationgateway:29407")
-    monkeypatch.setenv("CONVERSATION_GATEWAY_TOKEN", "cg_env")
-    assert settings.current_sync() == settings.GatewaySettings("http://conversationgateway:29407", "cg_env")
-    settings.reset_cache()
+def test_the_default_address_fills_what_the_record_lacks_and_no_environment_variable_names_a_gateway(treasury, monkeypatch):
+    monkeypatch.setenv("CONVERSATION_GATEWAY_URL", "http://ignored:1")
+    monkeypatch.setenv("CONVERSATION_GATEWAY_TOKEN", "ignored")
     treasury.doc = {"token": "cg_saved"}
-    assert asyncio.run(settings.current()) == settings.GatewaySettings("http://conversationgateway:29407", "cg_saved")
+    assert asyncio.run(settings.current()) == settings.GatewaySettings(settings.DEFAULT_URL, "cg_saved")
 
 
-def test_no_record_and_no_environment_gives_the_defaults(treasury):
+def test_no_record_gives_the_defaults(treasury):
     assert settings.current_sync() == settings.GatewaySettings(settings.DEFAULT_URL, "")
 
 
@@ -138,12 +134,11 @@ def test_routes_read_and_save_without_showing_the_token(treasury):
     assert refused.status_code == 400 and "http(s)" in refused.json()["error"]
 
 
-def test_the_decision_gateway_has_its_own_record_and_environment(treasury, monkeypatch):
-    monkeypatch.setenv("DECISION_GATEWAY_URL", "http://decisiongateway:29406")
+def test_the_decision_gateway_has_its_own_record(treasury):
     which = settings.DECISION_KEY
-    assert settings.current_sync(which) == settings.GatewaySettings("http://decisiongateway:29406", "")
+    assert settings.current_sync(which) == settings.GatewaySettings("http://127.0.0.1:29406", "")
     assert str(treasury.requests[0].url).endswith("/records/decision_gateway")
     saved = asyncio.run(settings.save({"token": "dg_new"}, which))
-    assert saved == settings.GatewaySettings("http://decisiongateway:29406", "dg_new")
+    assert saved == settings.GatewaySettings("http://127.0.0.1:29406", "dg_new")
     assert str(treasury.requests[-1].url).endswith("/records/decision_gateway")
     assert settings._fresh(settings.KEY) is None  # the other service's cache is untouched

@@ -2,10 +2,7 @@
   "host": "127.0.0.1",
   "port": 29601,
   "session_cookie_name": "ember_session",
-  "session_hours": 12,
   "cookie_secure": false,
-  "default_role": "Member",
-  "require_email_verification": true,
   "mcp_server_url": "http://127.0.0.1:29600/mcp",
   "stronghold_url": "http://127.0.0.1:29650",
   "bard_url": "http://127.0.0.1:29400",
@@ -19,34 +16,6 @@
     "trusted_proxies": [
       "127.0.0.1",
       "::1"
-    ],
-    "rate_limit": {
-      "enabled": true,
-      "scope": "both",
-      "max_attempts": 5,
-      "window_seconds": 900,
-      "lockout_seconds": 900
-    },
-    "ip_filter": {
-      "allow_list": [],
-      "deny_list": []
-    },
-    "headers": {
-      "enabled": true,
-      "hsts_max_age": 0
-    },
-    "fingerprint": {
-      "enabled": true,
-      "signals": [
-        "user_agent",
-        "accept_language",
-        "ip_subnet"
-      ]
-    }
-  },
-  "backup": {
-    "enabled": true,
-    "keep": 14,
-    "every_hours": 24
+    ]
   }
 }

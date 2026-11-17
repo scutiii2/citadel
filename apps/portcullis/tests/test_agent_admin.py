@@ -298,3 +298,31 @@ def test_model_names_pass_through_are_admin_only_and_logged(client_factory, emai
     login(member, "alice")
     assert member.get("/api/admin/model-names").status_code == 403
     assert member.put("/api/admin/model-names", json={"VLLM_MODEL_DEFAULT": "x"}).status_code == 403
+
+
+def test_treasury_address_passes_through_is_admin_only_and_logged(client_factory, email, upstream) -> None:
+    def agent(request: httpx.Request) -> httpx.Response:
+        if request.url.path != "/agents/treasury-address":
+            return ai_agent(request)
+        if request.method == "GET":
+            return httpx.Response(200, json={"url": "http://127.0.0.1:29602", "stored": False})
+        if json.loads(request.content)["url"] == "ftp://x":
+            return httpx.Response(400, json={"error": "url must be an http(s) address"})
+        return httpx.Response(200, json={"url": "http://treasury:29602", "stored": True})
+
+    upstream.handler = agent
+    admin = as_admin(client_factory())
+
+    assert admin.get("/api/admin/treasury-address").json()["stored"] is False
+    assert admin.put("/api/admin/treasury-address", json={"url": "http://treasury:29602"}).json()["stored"] is True
+    assert json.loads(upstream.requests[-1].content) == {"url": "http://treasury:29602"}
+    assert admin.put("/api/admin/treasury-address", json={"url": None}).status_code == 200
+    refused = admin.put("/api/admin/treasury-address", json={"url": "ftp://x"})
+    assert (refused.status_code, refused.json()["detail"]) == (400, "url must be an http(s) address")
+    assert admin.put("/api/admin/treasury-address", json={"url": "http://x", "other": 1}).status_code == 422
+
+    member = client_factory()
+    make_member(member, email)
+    login(member, "alice")
+    assert member.get("/api/admin/treasury-address").status_code == 403
+    assert member.put("/api/admin/treasury-address", json={"url": None}).status_code == 403

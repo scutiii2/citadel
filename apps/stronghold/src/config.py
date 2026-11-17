@@ -1,7 +1,6 @@
-"""Stronghold's settings: addresses from the environment, feature blocks from a JSON file.
-
-The file is `configs/config_app.json` (or `STRONGHOLD_CONFIG`). A missing file means defaults.
-"""
+"""Stronghold's settings: host and port from `configs/config_app.json` (or `STRONGHOLD_CONFIG`), addresses from the
+environment, and the usage limits and price table from the settings database (edited in Stronghold Admin).
+A missing file means defaults."""
 
 from __future__ import annotations
 
@@ -12,6 +11,7 @@ from pathlib import Path
 
 from src.citadel_auth import apply_root_env, data_dir as _data_dir
 
+from src.usage import admin_settings
 from src.usage.settings import PricingSettings, UsageSettings
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
@@ -20,6 +20,9 @@ apply_root_env(PROJECT_DIR)  # the Citadel root .env overrides this service's .e
 
 @dataclass(frozen=True)
 class Settings:
+    # Where Stronghold listens. STRONGHOLD_HOST and STRONGHOLD_PORT win over the file (Compose sets them).
+    host: str = "127.0.0.1"
+    port: int = 29650
     portcullis_url: str = "http://127.0.0.1:29601"
     db_gateway_url: str = "http://127.0.0.1:29602"
     armory_url: str = "http://127.0.0.1:29600"
@@ -44,7 +47,11 @@ def load_settings() -> Settings:
     if not isinstance(raw, dict):
         raise ValueError(f"{path.name} must contain a JSON object")
     base = Settings()
+    data_dir = Path(os.getenv("STRONGHOLD_DATA_DIR") or base.data_dir)
+    usage, pricing = admin_settings.load(data_dir / "settings.db")
     return Settings(
+        host=os.getenv("STRONGHOLD_HOST") or str(raw.get("host", base.host)),
+        port=int(os.getenv("STRONGHOLD_PORT") or raw.get("port", base.port)),
         portcullis_url=os.getenv("PORTCULLIS_URL") or base.portcullis_url,
         db_gateway_url=os.getenv("DB_GATEWAY_URL") or base.db_gateway_url,
         armory_url=os.getenv("ARMORY_URL") or base.armory_url,
@@ -53,7 +60,7 @@ def load_settings() -> Settings:
         reader_url=os.getenv("READER_URL") or base.reader_url,
         agents_registry_path=Path(os.getenv("AGENTS_REGISTRY_PATH") or base.agents_registry_path),
         agents_registry_url=os.getenv("AGENTS_REGISTRY_URL") or None,
-        data_dir=Path(os.getenv("STRONGHOLD_DATA_DIR") or base.data_dir),
-        usage=UsageSettings.from_config(raw.get("usage", {})),
-        pricing=PricingSettings.from_config(raw.get("pricing", {})),
+        data_dir=data_dir,
+        usage=usage,
+        pricing=pricing,
     )

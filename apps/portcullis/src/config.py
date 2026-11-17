@@ -167,6 +167,10 @@ def load_settings() -> Settings:
     raw = load_json_config(CONFIGS_DIR / "config_app.json")
     ensure_env_file(ENV_PATH, ENV_PATH.with_name(".env.example"), LEGACY_SECRETS_DIR)
     database_path = _project_path(raw["database_path"]) if raw.get("database_path") else data_dir(PROJECT_DIR) / "ember_api.db"
+    # The policy settings an administrator edits (session length, rate limit, backups...) are not in the file.
+    from src.services import app_policy  # here, not at the top: app_policy imports this module
+
+    raw = app_policy.overlay(raw, database_path.parent / "settings.db")
     registry_path = raw.get("agents_registry_path") or data_dir(PROJECT_DIR.parent / "legion") / "agent_registry.json"
     return Settings(
         host=os.getenv("EMBER_API_HOST") or raw.get("host", "127.0.0.1"),

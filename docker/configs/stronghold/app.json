@@ -1,16 +1,4 @@
 {
-  "usage": {
-    "six_hour_token_limit": 1000000,
-    "weekly_token_limit": 5000000,
-    "max_context_tokens_per_chat": 150000,
-    "auto_summarize_ratio": 0.6
-  },
-  "pricing": {
-    "currency": "USD",
-    "models": {
-      "claude-haiku-5-5": { "input": 0.0, "output": 0.0 },
-      "claude-sonnet-5-5": { "input": 0.0, "output": 0.0 },
-      "claude-opus-5-5": { "input": 0.0, "output": 0.0 }
-    }
-  }
+  "host": "0.0.0.0",
+  "port": 29650
 }

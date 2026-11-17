@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -17,6 +18,20 @@ CACHE = cache_dir(_PROJECT)
 
 
 
+def _app_file() -> dict:
+    """configs/config_app.json: where Armory listens. A missing file means the defaults."""
+    path = _PROJECT / "configs" / "config_app.json"
+    if not path.is_file():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"{path.name} must contain a JSON object")
+    return raw
+
+
+_APP = _app_file()
+
+
 def _env(name: str, default: str) -> str:
     """os.getenv, but an empty value counts as unset.
     A blank line like ``MCP_LOG_DIR=`` would otherwise override a default with Path("")."""
@@ -28,8 +43,9 @@ def _env(name: str, default: str) -> str:
 class Settings:
     # Loopback by default: this server has no auth, so anything reaching the port can call every tool.
     # Set MCP_HOST to expose it only behind a reverse proxy, VPN or firewall that authenticates.
-    host: str = _env("MCP_HOST", "127.0.0.1")
-    port: int = int(_env("MCP_PORT", "29600"))
+    # MCP_HOST and MCP_PORT win over configs/config_app.json (Compose sets them).
+    host: str = _env("MCP_HOST", str(_APP.get("host", "127.0.0.1")))
+    port: int = int(_env("MCP_PORT", str(_APP.get("port", 29600))))
     # Where logging_setup.configure_logging() writes server.log and errors.report() writes per-reference files.
     # Relative to CWD like the paths above.
     log_dir: Path = Path(_env("MCP_LOG_DIR", str(DATA / "logs")))

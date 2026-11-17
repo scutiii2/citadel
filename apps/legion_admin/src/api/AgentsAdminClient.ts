@@ -139,6 +139,10 @@ export const agentsAdminClient = {
   saveServer: (id: string, entry: McpServer) =>
     apiRequest<{ saved: string }>("PUT", `/api/admin/servers/${encodeURIComponent(id)}`, entry),
   removeServer: (id: string) => apiRequest<{ deleted: string }>("DELETE", `/api/admin/servers/${encodeURIComponent(id)}`),
+  /** Where Legion reaches Treasury. `stored` is false while the environment's or the default address is in use. */
+  treasuryAddress: () => apiRequest<{ url: string; stored: boolean }>("GET", "/api/admin/treasury-address"),
+  /** `null` goes back to the environment's address or the default. Used by Legion's next request. */
+  setTreasuryAddress: (url: string | null) => apiRequest<{ url: string; stored: boolean }>("PUT", "/api/admin/treasury-address", { url }),
   modelNames: async () => (await apiRequest<{ models: ModelName[] }>("GET", "/api/admin/model-names")).models,
   /** A null value removes the saved name. An agent uses a change when it next starts. */
   setModelNames: async (changes: Record<string, string | null>) =>
