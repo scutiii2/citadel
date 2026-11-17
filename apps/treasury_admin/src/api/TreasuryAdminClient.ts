@@ -50,7 +50,20 @@ export interface ConnectionsView {
   applies?: string;
 }
 
+export interface ServiceRow {
+  name: string;
+  url: string;
+  source: "pinned" | "registered" | "default";
+  registered: string | null;
+  pinned: string | null;
+}
+
+export interface ServicesView { services: ServiceRow[]; }
+
 export const treasuryAdminClient = {
+  getServices: () => apiRequest<ServicesView>("GET", "/api/admin/treasury/services"),
+  putService: (name: string, url: string) => apiRequest<ServicesView>("PUT", `/api/admin/treasury/services/${encodeURIComponent(name)}`, { url }),
+  deleteService: (name: string) => apiRequest<ServicesView>("DELETE", `/api/admin/treasury/services/${encodeURIComponent(name)}`),
   get: () => apiRequest<TreasuryView>("GET", "/api/admin/treasury"),
   connections: () => apiRequest<ConnectionsView>("GET", "/api/admin/treasury/connections"),
   saveConnection: (name: string, spec: ConnectionSpec) =>

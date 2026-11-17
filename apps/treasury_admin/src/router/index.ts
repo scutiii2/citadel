@@ -14,6 +14,7 @@ declare module "vue-router" {
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: "/services", name: "services", component: () => import("../views/ServicesView.vue"), meta: { permission: "settings.manage" } },
     { path: "/", redirect: "/instances" },
     { path: "/instances", name: "instances", component: () => import("../views/InstancesView.vue"), meta: { permission: "settings.manage" } },
     { path: "/connections", name: "connections", component: () => import("../views/ConnectionsView.vue"), meta: { permission: "settings.manage" } },
