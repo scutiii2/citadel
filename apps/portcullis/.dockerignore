@@ -9,7 +9,6 @@ tests/
 node_modules/
 .env
 .data/
-data/
 *.db
 *.db-*
 *.tmp

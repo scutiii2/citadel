@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from src.capabilities.tickets.utils.config import DEFAULT_TAGS, load_ticket_config
 
 
-def test_missing_file_gives_defaults(tmp_path):
-    config = load_ticket_config(tmp_path / "config_tickets.json")
+def test_no_settings_give_defaults():
+    config = load_ticket_config()
 
     assert config.tags == DEFAULT_TAGS
     assert 2 <= len(config.tags) <= 10
@@ -20,11 +18,8 @@ def test_missing_file_gives_defaults(tmp_path):
     assert config.laya_timeout_seconds == 20.0
 
 
-def test_file_overrides_only_what_it_names(tmp_path):
-    path = tmp_path / "c.json"
-    path.write_text(json.dumps({"auto_hourly_cap": 2, "laya": {"candidates": 3}}))
-
-    config = load_ticket_config(path)
+def test_settings_override_only_what_they_name():
+    config = load_ticket_config({"auto_hourly_cap": 2, "laya": {"candidates": 3}})
 
     assert config.auto_hourly_cap == 2
     assert config.laya_candidates == 3
@@ -45,17 +40,17 @@ def test_file_overrides_only_what_it_names(tmp_path):
         {"laya": {"timeout_seconds": 0}},
     ],
 )
-def test_bad_values_are_rejected(tmp_path, raw):
-    path = tmp_path / "c.json"
-    path.write_text(json.dumps(raw))
-
+def test_bad_values_are_rejected(raw):
     with pytest.raises(ValueError):
-        load_ticket_config(path)
+        load_ticket_config(raw)
 
 
-def test_invalid_json_is_rejected(tmp_path):
-    path = tmp_path / "c.json"
-    path.write_text("{nope")
+def test_a_non_object_is_rejected():
+    with pytest.raises(ValueError, match="must be an object"):
+        load_ticket_config(["tags"])
 
-    with pytest.raises(ValueError, match="not valid JSON"):
-        load_ticket_config(path)
+
+def test_the_document_round_trips():
+    config = load_ticket_config({"auto_hourly_cap": 2})
+
+    assert load_ticket_config(config.document()) == config

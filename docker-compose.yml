@@ -30,9 +30,6 @@ services:
       DB_GATEWAY_CONNECTION: stronghold
       STRONGHOLD_URL: http://stronghold:29650
     volumes:
-      # Defaults only. The Extensions and Capabilities pages save their changes to .data/armory/config/.
-      - ./docker/configs/armory/extensions.json:/app/configs/config_extensions.json:ro
-      - ./docker/configs/armory/capabilities.json:/app/configs/config_capabilities.json:ro
       - ${CITADEL_DATA_DIR:-./.data}/armory:/app/.data
       - ${CITADEL_CACHE_DIR:-./.cache}/armory:/app/.cache
       - identity_armory:/identity:rw
@@ -108,7 +105,6 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./docker/configs/legion/servers.json:/app/configs/config_servers.json:ro
       - identity_legion:/identity:rw
       - ./.env:/citadel.env:ro
       - trust_armory:/trust/armory:ro

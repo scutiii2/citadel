@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient
 from src.app import create_app
 from src.db import Database
 from src.services.migrations import MigrationRunner
-from src.config import BackupSettings, PricingSettings, SecuritySettings, Settings, UsageSettings
+from src.config import BackupSettings, SecuritySettings, Settings
 from src.services import otp_service
 from src.services.caller import Caller
 from src.services.email_service import EmailDeliveryError
@@ -196,6 +196,12 @@ class FakeDbGateway:
     async def instances(self):
         return self.instances_seen
 
+    async def set_instance(self, name, connections):
+        self.instances_seen[name] = list(connections)
+
+    async def delete_instance(self, name):
+        self.instances_seen.pop(name, None)
+
     async def get(self, collection, key):
         doc = self.records.get((collection, key))
         return None if doc is None else json.loads(json.dumps(doc))
@@ -245,8 +251,6 @@ def make_settings(
     admin_password: str = ADMIN_PASSWORD,
     session_hours: int = 12,
     security: SecuritySettings | None = None,
-    usage: UsageSettings | None = None,
-    pricing: PricingSettings | None = None,
     backup: BackupSettings | None = None,
     require_email_verification: bool = True,
 ) -> Settings:
@@ -275,8 +279,6 @@ def make_settings(
         agents_registry_path=registry,
         mcp_server_url=MCP_SERVER_URL,
         security=security or SecuritySettings(),
-        usage=usage or UsageSettings(),
-        pricing=pricing or PricingSettings(),
         # Off unless a test asks: a background copy of every test's database is noise.
         backup=backup or BackupSettings(enabled=False),
         config_path=tmp_path / "config_app.json",

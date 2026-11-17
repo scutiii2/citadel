@@ -112,3 +112,51 @@ async def test_policy_denies_self_unknown_and_requester_forwarding(tmp_path):
         assert (await http.get("/instances", headers=forwarded)).status_code == 403
         forged = {**signed(stack["stronghold"], "treasury"), "X-Requester-Uid": "forged"}
         assert (await http.get("/instances", headers=forged)).status_code == 200
+
+
+@pytest.fixture
+async def registering(tmp_path):
+    registry = ConnectionRegistry({"a": memory_spec("a"), "b": memory_spec("b")}, build_backend)
+    manager = InstanceManager({}, registry)
+    stack = await make_stack(tmp_path)
+    db = tmp_path / "settings.db"
+    app = create_app(manager, keyring=stack["treasury"], settings_db=db)
+
+    def caller(name):
+        return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t",
+                                 auth=ServiceAuth(stack[name], "treasury"))
+
+    yield caller, db
+    await manager.close()
+
+
+async def test_a_service_registers_its_own_instance_and_uses_it_at_once(registering):
+    from src.citadel_auth import settings_store
+
+    caller, db = registering
+    async with caller("stronghold") as stronghold:
+        saved = await stronghold.put("/instances/stronghold", json={"connections": ["a", "a"]})
+        assert saved.status_code == 200
+        assert (await stronghold.get("/instances")).json() == {"stronghold": ["a"]}
+        written = await stronghold.put("/instances/stronghold/connections/a/collections/c/records/k", json={"doc": {"n": 1}})
+        assert written.status_code == 200
+        # registering again replaces the instance
+        await stronghold.put("/instances/stronghold", json={"connections": ["a", "b"]})
+        assert (await stronghold.get("/instances")).json() == {"stronghold": ["a", "b"]}
+    assert settings_store.read_all(db, "instances") == {"stronghold": ["a", "b"]}
+
+
+async def test_a_service_may_not_register_another_services_instance(registering):
+    caller, _ = registering
+    async with caller("stronghold") as stronghold, caller("portcullis") as portcullis:
+        assert (await stronghold.put("/instances/armory", json={"connections": ["a"]})).status_code == 403
+        assert (await stronghold.put("/instances/ember", json={"connections": ["a"]})).status_code == 403
+        assert (await portcullis.put("/instances/ember", json={"connections": ["a"]})).status_code == 200
+
+
+async def test_an_unknown_connection_is_refused(registering):
+    caller, _ = registering
+    async with caller("legion") as legion:
+        refused = await legion.put("/instances/legion", json={"connections": ["zzz"]})
+        assert refused.status_code == 404
+        assert (await legion.get("/instances")).json() == {}

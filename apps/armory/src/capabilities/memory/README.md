@@ -50,5 +50,5 @@ up to the full 200-memory account limit. Memory has no category or provenance fi
 
 ## Configuration
 
-- `MCP_MEMORY_DB_PATH` (`.env`, optional): the SQLite file. Default `specifics/memory/.data/memory.db`, gitignored.
-- Toggle: the `memory` entry in `configs/config_capabilities.json`, or the Capabilities page in ember_admin.
+- `MCP_MEMORY_DB_PATH` (`.env`, optional): the SQLite file. Default `.data/armory/memory/memory.db`, gitignored.
+- Toggle: the `memory` entry in the Capabilities page (stored in `.data/armory/settings.db`), or the Capabilities page in ember_admin.

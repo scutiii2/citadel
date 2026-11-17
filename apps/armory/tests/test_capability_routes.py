@@ -16,6 +16,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 from starlette.testclient import TestClient  # noqa: E402
 
 from src.capability_routes import install_capability_routes  # noqa: E402
+from src.citadel_auth import settings_store
 from src.services import capability_registry  # noqa: E402
 from src.services.capability_loader import CapabilityLoader  # noqa: E402
 
@@ -46,7 +47,7 @@ def test_mcp():
 
 @pytest.fixture
 def config_path(tmp_path: Path):
-    return tmp_path / "config_capabilities.json"
+    return tmp_path / "settings.db"
 
 
 @pytest.fixture
@@ -111,7 +112,7 @@ def test_patch_re_enables_a_capability(client, test_mcp):
 def test_patch_persists_to_disk(client, config_path):
     client.patch("/capabilities/widgets", json={"enabled": False})
 
-    saved = json.loads(config_path.read_text(encoding="utf-8"))
+    saved = settings_store.read_all(config_path, "capabilities")
     assert saved == {"widgets": {"enabled": False}}
 
 
@@ -119,7 +120,7 @@ def test_patch_preserves_other_capabilities_on_disk(client, config_path):
     client.patch("/capabilities/widgets", json={"enabled": False})
     client.patch("/capabilities/gadgets", json={"enabled": False})
 
-    saved = json.loads(config_path.read_text(encoding="utf-8"))
+    saved = settings_store.read_all(config_path, "capabilities")
     assert saved == {"widgets": {"enabled": False}, "gadgets": {"enabled": False}}
 
 
@@ -217,7 +218,7 @@ def test_patch_by_the_old_folder_name_replies_under_the_new_id(tmp_path, monkeyp
     server = FastMCP(name="hermetic")
     monkeypatch.setattr("src.server.mcp", server)
     try:
-        loader = CapabilityLoader(server, f"{pkg}.capabilities", tmp_path / "config_capabilities.json")
+        loader = CapabilityLoader(server, f"{pkg}.capabilities", tmp_path / "settings.db")
         loader.scan()
         app = Starlette()
         install_capability_routes(app, loader)

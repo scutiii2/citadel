@@ -16,7 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.citadel_auth import Keyring, ServiceAuthMiddleware, data_dir, from_env
+from src.citadel_auth import Keyring, ServiceAuthMiddleware, current_caller, data_dir, from_env, settings_store
 from src.backends.base import UnsupportedOperation
 from src.registry import InstanceManager, RawSqlDisabled, UnknownConnection, UnknownInstance
 
@@ -47,7 +47,15 @@ def _error(status: int):
     return handler
 
 
-def create_app(manager: InstanceManager, keyring: Keyring | None = None) -> FastAPI:
+class InstanceBody(BaseModel):
+    connections: list[str]
+
+
+# An instance a service may register besides the one named like itself.
+OWNED_INSTANCES = {"portcullis": {"portcullis", "ember"}, "armory": {"armory", "mcp_server"}}
+
+
+def create_app(manager: InstanceManager, keyring: Keyring | None = None, settings_db: Path | None = None) -> FastAPI:
     keyring = keyring if keyring is not None else from_env("treasury", data_dir=data_dir(Path(__file__).resolve().parent.parent))
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -79,6 +87,17 @@ def create_app(manager: InstanceManager, keyring: Keyring | None = None) -> Fast
     @app.get("/instances")
     async def instances() -> dict[str, list[str]]:
         return manager.describe()
+
+    @app.put("/instances/{name}")
+    async def register_instance(name: str, body: InstanceBody) -> dict[str, Any]:
+        """A service registers its own instance: which connections it uses. Takes effect at once and is kept for the next start."""
+        caller = current_caller()
+        if caller is None or name not in OWNED_INSTANCES.get(caller.name, {caller.name}):
+            raise HTTPException(403, f"{caller.name if caller else 'this caller'} may not register instance {name!r}")
+        await manager.register(name, tuple(body.connections))  # unknown connections: 404
+        if settings_db is not None:
+            settings_store.put(settings_db, "instances", name, list(dict.fromkeys(body.connections)))
+        return {"saved": name}
 
     @app.get(BASE + "/collections/{collection}/records/{key}")
     async def get_record(instance: str, connection: str, collection: str, key: str) -> dict[str, Any]:

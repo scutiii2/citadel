@@ -326,3 +326,22 @@ def test_an_internal_extension_sends_the_token_and_others_do_not(monkeypatch):
 
     assert extensions._request_headers(plain) == {"K": "v"}
     assert extensions._request_headers(inside) == {}
+
+
+def test_post_a_token_becomes_the_service_token_header_and_is_never_returned(client, monkeypatch):
+    captured = {}
+
+    async def fake_add_extension(config, config_path):
+        captured["headers"] = config.headers
+        captured["forward"] = config.forward_requester
+        return extensions.ExtensionStatus(id=config.id, label=config.label, description="", status="connected")
+
+    monkeypatch.setattr(extensions, "current_statuses", lambda: [])
+    monkeypatch.setattr(extensions, "add_extension", fake_add_extension)
+
+    response = client.post("/extensions", json={"label": "Bard", "url": "http://bard:29400/mcp", "token": " tok123 "})
+
+    assert response.status_code == 201
+    assert captured == {"headers": {"X-Internal-Token": "tok123"}, "forward": True}
+    assert "tok123" not in response.text
+    assert client.post("/extensions", json={"label": "B", "url": "http://b/mcp", "token": 5}).status_code == 400

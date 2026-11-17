@@ -28,8 +28,11 @@ def get_settings(request: Request) -> Settings:
     return request.app.state.settings
 
 
-def get_pricing(request: Request) -> Pricing:
-    return request.app.state.pricing
+async def get_pricing(request: Request) -> Pricing:
+    """The price table Stronghold owns, refreshed at most once a minute."""
+    pricing = request.app.state.pricing
+    await pricing.refresh(request.app.state.stronghold)
+    return pricing
 
 
 async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:

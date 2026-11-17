@@ -22,12 +22,12 @@ the cooldown durations, and enables no backups by itself.
   the example selects confidence 80. Gateway endpoints/models live in
   `gateways/decision/`, and Laya's internal service strategy is read there on
   every call. It has no account or admin override.
-- **`config_servers.json`** - `servers`: the MCP servers this agent
-  connects to as a client (currently just `main`, this repo's
-  `mcp_server`). Loaded by `src/tools/mcp_client/config.py`'s `load_servers_config` into
-  typed `ServerConfig` entries; each entry is `{label, description,
-  transport, url|command, auth?}`, symmetric for every configured server
-  unlike `mcp_server`'s own `config_extensions.json`.
+- **The MCP servers are not here.** The servers this agent connects to as a client are the `servers` table of
+  `.data/legion/settings.db`. A new install has none: an administrator adds `main` (Armory, e.g.
+  `http://127.0.0.1:29600/mcp`) and any other. `GET /agents/servers` lists them, `PUT`/`DELETE /agents/servers/{id}`
+  change them (a restart applies the change). Loaded by `src/tools/mcp_client/config.py`'s `load_servers_config`
+  into typed `ServerConfig` entries; each entry is `{label, description,
+  transport, url|command, auth?}`.
 - **`config_prompts.json`** (in `.data/legion/`, not here) - the prompt text every agent shares: `app_name`,
   `app_description`, `identity_template` (placeholders `{app_name}`,
   `{app_description}`, `{role}`), `default_instructions`, `roster_intro`,

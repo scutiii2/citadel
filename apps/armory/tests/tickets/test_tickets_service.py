@@ -46,7 +46,7 @@ def clock():
 
 @pytest.fixture
 def config(tmp_path):
-    return load_ticket_config(tmp_path / "missing.json")
+    return load_ticket_config()
 
 
 @pytest.fixture

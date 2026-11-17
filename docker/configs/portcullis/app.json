@@ -17,12 +17,18 @@
     "connection": "data"
   },
   "security": {
-    "trusted_proxies": ["127.0.0.1", "::1", "172.28.0.0/16"],
-    "rate_limit": {"scope": "account"}
+    "trusted_proxies": [
+      "127.0.0.1",
+      "::1",
+      "172.28.0.0/16"
+    ],
+    "rate_limit": {
+      "scope": "account"
+    }
   },
-  "usage": {
-    "max_context_tokens_per_chat": 150000,
-    "auto_summarize_ratio": 0.6
-  },
-  "backup": {"enabled": true, "keep": 14, "every_hours": 24}
+  "backup": {
+    "enabled": true,
+    "keep": 14,
+    "every_hours": 24
+  }
 }

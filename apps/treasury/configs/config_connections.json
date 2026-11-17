@@ -1,16 +1,25 @@
 {
   "connections": {
-    "main": {"type": "sqlite", "path": "main.db", "allow_raw_sql": false},
-    "data": {"type": "sqlite", "path": "ember.db"},
-    "stronghold": {"type": "sqlite", "path": "stronghold.db"},
-    "scratch": {"type": "sqlite", "path": "scratch.db", "allow_raw_sql": true, "cache": {"ttl_seconds": 0}}
-  },
-  "instances": {
-    "default": ["main", "scratch"],
-    "reports": ["main"],
-    "ember": ["data"],
-    "mcp_server": ["data", "stronghold"],
-    "legion": ["data"],
-    "stronghold": ["stronghold"]
+    "main": {
+      "type": "sqlite",
+      "path": "main.db",
+      "allow_raw_sql": false
+    },
+    "data": {
+      "type": "sqlite",
+      "path": "ember.db"
+    },
+    "stronghold": {
+      "type": "sqlite",
+      "path": "stronghold.db"
+    },
+    "scratch": {
+      "type": "sqlite",
+      "path": "scratch.db",
+      "allow_raw_sql": true,
+      "cache": {
+        "ttl_seconds": 0
+      }
+    }
   }
 }

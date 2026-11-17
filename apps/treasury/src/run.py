@@ -8,7 +8,7 @@ import uvicorn
 
 from src.api import create_app
 from src.backends.factory import build_backend
-from src.config import load_config, load_connections
+from src.config import SETTINGS_DB, load_config, load_connections
 from src.registry import ConnectionRegistry, InstanceManager
 
 log = logging.getLogger("db_gateway")
@@ -20,7 +20,7 @@ def build_app():
     registry = ConnectionRegistry(connections.connections, build_backend)
     manager = InstanceManager(connections.instances, registry)
     log.info("instances: %s", ", ".join(connections.instances) or "none")
-    return create_app(manager), config
+    return create_app(manager, settings_db=SETTINGS_DB), config
 
 
 def main() -> None:

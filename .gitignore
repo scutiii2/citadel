@@ -38,14 +38,6 @@ __pycache__/
 /apps/armory/.logs/
 /apps/armory/.cache/
 
-# Per-capability state/config under mcp_server/specifics/<capability_name>/:
-# dot-prefixed folders are untracked runtime state and secrets; the plain
-# configs/ folder next to them is tracked. Includes audit DBs and
-# JobWatcher persisted state ({state_dir}/{WatcherClass}/{key}.json).
-/apps/armory/specifics/*/.data/
-/apps/armory/specifics/*/.logs/
-/apps/armory/specifics/*/.cache/
-/apps/armory/specifics/*/.secrets/
 *.db
 
 

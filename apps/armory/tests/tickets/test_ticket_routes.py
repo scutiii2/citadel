@@ -20,7 +20,7 @@ TOKEN = "shared-secret"
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    service = TicketService(TicketStore(tmp_path / "t.db"), load_ticket_config(tmp_path / "none.json"))
+    service = TicketService(TicketStore(tmp_path / "t.db"), load_ticket_config())
     monkeypatch.setattr(tickets, "_service", service)
     monkeypatch.setattr(ticket_routes, "settings", SimpleNamespace())
     app = Starlette()
@@ -254,3 +254,29 @@ def test_staff_routes_record_authoritative_activity(client):
     assert closed["last_staff_activity_at"] == activity
     updated = client.patch(f"/ticket-admin/tickets/{ticket_id}", json={"status": "resolved"}, headers=headers("root")).json()["ticket"]
     assert updated["last_staff_activity_at"] == updated["updated_at"]
+
+
+def test_staff_can_read_and_change_the_ticket_settings(client, tmp_path, monkeypatch):
+    from src.citadel_auth import settings_store
+
+    saved = tmp_path / "settings.db"
+    monkeypatch.setattr(tickets.get_service(), "_settings_path", saved)
+    tags = {"billing": "Charges and invoices.", "other": "Anything else."}
+
+    before = client.get("/ticket-admin/settings", headers=headers("staff"))
+    changed = client.patch("/ticket-admin/settings", json={"tags": tags, "laya": {"candidates": 3}}, headers=headers("staff"))
+    options = client.get("/tickets/tags", headers=headers("alice"))
+
+    assert before.json()["laya"]["candidates"] == 5
+    assert changed.json()["tags"] == tags and changed.json()["laya"]["candidates"] == 3
+    assert [option["value"] for option in options.json()] == ["billing", "other"]
+    assert settings_store.read_all(saved, "settings")["tickets"]["tags"] == tags
+
+
+def test_bad_ticket_settings_are_refused_and_not_kept(client):
+    one_tag = client.patch("/ticket-admin/settings", json={"tags": {"only": "one"}}, headers=headers("staff"))
+    unknown = client.patch("/ticket-admin/settings", json={"colour": "red"}, headers=headers("staff"))
+    empty = client.patch("/ticket-admin/settings", json={}, headers=headers("staff"))
+
+    assert (one_tag.status_code, unknown.status_code, empty.status_code) == (400, 400, 400)
+    assert len(client.get("/ticket-admin/settings", headers=headers("staff")).json()["tags"]) == 8

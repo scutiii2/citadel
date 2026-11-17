@@ -20,6 +20,7 @@ from starlette.testclient import TestClient
 from src import capability_help, commands
 from src.capability_routes import install_capability_routes
 from src.config import settings
+from src.citadel_auth import settings_store
 from src.help_routes import install_help_routes
 from src.services import capability_meta, capability_registry
 from src.services.capability_loader import CapabilityLoader
@@ -251,8 +252,7 @@ def test_loader_toggle_tools_commands_and_help(tmp_path, monkeypatch, api):
     monkeypatch.setattr(capability_meta, "_BY_FOLDER", {})
     monkeypatch.setattr(capability_registry, "_REGISTRY", {})
     monkeypatch.setattr(commands, "_COMMANDS", {})
-    config = tmp_path / "capabilities.json"
-    config.write_text("{}")
+    config = tmp_path / "settings.db"
     loader = CapabilityLoader(server, "src.capabilities", config)
     loader.scan()
     record = loader.record_for("obsidian")
@@ -296,7 +296,7 @@ def test_loader_toggle_tools_commands_and_help(tmp_path, monkeypatch, api):
         help_result = http.get("/commands/help/obsidian")
         assert help_result.status_code == 200
         assert len(help_result.json()["tools"]) == 6
-    assert json.loads(config.read_text())["obsidian"]["enabled"] is True
+    assert settings_store.read_all(config, "capabilities")["obsidian"]["enabled"] is True
     asyncio.run(loader.set_online("obsidian", False))
     assert not asyncio.run(server.list_tools())
-    assert json.loads(config.read_text())["obsidian"]["enabled"] is False
+    assert settings_store.read_all(config, "capabilities")["obsidian"]["enabled"] is False

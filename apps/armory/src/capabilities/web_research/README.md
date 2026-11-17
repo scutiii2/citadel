@@ -32,4 +32,4 @@ Tavily fetches the pages, so this server never connects to an address a caller c
 24 KB and fenced as remote data (`services/untrusted.py`); search snippets are cut to 600 characters. Tavily's
 own generated answer is not requested: tools never call an AI. Each search and each page read uses Tavily credits.
 
-Toggle: `"web"` in `configs/config_capabilities.json`.
+Toggle: `"web"` in the Capabilities page (stored in `.data/armory/settings.db`).

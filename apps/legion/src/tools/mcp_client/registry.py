@@ -1,4 +1,4 @@
-"""McpClientRegistry: connect to every server in config_servers.json,
+"""McpClientRegistry: connect to every server in the settings database,
 merge their tools into one namespaced catalog, and dispatch calls to
 whichever server owns a given name.
 

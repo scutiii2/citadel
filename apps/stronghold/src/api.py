@@ -27,6 +27,7 @@ from src.brains.connections import BrainError
 from src.brains.gateway import BrainGateway
 from pathlib import Path
 from src.citadel_auth import Keyring, ServiceAuthMiddleware, from_env
+from src.citadel_auth.treasury import register_in_background
 from src.chats import routes as chats_routes
 from src.chats.store import ChatStore
 from src.config import Settings, load_settings
@@ -90,6 +91,8 @@ def create_app(
         app.state.box = SecretBox(keys.secrets)
         app.state.store = store or DbGatewayClient(
             http(settings.db_gateway_url), settings.db_instance, settings.db_connection, keyring)
+        registration = None if store is not None else register_in_background(
+            keyring, settings.db_gateway_url, settings.db_instance, [settings.db_connection])
         app.state.platform = platform or PortcullisClient(http(settings.portcullis_url), keyring)
         app.state.agent_gateway = agent_gateway or McpAgentGateway(keyring)
         app.state.agents = AgentDirectory(
@@ -134,6 +137,8 @@ def create_app(
         try:
             yield
         finally:
+            if registration is not None:
+                registration.cancel()
             await app.state.turns.shutdown()
             for client in clients:
                 await client.aclose()

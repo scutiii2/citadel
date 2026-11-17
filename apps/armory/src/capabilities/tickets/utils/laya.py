@@ -35,6 +35,11 @@ class TicketLaya:
         self._min_confidence = min_confidence
         self._timeout = timeout
 
+    def tune(self, *, min_confidence: float, timeout: float) -> None:
+        """Apply new limits to the next question."""
+        self._min_confidence = min_confidence
+        self._timeout = timeout
+
     async def _ask(self, text: str, questions: dict[str, Any]) -> dict[str, Any]:
         # local_only: Laya's configured service strategy answers locally; a ticket never goes on to the fallback classifier (Jev).
         payload = {"text": text, "questions": questions, "min_confidence": self._min_confidence, "local_only": True}

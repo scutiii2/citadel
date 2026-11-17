@@ -12,5 +12,3 @@ __pycache__/
 secrets/*
 !secrets/*.example
 !secrets/README.md
-data/*
-!data/README.md

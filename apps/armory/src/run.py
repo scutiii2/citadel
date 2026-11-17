@@ -12,6 +12,7 @@ from src.config import settings  # noqa: E402
 from src.services import capability_registry  # noqa: E402
 from src.services.capability_loader import CapabilityLoader  # noqa: E402
 from src.services.identity_context import IdentityContextMiddleware  # noqa: E402
+from src.citadel_auth.treasury import register_in_background  # noqa: E402
 from src.services.service_auth import install_auth, keyring  # noqa: E402
 from src.utils.logging_setup import configure_logging  # noqa: E402
 from src.server import mcp  # noqa: E402
@@ -21,7 +22,7 @@ configure_logging(settings.log_dir)
 
 # Capabilities are found by scanning src/capabilities/ (services/capability_loader.py), not imported here,
 # so a new folder appears on POST /capabilities/refresh. One with a config entry loads now; one without stays offline until an admin enables it.
-capability_loader = CapabilityLoader(mcp, "src.capabilities", settings.capabilities_config_path)
+capability_loader = CapabilityLoader(mcp, "src.capabilities", settings.settings_db_path)
 capability_loader.startup()
 
 
@@ -33,11 +34,14 @@ async def _serve() -> None:
     from src.services import extensions
 
     await keyring.ensure_identity()
+    # Treasury keeps no list of its callers: Armory tells it which connection its instance uses.
+    registration = register_in_background(
+        keyring, settings.db_gateway_url, settings.db_gateway_instance, [settings.db_gateway_connection])
 
     try:
         # Before tool_names on purpose: extensions register proxied tools onto `mcp`,
         # so connecting first puts them in the merged list and the counts below.
-        extension_statuses = await extensions.install_extensions(mcp, settings.extensions_config_path)
+        extension_statuses = await extensions.install_extensions(mcp, settings.settings_db_path)
 
         # Use extensions.merged_list_tools(), not mcp.list_tools(): proxied tools are visible only
         # through the handlers install_extensions() installed.
@@ -107,6 +111,7 @@ async def _serve() -> None:
         server = uvicorn.Server(uvicorn.Config(app, host=settings.host, port=settings.port))
         await server.serve()
     finally:
+        registration.cancel()
         # Mirrors install_extensions() at the top: subprocesses opened get closed on shutdown or startup failure.
         await extensions.shutdown_extensions()
 

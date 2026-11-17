@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
+from src.citadel_auth.treasury import register_in_background
 from src.routes import brains, stronghold
 
 from src.config import Settings
@@ -137,6 +138,9 @@ def create_app(
         app.state.db_gateway = db_gateway or DbGatewayClient(
             gateway_client, settings.db_gateway.instance, settings.db_gateway.connection, service_auth.keyring
         )
+        # Treasury keeps no list of its callers: Portcullis tells it which connection its instance uses.
+        registration = None if db_gateway is not None else register_in_background(
+            service_auth.keyring, settings.db_gateway.url, settings.db_gateway.instance, [settings.db_gateway.connection])
 
         app.state.settings = settings
         app.state.database = database
@@ -164,7 +168,7 @@ def create_app(
         app.state.share_limiter = PublicReadLimiter()
         from src.services.pricing import Pricing
 
-        app.state.pricing = Pricing(settings.pricing)
+        app.state.pricing = Pricing()
         backups: BackupScheduler | None = None
         app.state.backups = None
         if settings.backup.enabled:
@@ -178,6 +182,8 @@ def create_app(
         try:
             yield
         finally:
+            if registration is not None:
+                registration.cancel()
             if backups is not None:
                 await backups.stop()
             # Saves the counters (turns just ended may have added some).

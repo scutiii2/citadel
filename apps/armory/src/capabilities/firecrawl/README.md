@@ -38,4 +38,4 @@ to 60 seconds; if the job is still running the result says so and holds the page
 
 Not included: Firecrawl's search (use `/web search`) and its LLM-based extract.
 
-Toggle: `"scrape"` in `configs/config_capabilities.json`.
+Toggle: `"scrape"` in the Capabilities page (stored in `.data/armory/settings.db`).

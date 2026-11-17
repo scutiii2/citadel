@@ -138,6 +138,8 @@ class ExtensionCreate(BaseModel):
     description: str = Field(default="", max_length=500)
     # A server of this stack: mcp_server sends it the internal token. Off for anything else.
     internal: bool = False
+    # The token the tool service made for Armory on its own admin page (Tokens card). Sent on, never returned.
+    token: str = Field(default="", max_length=500, repr=False)
 
     @field_validator("label", "url", "description")
     @classmethod
@@ -347,7 +349,7 @@ async def add_extension(
 ) -> ExtensionOut:
     """mcp_server connects to the MCP server at `url` and offers its tools
     to every client, requiring extensions.manage. Added even if unreachable right now."""
-    extension = ExtensionOut(**await _call(info.add_extension(account, body.label, body.url, body.description, body.internal)))
+    extension = ExtensionOut(**await _call(info.add_extension(account, body.label, body.url, body.description, body.internal, body.token)))
     await logs.action(account, "mcp.extension_add", f"Added extension '{extension.id}' ({body.url})")
     return extension
 

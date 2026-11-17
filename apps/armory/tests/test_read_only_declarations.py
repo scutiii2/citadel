@@ -43,8 +43,7 @@ def loaded(tmp_path, monkeypatch):
     monkeypatch.setattr(capability_registry, "_REGISTRY", {})
     monkeypatch.setattr(capability_meta, "_BY_FOLDER", {})
     monkeypatch.setattr(commands, "_COMMANDS", {})
-    config = tmp_path / "capabilities.json"
-    config.write_text("{}")
+    config = tmp_path / "settings.db"
     loader = CapabilityLoader(server, "src.capabilities", config)
     loader.scan()
     for capability_id in READ_ONLY:

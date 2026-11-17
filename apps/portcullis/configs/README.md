@@ -1,24 +1,17 @@
 # configs
 
-`config_pricing.json` is the editable model price table. Replace `example-model` with your
-actual model names and prices: `input` and `output` are **USD per 1,000,000
-tokens**, with `currency` set to `USD`. The placeholder is not a real price.
-Prices must be finite, non-negative numbers. Exact model names win, with a
-case-insensitive fallback. Unknown models or missing input/output splits have
-no cost estimate; one missing side counts as zero when the other is known.
+`config_app.json` - server and session settings, tracked, with no `.example` twin. Nothing secret is kept here:
+secrets and private values are in `../.env` (see `../.env.example`). Restart Portcullis after editing; the Config
+issues page checks the file.
 
-Restart portcullis after editing prices. Costs are computed on output and never
-stored, so the updated table also re-prices old answers. Usage totals sum only
-priced calls and report excluded tokens separately; an entirely unpriced total
-is null, never a made-up zero. These are token-based estimates, not invoices.
-
-`config_app.json` - server and session settings. Both files are tracked; secrets
-are not kept here but in `../.env` (see `../.env.example`).
+**Pricing and token limits are not Portcullis's.** Stronghold owns the model price table and the usage limits
+(its `config_app.json`, `pricing` and `usage`). Portcullis asks Stronghold for the prices (`GET /usage/pricing`,
+refreshed at most once a minute) to price the chat messages it reads from its own database.
 
 | Key | Meaning |
 |---|---|
 | `host`, `port` | Where uvicorn listens. `EMBER_API_HOST` / `EMBER_API_PORT` override them. |
-| `database_path` | SQLite file, relative to the portcullis folder. |
+| `database_path` | Optional. SQLite file, relative to the portcullis folder; default `.data/portcullis/ember_api.db` in the Citadel folder. |
 | `session_cookie_name` | Name of the login cookie. |
 | `session_hours` | How long a login lasts. |
 | `cookie_secure` | `true` once served over HTTPS (the cookie is then never sent over plain HTTP). |
@@ -33,5 +26,4 @@ are not kept here but in `../.env` (see `../.env.example`).
 | `security.ip_filter` | `allow_list` / `deny_list` of addresses or CIDRs, checked on every request (`403`). Deny wins; a non-empty allow list refuses everything else. |
 | `security.headers` | `enabled` adds nosniff, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and a locked-down CSP to every response; `hsts_max_age` > 0 adds HSTS (HTTPS only). |
 | `security.fingerprint` | `enabled`: a login from a device the account never used (a hash of the `signals`: `user_agent`, `accept_language`, `ip_subnet` = /24 or /64 network) is written to the activity log - never blocked. Users see and forget their devices on the Account page. |
-| `backup` | Optional block: `enabled` (default true), `every_hours` (24) and `keep` (14). portcullis copies its database to `data/backups/<name>-<UTC time>.db` at startup (unless the newest copy is younger than `every_hours`) and then every `every_hours`, keeping the newest `keep`. Uses SQLite's online backup, so it is safe while running, and checks each copy. A failure is written to the Errors log. `python -m scripts.backup_db` makes one now. |
-| `usage` | Optional block (defaults as in the example). The rolling token caps (`six_hour_token_limit` / `weekly_token_limit`) are Stronghold's now: set them in its `config_app.json`; a new question over a cap still gets `429`. `max_context_tokens_per_chat` + `auto_summarize_ratio`: when the last answer used that share of the smaller of the model's context window and this cap, the chat is summarized before the next question is sent. |
+| `backup` | Optional block: `enabled` (default true), `every_hours` (24) and `keep` (14). portcullis copies its database to `backups/<name>-<UTC time>.db` beside the database at startup (unless the newest copy is younger than `every_hours`) and then every `every_hours`, keeping the newest `keep`. Uses SQLite's online backup, so it is safe while running, and checks each copy. A failure is written to the Errors log. `python -m scripts.backup_db` makes one now. |

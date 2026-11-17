@@ -25,12 +25,11 @@ def capability(tmp_path, monkeypatch):
     monkeypatch.setattr(capability_registry, "_REGISTRY", {})
     monkeypatch.setattr(capability_meta, "_BY_FOLDER", {})
     monkeypatch.setattr(commands, "_COMMANDS", {})
-    config = tmp_path / "capabilities.json"
-    config.write_text("{}")
+    config = tmp_path / "settings.db"
     loader = CapabilityLoader(server, "src.capabilities", config)
     loader.scan()
     asyncio.run(loader.set_online("ticket", True))  # the capability id; if the loader wants the folder name here, use "tickets"
-    service = TicketService(TicketStore(tmp_path / "t.db"), load_ticket_config(tmp_path / "none.json"))
+    service = TicketService(TicketStore(tmp_path / "t.db"), load_ticket_config())
     monkeypatch.setattr(tickets, "_service", service)
     monkeypatch.setattr(identity_context, "current_username", lambda: "alice")
     monkeypatch.setattr(identity_context, "current_uid", lambda: "uid-alice")

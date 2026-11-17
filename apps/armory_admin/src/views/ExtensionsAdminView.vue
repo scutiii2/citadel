@@ -22,6 +22,7 @@ const label = ref("");
 const url = ref("");
 const description = ref("");
 const internal = ref(false);
+const token = ref("");
 const adding = ref(false);
 const addError = ref("");
 
@@ -44,10 +45,11 @@ async function add(): Promise<void> {
   adding.value = true;
   addError.value = "";
   try {
-    const created = await extensionsClient.add({ label: label.value, url: url.value, description: description.value, internal: internal.value });
+    const created = await extensionsClient.add({ label: label.value, url: url.value, description: description.value, internal: internal.value, ...(token.value.trim() ? { token: token.value.trim() } : {}) });
     extensions.value = [...extensions.value, created];
     label.value = url.value = description.value = "";
     internal.value = false;
+    token.value = "";
   } catch (err) {
     addError.value = errorMessage(err);
   } finally {
@@ -107,6 +109,7 @@ onMounted(load);
         <input v-model="label" data-test="label" type="text" placeholder="Name" aria-label="Name" required maxlength="80" autocomplete="off" />
         <input v-model="url" data-test="url" type="text" placeholder="http://host:port/mcp" aria-label="URL" required maxlength="500" autocomplete="off" />
         <input v-model="description" type="text" placeholder="What it is for (optional)" aria-label="Description" maxlength="500" autocomplete="off" />
+        <input v-model="token" data-test="token" type="password" placeholder="Token from the service's admin page (optional)" aria-label="Token" maxlength="500" autocomplete="off" />
         <label class="internal"><input v-model="internal" data-test="internal" type="checkbox" /> Runs in this stack (send the internal token)</label>
         <button type="submit" class="primary" :disabled="adding">{{ adding ? "Adding…" : "Add" }}</button>
       </form>

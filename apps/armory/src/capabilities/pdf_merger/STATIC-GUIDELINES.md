@@ -1,6 +1,6 @@
 # PDF merger storage
 
-The capability owns generated state under `apps/armory/specifics/pdf_merger/.data/store/` by default, configurable through `MCP_PDF_MERGER_STORE_DIR`. The existing `specifics/*/.data/` ignore rule keeps it out of git. No cache or capability-specific log directory is created; standard Armory logging handles diagnostics.
+The capability owns generated state under `.data/armory/pdf_merger/store/` by default, configurable through `MCP_PDF_MERGER_STORE_DIR`. `.data/` is gitignored. No cache or capability-specific log directory is created; standard Armory logging handles diagnostics.
 
 | Location | Format and contents | Lifecycle |
 | --- | --- | --- |
@@ -11,4 +11,4 @@ The capability owns generated state under `apps/armory/specifics/pdf_merger/.dat
 
 Files and sidecars survive process restart until their expiry. Jobs, progress events and quota reservations are process-local memory, not a persistent job database. Index loading also removes orphan file bytes without a sidecar and stale partial files. Nonempty scratch directories left by an abrupt process termination are not automatically removed by startup; an operator may remove confirmed abandoned scratch data while Armory is stopped.
 
-Tuning configuration belongs in `specifics/pdf_merger/configs/config_pdf_merger.json`; the file is tracked, with a `README.md` beside it. It is hand-maintained configuration, never runtime data. Secrets belong in Armory's normal environment configuration, never in the capability directory or sidecars. Signed links are generated from file IDs and expiry timestamps and are not persisted.
+Tuning configuration belongs in `configs/config_pdf_merger.json`; the file is tracked and explained in `configs/README.md`. It is hand-maintained configuration, never runtime data. Secrets belong in Armory's normal environment configuration, never in the capability directory or sidecars. Signed links are generated from file IDs and expiry timestamps and are not persisted.

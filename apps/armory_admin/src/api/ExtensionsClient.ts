@@ -19,6 +19,8 @@ export interface ExtensionCreate {
   description: string;
   /** A server of this stack: mcp_server sends it the internal token. */
   internal?: boolean;
+  /** The token the tool service made for Armory on its own admin page (Tokens card). Kept by Armory, never shown again. */
+  token?: string;
 }
 
 /** Separates an extension tool's id from its own name. */

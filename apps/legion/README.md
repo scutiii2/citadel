@@ -33,8 +33,9 @@ The internal Router chooses specialists and model tiers through that arrangement
      same id as the file in `gateways/openai/` (`gpt`, `groq`, `azure`, ...).
 
 2. Make sure `mcp_server` is running (`py -m src.run` in `apps/armory/`) -
-   `apps/legion/configs/config_servers.json` points at its default
-   `http://127.0.0.1:29600/mcp`.
+   add it to Legion as the `main` server
+   (`PUT /agents/servers/main` with `{"label": "armory", "transport": "http", "url": "http://127.0.0.1:29600/mcp"}`);
+   a new install has no servers.
 
 3. Start the agents from `apps/legion/`: install the project once with `uv sync`
    (creates `.venv`), then run `uv run python -m src.supervisor`. See Agents below.

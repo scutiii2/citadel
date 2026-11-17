@@ -27,4 +27,4 @@ Add up token usage per agent, model or day from ai_agent's usage log - one tool.
 read. A line that is not valid JSON is counted in `skipped_lines`. Tokens only: the log has no prices. This is
 the agents' own log; portcullis's per-account usage and limits are separate.
 
-Toggle: `"usage"` in `configs/config_capabilities.json`.
+Toggle: `"usage"` in the Capabilities page (stored in `.data/armory/settings.db`).

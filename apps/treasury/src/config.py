@@ -1,4 +1,4 @@
-"""Typed loaders for configs/config_app.json and configs/config_connections.json."""
+"""Typed loaders for configs/config_app.json, configs/config_connections.json and the registered instances."""
 
 from __future__ import annotations
 
@@ -12,13 +12,16 @@ from typing import Any
 from dotenv import dotenv_values
 
 from src.cache import CacheSettings
-from src.citadel_auth import apply_root_env, data_dir
+from src.citadel_auth import apply_root_env, data_dir, settings_store
 from src.seed import seed_from_example
 
 ROOT = Path(__file__).resolve().parent.parent
 apply_root_env(ROOT)  # the Citadel root .env overrides this service's .env
 CONFIG_PATH = ROOT / "configs" / "config_app.json"
 CONNECTIONS_PATH = ROOT / "configs" / "config_connections.json"
+# Which connections an instance may use is registered by the service that owns the instance (PUT /instances/{name}).
+# The registrations are kept in the `instances` table of Treasury's settings database, so a restart keeps them.
+SETTINGS_DB = data_dir(ROOT) / "settings.db"
 ENV_PATH = ROOT / ".env"
 PORT_ENV_VAR = "DB_GATEWAY_PORT"
 _PLACEHOLDER = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
@@ -156,8 +159,9 @@ def load_config(path: Path | None = None) -> AppConfig:
 
 
 def load_connections(default_cache: CacheSettings, path: Path | None = None) -> ConnectionsConfig:
-    """Load connections and instances. With no path, use configs/config_connections.json
-    and resolve ${NAME} from the environment and .env."""
+    """Load connections and instances. With no path, the connections come from
+    configs/config_connections.json (${NAME} resolved from the environment and .env) and the
+    instances registered so far from the settings database. With a path, one file holds both."""
     env: dict[str, str] = {}
     data_root = None
     if path is None:
@@ -165,4 +169,8 @@ def load_connections(default_cache: CacheSettings, path: Path | None = None) -> 
         path = CONNECTIONS_PATH
         seed_from_example(ENV_PATH)
         env = {k: v for k, v in {**dotenv_values(ENV_PATH), **os.environ}.items() if v is not None}
+        raw = _read_json(path)
+        if isinstance(raw, dict):
+            raw = {**raw, "instances": settings_store.read_all(SETTINGS_DB, "instances")}
+        return parse_connections(raw, default_cache, env, data_root)
     return parse_connections(_read_json(path), default_cache, env, data_root)

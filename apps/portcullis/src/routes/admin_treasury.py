@@ -1,6 +1,6 @@
 """/api/admin/treasury: what Treasury holds, read-only, for the Treasury admin app.
 
-Needs settings.manage. Treasury's instances and connections are set in its own config files, so this
+Needs settings.manage. Treasury's connections are set in its own config file and each service registers its own instance, so this
 only shows them and whether Treasury answers, and which one Portcullis itself uses. Never a credential.
 """
 

@@ -8,13 +8,16 @@ import json
 from pathlib import Path
 from typing import Any
 
+from src.citadel_auth import data_dir
 from src.runtime import tuning_overrides
 
 CONFIGS_DIR = Path(__file__).resolve().parent.parent.parent / "configs"
 
 # Runtime tuning shares one file; the MCP server list stays separate.
 TUNING_PATH = CONFIGS_DIR / "config_tuning.json"  # token_limits
-SERVERS_PATH = CONFIGS_DIR / "config_servers.json"  # servers
+# The MCP servers Legion connects to are run-time settings: the `servers` table of Legion's settings database.
+# An administrator adds each one (Armory first), so a new install starts with none.
+SETTINGS_DB = data_dir(CONFIGS_DIR.parent) / "settings.db"
 
 _REQUIRED = object()
 

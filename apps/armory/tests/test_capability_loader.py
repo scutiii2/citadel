@@ -14,6 +14,7 @@ import pytest
 from mcp.server.fastmcp import FastMCP
 
 from src import commands
+from src.citadel_auth import settings_store
 from src.services import capability_meta, capability_registry
 from src.services.capability_loader import (
     CapabilityLoader,
@@ -76,7 +77,7 @@ def loader_for(mcp, package, tmp_path):
     name, root = package
 
     def make() -> CapabilityLoader:
-        return CapabilityLoader(mcp, f"{name}.capabilities", tmp_path / "config_capabilities.json")
+        return CapabilityLoader(mcp, f"{name}.capabilities", tmp_path / "settings.db")
 
     return make
 
@@ -133,7 +134,7 @@ def test_set_online_loads_the_tools_and_commands_and_persists(loader_for, packag
     assert tool_names(mcp) == {"tool_wid_run"}
     assert loader.record_for("wid").loaded is True
     assert [spec.tool_name for spec in commands.all_commands()] == ["tool_wid_run"]
-    assert json.loads((tmp_path / "config_capabilities.json").read_text()) == {"wid": {"enabled": True}}
+    assert settings_store.read_all(tmp_path / "settings.db", "capabilities") == {"wid": {"enabled": True}}
 
 
 def test_going_online_again_picks_up_edited_code(loader_for, package, mcp):
@@ -315,7 +316,7 @@ def test_going_offline_persists_first_and_hides_the_tools(loader_for, package, m
     run(loader.set_online("wid", False))
 
     assert tool_names(mcp) == set()
-    assert json.loads((tmp_path / "config_capabilities.json").read_text()) == {"wid": {"enabled": False}}
+    assert settings_store.read_all(tmp_path / "settings.db", "capabilities") == {"wid": {"enabled": False}}
     assert loader.record_for("wid").loaded is True  # still captured, so the tools stay listable
 
 
@@ -323,35 +324,28 @@ def test_startup_loads_configured_folders_and_applies_offline(loader_for, packag
     _, root = package
     write_capability(root, "widgets", "wid", "tool_wid_run")
     write_capability(root, "gadgets", "gad", "tool_gad_run")
-    (tmp_path / "config_capabilities.json").write_text(json.dumps({"gad": {"enabled": False}}))
+    settings_store.put(tmp_path / "settings.db", "capabilities", "gad", {"enabled": False})
     loader = loader_for()
 
     loader.startup()
 
-    assert loader.record_for("wid").loaded is True  # migrated to enabled
-    assert capability_registry.is_enabled("wid") is True
+    assert loader.record_for("wid").loaded is False  # no entry: off until an administrator turns it on
     assert loader.record_for("gad").loaded is True  # imported, so its tools stay listed
     assert capability_registry.is_enabled("gad") is False
     assert "tool_gad_run" not in tool_names(mcp)
 
 
-def test_startup_leaves_a_folder_added_after_the_migration_offline(loader_for, package, tmp_path):
+def test_every_capability_starts_offline_until_an_administrator_enables_it(loader_for, package, mcp):
     _, root = package
     write_capability(root, "widgets", "wid", "tool_wid_run")
     loader = loader_for()
+
     loader.startup()
 
-    write_capability(root, "gadgets", "gad", "tool_gad_run")
-    second = loader_for()
-    second._records.clear()
-    for key in [key for key in sys.modules if key.endswith("capabilities.gadgets")]:
-        del sys.modules[key]
-    capability_registry._REGISTRY.clear()
-    capability_meta._BY_FOLDER.clear()
-    second.startup()
-
-    assert second.record_for("gad").loaded is False
-    assert capability_registry.is_enabled("gad") is False
+    assert loader.record_for("wid").loaded is False
+    assert tool_names(mcp) == set()
+    run(loader.set_online("wid", True))
+    assert tool_names(mcp) == {"tool_wid_run"}
 
 
 def test_concurrent_toggles_do_not_interleave(loader_for, package, mcp):

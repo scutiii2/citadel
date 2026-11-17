@@ -24,8 +24,7 @@ def test_pdf_refresh_help_and_runtime_survive_reload(tmp_path, monkeypatch):
     monkeypatch.setattr(capability_meta, "_BY_FOLDER", {})
     monkeypatch.setattr(capability_registry, "_REGISTRY", {})
     monkeypatch.setattr(commands, "_COMMANDS", {})
-    config = tmp_path / "capabilities.json"
-    config.write_text("{}")
+    config = tmp_path / "settings.db"
     loader = CapabilityLoader(server, "src.capabilities", config)
 
     async def run():

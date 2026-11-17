@@ -17,7 +17,9 @@ import sys
 from uuid import uuid4
 from pathlib import Path
 from src.providers import gateway_client
+from src.citadel_auth import settings_store
 from src.runtime import config_files, gateway_settings, tuning_overrides
+from src.tools.mcp_client import config as mcp_config
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -26,7 +28,7 @@ _parser.add_argument(
     "--mcp-url",
     help=(
         "Override the mcp_server URL this agent connects to as an MCP "
-        "client (configs/config_servers.json's 'main' entry), e.g. "
+        "client (the 'main' server in Legion's settings database), e.g. "
         "http://127.0.0.1:29600/mcp to point at a different host/port. "
         "Takes precedence over MCP_SERVER_URL. Set before mcp_upstream.connect() "
         "runs in main() below."
@@ -480,6 +482,34 @@ async def decision_gateway_settings_put(request: Request) -> JSONResponse:
     return JSONResponse(gateway_settings.view(saved))
 
 
+@mcp.custom_route("/agents/servers", methods=["GET"])
+async def servers_get(_request: Request) -> JSONResponse:
+    """The MCP servers Legion connects to, as stored. Edits apply at the next start."""
+    return JSONResponse({"servers": await asyncio.to_thread(settings_store.read_all, config_files.SETTINGS_DB, "servers")})
+
+
+@mcp.custom_route("/agents/servers/{server_id}", methods=["PUT"])
+async def servers_put(request: Request) -> JSONResponse:
+    """Body: one server entry (transport, url or command, optional auth). Checked before it is saved."""
+    entry = await _json_object(request)
+    if entry is None:
+        return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
+    server_id = request.path_params["server_id"]
+    try:
+        mcp_config.validate_server(server_id, entry)
+    except mcp_config.ConfigError as error:
+        return JSONResponse({"error": str(error)}, status_code=400)
+    await asyncio.to_thread(settings_store.put, config_files.SETTINGS_DB, "servers", server_id, entry)
+    return JSONResponse({"saved": server_id, "applies": "next start"})
+
+
+@mcp.custom_route("/agents/servers/{server_id}", methods=["DELETE"])
+async def servers_delete(request: Request) -> JSONResponse:
+    server_id = request.path_params["server_id"]
+    await asyncio.to_thread(settings_store.delete, config_files.SETTINGS_DB, "servers", server_id)
+    return JSONResponse({"deleted": server_id, "applies": "next start"})
+
+
 @mcp.custom_route("/agents/tuning", methods=["GET"])
 async def tuning_get(_request: Request) -> JSONResponse:
     """The editable tuning values: the file's, the admin's changes, and the two merged."""
@@ -625,8 +655,24 @@ if SPEC.internal_role == "router":
     mcp.tool()(route)
 
 
+def _register_with_treasury() -> None:
+    """Treasury keeps no list of its callers: tell it which connection Legion's instance uses.
+    A background thread, so a Treasury that is not up yet never delays the agent; it retries on its own."""
+    import threading
+
+    from src.citadel_auth.treasury import register_instance
+
+    url = os.getenv("DB_GATEWAY_URL") or "http://127.0.0.1:29602"
+    threading.Thread(
+        target=lambda: asyncio.run(register_instance(
+            internal_auth.keyring, url, gateway_settings.INSTANCE, [gateway_settings.CONNECTION])),
+        daemon=True, name="treasury-registration",
+    ).start()
+
+
 def main() -> None:
     asyncio.run(internal_auth.keyring.ensure_identity())
+    _register_with_treasury()
     role_info = {}
     if SPEC.role == "architect":
         role_info = {"kind": SPEC.kind, "workers": list(SPEC.workers)}

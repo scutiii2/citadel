@@ -136,10 +136,12 @@ class McpServerInfo:
         body = await self._request("GET", "/extensions", account)
         return body if isinstance(body, list) else []
 
-    async def add_extension(self, account: Account, label: str, url: str, description: str, internal: bool = False) -> dict[str, Any]:
+    async def add_extension(self, account: Account, label: str, url: str, description: str, internal: bool = False, token: str = "") -> dict[str, Any]:
         """mcp_server connects to it and saves it to its config; an
         unreachable URL is still added (status "error")."""
         body = {"label": label, "url": url, "description": description, "internal": internal}
+        if token.strip():
+            body["token"] = token.strip()
         return await self._request("POST", "/extensions", account, json=body)
 
     async def remove_extension(self, account: Account, extension_id: str) -> None:

@@ -72,7 +72,7 @@ Restart Armory and portcullis after deploying the new HTTP adapters.
 
 Enable `media` on armory's Capabilities page after Refresh (or `POST /capabilities/refresh`, then `PATCH /capabilities/media` with `{"enabled": true}`). A fresh install leaves it offline. `/media help` uses the adjacent `help.json`. Toggle `media` offline to hide tools and refuse new signed HTTP downloads; already running jobs finish and expire normally. Shared HTTP/runtime changes require an armory restart on deployment.
 
-Caps and TTLs are in the tracked `specifics/media_downloader/configs/config_media_downloader.json` (see the README beside it). The shape preserves `file_ttl_hours`, `sweep_interval_minutes`, `download_link_minutes` and the original `limits` keys (file MB, duration minutes, session MB, concurrency, queue size and job timeout minutes). `limits.max_caller_downloads` additionally bounds each account's unfinished jobs, default 2. All caps and intervals must be positive, except the queued-job allowance may be zero.
+Caps and TTLs are in the tracked `configs/config_media_downloader.json` (see `configs/README.md`). The shape preserves `file_ttl_hours`, `sweep_interval_minutes`, `download_link_minutes` and the original `limits` keys (file MB, duration minutes, session MB, concurrency, queue size and job timeout minutes). `limits.max_caller_downloads` additionally bounds each account's unfinished jobs, default 2. All caps and intervals must be positive, except the queued-job allowance may be zero.
 
 Account operations require signed service assertions and verified Portcullis requester tokens. Private keys stay in the identity directory.
 
@@ -114,7 +114,7 @@ Links are bearer credentials: anyone holding a valid link can download until lin
 
 The existing async JobQueue remains the owner of concurrency, progress, cooperative cancellation and timeouts. It runs on one dedicated background event loop in process-owned `capabilities/media_downloader/utils/media_downloads.py`, so an offloaded tool can return a job id without destroying its task. yt-dlp uses worker threads; the tool does not wait for a download. The TTL sweeper shares the background loop. Shutdown cancels queued/running jobs cooperatively and drains the loop and worker executor. Blocking worker cancellation can take up to its socket timeout, or longer during a blocked local FFmpeg operation; Python cannot kill the thread safely.
 
-No JobWatcher is needed: the job is local work already owned by the queue. Jobs are in memory and do not resume after a process restart. Stored file sidecars rebuild the index; startup removes orphan files and scratch directories. The runtime and guard-bearing `utils` modules persist through capability tool reloads, retaining the same queue, store and network patches. Updating these engine modules requires an armory restart; tool/contract/domain/help changes may be reloaded. Runtime data stays under capability specifics, never under source. There is no separate audit database or email notification flow; operational logging uses armory's existing logger.
+No JobWatcher is needed: the job is local work already owned by the queue. Jobs are in memory and do not resume after a process restart. Stored file sidecars rebuild the index; startup removes orphan files and scratch directories. The runtime and guard-bearing `utils` modules persist through capability tool reloads, retaining the same queue, store and network patches. Updating these engine modules requires an armory restart; tool/contract/domain/help changes may be reloaded. Runtime data stays in `.data/armory/` and `.cache/armory/`, never under source. There is no separate audit database or email notification flow; operational logging uses armory's existing logger.
 
 ## Identity, read-only declarations and SSRF
 
@@ -126,6 +126,6 @@ The port retains URL validation and socket/curl guards: only public globally rou
 
 ## Migration boundaries
 
-The standalone MediaDownloader service and Vue web app are not migrated or removed; standalone browser files remain separate. When the native capability is enabled, disable or remove only the `media_downloader` extension entry in armory's `configs/config_extensions.json` through the existing extension controls to avoid duplicate tools. This change does not alter that deployment config. Deferred playlists, cookies, subtitles, history and clipping remain out of scope.
+The standalone MediaDownloader service and Vue web app are not migrated or removed; standalone browser files remain separate. When the native capability is enabled, disable or remove only the `media_downloader` extension entry in armory's extension list through the existing extension controls to avoid duplicate tools. This change does not alter that deployment config. Deferred playlists, cookies, subtitles, history and clipping remain out of scope.
 
 Tests use fake extractors or synthetic localhost fixtures with explicitly permissive test guards, never a real website download. Tests cover policies, guards, presets, store quotas/TTL/restart, sanitizing, signing, queue lifecycle/errors, identity scoping, signed streaming, dynamic loading, help and tool annotations.

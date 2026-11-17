@@ -82,8 +82,7 @@ def capability(tmp_path, monkeypatch, library):
     monkeypatch.setattr(capability_registry, "_REGISTRY", {})
     monkeypatch.setattr(capability_meta, "_BY_FOLDER", {})
     monkeypatch.setattr(commands, "_COMMANDS", {})
-    config = tmp_path / "capabilities.json"
-    config.write_text("{}")
+    config = tmp_path / "settings.db"
     loader = CapabilityLoader(server, "src.capabilities", config)
     loader.scan()
     asyncio.run(loader.set_online("notes", True))

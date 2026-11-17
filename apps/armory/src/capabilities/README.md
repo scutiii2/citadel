@@ -54,11 +54,10 @@ top level is a **closed whitelist** - nothing else is allowed there:
   `__init__.py` too). Nothing non-Python belongs here, except its own
   `README.md`.
 - **No runtime state or capability-owned config here.** A capability's
-  own state and config live outside `src/`, in
-  `mcp_server/specifics/<capability_name>/`: dot-prefixed folders
-  (`.cache/`, `.data/`, `.logs/`, `.secrets/`, ...) hold
-  **runtime/generated state only** and are always gitignored; a plain
-  `configs/` folder holds tracked, capability-owned config. See each
+  own state lives outside `src/`: runtime data in `.data/armory/<capability_name>/`
+  and rebuildable files in `.cache/armory/<capability_name>/`, both in the
+  Citadel folder and gitignored; tracked tuning is a `configs/config_<name>.json`
+  with its keys explained in `configs/README.md`. See each
   capability's own `STATIC-GUIDELINES.md` for what it actually uses.
   `__pycache__/` is exempt from this rule (Python controls that name,
   not this convention).
@@ -311,12 +310,11 @@ adding or removing a declaration means changing that test too.
     human-only step) uses the literal string `"(manual - no tool)"` for
     `tool`, matching how the README tables already write it.
 
-6. The toggle entry in `../../configs/config_capabilities.json` is written
+6. The toggle entry in the Capabilities page (stored in `.data/armory/settings.db`) is written
    by the loader the first time the capability is switched online or
    offline, so there is nothing to add by hand. A folder with no entry
-   starts offline. Add `{ "<id>": { "enabled": true } }` to
-   `config_capabilities.json` only if it should be on in a fresh
-   install (`<id>` is the short id from step 7 below, not necessarily the
+   starts offline, and so does every capability on a new install: an administrator turns it on from
+   the Capabilities page (`<id>` is the short id from step 7 below, not necessarily the
    folder name).
 
 7. In `capabilities/<name>/__init__.py`, subclass `Capability`

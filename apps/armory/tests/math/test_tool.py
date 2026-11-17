@@ -21,7 +21,7 @@ async def capability(tmp_path, monkeypatch):
     monkeypatch.setattr(capability_registry, "_REGISTRY", {})
     monkeypatch.setattr(capability_meta, "_BY_FOLDER", {})
     monkeypatch.setattr(commands, "_COMMANDS", {})
-    config = tmp_path / "capabilities.json"
+    config = tmp_path / "settings.db"
     config.write_text("{}", encoding="utf-8")
     loader = CapabilityLoader(server, "src.capabilities", config)
     loader.scan()

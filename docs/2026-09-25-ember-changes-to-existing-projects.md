@@ -38,7 +38,7 @@ Net diff for these four projects: 7 files, +76 / -12 lines
 
 - portcullis *mirrors* chat_app's auth logic (werkzeug password hashes,
   bootstrap admin, invite codes, email-verification codes, role/permission
-  tables) but in its own database (`portcullis/data/ember_api.db`). Accounts
+  tables) but in its own database (`.data/portcullis/ember_api.db`). Accounts
   are **not shared**: a chat_app user can't log into ember_web with the same
   credentials unless an account is created there too.
 - Because the logic is copied, a security fix in

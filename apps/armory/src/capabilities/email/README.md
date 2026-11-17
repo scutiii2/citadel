@@ -54,7 +54,7 @@ Ember's existing tool-execution permissions and approval rules. The capability
 supports explicitly addressed mail; review who receives tool-execution access.
 
 Audit stores timestamp, caller, outcome, recipient count and generated Message-ID
-in `specifics/email/.data/audit.db` (override `MCP_EMAIL_AUDIT_PATH`). It stores no
+in `.data/armory/email/audit.db` (override `MCP_EMAIL_AUDIT_PATH`). It stores no
 addresses, subjects, bodies, codes or raw errors. The history tool returns only
 the authenticated caller's records; no identity returns no records. Internal
 capability-owned job watchers attribute delivery to the watcher owner; Ember system emails

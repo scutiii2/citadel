@@ -56,9 +56,8 @@ to sit alongside the modules that write to them:
 - **[`../.env`](../docs/secrets.md)** - credential values,
   gitignored.
 - `../.data/` - runtime state shared across capabilities, gitignored.
-- `../specifics/<capability_name>/` - state and config one capability
-  owns outright (`.data/`, `.logs/`, `.cache/`, `.secrets/` gitignored;
-  `configs/` tracked).
+- Capability state is in the Citadel folder: `.data/armory/<capability_name>/`
+  (kept) and `.cache/armory/<capability_name>/` (rebuildable), both gitignored.
 - `../.logs/` - `server.log` plus one file per error reference id,
   regenerated on every run, entirely gitignored.
 

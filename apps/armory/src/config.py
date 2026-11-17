@@ -46,7 +46,7 @@ class Settings:
     # Relative to CWD like the paths above.
     uploads_dir: Path = Path(_env("MCP_UPLOADS_DIR", str(DATA / "uploads")))
     pdf_merger_store_dir: Path = Path(_env("MCP_PDF_MERGER_STORE_DIR", str(DATA / "pdf_merger" / "store")))
-    pdf_merger_config_path: Path = Path(_env("MCP_PDF_MERGER_CONFIG_PATH", "specifics/pdf_merger/configs/config_pdf_merger.json"))
+    pdf_merger_config_path: Path = Path(_env("MCP_PDF_MERGER_CONFIG_PATH", "configs/config_pdf_merger.json"))
     pdf_merger_public_base_url: str = _env("MCP_PDF_MERGER_PUBLIC_BASE_URL", "")
     pdf_merger_signing_key: str = _env("PDF_MERGER_SIGNING_KEY", "")
     # Where capability-owned job watchers keep their state
@@ -57,6 +57,8 @@ class Settings:
     memory_db_path: Path = Path(_env("MCP_MEMORY_DB_PATH", str(DATA / "memory" / "memory.db")))
     # Per-user learned skills (capabilities/skills). Runtime state: gitignored.
     skills_db_path: Path = Path(_env("MCP_SKILLS_DB_PATH", str(DATA / "skills" / "skills.db")))
+    # Capability toggles, extensions and ticket settings that admin pages change (citadel_auth/settings_store.py).
+    settings_db_path: Path = Path(_env("MCP_SETTINGS_DB_PATH", str(DATA / "settings.db")))
     # Support tickets (capabilities/tickets/utils/service.py): SQLite file and the optional Laya MCP address (http://host:29611/mcp).
     # Blank LAYA_URL skips Laya; tickets still work.
     tickets_db_path: Path = Path(_env("MCP_TICKETS_DB_PATH", str(DATA / "tickets" / "tickets.db")))
@@ -90,7 +92,7 @@ class Settings:
     # Video downloads stay on armory's listener; only the public origin is configurable.
     media_store_dir: Path = Path(_env("MCP_MEDIA_STORE_DIR", str(CACHE / "media_downloader" / "store")))
     media_log_dir: Path = Path(_env("MCP_MEDIA_LOG_DIR", str(DATA / "media_downloader" / "logs")))
-    media_config_path: Path = Path(_env("MCP_MEDIA_CONFIG_PATH", "specifics/media_downloader/configs/config_media_downloader.json"))
+    media_config_path: Path = Path(_env("MCP_MEDIA_CONFIG_PATH", "configs/config_media_downloader.json"))
     media_public_base_url: str = _env("MCP_MEDIA_PUBLIC_BASE_URL", "")
     media_signing_key: str = _env("MCP_MEDIA_SIGNING_KEY", "")
 
@@ -104,17 +106,6 @@ class Settings:
     def email_config_path(self) -> Path:
         return self.configs_dir / "config_email.json"
 
-    @property
-    def tickets_config_path(self) -> Path:
-        return self.configs_dir / "config_tickets.json"
-
-    @property
-    def extensions_config_path(self) -> Path:
-        return self.configs_dir / "config_extensions.json"
-
-    @property
-    def capabilities_config_path(self) -> Path:
-        return self.configs_dir / "config_capabilities.json"
 
 
 settings = Settings()

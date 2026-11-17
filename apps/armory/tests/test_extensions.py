@@ -15,6 +15,7 @@ import pytest
 from mcp import types
 from mcp.server.fastmcp import FastMCP
 
+from src.citadel_auth import settings_store
 from src.services import extensions
 from src.services.app_config import ExtensionConfig
 
@@ -672,20 +673,13 @@ def _real_extension_config() -> ExtensionConfig:
 
 @pytest.mark.anyio
 async def test_real_fixture_server_end_to_end(tmp_path: Path):
-    config_path = tmp_path / "config_extensions.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "reference": {
-                    "label": "Reference Extension (dev fixture)",
-                    "description": "Dev fixture",
-                    "command": sys.executable,
-                    "args": ["-m", "src._fixtures.reference_extension_server"],
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
+    config_path = tmp_path / "settings.db"
+    settings_store.put(config_path, "extensions", "reference", {
+        "label": "Reference Extension (dev fixture)",
+        "description": "Dev fixture",
+        "command": sys.executable,
+        "args": ["-m", "src._fixtures.reference_extension_server"],
+    })
 
     registry = extensions.ExtensionRegistry()
     try:

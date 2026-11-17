@@ -203,7 +203,7 @@ Google's native SDK rather than an OpenAI-compatible endpoint):
      Only the per-request `max_output_tokens`/`max_context_tokens`/`max_tool_rounds` in
      `configs/config_tuning.json` live here.
      (`config_tuning.json` holds `token_limits` and `classifier` (the optional
-     decision layer); `config_servers.json` holds `servers`. Both are read via
+     decision layer); the `servers` table of `.data/legion/settings.db` holds the MCP servers (added by an administrator). The tuning file is read via
      `src/runtime/config_files.py`'s `read_section`. On first read, tuning
      preserves sections from the legacy `config_limits.json`; the retained
      legacy file is a backup. Laya tool shortlisting (`tool_selection`) is gone.

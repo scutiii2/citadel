@@ -82,16 +82,10 @@ def _check_app(data: dict[str, Any]) -> list[Problem]:
         ("agents_registry_url", _is_http_url, "an http(s) URL"),
         ("mcp_server_url", _is_http_url, "an http(s) URL"),
         ("security", lambda v: isinstance(v, dict), "an object"),
-        ("usage", lambda v: isinstance(v, dict), "an object"),
         ("backup", lambda v: isinstance(v, dict), "an object"),
         ("db_gateway", lambda v: isinstance(v, dict), "an object"),
     ]
     problems = [(key, f"must be {expected}") for key, check, expected in rules if key in data and not check(data[key])]
-    usage = data.get("usage")
-    if isinstance(usage, dict):
-        for key in ("max_context_tokens_per_chat",):
-            if key in usage and not _is_int(usage[key], 0):
-                problems.append((f"usage.{key}", "must be a whole number, 0 or more"))
     backup = data.get("backup")
     if isinstance(backup, dict):
         if "enabled" in backup and not isinstance(backup["enabled"], bool):

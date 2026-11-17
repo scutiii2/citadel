@@ -35,4 +35,4 @@ vault, and names that mark a secret (`.env*`, `secrets`, key files) or tooling (
 capped at 24 KB and fenced as data. The search is a plain case-insensitive text match over the first 400 KB of
 each note, at most 3 lines per note.
 
-Toggle: `"vault"` in `configs/config_capabilities.json`.
+Toggle: `"vault"` in the Capabilities page (stored in `.data/armory/settings.db`).

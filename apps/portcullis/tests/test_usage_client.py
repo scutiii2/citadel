@@ -12,7 +12,6 @@ import pytest
 from src.services.stronghold_forwarder import StrongholdForwarder
 from src.services.usage_client import UsageClient, UsageUnavailable
 from src.services.usage_rows import stored_rows
-from src.config import UsageSettings
 from tests.test_registration import as_admin
 
 ACCOUNT = type("Who", (), {"uid": "u-1", "username": "ana", "email": "ana@example.com"})()
@@ -108,7 +107,3 @@ def test_a_record_that_cannot_be_stored_is_logged_and_never_raises(answer, caplo
 
 
 # --- through the app -----------------------------------------------------------------
-
-
-def test_the_token_limits_are_no_longer_settings_of_portcullis():
-    assert not hasattr(UsageSettings(), "six_hour_token_limit")

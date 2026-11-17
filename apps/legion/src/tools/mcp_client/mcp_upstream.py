@@ -20,7 +20,7 @@ from src.agents import agent_spec
 from src.runtime import approvals, internal_auth, tool_filter
 
 from src.tools.mcp_client import tool_progress
-from src.runtime.config_files import SERVERS_PATH
+from src.runtime.config_files import SETTINGS_DB
 from src.tools.mcp_client.sync_wrapper import SyncMcpClient
 from src.citadel_auth import ServiceAuth
 
@@ -30,9 +30,9 @@ from src.tools.private_extensions import turn as private_turn
 from src.tools.private_extensions.pool import PrivateSessionPool
 from src.tools.private_extensions.spec import InvalidSpec, PrivateSpec, describe_error
 
-_CONFIG_PATH = SERVERS_PATH
+_CONFIG_PATH = SETTINGS_DB
 
-# The single upstream server id configured in configs/config_servers.json.
+# The single upstream server id stored in the settings database.
 # Every tool list_tools() returns is namespaced "main__<tool name>" by
 # SyncMcpClient's underlying McpClientRegistry (see registry.py's
 # NAMESPACE_SEPARATOR) even though there's only one upstream server today.
@@ -76,7 +76,7 @@ def tool_description(tool: Any) -> str:
 
 def connect() -> None:
     # MCP_SERVER_URL (set directly, or via --mcp-url - see server.py) repoints
-    # the "main" upstream server without editing config_servers.json.
+    # the "main" upstream server without editing the stored server.
     override = os.getenv("MCP_SERVER_URL")
     url_overrides = {_SERVER_ID: override} if override else None
     # Armory checks a signed service assertion on /mcp.

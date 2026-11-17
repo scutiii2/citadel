@@ -14,7 +14,7 @@ def test_tracked_configs_parse():
 
     raw = json.loads((CONFIGS / "config_connections.json").read_text(encoding="utf-8"))
     parsed = parse_connections(raw, config.default_cache)
-    assert parsed.instances["default"] == ("main", "scratch")
+    assert parsed.instances == {}
     assert parsed.connections["scratch"].cache.ttl_seconds == 0
     assert parsed.connections["main"].cache == config.default_cache
 
@@ -39,3 +39,18 @@ def test_port_override(monkeypatch):
     monkeypatch.setenv("DB_GATEWAY_PORT", "abc")
     with pytest.raises(ConfigError):
         load_config(CONFIGS / "config_app.json")
+
+
+def test_registered_instances_come_from_the_settings_database(tmp_path, monkeypatch):
+    from src import config
+    from src.citadel_auth import settings_store
+
+    connections = tmp_path / "connections.json"
+    connections.write_text('{"connections": {"main": {"type": "sqlite", "path": "m.db"}, "other": {"type": "sqlite", "path": "o.db"}}}', encoding="utf-8")
+    monkeypatch.setattr(config, "SETTINGS_DB", tmp_path / "settings.db")
+    monkeypatch.setattr(config, "CONNECTIONS_PATH", connections)
+    monkeypatch.setattr(config, "ENV_PATH", tmp_path / ".env")
+
+    assert config.load_connections(CacheSettings()).instances == {}
+    settings_store.put(tmp_path / "settings.db", "instances", "reports", ["other"])
+    assert config.load_connections(CacheSettings()).instances == {"reports": ("other",)}

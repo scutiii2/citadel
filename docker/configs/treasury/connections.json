@@ -1,14 +1,17 @@
 {
   "connections": {
-    "main": {"type": "sqlite", "path": "main.db", "allow_raw_sql": false},
-    "data": {"type": "sqlite", "path": "ember.db"},
-    "stronghold": {"type": "sqlite", "path": "stronghold.db"}
-  },
-  "instances": {
-    "default": ["main"],
-    "ember": ["data"],
-    "armory": ["data", "stronghold"],
-    "legion": ["data"],
-    "stronghold": ["stronghold"]
+    "main": {
+      "type": "sqlite",
+      "path": "main.db",
+      "allow_raw_sql": false
+    },
+    "data": {
+      "type": "sqlite",
+      "path": "ember.db"
+    },
+    "stronghold": {
+      "type": "sqlite",
+      "path": "stronghold.db"
+    }
   }
 }

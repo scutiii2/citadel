@@ -127,10 +127,13 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
 4. **Configs are tracked.** Every `configs/*.json` is in git and none has an `.example` twin; each `configs/` folder has a
    `README.md` describing its keys. Secrets are `${NAME}` placeholders filled from the `.env` files (see the
-   `.env.example` beside each). Compose mounts the tracked files under `docker/configs/` read-only over
-   `config_extensions.json`, `config_capabilities.json`, `config_servers.json`, `config_app.json` and
-   `config_connections.json` for container values. Changes an admin makes at run time (extensions, capability
-   toggles, Legion tuning and prompts) are saved in `.data/<service>/`, so they survive rebuilds and never show in git.
+   `.env.example` beside each). Compose mounts the tracked files under `docker/configs/` read-only for container values (Portcullis's, Stronghold's
+   and Treasury's `config_app.json`, Treasury's `config_connections.json`). Everything an
+   admin changes at run time is saved in `.data/<service>/`, so it survives rebuilds and never shows in git: Armory's
+   extensions, capability toggles and ticket settings and Legion's servers (each in `settings.db`), Legion's tuning and
+   prompts, and the instances Treasury's callers register. A new install starts with every Armory capability off, no
+   Armory extension and no Legion server: an administrator turns on and adds what the machine needs. Stronghold alone
+   owns the usage limits and the price table; Portcullis reads the prices from it.
    Fill in `apps/armory/.env` (`SMTP_FROM`, `SMTP_PASSWORD`) before using email.
 
 5. **Start:**
@@ -236,7 +239,7 @@ Legion's Anthropic-protocol and OpenAI-protocol agents call their models through
 
 Product logic, called only by Portcullis. The calendar is the first feature that lives there.
 
-- **Storage**: Treasury, connection `stronghold` (`stronghold.db` in `.data/treasury/`). `docker/configs/treasury/connections.json` must list the `stronghold` connection and instance.
+- **Storage**: Treasury, connection `stronghold` (`stronghold.db` in `.data/treasury/`). `docker/configs/treasury/connections.json` must list the `stronghold` connection; Stronghold registers its own instance.
 - **Keys**: `.data/stronghold/keys.json` is made on first start. It holds the key that encrypts saved calendar links and the web push key pair. Back the folder up. Without the file, saved links must be entered again and browsers must subscribe to push again.
 - **Settings**: `docker/configs/stronghold/app.json` (the `calendar` block). The `calendar` block in Portcullis's config and `EMBER_VAPID_*` in its `.env` are no longer read.
 - **Notes shared with agents**: Armory's notes tools read Stronghold's database. Compose sets `DB_GATEWAY_INSTANCE=armory` and `DB_GATEWAY_CONNECTION=stronghold` for Armory, and `docker/configs/treasury/connections.json` lists `stronghold` under instance `armory`. A value for these in `apps/armory/.env` is overridden by Compose.
@@ -262,7 +265,7 @@ The Server Manager capability (chat id `server`) lists, starts, stops and restar
 logs. It works through the host Docker socket, which `docker-compose.yml` mounts into `armory`
 (`/var/run/docker.sock`).
 
-Enable it on the Capabilities page of armory_admin, or in `docker/configs/armory/capabilities.json`:
+Enable it on the Capabilities page of armory_admin, :
 
 ```json
 "server": { "enabled": true }
@@ -302,7 +305,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 | Overlay still binds `127.0.0.1` | Compose older than 2.24 ignores `!override`. Update Compose, or edit the `ports` lines in the main file. |
 | Port already in use | Another app uses 26502 or 26501. Change the left side of the port mapping. |
 | `permission denied` on the Docker socket | The container cannot read `/var/run/docker.sock`. Check its owner and mode on the host. |
-| Capability toggle reverted after a rebuild | `docker/configs/armory/capabilities.json` was reset (for example by `git checkout` or `git stash`) or is not mounted. Check `docker-compose.yml` mounts it, then set the toggle again. |
+| Capability toggle reverted after a rebuild | `.data/armory/settings.db` was deleted or is not mounted, so every capability started off. Check `docker-compose.yml` mounts `.data/armory`, then turn the capability on again. |
 | Funnel page loads but big files stall or time out | Check `docker inspect tailscale --format "{{.RestartCount}}"`. The ZimaOS Tailscale app's entrypoint (`tailscaled ... & sleep 10; tailscale web --listen 0.0.0.0:5252`) can exit after 10 s and restart the container in a loop. Append `; wait` to that entrypoint line in `/var/lib/casaos/apps/tailscale/docker-compose.yml` and run `docker compose up -d` there. A CasaOS app update may overwrite it. |
 
 ## Runtime data and cache

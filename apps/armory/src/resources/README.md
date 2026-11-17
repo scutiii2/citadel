@@ -55,7 +55,7 @@ resource needs a model-facing tool wrapper too:
 - The **capability** imports the resource's `domain`/`contract`
   modules and wraps them in a `tool.py` - never the other direction, so
   deleting the capability wrapper leaves the resource fully working.
-- One toggle entry in `../../configs/config_capabilities.json` governs
+- One toggle entry in the Capabilities page (stored in `.data/armory/settings.db`) governs
   both - `run.py` imports the resource and the capability's tool inside
   the *same* `capability_registry.capturing(mcp, "<name>")` block, so
   toggling `<name>` off/on live (via `PATCH /capabilities/<name>`,

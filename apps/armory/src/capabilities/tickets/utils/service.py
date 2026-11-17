@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 from src.config import settings
+from src.citadel_auth import settings_store
 from src.capabilities.tickets.utils import rules
 from src.services.redact import redact
 from src.capabilities.tickets.utils.config import TicketConfig, load_ticket_config
@@ -67,9 +68,10 @@ def _verified_context(context: dict[str, Any] | None) -> dict[str, str]:
 
 class TicketService:
     def __init__(self, store: TicketStore, config: TicketConfig, laya: Any = None,
-                 *, clock: Callable[[], datetime] | None = None) -> None:
+                 *, clock: Callable[[], datetime] | None = None, settings_path: Any = None) -> None:
         self._store = store
         self._config = config
+        self._settings_path = settings_path
         self._laya = laya
         self._clock = clock or _utc_now
 
@@ -79,6 +81,34 @@ class TicketService:
         custom = await self._db(self._store.owner_tags, owner)
         options.extend({"value": tag, "label": tag, "description": "A tag from your tickets."} for tag in custom if tag not in self._config.tags)
         return options
+
+    def settings_document(self) -> dict[str, Any]:
+        return self._config.document()
+
+    async def update_settings(self, changes: dict[str, Any]) -> dict[str, Any]:
+        """Change ticket settings: top-level keys in `changes` replace the current ones, `laya` merges key by key.
+        Validated as a whole, saved to the settings store, and used by the next ticket."""
+        if not isinstance(changes, dict) or not changes:
+            raise TicketError("Send at least one setting to change.")
+        document = self._config.document()
+        unknown = set(changes) - set(document)
+        if unknown:
+            raise TicketError(f"Unknown setting: {', '.join(sorted(unknown))}.")
+        document.update({key: value for key, value in changes.items() if key != "laya"})
+        if "laya" in changes:
+            if not isinstance(changes["laya"], dict):
+                raise TicketError("laya must be an object.")
+            document["laya"] = {**document["laya"], **changes["laya"]}
+        try:
+            config = load_ticket_config(document)
+        except ValueError as error:
+            raise TicketError(str(error)) from error
+        if self._settings_path is not None:
+            await self._db(settings_store.put, self._settings_path, "settings", "tickets", config.document())
+        self._config = config
+        if self._laya is not None:
+            self._laya.tune(min_confidence=config.laya_min_confidence, timeout=config.laya_timeout_seconds)
+        return config.document()
 
     def _now(self) -> datetime:
         return self._clock()
@@ -322,10 +352,10 @@ _service: TicketService | None = None
 
 
 def get_service() -> TicketService:
-    """The shared service, built on first use from settings and configs/config_tickets.json."""
+    """The shared service, built on first use from the ticket settings in the settings store."""
     global _service
     if _service is None:
-        config = load_ticket_config(settings.tickets_config_path)
+        config = load_ticket_config(settings_store.read_all(settings.settings_db_path, "settings").get("tickets"))
         laya = None
         if settings.laya_url:
             from src.capabilities.tickets.utils.laya import TicketLaya
@@ -335,5 +365,5 @@ def get_service() -> TicketService:
                 McpLayaTransport(settings.laya_url),
                 min_confidence=config.laya_min_confidence, timeout=config.laya_timeout_seconds,
             )
-        _service = TicketService(TicketStore(settings.tickets_db_path), config, laya)
+        _service = TicketService(TicketStore(settings.tickets_db_path), config, laya, settings_path=settings.settings_db_path)
     return _service

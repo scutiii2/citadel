@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.config import DATA
+
 MB = 1024 * 1024
 
 @dataclass(frozen=True)
@@ -37,8 +39,8 @@ class Settings:
     """Engine settings supplied by Armory; no standalone environment or config loading."""
 
     public_base_url: str = "http://127.0.0.1:8000"
-    store_dir: Path = Path("specifics/pdf_merger/.data/store")
-    log_dir: Path = Path("specifics/pdf_merger/.logs")
+    store_dir: Path = DATA / "pdf_merger" / "store"
+    log_dir: Path = DATA / "pdf_merger" / "logs"
     file_ttl_seconds: int = 6 * 3600
     sweep_interval_seconds: int = 600
     download_link_seconds: int = 3600

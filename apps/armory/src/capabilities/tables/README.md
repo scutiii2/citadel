@@ -43,4 +43,4 @@ evict other users' tables. Numeric ids of 16+ digits are typed as float and lose
 Every id is random, opaque and owner-bound; an unknown, expired or foreign id gives the same "not found". Cell values
 come from the user's file and may hold injection text, so each result carries a `notice` saying they are data.
 
-Toggle: `"data"` in `configs/config_capabilities.json`.
+Toggle: `"data"` in the Capabilities page (stored in `.data/armory/settings.db`).

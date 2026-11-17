@@ -14,6 +14,9 @@ from src.config import settings
 from src.services import extensions
 from src.services.app_config import ExtensionConfig
 
+# The header a tool service (Bard, Scribe, Reader, Lens, Mimic) reads its per-caller token from.
+TOKEN_HEADER = "X-Internal-Token"
+
 # Anything not a lowercase letter or digit collapses to a single "_", so the result
 # can never contain "__" (extensions.NAMESPACE_SEPARATOR).
 _SLUG_INVALID = re.compile(r"[^a-z0-9]+")
@@ -73,6 +76,12 @@ async def create_extension(request: Request) -> JSONResponse:
     internal = body.get("internal", False)
     if not isinstance(internal, bool):
         return JSONResponse({"error": "'internal' must be true or false"}, status_code=400)
+    token = body.get("token", "")
+    if not isinstance(token, str):
+        return JSONResponse({"error": "'token' must be text"}, status_code=400)
+    forward = body.get("forward_requester", bool(token.strip()))
+    if not isinstance(forward, bool):
+        return JSONResponse({"error": "'forward_requester' must be true or false"}, status_code=400)
 
     if not label:
         return JSONResponse({"error": "'label' is required"}, status_code=400)
@@ -92,9 +101,12 @@ async def create_extension(request: Request) -> JSONResponse:
         transport="http",
         url=url,
         internal=internal,
+        # The token the tool service made for this caller on its own admin page (Tokens card), sent as it expects.
+        headers={TOKEN_HEADER: token.strip()} if token.strip() else {},
+        forward_requester=forward,
     )
     try:
-        status = await extensions.add_extension(config, settings.extensions_config_path)
+        status = await extensions.add_extension(config, settings.settings_db_path)
     except OSError as error:
         return _unsaved(error)
     if status is None:
@@ -109,7 +121,7 @@ async def delete_extension(request: Request) -> Response:
     extensions.remove_extension. 404 for an unknown id, 204 on success."""
     extension_id = request.path_params["extension_id"]
     try:
-        removed = await extensions.remove_extension(extension_id, settings.extensions_config_path)
+        removed = await extensions.remove_extension(extension_id, settings.settings_db_path)
     except OSError as error:
         return _unsaved(error)
     if not removed:

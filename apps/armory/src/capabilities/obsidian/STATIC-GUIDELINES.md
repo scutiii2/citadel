@@ -1,10 +1,9 @@
 # Obsidian index state
 
-`specifics/obsidian/.data/index.db` (configurable with `OBSIDIAN_INDEX_PATH`)
+`.cache/armory/obsidian/index.db` (configurable with `OBSIDIAN_INDEX_PATH`)
 holds generated SQLite FTS5/sqlite-vec state: source hashes/mtimes, chunks,
 vectors and metadata. SQLite may create adjacent `-wal` and `-shm` files.
-These files are private generated state, gitignored by the existing specifics
-rule. They contain vault text: protect them like the vault, not like source code.
+These files are private generated state, gitignored with `.cache/`. They contain vault text: protect them like the vault, not like source code.
 
 The source is a separate read-only mount (`OBSIDIAN_VAULT_PATH`). The index
 must be outside it. Indexing never writes to the mount. Missing documents are

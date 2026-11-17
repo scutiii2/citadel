@@ -220,6 +220,16 @@ async def staff_stats(request: Request) -> JSONResponse:
     return JSONResponse(await tickets.get_service().stats())
 
 
+@_guarded
+async def staff_settings(request: Request) -> JSONResponse:
+    return JSONResponse(tickets.get_service().settings_document())
+
+
+@_guarded
+async def staff_update_settings(request: Request) -> JSONResponse:
+    return JSONResponse(await tickets.get_service().update_settings(await _body(request)))
+
+
 def install_ticket_routes(app: Starlette) -> None:
     install_auth(app)
     app.add_route("/tickets/tags", tag_options, methods=["GET"])
@@ -237,3 +247,5 @@ def install_ticket_routes(app: Starlette) -> None:
     app.add_route("/ticket-admin/groups", staff_groups, methods=["GET"])
     app.add_route("/ticket-admin/groups/{group_id:int}", staff_patch_group, methods=["PATCH"])
     app.add_route("/ticket-admin/stats", staff_stats, methods=["GET"])
+    app.add_route("/ticket-admin/settings", staff_settings, methods=["GET"])
+    app.add_route("/ticket-admin/settings", staff_update_settings, methods=["PATCH"])

@@ -37,5 +37,5 @@ Reusable how-tos the assistant proposes after solving a multi-step task. Three t
 
 ## Configuration
 
-- `MCP_SKILLS_DB_PATH` (`.env`, optional): the SQLite file. Default `specifics/skills/.data/skills.db`, gitignored.
-- Toggle: the `skills` entry in `configs/config_capabilities.json`, or the Capabilities page in ember_admin. Starts offline.
+- `MCP_SKILLS_DB_PATH` (`.env`, optional): the SQLite file. Default `.data/armory/skills/skills.db`, gitignored.
+- Toggle: the `skills` entry in the Capabilities page (stored in `.data/armory/settings.db`), or the Capabilities page in ember_admin. Starts offline.

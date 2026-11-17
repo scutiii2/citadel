@@ -50,4 +50,4 @@ No config or secrets, and nothing is stored: no files, no database, no audit tra
 
 **Privacy.** Without `email_to`, a generated value, and a TOTP secret passed to `tool_gen_getTotpCode`, travels through the chat and the agent transcript like any other tool result or argument. The tool does not log or store it, but chat history and agent logs may. Treat a value generated here as visible to whoever can read that chat; do not use it for something that must stay secret from them.
 
-Toggle: `"gen"` in `configs/config_capabilities.json`.
+Toggle: `"gen"` in the Capabilities page (stored in `.data/armory/settings.db`).

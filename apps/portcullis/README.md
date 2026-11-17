@@ -274,10 +274,9 @@ uv sync
 uv run python -m src.run
 ```
 
-On first start, a missing `configs/config_app.json` is copied from its
-`.example` twin and a missing `.env` is built from an old
+On first start a missing `.env` is built from an old
 `secrets/secret_*.env` set if there is one, else from `.env.example`,
-`data/ember_api.db` is created, and the bootstrap admin account is made. If
+`.data/portcullis/ember_api.db` is created, and the bootstrap admin account is made. If
 `BOOTSTRAP_ADMIN_PASSWORD` is empty, a random password is printed to the
 console once - save it.
 
@@ -656,7 +655,7 @@ operation verifies Portcullis's requester token, including per-tool MCP metadata
     purpose; and any member with `tools.use` can run any tool (that is what the
     permission means; "ask before each tool" is opt-in per chat).
 - **Backups:** the `backup` block in `config_app.json` copies the database
-  every 24 hours (default) into `data/backups` and keeps 14. See the config
+  every 24 hours (default) into `.data/portcullis/backups` and keeps 14. See the config
   README. `python -m scripts.backup_db` makes one now. The Config issues page
   warns when backups are off, when `cookie_secure` is off on a host other
   machines can reach, when HSTS is off while cookies are secure.
@@ -671,7 +670,7 @@ the database to the newest revision (`migrations/versions/`):
   (`0001`) without being rebuilt;
 - `usage_records` keeps `agent_id`, `provider_id`, `gateway`, `started_at`, `finished_at` and `delegated_by` for each agent's share of an answer (migration `0003`; older rows have them empty);
 - a database that is behind gets the missing migrations, after a backup
-  (`data/backups/`). SQLite cannot undo a half-finished migration, so the
+  (`.data/portcullis/backups/`). SQLite cannot undo a half-finished migration, so the
   backup is the way back; if the backup fails, nothing is changed.
 
 To change a table or add a column:
@@ -691,9 +690,9 @@ migrations build, so a model edit without its migration is caught.
 ## Layout
 
 ```
-configs/   config_app.json(.example)          host, port, db path, session/cookie settings
+configs/   config_app.json                    host, session/cookie settings, URLs, security, backup
 .env       BOOTSTRAP_ADMIN_* (+ .env.example); secrets/ is the old layout, read once to build it
-data/      ember_api.db (runtime, gitignored)
+           (runtime data - ember_api.db, backups - is in .data/portcullis/ of the Citadel folder)
 src/
   run.py, app.py, config.py, db.py, deps.py, json_only.py, security.py, body_limit.py
   models/     Account, AppSetting, Role, Permission, LoginAttempt, AuthSession, InviteCode, EmailVerificationCode, Chat,

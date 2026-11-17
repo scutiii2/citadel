@@ -243,7 +243,7 @@ from src.services.capability_loader import CapabilityLoader  # noqa: E402
 
 @pytest.fixture
 def client(widgets, monkeypatch, tmp_path):
-    loader = CapabilityLoader(FastMCP(name="routes"), "src.capabilities", tmp_path / "config_capabilities.json")
+    loader = CapabilityLoader(FastMCP(name="routes"), "src.capabilities", tmp_path / "settings.db")
     app = Starlette()
     capability_routes.install_capability_routes(app, loader)
     with TestClient(app) as test_client:

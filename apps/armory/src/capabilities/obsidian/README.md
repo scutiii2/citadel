@@ -50,7 +50,7 @@ Reads server `Settings` (`../../config.py`), populated from the environment. The
 
 Restart Armory after changing environment-backed settings. Base URL and API key are never returned or logged by this capability. Requests refuse redirects, and errors contain neither remote response bodies nor transport exception details.
 
-The capability starts **offline** when absent from `apps/armory/configs/config_capabilities.json`. Refresh capabilities in ember_admin (or `POST /capabilities/refresh`), then switch `obsidian` online (`PATCH /capabilities/obsidian`). The loader persists its `enabled` toggle in that file. Switch it offline to disable all six tools. No `run.py` or manual toggle entry is needed. `/obsidian help` describes these commands.
+The capability starts **offline** when absent from `.data/armory/settings.db`. Refresh capabilities in ember_admin (or `POST /capabilities/refresh`), then switch `obsidian` online (`PATCH /capabilities/obsidian`). The loader persists its `enabled` toggle in that file. Switch it offline to disable all six tools. No `run.py` or manual toggle entry is needed. `/obsidian help` describes these commands.
 
 ## Paths, output and ownership
 
@@ -69,7 +69,7 @@ Install Armory's updated dependencies (`sqlite-vec`, `PyYAML`) and run a user-op
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `OBSIDIAN_VAULT_PATH` | empty | Dedicated vault mounted read-only, e.g. `/vault`; must match the REST vault. |
-| `OBSIDIAN_INDEX_PATH` | `specifics/obsidian/.data/index.db` | Generated SQLite database outside the vault. |
+| `OBSIDIAN_INDEX_PATH` | `.cache/armory/obsidian/index.db` | Generated SQLite database outside the vault. |
 | `OBSIDIAN_OLLAMA_URL` | `http://127.0.0.1:11434` | Local embedding service reachable from Armory. |
 | `OBSIDIAN_EMBED_MODEL` | `nomic-embed-text` | Installed embedding model. |
 | `OBSIDIAN_REFRESH_SECONDS` | `60` | Incremental refresh interval in seconds. |

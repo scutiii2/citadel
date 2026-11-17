@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -83,66 +82,9 @@ class SecuritySettings:
 
 
 @dataclass(frozen=True)
-class UsageSettings:
-    """config_app.json's "usage" block. The token limits (six_hour_token_limit, weekly_token_limit)
-    are Stronghold's now; only the chat context settings stay here."""
-
-    # Soft cap on one chat's context, whatever the model allows: at
-    # auto_summarize_ratio of it (or of the model's window, if smaller) the
-    # chat is summarized before the next question is sent.
-    max_context_tokens_per_chat: int = 150_000
-    auto_summarize_ratio: float = 0.6
-
-    @classmethod
-    def from_config(cls, raw: dict) -> UsageSettings:
-        ratio = float(raw.get("auto_summarize_ratio", 0.6))
-        if not 0 < ratio <= 1:
-            raise ValueError("usage.auto_summarize_ratio must be above 0 and at most 1")
-        return cls(
-            max_context_tokens_per_chat=max(0, int(raw.get("max_context_tokens_per_chat", 150_000))),
-            auto_summarize_ratio=ratio,
-        )
-
-
-@dataclass(frozen=True)
-class ModelPrice:
-    input: float
-    output: float
-
-
-@dataclass(frozen=True)
-class PricingSettings:
-    """Model prices per million tokens. Unknown models have no estimate."""
-
-    currency: str = "USD"
-    models: dict[str, ModelPrice] = field(default_factory=dict)
-
-    @classmethod
-    def from_config(cls, raw: dict) -> PricingSettings:
-        currency = raw.get("currency", "USD")
-        if currency != "USD":
-            raise ValueError("pricing.currency must be USD")
-        models = raw.get("models", {})
-        if not isinstance(models, dict):
-            raise ValueError("pricing.models must be an object")
-        prices = {}
-        for model, price in models.items():
-            if not isinstance(model, str) or not model.strip():
-                raise ValueError(f"pricing.models key must be a non-empty string: {model!r}")
-            if not isinstance(price, dict):
-                raise ValueError(f"pricing.models.{model} must be an object")
-            for side in ("input", "output"):
-                value = price.get(side)
-                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
-                    raise ValueError(f"pricing.models.{model}.{side} must be a finite number >= 0")
-            prices[model] = ModelPrice(input=float(price["input"]), output=float(price["output"]))
-        return cls(currency=currency, models=prices)
-
-
-@dataclass(frozen=True)
 class BackupSettings:
     """config_app.json's "backup" block: a copy of the database every
-    `every_hours` hours, the newest `keep` of them kept (in `data/backups`)."""
+    `every_hours` hours, the newest `keep` of them kept (in `backups/` beside the database)."""
 
     enabled: bool = True
     keep: int = 14
@@ -203,8 +145,6 @@ class Settings:
     # Scribe (speech to text): the dictation WebSocket is relayed from here; Stronghold sends it audio files.
     scribe_url: str = "http://127.0.0.1:29401"
     security: SecuritySettings = field(default_factory=SecuritySettings)
-    usage: UsageSettings = field(default_factory=UsageSettings)
-    pricing: PricingSettings = field(default_factory=PricingSettings)
     backup: BackupSettings = field(default_factory=BackupSettings)
     db_gateway: DbGatewaySettings = field(default_factory=DbGatewaySettings)
     # Where these settings came from (the Config issues page re-reads it).
@@ -246,8 +186,6 @@ def load_settings() -> Settings:
         bard_url=raw.get("bard_url") or "http://127.0.0.1:29400",
         scribe_url=raw.get("scribe_url") or "http://127.0.0.1:29401",
         security=SecuritySettings.from_config(raw.get("security", {})),
-        usage=UsageSettings.from_config(raw.get("usage", {})),
-        pricing=PricingSettings.from_config(load_json_config(CONFIGS_DIR / "config_pricing.json")),
         backup=BackupSettings.from_config(raw.get("backup", {})),
         db_gateway=DbGatewaySettings.from_config(raw.get("db_gateway", {})),
         config_path=CONFIGS_DIR / "config_app.json",

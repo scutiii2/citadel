@@ -66,6 +66,12 @@ class RecordBody(BaseModel):
     rows: list[UsageRow] = Field(max_length=100)
 
 
+@router.get("/pricing")
+async def pricing(request: Request) -> dict[str, Any]:
+    """The model price table (per million tokens). Stronghold owns it; Portcullis reads it to price chat messages."""
+    return request.app.state.pricing.document()
+
+
 @router.post("/check")
 async def check(requester: Requester = Depends(current_requester), usage: UsageService = Depends(get_usage)) -> dict[str, Any]:
     """`{"block": null}`, or `{"block": {reason, reset_at}}` when a token limit is reached."""

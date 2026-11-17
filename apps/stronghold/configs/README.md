@@ -10,4 +10,7 @@ but in `../.env` (see `../.env.example`). Restart Stronghold after editing.
 | `pricing.currency` | Must be `USD`. |
 | `pricing.models` | Price per model name, `input` and `output` in USD per 1,000,000 tokens. A model that is not listed has no cost estimate. |
 
+Stronghold is the only owner of the usage limits and the price table. Portcullis keeps no copy: it reads the
+prices from `GET /usage/pricing` to price the chat messages it holds.
+
 Stronghold's data and keys are not here: they are in `.data/stronghold/` in the Citadel folder.

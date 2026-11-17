@@ -60,7 +60,6 @@ def test_config_flag_is_read_and_defaults_to_required(tmp_path, monkeypatch) -> 
     monkeypatch.setattr(config, "CONFIGS_DIR", configs)
 
     (configs / "config_app.json").write_text("{}", encoding="utf-8")
-    (configs / "config_pricing.json").write_text("{}", encoding="utf-8")
     assert load_settings().require_email_verification is True
 
     (configs / "config_app.json").write_text('{"require_email_verification": false}', encoding="utf-8")

@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from src.config import CACHE, DATA
 MB = 1024 * 1024
 
 @dataclass(frozen=True)
@@ -37,8 +39,8 @@ class Settings:
     port: int = 8050
     public_base_url: str = "http://127.0.0.1:8050"
     web_origin: str = "http://127.0.0.1:5175"
-    store_dir: Path = Path("specifics/media_downloader/.data/store")
-    log_dir: Path = Path("specifics/media_downloader/.logs")
+    store_dir: Path = CACHE / "media_downloader" / "store"
+    log_dir: Path = DATA / "media_downloader" / "logs"
     file_ttl_seconds: int = 6 * 3600
     sweep_interval_seconds: int = 600
     download_link_seconds: int = 3600

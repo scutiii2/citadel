@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from src.citadel_auth import settings_store
+
 
 
 # ${NAME} (a normal env-var identifier) is expanded; a "$" not followed by "{" is left alone.
@@ -122,22 +124,6 @@ def resolve_section(value: Any, *, where: str, config_path: Path) -> Any:
     return value
 
 
-# Admin pages change these two at run time. The tracked file in configs/ holds the defaults; the changes
-# are kept as a small overlay in Armory's data folder (.data/armory/config/<name>), so git never sees them.
-RUNTIME_CONFIGS = ("config_extensions.json", "config_capabilities.json")
-
-
-def _overlay_path(config_path: Path) -> Path | None:
-    """The overlay of one of the two files above when `config_path` is the real one in configs/."""
-    if config_path.name not in RUNTIME_CONFIGS:
-        return None
-    from src.config import DATA, settings
-
-    if config_path.resolve().parent != settings.configs_dir.resolve():
-        return None
-    return DATA / "config" / config_path.name
-
-
 def _read_object(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}.")
@@ -153,17 +139,8 @@ def _read_object(path: Path) -> dict[str, Any]:
 
 def load_config(config_path: Path) -> dict[str, Any]:
     """Read and parse one config file, raising on anything unusable.
-    Returns the document as written, ``${VAR}`` placeholders included; resolve with ``resolve_section``.
-    For the two run-time files the overlay is applied on top: its entries win, and ``null`` removes one."""
-    data = _read_object(config_path)
-    overlay = _overlay_path(config_path)
-    if overlay is not None and overlay.exists():
-        for key, value in _read_object(overlay).items():
-            if value is None:
-                data.pop(key, None)
-            else:
-                data[key] = value
-    return data
+    Returns the document as written, ``${VAR}`` placeholders included; resolve with ``resolve_section``."""
+    return _read_object(config_path)
 
 
 def _require(section: dict[str, Any], key: str, *, prefix: str, config_path: Path) -> Any:
@@ -233,9 +210,8 @@ def load_email_config(config_path: Path) -> EmailConfig:
 
 
 def _extensions_section(config_path: Path) -> dict[str, Any]:
-    """The raw extensions mapping, placeholders still unresolved -
-    config_extensions.json's whole content."""
-    return load_config(config_path)
+    """The raw extensions mapping from the settings store, placeholders still unresolved."""
+    return settings_store.read_all(config_path, "extensions")
 
 
 def _build_extension(id_: str, entry: Any, *, config_path: Path) -> ExtensionConfig:
@@ -316,7 +292,7 @@ def _build_extension(id_: str, entry: Any, *, config_path: Path) -> ExtensionCon
 
 
 def load_extensions_config(config_path: Path) -> dict[str, ExtensionConfig]:
-    """Parse config_extensions.json into ExtensionConfigs keyed by id, once at startup.
+    """Parse the extensions in the settings store into ExtensionConfigs keyed by id, once at startup.
     See ``_build_extension`` for why one broken entry doesn't stop the rest."""
     section = _extensions_section(config_path)
     return {id_: _build_extension(id_, entry, config_path=config_path) for id_, entry in section.items()}
@@ -333,27 +309,17 @@ def load_extension_config(config_path: Path, id_: str) -> ExtensionConfig:
     return _build_extension(id_, section[id_], config_path=config_path)
 
 
-def _write_config(config_path: Path, data: dict[str, Any]) -> None:
-    """Save `data`. For the two run-time files only the difference from the tracked file is written, to the overlay."""
-    overlay = _overlay_path(config_path)
-    if overlay is not None:
-        tracked = _read_object(config_path)
-        data = {**{key: value for key, value in data.items() if tracked.get(key) != value},
-                **{key: None for key in tracked if key not in data}}
-        config_path = overlay
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-    with config_path.open("w", encoding="utf-8") as handle:
-        json.dump(data, handle, indent=2)
-
-
 def save_extension_config(config_path: Path, config: ExtensionConfig) -> None:
-    """Insert or overwrite one entry in config_extensions.json, leaving every other entry untouched.
-    Reads with ``load_config`` so other entries' ``${VAR}`` pass through unresolved; writes only the transport's fields, and never ``headers`` (resolved secrets; configure by hand)."""
-    data = load_config(config_path)
-
+    """Insert or overwrite one extension in the settings store, leaving every other one untouched.
+    Writes only the transport's fields. ``headers`` (an upstream's own token, pasted on the Extensions page) are
+    kept as given: the database lives in the gitignored `.data/` folder, like the other saved connections."""
     entry: dict[str, Any] = {"label": config.label, "description": config.description}
     if config.transport == "http":
         entry["url"] = config.url
+        if config.headers:
+            entry["headers"] = {name: value.replace("$", "$$") for name, value in config.headers.items()}
+        if config.forward_requester:
+            entry["forward_requester"] = True
         if config.internal:
             entry["internal"] = True
             entry["audience"] = config.audience
@@ -362,17 +328,13 @@ def save_extension_config(config_path: Path, config: ExtensionConfig) -> None:
         entry["args"] = config.args
     if config.web_url:
         entry["web_url"] = config.web_url
-    data[config.id] = entry
-
-    _write_config(config_path, data)
+    settings_store.put(config_path, "extensions", config.id, entry)
 
 
 def delete_extension_config(config_path: Path, extension_id: str) -> None:
-    """Remove one entry from config_extensions.json.
+    """Remove one extension from the settings store.
     Idempotent: removing an absent id is not an error."""
-    data = load_config(config_path)
-    data.pop(extension_id, None)
-    _write_config(config_path, data)
+    settings_store.delete(config_path, "extensions", extension_id)
 
 
 # --- capabilities ---
@@ -380,16 +342,14 @@ def delete_extension_config(config_path: Path, extension_id: str) -> None:
 
 
 def load_capabilities_config(config_path: Path) -> dict[str, dict[str, Any]]:
-    """Read config_capabilities.json: which capabilities are enabled.
-    A missing file gives {} (all enabled), unlike other loaders."""
-    if not config_path.exists():
-        return {}
-    return load_config(config_path)
+    """The capability entries in the settings store: which capabilities are enabled.
+    An empty store gives {}: nothing is switched on until an administrator does it."""
+    return settings_store.read_all(config_path, "capabilities")
 
 
 def capability_enabled(config: dict[str, dict[str, Any]], name: str) -> bool:
     """True unless `name` is present in `config` with `"enabled": false`.
-    An unlisted capability is enabled; defaulting to disabled would make every capability vanish once the file exists."""
+    Only called for a name that has an entry; a capability with no entry is never loaded."""
     entry = config.get(name, {})
     if not isinstance(entry, dict):
         return True
@@ -398,25 +358,9 @@ def capability_enabled(config: dict[str, dict[str, Any]], name: str) -> bool:
 
 def save_capabilities_config(config_path: Path, name: str, enabled: bool) -> None:
     """Persist one capability's enabled state, leaving other entries untouched; mirrors save_extension_config.
-    A missing file is fine: this is the first writer of config_capabilities.json."""
-    data = load_config(config_path) if config_path.exists() else {}
-    data.setdefault(name, {})["enabled"] = enabled
-    _write_config(config_path, data)
-
-
-_SCANNER_MARKER = "_scanner"
-
-
-def migrate_capabilities_config(config_path: Path, ids: list[str]) -> None:
-    """Once, on the folder scanner's first run: write ``enabled: true`` for every capability without an entry, then set a marker.
-    Afterwards a new folder with no entry stays offline until an admin enables it; does nothing once the marker exists."""
-    data = load_config(config_path) if config_path.exists() else {}
-    if _SCANNER_MARKER in data:
-        return
-    for capability_id in ids:
-        data.setdefault(capability_id, {"enabled": True})
-    data[_SCANNER_MARKER] = {"migrated": True}
-    _write_config(config_path, data)
+    A capability with no entry stays offline: an administrator turns each one on, on the deployed machine."""
+    entry = settings_store.read_all(config_path, "capabilities").get(name, {})
+    settings_store.put(config_path, "capabilities", name, {**entry, "enabled": enabled})
 
 
 RENAMED_CAPABILITIES = {"video": "media"}
@@ -425,14 +369,9 @@ RENAMED_CAPABILITIES = {"video": "media"}
 def migrate_renamed_capabilities(config_path: Path) -> None:
     """Move the entry of a renamed capability to its new id, so its on/off state survives.
     An entry already under the new id wins. Writes only when something moved."""
-    if not config_path.exists():
-        return
-    data = load_config(config_path)
-    moved = False
+    data = settings_store.read_all(config_path, "capabilities")
     for old, new in RENAMED_CAPABILITIES.items():
         if old in data:
-            data.setdefault(new, data[old])
-            del data[old]
-            moved = True
-    if moved:
-        _write_config(config_path, data)
+            if new not in data:
+                settings_store.put(config_path, "capabilities", new, data[old])
+            settings_store.delete(config_path, "capabilities", old)

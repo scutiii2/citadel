@@ -1,5 +1,5 @@
-"""Load and validate configs/config_servers.json into typed ServerConfig
-objects.
+"""Load and validate the `servers` table of Legion's settings database into typed
+ServerConfig objects.
 
 Mirrors the shape of mcp_server/src/infra/app_config.py's ExtensionConfig,
 generalized with an optional `auth` block - every configured server here
@@ -14,11 +14,11 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from src.runtime.config_files import read_section
+from src.citadel_auth import settings_store
 
 
 class ConfigError(ValueError):
-    """Raised for a malformed config_servers.json servers entry."""
+    """Raised for a malformed server entry."""
 
 
 @dataclass(frozen=True)
@@ -101,8 +101,13 @@ def _build_server(server_id: str, raw: dict[str, Any]) -> ServerConfig:
     )
 
 
+def validate_server(server_id: str, raw: dict[str, Any]) -> ServerConfig:
+    """One entry checked as a server; raises ConfigError."""
+    return _build_server(server_id, raw)
+
+
 def load_servers_config(path: Path, url_overrides: dict[str, str] | None = None) -> dict[str, ServerConfig]:
-    """Load and validate every entry in `path` (config_servers.json servers).
+    """Load and validate every server in the settings database at `path`.
 
     Raises ConfigError for any entry missing a required field, using an
     unknown transport/auth type, or mixing fields from the wrong
@@ -113,9 +118,9 @@ def load_servers_config(path: Path, url_overrides: dict[str, str] | None = None)
     `url_overrides` (server_id -> url) replaces an http entry's configured
     url after loading - used by mcp_upstream.py to let --mcp-url/
     MCP_SERVER_URL repoint the "main" upstream server without editing
-    config_servers.json. Ignored for a stdio entry or an unknown server_id.
+    changing the stored entry. Ignored for a stdio entry or an unknown server_id.
     """
-    raw_data = read_section(path, "servers")
+    raw_data = settings_store.read_all(path, "servers")
     servers = {server_id: _build_server(server_id, raw) for server_id, raw in raw_data.items()}
     for server_id, url in (url_overrides or {}).items():
         config = servers.get(server_id)

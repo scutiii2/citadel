@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from src.citadel_auth import settings_store
 from src.services.app_config import (
     EmailConfig,
     ExtensionConfig,
@@ -18,7 +19,6 @@ from src.services.app_config import (
     load_email_config,
     load_extension_config,
     load_extensions_config,
-    migrate_capabilities_config,
     migrate_renamed_capabilities,
     resolve_section,
     save_capabilities_config,
@@ -29,6 +29,22 @@ from src.services.app_config import (
 def _write(tmp_path: Path, data: dict) -> Path:
     path = tmp_path / "config.json"
     path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
+def _store(tmp_path: Path, extensions: dict) -> Path:
+    """A settings store holding these extensions."""
+    path = tmp_path / "settings.db"
+    for key, entry in extensions.items():
+        settings_store.put(path, "extensions", key, entry)
+    return path
+
+
+def _caps(tmp_path: Path, capabilities: dict) -> Path:
+    """A settings store holding these capability entries."""
+    path = tmp_path / "settings.db"
+    for key, entry in capabilities.items():
+        settings_store.put(path, "capabilities", key, entry)
     return path
 
 
@@ -356,7 +372,7 @@ def test_domains_resolve_placeholders_and_are_still_normalized(tmp_path: Path):
 
 
 def test_extensions_are_keyed_by_id(tmp_path: Path):
-    path = _write(tmp_path, VALID_EXTENSIONS)
+    path = _store(tmp_path, VALID_EXTENSIONS)
 
     extensions = load_extensions_config(path)
 
@@ -368,7 +384,7 @@ def test_extensions_are_keyed_by_id(tmp_path: Path):
 
 def test_args_default_to_empty_list(tmp_path: Path):
     no_args = {k: v for k, v in VALID_EXTENSIONS["reference"].items() if k != "args"}
-    path = _write(tmp_path, {"reference": no_args})
+    path = _store(tmp_path, {"reference": no_args})
 
     assert load_extensions_config(path)["reference"].args == []
 
@@ -376,7 +392,7 @@ def test_args_default_to_empty_list(tmp_path: Path):
 def test_description_defaults_to_empty_string(tmp_path: Path):
     """Unlike `label` or `command`, a missing description degrades gracefully; it's cosmetic."""
     no_description = {k: v for k, v in VALID_EXTENSIONS["reference"].items() if k != "description"}
-    path = _write(tmp_path, {"reference": no_description})
+    path = _store(tmp_path, {"reference": no_description})
 
     assert load_extensions_config(path)["reference"].description == ""
 
@@ -385,7 +401,7 @@ def test_missing_command_and_url_is_rejected(tmp_path: Path):
     """'command' xor 'url' is required, so omitting 'command' alone with no 'url' raises the mutual-exclusion ValueError, not a KeyError.
     (see test_extension_with_neither_command_nor_url_is_rejected)"""
     no_command = {k: v for k, v in VALID_EXTENSIONS["reference"].items() if k != "command"}
-    path = _write(tmp_path, {"reference": no_command})
+    path = _store(tmp_path, {"reference": no_command})
 
     with pytest.raises(ValueError, match="'command'.*'url'"):
         load_extensions_config(path)
@@ -393,7 +409,7 @@ def test_missing_command_and_url_is_rejected(tmp_path: Path):
 
 def test_missing_label_names_the_entry_and_the_key(tmp_path: Path):
     no_label = {k: v for k, v in VALID_EXTENSIONS["reference"].items() if k != "label"}
-    path = _write(tmp_path, {"reference": no_label})
+    path = _store(tmp_path, {"reference": no_label})
 
     with pytest.raises(KeyError, match="reference.label"):
         load_extensions_config(path)
@@ -403,7 +419,7 @@ def test_extension_args_resolve_placeholders(tmp_path: Path, monkeypatch):
     """The documented future use case: a bearer token passed as a CLI
     arg, named rather than written down, same as hosts.<name>.password."""
     monkeypatch.setenv("REFERENCE_TOKEN", "s3cret")
-    path = _write(
+    path = _store(
         tmp_path,
         {"reference": {**VALID_EXTENSIONS["reference"], "args": ["--token", "${REFERENCE_TOKEN}"]}},
     )
@@ -414,7 +430,7 @@ def test_extension_args_resolve_placeholders(tmp_path: Path, monkeypatch):
 def test_a_broken_extension_does_not_break_a_sibling_extension(tmp_path: Path, monkeypatch):
     """Resolution is per entry: one extension's unset secret can't take a working sibling down."""
     monkeypatch.delenv("MISSING_TOKEN", raising=False)
-    path = _write(
+    path = _store(
         tmp_path,
         {
             "reference": VALID_EXTENSIONS["reference"],
@@ -431,7 +447,7 @@ def test_a_broken_extension_does_not_break_a_sibling_extension(tmp_path: Path, m
 def test_loading_all_extensions_still_fails_when_any_is_broken(tmp_path: Path, monkeypatch):
     """The one caller that needs every extension returns the whole set; skipping the broken one would silently shorten it."""
     monkeypatch.delenv("MISSING_TOKEN", raising=False)
-    path = _write(
+    path = _store(
         tmp_path,
         {
             "reference": VALID_EXTENSIONS["reference"],
@@ -444,28 +460,28 @@ def test_loading_all_extensions_still_fails_when_any_is_broken(tmp_path: Path, m
 
 
 def test_unknown_extension_names_the_ones_that_exist(tmp_path: Path):
-    path = _write(tmp_path, VALID_EXTENSIONS)
+    path = _store(tmp_path, VALID_EXTENSIONS)
 
     with pytest.raises(KeyError, match="other, reference"):
         load_extension_config(path, "nope")
 
 
 def test_an_extension_entry_that_is_not_an_object_is_rejected(tmp_path: Path):
-    path = _write(tmp_path, {"reference": "not-a-dict"})
+    path = _store(tmp_path, {"reference": "not-a-dict"})
 
     with pytest.raises(ValueError, match="must be an object"):
         load_extensions_config(path)
 
 
 def test_extension_entry_args_must_be_a_list(tmp_path: Path):
-    path = _write(tmp_path, {"reference": {**VALID_EXTENSIONS["reference"], "args": "not-a-list"}})
+    path = _store(tmp_path, {"reference": {**VALID_EXTENSIONS["reference"], "args": "not-a-list"}})
 
     with pytest.raises(ValueError, match="must be a list"):
         load_extensions_config(path)
 
 
 def test_load_extensions_config_returns_extension_config_instances(tmp_path: Path):
-    path = _write(tmp_path, {"reference": VALID_EXTENSIONS["reference"]})
+    path = _store(tmp_path, {"reference": VALID_EXTENSIONS["reference"]})
 
     assert load_extensions_config(path)["reference"] == ExtensionConfig(
         id="reference",
@@ -482,7 +498,7 @@ def test_load_extensions_config_returns_extension_config_instances(tmp_path: Pat
 
 
 def test_http_extension_entry_parses_correctly(tmp_path: Path):
-    path = _write(
+    path = _store(
         tmp_path,
         {
             "remote": {
@@ -505,7 +521,7 @@ def test_http_extension_entry_parses_correctly(tmp_path: Path):
 
 
 def test_extension_with_both_command_and_url_is_rejected(tmp_path: Path):
-    path = _write(
+    path = _store(
         tmp_path,
         {"confused": {"label": "Confused", "command": "python", "url": "http://127.0.0.1:9000/mcp"}},
     )
@@ -515,7 +531,7 @@ def test_extension_with_both_command_and_url_is_rejected(tmp_path: Path):
 
 
 def test_extension_with_neither_command_nor_url_is_rejected(tmp_path: Path):
-    path = _write(tmp_path, {"nothing": {"label": "Nothing"}})
+    path = _store(tmp_path, {"nothing": {"label": "Nothing"}})
 
     with pytest.raises(ValueError, match="'command'.*'url'"):
         load_extensions_config(path)
@@ -523,13 +539,13 @@ def test_extension_with_neither_command_nor_url_is_rejected(tmp_path: Path):
 
 def test_http_extension_url_resolves_placeholders(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("UPSTREAM_HOST", "upstream.internal")
-    path = _write(tmp_path, {"remote": {"label": "Remote", "url": "http://${UPSTREAM_HOST}:9000/mcp"}})
+    path = _store(tmp_path, {"remote": {"label": "Remote", "url": "http://${UPSTREAM_HOST}:9000/mcp"}})
 
     assert load_extensions_config(path)["remote"].url == "http://upstream.internal:9000/mcp"
 
 
 def test_http_extension_empty_url_is_rejected(tmp_path: Path):
-    path = _write(tmp_path, {"remote": {"label": "Remote", "url": "   "}})
+    path = _store(tmp_path, {"remote": {"label": "Remote", "url": "   "}})
 
     with pytest.raises(ValueError, match="must not be empty"):
         load_extensions_config(path)
@@ -537,7 +553,7 @@ def test_http_extension_empty_url_is_rejected(tmp_path: Path):
 
 def test_http_extension_headers_resolve_placeholders(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("PDF_MERGER_TOKEN", "s3cret")
-    path = _write(
+    path = _store(
         tmp_path,
         {
             "pdf_merger": {
@@ -554,27 +570,27 @@ def test_http_extension_headers_resolve_placeholders(tmp_path: Path, monkeypatch
 def test_legacy_shared_token_placeholder_is_rejected_even_if_set(tmp_path: Path, monkeypatch):
     name = "INTERNAL_" + "API_TOKEN"
     monkeypatch.setenv(name, "must-not-be-used")
-    path = _write(tmp_path, {"legacy": {"label": "Legacy", "url": "http://legion/mcp",
+    path = _store(tmp_path, {"legacy": {"label": "Legacy", "url": "http://legion/mcp",
                                       "headers": {"Authorization": "${" + name + "}"}}})
     with pytest.raises(ValueError, match="unsupported"):
         load_extensions_config(path)
 
 
 def test_http_extension_without_headers_has_none(tmp_path: Path):
-    path = _write(tmp_path, {"remote": {"label": "Remote", "url": "http://127.0.0.1:9000/mcp"}})
+    path = _store(tmp_path, {"remote": {"label": "Remote", "url": "http://127.0.0.1:9000/mcp"}})
 
     assert load_extensions_config(path)["remote"].headers == {}
 
 
 def test_http_extension_headers_must_be_strings(tmp_path: Path):
-    path = _write(tmp_path, {"remote": {"label": "Remote", "url": "http://127.0.0.1:9000/mcp", "headers": {"X-Count": 3}}})
+    path = _store(tmp_path, {"remote": {"label": "Remote", "url": "http://127.0.0.1:9000/mcp", "headers": {"X-Count": 3}}})
 
     with pytest.raises(ValueError, match="'remote.headers' must be an object of string values"):
         load_extensions_config(path)
 
 
 def test_stdio_extension_with_headers_is_rejected(tmp_path: Path):
-    path = _write(tmp_path, {"local": {"label": "Local", "command": "python", "headers": {"X": "y"}}})
+    path = _store(tmp_path, {"local": {"label": "Local", "command": "python", "headers": {"X": "y"}}})
 
     with pytest.raises(ValueError, match="'local.headers' only applies to an http extension"):
         load_extensions_config(path)
@@ -585,19 +601,19 @@ def test_stdio_extension_with_headers_is_rejected(tmp_path: Path):
 
 
 def test_save_extension_config_adds_a_new_http_entry(tmp_path: Path):
-    path = _write(tmp_path, {})
+    path = _store(tmp_path, {})
 
     save_extension_config(
         path,
         ExtensionConfig(id="remote", label="Remote", description="desc", transport="http", url="http://x/mcp"),
     )
 
-    data = load_config(path)
+    data = settings_store.read_all(path, "extensions")
     assert data["remote"] == {"label": "Remote", "description": "desc", "url": "http://x/mcp"}
 
 
 def test_save_extension_config_adds_a_new_stdio_entry(tmp_path: Path):
-    path = _write(tmp_path, {})
+    path = _store(tmp_path, {})
 
     save_extension_config(
         path,
@@ -606,44 +622,44 @@ def test_save_extension_config_adds_a_new_stdio_entry(tmp_path: Path):
         ),
     )
 
-    data = load_config(path)
+    data = settings_store.read_all(path, "extensions")
     assert data["local"] == {"label": "Local", "description": "desc", "command": "python", "args": ["-m", "x"]}
 
 
 def test_save_extension_config_overwrites_an_existing_entry_by_id(tmp_path: Path):
-    path = _write(tmp_path, {"remote": {"label": "Old", "description": "", "url": "http://old/mcp"}})
+    path = _store(tmp_path, {"remote": {"label": "Old", "description": "", "url": "http://old/mcp"}})
 
     save_extension_config(
         path,
         ExtensionConfig(id="remote", label="New", description="", transport="http", url="http://new/mcp"),
     )
 
-    assert load_config(path)["remote"]["url"] == "http://new/mcp"
-    assert load_config(path)["remote"]["label"] == "New"
+    assert settings_store.read_all(path, "extensions")["remote"]["url"] == "http://new/mcp"
+    assert settings_store.read_all(path, "extensions")["remote"]["label"] == "New"
 
 
 def test_save_extension_config_preserves_other_extension_entries(tmp_path: Path):
-    path = _write(tmp_path, {"other": VALID_EXTENSIONS["other"]})
+    path = _store(tmp_path, {"other": VALID_EXTENSIONS["other"]})
 
     save_extension_config(
         path, ExtensionConfig(id="remote", label="Remote", description="", transport="http", url="http://x/mcp")
     )
 
-    data = load_config(path)
+    data = settings_store.read_all(path, "extensions")
     assert data["other"] == VALID_EXTENSIONS["other"]
     assert "remote" in data
 
 
 def test_delete_extension_config_removes_the_entry(tmp_path: Path):
-    path = _write(tmp_path, {"remote": {"label": "Remote", "description": "", "url": "http://x/mcp"}})
+    path = _store(tmp_path, {"remote": {"label": "Remote", "description": "", "url": "http://x/mcp"}})
 
     delete_extension_config(path, "remote")
 
-    assert "remote" not in load_config(path)
+    assert "remote" not in settings_store.read_all(path, "extensions")
 
 
 def test_delete_extension_config_preserves_other_extension_entries(tmp_path: Path):
-    path = _write(
+    path = _store(
         tmp_path,
         {
             "remote": {"label": "Remote", "description": "", "url": "http://x/mcp"},
@@ -653,50 +669,50 @@ def test_delete_extension_config_preserves_other_extension_entries(tmp_path: Pat
 
     delete_extension_config(path, "remote")
 
-    data = load_config(path)
+    data = settings_store.read_all(path, "extensions")
     assert "remote" not in data
     assert data["other"] == VALID_EXTENSIONS["other"]
 
 
 def test_delete_extension_config_is_idempotent_for_an_unknown_id(tmp_path: Path):
-    path = _write(tmp_path, {"other": VALID_EXTENSIONS["other"]})
+    path = _store(tmp_path, {"other": VALID_EXTENSIONS["other"]})
 
     delete_extension_config(path, "does-not-exist")  # must not raise
 
-    assert set(load_config(path)) == {"other"}
+    assert set(settings_store.read_all(path, "extensions")) == {"other"}
 
 
 # --- capabilities ---
-# config_capabilities.json toggles capabilities; a missing file or entry must mean enabled.
+# The capabilities table toggles capabilities; a missing store or entry must mean enabled.
 
 
 def test_capability_enabled_defaults_to_true_when_file_is_missing(tmp_path: Path):
-    missing = tmp_path / "config_capabilities.json"
+    missing = tmp_path / "settings.db"
 
     assert capability_enabled(load_capabilities_config(missing), "otp") is True
 
 
 def test_capability_enabled_defaults_to_true_when_entry_is_absent(tmp_path: Path):
-    path = _write(tmp_path, {"otp": {"enabled": True}})
+    path = _caps(tmp_path, {"otp": {"enabled": True}})
 
     assert capability_enabled(load_capabilities_config(path), "host_health") is True
 
 
 def test_capability_can_be_explicitly_disabled(tmp_path: Path):
-    path = _write(tmp_path, {"otp": {"enabled": False}})
+    path = _caps(tmp_path, {"otp": {"enabled": False}})
 
     assert capability_enabled(load_capabilities_config(path), "otp") is False
 
 
 def test_capability_explicitly_enabled_is_true(tmp_path: Path):
-    path = _write(tmp_path, {"otp": {"enabled": True}})
+    path = _caps(tmp_path, {"otp": {"enabled": True}})
 
     assert capability_enabled(load_capabilities_config(path), "otp") is True
 
 
 def test_save_capabilities_config_creates_a_missing_file(tmp_path: Path):
     """Must not require the file to exist: a fresh deployment's first toggle goes through this write path."""
-    path = tmp_path / "config_capabilities.json"
+    path = tmp_path / "settings.db"
 
     save_capabilities_config(path, "otp", False)
 
@@ -704,7 +720,7 @@ def test_save_capabilities_config_creates_a_missing_file(tmp_path: Path):
 
 
 def test_save_capabilities_config_overwrites_an_existing_entry(tmp_path: Path):
-    path = _write(tmp_path, {"otp": {"enabled": True}})
+    path = _caps(tmp_path, {"otp": {"enabled": True}})
 
     save_capabilities_config(path, "otp", False)
 
@@ -712,7 +728,7 @@ def test_save_capabilities_config_overwrites_an_existing_entry(tmp_path: Path):
 
 
 def test_save_capabilities_config_preserves_other_capabilities(tmp_path: Path):
-    path = _write(tmp_path, {"host_health": {"enabled": True}})
+    path = _caps(tmp_path, {"host_health": {"enabled": True}})
 
     save_capabilities_config(path, "otp", False)
 
@@ -721,26 +737,25 @@ def test_save_capabilities_config_preserves_other_capabilities(tmp_path: Path):
     assert data["otp"] == {"enabled": False}
 
 
-def test_save_extension_config_never_writes_headers_and_repr_hides_them(tmp_path: Path):
-    path = _write(tmp_path, {})
+def test_save_extension_config_keeps_the_token_and_repr_hides_it(tmp_path: Path):
+    path = _store(tmp_path, {})
     config = ExtensionConfig(
         id="remote",
         label="Remote",
         description="desc",
         transport="http",
         url="http://x/mcp",
-        headers={"X-Internal-Token": "s3cret"},
+        headers={"X-Internal-Token": "s3$cret"},
     )
 
     save_extension_config(path, config)
 
-    assert "headers" not in load_config(path)["remote"]
-    assert "s3cret" not in path.read_text(encoding="utf-8")
-    assert "s3cret" not in repr(config)
+    assert load_extensions_config(path)["remote"].headers == {"X-Internal-Token": "s3$cret"}
+    assert "s3$cret" not in repr(config)
 
 
 def test_forward_requester_defaults_false_and_parses_true(tmp_path: Path):
-    path = _write(
+    path = _store(
         tmp_path,
         {
             "plain": {"label": "P", "url": "http://127.0.0.1:9000/mcp"},
@@ -757,14 +772,14 @@ def test_forward_requester_defaults_false_and_parses_true(tmp_path: Path):
 
 
 def test_forward_requester_must_be_a_bool(tmp_path: Path):
-    path = _write(tmp_path, {"remote": {"label": "R", "url": "http://x/mcp", "forward_requester": "yes"}})
+    path = _store(tmp_path, {"remote": {"label": "R", "url": "http://x/mcp", "forward_requester": "yes"}})
 
     with pytest.raises(ValueError, match=r"'remote\.forward_requester' must be true or false"):
         load_extensions_config(path)
 
 
 def test_web_url_defaults_to_none_and_parses_for_both_transports(tmp_path: Path):
-    path = _write(
+    path = _store(
         tmp_path,
         {
             "plain": {"label": "P", "url": "http://127.0.0.1:9000/mcp"},
@@ -785,14 +800,14 @@ def test_web_url_defaults_to_none_and_parses_for_both_transports(tmp_path: Path)
     ["javascript:alert(1)", "ftp://host/app", "//host/app", "http://", "not a url", "", 5, ["http://x"]],
 )
 def test_web_url_must_be_an_http_or_https_url(tmp_path: Path, bad):
-    path = _write(tmp_path, {"remote": {"label": "R", "url": "http://x/mcp", "web_url": bad}})
+    path = _store(tmp_path, {"remote": {"label": "R", "url": "http://x/mcp", "web_url": bad}})
 
     with pytest.raises(ValueError, match=r"'remote\.web_url'"):
         load_extensions_config(path)
 
 
 def test_web_url_survives_a_save(tmp_path: Path):
-    path = _write(tmp_path, {})
+    path = _store(tmp_path, {})
     config = ExtensionConfig(
         id="remote", label="R", description="", transport="http", url="http://x/mcp", web_url="http://x:5174"
     )
@@ -802,41 +817,19 @@ def test_web_url_survives_a_save(tmp_path: Path):
     assert load_extensions_config(path)["remote"].web_url == "http://x:5174"
 
 
-def test_migrate_capabilities_writes_missing_entries_once(tmp_path: Path):
-    path = tmp_path / "config_capabilities.json"
-    path.write_text(json.dumps({"vault": {"enabled": False}}), encoding="utf-8")
-
-    migrate_capabilities_config(path, ["vault", "watch"])
-
-    saved = json.loads(path.read_text(encoding="utf-8"))
-    assert saved["vault"] == {"enabled": False}  # an explicit entry is kept
-    assert saved["watch"] == {"enabled": True}  # a missing one stays on
-    assert saved["_scanner"] == {"migrated": True}
-
-    migrate_capabilities_config(path, ["vault", "watch", "newcomer"])
-
-    assert "newcomer" not in json.loads(path.read_text(encoding="utf-8"))  # after the marker: offline by default
-
-
-def test_migrate_capabilities_creates_a_missing_file(tmp_path: Path):
-    path = tmp_path / "config_capabilities.json"
-
-    migrate_capabilities_config(path, ["vault"])
-
-    assert json.loads(path.read_text(encoding="utf-8")) == {"vault": {"enabled": True}, "_scanner": {"migrated": True}}
-
-
 def test_renamed_capability_keeps_its_state_under_the_new_id(tmp_path: Path):
-    path = tmp_path / "capabilities.json"
-    path.write_text(json.dumps({"video": {"enabled": False}, "gen": {"enabled": True}}))
+    path = tmp_path / "settings.db"
+    settings_store.put(path, "capabilities", "video", {"enabled": False})
+    settings_store.put(path, "capabilities", "gen", {"enabled": True})
     migrate_renamed_capabilities(path)
-    assert json.loads(path.read_text()) == {"gen": {"enabled": True}, "media": {"enabled": False}}
+    assert settings_store.read_all(path, "capabilities") == {"gen": {"enabled": True}, "media": {"enabled": False}}
 
 
 def test_renamed_capability_does_not_override_a_new_entry_or_a_missing_file(tmp_path: Path):
-    path = tmp_path / "capabilities.json"
+    path = tmp_path / "settings.db"
     migrate_renamed_capabilities(path)
     assert not path.exists()
-    path.write_text(json.dumps({"video": {"enabled": False}, "media": {"enabled": True}}))
+    settings_store.put(path, "capabilities", "video", {"enabled": False})
+    settings_store.put(path, "capabilities", "media", {"enabled": True})
     migrate_renamed_capabilities(path)
-    assert json.loads(path.read_text()) == {"media": {"enabled": True}}
+    assert settings_store.read_all(path, "capabilities") == {"media": {"enabled": True}}

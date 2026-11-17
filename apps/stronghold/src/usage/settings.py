@@ -58,7 +58,7 @@ class PricingSettings:
             raise ValueError("pricing.models must be an object")
         prices = {}
         for model, price in models.items():
-            if not model.strip():
+            if not isinstance(model, str) or not model.strip():
                 raise ValueError(f"pricing.models key must be a non-empty string: {model!r}")
             if not isinstance(price, dict):
                 raise ValueError(f"pricing.models.{model} must be an object")
@@ -77,6 +77,11 @@ class Pricing:
         self.currency = settings.currency
         self._models = dict(settings.models)
         self._folded = {model.casefold(): price for model, price in self._models.items()}
+
+    def document(self) -> dict[str, Any]:
+        """The table as Portcullis reads it: `{"currency", "models": {name: {"input", "output"}}}`."""
+        return {"currency": self.currency,
+                "models": {model: {"input": price.input, "output": price.output} for model, price in self._models.items()}}
 
     def cost(self, model: str | None, input_tokens: int | None, output_tokens: int | None) -> float | None:
         if not model or (input_tokens is None and output_tokens is None):

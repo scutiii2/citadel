@@ -5,8 +5,9 @@ rather than each one inventing its own. Nothing here knows about `mcp`
 or any specific capability - see each capability's own `domain.py` for
 where that logic lives instead.
 
-- **`app_config.py`** - loaders for every `../../configs/config_*.json`
-  file: `load_email_config`,
+- **`app_config.py`** - loaders for `../../configs/config_email.json`
+  (`load_email_config`) and for the extensions and capability toggles kept in
+  the settings store (`settings_store.py`, `.data/armory/settings.db`):
   `load_extensions_config`/`load_extension_config`, plus
   `save_extension_config`/`delete_extension_config` for the runtime
   add/remove routes, `load_capabilities_config`/`capability_enabled`/
@@ -42,7 +43,7 @@ where that logic lives instead.
   module docstring first.
 - **`extensions.py`** - connects out to other MCP servers as a client
   and re-exposes their tools as this server's own, namespaced. The
-  proxying/aggregation engine behind `config_extensions.json` and the
+  proxying/aggregation engine behind the extensions table of the settings store and the
   `/extensions` HTTP routes.
 - **`job_events.py`**, **`job_queue.py`** - the replayable event log
   (`Job`) and the slot-holding core (`JobQueueBase`: concurrency limit,
