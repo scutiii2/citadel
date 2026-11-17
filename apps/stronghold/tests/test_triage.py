@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import identity, caller, requester
+
 import json
 from pathlib import Path
 
@@ -341,4 +343,4 @@ def test_the_usage_limit_blocks_both_routes(make_client, agent: FakeAgent, tmp_p
 
 
 def test_triage_needs_the_requester_identity(client: TestClient) -> None:
-    assert client.post(ASK, json=YES_NO, headers={"X-Requester-Uid": ""}).status_code == 400
+    assert client.post(ASK, json=YES_NO, headers=identity(uid="")).status_code == 400

@@ -1,5 +1,7 @@
 """/skills: Armory keeps the skills; Stronghold scopes every call to the requester."""
 
+from tests.auth_helpers import identity, caller, requester
+
 import json
 import logging
 
@@ -9,7 +11,7 @@ import pytest
 from tests.conftest import IDENTITY
 
 URL = "/skills"
-UID = IDENTITY["X-Requester-Uid"]
+UID = IDENTITY["uid"]
 SKILL = {
     "id": 1, "title": "Restart an app", "when_to_use": "an app is hung", "steps": "stop it, then start it",
     "tools": "tool_srv_stopApp", "status": "proposed", "successes": 0, "failures": 0,
@@ -19,7 +21,7 @@ EDIT = {"title": "Reboot an app", "when_to_use": "an app freezes", "steps": "kil
 
 
 def test_skills_need_the_requester_identity(client, armory):
-    assert client.get(URL, headers={"X-Requester-Uid": ""}).status_code == 400
+    assert client.get(URL, headers=identity(uid="")).status_code == 400
     assert not armory.requests
 
 
@@ -28,7 +30,7 @@ def test_skills_use_the_requester_uid_and_the_internal_token(client, armory):
 
     def respond(request):
         assert request.url.path.startswith(f"/skills/owners/{UID}/skills")
-        assert request.headers["X-Internal-Token"] == "shared-test-token"
+        assert caller(request, "armory") == "stronghold"
         if request.method == "DELETE":
             return httpx.Response(204)
         return httpx.Response(200, json=[SKILL] if request.method == "GET" else approved)

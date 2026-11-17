@@ -2,8 +2,9 @@
 
 Product logic for Citadel and Ember. Only `portcullis` calls it.
 
-- Every route but `/health` needs `X-Internal-Token` (the shared internal token).
-- The asking account arrives in `X-Requester-Uid`, `X-Requester-Username` and `X-Requester-Email`. Data is keyed on the uid.
+- Every route except `/health` requires a short-lived Ed25519 service assertion; keys are generated on first start.
+- Account identity comes only from a Portcullis-signed requester token. Running turns renew it before expiry and stop if renewal fails.
+- Private keys stay in the service's identity directory; only public keys are shared through the trust directory.
 - No cookies, no sessions and no login here. Portcullis owns those.
 
 ## Run

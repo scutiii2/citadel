@@ -14,12 +14,14 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 import httpx
 
-from src.agents.mcp_session import identity_headers, mcp_session, root_cause
+from src.agents.mcp_session import mcp_session, root_cause
+from src.citadel_auth import requester_header, current_requester_token, requester_token_provider
+from src import service_auth
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,7 @@ class Caller:
     email: str
     uid: str = ""
     brain_scope: str = ""
+    requester_token: str = field(default="", repr=False)
 
 
 class AgentGateway(Protocol):
@@ -84,11 +87,11 @@ class AgentGateway(Protocol):
 
 
 class McpAgentGateway:
-    def __init__(self, internal_token: str | None) -> None:
-        self._internal_token = internal_token
+    def __init__(self, keyring=None) -> None:
+        self._keyring = keyring or service_auth.keyring
 
     def _headers(self, caller: Caller) -> dict[str, str]:
-        headers = identity_headers(caller.username, caller.email, self._internal_token, caller.uid)
+        headers = requester_header(current_requester_token() or caller.requester_token)
         if caller.brain_scope in {"instance", "personal"}:
             headers["X-Brain-Destination"] = caller.brain_scope
         return headers
@@ -115,7 +118,7 @@ class McpAgentGateway:
         # raising inside them would surface as an ExceptionGroup from their
         # task groups (the same trap chat_app's client documents).
         try:
-            async with mcp_session(url, self._headers(caller), _TIMEOUT) as session:
+            async with mcp_session(url, self._headers(caller), _TIMEOUT, self._keyring) as session:
                 result = await session.call_tool(
                     tool, arguments, progress_callback=on_progress if on_event else None
                 )
@@ -223,6 +226,11 @@ class McpAgentGateway:
 
     async def interpret(self, url, caller, text):
         return await self._call(url, caller, "interpret", {"text": text})
+
+    async def refresh_requester(self, url, caller, token):
+        """Use the existing status channel to publish a renewed signed requester to Legion."""
+        with requester_token_provider(lambda: token):
+            await self._call(url, replace(caller, requester_token=token), "status", {})
 
     async def cancel(self, url, caller, request_id):
         result = await self._call(url, caller, "cancel", {"request_id": request_id})

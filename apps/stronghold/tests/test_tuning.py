@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import identity, caller, requester
+
 import httpx
 from fastapi.testclient import TestClient
 
@@ -19,7 +21,7 @@ def legion_up(legion) -> None:
 
 
 def test_every_route_needs_the_requester(client: TestClient) -> None:
-    anonymous = {"X-Requester-Uid": ""}
+    anonymous = identity(uid="")
     assert client.get(URL, headers=anonymous).status_code == 400
     assert client.get(f"{URL}/own", headers=anonymous).status_code == 400
     assert client.put(URL, json={}, headers=anonymous).status_code == 400
@@ -32,7 +34,7 @@ def test_default_is_unset_with_the_admin_values_as_ceiling(client: TestClient, l
     assert client.get(URL).json() == {"limits": NONE, "ceiling": {"max_output_tokens": 2048, "max_tool_rounds": 15}}
     sent = legion.requests[-1]
     assert sent.url.host == "agent-a.internal" and sent.url.path == "/agents/tuning"  # the entry agent's own server
-    assert sent.headers["x-requester-username"] == "ana" and sent.headers["x-internal-token"] == "shared-test-token"
+    assert requester(sent, "legion")["username"] == "ana" and caller(sent, "legion") == "stronghold"
 
 
 def test_save_read_back_and_clear_one(client: TestClient, legion) -> None:

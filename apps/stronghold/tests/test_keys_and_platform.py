@@ -25,7 +25,7 @@ def test_a_damaged_keys_file_is_an_error_not_a_silent_replacement(tmp_path) -> N
 
 def platform(handler) -> PortcullisClient:
     client = httpx.AsyncClient(base_url="http://portcullis.test", transport=httpx.MockTransport(handler))
-    return PortcullisClient(client, "internal")
+    return PortcullisClient(client)
 
 
 def test_refusals_and_outages_are_platform_errors_but_error_reports_never_raise() -> None:

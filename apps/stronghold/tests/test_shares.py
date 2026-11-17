@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import identity, caller, requester
+
 import hashlib
 import re
 from datetime import datetime, timedelta
@@ -45,7 +47,7 @@ def _parse(text: str) -> datetime:
 
 
 def test_managing_links_needs_the_requester_identity(client: TestClient) -> None:
-    anonymous = {"X-Requester-Uid": ""}
+    anonymous = identity(uid="")
     assert client.post("/shares", json={"chat_id": CHAT, "title": "t", "messages": MESSAGES}, headers=anonymous).status_code == 400
     assert client.get("/shares", headers=anonymous).status_code == 400
     assert client.delete("/shares/1", headers=anonymous).status_code == 400
@@ -55,7 +57,7 @@ def test_reading_a_link_needs_no_requester(client: TestClient) -> None:
     token = share(client).json()["token"]
 
     assert read(client, token).status_code == 200
-    assert client.get(f"/shares/public/{token}", headers={"X-Requester-Uid": ""}).status_code == 200
+    assert client.get(f"/shares/public/{token}", headers=identity(uid="")).status_code == 200
 
 
 # --- creating -------------------------------------------------------------------------------

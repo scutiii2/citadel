@@ -34,6 +34,8 @@ from src.turns.logs import TurnLogs
 from src.usage.rows import stored_rows, usage_rows
 from src.usage.service import UsageService
 from src.usage.settings import Pricing, UsageSettings, with_cost
+from src.citadel_auth import current_requester_token, requester_token_provider
+from src.turns.requester_tokens import RequesterRenewal, RequesterRefreshError
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +205,7 @@ class Turn:
     asking: bool = False
     task: asyncio.Task | None = None
     finished_at: float | None = None
+    requester_token: str = field(default="", repr=False)
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -308,6 +311,8 @@ class TurnRegistry:
         directory: AgentDirectory | None = None,
         max_running_per_account: int = 3,
         retention_seconds: float = 120.0,
+        requester_refresh=None,
+        keyring=None,
     ) -> None:
         self._chats = chats
         self._usage_service = usage_service
@@ -318,6 +323,7 @@ class TurnRegistry:
         self._directory = directory
         self._max_running = max_running_per_account
         self._retention = retention_seconds
+        self._requester_refresh, self._keyring = requester_refresh, keyring
         self._turns: dict[tuple[str, str], Turn] = {}
         self._sequences = count(1)
 
@@ -345,7 +351,8 @@ class TurnRegistry:
             raise TurnConflict(chat_id)
         if len(self.running_chat_ids(owner)) >= self._max_running:
             raise TooManyTurns(owner)
-        turn = Turn(owner=owner, chat_id=chat_id, agent=agent, caller=caller, options=options or TurnOptions())
+        turn = Turn(owner=owner, chat_id=chat_id, agent=agent, caller=caller, options=options or TurnOptions(),
+                    requester_token=current_requester_token() or caller.requester_token)
         self._turns[(owner, chat_id)] = turn
         turn.task = asyncio.create_task(self._run(turn), name=f"turn {chat_id}")
         return turn
@@ -516,7 +523,20 @@ class TurnRegistry:
 
     async def _run(self, turn: Turn) -> None:
         try:
-            await self._answer(turn)
+            if turn.requester_token:
+                async def refresh(uid):
+                    token = await self._requester_refresh(uid)
+                    agents = await self._directory.all() if self._directory is not None else []
+                    targets = {turn.agent.url, *(agent.url for agent in agents)}
+                    await asyncio.gather(*(self._gateway.refresh_requester(url, turn.caller, token) for url in targets))
+                    return token
+                renewal = RequesterRenewal(self._keyring, turn.owner, turn.requester_token, refresh)
+                with requester_token_provider(renewal.token):
+                    await renewal.run(self._answer(turn))
+            else:
+                await self._answer(turn)
+        except RequesterRefreshError as error:
+            await self._finish(turn, _interrupted(turn.text) + "\n" + str(error), status="failed", error=str(error))
         except asyncio.CancelledError:
             # Stronghold is stopping: keep what streamed, marked as such.
             await asyncio.shield(self._finish(turn, _interrupted(turn.text), status="failed", error=None))

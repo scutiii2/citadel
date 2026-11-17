@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import identity, caller, requester
+
 import base64
 import io
 
@@ -13,7 +15,7 @@ from openpyxl import Workbook
 
 from src.attachments.extraction import MAX_TEXT_CHARS
 
-ANONYMOUS = {"X-Requester-Uid": ""}
+ANONYMOUS = identity(uid="")
 PDF = {"file_id": "f_scan", "pages": 2, "kind": "pdf", "expires_at": 2000000000}
 TABLE = {"table_id": "tbl-1", "filename": "sales.csv", "rows": 2, "columns": ["region", "units"], "sheet": None, "notes": []}
 
@@ -115,8 +117,8 @@ def test_a_csv_is_forwarded_and_the_table_info_comes_back(client: TestClient, ar
     sent = armory.requests[-1]
     assert sent.url.path == "/upload/table"
     assert b'filename="sales.csv"' in sent.content and b"region,units" in sent.content
-    assert sent.headers["x-requester-username"] == "ana" and sent.headers["x-requester-uid"] == "u-1"
-    assert sent.headers["x-internal-token"] == "shared-test-token"
+    assert requester(sent)["username"] == "ana" and requester(sent)["sub"] == "u-1"
+    assert caller(sent, "armory") == "stronghold"
     assert sent.extensions["timeout"]["read"] == 120.0  # a big workbook can take a while to parse
     assert logged(platform)["attachments.table"] == "Attached 'sales.csv' (18 bytes) as a table"
 
@@ -174,7 +176,7 @@ def test_the_original_is_uploaded_without_needing_extractable_text(client: TestC
     assert response.json()["file_id"] == "f_scan"
     assert response.json()["filename"] == "scan.pdf" and response.json()["text"] == ""
     sent = armory.requests[-1]
-    assert sent.url.path == "/upload/pdf" and sent.headers["x-requester-username"] == "ana"
+    assert sent.url.path == "/upload/pdf" and requester(sent)["username"] == "ana"
     assert b"%PDF-scan" in sent.content and b'filename="scan.pdf"' in sent.content
     assert sent.extensions["timeout"]["read"] == 120
     assert "attachments.pdf" in logged(platform)

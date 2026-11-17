@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import identity, caller, requester
+
 import asyncio
 import json
 import re
@@ -17,7 +19,7 @@ from src.tickets.unread import TicketUnread
 from tests.conftest import IDENTITY, FakeArmory, FakeDbGateway
 from tests.helpers import action_messages, as_admin, login, uid_of
 
-UID = IDENTITY["X-Requester-Uid"]
+UID = IDENTITY["uid"]
 TICKET = {
     "id": 7, "group_id": 3, "type": "bug", "title": "Email fails", "description": "It does not send",
     "status": "open", "priority": "normal", "effective_priority": "normal", "assignee": None, "reporter": "alice",
@@ -95,23 +97,29 @@ def test_the_client_drops_empty_filters_and_flags_possible(armory: FakeArmory) -
     from src.requester import Requester
 
     http = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory))
-    tickets = ArmoryTickets(http, "tok")
+    tickets = ArmoryTickets(http)
 
-    result = asyncio.run(tickets.list_all(Requester("u-9", "root", "root@example.com"),
-                                          {"status": "open", "tag": None, "possible": True, "group_id": 3}))
+    from src.citadel_auth import Caller, requester_context
+    from tests import auth_helpers
+    async def run():
+        token = identity("u-9", "root", "root@example.com")["X-Citadel-Requester"]
+        async with requester_context(auth_helpers.stack["stronghold"], Caller("portcullis"), token, "stronghold"):
+            return await tickets.list_all(Requester("u-9", "root", "root@example.com"),
+                                          {"status": "open", "tag": None, "possible": True, "group_id": 3})
+    result = asyncio.run(run())
 
     assert result == {"tickets": [TICKET]}
     request = armory.requests[-1]
     assert dict(request.url.params) == {"status": "open", "possible": "1", "group_id": "3"}
-    assert (request.headers["x-requester-username"], request.headers["x-requester-uid"]) == ("root", "u-9")
-    assert request.headers["x-internal-token"] == "tok"
+    assert (requester(request)["username"], requester(request)["sub"]) == ("root", "u-9")
+    assert caller(request, "armory") == "stronghold"
 
 
 # ---- reporter routes -------------------------------------------------------
 
 def test_tickets_need_the_requester_identity(client: TestClient, armory: FakeArmory) -> None:
-    assert client.get("/tickets", headers={"X-Requester-Uid": ""}).status_code == 400
-    assert client.get("/ticket-admin/stats", headers={"X-Requester-Uid": ""}).status_code == 400
+    assert client.get("/tickets", headers=identity(uid="")).status_code == 400
+    assert client.get("/ticket-admin/stats", headers=identity(uid="")).status_code == 400
     assert not armory.requests
 
 
@@ -123,7 +131,7 @@ def test_reporter_reopen_is_scoped_logged_and_keeps_staff_fields_private(client:
     assert response.status_code == 200
     assert response.json()["ticket"]["id"] == 7 and "priority" not in response.json()["ticket"]
     assert armory.requests[-1].url.path == "/tickets/7/reopen"
-    assert armory.requests[-1].headers["x-requester-username"] == "alice"
+    assert requester(armory.requests[-1])["username"] == "alice"
     assert platform.actions == [(uid_of("alice"), "tickets.reopen", "Reopened ticket 7")]
     assert client.post("/tickets/404/reopen", json={}).status_code == 404
 
@@ -136,7 +144,7 @@ def test_member_files_and_follows_own_tickets(client: TestClient, armory) -> Non
     assert created.json() == {"ticket": REPORTER_TICKET, "duplicate": False, "group_size": 1}
     sent = armory.requests[-1]
     assert (sent.method, sent.url.path) == ("POST", "/tickets")
-    assert sent.headers["x-requester-username"] == "alice"
+    assert requester(sent)["username"] == "alice"
     assert body_of(sent) == {
         "type": "bug", "title": "Email fails", "description": "It does not send", "source": "user",
         "verified_context": {"via": "portcullis", "account_id": uid_of("alice")},
@@ -357,7 +365,7 @@ def test_staff_list_forwards_filters_and_reads_everything(client: TestClient, ar
         "status": "open", "type": "bug", "tag": "email", "priority": "high", "assignee": "root",
         "group_id": "3", "possible": "1", "limit": "20",
     }
-    assert request.headers["x-requester-username"] == "root"
+    assert requester(request)["username"] == "root"
     assert client.get("/ticket-admin/tickets", params={"status": "done"}).status_code == 422
     assert client.get("/ticket-admin/tickets", params={"limit": 501}).status_code == 422
 

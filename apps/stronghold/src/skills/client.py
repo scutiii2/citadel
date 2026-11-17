@@ -10,6 +10,8 @@ from typing import Literal
 from urllib.parse import quote
 
 import httpx
+from src.service_auth import authenticate
+from src.citadel_auth import requester_header
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -55,9 +57,9 @@ def _reason(response: httpx.Response) -> str:
 class SkillsClient:
     """`client` carries Armory's base URL; the caller closes it."""
 
-    def __init__(self, client: httpx.AsyncClient, token: str | None) -> None:
-        self._client = client
-        self._headers = {"X-Internal-Token": token} if token else {}
+    def __init__(self, client: httpx.AsyncClient, keyring=None) -> None:
+        self._client = authenticate(client, "armory", keyring)
+
 
     def _owner(self, uid: str) -> str:
         return f"/skills/owners/{quote(uid, safe='')}"
@@ -66,7 +68,7 @@ class SkillsClient:
         """`show_reason` passes Armory's own 409/422 sentence on (it is about the user's text, never about
         other data), for the edit form; everywhere else a fixed message is used."""
         try:
-            response = await self._client.request(method, url, headers=self._headers, json=body,
+            response = await self._client.request(method, url, headers=requester_header(), json=body,
                                                   timeout=httpx.Timeout(10), follow_redirects=False)
         except httpx.HTTPError as error:
             raise SkillsError(503, "Skill storage is unavailable") from error

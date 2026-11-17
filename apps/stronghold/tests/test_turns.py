@@ -1,6 +1,7 @@
 """/turns: a chat turn run by Stronghold, from start to the saved answer (ported from Portcullis's turn tests)."""
 
 from __future__ import annotations
+from tests.auth_helpers import identity, IdentityHeaders
 
 import json
 import re
@@ -16,8 +17,8 @@ from tests.turn_agent import TurnAgent
 from src.usage.settings import UsageSettings
 
 AGENT_ID = AGENTS[0]["id"]
+OTHER = IdentityHeaders(uid="u-2", username="bob")
 MESSAGE_TIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
-OTHER = {**IDENTITY, "X-Requester-Uid": "u-2", "X-Requester-Username": "bob"}
 
 
 @pytest.fixture
@@ -228,9 +229,9 @@ def test_turns_are_private_to_their_account(client: TestClient, agent: TurnAgent
     chat_id = new_id()
     start(client, chat_id)
     wait_until(lambda: agent.gate is not None)
-    assert client.get(f"/turns/{chat_id}/events", headers=OTHER).status_code == 404
-    assert client.post(f"/turns/{chat_id}/cancel", headers=OTHER).json() == {"cancelled": False}
-    assert client.get("/turns/running", headers=OTHER).json() == {"chat_ids": []}
+    assert client.get(f"/turns/{chat_id}/events", headers=identity(uid="u-2", username="bob")).status_code == 404
+    assert client.post(f"/turns/{chat_id}/cancel", headers=identity(uid="u-2", username="bob")).json() == {"cancelled": False}
+    assert client.get("/turns/running", headers=identity(uid="u-2", username="bob")).json() == {"chat_ids": []}
     agent.release()
     events(client, chat_id)
 

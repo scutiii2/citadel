@@ -17,8 +17,17 @@ import uvicorn
 from mcp.server.fastmcp import Context, FastMCP
 
 from src.agents.gateway import AgentCallError, Caller, McpAgentGateway
+from src.citadel_auth import verify_requester, verify_assertion
+from tests import auth_helpers
+from dataclasses import replace
 
 CALLER = Caller(username="alice", email="alice@example.com", uid="uid-alice")
+
+
+@pytest.fixture(autouse=True)
+def signed_caller(auth_stack, monkeypatch):
+    monkeypatch.setitem(globals(), "CALLER", replace(CALLER, requester_token=auth_helpers.identity(
+        "uid-alice", "alice", "alice@example.com")["X-Citadel-Requester"]))
 
 
 def _free_port() -> int:
@@ -57,9 +66,9 @@ def _build_agent(approvals: bool = True, private: bool | None = None, read_only:
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         headers = ctx.request_context.request.headers
-        seen["username"] = headers.get("x-requester-username")
-        seen["uid"] = headers.get("x-requester-uid")
-        seen["token"] = headers.get("x-internal-token")
+        requester = await verify_requester(auth_helpers.stack["legion"], headers["X-Citadel-Requester"], "legion")
+        caller = await verify_assertion(auth_helpers.stack["legion"], headers["Authorization"][7:], "legion")
+        seen["username"], seen["uid"], seen["caller"] = requester.username, requester.uid, caller.name
         calls["asks"] += 1
         for text in ("Hel", "lo"):
             await ctx.report_progress(0, None, json.dumps({"type": "token", "text": text}))
@@ -150,7 +159,7 @@ def before_auto_agent_url() -> Iterator[str]:
 
 
 def test_ask_streams_events_and_sends_identity(agent_url: str) -> None:
-    gateway = McpAgentGateway(internal_token="s3cret")
+    gateway = McpAgentGateway()
     events: list[dict] = []
 
     async def on_event(event: dict) -> None:
@@ -170,12 +179,12 @@ def test_ask_streams_events_and_sends_identity(agent_url: str) -> None:
     )
 
     assert result["response"] == "echo: hi (1 earlier, caveman=True, ext=['notes'])"
-    assert result["seen"] == {"username": "alice", "uid": "uid-alice", "token": "s3cret"}
+    assert result["seen"] == {"username": "alice", "uid": "uid-alice", "caller": "stronghold"}
     assert [e["text"] for e in events] == ["Hel", "lo"]
 
 
 def test_interpret_and_cancel(agent_url: str) -> None:
-    gateway = McpAgentGateway(internal_token=None)
+    gateway = McpAgentGateway()
 
     assert asyncio.run(gateway.interpret(agent_url, CALLER, "sum"))["response"] == "SUM"
     assert asyncio.run(gateway.cancel(agent_url, CALLER, "known")) is True
@@ -183,7 +192,7 @@ def test_interpret_and_cancel(agent_url: str) -> None:
 
 
 def test_tool_error_and_unreachable_agent_raise_agent_call_error(agent_url: str) -> None:
-    gateway = McpAgentGateway(internal_token=None)
+    gateway = McpAgentGateway()
 
     with pytest.raises(AgentCallError, match="provider rate limited"):
         asyncio.run(gateway._call(agent_url, CALLER, "broken", {}))

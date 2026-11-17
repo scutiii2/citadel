@@ -10,6 +10,8 @@ from typing import Any, Protocol
 from urllib.parse import quote
 
 import httpx
+from src.service_auth import authenticate
+from src.citadel_auth import requester_header
 
 Document = dict[str, Any]
 
@@ -45,17 +47,17 @@ class DbGatewayClient:
 
     `client` carries the gateway's base URL and a timeout; the caller closes it."""
 
-    def __init__(self, client: httpx.AsyncClient, instance: str, connection: str, internal_token: str | None) -> None:
-        self._client = client
+    def __init__(self, client: httpx.AsyncClient, instance: str, connection: str, keyring=None) -> None:
+        self._client = authenticate(client, "treasury", keyring)
         self._base = f"/instances/{quote(instance, safe='')}/connections/{quote(connection, safe='')}"
-        self._headers = {"X-Internal-Token": internal_token} if internal_token else {}
+
 
     def _record(self, collection: str, key: str) -> str:
         return f"{self._base}/collections/{quote(collection, safe='')}/records/{quote(key, safe='')}"
 
     async def _send(self, method: str, path: str, json: Any = None) -> httpx.Response:
         try:
-            return await self._client.request(method, path, json=json, headers=self._headers)
+            return await self._client.request(method, path, json=json, headers={})
         except httpx.TransportError as error:
             raise DbGatewayUnavailable(f"db_gateway is not reachable: {error.__class__.__name__}") from error
 

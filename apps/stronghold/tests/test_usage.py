@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import identity, caller, requester
+
 import json
 from datetime import datetime, timedelta
 
@@ -55,7 +57,7 @@ def report(client: TestClient, **params) -> dict:
 
 
 def test_usage_needs_the_requester_identity(client: TestClient) -> None:
-    assert client.get("/usage", headers={"X-Requester-Uid": ""}).status_code == 400
+    assert client.get("/usage", headers=identity(uid="")).status_code == 400
     assert record(client, [row()], ).status_code == 201
 
 
@@ -315,7 +317,7 @@ def test_purging_a_large_account_takes_every_page(client: TestClient, clock: Clo
     monkeypatch.setattr(usage_service, "_PAGE", 2)
     record(client, [row(1) for _ in range(7)])
 
-    assert client.delete(f"/usage/accounts/{IDENTITY['X-Requester-Uid']}").status_code == 204
+    assert client.delete(f"/usage/accounts/{IDENTITY["uid"]}").status_code == 204
 
     assert db_gateway.records == {}
 

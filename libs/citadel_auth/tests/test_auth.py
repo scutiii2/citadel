@@ -100,6 +100,8 @@ async def test_unreadable_trust_fails_closed(stack, monkeypatch):
     ("legion", "portcullis", "/agents", True),
     ("legion", "stronghold", "/registry", True),
     ("legion", "armory", "/mcp", True),
+    ("legion", "stronghold", "/agents/tuning", True),
+    ("legion", "legion", "/mcp", True),
     ("armory", "portcullis", "/commands/help", True),
     ("armory", "portcullis", "/pdf/ui/files", True),
     ("armory", "portcullis", "/tickets/tags", True),

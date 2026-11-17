@@ -11,6 +11,8 @@ from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
+from src.service_auth import authenticate
+from src.citadel_auth import requester_header
 
 from src.agents.directory import AgentDirectory
 from src.clock import utcnow
@@ -54,8 +56,8 @@ class LegionTuning:
 
     Only this fixed path is built here; the browser never names a URL."""
 
-    def __init__(self, client: httpx.AsyncClient, directory: AgentDirectory, token: str | None) -> None:
-        self._client, self._directory, self._token = client, directory, token
+    def __init__(self, client: httpx.AsyncClient, directory: AgentDirectory, keyring=None) -> None:
+        self._client, self._directory = authenticate(client, "legion", keyring), directory
 
     async def ceiling(self, who: Requester) -> dict[str, Any]:
         """Legion's current default token limits, which an account's own limits cannot exceed."""
@@ -64,9 +66,7 @@ class LegionTuning:
             raise LegionUnavailable("No agent is running")
         parts = urlsplit(agent.url)
         url = urlunsplit((parts.scheme, parts.netloc, "/agents/tuning", "", ""))
-        headers = {"X-Requester-Username": who.username, "X-Requester-Email": who.email, "X-Requester-Uid": who.uid}
-        if self._token:
-            headers["X-Internal-Token"] = self._token
+        headers = requester_header()
         try:
             response = await self._client.get(url, headers=headers, timeout=15.0, follow_redirects=False)
             default = response.json()["effective"]["token_limits"]["default"] if response.status_code == 200 else None

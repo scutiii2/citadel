@@ -6,6 +6,8 @@ import logging
 from urllib.parse import quote
 
 import httpx
+from src.service_auth import authenticate
+from src.citadel_auth import requester_header
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -32,9 +34,9 @@ class MemoryError(Exception):
 class MemoryClient:
     """`client` carries Armory's base URL; the caller closes it."""
 
-    def __init__(self, client: httpx.AsyncClient, token: str | None) -> None:
-        self._client = client
-        self._headers = {"X-Internal-Token": token} if token else {}
+    def __init__(self, client: httpx.AsyncClient, keyring=None) -> None:
+        self._client = authenticate(client, "armory", keyring)
+
 
     async def request(self, method: str, uid: str, note_id: int | None = None,
                       body: dict | None = None) -> list[MemoryNote] | MemoryNote | None:
@@ -42,7 +44,7 @@ class MemoryClient:
         if note_id is not None:
             path += f"/{note_id}"
         try:
-            response = await self._client.request(method, path, headers=self._headers, json=body,
+            response = await self._client.request(method, path, headers=requester_header(), json=body,
                                                   timeout=httpx.Timeout(10), follow_redirects=False)
         except httpx.HTTPError as error:
             raise MemoryError(503, "Memory storage is unavailable") from error
@@ -61,7 +63,7 @@ class MemoryClient:
     async def purge(self, uid: str) -> bool:
         """Delete everything a deleted account kept. True only when Armory confirmed; never raises."""
         try:
-            response = await self._client.delete(f"/memory/owners/{quote(uid, safe='')}", headers=self._headers,
+            response = await self._client.delete(f"/memory/owners/{quote(uid, safe='')}", headers=requester_header(),
                                                  timeout=httpx.Timeout(5), follow_redirects=False)
         except httpx.HTTPError as error:
             logger.warning("memory purge request failed (%s)", type(error).__name__)

@@ -13,6 +13,8 @@ import httpx
 from fastapi import HTTPException, status
 
 from src.requester import Requester
+from src.service_auth import authenticate
+from src.citadel_auth import requester_header
 
 _LONG = 120.0
 
@@ -77,12 +79,12 @@ def bard(client: httpx.AsyncClient, token: str | None) -> ToolService:
 class ArmoryUploads:
     """Armory's /upload/pdf and /upload/table: it keeps the file for the data and PDF tools and answers with an id."""
 
-    def __init__(self, client: httpx.AsyncClient, token: str | None) -> None:
-        self._client, self._token = client, token
+    def __init__(self, client: httpx.AsyncClient, keyring=None) -> None:
+        self._client = authenticate(client, "armory", keyring)
 
     async def _upload(self, path: str, who: Requester, filename: str, content: bytes, down: str) -> dict:
         try:
-            response = await self._client.post(path, files={"file": (filename, content)}, headers=_headers(who, self._token),
+            response = await self._client.post(path, files={"file": (filename, content)}, headers=requester_header(),
                                                timeout=_LONG, follow_redirects=False)
         except httpx.HTTPError as error:
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, down) from error

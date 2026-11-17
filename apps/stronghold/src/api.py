@@ -1,4 +1,4 @@
-"""Stronghold's HTTP app. Every route but /health needs the internal token."""
+"""Stronghold HTTP routes require service assertions except public health checks."""
 
 from __future__ import annotations
 
@@ -25,7 +25,8 @@ from src.bard import routes as bard_routes
 from src.brains import routes as brains_routes
 from src.brains.connections import BrainError
 from src.brains.gateway import BrainGateway
-from src.auth import ENV_PATH, InternalTokenMiddleware
+from pathlib import Path
+from src.citadel_auth import Keyring, ServiceAuthMiddleware, from_env
 from src.chats import routes as chats_routes
 from src.chats.store import ChatStore
 from src.config import Settings, load_settings
@@ -59,22 +60,25 @@ from src.turns.logs import PlatformLogs
 from src.usage.settings import Pricing
 
 _TIMEOUT = httpx.Timeout(15.0, connect=5.0)
+ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 
 
 def create_app(
-    token: str, settings: Settings | None = None, *,
+    keyring: Keyring | None = None, settings: Settings | None = None, *,
     store: DocumentStore | None = None, platform: PortcullisClient | None = None,
     armory: httpx.AsyncClient | None = None, agent_gateway: AgentGateway | None = None,
     tools: dict[str, httpx.AsyncClient] | None = None, legion: httpx.AsyncClient | None = None,
 ) -> FastAPI:
-    """token: the shared internal token; "" leaves the app open (tests, loopback).
+    """Service authentication is mandatory; tests inject isolated signing identities.
     `store`, `platform`, `armory`, `agent_gateway` and `tools` (clients for "bard", "scribe" and "reader") and `legion` are injected by tests;
     otherwise they are HTTP clients built at start."""
     settings = settings or load_settings()
+    keyring = keyring or from_env("stronghold", data_dir=settings.data_dir)
     log_privacy.install()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        await keyring.ensure_identity()
         clients: list[httpx.AsyncClient] = []
 
         def http(base_url: str) -> httpx.AsyncClient:
@@ -85,22 +89,22 @@ def create_app(
         app.state.settings = settings
         app.state.box = SecretBox(keys.secrets)
         app.state.store = store or DbGatewayClient(
-            http(settings.db_gateway_url), settings.db_instance, settings.db_connection, token or None)
-        app.state.platform = platform or PortcullisClient(http(settings.portcullis_url), token or None)
-        app.state.agent_gateway = agent_gateway or McpAgentGateway(token or None)
+            http(settings.db_gateway_url), settings.db_instance, settings.db_connection, keyring)
+        app.state.platform = platform or PortcullisClient(http(settings.portcullis_url), keyring)
+        app.state.agent_gateway = agent_gateway or McpAgentGateway(keyring)
         app.state.agents = AgentDirectory(
-            HttpRegistrySource(settings.agents_registry_url, http(settings.agents_registry_url), token or None)
+            HttpRegistrySource(settings.agents_registry_url, http(settings.agents_registry_url), keyring)
             if settings.agents_registry_url else settings.agents_registry_path
         )
         app.state.extension_probe = ExtensionProbe(app.state.agent_gateway)
         armory_client = armory or http(settings.armory_url)
-        app.state.memory = MemoryClient(armory_client, token or None)
-        app.state.skills = SkillsClient(armory_client, token or None)
-        app.state.brain_gateway = BrainGateway(armory_client, token or None)
-        app.state.tickets = ArmoryTickets(armory_client, token or None)
+        app.state.memory = MemoryClient(armory_client, keyring)
+        app.state.skills = SkillsClient(armory_client, keyring)
+        app.state.brain_gateway = BrainGateway(armory_client, keyring)
+        app.state.tickets = ArmoryTickets(armory_client, keyring)
         app.state.ticket_unread = TicketUnread(app.state.store)
         app.state.limits = LimitsStore(app.state.store)
-        app.state.legion = LegionTuning(legion or http(""), app.state.agents, token or None)
+        app.state.legion = LegionTuning(legion or http(""), app.state.agents, keyring)
         tools_in = tools or {}
         env = dotenv_values(ENV_PATH) if tools is None and ENV_PATH.exists() else {}  # tests inject `tools` and read no .env
 
@@ -109,7 +113,7 @@ def create_app(
             key = f"{name.upper()}_TOKEN"
             return os.getenv(key) or env.get(key) or None
 
-        app.state.uploads = ArmoryUploads(armory_client, token or None)
+        app.state.uploads = ArmoryUploads(armory_client, keyring)
         app.state.scribe = tool_services.scribe(tools_in.get("scribe") or http(settings.scribe_url), service_token("scribe"))
         app.state.reader = tool_services.reader(tools_in.get("reader") or http(settings.reader_url), service_token("reader"))
         app.state.bard = tool_services.bard(tools_in.get("bard") or http(settings.bard_url), service_token("bard"))
@@ -119,7 +123,8 @@ def create_app(
         app.state.usage = UsageService(app.state.store, settings.usage, app.state.pricing)
         app.state.turns = TurnRegistry(
             app.state.chats, app.state.usage, app.state.agent_gateway, settings.usage, PlatformLogs(app.state.platform),
-            pricing=app.state.pricing, directory=app.state.agents)
+            pricing=app.state.pricing, directory=app.state.agents, keyring=keyring,
+            requester_refresh=app.state.platform.requester_token)
         app.state.schema_version = None
         try:
             app.state.schema_version = (await migrations.migrate(app.state.store))["version"]
@@ -134,7 +139,7 @@ def create_app(
                 await client.aclose()
 
     app = FastAPI(title="stronghold", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
-    app.add_middleware(InternalTokenMiddleware, token=token)
+    app.add_middleware(ServiceAuthMiddleware, keyring=keyring, audience="stronghold")
     app.include_router(agents_routes.router)
     app.include_router(extensions_routes.router)
     app.include_router(attachments_routes.router)

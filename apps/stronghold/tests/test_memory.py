@@ -1,5 +1,7 @@
 """/memory: Armory keeps the notes; Stronghold scopes every call to the requester."""
 
+from tests.auth_helpers import identity, caller, requester
+
 import logging
 
 import httpx
@@ -8,7 +10,7 @@ import pytest
 from tests.conftest import IDENTITY
 
 URL = "/memory"
-UID = IDENTITY["X-Requester-Uid"]
+UID = IDENTITY["uid"]
 NOTE = {"id": 1, "text": "coffee", "created_at": "2026-10-18T00:00:00+00:00"}
 
 
@@ -19,7 +21,7 @@ def answer_notes(request: httpx.Request) -> httpx.Response:
 
 
 def test_memory_needs_the_requester_identity(client, armory):
-    assert client.get(URL, headers={"X-Requester-Uid": ""}).status_code == 400
+    assert client.get(URL, headers=identity(uid="")).status_code == 400
     assert not armory.requests
 
 
@@ -31,7 +33,7 @@ def test_memory_uses_the_requester_uid_and_the_internal_token(client, armory):
     assert client.delete(f"{URL}/1").status_code == 204
     for request in armory.requests:
         assert request.url.path.startswith(f"/memory/owners/{UID}/notes")
-        assert request.headers["X-Internal-Token"] == "shared-test-token"
+        assert caller(request, "armory") == "stronghold"
 
 
 @pytest.mark.parametrize("body", [{"text": " "}, {"text": "x" * 501}, {}])

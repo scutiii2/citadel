@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import identity, caller, requester
+
 import asyncio
 
 from fastapi.testclient import TestClient
@@ -26,7 +28,7 @@ def test_a_switched_off_agent_is_listed_and_back_on_removes_it(client: TestClien
 def test_the_list_is_private_to_the_account(client: TestClient) -> None:
     client.put(f"{URL}/claude-agent", json={"enabled": False})
 
-    assert client.get(URL, headers={"X-Requester-Uid": "u-2"}).json() == {"disabled": []}
+    assert client.get(URL, headers=identity(uid="u-2")).json() == {"disabled": []}
 
 
 def test_an_agent_id_must_look_like_one(client: TestClient) -> None:
@@ -35,7 +37,7 @@ def test_an_agent_id_must_look_like_one(client: TestClient) -> None:
 
 
 def test_the_requester_is_required(client: TestClient) -> None:
-    assert client.get(URL, headers={"X-Requester-Uid": ""}).status_code == 400
+    assert client.get(URL, headers=identity(uid="")).status_code == 400
 
 
 def test_purge_forgets_the_list(client: TestClient) -> None:

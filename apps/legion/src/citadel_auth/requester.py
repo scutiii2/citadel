@@ -3,7 +3,7 @@
 import time
 import uuid
 from contextvars import ContextVar
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 
 from .errors import AuthError
@@ -20,6 +20,7 @@ class Requester:
 
 _requester: ContextVar[Requester | None] = ContextVar("citadel_requester", default=None)
 _requester_token: ContextVar[str] = ContextVar("citadel_requester_token", default="")
+_token_provider: ContextVar[object] = ContextVar("citadel_requester_token_provider", default=None)
 
 
 def current_requester() -> Requester | None:
@@ -27,7 +28,18 @@ def current_requester() -> Requester | None:
 
 
 def current_requester_token() -> str:
-    return _requester_token.get()
+    provider = _token_provider.get()
+    return provider() if provider is not None else _requester_token.get()
+
+
+@contextmanager
+def requester_token_provider(provider):
+    """Let a running job forward its latest verified credential across child tasks."""
+    handle = _token_provider.set(provider)
+    try:
+        yield
+    finally:
+        _token_provider.reset(handle)
 
 
 def mint_requester(keyring: Keyring, uid: str, username: str, email: str, aud: list[str]) -> str:

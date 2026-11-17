@@ -96,9 +96,9 @@ def test_entry_is_none_when_nothing_qualifies_or_the_file_is_missing(tmp_path: P
 # --- URL source (ai_agent GET /registry) ---
 
 
-def http_directory(handler, token: str | None = None) -> tuple[AgentDirectory, httpx.AsyncClient]:
+def http_directory(handler) -> tuple[AgentDirectory, httpx.AsyncClient]:
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    return AgentDirectory(HttpRegistrySource("http://agents.test/registry", client, token)), client
+    return AgentDirectory(HttpRegistrySource("http://agents.test/registry", client)), client
 
 
 def test_the_url_source_lists_the_agents_and_sends_the_token() -> None:
@@ -109,7 +109,7 @@ def test_the_url_source_lists_the_agents_and_sends_the_token() -> None:
         return httpx.Response(200, json={"agents": [agent("main", entry=True)]})
 
     async def run():
-        d, client = http_directory(handler, token="s3cret")
+        d, client = http_directory(handler)
         try:
             return await d.entry()
         finally:
@@ -118,7 +118,8 @@ def test_the_url_source_lists_the_agents_and_sends_the_token() -> None:
     found = asyncio.run(run())
 
     assert found.id == "main"
-    assert seen[0].headers["X-Internal-Token"] == "s3cret"
+    from tests.auth_helpers import caller
+    assert caller(seen[0], "legion") == "stronghold"
 
 
 def test_the_url_source_sends_no_token_header_when_none_is_configured() -> None:
@@ -137,7 +138,8 @@ def test_the_url_source_sends_no_token_header_when_none_is_configured() -> None:
 
     asyncio.run(run())
 
-    assert "X-Internal-Token" not in seen[0].headers
+    from tests.auth_helpers import caller
+    assert caller(seen[0], "legion") == "stronghold"
 
 
 def test_the_url_source_caches_for_a_few_seconds() -> None:

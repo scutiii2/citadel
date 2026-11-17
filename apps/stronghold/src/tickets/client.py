@@ -11,6 +11,8 @@ import logging
 from typing import Any
 
 import httpx
+from src.service_auth import authenticate
+from src.citadel_auth import requester_header
 
 from src.requester import Requester
 
@@ -42,15 +44,11 @@ def _params(filters: dict[str, Any]) -> dict[str, str]:
 class ArmoryTickets:
     """`client` carries Armory's base URL; the caller closes it."""
 
-    def __init__(self, client: httpx.AsyncClient, token: str | None) -> None:
-        self._client = client
-        self._token = token
+    def __init__(self, client: httpx.AsyncClient, keyring=None) -> None:
+        self._client = authenticate(client, "armory", keyring)
 
     def _headers(self, who: Requester) -> dict[str, str]:
-        headers = {"X-Requester-Username": who.username, "X-Requester-Email": who.email, "X-Requester-Uid": who.uid}
-        if self._token:
-            headers["X-Internal-Token"] = self._token
-        return headers
+        return requester_header()
 
     async def _request(self, method: str, path: str, who: Requester, *, params: dict[str, str] | None = None,
                        json: Any = None) -> Any:

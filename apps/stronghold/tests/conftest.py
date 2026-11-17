@@ -3,17 +3,30 @@
 import json
 import os
 
-os.environ["INTERNAL_TOKEN_FILE"] = ""
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+from tests import auth_helpers
+from tests.auth_helpers import identity, service_auth
 
 IDENTITY = {
-    "X-Requester-Uid": "u-1",
-    "X-Requester-Username": "ana",
-    "X-Requester-Email": "ana@example.com",
+    "uid": "u-1", "username": "ana", "email": "ana@example.com",
 }
+
+
+@pytest.fixture(scope="session")
+def auth_stack(tmp_path_factory):
+    import asyncio
+    from src.citadel_auth.testing import make_stack
+    auth_helpers.stack = asyncio.run(make_stack(tmp_path_factory.mktemp("service-auth")))
+    return auth_helpers.stack
+
+
+@pytest.fixture(autouse=True)
+def service_identity(auth_stack, monkeypatch):
+    from src import service_auth as wiring
+    monkeypatch.setattr(wiring, "keyring", auth_stack["stronghold"])
 
 
 class FakeDbGateway:
@@ -68,6 +81,9 @@ class FakePlatform:
 
     async def permissions(self, uid):
         return self.granted.get(uid, self.default_permissions)
+
+    async def requester_token(self, uid):
+        return identity(uid=uid)["X-Citadel-Requester"]
 
     async def log_action(self, uid, action, message):
         self.actions.append((uid, action, message))
@@ -175,10 +191,11 @@ def client(tmp_path, db_gateway, armory, platform, agent, tools, legion):
     upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory))
     registry = tmp_path / "config_agents.json"  # tests add agents by rewriting it
     registry.write_text(json.dumps({"agents": AGENTS}), encoding="utf-8")
-    app = create_app("shared-test-token", Settings(data_dir=tmp_path / "data", agents_registry_path=registry),
+    app = create_app(auth_helpers.stack["stronghold"], Settings(data_dir=tmp_path / "data", agents_registry_path=registry),
                      store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent,
                      tools=tool_clients(tools), legion=httpx.AsyncClient(transport=httpx.MockTransport(legion)))
-    with TestClient(app, headers={**IDENTITY, "X-Internal-Token": "shared-test-token"}) as test_client:
+    with TestClient(app, headers=identity(**IDENTITY)) as test_client:
+        test_client.auth = service_auth()
         yield test_client
 
 
@@ -196,9 +213,10 @@ def make_client(tmp_path, db_gateway, armory, platform, agent, tools, legion):
         upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory))
         settings = Settings(data_dir=tmp_path / "data", agents_registry_path=registry,
                             usage=usage or UsageSettings(), pricing=pricing or PricingSettings())
-        app = create_app("shared-test-token", settings, store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent,
+        app = create_app(auth_helpers.stack["stronghold"], settings, store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent,
                      tools=tool_clients(tools), legion=httpx.AsyncClient(transport=httpx.MockTransport(legion)))
-        client = TestClient(app, headers={**IDENTITY, "X-Internal-Token": "shared-test-token"})
+        client = TestClient(app, headers=identity(**IDENTITY))
+        client.auth = service_auth()
         clients.append(client)
         return client.__enter__()
 

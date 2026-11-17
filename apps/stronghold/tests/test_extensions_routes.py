@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import identity, caller, requester
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -18,7 +20,7 @@ def add(client: TestClient, label: str = "Notes", url: str = EXT_URL, **extra):
 
 
 def test_the_requester_is_required(client: TestClient) -> None:
-    anonymous = {"X-Requester-Uid": ""}
+    anonymous = identity(uid="")
     assert client.get(URL, headers=anonymous).status_code == 400
     assert client.post(URL, json={"label": "x", "url": EXT_URL}, headers=anonymous).status_code == 400
 

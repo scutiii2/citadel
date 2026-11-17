@@ -1,11 +1,11 @@
-"""Who is asking. Portcullis authenticates the account and sends its identity in
-headers; Stronghold trusts them because the internal token was already checked."""
+"""Requester identity comes only from a verified Portcullis-signed token."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fastapi import Header, HTTPException, status
+from fastapi import HTTPException, status
+from src.citadel_auth import current_requester as verified_requester
 
 
 @dataclass(frozen=True)
@@ -17,12 +17,9 @@ class Requester:
     email: str
 
 
-async def current_requester(
-    x_requester_uid: str = Header(""),
-    x_requester_username: str = Header(""),
-    x_requester_email: str = Header(""),
-) -> Requester:
-    """The requester from Portcullis's headers, or 400 when the uid is missing."""
-    if not x_requester_uid:
+async def current_requester() -> Requester:
+    """Only a Portcullis-signed requester identifies an account."""
+    who = verified_requester()
+    if who is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Missing requester identity")
-    return Requester(uid=x_requester_uid, username=x_requester_username, email=x_requester_email)
+    return Requester(uid=who.uid, username=who.username, email=who.email)

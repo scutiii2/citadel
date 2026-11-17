@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import identity, caller, requester
+
 import json
 
 import httpx
@@ -9,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 FID = "a" * 32
-ANONYMOUS = {"X-Requester-Uid": ""}
+ANONYMOUS = identity(uid="")
 
 
 def down(_request):

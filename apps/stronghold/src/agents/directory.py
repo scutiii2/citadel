@@ -22,6 +22,8 @@ from pathlib import Path
 from typing import Any, Protocol
 
 import httpx
+from src.service_auth import authenticate
+from src.citadel_auth import requester_header
 
 logger = logging.getLogger(__name__)
 
@@ -231,10 +233,10 @@ class HttpRegistrySource:
     """ai_agent's GET /registry. Cached for a few seconds; when a fetch fails
     the last good list is kept for a minute, then the list is empty."""
 
-    def __init__(self, url: str, client: httpx.AsyncClient, internal_token: str | None) -> None:
+    def __init__(self, url: str, client: httpx.AsyncClient, keyring=None) -> None:
         self._url = url
-        self._client = client
-        self._headers = {"X-Internal-Token": internal_token} if internal_token else {}
+        self._client = authenticate(client, "legion", keyring)
+
         self._agents: list[AgentEntry] = []
         self._defined: list[AgentDefinition] = []
         self._fetched_at = 0.0  # last attempt, ok or not
@@ -254,7 +256,7 @@ class HttpRegistrySource:
                 return self._current(now, pick)
             self._fetched_at = now
             try:
-                response = await self._client.get(self._url, headers=self._headers, timeout=_FETCH_TIMEOUT)
+                response = await self._client.get(self._url, headers={}, timeout=_FETCH_TIMEOUT)
                 response.raise_for_status()
                 body = response.json()
                 self._agents = parse_registry(body)

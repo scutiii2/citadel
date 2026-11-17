@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.auth_helpers import identity, caller, requester
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -13,7 +15,7 @@ A = "chat-0001-aaaa"
 B = "chat-0002-bbbb"
 C = "chat-0003-cccc"
 MESSAGES = [{"role": "user", "content": "hello there"}, {"role": "assistant", "content": "Hi!", "model": "m", "total_tokens": 9}]
-ANONYMOUS = {"X-Requester-Uid": ""}
+ANONYMOUS = identity(uid="")
 
 
 def put(client: TestClient, chat_id: str = A, title: str = "First chat", messages=None, **extra):

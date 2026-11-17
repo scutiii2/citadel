@@ -7,6 +7,7 @@ the request headers name, so "logging in" only switches those headers.
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from tests.auth_helpers import identity
 
 
 def uid_of(name: str) -> str:
@@ -14,8 +15,7 @@ def uid_of(name: str) -> str:
 
 
 def login(client: TestClient, username: str, password: str = "") -> None:
-    client.headers.update({"X-Requester-Uid": uid_of(username), "X-Requester-Username": username,
-                           "X-Requester-Email": f"{username}@example.com"})
+    client.headers.update(identity(uid_of(username), username, f"{username}@example.com"))
 
 
 def as_admin(client: TestClient) -> None:

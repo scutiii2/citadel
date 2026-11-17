@@ -86,7 +86,7 @@ def test_start_records_the_baseline_and_schema_shows_it(client, db_gateway):
 
 
 def test_schema_needs_the_internal_token(client):
-    del client.headers["X-Internal-Token"]
+    client.auth = None
     assert client.get("/schema").status_code == 401
 
 

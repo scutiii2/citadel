@@ -10,6 +10,10 @@ import logging
 from typing import Any
 
 import httpx
+from src.service_auth import authenticate
+from src.citadel_auth import requester_header
+from src.citadel_auth import verify_requester
+from src import service_auth
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +25,14 @@ class PlatformError(Exception):
 class PortcullisClient:
     """`client` carries Portcullis's base URL and a timeout; the caller closes it."""
 
-    def __init__(self, client: httpx.AsyncClient, internal_token: str | None) -> None:
-        self._client = client
-        self._headers = {"X-Internal-Token": internal_token} if internal_token else {}
+    def __init__(self, client: httpx.AsyncClient, keyring=None) -> None:
+        self._keyring = keyring or service_auth.keyring
+        self._client = authenticate(client, "portcullis", keyring)
+
 
     async def _send(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         try:
-            return await self._client.request(method, path, headers=self._headers, **kwargs)
+            return await self._client.request(method, path, headers={}, **kwargs)
         except httpx.HTTPError as error:
             raise PlatformError(f"Portcullis is unreachable: {type(error).__name__}") from error
 
@@ -39,6 +44,19 @@ class PortcullisClient:
         if response.status_code != 200:
             raise PlatformError(f"Portcullis answered {response.status_code}")
         return set(response.json()["permissions"])
+
+    async def requester_token(self, uid: str) -> str:
+        response = await self._send("POST", "/internal/requester-token", json={"uid": uid})
+        if response.status_code != 200:
+            raise PlatformError("Requester renewal refused")
+        try:
+            token = response.json()["token"]
+            who = await verify_requester(self._keyring, token, "stronghold")
+            if who.uid != uid:
+                raise ValueError("requester mismatch")
+            return token
+        except (ValueError, KeyError, TypeError):
+            raise PlatformError("Invalid requester renewal response") from None
 
     async def log_action(self, uid: str, action: str, message: str) -> None:
         """Add a line to the Logs page for something the account did. Never raises:

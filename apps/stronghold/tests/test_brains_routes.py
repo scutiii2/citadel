@@ -3,6 +3,7 @@
 import json
 
 import httpx
+from tests.auth_helpers import requester
 
 PERSONAL = "/brains/connections/personal"
 INSTANCE = "/brains/connections/instance"
@@ -75,7 +76,7 @@ def test_resolve_hands_armory_the_credential_and_checks_publish(client, armory, 
 
 
 def test_resolve_needs_the_internal_token(client):
-    del client.headers["X-Internal-Token"]
+    client.auth = None
     assert client.post("/brains/resolve", json={"scope": "personal", "operation": "read"}).status_code == 401
 
 
@@ -94,7 +95,7 @@ def test_browse_passes_the_account_to_armory(client, armory):
     answer = client.post("/brains/browse", json={"scope": "both", "operation": "list"})
     assert answer.status_code == 200
     sent = armory.requests[-1]
-    assert sent.url.path == "/brains/operation" and sent.headers["x-requester-uid"] == "u-1"
+    assert sent.url.path == "/brains/operation" and requester(sent)["sub"] == "u-1"
     assert json.loads(sent.content)["scope"] == "both"
     armory.handler = lambda request: httpx.Response(500)
     assert client.post("/brains/browse", json={"operation": "list"}).status_code == 503
