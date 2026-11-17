@@ -72,8 +72,7 @@ changes the convention for every project after it.
    29601 portcullis, 8040 pdf_merger, 29602 db_gateway,
    29603+ ai_agent agents.
 6. Services reached over HTTP/MCP by other projects must take the shared
-   `INTERNAL_API_TOKEN` from a secrets file (`.env` in each project) and, for
-   `/mcp`, reject calls without it once set. Never import another root
+   signed service identity (`citadel_auth`) and, for `/mcp`, reject calls without it. Never import another root
    project: self-contained means a separate venv and no shared packages
    (see `chat_cli`, which talks to portcullis over HTTP instead of reusing
    its code). Never expose the shared token in a browser UI.
@@ -82,9 +81,8 @@ changes the convention for every project after it.
 
 `mcp_server` already goes one step further, and a new server that owns per-capability state should copy it: the rule is
 **dot-prefixed = untracked runtime state or secrets, plain `configs/` = tracked**. Its root has `.data/`, `.logs/`, `.cache/`
-(in place of plain `data/`, `logs/`), a single `.env`, and `configs/`; each capability gets `.data/ .logs/ .cache/ .secrets/ configs/` under
-`specifics/<capability_name>/`. An untracked dot-folder needs no `README.md`; a
-credentials README that is worth keeping lives in `docs/` (see `apps/armory/docs/secrets.md`); `.env.example` stays tracked. `apps/armory/migrate_state_layout.py` moves an older checkout onto this shape. `ai_agent`, `portcullis` and `chat_cli` use the
+(in place of plain `data/`, `logs/`), a single `.env`, and `configs/`; each capability keeps its runtime files in `.data/<capability_name>/` and `.cache/<capability_name>/`. An untracked dot-folder needs no `README.md`; a
+credentials README that is worth keeping lives in `docs/` (see `apps/armory/docs/secrets.md`); `.env.example` stays tracked. `ai_agent`, `portcullis` and `chat_cli` use the
 plain folder names above.
 
 ## Auditing an existing root folder

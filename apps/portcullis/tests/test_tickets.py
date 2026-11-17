@@ -40,7 +40,8 @@ def member_client(client_factory, email):
 def test_logged_out_visitors_get_401(client, served) -> None:
     for method, path in [("get", "/api/tickets"), ("get", "/api/tickets/unread-count"), ("get", "/api/tickets/7"),
                          ("get", "/api/admin/tickets"),
-                         ("get", "/api/admin/tickets/stats"), ("get", "/api/admin/ticket-groups")]:
+                         ("get", "/api/admin/tickets/stats"), ("get", "/api/admin/ticket-groups"),
+                     ("get", "/api/admin/ticket-settings"), ("patch", "/api/admin/ticket-settings")]:
         assert getattr(client, method)(path).status_code == 401
     assert client.post("/api/tickets", json=NEW).status_code == 401
     assert client.post("/api/tickets/7/reopen", json={}).status_code == 401
@@ -80,9 +81,13 @@ def test_every_staff_route_goes_to_stronghold_as_the_staff_account(client, serve
     assert admin.get("/api/admin/ticket-groups").json()["path"] == "/ticket-admin/groups"
     assert admin.patch("/api/admin/ticket-groups/3", json={"pinned": False}).json()["path"] == "/ticket-admin/groups/3"
 
+    assert admin.get("/api/admin/ticket-settings").json()["path"] == "/ticket-admin/settings"
+    assert admin.patch("/api/admin/ticket-settings", json={"tags": {"a": "b"}}).json()["path"] == "/ticket-admin/settings"
+
     assert all(requester(request)["sub"] == uid for request in served.requests)
     assert json.loads(served.requests[3].content) == {"status": "closed"}
-    assert len(served.requests) == 8
+    assert json.loads(served.requests[-1].content) == {"tags": {"a": "b"}}
+    assert len(served.requests) == 10
 
 
 def test_a_refusal_from_stronghold_passes_through(client_factory, email, upstream) -> None:

@@ -147,11 +147,11 @@ process restart. Cancellation is cooperative and may finish after the response.
 
 ## Usage cost estimates
 
-Configure `configs/config_pricing.json` (costs on chat messages) and Stronghold's `pricing` block (the Usage page) with your model names and separate
+Prices live only in Stronghold's `pricing` block (`apps/stronghold/configs/config_app.json`); Portcullis reads them from `GET /usage/pricing` for the cost on chat messages and the Usage page. Fill it with your model names and separate
 `input` / `output` prices in **USD per 1,000,000 tokens** (`currency: "USD"`).
-The file is created from its `.example` on first startup; the shipped
+The shipped
 `example-model` entry is a placeholder. Fill in real names and prices yourself,
-then restart portcullis. Unknown models and calls missing both token counts show
+then restart Stronghold. Unknown models and calls missing both token counts show
 no cost; a single missing side counts as zero when the other is known.
 
 Chat GET, branch, summarize/clear responses and live `final` events include

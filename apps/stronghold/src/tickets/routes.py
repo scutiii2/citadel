@@ -195,6 +195,20 @@ async def ticket_stats(who: Requester = Depends(current_requester), tickets: Arm
     return await tickets.stats(who)
 
 
+@admin_router.get("/settings")
+async def ticket_settings(who: Requester = Depends(current_requester), tickets: ArmoryTickets = Depends(get_tickets)) -> Any:
+    """The ticket settings Armory keeps: tags, elevation rules, Laya limits."""
+    return await tickets.settings(who)
+
+
+@admin_router.patch("/settings")
+async def update_ticket_settings(
+    changes: dict[str, Any], who: Requester = Depends(current_requester), tickets: ArmoryTickets = Depends(get_tickets)
+) -> Any:
+    """Armory validates the whole document; a refusal comes back as its own message."""
+    return await tickets.update_settings(who, changes)
+
+
 @admin_router.get("/tickets/{ticket_id}")
 async def get_any_ticket(ticket_id: TicketId, who: Requester = Depends(current_requester),
                          tickets: ArmoryTickets = Depends(get_tickets)) -> Any:

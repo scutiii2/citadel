@@ -2,7 +2,7 @@
 
 Project note: `Brain/Projects/armory_admin.md` in the Obsidian vault (`../../../../Brain/` from this folder), once it exists.
 
-Vue 3 + TypeScript admin app for Armory, for accounts holding `capabilities.manage` or `extensions.manage`. Talks only to `portcullis` through the Vite `/api` proxy (no backend of its own). Pages: Capabilities (which tool capabilities are online, with a tool test form) and Extensions (shared extensions).
+Vue 3 + TypeScript admin app for Armory, for accounts holding `capabilities.manage` or `extensions.manage`. Talks only to `portcullis` through the Vite `/api` proxy (no backend of its own). Pages: Capabilities (which tool capabilities are online, with a tool test form), Extensions (shared extensions) and Ticket settings (tags and Laya limits, for `tickets.manage`).
 
 ## Rules
 - Code is copied between the admin apps, not shared. Nothing here imports from another app. Apply a fix to a shared component (PageLayout, ToggleSwitch, BaseModal...) in every admin app that has a copy.

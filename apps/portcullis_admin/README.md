@@ -91,9 +91,7 @@ Only the capability's own folder is re-imported. Shared modules in
 `mcp_server/src/services` are not: restart mcp_server for those. Do not reload
 the server_manager capability while its ServerWatchers run.
 
-The first mcp_server run with the folder scanner writes `enabled: true` for
-every existing capability and a `_scanner` marker into
-`mcp_server/configs/config_capabilities.json` (gitignored). After that, a
+Every capability starts offline on a new install. An administrator switches each one on (Armory Admin, Capabilities page); the choice is saved in Armory's `settings.db`. A
 folder with no entry starts offline. See
 [mcp_server/configs/README.md](../../armory/configs/README.md).
 

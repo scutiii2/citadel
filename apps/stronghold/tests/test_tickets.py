@@ -63,6 +63,12 @@ def tickets_server(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"tickets": [TICKET]})
     if path == "/ticket-admin/groups" and method == "GET":
         return httpx.Response(200, json={"groups": [GROUP]})
+    if path == "/ticket-admin/settings":
+        if method == "GET":
+            return httpx.Response(200, json={"tags": {"email": "Mail problems", "other": "Anything else"}})
+        if not body_of(request)["tags"]:
+            return httpx.Response(400, json={"error": "tags: at least two"})
+        return httpx.Response(200, json=body_of(request))
     if path == "/ticket-admin/stats":
         return httpx.Response(200, json={"open": 1, "urgent": 0, "groups": 1})
     match = re.fullmatch(r"/(ticket-admin/)?tickets/(\d+)(?:/(comments|close|reopen|move))?", path)
@@ -446,3 +452,11 @@ def test_purging_an_account_removes_only_its_read_receipts(client: TestClient, d
 
     assert [doc["owner"] for doc in db_gateway.records.values()] == [uid_of("bob")]
     assert client.delete("/tickets/accounts/has%20space").status_code == 422
+
+
+def test_staff_ticket_settings_pass_through_to_armory(client: TestClient, armory) -> None:
+    assert client.get("/ticket-admin/settings").json() == {"tags": {"email": "Mail problems", "other": "Anything else"}}
+    assert armory.requests[-1].url.path == "/ticket-admin/settings"
+    changed = client.patch("/ticket-admin/settings", json={"tags": {"mail": "Mail", "other": "Rest"}})
+    assert changed.status_code == 200 and body_of(armory.requests[-1]) == {"tags": {"mail": "Mail", "other": "Rest"}}
+    assert client.patch("/ticket-admin/settings", json={"tags": {}}).json()["detail"] == "tags: at least two"

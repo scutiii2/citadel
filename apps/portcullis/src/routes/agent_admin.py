@@ -179,6 +179,64 @@ async def set_decision_gateway_settings(
     return result
 
 
+SERVER_ID_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,62}$"
+
+
+class ServerAuthIn(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    type: str = Field(max_length=20)
+    env_var: str | None = Field(default=None, max_length=200)
+    header_name: str | None = Field(default=None, max_length=200)
+    header_value: str | None = Field(default=None, max_length=2000, repr=False)
+
+
+class ServerIn(BaseModel):
+    """One MCP server legion connects to as a client; legion validates the combination."""
+
+    model_config = {"extra": "forbid"}
+
+    label: str = Field(max_length=100)
+    description: str = Field(default="", max_length=500)
+    transport: str = Field(max_length=10)
+    url: str | None = Field(default=None, max_length=500)
+    command: str | None = Field(default=None, max_length=500)
+    args: list[str] | None = Field(default=None, max_length=50)
+    auth: ServerAuthIn | None = None
+
+
+@prompts_router.get("/servers")
+async def list_servers(account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
+    """The MCP servers legion connects to: `{servers: {id: entry}}`. No header value is returned."""
+    return {"servers": await _call(admin.servers(account))}
+
+
+@prompts_router.put("/servers/{server_id}")
+async def put_server(
+    body: ServerIn,
+    server_id: str = Path(pattern=SERVER_ID_PATTERN),
+    account: Account = Depends(require_agents_manage),
+    admin: AgentAdmin = Depends(get_agent_admin),
+    logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    """Add or change a server; legion checks it and applies it at its next start."""
+    result = await _call(admin.set_server(account, server_id, body.model_dump(exclude_none=True)))
+    await logs.action(account, "agents.server", f"Saved MCP server '{server_id}'")
+    return result
+
+
+@prompts_router.delete("/servers/{server_id}")
+async def delete_server(
+    server_id: str = Path(pattern=SERVER_ID_PATTERN),
+    account: Account = Depends(require_agents_manage),
+    admin: AgentAdmin = Depends(get_agent_admin),
+    logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    await _call(admin.delete_server(account, server_id))
+    await logs.action(account, "agents.server", f"Removed MCP server '{server_id}'")
+    return {"deleted": server_id}
+
+
 @prompts_router.get("/agent-prompts")
 async def get_prompts(account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
     """The prompt texts every agent shares: `{values, defaults, overridden}`."""

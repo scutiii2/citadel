@@ -116,3 +116,9 @@ class ArmoryTickets:
 
     async def stats(self, who: Requester) -> dict[str, Any]:
         return await self._request("GET", "/ticket-admin/stats", who)
+
+    async def settings(self, who: Requester) -> dict[str, Any]:
+        return await self._request("GET", "/ticket-admin/settings", who)
+
+    async def update_settings(self, who: Requester, changes: dict[str, Any]) -> dict[str, Any]:
+        return await self._request("PATCH", "/ticket-admin/settings", who, json=changes)

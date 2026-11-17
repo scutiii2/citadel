@@ -100,6 +100,17 @@ export interface GatewaySettingsView {
   has_token: boolean;
 }
 
+/** One MCP server Legion connects to. A header value is write-only: reads carry `has_value` instead. */
+export interface McpServer {
+  label: string;
+  description?: string;
+  transport: "http" | "stdio";
+  url?: string;
+  command?: string;
+  args?: string[];
+  auth?: { type: string; env_var?: string; header_name?: string; header_value?: string; has_value?: boolean };
+}
+
 /** portcullis's /api/admin/agents (needs agents.manage), which ai_agent validates and applies. */
 export const agentsAdminClient = {
   gateways: async () => (await apiRequest<{ providers: ProviderCatalog }>("GET", "/api/admin/agents/gateways")).providers,
@@ -116,6 +127,11 @@ export const agentsAdminClient = {
   decisionGatewaySettings: () => apiRequest<GatewaySettingsView>("GET", "/api/admin/decision-gateway-settings"),
   setDecisionGatewaySettings: (changes: { url?: string; token?: string }) =>
     apiRequest<GatewaySettingsView>("PUT", "/api/admin/decision-gateway-settings", changes),
+  servers: async () => (await apiRequest<{ servers: Record<string, McpServer> }>("GET", "/api/admin/servers")).servers,
+  /** Add or change a server; an auth header sent without its value keeps the saved value. Applies at Legion's next start. */
+  saveServer: (id: string, entry: McpServer) =>
+    apiRequest<{ saved: string }>("PUT", `/api/admin/servers/${encodeURIComponent(id)}`, entry),
+  removeServer: (id: string) => apiRequest<{ deleted: string }>("DELETE", `/api/admin/servers/${encodeURIComponent(id)}`),
   prompts: () => apiRequest<SharedPrompts>("GET", "/api/admin/agent-prompts"),
   /** `null` (or blank) resets a text to its default. ai_agent restarts every agent to apply it. */
   setPrompts: (changes: Record<string, string | null>) => apiRequest<SharedPrompts>("PUT", "/api/admin/agent-prompts", changes),

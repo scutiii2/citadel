@@ -216,3 +216,56 @@ def test_decision_gateway_settings_need_agents_manage(client_factory, email: Fak
     login(member, "alice")
     assert member.put("/api/admin/decision-gateway-settings", json={"token": "x"}).status_code == 403
     assert upstream.requests == []
+
+
+def servers_agent(stored: dict):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if not request.url.path.startswith("/agents/servers"):
+            return ai_agent(request)
+        if request.method == "GET":
+            return httpx.Response(200, json={"servers": stored})
+        server_id = request.url.path.rsplit("/", 1)[1]
+        if request.method == "DELETE":
+            stored.pop(server_id, None)
+            return httpx.Response(200, json={"deleted": server_id, "applies": "next start"})
+        body = json.loads(request.content)
+        if body.get("transport") == "http" and not body.get("url"):
+            return httpx.Response(400, json={"error": "transport 'http' requires 'url'"})
+        stored[server_id] = body
+        return httpx.Response(200, json={"saved": server_id, "applies": "next start"})
+    return handler
+
+
+def test_servers_list_add_and_remove_never_show_a_header_value(client, upstream: FakeUpstream) -> None:
+    stored = {"main": {"label": "armory", "transport": "http", "url": "http://armory:29600/mcp",
+                       "auth": {"type": "header", "header_name": "X-Token", "header_value": "s3cret"}}}
+    upstream.handler = servers_agent(stored)
+    as_admin(client)
+
+    listed = client.get("/api/admin/servers")
+    assert "s3cret" not in listed.text
+    assert listed.json()["servers"]["main"]["auth"] == {"type": "header", "header_name": "X-Token", "has_value": True}
+
+    # editing without retyping the secret keeps the stored one
+    edit = {"label": "armory", "transport": "http", "url": "http://armory:29600/mcp2",
+            "auth": {"type": "header", "header_name": "X-Token"}}
+    assert client.put("/api/admin/servers/main", json=edit).status_code == 200
+    assert stored["main"]["url"].endswith("/mcp2") and stored["main"]["auth"]["header_value"] == "s3cret"
+
+    assert client.put("/api/admin/servers/docs", json={"label": "docs", "transport": "http"}).json()["detail"] == (
+        "transport 'http' requires 'url'")
+    assert client.put("/api/admin/servers/Bad Id", json=edit).status_code == 422
+    assert client.put("/api/admin/servers/x", json={**edit, "extra": 1}).status_code == 422
+    assert client.delete("/api/admin/servers/main").json() == {"deleted": "main"}
+    assert stored == {}
+
+
+def test_servers_need_agents_manage(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
+    upstream.handler = servers_agent({})
+    assert client_factory().get("/api/admin/servers").status_code == 401
+    member = client_factory()
+    make_member(member, email)
+    login(member, "alice")
+    assert member.get("/api/admin/servers").status_code == 403
+    assert member.delete("/api/admin/servers/main").status_code == 403
+    assert upstream.requests == []

@@ -37,6 +37,15 @@ class AgentAdminRefused(Exception):
         self.status = status
 
 
+def _without_secret(entry: Any) -> Any:
+    """The entry with its auth header value replaced by `has_value`, so the secret never reaches the browser."""
+    auth = entry.get("auth") if isinstance(entry, dict) else None
+    if not isinstance(auth, dict) or "header_value" not in auth:
+        return entry
+    shown = {key: value for key, value in auth.items() if key != "header_value"}
+    return {**entry, "auth": {**shown, "has_value": bool(auth["header_value"])}}
+
+
 class AgentAdmin:
     def __init__(
         self,
@@ -103,6 +112,26 @@ class AgentAdmin:
     async def set_decision_gateway_settings(self, account: Account, changes: dict[str, Any]) -> dict[str, Any]:
         """Save {"url"?, "token"?} for DecisionGateway; returns the new view."""
         return await self._request("PUT", "/agents/decision-gateway-settings", account, json=changes)
+
+    async def servers(self, account: Account) -> dict[str, Any]:
+        """The MCP servers legion connects to, `{id: entry}`. A header value is never returned."""
+        body = await self._request("GET", "/agents/servers", account)
+        servers = body.get("servers") if isinstance(body, dict) else None
+        return {key: _without_secret(value) for key, value in servers.items()} if isinstance(servers, dict) else {}
+
+    async def set_server(self, account: Account, server_id: str, entry: dict[str, Any]) -> dict[str, Any]:
+        """Save one server. A header auth sent without its value keeps the value already stored."""
+        auth = entry.get("auth")
+        if isinstance(auth, dict) and auth.get("type") == "header" and not auth.get("header_value"):
+            body = await self._request("GET", "/agents/servers", account)
+            stored = (body.get("servers") or {}).get(server_id) if isinstance(body, dict) else None
+            old = stored.get("auth") if isinstance(stored, dict) else None
+            if isinstance(old, dict) and old.get("header_value"):
+                entry = {**entry, "auth": {**auth, "header_value": old["header_value"]}}
+        return await self._request("PUT", f"/agents/servers/{quote(server_id, safe='')}", account, json=entry)
+
+    async def delete_server(self, account: Account, server_id: str) -> None:
+        await self._request("DELETE", f"/agents/servers/{quote(server_id, safe='')}", account)
 
     async def tuning(self, account: Account) -> dict[str, Any]:
         """legion's editable tuning: {defaults, overrides, effective}."""

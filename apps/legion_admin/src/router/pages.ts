@@ -21,4 +21,10 @@ export const LEGION_PAGES: LegionPage[] = [
     icon: ["M9 17H7a5 5 0 0 1 0-10h2", "M15 7h2a5 5 0 0 1 0 10h-2", "M8 12h8"],
     permission: "agents.manage",
   },
+  {
+    to: "/servers",
+    label: "MCP servers",
+    icon: ["M4 5h16v5H4zM4 14h16v5H4z", "M8 7.5h.01M8 16.5h.01"],
+    permission: "agents.manage",
+  },
 ];

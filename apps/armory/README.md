@@ -59,8 +59,7 @@ shape every capability follows and how to add a new one:
 Support tickets use the always-on `/tickets` reporter routes and `/ticket-admin`
 staff routes, even when the chat capability is offline. SQLite storage defaults
 to `tickets/tickets.db` in Armory's data folder, configurable with `MCP_TICKETS_DB_PATH`.
-See `configs/config_tickets.json` for tags, automatic-report caps,
-priority thresholds and classifier limits. Optional `LAYA_URL` points at the
+Tags, automatic-report caps, elevation rules and Laya limits are saved in Armory's `settings.db` (table `settings`, key `tickets`); staff edit them on the Ticket settings page of Armory Admin. Optional `LAYA_URL` points at the
 Triage Assistant's MCP address (a Legion agent on port 29611, which asks the shared Laya service; in Docker use
 `http://legion:29611/mcp`, because 127.0.0.1 is the container itself) for advisory grouping and
 tagging; blank skips Laya. Armory holds no Laya model.
@@ -73,7 +72,7 @@ restart needed. `GET /capabilities` lists each one's current state
 found but never brought online, `missing` means its folder is gone from
 disk, `load_error` is the text of the last failed import);
 `PATCH /capabilities/{name}` (body `{"enabled": bool}`) toggles it,
-persists the change to `config_capabilities.json`, and adds/removes its
+saves the change in `settings.db`, and adds/removes its
 tools and resources from the running server, all in one request. Going
 online re-imports the capability from disk, and answers `409` with
 `{"error": ...}` if that fails. `POST /capabilities/refresh` rescans

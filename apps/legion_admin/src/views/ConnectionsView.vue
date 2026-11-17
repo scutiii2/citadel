@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { agentsAdminClient } from "../api/AgentsAdminClient";
+
+const { gatewaySettings, setGatewaySettings, decisionGatewaySettings, setDecisionGatewaySettings } = agentsAdminClient;
 import GatewayConnectionCard from "../components/GatewayConnectionCard.vue";
 import PageLayout from "../components/PageLayout.vue";
 import "../components/infoPage.css";
@@ -16,15 +18,15 @@ import "../components/infoPage.css";
         id="conversation-gateway"
         title="ConversationGateway (chat models)"
         example="http://conversationgateway:29407"
-        :load="agentsAdminClient.gatewaySettings"
-        :store="agentsAdminClient.setGatewaySettings"
+        :load="gatewaySettings"
+        :store="setGatewaySettings"
       />
       <GatewayConnectionCard
         id="decision-gateway"
         title="DecisionGateway (Laya and Jev)"
         example="http://decisiongateway:29406"
-        :load="agentsAdminClient.decisionGatewaySettings"
-        :store="agentsAdminClient.setDecisionGatewaySettings"
+        :load="decisionGatewaySettings"
+        :store="setDecisionGatewaySettings"
       />
     </div>
   </PageLayout>

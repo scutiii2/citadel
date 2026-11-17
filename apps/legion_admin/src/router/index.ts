@@ -17,6 +17,7 @@ export const router = createRouter({
     { path: "/", redirect: "/agents" },
     { path: "/agents", name: "agents", component: () => import("../views/AgentsAdminView.vue"), meta: { permission: "agents.manage" } },
     { path: "/connections", name: "connections", component: () => import("../views/ConnectionsView.vue"), meta: { permission: "agents.manage" } },
+    { path: "/servers", name: "servers", component: () => import("../views/ServersView.vue"), meta: { permission: "agents.manage" } },
     { path: "/login", name: "login", component: () => import("../views/LoginView.vue"), meta: { guestOnly: true } },
     { path: "/no-access", name: "no-access", component: () => import("../views/NoAccessView.vue") },
     { path: "/:pathMatch(.*)*", redirect: "/" },

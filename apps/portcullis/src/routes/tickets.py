@@ -78,6 +78,13 @@ async def ticket_stats(request: Request, account: Account = Depends(require_mana
     return await pass_on(request, stronghold, account, "/ticket-admin/stats")
 
 
+@admin_router.api_route("/ticket-settings", methods=["GET", "PATCH"])
+async def ticket_settings(request: Request, account: Account = Depends(require_manage),
+                          stronghold: StrongholdForwarder = Depends(get_stronghold)) -> Response:
+    """The ticket settings (tags, elevation, Laya limits) Armory keeps; staff read and change them here."""
+    return await pass_on(request, stronghold, account, "/ticket-admin/settings")
+
+
 @admin_router.api_route("/tickets/{ticket_id}", methods=["GET", "PATCH"])
 async def any_ticket(ticket_id: TicketId, request: Request, account: Account = Depends(require_manage),
                      stronghold: StrongholdForwarder = Depends(get_stronghold)) -> Response:
