@@ -6,6 +6,9 @@ __pycache__/
 .claude/*
 !.claude/skills
 .pytest_cache/
+# Runtime data and cache of every service (see CITADEL_DATA_DIR / CITADEL_CACHE_DIR in .env.example).
+/.data/
+/.cache/
 .secret
 .vscode
 .vs

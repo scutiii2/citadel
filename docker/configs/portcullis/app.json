@@ -1,7 +1,6 @@
 {
   "host": "0.0.0.0",
   "port": 29601,
-  "database_path": "data/ember_api.db",
   "session_cookie_name": "ember_session",
   "session_hours": 12,
   "cookie_secure": false,

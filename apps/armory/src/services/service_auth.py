@@ -2,9 +2,12 @@
 
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
+from src.citadel_auth import data_dir
 from src.citadel_auth import ServiceAuthMiddleware, from_env, requester_context
 
-keyring = from_env("armory")
+keyring = from_env("armory", data_dir=data_dir(Path(__file__).resolve().parents[2]))
 
 
 def install_auth(app, identity=None):

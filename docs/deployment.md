@@ -246,11 +246,11 @@ Legion's Anthropic-protocol and OpenAI-protocol agents call their models through
 
 Product logic, called only by Portcullis. The calendar is the first feature that lives there.
 
-- **Storage**: Treasury, connection `stronghold` (`data/stronghold.db` in the `treasury_data` volume). `docker/configs/treasury/connections.json` must list the `stronghold` connection and instance.
-- **Keys**: `stronghold_data:/data/keys.json` is made on first start. It holds the key that encrypts saved calendar links and the web push key pair. Back the volume up. Without the file, saved links must be entered again and browsers must subscribe to push again.
+- **Storage**: Treasury, connection `stronghold` (`stronghold.db` in `.data/treasury/`). `docker/configs/treasury/connections.json` must list the `stronghold` connection and instance.
+- **Keys**: `.data/stronghold/keys.json` is made on first start. It holds the key that encrypts saved calendar links and the web push key pair. Back the folder up. Without the file, saved links must be entered again and browsers must subscribe to push again.
 - **Settings**: `docker/configs/stronghold/app.json` (the `calendar` block). The `calendar` block in Portcullis's config and `EMBER_VAPID_*` in its `.env` are no longer read.
 - **Notes shared with agents**: Armory's notes tools read Stronghold's database. Compose sets `DB_GATEWAY_INSTANCE=armory` and `DB_GATEWAY_CONNECTION=stronghold` for Armory, and `docker/configs/treasury/connections.json` lists `stronghold` under instance `armory`. A value for these in `apps/armory/.env` is overridden by Compose.
-- Stronghold reads Legion's agent registry from the `agent_data` volume (read-only) and calls Armory for the assistant memory.
+- Stronghold reads Legion's agent registry from `.data/legion/` (mounted read-only) and calls Armory for the assistant memory.
 - **Token limits and prices**: `usage.six_hour_token_limit`, `usage.weekly_token_limit` and the `pricing` block are in `docker/configs/stronghold/app.json` (Stronghold keeps usage). A limit set in Portcullis's config is ignored.
 - Stronghold calls Portcullis's `/internal` routes with the shared internal token (account standing, admin switches, email, Errors log). Nothing to configure: Compose sets `PORTCULLIS_URL`.
 
@@ -314,3 +314,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 | `permission denied` on the Docker socket | The container cannot read `/var/run/docker.sock`. Check its owner and mode on the host. |
 | Capability toggle reverted after a rebuild | `docker/configs/armory/capabilities.json` was reset (for example by `git checkout` or `git stash`) or is not mounted. Check `docker-compose.yml` mounts it, then set the toggle again. |
 | Funnel page loads but big files stall or time out | Check `docker inspect tailscale --format "{{.RestartCount}}"`. The ZimaOS Tailscale app's entrypoint (`tailscaled ... & sleep 10; tailscale web --listen 0.0.0.0:5252`) can exit after 10 s and restart the container in a loop. Append `; wait` to that entrypoint line in `/var/lib/casaos/apps/tailscale/docker-compose.yml` and run `docker compose up -d` there. A CasaOS app update may overwrite it. |
+
+## Runtime data and cache
+
+Every service keeps its runtime data in `.data/<service>/` and files it can make again in `.cache/<service>/`, both in the Citadel folder (gitignored). Compose bind-mounts them into the containers; running a service directly uses the same folders. Set `CITADEL_DATA_DIR` and `CITADEL_CACHE_DIR` in the root `.env` to move them (a relative value is relative to the Citadel folder). Back up `.data/`; `.cache/` can be deleted. Service keys stay in the `identity_*` and `trust_*` Docker volumes, not in `.data/`.

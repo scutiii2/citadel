@@ -19,8 +19,9 @@ from typing import Any
 import anyio.to_thread
 
 from src.providers.base_provider import ChatResult
+from src.citadel_auth import data_dir
 
-_DEFAULT_DIR = Path(__file__).resolve().parent.parent.parent / ".data" / "usage"
+_DEFAULT_DIR = data_dir(Path(__file__).resolve().parents[2]) / "usage"
 _log = logging.getLogger(__name__)
 # Serializes appends within this process. A threading lock, not an
 # asyncio one: writes run on worker threads, and tests use many loops.

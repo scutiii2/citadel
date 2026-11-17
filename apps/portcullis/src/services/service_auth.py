@@ -3,9 +3,12 @@ import threading
 import time
 from collections import OrderedDict
 
+from pathlib import Path
+
+from src.citadel_auth import data_dir
 from src.citadel_auth import Keyring, ServiceAuthMiddleware, from_env, mint_requester
 
-keyring = from_env("portcullis")
+keyring = from_env("portcullis", data_dir=data_dir(Path(__file__).resolve().parents[2]))
 _cache: OrderedDict[tuple[str, tuple[str, ...]], tuple[float, str, str, str]] = OrderedDict()
 _lock = threading.Lock()
 AUDIENCES = ("stronghold", "legion", "armory")

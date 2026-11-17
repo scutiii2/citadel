@@ -22,6 +22,7 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import urlsplit, urlunsplit
+from src.citadel_auth import data_dir
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -275,7 +276,7 @@ def overrides_path_for(directory: Path) -> Path:
     replaces it on this machine. Any other folder (tests) keeps its own
     overrides inside it, in a subfolder the `*.json` scan never matches."""
     if directory == AGENTS_DIR:
-        return AGENTS_DIR.parent / ".data" / "agent_overrides.json"
+        return data_dir(AGENTS_DIR.parent) / "agent_overrides.json"
     return directory / ".overrides" / "agent_overrides.json"
 
 

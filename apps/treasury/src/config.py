@@ -13,6 +13,7 @@ from typing import Any
 from dotenv import dotenv_values
 
 from src.cache import CacheSettings
+from src.citadel_auth import data_dir
 from src.seed import seed_from_example
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -99,7 +100,9 @@ def _expand(value: Any, env: dict[str, str]) -> Any:
     return value
 
 
-def parse_connections(raw: Any, default_cache: CacheSettings, env: dict[str, str] | None = None) -> ConnectionsConfig:
+def parse_connections(raw: Any, default_cache: CacheSettings, env: dict[str, str] | None = None,
+                      data_root: Path | None = None) -> ConnectionsConfig:
+    """`data_root`: a relative sqlite `path` is placed under it (Treasury's runtime data folder)."""
     if not isinstance(raw, dict):
         raise ConfigError("connections config must be a JSON object")
     env = env or {}
@@ -108,6 +111,9 @@ def parse_connections(raw: Any, default_cache: CacheSettings, env: dict[str, str
         if not isinstance(spec, dict) or not isinstance(spec.get("type"), str):
             raise ConfigError(f"connection {name!r} needs a string 'type'")
         options = {k: v for k, v in _expand(spec, env).items() if k not in ("type", "cache", "allow_raw_sql")}
+        if data_root is not None and spec["type"] == "sqlite" and isinstance(options.get("path"), str):
+            if options["path"] != ":memory:" and not Path(options["path"]).is_absolute():
+                options["path"] = str(data_root / options["path"])
         allow_sql = spec.get("allow_raw_sql", False)
         if not isinstance(allow_sql, bool):
             raise ConfigError(f"connection {name!r}: allow_raw_sql must be true or false")
@@ -155,9 +161,11 @@ def load_connections(default_cache: CacheSettings, path: Path | None = None) -> 
     """Load connections and instances. With no path, use configs/config_connections.json
     (seeded from its .example) and resolve ${NAME} from the environment and .env."""
     env: dict[str, str] = {}
+    data_root = None
     if path is None:
+        data_root = data_dir(ROOT)
         path = CONNECTIONS_PATH
         seed_from_example(path)
         seed_from_example(ENV_PATH)
         env = {k: v for k, v in {**dotenv_values(ENV_PATH), **os.environ}.items() if v is not None}
-    return parse_connections(_read_json(path), default_cache, env)
+    return parse_connections(_read_json(path), default_cache, env, data_root)

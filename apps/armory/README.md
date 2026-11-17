@@ -58,7 +58,7 @@ shape every capability follows and how to add a new one:
 
 Support tickets use the always-on `/tickets` reporter routes and `/ticket-admin`
 staff routes, even when the chat capability is offline. SQLite storage defaults
-to `specifics/tickets/.data/tickets.db`, configurable with `MCP_TICKETS_DB_PATH`.
+to `tickets/tickets.db` in Armory's data folder, configurable with `MCP_TICKETS_DB_PATH`.
 See `configs/config_tickets.json.example` for tags, automatic-report caps,
 priority thresholds and classifier limits. Optional `LAYA_URL` points at the
 Triage Assistant's MCP address (a Legion agent on port 29611, which asks the shared Laya service; in Docker use
@@ -88,18 +88,12 @@ see [`src/resources/README.md`](src/resources/README.md).
 
 ## Runtime state
 
-Dot-prefixed folders hold untracked runtime state and secrets; plain
-`configs/` folders are tracked.
+Runtime state is not kept in this folder. It lives in the Citadel root, one folder per service:
 
-- **`.data/`** - state shared across capabilities (`pending_requests.db`,
-  `uploads/`).
-- **`.logs/`** - `server.log` plus one file per error reference id,
-  regenerated on every run.
-- **`.cache/`** - regenerable shared cache, if any.
-- **`specifics/<capability_name>/`** - the same layout (`.data/`,
-  `.logs/`, `.cache/`, `.secrets/`, `configs/`) for state and config
-  that a single capability owns outright. Only `configs/` is tracked.
-  Documented in that capability's own README.
+- **`.data/armory/`** - databases (`memory/`, `skills/`, `tickets/`, `email/`), `uploads/`, `watchers/`, `pdf_merger/store/` and `logs/` (`server.log` plus one file per error reference id).
+- **`.cache/armory/`** - files Armory can make again: the Obsidian index and `media_downloader/store/`.
+
+`CITADEL_DATA_DIR` and `CITADEL_CACHE_DIR` in the root `.env` move the two roots; each `MCP_*_DIR` / `MCP_*_PATH` setting still overrides one path. Configuration stays in the tracked `configs/` folders.
 
 ## Tests
 

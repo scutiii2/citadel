@@ -10,12 +10,15 @@ from dataclasses import dataclass, field
 
 import jwt
 
+from pathlib import Path
+
+from src.citadel_auth import data_dir
 from src.citadel_auth import (
     AuthError, ServiceAuth, ServiceAuthMiddleware, current_requester as verified_requester,
     current_requester_token, from_env, requester_context,
 )
 
-keyring = from_env("legion")
+keyring = from_env("legion", data_dir=data_dir(Path(__file__).resolve().parents[2]))
 _latest: OrderedDict[str, tuple[float, str]] = OrderedDict()
 _lock = threading.Lock()
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -15,7 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.citadel_auth import Keyring, ServiceAuthMiddleware, from_env
+from src.citadel_auth import Keyring, ServiceAuthMiddleware, data_dir, from_env
 from src.backends.base import UnsupportedOperation
 from src.registry import InstanceManager, RawSqlDisabled, UnknownConnection, UnknownInstance
 
@@ -47,7 +48,7 @@ def _error(status: int):
 
 
 def create_app(manager: InstanceManager, keyring: Keyring | None = None) -> FastAPI:
-    keyring = keyring if keyring is not None else from_env("treasury", data_dir="data")
+    keyring = keyring if keyring is not None else from_env("treasury", data_dir=data_dir(Path(__file__).resolve().parent.parent))
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         await keyring.ensure_identity()

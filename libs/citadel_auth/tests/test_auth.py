@@ -196,3 +196,20 @@ async def test_service_auth_mints_unique_assertions_for_concurrent_requests(stac
         responses = await asyncio.gather(*(client.post("http://armory/mcp") for _ in range(20)))
     assert all(response.status_code == 200 for response in responses)
     assert received == ["legion"] * 20
+
+
+def test_data_and_cache_live_under_the_citadel_root(tmp_path, monkeypatch):
+    from citadel_auth import cache_dir, data_dir
+
+    for name in ("CITADEL_DATA_DIR", "CITADEL_CACHE_DIR"):
+        monkeypatch.delenv(name, raising=False)
+    project = tmp_path / "apps" / "armory"
+    project.mkdir(parents=True)
+    assert data_dir(project) == (tmp_path / ".data" / "armory").resolve()
+    assert cache_dir(project) == (tmp_path / ".cache" / "armory").resolve()
+    (tmp_path / ".env").write_text(f"CITADEL_DATA_DIR=store\nCITADEL_CACHE_DIR='{tmp_path / 'elsewhere'}'\n", encoding="utf-8")
+    assert data_dir(project) == (tmp_path / "store" / "armory").resolve()
+    assert cache_dir(project) == tmp_path / "elsewhere" / "armory"
+    monkeypatch.setenv("CITADEL_DATA_DIR", str(tmp_path / "env"))
+    assert data_dir(project) == tmp_path / "env" / "armory"
+    assert data_dir(tmp_path / "app") == (tmp_path / "app").resolve() / ".data"

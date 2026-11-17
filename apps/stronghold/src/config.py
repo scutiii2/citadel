@@ -10,6 +10,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.citadel_auth import data_dir as _data_dir
+
 from src.usage.settings import PricingSettings, UsageSettings
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
@@ -25,12 +27,12 @@ class Settings:
     scribe_url: str = "http://127.0.0.1:29401"
     reader_url: str = "http://127.0.0.1:29402"
     # Legion's registry of running agents: the file its supervisor writes, or its /registry URL (wins when set).
-    agents_registry_path: Path = PROJECT_DIR.parent / "legion" / ".data" / "agent_registry.json"
+    agents_registry_path: Path = _data_dir(PROJECT_DIR.parent / "legion") / "agent_registry.json"
     agents_registry_url: str | None = None
     # Stronghold's own instance and connection in Treasury.
     db_instance: str = "stronghold"
     db_connection: str = "stronghold"
-    data_dir: Path = PROJECT_DIR / ".data"
+    data_dir: Path = _data_dir(PROJECT_DIR)
     usage: UsageSettings = field(default_factory=UsageSettings)
     pricing: PricingSettings = field(default_factory=PricingSettings)
 

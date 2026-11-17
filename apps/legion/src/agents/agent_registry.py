@@ -23,8 +23,9 @@ from urllib.parse import urlparse
 
 from src.agents import agent_spec
 from src.providers import model_tiers
+from src.citadel_auth import data_dir
 
-_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / ".data" / "agent_registry.json"
+_CONFIG_PATH = data_dir(Path(__file__).resolve().parents[2]) / "agent_registry.json"
 
 _log = logging.getLogger(__name__)
 

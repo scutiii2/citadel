@@ -7,6 +7,7 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.citadel_auth import data_dir
 from src.utils.config_loader import load_json_config
 from src.utils.env_file import ensure_env_file
 
@@ -189,7 +190,7 @@ class Settings:
     # False: an account works without verifying its email, and registration
     # sends no code. Verifying stays available (resend, the verify page).
     require_email_verification: bool = True
-    agents_registry_path: Path = PROJECT_DIR.parent.parent / "ai_agent" / ".data" / "agent_registry.json"
+    agents_registry_path: Path = data_dir(PROJECT_DIR.parent / "legion") / "agent_registry.json"
     # ai_agent's GET /registry, for an ai_agent in another directory or on
     # another machine. Wins over agents_registry_path when set.
     agents_registry_url: str | None = None
@@ -224,11 +225,8 @@ def load_settings() -> Settings:
     container can pick the port."""
     raw = load_json_config(CONFIGS_DIR / "config_app.json")
     ensure_env_file(ENV_PATH, ENV_PATH.with_name(".env.example"), LEGACY_SECRETS_DIR)
-    database_path = _project_path(raw.get("database_path", "data/ember_api.db"))
-    registry_path = raw.get("agents_registry_path", "../../legion/.data/agent_registry.json")
-    # Preserve the standard registry location in configs predating the data-folder rename.
-    if registry_path == "../../legion/data/agent_registry.json":
-        registry_path = "../../legion/.data/agent_registry.json"
+    database_path = _project_path(raw["database_path"]) if raw.get("database_path") else data_dir(PROJECT_DIR) / "ember_api.db"
+    registry_path = raw.get("agents_registry_path") or data_dir(PROJECT_DIR.parent / "legion") / "agent_registry.json"
     return Settings(
         host=os.getenv("EMBER_API_HOST") or raw.get("host", "127.0.0.1"),
         port=int(os.getenv("EMBER_API_PORT") or raw.get("port", 29601)),
