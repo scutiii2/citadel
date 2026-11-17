@@ -76,3 +76,45 @@ def test_the_connections_routes_need_settings_manage(client, email, db_gateway):
     assert client.delete("/api/admin/treasury/connections/x").status_code == 403
     assert client.put("/api/admin/treasury/default-cache", json={"ttl_seconds": 1}).status_code == 403
     assert db_gateway.admin_calls == []
+
+
+def test_services_routes_forward_pin_unpin_and_audit_without_addresses(client, db_gateway):
+    admin = as_admin(client)
+    assert admin.get("/api/admin/treasury/services").json() == {"services": []}
+    body = {"url": "http://armory.lan:29600"}
+    assert admin.put("/api/admin/treasury/services/armory", json=body).status_code == 200
+    assert admin.delete("/api/admin/treasury/services/armory").status_code == 200
+    assert db_gateway.admin_calls == [
+        ("GET", "/admin/services", None), ("PUT", "/admin/services/armory", body),
+        ("DELETE", "/admin/services/armory", None),
+    ]
+    uid = admin.get("/api/auth/me").json()["id"]
+    entries = admin.get("/api/logs/action", params={"actor": uid}).json()
+    logged = " ".join(entry["message"] for entry in entries)
+    assert "Pinned Treasury service 'armory'" in logged
+    assert "Unpinned Treasury service 'armory'" in logged
+    assert body["url"] not in logged
+
+
+def test_services_routes_need_settings_manage(client, email, db_gateway):
+    assert client.get("/api/admin/treasury/services").status_code == 401
+    make_member(client, email, "alice")
+    login(client, "alice")
+    assert client.get("/api/admin/treasury/services").status_code == 403
+    assert client.put("/api/admin/treasury/services/armory", json={"url": "http://x:1"}).status_code == 403
+    assert client.delete("/api/admin/treasury/services/armory").status_code == 403
+    assert db_gateway.admin_calls == []
+
+
+def test_services_routes_report_refusals_and_outages(client, db_gateway):
+    from src.services.db_gateway import DbGatewayUnavailable
+    admin = as_admin(client)
+    db_gateway.admin_refusal = "an address looks like http://host:port"
+    response = admin.put("/api/admin/treasury/services/armory", json={"url": "bad"})
+    assert (response.status_code, response.json()["detail"]) == (400, db_gateway.admin_refusal)
+
+    async def down(*args, **kwargs):
+        raise DbGatewayUnavailable("down")
+
+    client.app.state.db_gateway.admin = down
+    assert admin.get("/api/admin/treasury/services").status_code == 502

@@ -950,3 +950,7 @@ def http_catalog(name: str) -> httpx.AsyncClient:
 
 - Existing main worktree has uncommitted Legion, Compose and documentation edits. Implementation uses isolated `.worktrees/plan-13-service-catalog`, based on committed `main` (09cc60c7); original edits remain untouched.
 - Task 1 FakeKeyring lacks `private_key` and `kid` required by real `sign_assertion`. Tests use in-memory Ed25519 identity; service authentication remains enabled.
+
+- Verification blocker discovered in Task 3: existing Portcullis `tests/conftest.py::make_settings` writes temporary `.env`, and startup `ensure_secrets_key` writes an encryption key there. Existing shared auth test helpers also persist temporary signing identities. Automatic approval review refused Portcullis rerun under the no-`.env`/key-file rule; disposable-fixture exception requested before continuing. No tests weakened or bypassed.
+
+- User approved existing disposable test-fixture `.env` and signing-key files only; real configuration and secret files remain prohibited.

@@ -89,3 +89,31 @@ async def put_default_cache(
     result = await _admin(store, "PUT", "/admin/default-cache", changes or None)
     await logs.action(account, "treasury.cache", "Changed Treasury cache defaults")
     return result
+
+
+@router.get("/services")
+async def services(_account: Account = Depends(require_manage), store: Any = Depends(get_db_gateway)) -> Any:
+    """The effective service addresses and their registered or pinned sources."""
+    return await _admin(store, "GET", "/admin/services")
+
+
+@router.put("/services/{name}")
+async def put_service(
+    name: str, spec: dict[str, str], account: Account = Depends(require_manage),
+    store: Any = Depends(get_db_gateway), logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    """Pin an address; log the service name without its address."""
+    result = await _admin(store, "PUT", f"/admin/services/{quote(name, safe='')}", spec)
+    await logs.action(account, "treasury.service_pin", f"Pinned Treasury service '{name}'")
+    return result
+
+
+@router.delete("/services/{name}")
+async def delete_service(
+    name: str, account: Account = Depends(require_manage),
+    store: Any = Depends(get_db_gateway), logs: LogWriter = Depends(get_log_writer),
+) -> Any:
+    """Use the service's registered address again."""
+    result = await _admin(store, "DELETE", f"/admin/services/{quote(name, safe='')}")
+    await logs.action(account, "treasury.service_unpin", f"Unpinned Treasury service '{name}'")
+    return result

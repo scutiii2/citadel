@@ -204,6 +204,8 @@ class FakeDbGateway:
         self.admin_calls.append((method, path, body))
         if getattr(self, "admin_refusal", None):
             raise DbGatewayRefused(400, self.admin_refusal)
+        if path.startswith("/admin/services"):
+            return {"services": []}
         return {"connections": [], "default_cache": {}, "applies": "now"}
 
     async def set_instance(self, name, connections):
