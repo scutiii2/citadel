@@ -1,57 +1,23 @@
-"""The shared internal token and the asking user's identity, both ways.
-
-Inbound: every caller of this agent's /mcp is another server in this repo
-(chat_app, portcullis, a delegating peer agent), so once INTERNAL_API_TOKEN
-is configured (.env, the same value as
-mcp_server's, chat_app's and portcullis's) InternalTokenMiddleware rejects a
-request without it.
-
-Outbound: the same token goes on this agent's own calls - to mcp_server
-(mcp_upstream.py) and to peers (delegation.py) - and so does the asking
-user. ask() reads X-Requester-Username / X-Requester-Email / X-Requester-Uid off the HTTP
-request (set by portcullis / chat_app, never by the model) and binds them
-for the turn with bind_requester(). The persistent mcp_server session is
-shared by every user, so the identity travels in each tool call's `_meta`
-(requester_meta()) instead of in headers; mcp_server's identity_context.py
-reads it from there.
-"""
-
+"""Legion service identity and verified requester context for shared MCP sessions."""
 from __future__ import annotations
 
-import hmac
-import json
-import os
+import threading
+import time
+from collections import OrderedDict
+from contextlib import asynccontextmanager
 from contextvars import ContextVar, Token
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Mapping
+from dataclasses import dataclass, field
 
-from dotenv import dotenv_values
+import jwt
 
-from src.runtime.seed import seed_from_example
-from src.runtime.shared_token import shared_token
+from src.citadel_auth import (
+    AuthError, ServiceAuth, ServiceAuthMiddleware, current_requester as verified_requester,
+    current_requester_token, from_env, requester_context,
+)
 
-_SECRETS_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
-
-INTERNAL_TOKEN_HEADER = "X-Internal-Token"
-REQUESTER_USERNAME_HEADER = "X-Requester-Username"
-REQUESTER_EMAIL_HEADER = "X-Requester-Email"
-REQUESTER_UID_HEADER = "X-Requester-Uid"
-REQUESTER_META_KEY = "requester"
-# /registry lists every agent's URL, so it sits behind the token like /mcp.
-# /agents edits the agent files, so it sits behind the token too.
-PROTECTED_PATHS = ("/mcp", "/registry", "/agents")
-
-
-def load_token() -> str:
-    """INTERNAL_API_TOKEN from the environment, else from the secret file
-    (seeded from its .example on first run), else the shared token file
-    (made on first run). "" = not configured."""
-    seed_from_example(_SECRETS_PATH)
-    return os.getenv("INTERNAL_API_TOKEN") or dotenv_values(_SECRETS_PATH).get("INTERNAL_API_TOKEN") or shared_token()
-
-
-TOKEN = load_token()
+keyring = from_env("legion")
+_latest: OrderedDict[str, tuple[float, str]] = OrderedDict()
+_lock = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -60,29 +26,24 @@ class Requester:
     email: str = ""
     uid: str = ""
     brain_scope: str = ""
+    requester_token: str = field(default="", repr=False)
 
     @classmethod
-    def from_headers(cls, headers: Mapping[str, str] | None) -> "Requester":
-        if headers is None:
+    def from_verified(cls) -> "Requester":
+        who = verified_requester()
+        if who is None:
             return cls()
-        username = headers.get(REQUESTER_USERNAME_HEADER, "")
-        email = headers.get(REQUESTER_EMAIL_HEADER, "")
-        uid = headers.get(REQUESTER_UID_HEADER, "")
-        return cls(
-            username if isinstance(username, str) else "",
-            email if isinstance(email, str) else "",
-            uid if isinstance(uid, str) else "",
-            headers.get("X-Brain-Destination", "") if headers.get("X-Brain-Destination", "") in {"personal", "instance"} else "",
-        )
+        return cls(who.username, who.email, who.uid, requester_token=current_requester_token())
 
-    def __bool__(self) -> bool:
-        return bool(self.username or self.email or self.uid)
+    def __bool__(self):
+        return bool(self.uid or self.username or self.email)
 
 
-_requester: ContextVar[Requester] = ContextVar("requester", default=Requester())
+_requester: ContextVar[Requester] = ContextVar("legion_requester", default=Requester())
 
 
 def bind_requester(requester: Requester) -> Token:
+    """Bind an already-verified account for a turn or a pure domain test."""
     return _requester.set(requester)
 
 
@@ -94,63 +55,97 @@ def current_requester() -> Requester:
     return _requester.get()
 
 
-def requester_meta() -> dict[str, Any] | None:
-    """The `_meta` for an outbound tool call carrying the current user, or
-    None when this turn has no known user (the call keeps its old shape)."""
-    requester = current_requester()
-    if not requester:
+def _remember(uid: str, token: str) -> None:
+    expiry = float(jwt.decode(token, options={"verify_signature": False})["exp"])
+    with _lock:
+        while _latest and next(iter(_latest.values()))[0] <= time.time():
+            _latest.popitem(last=False)
+        existing = _latest.get(uid)
+        if existing is None or expiry >= existing[0]:
+            _latest[uid] = (expiry, token)
+            _latest.move_to_end(uid)
+        while len(_latest) > 50_000:
+            _latest.popitem(last=False)
+
+
+def requester_token() -> str:
+    """Every worker sees renewal updates; an expired credential is never forwarded."""
+    who = current_requester()
+    token = who.requester_token or current_requester_token()
+    if who.uid:
+        with _lock:
+            latest = _latest.get(who.uid)
+        if latest is not None:
+            expiry, token = latest
+    if not token:
+        return ""
+    try:
+        expiry = float(jwt.decode(token, options={"verify_signature": False})["exp"])
+        if time.time() >= expiry:
+            raise AuthError("requester token expired")
+    except (jwt.PyJWTError, KeyError, TypeError, ValueError):
+        raise AuthError("invalid or expired requester token") from None
+    return token
+
+
+def requester_meta() -> dict | None:
+    token = requester_token()
+    if not token:
         return None
-    identity = {"username": requester.username, "email": requester.email}
-    if requester.uid:
-        identity["uid"] = requester.uid
-    if requester.brain_scope:
-        identity["brain_scope"] = requester.brain_scope
-    return {REQUESTER_META_KEY: identity}
+    meta = {"requester_token": token}
+    scope = current_requester().brain_scope
+    if scope in {"instance", "personal"}:
+        meta["brain_scope"] = scope
+    return meta
 
 
 def outbound_headers() -> dict[str, str]:
-    """Headers for a fresh HTTP MCP session to a peer agent: the token, if
-    configured, and the current user, if known."""
-    headers: dict[str, str] = {}
-    if TOKEN:
-        headers[INTERNAL_TOKEN_HEADER] = TOKEN
-    requester = current_requester()
-    if requester.username:
-        headers[REQUESTER_USERNAME_HEADER] = requester.username
-    if requester.email:
-        headers[REQUESTER_EMAIL_HEADER] = requester.email
-    if requester.uid:
-        headers[REQUESTER_UID_HEADER] = requester.uid
-    if requester.brain_scope:
-        headers["X-Brain-Destination"] = requester.brain_scope
+    token = requester_token()
+    headers = {"X-Citadel-Requester": token} if token else {}
+    scope = current_requester().brain_scope
+    if scope in {"instance", "personal"}:
+        headers["X-Brain-Destination"] = scope
     return headers
 
 
-class InternalTokenMiddleware:
-    """Plain ASGI middleware: a request to /mcp or /registry whose X-Internal-Token
-    doesn't match (constant-time) gets 401 JSON before the MCP transport
-    sees it. Does nothing when no token is configured."""
+@asynccontextmanager
+async def mcp_requester():
+    from mcp.server.lowlevel.server import request_ctx
+    try:
+        context = request_ctx.get()
+    except LookupError:
+        context = None
+    request = getattr(context, "request", None)
+    caller, _, header_token = getattr(request, "scope", {}).get("citadel_auth", (None, None, ""))
+    meta = getattr(context, "meta", None)
+    extras = (meta.model_extra or {}) if meta is not None else {}
+    token = extras.get("requester_token", header_token)
+    async with requester_context(keyring, caller, token, "legion") as who:
+        requester = Requester.from_verified()
+        if who is not None:
+            _remember(who.uid, token)
+            scope = extras.get("brain_scope") or getattr(request, "headers", {}).get("X-Brain-Destination", "")
+            requester = Requester(who.username, who.email, who.uid,
+                scope if scope in {"instance", "personal"} else "", token)
+        handle = bind_requester(requester)
+        try:
+            yield requester
+        finally:
+            reset_requester(handle)
 
-    def __init__(self, app, token: str) -> None:
-        self.app = app
-        self._token = token.encode("utf-8")
 
-    def _protects(self, scope) -> bool:
-        if not self._token or scope["type"] != "http":
-            return False
-        path = scope.get("path", "")
-        return any(path == p or path.startswith(p + "/") for p in PROTECTED_PATHS)
+def install_mcp(mcp):
+    """Wrap all tools, including status, so every call can publish a verified renewal."""
+    if getattr(mcp, "_citadel_auth_installed", False):
+        return
+    async def call(name, arguments):
+        async with mcp_requester():
+            return await mcp.call_tool(name, arguments)
+    mcp._mcp_server.call_tool(validate_input=False)(call)
+    mcp._citadel_auth_installed = True
 
-    async def __call__(self, scope, receive, send):
-        if self._protects(scope):
-            provided = dict(scope.get("headers") or []).get(INTERNAL_TOKEN_HEADER.lower().encode("latin-1"), b"")
-            if not hmac.compare_digest(self._token, provided):
-                body = json.dumps({"error": "Invalid or missing internal API token"}).encode("utf-8")
-                await send({
-                    "type": "http.response.start",
-                    "status": 401,
-                    "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())],
-                })
-                await send({"type": "http.response.body", "body": body})
-                return
-        await self.app(scope, receive, send)
+
+def install_auth(app, identity=None):
+    if not getattr(app.state, "citadel_auth_installed", False):
+        app.add_middleware(ServiceAuthMiddleware, keyring=identity or keyring, audience="legion")
+        app.state.citadel_auth_installed = True

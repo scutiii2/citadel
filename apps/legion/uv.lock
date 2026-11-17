@@ -330,8 +330,10 @@ name = "legion"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "httpx" },
     { name = "mcp" },
+    { name = "pyjwt" },
     { name = "python-dotenv" },
 ]
 
@@ -342,8 +344,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=44" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "mcp", specifier = ">=1.28.0,<2.0.0" },
+    { name = "pyjwt", specifier = ">=2.10" },
     { name = "python-dotenv", specifier = ">=1.0" },
 ]
 

@@ -285,7 +285,7 @@ Stored agent overrides in `.data/agent_overrides.json` that still use `orchestra
 
 portcullis finds agents through the registry. On the same machine it reads
 `.data/agent_registry.json`; from another machine it fetches `GET /registry`
-(served by every instance, same JSON, behind `INTERNAL_API_TOKEN` like
+(served by every instance, same JSON, authenticated by signed service assertions like
 `/mcp`). Both also carry `defined`: every agent in `agents/`, running or not
 (the supervisor writes `.data/agent_definitions.json` at start), so the Agents
 page can show an agent that is stopped or disabled. On the ai_agent machine:
@@ -296,8 +296,8 @@ page can show an agent that is stopped or disabled. On the ai_agent machine:
   host registers as `127.0.0.1`. Leave the port out when the supervisor starts
   several agents: each one adds its own port. A value with a port is used as
   is (single instance).
-- The same `INTERNAL_API_TOKEN` as portcullis, and the ports open in the
-  firewall. Use a private network or TLS: the token travels in a header.
+- Mount the shared public trust folders and Legion's own private identity folder,
+  and open the ports in the firewall. Use a private network or TLS.
 
 Then set `agents_registry_url` in `apps/portcullis/configs/config_app.json` (see
 `apps/portcullis/configs/README.md`).
@@ -662,17 +662,11 @@ Agent files give each instance its own id, so any number of same-provider agents
 
 ## Security
 
-- **`/mcp` needs the internal token** once `INTERNAL_API_TOKEN` is set in
-  `.env` (created from its `.example` on first
-  run; same value as mcp_server's, chat_app's and portcullis's). Without it
-  a request gets `401`. The agent sends the same token on its own calls to
-  mcp_server and to peer agents (`src/runtime/internal_auth.py`).
-- **The asking user travels on**: `ask()` reads `X-Requester-Username` /
-  `X-Requester-Email` from the request (portcullis and chat_app set them),
-  and every mcp_server tool it calls during that turn gets the user in the
-  call's `_meta.requester` - the agent's one mcp_server session is shared by
-  every user, so a header can't carry it. A delegated agent gets it as
-  headers. The model never sets either.
+- **Service authentication is mandatory**: Ed25519 assertions authorize every
+  backend request; only `/health` is exempt. Private identity stays outside public trust.
+- **Requester identity is signed by Portcullis**: each MCP tool call verifies
+  `_meta.requester_token`; delegated calls forward that token. Verified renewal
+  updates reach running asks, and expired requester tokens cannot be forwarded.
 
 ## Project layout
 
@@ -683,7 +677,7 @@ Agent files give each instance its own id, so any number of same-provider agents
 - **`configs/*.json`** - structured settings, mostly gitignored. See
   [`configs/README.md`](configs/README.md).
 - **`.env`** - the one credentials file (provider, gateway, role, API
-  keys, `INTERNAL_API_TOKEN`), gitignored; copy it from `.env.example`.
+  keys), gitignored; copy it from `.env.example`.
 
 See [`src/README.md`](src/README.md) for the full code map - what lives
 where, and where new code goes.

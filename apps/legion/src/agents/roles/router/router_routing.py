@@ -30,7 +30,7 @@ def _summary(result, chosen, tier, roster, spec):
 
 async def route_turn(question, history, on_event, request_id, depth, explicit_tier=None):
     spec = agent_spec.current()
-    if depth or not spec.entry or not spec.orchestrator or spec.internal_role or not internal_auth.TOKEN:
+    if depth or not spec.entry or not spec.orchestrator or spec.internal_role:
         return None, None, ""
     if not question.strip() or (explicit_tier and explicit_tier not in agent_spec.TIERS):
         # Preserve the ordinary resolver's default+note behavior for unknown tiers.

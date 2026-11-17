@@ -233,7 +233,7 @@ async def ask(
     # The asking user, from portcullis's / chat_app's identity headers; every
     # mcp_server tool this turn calls carries it on (see internal_auth.py).
     started_at = agent_events.now_iso()
-    requester_token = internal_auth.bind_requester(internal_auth.Requester.from_headers(_request_headers(ctx)))
+    requester_token = internal_auth.bind_requester(internal_auth.current_requester())
     from src.agents.roles.architect.pipeline import ArchitectError
 
     try:
@@ -626,6 +626,7 @@ if SPEC.internal_role == "router":
 
 
 def main() -> None:
+    asyncio.run(internal_auth.keyring.ensure_identity())
     role_info = {}
     if SPEC.role == "architect":
         role_info = {"kind": SPEC.kind, "workers": list(SPEC.workers)}
@@ -653,10 +654,9 @@ def main() -> None:
         # only servers call this agent (chat_app directly, ember_web's browser
         # via portcullis's proxy), never a browser - which is also why /mcp
         # can require the shared internal token (once one is configured).
+        internal_auth.install_mcp(mcp)
         app = mcp.streamable_http_app()
-        app.add_middleware(internal_auth.InternalTokenMiddleware, token=internal_auth.TOKEN)
-        if not internal_auth.TOKEN:
-            print("ai_agent: /mcp has no auth - set INTERNAL_API_TOKEN in .env", flush=True)
+        internal_auth.install_auth(app)
         uvicorn.run(app, host=HOST, port=PORT, log_level=mcp.settings.log_level.lower())
     finally:
         agent_registry.deregister(_AGENT_ID)

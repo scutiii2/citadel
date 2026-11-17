@@ -40,7 +40,6 @@ def treasury(monkeypatch):
     monkeypatch.setattr(settings, "_TRANSPORT", httpx.MockTransport(fake))
     monkeypatch.setattr(settings, "_SYNC_TRANSPORT", httpx.MockTransport(fake))
     monkeypatch.setenv("DB_GATEWAY_URL", "http://treasury.test:29602/")
-    monkeypatch.setenv("INTERNAL_API_TOKEN", "internal")
     monkeypatch.delenv("CONVERSATION_GATEWAY_URL", raising=False)
     monkeypatch.delenv("CONVERSATION_GATEWAY_TOKEN", raising=False)
     settings.reset_cache()
@@ -54,7 +53,10 @@ def test_reads_the_record_with_the_internal_token(treasury):
     sent = treasury.requests[0]
     assert str(sent.url) == ("http://treasury.test:29602/instances/legion/connections/data"
                              "/collections/legion_settings/records/conversation_gateway")
-    assert sent.headers["x-internal-token"] == "internal"
+    import jwt
+    from src.runtime import internal_auth
+    assert jwt.decode(sent.headers["Authorization"][7:], internal_auth.keyring.private_key.public_key(),
+                      algorithms=["EdDSA"], audience="treasury")["iss"] == "legion"
 
 
 def test_the_environment_fills_what_the_record_lacks(treasury, monkeypatch):

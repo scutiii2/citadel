@@ -22,6 +22,7 @@ from src.runtime import approvals, internal_auth, tool_filter
 from src.tools.mcp_client import tool_progress
 from src.runtime.config_files import SERVERS_PATH
 from src.tools.mcp_client.sync_wrapper import SyncMcpClient
+from src.citadel_auth import ServiceAuth
 
 import asyncio
 
@@ -81,8 +82,7 @@ def connect() -> None:
     override = os.getenv("MCP_SERVER_URL")
     url_overrides = {_SERVER_ID: override} if override else None
     # mcp_server requires the shared internal token on /mcp once it's configured.
-    extra_headers = {internal_auth.INTERNAL_TOKEN_HEADER: internal_auth.TOKEN} if internal_auth.TOKEN else None
-    client.connect_all(_CONFIG_PATH, url_overrides, extra_headers)
+    client.connect_all(_CONFIG_PATH, url_overrides, auth_by_server={_SERVER_ID: ServiceAuth(internal_auth.keyring, "armory")})
 
 
 def _tool_is_enabled(name: str, enabled: set[str]) -> bool:

@@ -91,7 +91,6 @@ def test_tools_may_be_empty():
 
 @pytest.fixture
 def helper(monkeypatch):
-    monkeypatch.setattr(internal_auth, "TOKEN", "test")
     monkeypatch.setattr(agent_registry, "reload", lambda: None)
     monkeypatch.setattr(agent_registry, "_AGENTS_BY_ID", {"context-summarizer": {"role": "specialist", "id": "context-summarizer", "url": "http://helper/mcp"}})
     ask = AsyncMock(return_value={"response": json.dumps(DRAFT)})
@@ -120,10 +119,9 @@ def test_a_decline_proposes_nothing(helper):
     assert helper.sent == []
 
 
-def test_no_summarizer_or_no_token_proposes_nothing(helper, monkeypatch):
+def test_no_summarizer_proposes_nothing(helper, monkeypatch):
     monkeypatch.setattr(agent_registry, "_AGENTS_BY_ID", {})
     assert asyncio.run(skill_reflection.reflect("q", CALLS, "r")) is False
-    monkeypatch.setattr(internal_auth, "TOKEN", "")
     assert asyncio.run(skill_reflection.reflect("q", CALLS, "r")) is False
     assert helper.sent == []
 

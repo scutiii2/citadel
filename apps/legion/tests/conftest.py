@@ -1,11 +1,6 @@
 """Primes a valid agent file and pinned-provider config before any test
 module imports src.agents.agent_config / src.server - agent_spec.current()
 needs AI_AGENT_FILE, and both modules resolve PROVIDER_ID/MODEL once at
-import os
-
-# Tests never read or create the shared token file.
-os.environ["INTERNAL_TOKEN_FILE"] = ""
-
 import time (see agent_config.py's module docstring) and raise
 AgentConfigError immediately if AI_AGENT_PROVIDER or its API key isn't
 set, which would otherwise break collection of test_server.py.
@@ -37,6 +32,22 @@ os.environ["DECISION_GATEWAY_URL"] = "http://127.0.0.1:9"
 
 
 import pytest  # noqa: E402
+
+
+@pytest.fixture(scope="session")
+def auth_stack(tmp_path_factory):
+    import asyncio
+    from src.citadel_auth.testing import make_stack
+    return asyncio.run(make_stack(tmp_path_factory.mktemp("service-auth")))
+
+
+@pytest.fixture(autouse=True)
+def service_identity(auth_stack, monkeypatch):
+    from src.runtime import internal_auth
+    monkeypatch.setattr(internal_auth, "keyring", auth_stack["legion"])
+    internal_auth._latest.clear()
+    yield
+    internal_auth._latest.clear()
 
 
 @pytest.fixture(autouse=True)

@@ -22,6 +22,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from src.runtime import internal_auth
+from src.citadel_auth import AuthError, ServiceAuth, service_client
 
 DEFAULT_URL = "http://127.0.0.1:29407"
 INSTANCE = "legion"
@@ -64,8 +65,7 @@ def _record_url(which: str = KEY) -> str:
 
 
 def _headers() -> dict[str, str]:
-    token = internal_auth.load_token()
-    return {"X-Internal-Token": token} if token else {}
+    return {}
 
 
 def _from_doc(doc: Any, which: str = KEY) -> GatewaySettings:
@@ -92,17 +92,17 @@ def _doc(response: httpx.Response) -> dict[str, Any] | None:
 
 async def _read(which: str = KEY) -> dict[str, Any] | None:
     try:
-        async with httpx.AsyncClient(transport=_TRANSPORT, timeout=_TIMEOUT) as client:
+        async with service_client(internal_auth.keyring, "treasury", transport=_TRANSPORT, timeout=_TIMEOUT) as client:
             return _doc(await client.get(_record_url(which), headers=_headers()))
-    except httpx.HTTPError:
+    except (httpx.HTTPError, AuthError):
         return None
 
 
 def _read_sync(which: str = KEY) -> dict[str, Any] | None:
     try:
-        with httpx.Client(transport=_SYNC_TRANSPORT, timeout=_TIMEOUT) as client:
+        with httpx.Client(auth=ServiceAuth(internal_auth.keyring, "treasury"), transport=_SYNC_TRANSPORT, timeout=_TIMEOUT) as client:
             return _doc(client.get(_record_url(which), headers=_headers()))
-    except httpx.HTTPError:
+    except (httpx.HTTPError, AuthError):
         return None
 
 
@@ -162,7 +162,7 @@ async def save(changes: dict[str, Any], which: str = KEY) -> GatewaySettings:
     if "token" in changes:
         doc["token"] = _checked_token(changes["token"])
     try:
-        async with httpx.AsyncClient(transport=_TRANSPORT, timeout=_TIMEOUT) as client:
+        async with service_client(internal_auth.keyring, "treasury", transport=_TRANSPORT, timeout=_TIMEOUT) as client:
             response = await client.put(_record_url(which), json={"doc": doc}, headers=_headers())
     except httpx.HTTPError as error:
         raise GatewaySettingsError("Treasury is not reachable; the settings were not saved") from error

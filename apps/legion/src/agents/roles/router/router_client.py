@@ -11,6 +11,7 @@ from mcp.client.streamable_http import streamablehttp_client
 from src.agents import agent_registry, agent_spec
 from src.agents.roles.router.router_contract import RouteRequest, RouteResponse, VoterUsage
 from src.runtime import internal_auth
+from src.citadel_auth import ServiceAuth
 from src.providers import cancellation
 
 
@@ -26,7 +27,8 @@ def usage_row(row: VoterUsage, request_id: str, delegated_by: str | None = None)
 
 
 async def _call(agent: dict, request: RouteRequest) -> dict:
-    async with streamablehttp_client(agent["url"], headers=internal_auth.outbound_headers()) as (reader, writer, _):
+    async with streamablehttp_client(agent["url"], headers=internal_auth.outbound_headers(),
+                                     auth=ServiceAuth(internal_auth.keyring, "legion")) as (reader, writer, _):
         async with ClientSession(reader, writer) as session:
             await session.initialize()
             result = None
@@ -51,7 +53,7 @@ async def _call(agent: dict, request: RouteRequest) -> dict:
 
 
 async def decide(request: RouteRequest) -> RouteResponse | None:
-    if not internal_auth.TOKEN or cancellation.is_cancelled(request.request_id):
+    if cancellation.is_cancelled(request.request_id):
         return None
     try:
         await anyio.to_thread.run_sync(agent_registry.reload)

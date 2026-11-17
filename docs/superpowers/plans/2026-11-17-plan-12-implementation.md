@@ -121,6 +121,9 @@ Files: `src/utils/{config_loader,shared_token}.py`, `app.py`, `routes/{agent_adm
 
 ## Changes found during work
 
+- 12.5: Persistent MCP authentication also crosses `tools/mcp_client/{transports,registry,sync_wrapper}.py`; router clients/routing and orchestrator delegation, summarization and skill reflection also contained shared-token gates. Migrated these callers and their additional test modules. External model gateways retain their own Treasury-backed credentials.
+- 12.5: Legion verifies requester tokens per MCP tool call (including `status`) and keeps a bounded per-user cache of verified renewal updates. Running asks read the newest verified token before each outbound call; shared sessions cannot inherit another caller's identity.
+
 - 12.1: MCP 1.28 accepts `httpx.Auth` through `create_mcp_http_client(auth=...)` and `streamable_http_client(http_client=...)`. Real FastMCP session remained usable after its initial 60-second assertion expired (62.70-second spike, 1 passed).
 - 12.1: Decisions 7 and 9 conflict: reusing a cached signed assertion reuses its `jti`, so receivers must reject it. Preserve replay protection and sign a fresh assertion for each HTTP request; cache loaded signing key rather than reusable JWT. This strengthens freshness without changing service or requester identity rules.
 - 12.2: Treasury's `dev_deploy.bat` also documented the old shared-token requirement; updated it with the service's README. `httpx` was a dev-only dependency and is now explicit runtime dependency alongside PyJWT and cryptography because the shared library exposes HTTP auth helpers.

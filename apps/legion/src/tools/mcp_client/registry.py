@@ -95,6 +95,7 @@ class McpClientRegistry:
         # Sent on every HTTP server's session on top of its own auth block
         # (the shared internal token - see mcp_upstream.connect()).
         self._extra_headers: dict[str, str] = {}
+        self._auth_by_server = {}
 
     def statuses(self) -> list[ServerStatus]:
         return list(self._statuses)
@@ -104,6 +105,7 @@ class McpClientRegistry:
         config_path: Path,
         url_overrides: dict[str, str] | None = None,
         extra_headers: dict[str, str] | None = None,
+        auth_by_server=None,
     ) -> list[ServerStatus]:
         """Connect to every server in `config_path`, isolated - one bad
         entry is recorded as an error status and never stops a sibling
@@ -112,6 +114,7 @@ class McpClientRegistry:
         every HTTP server's session, reconnects included."""
         self._configs = load_servers_config(config_path, url_overrides)
         self._extra_headers = dict(extra_headers or {})
+        self._auth_by_server = dict(auth_by_server or {})
         for server_id, config in self._configs.items():
             await self._connect_one(server_id, config)
         return self.statuses()
@@ -132,7 +135,9 @@ class McpClientRegistry:
     async def _connect_one(self, server_id: str, config: ServerConfig) -> ServerStatus:
         local_stack = AsyncExitStack()
         try:
-            session = await open_session(local_stack, config, CONNECT_TIMEOUT_SECONDS, self._extra_headers)
+            auth = self._auth_by_server.get(server_id)
+            session = await open_session(local_stack, config, CONNECT_TIMEOUT_SECONDS, self._extra_headers,
+                                         **({"auth": auth} if auth is not None else {}))
             listed = await session.list_tools()
         except Exception as error:  # noqa: BLE001 - one bad server must not block the others
             try:

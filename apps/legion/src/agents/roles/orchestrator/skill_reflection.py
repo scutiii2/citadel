@@ -113,8 +113,6 @@ def parse_draft(text: object) -> dict[str, str] | None:
 
 
 async def _draft(question: str, calls: list[tuple[str, list[str]]], request_id: str) -> dict[str, str] | None:
-    if not internal_auth.TOKEN:
-        return None
     await anyio.to_thread.run_sync(agent_registry.reload, abandon_on_cancel=True)
     agent = agent_registry.get_agent(AGENT_ID)
     if agent is None:

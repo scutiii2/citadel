@@ -11,24 +11,32 @@ from src.agents.roles.router.router_contract import RouterPolicy, RouteResponse
 from src.agents.roles.router.router_contract import VoterUsage
 from src.agents.roles.router import router_service
 from src.runtime import internal_auth
+from src.citadel_auth.asgi import _caller
+from src.citadel_auth import verify_assertion
+from src.citadel_auth.testing import signed
 
 
-def test_route_fails_closed_without_configured_token(monkeypatch):
-    monkeypatch.setattr(internal_auth, "TOKEN", "")
-    with pytest.raises(ValueError, match="token"):
+@pytest.fixture
+def authenticated(auth_stack):
+    who = asyncio.run(verify_assertion(auth_stack["legion"], signed(auth_stack["legion"], "legion")["Authorization"][7:], "legion"))
+    handle = _caller.set(who)
+    try:
+        yield
+    finally:
+        _caller.reset(handle)
+
+
+def test_route_fails_closed_without_authenticated_service():
+    with pytest.raises(ValueError, match="authenticated"):
         asyncio.run(router_service.route({}, {}))
 
 
-def test_route_requires_valid_token_and_router_role(monkeypatch):
-    monkeypatch.setattr(internal_auth, "TOKEN", "internal")
-    with pytest.raises(ValueError, match="token"):
-        asyncio.run(router_service.route({}, {"X-Internal-Token": "wrong"}))
+def test_route_requires_router_role(authenticated):
     with pytest.raises(ValueError, match="Router"):
-        asyncio.run(router_service.route({}, {"X-Internal-Token": "internal"}))
+        asyncio.run(router_service.route({}, {}))
 
 
-def test_authenticated_route_validates_and_runs_engine(monkeypatch):
-    monkeypatch.setattr(internal_auth, "TOKEN", "internal")
+def test_authenticated_route_validates_and_runs_engine(monkeypatch, authenticated):
     monkeypatch.setattr(agent_spec, "current", lambda: SimpleNamespace(
         internal_role="router", decision=RouterPolicy()))
     class Engine:
@@ -36,12 +44,11 @@ def test_authenticated_route_validates_and_runs_engine(monkeypatch):
             return RouteResponse(policy_revision=policy.revision())
     monkeypatch.setattr(router_service, "_engine", Engine())
     result = asyncio.run(router_service.route({"subject": "hello", "request_id": "r"},
-                                             {"X-Internal-Token": "internal"}))
+                                             {}))
     assert result["agent"]["uncertain"]
 
 
-def test_deadline_returns_partial_usage_and_freezes_late_worker_records(monkeypatch):
-    monkeypatch.setattr(internal_auth, "TOKEN", "internal")
+def test_deadline_returns_partial_usage_and_freezes_late_worker_records(monkeypatch, authenticated):
     monkeypatch.setattr(agent_spec, "current", lambda: SimpleNamespace(
         internal_role="router", decision=RouterPolicy(deadline_seconds=1)))
     release, late = threading.Event(), threading.Event()
@@ -60,7 +67,7 @@ def test_deadline_returns_partial_usage_and_freezes_late_worker_records(monkeypa
     started = time.monotonic()
     try:
         result = asyncio.run(router_service.route({"subject": "hello", "request_id": "slow-route"},
-                                                 {"X-Internal-Token": "internal"}))
+                                                 {}))
         assert time.monotonic()-started < 2
         assert result["agent"]["reason"] == "timeout" and len(result["usage"]) == 1
         release.set()

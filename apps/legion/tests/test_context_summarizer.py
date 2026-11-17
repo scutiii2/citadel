@@ -12,7 +12,6 @@ from src.providers import cancellation
 
 @pytest.fixture
 def helper(monkeypatch):
-    monkeypatch.setattr(internal_auth, "TOKEN", "test")
     monkeypatch.setattr(agent_registry, "reload", lambda: None)
     monkeypatch.setattr(agent_registry, "_AGENTS_BY_ID", {
         "context-summarizer": {"role": "specialist", "id": "context-summarizer", "url": "http://helper/mcp"},
