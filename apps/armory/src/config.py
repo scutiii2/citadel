@@ -87,7 +87,6 @@ class Settings:
     obsidian_embed_model: str = _env("OBSIDIAN_EMBED_MODEL", "nomic-embed-text")
     obsidian_refresh_seconds: float = float(_env("OBSIDIAN_REFRESH_SECONDS", "60"))
     # Stronghold keeps the brain connections; Armory asks it which one an account may use.
-    stronghold_url: str = _env("STRONGHOLD_URL", "http://127.0.0.1:29650")
     # Tavily API key for the web_research capability. Blank until set in .env;
     # the tools then fail with a message naming the variable.
     tavily_api_key: str = _env("TAVILY_API_KEY", "")

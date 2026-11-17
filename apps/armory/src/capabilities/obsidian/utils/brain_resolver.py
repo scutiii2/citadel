@@ -7,6 +7,7 @@ import urllib.error
 import urllib.request
 
 from src.config import settings
+from src.service_catalog import catalog
 from src.services import identity_context
 from src.capabilities.obsidian.utils.gateway import ObsidianGateway, ObsidianGatewayError, _NoRedirect
 
@@ -28,7 +29,7 @@ async def _resolve(scope: str, operation: str) -> dict:
     import httpx
     try:
         async with service_client(keyring, "stronghold", timeout=5) as client:
-            async with client.stream("POST", settings.stronghold_url.rstrip("/") + "/brains/resolve",
+            async with client.stream("POST", catalog.url("stronghold") + "/brains/resolve",
                     json={"scope": scope, "operation": operation}, headers=requester_header()) as response:
                 response.raise_for_status()
                 raw = bytearray()
@@ -40,7 +41,9 @@ async def _resolve(scope: str, operation: str) -> dict:
         if not isinstance(result, dict) or result.get("scope") != scope:
             raise ValueError("invalid brain reply")
         return result
-    except httpx.HTTPError:
+    except httpx.HTTPError as error:
+        if isinstance(error, httpx.ConnectError):
+            catalog.refresh_soon()
         raise ValueError("brain connection unavailable") from None
 
 

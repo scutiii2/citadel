@@ -30,3 +30,20 @@ def test_promotion_requires_known_conditional_create_support(monkeypatch, versio
     else:
         with pytest.raises(ObsidianGatewayError, match="conditional create"):
             gateway.require_create_only()
+
+
+def test_resolve_uses_current_catalog_address(monkeypatch):
+    import asyncio
+    import httpx
+    from src.service_catalog import catalog
+    real_client = brain_resolver.service_client
+    seen = []
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(200, json={"scope": "instance"})
+    monkeypatch.setattr(brain_resolver, "service_client", lambda *a, **kw: real_client(*a, transport=httpx.MockTransport(handler), **kw))
+    monkeypatch.setitem(catalog._known, "stronghold", "http://stronghold.test:29650")
+    assert asyncio.run(brain_resolver._resolve("instance", "read")) == {"scope": "instance"}
+    monkeypatch.setitem(catalog._known, "stronghold", "http://moved.test:29650")
+    assert asyncio.run(brain_resolver._resolve("instance", "read")) == {"scope": "instance"}
+    assert seen == ["http://stronghold.test:29650/brains/resolve", "http://moved.test:29650/brains/resolve"]
