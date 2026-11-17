@@ -42,3 +42,13 @@ def test_compose_trust_mounts_are_owner_writable_only():
         for other in SERVICES:
             if receiver != other:
                 assert not any(mount[0] == f"identity_{other}" for mount in mounts.values())
+
+
+def test_compose_bootstraps_services_and_advertises_catalog_addresses():
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
+    for name, port in (("armory", 29600), ("stronghold", 29650), ("portcullis", 29601), ("legion", 29603)):
+        env = compose["services"][name]["environment"]
+        assert env["TREASURY_URL"] == "http://treasury:29602"
+        assert env["CITADEL_ADVERTISE_URL"] == f"http://{name}:{port}"
+        assert not set(env) & {"DB_GATEWAY_URL", "STRONGHOLD_URL", "PORTCULLIS_URL", "ARMORY_URL", "MCP_SERVER_URL"}
+    assert compose["services"]["legion"]["environment"]["AI_AGENT_ADVERTISE_URL"] == "http://legion"

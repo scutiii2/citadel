@@ -26,8 +26,8 @@ The internal Router chooses specialists and model tiers through that arrangement
      `gateways/anthropic/` (`claude`, `openrouter`, ...) and create an access token for Legion. Then
      set the gateway's address and that token on the Legion admin app's **Connections** page. Legion
      keeps them in Treasury (instance `legion`, collection `legion_settings`), so Legion must know where Treasury is:
-     the **Treasury** card on the same page (its starting value is `DB_GATEWAY_URL`). Every agent process picks an
-     edit up within half a minute. The token is write-only. No environment variable names a gateway: until a
+     `treasury_url` in `configs/config_app.json` (`TREASURY_URL` overrides it). Every agent process picks an
+     gateway edit up within half a minute. The token is write-only. No environment variable names a gateway: until a
      value is saved the default address is used, and no token.
    - **OpenAI-protocol agents** use the same service and the same token. Save a gateway with the
      same id as the file in `gateways/openai/` (`gpt`, `groq`, `azure`, ...).

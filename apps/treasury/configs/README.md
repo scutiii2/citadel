@@ -36,3 +36,18 @@ Legion `legion`, Armory `armory` (or `mcp_server`), each with the connection it 
 the instance it owns, and only connections that exist (built in or saved); anything else is refused.
 Registration takes effect at once and is kept in the `instances` table of `.data/treasury/settings.db`, so a
 Treasury restart keeps it. A service retries until Treasury answers, so start order does not matter.
+
+## Service addresses
+
+Treasury keeps the four peer addresses (Portcullis, Stronghold, Armory, Legion) in `.data/treasury/settings.db`:
+`service_addresses` holds registrations and `service_pins` holds administrator pins. Each service may register only
+its own name through `PUT /services/{name}`. All four read `GET /services`; only Portcullis may change pins through
+`/admin/services`, after checking `settings.manage` for Treasury Admin, Services.
+
+A pin wins over registration; registration wins over the caller’s built-in local default. Removing a pin uses
+registration again, or the default when nothing registered. Addresses are HTTP(S) bases without credentials,
+paths, queries or fragments. Callers add `/mcp` when needed. Treasury is the bootstrap address, never a catalog entry.
+
+Services start without Treasury: they use a last-good disk cache, then local defaults, and retry registration and
+refresh in the background. Set `treasury_url` in each service’s tracked `configs/config_app.json`, or override it with
+`TREASURY_URL`. Set `advertise_url` or `CITADEL_ADVERTISE_URL` when the listener’s local address is not reachable by peers.

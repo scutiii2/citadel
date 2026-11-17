@@ -9,7 +9,7 @@ Citadel runs as containers from one `docker-compose.yml`:
 | `legion_admin` | admin web app: agents, connections | 26500 |
 | `armory_admin` | admin web app: capabilities, extensions | 26503 |
 | `stronghold_admin` | admin web app: usage, analytics, tickets, tuning | 26504 |
-| `treasury_admin` | admin web app: Treasury instances (read-only) | 26505 |
+| `treasury_admin` | admin web app: Treasury instances, connections and service addresses | 26505 |
 | `portcullis` | backend for both web apps | internal |
 | `armory` | MCP server (capabilities, including Server Manager) | internal 29600 |
 | `legion` | AI agent | internal |
@@ -116,7 +116,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | `apps/portcullis/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
 
    - Compose supplies `CITADEL_SERVICE`, `CITADEL_TRUST_DIR` and `CITADEL_IDENTITY_DIR`. Keep the trust and identity mounts; authentication is mandatory.
-   - Skip `MCP_HOST`, `MCP_PORT` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. A gateway entry that points at a service
+   - Compose sets `TREASURY_URL` and `CITADEL_ADVERTISE_URL` for each service; every service registers its own address with Treasury at start, and finds the others in Treasury's catalog (Treasury Admin, Services). A gateway entry that points at a service
      published on the host uses `http://host.docker.internal:<port>`. Do not use `localhost` or
      the server's hostname for another service.
    - **Laya settings** (`LAYA_TOKEN`, `LAYA_REPLICAS`, `LAYA_PORT`) belong in `LayaModel`'s own `.env`, not here. Each
@@ -126,13 +126,13 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
      when you rebuild.
 
 4. **Configs are tracked.** Every `configs/*.json` is in git and none has an `.example` twin; each `configs/` folder has a
-   `README.md` describing its keys (Armory has none: its settings are in Armory Admin, see `apps/armory/docs/settings.md`). Secrets are `${NAME}` placeholders filled from the `.env` files (see the
+   `README.md` describing its keys (Armory’s listener and Treasury bootstrap are in `configs/config_app.json`; other settings are in Armory Admin). Secrets are `${NAME}` placeholders filled from the `.env` files (see the
    `.env.example` beside each). Compose mounts the tracked files under `docker/configs/` read-only for container values (Portcullis's, Stronghold's
    and Treasury's `config_app.json`). Everything an
    admin changes at run time is saved in `.data/<service>/`, so it survives rebuilds and never shows in git: Armory's
    extensions, capability toggles and ticket settings and Legion's servers (each in `settings.db`), Legion's tuning and
    prompts, and the instances Treasury's callers register. A new install starts with every Armory capability off, no
-   Armory extension and no Legion server: an administrator turns on and adds what the machine needs. Stronghold alone
+   Armory extension; Legion defaults its main server to Armory’s catalog address. An administrator turns on and adds what the machine needs. Stronghold alone
    owns the usage limits and the price table; Portcullis reads the prices from it.
    Set up email on the Email page of Armory Admin before using it.
 
@@ -245,7 +245,7 @@ Product logic, called only by Portcullis. The calendar is the first feature that
 - **Notes shared with agents**: Armory's notes tools read Stronghold's database. Compose sets `DB_GATEWAY_INSTANCE=armory` and `DB_GATEWAY_CONNECTION=stronghold` for Armory, as the starting values, and Armory registers instance `armory` with that connection itself. A value saved on the Settings page of Armory Admin wins over them.
 - Stronghold reads Legion's agent registry from `.data/legion/` (mounted read-only) and calls Armory for the assistant memory.
 - **Token limits and prices**: `usage.six_hour_token_limit`, `usage.weekly_token_limit` and the `pricing` block are in `docker/configs/stronghold/app.json` (Stronghold keeps usage). A limit set in Portcullis's config is ignored.
-- Stronghold calls Portcullis's `/internal` routes with the shared internal token (account standing, admin switches, email, Errors log). Nothing to configure: Compose sets `PORTCULLIS_URL`.
+- Stronghold calls Portcullis's `/internal` routes with signed service assertions (account standing, admin switches, email, Errors log). Its address comes from Treasury’s catalog.
 
 ## DecisionGateway
 

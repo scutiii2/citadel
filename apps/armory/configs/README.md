@@ -1,6 +1,6 @@
 # configs
 
-`config_app.json` is tracked; there is no `.example` twin. It holds only where Armory listens:
+`config_app.json` is tracked; there is no `.example` twin. It holds where Armory listens and its Treasury bootstrap address:
 
 | Key | Meaning |
 |---|---|
@@ -11,3 +11,5 @@
 
 Everything else an administrator changes is in Armory Admin and saved in `.data/armory/settings.db`: see
 [`../docs/settings.md`](../docs/settings.md).
+
+Optional `treasury_url` defaults to `http://127.0.0.1:29602`; `TREASURY_URL` overrides it. Optional `advertise_url` names this service’s reachable base address; `CITADEL_ADVERTISE_URL` overrides it. Other Citadel addresses come from Treasury’s service catalog, with pins on Treasury Admin, Services.

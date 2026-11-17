@@ -18,17 +18,17 @@ services:
       - path: ./apps/armory/.env
         required: false
     environment:
+      TREASURY_URL: http://treasury:29602
+      CITADEL_ADVERTISE_URL: http://armory:29600
       MCP_HOST: 0.0.0.0
       CITADEL_SERVICE: armory
       CITADEL_ROOT_ENV: /citadel.env
       CITADEL_TRUST_DIR: /trust
       CITADEL_IDENTITY_DIR: /identity
       MCP_PORT: "29600"
-      DB_GATEWAY_URL: http://treasury:29602
       # The notes tools read the notes the Notes page saves, which Stronghold keeps in its own database.
       DB_GATEWAY_INSTANCE: armory
       DB_GATEWAY_CONNECTION: stronghold
-      STRONGHOLD_URL: http://stronghold:29650
     volumes:
       - ${CITADEL_DATA_DIR:-./.data}/armory:/app/.data
       - ${CITADEL_CACHE_DIR:-./.cache}/armory:/app/.cache
@@ -90,15 +90,15 @@ services:
       - path: ./apps/legion/.env
         required: false
     environment:
+      TREASURY_URL: http://treasury:29602
+      CITADEL_ADVERTISE_URL: http://legion:29603
       AI_AGENT_HOST: 0.0.0.0
       CITADEL_SERVICE: legion
       CITADEL_ROOT_ENV: /citadel.env
       CITADEL_TRUST_DIR: /trust
       CITADEL_IDENTITY_DIR: /identity
       AI_AGENT_ADVERTISE_URL: http://legion
-      MCP_SERVER_URL: http://armory:29600/mcp
       # Legion keeps each gateway's address and token, set by an admin, in Treasury.
-      DB_GATEWAY_URL: http://treasury:29602
     # Lets legion reach host-published stacks as host.docker.internal.
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -149,16 +149,14 @@ services:
       - path: ./apps/stronghold/.env
         required: false
     environment:
+      TREASURY_URL: http://treasury:29602
+      CITADEL_ADVERTISE_URL: http://stronghold:29650
       STRONGHOLD_HOST: 0.0.0.0
       CITADEL_SERVICE: stronghold
       CITADEL_ROOT_ENV: /citadel.env
       CITADEL_TRUST_DIR: /trust
       CITADEL_IDENTITY_DIR: /identity
       STRONGHOLD_PORT: "29650"
-      DB_GATEWAY_URL: http://treasury:29602
-      # Account facts, admin switches, email and the error log are asked from Portcullis.
-      PORTCULLIS_URL: http://portcullis:29601
-      ARMORY_URL: http://armory:29600
       # Attached files and speech go to these tool services; their tokens are set in Stronghold admin > Tool services.
       BARD_URL: http://bard:29400
       SCRIBE_URL: http://scribe:29401
@@ -188,6 +186,8 @@ services:
       - path: ./apps/portcullis/.env
         required: false
     environment:
+      TREASURY_URL: http://treasury:29602
+      CITADEL_ADVERTISE_URL: http://portcullis:29601
       EMBER_API_HOST: 0.0.0.0
       CITADEL_SERVICE: portcullis
       CITADEL_ROOT_ENV: /citadel.env
