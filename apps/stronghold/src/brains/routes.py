@@ -1,9 +1,9 @@
-"""/brains: encrypted brain connections, browsing, publishing Notes and promotion suggestions.
+"""/brains: personal connections, browsing, publishing Notes and promotion suggestions.
 
 Portcullis serves these as /api/brains after checking the login. What an account may do is asked of
 Portcullis on each request (`/internal/accounts/{uid}/permissions`), so a permission taken away
 applies at once, and Armory's own resolve call (`POST /brains/resolve`, uid only) is checked the same way.
-Browsers never see a credential: `/resolve` is for Armory and carries it.
+The resolver exports only personal credentials to Armory. Instance resolution returns authorization.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from src.brains import suggestions as brain_suggestions
 from src.brains.connections import PUBLISH, BrainConnections, BrainError, ConnectionInput, purge_owner
 from src.brains.gateway import BrainGateway
 from src.brains.promotions import Promotions, PublicationInput, note_hash
+from src.citadel_auth import current_caller
 from src.notes.store import NoteNotFound, NotesService
 from src.platform import PlatformError
 from src.requester import Requester, current_requester
@@ -33,7 +34,7 @@ SETTINGS_MANAGE = "settings.manage"
 
 
 def connections(request: Request) -> BrainConnections:
-    return BrainConnections(request.app.state.store, request.app.state.box)
+    return BrainConnections(request.app.state.store, request.app.state.box, request.app.state.brain_gateway)
 
 
 def gateway(request: Request) -> BrainGateway:
@@ -56,43 +57,35 @@ def need(granted: set[str], permission: str) -> None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"Missing permission: {permission}")
 
 
-def _manage(scope: str, granted: set[str]) -> None:
-    if scope == "instance":
-        need(granted, SETTINGS_MANAGE)
-
-
 async def _log(request: Request, who: Requester, action: str, message: str) -> None:
     await request.app.state.platform.log_action(who.uid, action, message)
 
 
-@router.get("/connections/{scope}")
-async def get_connection(scope: Scope, who: Requester = Depends(current_requester), granted: set[str] = Depends(permissions),
+@router.get("/connections/personal")
+async def get_connection(who: Requester = Depends(current_requester), granted: set[str] = Depends(permissions),
                          service: BrainConnections = Depends(connections)):
-    _manage(scope, granted)
-    return await service.get(scope, who.uid)
+    return await service.get("personal", who.uid)
 
 
-@router.put("/connections/{scope}")
-async def save_connection(scope: Scope, body: ConnectionInput, request: Request, who: Requester = Depends(current_requester),
+@router.put("/connections/personal")
+async def save_connection(body: ConnectionInput, request: Request, who: Requester = Depends(current_requester),
                           granted: set[str] = Depends(permissions), service: BrainConnections = Depends(connections),
                           remote: BrainGateway = Depends(gateway)):
-    _manage(scope, granted)
-    result = await service.save(scope, who.uid, body)
+    result = await service.save("personal", who.uid, body)
     try:
-        await remote.operation(who.uid, "retire", scope)
+        await remote.operation(who.uid, "retire", "personal")
     except BrainError:
         pass  # Resolver revocation is immediate even when Armory is unreachable.
-    await _log(request, who, "brain.connection_save", f"scope={scope}; revision={result['revision']}")
+    await _log(request, who, "brain.connection_save", f"scope=personal; revision={result['revision']}")
     return result
 
 
-@router.post("/connections/{scope}/test")
-async def test_connection(scope: Scope, body: ConnectionInput, who: Requester = Depends(current_requester),
+@router.post("/connections/personal/test")
+async def test_connection(body: ConnectionInput, who: Requester = Depends(current_requester),
                           granted: set[str] = Depends(permissions), service: BrainConnections = Depends(connections),
                           remote: BrainGateway = Depends(gateway)):
-    _manage(scope, granted)
-    candidate = await service.candidate(scope, who.uid, body)
-    return await remote.operation(who.uid, "test", scope, candidate=service.snapshot(candidate))
+    candidate = await service.candidate("personal", who.uid, body)
+    return await remote.operation(who.uid, "test", "personal", candidate=service.snapshot(candidate))
 
 
 @router.get("/destinations")
@@ -100,10 +93,17 @@ async def destinations(who: Requester = Depends(current_requester), granted: set
                        service: BrainConnections = Depends(connections)):
     results = []
     for scope in ("personal", "instance"):
-        row = await service.get(scope, who.uid)
-        # Instance endpoint and credentials belong in staff settings only.
-        results.append({k: row[k] for k in ("id", "scope", "label", "enabled", "revision", "generation", "folder", "status")} | {
-            "writable": row["enabled"] and (row["allow_write"] or row["status"] == "legacy") and (scope == "personal" or PUBLISH in granted)})
+        if scope == "instance":
+            try:
+                row = await service.get(scope, who.uid)
+            except BrainError:
+                row = {**BrainConnections.public(None, scope), "enabled": False, "status": "unavailable", "writable": False}
+            writable = row["writable"] is True and PUBLISH in granted
+        else:
+            row = await service.get(scope, who.uid)
+            writable = row["enabled"] and row["allow_write"]
+        results.append({k: row[k] for k in ("id", "scope", "label", "enabled", "revision", "generation", "folder", "status")}
+                       | {"writable": writable})
     return results
 
 
@@ -121,14 +121,26 @@ async def writable(scope: Scope, who: Requester = Depends(current_requester), gr
 class ResolveBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     scope: Scope
-    operation: Literal["read", "list", "search", "status", "write", "append"]
+    operation: Literal["read", "list", "search", "status", "write", "append", "manage"]
 
 
 @router.post("/resolve")
 async def resolve_connection(body: ResolveBody, who: Requester = Depends(current_requester),
                              granted: set[str] = Depends(permissions), service: BrainConnections = Depends(connections)):
-    """For Armory: the connection to use, with its credential. Needs the internal token (every route does)."""
-    return await service.resolve(body.scope, who.uid, write=body.operation in {"write", "append"}, publish=PUBLISH in granted)
+    """For Armory: live authorization for shared access, or the requester's personal snapshot."""
+    caller = current_caller()
+    if caller is None or caller.name != "armory":
+        raise HTTPException(403, "Armory service required")
+    write = body.operation in {"write", "append"}
+    if body.scope == "instance":
+        if body.operation == "manage":
+            need(granted, SETTINGS_MANAGE)
+        elif write:
+            need(granted, PUBLISH)
+        return {"scope": "instance", "authorized": True}
+    if body.operation == "manage":
+        raise HTTPException(422, "Choose the Instance Brain for shared settings")
+    return await service.resolve("personal", who.uid, write=write, publish=False)
 
 
 class BrowseBody(BaseModel):

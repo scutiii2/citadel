@@ -236,6 +236,7 @@ def create_app(
     app.include_router(account_tuning.router)
     app.include_router(notes.router)
     app.include_router(brains.router)
+    app.include_router(brains.admin_router)
     app.include_router(memory.router)
     app.include_router(skills.router)
     app.include_router(triage.router)

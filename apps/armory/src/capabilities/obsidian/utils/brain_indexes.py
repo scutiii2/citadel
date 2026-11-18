@@ -165,16 +165,18 @@ class ScopedIndexes:
                 return "refresh_failed"
             return "indexing" if entry.runtime.refreshing else "ready"
 
-    def retire(self, uid, scope="personal"):
+    def retire(self, uid, scope="personal", *, generation=None):
         with self.lock:
             active_paths = {e.path.parent.resolve() for e in [*self.entries.values(), *self.retiring.values()]}
             for key, entry in list(self.entries.items()):
+                if generation is not None and key[1] != generation:
+                    continue
                 if (scope == "instance" and entry.connection == "instance") or (scope == "personal" and entry.uid == uid and entry.connection != "instance"):
                     entry.retired = True
                     entry.runtime._stop.set()
                     if not entry.readers:
                         self._discard(key)
-        if scope == "instance":
+        if scope == "instance" and generation in {None, "legacy"}:
             from src.capabilities.obsidian.utils.obsidian_index import close_runtime
             close_runtime()
         # Account cleanup also removes derived state left by earlier processes.
@@ -186,7 +188,7 @@ class ScopedIndexes:
                 try:
                     owner = json.loads(manifest.read_text(encoding="utf-8"))
                     matches = owner.get("owner") == uid if scope == "personal" else owner.get("connection") == "instance"
-                    if not matches:
+                    if not matches or generation is not None and owner.get("generation") != generation:
                         continue
                     with self.lock:
                         if any(e.path.parent.resolve() == manifest.parent.resolve() for e in [*self.entries.values(), *self.retiring.values()]):

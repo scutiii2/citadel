@@ -1,15 +1,19 @@
-"""Resolve current authorized snapshots in Ember; secrets live only in request objects."""
-import json
+"""Resolve authorized vault snapshots. Shared credentials stay in Armory."""
 import asyncio
-from src.citadel_auth import service_client, requester_header
-from src.services.service_auth import keyring
-import urllib.error
-import urllib.request
+import json
+import sqlite3
 
+import httpx
+
+from src.capabilities.obsidian.utils.gateway import ObsidianGateway, ObsidianGatewayError
+from src.capabilities.obsidian.utils.instance_brain import InstanceBrainStore
+from src.citadel_auth import requester_header, service_client
 from src.config import settings
 from src.service_catalog import catalog
 from src.services import identity_context
-from src.capabilities.obsidian.utils.gateway import ObsidianGateway, ObsidianGatewayError, _NoRedirect
+from src.services.service_auth import keyring
+
+instance_store: InstanceBrainStore | None = None
 
 
 def resolve(scope: str, operation: str, uid: str | None = None) -> dict:
@@ -21,12 +25,18 @@ def resolve(scope: str, operation: str, uid: str | None = None) -> dict:
         raise ObsidianGatewayError("The selected auto-save destination cannot be changed by the model.")
     try:
         return asyncio.run(_resolve(scope, operation))
-    except (OSError, ValueError):
+    except (KeyError, OSError, ValueError, sqlite3.Error):
         raise ObsidianGatewayError("Brain connection is unavailable or access was refused. Check your destination and permissions.") from None
 
 
+async def authorize_management() -> None:
+    try:
+        await _resolve("instance", "manage")
+    except (KeyError, OSError, ValueError):
+        raise ObsidianGatewayError("Could not verify Instance Brain management access", status=503) from None
+
+
 async def _resolve(scope: str, operation: str) -> dict:
-    import httpx
     try:
         async with service_client(keyring, "stronghold", timeout=5) as client:
             async with client.stream("POST", catalog.url("stronghold") + "/brains/resolve",
@@ -40,7 +50,18 @@ async def _resolve(scope: str, operation: str) -> dict:
         result = json.loads(raw)
         if not isinstance(result, dict) or result.get("scope") != scope:
             raise ValueError("invalid brain reply")
+        if scope == "instance":
+            if result.get("authorized") is not True:
+                raise ValueError("missing instance authorization")
+            if operation != "manage":
+                if instance_store is None:
+                    raise ValueError("missing instance connection store")
+                return await asyncio.to_thread(instance_store.snapshot, write=operation in {"write", "append"})
         return result
+    except httpx.HTTPStatusError as error:
+        if operation == "manage" and error.response.status_code == 403:
+            raise ObsidianGatewayError("Instance Brain management permission is required", status=403) from None
+        raise ValueError("brain connection unavailable") from None
     except httpx.HTTPError as error:
         if isinstance(error, httpx.ConnectError):
             catalog.refresh_soon()

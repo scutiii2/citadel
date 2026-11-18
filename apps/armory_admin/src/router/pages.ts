@@ -23,6 +23,12 @@ export const ARMORY_PAGES: ArmoryPage[] = [
     permission: "extensions.manage",
   },
   {
+    to: "/brain",
+    label: "Brain",
+    icon: ["M4 4h7v16H4z", "M13 4h7v16h-7z"],
+    permission: "settings.manage",
+  },
+  {
     to: "/tickets",
     label: "Ticket settings",
     icon: ["M4 9V6h16v3a2 2 0 0 0 0 6v3H4v-3a2 2 0 0 0 0-6z", "M10 8v8"],

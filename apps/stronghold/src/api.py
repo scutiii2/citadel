@@ -21,7 +21,7 @@ from src.attachments import routes as attachments_routes
 from src.usage import settings_routes as usage_settings_routes
 from src.attachments.services import ArmoryConnections, ArmoryUploads
 from src.bard import routes as bard_routes
-from src.brains import routes as brains_routes
+from src.brains import instance_migration, routes as brains_routes
 from src.brains.connections import BrainError
 from src.brains.gateway import BrainGateway
 from src.citadel_auth import Keyring, ServiceAuthMiddleware, ServiceCatalog, CatalogTransport, logical_url, advertised_url, from_env
@@ -78,6 +78,8 @@ def create_app(
     async def lifespan(app: FastAPI):
         await keyring.ensure_identity()
         catalog = ServiceCatalog(keyring, settings.treasury_url, cache_path=settings.data_dir / "catalog_cache.json")
+        app.state.keyring = keyring
+        app.state.brain_migration_lock = asyncio.Lock()
         app.state.catalog = catalog
         if store is None:
             catalog.start("stronghold", advertised_url(settings.host, settings.port, settings.advertise_url))
@@ -152,6 +154,7 @@ def create_app(
     app.include_router(attachments_routes.router)
     app.include_router(bard_routes.router)
     app.include_router(brains_routes.router)
+    app.include_router(instance_migration.router)
     app.include_router(chats_routes.router)
     app.include_router(chats_routes.folder_router)
     app.include_router(memory_routes.router)
