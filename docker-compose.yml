@@ -55,6 +55,9 @@ services:
       - "0.0.0.0:29407:29407"
     volumes:
       - ${CITADEL_DATA_DIR:-./.data}/conversationgateway:/data
+    # Lets a saved gateway reach a service published on the host (OmniRoute, Ollama, vLLM) as host.docker.internal.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:29407/health')"]
       interval: 15s
