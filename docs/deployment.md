@@ -22,15 +22,16 @@ from the separate `LayaModel` project (see "Laya" below) and legion reaches it t
 
 ## 1. Local (Windows, macOS, Linux with Docker Desktop or Engine)
 
-1. Service identity keys are made on first start; no shared token or auth setting is needed. Each service writes only its own public trust folder and private `identity_*` volume; peers mount that public folder read-only. Backing up private identity volumes is optional: a lost key is remade and peers reload its new public key.
-   Per-app secrets live in `apps/<app>/.env` and are loaded when the file exists.
-2. Start the stack:
+1. **Get the gateways.** `conversationgateway` and `decisiongateway` are built from their own repos (`AI/ModelProviders/ConversationGateway` and `AI/ModelProviders/DecisionGateway`), not from this one. They are not on a Git remote, so copy the two folders to the machine and set `CONVERSATION_GATEWAY_DIR` and `DECISION_GATEWAY_DIR` in the root `.env` to where they are (a relative path is relative to the Citadel folder). Without them the build fails.
+2. **Create the `.env` files.** Run `python tools/setup_env.py` (the `live` branch carries it too). It makes the root `.env` and each `apps/<app>/.env` from its `.env.example`, fills the two gateway admin passwords and `BOOTSTRAP_ADMIN_PASSWORD` with random values, and never overwrites a file that exists or prints a secret. Open the files to read the passwords. The root `.env` is required: compose refuses to start without the two gateway passwords, and every service bind-mounts it.
+   Service identity keys are made on first start; no shared token or auth setting is needed. Each service writes only its own public trust folder and private `identity_*` volume; peers mount that public folder read-only. Backing up private identity volumes is optional: a lost key is remade and peers reload its new public key.
+3. Start the stack:
 
    ```bash
    docker compose up -d --build
    ```
 
-3. Open http://localhost:26501 (portcullis_admin; the other admin apps are on 26500 and 26503 to 26505). All bind to `127.0.0.1`.
+4. Open http://localhost:26501 (portcullis_admin; the other admin apps are on 26500 and 26503 to 26505). All bind to `127.0.0.1`.
 
 To rebuild one service, run `docker compose up -d --build <service>`, or double-click the `dev_deploy.bat` in that
 service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `portcullis_admin`, `legion_admin`, `armory_admin`, `stronghold_admin`, `treasury_admin`).
@@ -96,24 +97,24 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    The simplest way is deploy option 2, which copies yours from the PC. To create them by hand, run from the Citadel
    folder (names that start with a dot are hidden: use `ls -la`).
 
-   No root `.env` is needed: the internal token is made on first start.
-
-   Per-app files: copy each committed `.env.example` and fill in the values.
+   The root `.env` is required (gateway admin passwords; see "Local" step 2). Run `python tools/setup_env.py` to make it and every per-app file from the committed `.env.example` files with random passwords; or copy them by hand:
 
    ```bash
-   cp apps/armory/.env.example apps/armory/.env
-   cp apps/legion/.env.example apps/legion/.env
-   cp apps/treasury/.env.example apps/treasury/.env
-   cp apps/portcullis/.env.example apps/portcullis/.env
-   chmod 600 .env apps/*/.env apps/portcullis/.env
+   cp .env.example .env
+   for app in armory legion treasury stronghold portcullis; do cp apps/$app/.env.example apps/$app/.env; done
+   chmod 600 .env apps/*/.env
    ```
+
+   Then set `CONVERSATION_GATEWAY_ADMIN_PASSWORD`, `DECISION_GATEWAY_ADMIN_PASSWORD` and `BOOTSTRAP_ADMIN_PASSWORD` yourself if you copied by hand.
 
    | File | Keys to fill in |
    |---|---|
    | `apps/armory/.env` | Nothing is needed. Set the capability keys you use (Tavily, Firecrawl), `LAYA_URL` (`http://legion:29611/mcp` to group tickets with the triage agent) and the email account in Armory Admin (Settings and Email pages) |
    | `apps/legion/.env` | `HF_TOKEN` if used. Model provider keys, the Laya token and the TypeSafe key are saved in ConversationGateway and DecisionGateway, not here |
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if a connection saved in Treasury Admin references any |
-   | `apps/portcullis/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
+   | `apps/portcullis/.env` | `BOOTSTRAP_ADMIN_*` (first admin account) |
+   | `apps/stronghold/.env` | Nothing is needed |
+   | `.env` (root) | `CONVERSATION_GATEWAY_ADMIN_PASSWORD`, `DECISION_GATEWAY_ADMIN_PASSWORD`, and `CONVERSATION_GATEWAY_DIR` / `DECISION_GATEWAY_DIR` when the gateway repos are not at `../../AI/ModelProviders/` |
 
    - Compose supplies `CITADEL_SERVICE`, `CITADEL_TRUST_DIR` and `CITADEL_IDENTITY_DIR`. Keep the trust and identity mounts; authentication is mandatory.
    - Compose sets `TREASURY_URL` and `CITADEL_ADVERTISE_URL` for each service; every service registers its own address with Treasury at start, and finds the others in Treasury's catalog (Treasury Admin, Services). A gateway entry that points at a service
@@ -142,7 +143,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    docker compose up -d --build
    ```
 
-6. Open `http://<zima-ip>:26502` and `http://<zima-ip>:26501` from any device on your network.
+6. Open `http://<zima-ip>:26501` (and the other admin apps, 26500 and 26503 to 26505) from any device on your network.
 
 ### Updating
 
@@ -162,11 +163,11 @@ changed and no code did, add `--force-recreate`.
 The box needs only what the stack builds from, not the whole repo. `tools/publish_live.py` builds a `live` branch from
 `main` with just these paths:
 
-- `docker-compose.yml`, `docker-compose.zima.yml`, `.env.example`, `docker/`
+- `docker-compose.yml`, `docker-compose.zima.yml`, `.env.example`, `docker/`, `tools/setup_env.py`
 - `apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `apps/portcullis_admin`, `apps/legion_admin`, `apps/armory_admin`, `apps/stronghold_admin`, `apps/treasury_admin`
 - `docs/deployment.md`
 
-It leaves out other docs, skills, `tools/`, the Python `tests/` folders and `apps/ember_cli`. `e2e/` and the
+It leaves out other docs, skills, the rest of `tools/`, the Python `tests/` folders and `apps/ember_cli`. `e2e/` and the
 `src/*.test.ts` files stay because the web apps' tsconfig includes them. The path lists are at the top of the script;
 add a path there when you add a compose service.
 
@@ -301,8 +302,9 @@ A service reports 'connection refused' to a peer: open Treasury Admin, Services;
 | legion cannot reach Laya | LayaModel is not running, or its published port is not 29220. Run `docker compose ps` in `LayaModel`, then `docker compose exec legion python -c "import urllib.request as u; print(u.urlopen('http://host.docker.internal:29220/health').status)"`. Expect 200. |
 | `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
 | `scp` will not log in | Check `DEPLOY_HOST` and that the folder exists. Run `ssh <host>` by hand to test. |
-| `openssl: command not found` | Use the `/dev/urandom` command in first-time setup, step 3. A failed `echo` leaves an empty `.env`, so run it again. |
-| portcullis fails and `apps/portcullis/.env` is a directory | Compose created it because the file was missing. Run `rmdir apps/portcullis/.env`, then `touch apps/portcullis/.env`, then start again. |
+| `variable is not set` for a gateway admin password | The root `.env` is missing or the password is empty. Run `python tools/setup_env.py`, or set it by hand. |
+| A gateway build fails: path not found | `CONVERSATION_GATEWAY_DIR` or `DECISION_GATEWAY_DIR` points nowhere. Copy the gateway repos and set both in the root `.env`. |
+| A service fails and its `.env` (or the root `.env`) is a directory | Compose created it because the file was missing. Remove the directory, run `python tools/setup_env.py`, then start again. |
 | UI loads on the box but not on another device | Overlay not used. Check `COMPOSE_FILE` in the root `.env`, or add `-f docker-compose.zima.yml`. |
 | Overlay still binds `127.0.0.1` | Compose older than 2.24 ignores `!override`. Update Compose, or edit the `ports` lines in the main file. |
 | Port already in use | Another app uses 26502 or 26501. Change the left side of the port mapping. |

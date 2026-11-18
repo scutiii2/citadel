@@ -42,6 +42,7 @@ DEPLOY_PATHS = [
     "apps/stronghold_admin",
     "apps/treasury_admin",
     "docs/deployment.md",
+    "tools/setup_env.py",
 ]
 # Left out of live. Python tests/ folders are not built into any image; e2e/ and src/*.test.ts stay
 # because the web apps' tsconfig includes them. ember_cli is not a compose service.
