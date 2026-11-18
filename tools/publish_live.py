@@ -37,6 +37,9 @@ DEPLOY_PATHS = [
     "apps/stronghold",
     "apps/portcullis",
     "apps/portcullis_admin",
+    # portcullis_admin imports these two files by relative path (its Dockerfile copies them).
+    "apps/ember_web/src/components/layout/PwaStatus.vue",
+    "apps/ember_web/src/components/layout/pageLayout.css",
     "apps/legion_admin",
     "apps/armory_admin",
     "apps/stronghold_admin",
