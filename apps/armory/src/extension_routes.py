@@ -13,6 +13,7 @@ from starlette.responses import JSONResponse, Response
 from src.config import settings
 from src.services import extensions
 from src.services.app_config import ExtensionConfig
+from src.services.connections import REQUIRED
 
 # The header a tool service (Bard, Scribe, Reader, Lens, Mimic) reads its per-caller token from.
 TOKEN_HEADER = "X-Internal-Token"
@@ -35,7 +36,7 @@ def _unsaved(error: OSError) -> JSONResponse:
 def _unique_extension_id(label: str) -> str:
     """A slug of `label`, made unique among known extension ids by appending _2, _3, ... on collision."""
     base = _slugify(label)
-    existing = {status.id for status in extensions.current_statuses()}
+    existing = REQUIRED.keys() | {status.id for status in extensions.current_statuses()}
     if base not in existing:
         return base
     suffix = 2

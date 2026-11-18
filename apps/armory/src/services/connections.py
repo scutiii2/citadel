@@ -42,6 +42,16 @@ def _view_url(value: object) -> str | None:
         return None
 
 
+def _origin(value: str | None) -> tuple[str, str | None, int] | None:
+    if not value:
+        return None
+    try:
+        url = urlsplit(value)
+        return url.scheme, url.hostname, url.port or (443 if url.scheme == "https" else 80)
+    except ValueError:
+        return None
+
+
 def _text(value: object, limit: int) -> str:
     if not isinstance(value, str) or len(value) > limit:
         raise ValueError("Invalid connection text.")
@@ -94,7 +104,7 @@ def auth_headers(auth: dict) -> dict[str, str]:
 
 def ready_status(record: dict) -> dict:
     rest = record["rest"]
-    label = record["label"]
+    label = REQUIRED.get(record["name"], record["label"])
     if not record["enabled"]:
         reason = f"{label} is disabled in Armory Admin."
     elif not rest:
@@ -270,12 +280,17 @@ class ConnectionStore:
 
     @staticmethod
     def _transport(kind, field, validate, incoming, previous, required) -> dict:
-        auth = _auth(incoming.get("auth", {}), previous.get("auth", {}))
-        if previous.get("legacy") and "auth" not in incoming:
+        address = validate(incoming.get(field, previous.get(field)))
+        same_origin = _origin(address) == _origin(previous.get(field))
+        previous_auth = previous.get("auth", {})
+        if not same_origin:
+            previous_auth = {key: value for key, value in previous_auth.items() if key in {"kind", "audience"}}
+        auth = _auth(incoming.get("auth", {}), previous_auth)
+        if same_origin and previous.get("legacy") and "auth" not in incoming:
             auth = previous["auth"]
         if required and kind == "rest" and auth["kind"] != "token":
             raise ValueError("Required REST connections use a tool-service token.")
-        block = {field: validate(incoming.get(field, previous.get(field))), "auth": auth}
+        block = {field: address, "auth": auth}
         if kind == "mcp":
             forward = incoming.get("forward_requester", previous.get("forward_requester", auth["kind"] == "token"))
             if not isinstance(forward, bool):

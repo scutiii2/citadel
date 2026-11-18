@@ -137,6 +137,13 @@ Verification: Stronghold 730 passed. Stronghold Admin type check and 260 tests p
 - Audio, attachment content and the dictation WebSocket open against Armory. Remove `services/scribe.py`, `tool_tokens`, `tool_token_routes`, `scribe_url`, the Tool services page and the related admin client.
 - Tests: audio and dictation route tests against a fake Armory; remove the token tests.
 
+#### Interfaces
+
+- Portcullis's audio and dictation routes sign for Armory and forward a signed requester. Attachment content keeps its direct Armory PDF stream. Public URLs, PCM messages, browser authentication, and Range behavior stay compatible.
+- The desktop chat consumes `GET /api/connection-status`. A missing required tool leaves its control visible with a reason. Stronghold's tool-specific 502 detail is passed through for these feature routes.
+
+Verification: Portcullis 960 passed and the two recorded baseline failures recurred. The 70 focused Portcullis tests passed. Armory 1,545 passed, 1 skipped, 280 deselected. Ember 2,227 tests, Portcullis Admin 201 tests, and Armory Admin 105 tests passed with type checks.
+
 ### Task 5: Deployment, docs, cleanup
 - Compose: remove `BARD_URL`, `SCRIBE_URL`, `READER_URL` from Stronghold, the token variables from `.env.example` files.
 - Docs: `docs/deployment.md` (a "Tool connections" section), the three service READMEs, `_TODO.md`, Plan 13's left-alone list.
@@ -157,6 +164,8 @@ Verification: Stronghold 730 passed. Stronghold Admin type check and 260 tests p
 - Portcullis already opens attachment previews against Armory's PDF content route. Preserve its owner check and Range behavior during the remaining stream cutover.
 - Armory's MCP transports use AnyIO scopes that must close in their opening task. Each live transport now has an owner task, so editing or removing a connection can close and replace it from an admin request.
 - The Client-sided count uses the existing personal extensions endpoint and counts the signed-in account's connections. Armory never queries personal connection storage.
+- Connection edits keep an omitted credential only when the origin stays the same. Changing the origin requires entering the credential again.
+- Portcullis's app policy also used the path named `tool_tokens_db`. It now uses `settings_db` so removing token management does not break app policy.
 
 ## Risks
 

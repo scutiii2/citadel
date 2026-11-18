@@ -1,5 +1,6 @@
 import { computed, ref } from "vue";
 import { useAuthStore } from "../../../stores/auth";
+import { useToolConnectionsStore } from "../../../stores/toolConnections";
 import { attachmentsClient } from "../../../api/files/AttachmentsClient";
 import { splitAttachments, AUDIO_FILE, DOCUMENT_FILE, PDF_FILE, TABLE_FILE, audioHeader, documentHeader, tableHeader } from "../../../utils/content/attachments";
 import { errorMessage } from "../../../utils/errors";
@@ -7,6 +8,7 @@ import { errorMessage } from "../../../utils/errors";
 /** File uploads, previews, and input events for one chat composer. */
 export function useComposerAttachments() {
   const auth = useAuthStore();
+  const connections = useToolConnectionsStore();
   const dragging = ref(false);
   /** A file attached to the next question. Its text is extracted by ember_api
    * as soon as it's added, so sending doesn't wait for an upload. */
@@ -48,6 +50,11 @@ export function useComposerAttachments() {
       attachments.value.push(entry);
       const live = attachments.value[attachments.value.length - 1]!; // the reactive copy
       if (AUDIO_FILE.test(file.name)) {
+        const reason = connections.reason("scribe");
+        if (reason) {
+          Object.assign(live, { state: "error", error: reason });
+          continue;
+        }
         void attachmentsClient.audio(file).then((result) => {
           const text = audioHeader(result);
           Object.assign(live, { state: "ready", text, chars: text.length });

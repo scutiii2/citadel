@@ -2,6 +2,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useAuthStore } from "../../../stores/auth";
+import { useToolConnectionsStore } from "../../../stores/toolConnections";
 import { bardClient } from "../../../api/files/BardClient";
 import ReadAloudButton from "./ReadAloudButton.vue";
 
@@ -38,6 +39,17 @@ it("hides without both playback permissions", () => {
   useAuthStore().account!.permissions = ["tools.execute"];
   const wrapper = mount(ReadAloudButton, { props: { text: "hello" } });
   expect(wrapper.find("button").exists()).toBe(false);
+  wrapper.unmount();
+});
+
+it("leaves read aloud visible and explains a missing connection", async () => {
+  useToolConnectionsStore().status = { bard: { ready: false, reason: "Set the Bard token in Armory Admin." } };
+  const wrapper = mount(ReadAloudButton, { props: { text: "hello" } });
+  const button = wrapper.get('button[aria-label="Read aloud"]');
+  expect(button.attributes("aria-disabled")).toBe("true");
+  await button.trigger("click");
+  expect(wrapper.get('[role="alert"]').text()).toContain("Set the Bard token");
+  expect(bardClient.voices).not.toHaveBeenCalled();
   wrapper.unmount();
 });
 

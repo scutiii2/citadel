@@ -152,3 +152,36 @@ def test_dictation_enforces_bounds_and_one_stream_per_account(tmp_path, monkeypa
         with client.websocket_connect(path, headers=headers()) as retry:
             retry.send_bytes(b"\0" * (dictation.STREAM_FRAME_BYTES + 2))
             assert retry.receive()["code"] == 1009
+
+
+@pytest.mark.parametrize("message, code", [
+    (b"x", 1008),
+    ('{"type":"surprise"}', 1008),
+    ('{"type":"stop","extra":true}', 1008),
+    (None, 1011),
+])
+def test_armory_owns_dictation_validation_and_idle_timeout(tmp_path, monkeypatch, message, code):
+    from src.services import dictation
+
+    class Remote:
+        async def recv(self):
+            await asyncio.Future()
+
+        async def send(self, _message):
+            pytest.fail("Invalid frame reached the upstream")
+
+    @asynccontextmanager
+    async def connect(*args, **kwargs):
+        yield Remote()
+
+    monkeypatch.setattr(dictation.websocket_client, "connect", connect)
+    if message is None:
+        monkeypatch.setattr(dictation, "STREAM_IDLE_SECONDS", 0.05)
+    _, client = setup_api(tmp_path, lambda request: pytest.fail("Unexpected HTTP request"))
+    headers = dict(FreshHeaders(uid="one", username="ada").items())
+    with client, client.websocket_connect("/connections/scribe/dictate", headers=headers) as socket:
+        if isinstance(message, bytes):
+            socket.send_bytes(message)
+        elif isinstance(message, str):
+            socket.send_text(message)
+        assert socket.receive()["code"] == code

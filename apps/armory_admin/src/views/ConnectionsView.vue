@@ -207,7 +207,7 @@ onMounted(async () => {
               <label v-if="draft[transport].kind === 'token' || draft[transport].kind === 'headers'">
                 {{ draft[transport].kind === 'token' ? 'Token' : 'Credential headers in JSON' }}
                 <input v-model="draft[transport].credential" type="password" autocomplete="new-password" />
-                <small v-if="editing?.[transport]?.auth.configured">Leave blank to keep the saved credentials.</small>
+                <small v-if="editing?.[transport]?.auth.configured">Leave blank to keep saved credentials for the same origin.</small>
               </label>
               <label v-if="draft[transport].kind === 'internal'">Audience
                 <select v-model="draft[transport].audience"><option v-for="service in services" :key="service">{{ service }}</option></select>

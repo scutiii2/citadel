@@ -1,5 +1,6 @@
 import httpx
 
+from tests.auth_helpers import assertion, requester
 from tests.test_registration import as_admin
 
 FID = "a" * 32
@@ -10,7 +11,7 @@ def test_audio_requires_login(client, upstream):
     assert not upstream.requests
 
 
-def test_audio_streams_through_stronghold_with_identity_and_range(client, upstream):
+def test_audio_streams_from_armory_with_identity_and_range(client, upstream):
     as_admin(client)
     upstream.handler = lambda r: httpx.Response(
         206, content=b"2345",
@@ -22,7 +23,9 @@ def test_audio_streams_through_stronghold_with_identity_and_range(client, upstre
     assert response.headers["content-range"] == "bytes 2-5/10"
     assert response.headers["cache-control"] == "no-store"
     sent = upstream.requests[-1]
-    assert sent.url.path == f"/bard/audio/{FID}"   # Stronghold holds Bard's token; Portcullis sends none
+    assert sent.url.path == f"/connections/bard/audio/{FID}"
+    assert assertion(sent, "armory")["iss"] == "portcullis"
+    assert requester(sent)["username"] == "root"
     assert sent.headers["range"] == "bytes=2-5"
     assert "x-internal-token" not in sent.headers
 

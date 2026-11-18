@@ -36,3 +36,13 @@ def test_admin_records_keep_credentials_write_only_and_test_rest(tmp_path):
         assert checked.json()["ok"] is True
         assert "tool-test-value" not in checked.text
         assert client.delete(f"{path}/bard", headers=FreshHeaders()).status_code == 400
+
+
+def test_address_changes_cannot_reuse_a_secret_on_another_origin(tmp_path):
+    from src.services.connections import ConnectionStore
+
+    store = ConnectionStore(tmp_path / "settings.db")
+    store.update("bard", {"rest": {"base_url": "https://bard", "auth": {"kind": "token", "token": "fixture"}}})
+    changed = store.update("bard", {"rest": {"base_url": "https://different-host"}})
+    assert store.view(changed)["rest"]["auth"] == {"kind": "token", "configured": False}
+    assert store.view(changed)["ready"] is False

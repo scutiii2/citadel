@@ -20,7 +20,7 @@ require_manage = require_permission(SETTINGS_MANAGE)
 
 
 def _path(request: Request):
-    return request.app.state.tool_tokens_db  # settings.db beside the database
+    return request.app.state.settings_db  # settings.db beside the database
 
 
 @router.get("/app-config")

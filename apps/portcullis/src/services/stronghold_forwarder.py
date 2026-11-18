@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 _TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 _STREAM_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0)
+_CONNECTION_FEATURES = frozenset(("/bard/speak", "/bard/voices", "/attachments/audio",
+                                  "/attachments/document", "/attachments/dictate", "/attachments/dictate/partial"))
 
 
 class StrongholdUnavailable(Exception):
@@ -100,7 +102,7 @@ class StrongholdForwarder:
         except httpx.HTTPError as error:
             logger.warning("stronghold %s %s unreachable: %s", method, redact(path), type(error).__name__)
             raise StrongholdUnavailable(type(error).__name__) from error
-        if response.status_code >= 500:
+        if response.status_code >= 500 and not (response.status_code == 502 and path in _CONNECTION_FEATURES):
             raise StrongholdUnavailable(f"stronghold answered {response.status_code}")
         return ForwardedResponse(
             response.status_code,

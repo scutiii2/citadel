@@ -18,6 +18,7 @@ import TriageQuestionModal from "../components/TriageQuestionModal.vue";
 import TurnNotices from "../components/TurnNotices.vue";
 import { useEntryAgentStore } from "../stores/entryAgent";
 import { useAuthStore } from "../../../stores/auth";
+import { useToolConnectionsStore } from "../../../stores/toolConnections";
 import { useChatStore } from "../stores/chat";
 import { useFoldersStore } from "../stores/folders";
 import { useChatTemplates } from "../composables/useChatTemplates";
@@ -36,6 +37,7 @@ import { downloadText, exportFileName } from "../../../utils/browser/textDownloa
 import { errorMessage } from "../../../utils/errors";
 
 const auth = useAuthStore();
+const toolConnections = useToolConnectionsStore();
 const chat = useChatStore();
 // storeToRefs keeps destructured state reactive; actions come off `chat`.
 const {
@@ -91,7 +93,10 @@ const {
   searching,
   searchError,
 } = storeToRefs(chat);
-onMounted(() => void chat.loadCommands());
+onMounted(() => {
+  void chat.loadCommands();
+  void toolConnections.refresh();
+});
 onActivated(() => void chat.refreshSecondBrainAvailability());
 
 // Chat folders: the list, which of them are folded, and the new / rename /

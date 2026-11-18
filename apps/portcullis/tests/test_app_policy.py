@@ -35,7 +35,7 @@ def test_what_was_saved_is_what_the_next_start_loads(client_factory, monkeypatch
         "fingerprint": {"signals": ["user_agent"]}, "headers": {"hsts_max_age": 60},
     })
     settings = admin.app.state.settings
-    path = admin.app.state.tool_tokens_db
+    path = admin.app.state.settings_db
 
     reloaded = app_policy.overlay({"security": {"trusted_proxies": ["127.0.0.1"]}}, path)
 

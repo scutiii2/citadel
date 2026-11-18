@@ -8,6 +8,7 @@ from starlette.websockets import WebSocket
 from websockets.exceptions import ConnectionClosedError
 from websockets.frames import Close
 
+from tests.auth_helpers import assertion, requester
 from tests.test_attachments import body as _body
 
 
@@ -85,33 +86,25 @@ def test_stream_requires_upload_permission(client, email, remote):
 
 def test_stream_proxies_pcm_stop_transcripts_and_identity(client, remote):
     as_admin(client)
-    client.app.state.scribe_token = 'test-private-token'
     with client.websocket_connect(PATH, headers=ORIGIN) as ws:
         assert ws.receive_json() == {'type': 'partial', 'text': 'hello'}
         ws.send_bytes(b'\x00\x01' * 320)
         ws.send_json({'type': 'stop'})
         assert ws.receive_json() == {'type': 'final', 'text': 'hello world', 'duration_s': 1.5}
-    assert remote.sent == [b'\x00\x01' * 320, '{"type": "stop"}']
+    assert remote.sent[0] == b'\x00\x01' * 320
+    assert json.loads(remote.sent[1]) == {'type': 'stop'}
     uri, options = remote.opened[0]
-    assert uri.endswith('/api/stream') and uri.startswith('ws://')
+    assert uri.endswith('/connections/scribe/dictate') and uri.startswith('ws://')
     headers = {key.lower(): value for key, value in options['additional_headers'].items()}
-    assert headers['x-requester-username'] == 'root'
-    assert 'test-private-token' in headers.values()
+    outbound = httpx.Request('GET', 'http://armory.test', headers=headers)
+    assert requester(outbound)['username'] == 'root'
+    assert assertion(outbound, 'armory')['iss'] == 'portcullis'
+    assert 'x-internal-token' not in headers
     assert 'origin' not in headers and 'cookie' not in headers
     actor = client.get('/api/auth/me').json()['id']
     logs = client.get('/api/logs/action', params={'actor': actor}).json()
     assert any(row['source'] == 'attachments.dictate' and '640 bytes' in row['message']
                and 'hello' not in row['message'] for row in logs)
-
-
-def test_stream_limit_releases_after_disconnect(client, remote):
-    as_admin(client)
-    with client.websocket_connect(PATH, headers=ORIGIN) as first:
-        first.receive_json()
-        rejected(client, 1013)
-        assert len(remote.opened) == 1
-    with client.websocket_connect(PATH, headers=ORIGIN) as second:
-        assert second.receive_json()['type'] == 'partial'
 
 
 def test_capacity_close_reaches_browser_without_private_reason(client, remote):
@@ -123,20 +116,14 @@ def test_capacity_close_reaches_browser_without_private_reason(client, remote):
         assert error.value.code == 1013
         assert 'private' not in error.value.reason
 
-
-@pytest.mark.parametrize('payload', [b'x' * 65538, b'x', {'type': 'surprise'}, {'type': 'stop', 'extra': True}],
-                         ids=['oversized', 'odd-pcm', 'unknown-command', 'extra-stop-keys'])
-def test_stream_rejects_bad_frames(client, remote, payload):
+def test_stream_rejects_oversized_transport_frame(client, remote):
     as_admin(client)
     with client.websocket_connect(PATH, headers=ORIGIN) as ws:
         ws.receive_json()
-        if isinstance(payload, bytes):
-            ws.send_bytes(payload)
-        else:
-            ws.send_json(payload)
+        ws.send_bytes(b'x' * 65538)
         with pytest.raises(WebSocketDisconnect) as error:
             ws.receive_json()
-        assert error.value.code in (1008, 1009)
+        assert error.value.code == 1009
     assert not remote.sent
 
 
@@ -146,24 +133,6 @@ def test_partial_requires_login_and_upload_permission(client, email, upstream):
     upstream.requests.clear()
     assert client.post('/api/attachments/dictate/partial', json=body()).status_code == 403
     assert not upstream.requests
-
-
-def test_stream_bounds_total_pcm_and_idle_time(client, remote, monkeypatch):
-    as_admin(client)
-    monkeypatch.setattr('src.services.scribe.STREAM_MAX_BYTES', 4)
-    with client.websocket_connect(PATH, headers=ORIGIN) as ws:
-        ws.receive_json()
-        ws.send_bytes(b'abcdef')
-        with pytest.raises(WebSocketDisconnect) as error:
-            ws.receive_json()
-        assert error.value.code == 1009
-    assert not remote.sent
-    monkeypatch.setattr('src.services.scribe.STREAM_IDLE_SECONDS', 0.01)
-    with client.websocket_connect(PATH, headers=ORIGIN) as ws:
-        ws.receive_json()
-        with pytest.raises(WebSocketDisconnect) as error:
-            ws.receive_json()
-        assert error.value.code == 1011
 
 
 def test_secure_stream_accepts_matching_https_origin(client, remote):
@@ -190,7 +159,7 @@ def test_stream_never_relays_upstream_error_details(client, remote):
             assert 'private-scribe' not in str(event) and 'secret' not in str(event)
 
 
-def test_socket_task_cancellation_drains_relays_and_releases_account(client, remote):
+def test_socket_task_cancellation_drains_both_relays(client, remote):
     as_admin(client)
     cookie = client.cookies.get('ember_session')
 
@@ -216,7 +185,6 @@ def test_socket_task_cancellation_drains_relays_and_releases_account(client, rem
         await asyncio.wait_for(partial.wait(), 2)
         task.cancel()
         await asyncio.wait_for(task, 2)
-        assert not client.app.state.dictation_accounts
         assert not [pending for pending in asyncio.all_tasks() - before if not pending.done()]
 
     client.portal.call(cancel_connection)

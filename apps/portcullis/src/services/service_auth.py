@@ -34,16 +34,6 @@ def identity_headers(username: str, email: str, uid: str = "", *, fresh: bool = 
     return {"X-Citadel-Requester": cached[1]}
 
 
-def tool_headers(username: str, email: str, token: str | None, uid: str = "") -> dict[str, str]:
-    """Bard and Scribe sit outside service auth: they keep their own per-caller token."""
-    headers = {"X-Requester-Username": username, "X-Requester-Email": email}
-    if uid:
-        headers["X-Requester-Uid"] = uid
-    if token:
-        headers["X-Internal-Token"] = token
-    return headers
-
-
 class InternalServiceAuthMiddleware:
     """Protect only internal routes; browser routes keep account/session authentication."""
 

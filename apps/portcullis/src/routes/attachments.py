@@ -17,9 +17,9 @@ from fastapi import APIRouter, Depends, Path, Request, Response, WebSocket
 from src.deps import get_stronghold, require_permission
 from src.models import Account
 from src.routes.stronghold import pass_on
+from src.services.armory_streams import ArmoryStreams
 from src.services.capability_files import CapabilityFilesGateway
 from src.services.permissions import FILES_UPLOAD
-from src.services.scribe import ScribeGateway
 from src.services.session_service import SessionService
 from src.services.stronghold_forwarder import StrongholdForwarder
 
@@ -119,23 +119,13 @@ async def dictate_stream(websocket: WebSocket):
                 or FILES_UPLOAD not in account.permission_names):
             await websocket.close(4403, "Missing upload permission")
             return
-    # No await between checking and claiming: all streams run on this app's loop.
-    if account.id in state.dictation_accounts:
-        await websocket.accept(subprotocol=subprotocol)
-        await websocket.close(1013, "A dictation stream is already active")
-        return
-    state.dictation_accounts.add(account.id)
+    await websocket.accept(subprotocol=subprotocol)
+    gateway = ArmoryStreams(state.upstream, state.catalog, state.keyring)
     try:
-        await websocket.accept(subprotocol=subprotocol)
-        gateway = ScribeGateway(state.upstream, settings.scribe_url, state.scribe_token)
-
         async def log_final(byte_count):
             await state.logs.action(account, "attachments.dictate", f"Transcribed {byte_count:,} bytes of dictated audio")
 
-        await gateway.stream(account, websocket, on_final=log_final)
+        await gateway.dictate(account, websocket, on_final=log_final)
     except asyncio.CancelledError:
-        # The connection task can be cancelled while its relay tasks drain.
-        # Closing a socket ends this route; always release its account claim.
+        # The relay drains both directions before cancellation returns here.
         pass
-    finally:
-        state.dictation_accounts.discard(account.id)

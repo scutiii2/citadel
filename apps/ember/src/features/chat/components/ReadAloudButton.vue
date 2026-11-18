@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onDeactivated, ref, watch } from "
 import { bardClient } from "../../../api/files/BardClient";
 import PopupMenu from "../../../components/ui/menus/PopupMenu.vue";
 import { useAuthStore } from "../../../stores/auth";
+import { useToolConnectionsStore } from "../../../stores/toolConnections";
 import { speechBatches } from "../../../utils/content/speechBatches";
 import { useReadAloud } from "../composables/useReadAloud";
 import { useReadAloudVoice } from "../composables/useReadAloudVoice";
@@ -10,6 +11,8 @@ import { createSpeechHighlight } from "../composables/useSpeechHighlight";
 
 const props = defineProps<{ text: string; scope?: string | number | null }>();
 const auth = useAuthStore();
+const connections = useToolConnectionsStore();
+const unavailable = computed(() => connections.reason("bard"));
 const allowed = computed(() => auth.hasPermission("tools.execute") && auth.hasPermission("files.download"));
 const audio = ref<HTMLAudioElement | null>(null);
 const button = ref<HTMLButtonElement | null>(null);
@@ -43,6 +46,7 @@ function closeMenu(): void {
 async function toggle(): Promise<void> {
   if (active.value || loading.value) { reset(); return; }
   if (menu.value) { closeMenu(); return; }
+  if (unavailable.value) { menuError.value = unavailable.value; return; }
   menuError.value = "";
   error.value = "";
   if (!speechBatches(props.text).length) { menuError.value = "There is no speakable text."; return; }
@@ -85,7 +89,8 @@ onDeactivated(reset);
 
 <template>
   <span v-if="allowed" class="read-aloud">
-    <button ref="button" type="button" class="read-aloud-button" :aria-label="label" :title="label"
+    <button ref="button" type="button" class="read-aloud-button" :aria-label="label" :title="unavailable || label"
+      :aria-disabled="unavailable && !active && !loading ? true : undefined"
       :aria-busy="loading || state === 'busy'" :aria-expanded="menu !== null" aria-haspopup="menu" @click="toggle">
       <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path v-if="active || loading" d="M6 6h12v12H6z" />

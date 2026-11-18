@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onDeactivated, ref, useId, watch } from "vue";
 import { useAuthStore } from "../../../stores/auth";
+import { useToolConnectionsStore } from "../../../stores/toolConnections";
 import type { CommandInfo } from "../../../api/tools/CommandsClient";
 import { EXTENSION_SEPARATOR } from "../../../api/contracts/extensions";
 import type { PromptTemplate } from "../api/TemplatesClient";
@@ -123,6 +124,19 @@ const { state: dictationState, error: dictationError, supported: dictationSuppor
     onCancel: restoreDictationDraft,
   });
 const dictationActive = computed(() => draftLocked.value);
+const toolConnections = useToolConnectionsStore();
+const scribeUnavailable = computed(() => toolConnections.reason("scribe"));
+const readerUnavailable = computed(() => toolConnections.reason("reader"));
+const connectionNotice = ref("");
+
+function startOrStopDictation(): void {
+  if (scribeUnavailable.value && !dictationActive.value) {
+    connectionNotice.value = scribeUnavailable.value;
+    return;
+  }
+  connectionNotice.value = "";
+  void toggleDictation();
+}
 const dictationTime = computed(() => {
   const seconds = Math.floor(dictationElapsed.value / 1000);
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -481,7 +495,10 @@ function onKeydown(event: KeyboardEvent): void {
           <small v-if="a.ocr === 'done'">(OCR ready)</small>
           <small v-if="a.ocr === 'error'">(OCR failed: {{ a.error }})</small>
         </span>
-        <button v-if="a.state === 'ready' && a.source && a.ocr !== 'done'" type="button" class="ocr" :disabled="a.ocr === 'reading'" @click="readWithOcr(a.id)">
+        <button v-if="a.state === 'ready' && a.source && a.ocr !== 'done'" type="button" class="ocr"
+          :disabled="a.ocr === 'reading'" :aria-disabled="readerUnavailable ? true : undefined"
+          :title="readerUnavailable || undefined"
+          @click="readerUnavailable ? connectionNotice = readerUnavailable : readWithOcr(a.id)">
           {{ a.ocr === "reading" ? "Sending to OCR …" : a.ocr === "error" ? "Retry OCR" : "Read with OCR" }}
         </button>
         <button type="button" :aria-label="`Remove ${a.filename}`" @click="removeAttachment(a.id)">×</button>
@@ -539,9 +556,10 @@ function onKeydown(event: KeyboardEvent): void {
         <button v-if="auth.hasPermission('files.upload') && dictationSupported" type="button" class="attach dictation"
           :class="{ active: dictationActive, recording: dictationState === 'recording', ending: dictationState === 'recording' && dictationElapsed >= 140000 }"
           :aria-label="dictationState === 'recording' ? 'Stop dictation' : dictationState === 'transcribing' ? 'Transcribing…' : 'Dictate message'"
-          :title="dictationState === 'recording' ? 'Stop dictation' : dictationState === 'transcribing' ? 'Transcribing…' : 'Dictate message'"
+          :title="dictationState === 'recording' ? 'Stop dictation' : dictationState === 'transcribing' ? 'Transcribing…' : scribeUnavailable || 'Dictate message'"
+          :aria-disabled="scribeUnavailable && !dictationActive ? true : undefined"
           :aria-pressed="dictationState === 'recording'" :aria-busy="requestingMic || dictationState === 'transcribing'"
-          :disabled="requestingMic || dictationState === 'transcribing'" @click="toggleDictation">
+          :disabled="requestingMic || dictationState === 'transcribing'" @click="startOrStopDictation">
           <template v-if="dictationState === 'recording'">
             <span class="dictation-waveform" aria-hidden="true">
               <span v-for="(level, index) in dictationLevels" :key="index" :style="{ height: `${2 + level * 22}px` }" />
@@ -612,7 +630,7 @@ function onKeydown(event: KeyboardEvent): void {
         </span>
       </div>
     </div>
-    <p v-if="dictationError" class="dictation-error" role="alert">{{ dictationError }}</p>
+    <p v-if="dictationError || connectionNotice" class="dictation-error" role="alert">{{ dictationError || connectionNotice }}</p>
     <p class="dictation-status sr-only" role="status">{{ dictationAnnouncement }}</p>
     <p class="keys" :class="{ 'locked-hint': draftLocked }"><span v-if="draftLocked && liveMode" class="live-badge" :class="liveMode" data-testid="live-mode">{{ liveMode === 'live' ? 'Live' : liveMode === 'periodic' ? 'Updating every few seconds' : 'Transcribes on stop' }}</span> {{ draftLocked ? (liveStatus || 'Draft locked during dictation · Cancel to restore') : 'Enter to send · Shift+Enter for a new line or next list item' }}</p>
   </form>
