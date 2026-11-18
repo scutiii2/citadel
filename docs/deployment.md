@@ -17,7 +17,7 @@ Citadel runs as containers from one `docker-compose.yml`:
 | `stronghold` | product logic, called only by portcullis | internal 29650 |
 | `conversationgateway` | chat-model gateway for Legion, shared with callers outside Citadel | 29407 on all interfaces |
 
-Only the two web apps publish ports. The rest talk over the internal `core` network. Laya is not in this stack: it runs
+Only the five admin web apps publish ports (on `127.0.0.1`; the ZimaOS overlay opens them to the LAN). The rest talk over the internal `core` network. Laya is not in this stack: it runs
 from the separate `LayaModel` project (see "Laya" below) and legion reaches it through the host's published port, `http://host.docker.internal:29220`.
 
 ## 1. Local (Windows, macOS, Linux with Docker Desktop or Engine)
@@ -47,7 +47,7 @@ Anything you edit inside a running container is lost on rebuild. Keep changes in
 ## 2. ZimaOS
 
 ZimaOS is Linux with Docker and Compose, so the same compose file works. The overlay `docker-compose.zima.yml` does
-two things for the box: it publishes the two web ports on all interfaces so the LAN can reach them, and it mounts the
+two things for the box: it publishes the five admin web ports (26500, 26501, 26503 to 26505) on all interfaces so the LAN can reach them; each login page is the only protection, so keep the box off the public internet, and it mounts the
 Obsidian vault into `armory`. It needs Compose 2.24 or newer (`docker compose version`).
 
 Without the overlay the UIs stay on `127.0.0.1` and are not reachable from the LAN. Deployment sets
