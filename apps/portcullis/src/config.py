@@ -139,7 +139,6 @@ class Settings:
     agents_registry_url: str | None = None
     # Stronghold (product logic): reached only from here, never by the browser.
     # Bard (text to speech): finished audio files are streamed from here; Stronghold asks it for speech.
-    bard_url: str = "http://127.0.0.1:29400"
     # Scribe (speech to text): the dictation WebSocket is relayed from here; Stronghold sends it audio files.
     scribe_url: str = "http://127.0.0.1:29401"
     security: SecuritySettings = field(default_factory=SecuritySettings)
@@ -185,7 +184,6 @@ def load_settings() -> Settings:
         require_email_verification=bool(raw.get("require_email_verification", True)),
         agents_registry_path=_project_path(registry_path),
         agents_registry_url=raw.get("agents_registry_url") or None,
-        bard_url=raw.get("bard_url") or "http://127.0.0.1:29400",
         scribe_url=raw.get("scribe_url") or "http://127.0.0.1:29401",
         security=SecuritySettings.from_config(raw.get("security", {})),
         backup=BackupSettings.from_config(raw.get("backup", {})),

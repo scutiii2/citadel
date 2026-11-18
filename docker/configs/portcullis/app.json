@@ -11,7 +11,6 @@
     "http://127.0.0.1:26506",
     "http://localhost:26506"
   ],
-  "bard_url": "http://bard:29400",
   "scribe_url": "http://scribe:29401",
   "db_gateway": {
     "instance": "ember",

@@ -60,12 +60,15 @@ class StrongholdForwarder:
             return {}
         return service_auth.identity_headers(account.username, account.email, account.uid, identity=self._identity)
 
-    async def open_stream(self, path: str, account: Account | None, *, params: dict[str, str] | None = None) -> httpx.Response:
-        """GET a fixed Stronghold path as a stream the caller must close (the turn events). No read timeout:
-        Stronghold sends a ping while idle, so a silent stream means it is gone."""
+    async def open_stream(
+        self, path: str, account: Account | None, *, params: dict[str, str] | None = None, headers: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        """GET a fixed Stronghold path as a stream the caller must close (the turn events, Bard audio). No read timeout:
+        Stronghold sends a ping while idle, so a silent stream means it is gone. `headers` adds request headers (Range)."""
         try:
             request = self._client.build_request(
-                "GET", f"{self._base}{path}", params=params, headers=self._headers(account), timeout=_STREAM_TIMEOUT)
+                "GET", f"{self._base}{path}", params=params, headers={**self._headers(account), **(headers or {})},
+                timeout=_STREAM_TIMEOUT)
             return await self._client.send(request, stream=True, follow_redirects=False, auth=ServiceAuth(self._identity, "stronghold"))
         except httpx.HTTPError as error:
             logger.warning("stronghold GET %s unreachable: %s", redact(path), type(error).__name__)

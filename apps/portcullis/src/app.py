@@ -159,7 +159,6 @@ def create_app(
         # A token saved on the Tool services page (settings.db next to the database) wins over the environment's.
         app.state.tool_tokens_db = settings.database_path.parent / "settings.db"
         app.state.env_tool_tokens = {name: service_token(settings.env_path, name) or None for name in tool_tokens.NAMES}
-        app.state.bard_token = tool_tokens.token_for(app.state.tool_tokens_db, "bard", app.state.env_tool_tokens["bard"])
         app.state.scribe_token = tool_tokens.token_for(app.state.tool_tokens_db, "scribe", app.state.env_tool_tokens["scribe"])
         app.state.dictation_accounts = set()
         app.state.secret_box = secret_box
