@@ -31,8 +31,10 @@ Both loaded once at boot by `src/run.py`:
 
 - **`.env`** - credentials and deployment settings, gitignored. Copy
   `.env.example` to `.env`. See [`docs/secrets.md`](docs/secrets.md).
-- **Armory Admin pages** - capabilities, extensions, deployment values, email, limits and ticket settings, saved in
+- **Armory Admin pages** - capabilities, connections, deployment values, email, limits and ticket settings, saved in
   `.data/armory/settings.db`. See [`docs/settings.md`](docs/settings.md).
+
+The Connections page manages required Bard, Scribe, and Reader settings and optional shared MCP or REST connections. Armory keeps the addresses and credentials. Signed calls from Stronghold and Portcullis use the corresponding `/connections` routes. Existing shared MCP extensions keep their names after migration.
 
 ## Security
 

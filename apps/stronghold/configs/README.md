@@ -12,7 +12,7 @@
 The usage limits and the price table are not here. An administrator sets them on the Usage settings page of Stronghold
 Admin and they are kept in `.data/stronghold/settings.db` (table `limits_and_prices`); a change is used at once.
 Stronghold is the only owner of both: Portcullis keeps no copy and reads the prices from `GET /usage/pricing` to price
-the chat messages it holds. The tool service tokens are on the Tool services page, not in `.env`.
+the chat messages it holds. Configure tool service connections on Armory Admin → Connections.
 
 Stronghold's data and keys are in `.data/stronghold/` in the Citadel folder.
 

@@ -38,7 +38,7 @@
 | Legion `MCP_SERVER_URL` default for server `main` | catalog `armory` + `/mcp` (a saved server URL still wins) |
 | Compose `*_URL` variables | `TREASURY_URL` and `CITADEL_ADVERTISE_URL` per service |
 
-Left alone: `agents_registry_url` / `agents_registry_path` (Legion's agent list), `bard_url`, `scribe_url`, `reader_url`, Laya, Obsidian, Firecrawl.
+Left alone: `agents_registry_url` / `agents_registry_path` (Legion's agent list), Laya, Obsidian and Firecrawl. Plan 14 moved Bard, Scribe, and Reader settings to Armory Admin → Connections. They stay outside Treasury's service catalog.
 
 ## File Structure
 

@@ -10,7 +10,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from src.citadel_auth import ServiceAuth
-from src.connection_routes import RouteError, read_body
+from src.connection_routes import RouteError, read_body, read_json, requester_headers
+from src.service_catalog import require_internal_origin
 from src.services import extensions, service_auth
 from src.services.connections import REQUIRED, ConnectionStore, auth_headers, ready_status
 
@@ -97,8 +98,6 @@ class ConnectionAdmin:
                 if config.transport != "http":
                     return _test(False, "This local MCP process is managed on the server.")
                 tools = await extensions.test_connection(config)
-                if any(value and value in tool for tool in tools for value in config.headers.values()):
-                    return _test(False, "MCP returned an invalid tool list.")
                 return _test(True, f"MCP listed {len(tools)} tools.", tools=tools)
             except Exception:
                 return _test(False, "MCP did not list tools. Check the address and credentials.")
@@ -110,7 +109,13 @@ class ConnectionAdmin:
             return _test(False, state["reason"])
         rest = record["rest"]
         auth = rest["auth"]
-        signed = ServiceAuth(service_auth.keyring, auth["audience"]) if auth["kind"] == "internal" else None
+        signed = None
+        if auth["kind"] == "internal":
+            try:
+                require_internal_origin(rest["base_url"], auth["audience"])
+            except ValueError as error:
+                return _test(False, str(error))
+            signed = ServiceAuth(service_auth.keyring, auth["audience"])
         try:
             async with asyncio.timeout(10):
                 async with self.client.stream("GET", rest["base_url"] + "/health", headers=auth_headers(auth),
@@ -130,9 +135,29 @@ class ConnectionAdmin:
                         result = None
                     if isinstance(result, dict) and (result.get("ok") is False or result.get("ready") is False):
                         return _test(False, "REST responded but is not ready.")
-                    return _test(True, "REST is ready.")
-        except (httpx.HTTPError, TimeoutError):
+                if record["name"] in REQUIRED:
+                    return await self._test_required_auth(record["name"], rest["base_url"], auth_headers(auth))
+                return _test(True, "REST is ready.")
+        except RouteError as error:
+            return _test(False, str(error))
+        except (httpx.HTTPError, TimeoutError, ValueError, RecursionError):
             return _test(False, "REST health is unreachable.")
+
+    async def _test_required_auth(self, name: str, origin: str, headers: dict[str, str]) -> JSONResponse:
+        """Check an authenticated path without generating or storing any content."""
+        headers = {**headers, **requester_headers()}
+        method, path, expected, error_code = {
+            "bard": ("GET", "/api/voices", 200, None),
+            "scribe": ("POST", "/api/transcribe?voice_gate=invalid", 422, "bad_voice_gate"),
+            "reader": ("POST", "/api/parse", 422, "invalid_request"),
+        }[name]
+        async with self.client.stream(method, origin + path, headers=headers,
+                                      json={} if name == "reader" else None, follow_redirects=False) as remote:
+            if remote.status_code in (401, 403):
+                return _test(False, "REST refused the credentials.")
+            if remote.status_code == expected and (not error_code or (await read_json(remote)).get("error") == error_code):
+                return _test(True, "REST is ready.")
+            return _test(False, f"REST health passed, but the authenticated check returned HTTP {remote.status_code}.")
 
 
 def _problem(message: str, status: int = 400) -> JSONResponse:

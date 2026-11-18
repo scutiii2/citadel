@@ -25,7 +25,8 @@ The capability exists at `apps/armory/src/capabilities/firecrawl/`, but its test
 
 **Still to verify** (none of it has been run on the box):
 - `tools/deploy.bat` against the real server: option 2 (one-session `tar` push as `lex`, `COMPOSE_FILE` line, the chown helper) and option 1 (publish to `origin/live`). Same for `LayaModel/tools/deploy.bat` and `Bard/tools/deploy.bat` (Bard: publish creates `origin/live`; first start downloads the Piper voice).
-- Bard in the stack: start Citadel, then `Bard` (`docker compose up -d --build` there), restart armory, and check `bard__tool_bard_speak` plays in chat.
+- Verify Bard, Scribe, and Reader from Armory Admin → Connections. Check `bard__tool_bard_speak`, read aloud, microphone dictation, and attached documents on a deployed stack.
+- Move tool services from per-caller tokens to signed service assertions in a follow-up.
 - A full `docker compose up -d --build` on ZimaOS with `LayaModel` next to `Citadel`, then `tool_srv_listApps` returning the `citadel-*` containers.
 - `LAYA_URL=http://legion:29611/mcp` in `apps/armory/.env`: confirm legion listens on 29611 inside the container and tickets get grouped.
 - Self-stop: `/server stop armory` kills the server running the tool; expected, but it cannot be restarted from the same chat.

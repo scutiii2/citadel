@@ -426,7 +426,12 @@ async def test_http_extension_sends_configured_headers(monkeypatch: pytest.Monke
     registry = extensions.ExtensionRegistry()
     await registry.connect_all(Path("unused.json"))
 
-    assert seen == [{"url": "http://127.0.0.1:8040/mcp", "headers": {"X-Internal-Token": "s3cret"}}]
+    [request] = seen
+    assert request["url"] == "http://127.0.0.1:8040/mcp"
+    assert request["headers"] == {"X-Internal-Token": "s3cret"}
+    async with request["httpx_client_factory"](headers=request["headers"]) as secured:
+        assert not secured.follow_redirects
+        assert secured.headers["X-Internal-Token"] == request["headers"]["X-Internal-Token"]
     [status] = registry.statuses()
     assert "s3cret" not in repr(status)
 

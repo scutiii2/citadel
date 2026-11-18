@@ -77,8 +77,14 @@ async function save(): Promise<void> {
   try {
     const { label, description, enabled, web_url } = draft.value;
     const entry = editing.value;
-    const changes = { label, description, enabled, web_url, rest: transportChanges("rest"),
-      ...(!entry?.mcp?.local ? { mcp: transportChanges("mcp") } : {}) };
+    const initial = draftFor(entry);
+    const changes = { ...(!entry || label !== initial.label ? { label } : {}),
+      ...(description !== initial.description ? { description } : {}),
+      ...(enabled !== initial.enabled ? { enabled } : {}),
+      ...(web_url !== initial.web_url ? { web_url } : {}),
+      ...(!entry || JSON.stringify(draft.value.rest) !== JSON.stringify(initial.rest) ? { rest: transportChanges("rest") } : {}),
+      ...(!entry?.mcp?.local && (!entry || JSON.stringify(draft.value.mcp) !== JSON.stringify(initial.mcp))
+        ? { mcp: transportChanges("mcp") } : {}) };
     const saved = entry ? await connectionsClient.update(entry.name, changes) : await connectionsClient.create(changes);
     records.value = entry ? records.value.map(item => item.name === saved.name ? saved : item) : [...records.value, saved];
     for (const transport of transports) delete results.value[saved.name + ":" + transport];

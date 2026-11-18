@@ -348,7 +348,7 @@ def load_extension_config(config_path: Path, id_: str) -> ExtensionConfig:
     return _build_extension(id_, section[id_], config_path=config_path)
 
 
-def save_extension_config(config_path: Path, config: ExtensionConfig) -> None:
+def save_extension_config(config_path: Path, config: ExtensionConfig, *, create: bool = False) -> str:
     """Insert or overwrite one extension in the settings store, leaving every other one untouched.
     Writes only the transport's fields. ``headers`` (an upstream's own token, pasted on the Extensions page) are
     kept as given: the database lives in the gitignored `.data/` folder, like the other saved connections."""
@@ -367,7 +367,7 @@ def save_extension_config(config_path: Path, config: ExtensionConfig) -> None:
         entry["args"] = config.args
     if config.web_url:
         entry["web_url"] = config.web_url
-    ConnectionStore(config_path).save_legacy_mcp(config.id, entry)
+    return ConnectionStore(config_path).save_legacy_mcp(config.id, entry, create=create)
 
 
 def delete_extension_config(config_path: Path, extension_id: str) -> None:

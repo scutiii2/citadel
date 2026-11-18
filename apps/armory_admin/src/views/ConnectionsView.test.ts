@@ -54,3 +54,22 @@ it("adds a REST-only optional connection without putting credentials in the resu
   expect(wrapper.text()).toContain("Lens");
   wrapper.unmount();
 });
+
+it("preserves an unchanged migrated MCP transport when configuring REST", async () => {
+  const bard = {
+    name: "bard", class: "required" as const, label: "Bard", enabled: true, description: "",
+    web_url: null, ready: false, reason: "Set up REST.",
+    mcp: { url: null, auth: { kind: "token" as const, configured: true } }, rest: null,
+  };
+  vi.spyOn(connectionsClient, "list").mockResolvedValue([bard]);
+  vi.spyOn(connectionsClient, "personalCount").mockResolvedValue(0);
+  const update = vi.spyOn(connectionsClient, "update").mockResolvedValue(bard);
+  const wrapper = mount(ConnectionsView);
+  await flushPromises();
+  await wrapper.get('button[aria-label="Edit Bard"]').trigger("click");
+  await wrapper.findAll('form input[type="url"]').at(-1)!.setValue("http://bard");
+  await wrapper.get("form").trigger("submit");
+  await flushPromises();
+  expect(update.mock.calls[0]?.[1]).not.toHaveProperty("mcp");
+  wrapper.unmount();
+});

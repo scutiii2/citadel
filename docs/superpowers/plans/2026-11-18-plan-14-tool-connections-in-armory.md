@@ -1,6 +1,6 @@
 # Plan 14: every tool connection lives in Armory
 
-> Status: decisions approved 2026-11-18 (the recommendations below). Nothing here is built. Written from the discussion about the Bard speaker failing on a missing Portcullis token.
+> Status: decisions approved 2026-11-18. Implementation and verification recorded below. Live deployment is pending.
 
 **Goal:** Armory is the only service that holds the address, the credentials and the transports of the services Citadel talks to besides its own five. Stronghold and Portcullis stop keeping Bard, Scribe and Reader tokens and addresses.
 
@@ -149,6 +149,12 @@ Verification: Portcullis 960 passed and the two recorded baseline failures recur
 - Docs: `docs/deployment.md` (a "Tool connections" section), the three service READMEs, `_TODO.md`, Plan 13's left-alone list.
 - Server steps in this order: publish Armory, open Armory Admin, Connections, enter address and token for Bard, Scribe and Reader (the same tokens as today), then publish Stronghold and Portcullis, then remove the old tokens from their admin pages.
 
+#### Interfaces
+
+- Compose no longer supplies tool-service addresses to Stronghold or Portcullis. The deployment guide names the required Armory settings and the rollout sequence.
+
+Verification: base and ZimaOS Compose configurations validated with `docker compose config --no-env-resolution --quiet` and an empty interpolation file. After final review fixes, Armory had 1,551 passed, 1 skipped, 280 deselected. Armory Admin type check and 106 tests passed. Shared auth copies match.
+
 ## Decisions (approved 2026-11-18)
 
 1. **Streams.** Portcullis opens the audio, attachment-content and dictation streams straight to Armory, not through Stronghold. Task 3 therefore drops the interim `GET /bard/audio/{id}` in Stronghold.
@@ -166,6 +172,11 @@ Verification: Portcullis 960 passed and the two recorded baseline failures recur
 - The Client-sided count uses the existing personal extensions endpoint and counts the signed-in account's connections. Armory never queries personal connection storage.
 - Connection edits keep an omitted credential only when the origin stays the same. Changing the origin requires entering the credential again.
 - Portcullis's app policy also used the path named `tool_tokens_db`. It now uses `settings_db` so removing token management does not break app policy.
+- Armory Admin uses Portcullis as its API proxy. The Task 2 Portcullis build can bridge the setup phase before the final Stronghold and Portcullis cutover. After cutover, obsolete saved tokens are removed from the old settings tables because their admin pages have been retired.
+- Tracked environment examples already had no Bard, Scribe or Reader address or token variables. Compose and the Docker Portcullis config still carried the old addresses and were cleaned up.
+- Required REST tests check both public health and an authenticated operation that leaves no stored file or generated media. During rollout this catches a refused token before the traffic cutover.
+- Independent review found that editing a migrated connection could remove or re-escape old MCP fields or expand newly entered metadata. Updates now omit untouched form fields, retain legacy expansion only for migrated values, and allocate legacy creates against all stored names.
+- Signed outbound authentication is limited to the selected audience's Treasury catalog origin. Credential-bearing MCP clients refuse redirects. MCP status and results reject reflected credentials, and a failed session worker stops advertising its tools.
 
 ## Risks
 

@@ -144,9 +144,17 @@ def extension_entry(record: dict):
         headers = auth.get("legacy_headers", {})
     if headers:
         result["headers"] = headers
-    if not mcp.get("legacy"):
-        return _escape_placeholders(result)
-    return result
+    legacy_record = record.get("legacy_metadata", mcp.get("legacy"))
+    escaped = result.copy() if mcp.get("legacy") else _escape_placeholders(result)
+    if legacy_record:
+        literal_fields = record.get("literal_metadata", ())
+        for field in ("label", "description", "web_url"):
+            if field in result:
+                escaped[field] = _escape_placeholders(result[field]) if field in literal_fields else result[field]
+    for field, flag in (("url", "legacy_url"), ("headers", "legacy_auth")):
+        if mcp.get(flag) and field in result:
+            escaped[field] = result[field]
+    return escaped
 
 
 def _escape_placeholders(value):
@@ -176,7 +184,7 @@ class ConnectionStore:
                     record = _base_record(name)
                     if isinstance(entry, dict):
                         record.update(label=entry.get("label"), description=entry.get("description", ""),
-                                      web_url=entry.get("web_url"))
+                                      web_url=entry.get("web_url"), legacy_metadata=True)
                         record["mcp"] = _legacy_mcp(entry)
                     else:
                         record["mcp"] = {"invalid_entry": entry, "auth": {"kind": "none"}}
@@ -228,13 +236,20 @@ class ConnectionStore:
                     view[kind]["local"] = "command" in block
         return {**view, **ready_status(record)}
 
-    def save_legacy_mcp(self, name: str, entry: dict) -> None:
+    def save_legacy_mcp(self, name: str, entry: dict, *, create: bool = False) -> str:
         with self._open() as db:
             db.execute("BEGIN IMMEDIATE")
+            if create:
+                base, number = name, 2
+                while name in REQUIRED or db.execute("SELECT 1 FROM connections WHERE key = ?", (name,)).fetchone():
+                    name = f"{base}_{number}"
+                    number += 1
             record = self._get(db, name)
             record.update(label=entry["label"], description=entry["description"], web_url=entry.get("web_url"))
+            record["literal_metadata"] = ["label", "description", "web_url"]
             record["mcp"] = _legacy_mcp(entry)
             self._put(db, record)
+        return name
 
     def remove_legacy_mcp(self, name: str) -> None:
         with self._open() as db:
@@ -264,6 +279,9 @@ class ConnectionStore:
                 record["enabled"] = changes["enabled"]
             if "web_url" in changes:
                 record["web_url"] = _http_url(changes["web_url"]) if changes["web_url"] else None
+            literal_fields = set(record.get("literal_metadata", ())) | (changes.keys() & {"label", "description", "web_url"})
+            if literal_fields:
+                record["literal_metadata"] = sorted(literal_fields)
             for kind, field, validate in (("rest", "base_url", checked_address), ("mcp", "url", _http_url)):
                 if kind not in changes:
                     continue
@@ -280,18 +298,27 @@ class ConnectionStore:
 
     @staticmethod
     def _transport(kind, field, validate, incoming, previous, required) -> dict:
-        address = validate(incoming.get(field, previous.get(field)))
+        legacy_url = (previous.get("legacy") or previous.get("legacy_url")) and (
+            field not in incoming or incoming[field] == previous.get(field))
+        address = previous.get(field) if legacy_url and previous.get(field) else validate(incoming.get(field, previous.get(field)))
         same_origin = _origin(address) == _origin(previous.get(field))
         previous_auth = previous.get("auth", {})
         if not same_origin:
             previous_auth = {key: value for key, value in previous_auth.items() if key in {"kind", "audience"}}
-        auth = _auth(incoming.get("auth", {}), previous_auth)
-        if same_origin and previous.get("legacy") and "auth" not in incoming:
+        incoming_auth = incoming.get("auth", {})
+        auth = _auth(incoming_auth, previous_auth)
+        retained_auth = (same_origin and auth["kind"] == previous_auth.get("kind")
+                         and not ({"headers", "token", "audience"} & incoming_auth.keys()))
+        if retained_auth and previous.get("legacy"):
             auth = previous["auth"]
         if required and kind == "rest" and auth["kind"] != "token":
             raise ValueError("Required REST connections use a tool-service token.")
         block = {field: address, "auth": auth}
         if kind == "mcp":
+            if legacy_url:
+                block["legacy_url"] = True
+            if retained_auth and (previous.get("legacy") or previous.get("legacy_auth")):
+                block["legacy_auth"] = True
             forward = incoming.get("forward_requester", previous.get("forward_requester", auth["kind"] == "token"))
             if not isinstance(forward, bool):
                 raise ValueError("Invalid requester forwarding setting.")

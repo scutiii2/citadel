@@ -122,10 +122,6 @@ services:
       CITADEL_TRUST_DIR: /trust
       CITADEL_IDENTITY_DIR: /identity
       STRONGHOLD_PORT: "29650"
-      # Attached files and speech go to these tool services; their tokens are set in Stronghold admin > Tool services.
-      BARD_URL: http://bard:29400
-      SCRIBE_URL: http://scribe:29401
-      READER_URL: http://reader:29402
       AGENTS_REGISTRY_PATH: /agent_data/agent_registry.json
       STRONGHOLD_DATA_DIR: /data
     volumes:
