@@ -552,6 +552,13 @@ def test_stdio_extension_with_headers_is_rejected(tmp_path: Path):
 # The runtime add/remove routes persist through these, so they must round-trip and leave other entries untouched.
 
 
+def _saved_extensions(path: Path) -> dict:
+    from src.services.connections import ConnectionStore, extension_entry
+
+    return {name: extension_entry(record) for name, record in ConnectionStore(path).records().items()
+            if record["mcp"]}
+
+
 def test_save_extension_config_adds_a_new_http_entry(tmp_path: Path):
     path = _store(tmp_path, {})
 
@@ -560,7 +567,7 @@ def test_save_extension_config_adds_a_new_http_entry(tmp_path: Path):
         ExtensionConfig(id="remote", label="Remote", description="desc", transport="http", url="http://x/mcp"),
     )
 
-    data = settings_store.read_all(path, "extensions")
+    data = _saved_extensions(path)
     assert data["remote"] == {"label": "Remote", "description": "desc", "url": "http://x/mcp"}
 
 
@@ -574,7 +581,7 @@ def test_save_extension_config_adds_a_new_stdio_entry(tmp_path: Path):
         ),
     )
 
-    data = settings_store.read_all(path, "extensions")
+    data = _saved_extensions(path)
     assert data["local"] == {"label": "Local", "description": "desc", "command": "python", "args": ["-m", "x"]}
 
 
@@ -586,8 +593,8 @@ def test_save_extension_config_overwrites_an_existing_entry_by_id(tmp_path: Path
         ExtensionConfig(id="remote", label="New", description="", transport="http", url="http://new/mcp"),
     )
 
-    assert settings_store.read_all(path, "extensions")["remote"]["url"] == "http://new/mcp"
-    assert settings_store.read_all(path, "extensions")["remote"]["label"] == "New"
+    assert _saved_extensions(path)["remote"]["url"] == "http://new/mcp"
+    assert _saved_extensions(path)["remote"]["label"] == "New"
 
 
 def test_save_extension_config_preserves_other_extension_entries(tmp_path: Path):
@@ -597,7 +604,7 @@ def test_save_extension_config_preserves_other_extension_entries(tmp_path: Path)
         path, ExtensionConfig(id="remote", label="Remote", description="", transport="http", url="http://x/mcp")
     )
 
-    data = settings_store.read_all(path, "extensions")
+    data = _saved_extensions(path)
     assert data["other"] == VALID_EXTENSIONS["other"]
     assert "remote" in data
 
@@ -607,7 +614,7 @@ def test_delete_extension_config_removes_the_entry(tmp_path: Path):
 
     delete_extension_config(path, "remote")
 
-    assert "remote" not in settings_store.read_all(path, "extensions")
+    assert "remote" not in _saved_extensions(path)
 
 
 def test_delete_extension_config_preserves_other_extension_entries(tmp_path: Path):
@@ -621,7 +628,7 @@ def test_delete_extension_config_preserves_other_extension_entries(tmp_path: Pat
 
     delete_extension_config(path, "remote")
 
-    data = settings_store.read_all(path, "extensions")
+    data = _saved_extensions(path)
     assert "remote" not in data
     assert data["other"] == VALID_EXTENSIONS["other"]
 
@@ -631,7 +638,7 @@ def test_delete_extension_config_is_idempotent_for_an_unknown_id(tmp_path: Path)
 
     delete_extension_config(path, "does-not-exist")  # must not raise
 
-    assert set(settings_store.read_all(path, "extensions")) == {"other"}
+    assert set(_saved_extensions(path)) == {"other"}
 
 
 # --- capabilities ---

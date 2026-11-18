@@ -58,6 +58,34 @@ Replaces the Extensions page. Three sections:
 2. **Server-sided optional**: today's extension list with Add, Edit, Remove and the same form, with an MCP block and an optional REST block.
 3. **Client-sided**: a read-only note and a count, linking to the Ember page where accounts add their own. Armory cannot read their secrets and does not store them.
 
+## Baseline
+
+Baseline at `ffa42d66` on 2026-11-18. Task 0 is present at `91e0b6ff`.
+
+| Suite | Result |
+|---|---|
+| Armory | 1,525 passed, 1 skipped, 280 deselected |
+| Stronghold | 738 passed |
+| Portcullis | 970 passed, 2 failed (11m 36s) |
+| Legion | 1,411 passed, 6 deselected |
+| Treasury | 81 passed, 13 skipped |
+| Shared auth | 87 passed |
+| Armory Admin | Type check passed, 113 tests passed |
+| Stronghold Admin | Type check passed, 263 tests passed |
+| Portcullis Admin | Type check passed, 205 tests passed |
+| Legion Admin | Type check passed, 88 tests passed |
+| Treasury Admin | Type check passed, 41 tests passed |
+| Ember | Type check passed, 2,226 tests passed |
+
+Python suites used `uv run pytest -q -p no:cacheprovider`, with `-m "not slow"` for Armory and Legion. Windows loopback required running these suites outside the sandbox. Frontend checks used `pnpm exec vue-tsc -b` and `pnpm exec vitest run`. Portcullis Admin and Ember passed on a retry with writable temporary paths and two workers.
+
+Existing Portcullis failures:
+
+- `tests/test_secret_box.py::test_an_invalid_key_in_env_stops_startup`
+- `tests/test_traffic.py::test_the_default_recorder_saves_to_the_database_on_shutdown`
+
+Both fail during startup because `checked_address` rejects `http://127.0.0.1:0` before either test reaches its assertion. These two existing failures are accepted for Plan 14 and remain part of the full suite.
+
 ## Tasks
 
 Each task ends green on its own suite and is committed separately. Python through `uv` / the project `.venv`, JS through `pnpm`. After any change to `libs/citadel_auth` run `scripts/sync_citadel_auth.py` and check with `--check`.
@@ -71,6 +99,14 @@ Bard audio streams through Stronghold and Portcullis drops its Bard token. Stron
 - `apps/armory/src/connection_routes.py`: the REST façade above, behind the service-assertion middleware, allowed callers `stronghold` and `portcullis` only (extend `citadel_auth.policy`).
 - REST clients for Bard, Scribe, Reader with the error mapping, Range streaming and the dictation WebSocket relay moved from Portcullis `ScribeGateway`, keeping its bounds (frame size, 150 s of audio, idle and final timeouts, one stream per account).
 - Tests: record validation, secret never returned, each route with a fake upstream, caller allow-list, error mapping, Range, WebSocket limits.
+
+#### Interfaces
+
+- `ConnectionStore(path)` stores records by `name` with `class`, `enabled`, metadata, and separate MCP and REST blocks. Updates retain an omitted credential. Views expose only whether one is set.
+- `install_connection_routes(app, store, client)` installs the fixed `/connections/{service}/{operation}` routes. File uploads send raw bytes and `X-Filename`. Audio streams support Range. Errors use `{"detail": "..."}`.
+- `GET /connections/status` returns per-required-service `ready` and `reason`. `/connections/scribe/dictate` accepts signed requester identity and the existing PCM and stop messages.
+
+Verification: Armory 1,539 passed, 1 skipped, 280 deselected. Shared auth 87 passed; vendored copies synchronized and checked.
 
 ### Task 2: Armory Admin Connections page
 - New view and API client, replacing `ExtensionsAdminView`. Cards for the three required connections, the optional list with the existing add and edit form, Test buttons.
@@ -99,6 +135,11 @@ Bard audio streams through Stronghold and Portcullis drops its Bard token. Stron
 4. **Tokens.** Keep the per-caller `X-Internal-Token` that Bard, Scribe and Reader use now. Signed service assertions for them is a later step, listed in `_TODO.md`.
 5. **Client-sided REST.** Out of this plan. It means server-side requests to user-chosen addresses and needs its own security review.
 6. **Name.** "Connections" in Armory Admin, replacing both "Extensions" and "Tool services".
+
+## Changes found during work
+
+- Service assertion middleware originally skipped WebSockets. Armory explicitly opts its dictation path into authentication, and shared policy limits it to Portcullis and Stronghold.
+- Portcullis already opens attachment previews against Armory's PDF content route. Preserve its owner check and Range behavior during the remaining stream cutover.
 
 ## Risks
 

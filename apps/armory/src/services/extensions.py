@@ -67,6 +67,14 @@ def _request_headers(config: ExtensionConfig) -> dict[str, str]:
     return config.headers
 
 
+def _safe_error(error: Exception, config: ExtensionConfig) -> str:
+    message = str(error) or type(error).__name__
+    for value in config.headers.values():
+        if value:
+            message = message.replace(value, "[redacted]")
+    return message
+
+
 async def _check_handshake_accepted(url: str, headers: dict[str, str] | None, auth=None) -> None:
     """Raise a plain exception if `url` answers an MCP ``initialize`` POST with an HTTP error status (401, 403, 404, 5xx).
     Companion to _check_tcp_reachable: a rejected handshake inside streamablehttp_client hits the cancel-scope bug, while plain httpx fails normally. Only the status is read, never headers."""
@@ -158,7 +166,7 @@ class ExtensionRegistry:
     async def connect_all(self, config_path: Path) -> None:
         """Connect to every extension in config.json's "extensions" section.
         Each is isolated (see _connect_one): a failure is recorded as its status, never raised, so siblings and our own tools still start."""
-        for extension_id, extension_config in load_extensions_config(config_path).items():
+        for extension_id, extension_config in (await asyncio.to_thread(load_extensions_config, config_path)).items():
             await self._connect_one(extension_id, extension_config)
 
     async def _connect_one(self, extension_id: str, config: ExtensionConfig) -> ExtensionStatus:
@@ -181,7 +189,7 @@ class ExtensionRegistry:
                 label=config.label,
                 description=config.description,
                 status="error",
-                error=str(error) or type(error).__name__,
+                error=_safe_error(error, config),
                 web_url=config.web_url,
             )
             self._statuses.append(status)
@@ -389,7 +397,7 @@ async def add_extension(config: ExtensionConfig, config_path: Path) -> Extension
     if _registry is None:
         return None
     async with _registry._mutation_lock:
-        save_extension_config(config_path, config)
+        await asyncio.to_thread(save_extension_config, config_path, config)
         status = await _registry._connect_one(config.id, config)
     return status
 
@@ -400,6 +408,6 @@ async def remove_extension(extension_id: str, config_path: Path) -> bool:
     if _registry is None:
         return False
     async with _registry._mutation_lock:
-        delete_extension_config(config_path, extension_id)
+        await asyncio.to_thread(delete_extension_config, config_path, extension_id)
         removed = await _registry._remove_one(extension_id)
     return removed

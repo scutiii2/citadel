@@ -20,13 +20,16 @@ def current_caller() -> Caller | None:
 class ServiceAuthMiddleware:
     """Fail closed for every HTTP route except explicitly public health checks."""
 
-    def __init__(self, app, keyring, audience: str, open_paths=("/health",)):
+    def __init__(self, app, keyring, audience: str, open_paths=("/health",), websocket_paths=()):
         self.app, self.keyring, self.audience = app, keyring, audience
         self.open_paths = frozenset(open_paths)
+        self.websocket_paths = frozenset(websocket_paths)
         self._warned = False
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or scope.get("path") in self.open_paths:
+        path = scope.get("path")
+        websocket = scope["type"] == "websocket" and path in self.websocket_paths
+        if not websocket and (scope["type"] != "http" or path in self.open_paths):
             await self.app(scope, receive, send)
             return
         try:
@@ -47,6 +50,9 @@ class ServiceAuthMiddleware:
             if "trust" in str(error) and not self._warned:
                 log.warning("Service authentication unavailable: unreadable trust directory")
                 self._warned = True
+            if websocket:
+                await send({"type": "websocket.close", "code": 4403 if isinstance(error, Forbidden) else 4401})
+                return
             body = json.dumps({"error": str(error)}).encode()
             await send({"type": "http.response.start", "status": 403 if isinstance(error, Forbidden) else 401,
                         "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())]})
