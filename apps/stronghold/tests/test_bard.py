@@ -62,3 +62,34 @@ def test_a_bard_outage_is_a_502(client: TestClient, tools) -> None:
 
     assert client.get("/bard/voices").status_code == 502
     assert client.post("/bard/speak", json={"text": "hi", "voice": "v1"}).status_code == 502
+
+
+def test_audio_streams_from_bard_with_identity_token_and_range(client: TestClient, tools) -> None:
+    tools["bard"].handler = lambda r: httpx.Response(
+        206, content=b"2345",
+        headers={"content-type": "audio/mpeg", "content-range": "bytes 2-5/10", "accept-ranges": "bytes"})
+
+    response = client.get(f"/bard/audio/{FID}", headers={"Range": "bytes=2-5"})
+
+    assert response.status_code == 206 and response.content == b"2345"
+    assert response.headers["content-type"] == "audio/mpeg" and response.headers["content-range"] == "bytes 2-5/10"
+    sent = tools["bard"].requests[-1]
+    assert sent.url.path == f"/api/files/{FID}" and sent.headers["range"] == "bytes=2-5"
+    assert sent.headers["x-requester-username"] == "ana"
+
+
+def test_audio_needs_the_requester_and_a_valid_id(client: TestClient, tools) -> None:
+    assert client.get(f"/bard/audio/{FID}", headers=ANONYMOUS).status_code == 400
+    assert client.get("/bard/audio/not-hex").status_code == 422
+    assert not tools["bard"].requests
+
+
+@pytest.mark.parametrize("code, expected", [(404, 404), (416, 416), (401, 502), (503, 502)])
+def test_audio_maps_bard_failures(client: TestClient, tools, code: int, expected: int) -> None:
+    tools["bard"].handler = lambda r: httpx.Response(code, json={"error": "x"})
+    assert client.get(f"/bard/audio/{FID}").status_code == expected
+
+
+def test_audio_with_bard_down_is_a_502(client: TestClient, tools) -> None:
+    tools["bard"].handler = down
+    assert client.get(f"/bard/audio/{FID}").status_code == 502

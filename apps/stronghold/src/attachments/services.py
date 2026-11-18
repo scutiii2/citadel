@@ -8,15 +8,18 @@ with their own safe message; that message is kept, anything else becomes a 502 t
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from fastapi import HTTPException, status
+from fastapi.responses import StreamingResponse
 
 from src.requester import Requester
 from src.service_auth import authenticate
 from src.citadel_auth import requester_header
 
 _LONG = 120.0
+_STREAMED = ("content-type", "content-length", "content-range", "accept-ranges")
 
 
 def _headers(who: Requester, token: str | None) -> dict[str, str]:
@@ -70,6 +73,34 @@ class ToolService:
 
     async def call(self, method: str, path: str, who: Requester, body: dict | None = None) -> dict:
         return await self._send(method, path, who, json=body)
+
+    async def stream(self, path: str, who: Requester, range_header: str | None = None) -> StreamingResponse:
+        """GET a stored file as a stream, with the browser's Range header, so a player can seek.
+        404 and 416 keep their meaning (the file expired); every other refusal is a 502."""
+        headers = {**_headers(who, self._token), "Accept-Encoding": "identity"}
+        if range_header:
+            headers["Range"] = range_header
+        request = self._client.build_request("GET", path, headers=headers, timeout=_LONG)
+        try:
+            response = await self._client.send(request, stream=True, follow_redirects=False)
+        except httpx.HTTPError as error:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"{self._name} is unreachable. Try again.") from error
+        if response.status_code not in (200, 206):
+            await response.aread()
+            await response.aclose()
+            if response.status_code in (404, 416):
+                raise HTTPException(response.status_code, "The file expired or is unavailable.")
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"{self._name} is unavailable; check its internal connection.")
+
+        async def chunks():
+            try:
+                async for chunk in response.aiter_bytes():
+                    yield chunk
+            finally:
+                await response.aclose()
+
+        kept = {k: v for k, v in response.headers.items() if k.lower() in _STREAMED}
+        return StreamingResponse(chunks(), status_code=response.status_code, headers=kept)
 
 
 def scribe(client: httpx.AsyncClient, token: str | None) -> ToolService:

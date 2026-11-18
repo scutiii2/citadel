@@ -21,7 +21,7 @@ require_manage = require_permission(SETTINGS_MANAGE)
 
 
 def _current(request: Request) -> dict[str, str | None]:
-    return {"bard": request.app.state.bard_token, "scribe": request.app.state.scribe_token}
+    return {"scribe": request.app.state.scribe_token}
 
 
 @router.get("/tool-tokens")

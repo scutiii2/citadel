@@ -15,26 +15,26 @@ def test_own_tokens_are_saved_used_at_once_logged_without_the_value_and_never_re
     admin = as_admin(root)
 
     first = admin.get("/api/admin/tool-tokens").json()["services"]
-    assert [row["name"] for row in first] == ["bard", "scribe"]
+    assert [row["name"] for row in first] == ["scribe"]
 
-    saved = admin.put("/api/admin/tool-tokens", json={"bard": "bd-secret"})
+    saved = admin.put("/api/admin/tool-tokens", json={"scribe": "bd-secret"})
 
     assert saved.status_code == 200 and "bd-secret" not in saved.text and "bd-secret" not in admin.get("/api/admin/tool-tokens").text
-    assert {row["name"]: row["stored"] for row in saved.json()["services"]} == {"bard": True, "scribe": False}
-    assert admin.app.state.bard_token == "bd-secret"
+    assert {row["name"]: row["stored"] for row in saved.json()["services"]} == {"scribe": True}
+    assert admin.app.state.scribe_token == "bd-secret"
     uid = admin.get("/api/auth/me").json()["id"]
     logged = " ".join(entry["message"] for entry in admin.get("/api/logs/action", params={"actor": uid}).json())
-    assert "Changed Portcullis tool service tokens (bard)" in logged and "bd-secret" not in logged
+    assert "Changed Portcullis tool service tokens (scribe)" in logged and "bd-secret" not in logged
 
-    removed = admin.put("/api/admin/tool-tokens", json={"bard": None})
-    assert removed.json()["services"][0]["stored"] is False and admin.app.state.bard_token is None
+    removed = admin.put("/api/admin/tool-tokens", json={"scribe": None})
+    assert removed.json()["services"][0]["stored"] is False and admin.app.state.scribe_token is None
 
 
 def test_a_bad_token_change_is_refused(client_factory) -> None:
     admin = as_admin(client_factory())
 
     assert admin.put("/api/admin/tool-tokens", json={"made_up": "x"}).json()["detail"] == "Unknown tool service: made_up."
-    assert admin.put("/api/admin/tool-tokens", json={"bard": "  "}).status_code == 400
+    assert admin.put("/api/admin/tool-tokens", json={"scribe": "  "}).status_code == 400
     assert admin.put("/api/admin/tool-tokens", json={}).status_code == 400
 
 
@@ -63,8 +63,8 @@ def test_every_tool_token_route_needs_settings_manage(client_factory, email, ups
 
     for method, path in [("get", "/api/admin/tool-tokens"), ("get", "/api/admin/stronghold-tool-tokens")]:
         assert getattr(member, method)(path).status_code == 403
-    assert member.put("/api/admin/tool-tokens", json={"bard": "x"}).status_code == 403
-    assert member.put("/api/admin/stronghold-tool-tokens", json={"bard": "x"}).status_code == 403
+    assert member.put("/api/admin/tool-tokens", json={"scribe": "x"}).status_code == 403
+    assert member.put("/api/admin/stronghold-tool-tokens", json={"scribe": "x"}).status_code == 403
     assert len(upstream.requests) == served
 
 

@@ -1,4 +1,5 @@
-"""The tokens Portcullis presents to the tool services (Bard, Scribe), kept in its settings database.
+"""The token Portcullis presents to Scribe (dictation), kept in its settings database. Bard and the other tool services are reached
+through Stronghold, which keeps their tokens (Stronghold Admin, Tool services).
 
 Each tool service makes one token per caller on its own admin page (Tokens card). An administrator pastes it on the
 Tool services page; it is saved in `settings.db` (table `tool_tokens`) and used by the next request. The token is
@@ -13,8 +14,8 @@ from typing import Any
 from src.citadel_auth import settings_store
 
 TABLE = "tool_tokens"
-NAMES = ("bard", "scribe")
-LABELS = {"bard": "Bard", "scribe": "Scribe"}
+NAMES = ("scribe",)
+LABELS = {"scribe": "Scribe"}
 
 
 class TokenError(ValueError):
