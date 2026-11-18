@@ -9,7 +9,7 @@ from tests.test_registration import as_admin
 
 ROUTES = [
     ("GET", "/api/brains/connections/personal", "/brains/connections/personal"),
-    ("PUT", "/api/brains/connections/instance", "/brains/connections/instance"),
+    ("PUT", "/api/brains/connections/personal", "/brains/connections/personal"),
     ("POST", "/api/brains/connections/personal/test", "/brains/connections/personal/test"),
     ("GET", "/api/brains/destinations", "/brains/destinations"),
     ("POST", "/api/brains/browse", "/brains/browse"),
@@ -56,6 +56,25 @@ def test_member_needs_chat_use_for_notes_and_suggestions(client, email, upstream
     upstream.handler = lambda request: httpx.Response(200, json=[])
     assert client.get("/api/brains/destinations").status_code == 200
     assert client.get("/api/brains/promotions").status_code == 200  # members hold chat.use
+
+
+def test_instance_settings_use_armory_and_require_settings_manage(client, upstream, email):
+    path = "/api/admin/brain"
+    assert client.get(path).status_code == 401
+    make_member(client, email, "alice")
+    login(client, "alice")
+    assert client.get(path).status_code == 403
+
+    as_admin(client)
+    upstream.handler = lambda request: httpx.Response(200, json={
+        "status": "legacy", "credential_configured": False, "api_key": "unexpected-test-value",
+    })
+    assert client.get(path).json() == {"status": "legacy", "credential_configured": False}
+    sent = upstream.requests[-1]
+    assert sent.url.path == "/admin/brain"
+    assert sent.headers["Authorization"].startswith("Bearer ")
+    assert sent.headers["X-Citadel-Requester"]
+    assert client.put("/api/brains/connections/instance", json={}).status_code == 404
 
 
 def test_the_old_internal_resolve_route_is_gone(client):

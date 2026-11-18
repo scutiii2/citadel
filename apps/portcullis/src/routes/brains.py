@@ -1,23 +1,82 @@
 """/api/brains: brain settings, browsing, publishing Notes and promotion suggestions.
 
-Stronghold (`apps/stronghold/src/brains`) keeps the encrypted connections and does the work; it asks
-Portcullis for the account's permissions on every request. Portcullis checks the login (and chat.use
-where it applied) and passes the request on. Armory resolves connections with Stronghold directly.
+Portcullis proxies personal settings and Brain usage to Stronghold. Shared settings go
+to Armory with signed service and requester identity, after checking settings.manage.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from src.deps import current_account, get_settings, get_stronghold, require_permission
+from src.deps import current_account, get_log_writer, get_settings, get_stronghold, require_permission
 from src.models import Account
+from src.routes.server_info import get_server_info
 from src.routes.stronghold import pass_on
-from src.services.permissions import CHAT_USE
+from src.services.log_service import LogWriter
+from src.services.mcp_server_info import McpServerInfo, McpServerRefused, McpServerUnavailable
+from src.services.permissions import CHAT_USE, SETTINGS_MANAGE
 from src.services.stronghold_forwarder import StrongholdForwarder
 
 router = APIRouter(prefix="/api/brains", tags=["brains"])
 
 require_chat = require_permission(CHAT_USE)
+manage_brain = require_permission(SETTINGS_MANAGE)
+admin_router = APIRouter(prefix="/api/admin/brain", tags=["brains"])
+_CONNECTION_FIELDS = {"id", "scope", "label", "endpoint", "folder", "enabled", "allow_write",
+                      "revision", "generation", "updated_at", "status", "credential_configured"}
+_CHECK_FIELDS = {"status", "message", "index_status"}
+
+
+async def _admin_call(info: McpServerInfo, account: Account, method: str, suffix: str = "", body=None):
+    try:
+        result = await info.request(method, "/admin/brain" + suffix, account, json=body)
+    except McpServerRefused as error:
+        raise HTTPException(error.status, str(error)) from None
+    except McpServerUnavailable:
+        raise HTTPException(502, "Instance Brain is unavailable. Try again shortly.") from None
+    if not isinstance(result, dict):
+        raise HTTPException(502, "Armory returned an invalid Brain response")
+    fields = _CHECK_FIELDS if suffix in {"/test", "/status"} else _CONNECTION_FIELDS
+    return {name: value for name, value in result.items() if name in fields}
+
+
+@admin_router.get("")
+async def instance_connection(account: Account = Depends(manage_brain), info: McpServerInfo = Depends(get_server_info)):
+    return await _admin_call(info, account, "GET")
+
+
+@admin_router.put("")
+async def save_instance_connection(
+    body: dict[str, Any], account: Account = Depends(manage_brain), info: McpServerInfo = Depends(get_server_info),
+    logs: LogWriter = Depends(get_log_writer),
+):
+    result = await _admin_call(info, account, "PUT", body=body)
+    await logs.action(account, "brain.connection_save", "Saved Instance Brain connection")
+    return result
+
+
+@admin_router.post("/test")
+async def test_instance_connection(
+    body: dict[str, Any], account: Account = Depends(manage_brain), info: McpServerInfo = Depends(get_server_info),
+):
+    return await _admin_call(info, account, "POST", "/test", body)
+
+
+@admin_router.get("/status")
+async def instance_status(account: Account = Depends(manage_brain), info: McpServerInfo = Depends(get_server_info)):
+    return await _admin_call(info, account, "GET", "/status")
+
+
+@admin_router.post("/disable")
+async def disable_instance_connection(
+    body: dict[str, Any], account: Account = Depends(manage_brain), info: McpServerInfo = Depends(get_server_info),
+    logs: LogWriter = Depends(get_log_writer),
+):
+    result = await _admin_call(info, account, "POST", "/disable", body)
+    await logs.action(account, "brain.connection_save", "Disabled Instance Brain connection")
+    return result
 
 
 async def valid_account(account: Account = Depends(current_account), settings=Depends(get_settings)) -> Account:
@@ -26,22 +85,22 @@ async def valid_account(account: Account = Depends(current_account), settings=De
     return account
 
 
-@router.get("/connections/{scope}")
-async def get_connection(scope: str, request: Request, account: Account = Depends(valid_account),
+@router.get("/connections/personal")
+async def get_connection(request: Request, account: Account = Depends(valid_account),
                          stronghold: StrongholdForwarder = Depends(get_stronghold)) -> Response:
-    return await pass_on(request, stronghold, account, f"/brains/connections/{scope}")
+    return await pass_on(request, stronghold, account, "/brains/connections/personal")
 
 
-@router.put("/connections/{scope}")
-async def save_connection(scope: str, request: Request, account: Account = Depends(valid_account),
+@router.put("/connections/personal")
+async def save_connection(request: Request, account: Account = Depends(valid_account),
                           stronghold: StrongholdForwarder = Depends(get_stronghold)) -> Response:
-    return await pass_on(request, stronghold, account, f"/brains/connections/{scope}")
+    return await pass_on(request, stronghold, account, "/brains/connections/personal")
 
 
-@router.post("/connections/{scope}/test")
-async def test_connection(scope: str, request: Request, account: Account = Depends(valid_account),
+@router.post("/connections/personal/test")
+async def test_connection(request: Request, account: Account = Depends(valid_account),
                           stronghold: StrongholdForwarder = Depends(get_stronghold)) -> Response:
-    return await pass_on(request, stronghold, account, f"/brains/connections/{scope}/test")
+    return await pass_on(request, stronghold, account, "/brains/connections/personal/test")
 
 
 @router.get("/destinations")
