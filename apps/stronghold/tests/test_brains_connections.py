@@ -37,11 +37,11 @@ def test_personal_isolation_disable_and_instance_publish_permission():
         label="Mine", endpoint="https://vault.lan", api_key="key", allow_write=True)))
     with pytest.raises(BrainError):
         run(service.resolve("personal", "bob", write=False, publish=False))
-    run(service.save("instance", "", ConnectionInput(
-        label="Shared", endpoint="https://127.0.0.1:27124", api_key="shared", allow_write=True)))
+    with pytest.raises(BrainError, match="Armory Admin"):
+        run(service.save("instance", "", ConnectionInput(
+            label="Shared", endpoint="https://127.0.0.1:27124", api_key="shared", allow_write=True)))
     with pytest.raises(BrainError, match="publish"):
         run(service.resolve("instance", "alice", write=True, publish=False))
-    assert run(service.resolve("instance", "alice", write=True, publish=True))["scope"] == "instance"
     run(service.save("personal", "alice", ConnectionInput(
         label="Mine", endpoint="https://vault.lan", enabled=False, expected_revision=1)))
     with pytest.raises(BrainError, match="disabled"):

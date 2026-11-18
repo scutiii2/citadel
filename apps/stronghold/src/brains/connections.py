@@ -74,8 +74,8 @@ class ConnectionInput(BaseModel):
 
 
 class BrainConnections:
-    def __init__(self, store: DocumentStore, box: SecretBox):
-        self.store, self.box = store, box
+    def __init__(self, store: DocumentStore, box: SecretBox, instance=None):
+        self.store, self.box, self.instance = store, box, instance
 
     @staticmethod
     def connection_id(scope: str, uid: str) -> str:
@@ -111,9 +111,13 @@ class BrainConnections:
                 "status": "configured" if row["enabled"] else "disabled"}
 
     async def get(self, scope: str, uid: str) -> dict:
+        if scope == "instance":
+            return await self.instance.destination(uid)
         return self.public(await self.current(scope, uid), scope)
 
     async def candidate(self, scope: str, uid: str, value: ConnectionInput) -> dict:
+        if scope != "personal":
+            raise BrainError("Manage the Instance Brain through Armory Admin", 404)
         previous = await self.current(scope, uid)
         if (previous["revision"] if previous else 0) != value.expected_revision:
             raise BrainError("The connection changed. Reload before saving.")
@@ -148,10 +152,14 @@ class BrainConnections:
             raise BrainError("A signed-in user is required", 403)
         if write and scope == "instance" and not publish:
             raise BrainError("Missing permission: brain.instance.publish", 403)
+        if scope == "instance":
+            row = await self.get(scope, uid)
+            if not row["enabled"]:
+                raise BrainError("This brain connection is disabled")
+            if write and row["writable"] is not True:
+                raise BrainError("Writes to this brain are disabled", 403)
+            return row
         row = await self.current(scope, uid)
-        if row is None and scope == "instance":
-            return {"id": "instance", "scope": "instance", "revision": 0, "generation": "legacy",
-                "label": "Instance Brain", "folder": "Inbox", "source": "legacy"}
         if row is None:
             raise BrainError("Personal Brain is not configured", 404)
         if not row["enabled"]:

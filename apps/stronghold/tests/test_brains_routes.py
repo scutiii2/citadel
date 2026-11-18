@@ -3,11 +3,17 @@
 import json
 
 import httpx
+from src.citadel_auth import ServiceAuth
+from tests import auth_helpers
 from tests.auth_helpers import requester
 
 PERSONAL = "/brains/connections/personal"
 INSTANCE = "/brains/connections/instance"
 SAVE = {"label": "Mine", "endpoint": "https://vault.lan", "api_key": "private-brain-key", "allow_write": True}
+
+
+def armory_auth():
+    return ServiceAuth(auth_helpers.stack["armory"], "stronghold")
 
 
 def armory_ok(armory):
@@ -35,8 +41,8 @@ def test_save_still_works_when_armory_is_down(client, armory):
 def test_members_manage_personal_but_not_the_instance_brain(client, platform):
     platform.granted["u-1"] = {"chat.use"}
     assert client.get(PERSONAL).status_code == 200
-    assert client.get(INSTANCE).status_code == 403
-    assert client.put(INSTANCE, json=SAVE).status_code == 403
+    assert client.get(INSTANCE).status_code == 404
+    assert client.put(INSTANCE, json=SAVE).status_code == 404
     assert client.get("/brains/destinations").status_code == 200
 
 
@@ -44,11 +50,61 @@ def test_unusable_account_is_refused_and_a_permission_change_applies_at_once(cli
     platform.granted["u-1"] = None
     assert client.get(PERSONAL).status_code == 403
     platform.granted["u-1"] = {"chat.use", "settings.manage"}
-    assert client.get(INSTANCE).status_code == 200
-    platform.granted["u-1"] = {"chat.use"}
-    assert client.get(INSTANCE).status_code == 403
+    assert client.get(PERSONAL).status_code == 200
+    platform.granted["u-1"] = None
+    assert client.get(PERSONAL).status_code == 403
     platform.granted["u-1"] = {"settings.manage"}
     assert client.get("/brains/promotions").status_code == 403  # needs chat.use
+
+
+def test_instance_resolver_authorizes_without_returning_a_connection(client, platform):
+    platform.granted["u-1"] = {"chat.use"}
+    body = {"scope": "instance", "operation": "read"}
+    assert client.post("/brains/resolve", json=body).status_code == 403
+    answer = client.post("/brains/resolve", json=body, auth=armory_auth())
+    assert answer.json() == {"scope": "instance", "authorized": True}
+    assert client.post("/brains/resolve", json={**body, "operation": "write"}, auth=armory_auth()).status_code == 403
+    manage = {**body, "operation": "manage"}
+    assert client.post("/brains/resolve", json=manage, auth=armory_auth()).status_code == 403
+    platform.granted["u-1"] = {"settings.manage"}
+    assert client.post("/brains/resolve", json=manage, auth=armory_auth()).json() == answer.json()
+
+
+def test_migration_exports_the_latest_committed_revision_and_removes_it_after_ack(client, db_gateway):
+    import asyncio
+
+    from src.citadel_auth.brain_migration import acknowledgement, challenge, unseal
+
+    path = "/brains/instance-migration"
+    armory = auth_helpers.stack["armory"]
+    key = "fixture-legacy-credential"
+    base = {"id": "instance", "scope": "instance", "owner": "", "label": "Shared",
+            "endpoint": "https://vault.lan", "folder": "Published", "enabled": True,
+            "allow_write": True, "updated_at": "2026-11-18T00:00:00+00:00",
+            "credential": client.app.state.box.encrypt_map({"api_key": key})}
+    older = {**base, "revision": 1, "generation": "older"}
+    current = {**base, "revision": 2, "generation": "committed"}
+    db_gateway.records["brain_connections", "instance"] = older
+    db_gateway.records["brain_connection_revisions", "instance:1"] = older
+    db_gateway.records["brain_connection_revisions", "instance:2"] = current
+
+    private, proof = challenge(armory)
+    assert client.post(path, json={"proof": proof}).status_code == 403
+    exported = client.post(path, json={"proof": proof}, auth=armory_auth())
+    assert exported.status_code == 200 and key not in exported.text
+    old = asyncio.run(unseal(armory, private, proof, exported.json()))
+    assert (old["api_key"], old["revision"], old["generation"]) == (key, 2, "committed")
+    assert client.post(path, json={"proof": proof}, auth=armory_auth()).status_code == 403
+
+    def ack(generation):
+        return client.post(f"{path}/ack", json={"proof": acknowledgement(armory, 2, generation)},
+                           auth=armory_auth())
+
+    assert ack("different").status_code == 409
+    assert db_gateway.records["brain_connection_revisions", "instance:2"] == current
+    assert ack("committed").status_code == 204
+    assert ack("committed").status_code == 204
+    assert all(not name.startswith("instance") for _, name in db_gateway.records)
 
 
 def test_platform_down_is_a_503(client, platform):
@@ -64,15 +120,15 @@ def test_platform_down_is_a_503(client, platform):
 def test_resolve_hands_armory_the_credential_and_checks_publish(client, armory, platform):
     armory_ok(armory)
     client.put(PERSONAL, json=SAVE)
-    snapshot = client.post("/brains/resolve", json={"scope": "personal", "operation": "write"})
+    snapshot = client.post("/brains/resolve", json={"scope": "personal", "operation": "write"}, auth=armory_auth())
     assert snapshot.status_code == 200 and snapshot.json()["api_key"] == "private-brain-key"
     platform.granted["u-1"] = {"chat.use"}
-    assert client.post("/brains/resolve", json={"scope": "instance", "operation": "write"}).status_code == 403
-    assert client.post("/brains/resolve", json={"scope": "personal", "operation": "read"}).status_code == 200
+    assert client.post("/brains/resolve", json={"scope": "instance", "operation": "write"}, auth=armory_auth()).status_code == 403
+    assert client.post("/brains/resolve", json={"scope": "personal", "operation": "read"}, auth=armory_auth()).status_code == 200
     platform.granted["u-1"] = None
-    assert client.post("/brains/resolve", json={"scope": "personal", "operation": "read"}).status_code == 403
+    assert client.post("/brains/resolve", json={"scope": "personal", "operation": "read"}, auth=armory_auth()).status_code == 403
     platform.granted["u-1"] = {"chat.use"}
-    assert client.post("/brains/resolve", json={"scope": "personal", "operation": "nuke"}).status_code == 422
+    assert client.post("/brains/resolve", json={"scope": "personal", "operation": "nuke"}, auth=armory_auth()).status_code == 422
 
 
 def test_resolve_needs_the_internal_token(client):
@@ -85,7 +141,12 @@ def test_writable_follows_connection_and_publish_permission(client, armory, plat
     assert client.get("/brains/writable/personal").json() == {"writable": False}
     client.put(PERSONAL, json=SAVE)
     assert client.get("/brains/writable/personal").json() == {"writable": True}
-    assert client.get("/brains/writable/instance").json() == {"writable": True}  # legacy instance brain
+    shared = {"id": "instance", "scope": "instance", "label": "Shared", "folder": "Inbox", "enabled": True,
+              "revision": 2, "generation": "imported", "status": "configured", "writable": True}
+    armory.handler = lambda request: httpx.Response(200, json=shared)
+    assert client.get("/brains/writable/instance").json() == {"writable": True}
+    assert armory.requests[-1].url.path == "/brains/destination"
+    assert client.get("/brains/destinations").json()[-1] == shared
     platform.granted["u-1"] = {"chat.use"}
     assert client.get("/brains/writable/instance").json() == {"writable": False}
 

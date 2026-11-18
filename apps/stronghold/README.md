@@ -21,7 +21,7 @@ Default address `127.0.0.1:29650`. `STRONGHOLD_HOST` and `STRONGHOLD_PORT` overr
 | `STRONGHOLD_DATA_DIR` | `.data` | Holds `keys.json` |
 | `STRONGHOLD_CONFIG` | `configs/config_app.json` | Host and port (tracked; see `configs/README.md`). A missing file means defaults. Usage limits and prices are in Stronghold Admin |
 
-`keys.json` is made on first start: the key that encrypts saved secrets (brain keys, private-extension headers). Back it up with the data. Without it, saved secrets cannot be read. An older file may also hold a web push key pair; it is ignored.
+`keys.json` is made on first start: the key that encrypts saved secrets (personal brain keys, private-extension headers). Back it up with the data. Without it, saved secrets cannot be read. An older file may also hold a web push key pair; it is ignored.
 
 ## What Stronghold asks Portcullis
 
@@ -44,7 +44,7 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/tickets/...`, `/ticket-admin/...` | Tickets (Armory keeps them) and the account's read receipts (Treasury, collection `ticket_seen`). Portcullis exposes them as `/api/tickets/...` (`tickets.create`) and `/api/admin/tickets...`, `/api/admin/ticket-groups...` (`tickets.manage`) |
 | `/triage/titles`, `/triage/ask` | Option titles from the `title-writer` agent and typed questions to the Triage Assistant (Laya); both count toward the token limits. Portcullis exposes them as `/api/triage/...` after checking `chat.use` |
 | `/attachments/...` | Text extraction (`text`), PDFs and tables stored by Armory (`pdf`, `table`), and Armory calls for Scribe audio (`audio`, `dictate`, `dictate/partial`) or Reader documents (`document`). Portcullis exposes the JSON endpoints and opens preview and dictation streams directly against Armory |
-| `/brains...` | Encrypted Obsidian brain connections, browsing through Armory, Note publication and AI promotion suggestions. Portcullis exposes them as `/api/brains`; Armory resolves a connection with `POST /brains/resolve`. Stronghold asks Portcullis for the account's permissions on every request |
+| `/brains...` | Encrypted Personal Brain connections, browsing through Armory, Note publication and AI promotion suggestions. Portcullis exposes them as `/api/brains`. `POST /brains/resolve` authorizes shared access and resolves personal connections for Armory. Stronghold asks Portcullis for current account permissions and Armory for shared destination metadata |
 | `/chats...`, `/chat-folders...` | Chat history (details and transcript in separate documents), folders and search. Portcullis exposes them as `/api/chats` and `/api/chat-folders` and Stronghold runs the answers (`/turns`). Deleting chats revokes their share links first, inside the same call |
 | `/account-agents...` | The specialist agents an account switched off (Treasury, collection `account_agents`). Portcullis exposes it as `/api/account-agents` and reads the list when a chat turn starts |
 | `/user-extensions...` | An account's own MCP servers: stored with encrypted headers (collection `user_extensions`), probed through Legion for status and tools. Portcullis exposes them as `/api/user-extensions` (`chat.use` to read, `extensions.personal.manage` to change) and reads `GET /user-extensions/for-turn` when a chat turn starts |
