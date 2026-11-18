@@ -13,5 +13,6 @@ RUN ln -s /src/portcullis_admin/node_modules /src/ember_web/node_modules \
 
 FROM nginx:1.27-alpine
 COPY --from=build /src/portcullis_admin/dist /usr/share/nginx/html
-COPY portcullis_admin/nginx.conf /etc/nginx/conf.d/default.conf
+COPY portcullis_admin/nginx.conf /etc/nginx/templates/default.conf.template
+ENV FRAME_ANCESTORS="'none'"
 EXPOSE 80

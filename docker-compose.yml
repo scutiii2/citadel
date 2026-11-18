@@ -214,6 +214,8 @@ services:
       context: ./apps
       dockerfile: portcullis_admin/Dockerfile
     restart: unless-stopped
+    environment:
+      FRAME_ANCESTORS: "${HUB_FRAME_ANCESTORS:-'none'}"
     ports:
       - "127.0.0.1:26501:80"
     depends_on: [portcullis]
@@ -222,6 +224,8 @@ services:
   legion_admin:
     build: ./apps/legion_admin
     restart: unless-stopped
+    environment:
+      FRAME_ANCESTORS: "${HUB_FRAME_ANCESTORS:-'none'}"
     ports:
       - "127.0.0.1:26500:80"
     depends_on: [portcullis]
@@ -230,6 +234,8 @@ services:
   armory_admin:
     build: ./apps/armory_admin
     restart: unless-stopped
+    environment:
+      FRAME_ANCESTORS: "${HUB_FRAME_ANCESTORS:-'none'}"
     ports:
       - "127.0.0.1:26503:80"
     depends_on: [portcullis]
@@ -238,6 +244,8 @@ services:
   stronghold_admin:
     build: ./apps/stronghold_admin
     restart: unless-stopped
+    environment:
+      FRAME_ANCESTORS: "${HUB_FRAME_ANCESTORS:-'none'}"
     ports:
       - "127.0.0.1:26504:80"
     depends_on: [portcullis]
@@ -246,6 +254,8 @@ services:
   treasury_admin:
     build: ./apps/treasury_admin
     restart: unless-stopped
+    environment:
+      FRAME_ANCESTORS: "${HUB_FRAME_ANCESTORS:-'none'}"
     ports:
       - "127.0.0.1:26505:80"
     depends_on: [portcullis]

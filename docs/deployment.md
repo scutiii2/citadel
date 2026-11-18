@@ -226,6 +226,10 @@ Funnel sends `X-Forwarded-Proto: https` for TLS requests. nginx passes it on, an
 cookie when the request came through a `trusted_proxies` peer with that header. Plain-HTTP LAN access at
 `http://<zima-ip>:26502` keeps working, with no `Secure` flag, so leave `cookie_secure` at `false`.
 
+## Showing the admin apps inside ServiceHub
+
+The five admin apps refuse to be framed (`frame-ancestors 'none'`). To let ServiceHub show them in its frame, set `HUB_FRAME_ANCESTORS` in the root `.env` to the exact origins you open the hub with (space-separated, quoted), for example `HUB_FRAME_ANCESTORS="http://scutiserver1.local:29880 http://192.168.1.50:29880"`, then run `docker compose up -d` to recreate the admin containers. Only those pages may frame them. In ServiceHub register each admin with "Open directly" ticked (the proxy would break their absolute `/assets` and `/api` paths), URL `http://host.docker.internal:26501` (the hub probes it from its container) and Link address `http://scutiserver1.local:26501` (what your browser frames). Unset or empty keeps `'none'`.
+
 ## ConversationGateway
 
 Legion's Anthropic-protocol and OpenAI-protocol agents call their models through ConversationGateway. It is a service of this stack, built from its own repo, and other services may use it too.
