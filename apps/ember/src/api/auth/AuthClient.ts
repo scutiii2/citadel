@@ -64,7 +64,14 @@ export const authClient = {
   logout: async (): Promise<void> => {
     try { await apiRequest<void>("POST", "/api/auth/logout"); } finally { setSessionToken(""); }
   },
-  register: (input: RegisterInput) => apiRequest<RegisterResult>("POST", "/api/auth/register", input),
+  register: async (input: RegisterInput): Promise<RegisterResult> => {
+    const result = await apiRequest<RegisterResult>("POST", "/api/auth/register", input);
+    // Registering starts a cookie session, which the Windows app cannot use. Log in once to get its bearer token.
+    if (isDesktop()) {
+      try { await authClient.login(input.username, input.password); } catch { /* the user can log in by hand */ }
+    }
+    return result;
+  },
   verifyEmail: (code: string) => apiRequest<Account>("POST", "/api/auth/verify-email", { code }),
   resendVerification: () => apiRequest<{ sent: boolean }>("POST", "/api/auth/verify-email/resend"),
   changeEmail: (current_password: string, email: string) =>
