@@ -15,15 +15,14 @@ Citadel runs as containers from one `docker-compose.yml`:
 | `legion` | AI agent | internal |
 | `treasury` | database gateway | internal 29602 |
 | `stronghold` | product logic, called only by portcullis | internal 29650 |
-| `conversationgateway` | chat-model gateway for Legion, shared with callers outside Citadel | 29407 on all interfaces |
 
 Only the five admin web apps publish ports (on `127.0.0.1`; the ZimaOS overlay opens them to the LAN). The rest talk over the internal `core` network. Laya is not in this stack: it runs
 from the separate `LayaModel` project (see "Laya" below) and legion reaches it through the host's published port, `http://host.docker.internal:29220`.
 
 ## 1. Local (Windows, macOS, Linux with Docker Desktop or Engine)
 
-1. **Get the gateways.** `conversationgateway` and `decisiongateway` are built from their own repos (`AI/ModelProviders/ConversationGateway` and `AI/ModelProviders/DecisionGateway`), not from this one. They are not on a Git remote, so copy the two folders to the machine and set `CONVERSATION_GATEWAY_DIR` and `DECISION_GATEWAY_DIR` in the root `.env` to where they are (a relative path is relative to the Citadel folder). Without them the build fails.
-2. **Create the `.env` files.** Run `python tools/setup_env.py` (the `live` branch carries it too). It makes the root `.env` and each `apps/<app>/.env` from its `.env.example`, fills the two gateway admin passwords and `BOOTSTRAP_ADMIN_PASSWORD` with random values, and never overwrites a file that exists or prints a secret. Open the files to read the passwords. The root `.env` is required: compose refuses to start without the two gateway passwords, and every service bind-mounts it.
+1. **The gateways are separate stacks.** ConversationGateway (29407) and DecisionGateway (29406) are not in this compose file. Each runs from its own repo (`AI/ModelProviders/<name>`), with its own `.env` (`SERVICE_ADMIN_PASSWORD`) and its own `docker compose up -d --build`; see "ConversationGateway" and "DecisionGateway" below. Start Citadel first: it creates the `citadel_core` network they join, so Legion still reaches them as `http://conversationgateway:29407` and `http://decisiongateway:29406`.
+2. **Create the `.env` files.** Run `python tools/setup_env.py` (the `live` branch carries it too). It makes the root `.env` and each `apps/<app>/.env` from its `.env.example`, fills `BOOTSTRAP_ADMIN_PASSWORD` with a random value, and never overwrites a file that exists or prints a secret. Open the files to read the passwords. The root `.env` is required: every service bind-mounts it.
    Service identity keys are made on first start; no shared token or auth setting is needed. Each service writes only its own public trust folder and private `identity_*` volume; peers mount that public folder read-only. Backing up private identity volumes is optional: a lost key is remade and peers reload its new public key.
 3. Start the stack:
 
@@ -82,7 +81,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    git clone -b live <your-repo-url> /media/ZimaOS-HD/Apps/Applications/Citadel
    ```
 
-   Copy `ConversationGateway` and `DecisionGateway` to `/media/ZimaOS-HD/Apps/ModelProviders/` and set `CONVERSATION_GATEWAY_DIR=../../ModelProviders/ConversationGateway` and `DECISION_GATEWAY_DIR=../../ModelProviders/DecisionGateway` in the root `.env` (paths are relative to the Citadel folder).
+   Put `ConversationGateway` and `DecisionGateway` in `/media/ZimaOS-HD/Apps/ModelProviders/` and run each from its own folder (see "ConversationGateway" and "DecisionGateway" below). Citadel needs neither folder.
    Already cloned `main`? Switch in place; the containers keep running:
    `git fetch origin live && git switch -c live --track origin/live`.
 
@@ -98,7 +97,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    The simplest way is deploy option 2, which copies yours from the PC. To create them by hand, run from the Citadel
    folder (names that start with a dot are hidden: use `ls -la`).
 
-   The root `.env` is required (gateway admin passwords; see "Local" step 2). Run `python tools/setup_env.py` to make it and every per-app file from the committed `.env.example` files with random passwords; or copy them by hand:
+   The root `.env` is required (see "Local" step 2). Run `python tools/setup_env.py` to make it and every per-app file from the committed `.env.example` files with random passwords; or copy them by hand:
 
    ```bash
    cp .env.example .env
@@ -106,7 +105,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    chmod 600 .env apps/*/.env
    ```
 
-   Then set `CONVERSATION_GATEWAY_ADMIN_PASSWORD`, `DECISION_GATEWAY_ADMIN_PASSWORD` and `BOOTSTRAP_ADMIN_PASSWORD` yourself if you copied by hand.
+   Then set `BOOTSTRAP_ADMIN_PASSWORD` yourself if you copied by hand.
 
    | File | Keys to fill in |
    |---|---|
@@ -115,7 +114,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if a connection saved in Treasury Admin references any |
    | `apps/portcullis/.env` | `BOOTSTRAP_ADMIN_*` (first admin account) |
    | `apps/stronghold/.env` | Nothing is needed |
-   | `.env` (root) | `CONVERSATION_GATEWAY_ADMIN_PASSWORD`, `DECISION_GATEWAY_ADMIN_PASSWORD`, and `CONVERSATION_GATEWAY_DIR` / `DECISION_GATEWAY_DIR` when the gateway repos are not at `../../AI/ModelProviders/` |
+   | `.env` (root) | `BOOTSTRAP_ADMIN_PASSWORD` and the optional settings in `.env.example` |
 
    - Compose supplies `CITADEL_SERVICE`, `CITADEL_TRUST_DIR` and `CITADEL_IDENTITY_DIR`. Keep the trust and identity mounts; authentication is mandatory.
    - Compose sets `TREASURY_URL` and `CITADEL_ADVERTISE_URL` for each service; every service registers its own address with Treasury at start, and finds the others in Treasury's catalog (Treasury Admin, Services). A gateway entry that points at a service
@@ -232,14 +231,13 @@ The five admin apps refuse to be framed (`frame-ancestors 'none'`). To let Servi
 
 ## ConversationGateway
 
-Legion's Anthropic-protocol and OpenAI-protocol agents call their models through ConversationGateway. It is a service of this stack, built from its own repo, and other services may use it too.
+Legion's Anthropic-protocol and OpenAI-protocol agents call their models through ConversationGateway. It is its own stack, deployed from its own repo, and other services may use it too.
 
-- **Source**: `AI/ModelProviders/ConversationGateway` beside this workspace. On a server set `CONVERSATION_GATEWAY_DIR` in the root `.env` to where that repo sits.
-- **Admin password**: `CONVERSATION_GATEWAY_ADMIN_PASSWORD` in the root `.env`. The stack refuses to start without it.
+- **Source and start**: `AI/ModelProviders/ConversationGateway` (on ZimaOS `/media/ZimaOS-HD/Apps/ModelProviders/ConversationGateway`). Run `docker compose up -d --build` in that folder, after Citadel is up: it joins `citadel_core`, so Legion reaches it as `http://conversationgateway:29407`.
+- **Admin password**: `SERVICE_ADMIN_PASSWORD` in that folder's `.env` (copy `.env.example`). It refuses to start without it.
 - **First start**: open `http://<host>:29407/admin/`, create an access token for Legion. Then open the Legion admin app (`http://<host>:26500`), go to **Connections**, and save the gateway address (`http://conversationgateway:29407` inside Docker) and that token. They are stored in Treasury, not in a `.env` file. On `/admin/gateways.html` save one gateway per file in `apps/legion/gateways/anthropic/` that your agents use, with the same id as the filename (`claude`, `openrouter`, ...). No restart is needed; agents pick the settings up within half a minute.
 - **Outside callers**: the port is published on all interfaces. Give each caller its own token; it connects to `http://<host>:29407` and sends the token as `X-Internal-Token`. There is no TLS in front.
-- **One copy per host**: do not also start the gateway's own `docker-compose.yml` on the same host; port 29407 would clash.
-- Provider keys, gateway entries and tokens live in the `conversationgateway_data` volume. Back it up with the other volumes.
+- Provider keys, gateway entries and tokens live in its `conversationgateway_data` volume (project `conversationgateway`). Back it up with the other volumes.
 
 ## Stronghold
 
@@ -255,14 +253,13 @@ Product logic, called only by Portcullis. The calendar is the first feature that
 
 ## DecisionGateway
 
-Legion's decision agents and its automatic routing ask Laya and Jev through DecisionGateway. It is a service of this stack, built from its own repo, and other services may use it too.
+Legion's decision agents and its automatic routing ask Laya and Jev through DecisionGateway. It is its own stack, deployed from its own repo, and other services may use it too.
 
-- **Source**: `AI/ModelProviders/DecisionGateway` beside this workspace. On a server set `DECISION_GATEWAY_DIR` in the root `.env` to where that repo sits.
-- **Admin password**: `DECISION_GATEWAY_ADMIN_PASSWORD` in the root `.env`. The stack refuses to start without it.
+- **Source and start**: `AI/ModelProviders/DecisionGateway` (on ZimaOS `/media/ZimaOS-HD/Apps/ModelProviders/DecisionGateway`). Run `docker compose up -d --build` in that folder, after Citadel is up: it joins `citadel_core`, so Legion reaches it as `http://decisiongateway:29406`.
+- **Admin password**: `SERVICE_ADMIN_PASSWORD` in that folder's `.env` (copy `.env.example`). It refuses to start without it.
 - **First start**: open `http://<host>:29406/admin/`, create an access token for Legion. In the Legion admin app, **Connections**, save the address (`http://decisiongateway:29406` inside Docker) and that token in the DecisionGateway card.
 - **Gateways**: on `/admin/gateways.html` save two entries with exactly these ids. `laya`: kind `scuti`, URL of the Laya model service (`http://host.docker.internal:29220`), its token if it has one, and the strategy and window that used to be in `gateways/decision/laya.json` (`english-then-typed`, `4096`). `jev`: kind `typesafe`, model `jev-latest`, and the TypeSafe API key. Legion treats `laya` as the local gateway and `jev` as the cloud one.
 - **Outside callers**: port 29406 is published on all interfaces. Give each caller its own token. There is no TLS in front.
-- **One copy per host**: do not also start the gateway's own `docker-compose.yml` on the same host.
 - `LAYA_SERVICE_URL`, `LAYA_TOKEN` and `TYPESAFE_API_KEY` in `apps/legion/.env` are no longer read.
 
 ## 3. Server Manager
@@ -307,8 +304,8 @@ A service reports 'connection refused' to a peer: open Treasury Admin, Services;
 | legion cannot reach Laya | LayaModel is not running, or its published port is not 29220. Run `docker compose ps` in `LayaModel`, then `docker compose exec legion python -c "import urllib.request as u; print(u.urlopen('http://host.docker.internal:29220/health').status)"`. Expect 200. |
 | `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
 | `scp` will not log in | Check `DEPLOY_HOST` and that the folder exists. Run `ssh <host>` by hand to test. |
-| `variable is not set` for a gateway admin password | The root `.env` is missing or the password is empty. Run `python tools/setup_env.py`, or set it by hand. |
-| A gateway build fails: path not found | `CONVERSATION_GATEWAY_DIR` or `DECISION_GATEWAY_DIR` points nowhere. Copy the gateway repos and set both in the root `.env`. |
+| A gateway fails with `network citadel_core ... not found` | Start Citadel first; it creates the network. |
+| Legion: `ConversationGateway is unreachable` | The gateway is not running, or Legion's saved address is wrong. Run `docker compose up -d` in the gateway's folder and check the Connections page. |
 | A service fails and its `.env` (or the root `.env`) is a directory | Compose created it because the file was missing. Remove the directory, run `python tools/setup_env.py`, then start again. |
 | UI loads on the box but not on another device | Overlay not used. Check `COMPOSE_FILE` in the root `.env`, or add `-f docker-compose.zima.yml`. |
 | Overlay still binds `127.0.0.1` | Compose older than 2.24 ignores `!override`. Update Compose, or edit the `ports` lines in the main file. |
@@ -327,4 +324,4 @@ A value in the root `.env` wins over the same name in `apps/<service>/.env`. Emp
 - `BOOTSTRAP_ADMIN_PASSWORD=...` applies to every service that lists that name in its `.env.example` or `.env`.
 - `PORTCULLIS__BOOTSTRAP_ADMIN_PASSWORD=...` applies to Portcullis only (prefixes `ARMORY__`, `LEGION__`, `PORTCULLIS__`, `STRONGHOLD__`, `TREASURY__`; two underscores). It wins over the plain form.
 
-Other root variables, such as the gateway admin passwords and `CITADEL_DATA_DIR`, never reach a service's settings. Compose mounts the whole root `.env` read-only at `/citadel.env` in each service, so a process that can read files there can read those passwords too.
+Other root variables, such as `CITADEL_DATA_DIR`, never reach a service's settings. Compose mounts the whole root `.env` read-only at `/citadel.env` in each service, so a process that can read files there can read those passwords too.

@@ -44,47 +44,9 @@ services:
     depends_on: [treasury]
     networks: [core]
 
-  # Shared chat-model gateway (its own repo). Part of this stack, but open to callers
-  # outside Citadel: each one gets its own token on http://<host>:29407/admin/.
-  conversationgateway:
-    build: ${CONVERSATION_GATEWAY_DIR:-../../AI/ModelProviders/ConversationGateway}
-    restart: unless-stopped
-    environment:
-      SERVICE_ADMIN_PASSWORD: ${CONVERSATION_GATEWAY_ADMIN_PASSWORD:?set CONVERSATION_GATEWAY_ADMIN_PASSWORD in the root .env}
-    ports:
-      - "0.0.0.0:29407:29407"
-    volumes:
-      - ${CITADEL_DATA_DIR:-./.data}/conversationgateway:/data
-    # Lets a saved gateway reach a service published on the host (OmniRoute, Ollama, vLLM) as host.docker.internal.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:29407/health')"]
-      interval: 15s
-      timeout: 5s
-      start_period: 30s
-    networks: [core]
-
-  # Shared decision-model gateway (its own repo): TypeSafe Jev and the Laya model service.
-  # Part of this stack, but open to callers outside Citadel by token, like conversationgateway.
-  decisiongateway:
-    build: ${DECISION_GATEWAY_DIR:-../../AI/ModelProviders/DecisionGateway}
-    restart: unless-stopped
-    environment:
-      SERVICE_ADMIN_PASSWORD: ${DECISION_GATEWAY_ADMIN_PASSWORD:?set DECISION_GATEWAY_ADMIN_PASSWORD in the root .env}
-    ports:
-      - "0.0.0.0:29406:29406"
-    volumes:
-      - ${CITADEL_DATA_DIR:-./.data}/decisiongateway:/data
-    # Lets a saved gateway reach a host-published model service (LayaModel) as host.docker.internal.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:29406/health')"]
-      interval: 15s
-      timeout: 5s
-      start_period: 30s
-    networks: [core]
+  # ConversationGateway (29407) and DecisionGateway (29406) are not part of this file. Each runs from its own repo
+  # (AI/ModelProviders/<name>, `docker compose up -d --build` there) and joins citadel_core, so Legion still reaches
+  # them as http://conversationgateway:29407 and http://decisiongateway:29406. Start this stack first: it creates the network.
 
   legion:
     build: ./apps/legion
@@ -114,7 +76,7 @@ services:
       - trust_stronghold:/trust/stronghold:ro
       - trust_portcullis:/trust/portcullis:ro
       - ${CITADEL_DATA_DIR:-./.data}/legion:/app/.data
-    depends_on: [armory, conversationgateway, decisiongateway, treasury]
+    depends_on: [armory, treasury]
     networks: [core]
 
   treasury:
