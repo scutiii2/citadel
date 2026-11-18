@@ -113,6 +113,14 @@ Verification: Armory 1,539 passed, 1 skipped, 280 deselected. Shared auth 87 pas
 - Config issues: report a missing required connection (`/config-issues` in Portcullis reads Armory's status).
 - Tests: view tests for the three sections, secret fields, Test results; radius and layout checks as in `ember-frontend-design`.
 
+#### Interfaces
+
+- Armory `GET/POST /admin/connections`, `PATCH/DELETE /admin/connections/{name}`, and `POST /admin/connections/{name}/test/{transport}` manage records through Portcullis's matching `/api/admin/connections` routes under `extensions.manage`.
+- List and mutation responses return connection metadata and credential presence. A transport test returns `{ok, message, tools?}`. The admin list never fetches personal credentials.
+- Portcullis exposes credentials-free readiness at `GET /api/connection-status` for signed-in accounts and adds missing required connections to the existing `/api/config-issues` response.
+
+Verification: Armory 1,540 passed, 1 skipped, 280 deselected. Portcullis Config issues and server-info tests 24 passed. Armory Admin type check and 105 tests passed.
+
 ### Task 3: Stronghold uses Armory
 - New `ArmoryConnections` client beside `ArmoryUploads`. `bard`, `attachments` (audio, document, dictate) call it. Remove `ToolService`, `tool_tokens`, `tool_token_routes`, `BARD_URL`, `SCRIBE_URL`, `READER_URL`, `service_token` use for them, and the Tool services page in Stronghold Admin.
 - Keep the interim `GET /bard/audio/{id}`, now backed by Armory, or drop it if Portcullis streams from Armory directly (see Question 1).
@@ -140,6 +148,8 @@ Verification: Armory 1,539 passed, 1 skipped, 280 deselected. Shared auth 87 pas
 
 - Service assertion middleware originally skipped WebSockets. Armory explicitly opts its dictation path into authentication, and shared policy limits it to Portcullis and Stronghold.
 - Portcullis already opens attachment previews against Armory's PDF content route. Preserve its owner check and Range behavior during the remaining stream cutover.
+- Armory's MCP transports use AnyIO scopes that must close in their opening task. Each live transport now has an owner task, so editing or removing a connection can close and replace it from an admin request.
+- The Client-sided count uses the existing personal extensions endpoint and counts the signed-in account's connections. Armory never queries personal connection storage.
 
 ## Risks
 

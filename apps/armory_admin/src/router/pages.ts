@@ -17,8 +17,8 @@ export const ARMORY_PAGES: ArmoryPage[] = [
     permission: "capabilities.manage",
   },
   {
-    to: "/extensions",
-    label: "Extensions",
+    to: "/connections",
+    label: "Connections",
     icon: ["M12 2v6", "M8 8h8v4a4 4 0 0 1-8 0z", "M12 16v6"],
     permission: "extensions.manage",
   },

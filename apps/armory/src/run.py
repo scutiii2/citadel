@@ -63,6 +63,7 @@ async def _serve() -> None:
 
         from src.capability_routes import install_capability_routes
         from src.command_routes import install_command_routes
+        from src.connection_admin import install_connection_admin
         from src.connection_routes import install_connection_routes
         from src.download_routes import install_download_routes
         from src.environment_routes import install_environment_routes
@@ -119,7 +120,9 @@ async def _serve() -> None:
         # uvicorn.Server(...).serve(), not uvicorn.run(): run() calls asyncio.run() and would
         # nest a second event loop inside this one.
         async with httpx.AsyncClient(trust_env=False) as client:
-            install_connection_routes(app, ConnectionStore(settings.settings_db_path), client)
+            connections = ConnectionStore(settings.settings_db_path)
+            install_connection_routes(app, connections, client)
+            install_connection_admin(app, connections, client)
             server = uvicorn.Server(uvicorn.Config(app, host=settings.host, port=settings.port,
                                                    ws_max_size=STREAM_FRAME_BYTES, ws_max_queue=4))
             await server.serve()

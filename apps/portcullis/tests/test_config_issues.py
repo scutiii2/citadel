@@ -74,6 +74,22 @@ def test_config_issues_need_permission(client: TestClient, email: FakeEmailSende
     assert client.get("/api/config-issues").status_code == 403
 
 
+def test_missing_required_connection_is_reported(client: TestClient) -> None:
+    from src.routes.server_info import get_server_info
+
+    class Armory:
+        async def request(self, method, path, account):
+            assert (method, path) == ("GET", "/connections/status")
+            return {"bard": {"ready": False, "reason": "Set the Bard token in Armory Admin."},
+                    "scribe": {"ready": True, "reason": None},
+                    "reader": {"ready": True, "reason": None}}
+
+    client.app.dependency_overrides[get_server_info] = Armory
+    as_admin(client)
+    assert ("Armory Connections", "bard", "Set the Bard token in Armory Admin.") in issues(client)
+    assert client.get("/api/connection-status").json()["scribe"]["ready"] is True
+
+
 def test_a_missing_env_file_is_an_error(client: TestClient, tmp_path: Path) -> None:
     as_admin(client)
     (tmp_path / ".env").unlink()

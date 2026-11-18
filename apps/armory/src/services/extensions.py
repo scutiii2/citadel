@@ -22,10 +22,12 @@ from mcp.server.fastmcp import FastMCP
 from src.config import settings
 from src.services.app_config import (
     ExtensionConfig,
+    _build_extension,
     delete_extension_config,
     load_extensions_config,
     save_extension_config,
 )
+from src.services.connections import extension_entry
 from src.services.identity_context import current_email, current_username
 from src.citadel_auth import ServiceAuth, requester_meta
 from src.services.service_auth import keyring, mcp_requester
@@ -140,9 +142,7 @@ class ExtensionRegistry:
     A class, not module globals, so tests can spin it up and tear it down; the real server has one instance, held by ``install_extensions``."""
 
     def __init__(self) -> None:
-        # One AsyncExitStack per extension: a shared one can only close everything in LIFO order,
-        # but `remove()` must close exactly one extension's connection.
-        self._extension_stacks: dict[str, AsyncExitStack] = {}
+        self._connection_workers: dict[str, tuple[asyncio.Event, asyncio.Task]] = {}
         self._sessions: dict[str, ClientSession] = {}  # extension id -> session
         self._forward_requester: set[str] = set()  # ids whose config opted in to requester forwarding
         self._internal: set[str] = set()
@@ -172,18 +172,17 @@ class ExtensionRegistry:
     async def _connect_one(self, extension_id: str, config: ExtensionConfig) -> ExtensionStatus:
         """Connect one extension, append its ExtensionStatus and return it.
         Never raises (failures are recorded as status); not locked, since connect_all() runs it in a plain loop and add() locks around it."""
-        # A local stack until the connection is known to work: registering half-open resources
-        # would keep a broken extension's subprocess alive for the server's whole run.
-        local_stack = AsyncExitStack()
+        stop = asyncio.Event()
+        opened = asyncio.get_running_loop().create_future()
+        worker = asyncio.create_task(self._serve_session(config, opened, stop))
         try:
-            # No external timeout wrapper (asyncio.wait_for or anyio.fail_after): both corrupted anyio's cancel-scope tree
-            # (see _open_and_list). CONNECT_TIMEOUT_SECONDS goes into ClientSession, whose own request timeout is correctly scoped.
-            session, listed = await self._open_and_list(local_stack, config)
+            session, listed = await opened
+        except asyncio.CancelledError:
+            worker.cancel()
+            await asyncio.gather(worker, return_exceptions=True)
+            raise
         except Exception as error:  # noqa: BLE001 - one bad extension must not block the others
-            try:
-                await local_stack.aclose()
-            except Exception:  # noqa: BLE001 - a messy close must not escape a failed connect
-                pass
+            await asyncio.gather(worker, return_exceptions=True)
             status = ExtensionStatus(
                 id=extension_id,
                 label=config.label,
@@ -195,10 +194,7 @@ class ExtensionRegistry:
             self._statuses.append(status)
             return status
 
-        # Success: hand the local stack's resources to this extension's long-lived stack,
-        # so they close at shutdown or removal, not when this function returns.
-        opened = local_stack.pop_all()
-        self._extension_stacks[extension_id] = opened
+        self._connection_workers[extension_id] = (stop, worker)
 
         tool_names: list[str] = []
         for tool in listed.tools:
@@ -237,20 +233,29 @@ class ExtensionRegistry:
         self._statuses.append(status)
         return status
 
+    async def _serve_session(self, config, opened, stop) -> None:
+        """Own each transport's AnyIO scopes in one task across HTTP edits and shutdown."""
+        try:
+            async with AsyncExitStack() as stack:
+                session = await self._open_and_list(stack, config)
+                if not opened.done():
+                    opened.set_result(session)
+                await stop.wait()
+        except Exception as error:
+            if not opened.done():
+                opened.set_exception(error)
+
     async def _remove_one(self, extension_id: str) -> bool:
         """The unlocked core of remove(); split out like _connect_one so add_extension()/remove_extension()
         can hold the lock across the registry mutation and config.json write without deadlocking."""
         if extension_id not in {status.id for status in self._statuses}:
             return False
 
-        stack = self._extension_stacks.pop(extension_id, None)
-        if stack is not None:
-            # Only present for an extension that connected; an "error" one has just a status entry,
-            # which the filter below removes.
-            try:
-                await stack.aclose()
-            except Exception:  # noqa: BLE001 - a messy close must not stop removal
-                pass
+        worker = self._connection_workers.pop(extension_id, None)
+        if worker is not None:
+            stop, task = worker
+            stop.set()
+            await asyncio.gather(task, return_exceptions=True)
 
         self._sessions.pop(extension_id, None)
         self._forward_requester.discard(extension_id)
@@ -344,12 +349,11 @@ class ExtensionRegistry:
 
     async def aclose(self) -> None:
         """Close every open upstream connection, in no particular order; one failing to close must not stop the others."""
-        for stack in self._extension_stacks.values():
-            try:
-                await stack.aclose()
-            except Exception:  # noqa: BLE001 - a messy shutdown must not block the rest
-                pass
-        self._extension_stacks.clear()
+        workers = tuple(self._connection_workers.values())
+        for stop, _ in workers:
+            stop.set()
+        await asyncio.gather(*(task for _, task in workers), return_exceptions=True)
+        self._connection_workers.clear()
 
 
 _registry: ExtensionRegistry | None = None
@@ -411,3 +415,24 @@ async def remove_extension(extension_id: str, config_path: Path) -> bool:
         await asyncio.to_thread(delete_extension_config, config_path, extension_id)
         removed = await _registry._remove_one(extension_id)
     return removed
+
+
+def config_for_record(record: dict, path: Path) -> ExtensionConfig:
+    return _build_extension(record["name"], extension_entry(record), config_path=path)
+
+
+async def refresh_connection(name: str, record: dict | None, path: Path) -> None:
+    registry = _registry
+    if registry is None:
+        return
+    async with registry._mutation_lock:
+        await registry._remove_one(name)
+        if record and record["enabled"] and record["mcp"]:
+            config = config_for_record(record, path)
+            await registry._connect_one(name, config)
+
+
+async def test_connection(config: ExtensionConfig) -> list[str]:
+    async with AsyncExitStack() as stack:
+        _, listed = await ExtensionRegistry._open_and_list(stack, config)
+        return [tool.name for tool in listed.tools]

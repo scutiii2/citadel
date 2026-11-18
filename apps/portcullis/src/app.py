@@ -39,6 +39,7 @@ from src.routes import (
     chat_folders,
     chats,
     config_issues,
+    connections,
     tickets as tickets_routes,
     logs,
     mcp,
@@ -269,6 +270,7 @@ def create_app(
             "detail": str(error), "error": {"code": error.code, "message": str(error)},
         })
     app.include_router(config_issues.router)
+    app.include_router(connections.router)
     app.include_router(tickets_routes.router)
     app.include_router(tickets_routes.admin_router)
 
