@@ -119,7 +119,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 
    - Compose supplies `CITADEL_SERVICE`, `CITADEL_TRUST_DIR` and `CITADEL_IDENTITY_DIR`. Keep the trust and identity mounts; authentication is mandatory.
    - Compose sets `TREASURY_URL` and `CITADEL_ADVERTISE_URL` for each service; every service registers its own address with Treasury at start, and finds the others in Treasury's catalog (Treasury Admin, Services). A gateway entry that points at a service
-     published on the host uses `http://host.docker.internal:<port>`. Do not use `localhost` or
+     published on the host uses `http://host.docker.internal:<port>` (both gateway containers have that name, so a ConversationGateway entry can reach OmniRoute at `http://host.docker.internal:20128`). Do not use `localhost` or
      the server's hostname for another service.
    - **Laya settings** (`LAYA_TOKEN`, `LAYA_REPLICAS`, `LAYA_PORT`) belong in `LayaModel`'s own `.env`, not here. Each
      replica loads its own copy of the models in RAM, so keep `LAYA_REPLICAS` low on a small box.
