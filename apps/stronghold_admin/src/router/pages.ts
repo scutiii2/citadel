@@ -34,12 +34,6 @@ export const STRONGHOLD_PAGES: StrongholdPage[] = [
     permission: "tickets.manage",
   },
   {
-    to: "/tools",
-    label: "Tool services",
-    icon: ["M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.1-2.1z"],
-    permission: "settings.manage",
-  },
-  {
     to: "/usage-settings",
     label: "Usage settings",
     icon: ["M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3", "M1 14h6M9 8h6M17 16h6"],

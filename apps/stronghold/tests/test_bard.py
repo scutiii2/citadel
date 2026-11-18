@@ -29,20 +29,22 @@ def test_speak_and_installed_voices_are_asked_from_bard(client: TestClient, tool
         200, json={"voices": ["v2"]} if r.method == "GET" else {"file_id": FID, "duration_s": 1.5, "voice": "v2"})
 
     assert client.get("/bard/voices").json() == {"voices": ["v2"]}
-    assert tools["bard"].requests[-1].url.path == "/api/voices"
+    assert tools["bard"].requests[-1].url.path == "/connections/bard/voices"
     response = client.post("/bard/speak", json={"text": "hello", "voice": "v2"})
 
     assert response.status_code == 200
     assert response.json() == {"file_id": FID, "duration_s": 1.5, "voice": "v2"}
     sent = tools["bard"].requests[-1]
-    assert sent.url.path == "/api/speak" and json.loads(sent.content) == {"text": "hello", "voice": "v2"}
-    assert sent.headers["x-requester-username"] == "ana" and sent.headers["x-requester-uid"] == "u-1"
+    assert sent.url.path == "/connections/bard/speak" and json.loads(sent.content) == {"text": "hello", "voice": "v2"}
+    assert caller(sent, "armory") == "stronghold"
+    assert requester(sent)["username"] == "ana" and requester(sent)["sub"] == "u-1"
+    assert "x-internal-token" not in sent.headers
     assert platform.actions == [("u-1", "bard.speak", f"Generated speech file {FID}")]  # never the text
 
 
 @pytest.mark.parametrize("code, expected", [(400, 400), (413, 413), (401, 502), (503, 502)])
 def test_speak_maps_bard_failures(client: TestClient, tools, code: int, expected: int) -> None:
-    tools["bard"].handler = lambda r: httpx.Response(code, json={"message": "Unable to speak"})
+    tools["bard"].handler = lambda r: httpx.Response(code, json={"detail": "Unable to speak"})
 
     response = client.post("/bard/speak", json={"text": "hi", "voice": "v2"})
 
@@ -63,33 +65,6 @@ def test_a_bard_outage_is_a_502(client: TestClient, tools) -> None:
     assert client.get("/bard/voices").status_code == 502
     assert client.post("/bard/speak", json={"text": "hi", "voice": "v1"}).status_code == 502
 
-
-def test_audio_streams_from_bard_with_identity_token_and_range(client: TestClient, tools) -> None:
-    tools["bard"].handler = lambda r: httpx.Response(
-        206, content=b"2345",
-        headers={"content-type": "audio/mpeg", "content-range": "bytes 2-5/10", "accept-ranges": "bytes"})
-
-    response = client.get(f"/bard/audio/{FID}", headers={"Range": "bytes=2-5"})
-
-    assert response.status_code == 206 and response.content == b"2345"
-    assert response.headers["content-type"] == "audio/mpeg" and response.headers["content-range"] == "bytes 2-5/10"
-    sent = tools["bard"].requests[-1]
-    assert sent.url.path == f"/api/files/{FID}" and sent.headers["range"] == "bytes=2-5"
-    assert sent.headers["x-requester-username"] == "ana"
-
-
-def test_audio_needs_the_requester_and_a_valid_id(client: TestClient, tools) -> None:
-    assert client.get(f"/bard/audio/{FID}", headers=ANONYMOUS).status_code == 400
-    assert client.get("/bard/audio/not-hex").status_code == 422
+def test_audio_is_owned_by_armory(client: TestClient, tools) -> None:
+    assert client.get(f"/bard/audio/{FID}").status_code == 404
     assert not tools["bard"].requests
-
-
-@pytest.mark.parametrize("code, expected", [(404, 404), (416, 416), (401, 502), (503, 502)])
-def test_audio_maps_bard_failures(client: TestClient, tools, code: int, expected: int) -> None:
-    tools["bard"].handler = lambda r: httpx.Response(code, json={"error": "x"})
-    assert client.get(f"/bard/audio/{FID}").status_code == expected
-
-
-def test_audio_with_bard_down_is_a_502(client: TestClient, tools) -> None:
-    tools["bard"].handler = down
-    assert client.get(f"/bard/audio/{FID}").status_code == 502

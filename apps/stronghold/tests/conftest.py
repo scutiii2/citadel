@@ -168,13 +168,18 @@ def legion() -> FakeArmory:
 
 @pytest.fixture
 def tools() -> dict[str, FakeArmory]:
-    """Scribe, Reader and Bard: each answers through its own handler and records its requests."""
+    """Armory's Scribe, Reader and Bard routes have independent fake handlers."""
     return {name: FakeArmory() for name in ("scribe", "reader", "bard")}
 
 
-def tool_clients(tools: dict[str, FakeArmory]) -> dict[str, httpx.AsyncClient]:
-    return {name: httpx.AsyncClient(base_url=f"http://{name}.test", transport=httpx.MockTransport(fake))
-            for name, fake in tools.items()}
+def armory_dispatch(armory: FakeArmory, connections: dict[str, FakeArmory]):
+    """One Armory transport with independent handlers for its connection endpoints."""
+    def handle(request: httpx.Request) -> httpx.Response:
+        parts = request.url.path.split("/")
+        if len(parts) >= 4 and parts[1] == "connections":
+            return connections[parts[2]](request)
+        return armory(request)
+    return handle
 
 
 @pytest.fixture
@@ -188,12 +193,12 @@ def client(tmp_path, db_gateway, armory, platform, agent, tools, legion):
     from src.api import create_app
     from src.config import Settings
 
-    upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory))
+    upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory_dispatch(armory, tools)))
     registry = tmp_path / "config_agents.json"  # tests add agents by rewriting it
     registry.write_text(json.dumps({"agents": AGENTS}), encoding="utf-8")
     app = create_app(auth_helpers.stack["stronghold"], Settings(data_dir=tmp_path / "data", agents_registry_path=registry),
                      store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent,
-                     tools=tool_clients(tools), legion=httpx.AsyncClient(transport=httpx.MockTransport(legion)))
+                     legion=httpx.AsyncClient(transport=httpx.MockTransport(legion)))
     with TestClient(app, headers=identity(**IDENTITY)) as test_client:
         test_client.auth = service_auth()
         yield test_client
@@ -210,11 +215,11 @@ def make_client(tmp_path, db_gateway, armory, platform, agent, tools, legion):
     def make(usage: "UsageSettings | None" = None, pricing: "PricingSettings | None" = None) -> TestClient:
         registry = tmp_path / "config_agents.json"
         registry.write_text(json.dumps({"agents": AGENTS}), encoding="utf-8")
-        upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory))
+        upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory_dispatch(armory, tools)))
         settings = Settings(data_dir=tmp_path / "data", agents_registry_path=registry,
                             usage=usage or UsageSettings(), pricing=pricing or PricingSettings())
         app = create_app(auth_helpers.stack["stronghold"], settings, store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent,
-                     tools=tool_clients(tools), legion=httpx.AsyncClient(transport=httpx.MockTransport(legion)))
+                     legion=httpx.AsyncClient(transport=httpx.MockTransport(legion)))
         client = TestClient(app, headers=identity(**IDENTITY))
         client.auth = service_auth()
         clients.append(client)

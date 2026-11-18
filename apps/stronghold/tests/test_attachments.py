@@ -240,8 +240,8 @@ def test_audio_is_forwarded_to_scribe_with_identity(client: TestClient, tools, p
     assert response.status_code == 200
     assert response.json() == {"filename": "talk.m4a", "file_id": "a" * 32, "duration_s": 3.2, "expires_at": 99.0}
     sent = tools["scribe"].requests[-1]
-    assert sent.url.path == "/api/files" and sent.content == b"abc"
-    assert sent.headers["x-requester-username"] == "ana" and sent.headers["x-filename"] == "talk.m4a"
+    assert sent.url.path == "/connections/scribe/files" and sent.content == b"abc"
+    assert requester(sent)["username"] == "ana" and sent.headers["x-filename"] == "talk.m4a"
     assert "attachments.audio" in logged(platform)
 
 
@@ -254,7 +254,7 @@ def test_audio_that_cannot_be_right_never_reaches_scribe(client: TestClient, too
 
 
 def test_scribe_rejecting_audio_is_a_400_with_its_message(client: TestClient, tools) -> None:
-    tools["scribe"].handler = lambda r: httpx.Response(400, json={"error": "audio_rejected", "message": "Not audio."})
+    tools["scribe"].handler = lambda r: httpx.Response(400, json={"detail": "Not audio."})
 
     response = post(client, "audio", "a.mp3")
 
@@ -277,7 +277,7 @@ def test_dictation_returns_the_transcript_and_logs_no_words(client: TestClient, 
 
     assert response.status_code == 200 and response.json() == {"text": "hello", "duration_s": 2.5}
     sent = tools["scribe"].requests[-1]
-    assert sent.url.path == "/api/transcribe" and sent.content == b"abc" and sent.headers["x-filename"] == "speech.webm"
+    assert sent.url.path == "/connections/scribe/transcribe" and sent.content == b"abc" and sent.headers["x-filename"] == "speech.webm"
     assert logged(platform)["attachments.dictate"] == "Transcribed 3 bytes of dictated audio"
 
 
@@ -287,7 +287,7 @@ def test_a_partial_dictation_leaves_no_log_line(client: TestClient, tools, platf
     response = post(client, "dictate/partial", "a.webm")
 
     assert response.json() == {"text": "hel", "duration_s": 1.0}
-    assert tools["scribe"].requests[-1].url.path == "/api/transcribe-partial"
+    assert tools["scribe"].requests[-1].url.path == "/connections/scribe/transcribe-partial"
     assert platform.actions == []
 
 
@@ -303,7 +303,7 @@ def test_a_document_is_forwarded_to_reader_with_identity(client: TestClient, too
     assert response.status_code == 200
     assert response.json() == {"filename": "scan.pdf", "file_id": "b" * 32, "page_count": 2, "expires_at": 99.0}
     sent = tools["reader"].requests[-1]
-    assert sent.url.path == "/api/files" and sent.content == b"%PDF" and sent.headers["x-filename"] == "scan.pdf"
+    assert sent.url.path == "/connections/reader/files" and sent.content == b"%PDF" and sent.headers["x-filename"] == "scan.pdf"
     assert "attachments.document" in logged(platform)
 
 
@@ -314,7 +314,7 @@ def test_a_document_that_cannot_be_right_never_reaches_reader(client: TestClient
 
 
 def test_reader_rejection_is_a_400_and_outage_is_a_502(client: TestClient, tools) -> None:
-    tools["reader"].handler = lambda r: httpx.Response(422, json={"message": "Not a document."})
+    tools["reader"].handler = lambda r: httpx.Response(400, json={"detail": "Not a document."})
     response = post(client, "document", "a.pdf")
     assert response.status_code == 400 and "Not a document." in response.text
 

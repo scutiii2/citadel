@@ -25,14 +25,13 @@ def test_treasury_url_comes_from_config_and_env_wins(tmp_path, monkeypatch):
     assert load_settings().treasury_url == "http://from-env:29602"
 
 
-def test_lifespan_registers_its_advertised_address(tmp_path, monkeypatch, auth_stack, platform, agent, tools, legion):
+def test_lifespan_registers_its_advertised_address(tmp_path, monkeypatch, auth_stack, platform, agent, legion):
     import asyncio
     import json
     from fastapi.testclient import TestClient
     from src import api
     from src.citadel_auth import ServiceCatalog
     from src.config import Settings
-    from tests.conftest import tool_clients
     seen = []
 
     def handler(request):
@@ -49,7 +48,7 @@ def test_lifespan_registers_its_advertised_address(tmp_path, monkeypatch, auth_s
     monkeypatch.setattr(api, "ServiceCatalog", lambda *args, **kwargs: ServiceCatalog(*args, transport=transport, **kwargs))
     settings = Settings(data_dir=tmp_path / "data", advertise_url="http://stronghold.test:29650")
     app = api.create_app(auth_stack["stronghold"], settings, platform=platform, agent_gateway=agent,
-                         tools={name: real_client(transport=transport) for name in tools}, legion=real_client(transport=transport))
+                         legion=real_client(transport=transport))
     with TestClient(app) as client:
         async def wait_registered():
             for _ in range(100):

@@ -150,7 +150,7 @@ def test_stronghold_still_starts_when_storage_is_down_or_data_is_too_new(tmp_pat
     db_gateway.get = down
     upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(FakeArmory()))
     app = create_app("", Settings(data_dir=tmp_path / "data", agents_registry_path=registry), store=db_gateway,
-                     platform=platform, armory=upstream, agent_gateway=agent, tools={}, legion=upstream)
+                     platform=platform, armory=upstream, agent_gateway=agent, legion=upstream)
     with TestClient(app) as test_client:
         assert app.state.schema_version is None
         assert test_client.get("/health").json() == {"status": "ok"}

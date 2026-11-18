@@ -126,6 +126,13 @@ Verification: Armory 1,540 passed, 1 skipped, 280 deselected. Portcullis Config 
 - Keep the interim `GET /bard/audio/{id}`, now backed by Armory, or drop it if Portcullis streams from Armory directly (see Question 1).
 - Tests: the existing `test_bard`, `test_attachments`, `test_tool_tokens` become tests against a fake Armory.
 
+#### Interfaces
+
+- `ArmoryConnections(client, keyring)` forwards the signed requester to the fixed Armory endpoints. `call(method, path, body)` sends JSON and `post_file(path, filename, content)` sends raw bytes and `X-Filename`.
+- Stronghold's existing Bard and attachment JSON responses stay compatible. Armory's safe `detail` on 400, 413, and 502 reaches the caller. Stronghold stops serving Bard audio and tool tokens.
+
+Verification: Stronghold 730 passed. Stronghold Admin type check and 260 tests passed. Audio streaming tests move to Portcullis and Armory.
+
 ### Task 4: Portcullis streams from Armory
 - Audio, attachment content and the dictation WebSocket open against Armory. Remove `services/scribe.py`, `tool_tokens`, `tool_token_routes`, `scribe_url`, the Tool services page and the related admin client.
 - Tests: audio and dictation route tests against a fake Armory; remove the token tests.
