@@ -1,31 +1,45 @@
 import { onScopeDispose, ref, type Ref } from "vue";
 import { bardClient, type SpeechClip } from "../../../api/files/BardClient";
+import { mediaUrl } from "../../../utils/server";
 
 // Speech is heard slightly after the audio clock reports it, so run the highlight a little ahead.
 const LEAD_S = 0.15;
 let stopActive: (() => void) | undefined;
 type Prepared = { clip: SpeechClip; error?: never } | { error: unknown; clip?: never };
 
-/** Play one clip to completion, releasing listeners on stop and every failure path. */
-function playClip(audio: HTMLAudioElement, clip: SpeechClip, signal: AbortSignal, playing: () => void): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const cleanup = () => {
-      audio.removeEventListener("ended", ended);
-      audio.removeEventListener("error", failed);
-      signal.removeEventListener("abort", aborted);
-    };
-    const ended = () => { cleanup(); resolve(); };
-    const failed = () => { cleanup(); reject(new Error("Audio unavailable. Try reading aloud again.")); };
-    const aborted = () => { cleanup(); reject(new DOMException("Stopped", "AbortError")); };
-    if (signal.aborted) { aborted(); return; }
-    audio.addEventListener("ended", ended);
-    audio.addEventListener("error", failed);
-    signal.addEventListener("abort", aborted, { once: true });
-    audio.src = `/api/bard/audio/${encodeURIComponent(clip.file_id)}`;
-    void audio.play().then(() => { if (!signal.aborted) playing(); }).catch((cause: unknown) => {
-      cleanup(); reject(cause);
+const FAILED = "Audio unavailable. Try reading aloud again.";
+
+/** Play one clip to completion, releasing listeners on stop and every failure path.
+ * The Windows app cannot send its bearer from an <audio> element, so the clip is fetched first and played from a blob: URL. */
+async function playClip(audio: HTMLAudioElement, clip: SpeechClip, signal: AbortSignal, playing: () => void): Promise<void> {
+  let src: string;
+  try {
+    src = await mediaUrl(`/api/bard/audio/${encodeURIComponent(clip.file_id)}`);
+  } catch {
+    throw new Error(FAILED);
+  }
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        audio.removeEventListener("ended", ended);
+        audio.removeEventListener("error", failed);
+        signal.removeEventListener("abort", aborted);
+      };
+      const ended = () => { cleanup(); resolve(); };
+      const failed = () => { cleanup(); reject(new Error(FAILED)); };
+      const aborted = () => { cleanup(); reject(new DOMException("Stopped", "AbortError")); };
+      if (signal.aborted) { aborted(); return; }
+      audio.addEventListener("ended", ended);
+      audio.addEventListener("error", failed);
+      signal.addEventListener("abort", aborted, { once: true });
+      audio.src = src;
+      void audio.play().then(() => { if (!signal.aborted) playing(); }).catch((cause: unknown) => {
+        cleanup(); reject(cause);
+      });
     });
-  });
+  } finally {
+    if (src.startsWith("blob:")) URL.revokeObjectURL(src);
+  }
 }
 
 /** Synthesize at most one batch ahead; a cancelled run never resumes playback. */
