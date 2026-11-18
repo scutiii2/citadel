@@ -8,9 +8,9 @@ it creates a separate Markdown document, without automatic synchronization.
 
 ## Connect a vault
 
-In Ember Admin, open **Workspace settings → Instance Brain**. Managing the shared
+In Armory Admin, open **Brain**. Managing the shared
 connection requires `settings.manage` and the existing staff verification rules.
-In Ember Web, open **Brains → Personal Brain** to configure your own connection.
+In Ember, open **Brains → Personal Brain** to configure your own connection.
 Use the Obsidian Local REST API plugin's HTTPS endpoint and API key. The endpoint
 must be reachable from Armory, not just from the browser or the user's desktop.
 
@@ -27,17 +27,25 @@ TLS verification, refuses redirects, and ignores proxy environment variables.
 Install the plugin certificate in the backend trust store when necessary; there
 is no personal TLS bypass. An instance administrator can configure a local vault.
 
-API keys are encrypted by Stronghold's SecretBox (key in `keys.json` of Stronghold's data folder) in its own database. Protect
-the existing encryption key together with storage backups. Product account
-isolation does not hide data from the operator of the deployment.
+Armory encrypts the Instance Brain credential in its settings database. Back up
+the Armory identity volume with the settings database to preserve the encryption
+material. Stronghold encrypts Personal Brain credentials with its own SecretBox.
+Keep Stronghold's encryption material with its backups as well.
 
 ## Backend configuration and compatibility
 
-Armory needs `STRONGHOLD_URL` to reach Stronghold's internal connection resolver.
-The local default is `http://127.0.0.1:29650`; Compose sets
-`http://stronghold:29650`. Both services require per-service Ed25519 assertions; requester identity comes from a Portcullis-signed token.
-Resolution fails closed without a token and trusted, valid account UID. No browser
-or model supplies an owner UID or receives a stored credential.
+Armory and Stronghold discover each other through the Treasury service catalog.
+Both services require Ed25519 service assertions. Requester identity comes from
+a Portcullis-signed token. Stronghold checks current account permissions before
+Armory accesses a vault. Shared credentials resolve inside Armory.
+
+Stop all pre-Plan-15 Stronghold processes before starting the new Stronghold.
+Those processes can still write shared revisions. Start the new Armory after
+Stronghold, then update Portcullis and the admin apps. Armory imports the last committed shared
+connection from Stronghold at startup. It retries if the source is unavailable.
+The import preserves revision and generation, so existing publication receipts
+and pending reviews still refer to the same destination. After committing the
+import, Armory acknowledges it and Stronghold removes the old shared records.
 
 Existing Obsidian environment settings remain the legacy Instance Brain until a
 managed connection is saved. A managed disabled connection never falls back to
@@ -123,8 +131,10 @@ another brain. CLI parsing and optional turn parameters preserve this contract.
 Stronghold owns Treasury collections `brain_connections`,
 `brain_connection_revisions`, `brain_promotions`, `brain_promotion_attempts`,
 `brain_promotion_decisions`, `brain_promotion_requests` and `brain_suggestions`.
-Connection revisions and promotion decisions use create-if-absent claims; mutable
-head records are recoverable hints. Personal records use immutable account UID.
+Personal connection revisions and promotion decisions use create-if-absent claims.
+Mutable head records are recoverable hints. Personal records use immutable account
+UID. Armory's `instance_brain` settings table stores the shared connection and its
+migration state.
 
 Armory's derived indexes live beside `OBSIDIAN_INDEX_PATH`, under
 `brains/<connection-generation-model hash>/index.db`, with SQLite WAL/SHM and an

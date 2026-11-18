@@ -40,10 +40,10 @@ def test_resolve_uses_current_catalog_address(monkeypatch):
     seen = []
     def handler(request):
         seen.append(str(request.url))
-        return httpx.Response(200, json={"scope": "instance"})
+        return httpx.Response(200, json={"scope": "personal"})
     monkeypatch.setattr(brain_resolver, "service_client", lambda *a, **kw: real_client(*a, transport=httpx.MockTransport(handler), **kw))
     monkeypatch.setitem(catalog._known, "stronghold", "http://stronghold.test:29650")
-    assert asyncio.run(brain_resolver._resolve("instance", "read")) == {"scope": "instance"}
+    assert asyncio.run(brain_resolver._resolve("personal", "read")) == {"scope": "personal"}
     monkeypatch.setitem(catalog._known, "stronghold", "http://moved.test:29650")
-    assert asyncio.run(brain_resolver._resolve("instance", "read")) == {"scope": "instance"}
+    assert asyncio.run(brain_resolver._resolve("personal", "read")) == {"scope": "personal"}
     assert seen == ["http://stronghold.test:29650/brains/resolve", "http://moved.test:29650/brains/resolve"]

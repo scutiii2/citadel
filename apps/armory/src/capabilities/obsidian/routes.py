@@ -29,6 +29,8 @@ class Operation(BaseModel):
 
 
 def execute(body: Operation, uid: str):
+    if body.scope != "personal" and body.operation in {"retire", "test"}:
+        raise ObsidianGatewayError("Manage the Instance Brain through Armory Admin.", status=403)
     if body.operation == "retire":
         from src.capabilities.obsidian.utils.brain_indexes import indexes
         indexes.retire(uid, body.scope)
