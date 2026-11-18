@@ -11,6 +11,7 @@ const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 
+const EXAMPLE = "http://192.168.1.5:29601";
 const previous = serverBase();
 const server = ref(previous);
 const error = ref(serverError());
@@ -19,6 +20,15 @@ const busy = ref(false);
 onMounted(() => {
   if (!isDesktop()) void router.replace("/");
 });
+
+/** Tab or Right arrow at the end of the text finishes the example address, like a shell's ghost text. */
+function complete(event: KeyboardEvent): void {
+  const input = event.target as HTMLInputElement;
+  const atEnd = input.selectionStart === input.value.length && input.selectionEnd === input.value.length;
+  if (!atEnd || input.value === EXAMPLE || !EXAMPLE.startsWith(input.value)) return;
+  event.preventDefault();
+  server.value = EXAMPLE;
+}
 
 async function submit(): Promise<void> {
   if (busy.value) return;
@@ -53,7 +63,9 @@ async function submit(): Promise<void> {
           inputmode="url"
           autocomplete="off"
           spellcheck="false"
-          placeholder="http://192.168.1.5:29601"
+          :placeholder="EXAMPLE"
+          @keydown.tab="complete"
+          @keydown.right="complete"
           :aria-invalid="error ? 'true' : 'false'"
           aria-describedby="connect-help connect-error"
           required

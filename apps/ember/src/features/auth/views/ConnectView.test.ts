@@ -65,3 +65,16 @@ it("shows why the last check failed on arrival, and guards a repeated submit", a
   expect(w.get("button.primary").attributes("aria-busy")).toBe("true");
   finish({ ok: false, error: "no" }); await flushPromises();
 });
+
+it("finishes the example address on Tab and Right arrow, only at the end of a matching text", async () => {
+  const w = mount(ConnectView);
+  const input = w.get("input");
+  await input.trigger("keydown", { key: "ArrowRight" });
+  expect((input.element as HTMLInputElement).value).toBe("http://192.168.1.5:29601");
+  await input.setValue("");
+  await input.trigger("keydown", { key: "Tab" });
+  expect((input.element as HTMLInputElement).value).toBe("http://192.168.1.5:29601");
+  await input.setValue("http://10.0.0.5");            // does not match the example: Tab keeps its normal job
+  await input.trigger("keydown", { key: "Tab" });
+  expect((input.element as HTMLInputElement).value).toBe("http://10.0.0.5");
+});
