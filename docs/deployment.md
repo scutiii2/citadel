@@ -293,6 +293,8 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 
 ## 4. Troubleshooting
 
+A service reports 'connection refused' to a peer: open Treasury Admin, Services; pin the address if the peer registered a wrong one.
+
 | Symptom | Cause and fix |
 |---|---|
 | `401` or `403` between backends | Check service identity/trust mounts, clock synchronization and the caller's route policy. There is no legacy token fallback. |

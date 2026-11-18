@@ -218,3 +218,8 @@ def test_background_refusal_is_final(tmp_path):
         await catalog.stop()
     asyncio.run(go())
     assert calls == ["/services/stronghold"]
+
+
+def test_advertised_url_brackets_an_ipv6_listener():
+    assert advertised_url("::1", 29650) == "http://[::1]:29650"
+    assert checked_address(advertised_url("::1", 29650)) == "http://[::1]:29650"

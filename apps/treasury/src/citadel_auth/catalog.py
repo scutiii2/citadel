@@ -61,7 +61,10 @@ def advertised_url(host: str, port: int, configured: str | None = None) -> str:
     chosen = os.getenv("CITADEL_ADVERTISE_URL") or configured
     if chosen:
         return checked_address(chosen)
-    return f"http://{'127.0.0.1' if host in ('', '0.0.0.0', '::') else host}:{port}"
+    listener = "127.0.0.1" if host in ("", "0.0.0.0", "::") else host
+    if ":" in listener and not listener.startswith("["):
+        listener = f"[{listener}]"
+    return checked_address(f"http://{listener}:{port}")
 
 
 def resolved(value: str | Callable[[], str]) -> str:

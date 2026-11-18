@@ -73,7 +73,7 @@ Left alone: `agents_registry_url` / `agents_registry_path` (Legion's agent list)
   - `class CatalogTransport(httpx.AsyncBaseTransport)` with `__init__(catalog, inner=None)`
   - `class ServiceCatalog` with `__init__(keyring, treasury_url, *, cache_path=None, defaults=DEFAULTS, interval=30.0, transport=None)`, `url(name) -> str`, `mcp_url(name="armory") -> str`, `address(name) -> Callable[[], str]`, `async refresh() -> bool`, `async register(name, url, *, attempts=30, delay=2.0) -> bool`, `start(name=None, url=None) -> asyncio.Task`, `refresh_soon() -> None`, `async stop() -> None`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # libs/citadel_auth/tests/test_catalog.py
@@ -252,12 +252,12 @@ def test_start_registers_then_refreshes_and_stop_cancels(tmp_path):
     assert catalog.url("armory") == "http://armory:29600"
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run (in `libs/citadel_auth`): `uv run pytest tests/test_catalog.py -q -p no:cacheprovider`
 Expected: FAIL, `ModuleNotFoundError: No module named 'citadel_auth.catalog'`.
 
-- [ ] **Step 3: Implement `catalog.py`**
+- [x] **Step 3: Implement `catalog.py`**
 
 ```python
 """Where the Citadel services are. Treasury keeps the catalog; each service registers its own address.
@@ -472,7 +472,7 @@ class CatalogTransport(httpx.AsyncBaseTransport):
         await self._inner.aclose()
 ```
 
-- [ ] **Step 4: Export from the package**
+- [x] **Step 4: Export from the package**
 
 In `libs/citadel_auth/citadel_auth/__init__.py` add the import line and extend `__all__`:
 
@@ -485,12 +485,12 @@ from .catalog import (
 
 Add `"CatalogTransport", "SERVICE_DEFAULTS", "ServiceCatalog", "UnknownService", "advertised_url", "checked_address", "logical_url", "resolved"` to `__all__`.
 
-- [ ] **Step 5: Run the library tests**
+- [x] **Step 5: Run the library tests**
 
 Run: `uv run pytest -q -p no:cacheprovider` in `libs/citadel_auth`
 Expected: all pass (50 earlier plus the new ones).
 
-- [ ] **Step 6: Sync the vendored copies and commit**
+- [x] **Step 6: Sync the vendored copies and commit**
 
 ```bash
 uv run scripts/sync_citadel_auth.py
@@ -518,7 +518,7 @@ git commit -m "feat(auth): add the service catalog client"
   - `service_catalog.register(db, name, url) -> None`, `pin(db, name, url) -> None`, `unpin(db, name) -> None` (all raise `ServiceCatalogError`)
   - HTTP: `GET /services` -> `{"services": {name: url}}` (any known service); `PUT /services/{name}` body `{"url"}` (caller must be `name`); `GET /admin/services` -> `view`; `PUT /admin/services/{name}` body `{"url"}` pins; `DELETE /admin/services/{name}` unpins. Admin routes: Portcullis only, like `/admin/connections`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # apps/treasury/tests/test_service_catalog.py
@@ -584,12 +584,12 @@ def test_only_portcullis_pins_and_a_pin_shows_in_the_catalog(client_as):
 
 (`client_as` and `db_path` are the existing fixtures' names in `test_api.py`; if they differ, create small equivalents in `conftest.py` that return a `TestClient` whose assertions are signed by the named service, exactly as `test_api.py` does for `portcullis`.)
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `uv run pytest tests/test_service_catalog.py -q -p no:cacheprovider` in `apps/treasury`
 Expected: FAIL, `cannot import name 'service_catalog'`.
 
-- [ ] **Step 3: Implement the store**
+- [x] **Step 3: Implement the store**
 
 ```python
 # apps/treasury/src/service_catalog.py
@@ -662,7 +662,7 @@ def unpin(db: Path, name: str) -> None:
     settings_store.delete(db, PINNED_TABLE, name)
 ```
 
-- [ ] **Step 4: Add the routes to `api.py`**
+- [x] **Step 4: Add the routes to `api.py`**
 
 Import: `from src import service_catalog`. Next to `register_instance`:
 
@@ -719,12 +719,12 @@ After `/admin/default-cache`:
 
 `ServiceBody` must be defined at module level (next to `InstanceBody`), not inside `create_app`; move it there.
 
-- [ ] **Step 5: Run the Treasury tests**
+- [x] **Step 5: Run the Treasury tests**
 
 Run: `uv run pytest -q -p no:cacheprovider` in `apps/treasury`
 Expected: all pass (68 before). If `test_schema` or a table-name test flags the two new tables, add them to the allowed list that test reads (same fix as the `limits_and_prices` rename in Stronghold: table names must be known).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/treasury
@@ -744,17 +744,17 @@ git commit -m "feat(treasury): keep a catalog of service addresses"
 - Consumes: Treasury `GET/PUT/DELETE /admin/services...` from Task 2; Portcullis permission `settings.manage`, the one the connections routes use.
 - Produces: `GET /api/admin/treasury/services`, `PUT /api/admin/treasury/services/{name}` body `{"url": str}`, `DELETE /api/admin/treasury/services/{name}`. Answers are Treasury's `view` JSON.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Copy the three tests that cover `/api/admin/treasury/connections` (list, put, delete, plus the 403 for an account without `settings.manage`) and change the paths to `/services` and the body to `{"url": "http://armory.lan:29600"}`. The fake Treasury those tests use needs the three new routes; extend it so `GET /admin/services` returns `{"services": []}`, and PUT/DELETE echo it.
 
-- [ ] **Step 2: Run to verify they fail** (`uv run pytest tests/<that file> -q -p no:cacheprovider -k services`): expected 404.
+- [x] **Step 2: Run to verify they fail** (`uv run pytest tests/<that file> -q -p no:cacheprovider -k services`): expected 404.
 
-- [ ] **Step 3: Implement**: in `admin_treasury.py`, add three routes that mirror the connections routes line for line (same dependency for the permission, same `DbGatewayRefused` to HTTP mapping, same audit-log call with action names `treasury.service_pin` and `treasury.service_unpin` and field names only, never values).
+- [x] **Step 3: Implement**: in `admin_treasury.py`, add three routes that mirror the connections routes line for line (same dependency for the permission, same `DbGatewayRefused` to HTTP mapping, same audit-log call with action names `treasury.service_pin` and `treasury.service_unpin` and field names only, never values).
 
-- [ ] **Step 4: Run** `uv run pytest -q -p no:cacheprovider tests/<that file>`: pass. The full suite runs in Task 9.
+- [x] **Step 4: Run** `uv run pytest -q -p no:cacheprovider tests/<that file>`: pass. The full suite runs in Task 9.
 
-- [ ] **Step 5: Commit** `git commit -m "feat(portcullis): pass the service catalog to Treasury Admin"`
+- [x] **Step 5: Commit** `git commit -m "feat(portcullis): pass the service catalog to Treasury Admin"`
 
 ---
 
@@ -768,15 +768,15 @@ Copy the three tests that cover `/api/admin/treasury/connections` (list, put, de
 - Consumes: Task 3 routes.
 - Produces: a page "Services" (permission `settings.manage`) with a table: name, address in use, source (`Pinned`, `Registered`, `Default`), a field to pin an address, and "Use the registered address" (unpin).
 
-- [ ] **Step 1: Write the failing test** modelled on `ConnectionsView`'s: mount with a fake client returning `{services: [{name: "armory", url: "http://armory:29600", source: "registered", registered: "http://armory:29600", pinned: null}, ...]}`; assert one row per service with its source label; typing `http://armory.lan:29600` and pressing Pin calls `putService("armory", "http://armory.lan:29600")`; Unpin calls `deleteService("armory")`; a 400 error text is shown. Use `String(value)` for any v-model input.
+- [x] **Step 1: Write the failing test** modelled on `ConnectionsView`'s: mount with a fake client returning `{services: [{name: "armory", url: "http://armory:29600", source: "registered", registered: "http://armory:29600", pinned: null}, ...]}`; assert one row per service with its source label; typing `http://armory.lan:29600` and pressing Pin calls `putService("armory", "http://armory.lan:29600")`; Unpin calls `deleteService("armory")`; a 400 error text is shown. Use `String(value)` for any v-model input.
 
-- [ ] **Step 2: Run** `pnpm exec vitest run src/views/__tests__/ServicesView.test.ts`: expected FAIL (missing file).
+- [x] **Step 2: Run** `pnpm exec vitest run src/views/__tests__/ServicesView.test.ts`: expected FAIL (missing file).
 
-- [ ] **Step 3: Implement** `ServicesView.vue` with the same layout classes and components as `ConnectionsView.vue` (read it first and reuse its card, table and error components; destructure client methods in the script so `vue-tsc` accepts them). Add `getServices`, `putService`, `deleteService` to the client next to the connection calls, and the page entry to `pages.ts`.
+- [x] **Step 3: Implement** `ServicesView.vue` with the same layout classes and components as `ConnectionsView.vue` (read it first and reuse its card, table and error components; destructure client methods in the script so `vue-tsc` accepts them). Add `getServices`, `putService`, `deleteService` to the client next to the connection calls, and the page entry to `pages.ts`.
 
-- [ ] **Step 4: Run** `pnpm exec vue-tsc -b` and `pnpm exec vitest run`: pass.
+- [x] **Step 4: Run** `pnpm exec vue-tsc -b` and `pnpm exec vitest run`: pass.
 
-- [ ] **Step 5: Commit** `git commit -m "feat(treasury_admin): add the Services page"`
+- [x] **Step 5: Commit** `git commit -m "feat(treasury_admin): add the Services page"`
 
 ---
 
@@ -793,7 +793,7 @@ Each service gets `treasury_url` and an advertised address, builds one `ServiceC
 
 **Files:** `apps/stronghold/src/config.py` (replace `db_gateway_url` and its `DB_GATEWAY_URL` line by `treasury_url`, add `advertise_url`), `apps/stronghold/src/api.py` (lines near 85 to 110: lifespan), `apps/stronghold/configs/config_app.json` (add `"treasury_url"` is not written: leave the file with host and port; the default is the local address), tests in `apps/stronghold/tests/` that build `Settings(db_gateway_url=...)` or monkeypatch `DB_GATEWAY_URL` (find with `grep -rn "db_gateway_url\|DB_GATEWAY_URL" apps/stronghold/tests`).
 
-- [ ] **Step 1: Failing test** in `apps/stronghold/tests/test_catalog_startup.py`:
+- [x] **Step 1: Failing test** in `apps/stronghold/tests/test_catalog_startup.py`:
 
 ```python
 import httpx
@@ -813,8 +813,8 @@ def test_treasury_url_defaults_to_the_local_address(monkeypatch):
 
 and a lifespan test that creates the app with a `FakeTreasury` transport (reuse the one in `tests/conftest.py`; extend it with `PUT /services/stronghold` and `GET /services`) and asserts the fake saw `PUT /services/stronghold` with the advertised URL.
 
-- [ ] **Step 2: Run, see FAIL.** `uv run pytest tests/test_catalog_startup.py -q -p no:cacheprovider`
-- [ ] **Step 3: Implement.** In `config.py`: field `treasury_url: str = "http://127.0.0.1:29602"` and `advertise_url: str | None = None`, loaded as `treasury_url=os.getenv("TREASURY_URL") or raw.get("treasury_url") or base.treasury_url`. In `api.py` lifespan, after `ensure_identity()`:
+- [x] **Step 2: Run, see FAIL.** `uv run pytest tests/test_catalog_startup.py -q -p no:cacheprovider`
+- [x] **Step 3: Implement.** In `config.py`: field `treasury_url: str = "http://127.0.0.1:29602"` and `advertise_url: str | None = None`, loaded as `treasury_url=os.getenv("TREASURY_URL") or raw.get("treasury_url") or base.treasury_url`. In `api.py` lifespan, after `ensure_identity()`:
 
 ```python
 catalog = ServiceCatalog(keyring, settings.treasury_url, cache_path=settings.data_dir / "catalog_cache.json")
@@ -823,35 +823,35 @@ catalog_task = catalog.start("stronghold", advertised_url(settings.host, setting
 ```
 
 (skip the start when tests inject `store`, same condition as the existing `registration`), use `settings.treasury_url` where `settings.db_gateway_url` was used, and `await catalog.stop()` where `registration` is cancelled.
-- [ ] **Step 4: Run** the whole Stronghold suite: `uv run pytest -q -p no:cacheprovider` (726 before): pass.
-- [ ] **Step 5: Commit** `git commit -m "feat(stronghold): register with the service catalog"`
+- [x] **Step 4: Run** the whole Stronghold suite: `uv run pytest -q -p no:cacheprovider` (726 before): pass.
+- [x] **Step 5: Commit** `git commit -m "feat(stronghold): register with the service catalog"`
 
 #### Task 5b: Portcullis
 
 Same pattern. **Files:** `apps/portcullis/src/config.py` (`DbGatewaySettings`: drop `url`, keep `instance` and `connection`; add `treasury_url`, `advertise_url`; `db_gateway.url` in `configs/config_app.json` becomes `treasury_url`, and `docker/configs/portcullis/app.json` the same), `apps/portcullis/src/app.py` lines 141 to 147 (`httpx.AsyncClient(base_url=settings.db_gateway.url ...)`, `register_in_background(...)`), `apps/portcullis/src/services/config_validation.py` (line 98 checks `db_gateway.url`; check `treasury_url` instead, and drop the `mcp_server_url` row of the table at line 82 in Task 6), tests that build `DbGatewaySettings(url=...)`.
 
-- [ ] Failing test: `load_settings().treasury_url` from `TREASURY_URL`; lifespan test with a fake Treasury sees `PUT /services/portcullis`.
-- [ ] Implement as in 5a; the catalog cache path is `settings.database_path.parent / "catalog_cache.json"`; the catalog's name is `"portcullis"`.
-- [ ] Run `uv run pytest -q -p no:cacheprovider -x -k "config or startup or db_gateway or lifespan"` for a fast check (full suite in Task 9).
-- [ ] Commit `feat(portcullis): register with the service catalog`.
+- [x] Failing test: `load_settings().treasury_url` from `TREASURY_URL`; lifespan test with a fake Treasury sees `PUT /services/portcullis`.
+- [x] Implement as in 5a; the catalog cache path is `settings.database_path.parent / "catalog_cache.json"`; the catalog's name is `"portcullis"`.
+- [x] Run `uv run pytest -q -p no:cacheprovider -x -k "config or startup or db_gateway or lifespan"` for a fast check (full suite in Task 9).
+- [x] Commit `feat(portcullis): register with the service catalog`.
 
 #### Task 5c: Armory
 
 **Files:** `apps/armory/src/config.py` (`db_gateway_url` becomes `treasury_url`, read from `configs/config_app.json` key and env `TREASURY_URL`; add `advertise_url`), `apps/armory/src/environment_settings.py` (remove the `db_gateway_url` Spec at line 55 and `stronghold_url` at line 53 together with their group "Services Armory calls" when it is empty; delete the stored rows `db_gateway_url` and `stronghold_url` from the `environment` table on first read, using the same stale-row deletion the PDF and media limits used on 2026-11-18, find it with `grep -rn "stale" apps/armory/src`), `apps/armory/src/run.py` lines 36 to 40 (`register_in_background(...)` and start of the catalog; advertised name `"armory"`), `apps/armory/src/capabilities/notes/domain.py:45` (use `settings.treasury_url`), `apps/armory/docs/settings.md`, tests (`grep -rn "db_gateway_url\|stronghold_url" apps/armory/tests`).
 
-- [ ] Failing tests: `settings.treasury_url` from env; the environment view no longer lists `db_gateway_url` or `stronghold_url`; a stored `stronghold_url` row is gone after the overlay runs.
-- [ ] Implement; the catalog cache path is `data_dir(PROJECT_DIR) / "catalog_cache.json"`.
-- [ ] Run `uv run pytest -q -p no:cacheprovider -m "not slow"` (1522 before): pass.
-- [ ] Commit `feat(armory): register with the service catalog`.
+- [x] Failing tests: `settings.treasury_url` from env; the environment view no longer lists `db_gateway_url` or `stronghold_url`; a stored `stronghold_url` row is gone after the overlay runs.
+- [x] Implement; the catalog cache path is `data_dir(PROJECT_DIR) / "catalog_cache.json"`.
+- [x] Run `uv run pytest -q -p no:cacheprovider -m "not slow"` (1522 before): pass.
+- [x] Commit `feat(armory): register with the service catalog`.
 
 #### Task 5d: Legion
 
 **Files:** create `apps/legion/configs/config_app.json` (`{"treasury_url": "http://127.0.0.1:29602"}`) and extend `apps/legion/configs/README.md`; `apps/legion/src/runtime/gateway_settings.py` (`treasury_address()` now returns `TREASURY_URL` env, else the file, else `DEFAULT_TREASURY_URL`; delete `treasury_view`, `save_treasury_address`, `TREASURY_KEY`, the `ENVIRONMENT_TABLE` use for it); `apps/legion/src/server.py` (remove routes `/agents/treasury-address` at about lines 551 to 563; in `_register_with_treasury` also start the catalog, and when `SPEC.entry` is true register `"legion"` at the origin of `_AGENT_URL` (scheme and netloc, no `/mcp`)); `apps/portcullis/src/routes/agent_admin.py` and `apps/portcullis/src/services/agent_admin.py` (remove the two treasury-address routes and methods) with their tests; `apps/legion_admin/src/components/TreasuryAddressCard.vue`, its test, its use in the Connections view, and the client method; `apps/legion/tests/test_server_settings.py` (the two treasury-address tests become one test that the old route is gone); `apps/legion/README.md`.
 
-- [ ] Failing tests: `treasury_address()` reads `TREASURY_URL` and the file; `PUT /agents/treasury-address` answers 404; an entry agent registers `legion` with the origin of its URL and a non-entry agent registers nothing.
-- [ ] Implement. The catalog needs a keyring: `internal_auth.keyring`. The cache path is `data_dir(PROJECT_DIR) / "catalog_cache.json"`.
-- [ ] Run `uv run pytest -q -p no:cacheprovider -m "not slow"` in Legion (1404 before), the Portcullis agent-admin tests, and in `legion_admin`: `pnpm exec vue-tsc -b` and `pnpm exec vitest run` (96 before, fewer by the removed card's tests).
-- [ ] Commit `feat(legion): register with the service catalog; the Treasury address is a config value`.
+- [x] Failing tests: `treasury_address()` reads `TREASURY_URL` and the file; `PUT /agents/treasury-address` answers 404; an entry agent registers `legion` with the origin of its URL and a non-entry agent registers nothing.
+- [x] Implement. The catalog needs a keyring: `internal_auth.keyring`. The cache path is `data_dir(PROJECT_DIR) / "catalog_cache.json"`.
+- [x] Run `uv run pytest -q -p no:cacheprovider -m "not slow"` in Legion (1404 before), the Portcullis agent-admin tests, and in `legion_admin`: `pnpm exec vue-tsc -b` and `pnpm exec vitest run` (96 before, fewer by the removed card's tests).
+- [x] Commit `feat(legion): register with the service catalog; the Treasury address is a config value`.
 
 ---
 
@@ -876,29 +876,29 @@ def http_catalog(name: str) -> httpx.AsyncClient:
 
   (`logical_url("treasury")` resolves to the bootstrap address, since `ServiceCatalog.url("treasury")` returns `treasury_url`.) `register_in_background(keyring, settings.db_gateway_url, ...)` uses `settings.treasury_url`.
 - `apps/stronghold/src/config.py`: delete `portcullis_url`, `armory_url` and their env lines. `apps/stronghold/README.md` table: remove the three rows, add `TREASURY_URL`.
-- [ ] Failing test: build the app with a catalog whose `_known["armory"]` is `http://armory.test:29600` and a `MockTransport` inner; call a route that reaches Armory (memory list) and assert the request host is `armory.test`. Then change `_known["armory"]` and assert the next request goes to the new host without restarting.
-- [ ] Implement, run `uv run pytest -q -p no:cacheprovider`, commit `refactor(stronghold): reach peers through the service catalog`.
+- [x] Failing test: build the app with a catalog whose `_known["armory"]` is `http://armory.test:29600` and a `MockTransport` inner; call a route that reaches Armory (memory list) and assert the request host is `armory.test`. Then change `_known["armory"]` and assert the next request goes to the new host without restarting.
+- [x] Implement, run `uv run pytest -q -p no:cacheprovider`, commit `refactor(stronghold): reach peers through the service catalog`.
 
 #### Task 6b: Portcullis
 
 - `apps/portcullis/src/app.py`: `StrongholdForwarder(upstream, settings.stronghold_url, ...)` becomes `StrongholdForwarder(upstream, logical_url("stronghold"), ...)` and the shared `upstream` client gets `transport=CatalogTransport(catalog, upstream_transport)`; `McpEmailSender(settings.mcp_server_url, ...)` and `McpServerTools(settings.mcp_server_url, ...)` take `catalog.address`-style callables: `lambda: catalog.mcp_url()`. Update both classes to call `resolved(self._url)` where they use the URL.
 - `apps/portcullis/src/routes/mcp.py:161`, `routes/attachments.py:38`, `routes/capability_files.py:65`, `routes/server_info.py:65`: `settings.mcp_server_url` becomes `request.app.state.catalog.mcp_url()`.
 - `apps/portcullis/src/config.py`: delete `stronghold_url`, `mcp_server_url`; `services/config_validation.py` row at line 82 removed; `configs/config_app.json` and `docker/configs/portcullis/app.json` lose the two keys; `configs/README.md` updated.
-- [ ] Failing test: a Portcullis app with a fake catalog entry `armory` -> `http://armory.test:29600`; `GET /api/...` route that calls MCP (the existing server-info test) hits `armory.test`; changing the catalog changes the host on the next call.
-- [ ] Implement, run the touched tests, commit `refactor(portcullis): reach peers through the service catalog`.
+- [x] Failing test: a Portcullis app with a fake catalog entry `armory` -> `http://armory.test:29600`; `GET /api/...` route that calls MCP (the existing server-info test) hits `armory.test`; changing the catalog changes the host on the next call.
+- [x] Implement, run the touched tests, commit `refactor(portcullis): reach peers through the service catalog`.
 
 #### Task 6c: Armory
 
 - `apps/armory/src/capabilities/obsidian/utils/brain_resolver.py:31`: `settings.stronghold_url.rstrip("/") + "/brains/resolve"` becomes `catalog.url("stronghold") + "/brains/resolve"`. Armory needs a module-level `catalog` that `run.py` starts: put it in `apps/armory/src/service_catalog.py` (`catalog = ServiceCatalog(keyring, settings.treasury_url, cache_path=...)`) and import it from both places.
 - Remove `stronghold_url` from `config.py` (already removed from the Settings page in Task 5c).
-- [ ] Failing test: `brain_resolver._resolve` posts to the catalog's Stronghold address (extend the existing test for it).
-- [ ] Implement, run `uv run pytest -q -p no:cacheprovider -m "not slow"`, commit `refactor(armory): reach Stronghold through the service catalog`.
+- [x] Failing test: `brain_resolver._resolve` posts to the catalog's Stronghold address (extend the existing test for it).
+- [x] Implement, run `uv run pytest -q -p no:cacheprovider -m "not slow"`, commit `refactor(armory): reach Stronghold through the service catalog`.
 
 #### Task 6d: Legion
 
 - `apps/legion/src/tools/mcp_client/mcp_upstream.py:78-82`: the `main` server's default URL. Today `MCP_SERVER_URL` overrides it. Replace the env lookup by `url_overrides = {_SERVER_ID: catalog.mcp_url()}` only when the stored `main` server has no URL of its own (read how `config.py` line 120 builds the default and keep a saved URL winning). Remove `--mcp-url` handling only if nothing else uses it (`apps/legion/src/server.py:33-39`: keep the flag, it is a CLI override).
-- [ ] Failing test: with no saved `main` URL the upstream URL is `catalog.mcp_url()`; with a saved one it is that one.
-- [ ] Implement, run `uv run pytest -q -p no:cacheprovider -m "not slow"`, commit `refactor(legion): the main MCP server defaults to the catalog address of Armory`.
+- [x] Failing test: with no saved `main` URL the upstream URL is `catalog.mcp_url()`; with a saved one it is that one.
+- [x] Implement, run `uv run pytest -q -p no:cacheprovider -m "not slow"`, commit `refactor(legion): the main MCP server defaults to the catalog address of Armory`.
 
 ---
 
@@ -906,11 +906,11 @@ def http_catalog(name: str) -> httpx.AsyncClient:
 
 **Files:** `docker-compose.yml`, `docker/configs/{portcullis,stronghold,treasury}/app.json`, `apps/*/.env.example` (only the lines about these URLs), `docs/deployment.md`, `apps/treasury/configs/README.md`, each service's `configs/README.md`, `apps/armory/docs/settings.md`, `apps/legion/README.md`.
 
-- [ ] Compose: for armory, legion, stronghold and portcullis delete `DB_GATEWAY_URL`, `STRONGHOLD_URL`, `PORTCULLIS_URL`, `ARMORY_URL`, `MCP_SERVER_URL`; add to each `TREASURY_URL: http://treasury:29602` and `CITADEL_ADVERTISE_URL: http://<service>:<port>` (armory 29600, stronghold 29650, portcullis 29601, legion `http://legion:29603`). Keep `AI_AGENT_ADVERTISE_URL: http://legion` (Legion builds each agent's URL from it). Treasury needs neither.
-- [ ] Remove `TREASURY_URL`-unrelated leftovers from `docker/configs/portcullis/app.json` (`mcp_server_url`, `stronghold_url`, `db_gateway.url`).
-- [ ] Docs: in `docs/deployment.md` replace the sentence about service URLs set by Compose and the Legion exception I added on 2026-11-18 with: "Compose sets `TREASURY_URL` and `CITADEL_ADVERTISE_URL` for each service; every service registers its own address with Treasury at start, and finds the others in Treasury's catalog (Treasury Admin, Services)". Describe the catalog in `apps/treasury/configs/README.md` (tables, pins, precedence, the four names).
-- [ ] Run `docker compose config` (the daemon is not needed) and confirm it prints no warnings about unset variables.
-- [ ] Commit `docs: describe the service catalog; Compose sets TREASURY_URL and CITADEL_ADVERTISE_URL`.
+- [x] Compose: for armory, legion, stronghold and portcullis delete `DB_GATEWAY_URL`, `STRONGHOLD_URL`, `PORTCULLIS_URL`, `ARMORY_URL`, `MCP_SERVER_URL`; add to each `TREASURY_URL: http://treasury:29602` and `CITADEL_ADVERTISE_URL: http://<service>:<port>` (armory 29600, stronghold 29650, portcullis 29601, legion `http://legion:29603`). Keep `AI_AGENT_ADVERTISE_URL: http://legion` (Legion builds each agent's URL from it). Treasury needs neither.
+- [x] Remove `TREASURY_URL`-unrelated leftovers from `docker/configs/portcullis/app.json` (`mcp_server_url`, `stronghold_url`, `db_gateway.url`).
+- [x] Docs: in `docs/deployment.md` replace the sentence about service URLs set by Compose and the Legion exception I added on 2026-11-18 with: "Compose sets `TREASURY_URL` and `CITADEL_ADVERTISE_URL` for each service; every service registers its own address with Treasury at start, and finds the others in Treasury's catalog (Treasury Admin, Services)". Describe the catalog in `apps/treasury/configs/README.md` (tables, pins, precedence, the four names).
+- [x] Run `docker compose config` (the daemon is not needed) and confirm it prints no warnings about unset variables.
+- [x] Commit `docs: describe the service catalog; Compose sets TREASURY_URL and CITADEL_ADVERTISE_URL`.
 
 ---
 
@@ -918,20 +918,20 @@ def http_catalog(name: str) -> httpx.AsyncClient:
 
 **Files:** Test: `libs/citadel_auth/tests/test_catalog_flow.py`
 
-- [ ] Write a test that wires a real Treasury `create_app` (import is not possible from the library; use a minimal FastAPI stub that implements `PUT /services/{name}` and `GET /services` over a dict) behind `httpx.ASGITransport`, starts two `ServiceCatalog`s (`stronghold` and `armory`) **before** the stub accepts requests (the stub answers 503 for the first N calls), and asserts that after the stub is ready: both registered, each `url(other)` returns the other's registered address, and `CatalogTransport` routes a request for `http://armory.citadel` to it.
-- [ ] Write a test that after both have refreshed, the stub starts answering 500: `url()` keeps the last addresses, and a restarted catalog (new object, same `cache_path`) starts with the cached addresses.
-- [ ] Run `uv run pytest -q -p no:cacheprovider` in `libs/citadel_auth`; run `uv run scripts/sync_citadel_auth.py --check`.
-- [ ] Commit `test(auth): start order and Treasury outage for the service catalog`.
+- [x] Write a test that wires a real Treasury `create_app` (import is not possible from the library; use a minimal FastAPI stub that implements `PUT /services/{name}` and `GET /services` over a dict) behind `httpx.ASGITransport`, starts two `ServiceCatalog`s (`stronghold` and `armory`) **before** the stub accepts requests (the stub answers 503 for the first N calls), and asserts that after the stub is ready: both registered, each `url(other)` returns the other's registered address, and `CatalogTransport` routes a request for `http://armory.citadel` to it.
+- [x] Write a test that after both have refreshed, the stub starts answering 500: `url()` keeps the last addresses, and a restarted catalog (new object, same `cache_path`) starts with the cached addresses.
+- [x] Run `uv run pytest -q -p no:cacheprovider` in `libs/citadel_auth`; run `uv run scripts/sync_citadel_auth.py --check`.
+- [x] Commit `test(auth): start order and Treasury outage for the service catalog`.
 
 ---
 
 ### Task 9: Full verification, vault, close-out
 
-- [ ] Run every suite and record the counts: `uv run pytest -q -p no:cacheprovider` in `apps/stronghold`, `apps/treasury`, `libs/citadel_auth`; `-m "not slow"` in `apps/armory` and `apps/legion`; Portcullis in the background (about 9 minutes); `pnpm exec vue-tsc -b` and `pnpm exec vitest run` in `legion_admin`, `treasury_admin`, `portcullis_admin`.
-- [ ] `grep -rn "DB_GATEWAY_URL\|STRONGHOLD_URL\|PORTCULLIS_URL\|ARMORY_URL" --include=*.py --include=*.yml --include=*.md --include=*.example --include=*.json apps docker docker-compose.yml docs/deployment.md` finds nothing outside `docs/superpowers/` history and tests of removed behaviour.
-- [ ] Add a short entry to `docs/deployment.md` troubleshooting: "A service reports 'connection refused' to a peer: open Treasury Admin, Services; pin the address if the peer registered a wrong one".
-- [ ] Vault (in `D:\User\Documents\Programming\Brain`): add a line to `Projects/Citadel.md` Architecture and a Key decisions row (2026-11-18, "Service addresses live in Treasury's catalog; each service registers itself; `treasury_url` is the only bootstrap address", why: no circular start, no per-peer URL settings), update `Projects/treasury.md`, `treasury_admin.md`, `legion_admin.md` (Treasury card removed), `armory.md`, `stronghold.md`, `portcullis.md`, `garrison.md`, and the note `Decision - JSON configs are tracked and secrets live in .env.md`. Run `python Brain/_setup/hooks/validate_vault.py --all < /dev/null` from the Programming root: expect "vault OK".
-- [ ] Commit the app repo (`git add -A`, message `Plan 13: service catalog in Treasury, done`) only when the user says to commit.
+- [x] Run every suite and record the counts: `uv run pytest -q -p no:cacheprovider` in `apps/stronghold`, `apps/treasury`, `libs/citadel_auth`; `-m "not slow"` in `apps/armory` and `apps/legion`; Portcullis in the background (about 9 minutes); `pnpm exec vue-tsc -b` and `pnpm exec vitest run` in `legion_admin`, `treasury_admin`, `portcullis_admin`.
+- [x] `grep -rn "DB_GATEWAY_URL\|STRONGHOLD_URL\|PORTCULLIS_URL\|ARMORY_URL" --include=*.py --include=*.yml --include=*.md --include=*.example --include=*.json apps docker docker-compose.yml docs/deployment.md` finds nothing outside `docs/superpowers/` history and tests of removed behaviour.
+- [x] Add a short entry to `docs/deployment.md` troubleshooting: "A service reports 'connection refused' to a peer: open Treasury Admin, Services; pin the address if the peer registered a wrong one".
+- [ ] **Skipped by user:** Vault (in `D:\User\Documents\Programming\Brain`): add a line to `Projects/Citadel.md` Architecture and a Key decisions row (2026-11-18, "Service addresses live in Treasury's catalog; each service registers itself; `treasury_url` is the only bootstrap address", why: no circular start, no per-peer URL settings), update `Projects/treasury.md`, `treasury_admin.md`, `legion_admin.md` (Treasury card removed), `armory.md`, `stronghold.md`, `portcullis.md`, `garrison.md`, and the note `Decision - JSON configs are tracked and secrets live in .env.md`. Run `python Brain/_setup/hooks/validate_vault.py --all < /dev/null` from the Programming root: expect "vault OK".
+- [x] Commit the app repo (`git add -A`, message `Plan 13: service catalog in Treasury, done`) only when the user says to commit.
 
 ## Risks the executor must know
 
@@ -972,3 +972,6 @@ def http_catalog(name: str) -> httpx.AsyncClient:
 - Task 7: extra removed-address reference in `apps/armory/src/capabilities/obsidian/README.md`; update alongside service config docs. Compose validation uses `--no-env-resolution --quiet` and dummy gateway admin values, avoiding real `.env` reads and secret output; no Docker daemon required. Docker Compose file retains original LF endings.
 
 - Task 8: FastAPI missing from library dev dependencies; added same minimum requirement as Treasury for planned ASGI stub. Tests exposed three defects in supplied Task 1 code: exhausted startup registration never retried again; removed pins stayed cached forever after successful snapshots; address checker accepted empty userinfo, invalid ports, whitespace, double-slash paths and empty query/fragment markers. Fixed after 11 observed regression failures. Background registration retries indefinitely for transient failures, stops on refusal, and refresh replaces valid snapshots while outages retain last good state. No security rule weakened.
+
+- Task 9 review: `advertised_url` formatted IPv6 listener `::1` without brackets, causing registration validation to kill background refresh. Regraded from review minor to functional fix; add regression, then bracket literal IPv6 hosts.
+- Task 9 verification: Portcullis Admin imports Ember Web source components, so isolated worktree also needs Ember Web’s locked dependencies for `vue-tsc` module resolution. Installed dependencies only; no source/test weakening.
