@@ -1,4 +1,4 @@
-"""McpClientRegistry: connect to every server in config_servers.json,
+"""McpClientRegistry: connect to every server in the settings database,
 merge their tools into one namespaced catalog, and dispatch calls to
 whichever server owns a given name.
 
@@ -95,6 +95,8 @@ class McpClientRegistry:
         # Sent on every HTTP server's session on top of its own auth block
         # (the shared internal token - see mcp_upstream.connect()).
         self._extra_headers: dict[str, str] = {}
+        self._auth_by_server = {}
+        self._catalog_reconnect_lock = asyncio.Lock()
 
     def statuses(self) -> list[ServerStatus]:
         return list(self._statuses)
@@ -104,6 +106,7 @@ class McpClientRegistry:
         config_path: Path,
         url_overrides: dict[str, str] | None = None,
         extra_headers: dict[str, str] | None = None,
+        auth_by_server=None,
     ) -> list[ServerStatus]:
         """Connect to every server in `config_path`, isolated - one bad
         entry is recorded as an error status and never stops a sibling
@@ -112,6 +115,7 @@ class McpClientRegistry:
         every HTTP server's session, reconnects included."""
         self._configs = load_servers_config(config_path, url_overrides)
         self._extra_headers = dict(extra_headers or {})
+        self._auth_by_server = dict(auth_by_server or {})
         for server_id, config in self._configs.items():
             await self._connect_one(server_id, config)
         return self.statuses()
@@ -132,7 +136,9 @@ class McpClientRegistry:
     async def _connect_one(self, server_id: str, config: ServerConfig) -> ServerStatus:
         local_stack = AsyncExitStack()
         try:
-            session = await open_session(local_stack, config, CONNECT_TIMEOUT_SECONDS, self._extra_headers)
+            auth = self._auth_by_server.get(server_id)
+            session = await open_session(local_stack, config, CONNECT_TIMEOUT_SECONDS, self._extra_headers,
+                                         **({"auth": auth} if auth is not None else {}))
             listed = await session.list_tools()
         except Exception as error:  # noqa: BLE001 - one bad server must not block the others
             try:
@@ -173,11 +179,20 @@ class McpClientRegistry:
         self._last_known_tools[server_id] = namespaced_tools
         return namespaced_tools
 
+    async def _recover_catalog_connections(self) -> None:
+        """A catalog-backed Armory absent at startup may become reachable later."""
+        async with self._catalog_reconnect_lock:
+            for server_id, config in self._configs.items():
+                if callable(config.url) and server_id not in self._sessions:
+                    self._statuses = [status for status in self._statuses if status.id != server_id]
+                    await self._reconnect(server_id)
+
     async def list_tools(self) -> list[types.Tool]:
         """The merged catalog, fetched live from every connected server on
         each call - so a server's tools changing at runtime is reflected
         without a restart, the same reasoning as extensions.py's
         merged_list_tools()."""
+        await self._recover_catalog_connections()
         results = await asyncio.gather(
             *(self._live_tools_for(server_id, session) for server_id, session in self._sessions.items())
         )
@@ -200,6 +215,8 @@ class McpClientRegistry:
         registry's own event-loop thread. `meta` becomes the request's
         `_meta` (the asking user - see internal_auth.py)."""
         server_id, separator, upstream_name = name.partition(NAMESPACE_SEPARATOR)
+        if separator and server_id not in self._sessions:
+            await self._recover_catalog_connections()
         session = self._sessions.get(server_id) if separator else None
         if session is None:
             raise KeyError(f"No tool named {name!r} on any connected server")

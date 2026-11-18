@@ -1,6 +1,6 @@
 {
   "label": "Context Summarizer",
-  "port": 9118,
+  "port": 29617,
   "enabled": true,
   "entry": false,
   "delegable": false,

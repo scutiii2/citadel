@@ -1,24 +1,16 @@
-"""Same-provider routing; only SDK gateway failures may advance a turn."""
+"""Same-provider routing; only gateway failures may advance a turn."""
 
 from __future__ import annotations
 
-import json
-import traceback
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import lru_cache
 from typing import Callable, Iterable
 
-import anthropic
-import openai
-
 from src.runtime import tuning_overrides
 from src.runtime.config_files import TUNING_PATH, read_section
 from src.providers import cooldown
-
-_SDK_ERRORS = (anthropic.APIError, openai.APIError)
-_TRANSPORT_ERRORS = (anthropic.APIConnectionError, openai.APIConnectionError)
-
+from src.providers.gateway_client import GatewayCallError
 
 class FailureKind(StrEnum):
     rate_limit = "rate_limit"
@@ -27,44 +19,16 @@ class FailureKind(StrEnum):
     unavailable = "unavailable"
 
 
-_FAILURE_WORDS = {
-    FailureKind.quota: ("credit", "quota", "billing", "insufficient", "balance", "exceeded your current"),
-    FailureKind.unavailable: ("overloaded",),
-}
+_KINDS = {kind.value: kind for kind in FailureKind}
 
 
 def classify(error: Exception) -> FailureKind | None:
-    """Inspect SDK origin before status/wording so local failures never retry."""
-    if isinstance(error, json.JSONDecodeError):
-        # The Messages SDK parses SSE event data before producing message/tool
-        # events. Only this parser's failures represent malformed upstream data.
-        if any(frame.f_globals.get("__name__") == "anthropic._streaming"
-               and frame.f_code.co_name == "json"
-               for frame, _ in traceback.walk_tb(error.__traceback__)):
-            return FailureKind.unavailable
-        return None
-    if not isinstance(error, _SDK_ERRORS):
-        return None
-    status = getattr(error, "status_code", None)
-    if status == 402:
-        return FailureKind.quota
-    if status in (401, 403):
-        return FailureKind.auth
-    if status in (400, 429) and any(word in str(error).lower() for word in _FAILURE_WORDS[FailureKind.quota]):
-        return FailureKind.quota
-    if status == 429 or isinstance(error, (anthropic.RateLimitError, openai.RateLimitError)):
-        return FailureKind.rate_limit
-    if (isinstance(status, int) and 500 <= status < 600) or isinstance(error, _TRANSPORT_ERRORS):
-        return FailureKind.unavailable
-    if isinstance(error, (anthropic.AuthenticationError, openai.AuthenticationError,
-                          anthropic.PermissionDeniedError, openai.PermissionDeniedError)):
-        return FailureKind.auth
-    if isinstance(error, (anthropic.InternalServerError, openai.InternalServerError)):
-        return FailureKind.unavailable
-    # SDK stream errors may retain the successful HTTP 200 status of the
-    # connection. A plain bad request remains non-retryable unless quota-related.
-    if status != 400 and any(word in str(error).lower() for word in _FAILURE_WORDS[FailureKind.unavailable]):
-        return FailureKind.unavailable
+    """A gateway failure's kind, or None when the round must not be retried.
+    ConversationGateway classifies its own failures; anything else is Legion's
+    own error and never a reason to switch gateway."""
+    if isinstance(error, GatewayCallError):
+        # No kind means the request itself was refused: never retry that.
+        return _KINDS.get(error.kind or "")
     return None
 
 

@@ -1,0 +1,32 @@
+[project]
+name = "stronghold"
+description = "Product logic for Citadel and Ember, called only by Portcullis"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "PyJWT>=2.10",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-dotenv>=1.0",
+    "httpx>=0.27",
+    "cryptography>=42",
+    "mcp>=1.30.0,<2.0.0",
+    "pypdf>=4.0",
+    "python-docx>=1.1",
+    "openpyxl>=3.1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "httpx>=0.27"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"

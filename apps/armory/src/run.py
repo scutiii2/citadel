@@ -12,7 +12,10 @@ from src.config import settings  # noqa: E402
 from src.services import capability_registry  # noqa: E402
 from src.services.capability_loader import CapabilityLoader  # noqa: E402
 from src.services.identity_context import IdentityContextMiddleware  # noqa: E402
-from src.services.internal_token import InternalTokenMiddleware, is_exposed_without_token  # noqa: E402
+from src.citadel_auth import advertised_url
+from src.service_catalog import catalog
+from src.citadel_auth.treasury import register_in_background  # noqa: E402
+from src.services.service_auth import install_auth, keyring  # noqa: E402
 from src.utils.logging_setup import configure_logging  # noqa: E402
 from src.server import mcp  # noqa: E402
 
@@ -21,7 +24,7 @@ configure_logging(settings.log_dir)
 
 # Capabilities are found by scanning src/capabilities/ (services/capability_loader.py), not imported here,
 # so a new folder appears on POST /capabilities/refresh. One with a config entry loads now; one without stays offline until an admin enables it.
-capability_loader = CapabilityLoader(mcp, "src.capabilities", settings.capabilities_config_path)
+capability_loader = CapabilityLoader(mcp, "src.capabilities", settings.settings_db_path)
 capability_loader.startup()
 
 
@@ -32,10 +35,16 @@ async def _serve() -> None:
 
     from src.services import extensions
 
+    await keyring.ensure_identity()
+    catalog.start("armory", advertised_url(settings.host, settings.port, settings.advertise_url))
+    # Treasury keeps no list of its callers: Armory tells it which connection its instance uses.
+    registration = register_in_background(
+        keyring, settings.treasury_url, settings.db_gateway_instance, [settings.db_gateway_connection])
+
     try:
         # Before tool_names on purpose: extensions register proxied tools onto `mcp`,
         # so connecting first puts them in the merged list and the counts below.
-        extension_statuses = await extensions.install_extensions(mcp, settings.extensions_config_path)
+        extension_statuses = await extensions.install_extensions(mcp, settings.settings_db_path)
 
         # Use extensions.merged_list_tools(), not mcp.list_tools(): proxied tools are visible only
         # through the handlers install_extensions() installed.
@@ -54,6 +63,7 @@ async def _serve() -> None:
         from src.capability_routes import install_capability_routes
         from src.command_routes import install_command_routes
         from src.download_routes import install_download_routes
+        from src.environment_routes import install_environment_routes
         from src.extension_routes import install_extension_routes
         from src.help_routes import install_help_routes
         from src.upload_routes import install_upload_routes
@@ -64,21 +74,14 @@ async def _serve() -> None:
         banner = [
             "MCP server",
             f"  Endpoint : http://{settings.host}:{settings.port}/mcp",
-            f"  Config   : {settings.configs_dir}",
+            f"  Settings : {settings.settings_db_path}",
             f"  Capabilities: {', '.join(enabled_capabilities) or 'none'}",
             f"  Tools    : {len(tool_names)}",
             *(f"    - {name}" for name in tool_names),
             f"  Resources: {resource_count}",
             f"  Extensions: {', '.join(f'{s.id} ({s.status})' for s in extension_statuses) or 'none'}",
         ]
-        banner.append(
-            "  /mcp auth : X-Internal-Token required"
-            if settings.internal_api_token
-            else "  /mcp auth : none (set INTERNAL_API_TOKEN in .env)"
-        )
-        if is_exposed_without_token(settings.host, settings.internal_api_token):
-            # No authentication here, so a non-loopback bind lets anything that can reach the port call every tool.
-            banner.append(f"  WARNING  : bound to {settings.host} with no authentication.")
+        banner.append("  /mcp auth : signed Ed25519 service assertion required")
 
         # flush=True matters: stdout is block-buffered when not a terminal (Docker, systemd, files),
         # so the banner and the no-authentication warning would lag uvicorn's stderr logs.
@@ -88,12 +91,7 @@ async def _serve() -> None:
         capability_loader.run_startup_hooks()
 
         app = mcp.streamable_http_app()
-        # Reads chat_app's X-Requester-Username/X-Requester-Email headers into per-request contextvars
-        # so identity-gated capabilities don't take identity as a tool argument (see services/identity_context.py).
-        app.add_middleware(IdentityContextMiddleware)
-        # Added last, so it runs first: /mcp requests without the shared internal token never reach the transport
-        # (only when a token is configured). See services/internal_token.py.
-        app.add_middleware(InternalTokenMiddleware, token=settings.internal_api_token)
+        install_auth(app)
         # Where a human or chat_app's sidebar checks what's connected; a plain route, not a tool. See extension_routes.py.
         install_extension_routes(app)
         # Where chat_app discovers which built-in tools are invocable as "/" commands; a plain route. See command_routes.py.
@@ -103,11 +101,13 @@ async def _serve() -> None:
         # Where chat_app's Capabilities page toggles built-in capabilities live, rescans src/capabilities/ and reloads code on going online.
         # A plain route: a model must not change what it can do. See capability_routes.py.
         install_capability_routes(app, capability_loader)
+        # Where Armory Admin edits the deployment values (addresses, link keys, Obsidian, folders); saved in settings.db. See environment_routes.py.
+        install_environment_routes(app)
         # Where chat_app proxies a file dropped into a command-form modal; a plain route checked against
-        # the internal shared secret. See upload_routes.py.
+        # service assertions. See upload_routes.py.
         install_upload_routes(app)
-        # Where a caller fetches a file a tool offered it (via ember_api); a plain route checked against
-        # the internal token and the requester. See download_routes.py.
+        # Where a caller fetches a file a tool offered it (via portcullis); a plain route checked against
+        # service assertions and signed requester identity. See download_routes.py.
         install_download_routes(app)
         # Each capability mounts its own always-on routes (memory, skills, obsidian, tickets), even when its tools are off.
         capability_loader.install_routes(app)
@@ -117,6 +117,8 @@ async def _serve() -> None:
         server = uvicorn.Server(uvicorn.Config(app, host=settings.host, port=settings.port))
         await server.serve()
     finally:
+        await catalog.stop()
+        registration.cancel()
         # Mirrors install_extensions() at the top: subprocesses opened get closed on shutdown or startup failure.
         await extensions.shutdown_extensions()
 

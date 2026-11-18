@@ -1,22 +1,17 @@
 # .env
 
-The actual credential values that `../configs/*.json` refers to by name
-via `${VAR}` placeholders (e.g. `"password": "${SMTP_PASSWORD}"`), plus
-the server's own deployment settings. One file, `mcp_server/.env`,
+The server's own deployment settings and the credential values you
+prefer to keep out of the database. One file, `mcp_server/.env`,
 gitignored; `.env.example` is the committed template with every variable
 and its explanation.
 
-- **Server** - `MCP_HOST`, `MCP_PORT`. Not secrets in the "must never
-  leak" sense, but deployment-specific and kept with the ones that are.
-- **Internal API auth** - `INTERNAL_API_TOKEN`, the same value as
-  ai_agent's and ember_api's. When set, every request to `/mcp` must carry
-  it as `X-Internal-Token` (`services/internal_token.py`, else `401`), and
-  `POST /upload` (`upload_routes.py`) always requires it. Blank leaves
-  `/mcp` open, which is only safe while the port stays on `127.0.0.1`.
-- **SMTP** - `SMTP_PASSWORD`, backing `config_email.json`'s `"password"`,
-  and `TEAMS_WEBHOOK_URL`.
-- **SSH** - `SSH_HOST_KEY_POLICY`, `SSH_KNOWN_HOSTS`. Applies to every SSH
-  connection this server makes (`services/ssh.py`). No credentials.
+- **Server** - not here. `host` and `port` are in the tracked `configs/config_app.json`; `MCP_HOST` and `MCP_PORT`
+  override them (Compose sets them).
+- **Internal API auth** - Ed25519 identity keys are generated automatically.
+  `CITADEL_IDENTITY_DIR` holds the private key; `CITADEL_TRUST_DIR` distributes only public keys.
+  Every internal request requires a short-lived service assertion; user calls also carry a signed requester token.
+- **Email** - not here. The SMTP server, sender and password are set on the Email page of Armory Admin and kept in
+  `settings.db`.
 
 `run.py` loads `.env` before anything else (`utils/env_file.py`). If it is
 missing, it is built once: from the old `.secrets/secret_*.env` files when

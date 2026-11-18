@@ -23,7 +23,6 @@ from src.services.capability_base import Capability
 from src.services.app_config import (
     capability_enabled,
     load_capabilities_config,
-    migrate_capabilities_config,
     migrate_renamed_capabilities,
     save_capabilities_config,
 )
@@ -119,12 +118,10 @@ class CapabilityLoader:
         return CapabilityRecord(folder, capability.id, capability.label, capability=capability)
 
     def startup(self) -> None:
-        """Scan, migrate the config once, then load every folder with an entry.
+        """Scan, then load every folder with an entry. Every capability is off until an administrator turns it on.
         ``enabled: false`` is imported then switched off (tools stay listed); no entry stays unloaded."""
         self.scan()
-        ids = [record.id for record in self._records.values() if record.load_error is None]
         migrate_renamed_capabilities(self._config_path)
-        migrate_capabilities_config(self._config_path, ids)
         config = load_capabilities_config(self._config_path)
         for record in self._records.values():
             if record.load_error is not None or record.id not in config:

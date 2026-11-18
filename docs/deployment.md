@@ -4,30 +4,37 @@ Citadel runs as containers from one `docker-compose.yml`:
 
 | Service | Role | Port |
 |---|---|---|
-| `ember_web` | user web app | 5173 |
-| `ember_admin` | admin web app | 5176 |
-| `ember_api` | backend for both web apps | internal |
-| `armory` | MCP server (capabilities, including Server Manager) | internal 8010 |
+| `ember_web` | user web app, disabled (reference only; the Ember Windows app replaces it) | 26502, unused |
+| `portcullis_admin` | admin web app: accounts, roles, invites, settings | 26501 |
+| `legion_admin` | admin web app: agents, connections | 26500 |
+| `armory_admin` | admin web app: capabilities, extensions | 26503 |
+| `stronghold_admin` | admin web app: usage, analytics, tickets, tuning | 26504 |
+| `treasury_admin` | admin web app: Treasury instances, connections and service addresses | 26505 |
+| `portcullis` | backend for both web apps | internal |
+| `armory` | MCP server (capabilities, including Server Manager) | internal 29600 |
 | `legion` | AI agent | internal |
-| `treasury` | database gateway | internal 8071 |
+| `treasury` | database gateway | internal 29602 |
+| `stronghold` | product logic, called only by portcullis | internal 29650 |
+| `conversationgateway` | chat-model gateway for Legion, shared with callers outside Citadel | 29407 on all interfaces |
 
 Only the two web apps publish ports. The rest talk over the internal `core` network. Laya is not in this stack: it runs
-from the separate `LayaModel` project (see "Laya" below) and legion reaches it through the host's published port, `http://host.docker.internal:9120`.
+from the separate `LayaModel` project (see "Laya" below) and legion reaches it through the host's published port, `http://host.docker.internal:29220`.
 
 ## 1. Local (Windows, macOS, Linux with Docker Desktop or Engine)
 
-1. Copy `.env.example` to `.env` in the repo root and set `INTERNAL_API_TOKEN` to a long random string. Compose
-   refuses to start without it. Per-app secrets live in `apps/<app>/.env` and are loaded when the file exists.
-2. Start the stack:
+1. **Get the gateways.** `conversationgateway` and `decisiongateway` are built from their own repos (`AI/ModelProviders/ConversationGateway` and `AI/ModelProviders/DecisionGateway`), not from this one. They are not on a Git remote, so copy the two folders to the machine and set `CONVERSATION_GATEWAY_DIR` and `DECISION_GATEWAY_DIR` in the root `.env` to where they are (a relative path is relative to the Citadel folder). Without them the build fails.
+2. **Create the `.env` files.** Run `python tools/setup_env.py` (the `live` branch carries it too). It makes the root `.env` and each `apps/<app>/.env` from its `.env.example`, fills the two gateway admin passwords and `BOOTSTRAP_ADMIN_PASSWORD` with random values, and never overwrites a file that exists or prints a secret. Open the files to read the passwords. The root `.env` is required: compose refuses to start without the two gateway passwords, and every service bind-mounts it.
+   Service identity keys are made on first start; no shared token or auth setting is needed. Each service writes only its own public trust folder and private `identity_*` volume; peers mount that public folder read-only. Backing up private identity volumes is optional: a lost key is remade and peers reload its new public key.
+3. Start the stack:
 
    ```bash
    docker compose up -d --build
    ```
 
-3. Open http://localhost:5173 (ember_web) and http://localhost:5176 (ember_admin). Both bind to `127.0.0.1`.
+4. Open http://localhost:26501 (portcullis_admin; the other admin apps are on 26500 and 26503 to 26505). All bind to `127.0.0.1`.
 
 To rebuild one service, run `docker compose up -d --build <service>`, or double-click the `dev_deploy.bat` in that
-service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/Ember/ember_api`, `ember_web`, `ember_admin`).
+service's folder (`apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `portcullis_admin`, `legion_admin`, `armory_admin`, `stronghold_admin`, `treasury_admin`).
 
 ```bash
 docker compose ps              # state of every service
@@ -54,7 +61,7 @@ Double-click it for a menu:
 | Option | Does |
 |---|---|
 | 1 | Publish code to the `live` branch (see "The live branch") |
-| 2 | Copy the gitignored `.env` and `config_*.json` files to the server as one `tar` stream over a single `ssh` connection (one password prompt), and set `COMPOSE_FILE` in the server's `.env` |
+| 2 | Copy the gitignored `.env` files to the server (configs come with git) as one `tar` stream over a single `ssh` connection (one password prompt), and set `COMPOSE_FILE` in the server's `.env` |
 | 3 | Both: publish, then push |
 | 4, 5 | Dry-run previews of 1 and 2 |
 | 6 | Chown helper: copies `chown -R <user> <dir>` to the clipboard and opens the server's web terminal (root shell) so you can paste it |
@@ -79,10 +86,10 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    `git fetch origin live && git switch -c live --track origin/live`.
 
 2. **Deploy `LayaModel` separately** (it is its own project and Citadel's compose does not start it). Run
-   `docker compose up -d --build` in the `LayaModel` folder (`/media/ZimaOS-HD/Apps/LayaModel`), in any order relative
-   to Citadel. It publishes port 9120 on the host and legion reaches it at `http://host.docker.internal:9120`
+   `docker compose up -d --build` in the `LayaModel` folder (`/media/ZimaOS-HD/Apps/ModelServices/DSC_Laya_Model`), in any order relative
+   to Citadel. It publishes port 29220 on the host and DecisionGateway reaches it at `http://host.docker.internal:29220`
    (Compose maps that name to the host with `extra_hosts`), so the two stacks share no Docker network. Set
-   `LAYA_SERVICE_URL=http://host.docker.internal:9120` in `apps/legion/.env`; if you change `LAYA_PORT` in `LayaModel`,
+   that address on the `laya` gateway in DecisionGateway (see "DecisionGateway" below); if you change `LAYA_PORT` in `LayaModel`,
    change the port there to match. A container cannot resolve the server's own hostname (`scutiserver1`). See
    `LayaModel/deployment.md` for replicas, port and weights.
 
@@ -90,56 +97,45 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    The simplest way is deploy option 2, which copies yours from the PC. To create them by hand, run from the Citadel
    folder (names that start with a dot are hidden: use `ls -la`).
 
-   Root `.env` (required). ZimaOS has no `openssl`, so build the token from `/dev/urandom`:
+   The root `.env` is required (gateway admin passwords; see "Local" step 2). Run `python tools/setup_env.py` to make it and every per-app file from the committed `.env.example` files with random passwords; or copy them by hand:
 
    ```bash
-   echo "INTERNAL_API_TOKEN=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" > .env
+   cp .env.example .env
+   for app in armory legion treasury stronghold portcullis; do cp apps/$app/.env.example apps/$app/.env; done
+   chmod 600 .env apps/*/.env
    ```
 
-   Per-app files: copy each committed `.env.example` and fill in the values.
-
-   ```bash
-   cp apps/armory/.env.example apps/armory/.env
-   cp apps/legion/.env.example apps/legion/.env
-   cp apps/treasury/.env.example apps/treasury/.env
-   cp apps/Ember/ember_api/.env.example apps/Ember/ember_api/.env
-   chmod 600 .env apps/*/.env apps/Ember/ember_api/.env
-   ```
+   Then set `CONVERSATION_GATEWAY_ADMIN_PASSWORD`, `DECISION_GATEWAY_ADMIN_PASSWORD` and `BOOTSTRAP_ADMIN_PASSWORD` yourself if you copied by hand.
 
    | File | Keys to fill in |
    |---|---|
-   | `apps/armory/.env` | Only the capability keys you use: `SMTP_PASSWORD`, `TEAMS_WEBHOOK_URL`, `TAVILY_API_KEY`, `FIRECRAWL_API_KEY`, `LAYA_URL` (`http://legion:9111/mcp` to group tickets with the triage agent) |
-   | `apps/legion/.env` | `CLAUDE_API_KEY`, or the keys of the gateway your agents use; `HF_TOKEN` if used; `LAYA_TOKEN` (must equal the one in `LayaModel`'s `.env`) |
-   | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if `config_connections.json` references any |
-   | `apps/Ember/ember_api/.env` | `BOOTSTRAP_ADMIN_*` (first admin account), `SMTP_*`, `MAIL_FROM_ADDRESS` |
+   | `apps/armory/.env` | Nothing is needed. Set the capability keys you use (Tavily, Firecrawl), `LAYA_URL` (`http://legion:29611/mcp` to group tickets with the triage agent) and the email account in Armory Admin (Settings and Email pages) |
+   | `apps/legion/.env` | `HF_TOKEN` if used. Model provider keys, the Laya token and the TypeSafe key are saved in ConversationGateway and DecisionGateway, not here |
+   | `apps/treasury/.env` | Connection secrets such as Postgres DSNs, if a connection saved in Treasury Admin references any |
+   | `apps/portcullis/.env` | `BOOTSTRAP_ADMIN_*` (first admin account) |
+   | `apps/stronghold/.env` | Nothing is needed |
+   | `.env` (root) | `CONVERSATION_GATEWAY_ADMIN_PASSWORD`, `DECISION_GATEWAY_ADMIN_PASSWORD`, and `CONVERSATION_GATEWAY_DIR` / `DECISION_GATEWAY_DIR` when the gateway repos are not at `../../AI/ModelProviders/` |
 
-   - The root token reaches every service and overrides any `INTERNAL_API_TOKEN` in a per-app file.
-   - Skip `MCP_HOST`, `MCP_PORT` and service URLs such as `DB_GATEWAY_URL`; Compose sets them. Set `LAYA_SERVICE_URL`
-     and `OMNIROUTE_BASE_URL` in `apps/legion/.env` to `http://host.docker.internal:<port>`. Do not use `localhost` or
+   - Compose supplies `CITADEL_SERVICE`, `CITADEL_TRUST_DIR` and `CITADEL_IDENTITY_DIR`. Keep the trust and identity mounts; authentication is mandatory.
+   - Compose sets `TREASURY_URL` and `CITADEL_ADVERTISE_URL` for each service; every service registers its own address with Treasury at start, and finds the others in Treasury's catalog (Treasury Admin, Services). A gateway entry that points at a service
+     published on the host uses `http://host.docker.internal:<port>`. Do not use `localhost` or
      the server's hostname for another service.
    - **Laya settings** (`LAYA_TOKEN`, `LAYA_REPLICAS`, `LAYA_PORT`) belong in `LayaModel`'s own `.env`, not here. Each
      replica loads its own copy of the models in RAM, so keep `LAYA_REPLICAS` low on a small box.
-   - `apps/Ember/ember_api/.env` must exist before the first start. Compose bind-mounts it, and if it is missing Docker
-     creates a directory in its place and ember_api fails. ember_api writes `EMBER_SECRETS_KEY` into it, so keep it
+   - `apps/portcullis/.env` must exist before the first start. Compose bind-mounts it, and if it is missing Docker
+     creates a directory in its place and portcullis fails. portcullis writes `EMBER_SECRETS_KEY` into it, so keep it
      when you rebuild.
 
-4. **Create the config files git does not hold.** `config_*.json` is gitignored (deploy option 2 copies yours). Compose
-   mounts the tracked files under `docker/configs/` over `config_extensions.json`, `config_servers.json`,
-   `config_app.json` and `config_connections.json`. For the rest:
-
-   | File | On a fresh clone |
-   |---|---|
-   | `apps/legion/configs/config_tuning.json` | Created from its `.example` automatically |
-   | `apps/Ember/ember_api/configs/config_pricing.json` | Created from its `.example` automatically |
-   | `apps/armory/configs/config_email.json`, `config_tickets.json` | Copy each `.example` and fill in `config_email.json` |
-
-   These files are baked into the image at build time, so a change made to them inside the container is lost when
-   armory is rebuilt. Edit the file instead.
-
-   `docker/configs/armory/extensions.json` and `docker/configs/armory/capabilities.json` are the exception: they are
-   mounted writable, so extensions added on the Extensions page and capability toggles set on the Capabilities page of
-   ember_admin are saved into those files and survive restarts and rebuilds. On the device they differ from git after
-   the first change; keep them when you update (`git stash` or `git update-index --skip-worktree`).
+4. **Configs are tracked.** Every `configs/*.json` is in git and none has an `.example` twin; each `configs/` folder has a
+   `README.md` describing its keys (Armory’s listener and Treasury bootstrap are in `configs/config_app.json`; other settings are in Armory Admin). Secrets are `${NAME}` placeholders filled from the `.env` files (see the
+   `.env.example` beside each). Compose mounts the tracked files under `docker/configs/` read-only for container values (Portcullis's, Stronghold's
+   and Treasury's `config_app.json`). Everything an
+   admin changes at run time is saved in `.data/<service>/`, so it survives rebuilds and never shows in git: Armory's
+   extensions, capability toggles and ticket settings and Legion's servers (each in `settings.db`), Legion's tuning and
+   prompts, and the instances Treasury's callers register. A new install starts with every Armory capability off, no
+   Armory extension; Legion defaults its main server to Armory’s catalog address. An administrator turns on and adds what the machine needs. Stronghold alone
+   owns the usage limits and the price table; Portcullis reads the prices from it.
+   Set up email on the Email page of Armory Admin before using it.
 
 5. **Start:**
 
@@ -147,7 +143,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    docker compose up -d --build
    ```
 
-6. Open `http://<zima-ip>:5173` and `http://<zima-ip>:5176` from any device on your network.
+6. Open `http://<zima-ip>:26501` (and the other admin apps, 26500 and 26503 to 26505) from any device on your network.
 
 ### Updating
 
@@ -167,11 +163,11 @@ changed and no code did, add `--force-recreate`.
 The box needs only what the stack builds from, not the whole repo. `tools/publish_live.py` builds a `live` branch from
 `main` with just these paths:
 
-- `docker-compose.yml`, `docker-compose.zima.yml`, `.env.example`, `docker/`
-- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/Ember`
+- `docker-compose.yml`, `docker-compose.zima.yml`, `.env.example`, `docker/`, `tools/setup_env.py`
+- `apps/armory`, `apps/legion`, `apps/treasury`, `apps/stronghold`, `apps/portcullis`, `apps/portcullis_admin`, `apps/legion_admin`, `apps/armory_admin`, `apps/stronghold_admin`, `apps/treasury_admin`
 - `docs/deployment.md`
 
-It leaves out other docs, skills, `tools/`, the Python `tests/` folders and `apps/Ember/ember_cli`. `e2e/` and the
+It leaves out other docs, skills, the rest of `tools/`, the Python `tests/` folders and `apps/ember_cli`. `e2e/` and the
 `src/*.test.ts` files stay because the web apps' tsconfig includes them. The path lists are at the top of the script;
 add a path there when you add a compose service.
 
@@ -192,44 +188,77 @@ Custom Install cannot adopt compose containers or build our images. Add external
 under compose.
 
 1. In the dashboard, click **+** and choose **Add external link**. The label may differ by version.
-2. Add two links, using the box's LAN IP (not `localhost`) so they work from other devices:
+2. Add a link per admin app, using the box's LAN IP (not `localhost`) so they work from other devices:
 
    | Name | URL | Icon |
    |---|---|---|
-   | Ember | `http://<zima-ip>:5173` | `apps/Ember/ember_web/public/icons/icon-512.png` |
-   | Ember Admin | `http://<zima-ip>:5176` | `apps/Ember/ember_admin/public/icons/icon-512.png` |
+   | Ember Admin | `http://<zima-ip>:26501` | `apps/portcullis_admin/public/icons/icon-512.png` |
 
-3. If the dashboard asks for an image URL, use `http://<zima-ip>:5173/icons/icon-512.png` and
-   `http://<zima-ip>:5176/icons/icon-512.png`. Avoid `icon-maskable-512.png`; its padding makes the tile look small.
+3. If the dashboard asks for an image URL, use `http://<zima-ip>:26501/icons/icon-512.png`. Avoid `icon-maskable-512.png`; its padding makes the tile look small.
 
 Give the box a fixed IP (a DHCP reservation in the router) so the links keep working. If your version has no external
 link option, use a browser bookmark.
 
 ### Public access with Tailscale Funnel
 
-Funnel publishes Ember on `https://<box>.<tailnet>.ts.net/` without a Tailscale client on the viewing device. Only
-`ember_web` (5173) goes public; keep `ember_admin` (5176) on the LAN. Public signup must stay off, because anyone with
+Funnel publishes a web app on `https://<box>.<tailnet>.ts.net/` without a Tailscale client on the viewing device. No user web
+app runs while `ember_web` is disabled (Plan 8), so this section applies again only when one is back (port 26502); keep the admin apps (26500 to 26505) on the LAN. Public signup must stay off, because anyone with
 the URL can reach the login page.
 
 1. In the Tailscale admin console, give the box the `funnel` attribute (`nodeAttrs` in the access controls) and turn on
    MagicDNS and HTTPS. The first `funnel` command prints an approval link if something is missing.
-2. Set `"security": {"rate_limit": {"scope": "account"}}` in the ember_api config (`docker/configs/ember_api/app.json`).
+2. Set `"security": {"rate_limit": {"scope": "account"}}` in the portcullis config (`docker/configs/portcullis/app.json`).
    Behind Funnel every client reaches nginx through the Docker bridge, so the IP-based lockout would count all users as
    one address. With the default `"both"`, five wrong passwords from anyone would lock everyone out.
 3. Rebuild and start Funnel. The `docker exec tailscale` prefix is for the ZimaOS Tailscale app; drop it if Tailscale
    runs on the host:
 
    ```bash
-   docker compose up -d --build ember_api ember_web
-   docker exec tailscale tailscale funnel --bg 5173
+   docker compose up -d --build portcullis
+   docker exec tailscale tailscale funnel --bg 26502
    docker exec tailscale tailscale funnel status
    ```
 
    Turn it off with `docker exec tailscale tailscale funnel --https=443 off`.
 
-Funnel sends `X-Forwarded-Proto: https` for TLS requests. nginx passes it on, and ember_api adds `Secure` to the session
+Funnel sends `X-Forwarded-Proto: https` for TLS requests. nginx passes it on, and portcullis adds `Secure` to the session
 cookie when the request came through a `trusted_proxies` peer with that header. Plain-HTTP LAN access at
-`http://<zima-ip>:5173` keeps working, with no `Secure` flag, so leave `cookie_secure` at `false`.
+`http://<zima-ip>:26502` keeps working, with no `Secure` flag, so leave `cookie_secure` at `false`.
+
+## ConversationGateway
+
+Legion's Anthropic-protocol and OpenAI-protocol agents call their models through ConversationGateway. It is a service of this stack, built from its own repo, and other services may use it too.
+
+- **Source**: `AI/ModelProviders/ConversationGateway` beside this workspace. On a server set `CONVERSATION_GATEWAY_DIR` in the root `.env` to where that repo sits.
+- **Admin password**: `CONVERSATION_GATEWAY_ADMIN_PASSWORD` in the root `.env`. The stack refuses to start without it.
+- **First start**: open `http://<host>:29407/admin/`, create an access token for Legion. Then open the Legion admin app (`http://<host>:26500`), go to **Connections**, and save the gateway address (`http://conversationgateway:29407` inside Docker) and that token. They are stored in Treasury, not in a `.env` file. On `/admin/gateways.html` save one gateway per file in `apps/legion/gateways/anthropic/` that your agents use, with the same id as the filename (`claude`, `openrouter`, ...). No restart is needed; agents pick the settings up within half a minute.
+- **Outside callers**: the port is published on all interfaces. Give each caller its own token; it connects to `http://<host>:29407` and sends the token as `X-Internal-Token`. There is no TLS in front.
+- **One copy per host**: do not also start the gateway's own `docker-compose.yml` on the same host; port 29407 would clash.
+- Provider keys, gateway entries and tokens live in the `conversationgateway_data` volume. Back it up with the other volumes.
+
+## Stronghold
+
+Product logic, called only by Portcullis. The calendar is the first feature that lives there.
+
+- **Storage**: Treasury, connection `stronghold` (`stronghold.db` in `.data/treasury/`). the `stronghold` connection is built in; Stronghold registers its own instance.
+- **Keys**: `.data/stronghold/keys.json` is made on first start. It holds the key that encrypts saved calendar links and the web push key pair. Back the folder up. Without the file, saved links must be entered again and browsers must subscribe to push again.
+- **Settings**: `docker/configs/stronghold/app.json` (the `calendar` block). The `calendar` block in Portcullis's config and `EMBER_VAPID_*` in its `.env` are no longer read.
+- **Notes shared with agents**: Armory's notes tools read Stronghold's database. Compose sets `DB_GATEWAY_INSTANCE=armory` and `DB_GATEWAY_CONNECTION=stronghold` for Armory, as the starting values, and Armory registers instance `armory` with that connection itself. A value saved on the Settings page of Armory Admin wins over them.
+- Stronghold reads Legion's agent registry from `.data/legion/` (mounted read-only) and calls Armory for the assistant memory.
+- **Token limits and prices**: `usage.six_hour_token_limit`, `usage.weekly_token_limit` and the `pricing` block are in `docker/configs/stronghold/app.json` (Stronghold keeps usage). A limit set in Portcullis's config is ignored.
+- Stronghold calls Portcullis's `/internal` routes with signed service assertions (account standing, admin switches, email, Errors log). Its address comes from Treasury’s catalog.
+
+## DecisionGateway
+
+Legion's decision agents and its automatic routing ask Laya and Jev through DecisionGateway. It is a service of this stack, built from its own repo, and other services may use it too.
+
+- **Source**: `AI/ModelProviders/DecisionGateway` beside this workspace. On a server set `DECISION_GATEWAY_DIR` in the root `.env` to where that repo sits.
+- **Admin password**: `DECISION_GATEWAY_ADMIN_PASSWORD` in the root `.env`. The stack refuses to start without it.
+- **First start**: open `http://<host>:29406/admin/`, create an access token for Legion. In the Legion admin app, **Connections**, save the address (`http://decisiongateway:29406` inside Docker) and that token in the DecisionGateway card.
+- **Gateways**: on `/admin/gateways.html` save two entries with exactly these ids. `laya`: kind `scuti`, URL of the Laya model service (`http://host.docker.internal:29220`), its token if it has one, and the strategy and window that used to be in `gateways/decision/laya.json` (`english-then-typed`, `4096`). `jev`: kind `typesafe`, model `jev-latest`, and the TypeSafe API key. Legion treats `laya` as the local gateway and `jev` as the cloud one.
+- **Outside callers**: port 29406 is published on all interfaces. Give each caller its own token. There is no TLS in front.
+- **One copy per host**: do not also start the gateway's own `docker-compose.yml` on the same host.
+- `LAYA_SERVICE_URL`, `LAYA_TOKEN` and `TYPESAFE_API_KEY` in `apps/legion/.env` are no longer read.
 
 ## 3. Server Manager
 
@@ -237,13 +266,13 @@ The Server Manager capability (chat id `server`) lists, starts, stops and restar
 logs. It works through the host Docker socket, which `docker-compose.yml` mounts into `armory`
 (`/var/run/docker.sock`).
 
-Enable it on the Capabilities page of ember_admin, or in `docker/configs/armory/capabilities.json`:
+Enable it on the Capabilities page of armory_admin, :
 
 ```json
 "server": { "enabled": true }
 ```
 
-You can also toggle it on the Capabilities page in ember_admin, but that toggle lives in the container and is lost when
+You can also toggle it on the Capabilities page in armory_admin, but that toggle lives in the container and is lost when
 armory is rebuilt, so set the repo file to keep it. The file is gitignored: set it on the box, or push it with deploy
 option 2.
 
@@ -255,7 +284,7 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 
 - The Docker socket is root on the host. Anyone who can call the `tool_srv_*` tools can control every container.
 - Server Manager lists every container on the host, not only Citadel's. On ZimaOS that includes your other apps.
-- Keep `INTERNAL_API_TOKEN` secret. Do not publish armory's port 8010.
+- Keep each service's private `identity_*` volume private. Do not publish armory's port 29600.
 - Keep `server` disabled where you do not need it.
 
 **Checking it works.** With the stack up and `server` enabled, ask the assistant to list apps, or call
@@ -265,17 +294,32 @@ the app crashes or logs errors. See `apps/armory/src/capabilities/server_manager
 
 ## 4. Troubleshooting
 
+A service reports 'connection refused' to a peer: open Treasury Admin, Services; pin the address if the peer registered a wrong one.
+
 | Symptom | Cause and fix |
 |---|---|
-| `set INTERNAL_API_TOKEN in .env` | The root `.env` is missing or empty. |
-| legion cannot reach Laya | LayaModel is not running, or its published port is not 9120. Run `docker compose ps` in `LayaModel`, then `docker compose exec legion python -c "import urllib.request as u; print(u.urlopen('http://host.docker.internal:9120/health').status)"`. Expect 200. |
+| `401` or `403` between backends | Check service identity/trust mounts, clock synchronization and the caller's route policy. There is no legacy token fallback. |
+| legion cannot reach Laya | LayaModel is not running, or its published port is not 29220. Run `docker compose ps` in `LayaModel`, then `docker compose exec legion python -c "import urllib.request as u; print(u.urlopen('http://host.docker.internal:29220/health').status)"`. Expect 200. |
 | `.env` files seem to be missing | They are hidden dotfiles. Run `ls -la apps/armory`. |
 | `scp` will not log in | Check `DEPLOY_HOST` and that the folder exists. Run `ssh <host>` by hand to test. |
-| `openssl: command not found` | Use the `/dev/urandom` command in first-time setup, step 3. A failed `echo` leaves an empty `.env`, so run it again. |
-| ember_api fails and `apps/Ember/ember_api/.env` is a directory | Compose created it because the file was missing. Run `rmdir apps/Ember/ember_api/.env`, then `touch apps/Ember/ember_api/.env`, then start again. |
+| `variable is not set` for a gateway admin password | The root `.env` is missing or the password is empty. Run `python tools/setup_env.py`, or set it by hand. |
+| A gateway build fails: path not found | `CONVERSATION_GATEWAY_DIR` or `DECISION_GATEWAY_DIR` points nowhere. Copy the gateway repos and set both in the root `.env`. |
+| A service fails and its `.env` (or the root `.env`) is a directory | Compose created it because the file was missing. Remove the directory, run `python tools/setup_env.py`, then start again. |
 | UI loads on the box but not on another device | Overlay not used. Check `COMPOSE_FILE` in the root `.env`, or add `-f docker-compose.zima.yml`. |
 | Overlay still binds `127.0.0.1` | Compose older than 2.24 ignores `!override`. Update Compose, or edit the `ports` lines in the main file. |
-| Port already in use | Another app uses 5173 or 5176. Change the left side of the port mapping. |
+| Port already in use | Another app uses 26502 or 26501. Change the left side of the port mapping. |
 | `permission denied` on the Docker socket | The container cannot read `/var/run/docker.sock`. Check its owner and mode on the host. |
-| Capability toggle reverted after a rebuild | `docker/configs/armory/capabilities.json` was reset (for example by `git checkout` or `git stash`) or is not mounted. Check `docker-compose.yml` mounts it, then set the toggle again. |
+| Capability toggle reverted after a rebuild | `.data/armory/settings.db` was deleted or is not mounted, so every capability started off. Check `docker-compose.yml` mounts `.data/armory`, then turn the capability on again. |
 | Funnel page loads but big files stall or time out | Check `docker inspect tailscale --format "{{.RestartCount}}"`. The ZimaOS Tailscale app's entrypoint (`tailscaled ... & sleep 10; tailscale web --listen 0.0.0.0:5252`) can exit after 10 s and restart the container in a loop. Append `; wait` to that entrypoint line in `/var/lib/casaos/apps/tailscale/docker-compose.yml` and run `docker compose up -d` there. A CasaOS app update may overwrite it. |
+
+## Runtime data and cache
+
+Every service keeps its runtime data in `.data/<service>/` and files it can make again in `.cache/<service>/`, both in the Citadel folder (gitignored). Compose bind-mounts them into the containers; running a service directly uses the same folders. Set `CITADEL_DATA_DIR` and `CITADEL_CACHE_DIR` in the root `.env` to move them (a relative value is relative to the Citadel folder). Back up `.data/`; `.cache/` can be deleted. Service keys stay in the `identity_*` and `trust_*` Docker volumes, not in `.data/`.
+
+## Overriding a service's `.env` from the root `.env`
+
+A value in the root `.env` wins over the same name in `apps/<service>/.env`. Empty values are ignored.
+- `BOOTSTRAP_ADMIN_PASSWORD=...` applies to every service that lists that name in its `.env.example` or `.env`.
+- `PORTCULLIS__BOOTSTRAP_ADMIN_PASSWORD=...` applies to Portcullis only (prefixes `ARMORY__`, `LEGION__`, `PORTCULLIS__`, `STRONGHOLD__`, `TREASURY__`; two underscores). It wins over the plain form.
+
+Other root variables, such as the gateway admin passwords and `CITADEL_DATA_DIR`, never reach a service's settings. Compose mounts the whole root `.env` read-only at `/citadel.env` in each service, so a process that can read files there can read those passwords too.

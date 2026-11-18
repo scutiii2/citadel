@@ -27,10 +27,12 @@ from src.tools.private_extensions import turn as private_turn
 from src.agents import auto_tier
 from src.providers import context_breakdown, llm_config, llm_options, model_tiers, token_limits
 from src.providers import reasoning_effort as effort_limits
+from src.citadel_auth import apply_root_env
 from src.runtime.seed import seed_from_example
 from src.runtime.chat_history import validate_history
 
 _SECRETS_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
+apply_root_env(_SECRETS_PATH.parent)  # the Citadel root .env overrides this service's .env
 _log = logging.getLogger(__name__)
 
 
@@ -82,6 +84,7 @@ def _resolve() -> tuple[str, Any]:
     if not module.has_api_key():
         raise AgentConfigError(
             f"AI_AGENT_PROVIDER is {provider_id!r} but its API key is not configured in {_SECRETS_PATH}"
+            " (an anthropic or openai gateway must be saved in ConversationGateway under the same id)"
         )
     spec = agent_spec.current()
     for index, choice in enumerate(spec.llm.fallback_gateways):
@@ -159,7 +162,7 @@ async def run_chat(
 
     limits: the user's own output-token and tool-round caps for this turn; lower only.
 
-    private_extensions: the user's own MCP servers for this turn, as ember_api
+    private_extensions: the user's own MCP servers for this turn, as portcullis
     sent them (see private_extensions/turn.py). Their tools are offered after
     the user approves each one; a server that cannot be reached is reported
     in `result.private_extension_errors` and the turn goes on without it.

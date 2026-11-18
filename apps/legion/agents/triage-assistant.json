@@ -1,6 +1,6 @@
 {
   "label": "Triage Assistant",
-  "port": 9111,
+  "port": 29611,
   "plan_tool": false,
   "enabled": true,
   "entry": false,

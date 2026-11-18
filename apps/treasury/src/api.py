@@ -1,4 +1,4 @@
-"""HTTP API. Every route but /health needs X-Internal-Token (once configured).
+"""HTTP API. Every route but /health requires a signed service assertion.
 
 Records live at /instances/{instance}/connections/{connection}/collections/{collection}/...
 A connection is reachable only through an instance that lists it.
@@ -6,8 +6,10 @@ A connection is reachable only through an instance that lists it.
 
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -15,8 +17,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.auth import InternalTokenMiddleware
+from src.citadel_auth import Keyring, ServiceAuthMiddleware, current_caller, data_dir, from_env, settings_store
 from src.backends.base import UnsupportedOperation
+from src import connection_admin, service_catalog
 from src.registry import InstanceManager, RawSqlDisabled, UnknownConnection, UnknownInstance
 
 MAX_LIMIT = 1000
@@ -46,14 +49,28 @@ def _error(status: int):
     return handler
 
 
-def create_app(manager: InstanceManager, token: str = "") -> FastAPI:
+class ServiceBody(BaseModel):
+    url: str
+
+
+class InstanceBody(BaseModel):
+    connections: list[str]
+
+
+# An instance a service may register besides the one named like itself.
+OWNED_INSTANCES = {"portcullis": {"portcullis", "ember"}, "armory": {"armory", "mcp_server"}}
+
+
+def create_app(manager: InstanceManager, keyring: Keyring | None = None, settings_db: Path | None = None) -> FastAPI:
+    keyring = keyring if keyring is not None else from_env("treasury", data_dir=data_dir(Path(__file__).resolve().parent.parent))
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        await keyring.ensure_identity()
         yield
         await manager.close()
 
     app = FastAPI(title="db_gateway", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
-    app.add_middleware(InternalTokenMiddleware, token=token)
+    app.add_middleware(ServiceAuthMiddleware, keyring=keyring, audience="treasury")
 
     for error, status in (
         (UnknownInstance, 404), (UnknownConnection, 404), (RawSqlDisabled, 403),
@@ -76,6 +93,100 @@ def create_app(manager: InstanceManager, token: str = "") -> FastAPI:
     @app.get("/instances")
     async def instances() -> dict[str, list[str]]:
         return manager.describe()
+
+    @app.put("/instances/{name}")
+    async def register_instance(name: str, body: InstanceBody) -> dict[str, Any]:
+        """A service registers its own instance: which connections it uses. Takes effect at once and is kept for the next start."""
+        caller = current_caller()
+        if caller is None or name not in OWNED_INSTANCES.get(caller.name, {caller.name}):
+            raise HTTPException(403, f"{caller.name if caller else 'this caller'} may not register instance {name!r}")
+        await manager.register(name, tuple(body.connections))  # unknown connections: 404
+        if settings_db is not None:
+            settings_store.put(settings_db, "instances", name, list(dict.fromkeys(body.connections)))
+        return {"saved": name}
+
+    @app.get("/services")
+    async def services() -> dict[str, Any]:
+        """The catalog every service reads: the address each one registered, or an administrator pinned."""
+        return {"services": await asyncio.to_thread(service_catalog.effective, settings_db) if settings_db is not None else {}}
+
+    @app.put("/services/{name}")
+    async def register_service(name: str, body: ServiceBody) -> dict[str, Any]:
+        """A service says where it is. Only a service may set its own address."""
+        caller = current_caller()
+        if caller is None or caller.name != name:
+            raise HTTPException(403, f"{caller.name if caller else 'this caller'} may not register the address of {name!r}")
+        if settings_db is None:
+            raise HTTPException(409, "this Treasury keeps no settings database")
+        try:
+            await asyncio.to_thread(service_catalog.register, settings_db, name, body.url)
+        except service_catalog.ServiceCatalogError as error:
+            raise HTTPException(400, str(error)) from error
+        return {"saved": name}
+
+    def _admin_only() -> None:
+        """The connections page is Portcullis's (staff only there); no other service may change a connection."""
+        caller = current_caller()
+        if caller is None or caller.name != "portcullis":
+            raise HTTPException(403, "only Portcullis may change connections")
+        if settings_db is None:
+            raise HTTPException(409, "this Treasury keeps no settings database")
+
+    @app.get("/admin/connections")
+    async def list_connections() -> dict[str, Any]:
+        _admin_only()
+        return connection_admin.view(settings_db, manager)
+
+    @app.put("/admin/connections/{name}")
+    async def put_connection(name: str, spec: dict[str, Any]) -> dict[str, Any]:
+        _admin_only()
+        try:
+            applies = connection_admin.save_connection(settings_db, manager, name, spec)
+        except connection_admin.ConnectionAdminError as error:
+            raise HTTPException(400, str(error)) from error
+        return {**connection_admin.view(settings_db, manager), "applies": applies}
+
+    @app.delete("/admin/connections/{name}")
+    async def delete_connection(name: str) -> dict[str, Any]:
+        _admin_only()
+        try:
+            applies = connection_admin.remove_connection(settings_db, manager, name)
+        except connection_admin.ConnectionAdminError as error:
+            raise HTTPException(400, str(error)) from error
+        return {**connection_admin.view(settings_db, manager), "applies": applies}
+
+    @app.put("/admin/default-cache")
+    async def put_default_cache(changes: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Body: ttl_seconds, max_entries and/or negative_ttl_seconds; an empty body puts the built-in defaults back."""
+        _admin_only()
+        try:
+            connection_admin.save_default_cache(settings_db, changes or None)
+        except connection_admin.ConnectionAdminError as error:
+            raise HTTPException(400, str(error)) from error
+        return {**connection_admin.view(settings_db, manager), "applies": "next start"}
+
+    @app.get("/admin/services")
+    async def admin_services() -> dict[str, Any]:
+        _admin_only()
+        return await asyncio.to_thread(service_catalog.view, settings_db)
+
+    @app.put("/admin/services/{name}")
+    async def pin_service(name: str, body: ServiceBody) -> dict[str, Any]:
+        _admin_only()
+        try:
+            await asyncio.to_thread(service_catalog.pin, settings_db, name, body.url)
+        except service_catalog.ServiceCatalogError as error:
+            raise HTTPException(400, str(error)) from error
+        return await asyncio.to_thread(service_catalog.view, settings_db)
+
+    @app.delete("/admin/services/{name}")
+    async def unpin_service(name: str) -> dict[str, Any]:
+        _admin_only()
+        try:
+            await asyncio.to_thread(service_catalog.unpin, settings_db, name)
+        except service_catalog.ServiceCatalogError as error:
+            raise HTTPException(400, str(error)) from error
+        return await asyncio.to_thread(service_catalog.view, settings_db)
 
     @app.get(BASE + "/collections/{collection}/records/{key}")
     async def get_record(instance: str, connection: str, collection: str, key: str) -> dict[str, Any]:

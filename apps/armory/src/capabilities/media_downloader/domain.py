@@ -10,7 +10,6 @@ from .utils.errors import DownloaderError, ErrorCode
 from .utils.service import Caller
 from src.config import settings
 from src.services.identity_context import current_uid, current_username
-from src.services.internal_token import is_exposed_without_token
 from src.services.untrusted import fenced_and_capped
 from src.capabilities.media_downloader.utils.media_downloads import get_runtime
 
@@ -18,8 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 def caller() -> Caller:
-    if is_exposed_without_token(settings.host, settings.internal_api_token):
-        raise ValueError("Video downloads require INTERNAL_API_TOKEN when armory is exposed beyond loopback.")
     uid = current_uid().strip()
     if not uid:
         raise ValueError("Video downloads require an authenticated account identity.")

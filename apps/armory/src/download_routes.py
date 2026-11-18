@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import hmac
 from urllib.parse import quote
 
 from starlette.applications import Starlette
@@ -12,22 +11,20 @@ from starlette.responses import JSONResponse, Response
 
 from src.config import settings
 from src.services import downloads
-from src.services.identity_context import REQUESTER_USERNAME_HEADER
+from src.services.identity_context import current_username
+from src.citadel_auth import current_caller
+from src.services.service_auth import install_auth
 
 
-def _token_valid(request: Request) -> bool:
-    """An unset token never validates (not even against an empty header)."""
-    expected = settings.internal_api_token
-    if not expected:
-        return False
-    return hmac.compare_digest(expected, request.headers.get("X-Internal-Token", ""))
+def _authenticated(request: Request) -> bool:
+    return current_caller() is not None
 
 
 async def download_file(request: Request) -> Response:
-    if not _token_valid(request):
-        return JSONResponse({"error": "Invalid or missing internal API token"}, status_code=401)
+    if not _authenticated(request):
+        return JSONResponse({"error": "Missing authenticated service caller"}, status_code=401)
     entry = downloads.registry.get(
-        request.query_params.get("path", ""), request.headers.get(REQUESTER_USERNAME_HEADER, "")
+        request.query_params.get("path", ""), current_username()
     )
     if entry is None:
         return JSONResponse({"error": "No such download (it may have expired)"}, status_code=404)
@@ -43,4 +40,5 @@ async def download_file(request: Request) -> Response:
 
 
 def install_download_routes(app: Starlette) -> None:
+    install_auth(app)
     app.add_route("/download", download_file, methods=["GET"])

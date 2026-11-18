@@ -11,7 +11,7 @@ reads `from src.foo import bar`, matching chat_app's layout.
   server can do."
 - **[`resources/`](resources/README.md)** - one folder per
   client-readable URI resource.
-- **[`services/`](services/README.md)** - shared clients (SSH, email, the
+- **[`services/`](services/README.md)** - shared clients (email, the
   config-file loader, the pending-requests store) every capability
   reuses.
 - **[`utils/`](utils/README.md)** - small, single-purpose helpers with
@@ -24,7 +24,7 @@ reads `from src.foo import bar`, matching chat_app's layout.
 - `server.py` - the shared `FastMCP` instance every capability/resource
   registers onto.
 - `config.py` - `Settings`, the process-level env-var-driven
-  configuration (bind host/port, where `configs/`/`.data/`/`.logs/` live).
+  configuration (bind host/port, where `.data/`/`.logs/` live).
 - `commands.py` - the `@command` registry backing chat_app's `/`
   slash-command autocomplete; capability id is inferred from the
   decorated function's module path.
@@ -43,7 +43,7 @@ reads `from src.foo import bar`, matching chat_app's layout.
 - `upload_routes.py`, `download_routes.py` - plain HTTP routes for files:
   `POST /upload` takes a file dropped into a command form; `GET /download?path=<id>`
   hands a caller a file a tool offered it (an opaque id, bound to the
-  asking account; see `services/downloads.py`). Both need `X-Internal-Token`.
+  asking account; see `services/downloads.py`). Both require a signed service assertion and verified requester token.
 
 ## Runtime data (not code)
 
@@ -51,14 +51,13 @@ All runtime-data folders live one level up, at the project root rather
 than under `src/` - nothing in them is package code, so they don't need
 to sit alongside the modules that write to them:
 
-- **[`../configs/`](../configs/README.md)** - structured settings,
-  mostly committed.
+- **[`../docs/settings.md`](../docs/settings.md)** - what an administrator
+  sets in Armory Admin, saved in `settings.db`.
 - **[`../.env`](../docs/secrets.md)** - credential values,
   gitignored.
 - `../.data/` - runtime state shared across capabilities, gitignored.
-- `../specifics/<capability_name>/` - state and config one capability
-  owns outright (`.data/`, `.logs/`, `.cache/`, `.secrets/` gitignored;
-  `configs/` tracked).
+- Capability state is in the Citadel folder: `.data/armory/<capability_name>/`
+  (kept) and `.cache/armory/<capability_name>/` (rebuildable), both gitignored.
 - `../.logs/` - `server.log` plus one file per error reference id,
   regenerated on every run, entirely gitignored.
 

@@ -8,7 +8,7 @@ from pathlib import Path
 from src.config import settings
 from src.services import capability_registry, identity_context
 from src.services.email import audit as email_audit
-from src.services.app_config import load_email_config
+from src.services.app_config import email_document, load_email_config
 from src.services.email.send import send_email
 
 logger = logging.getLogger(__name__)
@@ -46,15 +46,15 @@ def deliver_email(
     if not enabled:
         audit("skipped")
         raise EmailUnavailable("email capability is disabled; enable Email in capability controls")
-    path = config_path if config_path is not None else settings.email_config_path
-    if not path.is_file():
+    path = config_path if config_path is not None else settings.settings_db_path
+    if email_document(path) is None:
         audit("skipped")
-        raise EmailUnavailable("email is not configured; configure MCP configs/config_email.json")
+        raise EmailUnavailable("email is not configured; set it up on the Email page of Armory Admin")
     try:
         config = load_email_config(path)
     except Exception:
         audit("skipped")
-        raise EmailUnavailable("email config is invalid; check MCP configs/config_email.json") from None
+        raise EmailUnavailable("email config is invalid; check the Email page of Armory Admin") from None
     try:
         message_id = send_email(config, capability_alias, subject, body_html, to=to,
                                body_text=body_text, in_reply_to=in_reply_to,

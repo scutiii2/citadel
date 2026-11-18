@@ -31,6 +31,7 @@ from typing import Any
 
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
+from src.citadel_auth import ServiceAuth
 
 from src.agents import agent_events, agent_registry, agent_spec
 from src.agents.roles.orchestrator import plan
@@ -181,7 +182,8 @@ async def _call_tool(url: str, name: str, arguments: dict[str, Any], on_progress
     # usefully.
     # The shared token (peers require it) and the asking user, so the
     # delegate's own mcp_server calls carry them on too.
-    async with streamablehttp_client(url, headers=internal_auth.outbound_headers() or None) as (read, write, _):
+    async with streamablehttp_client(url, headers=internal_auth.outbound_headers() or None,
+                                     auth=ServiceAuth(internal_auth.keyring, "legion")) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.call_tool(name, arguments, progress_callback=on_progress)

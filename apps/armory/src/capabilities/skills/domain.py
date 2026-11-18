@@ -1,10 +1,9 @@
 """Typed skill operations; skill_store owns storage, identity_context the owner.
-No approve or retire here: only the user's side (ember_api) may activate a skill."""
+No approve or retire here: only the user's side (portcullis) may activate a skill."""
 from src.capabilities.skills.contract import MarkResult, ProposeResult, SearchResult
 from src.config import settings
 from src.services import identity_context, untrusted
 from src.capabilities.skills.utils import skill_store
-from src.services.internal_token import is_exposed_without_token
 
 
 class SkillDesk:
@@ -12,12 +11,6 @@ class SkillDesk:
 
     def _owner(self) -> str:
         """The caller's uid, after checking that the identity can be trusted at all."""
-        if is_exposed_without_token(settings.host, settings.internal_api_token):
-            # Without the token any machine that can reach the port could claim any uid.
-            raise skill_store.SkillStoreError(
-                f"Skills are disabled: this server listens on {settings.host!r} without INTERNAL_API_TOKEN, "
-                "so anyone on the network could read saved skills. Set INTERNAL_API_TOKEN, or bind to 127.0.0.1."
-            )
         return identity_context.current_uid()
 
     def propose(self, title: str, when_to_use: str, steps: str, tools: str = "") -> ProposeResult:

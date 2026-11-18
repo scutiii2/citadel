@@ -19,7 +19,7 @@ class TavilyClient:
 
     def __init__(self, api_key: str, base_url: str = BASE_URL, timeout: int = TIMEOUT_SECONDS) -> None:
         if not api_key:
-            raise TavilyError("TAVILY_API_KEY is not set. Add it to apps/armory/.env and restart the server.")
+            raise TavilyError("TAVILY_API_KEY is not set. Set it on the Settings page of Armory Admin.")
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout

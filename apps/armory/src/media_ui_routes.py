@@ -1,9 +1,8 @@
 """Fixed, authenticated HTTP adapters for Ember's native media screens.
-The internal token authenticates the gateway; the UID scopes every operation."""
+A service assertion authenticates the gateway; the UID scopes every operation."""
 from __future__ import annotations
 
 import asyncio
-import hmac
 import json
 import logging
 
@@ -12,25 +11,25 @@ from starlette.responses import FileResponse, JSONResponse
 
 from src.config import settings
 from src.services import capability_registry
-from src.services.identity_context import REQUESTER_UID_HEADER
-from src.services.internal_token import is_exposed_without_token
+from src.services.identity_context import current_uid
+from src.citadel_auth import current_caller
+from src.services.service_auth import install_auth
 
 logger = logging.getLogger(__name__)
 
 
 async def media_ui(request):
     kind = request.url.path.split("/")[1]
-    expected = settings.internal_api_token
-    if not expected or not hmac.compare_digest(expected, request.headers.get("X-Internal-Token", "")):
-        return JSONResponse({"error": "Invalid or missing internal API token"}, status_code=401)
-    uid = request.headers.get(REQUESTER_UID_HEADER, "").strip()
+    if current_caller() is None:
+        return JSONResponse({"error": "Missing authenticated service caller"}, status_code=401)
+    uid = current_uid().strip()
     if not uid:
         return JSONResponse({"error": "The requesting account is not identified"}, status_code=400)
     try:
         enabled = capability_registry.is_enabled(kind)
     except KeyError:
         enabled = False
-    if not enabled or is_exposed_without_token(settings.host, expected):
+    if not enabled:
         return JSONResponse({"error": "Capability is unavailable"}, status_code=503)
 
     ServiceError = ()
@@ -164,6 +163,7 @@ def _video_operation(request, uid, body):
 
 
 def install_media_ui_routes(app):
+    install_auth(app)
     for kind in ("pdf", "media"):
         base = f"/{kind}/ui"
         app.add_route(base + "/files", media_ui, methods=["GET"])

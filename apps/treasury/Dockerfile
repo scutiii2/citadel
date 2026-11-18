@@ -10,5 +10,5 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
-EXPOSE 8071
+EXPOSE 29602
 CMD ["python", "-m", "src.run"]

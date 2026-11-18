@@ -1,6 +1,6 @@
 {
   "label": "PDF Assistant",
-  "port": 9104,
+  "port": 29606,
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",

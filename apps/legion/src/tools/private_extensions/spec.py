@@ -1,6 +1,6 @@
-"""One private extension as ember_api sends it with a turn, validated.
+"""One private extension as portcullis sends it with a turn, validated.
 
-ember_api validates too; this is the last check before the process connects
+portcullis validates too; this is the last check before the process connects
 somewhere, so it does not trust the sender. Header values are secrets:
 `describe_error` is the only way an error leaves this package, and it hides
 them.

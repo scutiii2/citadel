@@ -1,0 +1,131 @@
+/* Shared look of the single-column information pages (Extensions,
+   Logs, Config issues). Plain CSS scoped to existing information-page content,
+   like admin/admin.css, since each view's <style scoped> can't share. */
+
+/* Existing pages opt into body decorations with .info-content.
+   PageLayout supplies .info-page geometry to every view. */
+
+.info-page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+
+.info-page:where(:not(.page), .info-content) h3 {
+  margin: 0;
+  font-size: 1em;
+}
+
+.info-page:where(:not(.page), .info-content) .card {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.info-page:where(:not(.page), .info-content) .card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.info-page:where(:not(.page), .info-content) .name {
+  font-family: var(--mono);
+  font-size: 0.8em;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.info-page:where(:not(.page), .info-content) input:not([type="checkbox"]),
+.info-page:where(:not(.page), .info-content) select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background: var(--bg);
+  font: inherit;
+}
+.info-page:where(:not(.page), .info-content) .primary {
+  padding: 6px 16px;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+.info-page:where(:not(.page), .info-content) .danger,
+.info-page:where(:not(.page), .info-content) .chip {
+  padding: 3px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font-size: 0.85em;
+  color: var(--muted);
+  background: transparent;
+}
+.info-page:where(:not(.page), .info-content) .danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.info-page:where(:not(.page), .info-content) .chip.active {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--bg);
+}
+.info-page:where(:not(.page), .info-content) button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.info-page:where(:not(.page), .info-content) .muted {
+  color: var(--muted);
+}
+.info-page:where(:not(.page), .info-content) .error {
+  color: var(--danger);
+}
+.info-page:where(:not(.page), .info-content) table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+.info-page:where(:not(.page), .info-content) th,
+.info-page:where(:not(.page), .info-content) td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.info-page:where(:not(.page), .info-content) th {
+  font-weight: 600;
+  color: var(--muted);
+}
+.info-page:where(:not(.page), .info-content) pre {
+  max-height: 320px;
+  margin: 6px 0 0;
+  padding: 8px;
+  overflow: auto;
+  border-radius: var(--radius-md);
+  font-family: var(--mono);
+  font-size: 0.85em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg);
+}
+/* Wide tables scroll sideways instead of widening the page. */
+.info-page:where(:not(.page), .info-content) .table-wrap {
+  overflow-x: auto;
+}
+
+/* Pieces shared by the list/editor pages (Notes, Memory, Skills). */
+.info-page:where(:not(.page), .info-content) .notice { margin: 0 0 12px; color: var(--muted); font-size: .85em; flex-shrink: 0; }
+.info-page:where(:not(.page), .info-content) .list-heading { display: flex; justify-content: space-between; gap: 10px; padding: 0 10px 12px; font-size: .75em; color: var(--muted); flex-shrink: 0; }
+.info-page:where(:not(.page), .info-content) .list-heading > :first-child { text-transform: uppercase; letter-spacing: .08em; }
+.info-page:where(:not(.page), .info-content) .unsaved, .info-page:where(:not(.page), .info-content) .saved-state { display: inline-flex; align-items: center; gap: 7px; margin-right: auto; font-size: .8em; color: var(--muted); }
+.info-page:where(:not(.page), .info-content) .unsaved i { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--accent); flex-shrink: 0; }
+.info-page:where(:not(.page), .info-content) .danger-zone { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; padding: 12px; border: 1px solid var(--danger); border-radius: var(--radius-lg); font-size: .85em; }
+.info-page:where(:not(.page), .info-content) .placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 28px; color: var(--muted); text-align: center; }
+.info-page:where(:not(.page), .info-content) .placeholder svg { width: 34px; height: 34px; color: var(--accent); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.info-page:where(:not(.page), .info-content) .placeholder h3 { font-size: 1em; margin: 0; color: var(--text); }
+.info-page:where(:not(.page), .info-content) .placeholder p { margin: 0 0 8px; font-size: .9em; }
+.info-page:where(:not(.page), .info-content) .load-error { color: var(--danger); }

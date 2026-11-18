@@ -1,8 +1,8 @@
 # capabilities/skills/ static and state files
 
-## `apps/armory/specifics/skills/.data/skills.db`
+## `apps/armory/.data/armory/skills/skills.db`
 
-- Runtime state: a SQLite database created on the first proposal. Gitignored by `/apps/armory/specifics/*/.data/`. Path setting: `MCP_SKILLS_DB_PATH`.
+- Runtime state: a SQLite database created on the first proposal. Gitignored with `.data/`. Path setting: `MCP_SKILLS_DB_PATH`.
 - Tables: `skills` (id, owner (the account uid), title, when_to_use, steps, tools, norm, status, successes, failures, created_at) and `skills_fts`, an FTS5 index over title, when_to_use and steps whose rowid equals `skills.id`.
 - Status: `proposed` (written by the assistant, never returned by search), `active` (approved by the user), `retired`. Only `utils/skill_store.set_status`, called from the user's side, makes a skill active; no MCP tool can.
 - Counts: `successes` and `failures` grow only through `tool_skill_mark` on an active skill, and reset to 0 when the user edits the skill. A skill with 3 or more failures and more failures than successes is never returned by search.

@@ -4,7 +4,7 @@ that itself talks to mcp_server as an MCP client (mcp_upstream.py).
 
 Run with:
     python -m src.supervisor   (starts one python -m src.server child per agent file)
-    python -m src.server --mcp-url http://127.0.0.1:8010/mcp   (with AI_AGENT_FILE set)
+    python -m src.server --mcp-url http://127.0.0.1:29600/mcp   (with AI_AGENT_FILE set)
 """
 
 from __future__ import annotations
@@ -16,7 +16,13 @@ import os
 import sys
 from uuid import uuid4
 from pathlib import Path
-from src.runtime import config_files, tuning_overrides
+from src.providers import gateway_client
+from contextlib import asynccontextmanager
+from src.citadel_auth import settings_store, advertised_url
+from src.citadel_auth.treasury import register_instance
+from src.runtime.service_catalog import catalog
+from src.runtime import config_files, gateway_settings, tuning_overrides
+from src.tools.mcp_client import config as mcp_config
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -25,15 +31,13 @@ _parser.add_argument(
     "--mcp-url",
     help=(
         "Override the mcp_server URL this agent connects to as an MCP "
-        "client (configs/config_servers.json's 'main' entry), e.g. "
-        "http://127.0.0.1:8010/mcp to point at a different host/port. "
-        "Takes precedence over MCP_SERVER_URL. Set before mcp_upstream.connect() "
+        "client (the 'main' server in Legion's settings database), e.g. "
+        "http://127.0.0.1:29600/mcp to point at a different host/port. "
+        "Takes precedence over saved main URL and the catalog. Set before mcp_upstream.connect() "
         "runs in main() below."
     ),
 )
 _args, _ = _parser.parse_known_args()
-if _args.mcp_url:
-    os.environ["MCP_SERVER_URL"] = _args.mcp_url
 
 # A supervised child (see supervisor.py) gets its agent file in
 # AI_AGENT_FILE. Its provider/gateway/model must reach the env vars before
@@ -75,7 +79,7 @@ except Exception as _exc:
     sys.exit(1)
 
 HOST = os.getenv("AI_AGENT_HOST", "127.0.0.1")
-PORT = int(os.getenv("AI_AGENT_PORT", "9100"))
+PORT = int(os.getenv("AI_AGENT_PORT", "29603"))
 
 
 
@@ -229,10 +233,10 @@ async def ask(
         if ctx is not None:
             await ctx.report_progress(0, None, json.dumps(agent_events.stamp(event, _AGENT_ID, _AGENT_LABEL)))
 
-    # The asking user, from ember_api's / chat_app's identity headers; every
+    # The asking user, from portcullis's / chat_app's identity headers; every
     # mcp_server tool this turn calls carries it on (see internal_auth.py).
     started_at = agent_events.now_iso()
-    requester_token = internal_auth.bind_requester(internal_auth.Requester.from_headers(_request_headers(ctx)))
+    requester_token = internal_auth.bind_requester(internal_auth.current_requester())
     from src.agents.roles.architect.pipeline import ArchitectError
 
     try:
@@ -309,7 +313,7 @@ async def ask(
 @mcp.custom_route("/registry", methods=["GET"])
 async def registry(_request: Request) -> JSONResponse:
     """The agent registry (the same JSON as .data/agent_registry.json), so
-    ember_api can find agents by URL instead of by file path, plus `defined`:
+    portcullis can find agents by URL instead of by file path, plus `defined`:
     every agent in agents/ (running or not, from agent_definitions.json). Behind the
     internal token like /mcp (see internal_auth.PROTECTED_PATHS)."""
     await asyncio.to_thread(agent_registry.reload)
@@ -433,7 +437,115 @@ async def agent_prompt_preview(request: Request) -> JSONResponse:
 
 
 def _tuning_overlay() -> Path:
-    return config_files.TUNING_PATH.with_name(tuning_overrides.OVERLAY_NAME)
+    return tuning_overrides.PATH
+
+
+@mcp.custom_route("/agents/gateway-settings", methods=["GET"])
+async def gateway_settings_get(_request: Request) -> JSONResponse:
+    """Where ConversationGateway is and whether a token is set. The token itself is never returned."""
+    return JSONResponse(gateway_settings.view(await gateway_settings.current()))
+
+
+@mcp.custom_route("/agents/gateway-settings", methods=["PUT"])
+async def gateway_settings_put(request: Request) -> JSONResponse:
+    """Body: {"url"?, "token"?}; a missing key keeps the stored value, an empty token clears it.
+    Saved in Treasury; other agent processes pick the edit up within half a minute."""
+    changes = await _json_object(request)
+    if changes is None:
+        return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
+    try:
+        saved = await gateway_settings.save(changes)
+    except gateway_settings.GatewaySettingsError as error:
+        return JSONResponse({"error": str(error)}, status_code=400)
+    gateway_client.reset_cache()
+    return JSONResponse(gateway_settings.view(saved))
+
+
+@mcp.custom_route("/agents/decision-gateway-settings", methods=["GET"])
+async def decision_gateway_settings_get(_request: Request) -> JSONResponse:
+    """Where DecisionGateway is and whether a token is set. The token itself is never returned."""
+    return JSONResponse(gateway_settings.view(await gateway_settings.current(gateway_settings.DECISION_KEY)))
+
+
+@mcp.custom_route("/agents/decision-gateway-settings", methods=["PUT"])
+async def decision_gateway_settings_put(request: Request) -> JSONResponse:
+    """Same body and rules as /agents/gateway-settings, for DecisionGateway."""
+    from src.providers.decision import gateway_client as decision_gateway
+
+    changes = await _json_object(request)
+    if changes is None:
+        return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
+    try:
+        saved = await gateway_settings.save(changes, gateway_settings.DECISION_KEY)
+    except gateway_settings.GatewaySettingsError as error:
+        return JSONResponse({"error": str(error)}, status_code=400)
+    decision_gateway.reset_cache()
+    return JSONResponse(gateway_settings.view(saved))
+
+
+@mcp.custom_route("/agents/servers", methods=["GET"])
+async def servers_get(_request: Request) -> JSONResponse:
+    """The MCP servers Legion connects to, as stored. Edits apply at the next start."""
+    return JSONResponse({"servers": await asyncio.to_thread(settings_store.read_all, config_files.SETTINGS_DB, "servers")})
+
+
+@mcp.custom_route("/agents/servers/{server_id}", methods=["PUT"])
+async def servers_put(request: Request) -> JSONResponse:
+    """Body: one server entry (transport, url or command, optional auth). Checked before it is saved."""
+    entry = await _json_object(request)
+    if entry is None:
+        return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
+    server_id = request.path_params["server_id"]
+    try:
+        mcp_config.validate_server(server_id, entry)
+    except mcp_config.ConfigError as error:
+        return JSONResponse({"error": str(error)}, status_code=400)
+    await asyncio.to_thread(settings_store.put, config_files.SETTINGS_DB, "servers", server_id, entry)
+    return JSONResponse({"saved": server_id, "applies": "next start"})
+
+
+@mcp.custom_route("/agents/servers/{server_id}", methods=["DELETE"])
+async def servers_delete(request: Request) -> JSONResponse:
+    server_id = request.path_params["server_id"]
+    await asyncio.to_thread(settings_store.delete, config_files.SETTINGS_DB, "servers", server_id)
+    return JSONResponse({"deleted": server_id, "applies": "next start"})
+
+
+def _models_view() -> dict[str, Any]:
+    from src.providers import llm_config
+
+    saved = settings_store.read_all(config_files.SETTINGS_DB, llm_config.MODELS_TABLE)
+    return {"models": [{"name": name, "value": saved.get(name, ""), "stored": name in saved}
+                       for name in llm_config.placeholders()]}
+
+
+@mcp.custom_route("/agents/models", methods=["GET"])
+async def models_get(_request: Request) -> JSONResponse:
+    """The model names gateway presets leave open ({NAME} placeholders), with the value saved for each."""
+    return JSONResponse(await asyncio.to_thread(_models_view))
+
+
+@mcp.custom_route("/agents/models", methods=["PUT"])
+async def models_put(request: Request) -> JSONResponse:
+    """Body {NAME: text | null}; null removes the saved name (the environment's value, if any, applies again).
+    Nothing is saved if one change is refused. An agent uses a changed name when it next starts."""
+    from src.providers import llm_config
+
+    changes = await _json_object(request)
+    if not changes:
+        return JSONResponse({"error": "body must be a JSON object with at least one name"}, status_code=400)
+    known = llm_config.placeholders()
+    for name, value in changes.items():
+        if name not in known:
+            return JSONResponse({"error": f"Unknown model name: {name}."}, status_code=400)
+        if value is not None and (not isinstance(value, str) or not value.strip() or len(value) > 200):
+            return JSONResponse({"error": f"{name}: enter the name, or remove it."}, status_code=400)
+    for name, value in changes.items():
+        if value is None:
+            await asyncio.to_thread(settings_store.delete, config_files.SETTINGS_DB, llm_config.MODELS_TABLE, name)
+        else:
+            await asyncio.to_thread(settings_store.put, config_files.SETTINGS_DB, llm_config.MODELS_TABLE, name, value.strip())
+    return JSONResponse({**await asyncio.to_thread(_models_view), "applies": "next agent start"})
 
 
 @mcp.custom_route("/agents/tuning", methods=["GET"])
@@ -530,7 +642,7 @@ def status() -> dict[str, Any]:
 @mcp.tool()
 async def probe_extension(url: str, headers: dict[str, str] | None = None) -> dict[str, Any]:
     """Connect once to the MCP server at `url` (with `headers`, which may carry
-    a secret) and report `{status, error, tools}`. Used by ember_api when a user
+    a secret) and report `{status, error, tools}`. Used by portcullis when a user
     adds or edits a private extension. Never raises; the error is short and
     never contains a header value."""
     return await mcp_upstream.probe_private(url, headers)
@@ -581,7 +693,25 @@ if SPEC.internal_role == "router":
     mcp.tool()(route)
 
 
+@asynccontextmanager
+async def _register_with_treasury():
+    """Register in the serving loop and release both background tasks on shutdown."""
+    registration = asyncio.create_task(register_instance(
+        internal_auth.keyring, gateway_settings.treasury_address(), gateway_settings.INSTANCE, [gateway_settings.CONNECTION]))
+    parts = urlsplit(_AGENT_URL)
+    origin = f"{parts.scheme}://{parts.netloc}"
+    catalog.start("legion" if SPEC.entry else None,
+                  advertised_url(HOST, PORT, origin) if SPEC.entry else None)
+    try:
+        yield
+    finally:
+        await catalog.stop()
+        registration.cancel()
+        await asyncio.gather(registration, return_exceptions=True)
+
+
 def main() -> None:
+    asyncio.run(internal_auth.keyring.ensure_identity())
     role_info = {}
     if SPEC.role == "architect":
         role_info = {"kind": SPEC.kind, "workers": list(SPEC.workers)}
@@ -594,7 +724,10 @@ def main() -> None:
 
         provider.prepare()
     elif agent_config.PROVIDER_ID != "decision":
-        mcp_upstream.connect()
+        if _args.mcp_url:
+            mcp_upstream.connect(_args.mcp_url)
+        else:
+            mcp_upstream.connect()
         mcp_upstream.warn_unmatched_tool_globs()
     agent_registry.register(
         _AGENT_ID, _AGENT_LABEL, _AGENT_URL,
@@ -607,12 +740,19 @@ def main() -> None:
         # Same app, host, port and log level mcp.run(transport="streamable-http")
         # would use, built explicitly so middleware can be added here. No CORS:
         # only servers call this agent (chat_app directly, ember_web's browser
-        # via ember_api's proxy), never a browser - which is also why /mcp
+        # via portcullis's proxy), never a browser - which is also why /mcp
         # can require the shared internal token (once one is configured).
+        internal_auth.install_mcp(mcp)
         app = mcp.streamable_http_app()
-        app.add_middleware(internal_auth.InternalTokenMiddleware, token=internal_auth.TOKEN)
-        if not internal_auth.TOKEN:
-            print("ai_agent: /mcp has no auth - set INTERNAL_API_TOKEN in .env", flush=True)
+        internal_auth.install_auth(app)
+        previous_lifespan = app.router.lifespan_context
+
+        @asynccontextmanager
+        async def lifespan(application):
+            async with previous_lifespan(application), _register_with_treasury():
+                yield
+
+        app.router.lifespan_context = lifespan
         uvicorn.run(app, host=HOST, port=PORT, log_level=mcp.settings.log_level.lower())
     finally:
         agent_registry.deregister(_AGENT_ID)

@@ -54,9 +54,12 @@ def reset(provider_id: str | None = None) -> None:
 
 
 def extract_retry_after_seconds(error: Exception) -> float | None:
-    """Both openai and anthropic's rate-limit errors carry the original
-    httpx response, which may include a Retry-After header - prefer the
-    server's own answer over guessing a fixed cooldown length."""
+    """The delay the gateway reported (GatewayCallError.retry_after), else a
+    Retry-After header on an attached response - prefer the server's own
+    answer over guessing a fixed cooldown length."""
+    direct = getattr(error, "retry_after", None)
+    if isinstance(direct, (int, float)) and not isinstance(direct, bool):
+        return float(direct)
     response = getattr(error, "response", None)
     if response is None:
         return None

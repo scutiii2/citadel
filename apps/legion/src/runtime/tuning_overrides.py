@@ -12,10 +12,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from src.citadel_auth import data_dir
+
 _log = logging.getLogger(__name__)
 
 OVERLAY_NAME = "tuning_overrides.json"
-PATH = Path(__file__).resolve().parent.parent.parent / "configs" / OVERLAY_NAME
+# Admin edits are runtime state: they live in the Citadel .data folder, not in the tracked configs/.
+PATH = data_dir(Path(__file__).resolve().parents[2]) / OVERLAY_NAME
 
 
 class TuningError(Exception):
@@ -133,8 +136,6 @@ def save(changes: dict[str, Any], path: Path = PATH) -> dict[str, Any]:
             current.pop(key, None)
         else:
             current[key] = check(key, value)
-    # Docker exposes the required configs path as a link into the persistent data volume.
-    # Replace the target atomically, retaining the link across successive saves.
     path = path.resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")

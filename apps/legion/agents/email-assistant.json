@@ -1,6 +1,6 @@
 {
   "label": "Email Assistant",
-  "port": 9112,
+  "port": 29612,
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",

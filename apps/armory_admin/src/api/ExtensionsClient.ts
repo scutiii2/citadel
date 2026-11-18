@@ -1,0 +1,35 @@
+import { apiRequest } from "./http";
+
+/** Another MCP server mcp_server re-exposes; its tools are named
+ * "<id>__<tool>". */
+export interface ExtensionInfo {
+  id: string;
+  label: string;
+  description: string;
+  status: "connected" | "error" | string;
+  error: string | null;
+  tools: string[];
+  /** The extension's own web app (an http(s) address from mcp_server's config). */
+  web_url?: string | null;
+}
+
+export interface ExtensionCreate {
+  label: string;
+  url: string;
+  description: string;
+  /** A server of this stack: mcp_server sends it the internal token. */
+  internal?: boolean;
+  /** The token the tool service made for Armory on its own admin page (Tokens card). Kept by Armory, never shown again. */
+  token?: string;
+}
+
+/** Separates an extension tool's id from its own name. */
+export const EXTENSION_SEPARATOR = "__";
+
+/** portcullis's pass-through to mcp_server's extensions: listing needs
+ * chat.use or tools.view, adding/removing extensions.manage. */
+export const extensionsClient = {
+  list: () => apiRequest<ExtensionInfo[]>("GET", "/api/extensions"),
+  add: (extension: ExtensionCreate) => apiRequest<ExtensionInfo>("POST", "/api/extensions", extension),
+  remove: (id: string) => apiRequest<void>("DELETE", `/api/extensions/${encodeURIComponent(id)}`),
+};

@@ -22,6 +22,7 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import urlsplit, urlunsplit
+from src.citadel_auth import data_dir
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -159,9 +160,9 @@ class AgentSpec:
     skill_learning: bool = False
     # Offer the update_plan checklist tool (agents/plan.py); the chat's own toggle can still switch it off.
     plan_tool: bool = True
-    # False keeps the agent out of every orchestrator's roster: it is called directly (ember_api), never delegated to.
+    # False keeps the agent out of every orchestrator's roster: it is called directly (portcullis), never delegated to.
     delegable: bool = True
-    # Address peers and ember_api reach this agent at (what it registers);
+    # Address peers and portcullis reach this agent at (what it registers);
     # None = derived from the host and port it listens on.
     url: str | None = None
     source: Path | None = None
@@ -259,7 +260,7 @@ def _agent_url(check: _Checker, data: dict[str, Any]) -> str | None:
         return None
     parts = urlsplit(value.strip())
     if parts.scheme not in ("http", "https") or not parts.hostname or parts.query or parts.fragment:
-        raise check.fail("url", "must be an http(s) address like http://10.0.0.5:9103/mcp")
+        raise check.fail("url", "must be an http(s) address like http://10.0.0.5:29605/mcp")
     try:
         parts.port  # noqa: B018 - raises ValueError for a port out of range
     except ValueError:
@@ -275,7 +276,7 @@ def overrides_path_for(directory: Path) -> Path:
     replaces it on this machine. Any other folder (tests) keeps its own
     overrides inside it, in a subfolder the `*.json` scan never matches."""
     if directory == AGENTS_DIR:
-        return AGENTS_DIR.parent / ".data" / "agent_overrides.json"
+        return data_dir(AGENTS_DIR.parent) / "agent_overrides.json"
     return directory / ".overrides" / "agent_overrides.json"
 
 

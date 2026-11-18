@@ -13,30 +13,38 @@ from typing import TypeVar
 from urllib.parse import urlsplit
 
 from src.config import settings
-from src.services.app_config import load_config
+from src.services import capability_tuning
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
 
 
-def load_media_settings():
-    """Use armory's config loader and the standalone caps/TTL shape, validating bounds."""
-    from src.capabilities.media_downloader.utils.config import Limits, Settings
-    raw = load_config(settings.media_config_path)
+def validate_tuning(raw):
+    """Refuse an unusable caps-and-lifetimes document (ValueError); the Limits page uses it before saving."""
+    from src.capabilities.media_downloader.utils.config import Limits
+
     limits = Limits.from_config(raw.get("limits", {}))
     for field in fields(limits):
         value = getattr(limits, field.name)
         minimum = 0 if field.name == "max_queued_downloads" else 1
         if not math.isfinite(value) or value < minimum:
-            raise ValueError(f"{settings.media_config_path}: invalid {field.name}")
+            raise ValueError(f"invalid {field.name}")
     ttl = float(raw.get("file_ttl_hours", 6)) * 3600
     sweep = float(raw.get("sweep_interval_minutes", 10)) * 60
     link = float(raw.get("download_link_minutes", 60)) * 60
     caller_jobs = raw.get("limits", {}).get("max_caller_downloads", 2)
     if any(not math.isfinite(v) or v < 1 for v in (ttl, sweep, link)):
-        raise ValueError(f"{settings.media_config_path}: TTLs and sweep interval must be positive")
+        raise ValueError("TTLs and sweep interval must be positive")
     if not isinstance(caller_jobs, int) or isinstance(caller_jobs, bool) or caller_jobs < 1:
-        raise ValueError(f"{settings.media_config_path}: max_caller_downloads must be a positive integer")
+        raise ValueError("max_caller_downloads must be a positive integer")
+    return limits, ttl, sweep, link, caller_jobs
+
+
+def load_media_settings():
+    """The caps and lifetimes saved on the Limits page (defaults otherwise), validated, with Armory's addresses and key."""
+    from src.capabilities.media_downloader.utils.config import Settings
+    raw = capability_tuning.document(settings.settings_db_path, "media_downloader")
+    limits, ttl, sweep, link, caller_jobs = validate_tuning(raw)
     base_url = settings.media_public_base_url.rstrip("/") or f"http://127.0.0.1:{settings.port}"
     parsed = urlsplit(base_url)
     if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:

@@ -12,7 +12,6 @@ connection - not reconnected per call, unlike chat_app's mcp_client.py.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from src.agents import agent_spec
@@ -20,8 +19,10 @@ from src.agents import agent_spec
 from src.runtime import approvals, internal_auth, tool_filter
 
 from src.tools.mcp_client import tool_progress
-from src.runtime.config_files import SERVERS_PATH
+from src.runtime.config_files import SETTINGS_DB
 from src.tools.mcp_client.sync_wrapper import SyncMcpClient
+from src.citadel_auth import ServiceAuth, settings_store
+from src.runtime.service_catalog import catalog
 
 import asyncio
 
@@ -29,9 +30,9 @@ from src.tools.private_extensions import turn as private_turn
 from src.tools.private_extensions.pool import PrivateSessionPool
 from src.tools.private_extensions.spec import InvalidSpec, PrivateSpec, describe_error
 
-_CONFIG_PATH = SERVERS_PATH
+_CONFIG_PATH = SETTINGS_DB
 
-# The single upstream server id configured in configs/config_servers.json.
+# The single upstream server id stored in the settings database.
 # Every tool list_tools() returns is namespaced "main__<tool name>" by
 # SyncMcpClient's underlying McpClientRegistry (see registry.py's
 # NAMESPACE_SEPARATOR) even though there's only one upstream server today.
@@ -73,16 +74,13 @@ def tool_description(tool: Any) -> str:
     return description
 
 
-def connect() -> None:
-    # MCP_SERVER_URL (set directly, or via --mcp-url - see server.py) repoints
-    # the "main" upstream server without editing config_servers.json - same
-    # env var chat_app's own services/llm/settings.py reads for its direct
-    # connection to mcp_server, so one variable controls both.
-    override = os.getenv("MCP_SERVER_URL")
-    url_overrides = {_SERVER_ID: override} if override else None
-    # mcp_server requires the shared internal token on /mcp once it's configured.
-    extra_headers = {internal_auth.INTERNAL_TOKEN_HEADER: internal_auth.TOKEN} if internal_auth.TOKEN else None
-    client.connect_all(_CONFIG_PATH, url_overrides, extra_headers)
+def connect(url_override: str | None = None) -> None:
+    """Saved main URLs win over the catalog; an explicit CLI override wins over both."""
+    main = settings_store.read_all(_CONFIG_PATH, "servers").get(_SERVER_ID, {})
+    url_overrides = {_SERVER_ID: url_override} if url_override else (
+        {_SERVER_ID: catalog.mcp_url} if not main.get("url") and main.get("transport", "http") == "http" else None)
+    # Armory checks a signed service assertion on /mcp.
+    client.connect_all(_CONFIG_PATH, url_overrides, auth_by_server={_SERVER_ID: ServiceAuth(internal_auth.keyring, "armory")})
 
 
 def _tool_is_enabled(name: str, enabled: set[str]) -> bool:

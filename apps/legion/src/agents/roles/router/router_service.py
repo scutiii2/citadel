@@ -1,7 +1,6 @@
 """Authenticated Router operation, bounded independently of inference threads."""
 from __future__ import annotations
 
-import hmac
 import threading
 from functools import partial
 
@@ -10,25 +9,24 @@ import anyio
 from src.agents import agent_spec
 from src.agents.roles.router.router_contract import DecisionOutcome, RouteRequest, RouteResponse
 from src.agents.roles.router.router_engine import RouterEngine
-from src.runtime import internal_auth, usage_log
+from src.runtime import usage_log
+from src.citadel_auth import current_caller
 from src.providers import cancellation
-from src.providers.decision import strategy, laya_model
-from src.providers.decision.gateways.jev import JevGateway
+from src.providers.decision import gateway_client as decision_gateway, strategy
 
 _engine = RouterEngine()
 
 
 def status_summary() -> dict:
     policy = agent_spec.current().decision
-    local_status = "loaded" if laya_model.configured() and laya_model.agent().health() else "unavailable"
+    local_status = "loaded" if decision_gateway.is_reachable("laya") else "unavailable"
     return {**policy.summary(), "local_status": local_status,
-            "fallback_available": "jev" in strategy._ORDER[policy.strategy] and JevGateway().available()}
+            "fallback_available": "jev" in strategy._ORDER[policy.strategy] and decision_gateway.is_usable("jev")}
 
 
 async def route(raw: dict, headers) -> dict:
-    provided = (headers or {}).get("X-Internal-Token", "")
-    if not internal_auth.TOKEN or not hmac.compare_digest(provided, internal_auth.TOKEN):
-        raise ValueError("Router requires a valid configured internal token")
+    if current_caller() is None:
+        raise ValueError("Router requires an authenticated service caller")
     spec = agent_spec.current()
     if spec.internal_role != "router":
         raise ValueError("This is not a Router agent")

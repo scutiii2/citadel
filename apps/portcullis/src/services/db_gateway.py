@@ -1,0 +1,130 @@
+"""Client for db_gateway: key/document storage that lives outside portcullis's own database.
+
+Used for new data that needs no joins or foreign keys. Accounts, chats and the rest stay
+in SQLAlchemy. A call fails with DbGatewayUnavailable when the gateway cannot be reached,
+so a feature that uses it fails alone and portcullis itself keeps running.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Protocol
+from urllib.parse import quote
+
+import httpx
+from src.citadel_auth import Keyring, ServiceAuth
+from src.services import service_auth
+
+Document = dict[str, Any]
+
+# db_gateway answers a missing record with 404 and an error starting like this;
+# 404 for an unknown instance or connection has a different message.
+_NO_RECORD = "no record"
+
+
+class DbGatewayError(Exception):
+    pass
+
+
+class DbGatewayRefused(DbGatewayError):
+    """Treasury refused an admin change (4xx); `message` is its own and safe to show."""
+
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+class DbGatewayUnavailable(DbGatewayError):
+    pass
+
+
+class DocumentStore(Protocol):
+    async def get(self, collection: str, key: str) -> Document | None: ...
+
+    async def put(self, collection: str, key: str, doc: Document) -> None: ...
+
+    async def create(self, collection: str, key: str, doc: Document) -> bool: ...
+
+    async def delete(self, collection: str, key: str) -> bool: ...
+
+    async def query(
+        self, collection: str, filters: dict[str, Any] | None = None, limit: int = 100, offset: int = 0
+    ) -> list[Document]: ...
+
+
+class DbGatewayClient:
+    """One instance and connection of db_gateway, reached over HTTP with signed service assertions.
+
+    `client` carries the gateway's base URL and a timeout; the caller closes it."""
+
+    def __init__(self, client: httpx.AsyncClient, instance: str, connection: str, identity: Keyring | None) -> None:
+        self._client = client
+        self._base = f"/instances/{quote(instance, safe='')}/connections/{quote(connection, safe='')}"
+        self._auth = ServiceAuth(identity or service_auth.keyring, "treasury")
+
+    def _record(self, collection: str, key: str) -> str:
+        return f"{self._base}/collections/{quote(collection, safe='')}/records/{quote(key, safe='')}"
+
+    async def _send(self, method: str, path: str, json: Any = None) -> httpx.Response:
+        try:
+            return await self._client.request(method, path, json=json, auth=self._auth)
+        except httpx.TransportError as error:
+            raise DbGatewayUnavailable(f"db_gateway is not reachable: {error.__class__.__name__}") from error
+
+    @staticmethod
+    def _is_missing_record(response: httpx.Response) -> bool:
+        return response.status_code == 404 and _error_text(response).startswith(_NO_RECORD)
+
+    @staticmethod
+    def _check(response: httpx.Response) -> httpx.Response:
+        if response.status_code >= 400:
+            raise DbGatewayError(f"db_gateway answered {response.status_code}: {_error_text(response)}")
+        return response
+
+    async def instances(self) -> dict[str, list[str]]:
+        """The gateway's instances and the connections each may use."""
+        return self._check(await self._send("GET", "/instances")).json()
+
+    async def admin(self, method: str, path: str, body: Any = None) -> Any:
+        """A call to Treasury's /admin routes (the connections page). A 4xx comes back as DbGatewayRefused with Treasury's own message."""
+        response = await self._send(method, path, body)
+        if 400 <= response.status_code < 500:
+            raise DbGatewayRefused(response.status_code, _error_text(response) or f"db_gateway answered {response.status_code}")
+        return self._check(response).json()
+
+    async def get(self, collection: str, key: str) -> Document | None:
+        response = await self._send("GET", self._record(collection, key))
+        if self._is_missing_record(response):
+            return None
+        return self._check(response).json()["doc"]
+
+    async def put(self, collection: str, key: str, doc: Document) -> None:
+        self._check(await self._send("PUT", self._record(collection, key), {"doc": doc}))
+
+    async def create(self, collection: str, key: str, doc: Document) -> bool:
+        """Stores `doc` only when the key is free. False when a record already has this key."""
+        response = await self._send("PUT", self._record(collection, key) + "?if_absent=true", {"doc": doc})
+        if response.status_code == 409:
+            return False
+        self._check(response)
+        return True
+
+    async def delete(self, collection: str, key: str) -> bool:
+        response = await self._send("DELETE", self._record(collection, key))
+        if self._is_missing_record(response):
+            return False
+        self._check(response)
+        return True
+
+    async def query(
+        self, collection: str, filters: dict[str, Any] | None = None, limit: int = 100, offset: int = 0
+    ) -> list[Document]:
+        path = f"{self._base}/collections/{quote(collection, safe='')}/query"
+        body = {"filters": filters or {}, "limit": limit, "offset": offset}
+        return self._check(await self._send("POST", path, body)).json()["docs"]
+
+
+def _error_text(response: httpx.Response) -> str:
+    try:
+        return str(response.json().get("error", ""))
+    except (ValueError, AttributeError):
+        return response.text[:200]

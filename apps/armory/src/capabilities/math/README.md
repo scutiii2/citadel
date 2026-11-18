@@ -378,7 +378,7 @@ No network, secrets, external service, calculation history, or custom settings.
 Install locked dependencies with `uv sync --frozen`. Refresh capabilities in
 ember_admin, then enable **Mathematics** through the normal controls. Existing
 deployments discover new capabilities offline. The loader owns the standard
-`configs/config_capabilities.json` entry; do not add live entries by hand.
+the Capabilities page (stored in `.data/armory/settings.db`) entry; do not add live entries by hand.
 
 Each server event loop admits at most 16 requests and executes at most two
 workers at once. Reusable workers expire after 30 idle seconds and are recycled

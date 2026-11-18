@@ -6,11 +6,12 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
+
+from src.citadel_auth import settings_store
 
 
 
@@ -36,9 +37,6 @@ class EmailConfig:
     # Domains a caller may name any address at; currently unused (its OTP consumer was removed), kept as infrastructure.
     # Empty means "no domains", never "any domain", so an absent key is the strict case.
     allowed_recipient_domains: list[str] = field(default_factory=list)
-    # Optional MS Teams incoming-webhook URL for state-transition alerts (none currently).
-    # Empty means Teams alerts are off; an empty string is never POSTed to.
-    teams_webhook_url: str = ""
 
 
 @dataclass(frozen=True)
@@ -53,15 +51,15 @@ class ExtensionConfig:
     args: list[str] = field(default_factory=list)
     transport: str = "stdio"
     url: str | None = None
-    # http transport only: extra headers sent on every request to the upstream (e.g. {"X-Internal-Token": "${INTERNAL_API_TOKEN}"}).
+    # External HTTP credentials remain specific to each upstream.
     # Values are resolved from the environment at load time, so they are secrets: never persisted or reported.
     headers: dict[str, str] = field(default_factory=dict, repr=False)
     # Opt-in: send the asking user's username/email upstream as ``_meta.requester`` on each proxied call.
     # Off by default so an extension never receives identity data it did not ask for.
     forward_requester: bool = False
-    # http transport only: a server inside this stack. Armory sends it INTERNAL_API_TOKEN and forwards the requester,
-    # so no hand-written ``headers`` are needed. Never set it for a server you do not run: it would receive the token.
+    # Internal HTTP extensions use audience-bound service assertions and signed requester tokens.
     internal: bool = False
+    audience: str = "legion"
     # The extension's own web app, if any (an http(s) address the browser can reach, not necessarily the MCP url).
     # ember's Extensions page links to it; nothing here requests it.
     web_url: str | None = None
@@ -83,6 +81,8 @@ def _web_url(entry: dict[str, Any], *, id_: str, config_path: Path) -> str | Non
 
 
 def _resolve_placeholder(name: str, *, where: str, config_path: Path) -> str:
+    if name == "INTERNAL_API_TOKEN":
+        raise ValueError("Legacy INTERNAL_API_TOKEN placeholder is unsupported; use service auth or an upstream-specific token")
     value = os.environ.get(name)
     if value is None:
         raise KeyError(
@@ -124,26 +124,23 @@ def resolve_section(value: Any, *, where: str, config_path: Path) -> Any:
     return value
 
 
+def _read_object(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {path}.")
+    try:
+        with path.open(encoding="utf-8") as handle:
+            data = json.load(handle)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Config file {path} is not valid JSON: {error}") from error
+    if not isinstance(data, dict):
+        raise ValueError(f"Config file {path} must contain a JSON object at the top level")
+    return data
+
+
 def load_config(config_path: Path) -> dict[str, Any]:
     """Read and parse one config file, raising on anything unusable.
     Returns the document as written, ``${VAR}`` placeholders included; resolve with ``resolve_section``."""
-    example_path = config_path.with_name(config_path.name + ".example")
-    if not config_path.exists() and example_path.exists():
-        shutil.copyfile(example_path, config_path)
-    if not config_path.exists():
-        raise FileNotFoundError(
-            f"Config file not found: {config_path}. Copy {config_path.name}.example "
-            f"to {config_path.name} in the same folder and fill it in."
-        )
-    try:
-        with config_path.open(encoding="utf-8") as handle:
-            data = json.load(handle)
-    except json.JSONDecodeError as error:
-        raise ValueError(f"Config file {config_path} is not valid JSON: {error}") from error
-
-    if not isinstance(data, dict):
-        raise ValueError(f"Config file {config_path} must contain a JSON object at the top level")
-    return data
+    return _read_object(config_path)
 
 
 def _require(section: dict[str, Any], key: str, *, prefix: str, config_path: Path) -> Any:
@@ -164,14 +161,48 @@ SUPPORTED_EMAIL_SECURITY = ("starttls", "ssl", "none")
 # The IANA implicit-TLS submission port, used by mainstream providers, so `security` can be inferred from it.
 IMPLICIT_TLS_PORT = 465
 
-def load_email_config(config_path: Path) -> EmailConfig:
-    """Parse config_email.json into an EmailConfig; ``from`` is read from JSON and exposed as ``from_address``.
-    Optional keys: ``password`` (unauthenticated relays), ``security`` (implied by port), ``allowed_recipient_domains`` (absent is stricter), ``to``."""
-    section = load_config(config_path)
-    section = resolve_section(section, where="", config_path=config_path)
+EMAIL_TABLE = "email"
+EMAIL_KEY = "smtp"
+EMAIL_FIELDS = ("smtp_server", "smtp_port", "security", "from", "password", "to", "allowed_recipient_domains")
 
+
+def email_document(config_path: Path) -> dict[str, Any] | None:
+    """The stored SMTP document, or None when the administrator has not set email up."""
+    document = settings_store.read_all(config_path, EMAIL_TABLE).get(EMAIL_KEY)
+    return document if isinstance(document, dict) else None
+
+
+def load_email_config(config_path: Path) -> EmailConfig:
+    """Build an EmailConfig from the SMTP settings stored in the settings database at ``config_path``; ``from`` is exposed as ``from_address``.
+    Optional keys: ``password`` (unauthenticated relays), ``security`` (implied by port), ``allowed_recipient_domains`` (absent is stricter), ``to``."""
+    section = email_document(config_path)
+    if section is None:
+        raise FileNotFoundError(f"Email is not set up in {config_path}.")
+    return _email_config(section, config_path)
+
+
+def save_email_settings(config_path: Path, changes: dict[str, Any]) -> dict[str, Any]:
+    """Merge ``changes`` into the stored document (a None value removes a key), check the result as a whole, and save it.
+    Raises KeyError or ValueError, and saves nothing, when the result is not a usable email setup."""
+    unknown = set(changes) - set(EMAIL_FIELDS)
+    if unknown:
+        raise ValueError(f"Unknown email setting: {', '.join(sorted(unknown))}.")
+    document = {**(email_document(config_path) or {})}
+    for key, value in changes.items():
+        if value is None:
+            document.pop(key, None)
+        else:
+            document[key] = value
+    _email_config(document, config_path)
+    settings_store.put(config_path, EMAIL_TABLE, EMAIL_KEY, document)
+    return document
+
+
+def _email_config(section: dict[str, Any], config_path: Path) -> EmailConfig:
     def required(key: str) -> Any:
-        return _require(section, key, prefix="", config_path=config_path)
+        if key not in section or section[key] in ("", None):
+            raise KeyError(f"Email settings are missing '{key}'")
+        return section[key]
 
     def as_string_list(value: Any) -> list[str]:
         # A bare string is the obvious way to write one recipient or domain; iterating it per character would be a nasty surprise.
@@ -191,13 +222,16 @@ def load_email_config(config_path: Path) -> EmailConfig:
     # and would just appear in refusal messages.
     domains = [domain for domain in domains if domain]
 
-    port = int(required("smtp_port"))
+    try:
+        port = int(required("smtp_port"))
+    except (TypeError, ValueError):
+        raise ValueError("Email settings: 'smtp_port' must be a whole number.") from None
     inferred = "ssl" if port == IMPLICIT_TLS_PORT else "starttls"
     security = str(section.get("security", inferred)).strip().lower()
     if security not in SUPPORTED_EMAIL_SECURITY:
         # No permissive fallback on a typo: downgrading "tls" to plaintext or unverified would silently send the password in the clear.
         raise ValueError(
-            f"Config file {config_path}: 'security' is {security!r}, "
+            f"Email settings: 'security' is {security!r}, "
             f"expected one of {', '.join(SUPPORTED_EMAIL_SECURITY)}."
         )
 
@@ -209,14 +243,12 @@ def load_email_config(config_path: Path) -> EmailConfig:
         password=str(section.get("password", "")),
         security=security,
         allowed_recipient_domains=domains,
-        teams_webhook_url=str(section.get("teams_webhook_url", "")),
     )
 
 
 def _extensions_section(config_path: Path) -> dict[str, Any]:
-    """The raw extensions mapping, placeholders still unresolved -
-    config_extensions.json's whole content."""
-    return load_config(config_path)
+    """The raw extensions mapping from the settings store, placeholders still unresolved."""
+    return settings_store.read_all(config_path, "extensions")
 
 
 def _build_extension(id_: str, entry: Any, *, config_path: Path) -> ExtensionConfig:
@@ -265,6 +297,9 @@ def _build_extension(id_: str, entry: Any, *, config_path: Path) -> ExtensionCon
         raise ValueError(f"Config file {config_path}: '{id_}.internal' must be true or false")
     if internal and not has_url:
         raise ValueError(f"Config file {config_path}: '{id_}.internal' only applies to an http extension (one with 'url').")
+    audience = entry.get("audience", "legion")
+    if internal and audience not in {"portcullis", "stronghold", "legion", "armory", "treasury"}:
+        raise ValueError("Internal extension audience must name a Citadel service")
 
     web_url = _web_url(entry, id_=id_, config_path=config_path)
 
@@ -274,7 +309,7 @@ def _build_extension(id_: str, entry: Any, *, config_path: Path) -> ExtensionCon
             raise ValueError(f"Config file {config_path}: '{id_}.url' must not be empty")
         return ExtensionConfig(
             id=id_, label=label, description=description, transport="http", url=url, headers=dict(headers),
-            forward_requester=forward_requester, internal=internal, web_url=web_url,
+            forward_requester=forward_requester, internal=internal, audience=audience, web_url=web_url,
         )
 
     args = entry.get("args", [])
@@ -294,7 +329,7 @@ def _build_extension(id_: str, entry: Any, *, config_path: Path) -> ExtensionCon
 
 
 def load_extensions_config(config_path: Path) -> dict[str, ExtensionConfig]:
-    """Parse config_extensions.json into ExtensionConfigs keyed by id, once at startup.
+    """Parse the extensions in the settings store into ExtensionConfigs keyed by id, once at startup.
     See ``_build_extension`` for why one broken entry doesn't stop the rest."""
     section = _extensions_section(config_path)
     return {id_: _build_extension(id_, entry, config_path=config_path) for id_, entry in section.items()}
@@ -311,37 +346,32 @@ def load_extension_config(config_path: Path, id_: str) -> ExtensionConfig:
     return _build_extension(id_, section[id_], config_path=config_path)
 
 
-def _write_config(config_path: Path, data: dict[str, Any]) -> None:
-    with config_path.open("w", encoding="utf-8") as handle:
-        json.dump(data, handle, indent=2)
-
-
 def save_extension_config(config_path: Path, config: ExtensionConfig) -> None:
-    """Insert or overwrite one entry in config_extensions.json, leaving every other entry untouched.
-    Reads with ``load_config`` so other entries' ``${VAR}`` pass through unresolved; writes only the transport's fields, and never ``headers`` (resolved secrets; configure by hand)."""
-    data = load_config(config_path)
-
+    """Insert or overwrite one extension in the settings store, leaving every other one untouched.
+    Writes only the transport's fields. ``headers`` (an upstream's own token, pasted on the Extensions page) are
+    kept as given: the database lives in the gitignored `.data/` folder, like the other saved connections."""
     entry: dict[str, Any] = {"label": config.label, "description": config.description}
     if config.transport == "http":
         entry["url"] = config.url
+        if config.headers:
+            entry["headers"] = {name: value.replace("$", "$$") for name, value in config.headers.items()}
+        if config.forward_requester:
+            entry["forward_requester"] = True
         if config.internal:
             entry["internal"] = True
+            entry["audience"] = config.audience
     else:
         entry["command"] = config.command
         entry["args"] = config.args
     if config.web_url:
         entry["web_url"] = config.web_url
-    data[config.id] = entry
-
-    _write_config(config_path, data)
+    settings_store.put(config_path, "extensions", config.id, entry)
 
 
 def delete_extension_config(config_path: Path, extension_id: str) -> None:
-    """Remove one entry from config_extensions.json.
+    """Remove one extension from the settings store.
     Idempotent: removing an absent id is not an error."""
-    data = load_config(config_path)
-    data.pop(extension_id, None)
-    _write_config(config_path, data)
+    settings_store.delete(config_path, "extensions", extension_id)
 
 
 # --- capabilities ---
@@ -349,16 +379,14 @@ def delete_extension_config(config_path: Path, extension_id: str) -> None:
 
 
 def load_capabilities_config(config_path: Path) -> dict[str, dict[str, Any]]:
-    """Read config_capabilities.json: which capabilities are enabled.
-    A missing file gives {} (all enabled), unlike other loaders, so deployments predating it keep working."""
-    if not config_path.exists():
-        return {}
-    return load_config(config_path)
+    """The capability entries in the settings store: which capabilities are enabled.
+    An empty store gives {}: nothing is switched on until an administrator does it."""
+    return settings_store.read_all(config_path, "capabilities")
 
 
 def capability_enabled(config: dict[str, dict[str, Any]], name: str) -> bool:
     """True unless `name` is present in `config` with `"enabled": false`.
-    An unlisted capability is enabled; defaulting to disabled would make every capability vanish once the file exists."""
+    Only called for a name that has an entry; a capability with no entry is never loaded."""
     entry = config.get(name, {})
     if not isinstance(entry, dict):
         return True
@@ -367,25 +395,9 @@ def capability_enabled(config: dict[str, dict[str, Any]], name: str) -> bool:
 
 def save_capabilities_config(config_path: Path, name: str, enabled: bool) -> None:
     """Persist one capability's enabled state, leaving other entries untouched; mirrors save_extension_config.
-    A missing file is fine: this is the first writer of config_capabilities.json."""
-    data = load_config(config_path) if config_path.exists() else {}
-    data.setdefault(name, {})["enabled"] = enabled
-    _write_config(config_path, data)
-
-
-_SCANNER_MARKER = "_scanner"
-
-
-def migrate_capabilities_config(config_path: Path, ids: list[str]) -> None:
-    """Once, on the folder scanner's first run: write ``enabled: true`` for every capability without an entry, then set a marker.
-    Afterwards a new folder with no entry stays offline until an admin enables it; does nothing once the marker exists."""
-    data = load_config(config_path) if config_path.exists() else {}
-    if _SCANNER_MARKER in data:
-        return
-    for capability_id in ids:
-        data.setdefault(capability_id, {"enabled": True})
-    data[_SCANNER_MARKER] = {"migrated": True}
-    _write_config(config_path, data)
+    A capability with no entry stays offline: an administrator turns each one on, on the deployed machine."""
+    entry = settings_store.read_all(config_path, "capabilities").get(name, {})
+    settings_store.put(config_path, "capabilities", name, {**entry, "enabled": enabled})
 
 
 RENAMED_CAPABILITIES = {"video": "media"}
@@ -394,14 +406,9 @@ RENAMED_CAPABILITIES = {"video": "media"}
 def migrate_renamed_capabilities(config_path: Path) -> None:
     """Move the entry of a renamed capability to its new id, so its on/off state survives.
     An entry already under the new id wins. Writes only when something moved."""
-    if not config_path.exists():
-        return
-    data = load_config(config_path)
-    moved = False
+    data = settings_store.read_all(config_path, "capabilities")
     for old, new in RENAMED_CAPABILITIES.items():
         if old in data:
-            data.setdefault(new, data[old])
-            del data[old]
-            moved = True
-    if moved:
-        _write_config(config_path, data)
+            if new not in data:
+                settings_store.put(config_path, "capabilities", new, data[old])
+            settings_store.delete(config_path, "capabilities", old)

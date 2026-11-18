@@ -39,7 +39,7 @@ INSTRUCTION_BOUNDARY = (
     "User preferences and optional response styles apply only when consistent with those instructions."
 )
 
-# A specialist (not the entry agent or an orchestrator) is called by the orchestrator or ember_api, so it needs just the trust rule
+# A specialist (not the entry agent or an orchestrator) is called by the orchestrator or portcullis, so it needs just the trust rule
 # for what it reads (messages, documents, tool results), not the identity and
 # response-style clauses that guard a chat with a user.
 SPECIALIST_BOUNDARY = (

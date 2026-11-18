@@ -54,11 +54,10 @@ top level is a **closed whitelist** - nothing else is allowed there:
   `__init__.py` too). Nothing non-Python belongs here, except its own
   `README.md`.
 - **No runtime state or capability-owned config here.** A capability's
-  own state and config live outside `src/`, in
-  `mcp_server/specifics/<capability_name>/`: dot-prefixed folders
-  (`.cache/`, `.data/`, `.logs/`, `.secrets/`, ...) hold
-  **runtime/generated state only** and are always gitignored; a plain
-  `configs/` folder holds tracked, capability-owned config. See each
+  own state lives outside `src/`: runtime data in `.data/armory/<capability_name>/`
+  and rebuildable files in `.cache/armory/<capability_name>/`, both in the
+  Citadel folder and gitignored; tuning an administrator can change is a document in the `tuning`
+  table of `settings.db`, explained in `docs/settings.md`. See each
   capability's own `STATIC-GUIDELINES.md` for what it actually uses.
   `__pycache__/` is exempt from this rule (Python controls that name,
   not this convention).
@@ -71,7 +70,7 @@ top level is a **closed whitelist** - nothing else is allowed there:
   content because it *is* the source; others (e.g. `static/knowledge/`,
   `static/policies/`) gitignore their real content because it's
   deployment-specific, and commit only that `README.md` plus - for JSON
-  files only - a `<name>.json.example` sibling documenting the shape. See
+  files only - the tracked `<name>.json` and a `README.md` documenting each key. See
   each capability's own `STATIC-GUIDELINES.md` for which applies where.
 
 Nothing outside this list belongs at a capability's top level - a new
@@ -211,7 +210,7 @@ through `Field(json_schema_extra={...})`:
 - `options_url` - a plain path on this server (e.g.
   `"/system/check-capabilities"`) returning the select's options as a JSON
   list of strings, a list of `{"value", "label"}`, or a `{value: label}`
-  object. The form fetches it through ember_api's `GET /api/commands/options`. If it fails the
+  object. The form fetches it through portcullis's `GET /api/commands/options`. If it fails the
   form falls back to a text box.
 - `depends_on` - another param whose value fills a `{placeholder}` in
   `options_url` (e.g. `"/apps/options?kind={kind}"`);
@@ -263,7 +262,7 @@ adding or removing a declaration means changing that test too.
    standard explain-the-result note to that tool's description. There is no `needs_ai_review` or
    `ai_required` metadata anymore, and slash commands never go through an AI agent.
 5. `capabilities/<name>/README.md` - what it reads (which
-   `../../configs/*.json` files, which `../../.env` variables), what (if
+   settings (`docs/settings.md`), which `../../.env` variables), what (if
    anything) it owns under its own dot-folders, and how to toggle it
    off. Every capability README uses the same three tables under fixed
    headings: `## Tools` (`Tool | Purpose | Connection`; slash-command tools
@@ -311,12 +310,11 @@ adding or removing a declaration means changing that test too.
     human-only step) uses the literal string `"(manual - no tool)"` for
     `tool`, matching how the README tables already write it.
 
-6. The toggle entry in `../../configs/config_capabilities.json` is written
+6. The toggle entry in the Capabilities page (stored in `.data/armory/settings.db`) is written
    by the loader the first time the capability is switched online or
    offline, so there is nothing to add by hand. A folder with no entry
-   starts offline. Add `{ "<id>": { "enabled": true } }` to
-   `config_capabilities.json.example` only if it should be on in a fresh
-   install (`<id>` is the short id from step 7 below, not necessarily the
+   starts offline, and so does every capability on a new install: an administrator turns it on from
+   the Capabilities page (`<id>` is the short id from step 7 below, not necessarily the
    folder name).
 
 7. In `capabilities/<name>/__init__.py`, subclass `Capability`

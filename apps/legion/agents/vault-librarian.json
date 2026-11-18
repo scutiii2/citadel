@@ -1,6 +1,6 @@
 {
   "label": "Vault Librarian",
-  "port": 9109,
+  "port": 29609,
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",

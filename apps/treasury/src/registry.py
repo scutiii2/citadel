@@ -40,6 +40,17 @@ class ConnectionRegistry:
         except KeyError:
             raise UnknownConnection(name) from None
 
+    def names(self) -> list[str]:
+        return sorted(self._specs)
+
+    def add_spec(self, spec: ConnectionSpec) -> bool:
+        """Offer a new connection to the instances. False (nothing changes) when the name is taken: a connection that
+        may already be open is changed or removed only by a restart."""
+        if spec.name in self._specs:
+            return False
+        self._specs[spec.name] = spec
+        return True
+
     def open_names(self) -> list[str]:
         return sorted(self._open)
 
@@ -110,6 +121,22 @@ class InstanceManager:
             return self._instances[name]
         except KeyError:
             raise UnknownInstance(name) from None
+
+    def connection_names(self) -> list[str]:
+        return self._registry.names()
+
+    def add_connection(self, spec: ConnectionSpec) -> bool:
+        return self._registry.add_spec(spec)
+
+    async def register(self, name: str, members: tuple[str, ...]) -> None:
+        """Add or replace an instance while running. Unknown connections are refused; the old handle is closed."""
+        unknown = [member for member in members if member not in self._registry.names()]
+        if unknown:
+            raise UnknownConnection(", ".join(unknown))
+        old = self._instances.get(name)
+        self._instances[name] = Instance(name, tuple(dict.fromkeys(members)), self._registry)
+        if old is not None:
+            await old.close()
 
     def describe(self) -> dict[str, list[str]]:
         return {name: list(inst.connection_names) for name, inst in self._instances.items()}

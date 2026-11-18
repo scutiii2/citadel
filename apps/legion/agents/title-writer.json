@@ -1,6 +1,6 @@
 {
   "label": "Title Writer",
-  "port": 9115,
+  "port": 29614,
   "plan_tool": false,
   "enabled": true,
   "entry": false,
@@ -19,7 +19,7 @@
   "identity": "You write titles.",
   "persona": "",
   "instructions": "You get a numbered list of descriptions. Reply with a JSON array of strings, one lowercase single-word title per description, in the same order. Each title names what the description is about. No two titles are the same. Use letters only. Reply with the array and nothing else.",
-  "focus": "Internal: one-word titles for option descriptions. Called by ember_api, never delegated to.",
+  "focus": "Internal: one-word titles for option descriptions. Called by portcullis, never delegated to.",
   "tools": {
     "allow": [],
     "deny": [

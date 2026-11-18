@@ -7,7 +7,6 @@ import anyio
 
 from src.agents import agent_registry, agent_spec
 from src.agents.roles.orchestrator import delegation
-from src.runtime import internal_auth
 from src.providers import cancellation
 
 AGENT_ID = "context-summarizer"
@@ -22,7 +21,7 @@ async def routing_brief(question: str, history: list[dict], request_id: str) -> 
     No persistent state: an existing compacted summary arrives in history.
     The original latest message is sent separately to Router by the caller.
     """
-    if not history or len(question) > 16000 or not internal_auth.TOKEN or cancellation.is_cancelled(request_id):
+    if not history or len(question) > 16000 or cancellation.is_cancelled(request_id):
         return None
     try:
         with anyio.fail_after(ROUTING_TIMEOUT_SECONDS):

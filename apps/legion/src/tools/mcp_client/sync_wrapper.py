@@ -46,8 +46,10 @@ class SyncMcpClient:
         config_path: Path,
         url_overrides: dict[str, str] | None = None,
         extra_headers: dict[str, str] | None = None,
+        auth_by_server=None,
     ) -> list[ServerStatus]:
-        return self._run(self._registry.connect_all(config_path, url_overrides, extra_headers))
+        return self._run(self._registry.connect_all(config_path, url_overrides, extra_headers,
+            **({"auth_by_server": auth_by_server} if auth_by_server is not None else {})))
 
     def list_tools(self) -> list[types.Tool]:
         return self._run(self._registry.list_tools())

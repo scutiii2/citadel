@@ -13,8 +13,8 @@ checks the Laya service strategy when used, and manages the child processes.
   cooldown and failover. Language loops are in `providers/language/`.
 - `providers/decision/`: typed request/result contract, question constants,
   automatic-feature settings, strategy runner and provider transport adapter.
-  `gateways/` contains `laya.py` and `jev.py`; `laya_model.py` is the HTTP client
-  for the separate LayaModel service. Legion loads no weights.
+  `gateway_client.py` is the HTTP client for DecisionGateway; `gateways/saved.py`
+  names the two saved gateways it asks (`laya`, `jev`). Legion loads no weights.
 - `tools/mcp_client/` and `tools/private_extensions/`: upstream MCP connections,
   dispatch and per-account extension connections.
 - `runtime/`: approval/question brokers, authentication, history validation,

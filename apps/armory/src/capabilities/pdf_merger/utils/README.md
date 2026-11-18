@@ -9,4 +9,4 @@ Ported from the standalone PDFMerger engine. These modules contain no server, RE
 - `service.py`: shared facade composing the engine, store, queue and signer.
 - `models.py`, `errors.py`, `config.py`: engine models, typed errors and immutable settings.
 
-The capability runtime supplies paths and settings. State belongs under `specifics/pdf_merger/.data/`; scratch files are removed after each merge and expired files by the sweeper. Caller scope always equals its owner session, including callers authenticated with the internal token. Only a successfully verified signed download link permits lookup without owner scope.
+The capability runtime supplies paths and settings. State belongs under `.data/armory/pdf_merger/`; scratch files are removed after each merge and expired files by the sweeper. Caller scope always equals its owner session, including callers authenticated with the internal token. Only a successfully verified signed download link permits lookup without owner scope.

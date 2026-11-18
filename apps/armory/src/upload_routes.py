@@ -1,10 +1,9 @@
 """HTTP endpoint for chat_app to hand this server a file dropped into a command-form modal, so a tool path param can be filled.
-A plain route, not a tool, so a model can't plant files; authenticated with the shared X-Internal-Token (constant-time), the first route here to check it inbound."""
+A plain route, not a tool, so a model can't plant files; authenticated by signed service assertions."""
 
 from __future__ import annotations
 
 import asyncio
-import hmac
 
 from uuid import uuid4
 
@@ -18,20 +17,18 @@ from src.config import settings
 from src.services import capability_registry
 from src.capabilities.tables.utils import table_loader
 from src.capabilities.tables.utils import tables
-from src.services.identity_context import REQUESTER_UID_HEADER, REQUESTER_USERNAME_HEADER
+from src.services.identity_context import current_uid, current_username
+from src.citadel_auth import current_caller
+from src.services.service_auth import install_auth
 
 # Deliberately tight, not a generic upload endpoint: no built-in tool consumes an uploaded file today.
 # Extend only when a new file-shaped param needs another kind.
 _ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 
 
-def _token_valid(request: Request) -> bool:
-    """Mirrors chat_app/src/internal_routes.py's _token_valid(): an unset expected token must never validate against an empty header."""
-    expected = settings.internal_api_token
-    provided = request.headers.get("X-Internal-Token", "")
-    if not expected:
-        return False
-    return hmac.compare_digest(expected, provided)
+def _authenticated(request: Request) -> bool:
+    """Only middleware-authenticated calls reach upload processing."""
+    return current_caller() is not None
 
 
 def _safe_extension(filename: str | None) -> str | None:
@@ -42,8 +39,8 @@ def _safe_extension(filename: str | None) -> str | None:
 
 
 async def upload_file(request: Request) -> JSONResponse:
-    if not _token_valid(request):
-        return JSONResponse({"error": "Invalid or missing internal API token"}, status_code=401)
+    if not _authenticated(request):
+        return JSONResponse({"error": "Missing authenticated service caller"}, status_code=401)
 
     form = await request.form()
     upload = form.get("file")
@@ -66,8 +63,8 @@ async def upload_file(request: Request) -> JSONResponse:
 async def upload_table(request: Request) -> JSONResponse:
     """Keeps an uploaded CSV/XLSX as an in-memory table for the data tools; nothing is written to disk and the caller gets an opaque `table_id` bound to the requester.
     Parsing is blocking, so it runs in a worker thread."""
-    if not _token_valid(request):
-        return JSONResponse({"error": "Invalid or missing internal API token"}, status_code=401)
+    if not _authenticated(request):
+        return JSONResponse({"error": "Missing authenticated service caller"}, status_code=401)
 
     form = await request.form()
     upload = form.get("file")
@@ -79,7 +76,7 @@ async def upload_table(request: Request) -> JSONResponse:
     try:
         parsed = await asyncio.to_thread(table_loader.load_table, filename, content)
         table = tables.registry.add(
-            request.headers.get(REQUESTER_USERNAME_HEADER, ""), filename, parsed, len(content)
+            current_username(), filename, parsed, len(content)
         )
     except tables.TableRefused as error:
         return JSONResponse({"error": str(error)}, status_code=400)
@@ -98,9 +95,9 @@ async def upload_table(request: Request) -> JSONResponse:
 
 async def upload_pdf(request: Request) -> JSONResponse:
     """Keep an original PDF/image in the native capability's account store."""
-    if not _token_valid(request):
-        return JSONResponse({"error": "Invalid or missing internal API token"}, status_code=401)
-    if not request.headers.get(REQUESTER_UID_HEADER, "").strip():
+    if not _authenticated(request):
+        return JSONResponse({"error": "Missing authenticated service caller"}, status_code=401)
+    if not current_uid().strip():
         return JSONResponse({"error": "The requesting account is not identified"}, status_code=400)
     try:
         enabled = capability_registry.is_enabled("pdf")
@@ -158,6 +155,7 @@ async def upload_pdf(request: Request) -> JSONResponse:
 
 def install_upload_routes(app: Starlette) -> None:
     """Add the file-upload routes to an existing Starlette app."""
+    install_auth(app)
     app.add_route("/upload", upload_file, methods=["POST"])
     app.add_route("/upload/table", upload_table, methods=["POST"])
     app.add_route("/upload/pdf", upload_pdf, methods=["POST"])

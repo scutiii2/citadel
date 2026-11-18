@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.test-tmp/
+.venv_ember_api/
+
+# Real secrets live in .env; secrets/ is only the pre-.env layout, read once
+# to build .env.
+.env
+!.env.example
+secrets/*
+!secrets/*.example
+!secrets/README.md

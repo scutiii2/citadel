@@ -39,15 +39,14 @@ Ember's existing `/upload/pdf` path now uploads to the native store. It requires
 
 ## Configuration
 
-Armory settings read its normal environment configuration. Capability tuning lives in `specifics/pdf_merger/configs/config_pdf_merger.json`, with the tracked `.json.example` documenting the shape. Armory's shared config loader copies the example when the real file is absent.
+Armory settings read its normal environment configuration. Caps and lifetimes are set on the Limits page of Armory Admin (see `docs/settings.md`).
 
 | Setting | Purpose |
 | --- | --- |
-| `MCP_PDF_MERGER_CONFIG_PATH` | Tuning JSON path; defaults to `specifics/pdf_merger/configs/config_pdf_merger.json`. |
-| `MCP_PDF_MERGER_STORE_DIR` | Generated file store; defaults to `specifics/pdf_merger/.data/store`. |
+| `MCP_PDF_MERGER_STORE_DIR` | Generated file store; defaults to `.data/armory/pdf_merger/store`. |
 | `MCP_PDF_MERGER_PUBLIC_BASE_URL` | Browser-reachable Armory base URL for download links; defaults to `http://127.0.0.1:{MCP_PORT}`. Configure it for remote browsers or a reverse proxy. |
 | `PDF_MERGER_SIGNING_KEY` | Stable HMAC signing secret. If absent, Armory warns and generates an ephemeral key; links stop working after a process restart. |
-| `INTERNAL_API_TOKEN` | Authenticates internal requests. Per-account operations refuse missing identity, and PDF operations refuse a non-loopback bind without a token. |
+| Service authentication | Requires a signed Ed25519 service assertion and a Portcullis-signed requester token for account operations. |
 
 Default tuning keeps files for 6 hours, sweeps every 10 minutes, and signs download links for 60 minutes. Limits cover 100 MiB per engine input file, 500 MiB per account, 50 plan segments, 2,000 output pages, 80 megapixels per image, and two simultaneous merges. The HTTP upload limit still applies first.
 
@@ -56,8 +55,8 @@ Default tuning keeps files for 6 hours, sweeps every 10 minutes, and signs downl
 ## Runtime, storage and downloads
 
 Ember's PDF screen uses fixed internal HTTP adapters on the existing listener.
-Every `/pdf/ui` request requires `X-Internal-Token` and `X-Requester-Uid`;
-the token never bypasses ownership. Disabled or absent capabilities return 503
+Account operations require signed service assertions and verified Portcullis requester tokens. Private keys stay in the identity directory.
+Requester identity never bypasses ownership. Disabled or absent capabilities return 503
 before the engine is initialized. These routes add no MCP schemas.
 
 | Method and path | Request / response |

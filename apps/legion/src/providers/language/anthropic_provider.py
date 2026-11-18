@@ -1,49 +1,21 @@
-"""Anthropic Messages API provider - pinned by agent_config.py when
-AI_AGENT_PROVIDER=anthropic. (Renamed from claude_provider.py - the
-AI_AGENT_PROVIDER value and PROVIDER_ID/cooldown key are "anthropic".)
+"""Anthropic-protocol provider - pinned by agent_config.py when
+AI_AGENT_PROVIDER=anthropic. The AI_AGENT_PROVIDER value and
+PROVIDER_ID/cooldown key are "anthropic".
 
-Adapted from chat_app/src/services/llm/claude_provider.py: tool calls go
-through src.tools.mcp_client.mcp_upstream instead of src.services.mcp_client; no MODELS
-list or ProviderSpec registration (this project pins one provider per
-instance - see agent_config.py); DEFAULT_MODEL replaces chat_app's
-shared Settings object. The tool-calling loop itself, including the
-cancellation checkpoint between rounds, is unchanged.
-
-AI_AGENT_GATEWAY picks which client this instance talks through, always
-by loading gateways/anthropic/<gateway>.json - "claude" (default) is just another block there,
-same as "openrouter"/"litellm"/"portkey"/etc, except it has no base_url
-(the Anthropic SDK already defaults to api.anthropic.com), needs no
-auth_token (Anthropic's own API takes a plain api_key), and its api_key
-points at the plain CLAUDE_API_KEY var. "bedrock" and "vertex" are the
-two exceptions requiring a different SDK client class (AnthropicBedrock/
-AnthropicVertex, different auth shape entirely) rather than a base_url
-swap. Whichever block is picked, the actual secret values it points at
-("{CLAUDE_API_KEY}" etc) still only ever come from .env,
-resolved by llm_config.py - never written in the JSON file itself.
-has_api_key() checks the CURRENTLY SELECTED gateway's own required
-secret(s), not a fixed var - a developer running only "openrouter" with
-OPENROUTER_API_KEY set (and no CLAUDE_API_KEY at all) is correctly seen
-as configured.
+Every model call goes to ConversationGateway through
+anthropic_gateway_shim.py, which stands where the Anthropic SDK client stood.
+AI_AGENT_GATEWAY names the gateway ("claude" by default); its connection and
+key are saved in ConversationGateway under the same id, and
+gateways/anthropic/<gateway>.json here keeps only label, prompt_cache, model
+and the strength tiers. The tool-calling loop, including the cancellation
+checkpoint between rounds, runs here.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import os
-import traceback
 from typing import Any, AsyncIterator, Sequence
-
-from anthropic import (
-    Anthropic,
-    AnthropicBedrock,
-    AnthropicVertex,
-    AsyncAnthropic,
-    AsyncAnthropicBedrock,
-    AsyncAnthropicVertex,
-    BadRequestError,
-)
-from anthropic.lib.streaming import AsyncMessageStream
 
 from src.providers.turn_guard import TurnStopped
 from src.agents import agent_routing, agent_spec
@@ -54,7 +26,9 @@ from src.runtime import approvals, questions
 from src.runtime.chat_history import validate_history
 
 from src.agents.agent_spec import RosterEntry
-from src.providers import cancellation, cooldown, llm_config, llm_options, token_limits
+from src.providers import cancellation, cooldown, gateway_client, llm_config, llm_options, token_limits
+from src.providers.gateway_client import GatewayCallError
+from src.providers.language.anthropic_gateway_shim import GatewayShim
 from src.agents.agent_roles import SYSTEM_PROMPT, roster_block, system_prompt_for
 from src.providers.context_breakdown import ProviderCounter, breakdown_fields
 from src.providers.base_provider import (
@@ -81,8 +55,7 @@ class _Anthropic(BaseProvider):
     GATEWAY_ENV = "AI_AGENT_GATEWAY"
     DEFAULT_MODEL_FALLBACK = "claude-sonnet-5"
 
-    _clients: dict[str, Any] = {}
-    _sync_clients: dict[str, Any] = {}
+    _clients: dict[str, GatewayShim] = {}
 
     @classmethod
     def _gateway_name(cls) -> str:
@@ -90,16 +63,10 @@ class _Anthropic(BaseProvider):
 
     @classmethod
     def has_api_key(cls, gateway: str | None = None) -> bool:
-        gateway_name = gateway or cls._gateway_name()
-        try:
-            cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
-        except KeyError:
-            return False
-        if gateway_name == "bedrock":
-            return bool(cfg.get("aws_access_key_id") and cfg.get("aws_secret_access_key"))
-        if gateway_name == "vertex":
-            return bool(cfg.get("project_id"))
-        return bool(cfg.get("api_key") or cfg.get("auth_token"))
+        """Whether ConversationGateway has this gateway saved. The keys live there,
+        so "saved" is all Legion can know; a bad key shows up as an `auth` failure.
+        True when the service cannot be asked, so Legion can start before it does."""
+        return gateway_client.is_saved(gateway or cls._gateway_name())
 
     @classmethod
     def is_available(cls) -> bool:
@@ -108,54 +75,17 @@ class _Anthropic(BaseProvider):
                    for name in names)
 
     @classmethod
-    def _build_client(cls, gateway: str | None, cache: dict[str, Any], plain: Any, bedrock: Any, vertex: Any) -> Any:
-        """Resolve the gateway and build (once, cached in `cache`) its SDK client from the
-        given classes: the Async* ones for get_client(), the sync ones for get_sync_client()."""
+    def get_client(cls, gateway: str | None = None) -> GatewayShim:
+        """The shim for this gateway, built once."""
         gateway_name = gateway or cls._gateway_name()
-        if gateway_name in cache:
-            return cache[gateway_name]
-
-        if gateway_name == "bedrock":
-            cfg = llm_config.gateway(PROVIDER_NAME, "bedrock")
-            cache[gateway_name] = bedrock(
-                aws_access_key=cfg.get("aws_access_key_id"),
-                aws_secret_key=cfg.get("aws_secret_access_key"),
-                aws_region=cfg.get("aws_region"),
-            )
-            return cache[gateway_name]
-
-        if gateway_name == "vertex":
-            cfg = llm_config.gateway(PROVIDER_NAME, "vertex")
-            if not cfg.get("project_id"):
-                raise ValueError("gateways/anthropic/vertex.json project_id env var not set")
-            cache[gateway_name] = vertex(project_id=cfg["project_id"], region=cfg.get("region"))
-            return cache[gateway_name]
-
-        # Every other block ("claude" itself, "openrouter", "litellm",
-        # "helicone", "portkey", ...) is a plain Anthropic() build -
-        # The gateway file supplies api_key/auth_token/base_url, "claude"'s
-        # own block just leaves base_url unset (SDK default).
-        cfg = llm_config.gateway(PROVIDER_NAME, gateway_name)
-        api_key = cfg.get("api_key")
-        auth_token = cfg.get("auth_token")
-        if not api_key and not auth_token:
-            raise ValueError(
-                f"gateways/anthropic/{gateway_name}.json: neither its api_key nor "
-                "auth_token env var is set in .env"
-            )
-        cache[gateway_name] = plain(api_key=api_key, auth_token=auth_token, base_url=cfg.get("base_url"))
-        return cache[gateway_name]
+        if gateway_name not in cls._clients:
+            cls._clients[gateway_name] = GatewayShim(gateway_name, gateway_client.ConversationGatewayClient())
+        return cls._clients[gateway_name]
 
     @classmethod
-    def get_client(cls, gateway: str | None = None) -> AsyncAnthropic | AsyncAnthropicBedrock | AsyncAnthropicVertex:
-        return cls._build_client(gateway, cls._clients, AsyncAnthropic, AsyncAnthropicBedrock, AsyncAnthropicVertex)
-
-    @classmethod
-    def get_sync_client(cls, gateway: str | None = None) -> Anthropic | AnthropicBedrock | AnthropicVertex:
-        """Same as get_client(), but the plain synchronous SDK classes, cached separately.
-        Exists solely for run_interpret(), whose single non-streaming
-        `client.messages.create(...)` call is never awaited."""
-        return cls._build_client(gateway, cls._sync_clients, Anthropic, AnthropicBedrock, AnthropicVertex)
+    def get_sync_client(cls, gateway: str | None = None) -> GatewayShim:
+        """Same object as get_client(): the shim has both the async stream and the sync create."""
+        return cls.get_client(gateway)
 
     @classmethod
     def resolve_default_model(cls) -> str:
@@ -314,21 +244,10 @@ class _AnthropicRequestCounter:
 
 
 async def _stream_pieces(stream: Any) -> AsyncIterator[tuple[bool, str]]:
-    """Yield (is_text, chunk) for what a round streams. Only text goes to the
-    user; thinking and tool-call JSON are yielded too (is_text False) so the
-    live token meter keeps climbing while the model reasons or writes tool
-    arguments. A stream without SDK events (a test double) only has text."""
-    if not isinstance(stream, AsyncMessageStream):
-        async for chunk in stream.text_stream:
-            yield True, chunk
-        return
-    async for event in stream:
-        if event.type == "text":
-            yield True, event.text
-        elif event.type == "thinking":
-            yield False, event.thinking
-        elif event.type == "input_json":
-            yield False, event.partial_json
+    """Yield (is_text, chunk) for what a round streams. The gateway shim streams
+    answer text only, so every chunk is text."""
+    async for chunk in stream.text_stream:
+        yield True, chunk
 
 
 def _usage_count(usage: Any, name: str) -> int:
@@ -422,8 +341,6 @@ async def run_chat(
     guard = options.turn_guard()
     checklist = plan.Checklist()
     empty_answer_retried = False
-    malformed_stream_retries: set[str] = set()
-    failed_stream_tokens = 0
     stop_message = 'Reached maximum tool-call rounds without a final answer.'
     # The full prompt just sent (all resent history + this round's tool
     # results), not a sum across rounds like total_tokens - this is what
@@ -470,8 +387,6 @@ async def run_chat(
                         raise ChatCancelled()
                     token_limits.enforce_context_limit(PROVIDER_ID, [system_prompt, *messages], route.current)
                     text_parts: list[str] = []
-                    stream_chars = 0
-                    stream_stage = "opening_stream"
                     try:
                         async with client.messages.stream(
                             model=model_name,
@@ -481,54 +396,22 @@ async def run_chat(
                             tools=tools,
                             **options.extra_kwargs(model_name),
                         ) as stream:
-                            stream_stage = "stream_events"
                             async for is_text, chunk in _stream_pieces(stream):
-                                stream_chars += len(chunk)
                                 if is_text:
                                     text_parts.append(chunk)
                                     if on_event:
                                         await on_event(step_event("token", text=chunk))
                                 await meter.chars(len(chunk))
-                            stream_stage = "final_message"
                             response = await stream.get_final_message()
                         break
                     except Exception as error:
-                        if isinstance(error, json.JSONDecodeError):
-                            # Omit exception text, chained exceptions and locals that
-                            # may contain gateway payloads; retain parser stack frames.
-                            _log.error(
-                                "Anthropic response JSONDecodeError: gateway=%s model=%s request_id=%s "
-                                "stage=%s line=%s column=%s position=%s\n%s",
-                                route.current, model_name, request_id, stream_stage,
-                                error.lineno, error.colno, error.pos,
-                                "".join(traceback.format_tb(error.__traceback__)),
-                            )
-                            if classify(error) is None:
-                                raise
-                            # Failed streams lack final usage. Charge an estimate to
-                            # the guard without labelling it as reported token usage.
-                            failed_stream_tokens += token_limits.estimate_context_tokens(
-                                [system_prompt, *messages, schemas]
-                            ) + (stream_chars + len(error.doc) + 3) // 4
-                            guard.check_tokens(total_tokens + failed_stream_tokens)
-                            await meter.round_done(None)
-                            if route.current not in malformed_stream_retries:
-                                malformed_stream_retries.add(route.current)
-                                _log.warning("Retrying malformed response stream: gateway=%s request_id=%s",
-                                             route.current, request_id)
-                                if text_parts and on_event:
-                                    await on_event(step_event("token_reset"))
-                                continue
-                        elif isinstance(error, BadRequestError) and classify(error) is None:
+                        # 422 without a kind: the provider refused the request itself.
+                        # If it names an option we sent, drop that option and repeat the round.
+                        if isinstance(error, GatewayCallError) and error.status == 422 and classify(error) is None:
                             if not text_parts and options.drop_rejected(str(error), model_name):
                                 continue
                         switch = route.advance(error)
                         if switch is None:
-                            if isinstance(error, json.JSONDecodeError):
-                                raise TurnStopped(
-                                    "The model gateway returned an invalid response stream after retrying. "
-                                    "Please try again or choose another gateway."
-                                ) from None
                             raise
                         if on_event:
                             if text_parts:
@@ -546,7 +429,7 @@ async def run_chat(
                 cached_input_tokens += _usage_count(response.usage, "cache_read_input_tokens")
                 await meter.round_done(prompt_tokens + response.usage.output_tokens)
                 context_tokens = prompt_tokens
-                guard.check_tokens(total_tokens + failed_stream_tokens)
+                guard.check_tokens(total_tokens)
 
                 if response.stop_reason != "tool_use":
                     answer = "".join(block.text for block in response.content if block.type == "text")

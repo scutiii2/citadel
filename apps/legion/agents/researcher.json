@@ -1,6 +1,6 @@
 {
   "label": "Researcher",
-  "port": 9107,
+  "port": 29608,
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",

@@ -1,0 +1,107 @@
+"""Portcullis's one way into Stronghold.
+
+Portcullis has already authenticated the account and checked its permission.
+This sends the request on with the account's identity and signed service assertions.
+The browser's cookies and headers are never forwarded: only what is built here
+leaves, so Stronghold cannot see a session. Stronghold's own answers below 500
+go back unchanged, so a route keeps the status and body Stronghold chose.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from typing import Any
+
+import httpx
+from src.citadel_auth import Keyring, ServiceAuth
+from src.services import service_auth
+
+from src.models import Account
+from src.services.traffic import TrafficRecorder
+from src.services.uid_log_filter import redact
+
+logger = logging.getLogger(__name__)
+
+_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+_STREAM_TIMEOUT = httpx.Timeout(60.0, connect=10.0, read=60.0)
+
+
+class StrongholdUnavailable(Exception):
+    """Stronghold could not be reached or answered 5xx (maps to 502)."""
+
+
+@dataclass(frozen=True)
+class ForwardedResponse:
+    """Stronghold's answer, ready to hand back as it came."""
+
+    status: int
+    body: bytes
+    content_type: str
+    # Stronghold's own Retry-After (a 429 for a token limit), kept so the browser still sees it.
+    retry_after: str | None = None
+
+
+class StrongholdForwarder:
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        base_url: str,
+        identity: Keyring | None,
+        traffic: TrafficRecorder | None = None,
+    ) -> None:
+        self._client = client
+        self._base = base_url.rstrip("/")
+        self._identity = identity or service_auth.keyring
+        self._traffic = traffic or TrafficRecorder()
+
+    def _headers(self, account: Account | None) -> dict[str, str]:
+        if account is None:
+            return {}
+        return service_auth.identity_headers(account.username, account.email, account.uid, identity=self._identity)
+
+    async def open_stream(self, path: str, account: Account | None, *, params: dict[str, str] | None = None) -> httpx.Response:
+        """GET a fixed Stronghold path as a stream the caller must close (the turn events). No read timeout:
+        Stronghold sends a ping while idle, so a silent stream means it is gone."""
+        try:
+            request = self._client.build_request(
+                "GET", f"{self._base}{path}", params=params, headers=self._headers(account), timeout=_STREAM_TIMEOUT)
+            return await self._client.send(request, stream=True, follow_redirects=False, auth=ServiceAuth(self._identity, "stronghold"))
+        except httpx.HTTPError as error:
+            logger.warning("stronghold GET %s unreachable: %s", redact(path), type(error).__name__)
+            raise StrongholdUnavailable(type(error).__name__) from error
+
+    async def forward(
+        self,
+        method: str,
+        path: str,
+        account: Account | None,
+        *,
+        params: dict[str, str] | None = None,
+        json: Any = None,
+    ) -> ForwardedResponse:
+        """One call to a fixed Stronghold path. `path` is built by the route, never by the browser."""
+        try:
+            # A purge path carries an account uid: keep it out of the traffic counters and the log.
+            with self._traffic.timed("stronghold", f"{method} {redact(path)}") as timing:
+                response = await self._client.request(
+                    method,
+                    f"{self._base}{path}",
+                    params=params,
+                    json=json,
+                    headers=self._headers(account), auth=ServiceAuth(self._identity, "stronghold"),
+                    timeout=_TIMEOUT,
+                    follow_redirects=False,  # the identity headers must never follow one
+                )
+                timing.ok = response.status_code < 500
+        except httpx.HTTPError as error:
+            logger.warning("stronghold %s %s unreachable: %s", method, redact(path), type(error).__name__)
+            raise StrongholdUnavailable(type(error).__name__) from error
+        if response.status_code >= 500:
+            raise StrongholdUnavailable(f"stronghold answered {response.status_code}")
+        return ForwardedResponse(
+            response.status_code,
+            response.content,
+            response.headers.get("content-type", "application/json"),
+            response.headers.get("retry-after"),
+        )

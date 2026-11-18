@@ -1,5 +1,5 @@
 """Typed operations on the notes a user let agents use (`agent_readable` on), for the asking account only.
-Other notes are reported as "no such note". Limits mirror ember_api's `services/notes.py`; change them together."""
+Other notes are reported as "no such note". Limits mirror portcullis's `services/notes.py`; change them together."""
 
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ from src.capabilities.notes.contract import (
 )
 from src.capabilities.notes.utils.gateway import MAX_NOTES, NotesGateway, NotesGatewayError
 from src.config import settings
+from src.services.service_auth import keyring
 from src.services import identity_context, untrusted
-from src.services.internal_token import is_exposed_without_token
 
 logger = logging.getLogger(__name__)
 
@@ -42,21 +42,15 @@ class NotesError(Exception):
 
 def open_gateway() -> NotesGateway:
     return NotesGateway(
-        settings.db_gateway_url,
+        settings.treasury_url,
         settings.db_gateway_instance,
         settings.db_gateway_connection,
-        settings.internal_api_token,
+        keyring,
     )
 
 
 def _owner() -> str:
     """The caller's account uid, after checking that the identity can be trusted at all."""
-    if is_exposed_without_token(settings.host, settings.internal_api_token):
-        # Without the token any machine that can reach the port could claim any uid.
-        raise NotesError(
-            f"Notes are disabled: this server listens on {settings.host!r} without INTERNAL_API_TOKEN, "
-            "so anyone on the network could read notes. Set INTERNAL_API_TOKEN, or bind to 127.0.0.1."
-        )
     uid = identity_context.current_uid()
     if not uid:
         raise NotesError("Notes need a signed-in user, and this call carried no identity.")
@@ -78,7 +72,7 @@ def _preview(doc: dict[str, Any]) -> str:
 
 def _parse_tags(raw: str) -> list[str]:
     """Comma-separated tags: trimmed, lowercase, repeats and empty entries dropped. The same
-    rules ember_api enforces, so a note an agent writes opens cleanly on the Notes page."""
+    rules portcullis enforces, so a note an agent writes opens cleanly on the Notes page."""
     tags: list[str] = []
     for item in raw.split(","):
         tag = item.strip().lower()

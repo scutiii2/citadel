@@ -39,4 +39,4 @@ fixed strings. `.env*`, `secrets/`, `.secrets/`, key files and private keys are 
 pathspec, and `grep` searches tracked files only. Output is capped at 24 KB and fenced as data. A command stops
 after 20 seconds.
 
-Toggle: `"repo"` in `configs/config_capabilities.json`.
+Toggle: `"repo"` in the Capabilities page (stored in `.data/armory/settings.db`).

@@ -1,6 +1,6 @@
 {
   "label": "Analyst",
-  "port": 9113,
+  "port": 29613,
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",

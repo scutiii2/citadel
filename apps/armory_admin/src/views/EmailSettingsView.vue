@@ -1,0 +1,162 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from "vue";
+import { emailSettingsClient, type EmailChanges, type EmailSettings } from "../api/EmailSettingsClient";
+import PageLayout from "../components/PageLayout.vue";
+import PasswordInput from "../components/PasswordInput.vue";
+import { errorMessage } from "../utils/errors";
+import "../components/infoPage.css";
+
+/** The SMTP account Armory sends mail through. Saved in Armory's database; a send uses the saved values at once.
+ * The password is write-only: the page only says whether one is saved. */
+const saved = ref<EmailSettings>({ configured: false });
+const server = ref("");
+const port = ref("");
+const security = ref("");
+const from = ref("");
+const recipients = ref("");
+const domains = ref("");
+const password = ref("");
+const clearPassword = ref(false);
+const loading = ref(true);
+const saving = ref(false);
+const error = ref("");
+const notice = ref("");
+
+const lines = (text: string) => text.split(/[\n,]/).map((item) => item.trim()).filter(Boolean);
+
+function apply(view: EmailSettings) {
+  saved.value = view;
+  server.value = view.smtp_server ?? "";
+  port.value = view.smtp_port ? String(view.smtp_port) : "";
+  security.value = view.security ?? "";
+  from.value = view.from ?? "";
+  recipients.value = (view.to ?? []).join("\n");
+  domains.value = (view.allowed_recipient_domains ?? []).join("\n");
+  password.value = "";
+  clearPassword.value = false;
+}
+
+onMounted(async () => {
+  try {
+    apply(await emailSettingsClient.get());
+  } catch (err) {
+    error.value = errorMessage(err);
+  } finally {
+    loading.value = false;
+  }
+});
+
+const same = (a: string[], b: string[] | undefined) => a.join("\n") === (b ?? []).join("\n");
+
+/** Only what differs from the saved values, so an untouched password stays. */
+const changes = computed<EmailChanges>(() => {
+  const out: EmailChanges = {};
+  if (server.value.trim() !== (saved.value.smtp_server ?? "")) out.smtp_server = server.value.trim();
+  const typedPort = String(port.value ?? "").trim(); // a number input hands back a number
+  if (typedPort !== (saved.value.smtp_port ? String(saved.value.smtp_port) : "")) out.smtp_port = typedPort === "" ? null : Number(typedPort);
+  if (security.value !== (saved.value.security ?? "")) out.security = security.value || null;
+  if (from.value.trim() !== (saved.value.from ?? "")) out.from = from.value.trim();
+  if (!same(lines(recipients.value), saved.value.to)) out.to = lines(recipients.value);
+  if (!same(lines(domains.value), saved.value.allowed_recipient_domains)) out.allowed_recipient_domains = lines(domains.value);
+  if (password.value) out.password = password.value;
+  else if (clearPassword.value) out.password = null;
+  return out;
+});
+const changed = computed(() => Object.keys(changes.value).length > 0);
+
+async function save() {
+  saving.value = true;
+  error.value = notice.value = "";
+  try {
+    apply(await emailSettingsClient.save(changes.value));
+    notice.value = "Saved. The next email uses it.";
+  } catch (err) {
+    error.value = errorMessage(err);
+  } finally {
+    saving.value = false;
+  }
+}
+</script>
+
+<template>
+  <PageLayout
+    class="info-content email-settings"
+    title="Email"
+    description="The mail account Armory sends from. It is saved in Armory's database. Gmail, Outlook, Yahoo and iCloud need an app password."
+  >
+    <p v-if="loading" class="muted">Loading…</p>
+    <form v-else class="form" data-test="form" @submit.prevent="save">
+      <p v-if="!saved.configured" class="muted" data-test="empty">Email is not set up. Fill in the server, port and sender, then save.</p>
+      <section class="card" aria-labelledby="smtp-title">
+        <h2 id="smtp-title" class="title">Mail server</h2>
+        <div class="field">
+          <label for="smtp-server">Server</label>
+          <input id="smtp-server" v-model="server" :disabled="saving" autocomplete="off" spellcheck="false" placeholder="smtp.gmail.com" data-test="server" />
+        </div>
+        <div class="field">
+          <label for="smtp-port">Port</label>
+          <input id="smtp-port" v-model="port" type="number" min="1" max="65535" step="1" :disabled="saving" placeholder="465" data-test="port" />
+        </div>
+        <div class="field">
+          <label for="smtp-security">Connection</label>
+          <select id="smtp-security" v-model="security" :disabled="saving" data-test="security">
+            <option value="">Choose from the port (465 is ssl, others starttls)</option>
+            <option value="ssl">ssl</option>
+            <option value="starttls">starttls</option>
+            <option value="none">none (no encryption)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="smtp-from">Sender address</label>
+          <input id="smtp-from" v-model="from" type="email" :disabled="saving" autocomplete="off" data-test="from" />
+        </div>
+        <div class="field">
+          <PasswordInput
+            v-model="password"
+            label="Password"
+            autocomplete="off"
+            data-test="password"
+            :disabled="saving || clearPassword"
+            :placeholder="saved.has_password ? 'Leave empty to keep the saved password' : 'None saved (a relay without a login needs none)'"
+          />
+          <p class="help" data-test="password-state">{{ saved.has_password ? "A password is saved. It is never shown again." : "No password is saved." }}</p>
+          <label v-if="saved.has_password" class="check">
+            <input v-model="clearPassword" type="checkbox" :disabled="saving" data-test="clear-password" /> Remove the saved password
+          </label>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="who-title">
+        <h2 id="who-title" class="title">Recipients</h2>
+        <div class="field">
+          <label for="smtp-to">Standing recipients</label>
+          <textarea id="smtp-to" v-model="recipients" rows="3" :disabled="saving" spellcheck="false" data-test="to"></textarea>
+          <p class="help">One address per line. Empty is fine if every send names its own address.</p>
+        </div>
+        <div class="field">
+          <label for="smtp-domains">Domains a caller may name any address at</label>
+          <textarea id="smtp-domains" v-model="domains" rows="3" :disabled="saving" spellcheck="false" data-test="domains"></textarea>
+          <p class="help">One domain per line. Empty means no domain.</p>
+        </div>
+      </section>
+
+      <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <p v-if="notice" class="muted" role="status" data-test="notice">{{ notice }}</p>
+      <div class="actions">
+        <button type="submit" class="primary" data-test="save" :disabled="saving || !changed">{{ saving ? "Saving…" : "Save" }}</button>
+      </div>
+    </form>
+  </PageLayout>
+</template>
+
+<style scoped>
+.form { display: grid; gap: 16px; max-width: 720px; }
+.card { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.title { margin: 0; font-size: 1em; font-weight: 600; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field > label:first-child { font-size: 0.9em; font-weight: 600; }
+.field > input, .field > select, .field > textarea { width: 100%; min-width: 0; min-height: 44px; }
+.check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+.help { margin: 0; font-size: 0.85em; color: var(--muted); }
+.actions { display: flex; justify-content: flex-end; }
+</style>

@@ -8,8 +8,8 @@ from typing import Any
 
 from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
-
-INTERNAL_TOKEN_HEADER = "X-Internal-Token"
+from src.citadel_auth import ServiceAuth, requester_meta
+from src.services.service_auth import keyring
 
 
 def parse_laya_reply(result: dict[str, Any]) -> dict[str, Any]:
@@ -27,15 +27,14 @@ def parse_laya_reply(result: dict[str, Any]) -> dict[str, Any]:
 
 
 class McpLayaTransport:
-    def __init__(self, url: str, token: str) -> None:
+    def __init__(self, url: str) -> None:
         self._url = url
-        self._headers = {INTERNAL_TOKEN_HEADER: token} if token else {}
 
     async def ask(self, payload: dict[str, Any]) -> dict[str, Any]:
-        async with streamablehttp_client(self._url, headers=self._headers) as (read, write, _):
+        async with streamablehttp_client(self._url, auth=ServiceAuth(keyring, "legion")) as (read, write, _):
             async with ClientSession(read, write) as session:
                 await session.initialize()
-                result = await session.call_tool("ask", {"question": json.dumps(payload)})
+                result = await session.call_tool("ask", {"question": json.dumps(payload)}, meta=requester_meta())
         if result.isError:
             raise ValueError("Laya reported an error.")
         data = result.structuredContent

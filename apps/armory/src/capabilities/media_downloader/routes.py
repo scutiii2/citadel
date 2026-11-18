@@ -6,7 +6,6 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 from src.config import settings
 from src.services import capability_registry
-from src.services.internal_token import is_exposed_without_token
 from src.capabilities.media_downloader.utils.media_downloads import get_runtime
 
 
@@ -16,7 +15,7 @@ async def download_video(request: Request):
         enabled = capability_registry.is_enabled("media")
     except KeyError:
         enabled = False
-    if not enabled or is_exposed_without_token(settings.host, settings.internal_api_token):
+    if not enabled:
         return JSONResponse({"error": "File not available"}, status_code=404)
     from src.capabilities.media_downloader.utils.errors import DownloaderError
     from src.capabilities.media_downloader.utils.store.names import content_disposition

@@ -28,8 +28,8 @@ Scrape a web page, list a site's pages and crawl a site through [Firecrawl](http
 
 ## Configuration
 
-`FIRECRAWL_API_KEY` in `apps/armory/.env` (key from https://www.firecrawl.dev/app). Without it each tool fails with a
-message naming the variable; the rest of the server is unaffected. `FIRECRAWL_API_URL` is optional: leave it blank for the
+Set the Firecrawl API key on the Settings page of Armory Admin (key from https://www.firecrawl.dev/app); it is saved in
+Armory's database and used at once. Without it each tool fails with a message naming the setting; the rest of the server is unaffected. The Firecrawl address is optional: leave it blank for the
 hosted API, or set it to a self-hosted instance (the key is then optional). The client is built per call.
 
 Firecrawl fetches the pages, so this server never connects to an address a caller chose. Page text is capped at 24 KB
@@ -38,4 +38,4 @@ to 60 seconds; if the job is still running the result says so and holds the page
 
 Not included: Firecrawl's search (use `/web search`) and its LLM-based extract.
 
-Toggle: `"scrape"` in `configs/config_capabilities.json`.
+Toggle: `"scrape"` in the Capabilities page (stored in `.data/armory/settings.db`).

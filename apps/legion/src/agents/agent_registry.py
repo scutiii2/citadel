@@ -23,8 +23,9 @@ from urllib.parse import urlparse
 
 from src.agents import agent_spec
 from src.providers import model_tiers
+from src.citadel_auth import data_dir
 
-_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / ".data" / "agent_registry.json"
+_CONFIG_PATH = data_dir(Path(__file__).resolve().parents[2]) / "agent_registry.json"
 
 _log = logging.getLogger(__name__)
 
@@ -154,7 +155,7 @@ def register(
     manual edit is needed to learn about a newly-started instance. Call once at startup, before
     serving; see deregister() for the matching shutdown call.
 
-    role identifies the orchestrator, internal router or specialist. ember_api
+    role identifies the orchestrator, internal router or specialist. portcullis
     picks the entry agent, and an orchestrator builds its roster from role
     and uses focus to choose specialists.
     tiers is this agent's allowed model tiers (model_tiers.as_records); an orchestrator offers them when delegating. It is stored only when non-empty.
@@ -276,7 +277,7 @@ def _tiers_of(spec: Any) -> list[dict[str, str]]:
 def write_definitions(specs: Iterable[Any]) -> None:
     """Publishes every agent the supervisor knows (from agents/*.json) next
     to the registry, enabled or not. The registry lists only agents that are
-    running, so this is how readers (ember_api's Agents page) tell an agent
+    running, so this is how readers (portcullis's Agents page) tell an agent
     that is stopped or switched off from one that does not exist. Written
     once at supervisor start - an agent's file is read only then. Silently
     gives up on any OSError, like register(). `llm` (provider, gateway,

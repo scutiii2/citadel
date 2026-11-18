@@ -23,7 +23,7 @@ class FirecrawlClient:
     def __init__(self, api_key: str, base_url: str = "", timeout: int = TIMEOUT_SECONDS) -> None:
         self._base_url = (base_url or HOSTED_URL).rstrip("/")
         if not api_key and self._base_url == HOSTED_URL:
-            raise FirecrawlError("FIRECRAWL_API_KEY is not set. Add it to apps/armory/.env and restart the server.")
+            raise FirecrawlError("FIRECRAWL_API_KEY is not set. Set it on the Settings page of Armory Admin.")
         self._api_key = api_key
         self._timeout = timeout
 

@@ -203,7 +203,7 @@ def list_skills(path: Path, owner: str, status: str | None = None) -> list[Skill
 
 def set_status(path: Path, owner: str, skill_id: int, status: str) -> bool:
     """Approve (`active`), retire or re-propose a skill; False when it is not the owner's.
-    Called from the user's side only (ember_api routes), never from a model tool."""
+    Called from the user's side only (portcullis routes), never from a model tool."""
     owner = _owner(owner)
     if status not in STATUSES:
         raise SkillStoreError(f"Unknown status {status!r}.")

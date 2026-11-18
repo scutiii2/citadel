@@ -1,0 +1,13 @@
+# legion_admin
+
+Project note: `Brain/Projects/legion_admin.md` in the Obsidian vault (`../../../../Brain/` from this folder).
+
+Vue 3 + TypeScript admin app for Legion, for accounts holding `agents.manage` (Agents, Connections, MCP servers) or `tuning.manage` (Tuning: response-limit ceilings, `/api/admin/tuning`). Talks only to `portcullis` through the Vite `/api` proxy (no backend of its own).
+
+## Rules
+- Code is copied between the admin apps, not shared. Nothing here imports from another app. Apply a fix to a shared component in every admin app that has a copy.
+- Add a page: one entry in `src/router/pages.ts`, one route in `src/router/index.ts` with `meta.permission`, one view.
+- Radius only through `--radius-*` tokens, colors only through `style.css` tokens (`radiusScale.test.ts` enforces it).
+- A switch that calls the server stays pending until the server answers.
+- Never add reduced-motion code.
+- Checks: `pnpm exec vue-tsc -b`, `pnpm test`. Dev: `pnpm dev` (port 26500; `EMBER_API_PORT` sets the proxy target, default 29601).

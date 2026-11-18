@@ -5,7 +5,7 @@ Chat id `data`, label "Data Tables".
 
 ## How a file gets here
 
-`ember_web` uploads an attached `.csv` / `.xlsx` through `ember_api` to `POST /upload/table` (`upload_routes.py`,
+`ember_web` uploads an attached `.csv` / `.xlsx` through `portcullis` to `POST /upload/table` (`upload_routes.py`,
 internal token required). `utils/table_loader.py` parses the whole file once into typed columns;
 `utils/tables.py` keeps it in memory under a random id, bound to the requesting account. Nothing is written to disk.
 A restart, or 30 minutes, drops the table: attach the file again.
@@ -43,4 +43,4 @@ evict other users' tables. Numeric ids of 16+ digits are typed as float and lose
 Every id is random, opaque and owner-bound; an unknown, expired or foreign id gives the same "not found". Cell values
 come from the user's file and may hold injection text, so each result carries a `notice` saying they are data.
 
-Toggle: `"data"` in `configs/config_capabilities.json`.
+Toggle: `"data"` in the Capabilities page (stored in `.data/armory/settings.db`).

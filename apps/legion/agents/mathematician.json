@@ -1,6 +1,6 @@
 {
   "label": "Mathematician",
-  "port": 9121,
+  "port": 29620,
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",

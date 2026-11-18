@@ -1,6 +1,6 @@
 {
   "label": "Reviewer",
-  "port": 9102,
+  "port": 29604,
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",

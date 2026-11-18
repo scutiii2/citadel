@@ -1,6 +1,6 @@
 {
   "label": "Repo Helper",
-  "port": 9110,
+  "port": 29610,
   "plan_tool": false,
   "llm": {
     "provider": "anthropic",

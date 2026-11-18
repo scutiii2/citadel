@@ -1,14 +1,14 @@
-# Stack: ember_web / ember_admin -> ember_api -> armory / legion / treasury; legion -> LayaModel (its own stack, reached through the host's published port 9120, not started here).
+# Stack: portcullis_admin / legion_admin / armory_admin / stronghold_admin / treasury_admin -> portcullis -> armory / legion / treasury / stronghold; legion -> LayaModel (its own stack, reached through the host's published port 29220, not started here).
 # Start:  docker compose up -d --build
-# Needs a root .env with INTERNAL_API_TOKEN (see .env.example). Per-app
-# secrets stay in apps/<app>/.env and are loaded when the file exists.
+# Per-service Ed25519 identities are created on first start. Public trust is shared read-only
+# with peers; private identities remain in their own volumes. Per-app secrets load when present.
+# Runtime data and cache are folders in this repo: ${CITADEL_DATA_DIR:-./.data}/<service> and
+# ${CITADEL_CACHE_DIR:-./.cache}/<service> (set both in the root .env to move them).
+# The root .env is mounted read-only in each service; see citadel_auth/rootenv.py for what it overrides.
 # Container-only configs live in docker/configs and are mounted over each
 # app's configs/ file; the apps' own configs stay untouched.
 
 name: citadel
-
-x-internal-token: &internal_token
-  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?set INTERNAL_API_TOKEN in .env}
 
 services:
   armory:
@@ -18,20 +18,69 @@ services:
       - path: ./apps/armory/.env
         required: false
     environment:
-      <<: *internal_token
+      TREASURY_URL: http://treasury:29602
+      CITADEL_ADVERTISE_URL: http://armory:29600
       MCP_HOST: 0.0.0.0
-      MCP_PORT: "8010"
-      DB_GATEWAY_URL: http://treasury:8071
-      EMBER_API_URL: http://ember_api:8030
+      CITADEL_SERVICE: armory
+      CITADEL_ROOT_ENV: /citadel.env
+      CITADEL_TRUST_DIR: /trust
+      CITADEL_IDENTITY_DIR: /identity
+      MCP_PORT: "29600"
+      # The notes tools read the notes the Notes page saves, which Stronghold keeps in its own database.
+      DB_GATEWAY_INSTANCE: armory
+      DB_GATEWAY_CONNECTION: stronghold
     volumes:
-      # Writable: the Extensions page in ember_admin saves added extensions into this tracked file.
-      - ./docker/configs/armory/extensions.json:/app/configs/config_extensions.json
-      # Writable: the Capabilities page in ember_admin saves its on/off toggles into this tracked file.
-      - ./docker/configs/armory/capabilities.json:/app/configs/config_capabilities.json
-      - armory_data:/app/.data
+      - ${CITADEL_DATA_DIR:-./.data}/armory:/app/.data
+      - ${CITADEL_CACHE_DIR:-./.cache}/armory:/app/.cache
+      - identity_armory:/identity:rw
+      - ./.env:/citadel.env:ro
+      - trust_armory:/trust/armory:rw
+      - trust_legion:/trust/legion:ro
+      - trust_treasury:/trust/treasury:ro
+      - trust_stronghold:/trust/stronghold:ro
+      - trust_portcullis:/trust/portcullis:ro
       # server_manager (Docker apps list/start/stop/logs) talks to the host daemon.
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on: [treasury]
+    networks: [core]
+
+  # Shared chat-model gateway (its own repo). Part of this stack, but open to callers
+  # outside Citadel: each one gets its own token on http://<host>:29407/admin/.
+  conversationgateway:
+    build: ${CONVERSATION_GATEWAY_DIR:-../../AI/ModelProviders/ConversationGateway}
+    restart: unless-stopped
+    environment:
+      SERVICE_ADMIN_PASSWORD: ${CONVERSATION_GATEWAY_ADMIN_PASSWORD:?set CONVERSATION_GATEWAY_ADMIN_PASSWORD in the root .env}
+    ports:
+      - "0.0.0.0:29407:29407"
+    volumes:
+      - ${CITADEL_DATA_DIR:-./.data}/conversationgateway:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:29407/health')"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+    networks: [core]
+
+  # Shared decision-model gateway (its own repo): TypeSafe Jev and the Laya model service.
+  # Part of this stack, but open to callers outside Citadel by token, like conversationgateway.
+  decisiongateway:
+    build: ${DECISION_GATEWAY_DIR:-../../AI/ModelProviders/DecisionGateway}
+    restart: unless-stopped
+    environment:
+      SERVICE_ADMIN_PASSWORD: ${DECISION_GATEWAY_ADMIN_PASSWORD:?set DECISION_GATEWAY_ADMIN_PASSWORD in the root .env}
+    ports:
+      - "0.0.0.0:29406:29406"
+    volumes:
+      - ${CITADEL_DATA_DIR:-./.data}/decisiongateway:/data
+    # Lets a saved gateway reach a host-published model service (LayaModel) as host.docker.internal.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:29406/health')"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
     networks: [core]
 
   legion:
@@ -41,17 +90,28 @@ services:
       - path: ./apps/legion/.env
         required: false
     environment:
-      <<: *internal_token
+      TREASURY_URL: http://treasury:29602
+      CITADEL_ADVERTISE_URL: http://legion:29603
       AI_AGENT_HOST: 0.0.0.0
+      CITADEL_SERVICE: legion
+      CITADEL_ROOT_ENV: /citadel.env
+      CITADEL_TRUST_DIR: /trust
+      CITADEL_IDENTITY_DIR: /identity
       AI_AGENT_ADVERTISE_URL: http://legion
-      MCP_SERVER_URL: http://armory:8010/mcp
-    # Lets apps/legion/.env reach host-published stacks (LayaModel, OmniRoute) as host.docker.internal.
+      # Legion keeps each gateway's address and token, set by an admin, in Treasury.
+    # Lets legion reach host-published stacks as host.docker.internal.
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./docker/configs/legion/servers.json:/app/configs/config_servers.json:ro
-      - agent_data:/app/.data
-    depends_on: [armory]
+      - identity_legion:/identity:rw
+      - ./.env:/citadel.env:ro
+      - trust_armory:/trust/armory:ro
+      - trust_legion:/trust/legion:rw
+      - trust_treasury:/trust/treasury:ro
+      - trust_stronghold:/trust/stronghold:ro
+      - trust_portcullis:/trust/portcullis:ro
+      - ${CITADEL_DATA_DIR:-./.data}/legion:/app/.data
+    depends_on: [armory, conversationgateway, decisiongateway, treasury]
     networks: [core]
 
   treasury:
@@ -61,48 +121,134 @@ services:
       - path: ./apps/treasury/.env
         required: false
     environment:
-      <<: *internal_token
-      DB_GATEWAY_PORT: "8071"
+      DB_GATEWAY_PORT: "29602"
+      CITADEL_SERVICE: treasury
+      CITADEL_ROOT_ENV: /citadel.env
+      CITADEL_TRUST_DIR: /trust
+      CITADEL_IDENTITY_DIR: /identity
     volumes:
       - ./docker/configs/treasury/app.json:/app/configs/config_app.json:ro
-      - ./docker/configs/treasury/connections.json:/app/configs/config_connections.json:ro
-      - treasury_data:/app/data
+      - ${CITADEL_DATA_DIR:-./.data}/treasury:/app/.data
+      - identity_treasury:/identity:rw
+      - ./.env:/citadel.env:ro
+      - trust_armory:/trust/armory:ro
+      - trust_legion:/trust/legion:ro
+      - trust_treasury:/trust/treasury:rw
+      - trust_stronghold:/trust/stronghold:ro
+      - trust_portcullis:/trust/portcullis:ro
     networks: [core]
 
-  ember_api:
-    build: ./apps/Ember/ember_api
+  # Product logic. Only portcullis calls it, so no port is published.
+  # Run ONE replica: running chat turns live in this process's memory (Plan 10), so a second replica could not see them.
+  stronghold:
+    build: ./apps/stronghold
     restart: unless-stopped
+    # On stop, running turns are cancelled and their partial text saved; give that time before SIGKILL.
+    stop_grace_period: 30s
     env_file:
-      - path: ./apps/Ember/ember_api/.env
+      - path: ./apps/stronghold/.env
         required: false
     environment:
-      <<: *internal_token
-      EMBER_API_HOST: 0.0.0.0
+      TREASURY_URL: http://treasury:29602
+      CITADEL_ADVERTISE_URL: http://stronghold:29650
+      STRONGHOLD_HOST: 0.0.0.0
+      CITADEL_SERVICE: stronghold
+      CITADEL_ROOT_ENV: /citadel.env
+      CITADEL_TRUST_DIR: /trust
+      CITADEL_IDENTITY_DIR: /identity
+      STRONGHOLD_PORT: "29650"
+      # Attached files and speech go to these tool services; their tokens are set in Stronghold admin > Tool services.
+      BARD_URL: http://bard:29400
+      SCRIBE_URL: http://scribe:29401
+      READER_URL: http://reader:29402
+      AGENTS_REGISTRY_PATH: /agent_data/agent_registry.json
+      STRONGHOLD_DATA_DIR: /data
     volumes:
-      - ./docker/configs/ember_api/app.json:/app/configs/config_app.json:ro
-      # ember_api reads and writes its secrets (EMBER_SECRETS_KEY) in its own .env file.
-      - ./apps/Ember/ember_api/.env:/app/.env
-      - ember_api_data:/app/data
-      - agent_data:/agent_data:ro
-    depends_on: [armory, legion, treasury]
+      - ./docker/configs/stronghold/app.json:/app/configs/config_app.json:ro
+      # keys.json: the key that encrypts saved secrets (brain keys, private-extension headers).
+      - ${CITADEL_DATA_DIR:-./.data}/stronghold:/data
+      - identity_stronghold:/identity:rw
+      - ./.env:/citadel.env:ro
+      - trust_armory:/trust/armory:ro
+      - trust_legion:/trust/legion:ro
+      - trust_treasury:/trust/treasury:ro
+      - trust_stronghold:/trust/stronghold:rw
+      - trust_portcullis:/trust/portcullis:ro
+      # Legion's registry of running agents (notes ask the Laya and tag-writer agents).
+      - ${CITADEL_DATA_DIR:-./.data}/legion:/agent_data:ro
+    depends_on: [treasury, armory]
     networks: [core]
 
-  ember_web:
-    build: ./apps/Ember/ember_web
+  portcullis:
+    build: ./apps/portcullis
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:5173:80"
-    depends_on: [ember_api]
+    env_file:
+      - path: ./apps/portcullis/.env
+        required: false
+    environment:
+      TREASURY_URL: http://treasury:29602
+      CITADEL_ADVERTISE_URL: http://portcullis:29601
+      EMBER_API_HOST: 0.0.0.0
+      CITADEL_SERVICE: portcullis
+      CITADEL_ROOT_ENV: /citadel.env
+      CITADEL_TRUST_DIR: /trust
+      CITADEL_IDENTITY_DIR: /identity
+    volumes:
+      - ./docker/configs/portcullis/app.json:/app/configs/config_app.json:ro
+      # portcullis reads and writes its secrets (EMBER_SECRETS_KEY) in its own .env file.
+      - ./apps/portcullis/.env:/app/.env
+      - ${CITADEL_DATA_DIR:-./.data}/portcullis:/app/.data
+      - identity_portcullis:/identity:rw
+      - ./.env:/citadel.env:ro
+      - trust_armory:/trust/armory:ro
+      - trust_legion:/trust/legion:ro
+      - trust_treasury:/trust/treasury:ro
+      - trust_stronghold:/trust/stronghold:ro
+      - trust_portcullis:/trust/portcullis:rw
+      - ${CITADEL_DATA_DIR:-./.data}/legion:/agent_data:ro
+    depends_on: [armory, legion, treasury, stronghold]
     networks: [core]
 
-  ember_admin:
+  portcullis_admin:
     build:
-      context: ./apps/Ember
-      dockerfile: ember_admin/Dockerfile
+      context: ./apps
+      dockerfile: portcullis_admin/Dockerfile
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5176:80"
-    depends_on: [ember_api]
+      - "127.0.0.1:26501:80"
+    depends_on: [portcullis]
+    networks: [core]
+
+  legion_admin:
+    build: ./apps/legion_admin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:26500:80"
+    depends_on: [portcullis]
+    networks: [core]
+
+  armory_admin:
+    build: ./apps/armory_admin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:26503:80"
+    depends_on: [portcullis]
+    networks: [core]
+
+  stronghold_admin:
+    build: ./apps/stronghold_admin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:26504:80"
+    depends_on: [portcullis]
+    networks: [core]
+
+  treasury_admin:
+    build: ./apps/treasury_admin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:26505:80"
+    depends_on: [portcullis]
     networks: [core]
 
 networks:
@@ -112,7 +258,13 @@ networks:
         - subnet: 172.28.0.0/16
 
 volumes:
-  armory_data:
-  agent_data:
-  treasury_data:
-  ember_api_data:
+  trust_armory:
+  trust_legion:
+  trust_treasury:
+  trust_stronghold:
+  trust_portcullis:
+  identity_armory:
+  identity_legion:
+  identity_treasury:
+  identity_stronghold:
+  identity_portcullis:

@@ -1,0 +1,65 @@
+"""Per-account list of specialist agents the account switched off. Stored as one
+document per account in Treasury (collection "account_agents", key the account uid).
+An id in the list means off; an account that never touched it has every agent on.
+
+It holds only ids and does not know which agents exist: Legion owns that.
+`blocked_names` turns the list into the entries Legion's tool filter understands.
+"""
+
+from __future__ import annotations
+
+from src.clock import utcnow
+from src.document_store import DocumentStore
+
+COLLECTION = "account_agents"
+MAX_ITEMS = 200
+# Mirrors Legion's core/tool_filter.AGENT_PREFIX.
+AGENT_PREFIX = "agent:"
+
+
+class TooManyItems(Exception):
+    """The account already switched off MAX_ITEMS agents."""
+
+
+class AccountAgentService:
+    def __init__(self, store: DocumentStore, owner_uid: str) -> None:
+        self._store = store
+        self._owner = owner_uid
+
+    async def _stored(self) -> set[str]:
+        doc = await self._store.get(COLLECTION, self._owner) or {}
+        return set(doc.get("disabled", []))
+
+    async def disabled(self, known: set[str] | None = None) -> list[str]:
+        """The switched-off ids. `known` is every agent that exists; ids outside it (an agent that was
+        retired) are left out. Empty or None means the roster is unknown, so nothing is left out."""
+        ids = await self._stored()
+        return sorted(ids & known if known else ids)
+
+    async def set_enabled(self, agent_id: str, enabled: bool, known: set[str] | None = None) -> list[str]:
+        """Switches one agent on or off and returns the whole disabled list. Ids of retired agents
+        (see `disabled`) are dropped from what is stored. Read then write, not atomic: one account
+        toggling from two tabs at the same instant can lose a change."""
+        stored = await self._stored()
+        ids = set(await self.disabled(known))
+        if not enabled and agent_id not in ids:
+            if len(ids) >= MAX_ITEMS:
+                raise TooManyItems
+            ids.add(agent_id)
+        elif enabled and agent_id in ids:
+            ids.remove(agent_id)
+        if ids == stored:
+            return sorted(ids)
+        doc = {"owner": self._owner, "disabled": sorted(ids), "updated_at": utcnow().isoformat(timespec="seconds")}
+        await self._store.put(COLLECTION, self._owner, doc)
+        return doc["disabled"]
+
+
+async def purge_owner(store: DocumentStore, owner_uid: str) -> None:
+    """Forget one account's switched-off agents (used when the account is deleted)."""
+    await store.delete(COLLECTION, owner_uid)
+
+
+def blocked_names(disabled: list[str]) -> list[str]:
+    """The tool-filter entries ai_agent reads as "this specialist is off"."""
+    return [AGENT_PREFIX + agent_id for agent_id in disabled]

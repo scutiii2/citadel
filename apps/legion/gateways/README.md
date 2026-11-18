@@ -13,7 +13,6 @@ wrapper keys. For example, `anthropic/claude.json`:
 ```json
 {
   "label": "Claude",
-  "api_key": "{CLAUDE_API_KEY}",
   "model": "claude-sonnet-5",
   "models": {
     "light": {"id": "claude-haiku-4-5", "use_for": "quick tasks"},
@@ -22,9 +21,9 @@ wrapper keys. For example, `anthropic/claude.json`:
 }
 ```
 
-Use `{ENV_VAR_NAME}` placeholders for credentials; the actual values belong
-in `../.env`. Files can also specify gateway-specific fields such as
-`base_url`, `auth_token`, `azure_endpoint`, or `aws_region`. An `anthropic`
+Files in `anthropic/` and `openai/` hold only `label`, `prompt_cache`, `model` and `models`. Their connection and key are saved in ConversationGateway (`AI/ModelProviders/ConversationGateway`, admin page `/admin/gateways.html`) under the same id as the filename.
+
+A model id may be an `{ENV_VAR_NAME}` placeholder (Azure deployment names); the value belongs in `../.env`. An `anthropic`
 gateway that serves Claude models can set `"prompt_cache": true` to cache its system prompt,
 tool list and conversation so far between calls (leave it off for gateways that route to other models). Optional `models`
 defines the `light`, `standard`, `heavy`, and `extreme` tiers. Agent files keep their
@@ -48,18 +47,12 @@ Temporary migration files are also ignored.
 
 The gateway loader and admin catalog cache normal presets for the process
 lifetime. Restart the agent processes and supervisor after editing those files.
-Laya service strategy is the exception: `gateways/decision/laya.json` is read
-on every call, so editing its strategy needs no restart. For rollback, use the previous code with the retained
+For rollback, use the previous code with the retained
 legacy file; copy any subsequent gateway changes back into that file first.
 
 ## decision
 
-Provider folder `decision/` holds `laya.json` and `jev.json`. Laya is the
-local LayaModel service; its `strategy` selects any name offered by the
-service's `GET /v1/strategies` endpoint (default `english-then-typed`), and its
-`window` is the token window sent as `max_len` (default 4096, allowed 16 to 8192;
-the service refuses text that does not fit it with a 413). The service URL is
-configured through `LAYA_SERVICE_URL`.
-
-Jev calls the TypeSafe API; its URL and model are preset in `jev.json`, and
-its credential is resolved from `TYPESAFE_API_KEY`.
+Provider folder `decision/` holds `laya.json` and `jev.json`, each with only a `label`. The two
+ids name entries saved in DecisionGateway (`AI/ModelProviders/DecisionGateway`): `laya` is the
+local Laya model service, `jev` is TypeSafe's cloud API. Address, key, model, strategy and window
+are set there. Agents choose `laya-only`, `jev-only` or `both`; that arrangement stays in Legion.
