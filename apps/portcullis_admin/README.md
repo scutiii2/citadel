@@ -292,11 +292,8 @@ Every page view uses PageLayout; the AdminView routing shell and chat/auth scree
 
 ## Instance Brain
 
-Workspace settings contains the shared Obsidian connection editor under existing
-`settings.manage` authorization. Saved keys appear only as a configured indicator;
-the password field is write-only and an unchanged value preserves the key. Test
-reads the candidate; Save applies a revision without restart; Disable revokes new
-operations. `brain.instance.publish` separately permits publishing shared knowledge.
+Manage the shared Obsidian connection in **Armory Admin → Brain** with
+`settings.manage`. `brain.instance.publish` permits publishing shared knowledge.
 See [brain operations](../../../docs/obsidian-brains.md).
 
 Laya's internal strategy is configured in Legion's `gateways/decision/laya.json`
