@@ -10,3 +10,15 @@ services:
   portcullis_admin:
     ports: !override
       - "26501:80"
+  legion_admin:
+    ports: !override
+      - "26500:80"
+  armory_admin:
+    ports: !override
+      - "26503:80"
+  stronghold_admin:
+    ports: !override
+      - "26504:80"
+  treasury_admin:
+    ports: !override
+      - "26505:80"
