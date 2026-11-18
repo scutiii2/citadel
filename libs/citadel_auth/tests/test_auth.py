@@ -125,6 +125,9 @@ async def test_unreadable_trust_fails_closed(stack, monkeypatch):
     ("armory", "portcullis", "/tickets/tags", True),
     ("armory", "stronghold", "/upload/pdf", True),
     ("armory", "stronghold", "/brains/operation", True),
+    ("armory", "stronghold", "/brains/destination", True),
+    ("armory", "portcullis", "/admin/brain", True),
+    ("stronghold", "armory", "/brains/instance-migration", True),
     ("armory", "stronghold", "/ticket-admin/tickets", True),
     ("treasury", "portcullis", "/instances", False),
     ("treasury", "stronghold", "/instances", False),
@@ -140,6 +143,8 @@ def test_policy_rows(audience, caller, path, forward):
 
 def test_policy_denies_unlisted_routes_and_prefix_lookalikes():
     assert not allowed("stronghold", "armory", "/brains/resolve-admin")
+    assert not allowed("armory", "portcullis", "/brains/destination")
+    assert not allowed("armory", "stronghold", "/admin/brain")
     assert not allowed("armory", "legion", "/admin")
     assert not allowed("portcullis", "stronghold", "/internal-evil")
     assert not allowed("armory", "treasury", "/mcp")
