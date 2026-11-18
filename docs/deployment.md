@@ -66,7 +66,7 @@ Double-click it for a menu:
 | 4, 5 | Dry-run previews of 1 and 2 |
 | 6 | Chown helper: copies `chown -R <user> <dir>` to the clipboard and opens the server's web terminal (root shell) so you can paste it |
 
-The target is `lex@scutiserver1.local:/media/ZimaOS-HD/Apps/Citadel`. The server refuses root over ssh, so the script logs
+The target is `lex@scutiserver1.local:/media/ZimaOS-HD/Apps/Applications/Citadel`. The server refuses root over ssh, so the script logs
 in as `lex`; the web terminal is at `http://scutiserver1.local:7681/`. If option 2 fails with `Permission denied`, run
 option 6 once (it also offers itself after a failed push). Set `DEPLOY_HOST`, `DEPLOY_DIR` and `DEPLOY_WEB_PORT` before
 running to change them. After each action the script prints the commands to run on the server. Option 2 overwrites the
@@ -78,15 +78,16 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    repo needs a deploy key or token.
 
    ```bash
-   mkdir -p /media/ZimaOS-HD/Apps
-   git clone -b live <your-repo-url> /media/ZimaOS-HD/Apps/Citadel
+   mkdir -p /media/ZimaOS-HD/Apps/Applications /media/ZimaOS-HD/Apps/AI/ModelProviders
+   git clone -b live <your-repo-url> /media/ZimaOS-HD/Apps/Applications/Citadel
    ```
 
+   Compose finds the gateways two folders up, so with this layout copy `ConversationGateway` and `DecisionGateway` to `/media/ZimaOS-HD/Apps/AI/ModelProviders/` and no `*_GATEWAY_DIR` variable is needed.
    Already cloned `main`? Switch in place; the containers keep running:
    `git fetch origin live && git switch -c live --track origin/live`.
 
 2. **Deploy `LayaModel` separately** (it is its own project and Citadel's compose does not start it). Run
-   `docker compose up -d --build` in the `LayaModel` folder (`/media/ZimaOS-HD/Apps/ModelServices/DSC_Laya_Model`), in any order relative
+   `docker compose up -d --build` in the `LayaModel` folder (`/media/ZimaOS-HD/Apps/AI/ModelServices/DSC_Laya_Model`), in any order relative
    to Citadel. It publishes port 29220 on the host and DecisionGateway reaches it at `http://host.docker.internal:29220`
    (Compose maps that name to the host with `extra_hosts`), so the two stacks share no Docker network. Set
    that address on the `laya` gateway in DecisionGateway (see "DecisionGateway" below); if you change `LAYA_PORT` in `LayaModel`,
@@ -150,7 +151,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
 Publish and push from the PC (`tools\deploy.bat`, option 3), then on the box:
 
 ```bash
-cd /media/ZimaOS-HD/Apps/Citadel
+cd /media/ZimaOS-HD/Apps/Applications/Citadel
 git pull
 docker compose up -d --build
 ```
