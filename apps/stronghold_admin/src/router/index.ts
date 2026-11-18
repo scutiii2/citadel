@@ -19,7 +19,6 @@ export const router = createRouter({
     { path: "/usage", name: "usage", component: () => import("../views/UsageView.vue"), meta: { permission: "usage.all.view" } },
     { path: "/analytics", name: "analytics", component: () => import("../views/AnalyticsView.vue"), meta: { permission: ANALYTICS_PERMISSIONS } },
     { path: "/tickets", name: "tickets", component: () => import("../views/TicketsAdminView.vue"), meta: { permission: "tickets.manage" } },
-    { path: "/tools", name: "tools", component: () => import("../views/ToolServicesView.vue"), meta: { permission: "settings.manage" } },
     { path: "/usage-settings", name: "usage-settings", component: () => import("../views/UsageSettingsView.vue"), meta: { permission: "settings.manage" } },
     { path: "/login", name: "login", component: () => import("../views/LoginView.vue"), meta: { guestOnly: true } },
     { path: "/no-access", name: "no-access", component: () => import("../views/NoAccessView.vue") },

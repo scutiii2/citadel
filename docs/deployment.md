@@ -7,7 +7,7 @@ Citadel runs as containers from one `docker-compose.yml`:
 | `ember_web` | user web app, disabled (reference only; the Ember Windows app replaces it) | 26502, unused |
 | `portcullis_admin` | admin web app: accounts, roles, invites, settings | 26501 |
 | `legion_admin` | admin web app: agents, connections | 26500 |
-| `armory_admin` | admin web app: capabilities, extensions | 26503 |
+| `armory_admin` | admin web app: capabilities, connections | 26503 |
 | `stronghold_admin` | admin web app: usage, analytics, tickets, tuning | 26504 |
 | `treasury_admin` | admin web app: Treasury instances, connections and service addresses | 26505 |
 | `portcullis` | backend for both web apps | internal |
@@ -131,7 +131,7 @@ server's copies, including `EMBER_SECRETS_KEY`, so do not push over secrets the 
    `.env.example` beside each). Compose mounts the tracked files under `docker/configs/` read-only for container values (Portcullis's, Stronghold's
    and Treasury's `config_app.json`). Everything an
    admin changes at run time is saved in `.data/<service>/`, so it survives rebuilds and never shows in git: Armory's
-   extensions, capability toggles and ticket settings and Legion's servers (each in `settings.db`), Legion's tuning and
+   connections, capability toggles and ticket settings and Legion's servers (each in `settings.db`), Legion's tuning and
    prompts, and the instances Treasury's callers register. A new install starts with every Armory capability off, no
    Armory extension; Legion defaults its main server to Armory’s catalog address. An administrator turns on and adds what the machine needs. Stronghold alone
    owns the usage limits and the price table; Portcullis reads the prices from it.
@@ -250,6 +250,19 @@ Product logic, called only by Portcullis. The calendar is the first feature that
 - Stronghold reads Legion's agent registry from `.data/legion/` (mounted read-only) and calls Armory for the assistant memory.
 - **Token limits and prices**: `usage.six_hour_token_limit`, `usage.weekly_token_limit` and the `pricing` block are in `docker/configs/stronghold/app.json` (Stronghold keeps usage). A limit set in Portcullis's config is ignored.
 - Stronghold calls Portcullis's `/internal` routes with signed service assertions (account standing, admin switches, email, Errors log). Its address comes from Treasury’s catalog.
+
+## Tool connections
+
+Armory owns the required Bard, Scribe, and Reader connections and optional shared connections. Configure them on **Armory Admin → Connections**. Use a REST base URL and a tool-service token. An MCP transport takes its own URL and credentials. Armory shows whether credentials are set.
+
+For an existing deployment, apply these steps in order:
+
+1. Publish and rebuild Armory and Armory Admin. Armory migrates existing shared MCP connections, keeping tool names such as `bard__tool_bard_speak`. If Portcullis predates Plan 14, first run the Portcullis build from the Task 2 commit `d374fe7b` as a temporary bridge. It supports the Connections API and keeps existing speech, attachment, and dictation routing during setup.
+2. Open **Connections** and enter the REST base URLs and existing per-caller tool tokens for Bard, Scribe, and Reader. On the shared Docker network these URLs are `http://bard:29400`, `http://scribe:29401`, and `http://reader:29402`. Use **Test REST** on each card to check service health and credential acceptance. Use **Test MCP** wherever agents use that connection.
+3. Publish and rebuild Stronghold and Portcullis together. Confirm read aloud, owned attachment previews, and live dictation. Portcullis needs a proxy that passes WebSocket upgrades and allows a connection lifetime of at least 270 seconds.
+4. Remove the old tool-service values from Stronghold and Portcullis after the checks pass. Remove the obsolete address and token variables from deployment overrides. If the old admin pages stored tokens in SQLite, back up each service's settings database and remove only the obsolete `tool_tokens` table from that service's database. Keep the rest of each database. Revoke any unused old tool-service tokens, keeping the ones Armory currently uses.
+
+The Config issues page reports missing required connections. Ember keeps affected controls visible and explains what needs configuration.
 
 ## DecisionGateway
 

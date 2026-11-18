@@ -25,10 +25,6 @@ class Settings:
     port: int = 29650
     treasury_url: str = "http://127.0.0.1:29602"
     advertise_url: str | None = None
-    # Tool services that take attachments and speech (Bard, Scribe, Reader); each has its own token.
-    bard_url: str = "http://127.0.0.1:29400"
-    scribe_url: str = "http://127.0.0.1:29401"
-    reader_url: str = "http://127.0.0.1:29402"
     # Legion's registry of running agents: the file its supervisor writes, or its /registry URL (wins when set).
     agents_registry_path: Path = _data_dir(PROJECT_DIR.parent / "legion") / "agent_registry.json"
     agents_registry_url: str | None = None
@@ -53,9 +49,6 @@ def load_settings() -> Settings:
         port=int(os.getenv("STRONGHOLD_PORT") or raw.get("port", base.port)),
         treasury_url=os.getenv("TREASURY_URL") or raw.get("treasury_url") or base.treasury_url,
         advertise_url=raw.get("advertise_url") or None,
-        bard_url=os.getenv("BARD_URL") or base.bard_url,
-        scribe_url=os.getenv("SCRIBE_URL") or base.scribe_url,
-        reader_url=os.getenv("READER_URL") or base.reader_url,
         agents_registry_path=Path(os.getenv("AGENTS_REGISTRY_PATH") or base.agents_registry_path),
         agents_registry_url=os.getenv("AGENTS_REGISTRY_URL") or None,
         data_dir=data_dir,

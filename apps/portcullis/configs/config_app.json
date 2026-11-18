@@ -3,7 +3,6 @@
   "port": 29601,
   "session_cookie_name": "ember_session",
   "cookie_secure": false,
-  "scribe_url": "http://127.0.0.1:29401",
   "db_gateway": {
     "instance": "ember",
     "connection": "data"

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from pathlib import Path
 
@@ -38,10 +37,3 @@ def load_env_secrets(path: str | Path) -> dict[str, str]:
     if not _ensure_from_example(path):
         return {}
     return {**{k: v for k, v in dotenv_values(path).items() if v is not None}, **root_overrides(path.parent)}
-
-
-def service_token(path: str | Path, name: str) -> str:
-    """The token a tool service (Bard, Scribe...) issued to this app: `<NAME>_TOKEN` from the environment, else the secret file.
-    Tool services keep their own per-caller tokens, and never reuse service assertions. "" = not configured."""
-    key = f"{name.upper()}_TOKEN"
-    return os.getenv(key) or load_env_secrets(path).get(key) or ""

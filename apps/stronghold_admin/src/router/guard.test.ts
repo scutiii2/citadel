@@ -29,4 +29,8 @@ describe("resolveGuard", () => {
     expect(resolveGuard({ name: "login", fullPath: "/login", guestOnly: true }, only)).toEqual(home);
     expect(resolveGuard({ name: "no-access", fullPath: "/no-access" }, first)).toEqual({ path: "/usage" });
   });
+  it("opens usage settings for settings managers", () => {
+    expect(resolveGuard({ name: "login", fullPath: "/login", guestOnly: true }, holds("settings.manage")))
+      .toEqual({ path: "/usage-settings" });
+  });
 });

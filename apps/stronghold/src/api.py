@@ -7,10 +7,8 @@ from contextlib import asynccontextmanager
 from dataclasses import asdict
 
 import logging
-import os
 
 import httpx
-from dotenv import dotenv_values
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -20,16 +18,12 @@ from src.extensions import routes as extensions_routes
 from src.extensions.probe import ExtensionProbe
 from src.agents.gateway import AgentGateway, McpAgentGateway
 from src.attachments import routes as attachments_routes
-from src import tool_tokens
 from src.usage import settings_routes as usage_settings_routes
-from src import tool_token_routes
-from src.attachments import services as tool_services
-from src.attachments.services import ArmoryUploads
+from src.attachments.services import ArmoryConnections, ArmoryUploads
 from src.bard import routes as bard_routes
 from src.brains import routes as brains_routes
 from src.brains.connections import BrainError
 from src.brains.gateway import BrainGateway
-from pathlib import Path
 from src.citadel_auth import Keyring, ServiceAuthMiddleware, ServiceCatalog, CatalogTransport, logical_url, advertised_url, from_env
 from src.citadel_auth.treasury import register_in_background
 from src.chats import routes as chats_routes
@@ -65,17 +59,16 @@ from src.turns.logs import PlatformLogs
 from src.usage.settings import Pricing
 
 _TIMEOUT = httpx.Timeout(15.0, connect=5.0)
-ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 
 
 def create_app(
     keyring: Keyring | None = None, settings: Settings | None = None, *,
     store: DocumentStore | None = None, platform: PortcullisClient | None = None,
     armory: httpx.AsyncClient | None = None, agent_gateway: AgentGateway | None = None,
-    tools: dict[str, httpx.AsyncClient] | None = None, legion: httpx.AsyncClient | None = None,
+    legion: httpx.AsyncClient | None = None,
 ) -> FastAPI:
     """Service authentication is mandatory; tests inject isolated signing identities.
-    `store`, `platform`, `armory`, `agent_gateway` and `tools` (clients for "bard", "scribe" and "reader") and `legion` are injected by tests;
+    `store`, `platform`, `armory`, `agent_gateway` and `legion` may be injected by tests;
     otherwise they are HTTP clients built at start."""
     settings = settings or load_settings()
     keyring = keyring or from_env("stronghold", data_dir=settings.data_dir)
@@ -120,23 +113,8 @@ def create_app(
         app.state.ticket_unread = TicketUnread(app.state.store)
         app.state.limits = LimitsStore(app.state.store)
         app.state.legion = LegionTuning(legion or http(""), app.state.agents, keyring)
-        tools_in = tools or {}
-        env = dotenv_values(ENV_PATH) if tools is None and ENV_PATH.exists() else {}  # tests inject `tools` and read no .env
-
-        settings_db = settings.data_dir / "settings.db"
-        env_tokens = {name: os.getenv(f"{name.upper()}_TOKEN") or env.get(f"{name.upper()}_TOKEN") or None
-                      for name in tool_tokens.NAMES}
-        app.state.env_tokens = env_tokens
-
-        def service_token(name: str) -> str | None:
-            # Tool services issue their own tokens; the shared internal token is no fallback.
-            # A token saved on the Tool services page wins over the environment's.
-            return tool_tokens.token_for(settings_db if tools is None else None, name, env_tokens[name])
-
         app.state.uploads = ArmoryUploads(armory_client, keyring)
-        app.state.scribe = tool_services.scribe(tools_in.get("scribe") or http(settings.scribe_url), service_token("scribe"))
-        app.state.reader = tool_services.reader(tools_in.get("reader") or http(settings.reader_url), service_token("reader"))
-        app.state.bard = tool_services.bard(tools_in.get("bard") or http(settings.bard_url), service_token("bard"))
+        app.state.connections = ArmoryConnections(armory_client, keyring)
         app.state.shares = ShareStore(app.state.store)
         app.state.chats = ChatStore(app.state.store, app.state.shares)
         app.state.pricing = Pricing(settings.pricing)
@@ -185,7 +163,6 @@ def create_app(
     app.include_router(shares_routes.router)
     app.include_router(tickets_routes.router)
     app.include_router(usage_settings_routes.router)
-    app.include_router(tool_token_routes.router)
     app.include_router(tickets_routes.admin_router)
     app.include_router(triage_routes.router)
     app.include_router(turns_routes.router)

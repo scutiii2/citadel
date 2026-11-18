@@ -17,8 +17,8 @@ POLICY = {
         "armory": Rule(("/brains/resolve", "/notes", "/memory", "/skills", "/tickets"), True),
     },
     "armory": {
-        "portcullis": Rule(("/mcp", "/upload", "/download", "/media", "/pdf", "/admin", "/capabilities", "/extensions", "/commands", "/tickets/tags"), True),
-        "stronghold": Rule(("/mcp", "/skills", "/memory", "/notes", "/tickets", "/ticket-admin", "/upload", "/brains/operation"), True),
+        "portcullis": Rule(("/mcp", "/upload", "/download", "/media", "/pdf", "/admin", "/capabilities", "/extensions", "/commands", "/tickets/tags", "/connections"), True),
+        "stronghold": Rule(("/mcp", "/skills", "/memory", "/notes", "/tickets", "/ticket-admin", "/upload", "/brains/operation", "/connections"), True),
         "legion": Rule(("/mcp",), True),
     },
     "legion": {

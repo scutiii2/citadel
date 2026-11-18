@@ -12,10 +12,12 @@
 | `WS /api/attachments/dictate/stream` | session cookie + `files.upload` | Same-origin binary mono 16 kHz PCM16 and JSON `{"type":"stop"}`; returns `{type:"partial"|"final", text}` events. Scribe capacity closes with 1013 so the browser can use HTTP previews. |
 | `POST /api/bard/speak` | `tools.execute` + `files.download` | JSON `{text, voice?}`; returns `{file_id, duration_s, voice}`. Logs `bard.speak` without spoken text. |
 | `GET /api/bard/voices` | `tools.execute` + `files.download` | Returns `{voices: string[]}` for installed voices only. |
+| `GET /api/bard/audio/{id}` | `tools.execute` + `files.download` | Streams owned Bard audio from Armory and forwards Range. |
+| `GET /api/connection-status` | signed-in account | Returns readiness and a safe configuration reason for Bard, Scribe, and Reader. |
 
-Since Plan 5.7 Stronghold sends attached files, dictation and speech requests to Scribe, Reader, Bard and Armory; Portcullis checks the login and permission, passes the JSON on, and keeps only the streams (attachment content, the dictation WebSocket) and passes Bard audio through from Stronghold (`GET /bard/audio/{id}`, with Range), so Portcullis holds no Bard token. Speech gateways supply account identity and the service's own token: `BARD_TOKEN` / `SCRIBE_TOKEN` / `READER_TOKEN` (environment, else `.env`, or saved in Stronghold Admin, Tool services; Stronghold holds all three, Portcullis only `SCRIBE_TOKEN` for dictation), made on that tool service's admin page (Tokens card) and sent as `X-Internal-Token`. Tool services keep per-caller tokens; leave a token empty only for a tool service with no admin password (open, loopback). Rejected audio/text remains 400, quota/size 413 and unreachable services or refused credentials become 502. Existing audio upload and Bard streaming routes retain their contracts.
+Portcullis checks login and permissions and forwards the JSON features to Stronghold. It opens attachment previews, Bard audio, and live dictation directly against Armory with signed service and requester assertions. Armory holds the tool-service addresses and per-caller tokens. Rejected audio or text returns 400, quota and size errors return 413, and unavailable services or refused credentials return 502.
 
-Live dictation allows one stream per account per portcullis process, with at most
+Armory allows one live dictation stream per account, with at most
 64,000 bytes per PCM frame, 150 seconds of audio, 15 seconds idle while recording,
 120 seconds awaiting the final result and 270 seconds total connection lifetime.
 Completed streams log `attachments.dictate` with the byte count, before delivering
@@ -28,7 +30,7 @@ the connection. The security middleware reads `X-Forwarded-Proto` only from a
 `trusted_proxies` peer (as for HTTP) and applies the IP allow/deny lists to
 WebSocket handshakes, so an HTTPS browser origin behind the proxy is accepted. Ember compares both origin scheme and authority; rewriting
 the host or losing the HTTPS scheme causes the handshake to be refused. Keep the
-internal Scribe URL and token on portcullis; the browser connects only to Ember.
+Scribe address and token in Armory Admin. The browser connects to Portcullis.
 
 ## Triage strategy
 

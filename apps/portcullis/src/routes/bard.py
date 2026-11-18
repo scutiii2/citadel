@@ -1,17 +1,14 @@
-"""Speech from Bard, through Stronghold: it holds Bard's connection and token, so Portcullis keeps none.
-
-Stronghold (`apps/stronghold/src/bard`) asks Bard for the speech, the voice list and the finished audio file.
-The file is streamed through here, with the browser's Range header, so the player can seek.
-"""
+"""Stronghold handles speech and voice requests. Armory streams Bard audio directly."""
 from __future__ import annotations
 
-import httpx
+import json
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
 from fastapi.responses import StreamingResponse
 
 from src.deps import get_stronghold, require_permission
 from src.models import Account
 from src.routes.stronghold import pass_on
+from src.services.armory_streams import ArmoryStreams
 from src.services.stronghold_forwarder import StrongholdForwarder
 
 router = APIRouter(prefix="/api/bard", tags=["bard"])
@@ -47,17 +44,29 @@ async def audio(
     file_id: str = Path(pattern=ID),
     account: Account = Depends(require_permission("tools.execute")),
     _transfer: Account = Depends(require_permission("files.download")),
-    stronghold: StrongholdForwarder = Depends(get_stronghold),
 ) -> StreamingResponse:
-    range_header = request.headers.get("range")
-    response = await stronghold.open_stream(
-        f"/bard/audio/{file_id}", account, headers={"Range": range_header} if range_header else None)
+    state = request.app.state
+    streams = ArmoryStreams(state.upstream, state.catalog, state.keyring)
+    response = await streams.open_audio(file_id, account, request.headers.get("range"))
     if response.status_code not in (200, 206):
-        await response.aread()
-        await response.aclose()
-        if response.status_code in (404, 416):
-            raise HTTPException(response.status_code, "The audio expired or is unavailable.")
-        raise HTTPException(502, "Audio is unavailable; check Stronghold's Bard connection.")
+        try:
+            if response.status_code in (404, 416):
+                raise HTTPException(response.status_code, "The audio expired or is unavailable.")
+            if response.status_code == 502:
+                body = bytearray()
+                try:
+                    async for chunk in response.aiter_bytes(chunk_size=4096):
+                        if len(body) + len(chunk) > 4096:
+                            break
+                        body.extend(chunk)
+                    detail = json.loads(body).get("detail")
+                except (ValueError, AttributeError):
+                    detail = None
+                if isinstance(detail, str) and detail:
+                    raise HTTPException(502, detail)
+            raise HTTPException(502, "Bard audio is unavailable. Check Armory Admin, Connections.")
+        finally:
+            await response.aclose()
 
     async def chunks():
         try:

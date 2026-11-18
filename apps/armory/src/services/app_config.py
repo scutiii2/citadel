@@ -12,6 +12,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from src.citadel_auth import settings_store
+from src.services.connections import ConnectionStore, extension_entry
 
 
 
@@ -248,7 +249,8 @@ def _email_config(section: dict[str, Any], config_path: Path) -> EmailConfig:
 
 def _extensions_section(config_path: Path) -> dict[str, Any]:
     """The raw extensions mapping from the settings store, placeholders still unresolved."""
-    return settings_store.read_all(config_path, "extensions")
+    return {name: extension_entry(record) for name, record in ConnectionStore(config_path).records().items()
+            if record["mcp"] and record["enabled"]}
 
 
 def _build_extension(id_: str, entry: Any, *, config_path: Path) -> ExtensionConfig:
@@ -346,7 +348,7 @@ def load_extension_config(config_path: Path, id_: str) -> ExtensionConfig:
     return _build_extension(id_, section[id_], config_path=config_path)
 
 
-def save_extension_config(config_path: Path, config: ExtensionConfig) -> None:
+def save_extension_config(config_path: Path, config: ExtensionConfig, *, create: bool = False) -> str:
     """Insert or overwrite one extension in the settings store, leaving every other one untouched.
     Writes only the transport's fields. ``headers`` (an upstream's own token, pasted on the Extensions page) are
     kept as given: the database lives in the gitignored `.data/` folder, like the other saved connections."""
@@ -365,13 +367,13 @@ def save_extension_config(config_path: Path, config: ExtensionConfig) -> None:
         entry["args"] = config.args
     if config.web_url:
         entry["web_url"] = config.web_url
-    settings_store.put(config_path, "extensions", config.id, entry)
+    return ConnectionStore(config_path).save_legacy_mcp(config.id, entry, create=create)
 
 
 def delete_extension_config(config_path: Path, extension_id: str) -> None:
     """Remove one extension from the settings store.
     Idempotent: removing an absent id is not an error."""
-    settings_store.delete(config_path, "extensions", extension_id)
+    ConnectionStore(config_path).remove_legacy_mcp(extension_id)
 
 
 # --- capabilities ---

@@ -1,5 +1,5 @@
 import type { CommandInfo } from "../api/CommandsClient";
-import { EXTENSION_SEPARATOR } from "../api/ExtensionsClient";
+const EXTENSION_SEPARATOR = "__";
 
 /** Slash command per tool name: built-in commands from the registry, plus
  * "/<extension> <tool>" for each tool of a shared extension. */
