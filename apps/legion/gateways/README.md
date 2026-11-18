@@ -23,7 +23,7 @@ wrapper keys. For example, `anthropic/claude.json`:
 
 Files in `anthropic/` and `openai/` hold only `label`, `prompt_cache`, `model` and `models`. Their connection and key are saved in ConversationGateway (`AI/ModelProviders/ConversationGateway`, admin page `/admin/gateways.html`) under the same id as the filename.
 
-A model id may be an `{ENV_VAR_NAME}` placeholder (Azure deployment names); the value belongs in `../.env`. An `anthropic`
+A model id `tier:<tier>` (`tier:light`, `tier:standard`, `tier:heavy`, or `tier:default` for the gateway's own model) means the model name is saved in ConversationGateway for that tier (Gateways page). Legion sends the tier, not a name; `azure` and `vllm` work this way. A model id may also be an `{ENV_VAR_NAME}` placeholder; the value belongs in `../.env`. An `anthropic`
 gateway that serves Claude models can set `"prompt_cache": true` to cache its system prompt,
 tool list and conversation so far between calls (leave it off for gateways that route to other models). Optional `models`
 defines the `light`, `standard`, `heavy`, and `extreme` tiers. Agent files keep their

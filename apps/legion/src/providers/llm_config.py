@@ -101,47 +101,11 @@ def _publish_missing(path: Path, content: str) -> None:
             temporary.unlink(missing_ok=True)
 
 
-MODELS_TABLE = "models"
-
-
-def _stored_models() -> dict[str, Any]:
-    """The model names an administrator saved (Legion admin > Model names); empty when none or unreadable."""
-    from src.citadel_auth import settings_store
-    from src.runtime.config_files import SETTINGS_DB
-
-    try:
-        return settings_store.read_all(SETTINGS_DB, MODELS_TABLE)
-    except Exception:  # noqa: BLE001 - a broken settings file must not stop a gateway from loading
-        return {}
-
-
-def placeholders() -> list[str]:
-    """Every {NAME} a gateway file leaves for the administrator to fill (deployment names, served model names)."""
-    names: set[str] = set()
-
-    def walk(value: Any) -> None:
-        if isinstance(value, str):
-            match = _PLACEHOLDER.match(value)
-            if match:
-                names.add(match.group(1))
-        elif isinstance(value, dict):
-            for item in value.values():
-                walk(item)
-        elif isinstance(value, list):
-            for item in value:
-                walk(item)
-
-    walk(load_gateways())
-    return sorted(names)
-
-
-def _resolve(value: Any, stored: dict[str, Any] | None = None) -> Any:
+def _resolve(value: Any) -> Any:
     if isinstance(value, str):
         match = _PLACEHOLDER.match(value)
         if match:
-            name = match.group(1)
-            saved = (stored if stored is not None else _stored_models()).get(name)
-            return (saved if isinstance(saved, str) and saved else None) or os.getenv(name) or None
+            return os.getenv(match.group(1)) or None
     return value
 
 
@@ -151,8 +115,7 @@ def gateway(provider: str, gateway_name: str) -> dict[str, Any]:
     that var is unset). Raises KeyError if provider/gateway_name isn't in
     gateways/."""
     block = load_gateways()[provider][gateway_name]
-    stored = _stored_models()
-    return {key: _resolve(value, stored) for key, value in block.items()}
+    return {key: _resolve(value) for key, value in block.items()}
 
 
 @dataclass(frozen=True)

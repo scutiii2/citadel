@@ -111,13 +111,6 @@ export interface McpServer {
   auth?: { type: string; env_var?: string; header_name?: string; header_value?: string; has_value?: boolean };
 }
 
-/** One open model name of a gateway preset ({NAME} placeholder) and the value saved for it. */
-export interface ModelName {
-  name: string;
-  value: string;
-  stored: boolean;
-}
-
 /** portcullis's /api/admin/agents (needs agents.manage), which ai_agent validates and applies. */
 export const agentsAdminClient = {
   gateways: async () => (await apiRequest<{ providers: ProviderCatalog }>("GET", "/api/admin/agents/gateways")).providers,
@@ -139,10 +132,6 @@ export const agentsAdminClient = {
   saveServer: (id: string, entry: McpServer) =>
     apiRequest<{ saved: string }>("PUT", `/api/admin/servers/${encodeURIComponent(id)}`, entry),
   removeServer: (id: string) => apiRequest<{ deleted: string }>("DELETE", `/api/admin/servers/${encodeURIComponent(id)}`),
-  modelNames: async () => (await apiRequest<{ models: ModelName[] }>("GET", "/api/admin/model-names")).models,
-  /** A null value removes the saved name. An agent uses a change when it next starts. */
-  setModelNames: async (changes: Record<string, string | null>) =>
-    (await apiRequest<{ models: ModelName[] }>("PUT", "/api/admin/model-names", changes)).models,
   prompts: () => apiRequest<SharedPrompts>("GET", "/api/admin/agent-prompts"),
   /** `null` (or blank) resets a text to its default. ai_agent restarts every agent to apply it. */
   setPrompts: (changes: Record<string, string | null>) => apiRequest<SharedPrompts>("PUT", "/api/admin/agent-prompts", changes),
