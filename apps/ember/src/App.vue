@@ -5,6 +5,7 @@ import { RouterView, useRoute, useRouter } from "vue-router";
 import NavRail from "./components/layout/NavRail.vue";
 import { usePageVisibilityStore } from "./stores/navigation/pageVisibility";
 import { useAuthStore } from "./stores/auth";
+import { onServerLost } from "./utils/server";
 
 const auth = useAuthStore();
 usePageVisibilityStore();
@@ -41,7 +42,13 @@ onBeforeUnmount(() => {
 // The session can end mid-page (expired, or logged out elsewhere): any 401
 // clears the account, and this sends the user back to the login page.
 watch(account, (now) => {
-  if (!now && !route.meta.guestOnly && !route.meta.public) void router.replace({ name: "login" });
+  if (!now && !route.meta.guestOnly && !route.meta.public && !route.meta.connect) void router.replace({ name: "login" });
+});
+
+// Windows app: when a call cannot reach the server, go back to the connect screen and return here after.
+onServerLost(() => {
+  if (route.meta.connect) return;
+  void router.replace({ name: "connect", query: { redirect: route.fullPath } });
 });
 </script>
 

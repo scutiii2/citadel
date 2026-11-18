@@ -3,11 +3,14 @@ import { useAuthStore } from "../stores/auth";
 import ChatView from "../features/chat/views/ChatView.vue";
 import { commandsClient } from "../api/tools/CommandsClient";
 import { NATIVE_CAPABILITY_ROUTES } from "./capabilityPages";
+import { ensureServer, isDesktop } from "../utils/server";
 
 declare module "vue-router" {
   interface RouteMeta {
     /** Reachable without logging in (login, register). */
     guestOnly?: boolean;
+    /** The Windows app's connect screen: open before a server has answered. */
+    connect?: boolean;
     /** Open to everyone, logged in or not, and left as it is: a shared chat. */
     public?: boolean;
     /** The ember_api permission the page needs; a list = any one of them. */
@@ -115,6 +118,7 @@ export const router = createRouter({
       component: () => import("../features/account/AccountView.vue"),
       meta: { anyAccount: true },
     },
+    { path: "/connect", name: "connect", component: () => import("../features/auth/views/ConnectView.vue"), meta: { connect: true } },
     { path: "/login", name: "login", component: () => import("../features/auth/views/LoginView.vue"), meta: { guestOnly: true } },
     {
       path: "/register",
@@ -137,6 +141,11 @@ export const router = createRouter({
 // Access rules. ember_api enforces every one of these itself; the guard only
 // keeps the UI from showing pages whose calls would be refused.
 router.beforeEach(async (to): Promise<true | RouteLocationRaw> => {
+  // Windows app: nothing opens until the saved server has answered. The connect screen is the only way past.
+  if (to.meta.connect) return true;
+  if (isDesktop() && !(await ensureServer())) {
+    return { name: "connect", query: to.fullPath === "/" ? {} : { redirect: to.fullPath } };
+  }
   // A shared chat is read by anyone holding the link: no login, and no
   // redirect for someone who is logged in either.
   if (to.meta.public) return true;

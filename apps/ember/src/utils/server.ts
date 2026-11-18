@@ -52,6 +52,74 @@ export function hasServer(): boolean {
   return !isDesktop() || serverBase() !== "";
 }
 
+// The origin that answered the health check in this run of the app. A saved address is not trusted until it
+// has answered; "" means unchecked, or lost since.
+let verifiedOrigin = "";
+let lastError = "";
+let lostHandler: (() => void) | null = null;
+
+export type ServerCheck = { ok: true; origin: string } | { ok: false; error: string };
+
+/** Asks `value`'s `/api/health` once. Saves nothing. This is the only place that fetches before an address is saved. */
+export async function checkServer(value: string, timeoutMs = 6000): Promise<ServerCheck> {
+  const origin = normalizeServerUrl(value);
+  if (!origin) return { ok: false, error: "Enter the server address, like http://192.168.1.5:29601 or https://ember.example." };
+  try {
+    const response = await fetch(`${origin}/api/health`, { credentials: "omit", signal: AbortSignal.timeout(timeoutMs) });
+    if (!response.ok) return { ok: false, error: `The server answered HTTP ${response.status}. Is this the Portcullis address?` };
+    const body: unknown = await response.json().catch(() => null);
+    if ((body as { status?: unknown } | null)?.status !== "ok") return { ok: false, error: "That address answers, but it is not an Ember server." };
+    return { ok: true, origin };
+  } catch {
+    return { ok: false, error: `Could not reach ${origin}. Check the address, that the server is running and that this PC can reach it.` };
+  }
+}
+
+/** Checks `value` and, only if the server answers, saves it as the server. */
+export async function connectServer(value: string): Promise<ServerCheck> {
+  const result = await checkServer(value);
+  if (result.ok) {
+    write(URL_KEY, result.origin);
+    verifiedOrigin = result.origin;
+    lastError = "";
+  } else {
+    lastError = result.error;
+  }
+  return result;
+}
+
+/** True when the app may go on: always in the browser, in the Windows app once the saved server has answered. */
+export function isServerReady(): boolean {
+  return !isDesktop() || (serverBase() !== "" && verifiedOrigin === serverBase());
+}
+
+/** Checks the saved server (if any) once per run; resolves to whether the app may go on. */
+export async function ensureServer(): Promise<boolean> {
+  if (isServerReady()) return true;
+  const saved = serverBase();
+  if (!saved) return false;
+  const result = await checkServer(saved);
+  if (result.ok) { verifiedOrigin = result.origin; lastError = ""; } else lastError = result.error;
+  return result.ok;
+}
+
+/** Why the last check failed, for the connect screen. */
+export function serverError(): string {
+  return lastError;
+}
+
+/** A call could not reach the server: the app goes back to the connect screen. */
+export function reportServerLost(): void {
+  if (!isDesktop() || verifiedOrigin === "") return;
+  verifiedOrigin = "";
+  lastError = `Lost the connection to ${serverBase()}.`;
+  lostHandler?.();
+}
+
+export function onServerLost(handler: () => void): void {
+  lostHandler = handler;
+}
+
 /** `/api/...` becomes an absolute URL in the Windows app, stays relative in the browser. */
 export function apiUrl(path: string): string {
   return serverBase() + path;

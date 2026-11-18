@@ -52,6 +52,12 @@ export const useAuthStore = defineStore("auth", () => {
     return loaded;
   }
 
+  /** Forget who was logged in, e.g. after the server address changed. The next `ensureLoaded` asks again. */
+  function reset(): void {
+    account.value = null;
+    loaded = null;
+  }
+
   /** Re-reads the account, e.g. after an admin changed its roles. */
   async function refresh(): Promise<void> {
     account.value = await authClient.me();
@@ -101,5 +107,5 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  return { account, needsVerification, promptSuggestions, hasPermission, ensureLoaded, refresh, login, register, verifyEmail, resendVerification, changeEmail, changePassword, setPromptSuggestions, logout };
+  return { account, needsVerification, promptSuggestions, hasPermission, ensureLoaded, reset, refresh, login, register, verifyEmail, resendVerification, changeEmail, changePassword, setPromptSuggestions, logout };
 });

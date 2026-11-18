@@ -8,7 +8,7 @@ const features = join(dirname(fileURLToPath(import.meta.url)), "features");
 const views = readdirSync(features, { recursive: true })
   .filter((name): name is string => typeof name === "string" && name.endsWith("View.vue"));
 const EXEMPT = new Set([
-  "ChatView.vue", "LoginView.vue", "RegisterView.vue", "VerifyEmailView.vue",
+  "ChatView.vue", "LoginView.vue", "ConnectView.vue", "RegisterView.vue", "VerifyEmailView.vue",
   "NoAccessView.vue", "SharedChatView.vue",
 ]);
 

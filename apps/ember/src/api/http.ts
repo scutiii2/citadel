@@ -1,4 +1,4 @@
-import { apiUrl, authHeaders, credentialsMode, hasServer } from "../utils/server";
+import { apiUrl, authHeaders, credentialsMode, hasServer, isDesktop, reportServerLost } from "../utils/server";
 
 /** JSON calls to Portcullis's REST routes: same origin with the session cookie in the browser, the configured server with a bearer token in the Windows app. */
 
@@ -68,7 +68,17 @@ export async function apiRequest<T>(
     init.body = JSON.stringify(body ?? {});
   }
   if (Object.keys(sent).length > 0) init.headers = sent;
-  const response = await fetch(apiUrl(path), init);
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(path), init);
+  } catch (err) {
+    // Windows app: a network failure means the server is gone, so go back to the connect screen. Aborts pass through.
+    if (isDesktop() && err instanceof TypeError) {
+      reportServerLost();
+      throw new ApiError(0, "Cannot reach the server. Check your network and the server address.");
+    }
+    throw err;
+  }
   if (response.status === 204) return undefined as T;
   const data: unknown = await response.json().catch(() => null);
   if (!response.ok) {
