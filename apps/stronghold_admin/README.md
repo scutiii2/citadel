@@ -2,7 +2,7 @@
 
 Admin web app for Stronghold, built with Vue 3, TypeScript and Vite. It runs on port 26504 (`STRONGHOLD_ADMIN_PORT`) and talks only to [portcullis](../portcullis) over the same origin: its Vite server (and its nginx in Docker) forwards `/api` to Portcullis, so the browser holds no server URL or token.
 
-Pages: Usage, Analytics (logs, errors, chat activity, traffic), Tickets and Tool services. Calls: `/api/admin/usage`, `/api/logs`, `/api/traffic/analytics`, `/api/admin/tickets`, `/api/admin/ticket-groups`. Usage and Tickets data comes from `stronghold`; logs and traffic are Portcullis's own.
+Pages: Usage, Analytics (logs, errors, chat activity, traffic), Tickets, and Usage settings. Calls: `/api/admin/usage`, `/api/logs`, `/api/traffic/analytics`, `/api/admin/tickets`, `/api/admin/ticket-groups`, `/api/admin/stronghold-usage-settings`. Usage and Tickets data comes from `stronghold`; logs and traffic are Portcullis's own.
 
 ## Run
 
