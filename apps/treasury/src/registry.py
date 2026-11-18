@@ -133,8 +133,11 @@ class InstanceManager:
         unknown = [member for member in members if member not in self._registry.names()]
         if unknown:
             raise UnknownConnection(", ".join(unknown))
+        wanted = tuple(dict.fromkeys(members))
         old = self._instances.get(name)
-        self._instances[name] = Instance(name, tuple(dict.fromkeys(members)), self._registry)
+        if old is not None and old.connection_names == wanted:
+            return  # a service registers at every start; replacing the instance would close a connection requests are using
+        self._instances[name] = Instance(name, wanted, self._registry)
         if old is not None:
             await old.close()
 
