@@ -47,32 +47,9 @@ def test_put_validates_saves_and_delete_removes(client, db):
     assert client.get("/agents/servers").json() == {"servers": {}}
 
 
-def test_model_names_are_listed_saved_used_by_gateways_and_removable(client, db, monkeypatch):
-    from src.providers import llm_config
-
-    monkeypatch.delenv("VLLM_MODEL_DEFAULT", raising=False)
-    names = {row["name"]: row for row in client.get("/agents/models").json()["models"]}
-    assert "VLLM_MODEL_DEFAULT" in names and "AZURE_OPENAI_DEPLOYMENT_HEAVY" in names
-    assert names["VLLM_MODEL_DEFAULT"] == {"name": "VLLM_MODEL_DEFAULT", "value": "", "stored": False}
-
-    saved = client.put("/agents/models", json={"VLLM_MODEL_DEFAULT": " llama-3 "})
-
-    assert saved.status_code == 200 and saved.json()["applies"] == "next agent start"
-    assert llm_config.gateway("openai", "vllm")["model"] == "llama-3"
-    monkeypatch.setenv("VLLM_MODEL_DEFAULT", "from-env")
-    assert llm_config.gateway("openai", "vllm")["model"] == "llama-3"  # a saved name wins over the environment
-
-    assert client.put("/agents/models", json={"VLLM_MODEL_DEFAULT": None}).status_code == 200
-    assert llm_config.gateway("openai", "vllm")["model"] == "from-env"
-
-
-def test_a_bad_model_name_change_saves_nothing(client, db):
-    for bad in ({}, {"NOT_A_NAME": "x"}, {"VLLM_MODEL_DEFAULT": "  "}, {"VLLM_MODEL_DEFAULT": "x" * 201}):
-        assert client.put("/agents/models", json=bad).status_code == 400
-    refused = client.put("/agents/models", json={"VLLM_MODEL_LIGHT": "ok", "NOT_A_NAME": "x"})
-
-    assert refused.json()["error"] == "Unknown model name: NOT_A_NAME."
-    assert settings_store.read_all(db, "models") == {}
+def test_the_model_name_routes_are_removed(client):
+    assert client.get("/agents/models").status_code == 404
+    assert client.put("/agents/models", json={"VLLM_MODEL_DEFAULT": "x"}).status_code == 404
 
 
 def test_the_treasury_address_routes_are_removed(client):

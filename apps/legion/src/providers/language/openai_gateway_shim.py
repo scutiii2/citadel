@@ -104,10 +104,19 @@ def _messages(items: list[Any]) -> tuple[str, list[dict[str, Any]]]:
     return "\n\n".join(part for part in system if part), out
 
 
+TIER_PREFIX = "tier:"
+
+
 def request_body(gateway: str, kwargs: dict[str, Any]) -> dict[str, Any]:
     """The gateway chat body for one `responses.stream(...)` / `responses.create(...)` call."""
     system, messages = _messages(kwargs["input"])
-    body: dict[str, Any] = {"gateway": gateway, "model": kwargs["model"], "max_tokens": kwargs["max_output_tokens"]}
+    body: dict[str, Any] = {"gateway": gateway, "max_tokens": kwargs["max_output_tokens"]}
+    model = kwargs["model"]
+    if model.startswith(TIER_PREFIX):  # "tier:light": the gateway owns the name; "tier:default" asks for its own model
+        if model != TIER_PREFIX + "default":
+            body["tier"] = model[len(TIER_PREFIX):]
+    else:
+        body["model"] = model
     if system:
         body["system"] = system
     body["messages"] = messages

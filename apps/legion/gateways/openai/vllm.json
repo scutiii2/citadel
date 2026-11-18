@@ -1,17 +1,17 @@
 {
   "label": "vLLM",
-  "model": "{VLLM_MODEL_DEFAULT}",
+  "model": "tier:default",
   "models": {
     "light": {
-      "id": "{VLLM_MODEL_LIGHT}",
+      "id": "tier:light",
       "use_for": "lookups, extraction, short rewrites, simple formatting"
     },
     "standard": {
-      "id": "{VLLM_MODEL_STANDARD}",
+      "id": "tier:standard",
       "use_for": "most tasks"
     },
     "heavy": {
-      "id": "{VLLM_MODEL_HEAVY}",
+      "id": "tier:heavy",
       "use_for": "multi-step reasoning, hard code or data analysis"
     }
   }

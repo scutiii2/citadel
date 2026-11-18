@@ -125,3 +125,11 @@ def test_create_is_one_sync_reply():
 def test_count_tokens_is_not_offered():
     with pytest.raises(NotImplementedError):
         asyncio.run(GatewayShim("gpt", FakeClient()).responses.input_tokens.count(model="m", input=[]))
+
+
+def test_a_tier_marker_asks_the_gateway_for_its_own_model_name():
+    light = request_body("vllm", base(model="tier:light"))
+    assert light["tier"] == "light" and "model" not in light
+    default = request_body("vllm", base(model="tier:default"))
+    assert "tier" not in default and "model" not in default
+    assert request_body("vllm", base(model="llama-3"))["model"] == "llama-3"

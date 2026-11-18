@@ -511,43 +511,6 @@ async def servers_delete(request: Request) -> JSONResponse:
     return JSONResponse({"deleted": server_id, "applies": "next start"})
 
 
-def _models_view() -> dict[str, Any]:
-    from src.providers import llm_config
-
-    saved = settings_store.read_all(config_files.SETTINGS_DB, llm_config.MODELS_TABLE)
-    return {"models": [{"name": name, "value": saved.get(name, ""), "stored": name in saved}
-                       for name in llm_config.placeholders()]}
-
-
-@mcp.custom_route("/agents/models", methods=["GET"])
-async def models_get(_request: Request) -> JSONResponse:
-    """The model names gateway presets leave open ({NAME} placeholders), with the value saved for each."""
-    return JSONResponse(await asyncio.to_thread(_models_view))
-
-
-@mcp.custom_route("/agents/models", methods=["PUT"])
-async def models_put(request: Request) -> JSONResponse:
-    """Body {NAME: text | null}; null removes the saved name (the environment's value, if any, applies again).
-    Nothing is saved if one change is refused. An agent uses a changed name when it next starts."""
-    from src.providers import llm_config
-
-    changes = await _json_object(request)
-    if not changes:
-        return JSONResponse({"error": "body must be a JSON object with at least one name"}, status_code=400)
-    known = llm_config.placeholders()
-    for name, value in changes.items():
-        if name not in known:
-            return JSONResponse({"error": f"Unknown model name: {name}."}, status_code=400)
-        if value is not None and (not isinstance(value, str) or not value.strip() or len(value) > 200):
-            return JSONResponse({"error": f"{name}: enter the name, or remove it."}, status_code=400)
-    for name, value in changes.items():
-        if value is None:
-            await asyncio.to_thread(settings_store.delete, config_files.SETTINGS_DB, llm_config.MODELS_TABLE, name)
-        else:
-            await asyncio.to_thread(settings_store.put, config_files.SETTINGS_DB, llm_config.MODELS_TABLE, name, value.strip())
-    return JSONResponse({**await asyncio.to_thread(_models_view), "applies": "next agent start"})
-
-
 @mcp.custom_route("/agents/tuning", methods=["GET"])
 async def tuning_get(_request: Request) -> JSONResponse:
     """The editable tuning values: the file's, the admin's changes, and the two merged."""

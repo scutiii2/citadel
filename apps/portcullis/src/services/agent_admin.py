@@ -133,15 +133,6 @@ class AgentAdmin:
     async def delete_server(self, account: Account, server_id: str) -> None:
         await self._request("DELETE", f"/agents/servers/{quote(server_id, safe='')}", account)
 
-    async def model_names(self, account: Account) -> dict[str, Any]:
-        """The open model names of Legion's gateway presets: {models: [{name, value, stored}]}."""
-        body = await self._request("GET", "/agents/models", account)
-        return body if isinstance(body, dict) else {}
-
-    async def set_model_names(self, account: Account, changes: dict[str, Any]) -> dict[str, Any]:
-        body = await self._request("PUT", "/agents/models", account, json=changes)
-        return body if isinstance(body, dict) else {}
-
     async def tuning(self, account: Account) -> dict[str, Any]:
         """legion's editable tuning: {defaults, overrides, effective}."""
         return await self._request("GET", "/agents/tuning", account)

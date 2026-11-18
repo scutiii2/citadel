@@ -237,25 +237,6 @@ async def delete_server(
     return {"deleted": server_id}
 
 
-@prompts_router.get("/model-names")
-async def get_model_names(account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
-    """The model names gateway presets leave open (Azure deployments, vLLM models), with the saved value of each."""
-    return await _call(admin.model_names(account))
-
-
-@prompts_router.put("/model-names")
-async def set_model_names(
-    changes: dict[str, str | None],
-    account: Account = Depends(require_agents_manage),
-    admin: AgentAdmin = Depends(get_agent_admin),
-    logs: LogWriter = Depends(get_log_writer),
-) -> Any:
-    """legion validates and stores the change; an agent uses it when it next starts."""
-    result = await _call(admin.set_model_names(account, changes))
-    await logs.action(account, "agents.model_names", f"Changed model names ({', '.join(sorted(changes)) or 'none'})")
-    return result
-
-
 @prompts_router.get("/agent-prompts")
 async def get_prompts(account: Account = Depends(require_agents_manage), admin: AgentAdmin = Depends(get_agent_admin)) -> Any:
     """The prompt texts every agent shares: `{values, defaults, overridden}`."""

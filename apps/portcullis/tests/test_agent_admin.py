@@ -271,33 +271,9 @@ def test_servers_need_agents_manage(client_factory, email: FakeEmailSender, upst
     assert upstream.requests == []
 
 
-def test_model_names_pass_through_are_admin_only_and_logged(client_factory, email, upstream) -> None:
-    def agent(request: httpx.Request) -> httpx.Response:
-        if request.url.path != "/agents/models":
-            return ai_agent(request)
-        if request.method == "GET":
-            return httpx.Response(200, json={"models": [{"name": "VLLM_MODEL_DEFAULT", "value": "", "stored": False}]})
-        if "NOPE" in json.loads(request.content):
-            return httpx.Response(400, json={"error": "Unknown model name: NOPE."})
-        return httpx.Response(200, json={"models": [], "applies": "next agent start"})
-
-    upstream.handler = agent
-    admin = as_admin(client_factory())
-
-    assert admin.get("/api/admin/model-names").json()["models"][0]["name"] == "VLLM_MODEL_DEFAULT"
-    assert admin.put("/api/admin/model-names", json={"VLLM_MODEL_DEFAULT": "llama"}).status_code == 200
-    assert json.loads(upstream.requests[-1].content) == {"VLLM_MODEL_DEFAULT": "llama"}
-    refused = admin.put("/api/admin/model-names", json={"NOPE": "x"})
-    assert (refused.status_code, refused.json()["detail"]) == (400, "Unknown model name: NOPE.")
-    uid = admin.get("/api/auth/me").json()["id"]
-    logged = " ".join(entry["message"] for entry in admin.get("/api/logs/action", params={"actor": uid}).json())
-    assert "Changed model names (VLLM_MODEL_DEFAULT)" in logged
-
-    member = client_factory()
-    make_member(member, email)
-    login(member, "alice")
-    assert member.get("/api/admin/model-names").status_code == 403
-    assert member.put("/api/admin/model-names", json={"VLLM_MODEL_DEFAULT": "x"}).status_code == 403
+def test_model_name_routes_are_removed(client) -> None:
+    admin = as_admin(client)
+    assert admin.get("/api/admin/model-names").status_code == 404
 
 
 def test_treasury_address_routes_are_removed(client):
