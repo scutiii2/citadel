@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 
@@ -144,6 +145,12 @@ def create_app(
             app.state.chats, app.state.usage, app.state.agent_gateway, settings.usage, PlatformLogs(app.state.platform),
             pricing=app.state.pricing, directory=app.state.agents, keyring=keyring,
             requester_refresh=app.state.platform.requester_token)
+        if registration is not None:
+            # Migrate only once Treasury knows this instance: a cold start would answer 404 and skip the migration.
+            try:
+                await asyncio.wait_for(asyncio.shield(registration), timeout=20)
+            except asyncio.TimeoutError:
+                pass  # shortcut: Treasury is slow to answer, so the migration may fail and is logged below; upgrade with a retry loop
         app.state.schema_version = None
         try:
             app.state.schema_version = (await migrations.migrate(app.state.store))["version"]

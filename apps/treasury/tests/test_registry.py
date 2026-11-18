@@ -63,3 +63,13 @@ async def test_raw_sql_gate():
         await one.sql_backend("a")
     assert await one.sql_backend("b")
     await manager.close()
+
+
+async def test_registering_an_instance_again_with_the_same_connections_keeps_them_open():
+    # A service registers at every start; a request already running on its connection must not be cut off.
+    manager, _ = make_manager([])
+    backend = await manager.get("one").backend("b")
+    await manager.register("one", ("a", "b"))
+    await backend.put("c", "k", {"v": 1})  # raised "Connection closed" while the old instance closed it
+    assert await (await manager.get("one").backend("b")).get("c", "k") == {"v": 1}
+    await manager.close()
