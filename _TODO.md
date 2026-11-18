@@ -130,3 +130,18 @@ Optional follow-up features, not implemented:
 - Update the "Frontend for db_gateway" item above, since the gateway frontend then lives with Treasury.
 
 **Revisit when**: user wants it built. Brainstorm the split first.
+
+## Give the tool and model services their own network (added 2026-11-18)
+
+**Context**: Every service in `AI/ToolServices` (Bard, Converse, Lens, Mimic, Reader, Scribe), every one in `AI/ModelServices` (17 of them) and the two gateways in `AI/ModelProviders` declare `citadel_core` as `external: true`. Citadel's compose creates and owns that network, so these services cannot start unless Citadel has created it, and their traffic crosses Citadel's private network. On the ZimaOS box this already showed: six of them were attached when the old Citadel stack went down, so `docker compose down` could not remove the network. They are meant to be independent.
+
+**Plan** (do it after the fresh Citadel stack has been tested on the box):
+- **Network**: one neutral network `ai_net`, created once with `docker network create ai_net` and declared `external: true` in every compose file, Citadel's included. Do not pin a subnet (Citadel's `core` pins `172.28.0.0/16`). First check on a throwaway pair of compose files whether two projects may both declare a non-external network with the same `name:`; if Compose accepts it, that removes the manual create step.
+- **Citadel**: keep `core` for its own internal traffic. Put `armory`, `legion`, `conversationgateway` and `decisiongateway` on both `core` and `ai_net`, because they are the ones that call the tool and model services by container name (`http://bard:29400`). The other Citadel services stay on `core` only.
+- **Services**: replace the `citadel_core` block in each of the 26 compose files with `ai_net`; names and ports do not change, so stored addresses stay valid. Run it with the `tool-service-parity` and `model-service-parity` skills so all files change the same way. Remove the "start the Citadel stack first" comments.
+- **Scripts and docs**: any `run.bat` or deploy tooling that creates or assumes `citadel_core` runs `docker network create ai_net` if it is missing. Update each service's `docs/guide-docker-*.md`, `docs/deployment.md` of Citadel, the service parity skills, and the vault notes.
+- **Rollout on the box** (one service at a time, a short outage each): create `ai_net`; edit and `docker compose up -d` each service; do Citadel last; then `docker compose down` in Citadel removes `citadel_core` cleanly.
+- **Check**: from `armory` and `legion`, call every service by name; stop Citadel and confirm each service still starts alone; start a service with Citadel down.
+- **Rollback**: put the old `citadel_core` block back and run `docker compose up -d` in that service. The old network stays until Citadel is torn down.
+
+**Revisit when**: the fresh Citadel stack works on the box. Related: "Move Treasury out of Citadel into its own stack", which needs the same shared network.
