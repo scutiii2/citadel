@@ -15,6 +15,7 @@ POLICY = {
     "stronghold": {
         "portcullis": Rule(("/",), True),
         "armory": Rule(("/brains/resolve", "/brains/instance-migration", "/notes", "/memory", "/skills", "/tickets"), True),
+        "legion": Rule(("/mcp",), True),
     },
     "armory": {
         "portcullis": Rule(("/mcp", "/upload", "/download", "/media", "/pdf", "/admin", "/capabilities", "/extensions", "/commands", "/tickets/tags", "/connections"), True),

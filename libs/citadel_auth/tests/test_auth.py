@@ -112,6 +112,7 @@ async def test_unreadable_trust_fails_closed(stack, monkeypatch):
 @pytest.mark.parametrize("audience,caller,path,forward", [
     ("stronghold", "portcullis", "/chat", True),
     ("stronghold", "armory", "/brains/resolve", True),
+    ("stronghold", "legion", "/mcp", True),
     ("armory", "portcullis", "/download/file", True),
     ("armory", "stronghold", "/notes", True),
     ("armory", "legion", "/mcp", True),
