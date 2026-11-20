@@ -11,7 +11,7 @@ because it is itself a server with tools of its own.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +31,14 @@ class AuthConfig:
 
 
 @dataclass(frozen=True)
+class OriginRef:
+    """One address of an outside service: an id from Treasury's catalog and an optional token of its own."""
+
+    origin_id: str
+    header_value: str | None = field(default=None, repr=False)
+
+
+@dataclass(frozen=True)
 class ServerConfig:
     id: str
     label: str
@@ -40,6 +48,9 @@ class ServerConfig:
     command: str | None = None
     args: list[str] | None = None
     auth: AuthConfig | None = None
+    service_id: str | None = None
+    path: str = "/mcp"
+    origins: tuple[OriginRef, ...] = ()
 
 
 _VALID_TRANSPORTS = {"stdio", "http"}
@@ -64,6 +75,14 @@ def _build_auth(server_id: str, raw: dict[str, Any] | None) -> AuthConfig | None
     )
 
 
+def _build_origin(server_id: str, raw: Any) -> OriginRef:
+    origin_id = raw.get("origin_id") if isinstance(raw, dict) else None
+    if not isinstance(origin_id, str) or not origin_id:
+        raise ConfigError(f"{server_id!r}: every origin needs an 'origin_id'")
+    token = raw.get("header_value")
+    return OriginRef(origin_id, token if isinstance(token, str) and token else None)
+
+
 def _build_server(server_id: str, raw: dict[str, Any]) -> ServerConfig:
     transport = raw.get("transport")
     if transport not in _VALID_TRANSPORTS:
@@ -74,19 +93,39 @@ def _build_server(server_id: str, raw: dict[str, Any]) -> ServerConfig:
         raise ConfigError(f"{server_id!r}: 'label' is required")
     description = raw.get("description", "")
 
+    service_id = raw.get("service_id")
+    raw_origins = raw.get("origins")
+    has_origin_fields = "service_id" in raw or "origins" in raw
+    origins: tuple[OriginRef, ...] = ()
+    path = "/mcp"
     if transport == "http":
-        url = raw.get("url")
-        if not url:
-            raise ConfigError(f"{server_id!r}: transport 'http' requires 'url'")
         if raw.get("command"):
             raise ConfigError(f"{server_id!r}: transport 'http' must not set 'command'")
         command, args = None, None
+        if has_origin_fields:
+            if "url" in raw:
+                raise ConfigError(f"{server_id!r}: use either 'url' or 'origins', not both")
+            if not isinstance(service_id, str) or not service_id:
+                raise ConfigError(f"{server_id!r}: 'origins' requires 'service_id'")
+            if not isinstance(raw_origins, list) or not raw_origins:
+                raise ConfigError(f"{server_id!r}: 'service_id' requires at least one origin")
+            origins = tuple(_build_origin(server_id, item) for item in raw_origins)
+            if len({origin.origin_id for origin in origins}) != len(origins):
+                raise ConfigError(f"{server_id!r}: an origin is listed twice")
+            path = raw.get("path", "/mcp")
+            if not isinstance(path, str) or not path.startswith("/") or any(char in path for char in "?# \\"):
+                raise ConfigError(f"{server_id!r}: 'path' must start with / and hold no query or space")
+            url = None
+        else:
+            url = raw.get("url")
+            if not url:
+                raise ConfigError(f"{server_id!r}: transport 'http' requires 'url'")
     else:
         command = raw.get("command")
         if not command:
             raise ConfigError(f"{server_id!r}: transport 'stdio' requires 'command'")
-        if raw.get("url"):
-            raise ConfigError(f"{server_id!r}: transport 'stdio' must not set 'url'")
+        if raw.get("url") or has_origin_fields:
+            raise ConfigError(f"{server_id!r}: transport 'stdio' must not set 'url' or 'origins'")
         url = None
         args = raw.get("args", [])
 
@@ -99,6 +138,9 @@ def _build_server(server_id: str, raw: dict[str, Any]) -> ServerConfig:
         command=command,
         args=args,
         auth=_build_auth(server_id, raw.get("auth")),
+        service_id=service_id if origins else None,
+        path=path,
+        origins=origins,
     )
 
 
@@ -125,11 +167,11 @@ def load_servers_config(path: Path, url_overrides: dict[str, str | Callable[[], 
     # The catalog supplies Armory on fresh installs or when main has no saved URL.
     if url_overrides and "main" in url_overrides:
         main = raw_data.get("main", {"label": "Armory", "transport": "http"})
-        if main.get("transport") == "http" and not main.get("url"):
+        if main.get("transport") == "http" and not main.get("url") and "origins" not in main:
             raw_data["main"] = {**main, "url": resolved(url_overrides["main"])}
     servers = {server_id: _build_server(server_id, raw) for server_id, raw in raw_data.items()}
     for server_id, url in (url_overrides or {}).items():
         config = servers.get(server_id)
-        if config is not None and config.transport == "http":
+        if config is not None and config.transport == "http" and not config.origins:
             servers[server_id] = replace(config, url=url)
     return servers
