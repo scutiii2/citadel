@@ -38,11 +38,11 @@ def token_for(record: dict, origin: dict) -> str:
     return origin.get("header_value") or record["token"]
 
 
-def ready_status(name: str, record: dict) -> dict:
+def ready_status(name: str, record: dict, resolve: Callable[[str], str | None] | None = None) -> dict:
     label = REQUIRED[name]
     if not record["enabled"]:
         return {"ready": False, "reason": f"{label} is disabled in Stronghold Admin."}
-    if not record["origins"]:
+    if not record["origins"] or (resolve is not None and not any(resolve(origin["origin_id"]) for origin in record["origins"])):
         return {"ready": False, "reason": f"Configure {label} in Stronghold Admin."}
     if not all(token_for(record, origin) for origin in record["origins"]):
         return {"ready": False, "reason": f"Set the {label} token in Stronghold Admin."}
@@ -56,5 +56,5 @@ def view(name: str, record: dict, resolve: Callable[[str], str | None]) -> dict:
         "has_token": bool(record["token"]),
         "origins": [{"origin_id": o["origin_id"], "origin": resolve(o["origin_id"]), "has_override": bool(o.get("header_value"))}
                     for o in record["origins"]],
-        **ready_status(name, record),
+        **ready_status(name, record, resolve),
     }

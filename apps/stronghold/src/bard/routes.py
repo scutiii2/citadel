@@ -1,7 +1,6 @@
 """/bard: speech from Bard (tools.execute and files.download at Portcullis).
 
-Stronghold requests speech and the voice list through Armory. Portcullis still streams the finished audio
-file to the browser itself. The log never holds the spoken text.
+Stronghold calls Bard for speech and the voice list. Portcullis relays the finished audio to the browser. The log never holds the spoken text.
 """
 
 from __future__ import annotations
@@ -9,14 +8,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
-from src.attachments.services import ArmoryConnections
 from src.platform import PortcullisClient
 from src.requester import Requester, current_requester
+from src.tool_services.client import ToolServices
 
 router = APIRouter(prefix="/bard", tags=["bard"])
 
 
-def get_connections(request: Request) -> ArmoryConnections:
+def get_connections(request: Request) -> ToolServices:
     return request.app.state.connections
 
 
@@ -40,7 +39,7 @@ class VoicesOut(BaseModel):
 
 
 @router.post("/speak")
-async def speak(body: SpeakIn, who: Requester = Depends(current_requester), connections: ArmoryConnections = Depends(get_connections),
+async def speak(body: SpeakIn, who: Requester = Depends(current_requester), connections: ToolServices = Depends(get_connections),
                 platform: PortcullisClient = Depends(get_platform)) -> SpeakOut:
     """One bounded batch of speech."""
     result = await connections.call("POST", "/connections/bard/speak", {"text": body.text, "voice": body.voice})
@@ -49,6 +48,6 @@ async def speak(body: SpeakIn, who: Requester = Depends(current_requester), conn
 
 
 @router.get("/voices")
-async def voices(who: Requester = Depends(current_requester), connections: ArmoryConnections = Depends(get_connections)) -> VoicesOut:
+async def voices(who: Requester = Depends(current_requester), connections: ToolServices = Depends(get_connections)) -> VoicesOut:
     """Installed voices only; choosing one belongs to the current run."""
     return VoicesOut(**await connections.call("GET", "/connections/bard/voices"))

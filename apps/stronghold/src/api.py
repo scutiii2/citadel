@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+from http.cookiejar import CookieJar, DefaultCookiePolicy
 
 import logging
 
@@ -19,7 +21,7 @@ from src.extensions.probe import ExtensionProbe
 from src.agents.gateway import AgentGateway, McpAgentGateway
 from src.attachments import routes as attachments_routes
 from src.usage import settings_routes as usage_settings_routes
-from src.attachments.services import ArmoryConnections, ArmoryUploads
+from src.attachments.services import ArmoryUploads
 from src.bard import routes as bard_routes
 from src.brains import instance_migration, routes as brains_routes
 from src.brains.connections import BrainError
@@ -48,6 +50,11 @@ from src.templates import routes as templates_routes
 from src.tickets import routes as tickets_routes
 from src.tickets.client import ArmoryTickets, TicketRefused, TicketUnavailable
 from src.tickets.unread import TicketUnread
+from src.tool_services import routes as tool_services_routes
+from src.tool_services.client import ToolServices
+from src.tool_services.dictation import DictationRelay
+from src.tool_services.outside import OutsideRegistry
+from src.tool_services.store import ToolStore
 from src.triage import routes as triage_routes
 from src.tuning import routes as tuning_routes
 from src.tuning.limits import LegionTuning, LimitsStore
@@ -66,10 +73,10 @@ def create_app(
     store: DocumentStore | None = None, platform: PortcullisClient | None = None,
     armory: httpx.AsyncClient | None = None, agent_gateway: AgentGateway | None = None,
     legion: httpx.AsyncClient | None = None,
+    tool_http: httpx.AsyncClient | None = None, tool_origins: Callable[[str], str] | None = None,
 ) -> FastAPI:
     """Service authentication is mandatory; tests inject isolated signing identities.
-    `store`, `platform`, `armory`, `agent_gateway` and `legion` may be injected by tests;
-    otherwise they are HTTP clients built at start."""
+    Tests may inject clients and an outside-origin resolver."""
     settings = settings or load_settings()
     keyring = keyring or from_env("stronghold", data_dir=settings.data_dir)
     log_privacy.install()
@@ -116,7 +123,18 @@ def create_app(
         app.state.limits = LimitsStore(app.state.store)
         app.state.legion = LegionTuning(legion or http(""), app.state.agents, keyring)
         app.state.uploads = ArmoryUploads(armory_client, keyring)
-        app.state.connections = ArmoryConnections(armory_client, keyring)
+        data_settings = settings.data_dir / "settings.db"
+        app.state.tool_store = ToolStore(data_settings)
+        app.state.outside = OutsideRegistry(keyring, catalog)
+        app.state.tool_http = tool_http
+        if tool_http is None:
+            app.state.tool_http = httpx.AsyncClient(timeout=120, trust_env=False)
+            clients.append(app.state.tool_http)
+        # Cookies ignore ports. Keep credentials isolated between outside origins.
+        app.state.tool_http.cookies = CookieJar(policy=DefaultCookiePolicy(allowed_domains=[]))
+        app.state.tool_settings_lock = asyncio.Lock()
+        app.state.connections = ToolServices(app.state.tool_store, app.state.tool_http, tool_origins or catalog.outside_origin)
+        app.state.dictation = DictationRelay()
         app.state.shares = ShareStore(app.state.store)
         app.state.chats = ChatStore(app.state.store, app.state.shares)
         app.state.pricing = Pricing(settings.pricing)
@@ -148,11 +166,12 @@ def create_app(
                 await client.aclose()
 
     app = FastAPI(title="stronghold", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
-    app.add_middleware(ServiceAuthMiddleware, keyring=keyring, audience="stronghold")
+    app.add_middleware(ServiceAuthMiddleware, keyring=keyring, audience="stronghold", websocket_paths=("/speech/dictate",))
     app.include_router(agents_routes.router)
     app.include_router(extensions_routes.router)
     app.include_router(attachments_routes.router)
     app.include_router(bard_routes.router)
+    app.include_router(tool_services_routes.router)
     app.include_router(brains_routes.router)
     app.include_router(instance_migration.router)
     app.include_router(chats_routes.router)

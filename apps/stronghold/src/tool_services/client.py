@@ -201,6 +201,24 @@ class ToolServices:
             headers={"X-Filename": filename, "Content-Type": "application/octet-stream"})
         return await self._finish(feature, *response, deadline=deadline)
 
+    async def stream_target(self, name: str) -> tuple[str, str, dict[str, str]]:
+        """The first healthy origin and the headers a stream to it needs (the token is never logged)."""
+        record = await self._ready_record(name)
+        who = current_requester()
+        if who is None or not who.username:
+            raise HTTPException(400, "Missing requester identity")
+        for origin in self._candidates(name, record, who.uid, None):
+            try:
+                address = self._resolve(origin["origin_id"])
+            except (KeyError, UnknownService):
+                continue
+            return origin["origin_id"], address, {"X-Requester-Username": who.username, "X-Requester-Email": who.email,
+                             "X-Requester-Uid": who.uid, "X-Internal-Token": token_for(record, origin)}
+        raise self._unreachable(name)
+
+    def mark_down(self, name: str, origin_id: str) -> None:
+        self._mark_down(name, origin_id)
+
     async def open_audio(self, file_id: str, range_header: str | None) -> httpx.Response:
         """The audio file as an open stream the caller must close. Only the origin that made it can serve it."""
         if not valid_id(file_id):
@@ -208,8 +226,9 @@ class ToolServices:
         if range_header is not None and len(range_header) > 256:
             raise HTTPException(416, "Invalid audio range.")
         deadline = asyncio.get_running_loop().time() + READ_SECONDS
-        response, _, _, _ = await self._send(
+        response, origin_id, _, _ = await self._send(
             AUDIO, deadline=deadline, file_id=file_id, headers={"Range": range_header} if range_header else None)
+        response.extensions["tool_service_origin_id"] = origin_id
         return response
 
 

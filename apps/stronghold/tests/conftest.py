@@ -7,6 +7,8 @@ import os
 import httpx  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+from src.citadel_auth import ServiceAuth
+from src.tool_services.store import ToolStore
 from tests import auth_helpers
 from tests.auth_helpers import identity, service_auth
 
@@ -168,18 +170,34 @@ def legion() -> FakeArmory:
 
 @pytest.fixture
 def tools() -> dict[str, FakeArmory]:
-    """Armory's Scribe, Reader and Bard routes have independent fake handlers."""
+    """Each outside tool service has its own recording HTTP handler."""
     return {name: FakeArmory() for name in ("scribe", "reader", "bard")}
 
 
-def armory_dispatch(armory: FakeArmory, connections: dict[str, FakeArmory]):
-    """One Armory transport with independent handlers for its connection endpoints."""
-    def handle(request: httpx.Request) -> httpx.Response:
-        parts = request.url.path.split("/")
-        if len(parts) >= 4 and parts[1] == "connections":
-            return connections[parts[2]](request)
-        return armory(request)
-    return handle
+TOOL_TOKEN = "fake-tool-token"
+TOOL_ORIGINS = {name: f"http://{name}.test" for name in ("bard", "scribe", "reader")}
+TOOL_ORIGINS["o1"] = TOOL_ORIGINS["bard"]
+
+
+def tool_options(settings, tools, *, seed_store=True):
+    if seed_store:
+        store = ToolStore(settings.data_dir / "settings.db")
+        for name in tools:
+            store.put(name, {"enabled": True, "service_id": name, "token": TOOL_TOKEN, "origins": [{"origin_id": name}]})
+
+    def dispatch(request: httpx.Request) -> httpx.Response:
+        return tools[request.url.host.split(".")[0]](request)
+
+    return {"tool_http": httpx.AsyncClient(transport=httpx.MockTransport(dispatch)),
+            "tool_origins": TOOL_ORIGINS.__getitem__}
+
+
+def mock_tool_catalog(app, monkeypatch):
+    async def refresh():
+        return True
+
+    monkeypatch.setattr(app.state.catalog, "outside_origin", TOOL_ORIGINS.__getitem__)
+    monkeypatch.setattr(app.state.catalog, "refresh", refresh)
 
 
 @pytest.fixture
@@ -188,18 +206,20 @@ def platform() -> FakePlatform:
 
 
 @pytest.fixture
-def client(tmp_path, db_gateway, armory, platform, agent, tools, legion):
+def client(tmp_path, db_gateway, armory, platform, agent, tools, legion, monkeypatch):
     """The app with its lifespan running, an open token and the requester headers already set."""
     from src.api import create_app
     from src.config import Settings
 
-    upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory_dispatch(armory, tools)))
+    upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory))
     registry = tmp_path / "config_agents.json"  # tests add agents by rewriting it
     registry.write_text(json.dumps({"agents": AGENTS}), encoding="utf-8")
-    app = create_app(auth_helpers.stack["stronghold"], Settings(data_dir=tmp_path / "data", agents_registry_path=registry),
+    settings = Settings(data_dir=tmp_path / "data", agents_registry_path=registry)
+    app = create_app(auth_helpers.stack["stronghold"], settings,
                      store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent,
-                     legion=httpx.AsyncClient(transport=httpx.MockTransport(legion)))
+                     legion=httpx.AsyncClient(transport=httpx.MockTransport(legion)), **tool_options(settings, tools))
     with TestClient(app, headers=identity(**IDENTITY)) as test_client:
+        mock_tool_catalog(app, monkeypatch)
         test_client.auth = service_auth()
         yield test_client
 
@@ -215,11 +235,11 @@ def make_client(tmp_path, db_gateway, armory, platform, agent, tools, legion):
     def make(usage: "UsageSettings | None" = None, pricing: "PricingSettings | None" = None) -> TestClient:
         registry = tmp_path / "config_agents.json"
         registry.write_text(json.dumps({"agents": AGENTS}), encoding="utf-8")
-        upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory_dispatch(armory, tools)))
+        upstream = httpx.AsyncClient(base_url="http://armory.test", transport=httpx.MockTransport(armory))
         settings = Settings(data_dir=tmp_path / "data", agents_registry_path=registry,
                             usage=usage or UsageSettings(), pricing=pricing or PricingSettings())
         app = create_app(auth_helpers.stack["stronghold"], settings, store=db_gateway, platform=platform, armory=upstream, agent_gateway=agent,
-                     legion=httpx.AsyncClient(transport=httpx.MockTransport(legion)))
+                     legion=httpx.AsyncClient(transport=httpx.MockTransport(legion)), **tool_options(settings, tools, seed_store=False))
         client = TestClient(app, headers=identity(**IDENTITY))
         client.auth = service_auth()
         clients.append(client)
@@ -228,3 +248,14 @@ def make_client(tmp_path, db_gateway, armory, platform, agent, tools, legion):
     yield make
     for client in clients:
         client.__exit__(None, None, None)
+
+
+@pytest.fixture
+def as_service(client, auth_stack):
+    def make(name):
+        if name == "portcullis":
+            return client
+        other = TestClient(client.app)
+        other.auth = ServiceAuth(auth_stack[name], "stronghold")
+        return other
+    return make
