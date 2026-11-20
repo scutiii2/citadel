@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -9,7 +10,7 @@ from unittest.mock import patch
 import pytest
 from mcp import types
 
-from src.agents import agent_spec
+from src.agents import agent_routing, agent_spec
 from src.agents.agent_spec import ToolScope
 from src.runtime import approvals
 from src.tools.mcp_client import mcp_upstream
@@ -141,3 +142,16 @@ def test_an_outside_read_only_hint_does_not_skip_approval(upstream, monkeypatch)
     assert listed(allow=("lens__*",)) == ["lens__tool_ocr"]
     policy = approvals.ApprovalPolicy("ask", read_only_check=mcp_upstream.is_read_only_builtin)
     assert policy.needs_approval("lens__tool_ocr") is True
+
+
+def test_the_roster_check_sees_every_connections_tools(upstream):
+    names = agent_routing._live_tool_names()
+    assert "tool_ticket_create" in names and "bard__tool_bard_speak" in names and "lens__tool_ocr" in names
+
+
+def test_a_glob_that_matches_no_tool_of_any_connection_is_warned_about(upstream, caplog):
+    with patch.object(mcp_upstream.agent_spec, "current", return_value=agent(allow=("lens__*", "nope__*"), deny=("nope__*",))):
+        with caplog.at_level(logging.WARNING):
+            mcp_upstream.warn_unmatched_tool_globs()
+    assert caplog.text.count("nope__*") == 1
+    assert "lens__*" not in caplog.text

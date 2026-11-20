@@ -248,8 +248,9 @@ def unprefixed(name: str) -> str:
 
 
 def warn_unmatched_tool_globs() -> None:
-    """One warning per tools.allow/deny glob that matches no mcp_server
-    tool - almost always a typo. Called once at startup, after connect()."""
-    names = [unprefixed(t.name) for t in client.list_tools() if t.name.startswith(_PREFIX)]
-    for glob in agent_spec.current().tools.unmatched(names):
-        _log.warning("agent %s: tools glob %r matches no mcp_server tool", agent_spec.current().id, glob)
+    """Warn once per tools.allow/deny glob that matches no tool on any connection.
+    Called once at startup, after connect()."""
+    names = [unprefixed(t.name) for t in client.list_tools()]
+    agent = agent_spec.current()
+    for glob in dict.fromkeys(agent.tools.unmatched(names)):
+        _log.warning("agent %s: tools glob %r matches no tool on any MCP connection", agent.id, glob)
