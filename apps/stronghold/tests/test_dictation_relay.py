@@ -114,3 +114,31 @@ async def test_relay_reports_only_an_unreachable_handshake(monkeypatch, refused)
 def test_dictation_never_follows_a_redirect():
     error = RuntimeError("handshake redirect")
     assert dictation.Connect.process_redirect(None, error) is error
+
+
+def test_a_signed_legion_caller_cannot_open_dictation(as_service):
+    from starlette.websockets import WebSocketDisconnect
+
+    with pytest.raises(WebSocketDisconnect) as error:
+        with as_service("legion").websocket_connect(PATH):
+            pytest.fail("Legion connected to dictation")
+    assert error.value.code == 4403
+
+
+def test_a_refused_scribe_token_names_stronghold_admin(client, auth_stack, monkeypatch):
+    from websockets.datastructures import Headers
+    from websockets.exceptions import InvalidStatus
+    from websockets.http11 import Response
+
+    class RefusedConnection:
+        async def __aenter__(self):
+            raise InvalidStatus(Response(401, "Unauthorized", Headers()))
+
+        async def __aexit__(self, *_args):
+            pass
+
+    monkeypatch.setattr(dictation, "Connect", lambda *_args, **_kwargs: RefusedConnection())
+    with client.websocket_connect(PATH, headers=signed_headers(auth_stack)) as socket:
+        close = socket.receive()
+        assert close["code"] == 1011
+        assert close["reason"] == "Scribe refused the token. Check Stronghold Admin."

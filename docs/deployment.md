@@ -8,7 +8,7 @@ Citadel runs as containers from one `docker-compose.yml`:
 | `portcullis_admin` | admin web app: accounts, roles, invites, settings | 26501 |
 | `legion_admin` | admin web app: agents, connections | 26500 |
 | `armory_admin` | admin web app: capabilities, connections | 26503 |
-| `stronghold_admin` | admin web app: usage, analytics, tickets, tuning | 26504 |
+| `stronghold_admin` | admin web app: usage, analytics, tickets, usage settings, tool services | 26504 |
 | `treasury_admin` | admin web app: Treasury instances, connections and service addresses | 26505 |
 | `portcullis` | backend for both web apps | internal |
 | `armory` | MCP server (capabilities, including Server Manager) | internal 29600 |
@@ -251,18 +251,15 @@ Product logic, called only by Portcullis. The calendar is the first feature that
 - **Token limits and prices**: `usage.six_hour_token_limit`, `usage.weekly_token_limit` and the `pricing` block are in `docker/configs/stronghold/app.json` (Stronghold keeps usage). A limit set in Portcullis's config is ignored.
 - Stronghold calls Portcullis's `/internal` routes with signed service assertions (account standing, admin switches, email, Errors log). Its address comes from Treasury’s catalog.
 
-## Tool connections
+## Tool services
 
-Armory owns the required Bard, Scribe, and Reader connections and optional shared connections. Configure them on **Armory Admin → Connections**. Use a REST base URL and a tool-service token. An MCP transport takes its own URL and credentials. Armory shows whether credentials are set.
+Before using read aloud, dictation, audio attachments, or document attachments, configure Bard, Scribe, and Reader in **Stronghold Admin → Tool services**. Deploy compatible builds of Stronghold, Portcullis, and Stronghold Admin together.
 
-For an existing deployment, apply these steps in order:
+1. Enter each REST address. On the shared Docker network, use `http://bard:29400`, `http://scribe:29401`, and `http://reader:29402`. Treasury must be reachable to register addresses. Enter a service name when Treasury does not recognize an address.
+2. Enter the same per-caller tool tokens used before the move. Add backups in order and supply per-address tokens where needed. Save and use **Test** to check the saved addresses and credentials.
+3. Confirm read aloud, live dictation, and attachments. The Portcullis reverse proxy must pass WebSocket upgrades and allow connections to stay open for at least 270 seconds. The Config issues page identifies missing configurations.
 
-1. Publish and rebuild Armory and Armory Admin. Armory migrates existing shared MCP connections, keeping tool names such as `bard__tool_bard_speak`. If Portcullis predates Plan 14, first run the Portcullis build from the Task 2 commit `d374fe7b` as a temporary bridge. It supports the Connections API and keeps existing speech, attachment, and dictation routing during setup.
-2. Open **Connections** and enter the REST base URLs and existing per-caller tool tokens for Bard, Scribe, and Reader. On the shared Docker network these URLs are `http://bard:29400`, `http://scribe:29401`, and `http://reader:29402`. Use **Test REST** on each card to check service health and credential acceptance. Use **Test MCP** wherever agents use that connection.
-3. Publish and rebuild Stronghold and Portcullis together. Confirm read aloud, owned attachment previews, and live dictation. Portcullis needs a proxy that passes WebSocket upgrades and allows a connection lifetime of at least 270 seconds.
-4. Remove the old tool-service values from Stronghold and Portcullis after the checks pass. Remove the obsolete address and token variables from deployment overrides. If the old admin pages stored tokens in SQLite, back up each service's settings database and remove only the obsolete `tool_tokens` table from that service's database. Keep the rest of each database. Revoke any unused old tool-service tokens, keeping the ones Armory currently uses.
-
-The Config issues page reports missing required connections. Ember keeps affected controls visible and explains what needs configuration.
+Armory's REST façade and Connections page remain until Plan 22. Citadel's speech, dictation, and attachment features use the new Stronghold configuration. Stronghold only streams Bard files whose origin it recorded, so clips created before cutover or through Bard's MCP tool return 404. Legion chooses MCP origins independently. Separate Scribe or Reader backing stores can make files uploaded to a REST backup unavailable to an agent using a different origin.
 
 ## DecisionGateway
 

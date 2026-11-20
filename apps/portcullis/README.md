@@ -12,12 +12,12 @@
 | `WS /api/attachments/dictate/stream` | session cookie + `files.upload` | Same-origin binary mono 16 kHz PCM16 and JSON `{"type":"stop"}`; returns `{type:"partial"|"final", text}` events. Scribe capacity closes with 1013 so the browser can use HTTP previews. |
 | `POST /api/bard/speak` | `tools.execute` + `files.download` | JSON `{text, voice?}`; returns `{file_id, duration_s, voice}`. Logs `bard.speak` without spoken text. |
 | `GET /api/bard/voices` | `tools.execute` + `files.download` | Returns `{voices: string[]}` for installed voices only. |
-| `GET /api/bard/audio/{id}` | `tools.execute` + `files.download` | Streams owned Bard audio from Armory and forwards Range. |
+| `GET /api/bard/audio/{id}` | `tools.execute` + `files.download` | Streams owned Bard audio from Stronghold and forwards Range. |
 | `GET /api/connection-status` | signed-in account | Returns readiness and a safe configuration reason for Bard, Scribe, and Reader. |
 
-Portcullis checks login and permissions and forwards the JSON features to Stronghold. It opens attachment previews, Bard audio, and live dictation directly against Armory with signed service and requester assertions. Armory holds the tool-service addresses and per-caller tokens. Rejected audio or text returns 400, quota and size errors return 413, and unavailable services or refused credentials return 502.
+Portcullis checks login and permissions and forwards the JSON features to Stronghold. It opens Bard audio and live dictation against Stronghold with signed service and requester assertions. Stronghold holds the tool-service origin references and per-caller tokens. Attachment previews continue through Armory. Rejected audio or text returns 400, quota and size errors return 413, and unavailable services or refused credentials return 502.
 
-Armory allows one live dictation stream per account, with at most
+Stronghold allows one live dictation stream per account, with at most
 64,000 bytes per PCM frame, 150 seconds of audio, 15 seconds idle while recording,
 120 seconds awaiting the final result and 270 seconds total connection lifetime.
 Completed streams log `attachments.dictate` with the byte count, before delivering
@@ -287,6 +287,24 @@ Tests:
 ```bash
 uv run pytest
 ```
+
+## Tool services
+
+Portcullis sends Bard speech and voices, Scribe dictation and audio attachments, and Reader document attachments to Stronghold. It streams browser audio from Stronghold's `/speech/audio/{file_id}` and relays live dictation to `/speech/dictate`. The browser URLs and permission checks stay the same. PDF and table uploads and owned attachment previews retain their Armory routes.
+
+`GET /api/connection-status` returns configuration readiness from Stronghold. `GET /api/config-issues` lists unavailable configurations under **Stronghold Tool services**.
+
+Each admin route requires `extensions.manage` and forwards to the same path on Stronghold without the `/api` prefix.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/admin/tool-services` | List the three connections and their status |
+| `POST` | `/api/admin/tool-services/lookup` | Look up a typed address in Treasury |
+| `PUT` | `/api/admin/tool-services/{name}` | Save addresses, availability, and write-only tokens |
+| `DELETE` | `/api/admin/tool-services/{name}` | Remove a connection from Stronghold |
+| `POST` | `/api/admin/tool-services/{name}/test` | Test each saved origin |
+
+Armory's Connections proxy remains available until Plan 22.
 
 ## API
 

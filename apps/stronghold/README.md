@@ -43,20 +43,41 @@ In Docker: `dev_deploy.bat` rebuilds and restarts the `stronghold` container fro
 | `/memory/...` | Assistant memory. Portcullis exposes it as `/api/memory/...` after checking `chat.use` |
 | `/tickets/...`, `/ticket-admin/...` | Tickets (Armory keeps them) and the account's read receipts (Treasury, collection `ticket_seen`). Portcullis exposes them as `/api/tickets/...` (`tickets.create`) and `/api/admin/tickets...`, `/api/admin/ticket-groups...` (`tickets.manage`) |
 | `/triage/titles`, `/triage/ask` | Option titles from the `title-writer` agent and typed questions to the Triage Assistant (Laya); both count toward the token limits. Portcullis exposes them as `/api/triage/...` after checking `chat.use` |
-| `/attachments/...` | Text extraction (`text`), PDFs and tables stored by Armory (`pdf`, `table`), and Armory calls for Scribe audio (`audio`, `dictate`, `dictate/partial`) or Reader documents (`document`). Portcullis exposes the JSON endpoints and opens preview and dictation streams directly against Armory |
+| `/attachments/...` | Text extraction (`text`), PDFs and tables stored by Armory (`pdf`, `table`), plus Stronghold calls for Scribe audio (`audio`, `dictate`, `dictate/partial`) or Reader documents (`document`). Portcullis forwards the JSON endpoints and dictation to Stronghold. Attachment previews retain the Armory content stream |
 | `/brains...` | Encrypted Personal Brain connections, browsing through Armory, Note publication and AI promotion suggestions. Portcullis exposes them as `/api/brains`. `POST /brains/resolve` authorizes shared access and resolves personal connections for Armory. Stronghold asks Portcullis for current account permissions and Armory for shared destination metadata |
 | `/chats...`, `/chat-folders...` | Chat history (details and transcript in separate documents), folders and search. Portcullis exposes them as `/api/chats` and `/api/chat-folders` and Stronghold runs the answers (`/turns`). Deleting chats revokes their share links first, inside the same call |
 | `/account-agents...` | The specialist agents an account switched off (Treasury, collection `account_agents`). Portcullis exposes it as `/api/account-agents` and reads the list when a chat turn starts |
 | `/user-extensions...` | An account's own MCP servers: stored with encrypted headers (collection `user_extensions`), probed through Legion for status and tools. Portcullis exposes them as `/api/user-extensions` (`chat.use` to read, `extensions.personal.manage` to change) and reads `GET /user-extensions/for-turn` when a chat turn starts |
 | `/schema` | The schema version the stored data is at, the steps applied and every Treasury collection Stronghold uses |
 | `/tuning/...` | An account's own response limits (`GET\|PUT\|DELETE /tuning/limits`, `GET /tuning/limits/own`), capped by Legion's tuning, which Stronghold reads from the entry agent. Portcullis exposes them as `/api/account/tuning` and reads `/tuning/limits/own` when a chat turn starts |
-| `/bard/...` | `POST /bard/speak` and `GET /bard/voices` call Armory with Stronghold's service assertion and a signed requester. Portcullis opens `/api/bard/audio/{id}` directly against Armory with Range |
+| `/bard/...` | `POST /bard/speak` and `GET /bard/voices` call the configured Bard connection. Portcullis relays `/api/bard/audio/{id}` from Stronghold with Range |
 | `/shares...` | Share links to frozen chat snapshots (Treasury, collection `shared_chats`) and the public read of one (`GET /shares/public/{token}`, no requester). Portcullis exposes them as `/api/chats/{id}/shares`, `/api/shares...` and `/api/shared/{token}`. Deleting a chat revokes its links in the same call |
 | `/turns/...` | Chat turns, run here (one replica only: running turns live in memory). `POST /turns/{chat}` saves the question and starts the answer; `GET /turns/{chat}/events` is the SSE stream; `/approvals`, `/questions`, `/cancel`, `/summarize`, `/clear`, `/suggestion`; `GET /turns/running`; `DELETE /turns/{chat}` and `DELETE /turns` stop turns. The start body carries a `trusted` block (`forced_approval`, `tools_execute`, `extension_ids`, `second_brain_available`) that only Portcullis may fill. Error and chat-trace lines go to Portcullis's `POST /internal/logs`. Portcullis still runs its own copy until Plan 10.4 |
 | `/usage/...` | Token usage and limits, kept in Treasury (collection `usage_records`). Portcullis exposes the reads as `/api/usage/...` and `/api/admin/usage/...`, and calls `POST /usage/check` and `POST /usage/records` around every agent call |
 | `/templates/...` | Saved prompts, kept in Treasury (collection `prompt_templates`). Portcullis exposes them as `/api/templates/...` after checking `chat.use` |
 | `/skills/...` | Learned skills, which Armory keeps. Portcullis exposes them as `/api/skills/...` after checking `chat.use` |
 | `DELETE /<domain>/accounts/{uid}` | Removes everything a deleted account kept (`notes`, `memory`, `skills`, `templates`, `usage`, `tickets`, `shares`, `tuning`, `chats`, `brains`, `account-agents`, `user-extensions`, and `turns`, which stops its running turns). Called by Portcullis only |
+
+## Tool services
+
+Stronghold calls Bard for speech, Scribe for dictation and audio attachments, and Reader for document attachments. Configure these three services in **Stronghold Admin → Tool services**. Stronghold stores one record per service in its `settings.db` table `tool_services`. A record holds `enabled`, a Treasury `service_id`, an ordered list of `{origin_id, header_value?}` references, and a parent `token`. Treasury stores the addresses and lists Stronghold in `used_by`. Admin responses expose token-presence flags. Each request sends `X-Internal-Token` only to its selected origin, using that origin's override when present.
+
+REST calls try the next origin on a connection refusal or connect timeout. A transport failure after a connection may have been made fails the call and puts that origin on a 30-second cooldown. An HTTP reply ends the attempt. File requests use the origin recorded when Stronghold received the file ID. The newest 2,000 mappings live in memory and include the account and service. A missing mapping returns 404, including pre-cutover clips, clips generated through MCP, and mappings lost to eviction or restart. Legion selects its MCP origin separately. If the backing stores are separate, an MCP tool can miss an attachment that Stronghold uploaded to a backup. If a Scribe connection cannot open, a new dictation stream can use the backup. The current stream is never replayed.
+
+Uploads are capped at 20 MB, JSON at 1 MB (4 KB for Reader parse), and REST requests at 120 seconds. Bard audio supports Range and streams up to 64 MB within 120 seconds. Scribe allows one live stream per account with 150 seconds of PCM audio, frames up to 64,000 bytes, a 15-second idle limit, and a 120-second final-result limit.
+
+| Route | Purpose |
+|---|---|
+| `GET /tool-services/status` | Configuration readiness for Bard, Scribe, and Reader |
+| `GET /speech/audio/{file_id}` | Stream Bard audio from its origin with Range support |
+| `WS /speech/dictate` | Relay PCM and stop frames to Scribe and return partial and final transcripts |
+| `GET /admin/tool-services` | List saved connection metadata and token-presence flags |
+| `POST /admin/tool-services/lookup` | Look up an address in Treasury |
+| `PUT /admin/tool-services/{name}` | Register addresses and save connection settings. Treasury outages refuse the save with `[1002]` |
+| `DELETE /admin/tool-services/{name}` | Clear the Stronghold record |
+| `POST /admin/tool-services/{name}/test` | Check each saved origin's health and credentials without generating files |
+
+Only Portcullis can call the admin routes. Armory's REST façade and Connections page remain until Plan 22.
 
 ## Schema
 

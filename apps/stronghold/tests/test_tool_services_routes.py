@@ -1,6 +1,7 @@
 """Status, admin and audio routes of the tool services, through the app with the shared fixtures."""
 
 import httpx
+import pytest
 from src.tool_services.outside import OutsideError
 
 from src.tool_services.store import ToolStore
@@ -141,6 +142,31 @@ def test_audio_streams_with_range_and_maps_errors(client, tools):
 
     tools["bard"].handler = lambda _: httpx.Response(200, headers={"content-length": str(64 * 1024 * 1024 + 1)})
     assert client.get(path).status_code == 502
+
+
+def test_audio_without_a_length_closes_the_upstream_at_the_stream_limit(client, tools, monkeypatch):
+    from src.tool_services import routes
+
+    class Audio(httpx.AsyncByteStream):
+        closed = False
+
+        async def __aiter__(self):
+            yield b"x" * 65_536
+            yield b"x" * 65_536
+
+        async def aclose(self):
+            self.closed = True
+
+    monkeypatch.setattr(routes, "MAX_AUDIO", 65_537)
+    file_id = "a" * 32
+    stream = Audio()
+    tools["bard"].handler = lambda _: httpx.Response(
+        200, json={"file_id": file_id, "duration_s": 1.0, "voice": "default"})
+    assert client.post("/bard/speak", json={"text": "hello"}).status_code == 200
+    tools["bard"].handler = lambda _: httpx.Response(200, stream=stream)
+    with pytest.raises(RuntimeError, match="Bard audio exceeded the stream limit"):
+        client.get(f"/speech/audio/{file_id}")
+    assert stream.closed
 
 
 def test_tool_origins_on_different_ports_never_share_cookies(client, tools, monkeypatch):

@@ -158,3 +158,19 @@ async def test_audio_does_not_retry_if_its_own_origin_is_unreachable(world):
         await services.open_audio(FID, None)
     assert error.value.status_code == 502 and error.value.detail.startswith("[1002]")
     assert state["seen"] == [("one", "/api/speak", "parent")]
+
+
+async def test_new_dictation_uses_its_backup_after_the_primary_cools_down(world):
+    services, state, store = world
+    store.put("scribe", {"enabled": True, "service_id": "s", "token": "parent",
+                       "origins": [{"origin_id": "o1"}, {"origin_id": "o2", "header_value": "second"}]})
+
+    origin_id, address, headers = await services.stream_target("scribe")
+    assert (origin_id, address, headers["X-Internal-Token"]) == ("o1", ADDRESS["o1"], "parent")
+    services.mark_down("scribe", origin_id)
+    origin_id, address, headers = await services.stream_target("scribe")
+    assert (origin_id, address, headers["X-Internal-Token"]) == ("o2", ADDRESS["o2"], "second")
+    assert "_origin_id" not in headers
+
+    state["clock"] += 31
+    assert (await services.stream_target("scribe"))[0] == "o1"
