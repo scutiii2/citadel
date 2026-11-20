@@ -1,4 +1,4 @@
-"""Open owned browser streams against Armory with service and requester assertions."""
+"""Open owned browser streams against Stronghold with service and requester assertions."""
 
 import asyncio
 import json
@@ -19,15 +19,15 @@ _CONTROL_BYTES = 128
 _STREAM_SECONDS = 280
 _FORWARD_SECONDS = 10
 _SAFE_ERRORS = {
-    "Configure Scribe's REST connection in Armory Admin.",
-    "Set the Scribe token in Armory Admin.",
-    "Scribe is disabled in Armory Admin.",
-    "Scribe refused the token. Check Armory Admin.",
+    "Configure Scribe in Stronghold Admin.",
+    "Set the Scribe token in Stronghold Admin.",
+    "Scribe is disabled in Stronghold Admin.",
+    "Scribe refused the token. Check Stronghold Admin.",
     "Dictation is unavailable. Try again.",
 }
 
 
-class ArmoryStreams:
+class ToolStreams:
     def __init__(self, client: httpx.AsyncClient, catalog, identity):
         self.client = client
         self.catalog = catalog
@@ -40,19 +40,19 @@ class ArmoryStreams:
         headers = {**self._headers(account), "Accept-Encoding": "identity"}
         if range_header:
             headers["Range"] = range_header
-        url = f"{logical_url('armory')}/connections/bard/audio/{file_id}"
+        url = f"{logical_url('stronghold')}/speech/audio/{file_id}"
         try:
             request = self.client.build_request("GET", url, headers=headers, timeout=120)
             return await self.client.send(request, stream=True, follow_redirects=False,
-                                          auth=ServiceAuth(self.identity, "armory"))
+                                          auth=ServiceAuth(self.identity, "stronghold"))
         except httpx.HTTPError as error:
-            raise HTTPException(502, "Armory is unreachable. Try again.") from error
+            raise HTTPException(502, "Stronghold is unreachable. Try again.") from error
 
     async def dictate(self, account: Account, browser: WebSocket, on_final: Callable[[int], Awaitable[None]]) -> None:
-        target = urlsplit(self.catalog.url("armory"))
+        target = urlsplit(self.catalog.url("stronghold"))
         uri = urlunsplit(("wss" if target.scheme == "https" else "ws", target.netloc,
-                          "/connections/scribe/dictate", "", ""))
-        headers = {**self._headers(account), "Authorization": "Bearer " + sign_assertion(self.identity, "armory")}
+                          "/speech/dictate", "", ""))
+        headers = {**self._headers(account), "Authorization": "Bearer " + sign_assertion(self.identity, "stronghold")}
         total = 0
 
         async def upstream(remote):

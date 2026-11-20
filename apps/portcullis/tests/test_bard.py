@@ -11,7 +11,7 @@ def test_audio_requires_login(client, upstream):
     assert not upstream.requests
 
 
-def test_audio_streams_from_armory_with_identity_and_range(client, upstream):
+def test_audio_streams_from_stronghold_with_identity_and_range(client, upstream):
     as_admin(client)
     upstream.handler = lambda r: httpx.Response(
         206, content=b"2345",
@@ -23,8 +23,8 @@ def test_audio_streams_from_armory_with_identity_and_range(client, upstream):
     assert response.headers["content-range"] == "bytes 2-5/10"
     assert response.headers["cache-control"] == "no-store"
     sent = upstream.requests[-1]
-    assert sent.url.path == f"/connections/bard/audio/{FID}"
-    assert assertion(sent, "armory")["iss"] == "portcullis"
+    assert sent.url.path == f"/speech/audio/{FID}"
+    assert assertion(sent, "stronghold")["iss"] == "portcullis"
     assert requester(sent)["username"] == "root"
     assert sent.headers["range"] == "bytes=2-5"
     assert "x-internal-token" not in sent.headers
@@ -39,7 +39,9 @@ def test_missing_or_expired_audio_is_404(client, upstream):
 def test_a_refusal_behind_stronghold_is_not_shown_as_a_browser_auth_error(client, upstream):
     as_admin(client)
     upstream.handler = lambda r: httpx.Response(401, json={"error": "Invalid or missing internal API token"})
-    assert client.get(f"/api/bard/audio/{FID}").status_code == 502
+    response = client.get(f"/api/bard/audio/{FID}")
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Bard audio is unavailable. Check Stronghold Admin, Tool services."
 
 
 def test_unreachable_stronghold_is_502(client, upstream):

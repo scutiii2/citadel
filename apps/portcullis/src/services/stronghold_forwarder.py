@@ -102,7 +102,9 @@ class StrongholdForwarder:
         except httpx.HTTPError as error:
             logger.warning("stronghold %s %s unreachable: %s", method, redact(path), type(error).__name__)
             raise StrongholdUnavailable(type(error).__name__) from error
-        if response.status_code >= 500 and not (response.status_code == 502 and path in _CONNECTION_FEATURES):
+        # Tool service routes return safe 502 details, including Treasury save refusals.
+        tool_service = path in _CONNECTION_FEATURES or path.startswith("/admin/tool-services/")
+        if response.status_code >= 500 and not (response.status_code == 502 and tool_service):
             raise StrongholdUnavailable(f"stronghold answered {response.status_code}")
         return ForwardedResponse(
             response.status_code,

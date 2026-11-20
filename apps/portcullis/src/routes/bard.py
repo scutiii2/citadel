@@ -1,4 +1,4 @@
-"""Stronghold handles speech and voice requests. Armory streams Bard audio directly."""
+"""Stronghold handles Bard speech, voices and audio streams."""
 from __future__ import annotations
 
 import json
@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from src.deps import get_stronghold, require_permission
 from src.models import Account
 from src.routes.stronghold import pass_on
-from src.services.armory_streams import ArmoryStreams
+from src.services.tool_streams import ToolStreams
 from src.services.stronghold_forwarder import StrongholdForwarder
 
 router = APIRouter(prefix="/api/bard", tags=["bard"])
@@ -46,7 +46,7 @@ async def audio(
     _transfer: Account = Depends(require_permission("files.download")),
 ) -> StreamingResponse:
     state = request.app.state
-    streams = ArmoryStreams(state.upstream, state.catalog, state.keyring)
+    streams = ToolStreams(state.upstream, state.catalog, state.keyring)
     response = await streams.open_audio(file_id, account, request.headers.get("range"))
     if response.status_code not in (200, 206):
         try:
@@ -64,7 +64,7 @@ async def audio(
                     detail = None
                 if isinstance(detail, str) and detail:
                     raise HTTPException(502, detail)
-            raise HTTPException(502, "Bard audio is unavailable. Check Armory Admin, Connections.")
+            raise HTTPException(502, "Bard audio is unavailable. Check Stronghold Admin, Tool services.")
         finally:
             await response.aclose()
 

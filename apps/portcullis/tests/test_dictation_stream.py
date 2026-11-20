@@ -94,11 +94,11 @@ def test_stream_proxies_pcm_stop_transcripts_and_identity(client, remote):
     assert remote.sent[0] == b'\x00\x01' * 320
     assert json.loads(remote.sent[1]) == {'type': 'stop'}
     uri, options = remote.opened[0]
-    assert uri.endswith('/connections/scribe/dictate') and uri.startswith('ws://')
+    assert uri.endswith('/speech/dictate') and uri.startswith('ws://')
     headers = {key.lower(): value for key, value in options['additional_headers'].items()}
-    outbound = httpx.Request('GET', 'http://armory.test', headers=headers)
+    outbound = httpx.Request('GET', 'http://stronghold.test', headers=headers)
     assert requester(outbound)['username'] == 'root'
-    assert assertion(outbound, 'armory')['iss'] == 'portcullis'
+    assert assertion(outbound, 'stronghold')['iss'] == 'portcullis'
     assert 'x-internal-token' not in headers
     assert 'origin' not in headers and 'cookie' not in headers
     actor = client.get('/api/auth/me').json()['id']
