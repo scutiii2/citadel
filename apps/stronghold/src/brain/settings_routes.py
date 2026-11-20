@@ -22,7 +22,8 @@ def _path(request: Request):
 
 def _view(request: Request) -> dict[str, Any]:
     state = request.app.state
-    return admin_settings.view(state.stacks, state.brain_files, state.brain_folder, _path(request))
+    return admin_settings.view(state.stacks, state.brain_files, state.brain_folder, _path(request),
+                               shares=getattr(state, "brain_shares", None))
 
 
 @router.get("")
@@ -39,7 +40,11 @@ async def set_brain_settings(request: Request, changes: Any = Body()) -> Any:
     state = request.app.state
     async with state.brain_settings_lock:
         try:
-            await run_in_threadpool(admin_settings.update, state.stacks, state.brain_files, _path(request), changes)
+            await run_in_threadpool(
+                admin_settings.update, state.stacks, state.brain_files, _path(request), changes,
+                shares=getattr(state, "brain_shares", None),
+                global_files=getattr(getattr(state, "global_brain", None), "files", None),
+            )
             return await run_in_threadpool(_view, request)
         except admin_settings.BrainSettingsError as error:
             raise HTTPException(400, str(error)) from None

@@ -20,6 +20,12 @@ LONG_TERM_RANGES = {
     "max_total_bytes": (10_000, 100_000_000),
     "search_limit": (1, 30),
 }
+SHARING_RANGES = {
+    "max_share_chars": (200, 100_000),
+    "max_pending_sent": (1, 200),
+    "max_inbox": (1, 1_000),
+    "max_global_queue": (1, 1_000),
+}
 
 
 @dataclass(frozen=True)
@@ -36,6 +42,14 @@ class LongTermLimits:
     max_files: int = 500
     max_total_bytes: int = 5_000_000
     search_limit: int = 8
+
+
+@dataclass(frozen=True)
+class SharingLimits:
+    max_share_chars: int = 20_000
+    max_pending_sent: int = 30
+    max_inbox: int = 100
+    max_global_queue: int = 200
 
 
 def _whole(value: object, low: int, high: int, default: int) -> int:
@@ -74,6 +88,14 @@ def load_long_term(path: Path) -> LongTermLimits:
     base = LongTermLimits()
     return LongTermLimits(**{
         name: _whole(saved.get(name), *LONG_TERM_RANGES[name], getattr(base, name)) for name in LONG_TERM_RANGES
+    })
+
+
+def load_sharing(path: Path) -> SharingLimits:
+    saved = _saved(path, "sharing")
+    base = SharingLimits()
+    return SharingLimits(**{
+        name: _whole(saved.get(name), *SHARING_RANGES[name], getattr(base, name)) for name in SHARING_RANGES
     })
 
 
