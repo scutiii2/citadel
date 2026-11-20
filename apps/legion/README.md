@@ -554,6 +554,20 @@ before starting a restricted turn. The filter follows nested delegation.
 `ask` also accepts `private_extensions`, the user's own MCP servers for this
 turn; see the next section for its shape and behavior.
 
+## Outside MCP connections
+
+Legion Admin accepts an MCP address and uses Treasury to find or register its outside service.
+A saved HTTP entry holds `service_id`, a shared `path` (default `/mcp`), and an ordered
+`origins` list of `{origin_id, header_value?}`. Legion uses the entry's `auth` header
+as the connection token. An origin can override its header value. Stored tokens are write-only.
+
+Legion tries the listed origins in order. A connection failure or timeout puts the origin
+on a 30-second cooldown. A tool call that fails returns its error. The next call uses the
+backup when one is available. The MCP registry's tool listing checks whether a preferred origin has recovered
+after the cooldown. A protocol or HTTP refusal does not trigger failover.
+
+Edits apply the next time Legion starts. Armory's `main` connection still uses a `url` entry.
+
 ## Private extensions
 
 A private extension is a user's own MCP server, passed to `ask()` per turn by

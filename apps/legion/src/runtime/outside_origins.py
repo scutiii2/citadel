@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -20,7 +21,9 @@ class OutsideError(Exception):
 
 
 async def _post(path: str, body: dict[str, Any]) -> httpx.Response:
-    async with service_client(internal_auth.keyring, "treasury", base_url=catalog.url("treasury"), timeout=10.0) as client:
+    async with asyncio.timeout(10), service_client(
+        internal_auth.keyring, "treasury", base_url=catalog.url("treasury"), timeout=10.0
+    ) as client:
         return await client.post(path, json=body)
 
 
@@ -34,7 +37,7 @@ def _text(response: httpx.Response) -> str:
 async def _call(path: str, body: dict[str, Any]) -> dict[str, Any]:
     try:
         response = await _post(path, body)
-    except httpx.HTTPError:
+    except (httpx.HTTPError, TimeoutError):
         raise OutsideError("[1002] Treasury is unavailable. Nothing was saved.", 502) from None
     if response.status_code in (502, 503, 504):
         raise OutsideError("[1002] Treasury is unavailable. Nothing was saved.", 502)
@@ -59,14 +62,17 @@ def origin_address(origin_id: str) -> str | None:
 async def entry_from_addresses(entry: dict[str, Any], previous: dict[str, Any] | None) -> dict[str, Any]:
     """Resolve addresses before registering them, then persist only catalog ids and auth."""
     addresses = entry.get("addresses")
-    if not isinstance(addresses, list) or not addresses or not all(
+    if not isinstance(addresses, list) or not 1 <= len(addresses) <= 10 or not all(
             isinstance(item, dict) and isinstance(item.get("address"), str) for item in addresses):
-        raise OutsideError("addresses must be a list of {address, name?, header_value?}")
+        raise OutsideError("addresses must contain 1 to 10 entries with an address")
     if entry.get("transport") != "http" or "url" in entry or "command" in entry:
         raise OutsideError("addresses require HTTP transport without a direct URL or command")
 
     kept = {item.get("origin_id"): item.get("header_value")
             for item in (previous or {}).get("origins", []) if isinstance(item, dict)}
+    auth = entry.get("auth")
+    has_connection_token = (isinstance(auth, dict) and auth.get("type") == "header"
+                            and bool(auth.get("header_name") and auth.get("header_value")))
     pending: dict[str, tuple[str, str | None]] = {}
     service_name, path = None, None
     for item in addresses:
@@ -86,6 +92,8 @@ async def entry_from_addresses(entry: dict[str, Any], previous: dict[str, Any] |
         token = item.get("header_value")
         if token is not None and not isinstance(token, str):
             raise OutsideError("An address token must be a string.")
+        if (token or kept.get(found["origin_id"])) and not has_connection_token:
+            raise OutsideError("Set a connection token header and value before adding address overrides.")
         pending[address] = (name, token)
         service_name, path = name, address_path
 

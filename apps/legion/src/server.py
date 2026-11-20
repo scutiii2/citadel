@@ -17,7 +17,7 @@ import sys
 from uuid import uuid4
 from pathlib import Path
 from src.providers import gateway_client
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from src.citadel_auth import settings_store, advertised_url
 from src.citadel_auth.treasury import register_instance
 from src.runtime.service_catalog import catalog
@@ -521,18 +521,22 @@ async def servers_put(request: Request) -> JSONResponse:
             entry["auth"] = {**auth, "header_value": old["header_value"]}
     if "origins" in entry or "service_id" in entry:
         return JSONResponse({"error": "send addresses to register outside origins"}, status_code=400)
-    if "addresses" in entry:
-        try:
-            entry = await outside_origins.entry_from_addresses(entry, previous)
-        except outside_origins.OutsideError as error:
-            return JSONResponse({"error": str(error)}, status_code=error.status)
     try:
+        if "addresses" in entry:
+            # Check local fields before creating any Treasury record.
+            draft = {**entry, "service_id": "pending", "path": "/mcp", "origins": [{"origin_id": "pending"}]}
+            mcp_config.validate_server(server_id, draft)
+            entry = await outside_origins.entry_from_addresses(entry, previous)
         mcp_config.validate_server(server_id, entry)
+    except outside_origins.OutsideError as error:
+        return JSONResponse({"error": str(error)}, status_code=error.status)
     except mcp_config.ConfigError as error:
         return JSONResponse({"error": str(error)}, status_code=400)
     await asyncio.to_thread(settings_store.put, config_files.SETTINGS_DB, "servers", server_id, entry)
     if any(outside_origins.origin_address(ref["origin_id"]) is None for ref in entry.get("origins", [])):
-        await catalog.refresh()
+        with suppress(TimeoutError):
+            async with asyncio.timeout(20):
+                await catalog.refresh()
     return JSONResponse({"saved": server_id, "applies": "next start"})
 
 

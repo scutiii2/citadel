@@ -133,3 +133,19 @@ def test_a_connection_with_different_paths_is_refused_before_registering(client,
     assert client.put("/agents/servers/bard", json=mixed).status_code == 400
     assert treasury.origins == {}
     assert settings_store.read_all(db, "servers") == {}
+
+
+def test_an_override_with_no_connection_token_is_refused_before_registering(client, treasury, db):
+    without_parent = {key: value for key, value in BODY.items() if key != "auth"}
+    response = client.put("/agents/servers/bard", json=without_parent)
+    assert response.status_code == 400
+    assert "connection token" in response.json()["error"]
+    assert treasury.origins == {}
+    assert settings_store.read_all(db, "servers") == {}
+
+
+def test_invalid_local_settings_leave_the_treasury_catalog_untouched(client, treasury, db):
+    refused = client.put("/agents/servers/bard", json={**BODY, "label": ""})
+    assert refused.status_code == 400
+    assert treasury.calls == []
+    assert settings_store.read_all(db, "servers") == {}

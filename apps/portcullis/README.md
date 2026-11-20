@@ -313,6 +313,8 @@ never grants; the MCP client's session `DELETE` has no body at all.)
 | `GET` | `/api/settings` | any logged-in account | `{force_tool_approval}`: what the administrator requires of everyone. |
 | `GET` | `/api/settings/pages` | any logged-in account | `{hidden: ["/usage", ...]}`: pages the administrator hid from every sidebar. |
 | `PUT` | `/api/admin/settings/pages` | `settings.manage` | `{hidden: [...]}` -> `{hidden: [...]}`. Hides pages from every account's sidebar (nav only: they still open by URL). Ids look like `/usage`, at most 20, repeats dropped; `/` and `/settings` cannot be hidden. `400` for a bad id or a list too long to store, `422` for a bad body. Logged as `admin.setting`. |
+| `POST` | `/api/admin/servers/lookup` | `agents.manage` | Sends `{address}` to Legion for a read-only Treasury catalog lookup. |
+| `GET` | `/api/admin/servers` | `agents.manage` | Lists connections and resolved origins. `has_value` and `has_override` indicate saved tokens. |
 | `GET` | `/api/admin/treasury/outside` | `settings.manage` | Outside service groups, their origins, and `used_by`. |
 | `PATCH` | `/api/admin/treasury/outside/{service_id}` | `settings.manage` | `{name}` renames a group and returns it with the same ID. |
 | `DELETE` | `/api/admin/treasury/outside/origins/{origin_id}` | `settings.manage` | Removes one origin and returns the catalog. An origin in use requires `?confirm=true`. |

@@ -61,6 +61,7 @@ by equality. Raw SQL works only on SQL backends and only when the connection set
 | Method | Path | Caller | Body or query |
 |---|---|---|---|
 | GET | `/outside` | Any authenticated Citadel service | |
+| POST | `/outside/lookup` | Any authenticated Citadel service | `{"address": "..."}`. Returns the normalized origin, path, and matching group if found. Read-only. |
 | POST | `/outside/origins` | Legion, Stronghold | `{"origin": "...", "name": "..."}`. Name can be omitted for a known origin. |
 | GET | `/admin/outside` | Portcullis | |
 | PATCH | `/admin/outside/{service_id}` | Portcullis | `{"name": "..."}` |

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import socket
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import replace
 
 import httpx
@@ -15,6 +15,7 @@ from mcp.shared.exceptions import McpError
 from src.tools.mcp_client import registry as registry_module
 from src.tools.mcp_client.config import validate_server
 from src.tools.mcp_client.registry import McpClientRegistry, is_connection_failure
+from src.tools.mcp_client import transports
 from src.tools.mcp_client.transports import open_session
 
 ENTRY = {"label": "Bard", "transport": "http", "service_id": "s", "path": "/mcp",
@@ -143,6 +144,8 @@ def test_a_rejected_handshake_does_not_try_another_origin(world, monkeypatch):
     status = asyncio.run(registry._connect_one("bard", registry._configs["bard"]))
     assert status.status == "error"
     assert attempted == ["http://one:1/mcp"]
+    asyncio.run(registry.list_tools())
+    assert attempted == ["http://one:1/mcp", "http://one:1/mcp"]
 
 
 def test_origins_down_at_start_are_resolved_again_after_cooldown(world):
@@ -169,3 +172,76 @@ def test_dns_failure_during_origin_connect_is_a_connection_error(monkeypatch):
 
     with pytest.raises(ConnectionError):
         asyncio.run(connect())
+
+
+def test_an_origin_transport_rejects_a_different_scheme_before_sending_credentials(monkeypatch):
+    async def reachable(_url, _timeout):
+        return None
+
+    @asynccontextmanager
+    async def attempt(url, *, headers, httpx_client_factory=None):
+        assert httpx_client_factory is not None
+        async with httpx_client_factory(headers=headers) as client:
+            for check in client.event_hooks["request"]:
+                await check(httpx.Request("POST", url))
+                await check(httpx.Request("POST", "https://one/mcp"))
+        pytest.fail("Unlisted origin was accepted")
+        yield
+
+    monkeypatch.setattr(transports, "_check_tcp_reachable", reachable)
+    monkeypatch.setattr(transports, "streamablehttp_client", attempt)
+    target = replace(validate_server("bard", ENTRY), url="http://one/mcp")
+
+    async def connect():
+        async with AsyncExitStack() as stack:
+            await open_session(stack, target, timeout_seconds=1)
+
+    with pytest.raises(transports.AuthResolutionError):
+        asyncio.run(connect())
+
+
+def test_a_call_timeout_does_not_mask_the_transport_owner_http_refusal(world, monkeypatch):
+    registry, _ = world
+
+    async def run():
+        refused, closed = asyncio.Event(), asyncio.Event()
+        target_url = "http://one:1/mcp"
+        request = httpx.Request("POST", target_url)
+        refusal = httpx.HTTPStatusError("Unauthorized", request=request,
+                                       response=httpx.Response(401, request=request))
+
+        class RefusedSession(_Session):
+            async def call_tool(self, name, arguments, read_timeout_seconds, **extra):
+                refused.set()
+                await closed.wait()
+                raise McpError(types.ErrorData(code=408, message="timed out"))
+
+        @asynccontextmanager
+        async def transport():
+            async def respond():
+                await refused.wait()
+                raise refusal
+
+            try:
+                async with asyncio.TaskGroup() as requests:
+                    requests.create_task(respond())
+                    yield
+            finally:
+                closed.set()
+
+        async def fake_open(stack, config, _timeout, _headers):
+            if config.url == target_url:
+                await stack.enter_async_context(transport())
+                return RefusedSession(target_url)
+            return _Session(config.url)
+
+        monkeypatch.setattr(registry_module, "open_session", fake_open)
+        try:
+            assert (await registry._connect_one("bard", registry._configs["bard"])).origin_id == "o1"
+            with pytest.raises(McpError):
+                await registry.call_tool("bard__x", {})
+            assert registry.statuses()[0].origin_id == "o1"
+        finally:
+            await registry.aclose()
+
+    asyncio.run(run())

@@ -119,6 +119,7 @@ class McpClientRegistry:
         self._clock = time.monotonic
         self._origin_locks: dict[str, asyncio.Lock] = {}
         self._origin_calls: dict[ClientSession, int] = {}
+        self._origin_errors: dict[ClientSession, Exception] = {}
         self._retired_origins: dict[ClientSession, AsyncExitStack] = {}
 
     def statuses(self) -> list[ServerStatus]:
@@ -164,6 +165,7 @@ class McpClientRegistry:
         stop = asyncio.Event()
 
         async def keep_open() -> None:
+            session = None
             try:
                 async with AsyncExitStack() as wire:
                     session = await open_session(wire, target, CONNECT_TIMEOUT_SECONDS, None)
@@ -174,6 +176,8 @@ class McpClientRegistry:
             except Exception as error:  # noqa: BLE001 - report opening failures to the registry
                 if not ready.done():
                     ready.set_exception(error)
+                elif session is not None and not ready.cancelled():
+                    self._origin_errors[session] = error
             finally:
                 if not ready.done():
                     ready.cancel()
@@ -188,8 +192,11 @@ class McpClientRegistry:
 
         async def close() -> None:
             stop.set()
-            if not owner.done():
-                await owner
+            try:
+                if not owner.done():
+                    await owner
+            finally:
+                self._origin_errors.pop(session, None)
 
         stack = AsyncExitStack()
         stack.push_async_callback(close)
@@ -214,7 +221,7 @@ class McpClientRegistry:
         self._active.pop(server_id, None)
         self._last_known_tools.pop(server_id, None)
         if stack is not None:
-            if self._origin_calls.get(session, 0):
+            if session is not None and self._origin_calls.get(session, 0):
                 self._retired_origins[session] = stack
             else:
                 await stack.aclose()
@@ -233,9 +240,9 @@ class McpClientRegistry:
                 stack, session, tools = await self._open_origin(target)
             except Exception as error:  # noqa: BLE001 - one upstream must not stop others
                 status.error = f"MCP connection failed ({type(error).__name__})"
-                self._down[(server_id, ref.origin_id)] = self._clock() + ORIGIN_COOLDOWN_SECONDS
                 if not is_connection_failure(error):
                     break
+                self._down[(server_id, ref.origin_id)] = self._clock() + ORIGIN_COOLDOWN_SECONDS
                 continue
             await self._drop_origin(server_id)
             self._stacks[server_id] = stack
@@ -255,6 +262,13 @@ class McpClientRegistry:
         """Retry an unavailable connection or probe a preferred origin."""
         async with self._origin_locks.setdefault(config.id, asyncio.Lock()):
             active = self._active.get(config.id)
+            session = self._sessions.get(config.id)
+            transport_error = self._origin_errors.get(session) if session is not None else None
+            if active is not None and transport_error is not None:
+                if is_connection_failure(transport_error):
+                    self._down[(config.id, active)] = self._clock() + ORIGIN_COOLDOWN_SECONDS
+                await self._drop_origin(config.id)
+                active = None
             candidates = self._eligible_origins(config)
             if active is not None:
                 preferred = []
@@ -264,7 +278,7 @@ class McpClientRegistry:
                     if ref in candidates:
                         preferred.append(ref)
                 candidates = preferred
-            if candidates:
+            if candidates or transport_error is not None:
                 await self._connect_origins(config, candidates)
 
     async def _fail_over(self, config: ServerConfig, session: ClientSession) -> None:
@@ -363,11 +377,11 @@ class McpClientRegistry:
         server_id, separator, upstream_name = name.partition(NAMESPACE_SEPARATOR)
         config = self._configs.get(server_id) if separator else None
         origin_connection = config is not None and bool(config.origins)
-        if separator and server_id not in self._sessions:
-            if origin_connection:
-                await self._refresh_origin(config)
-            else:
-                await self._recover_catalog_connections()
+        session = self._sessions.get(server_id) if separator else None
+        if origin_connection and (session is None or session in self._origin_errors):
+            await self._refresh_origin(config)
+        elif separator and session is None:
+            await self._recover_catalog_connections()
         session = self._sessions.get(server_id) if separator else None
         if session is None:
             raise KeyError(f"No tool named {name!r} on any connected server")
@@ -393,7 +407,8 @@ class McpClientRegistry:
             try:
                 return await call(session)
             except Exception as error:
-                if is_connection_failure(error):
+                # The SDK can report a timeout after the transport closed on an HTTP refusal.
+                if is_connection_failure(self._origin_errors.get(session, error)):
                     await self._fail_over(config, session)
                 raise
             finally:
@@ -426,3 +441,4 @@ class McpClientRegistry:
         self._stacks.clear()
         self._sessions.clear()
         self._retired_origins.clear()
+        self._origin_errors.clear()
