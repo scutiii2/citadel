@@ -118,3 +118,59 @@ def test_services_routes_report_refusals_and_outages(client, db_gateway):
 
     client.app.state.db_gateway.admin = down
     assert admin.get("/api/admin/treasury/services").status_code == 502
+
+
+def test_outside_routes_forward_rename_and_deletes_and_audit_without_addresses(client, db_gateway):
+    admin = as_admin(client)
+    sid, oid = "a" * 32, "b" * 32
+    assert admin.get("/api/admin/treasury/outside").json() == {"groups": []}
+    assert admin.patch(
+        f"/api/admin/treasury/outside/{sid}", json={"name": "speech", "unexpected": "not forwarded"}
+    ).status_code == 200
+    assert admin.delete(f"/api/admin/treasury/outside/origins/{oid}", params={"confirm": "true"}).status_code == 200
+    assert admin.delete(f"/api/admin/treasury/outside/{sid}", params={"confirm": "true"}).status_code == 200
+    assert admin.delete(f"/api/admin/treasury/outside/{sid}").status_code == 200
+    assert db_gateway.admin_calls == [
+        ("GET", "/admin/outside", None),
+        ("PATCH", f"/admin/outside/{sid}", {"name": "speech"}),
+        ("DELETE", f"/admin/outside/origins/{oid}?confirm=true", None),
+        ("DELETE", f"/admin/outside/{sid}?confirm=true", None),
+        ("DELETE", f"/admin/outside/{sid}", None),
+    ]
+    uid = admin.get("/api/auth/me").json()["id"]
+    logged = " ".join(entry["message"] for entry in admin.get("/api/logs/action", params={"actor": uid}).json())
+    assert f"Renamed outside service '{sid}'" in logged
+    assert f"Removed outside origin '{oid}'" in logged
+    assert f"Removed outside service '{sid}'" in logged
+    assert "speech" not in logged and "http" not in logged
+
+
+def test_outside_routes_need_settings_manage(client, email, db_gateway):
+    sid = "a" * 32
+    assert client.get("/api/admin/treasury/outside").status_code == 401
+    make_member(client, email, "alice")
+    login(client, "alice")
+    assert client.get("/api/admin/treasury/outside").status_code == 403
+    assert client.patch(f"/api/admin/treasury/outside/{sid}", json={"name": "x"}).status_code == 403
+    assert client.delete(f"/api/admin/treasury/outside/{sid}").status_code == 403
+    assert client.delete(f"/api/admin/treasury/outside/origins/{sid}").status_code == 403
+    assert db_gateway.admin_calls == []
+
+
+def test_outside_routes_report_refusals_and_outages(client, db_gateway):
+    from src.services.db_gateway import DbGatewayUnavailable
+    admin = as_admin(client)
+    db_gateway.admin_refusal = "the name 'armory' is the name of a Citadel service"
+    refused = admin.patch(f"/api/admin/treasury/outside/{'a' * 32}", json={"name": "armory"})
+    assert (refused.status_code, refused.json()["detail"]) == (400, db_gateway.admin_refusal)
+
+    async def down(*args, **kwargs):
+        raise DbGatewayUnavailable("down")
+
+    client.app.state.db_gateway.admin = down
+    assert admin.get("/api/admin/treasury/outside").status_code == 502
+
+def test_outside_routes_reject_an_invalid_id_before_calling_treasury(client, db_gateway):
+    admin = as_admin(client)
+    assert admin.delete("/api/admin/treasury/outside/host%3A29600").status_code == 422
+    assert db_gateway.admin_calls == []
