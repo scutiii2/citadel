@@ -24,10 +24,15 @@ def _no_advertise_env(monkeypatch):
     monkeypatch.delenv("CITADEL_ADVERTISE_URL", raising=False)
 
 
-def make(handler, tmp_path, **options):
+def make(handler, tmp_path, *, outside_handler=None, **options):
+    def dispatch(request):
+        if request.url.path == "/outside":
+            return outside_handler(request) if outside_handler else httpx.Response(404)
+        return handler(request)
+
     return ServiceCatalog(
         FakeKeyring(), "http://treasury.test:29602", cache_path=tmp_path / "catalog.json",
-        transport=httpx.MockTransport(handler), **options,
+        transport=httpx.MockTransport(dispatch), **options,
     )
 
 
@@ -223,3 +228,96 @@ def test_background_refusal_is_final(tmp_path):
 def test_advertised_url_brackets_an_ipv6_listener():
     assert advertised_url("::1", 29650) == "http://[::1]:29650"
     assert checked_address(advertised_url("::1", 29650)) == "http://[::1]:29650"
+
+
+OUTSIDE = {"groups": [{"service_id": "a" * 32, "name": "bard", "used_by": ["legion"],
+                       "origins": [{"origin_id": "b" * 32, "origin": "http://bard:29400"},
+                                   {"origin_id": "c" * 32, "origin": "http://bard2:29400"}]}]}
+
+
+def _handler(outside_status=200):
+    def handler(request):
+        if request.url.path == "/services":
+            return httpx.Response(200, json={"services": {}})
+        if request.url.path == "/outside":
+            return httpx.Response(outside_status, json=OUTSIDE)
+        return httpx.Response(404)
+    return handler
+
+
+async def test_refresh_reads_the_outside_groups_and_resolves_origin_ids(tmp_path):
+    catalog = make(_handler(), tmp_path, outside_handler=_handler())
+    assert await catalog.refresh() is True
+    assert catalog.outside_origin("c" * 32) == "http://bard2:29400"
+    group = catalog.outside_group("a" * 32)
+    assert group["name"] == "bard" and [o["origin"] for o in group["origins"]] == ["http://bard:29400", "http://bard2:29400"]
+    assert [g["name"] for g in catalog.outside_groups()] == ["bard"]
+    with pytest.raises(UnknownService):
+        catalog.outside_origin("0" * 32)
+
+
+async def test_the_outside_groups_survive_a_restart_through_the_disk_cache(tmp_path):
+    await make(_handler(), tmp_path, outside_handler=_handler()).refresh()
+    fresh = make(_handler(), tmp_path, outside_handler=_handler(outside_status=500))  # no refresh: only the cache
+    assert fresh.outside_origin("b" * 32) == "http://bard:29400"
+    assert (await fresh.refresh()) is True  # services answered; a failing /outside changes nothing
+    assert fresh.outside_origin("b" * 32) == "http://bard:29400"
+
+
+async def test_a_treasury_without_outside_still_refreshes(tmp_path):
+    catalog = make(_handler(), tmp_path)
+    assert await catalog.refresh() is True
+    assert catalog.outside_groups() == []
+
+
+async def test_a_bad_outside_entry_is_dropped(tmp_path):
+    bad = {"groups": [{"service_id": "a" * 32, "name": "x", "origins": [{"origin_id": "b" * 32, "origin": "http://u:p@x"}]}, {"nope": 1}]}
+
+    def handler(request):
+        return httpx.Response(200, json={"services": {}} if request.url.path == "/services" else bad)
+
+    catalog = make(handler, tmp_path, outside_handler=handler)
+    await catalog.refresh()
+    assert catalog.outside_groups()[0]["origins"] == []
+
+async def test_outside_groups_are_copied_and_a_successful_empty_snapshot_clears_the_cache(tmp_path):
+    groups = iter([OUTSIDE, {"groups": []}])
+    catalog = make(_handler(), tmp_path, outside_handler=lambda request: httpx.Response(200, json=next(groups)))
+    assert await catalog.refresh() is True
+    catalog.outside_groups()[0]["origins"].clear()
+    catalog.outside_group("a" * 32)["origins"][0]["origin"] = "http://other"
+    assert catalog.outside_origin("b" * 32) == "http://bard:29400"
+    assert await catalog.refresh() is True
+    assert make(_handler(), tmp_path).outside_groups() == []
+    with pytest.raises(UnknownService):
+        catalog.outside_group("a" * 32)
+
+
+async def test_outside_can_refresh_when_access_to_services_is_denied(tmp_path):
+    catalog = make(lambda request: httpx.Response(403), tmp_path, outside_handler=_handler())
+    assert await catalog.refresh() is False
+    assert catalog.outside_origin("b" * 32) == "http://bard:29400"
+    assert make(_handler(), tmp_path).outside_origin("b" * 32) == "http://bard:29400"
+
+
+async def test_services_are_available_and_cached_while_outside_is_still_loading(tmp_path):
+    reached_outside = asyncio.Event()
+    release_outside = asyncio.Event()
+
+    async def outside(request):
+        reached_outside.set()
+        await release_outside.wait()
+        return httpx.Response(404)
+
+    def services(request):
+        return httpx.Response(200, json={"services": {"armory": "http://new-armory:29600"}})
+
+    catalog = make(services, tmp_path, outside_handler=outside)
+    refreshing = asyncio.create_task(catalog.refresh())
+    try:
+        await asyncio.wait_for(reached_outside.wait(), timeout=1)
+        assert catalog.url("armory") == "http://new-armory:29600"
+        assert make(services, tmp_path).url("armory") == "http://new-armory:29600"
+    finally:
+        release_outside.set()
+        await refreshing
