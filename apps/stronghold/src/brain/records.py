@@ -51,6 +51,7 @@ class Record:
     revision: int = 1
     created_at: str = ""
     updated_at: str = ""
+    shared_from: str = ""
 
 
 def reserved_name(name: str) -> bool:
@@ -91,6 +92,8 @@ def render(record: Record) -> str:
         "last_editor": record.last_editor, "agent_editable": record.agent_editable, "edited": record.edited,
         "revision": record.revision, "created_at": record.created_at, "updated_at": record.updated_at,
     }
+    if record.shared_from:
+        header["shared_from"] = record.shared_from
     lines = [_FENCE, *(f"{key}: {json.dumps(value, ensure_ascii=False)}" for key, value in header.items()), _FENCE, "", record.body]
     return "\n".join(lines) + "\n"
 
@@ -141,5 +144,8 @@ def parse(text: str, *, folder: str, fallback_id: str, fallback_title: str, fall
     revision = values.get("revision", 1)
     if not all(isinstance(flag, bool) for flag in flags.values()) or isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
         raise RecordError("A flag or the revision is not valid.")
+    shared_from = text_of("shared_from")
+    if len(shared_from) > 80:
+        raise RecordError("shared_from is too long.")
     return Record(record_id, title, body, folder, tags, source, editor, flags["agent_editable"], flags["edited"], revision,
-                  text_of("created_at", fallback_time), text_of("updated_at", fallback_time))
+                  text_of("created_at", fallback_time), text_of("updated_at", fallback_time), shared_from=shared_from)

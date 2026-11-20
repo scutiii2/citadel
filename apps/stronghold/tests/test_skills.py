@@ -5,7 +5,7 @@ import pytest
 from tests.auth_helpers import identity
 
 EDIT = {"title": "Reboot an app", "when_to_use": "an app freezes", "steps": "kill it, then launch it", "tools": "tool_srv_restartApp"}
-KEYS = {"id", "title", "when_to_use", "steps", "tools", "status", "successes", "failures", "created_at", "failing"}
+KEYS = {"id", "title", "when_to_use", "steps", "tools", "status", "successes", "failures", "created_at", "failing", "shared_from"}
 
 
 def propose(client, uid="u-1", title="Restart an app"):

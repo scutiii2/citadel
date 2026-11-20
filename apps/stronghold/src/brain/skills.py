@@ -51,6 +51,7 @@ class Skill:
     successes: int
     failures: int
     created_at: str
+    shared_from: str = ""
 
     @property
     def failing(self) -> bool:
@@ -83,6 +84,8 @@ def render(skill: Skill) -> str:
         "id": skill.id, "title": skill.title, "when_to_use": skill.when_to_use, "tools": skill.tools,
         "status": skill.status, "successes": skill.successes, "failures": skill.failures, "created_at": skill.created_at,
     }
+    if skill.shared_from:
+        header["shared_from"] = skill.shared_from
     lines = [_FENCE, *(f"{key}: {json.dumps(value, ensure_ascii=False)}" for key, value in header.items()), _FENCE, "", skill.steps]
     return "\n".join(lines) + "\n"
 
@@ -122,7 +125,11 @@ def parse(text: str, expected_id: int) -> Skill:
         tools = _clean("tools list", text_of("tools"), MAX_TOOLS, required=False)
     except BrainError as error:
         raise RecordError(str(error)) from None
-    return Skill(expected_id, title, when, steps, tools, status, count_of("successes"), count_of("failures"), text_of("created_at"))
+    shared_from = values.get("shared_from", "")
+    if not isinstance(shared_from, str) or len(shared_from) > 80:
+        raise RecordError("shared_from is not valid.")
+    return Skill(expected_id, title, when, steps, tools, status, count_of("successes"), count_of("failures"),
+                 text_of("created_at"), shared_from)
 
 
 def _linked_folder(home: Path) -> bool:
@@ -206,7 +213,8 @@ class SkillFiles:
     def _same_title(skills: dict[int, Skill], title: str, *, except_id: int = 0) -> Skill | None:
         return next((s for s in skills.values() if s.id != except_id and s.status != RETIRED and _norm(s.title) == _norm(title)), None)
 
-    async def propose(self, uid: str, title: str, when_to_use: str, steps: str, tools: str = "") -> tuple[Skill, bool]:
+    async def propose(self, uid: str, title: str, when_to_use: str, steps: str, tools: str = "",
+                      shared_from: str = "") -> tuple[Skill, bool]:
         title = _clean("title", title, MAX_TITLE)
         when_to_use = _clean("when_to_use text", when_to_use, MAX_WHEN)
         steps = _clean("steps", steps, MAX_STEPS)
@@ -215,12 +223,14 @@ class SkillFiles:
             skills, occupied = await self._scan(home)
             same = self._same_title(skills, title)
             if same is not None:
+                if shared_from:
+                    raise BrainError(409, "You already have a skill with that title.")
                 return same, True
             self._check_proposal_room(skills)
             skill_id = max(occupied, default=0) + 1
             if len(occupied) >= MAX_SKILLS or skill_id > _MAX_ID:
                 raise BrainError(409, "The skill list is full. The user must delete some skills first.")
-            skill = Skill(skill_id, title, when_to_use, steps, tools, PROPOSED, 0, 0, _now())
+            skill = Skill(skill_id, title, when_to_use, steps, tools, PROPOSED, 0, 0, _now(), shared_from)
             await self._save(account, home, skill, create=True)
             return skill, False
 

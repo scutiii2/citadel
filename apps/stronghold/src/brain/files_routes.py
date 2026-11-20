@@ -65,6 +65,7 @@ def row(record: Record) -> dict[str, Any]:
         "last_editor": record.last_editor, "agent_editable": record.agent_editable, "edited": record.edited,
         "revision": record.revision, "created_at": record.created_at, "updated_at": record.updated_at,
         "chars": len(record.body), "warning": AGENT_WARNING if record.source == "automatic" else None,
+        "shared_from": record.shared_from,
     }
 
 

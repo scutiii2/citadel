@@ -57,6 +57,7 @@ class SkillOut(BaseModel):
     created_at: str
     # It failed often and more often than it worked, so agents are no longer offered it.
     failing: bool = False
+    shared_from: str = ""
 
 
 class StatusBody(BaseModel):

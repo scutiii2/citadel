@@ -383,16 +383,19 @@ class BrainFiles:
         return [Hit(records[doc_id], score, make_snippet(records[doc_id].body, query)) for doc_id, score in ranked[:wanted]]
 
     async def create(self, uid: str, *, title: str, body: str, tags: Iterable[str] = (), folder: str = "",
-                     actor: str = "user") -> Record:
+                     actor: str = "user", shared_from: str = "") -> Record:
         if actor not in EDITORS:
             raise BrainError(400, "Unknown editor.")
+        if shared_from and actor != "user":
+            raise BrainError(400, "Only a person imports a shared file.")
         title, body, tag_tuple, folder = self._check(title, body, tags, folder)
         async with self._open(uid) as (home, account):
             if account.purged:
                 raise BrainError(404, "No such account.")
             now = _now()
-            record = Record(uuid.uuid4().hex, title, body, folder, tag_tuple, "manual" if actor == "user" else "automatic",
-                            actor, False, False, 1, now, now)
+            source = "manual" if actor == "user" else "automatic"
+            record = Record(uuid.uuid4().hex, title, body, folder, tag_tuple, "shared" if shared_from else source,
+                            actor, False, False, 1, now, now, shared_from)
             text = render(record)
             size = len(text.encode("utf-8"))
             self._room(account, size, True)
@@ -419,7 +422,7 @@ class BrainFiles:
             if actor == "agent":
                 if folder is not None or agent_editable is not None:
                     raise BrainError(403, "Agents cannot move files or change who may edit them.")
-                if old.source != "automatic" and not old.agent_editable:
+                if old.source == "shared" or (old.source != "automatic" and not old.agent_editable):
                     raise BrainError(403, "This file belongs to the user and is read-only for agents.")
             new_title, new_body, new_tags, new_folder = self._check(
                 old.title if title is None else title, old.body if body is None else body,
