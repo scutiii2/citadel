@@ -54,7 +54,6 @@ from src.schema import migrations
 from src.schema import routes as schema_routes
 from src.secret_box import SecretBox
 from src.skills import routes as skills_routes
-from src.skills.client import SkillsClient
 from src.shares import routes as shares_routes
 from src.shares.store import ShareStore
 from src.templates import routes as templates_routes
@@ -127,7 +126,6 @@ def create_app(
         app.state.extension_probe = ExtensionProbe(app.state.agent_gateway)
         armory_client = armory or http_catalog("armory")
         app.state.memory = MemoryClient(armory_client, keyring)
-        app.state.skills = SkillsClient(armory_client, keyring)
         app.state.brain_gateway = BrainGateway(armory_client, keyring)
         app.state.tickets = ArmoryTickets(armory_client, keyring)
         app.state.ticket_unread = TicketUnread(app.state.store)
