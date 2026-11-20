@@ -149,7 +149,11 @@ def validate_server(server_id: str, raw: dict[str, Any]) -> ServerConfig:
     return _build_server(server_id, raw)
 
 
-def load_servers_config(path: Path, url_overrides: dict[str, str | Callable[[], str]] | None = None) -> dict[str, ServerConfig]:
+def load_servers_config(
+    path: Path,
+    url_overrides: dict[str, str | Callable[[], str]] | None = None,
+    builtins: dict[str, dict] | None = None,
+) -> dict[str, ServerConfig]:
     """Load and validate every server in the settings database at `path`.
 
     Raises ConfigError for any entry missing a required field, using an
@@ -164,6 +168,8 @@ def load_servers_config(path: Path, url_overrides: dict[str, str | Callable[[], 
     changing the stored entry. Ignored for a stdio entry or an unknown server_id.
     """
     raw_data = settings_store.read_all(path, "servers")
+    for server_id, entry in (builtins or {}).items():
+        raw_data.setdefault(server_id, entry)
     # The catalog supplies Armory on fresh installs or when main has no saved URL.
     if url_overrides and "main" in url_overrides:
         main = raw_data.get("main", {"label": "Armory", "transport": "http"})

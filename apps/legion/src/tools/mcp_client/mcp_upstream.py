@@ -36,6 +36,8 @@ _CONFIG_PATH = SETTINGS_DB
 # with the ID of its server.
 _SERVER_ID = "main"
 _PREFIX = f"{_SERVER_ID}__"
+_STRONGHOLD_ID = "stronghold"
+_STRONGHOLD_PREFIX = f"{_STRONGHOLD_ID}__"
 
 _log = logging.getLogger(__name__)
 
@@ -77,8 +79,15 @@ def connect(url_override: str | None = None) -> None:
     main = settings_store.read_all(_CONFIG_PATH, "servers").get(_SERVER_ID, {})
     url_overrides = {_SERVER_ID: url_override} if url_override else (
         {_SERVER_ID: catalog.mcp_url} if not main.get("url") and not main.get("origins") and main.get("transport", "http") == "http" else None)
-    # Armory checks a signed service assertion on /mcp.
-    client.connect_all(_CONFIG_PATH, url_overrides, auth_by_server={_SERVER_ID: ServiceAuth(internal_auth.keyring, "armory")})
+    stronghold = {"label": "Stronghold", "transport": "http", "url": lambda: catalog.mcp_url(_STRONGHOLD_ID)}
+    client.connect_all(
+        _CONFIG_PATH, url_overrides,
+        auth_by_server={
+            _SERVER_ID: ServiceAuth(internal_auth.keyring, "armory"),
+            _STRONGHOLD_ID: ServiceAuth(internal_auth.keyring, _STRONGHOLD_ID),
+        },
+        builtins={_STRONGHOLD_ID: stronghold},
+    )
 
 
 def _tool_is_enabled(name: str, enabled: set[str]) -> bool:
@@ -176,10 +185,10 @@ def call_tool(name: str, arguments: dict[str, Any]) -> str:
         # The model only sees in-scope tools, but may still name another one.
         raise PermissionError(f"tool {name!r} is not available to this agent")
     on_progress = tool_progress.current()
-    # The asking user rides in the call's _meta: the session is shared by
-    # every user, so it can't go in a header (see internal_auth.py). Armory
-    # alone needs this context. Outside connections use their configured auth.
-    meta = internal_auth.requester_meta() if name.startswith(_PREFIX) else None
+    # Internal connections share sessions across users. Identity belongs to the call.
+    meta = internal_auth.requester_meta() if name.startswith((_PREFIX, _STRONGHOLD_PREFIX)) else None
+    if meta and name.startswith(_PREFIX):
+        meta.pop("chat_id", None)
     # Each only passed when set, so the plain call keeps its original shape.
     extra: dict[str, Any] = {}
     if on_progress:

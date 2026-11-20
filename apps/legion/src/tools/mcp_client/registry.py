@@ -113,6 +113,7 @@ class McpClientRegistry:
         self._extra_headers: dict[str, str] = {}
         self._auth_by_server = {}
         self._catalog_reconnect_lock = asyncio.Lock()
+        self._builtin_tasks: dict[str, asyncio.Task[None]] = {}
         self._resolve_origin = resolve_origin
         self._active: dict[str, str] = {}
         self._down: dict[tuple[str, str], float] = {}
@@ -131,18 +132,33 @@ class McpClientRegistry:
         url_overrides: dict[str, str] | None = None,
         extra_headers: dict[str, str] | None = None,
         auth_by_server=None,
+        *,
+        builtins: dict[str, dict] | None = None,
     ) -> list[ServerStatus]:
         """Connect to every server in `config_path`, isolated - one bad
         entry is recorded as an error status and never stops a sibling
         from connecting. `url_overrides` is forwarded to
         load_servers_config() - see its docstring. `extra_headers` go on
         every HTTP server's session, reconnects included."""
-        self._configs = load_servers_config(config_path, url_overrides)
+        self._configs = load_servers_config(config_path, url_overrides, builtins)
         self._extra_headers = dict(extra_headers or {})
         self._auth_by_server = dict(auth_by_server or {})
         for server_id, config in self._configs.items():
-            await self._connect_one(server_id, config)
+            if server_id in (builtins or {}):
+                self._builtin_tasks[server_id] = asyncio.create_task(
+                    self._retry_builtin(server_id), name=f"MCP connection {server_id}"
+                )
+            else:
+                await self._connect_one(server_id, config)
         return self.statuses()
+
+    async def _retry_builtin(self, server_id: str) -> None:
+        """Keep a built-in connection available without holding up startup."""
+        while True:
+            session = self._sessions.get(server_id)
+            if session is None or session in self._origin_errors:
+                await self._reconnect(server_id)
+            await asyncio.sleep(ORIGIN_COOLDOWN_SECONDS)
 
     async def _reconnect(self, server_id: str) -> None:
         """Replace one dead upstream session using its startup config."""
@@ -158,7 +174,7 @@ class McpClientRegistry:
         await self._connect_one(server_id, config)
 
     async def _open_origin(
-        self, target: ServerConfig,
+        self, target: ServerConfig, *, extra_headers: dict[str, str] | None = None, auth=None,
     ) -> tuple[AsyncExitStack, ClientSession, list[types.Tool]]:
         """Keep the MCP transport's cancel scopes in the task that opened them."""
         ready: asyncio.Future[tuple[ClientSession, list[types.Tool]]] = asyncio.get_running_loop().create_future()
@@ -168,7 +184,8 @@ class McpClientRegistry:
             session = None
             try:
                 async with AsyncExitStack() as wire:
-                    session = await open_session(wire, target, CONNECT_TIMEOUT_SECONDS, None)
+                    session = await open_session(wire, target, CONNECT_TIMEOUT_SECONDS, extra_headers,
+                                                 **({"auth": auth} if auth is not None else {}))
                     tools = _namespace(target.id, (await session.list_tools()).tools)
                     if not ready.done():
                         ready.set_result((session, tools))
@@ -296,9 +313,13 @@ class McpClientRegistry:
         local_stack = AsyncExitStack()
         try:
             auth = self._auth_by_server.get(server_id)
-            session = await open_session(local_stack, config, CONNECT_TIMEOUT_SECONDS, self._extra_headers,
-                                         **({"auth": auth} if auth is not None else {}))
-            listed = await session.list_tools()
+            if server_id in self._builtin_tasks:
+                opened, session, namespaced_tools = await self._open_origin(config, extra_headers=self._extra_headers, auth=auth)
+            else:
+                session = await open_session(local_stack, config, CONNECT_TIMEOUT_SECONDS, self._extra_headers,
+                                             **({"auth": auth} if auth is not None else {}))
+                namespaced_tools = _namespace(server_id, (await session.list_tools()).tools)
+                opened = local_stack.pop_all()
         except Exception as error:  # noqa: BLE001 - one bad server must not block the others
             try:
                 await local_stack.aclose()
@@ -311,12 +332,10 @@ class McpClientRegistry:
                 status="error",
                 error=str(error) or type(error).__name__,
             )
-            self._statuses.append(status)
+            self._set_status(status)
             return status
 
-        opened = local_stack.pop_all()
         self._stacks[server_id] = opened
-        namespaced_tools = _namespace(server_id, listed.tools)
         self._last_known_tools[server_id] = namespaced_tools
         self._sessions[server_id] = session
         status = ServerStatus(
@@ -326,8 +345,12 @@ class McpClientRegistry:
             status="connected",
             tools=[tool.name for tool in namespaced_tools],
         )
-        self._statuses.append(status)
+        self._set_status(status)
         return status
+
+    def _set_status(self, status: ServerStatus) -> None:
+        self._statuses = [previous for previous in self._statuses if previous.id != status.id]
+        self._statuses.append(status)
 
     async def _live_tools_for(self, server_id: str, session: ClientSession) -> list[types.Tool]:
         try:
@@ -342,7 +365,7 @@ class McpClientRegistry:
         """A catalog-backed Armory absent at startup may become reachable later."""
         async with self._catalog_reconnect_lock:
             for server_id, config in self._configs.items():
-                if callable(config.url) and server_id not in self._sessions:
+                if callable(config.url) and server_id not in self._sessions and server_id not in self._builtin_tasks:
                     self._statuses = [status for status in self._statuses if status.id != server_id]
                     await self._reconnect(server_id)
 
@@ -352,7 +375,8 @@ class McpClientRegistry:
         without a restart, the same reasoning as extensions.py's
         merged_list_tools()."""
         await self._recover_catalog_connections()
-        await asyncio.gather(*(self._refresh_origin(config) for config in self._configs.values() if config.origins))
+        await asyncio.gather(*(self._refresh_origin(config) for config in self._configs.values()
+                               if config.origins and (config.id in self._sessions or config.id not in self._builtin_tasks)))
         results = await asyncio.gather(
             *(self._live_tools_for(server_id, session) for server_id, session in self._sessions.items())
         )
@@ -424,6 +448,9 @@ class McpClientRegistry:
         except RuntimeError as error:
             if str(error) != "Session terminated":
                 raise
+            if server_id in self._builtin_tasks:
+                self._origin_errors[session] = error
+                raise
             await self._reconnect(server_id)
             recovered_session = self._sessions.get(server_id)
             if recovered_session is None:
@@ -433,6 +460,10 @@ class McpClientRegistry:
     async def aclose(self) -> None:
         """Close every open connection. One server failing to close
         cleanly must not stop the others."""
+        for task in self._builtin_tasks.values():
+            task.cancel()
+        await asyncio.gather(*self._builtin_tasks.values(), return_exceptions=True)
+        self._builtin_tasks.clear()
         for stack in (*self._stacks.values(), *self._retired_origins.values()):
             try:
                 await stack.aclose()

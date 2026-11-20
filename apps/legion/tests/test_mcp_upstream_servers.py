@@ -125,15 +125,22 @@ def test_a_denied_or_switched_off_connection_tool_is_refused(upstream, monkeypat
     assert upstream == []
 
 
-def test_requester_metadata_goes_only_to_armory(upstream, monkeypatch):
-    meta = {"requester_token": "test-requester"}
-    monkeypatch.setattr(mcp_upstream.internal_auth, "requester_meta", lambda: meta)
+def test_requester_metadata_reaches_armory_and_stronghold_with_chat_id_only_for_stronghold(upstream, monkeypatch):
+    meta = {"requester_token": "test-requester", "chat_id": "chat-1"}
+    monkeypatch.setattr(mcp_upstream.internal_auth, "requester_meta", lambda: meta.copy())
+    stack_tool = "stronghold__tool_stack_add"
+    monkeypatch.setattr(mcp_upstream.client, "list_tools", lambda: [*CATALOG, tool(stack_tool)])
+    assert stack_tool not in listed()
+    assert listed(allow=("stronghold__*",)) == [stack_tool]
     with patch.object(mcp_upstream.client, "call_tool", wraps=mcp_upstream.client.call_tool) as dispatch:
         assert call("lens__tool_ocr", allow=("lens__*",)) == "ok"
         dispatch.assert_called_once_with("lens__tool_ocr", {})
         dispatch.reset_mock()
         assert call("tool_ticket_create") == "ok"
-        dispatch.assert_called_once_with("main__tool_ticket_create", {}, meta=meta)
+        dispatch.assert_called_once_with("main__tool_ticket_create", {}, meta={"requester_token": "test-requester"})
+        dispatch.reset_mock()
+        assert call(stack_tool, allow=("stronghold__*",)) == "ok"
+        dispatch.assert_called_once_with(stack_tool, {}, meta=meta)
 
 
 def test_an_outside_read_only_hint_does_not_skip_approval(upstream, monkeypatch):

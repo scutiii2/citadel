@@ -47,9 +47,15 @@ class SyncMcpClient:
         url_overrides: dict[str, str] | None = None,
         extra_headers: dict[str, str] | None = None,
         auth_by_server=None,
+        *,
+        builtins: dict[str, dict] | None = None,
     ) -> list[ServerStatus]:
-        return self._run(self._registry.connect_all(config_path, url_overrides, extra_headers,
-            **({"auth_by_server": auth_by_server} if auth_by_server is not None else {})))
+        options = {}
+        if auth_by_server is not None:
+            options["auth_by_server"] = auth_by_server
+        if builtins is not None:
+            options["builtins"] = builtins
+        return self._run(self._registry.connect_all(config_path, url_overrides, extra_headers, **options))
 
     def list_tools(self) -> list[types.Tool]:
         return self._run(self._registry.list_tools())
