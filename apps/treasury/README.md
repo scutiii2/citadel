@@ -56,6 +56,25 @@ A connection is reachable only through an instance that lists it. Filters match 
 by equality. Raw SQL works only on SQL backends and only when the connection sets
 `"allow_raw_sql": true`.
 
+### Outside services
+
+| Method | Path | Caller | Body or query |
+|---|---|---|---|
+| GET | `/outside` | Any authenticated Citadel service | |
+| POST | `/outside/origins` | Legion, Stronghold | `{"origin": "...", "name": "..."}`. Name can be omitted for a known origin. |
+| GET | `/admin/outside` | Portcullis | |
+| PATCH | `/admin/outside/{service_id}` | Portcullis | `{"name": "..."}` |
+| DELETE | `/admin/outside/origins/{origin_id}` | Portcullis | `?confirm=true` for an origin in use |
+| DELETE | `/admin/outside/{service_id}` | Portcullis | `?confirm=true` for a group in use |
+
+The catalog uses `outside_groups`, `outside_origins` and `outside_users` in
+`.data/treasury/settings.db`. Origins use `http(s)://host[:port]`. Treasury drops
+default ports and separates any path before storing the origin. It rejects addresses
+with credentials, a query or a fragment. A delete that needs confirmation returns
+`409` with `used_by`.
+
+Treasury stores addresses only. Each consumer keeps its own tokens and ordered origin list.
+
 ## Cache
 Per connection, in process (L1): TTL + LRU, write-through. Writes go to the database first, then
 drop that record and every cached query of that collection. Concurrent misses on one key share a
