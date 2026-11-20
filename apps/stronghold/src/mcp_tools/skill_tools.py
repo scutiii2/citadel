@@ -6,7 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 from src.brain.files import BrainError
-from src.brain.skills import SkillFiles
+from src.brain.global_brain import GLOBAL_UID, GlobalBrain
+from src.brain.skills import DEFAULT_LIMIT, Skill, SkillFiles
 from src.mcp_tools.scope import Account
 
 _SOURCE = "your approved skills"
@@ -24,23 +25,31 @@ def _refused(error: BrainError) -> dict[str, Any]:
 
 
 class SkillTools:
-    def __init__(self, files: SkillFiles) -> None:
+    def __init__(self, files: SkillFiles, global_brain: GlobalBrain | None = None) -> None:
         self._files = files
+        self._global = global_brain
 
     async def search(self, account: Account, query: str) -> dict[str, Any]:
         try:
             found = await self._files.search(account.uid, query)
+            shared = []
+            if self._global is not None and len(found) < DEFAULT_LIMIT:
+                taken = {s.title.lower() for s in found}
+                shared = [s for s in await self._global.skills.search(GLOBAL_UID, query, DEFAULT_LIMIT)
+                          if s.title.lower() not in taken][:DEFAULT_LIMIT - len(found)]
         except BrainError as error:
             return _refused(error)
-        if not found:
+        if not found and not shared:
             return {"ok": True, "count": 0, "message": "No approved skills match."}
-        blocks = [
-            f"[{s.id}] {s.title} (worked {s.successes}x, failed {s.failures}x)\n"
-            f"When to use: {s.when_to_use}\nSteps: {s.steps}" + (f"\nTools: {s.tools}" if s.tools else "")
-            for s in found
-        ]
+        blocks = [self._block(f"[{s.id}] {s.title} (worked {s.successes}x, failed {s.failures}x)", s) for s in found]
+        blocks += [self._block(f"[global] {s.title} (from the global brain)", s) for s in shared]
         joined = "\n".join(blocks)
-        return {"ok": True, "count": len(found), "message": f"{len(found)} approved skill(s):\n{_fence(joined)}"}
+        total = len(found) + len(shared)
+        return {"ok": True, "count": total, "message": f"{total} approved skill(s):\n{_fence(joined)}"}
+
+    @staticmethod
+    def _block(head: str, skill: Skill) -> str:
+        return f"{head}\nWhen to use: {skill.when_to_use}\nSteps: {skill.steps}" + (f"\nTools: {skill.tools}" if skill.tools else "")
 
     async def propose(self, account: Account, title: str, when_to_use: str, steps: str, tools: str) -> dict[str, Any]:
         try:
