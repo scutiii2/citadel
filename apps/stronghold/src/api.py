@@ -211,6 +211,7 @@ def create_app(
     app.include_router(brain_files_routes.router)
     app.include_router(brain_global_routes.router)
     app.include_router(brain_share_routes.router)
+    app.include_router(brain_share_routes.blocks_router)
     app.include_router(brain_settings_routes.router)
     app.include_router(instance_migration.router)
     app.include_router(chats_routes.router)

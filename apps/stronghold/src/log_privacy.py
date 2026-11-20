@@ -13,13 +13,15 @@ _UID_IN_PATH = re.compile(r"(/(?:owners|accounts)/)[^\s\"/?]+")
 
 
 _BRAIN_QUERY = re.compile(r'(/brain/[^?\s"]*)\?[^\s"]*')
+_BY_USERNAME = re.compile(r'(/by-username/)[^\s"?]+')
 
 
 class UidLogFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         def redact(value):
             text = str(value)
-            redacted = _UID_IN_PATH.sub(r"\1[redacted]", text)
+            redacted = _BY_USERNAME.sub(r"\1[redacted]", text)
+            redacted = _UID_IN_PATH.sub(r"\1[redacted]", redacted)
             redacted = _BRAIN_QUERY.sub(r"\1?[redacted]", redacted)
             return redacted if redacted != text else value
 

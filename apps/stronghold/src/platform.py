@@ -7,7 +7,9 @@ requester's identity; a job without a request asks here. Calls go to Portcullis'
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from src.service_auth import authenticate
@@ -15,6 +17,7 @@ from src.citadel_auth import verify_requester
 from src import service_auth
 
 logger = logging.getLogger(__name__)
+_USERNAME = re.compile(r"[A-Za-z0-9_.-]{3,80}")
 
 
 class PlatformError(Exception):
@@ -43,6 +46,21 @@ class PortcullisClient:
         if response.status_code != 200:
             raise PlatformError(f"Portcullis answered {response.status_code}")
         return set(response.json()["permissions"])
+
+    async def uid_for_username(self, username: str) -> tuple[str, str] | None:
+        """(uid, canonical username) of a usable account; None for an unknown, inactive or unverified one."""
+        if _USERNAME.fullmatch(username) is None:
+            return None
+        response = await self._send("GET", f"/internal/accounts/by-username/{quote(username, safe='')}")
+        if response.status_code == 404:
+            return None
+        if response.status_code != 200:
+            raise PlatformError(f"Portcullis answered {response.status_code}")
+        try:
+            body = response.json()
+            return body["uid"], body["username"]
+        except (ValueError, KeyError, TypeError):
+            raise PlatformError("Invalid recipient lookup response") from None
 
     async def requester_token(self, uid: str) -> str:
         response = await self._send("POST", "/internal/requester-token", json={"uid": uid})

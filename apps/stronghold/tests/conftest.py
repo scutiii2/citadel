@@ -80,9 +80,16 @@ class FakePlatform:
         # What each account may do; `granted[uid] = None` is an inactive or unverified account.
         self.default_permissions = {"chat.use", "settings.manage", "brain.instance.publish", "tools.execute"}
         self.granted: dict[str, set[str] | None] = {}
+        self.usernames = {"bob": "u-2", "cyd": "u-3"}
 
     async def permissions(self, uid):
         return self.granted.get(uid, self.default_permissions)
+
+    async def uid_for_username(self, username):
+        uid = self.usernames.get(username)
+        if uid is None or uid in self.granted and self.granted[uid] is None:
+            return None
+        return uid, username
 
     async def requester_token(self, uid):
         return identity(uid=uid)["X-Citadel-Requester"]

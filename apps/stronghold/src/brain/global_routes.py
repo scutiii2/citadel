@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from src.brain.files_routes import BrainRoute, FileId, NewFile, full, row
 from src.brain.global_brain import GLOBAL_UID, GlobalBrain
+from src.brain.share_routes import Landing, ShareId, shares_of
 from src.brains.routes import need, permissions
 from src.requester import Requester, current_requester
 from src.skills.routes import EditBody, SkillId, SkillOut, StatusBody, _out
@@ -122,3 +123,28 @@ async def delete_skill(skill_id: SkillId, request: Request, who: Requester = Dep
         raise HTTPException(404, _GONE)
     await _logged(request, who)
     return Response(status_code=204)
+
+
+@router.get("/shares")
+async def queue(request: Request, _who: Requester = Depends(writer)):
+    return {"shares": await shares_of(request).queue()}
+
+
+@router.get("/shares/{share_id}")
+async def queued_share(share_id: ShareId, request: Request, who: Requester = Depends(writer)):
+    return await shares_of(request).get(who.uid, share_id, reviewer=True)
+
+
+@router.post("/shares/{share_id}/approve")
+async def approve(share_id: ShareId, request: Request, body: Landing | None = None, who: Requester = Depends(writer)):
+    given = body or Landing()
+    done = await shares_of(request).review(share_id, True, given.title, given.folder)
+    await request.app.state.platform.log_action(who.uid, "brain.global_review", "Reviewed a global share")
+    return done
+
+
+@router.post("/shares/{share_id}/reject")
+async def reject(share_id: ShareId, request: Request, who: Requester = Depends(writer)):
+    done = await shares_of(request).review(share_id, False)
+    await request.app.state.platform.log_action(who.uid, "brain.global_review", "Reviewed a global share")
+    return done
