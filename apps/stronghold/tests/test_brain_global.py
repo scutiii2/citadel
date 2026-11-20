@@ -49,10 +49,12 @@ def test_global_skills_reach_readers_only_when_active(client, platform):
     skill, _ = asyncio.run(store.propose("global", "Restart an app", "hung", "stop, start", ""))
     assert client.get("/brain/global/skills").json() == []
     assert [s["status"] for s in client.get("/brain/global/skills/all").json()] == ["proposed"]
-    assert client.put(f"/brain/global/skills/{skill.id}/status", json={"status": "active"}).status_code == 200
+    status = client.put(f"/brain/global/skills/{skill.id}/status", json={"status": "active"})
+    assert status.status_code == 200 and "Do not put private data" in status.json()["notice"]
     assert [s["id"] for s in client.get("/brain/global/skills").json()] == [skill.id]
     edited = client.put(f"/brain/global/skills/{skill.id}", json={"title": "Reboot", "when_to_use": "hung", "steps": "kill it"})
     assert edited.status_code == 200 and edited.json()["title"] == "Reboot"
+    assert "Do not put private data" in edited.json()["notice"]
     platform.granted["u-1"] = READER
     assert client.put(f"/brain/global/skills/{skill.id}/status", json={"status": "retired"}).status_code == 403
     assert client.delete(f"/brain/global/skills/{skill.id}").status_code == 403

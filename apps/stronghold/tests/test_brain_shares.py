@@ -185,3 +185,25 @@ async def test_inbox_cap_above_one_page_is_enforced(world):
         share_id = f"{index:032x}"
         await world.db.put(SHARES, share_id, {"id": share_id, "recipient_uid": B, "status": "pending"})
     await refused(share_file(world), 409)
+
+
+async def test_sent_includes_newest_shares_across_key_ordered_pages(world):
+    for index in range(201):
+        share_id = f"{index:032x}"
+        await world.db.put(SHARES, share_id, {
+            "id": share_id, "sender_uid": A, "body": "", "created_at": f"{index:03d}",
+        })
+    sent = await world.shares.sent(A)
+    assert len(sent) == 200
+    assert [share["created_at"] for share in sent] == [f"{index:03d}" for index in range(200, 0, -1)]
+
+
+async def test_an_in_flight_recipient_lookup_cannot_create_data_after_purge(world):
+    made = await world.brain.create(A, title="Note", body="Text")
+    await world.shares.purge(B)
+    assert await refused(
+        world.shares.create(A, "alice", "file", {"file_id": made.id}, recipient_uid=B, recipient_name="bo"), 404,
+    ) == "No such recipient."
+    await refused(world.shares.block(A, B, "bo"), 404)
+    assert await world.db.query(SHARES) == []
+    assert await world.db.query(BLOCKS) == []

@@ -32,20 +32,24 @@ class SkillTools:
     async def search(self, account: Account, query: str) -> dict[str, Any]:
         try:
             found = await self._files.search(account.uid, query)
-            shared = []
-            if self._global is not None and len(found) < DEFAULT_LIMIT:
-                taken = {s.title.lower() for s in found}
-                shared = [s for s in await self._global.skills.search(GLOBAL_UID, query, DEFAULT_LIMIT)
-                          if s.title.lower() not in taken][:DEFAULT_LIMIT - len(found)]
         except BrainError as error:
             return _refused(error)
+        shared = []
+        warning = ""
+        if self._global is not None and len(found) < DEFAULT_LIMIT:
+            taken = {s.title.lower() for s in found}
+            try:
+                shared = [s for s in await self._global.skills.search(GLOBAL_UID, query, DEFAULT_LIMIT)
+                          if s.title.lower() not in taken][:DEFAULT_LIMIT - len(found)]
+            except (BrainError, OSError):
+                warning = "\nGlobal skill search is unavailable."
         if not found and not shared:
-            return {"ok": True, "count": 0, "message": "No approved skills match."}
+            return {"ok": True, "count": 0, "message": "No approved skills match." + warning}
         blocks = [self._block(f"[{s.id}] {s.title} (worked {s.successes}x, failed {s.failures}x)", s) for s in found]
         blocks += [self._block(f"[global] {s.title} (from the global brain)", s) for s in shared]
         joined = "\n".join(blocks)
         total = len(found) + len(shared)
-        return {"ok": True, "count": total, "message": f"{total} approved skill(s):\n{_fence(joined)}"}
+        return {"ok": True, "count": total, "message": f"{total} approved skill(s):\n{_fence(joined)}{warning}"}
 
     @staticmethod
     def _block(head: str, skill: Skill) -> str:

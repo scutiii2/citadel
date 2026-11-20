@@ -309,7 +309,8 @@ async def delete_account(
     for domain, what in (("memory", "Memory notes"), ("notes", "Notes"),
                          ("skills", "Skills"), ("templates", "Templates"), ("usage", "Usage"), ("tickets", "Tickets"), ("shares", "Share links"),
                          ("tuning", "Response limits"), ("chats", "Chats and folders"), ("stack", "Short-term memory"),
-                         ("brain", "Long-term memory"), ("brains", "Brain connections"),
+                         ("brain", "Long-term memory"), ("brain/shares", "Shared items and blocks"),
+                         ("brains", "Brain connections"),
                          ("account-agents", "Switched-off agents"), ("user-extensions", "Private extensions"),
                          ("turns", "Running answers")):
         try:
@@ -317,7 +318,9 @@ async def delete_account(
             confirmed = purged.status < 400
         except StrongholdUnavailable:
             confirmed = False
-        if not confirmed:
+        if not confirmed and domain == "brain/shares":
+            await logs.error(admin.id, "admin.brain_shares_purge", "Shared items and blocks were not purged")
+        elif not confirmed:
             await logs.error(
                 admin.id, f"admin.{domain}_purge", f"{what} of deleted account '{username}' were not purged (stronghold did not confirm)"
             )

@@ -85,11 +85,13 @@ def test_a_global_share_goes_to_the_review_queue(client, platform):
     done = client.post(f"/brain/global/shares/{given['id']}/approve", json={"title": "House diet", "folder": "policy"}, headers=BO)
     assert done.status_code == 200 and done.json()["status"] == "accepted"
     platform.granted["u-3"] = {"chat.use"}
+    assert "Do not put private data" in done.json()["notice"]
     shown = client.get("/brain/global/files", headers=CY).json()["files"]
     me = client.get("/whoami").json()["username"]
     assert [(f["title"], f["shared_from"], f["folder"]) for f in shown] == [("House diet", me, "policy")]
     second = client.post("/brain/shares", json={"kind": "file", "file_id": file["id"], "to_global": True}).json()
-    assert client.post(f"/brain/global/shares/{second['id']}/reject", headers=BO).json()["status"] == "rejected"
+    rejected = client.post(f"/brain/global/shares/{second['id']}/reject", headers=BO).json()
+    assert rejected["status"] == "rejected" and "Do not put private data" in rejected["notice"]
     assert client.get("/brain/global/shares", headers=BO).json()["shares"] == []
     assert "brain.global_review" in [a for _, a, _ in platform.actions]
 

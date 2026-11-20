@@ -80,3 +80,21 @@ async def test_a_global_skill_with_an_own_title_is_not_listed_twice(world):
 async def test_no_tool_shares_imports_or_writes_global(client):
     names = {tool.name for tool in await client.app.state.mcp.list_tools()}
     assert not any("share" in name or "global" in name or "import" in name for name in names)
+
+
+async def test_personal_results_survive_unavailable_global_storage(world, monkeypatch):
+    async def unavailable(*_args):
+        raise OSError("Unavailable storage")
+
+    await world.files.create("u-1", title="Personal note", body="tea")
+    own, _ = await world.skills.propose("u-1", "Make tea", "thirsty", "brew tea")
+    await world.skills.set_status("u-1", own.id, "active")
+    monkeypatch.setattr(world.glob.files, "search", unavailable)
+    monkeypatch.setattr(world.glob.skills, "search", unavailable)
+
+    notes = await world.brain.search(ME, "tea", None)
+    assert [note["scope"] for note in notes["results"]] == ["own"]
+    assert "Global brain search is unavailable." in notes["message"]
+    skills = await world.skill.search(ME, "tea")
+    assert skills["count"] == 1 and f"[{own.id}]" in skills["message"]
+    assert "Global skill search is unavailable." in skills["message"]

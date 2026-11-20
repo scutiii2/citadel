@@ -14,6 +14,9 @@ import hashlib
 import json
 import uuid
 from datetime import UTC, datetime
+from heapq import nlargest
+from itertools import chain
+from operator import itemgetter
 from typing import Any
 from weakref import WeakValueDictionary
 
@@ -60,6 +63,7 @@ class BrainShares:
         self._global = global_brain
         self.limits = limits
         self._creation_lock = asyncio.Lock()
+        self._purged: set[str] = set()
         self._locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
 
     def _lock(self, key: str) -> asyncio.Lock:
@@ -116,7 +120,9 @@ class BrainShares:
             raise BrainError(404, _NO_RECIPIENT)
         target = GLOBAL if to_global else recipient_uid
         async with self._creation_lock:
-            if not to_global and await self.is_blocked(recipient_uid, sender_uid):
+            if sender_uid in self._purged:
+                raise BrainError(404, "No such account.")
+            if not to_global and (recipient_uid in self._purged or await self.is_blocked(recipient_uid, sender_uid)):
                 raise BrainError(404, _NO_RECIPIENT)
             snapshot = self._sanitise(await self._snapshot(sender_uid, kind, ref))
             fingerprint = hashlib.sha256(json.dumps([target, kind, snapshot], sort_keys=True).encode()).hexdigest()
@@ -136,8 +142,14 @@ class BrainShares:
             return view(doc)
 
     async def sent(self, uid: str) -> list[dict[str, Any]]:
-        docs = await self._find(sender_uid=uid)
-        return [view(d) for d in sorted(docs, key=lambda d: d["created_at"], reverse=True)]
+        sent: list[dict[str, Any]] = []
+        offset = 0
+        while docs := await self._find(sender_uid=uid, offset=offset):
+            sent = nlargest(_PAGE, chain(sent, map(view, docs)), key=itemgetter("created_at"))
+            if len(docs) < _PAGE:
+                break
+            offset += len(docs)
+        return sent
 
     async def inbox(self, uid: str) -> list[dict[str, Any]]:
         docs = await self._find(recipient_uid=uid, status=PENDING, limit=1_000)
@@ -221,6 +233,8 @@ class BrainShares:
         if blocked_uid == uid:
             raise BrainError(422, "You cannot block yourself.")
         async with self._creation_lock:
+            if uid in self._purged or blocked_uid in self._purged:
+                raise BrainError(404, _NO_RECIPIENT)
             if len(await self._store.query(BLOCKS, {"owner": uid}, limit=_PAGE)) >= MAX_BLOCKS and not await self.is_blocked(uid, blocked_uid):
                 raise BrainError(409, f"You can block at most {MAX_BLOCKS} accounts.")
             await self._store.put(BLOCKS, f"{uid}:{blocked_uid}",
@@ -237,12 +251,14 @@ class BrainShares:
 
     async def purge(self, uid: str) -> None:
         """Every share the account sent or was sent, and every block to or from it."""
-        for filters in ({"sender_uid": uid}, {"recipient_uid": uid}):
-            while docs := await self._find(**filters):
-                for doc in docs:
-                    async with self._lock(doc["id"]):
-                        await self._store.delete(SHARES, doc["id"])
-        for filters in ({"owner": uid}, {"blocked_uid": uid}):
-            while docs := await self._store.query(BLOCKS, filters, limit=_PAGE):
-                for doc in docs:
-                    await self._store.delete(BLOCKS, f"{doc['owner']}:{doc['blocked_uid']}")
+        async with self._creation_lock:
+            self._purged.add(uid)
+            for filters in ({"sender_uid": uid}, {"recipient_uid": uid}):
+                while docs := await self._find(**filters):
+                    for doc in docs:
+                        async with self._lock(doc["id"]):
+                            await self._store.delete(SHARES, doc["id"])
+            for filters in ({"owner": uid}, {"blocked_uid": uid}):
+                while docs := await self._store.query(BLOCKS, filters, limit=_PAGE):
+                    for doc in docs:
+                        await self._store.delete(BLOCKS, f"{doc['owner']}:{doc['blocked_uid']}")

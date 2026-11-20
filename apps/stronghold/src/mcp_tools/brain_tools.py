@@ -39,17 +39,21 @@ class BrainTools:
         wanted = max(1, min(limit or self._files.limits.search_limit, 30))
         try:
             hits = [(hit, "own") for hit in await self._files.search(account.uid, query, wanted)]
-            if self._global is not None:
-                hits += [(hit, "global") for hit in await self._global.files.search(GLOBAL_UID, query, wanted)]
         except BrainError as error:
             return _refused(error)
+        warning = ""
+        if self._global is not None:
+            try:
+                hits += [(hit, "global") for hit in await self._global.files.search(GLOBAL_UID, query, wanted)]
+            except (BrainError, OSError):
+                warning = " Global brain search is unavailable."
         hits.sort(key=lambda pair: (-pair[0].score, pair[1] != "own"))
         hits = hits[:wanted]
         if not hits:
-            return {"ok": True, "count": 0, "results": [], "message": "No matching notes."}
+            return {"ok": True, "count": 0, "results": [], "message": "No matching notes." + warning}
         results = [{**_summary(hit.record, scope), "snippet": hit.snippet, "score": hit.score} for hit, scope in hits]
         return {"ok": True, "count": len(results), "results": results,
-                "message": f"{len(results)} matching notes. Call tool_brain_read for the whole text. {_DATA}"}
+                "message": f"{len(results)} matching notes. Call tool_brain_read for the whole text. {_DATA}{warning}"}
 
     async def read(self, account: Account, file_id: str) -> dict[str, Any]:
         try:

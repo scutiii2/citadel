@@ -129,6 +129,20 @@ Titles, when-to-use text, steps and tool lists allow up to 80, 300, 1,200 and 20
 
 A skill stops appearing in search after at least three failures when failures outnumber successes. Editing resets both counts.
 
+## Global brain and sharing
+
+The global brain stores Markdown files and skills under `<brain root>/_global/`, beside `accounts/`. Back up both directories. Signed-in chat users can read global files and active skills. `brain.global.write` controls file changes, skill management and share review. Administrators receive it at startup.
+
+Portcullis serves the session routes under `/api/brain`. Use `/global/files`, `/global/search`, `/global/summary` and `/global/skills` to read global content. Use `/shares` to send a file, section, skill or short-term item, `/shares/sent` and `/shares/inbox` to list shares, and `/blocks` to manage blocked accounts. Reviewers use `/global/shares`.
+
+A share freezes the selected content. It drops file tags and converts private Markdown links, images and wiki links to plain labels. Public HTTP, HTTPS and mailto text links remain. HTML links and bare paths stay as written. Unknown, inactive, self and blocking recipients return the same response.
+
+The recipient can accept or decline a pending share. The sender can revoke it before a decision. A reviewer approves or rejects shares sent to the global brain. Acceptance creates a file marked `shared` or a proposed skill with fresh counts. Both show the sender. Decline, revoke and rejection clear the snapshot text. Blocking also declines pending shares from that sender. Accepted copies stay after account purge.
+
+`/admin/brain-settings` exposes live `sharing` limits for snapshot characters, pending sends per account, inbox size and review queue size. Agents read global results alongside personal results. Global results are labelled and read-only, and global skills have no markable ID. Agents have no sharing or import tool.
+
+The personal and global BM25 scores come from separate corpora. Personal files come first on ties. Pending inboxes respect the configured limits. Sent history displays up to 200 rows. A crash after creating an accepted copy and before saving the decision can leave a pending share with an imported copy.
+
 ## Tool services
 
 Stronghold calls Bard for speech, Scribe for dictation and audio attachments, and Reader for document attachments. Configure these three services in **Stronghold Admin → Tool services**. Stronghold stores one record per service in its `settings.db` table `tool_services`. A record holds `enabled`, a Treasury `service_id`, an ordered list of `{origin_id, header_value?}` references, and a parent `token`. Treasury stores the addresses and lists Stronghold in `used_by`. Admin responses expose token-presence flags. Each request sends `X-Internal-Token` only to its selected origin, using that origin's override when present.

@@ -21,6 +21,10 @@ _GONE = "This skill no longer exists"
 router = APIRouter(prefix="/brain/global", tags=["brain-global"], route_class=BrainRoute)
 
 
+class GlobalSkillChange(SkillOut):
+    notice: str = NOTICE
+
+
 class GlobalChange(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     body: str | None = Field(default=None, max_length=100_000)
@@ -99,22 +103,22 @@ async def all_skills(request: Request, _who: Requester = Depends(writer)):
     return [_out(s) for s in await _global(request).skills.list(GLOBAL_UID)]
 
 
-@router.put("/skills/{skill_id}/status", response_model=SkillOut)
+@router.put("/skills/{skill_id}/status", response_model=GlobalSkillChange)
 async def skill_status(skill_id: SkillId, body: StatusBody, request: Request, who: Requester = Depends(writer)):
     skill = await _global(request).skills.set_status(GLOBAL_UID, skill_id, body.status)
     if skill is None:
         raise HTTPException(404, _GONE)
     await _logged(request, who)
-    return _out(skill)
+    return GlobalSkillChange(**_out(skill).model_dump())
 
 
-@router.put("/skills/{skill_id}", response_model=SkillOut)
+@router.put("/skills/{skill_id}", response_model=GlobalSkillChange)
 async def edit_skill(skill_id: SkillId, body: EditBody, request: Request, who: Requester = Depends(writer)):
     skill = await _global(request).skills.update(GLOBAL_UID, skill_id, body.title, body.when_to_use, body.steps, body.tools)
     if skill is None:
         raise HTTPException(404, _GONE)
     await _logged(request, who)
-    return _out(skill)
+    return GlobalSkillChange(**_out(skill).model_dump())
 
 
 @router.delete("/skills/{skill_id}", status_code=204)
@@ -140,11 +144,11 @@ async def approve(share_id: ShareId, request: Request, body: Landing | None = No
     given = body or Landing()
     done = await shares_of(request).review(share_id, True, given.title, given.folder)
     await request.app.state.platform.log_action(who.uid, "brain.global_review", "Reviewed a global share")
-    return done
+    return {**done, "notice": NOTICE}
 
 
 @router.post("/shares/{share_id}/reject")
 async def reject(share_id: ShareId, request: Request, who: Requester = Depends(writer)):
     done = await shares_of(request).review(share_id, False)
     await request.app.state.platform.log_action(who.uid, "brain.global_review", "Reviewed a global share")
-    return done
+    return {**done, "notice": NOTICE}

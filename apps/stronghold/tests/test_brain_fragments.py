@@ -17,6 +17,19 @@ def test_private_links_become_their_label_and_public_links_stay():
     assert drop_private_links("plain text, no links") == "plain text, no links"
 
 
+def test_private_reference_links_and_delimited_destinations_become_plain_labels():
+    text = (
+        "[file][ref], ![picture][ref], [ref] and [ref][].\n"
+        "[ref]: <folder with spaces/file.md>\n"
+        "[one](folder(file)/file.md) [two](<folder with spaces/file.md>) "
+        "[three](folder\\)/file.md 'optional title') [four](<https://example.test>)"
+    )
+    assert drop_private_links(text) == (
+        "file, picture, ref and ref.\n"
+        "one two three [four](<https://example.test>)"
+    )
+
+
 BODY = "intro\n\n# Setup\nstep one\n## Detail\nmore\n```\n# not a heading\n```\n# Usage\nrun it\n"
 
 
@@ -26,6 +39,11 @@ def test_a_section_runs_to_the_next_heading_of_the_same_or_higher_level():
     assert extract_section(BODY, "Usage") == "# Usage\nrun it"
     assert extract_section(BODY, "Missing") is None
     assert extract_section(BODY, "not a heading") is None
+
+
+def test_fenced_code_requires_a_matching_closer_of_sufficient_length():
+    section = "# Setup\n````python\n```\n# still code\n~~~\n# also code\n````\nstep one"
+    assert extract_section(section + "\n# Usage\nrun it", "Setup") == section
 
 
 def test_shared_from_survives_a_round_trip_and_old_files_still_parse():

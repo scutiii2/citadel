@@ -32,8 +32,10 @@ TUNING_MANAGE = "tuning.manage"
 TICKETS_CREATE = "tickets.create"
 TICKETS_MANAGE = "tickets.manage"
 BRAIN_INSTANCE_PUBLISH = "brain.instance.publish"
+BRAIN_GLOBAL_WRITE = "brain.global.write"
 
 ALL_PERMISSIONS = MappingProxyType({
+    BRAIN_GLOBAL_WRITE: "Write the global brain and review what people share with it",
     BRAIN_INSTANCE_PUBLISH: "Publish durable knowledge to the shared Instance Brain",
     CHAT_USE: "Chat with ai_agent instances",
     TOOLS_VIEW: "Browse tools, capabilities, help and resources",
@@ -71,7 +73,7 @@ STAFF_PERMISSIONS = frozenset({
     ACCOUNTS_VIEW, ACCOUNTS_MANAGE, ACCOUNTS_DELETE, ROLES_VIEW, ROLES_MANAGE, ROLES_ASSIGN,
     INVITES_MANAGE, SETTINGS_MANAGE, CAPABILITIES_MANAGE, EXTENSIONS_MANAGE, AGENTS_MANAGE, TUNING_MANAGE,
     LOGS_VIEW, LOGS_ERRORS_VIEW, LOGS_CHAT_VIEW, LOGS_CHAT_PROMPTS_VIEW, CONFIG_ISSUES_VIEW,
-    TRAFFIC_VIEW, USAGE_ALL_VIEW, TICKETS_MANAGE,
+    TRAFFIC_VIEW, USAGE_ALL_VIEW, TICKETS_MANAGE, BRAIN_GLOBAL_WRITE,
 })
 
 ADMIN_ROLE = "Administrator"

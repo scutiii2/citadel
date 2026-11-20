@@ -9,12 +9,14 @@ from __future__ import annotations
 import logging
 import re
 
-_UID_IN_PATH = re.compile(r"(/(?:owners|accounts)/)[^\s\"?]+")
+_UID_IN_PATH = re.compile(r"(/(?:owners|accounts)/)(?!by-username/)[^\s\"?]+")
+_BY_USERNAME = re.compile(r'(/by-username/)[^\s"?]+')
 
 
 def redact(text: str) -> str:
     """`text` with any account uid in a path replaced."""
-    return _UID_IN_PATH.sub(r"[redacted]", text)
+    redacted = _UID_IN_PATH.sub(r"\1[redacted]", text)
+    return _BY_USERNAME.sub(r"\1[redacted]", redacted)
 
 
 _BRAIN_QUERY = re.compile(r'(/brain/[^?\s"]*)\?[^\s"]*')
@@ -22,17 +24,17 @@ _BRAIN_QUERY = re.compile(r'(/brain/[^?\s"]*)\?[^\s"]*')
 
 class UidLogFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
-        def redact(value):
+        def redact_value(value):
             text = str(value)
-            redacted = _UID_IN_PATH.sub(r"\1[redacted]", text)
+            redacted = redact(text)
             redacted = _BRAIN_QUERY.sub(r"\1?[redacted]", redacted)
             return redacted if redacted != text else value
 
-        record.msg = redact(record.msg)
+        record.msg = redact_value(record.msg)
         if isinstance(record.args, tuple):
-            record.args = tuple(redact(value) for value in record.args)
+            record.args = tuple(redact_value(value) for value in record.args)
         elif isinstance(record.args, dict):
-            record.args = {key: redact(value) for key, value in record.args.items()}
+            record.args = {key: redact_value(value) for key, value in record.args.items()}
         return True
 
 

@@ -265,6 +265,12 @@ Deploy Stronghold and Legion from the same repo version. Ember needs the `strong
 
 Keep Armory's `skills` capability offline. Stronghold stores new skill files in `.skills/` inside each account's Brain folder, so include that folder in backups. Citadel no longer reads or purges the old Armory skill data. Agents can propose those skills again, and Plan 20f will support recreating them by hand.
 
+### Global brain rollout
+
+Deploy Portcullis and Stronghold together so Stronghold can resolve share recipients through Portcullis's signed internal username endpoint. Give `brain.global.write` to roles responsible for editing global content and reviewing shares. Startup grants it to the Administrator role.
+
+Include `<brain root>/_global/` in the same backups as `<brain root>/accounts/`. Both belong on the brain volume. Include Treasury data in backups to preserve share and block records.
+
 ## Tool services
 
 Before using read aloud, dictation, audio attachments, or document attachments, configure Bard, Scribe, and Reader in **Stronghold Admin → Tool services**. Deploy compatible builds of Stronghold, Portcullis, and Stronghold Admin together.
