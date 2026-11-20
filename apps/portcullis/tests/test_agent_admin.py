@@ -280,3 +280,67 @@ def test_treasury_address_routes_are_removed(client):
     admin = as_admin(client)
     assert admin.get("/api/admin/treasury-address").status_code == 404
     assert admin.put("/api/admin/treasury-address", json={"url": "http://treasury:29602"}).status_code == 404
+
+
+def test_origin_overrides_are_hidden_and_addresses_pass_through(client, upstream: FakeUpstream) -> None:
+    stored = {"bard": {"label": "Bard", "transport": "http", "service_id": "s", "path": "/mcp",
+                       "auth": {"type": "header", "header_name": "X-Token", "header_value": "parent"},
+                       "origins": [{"origin_id": "o1", "origin": "http://bard:29400"},
+                                   {"origin_id": "o2", "origin": None, "header_value": "second"}]}}
+    sent = {}
+
+    def handler(request):
+        if request.url.path == "/agents/servers/lookup":
+            sent["lookup"] = json.loads(request.content)
+            return httpx.Response(200, json={"found": False, "origin": "http://x:1", "path": "", "origin_id": None, "group": None})
+        if request.method == "PUT":
+            sent["put"] = json.loads(request.content)
+            return httpx.Response(200, json={"saved": "bard", "applies": "next start"})
+        return servers_agent(stored)(request)
+
+    upstream.handler = handler
+    as_admin(client)
+    listed = client.get("/api/admin/servers")
+    assert "second" not in listed.text and "parent" not in listed.text
+    origins = listed.json()["servers"]["bard"]["origins"]
+    assert origins[0] == {"origin_id": "o1", "origin": "http://bard:29400", "has_override": False}
+    assert origins[1] == {"origin_id": "o2", "origin": None, "has_override": True}
+
+    body = {"label": "Bard", "transport": "http", "path": "/mcp",
+            "auth": {"type": "header", "header_name": "X-Token"},
+            "addresses": [{"address": "http://bard:29400/mcp", "name": "bard", "header_value": "x"}]}
+    assert client.put("/api/admin/servers/bard", json=body).status_code == 200
+    assert sent["put"]["addresses"][0]["address"] == "http://bard:29400/mcp"
+    assert sent["put"]["auth"]["header_value"] == "parent"          # the parent token is kept when not retyped
+    assert client.post("/api/admin/servers/lookup", json={"address": "http://x:1"}).json()["found"] is False
+    assert sent["lookup"] == {"address": "http://x:1"}
+    assert client.post("/api/admin/servers/lookup", json={"address": "x", "extra": 1}).status_code == 422
+
+
+def test_lookup_needs_agents_manage(client_factory, email: FakeEmailSender, upstream: FakeUpstream) -> None:
+    upstream.handler = servers_agent({})
+    assert client_factory().post("/api/admin/servers/lookup", json={"address": "http://x:1"}).status_code == 401
+    member = client_factory()
+    make_member(member, email)
+    login(member, "alice")
+    assert member.post("/api/admin/servers/lookup", json={"address": "http://x:1"}).status_code == 403
+    assert upstream.requests == []
+
+
+def test_catalog_save_preserves_legions_treasury_outage_message(client, upstream: FakeUpstream) -> None:
+    message = "[1002] Treasury is unavailable. Nothing was saved."
+
+    def handler(request):
+        if request.method == "PUT" and request.url.path == "/agents/servers/bard":
+            assert request.extensions["timeout"]["read"] > 220
+            return httpx.Response(502, json={"error": message})
+        return servers_agent({})(request)
+
+    upstream.handler = handler
+    as_admin(client)
+    response = client.put("/api/admin/servers/bard", json={
+        "label": "Bard", "transport": "http",
+        "addresses": [{"address": "http://bard:29400/mcp", "name": "bard"}],
+    })
+    assert response.status_code == 502
+    assert response.json()["detail"] == message

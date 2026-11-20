@@ -38,12 +38,20 @@ class AgentAdminRefused(Exception):
 
 
 def _without_secret(entry: Any) -> Any:
-    """The entry with its auth header value replaced by `has_value`, so the secret never reaches the browser."""
-    auth = entry.get("auth") if isinstance(entry, dict) else None
-    if not isinstance(auth, dict) or "header_value" not in auth:
+    """The entry with its token values replaced by `has_value` and `has_override`, so no secret reaches the browser."""
+    if not isinstance(entry, dict):
         return entry
-    shown = {key: value for key, value in auth.items() if key != "header_value"}
-    return {**entry, "auth": {**shown, "has_value": bool(auth["header_value"])}}
+    shown = entry
+    auth = entry.get("auth")
+    if isinstance(auth, dict) and "header_value" in auth:
+        kept = {key: value for key, value in auth.items() if key != "header_value"}
+        shown = {**shown, "auth": {**kept, "has_value": bool(auth["header_value"])}}
+    origins = entry.get("origins")
+    if isinstance(origins, list):
+        shown = {**shown, "origins": [
+            {**{k: v for k, v in item.items() if k != "header_value"}, "has_override": bool(item.get("header_value", item.get("has_override")))}
+            if isinstance(item, dict) else item for item in origins]}
+    return shown
 
 
 class AgentAdmin:
@@ -70,12 +78,14 @@ class AgentAdmin:
             raise AgentAdminUnavailable(NO_AGENT_RUNNING)
         return base_url(agent.url)
 
-    async def _request(self, method: str, path: str, account: Account, json: Any = None) -> Any:
+    async def _request(
+        self, method: str, path: str, account: Account, json: Any = None, *, timeout: float = 15.0
+    ) -> Any:
         base = await self._base()
         try:
             with self._traffic.timed("ai_agent", f"{method} /agents") as timing:
                 response = await self._client.request(
-                    method, f"{base}{path}", json=json, headers=self._headers(account), auth=ServiceAuth(self._identity, "legion"), timeout=15.0
+                    method, f"{base}{path}", json=json, headers=self._headers(account), auth=ServiceAuth(self._identity, "legion"), timeout=timeout
                 )
                 timing.ok = response.status_code < 500
         except httpx.HTTPError as error:
@@ -85,8 +95,14 @@ class AgentAdmin:
             body = response.json()
         except ValueError:
             body = None
+        message = body.get("error") if isinstance(body, dict) else None
+        if (
+            response.status_code == 502
+            and path.startswith("/agents/servers/")
+            and message == "[1002] Treasury is unavailable. Nothing was saved."
+        ):
+            raise AgentAdminRefused(502, message)
         if 400 <= response.status_code < 500:
-            message = body.get("error") if isinstance(body, dict) else None
             raise AgentAdminRefused(response.status_code, str(message or f"ai_agent answered {response.status_code}"))
         if response.status_code >= 500 or body is None:
             raise AgentAdminUnavailable(f"ai_agent answered {response.status_code}")
@@ -128,7 +144,14 @@ class AgentAdmin:
             old = stored.get("auth") if isinstance(stored, dict) else None
             if isinstance(old, dict) and old.get("header_value"):
                 entry = {**entry, "auth": {**auth, "header_value": old["header_value"]}}
-        return await self._request("PUT", f"/agents/servers/{quote(server_id, safe='')}", account, json=entry)
+        # Legion may look up and register ten addresses, then refresh its catalog.
+        timeout = 240.0 if "addresses" in entry else 15.0
+        return await self._request("PUT", f"/agents/servers/{quote(server_id, safe='')}", account,
+                                   json=entry, timeout=timeout)
+
+    async def lookup_origin(self, account: Account, address: str) -> dict[str, Any]:
+        """Legion's answer about an address: whether Treasury's outside catalog knows it, and its group."""
+        return await self._request("POST", "/agents/servers/lookup", account, json={"address": address})
 
     async def delete_server(self, account: Account, server_id: str) -> None:
         await self._request("DELETE", f"/agents/servers/{quote(server_id, safe='')}", account)
