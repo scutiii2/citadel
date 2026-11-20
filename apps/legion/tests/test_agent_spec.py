@@ -349,14 +349,21 @@ def test_reviewer_cannot_use_skill_tools_and_ember_can():
         node.name for node in ast.parse(tool_path.read_text(encoding="utf-8")).body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("tool_")
     ]
-    assert skill_tools  # the real tool names, so a rename cannot silently defeat the globs
+    assert set(skill_tools) == {"tool_skill_propose", "tool_skill_search", "tool_skill_mark"}
 
     # The tracked JSON text: a machine's agent_overrides.json may replace either agent.
     reviewer = json.loads((app_dir / "agents" / "reviewer.json").read_text(encoding="utf-8"))
     ember = json.loads((app_dir / "agents" / "ember.json").read_text(encoding="utf-8"))
     scope = lambda data: agent_spec.ToolScope(allow=tuple(data["tools"].get("allow", ())), deny=tuple(data["tools"].get("deny", ())))
     assert not any(scope(reviewer).allows(name) for name in skill_tools)
-    assert all(scope(ember).allows(name) for name in skill_tools)
+    stronghold = [f"stronghold__{name}" for name in skill_tools]
+    assert not any(scope(reviewer).allows_explicitly(name) for name in stronghold)
+    assert all(scope(ember).allows_explicitly(name) for name in stronghold)
+    assert not any(scope(ember).allows(name) for name in skill_tools)  # Armory's copies are no longer offered to Ember
+    brain = ["stronghold__tool_brain_search", "stronghold__tool_brain_read", "stronghold__tool_brain_list",
+             "stronghold__tool_brain_write", "stronghold__tool_brain_update", "stronghold__tool_stack_add"]
+    assert all(scope(ember).allows_explicitly(name) for name in brain)
+    assert not any(scope(reviewer).allows_explicitly(name) for name in brain)
 
 
 def test_memory_recall_defaults_to_false_and_loads_true(tmp_path):
