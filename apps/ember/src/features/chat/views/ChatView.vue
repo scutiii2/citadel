@@ -408,6 +408,7 @@ useChatShortcuts({
       </button>
       </div>
       <ChatHeader
+        :chat-id="activeId"
         :title="active?.title ?? 'New chat'"
         :has-messages="!!active && messages.length > 0"
         :context-percent="contextPercent"

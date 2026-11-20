@@ -7,6 +7,10 @@ import ChatHeader from "./ChatHeader.vue";
 // The agent tag talks to ember_api; the header only needs it to be there.
 vi.mock("./EntryAgentTag.vue", () => ({ default: { template: '<div class="agent-tag">Talking to Test Agent</div>' } }));
 
+vi.mock("../api/StackClient", () => ({
+  stackClient: { view: vi.fn().mockResolvedValue({ items: [], used: 0, limit: 40, warn: false, full: false }) },
+}));
+
 type Props = InstanceType<typeof ChatHeader>["$props"];
 
 function mountHeader(props: Partial<Props> = {}) {
@@ -28,6 +32,17 @@ beforeEach(() => {
 });
 
 describe("ChatHeader", () => {
+  it("shows Memory for a chat with messages", () => {
+    const w = mountHeader({ chatId: "c-1", hasMessages: true });
+    expect(w.find("[data-test=stack-button]").exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("leaves out Memory without a chat id or messages", () => {
+    expect(mountHeader().find("[data-test=stack-button]").exists()).toBe(false);
+    expect(mountHeader({ chatId: "c-1", hasMessages: false }).find("[data-test=stack-button]").exists()).toBe(false);
+  });
+
   it("shows the title and the agent it talks to", () => {
     const w = mountHeader();
 

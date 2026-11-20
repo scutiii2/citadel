@@ -8,6 +8,7 @@ import type { ContextAccuracy } from "../utils/contextAccuracy";
 import { useAuthStore } from "../../../stores/auth";
 import ActionButton from "../../../components/ui/buttons/ActionButton.vue";
 import ContextPanel from "./ContextPanel.vue";
+import StackMenu from "./StackMenu.vue";
 import EntryAgentTag from "./EntryAgentTag.vue";
 import PopupMenu from "../../../components/ui/menus/PopupMenu.vue";
 
@@ -18,6 +19,7 @@ import PopupMenu from "../../../components/ui/menus/PopupMenu.vue";
  * the chat has messages. */
 const props = defineProps<{
   title: string;
+  chatId?: string | null;
   hasMessages: boolean;
   /** Share of the agent's context in use, or null before an answer. */
   contextPercent: number | null;
@@ -105,6 +107,7 @@ function choose(id: string): void {
     <h2 class="title" :title="title">{{ title }}</h2>
     <EntryAgentTag />
     <span class="spacer" />
+    <StackMenu v-if="chatId && hasMessages" :chat-id="chatId" :locked="locked" />
     <div v-if="contextPercent !== null || breakdown" ref="contextBox" class="context-box">
       <component
         :is="breakdown ? 'button' : 'span'"
@@ -159,6 +162,7 @@ function choose(id: string): void {
 
 <style scoped>
 .chat-header {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
