@@ -32,10 +32,8 @@ from src.tools.private_extensions.spec import InvalidSpec, PrivateSpec, describe
 
 _CONFIG_PATH = SETTINGS_DB
 
-# The single upstream server id stored in the settings database.
-# Every tool list_tools() returns is namespaced "main__<tool name>" by
-# SyncMcpClient's underlying McpClientRegistry (see registry.py's
-# NAMESPACE_SEPARATOR) even though there's only one upstream server today.
+# Armory keeps the default server id. The registry namespaces each tool
+# with the ID of its server.
 _SERVER_ID = "main"
 _PREFIX = f"{_SERVER_ID}__"
 
@@ -94,20 +92,34 @@ def _tool_is_enabled(name: str, enabled: set[str]) -> bool:
     return ext_id in enabled
 
 
+def _other_server(name: str) -> bool:
+    """A registry tool of a connection other than `main` (for example `bard__tool_bard_speak`)."""
+    return not name.startswith((_PREFIX, private_turn.TOOL_PREFIX))
+
+
 def list_tools(enabled_extensions: list[str] | None = None) -> list[Any]:
-    """Live tool catalog from mcp_server, filtered the same way
-    chat_app's mcp_client.list_tools() filters it today - an extension
-    tool is only kept when its extension id is in enabled_extensions - and
-    without the tools this turn's user switched off (see core/tool_filter.py)."""
+    """Live tool catalog from every connected server.
+
+    Armory-proxied tools require an enabled extension. Outside connections
+    require explicit agent scope. Users can switch off either for their turn.
+    """
     tools = client.list_tools()
     _remember_read_only(tools)
     enabled = set(enabled_extensions or [])
     scope = agent_spec.current().tools
+    connected = {tool.name.partition("__")[0] for tool in tools if _other_server(tool.name)}
     result = []
     for tool in tools:
+        short = unprefixed(tool.name)
+        if _other_server(tool.name):
+            # An administrator's connection: only an explicit tools.allow offers it, whatever `enabled_extensions` says.
+            if scope.allows_explicitly(short) and not tool_filter.is_blocked(short):
+                result.append(tool)
+            continue
         if not tool.name.startswith(_PREFIX):
             continue
-        short = unprefixed(tool.name)
+        if "__" in short and short.partition("__")[0] in connected:
+            continue  # a Legion connection of this id replaces Armory's proxied extension of the same name
         if not _tool_is_enabled(short, enabled):
             continue
         if not scope.allows(short):
