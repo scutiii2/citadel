@@ -37,6 +37,9 @@ from src.brain import routes as stack_routes
 from src.brain.compaction import StackCompactor
 from src.brain.limits import load_limits
 from src.brain.stack import StackStore
+from starlette.routing import Route
+
+from src.mcp_tools.server import LegionOnlyMcp, build_server
 from src.document_store import DbGatewayClient, DbGatewayError, DbGatewayUnavailable, DocumentStore
 from src import log_privacy
 from src.keys import load_keys
@@ -163,9 +166,15 @@ def create_app(
         except (DbGatewayError, migrations.SchemaTooNew) as error:
             # Storage down: Stronghold still starts (a feature fails alone). Data newer than this code: leave it alone.
             logging.getLogger(__name__).error("schema migration not run: %s", error)
+        app.state.mcp = build_server(app, settings.host)
+        mcp_app = app.state.mcp.streamable_http_app()
+        mount = Route("/mcp", LegionOnlyMcp(mcp_app))
+        app.router.routes.append(mount)
         try:
-            yield
+            async with app.state.mcp.session_manager.run():
+                yield
         finally:
+            app.router.routes.remove(mount)
             await catalog.stop()
             if registration is not None:
                 registration.cancel()
