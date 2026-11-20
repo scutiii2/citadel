@@ -101,7 +101,23 @@ export interface GatewaySettingsView {
 }
 
 /** One MCP server Legion connects to. A header value is write-only: reads carry `has_value` instead. */
+export interface McpOrigin { origin_id: string; origin?: string | null; has_override?: boolean; }
+
+export interface OriginLookup {
+  found: boolean;
+  origin: string;
+  path: string;
+  origin_id: string | null;
+  group: { service_id: string; name: string } | null;
+}
+
 export interface McpServer {
+  /** Outside-service form: ids from Treasury's catalog, in the order Legion tries them. */
+  service_id?: string;
+  path?: string;
+  origins?: McpOrigin[];
+  /** Sent on save only; Legion registers each address and stores ids. A token is write-only. */
+  addresses?: { address: string; name?: string; header_value?: string }[];
   label: string;
   description?: string;
   transport: "http" | "stdio";
@@ -129,6 +145,8 @@ export const agentsAdminClient = {
     apiRequest<GatewaySettingsView>("PUT", "/api/admin/decision-gateway-settings", changes),
   servers: async () => (await apiRequest<{ servers: Record<string, McpServer> }>("GET", "/api/admin/servers")).servers,
   /** Add or change a server; an auth header sent without its value keeps the saved value. Applies at Legion's next start. */
+  /** Does Treasury's outside catalog know this address? Changes nothing. */
+  lookupOrigin: (address: string) => apiRequest<OriginLookup>("POST", "/api/admin/servers/lookup", { address }),
   saveServer: (id: string, entry: McpServer) =>
     apiRequest<{ saved: string }>("PUT", `/api/admin/servers/${encodeURIComponent(id)}`, entry),
   removeServer: (id: string) => apiRequest<{ deleted: string }>("DELETE", `/api/admin/servers/${encodeURIComponent(id)}`),
