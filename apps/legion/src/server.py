@@ -21,7 +21,7 @@ from contextlib import asynccontextmanager
 from src.citadel_auth import settings_store, advertised_url
 from src.citadel_auth.treasury import register_instance
 from src.runtime.service_catalog import catalog
-from src.runtime import config_files, gateway_settings, tuning_overrides
+from src.runtime import config_files, gateway_settings, outside_origins, tuning_overrides
 from src.tools.mcp_client import config as mcp_config
 from typing import Any
 from urllib.parse import urlsplit
@@ -485,22 +485,54 @@ async def decision_gateway_settings_put(request: Request) -> JSONResponse:
 
 @mcp.custom_route("/agents/servers", methods=["GET"])
 async def servers_get(_request: Request) -> JSONResponse:
-    """The MCP servers Legion connects to, as stored. Edits apply at the next start."""
-    return JSONResponse({"servers": await asyncio.to_thread(settings_store.read_all, config_files.SETTINGS_DB, "servers")})
+    """The MCP servers Legion connects to, as stored; an origin also shows its current address. Edits apply at the next start."""
+    servers = await asyncio.to_thread(settings_store.read_all, config_files.SETTINGS_DB, "servers")
+    return JSONResponse({"servers": {server_id: outside_origins.server_view(entry)
+                                     for server_id, entry in servers.items()}})
+
+
+@mcp.custom_route("/agents/servers/lookup", methods=["POST"])
+async def servers_lookup(request: Request) -> JSONResponse:
+    """Is this address already in Treasury's outside catalog? Body {address}; changes nothing."""
+    body = await _json_object(request)
+    if body is None or not isinstance(body.get("address"), str):
+        return JSONResponse({"error": "body must be {address}"}, status_code=400)
+    try:
+        return JSONResponse(await outside_origins.lookup(body["address"]))
+    except outside_origins.OutsideError as error:
+        return JSONResponse({"error": str(error)}, status_code=error.status)
 
 
 @mcp.custom_route("/agents/servers/{server_id}", methods=["PUT"])
 async def servers_put(request: Request) -> JSONResponse:
-    """Body: one server entry (transport, url or command, optional auth). Checked before it is saved."""
+    """Body: one server entry (transport, url or command or addresses, optional auth). Checked before it is saved."""
     entry = await _json_object(request)
     if entry is None:
         return JSONResponse({"error": "body must be a JSON object"}, status_code=400)
     server_id = request.path_params["server_id"]
+    auth = entry.get("auth")
+    keep_parent = isinstance(auth, dict) and auth.get("type") == "header" and not auth.get("header_value")
+    previous = None
+    if "addresses" in entry or keep_parent:
+        previous = (await asyncio.to_thread(settings_store.read_all, config_files.SETTINGS_DB, "servers")).get(server_id)
+    if keep_parent and previous:
+        old = previous.get("auth")
+        if isinstance(old, dict) and old.get("type") == "header" and old.get("header_value"):
+            entry["auth"] = {**auth, "header_value": old["header_value"]}
+    if "origins" in entry or "service_id" in entry:
+        return JSONResponse({"error": "send addresses to register outside origins"}, status_code=400)
+    if "addresses" in entry:
+        try:
+            entry = await outside_origins.entry_from_addresses(entry, previous)
+        except outside_origins.OutsideError as error:
+            return JSONResponse({"error": str(error)}, status_code=error.status)
     try:
         mcp_config.validate_server(server_id, entry)
     except mcp_config.ConfigError as error:
         return JSONResponse({"error": str(error)}, status_code=400)
     await asyncio.to_thread(settings_store.put, config_files.SETTINGS_DB, "servers", server_id, entry)
+    if any(outside_origins.origin_address(ref["origin_id"]) is None for ref in entry.get("origins", [])):
+        await catalog.refresh()
     return JSONResponse({"saved": server_id, "applies": "next start"})
 
 
