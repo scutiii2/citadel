@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -19,9 +20,10 @@ from pydantic import BaseModel, Field
 
 from src.citadel_auth import Keyring, ServiceAuthMiddleware, current_caller, data_dir, from_env, settings_store
 from src.backends.base import UnsupportedOperation
-from src import connection_admin, service_catalog
+from src import connection_admin, outside_catalog, service_catalog
 from src.registry import InstanceManager, RawSqlDisabled, UnknownConnection, UnknownInstance
 
+OUTSIDE_CONSUMERS = frozenset({"legion", "stronghold"})
 MAX_LIMIT = 1000
 BASE = "/instances/{instance}/connections/{connection}"
 
@@ -51,6 +53,16 @@ def _error(status: int):
 
 class ServiceBody(BaseModel):
     url: str
+
+
+class OutsideBody(BaseModel):
+    origin: str
+    name: str | None = None
+
+
+
+class RenameBody(BaseModel):
+    name: str
 
 
 class InstanceBody(BaseModel):
@@ -187,6 +199,59 @@ def create_app(manager: InstanceManager, keyring: Keyring | None = None, setting
         except service_catalog.ServiceCatalogError as error:
             raise HTTPException(400, str(error)) from error
         return await asyncio.to_thread(service_catalog.view, settings_db)
+
+    @app.get("/outside")
+    async def outside() -> dict[str, Any]:
+        """The outside services every Citadel service may read: groups with their origins. Addresses only."""
+        if settings_db is None:
+            return {"groups": []}
+        return await asyncio.to_thread(outside_catalog.view, settings_db)
+
+    @app.post("/outside/origins")
+    async def add_outside_origin(body: OutsideBody) -> dict[str, Any]:
+        """A consumer form saves an origin: Legion for MCP connections, Stronghold for REST ones."""
+        caller = current_caller()
+        if caller is None or caller.name not in OUTSIDE_CONSUMERS:
+            raise HTTPException(403, f"{caller.name if caller else 'this caller'} may not add outside origins")
+        if settings_db is None:
+            raise HTTPException(409, "this Treasury keeps no settings database")
+        try:
+            return await asyncio.to_thread(outside_catalog.add_origin, settings_db, body.origin, body.name, caller.name)
+        except outside_catalog.OutsideCatalogError as error:
+            raise HTTPException(400, str(error)) from error
+
+    async def _outside_admin(action: Callable[..., Any], *args: object) -> Any:
+        _admin_only()
+        try:
+            return await asyncio.to_thread(action, settings_db, *args)
+        except outside_catalog.InUse as error:
+            return JSONResponse(
+                status_code=409,
+                content={"error": f"This is in use by {', '.join(error.users)}. Confirm to delete it.",
+                         "used_by": error.users},
+            )
+        except outside_catalog.NotFound as error:
+            raise HTTPException(404, str(error)) from error
+        except outside_catalog.OutsideCatalogError as error:
+            raise HTTPException(400, str(error)) from error
+
+    @app.get("/admin/outside")
+    async def admin_outside() -> Any:
+        return await _outside_admin(outside_catalog.view)
+
+    @app.patch("/admin/outside/{service_id}")
+    async def rename_outside(service_id: str, body: RenameBody) -> Any:
+        return await _outside_admin(outside_catalog.rename_group, service_id, body.name)
+
+    @app.delete("/admin/outside/origins/{origin_id}")
+    async def delete_outside_origin(origin_id: str, confirm: bool = False) -> Any:
+        result = await _outside_admin(outside_catalog.delete_origin, origin_id, confirm)
+        return result if isinstance(result, JSONResponse) else await _outside_admin(outside_catalog.view)
+
+    @app.delete("/admin/outside/{service_id}")
+    async def delete_outside_group(service_id: str, confirm: bool = False) -> Any:
+        result = await _outside_admin(outside_catalog.delete_group, service_id, confirm)
+        return result if isinstance(result, JSONResponse) else await _outside_admin(outside_catalog.view)
 
     @app.get(BASE + "/collections/{collection}/records/{key}")
     async def get_record(instance: str, connection: str, collection: str, key: str) -> dict[str, Any]:

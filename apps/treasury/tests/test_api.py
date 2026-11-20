@@ -160,3 +160,46 @@ async def test_an_unknown_connection_is_refused(registering):
         refused = await legion.put("/instances/legion", json={"connections": ["zzz"]})
         assert refused.status_code == 404
         assert (await legion.get("/instances")).json() == {}
+
+
+async def test_a_consumer_adds_an_outside_origin_and_everyone_reads_it(registering):
+    caller, _ = registering
+    async with caller("legion") as legion, caller("armory") as armory, caller("treasury") as treasury:
+        added = await legion.post("/outside/origins", json={"origin": "http://bard:29400/mcp", "name": "Bard"})
+        assert added.status_code == 200
+        group = added.json()
+        assert group["name"] == "bard" and group["used_by"] == ["legion"]
+        seen = (await armory.get("/outside")).json()
+        assert seen["groups"][0]["service_id"] == group["service_id"]
+        assert (await treasury.get("/outside")).json() == seen
+        assert (await treasury.get("/services")).status_code == 403
+        assert (await treasury.post("/outside/origins", json={"origin": "http://x", "name": "x"})).status_code == 403
+
+
+async def test_only_legion_and_stronghold_add_outside_origins_and_citadel_names_are_refused(registering):
+    caller, _ = registering
+    async with caller("armory") as armory, caller("portcullis") as portcullis, caller("stronghold") as stronghold:
+        assert (await armory.post("/outside/origins", json={"origin": "http://x:1", "name": "x"})).status_code == 403
+        assert (await portcullis.post("/outside/origins", json={"origin": "http://x:1", "name": "x"})).status_code == 403
+        assert (await stronghold.post("/outside/origins", json={"origin": "http://x:1", "name": "armory"})).status_code == 400
+        assert (await stronghold.post("/outside/origins", json={"origin": "http://x:1"})).status_code == 400
+
+
+async def test_outside_admin_routes_belong_to_portcullis_and_deletes_list_the_users(registering):
+    caller, _ = registering
+    async with caller("legion") as legion, caller("portcullis") as portcullis, caller("stronghold") as stronghold:
+        added = await legion.post("/outside/origins", json={"origin": "http://bard:1", "name": "bard"})
+        assert added.status_code == 200
+        group = added.json()
+        assert (await portcullis.get("/admin/outside")).json() == {"groups": [group]}
+        sid, oid = group["service_id"], group["origins"][0]["origin_id"]
+        assert (await stronghold.get("/admin/outside")).status_code == 403
+        assert (await stronghold.delete(f"/admin/outside/{sid}?confirm=true")).status_code == 403
+        renamed = await portcullis.patch(f"/admin/outside/{sid}", json={"name": "speech"})
+        assert renamed.status_code == 200 and renamed.json()["service_id"] == sid
+        refused = await portcullis.delete(f"/admin/outside/origins/{oid}")
+        assert refused.status_code == 409 and refused.json()["used_by"] == ["legion"]
+        assert (await portcullis.delete(f"/admin/outside/origins/{oid}?confirm=true")).status_code == 200
+        gone = await portcullis.delete(f"/admin/outside/{sid}?confirm=true")
+        assert gone.status_code == 200 and gone.json() == {"groups": []}
+        assert (await portcullis.patch(f"/admin/outside/{sid}", json={"name": "x"})).status_code == 404

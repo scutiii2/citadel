@@ -27,7 +27,10 @@ POLICY = {
         "stronghold": Rule(("/mcp", "/registry", "/agents"), True),
         "legion": Rule(("/mcp",), True),
     },
-    "treasury": {name: Rule(("/",)) for name in ("portcullis", "stronghold", "legion", "armory")},
+    "treasury": {
+        **{name: Rule(("/",)) for name in ("portcullis", "stronghold", "legion", "armory")},
+        "treasury": Rule(("/outside",)),
+    },
     "portcullis": {"stronghold": Rule(("/internal",))},
 }
 
