@@ -17,15 +17,22 @@ def test_other_routes_still_win_over_the_mount(client):
     assert client.put("/health").status_code == 405
 
 
-def test_the_server_offers_the_stack_and_brain_tools(client):
+def test_the_server_offers_the_stack_brain_and_skill_tools(client):
     listed = __import__("asyncio").run(client.app.state.mcp.list_tools())
     assert {tool.name for tool in listed} == {
         "tool_stack_add", "tool_stack_list", "tool_stack_remove", "tool_stack_pin",
         "tool_brain_search", "tool_brain_read", "tool_brain_list", "tool_brain_write", "tool_brain_update",
+        "tool_skill_search", "tool_skill_propose", "tool_skill_mark",
     }
     assert all(tool.description for tool in listed)
     write = next(tool for tool in listed if tool.name == "tool_brain_write")
     assert "Never save" in write.description
+    propose = next(tool for tool in listed if tool.name == "tool_skill_propose")
+    assert "NOT used until the user approves" in propose.description
+    mark = next(tool for tool in listed if tool.name == "tool_skill_mark")
+    fields = mark.inputSchema["properties"]
+    assert fields["skill_id"]["minimum"] == 1
+    assert fields["outcome"]["enum"] == ["success", "failure"]
 
 
 MCP = "http://127.0.0.1:29650/mcp"
@@ -105,7 +112,9 @@ def test_a_signed_legion_call_can_write_a_brain_note_without_a_chat(client, auth
         "arguments": {"title": "A preference", "body": "Prefers oatmeal.", "tags": ["food"]},
         "_meta": {"requester_token": token},
     }, headers=headers)
-    note = result(written)["structuredContent"]
+    payload = result(written)
+    note = payload["structuredContent"]
+    assert json.loads(payload["content"][0]["text"]) == note
     assert note["ok"] is True
     response = client.get("/brain/search", params={"q": "oatmeal"})
     assert response.status_code == 200

@@ -35,7 +35,10 @@ CUT_MARK = "... (more steps omitted)"
 
 
 def is_private_memory_tool(name: object) -> bool:
-    return isinstance(name, str) and name.startswith(("stronghold__tool_stack_", "stronghold__tool_brain_"))
+    return isinstance(name, str) and (
+        name == "skill_recall"
+        or name.startswith(("stronghold__tool_stack_", "stronghold__tool_brain_", "stronghold__tool_skill_"))
+    )
 
 
 def _visible(steps: object) -> list[dict[str, Any]]:

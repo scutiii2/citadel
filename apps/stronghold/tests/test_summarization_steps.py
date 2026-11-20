@@ -127,7 +127,9 @@ def test_compaction_folds_prior_summary_and_preserves_cumulative_log():
     assert outcome.results[0]["agent_usage"][0]["agent_id"] == "context-summarizer"
 
 
-@pytest.mark.parametrize("tool", ["stronghold__tool_stack_list", "stronghold__tool_brain_read"])
+@pytest.mark.parametrize("tool", [
+    "stronghold__tool_stack_list", "stronghold__tool_brain_read", "stronghold__tool_skill_search",
+])
 def test_memory_tool_arguments_and_results_are_excluded_from_later_prompts(tool):
     from src.turns.summarization import history_for_agent, render_messages
 

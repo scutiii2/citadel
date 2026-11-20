@@ -37,6 +37,7 @@ from src.brain import settings_routes as brain_settings_routes
 from src.brain.compaction import StackCompactor
 from src.brain.files import BrainFiles
 from src.brain.limits import brain_root, load_limits, load_long_term
+from src.brain.skills import SkillFiles
 from src.brain.stack import StackStore
 from starlette.routing import Route
 
@@ -155,6 +156,7 @@ def create_app(
         app.state.brain_files = BrainFiles(
             app.state.brain_folder, await asyncio.to_thread(load_long_term, data_settings),
         )
+        app.state.skill_files = SkillFiles(app.state.brain_files)
         app.state.compactor = StackCompactor(app.state.stacks, app.state.agent_gateway, app.state.agents)
         app.state.pricing = Pricing(settings.pricing)
         app.state.usage = UsageService(app.state.store, settings.usage, app.state.pricing)
