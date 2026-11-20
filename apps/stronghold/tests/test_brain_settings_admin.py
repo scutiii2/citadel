@@ -11,7 +11,7 @@ def test_defaults_ranges_and_root(client):
     shown = client.get("/admin/brain-settings").json()
     assert shown["long_term"]["max_record_chars"] == 20_000 and shown["stack"]["max_items"] == 40
     assert shown["ranges"]["long_term"]["max_files"] == [1, 5000] and shown["ranges"]["stack"]["warn_ratio"] == [0.3, 0.95]
-    assert shown["stored"] == {"stack": False, "long_term": False}
+    assert shown["stored"] == {"stack": False, "long_term": False, "sharing": False}
     assert shown["root"].replace("\\", "/").endswith("/data/brain")
 
 
@@ -44,7 +44,7 @@ def test_bad_changes_are_refused_and_nothing_is_saved(client, changes):
     answer = client.put("/admin/brain-settings", json=changes)
     assert answer.status_code == 400 and answer.json()["detail"]
     assert (client.app.state.stacks.limits, client.app.state.brain_files.limits) == before
-    assert client.get("/admin/brain-settings").json()["stored"] == {"stack": False, "long_term": False}
+    assert client.get("/admin/brain-settings").json()["stored"] == {"stack": False, "long_term": False, "sharing": False}
 
 
 def test_one_bad_part_saves_nothing(client):

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from src.brain.files import BrainError
 from src.brain.records import Record
+from src.document_store import DbGatewayError
 from src.requester import Requester, current_requester
 
 AGENT_WARNING = "Written by an agent. Editing it may break the agent that uses it."
@@ -28,7 +29,7 @@ class BrainRoute(APIRoute):
                 raise HTTPException(422, "Invalid brain request.") from None
             except BrainError as error:
                 raise HTTPException(error.status, str(error)) from None
-            except OSError:
+            except (OSError, DbGatewayError):
                 raise HTTPException(503, "Storage is unavailable") from None
 
         return safe_response

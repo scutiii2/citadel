@@ -33,12 +33,14 @@ from src.chats.store import ChatStore
 from src.config import Settings, load_settings
 from src.brain import files_routes as brain_files_routes
 from src.brain import global_routes as brain_global_routes
+from src.brain import share_routes as brain_share_routes
 from src.brain import routes as stack_routes
 from src.brain import settings_routes as brain_settings_routes
 from src.brain.compaction import StackCompactor
 from src.brain.files import BrainFiles
 from src.brain.global_brain import GlobalBrain
-from src.brain.limits import brain_root, load_limits, load_long_term
+from src.brain.limits import brain_root, load_limits, load_long_term, load_sharing
+from src.brain.shares import BrainShares
 from src.brain.skills import SkillFiles
 from src.brain.stack import StackStore
 from starlette.routing import Route
@@ -158,6 +160,10 @@ def create_app(
         )
         app.state.skill_files = SkillFiles(app.state.brain_files)
         app.state.global_brain = GlobalBrain(app.state.brain_folder, app.state.brain_files.limits)
+        app.state.brain_shares = BrainShares(
+            app.state.store, app.state.brain_files, app.state.skill_files, app.state.stacks, app.state.global_brain,
+            await asyncio.to_thread(load_sharing, data_settings),
+        )
         app.state.compactor = StackCompactor(app.state.stacks, app.state.agent_gateway, app.state.agents)
         app.state.pricing = Pricing(settings.pricing)
         app.state.usage = UsageService(app.state.store, settings.usage, app.state.pricing)
@@ -204,6 +210,7 @@ def create_app(
     app.include_router(stack_routes.router)
     app.include_router(brain_files_routes.router)
     app.include_router(brain_global_routes.router)
+    app.include_router(brain_share_routes.router)
     app.include_router(brain_settings_routes.router)
     app.include_router(instance_migration.router)
     app.include_router(chats_routes.router)
